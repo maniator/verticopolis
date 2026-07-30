@@ -1,9 +1,8 @@
-import { Simulation } from "./engine/Simulation";
+import { Simulation, type HeatmapMode } from "./engine/Simulation";
 import { UndoHistory, towerStateSig } from "./engine/UndoHistory";
 import { GRID } from "./engine/facilities";
 import type { FacilityKind, Transport, Unit } from "./engine/types";
 import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/TowerEngine";
-import type { HeatmapMode } from "./engine/Simulation";
 import { AudioEngine } from "./audio/Audio";
 import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, type Prefs } from "./storage/Prefs";
@@ -16,6 +15,7 @@ import type { BuildActions } from "./game/buildActions";
 import type { EditorActions } from "./game/editorActions";
 import type { SaveLoad } from "./game/saveLoad";
 import { announceLive } from "./game/liveRegion";
+import { isSplashUp } from "./game/interactionState";
 import type { InspectorController } from "./game/inspector";
 import type { KeyboardPlay } from "./game/keyboardPlay";
 import { createUICallbacks, type GameAppPorts } from "./game/uiCallbacks";
@@ -310,7 +310,7 @@ class GameApp implements GameAppPorts {
 
   /** Replay the Getting Started onboarding, unless the splash is up. */
   replayOnboarding(): void {
-    if (document.getElementById("splash")) return; // never arm behind the splash
+    if (isSplashUp()) return; // never arm behind the splash
     OnboardingController.clearOnboarded();
     this.ui.closeModal();
     if (!this.onboarding.arm(this.sim)) {

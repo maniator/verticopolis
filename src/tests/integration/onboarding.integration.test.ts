@@ -97,6 +97,8 @@ describe("Onboarding — steps advance on real progress", () => {
 });
 
 import { OnboardingController } from "../../ui/Onboarding";
+import { runSplashAction } from "../../ui/splashActions";
+import { isSplashUp } from "../../game/interactionState";
 
 function makeController(mobile = false) {
   document.body.innerHTML = '<div id="hint"></div><div id="palette-scroll"></div><div id="speed"></div>';
@@ -226,6 +228,27 @@ describe("Onboarding — splash / title screen", () => {
     expect(document.getElementById("splash")).toBeNull();
     expect(opts.pauseForSplash).toHaveBeenLastCalledWith(false);
     expect(onContinue).toHaveBeenCalledOnce();
+  });
+
+  it("publishes the #splash element and the action registry as one step, so the host menu never dead-clicks (issue #716)", () => {
+    // The desktop menu's New Tower / Load Tower decide via `isSplashUp()` (the
+    // `#splash` element) and then run `runSplashAction` (the `splashActions`
+    // registry). `hostCommands` ignores the registry's boolean because the two
+    // are assumed to go up and come down together; if they ever desynced, a menu
+    // command would silently no-op. This pins that atomicity end to end: after
+    // showSplash BOTH are live, and after teardown BOTH are cleared.
+    const { c } = makeSpyController();
+    const onNewTower = vi.fn();
+    const onLoadTower = vi.fn();
+    c.showSplash({ hasSave: true, onContinue: vi.fn(), onLoadTower, onNewTower });
+    expect(isSplashUp()).toBe(true);
+    expect(runSplashAction("new")).toBe(true); // registry live in lockstep with the element
+    expect(onNewTower).toHaveBeenCalledOnce();
+    expect(runSplashAction("load")).toBe(true);
+    expect(onLoadTower).toHaveBeenCalledOnce();
+    document.querySelector<HTMLElement>('[data-splash="continue"]')!.click();
+    expect(isSplashUp()).toBe(false);
+    expect(runSplashAction("new")).toBe(false); // registry cleared with the element
   });
 
   it("Load Tower keeps the splash up and hands the host NO dismiss callback", () => {

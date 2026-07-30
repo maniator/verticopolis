@@ -98,10 +98,17 @@ describe("updateCoastClear", () => {
     }
   });
 
-  it("is false while a modal is open", () => {
-    const { app, isModalOpen } = clearApp();
-    isModalOpen.mockReturnValue(true);
+  it("is false while a modal dialog is open", () => {
+    // `updateCoastClear` reads the modal through `interactionState.isDialogOpen()`
+    // (the `#modal.open` element) now, not `ui.isModalOpen()`, so drive the DOM.
+    const { app } = clearApp();
+    const modal = document.createElement("dialog");
+    modal.id = "modal";
+    document.body.appendChild(modal);
+    (modal as HTMLDialogElement).open = true;
     expect(updateCoastClear(app)).toBe(false);
+    modal.remove();
+    expect(updateCoastClear(app)).toBe(true);
   });
 
   it("is false while a #splash element is in the DOM", () => {

@@ -1,5 +1,5 @@
 import type { GameApp } from "../main";
-import { CRASH_SCREEN_ID } from "../ui/crashScreen";
+import { isCrashed, isSplashUp, isDialogOpen } from "./interactionState";
 import { flushPrefsSave } from "./audioPrefs";
 
 /**
@@ -36,7 +36,7 @@ export function bindKeys(app: GameApp): void {
     // must not silently mutate the sim behind the card. Checked before the
     // undo/redo block below, which deliberately runs ahead of the #modal
     // guard and would otherwise stay live.
-    if (document.getElementById(CRASH_SCREEN_ID)) return;
+    if (isCrashed()) return;
     // Undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or +Y), handled BEFORE the
     // modifier bail below so it isn't swallowed; yielded to a focused field that
     // keeps its own undo history (INPUT/TEXTAREA/contentEditable, e.g. the rename
@@ -50,9 +50,7 @@ export function bindKeys(app: GameApp): void {
       // builds undone under it, and the splash must stay inert; gating any open
       // #modal is the conservative call and leaves undo fully live in normal
       // play. A field with its own undo history still keeps it (ownsNativeUndo).
-      const guardsUndo =
-        !!document.getElementById("splash") ||
-        !!(document.getElementById("modal") as HTMLDialogElement | null)?.open;
+      const guardsUndo = isSplashUp() || isDialogOpen();
       if (!guardsUndo && !ownsNativeUndo(document.activeElement) && (e.ctrlKey || e.metaKey)) {
         const k = e.key.toLowerCase();
         if (k === "z" && !e.shiftKey) {
@@ -76,9 +74,9 @@ export function bindKeys(app: GameApp): void {
     const onControl = !!ae && (ae.tagName === "BUTTON" || ae.tagName === "A" || ae.getAttribute("role") === "button");
     const activationKey = e.key === "Enter" || e.key === " " || e.key === "Spacebar";
     if (onControl && activationKey) return;
-    if ((document.getElementById("modal") as HTMLDialogElement | null)?.open) return;
+    if (isDialogOpen()) return;
     // Don't let game keys run the paused engine behind the first-run splash.
-    if (document.getElementById("splash")) return;
+    if (isSplashUp()) return;
     if (e.key >= "0" && e.key <= "3") {
       app.setSpeed(Number(e.key));
       return;
@@ -119,7 +117,7 @@ export function bindKeys(app: GameApp): void {
   // card is ignored WITHOUT removing the listeners, so the first real gesture
   // still unlocks audio; this holds no matter how the card is later dismissed.
   const kick = () => {
-    if (document.getElementById(CRASH_SCREEN_ID)) return;
+    if (isCrashed()) return;
     app.audio.start();
     window.removeEventListener("pointerdown", kick);
     window.removeEventListener("keydown", kick);

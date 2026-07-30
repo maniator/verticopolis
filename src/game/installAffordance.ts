@@ -2,6 +2,7 @@ import type { GameApp } from "../main";
 import { initPwaInstall, installAvailability, promptInstall, isStandalone, isIos, canPromptInstall } from "../pwaInstall";
 import { trackAppAction, trackAppActionOnce } from "../analytics";
 import { showInstallHelp } from "../ui/uiDialogs";
+import { isSplashUp } from "./interactionState";
 import { isWrappedMode } from "../platform";
 
 /**
@@ -71,7 +72,7 @@ export function splashInstallOffered(mode: string = import.meta.env.MODE): boole
 /** Real play, the chip's gate: past the splash and with at least one unit in the
  *  tower (a placed lobby / any build). A brand-new empty lot is not yet "playing". */
 function hasReallyPlayed(app: GameApp): boolean {
-  if (document.getElementById("splash")) return false;
+  if (isSplashUp()) return false;
   return (app.sim?.tower?.units?.length ?? 0) > 0;
 }
 

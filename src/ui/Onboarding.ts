@@ -1,6 +1,8 @@
 import { html, nothing, render as litRender } from "lit-html";
 import type { Simulation } from "../engine/Simulation";
 import { splashTemplate, type SplashHandlers } from "./splashTemplate";
+import { setLiveSplashActions } from "./splashActions";
+import { isDialogOpen } from "../game/interactionState";
 
 /**
  * First-run experience — splash/title screen + a non-blocking "Getting Started"
@@ -259,6 +261,9 @@ export class OnboardingController {
     // anywhere else in the app.
     document.body.classList.add("splash-up");
     this.splashEl = el;
+    // Publish the bound handlers so an affordance outside the overlay (the desktop
+    // menu) runs the same action a splash button runs. See `splashActions.ts`.
+    setLiveSplashActions(handlers);
 
     const q = (sel: string) => el.querySelector<HTMLElement>(sel);
     // Move initial focus into the overlay, then TRAP Tab within it so keyboard
@@ -295,7 +300,7 @@ export class OnboardingController {
       // keyboard handler uses. This became reachable once a returning player with
       // a save can SEE the splash (hasSave true), which is now every boot except
       // a post-update resume, and open one of those modals over it.
-      if ((document.getElementById("modal") as HTMLDialogElement | null)?.open) return;
+      if (isDialogOpen()) return;
       this.teardownSplash();
       o.onContinue();
     };
@@ -343,6 +348,7 @@ export class OnboardingController {
     this.splashKey = null;
     this.splashEl?.remove();
     this.splashEl = null;
+    setLiveSplashActions(null);
     document.body.classList.remove("splash-up");
     this.opts.pauseForSplash(false);
     // Entering the tower: hand off from the splash theme to the in-game bed.

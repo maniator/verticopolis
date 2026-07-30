@@ -1,6 +1,7 @@
 import type { GameApp } from "../main";
 import type { UpdateInfo } from "../pwa";
 import { gameplaySession } from "../analytics";
+import { hasBlockingModal, isDialogOpen, isSplashUp } from "./interactionState";
 
 /**
  * The PWA update-prompt flow, split out of the `GameApp` class as friend
@@ -41,11 +42,12 @@ export function onUpdateAvailable(app: GameApp, activate: () => Promise<void>, i
 export function updateCoastClear(app: GameApp): boolean {
   return (
     app.pendingUpdate !== null &&
-    !app.shownUpdate &&
-    !app.shownChoice &&
+    // `hasBlockingModal` is `shownUpdate || shownChoice`; the update flow writes
+    // `shownUpdate` but reads the pair through the module like every other guard.
+    !hasBlockingModal(app) &&
     !app.transportStart &&
-    !app.ui.isModalOpen() &&
-    !document.getElementById("splash")
+    !isDialogOpen() &&
+    !isSplashUp()
   );
 }
 
