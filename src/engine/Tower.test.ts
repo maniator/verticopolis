@@ -94,19 +94,18 @@ describe("Tower placement", () => {
     expect(tower.canPlace("floor", 2, 20).ok).toBe(true);
   });
 
-  it("refuses a sky lobby on a floor that already carries plain floor tiles (sky-lobby canon)", () => {
-    // Sky-lobby canon (spec-sky-lobby-canon): the sky-lobby-conversion path is
-    // disabled for sky-lobby floors (15/30/45/60/75/90). A lobby is refused on
-    // any of those stories if the floor already carries non-lobby content, so
-    // the player must commit to the concourse BEFORE laying scaffolding. Floor
-    // 1 (ground concourse) keeps its in-place upgrade; only sky-lobby floors
-    // are gated by this rule.
+  it("upgrades bare floor to a sky lobby in place (a lobby can be built on top of floor)", () => {
+    // A sky story (15/30/45/60/75/90) with only plain floor tiles accepts a
+    // lobby, which upgrades the floor in place, exactly like the ground
+    // concourse. Only ROOMS block a sky lobby, not bare floor (party 2026-07-30,
+    // verified against 1994). Reversal of the earlier "refuse over floor" gate.
     for (let i = 0; i < 20; i++) tower.place("lobby", 1, i);
     for (let f = 2; f <= 16; f++) for (let i = 0; i < 20; i++) tower.place("floor", f, i);
-    // Floor 15 has plain floor tiles from setup, so a lobby placement there is
-    // refused: the sky-lobby-commit gate refuses on a mixed floor.
-    expect(tower.canPlace("lobby", 15, 0).ok).toBe(false);
-    // A lobby is still refused on any non-lobby floor (existing rule).
+    // Floor 15 has only plain floor tiles, so a lobby upgrades them in place.
+    expect(tower.canPlace("lobby", 15, 0).ok).toBe(true);
+    expect(tower.place("lobby", 15, 0).ok).toBe(true);
+    expect(tower.structureKindAt(15, 0)).toBe("lobby");
+    // A lobby is still refused on any non-lobby floor (only 1 and every 15th).
     expect(tower.canPlace("lobby", 5, 0).ok).toBe(false);
   });
 

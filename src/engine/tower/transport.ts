@@ -214,14 +214,14 @@ export function resizeTransport(tower: Tower, id: number, newBottom: number, new
       }
     }
     // A sky-lobby floor (15/30/45…) is a player-placed concourse. Plain floor
-    // IS placeable on an empty sky-lobby story, but once it is there the
-    // player can no longer drop their sky lobby on that floor without first
-    // clearing it (the `floorHasNonLobbyContent` guard in canPlace). So the
-    // extend refuses to AUTO-lay floor on an unbuilt sky-lobby story, to avoid
-    // pre-empting the lobby the player still has to place, and tells them to
-    // build it first, rather than auto-committing a permanent lobby they never
-    // asked for. A story that already carries its lobby under the shaft needs
-    // no fill and passes (`spanHasFloor` counts lobby tiles as structure).
+    // IS placeable on an empty sky-lobby story, and a later sky lobby upgrades
+    // that bare floor in place, so auto-laid floor would not trap the player.
+    // The extend still refuses to AUTO-lay floor on an unbuilt sky-lobby story,
+    // to avoid pre-empting the concourse the player still has to place: it tells
+    // them to build the lobby first rather than silently filling the story with
+    // plain floor they never asked for. A story that already carries its lobby
+    // under the shaft needs no fill and passes (`spanHasFloor` counts lobby
+    // tiles as structure).
     if (isSkyLobbyFloor(fl) && !tower.spanHasFloor(fl, t.x, t.width)) {
       return { ok: false, reason: `Build the sky lobby on floor ${fl} first, then extend through it.` };
     }
@@ -344,9 +344,9 @@ export function nearestLobbyFloorDistance(tower: Tower, floor: number): number {
  *  inspector's honesty gate for the lobby-distance advice (#394): it may only
  *  name a slot the player can actually reach, so the line goes neutral for the
  *  short block above the highest legal slot instead of prescribing an
- *  impossible fix. A returned slot may still need work first (floors laid,
- *  non-lobby content cleared; callers read {@link floorHasNonLobbyContent} to
- *  phrase that step). O(lobby slots), a handful. */
+ *  impossible fix. A returned slot may still need work first (floors laid, or
+ *  a room cleared; callers read {@link Tower.floorHasRoom} to phrase that
+ *  step). O(lobby slots), a handful. */
 export function nearestBuildableLobbySlot(tower: Tower, floor: number): number | null {
   const current = nearestLobbyFloorDistance(tower, floor);
   let best: number | null = null;
@@ -390,15 +390,6 @@ export function setStop(tower: Tower, id: number, floor: number, stop: boolean):
 /** Does this floor carry at least one lobby tile (a ground/sky lobby)? O(1). */
 export function floorHasLobby(tower: Tower, floor: number): boolean {
   return (tower.lobbyTiles.get(floor) ?? 0) > 0;
-}
-
-/** Does this floor carry any non-lobby content: a plain floor tile, or any
- *  room whose footprint (including a multi-story facility's upper story)
- *  covers this floor? Used by the sky-lobby-commit check to refuse a lobby
- *  placement on a story that already carries something else. O(1) via the
- *  `nonLobbyTiles` counter, which register/unregister keep in lockstep. */
-export function floorHasNonLobbyContent(tower: Tower, floor: number): boolean {
-  return (tower.nonLobbyTiles.get(floor) ?? 0) > 0;
 }
 
 /** Make a transport stop at every floor again. An express is locked to
