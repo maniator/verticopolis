@@ -161,7 +161,14 @@ export function bootGame(create: () => BootApp): Promise<void> {
     // statically replaced by Vite, so only the former lets Rollup drop the
     // store, the session model, and the migration out of a browser bundle.
     // `scripts/verify-wrapper-seam.ts` checks the built artifact both ways.
-    if (IS_WRAPPED_BUILD) await prepareSaveStore();
+    //
+    // `.catch` even though `prepareSaveStore` is documented and tested never to
+    // reject. This await sits OUTSIDE the try below, so a rejection would skip
+    // the boot message and leave the player on a blank page. Making the
+    // "cannot take boot down" property structural at the call site costs one
+    // line and does not depend on a module three imports away keeping its
+    // promise. Boot continues on localStorage either way.
+    if (IS_WRAPPED_BUILD) await prepareSaveStore().catch(() => {});
     try {
       const app = create();
       // Publish the tooling handle only where tooling runs: dev serves and
