@@ -1212,13 +1212,15 @@ ul.slots .slot-actions .btn {
   margin: 0 0 8px;
   color: var(--bad);
 }
-/* Where the listed towers live. Muted because it is standing context rather
-   than a warning, and not colour-coded at all: it carries information a player
-   needs, so it must survive a colourblind or high-contrast render intact. */
+/* Where the listed towers live. Standing context rather than a warning, so it
+   takes the same secondary-text token as every other supporting line in the
+   app (--muted is #2f2f38, picked to stay readable on the gray panel, not a
+   faded token). Nothing is conveyed by hue, so a colorblind render loses
+   nothing, and it stays at body size: this carries information the player
+   needs, and shrinking that is the wrong economy. */
 .slots-scope {
   margin: 0 0 8px;
   color: var(--muted);
-  font-size: 0.9em;
 }
 /* The file row crosses from device storage to the file system, so it gets a
    heavier rule than the hairline dividing the slots above it. With no slot rows

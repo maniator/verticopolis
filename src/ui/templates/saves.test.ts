@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { SlotInfo } from "../../storage/SaveGame";
-import { savesTemplate } from "./saves";
+import { savesTemplate, type SaveScopeCaption } from "./saves";
 import { renderToFragment } from "../testing/litTestUtils";
 
 /**
@@ -123,7 +123,12 @@ describe("savesTemplate scope caption (injected, never detected)", () => {
     { slot: "auto", exists: true, present: true, towerName: "A", star: 1, population: 1, funds: 1, savedAt: AT },
     { slot: 1, exists: false, present: false },
   ];
-  const SCOPE = { text: "Towers on this computer. Anyone who plays here can open them.", listLabel: "Towers on this computer" };
+  // Typed, so renaming a field on the interface fails this file rather than
+  // leaving a fixture that silently no longer matches the contract.
+  const SCOPE: SaveScopeCaption = {
+    text: "Towers on this computer. Anyone who plays here can open them.",
+    listLabel: "Towers on this computer",
+  };
 
   it("renders nothing extra when no scope is passed, so web and mobile are unchanged", () => {
     const frag = renderToFragment(savesTemplate(SLOTS));
@@ -172,5 +177,48 @@ describe("savesTemplate scope caption (injected, never detected)", () => {
     const frag = renderToFragment(savesTemplate(filled, SCOPE));
     expect(frag.querySelector(".slot")!.textContent).not.toContain("computer");
     expect(frag.querySelector("[data-del]")!.getAttribute("aria-label")).toBe("Delete save slot 1");
+  });
+});
+
+describe("savesTemplate scope caption: shell-supplied strings are not trusted to be sane", () => {
+  const SLOTS: SlotInfo[] = [{ slot: 1, exists: false, present: false }];
+
+  it("links the caption to the list, so a jump to the list still reaches it", () => {
+    // Document order serves a sequential reader. The normal way to reach a list
+    // of saves is to jump to it by role, and a jump lands past anything that
+    // merely precedes it, so the association is what makes the caption
+    // reachable both ways.
+    const frag = renderToFragment(savesTemplate(SLOTS, { text: "Where they live.", listLabel: "Here" }));
+    const list = frag.querySelector(".slots")!;
+    const captionId = list.getAttribute("aria-describedby");
+    expect(captionId).toBeTruthy();
+    expect(frag.querySelector(`#${captionId}`)!.textContent).toBe("Where they live.");
+  });
+
+  it("adds no dangling aria-describedby when there is no caption", () => {
+    // Pointing at an id that does not exist is worse than pointing at nothing.
+    const list = renderToFragment(savesTemplate(SLOTS)).querySelector(".slots")!;
+    expect(list.getAttribute("aria-describedby")).toBeFalsy();
+  });
+
+  it("falls back to the generic list name when the shell sends an empty label", () => {
+    // `??` would let "" through and leave the list with no accessible name at
+    // all, which is worse than the generic one it replaced.
+    for (const listLabel of ["", "   "]) {
+      const frag = renderToFragment(savesTemplate(SLOTS, { text: "t", listLabel }));
+      expect(frag.querySelector(".slots")!.getAttribute("aria-label")).toBe("Saved towers");
+    }
+  });
+
+  it("renders no caption element when the shell sends empty text", () => {
+    // An empty paragraph would still take its margin and would describe the
+    // list as "".
+    for (const text of ["", "   \n "]) {
+      const frag = renderToFragment(savesTemplate(SLOTS, { text, listLabel: "Here" }));
+      expect(frag.querySelector(".slots-scope")).toBeNull();
+      expect(frag.querySelector(".slots")!.getAttribute("aria-describedby")).toBeFalsy();
+      // The label it DID supply is still honored.
+      expect(frag.querySelector(".slots")!.getAttribute("aria-label")).toBe("Here");
+    }
   });
 });

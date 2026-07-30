@@ -1,6 +1,9 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { SlotInfo } from "../../storage/SaveGame";
-import { slotDetail, slotName, type SaveScopeCaption } from "./saves";
+import { hasScopeCaption, scopeCaption, scopeListLabel, slotDetail, slotName, type SaveScopeCaption } from "./saves";
+
+/** Distinct from the saves manager's, so the two can never collide. */
+const PICKER_CAPTION_ID = "picker-scope-caption";
 
 /**
  * The title screen's LOAD-ONLY tower picker (SPEC-splash-load-tower CAP-2 to
@@ -66,9 +69,13 @@ export function towerPickerTemplate(
     : "No towers saved on this device.";
   return html`
       <h2>Load a Tower</h2>
-      ${scope ? html`<p class="slots-scope">${scope.text}</p>` : nothing}
+      ${scopeCaption(scope, PICKER_CAPTION_ID)}
       ${error ? html`<p class="picker-error" role="alert" tabindex="-1">${error}</p>` : nothing}
-      <ul class="slots well" aria-label="${scope?.listLabel ?? "Towers you can load"}">
+      <ul
+        class="slots well"
+        aria-label="${scopeListLabel(scope, "Towers you can load")}"
+        aria-describedby="${hasScopeCaption(scope) ? PICKER_CAPTION_ID : nothing}"
+      >
         ${anyPresent
           ? rows.map((s) => pickerRow(s, h))
           : html`<li class="picker-none">${emptyLine}</li>`}

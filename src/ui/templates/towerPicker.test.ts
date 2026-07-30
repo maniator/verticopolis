@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { SlotInfo } from "../../storage/SaveGame";
 import { towerPickerTemplate, type TowerPickerHandlers } from "./towerPicker";
+import type { SaveScopeCaption } from "./saves";
 import { renderToFragment } from "../testing/litTestUtils";
 
 /**
@@ -228,7 +229,10 @@ describe("towerPickerTemplate scope caption", () => {
   const SLOTS: SlotInfo[] = [
     { slot: "auto", exists: true, present: true, towerName: "A", star: 1, population: 1, funds: 1, savedAt: AT },
   ];
-  const SCOPE = { text: "Towers on this computer. Anyone who plays here can open them.", listLabel: "Towers on this computer" };
+  const SCOPE: SaveScopeCaption = {
+    text: "Towers on this computer. Anyone who plays here can open them.",
+    listLabel: "Towers on this computer",
+  };
 
   it("keeps the existing label and renders no caption when no scope is passed", () => {
     // Web, Android and iOS pass nothing, so their render must not move at all.

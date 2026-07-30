@@ -21,8 +21,8 @@ import type { SlotInfo } from "../../storage/SaveGame";
  * INJECTED, never detected. Nothing in `src/ui/` asks what platform it is on or
  * imports the platform port; a caller that knows passes this, and every caller
  * that does not simply omits it, which is exactly how `storageBlocked` already
- * works one module over. That keeps the web, Android and iOS renders
- * byte-identical to what they were.
+ * works one module over. Web, Android and iOS pass nothing, so no caption is
+ * rendered and the list keeps a generic name.
  *
  * Both strings come from the side that knows what the storage area actually is.
  * Composing them here would mean this module reasoning about namespaces, and it
@@ -36,11 +36,20 @@ export interface SaveScopeCaption {
   readonly listLabel: string;
 }
 
+/** Ties the caption to the list it describes. Distinct per template so the two
+ *  can never collide if both are ever mounted at once. */
+const SAVES_CAPTION_ID = "saves-scope-caption";
+
 export function savesTemplate(slots: SlotInfo[], scope?: SaveScopeCaption): TemplateResult {
   return html`
       <h2>Saved Towers</h2>
-      ${scopeCaption(scope)}
-      <div class="slots well" role="list" aria-label="${scope?.listLabel ?? "Saved towers"}">
+      ${scopeCaption(scope, SAVES_CAPTION_ID)}
+      <div
+        class="slots well"
+        role="list"
+        aria-label="${scopeListLabel(scope, "Saved towers")}"
+        aria-describedby="${hasScopeCaption(scope) ? SAVES_CAPTION_ID : nothing}"
+      >
         ${slots.map(slotRow)}
       </div>
       <div class="modal-actions">
@@ -51,16 +60,44 @@ export function savesTemplate(slots: SlotInfo[], scope?: SaveScopeCaption): Temp
 }
 
 /**
- * The caption, in DOM order between the heading and the list.
+ * The caption, in DOM order between the heading and the list, AND linked to it
+ * by `aria-describedby`.
  *
- * Before the list, not after it, because it is the context a player needs in
- * order to read the list correctly, and a caption underneath is one a screen
- * reader reaches only after every row. It is ordinary rendered text rather than
- * a live region: this is a standing property of the storage, not an event, and
- * announcing it as an event would interrupt whatever the player was doing.
+ * Document order alone is not enough. It serves a player reading sequentially,
+ * but the normal way to reach a list of saves is to jump to it by role, and a
+ * jump lands past anything that merely precedes it. The association is what
+ * makes the caption reachable both ways.
+ *
+ * Ordinary rendered text rather than a live region: this is a standing property
+ * of the storage, not an event, and announcing it as an event would interrupt
+ * whatever the player was doing.
+ *
+ * Exported so the title screen's picker renders the identical markup instead of
+ * a second copy that can drift.
  */
-function scopeCaption(scope?: SaveScopeCaption): TemplateResult | typeof nothing {
-  return scope ? html`<p class="slots-scope">${scope.text}</p>` : nothing;
+export function scopeCaption(scope: SaveScopeCaption | undefined, id: string): TemplateResult | typeof nothing {
+  // An all-whitespace caption would render an empty paragraph, taking its
+  // margin with it and describing the list as "".
+  return hasScopeCaption(scope) ? html`<p class="slots-scope" id="${id}">${scope!.text.trim()}</p>` : nothing;
+}
+
+/**
+ * Whether a caption element will actually be rendered.
+ *
+ * The describedby attribute and the element itself MUST agree. Deciding the
+ * attribute on `scope` while deciding the element on the text left a dangling
+ * reference to a missing id whenever a shell sent a label but no text, which
+ * is a worse accessible name than none at all.
+ */
+export function hasScopeCaption(scope: SaveScopeCaption | undefined): boolean {
+  return (scope?.text.trim() ?? "") !== "";
+}
+
+/** The list's accessible name. `||` rather than `??` on purpose: a shell that
+ *  supplies an empty string must fall back to the generic name, not strip the
+ *  list of its name entirely. */
+export function scopeListLabel(scope: SaveScopeCaption | undefined, fallback: string): string {
+  return scope?.listLabel.trim() || fallback;
 }
 
 const fmtWhen = (ms?: number): string =>

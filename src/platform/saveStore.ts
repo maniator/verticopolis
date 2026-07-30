@@ -1,7 +1,8 @@
 /**
- * The save-store seam: a wrapper shell offering durable storage the game can
- * use instead of localStorage. Bound today by the Electron desktop shell in the
- * private distribution repo; every other build omits it entirely.
+ * The save-store seam: durable storage a wrapper shell may offer the game in
+ * place of localStorage. Nothing binds it yet. The Electron desktop shell in
+ * the private distribution repo is the intended first implementer, and this
+ * contract exists so that shell can be built against something.
  *
  * BLOB-SHAPED ON PURPOSE. Nothing here names a path, a directory, or a
  * filename, in either direction. The game hands over an id and a string and
@@ -12,28 +13,42 @@
  *
  * The scope token is the other half of that. The game never asks for a
  * namespace and never names one; it reads whichever scopes the shell reports,
- * echoes a record's token back when it writes, and treats the token as opaque.
- * A shell that later reports a second scope (an account directory beside the
- * shared one) needs no public change at all, which is what keeps
- * account-selective saves an additive step rather than a rewrite here.
+ * addresses records by (id, scope), and treats the token as opaque. A shell
+ * that later reports a second scope needs no change to this file, which is what
+ * keeps account-selective saves an additive step rather than a rewrite.
  */
 
+declare const SAVE_SCOPE_TOKEN: unique symbol;
+
 /**
- * Minted by the shell, per session. Opaque by contract: the game compares
- * tokens for equality and does nothing else with one. It is deliberately NOT a
- * union of known values, because the set of scopes is the shell's business and
- * a public union would leak the shape of it.
+ * Minted by the shell, per session. Opaque by contract AND by type: branded so
+ * a `label`, an id, or a tower name cannot be passed where a token belongs.
+ * Tokens arrive across the bridge as plain strings, so {@link asScopeToken} is
+ * the single sanctioned place that assertion happens.
+ *
+ * Deliberately not a union of known values: the set of scopes is the shell's
+ * business, and a public union would leak the shape of it.
  */
-export type SaveScopeToken = string;
+export type SaveScopeToken = string & { readonly [SAVE_SCOPE_TOKEN]: never };
+
+/** Narrow a bridge-supplied string to a token. The one cast site. */
+export function asScopeToken(raw: string): SaveScopeToken {
+  return raw as SaveScopeToken;
+}
 
 /** A storage area the shell is offering, as the player should see it. */
 export interface SaveScope {
-  /** Opaque handle. Echo it back on write; never parse it. */
+  /** Opaque handle. Pass it back when addressing a record; never parse it. */
   readonly token: SaveScopeToken;
   /**
    * Display text, supplied by the shell rather than composed here. The game
    * renders it verbatim, so wording lives with the side that knows what the
-   * scope actually is. Never a path.
+   * scope actually is.
+   *
+   * MUST NOT be a path. The game cannot verify this (a duck-check cannot tell a
+   * sentence from a directory), so it is a contract obligation on the shell,
+   * and it is load-bearing: this string is rendered to the screen, and on the
+   * desktop shell a path would carry an account identifier onto it.
    */
   readonly label: string;
 }
@@ -53,13 +68,37 @@ export interface SaveStoreError {
   readonly message?: string;
 }
 
+/** The set of codes, for runtime narrowing of a rejection. */
+const SAVE_STORE_ERROR_CODES: readonly SaveStoreErrorCode[] = [
+  "full",
+  "denied",
+  "io",
+  "not-found",
+  "too-large",
+];
+
+/**
+ * Recover the store-neutral code from a rejection, or undefined when the shell
+ * rejected with something unshaped.
+ *
+ * Exists because a taxonomy nothing narrows to is documentation rather than a
+ * contract: without this, every caller writes `catch {}` and the codes are
+ * decorative.
+ */
+export function saveStoreErrorCode(err: unknown): SaveStoreErrorCode | undefined {
+  const code = (err as { code?: unknown } | null | undefined)?.code;
+  return SAVE_STORE_ERROR_CODES.includes(code as SaveStoreErrorCode) ? (code as SaveStoreErrorCode) : undefined;
+}
+
 /** One stored tower, as the shell describes it. Note the absence of a path. */
 export interface SaveRecord {
   /** The slot id the game wrote under, from its own closed list. */
   readonly id: string;
-  /** Which scope this record came FROM, which is not necessarily the scope a
-   *  new save would go to. Autosave targets this, so a tower opened from one
-   *  scope is never written back into another. */
+  /**
+   * Which scope this record came FROM, which is not necessarily the scope a new
+   * save would go to. An id is unique only WITHIN a scope, so (id, scope) is
+   * the address of a record and `id` alone is not.
+   */
   readonly scope: SaveScopeToken;
   readonly bytes: number;
   /** Write time, when the shell knows it. Absent rather than guessed. */
@@ -76,25 +115,36 @@ export interface SaveStoreSnapshot {
 
 export interface SaveStorePort {
   /**
-   * Everything the shell can see right now. The game awaits this ONCE during
-   * boot, before the splash, and serves its synchronous readers from the
-   * result; see `SaveGame`. Rejecting is allowed and means "no durable store
-   * this session", which falls back to localStorage rather than failing boot.
+   * Every record the shell can see right now, across every scope it offers.
+   *
+   * Reports IDENTITY and SIZE, not tower contents: producing a tower name or a
+   * population would mean the shell inflating and parsing a save, and the shell
+   * is deliberately too dumb to do that. A caller that needs slot metadata
+   * reads the payloads it cares about and parses them itself.
+   *
+   * Rejecting is allowed and means "no durable store this session", which the
+   * caller should treat as a fallback to localStorage rather than a boot
+   * failure.
    */
   list(): Promise<SaveStoreSnapshot>;
-  /** Resolves null when the id is absent, which is not an error. */
-  read(id: string): Promise<string | null>;
+  /** Resolves null when the record is absent, which is not an error. */
+  read(id: string, scope: SaveScopeToken): Promise<string | null>;
   /**
-   * Durably store `contents` under `id` in `scope`.
+   * Durably store `contents` under (`id`, `scope`).
    *
-   * `seq` is a per-id monotonic counter minted by the game. The shell drops any
-   * write whose seq is below the last it committed for that id, so a slow write
-   * that lands late cannot overwrite a newer one. It is the shell's ordering
-   * authority precisely because arrival order across a process boundary is not
-   * one.
+   * `seq` is a per-id monotonic counter minted by the game, and its authority
+   * is SESSION-SCOPED: the shell compares against the highest seq it has
+   * committed for that id since the game connected, and must not persist a
+   * high-water mark across restarts. A persisted mark would silently drop every
+   * write of the next session, because the game's counter starts over.
+   * Cross-process safety is the single-instance lock's job, not this counter's.
+   *
+   * A write the shell DISCARDS as stale must REJECT, never resolve. A resolved
+   * promise is a commit, so resolving on a drop would let a caller report a
+   * save that does not exist.
    */
   write(id: string, contents: string, scope: SaveScopeToken, seq: number): Promise<void>;
-  delete(id: string): Promise<void>;
+  delete(id: string, scope: SaveScopeToken): Promise<void>;
 }
 
 /**
@@ -102,6 +152,11 @@ export interface SaveStorePort {
  * an injection is untrusted, and a malformed one must degrade to localStorage
  * rather than throw out of boot. Property reads are guarded because a throwing
  * getter or a revoked Proxy is just another malformed injection.
+ *
+ * This checks SHAPE only, and cannot check behavior. A `write` that ignores its
+ * arguments, or a `list` that resolves something malformed, passes here and
+ * fails later; callers that need certainty verify the effect rather than trust
+ * the signature (see `saveMigration.ts`, which reads its writes back).
  */
 export function isSaveStorePort(value: unknown): value is SaveStorePort {
   if (typeof value !== "object" || value === null) return false;
