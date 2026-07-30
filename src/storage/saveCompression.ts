@@ -12,6 +12,26 @@ import { Inflate } from "fflate";
  * decompression bomb can't hang the tab.
  */
 
+/**
+ * Prefix marking a compressed localStorage value: this magic, then the base64
+ * of the DEFLATE-compressed JSON. A legacy uncompressed save is raw JSON
+ * (starts with `{`), so the prefix check cleanly tells the two apart and old
+ * saves keep loading; they re-write compressed on the next save.
+ */
+export const STORE_MAGIC = "VCZ1:";
+
+/**
+ * First line of the `.vctower` container, naming the format and its version.
+ * The payload after it is the same deflate-then-base64 as {@link STORE_MAGIC}.
+ *
+ * Both live here, in the codec module, rather than beside their readers,
+ * because the two containers wrap byte-identical payloads and the desktop
+ * migration converts one into the other by rewriting only the header (see
+ * `./saveMigration.ts`). Splitting them across modules is how that stops being
+ * obviously true.
+ */
+export const TOWER_FILE_MAGIC = "VCTOWER1";
+
 // Base64 over raw bytes, chunked so String.fromCharCode never sees an argument
 // list long enough to blow the stack.
 export function toBase64(bytes: Uint8Array): string {

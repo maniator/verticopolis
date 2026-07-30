@@ -1,6 +1,9 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { SlotInfo } from "../../storage/SaveGame";
-import { slotDetail, slotName } from "./saves";
+import { scopeCaption, scopeListLabel, scopeText, slotDetail, slotName, type SaveScopeCaption } from "./saves";
+
+/** Distinct from the saves manager's, so the two can never collide. */
+const PICKER_CAPTION_ID = "picker-scope-caption";
 
 /**
  * The title screen's LOAD-ONLY tower picker (SPEC-splash-load-tower CAP-2 to
@@ -44,6 +47,7 @@ export function towerPickerTemplate(
   error: string | null,
   h: TowerPickerHandlers,
   storageBlocked = false,
+  scope?: SaveScopeCaption,
 ): TemplateResult {
   // "Anything on this device" is raw presence, so a storage full of corrupt
   // slots still renders those rows (and the recovery route beneath them)
@@ -63,10 +67,18 @@ export function towerPickerTemplate(
   const emptyLine = storageBlocked
     ? "This browser is blocking saved data, so towers on this device can't be listed."
     : "No towers saved on this device.";
+  // Resolved once, for the same reason as the saves manager: the element and
+  // the attribute that references it must come from a single read.
+  const caption = scopeText(scope);
   return html`
       <h2>Load a Tower</h2>
+      ${scopeCaption(caption, PICKER_CAPTION_ID)}
       ${error ? html`<p class="picker-error" role="alert" tabindex="-1">${error}</p>` : nothing}
-      <ul class="slots well" aria-label="Towers you can load">
+      <ul
+        class="slots well"
+        aria-label="${scopeListLabel(scope, "Towers you can load")}"
+        aria-describedby="${caption ? PICKER_CAPTION_ID : nothing}"
+      >
         ${anyPresent
           ? rows.map((s) => pickerRow(s, h))
           : html`<li class="picker-none">${emptyLine}</li>`}

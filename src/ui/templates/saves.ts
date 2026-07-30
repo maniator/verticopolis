@@ -15,15 +15,120 @@ import type { SlotInfo } from "../../storage/SaveGame";
  * by the controller (`showSaves`) after mount, unchanged by this migration, so the
  * re-render-on-save flow keeps routing exactly as before.
  */
-export function savesTemplate(slots: SlotInfo[]): TemplateResult {
+/**
+ * Where the listed towers live, as the player should be told.
+ *
+ * INJECTED, never detected. Nothing in `src/ui/` asks what platform it is on or
+ * imports the platform port; a caller that knows passes this, and every caller
+ * that does not simply omits it, which is exactly how `storageBlocked` already
+ * works one module over. Web, Android and iOS pass nothing, so no caption is
+ * rendered and the list keeps a generic name.
+ *
+ * Both strings come from the side that knows what the storage area actually is.
+ * Composing them here would mean this module reasoning about namespaces, and it
+ * would put player-facing wording about shared storage somewhere no one would
+ * think to look for it.
+ */
+export interface SaveScopeCaption {
+  /** Visible sentence, rendered between the heading and the list. */
+  readonly text: string;
+  /** Accessible name for the list, naming the same scope in fewer words. */
+  readonly listLabel: string;
+}
+
+/** Ties the caption to the list it describes. Distinct per template so the two
+ *  can never collide if both are ever mounted at once. */
+const SAVES_CAPTION_ID = "saves-scope-caption";
+
+export function savesTemplate(slots: SlotInfo[], scope?: SaveScopeCaption): TemplateResult {
+  // Read ONCE. Asking twice let a non-idempotent getter answer differently for
+  // the element and for the attribute that references it.
+  const caption = scopeText(scope);
   return html`
       <h2>Saved Towers</h2>
-      <div class="slots well">${slots.map(slotRow)}</div>
+      ${scopeCaption(caption, SAVES_CAPTION_ID)}
+      <div
+        class="slots well"
+        role="list"
+        aria-label="${scopeListLabel(scope, "Saved towers")}"
+        aria-describedby="${caption ? SAVES_CAPTION_ID : nothing}"
+      >
+        ${slots.map(slotRow)}
+      </div>
       <div class="modal-actions">
         <button class="btn" data-act="export">Export to file</button>
         <button class="btn" data-act="import">Import from file</button>
         <button class="btn primary" data-act="close">Close</button>
       </div>`;
+}
+
+/**
+ * The caption, in DOM order between the heading and the list, AND linked to it
+ * by `aria-describedby`.
+ *
+ * Document order alone is not enough. It serves a player reading sequentially,
+ * but the normal way to reach a list of saves is to jump to it by role, and a
+ * jump lands past anything that merely precedes it. The association is what
+ * makes the caption reachable both ways.
+ *
+ * Ordinary rendered text rather than a live region: this is a standing property
+ * of the storage, not an event, and announcing it as an event would interrupt
+ * whatever the player was doing.
+ *
+ * Exported so the title screen's picker renders the identical markup instead of
+ * a second copy that can drift.
+ */
+export function scopeCaption(text: string, id: string): TemplateResult | typeof nothing {
+  // Takes the resolved TEXT rather than the scope, so the caller reads the
+  // shell's string once and the element and the attribute referencing it can
+  // never be decided from two different answers. An empty caption would render
+  // an empty paragraph, taking its margin with it and describing the list as "".
+  return text ? html`<p class="slots-scope" id="${id}">${text}</p>` : nothing;
+}
+
+/** The caption text, or "" when there is nothing usable to render. Exported so
+ *  the picker resolves it the same way, once, before rendering. */
+export function scopeText(scope: SaveScopeCaption | undefined): string {
+  return bridgeString(scope, "text");
+}
+
+/**
+ * Read one string off an object that came from a wrapper shell, or "" if it is
+ * not there, not a string, or hostile to read at all.
+ *
+ * The ACCESS is guarded, not just the type. `src/platform/` already takes this
+ * posture toward an injected port ("Even the property reads are untrusted: a
+ * throwing getter or revoked Proxy must degrade like any other malformed
+ * injection"), and a type check alone left this module holding a weaker
+ * definition of untrusted than the module it receives its data from. Here the
+ * cost of being wrong is the whole saves dialog failing to render.
+ */
+function bridgeString(source: SaveScopeCaption | undefined, key: "text" | "listLabel"): string {
+  try {
+    const value = source?.[key];
+    return typeof value === "string" ? value.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The list's accessible name: what the list IS, then where it lives.
+ *
+ * The scope AUGMENTS the functional name rather than replacing it. Replacing it
+ * gave the saves manager and the load-only picker the identical accessible name
+ * (both became "Towers on this computer"), which threw away the one word
+ * telling a screen reader user which of the two they were in, and the shell has
+ * no way to know which list it is naming.
+ *
+ * Falls back on an empty or absent label rather than blanking the name, and
+ * type-checks the value because it crosses a process bridge: the interface
+ * promises a string, an injection is not obliged to keep that promise, and a
+ * throw here takes down the whole dialog.
+ */
+export function scopeListLabel(scope: SaveScopeCaption | undefined, fallback: string): string {
+  const label = bridgeString(scope, "listLabel");
+  return label ? `${fallback}, ${label}` : fallback;
 }
 
 const fmtWhen = (ms?: number): string =>
@@ -83,5 +188,9 @@ function slotRow(s: SlotInfo): TemplateResult {
     (s.exists || unreadable) && s.slot !== "auto"
       ? html`<button class="btn danger" data-del="${s.slot}" aria-label="Delete save slot ${s.slot}">✕</button>`
       : nothing;
-  return html`<div class="slot"><div class="slot-head"><b>${name}</b>${detail}</div><div class="slot-actions">${saveBtn}${loadBtn}${delBtn}</div></div>`;
+  // `role="listitem"` is not decoration. The container now carries `role="list"`,
+  // and a list whose children are not listitems is invalid ARIA: the semantics
+  // are dropped, so the label and the item count a screen reader would announce
+  // go with them. The two roles ship together or neither does.
+  return html`<div class="slot" role="listitem"><div class="slot-head"><b>${name}</b>${detail}</div><div class="slot-actions">${saveBtn}${loadBtn}${delBtn}</div></div>`;
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { SlotInfo } from "../../storage/SaveGame";
 import { towerPickerTemplate, type TowerPickerHandlers } from "./towerPicker";
+import { savesTemplate, type SaveScopeCaption } from "./saves";
 import { renderToFragment } from "../testing/litTestUtils";
 
 /**
@@ -221,5 +222,64 @@ describe("towerPickerTemplate dispatch", () => {
     expect(h.onFile).toHaveBeenCalledOnce();
     frag.querySelector<HTMLButtonElement>('[data-picker="back"]')!.click();
     expect(h.onBack).toHaveBeenCalledOnce();
+  });
+});
+
+describe("towerPickerTemplate scope caption", () => {
+  const SLOTS: SlotInfo[] = [
+    { slot: "auto", exists: true, present: true, towerName: "A", star: 1, population: 1, funds: 1, savedAt: AT },
+  ];
+  const SCOPE: SaveScopeCaption = {
+    text: "Towers on this computer. Anyone who plays here can open them.",
+    listLabel: "Towers on this computer",
+  };
+
+  it("keeps the existing label and renders no caption when no scope is passed", () => {
+    // Web, Android and iOS pass nothing, so their render must not move at all.
+    const frag = renderToFragment(towerPickerTemplate(SLOTS, null, handlers()));
+    expect(frag.querySelector(".slots-scope")).toBeNull();
+    expect(frag.querySelector("ul.slots")!.getAttribute("aria-label")).toBe("Towers you can load");
+  });
+
+  it("adds the scope to the group label and captions the list", () => {
+    const frag = renderToFragment(towerPickerTemplate(SLOTS, null, handlers(), false, SCOPE));
+    const label = frag.querySelector("ul.slots")!.getAttribute("aria-label")!;
+    // Both halves: the picker must stay distinguishable from the saves manager,
+    // which the scope label alone cannot do since the shell sends both the same
+    // string.
+    expect(label).toContain("Towers you can load");
+    expect(label).toContain(SCOPE.listLabel);
+    expect(frag.querySelector(".slots-scope")!.textContent).toBe(SCOPE.text);
+  });
+
+  it("stays distinguishable from the saves manager under the same scope", () => {
+    // The regression this guards: with the scope label REPLACING the fallback,
+    // both lists ended up with the byte-identical accessible name.
+    const picker = renderToFragment(towerPickerTemplate(SLOTS, null, handlers(), false, SCOPE))
+      .querySelector("ul.slots")!
+      .getAttribute("aria-label");
+    const manager = renderToFragment(savesTemplate(SLOTS, SCOPE)).querySelector(".slots")!.getAttribute("aria-label");
+    expect(picker).not.toBe(manager);
+  });
+
+  it("puts the caption before both the error and the list", () => {
+    const frag = renderToFragment(towerPickerTemplate(SLOTS, "Could not load.", handlers(), false, SCOPE));
+    const caption = frag.querySelector(".slots-scope")!;
+    const err = frag.querySelector(".picker-error")!;
+    const list = frag.querySelector("ul.slots")!;
+    expect(caption.compareDocumentPosition(err) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(caption.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The error keeps its alert role and its focus target; the caption is
+    // ordinary text and must not have taken either over.
+    expect(err.getAttribute("role")).toBe("alert");
+    expect(caption.hasAttribute("role")).toBe(false);
+  });
+
+  it("still renders the caption when storage is blocked and nothing can be listed", () => {
+    // "Where your towers would be" is exactly the context that matters when the
+    // list is empty, so this is the last place the caption should be dropped.
+    const frag = renderToFragment(towerPickerTemplate([], null, handlers(), true, SCOPE));
+    expect(frag.querySelector(".slots-scope")!.textContent).toBe(SCOPE.text);
+    expect(frag.querySelector(".picker-none")!.textContent).toContain("blocking saved data");
   });
 });

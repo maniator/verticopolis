@@ -255,6 +255,57 @@ describe("isPlatformPort: onHostCommand is optional on purpose", () => {
   });
 });
 
+describe("isPlatformPort: saveStore is optional on the same grounds", () => {
+  const fakeStore = () => ({
+    list: vi.fn(),
+    read: vi.fn(),
+    write: vi.fn(),
+    delete: vi.fn(),
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("accepts a port that omits it, so a shell with no store keeps validating", () => {
+    // Same hazard as the command members, and it bites harder here: the iOS
+    // shell has no save store and never will, so a required member would demote
+    // it to the browser port and cost it its native file save.
+    const noStore = fakePort();
+    expect("saveStore" in noStore).toBe(false);
+    expect(resolvePlatform("native", noStore)).toBe(noStore);
+    expect(resolvePlatform("desktop", noStore)).toBe(noStore);
+  });
+
+  it("accepts a port that provides a well-formed one", () => {
+    const withStore = { ...fakePort(), saveStore: fakeStore() };
+    expect(resolvePlatform("desktop", withStore)).toBe(withStore);
+  });
+
+  it("rejects a port whose saveStore is present but incomplete", () => {
+    // An object rather than a function, so it needs its own shape check. A
+    // store missing `write` would resolve fine and then throw on the first
+    // autosave, which is the worst possible time to discover it.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { write: _omitted, ...missingWrite } = fakeStore();
+    expect(resolvePlatform("desktop", { ...fakePort(), saveStore: missingWrite })).toBe(browserPlatform);
+    expect(resolvePlatform("desktop", { ...fakePort(), saveStore: { ...fakeStore(), read: 42 } })).toBe(
+      browserPlatform,
+    );
+    expect(resolvePlatform("desktop", { ...fakePort(), saveStore: {} })).toBe(browserPlatform);
+    expect(resolvePlatform("desktop", { ...fakePort(), saveStore: null })).toBe(browserPlatform);
+    expect(resolvePlatform("desktop", { ...fakePort(), saveStore: "yes" })).toBe(browserPlatform);
+    expect(warn).toHaveBeenCalledTimes(5);
+  });
+
+  it("the browser default omits it, so the desktop path folds out of a browser bundle", () => {
+    // `if (port.saveStore)` is the only gate, so omitting rather than stubbing
+    // is what lets the store code drop from a browser build entirely.
+    expect(browserPlatform.saveStore).toBeUndefined();
+    expect("saveStore" in browserPlatform).toBe(false);
+  });
+});
+
 describe("resolvePlatform: desktop mode binds like native", () => {
   const port = {
     isNativeWrapper: true as const,

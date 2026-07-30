@@ -1212,6 +1212,17 @@ ul.slots .slot-actions .btn {
   margin: 0 0 8px;
   color: var(--bad);
 }
+/* Where the listed towers live. Sits on the dialog surface, ABOVE the sunken
+   .well holding the rows, and takes the same secondary-text token every other
+   supporting line in this dialog uses, so its contrast matches copy already
+   shipping on that surface rather than resting on a fresh assumption.
+   Nothing is conveyed by hue, so a colorblind render loses nothing, and it
+   stays at body size: this carries information the player needs, and shrinking
+   that is the wrong economy. */
+.slots-scope {
+  margin: 0 0 8px;
+  color: var(--muted);
+}
 /* The file row crosses from device storage to the file system, so it gets a
    heavier rule than the hairline dividing the slots above it. With no slot rows
    above it (nothing saved, or storage blocked) there is nothing to divide from,

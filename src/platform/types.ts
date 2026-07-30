@@ -36,8 +36,12 @@
  *    an earlier revision of this contract carries only the three members above
  *    and must keep duck-validating (see `isPlatformPort`). A required fourth
  *    member would silently demote such a shell to the browser port and take
- *    its native file save with it.
+ *    its native file save with it. `setCommandsAvailable` and `saveStore` are
+ *    optional on the same grounds; every member added here after the original
+ *    three must be.
  */
+
+import type { SaveStorePort } from "./saveStore";
 
 /**
  * A command a wrapper shell may ask the game to run, named for what the player
@@ -99,6 +103,20 @@ export interface PlatformPort {
    * keeps everything enabled, which stays correct because of the re-check.
    */
   setCommandsAvailable?(commands: readonly HostCommand[]): void;
+  /**
+   * Durable storage the game uses in place of localStorage when a shell offers
+   * it. Optional for the same reason as the two members above, and the reason
+   * bites harder here: the iOS Capacitor shell implements the three-member
+   * revision of this contract, so requiring a save store would demote it to the
+   * browser port and take its native file save with it.
+   *
+   * Omitted rather than stubbed on ports that have no store (see
+   * `./browser.ts`), so the desktop path is one `if (port.saveStore)` and folds
+   * out of a browser bundle entirely.
+   *
+   * See `./saveStore.ts` for the blob shape and the opaque scope token.
+   */
+  saveStore?: SaveStorePort;
 }
 
 declare global {
