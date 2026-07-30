@@ -35,7 +35,8 @@ vi.mock("../platform", async (importOriginal) => ({
 }));
 
 const { persistAutosave } = await import("./autosavePersist");
-const { prepareSaveStore, resetSaveStoreForTests, noteTowerOrigin } = await import("./desktopSaveStore");
+const { prepareSaveStore, resetSaveStoreForTests, noteTowerOrigin, setStoreAuthoritativeForTests, storeIsAuthoritative } =
+  await import("./desktopSaveStore");
 
 function fakeStore(shared = true) {
   const written: { id: string; scope: SaveScopeToken; contents: string }[] = [];
@@ -56,6 +57,10 @@ beforeEach(() => {
   resetSaveStoreForTests();
   injectedStore = undefined;
   localStorage.clear();
+  // The store-routing tests below arm the tripwire explicitly. It is OFF in
+  // production until the read path lands, and the last test in this file pins
+  // that default, so the routing stays covered without pretending it is live.
+  setStoreAuthoritativeForTests(true);
 });
 
 describe("persistAutosave on a wrapped build", () => {
@@ -79,6 +84,26 @@ describe("persistAutosave on a wrapped build", () => {
     // format crosses the bridge rather than two.
     expect(written[0]!.contents.startsWith("VCTOWER1\n")).toBe(true);
     expect(localStorage.length).toBe(0);
+  });
+
+  it("TRIPWIRE: does not route to the store until the read path lands", async () => {
+    // The production default, asserted so this cannot be flipped by accident and
+    // so the reason is discoverable from a failing test rather than a comment.
+    // SaveGame answers load, hasSave, listSlots and hasSlot from localStorage
+    // across twenty call sites. Writing autosaves to the store while reads come
+    // from localStorage would send a player's progress somewhere nothing
+    // reads: the next launch would load the pre-migration copy and the session
+    // would silently vanish. The two halves ship together.
+    resetSaveStoreForTests();
+    expect(storeIsAuthoritative()).toBe(false);
+
+    const { port, written } = fakeStore();
+    injectedStore = port;
+    await prepareSaveStore();
+    await persistAutosave(Simulation.newGame(7));
+
+    expect(written).toEqual([]);
+    expect(localStorage.getItem("verticopolis-save")).not.toBeNull();
   });
 
   it("falls back to localStorage when the shell offers no store", async () => {

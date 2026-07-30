@@ -83,13 +83,18 @@ const SEAMS: readonly Seam[] = [
     // `simtower-clone-unreadable` are deliberately NOT here: both live in
     // SaveGame.ts, which every build ships.
     //
-    // `origin-gone` is the account-isolation refusal: autosave declining to
-    // write a tower whose origin scope disappeared, rather than falling back to
-    // a namespace every account on the machine can read. It is listed here
-    // because its ABSENCE from a desktop build would mean that refusal was
-    // eliminated, which is the one failure in this seam that costs privacy
-    // rather than a feature.
-    markers: ["auto-legacy", "already-present", "write-failed", "origin-gone"],
+    // `origin-gone` is NOT listed, and its absence is currently CORRECT rather
+    // than an oversight. It is the account-isolation refusal, reached only
+    // through the autosave write path, and that path is gated behind
+    // `storeIsAuthoritative()` until the readers are routed too (see
+    // `desktopSaveStore.ts`). Rollup proves the gate constant, folds the branch,
+    // and genuinely drops the refusal from the bundle. Asserting it here would
+    // fail every desktop build over code that really is not shipping.
+    //
+    // Add it back in the change that flips that gate. At that point its absence
+    // WOULD mean the refusal was eliminated, which is the one failure in this
+    // seam that costs privacy rather than a feature.
+    markers: ["auto-legacy", "already-present", "write-failed"],
     guardHint:
       "something now imports src/game/desktopSaveStore.ts (or the storage modules under it) outside an " +
       "IS_WRAPPED_BUILD branch, so every web player downloads a save store and a localStorage migration that " +

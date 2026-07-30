@@ -119,6 +119,41 @@ export function saveMigrationReport(): MigrationReport | null {
 }
 
 /**
+ * Whether the store is the authoritative save location yet.
+ *
+ * FALSE, deliberately, and this is a tripwire rather than a feature flag.
+ *
+ * The write path is finished and tested; the READ path is not. `SaveGame` still
+ * answers `load`, `hasSave`, `listSlots` and `hasSlot` from localStorage across
+ * twenty call sites. Writing autosaves to the store while reads come from
+ * localStorage would mean a player's progress went somewhere nothing reads: the
+ * game would load the pre-migration copy on the next launch and every session's
+ * play would silently vanish.
+ *
+ * Nothing is broken today, because no shell implements `saveStore` and the
+ * fallback keeps localStorage authoritative. The hazard is that implementing
+ * the port, the obvious next step, is exactly what would trigger it, and the
+ * shell author has no way to know that from their side.
+ *
+ * So the two halves ship together. Flipping this to true belongs in the change
+ * that routes the readers, not before, and `persistAutosave` consults it rather
+ * than assuming a store means a store worth writing to.
+ */
+export function storeIsAuthoritative(): boolean {
+  return authoritative;
+}
+
+/** Production default. The read path is what flips it, and when that lands this
+ *  whole tripwire goes away rather than becoming a setting. */
+let authoritative = false;
+
+/** Test seam, so the routing this gates stays covered while it is switched off
+ *  in production. Pinned by a test asserting the default is false. */
+export function setStoreAuthoritativeForTests(value: boolean): void {
+  authoritative = value;
+}
+
+/**
  * Record where the live tower came from, so autosave writes it back there.
  *
  * `undefined` means a tower with no origin: a new game, or one imported from a
@@ -179,4 +214,5 @@ export function resetSaveStoreForTests(): void {
   prepared = false;
   loadedFrom = undefined;
   seqById.clear();
+  authoritative = false;
 }

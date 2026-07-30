@@ -1,7 +1,7 @@
 import type { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
 import { IS_WRAPPED_BUILD } from "../platform";
-import { saveStoreSession, writeTowerToStore } from "./desktopSaveStore";
+import { saveStoreSession, storeIsAuthoritative, writeTowerToStore } from "./desktopSaveStore";
 
 /**
  * Where a periodic autosave actually lands.
@@ -33,7 +33,12 @@ import { saveStoreSession, writeTowerToStore } from "./desktopSaveStore";
  * that somewhere is localStorage exactly as on the web.
  */
 export async function persistAutosave(sim: Simulation): Promise<void> {
-  if (IS_WRAPPED_BUILD && saveStoreSession()) {
+  // `storeIsAuthoritative()` is false until the READ path lands, and the check
+  // is here rather than assumed. Writing to the store while `SaveGame` still
+  // reads localStorage would put a player's progress somewhere nothing reads,
+  // and the next launch would load the pre-migration copy as if the session had
+  // never happened. The two halves ship together.
+  if (IS_WRAPPED_BUILD && storeIsAuthoritative() && saveStoreSession()) {
     // `export` rather than `saveAsync`: the store holds `.vctower` text, the
     // same container the migration writes and `SaveGame.import` reads, so one
     // format crosses the bridge instead of two.
