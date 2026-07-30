@@ -246,14 +246,20 @@ describe("bootGame", () => {
     expect((window as unknown as { game?: unknown }).game).toBeUndefined();
   });
 
-  it("shows an error and rethrows when create() throws", () => {
+  it("shows an error and rethrows when create() throws", async () => {
     document.body.innerHTML = `<div id="stage"></div>`;
     stubWebGL(); // localhost host, so telemetry is skipped and boot reaches create()
     const create = vi.fn(() => {
       throw new Error("kaboom");
     });
 
-    expect(() => bootGame(create)).toThrow("kaboom");
+    // REJECTS rather than throwing synchronously. Boot became async so a
+    // wrapper shell's save store can resolve before the game constructs, which
+    // moves the rethrow from `error` to `unhandledrejection`; both are bound by
+    // `installErrorTracking`, which runs as boot's first statement, so the
+    // failure is still reported. `bootGame` returns the promise specifically so
+    // that is observable here instead of floating.
+    await expect(bootGame(create)).rejects.toThrow("kaboom");
     const html = document.getElementById("boot-fallback-host")!.innerHTML;
     expect(html).toContain("Something went wrong");
     expect(html).toContain("kaboom");

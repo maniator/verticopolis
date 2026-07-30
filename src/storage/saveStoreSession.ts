@@ -42,6 +42,17 @@ export interface SaveStoreSession {
   readonly scopes: readonly SaveScope[];
   /** Where a NEW tower is written when nothing says otherwise. */
   readonly defaultScope: SaveScopeToken | undefined;
+  /**
+   * The one scope shared across accounts on this machine, if the shell marked
+   * one. The ONLY scope the localStorage migration may write into.
+   *
+   * Kept separate from `defaultScope` on purpose, and they are the same token
+   * today only because a shell offers one scope. The day they diverge,
+   * migrating into the default would move the previous account's leftover
+   * towers into the current account's Cloud, so the migration must not be able
+   * to name the default at all.
+   */
+  readonly sharedScope: SaveScopeToken | undefined;
 }
 
 /**
@@ -65,7 +76,16 @@ export function sessionFromSnapshot(snapshot: unknown): SaveStoreSession {
           isSaveSlotId(r?.id) && typeof r?.scope === "string" && known.has(r.scope as SaveScopeToken),
       )
     : [];
-  return { records, scopes, defaultScope: scopes[0]?.token };
+  // The FIRST scope marked shared, not "any" and not "the only one". A shell
+  // that marks two is malformed, and picking one arbitrarily would make the
+  // migration's destination depend on array order.
+  const shared = scopes.filter((s) => s.shared === true);
+  return {
+    records,
+    scopes,
+    defaultScope: scopes[0]?.token,
+    sharedScope: shared.length === 1 ? shared[0]!.token : undefined,
+  };
 }
 
 /** Ids present in `scope`, which is what the migration's done-marker derives
@@ -109,6 +129,21 @@ export function resolveWriteTarget(
   }
   if (session.defaultScope === undefined) return { ok: false, refusal: "no-store" };
   return { ok: true, target: { id, scope: session.defaultScope } };
+}
+
+/**
+ * Where the localStorage migration is allowed to write, or null when there is
+ * nowhere safe.
+ *
+ * The whole point of this function is that it CANNOT return an account scope.
+ * A caller wanting to migrate has to come through here, so "aim the migration
+ * at the current account" is not expressible rather than merely discouraged.
+ * Returning null (no shell-marked shared scope) means the migration is skipped
+ * entirely, which is the correct conservative answer: localStorage keeps the
+ * towers and a later boot with a properly marked scope moves them.
+ */
+export function migrationTarget(session: SaveStoreSession): SaveScopeToken | null {
+  return session.sharedScope ?? null;
 }
 
 /**

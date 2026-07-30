@@ -497,4 +497,4 @@ export { GameApp };
 // bootstrap.ts) and calls it after this module has fully initialized, so the
 // runtime `import { GameApp }` reference in game/ modules resolves via live
 // bindings.
-bootGame(() => new GameApp());
+void bootGame(() => new GameApp()); // async since #729; see bootGame's return note

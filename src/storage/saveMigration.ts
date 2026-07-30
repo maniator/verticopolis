@@ -296,6 +296,15 @@ const MIGRATION_SEQ = 1;
  * `existingIds` are the ids already present IN `scope`; the caller filters the
  * snapshot, because a record in some other scope must not suppress a migration
  * into this one.
+ *
+ * `scope` MUST be the shared scope. Callers get it from
+ * `SaveStoreSession.sharedScope`, never from `defaultScope`, and the two are
+ * the same token today only because a shell offers one scope. A tower found in
+ * localStorage has no knowable owner: localStorage is per-origin and predates
+ * any notion of an account, so the previous account on this machine may have
+ * left it. Once a default scope means "the account logged in right now",
+ * migrating into it would sweep the previous player's towers into this
+ * player's Steam Cloud.
  */
 export async function migrateSavesToStore(
   store: SaveStorePort,

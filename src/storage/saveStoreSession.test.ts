@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { asScopeToken, type SaveScopeToken, type SaveStorePort } from "../platform/saveStore";
 import {
   idsInScope,
+  migrationTarget,
   openSaveStore,
   recordAt,
   resolveWriteTarget,
@@ -202,5 +203,72 @@ describe("openSaveStore", () => {
       throw new Error("synchronous throw, not a rejection");
     });
     await expect(openSaveStore(thrower)).resolves.toBeNull();
+  });
+});
+
+describe("sharedScope: the migration's only legal destination", () => {
+  it("is the scope the shell marked shared, not the first one", () => {
+    // Order must not decide where towers land. The shell says which namespace
+    // is shared across accounts; the game does not infer it.
+    const s = sessionFromSnapshot({
+      scopes: [
+        { token: ACCOUNT, label: "Your towers" },
+        { token: LOCAL, label: "Towers on this computer", shared: true },
+      ],
+      records: [],
+    });
+    expect(s.defaultScope).toBe(ACCOUNT);
+    expect(s.sharedScope).toBe(LOCAL);
+    expect(migrationTarget(s)).toBe(LOCAL);
+  });
+
+  it("refuses to guess when no scope is marked shared", () => {
+    // The conservative answer, and the important one. Falling back to
+    // defaultScope here is exactly how the previous account's leftover towers
+    // would end up in the current account's Steam Cloud. Skipping costs
+    // nothing: localStorage keeps them and a later boot moves them.
+    const s = sessionFromSnapshot({ scopes: [{ token: ACCOUNT, label: "A" }], records: [] });
+    expect(s.defaultScope).toBe(ACCOUNT);
+    expect(s.sharedScope).toBeUndefined();
+    expect(migrationTarget(s)).toBeNull();
+  });
+
+  it("refuses when a malformed shell marks two scopes shared", () => {
+    // Picking one would make the destination depend on array order, which is
+    // the same class of bug as guessing.
+    const s = sessionFromSnapshot({
+      scopes: [
+        { token: LOCAL, label: "L", shared: true },
+        { token: ACCOUNT, label: "A", shared: true },
+      ],
+      records: [],
+    });
+    expect(migrationTarget(s)).toBeNull();
+  });
+
+  it("treats a non-true shared flag as not shared", () => {
+    for (const shared of ["yes", 1, {}, null]) {
+      const s = sessionFromSnapshot({ scopes: [{ token: LOCAL, label: "L", shared }], records: [] });
+      expect(migrationTarget(s), JSON.stringify(shared)).toBeNull();
+    }
+  });
+
+  it("migrationTarget can never return an account scope", () => {
+    // The property, stated directly: whatever the snapshot looks like, the
+    // migration's destination is either the shell-marked shared scope or
+    // nothing. There is no input that makes it name an unmarked scope.
+    const snapshots = [
+      { scopes: [{ token: ACCOUNT, label: "A" }], records: [] },
+      { scopes: [{ token: ACCOUNT, label: "A" }, { token: LOCAL, label: "L", shared: true }], records: [] },
+      { scopes: [{ token: ACCOUNT, label: "A", shared: true }], records: [] },
+    ];
+    for (const snap of snapshots) {
+      const target = migrationTarget(sessionFromSnapshot(snap));
+      expect(target === null || target === sessionFromSnapshot(snap).sharedScope).toBe(true);
+      // Never the default merely because it was default.
+      if (target !== null) {
+        expect(sessionFromSnapshot(snap).scopes.find((x) => x.token === target)?.shared).toBe(true);
+      }
+    }
   });
 });

@@ -48,13 +48,56 @@ function scripts(dir: string): string[] {
   return out;
 }
 
-/** Literals that exist only inside the command seam. */
-const MARKERS = [
-  "Start or load a tower first",
-  "Close the open window first",
-  "Not available right now",
-  "Finish what you are doing first",
-  "Ignoring unknown host command",
+/**
+ * Each seam is a set of literals that exist ONLY inside it. Both are checked in
+ * both directions, and a seam is verified independently so a failure names
+ * which one moved.
+ *
+ * Detection uses string literals because minifiers preserve them while mangling
+ * every identifier around them.
+ */
+interface Seam {
+  readonly name: string;
+  readonly markers: readonly string[];
+  /** Appended to the browser-direction failure: what pulled it back in. */
+  readonly guardHint: string;
+}
+
+const SEAMS: readonly Seam[] = [
+  {
+    name: "command seam",
+    markers: [
+      "Start or load a tower first",
+      "Close the open window first",
+      "Not available right now",
+      "Finish what you are doing first",
+      "Ignoring unknown host command",
+    ],
+    guardHint:
+      "a new unguarded caller of src/game/hostCommands.ts has pulled it back into every player's bundle: " +
+      "the IS_WRAPPED_BUILD guards in appBoot.ts and frameLoop.ts are what let Rollup drop it.",
+  },
+  {
+    name: "save store",
+    // Migration outcomes and slot ids that appear nowhere else. `VCZ1` and
+    // `simtower-clone-unreadable` are deliberately NOT here: both live in
+    // SaveGame.ts, which every build ships.
+    //
+    // `origin-gone` is NOT listed yet, and its absence is deliberate rather
+    // than an oversight. It is `resolveWriteTarget`'s refusal, which has no
+    // production caller until the autosave write path is retargeted, so Rollup
+    // correctly drops it from the desktop bundle as well. Adding it here
+    // before it is wired would assert something untrue and fail every desktop
+    // build. Add it in the same change that wires the write path
+    // (maniator/verticopolis#729), where it becomes the marker proving the
+    // account-isolation refusal actually shipped.
+    markers: ["auto-legacy", "already-present", "write-failed"],
+    guardHint:
+      "something now imports src/game/desktopSaveStore.ts (or the storage modules under it) outside an " +
+      "IS_WRAPPED_BUILD branch, so every web player downloads a save store and a localStorage migration that " +
+      "can never run. Note that `if (port.saveStore)` does NOT fold: only IS_WRAPPED_BUILD does, because Vite " +
+      "statically replaces import.meta.env.MODE.",
+  },
 ];
 
 function fail(msg: string): never {
@@ -76,34 +119,44 @@ try {
 }
 if (files.length === 0) fail(`no scripts under ${DIST}; did the build output format change?`);
 
-// Read each file once and test every marker against it, rather than re-reading
-// the whole dist per marker.
-const found = new Set<string>();
-for (const file of files) {
-  const text = readFileSync(file, "utf8");
-  for (const marker of MARKERS) if (text.includes(marker)) found.add(marker);
+// Read each file ONCE and test every marker of every seam against it, rather
+// than re-reading the whole dist per marker.
+const texts = files.map((f) => readFileSync(f, "utf8"));
+const foundBySeam = new Map<string, Set<string>>();
+for (const seam of SEAMS) {
+  const found = new Set<string>();
+  for (const text of texts) {
+    for (const marker of seam.markers) if (text.includes(marker)) found.add(marker);
+  }
+  foundBySeam.set(seam.name, found);
 }
 
-if (shouldBePresent && found.size !== MARKERS.length) {
-  const missing = MARKERS.filter((m) => !found.has(m));
-  fail(
-    `a "${arg}" build must CONTAIN the command seam, but ${missing.length} of ${MARKERS.length} markers are missing ` +
-      `(${missing.map((m) => JSON.stringify(m)).join(", ")}). Either the seam was eliminated from a wrapped build, ` +
-      `which would leave the native menu doing nothing, or the refusal copy changed and MARKERS needs updating.`,
-  );
-}
+for (const seam of SEAMS) {
+  const found = foundBySeam.get(seam.name)!;
 
-if (!shouldBePresent && found.size > 0) {
-  fail(
-    `a browser build must NOT contain the command seam, but found ${[...found].map((m) => JSON.stringify(m)).join(", ")}. ` +
-      `Two ways to get here. If you meant to build a wrapper bundle, use \`npm run build:desktop\` rather than ` +
-      `\`npm run build -- --mode desktop\`, because the plain build's postbuild checks for a BROWSER bundle. ` +
-      `Otherwise a new unguarded caller of src/game/hostCommands.ts has pulled it back into every player's bundle: ` +
-      `the IS_WRAPPED_BUILD guards in appBoot.ts and frameLoop.ts are what let Rollup drop it.`,
-  );
+  if (shouldBePresent && found.size !== seam.markers.length) {
+    const missing = seam.markers.filter((m) => !found.has(m));
+    fail(
+      `a "${arg}" build must CONTAIN the ${seam.name}, but ${missing.length} of ${seam.markers.length} markers ` +
+        `are missing (${missing.map((m) => JSON.stringify(m)).join(", ")}). Either it was eliminated from a ` +
+        `wrapped build, which would leave the feature silently doing nothing, or one of those literals was ` +
+        `reworded and SEAMS needs updating. This positive direction exists because a typo that dropped the ` +
+        `module from EVERY build would otherwise pass the browser check silently.`,
+    );
+  }
+
+  if (!shouldBePresent && found.size > 0) {
+    fail(
+      `a browser build must NOT contain the ${seam.name}, but found ` +
+        `${[...found].map((m) => JSON.stringify(m)).join(", ")}. Two ways to get here. If you meant to build a ` +
+        `wrapper bundle, use \`npm run build:desktop\` rather than \`npm run build -- --mode desktop\`, because ` +
+        `the plain build's postbuild checks for a BROWSER bundle. Otherwise ${seam.guardHint}`,
+    );
+  }
 }
 
 console.log(
-  `verify-wrapper-seam: ${arg} build is correct (command seam ${shouldBePresent ? "present" : "absent"}, ` +
-    `${files.length} file${files.length === 1 ? "" : "s"} scanned)`,
+  `verify-wrapper-seam: ${arg} build is correct (` +
+    SEAMS.map((s) => `${s.name} ${shouldBePresent ? "present" : "absent"}`).join(", ") +
+    `, ${files.length} file${files.length === 1 ? "" : "s"} scanned)`,
 );

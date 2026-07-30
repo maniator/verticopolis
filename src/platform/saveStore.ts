@@ -58,6 +58,20 @@ export interface SaveScope {
    * desktop shell a path would carry an account identifier onto it.
    */
   readonly label: string;
+  /**
+   * True for the one scope that is SHARED across accounts on this machine, and
+   * absent on an account-private one. Exactly one scope should carry it.
+   *
+   * It exists so the localStorage migration can be aimed structurally rather
+   * than by convention. localStorage is per-origin and predates any notion of
+   * an account, so a tower found there has no knowable owner: the previous
+   * account on this machine may have left it. Migrating into whatever scope
+   * happened to be default would, once a default means "the account logged in
+   * right now", sweep the previous player's towers into this player's Steam
+   * Cloud. Marking the shared scope lets the migration refuse to write anywhere
+   * else, so the unsafe version is not expressible.
+   */
+  readonly shared?: boolean;
 }
 
 /**
