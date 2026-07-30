@@ -167,10 +167,11 @@ describe("facilityDiagnostics: lobby-distance advice names only buildable slots"
     expect(line?.getAttribute("style")).toBe("color:var(--bad)");
   });
 
-  it("names the teardown when stories rest on the blocked slot", () => {
-    // Slot 30 carries floor tiles AND supports built stories above (31-33), so
-    // bulldozing it is refused until those come down; the advice must say so
-    // rather than send the player into a clear-then-refuse loop.
+  it("upgrades a built-through bare-floor slot in place: no teardown advice", () => {
+    // Slot 30 carries only plain floor tiles AND supports built stories above
+    // (31-33). A lobby now upgrades bare floor in place (the shipped in-place
+    // conversion, both structural so support is preserved), so the fix is
+    // painless: no clear-then-demolish loop even with stories resting on it.
     const sim = new Simulation();
     sim.money = 1e12;
     sim.star = 5;
@@ -186,9 +187,9 @@ describe("facilityDiagnostics: lobby-distance advice names only buildable slots"
     unit.state = "occupied";
     const frag = render(facilityDiagnostics(sim, unit));
     const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Far from"));
-    expect(line?.textContent).toContain(
-      "A sky lobby on floor 30 would lift it (the stories above it must come down before it can be cleared).",
-    );
+    expect(line?.textContent).toContain("A sky lobby on floor 30 would lift it.");
+    expect(line?.textContent).not.toContain("come down");
+    expect(line?.textContent).not.toContain("clear");
   });
 
   it("tells a tenant sitting on the empty slot floor to move, not to demolish itself", () => {
@@ -216,23 +217,25 @@ describe("facilityDiagnostics: lobby-distance advice names only buildable slots"
     );
     expect(line?.textContent).not.toContain("Clear floor 30");
 
-    // The same tenant inside a built-through tower: stories above the slot must
-    // come down before its story can be cleared, and the advice says so.
+    // The same tenant inside a built-through tower: stories above the slot do
+    // NOT change the advice. The office is a room, freely removable no matter
+    // what rests above it, so no teardown-above step is named: moving it leaves
+    // bare floor the lobby upgrades in place, and the stories above keep support.
     for (let fl = 31; fl <= 33; fl++) {
       for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
     }
     const tall = render(facilityDiagnostics(sim, unit));
     const tallLine = [...tall.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Too far"));
     expect(tallLine?.textContent).toContain(
-      "This unit sits on the empty sky lobby slot; take down the stories above floor 30, move it, clear the story, and build the lobby there to anchor the block.",
+      "This unit sits on the empty sky lobby slot; move it, clear the story, and build the lobby on floor 30 to anchor the block.",
     );
+    expect(tallLine?.textContent).not.toContain("take down the stories above");
   });
 
-  it("names the clearing step when the buildable slot already carries non-lobby content", () => {
+  it("advises building the lobby directly on a bare-floor slot (in-place upgrade, no clear step)", () => {
     // Lobbies at 1 and 15; slot 30 was skipped and extended through with plain
-    // floor tiles instead. The office on floor 23 (distance 8 from the floor-15
-    // lobby) is capped; the fix is slot 30, but a lobby there is refused until
-    // the story is cleared, so the advice must name that step.
+    // floor tiles. A lobby now upgrades that bare floor in place, so the advice
+    // names no clearing step: just build the lobby on 30.
     const sim = new Simulation();
     sim.money = 1e12;
     sim.star = 5;
@@ -247,7 +250,32 @@ describe("facilityDiagnostics: lobby-distance advice names only buildable slots"
     const unit = sim.tower.units.find((u) => u.id === r.unitId)!;
     unit.state = "occupied";
     expect(sim.tower.nearestBuildableLobbySlot(23)).toBe(30); // precondition: the blocked slot is the fix
-    expect(sim.tower.floorHasNonLobbyContent(30)).toBe(true);
+    expect(sim.tower.floorHasRoom(30)).toBe(false); // only bare floor, no rooms
+    const frag = render(facilityDiagnostics(sim, unit));
+    const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Far from"));
+    expect(line?.textContent).toContain("A sky lobby on floor 30 would lift it.");
+    expect(line?.textContent).not.toContain("clear that floor first");
+  });
+
+  it("still names the clearing step when the buildable slot carries a ROOM", () => {
+    // A room (not bare floor) on the fix slot must be cleared before a lobby: a
+    // lobby is transit-only and can't sit on a room, so the clearFirst advice
+    // survives for rooms even though bare floor now upgrades in place.
+    const sim = new Simulation();
+    sim.money = 1e12;
+    sim.star = 5;
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let fl = 2; fl <= 30; fl++) {
+      const kind = fl === 15 ? "lobby" : "floor";
+      for (let x = 10; x < 30; x++) expect(sim.tower.place(kind, fl, x).ok).toBe(true);
+    }
+    expect(sim.buildTransport("elevatorStandard", 10, 1, 30).ok).toBe(true);
+    expect(sim.tower.place("office", 30, 20).ok).toBe(true); // a ROOM on the fix slot
+    const r = sim.tower.place("office", 23, 15);
+    expect(r.ok).toBe(true);
+    const unit = sim.tower.units.find((u) => u.id === r.unitId)!;
+    unit.state = "occupied";
+    expect(sim.tower.floorHasRoom(30)).toBe(true);
     const frag = render(facilityDiagnostics(sim, unit));
     const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Far from"));
     expect(line?.textContent).toContain("A sky lobby on floor 30 would lift it (clear that floor first).");

@@ -191,10 +191,10 @@ describe("F2 / Step 5 — honest v2 endgame: a served, well-zoned tower wins und
       for (let x = C; x < W; x++) sim.tower.place(k, f, x);
       for (let x = C - 1; x >= 0; x--) sim.tower.place(k, f, x);
     };
-    // Sky-lobby floors get LOBBY tiles, not floor tiles: a lobby can't be laid
-    // over existing floor tiles ("Clear the floor tiles or rooms here first"),
-    // so the old lay-floors-then-lobbies order silently left the tower with no
-    // sky lobbies at all, and an express with nothing to stop at.
+    // Sky-lobby floors get LOBBY tiles directly, so the express has a concourse
+    // to stop at. (A lobby laid over existing floor now upgrades it in place, so
+    // a floors-then-lobbies order would also work, but laying lobby tiles here
+    // keeps the fixture explicit about which stories are concourses.)
     const sky = [15, 30, 45, 60, 75, 90];
     const skyset = new Set(sky);
     lay("lobby", 1);
