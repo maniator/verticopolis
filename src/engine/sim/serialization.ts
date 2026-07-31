@@ -12,6 +12,7 @@ import { MILESTONES } from "../milestones";
 import { canonicalSubtype, subtypeListFor } from "../retailSubtypes";
 import { FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isFacilityKind, isFixedSpanTransport, isHotelKind, maxCarsFor } from "../facilities";
 import type { FacilityKind, GameMode, SerializedGame, Transport } from "../types";
+import { isStructural } from "../tower/towerTopology";
 
 import { isGameMode, isUnitState, isVacateReason } from "../types";
 import { coerceSchedule } from "../elevatorSchedule";
@@ -182,15 +183,19 @@ export function deserialize(raw: SerializedGame): Simulation {
   }
   sim.tower.units = rawUnits
     .map((u) => {
-      // Coerce geometry to finite integers, and keep the whole FOOTPRINT on
-      // the lot (not just the origin): forged floor/x/width would otherwise
-      // flow into renderer math (silhouette edges, lobby variant indexing,
-      // actor positions) as NaN/Infinity, make a per-tile draw loop iterate
-      // an absurd width, or hang a span/multi-story room off the lot edge.
+      // Coerce geometry to finite integers and keep the whole FOOTPRINT on the
+      // lot: forged floor/x/width would otherwise flow into renderer math as
+      // NaN/Infinity, drive an absurd per-tile draw loop, or hang off the edge.
+      // Clamp a STRUCTURAL tile (floor/lobby, always laid one width-1 tile) to
+      // its catalog, so a forged wide "floor" can't orphan structure on a
+      // sky-lobby in-place upgrade. Rooms are NOT clamped: TDT import and legacy
+      // reflow keep a room's original width even when wider than catalog. #731.
       const stories = facilityFloors(u.kind);
+      const cat = FACILITIES[u.kind].width;
       const floor = Math.max(GRID.minFloor, Math.min(GRID.maxFloor - (stories - 1), Math.round(num(u.floor, 1))));
       const x = Math.max(0, Math.min(GRID.width - 1, Math.round(num(u.x, 0))));
-      const width = Math.max(1, Math.min(GRID.width - x, Math.round(num(u.width, FACILITIES[u.kind].width))));
+      const cap = isStructural(u.kind) ? cat : GRID.width - x;
+      const width = Math.max(1, Math.min(GRID.width - x, cap, Math.round(num(u.width, cat))));
       // Coerce the free-form state first (a forged `state` would flow into UI
       // innerHTML and state-machine compares); the sold/leased flag below reads it.
       const state = isUnitState(u.state) ? u.state : "empty";
@@ -379,14 +384,9 @@ export function deserialize(raw: SerializedGame): Simulation {
       // never deserialize a zero-height shaft from a corrupt save.
       const top = Math.max(bottom + 1, Math.min(GRID.maxFloor, Math.round(num(t.top, bottom + 1))));
       // Shaft width is normally fixed per kind, but a legacy save keeps its own
-      // stored width (canon widths only ever GREW: stairs 4→8, standard
-      // elevator 3→4) and the consumers trust it, so preserve a valid stored
-      // width up to the catalog's. A width ABOVE the catalog is always forged
-      // (no canon width ever shrank), and trusting it would let one corrupt
-      // entry shadow every transport under its bogus footprint through the
-      // overlap filter below (and rasterize an oversized texture), so clamp
-      // down to the catalog. Non-positive/non-finite falls back to the
-      // catalog too (it would NaN-poison the W1 span scan and hit-testing).
+      // stored width (canon widths only ever GREW: stairs 4→8, standard elevator
+      // 3→4), so preserve a valid stored width up to the catalog's, and clamp an
+      // above-catalog (forged) or non-positive width down to it.
       const w0 = Math.round(num(t.width, FACILITIES[t.kind].width));
       const width = w0 > 0 ? Math.min(w0, FACILITIES[t.kind].width) : FACILITIES[t.kind].width;
       const fixLen = (arr: unknown, fill: number) =>
