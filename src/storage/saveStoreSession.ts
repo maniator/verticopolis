@@ -48,7 +48,7 @@ export interface SaveAddress {
 }
 
 /** Why a write was refused, when it was refused before being attempted. */
-export type WriteRefusal = "no-store" | "unknown-origin" | "origin-gone";
+export type WriteRefusal = "no-store" | "origin-gone";
 
 export interface SaveStoreSession {
   /** Every record the shell reported at boot, filtered to ids the game owns. */

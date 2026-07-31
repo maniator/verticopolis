@@ -45,20 +45,23 @@ export async function persistAutosave(sim: Simulation): Promise<void> {
     const result = await writeTowerToStore("auto", await SaveGame.export(sim));
     if (result.ok) return;
 
-    // ONLY `origin-gone` forbids a fallback, and conflating the refusals cost a
-    // save. That one means the tower's own scope disappeared mid-session, and
-    // the entire point of refusing is to avoid writing it somewhere every
-    // account on the machine can read; falling back would do exactly that. A
-    // periodic autosave is best effort, and the next tick retries once the
-    // shell reports the scope again.
+    // The store decides whether a localStorage fallback is safe, because only
+    // it knows which scope the tower was headed for.
     //
-    // Every other refusal is an ordinary failure with no privacy dimension. A
-    // full disk, an IO error, or a store that vanished are all reasons to keep
-    // the tower SOMEWHERE rather than nowhere, so they fall through to
-    // localStorage exactly as a browser session would. Treating them like
-    // `origin-gone` meant a disk-full desktop session wrote to neither store
-    // and lost every autosave with no log and no UI.
-    if (result.refusal === "origin-gone") return;
+    // An earlier version keyed this on the refusal NAME and fell back for
+    // everything except `origin-gone`. That reopened the leak it was avoiding,
+    // one step further out: a single disk-full tick on an account-scoped tower
+    // wrote it to localStorage, where it carries no scope, and the next boot's
+    // migration correctly read it as ownerless and moved it into the SHARED
+    // namespace, where every account on the machine can read it. Reaching that
+    // destination in two steps is not better than reaching it in one.
+    //
+    // A fallback is safe when the tower was headed for the shared scope anyway,
+    // or when there is no store and therefore no account context at all. Those
+    // are the cases where localStorage adds no exposure the tower did not
+    // already have. Everything else keeps the tower out of localStorage and
+    // retries on the next tick, which is what a best-effort autosave is for.
+    if (!result.localFallbackSafe) return;
   }
   await SaveGame.saveAsync(sim);
 }

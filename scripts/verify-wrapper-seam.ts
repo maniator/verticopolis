@@ -62,18 +62,14 @@ interface Seam {
   /** Appended to the browser-direction failure: what pulled it back in. */
   readonly guardHint: string;
   /**
-   * Set false for a seam that is expected in NO build yet, because the feature
-   * is gated off behind a runtime constant Rollup can fold.
+   * Markers that only ship once a runtime gate opens, checked for ABSENCE in a
+   * browser build like any other but not required in a wrapped one yet.
    *
-   * Only the browser direction is then checked, and that is a deliberate,
-   * temporary weakening rather than the one-sided check this script warns
-   * about: the positive direction exists to catch a seam that vanished from
-   * every build, and here it is SUPPOSED to be absent from every build.
-   * Asserting presence would fail honestly-correct builds, and dropping the
-   * seam entirely would stop watching the browser side. Restore it with the
-   * change that opens the gate.
+   * Splitting them is what keeps both directions alive on a partly-gated seam.
+   * Requiring them failed honestly-correct desktop builds; dropping the whole
+   * positive direction stopped watching for a seam that vanished everywhere.
    */
-  readonly expectedInWrappedBuilds?: boolean;
+  readonly gatedMarkers?: readonly string[];
 }
 
 const SEAMS: readonly Seam[] = [
@@ -96,16 +92,18 @@ const SEAMS: readonly Seam[] = [
     // `simtower-clone-unreadable` are deliberately NOT here: both live in
     // SaveGame.ts, which every build ships.
     //
-    // `origin-gone` is the account-isolation refusal, and it is listed because
-    // once the gate opens its ABSENCE would mean that refusal was eliminated,
-    // which is the one failure in this seam that costs privacy rather than a
-    // feature. It is not checked yet; see `expectedInWrappedBuilds` below.
-    markers: ["auto-legacy", "already-present", "write-failed", "origin-gone"],
-    // The whole feature is behind `storeIsAuthoritative()`, which is false
-    // until the read path lands. Rollup folds it, so the migration AND the
-    // write path drop out of the desktop bundle too, correctly. There is no
-    // honest desktop-present marker while that holds. Flip this with the gate.
-    expectedInWrappedBuilds: false,
+    // `auto-legacy` reaches a desktop bundle even with the gate closed, via
+    // `openSaveStore` -> `sessionFromSnapshot` -> `isSaveSlotId` -> the slot id
+    // list, all of which run BEFORE the tripwire is consulted. So the positive
+    // direction still has something real to assert.
+    markers: ["auto-legacy"],
+    // These three are reached only past `storeIsAuthoritative()`, which is
+    // false until the read path lands, so the minifier proves the branch dead
+    // and drops them. Absence from a desktop build is correct today. Move them
+    // up into `markers` with the change that opens the gate: at that point
+    // `origin-gone` going missing would mean the account-isolation refusal was
+    // eliminated, which is the one failure here that costs privacy.
+    gatedMarkers: ["already-present", "write-failed", "origin-gone"],
     guardHint:
       "something now imports src/game/desktopSaveStore.ts (or the storage modules under it) outside an " +
       "IS_WRAPPED_BUILD branch, so every web player downloads a save store and a localStorage migration that " +
@@ -140,17 +138,21 @@ const foundBySeam = new Map<string, Set<string>>();
 for (const seam of SEAMS) {
   const found = new Set<string>();
   for (const text of texts) {
-    for (const marker of seam.markers) if (text.includes(marker)) found.add(marker);
+    for (const marker of [...seam.markers, ...(seam.gatedMarkers ?? [])]) {
+      if (text.includes(marker)) found.add(marker);
+    }
   }
   foundBySeam.set(seam.name, found);
 }
 
 for (const seam of SEAMS) {
   const found = foundBySeam.get(seam.name)!;
-  const expectPresent = shouldBePresent && seam.expectedInWrappedBuilds !== false;
+  const expectPresent = shouldBePresent;
 
-  if (expectPresent && found.size !== seam.markers.length) {
-    const missing = seam.markers.filter((m) => !found.has(m));
+  // Presence is required only of the UNGATED markers.
+  const requiredPresent = seam.markers.filter((m) => !found.has(m));
+  if (expectPresent && requiredPresent.length > 0) {
+    const missing = requiredPresent;
     fail(
       `a "${arg}" build must CONTAIN the ${seam.name}, but ${missing.length} of ${seam.markers.length} markers ` +
         `are missing (${missing.map((m) => JSON.stringify(m)).join(", ")}). Either it was eliminated from a ` +
@@ -173,8 +175,9 @@ for (const seam of SEAMS) {
 console.log(
   `verify-wrapper-seam: ${arg} build is correct (` +
     SEAMS.map((s) => {
-      const gatedOff = shouldBePresent && s.expectedInWrappedBuilds === false;
-      return `${s.name} ${gatedOff ? "gated off, browser-absent only" : shouldBePresent ? "present" : "absent"}`;
+      if (!shouldBePresent) return `${s.name} absent`;
+      const partly = (s.gatedMarkers?.length ?? 0) > 0;
+      return `${s.name} present${partly ? " (gated parts not yet expected)" : ""}`;
     }).join(", ") +
     `, ${files.length} file${files.length === 1 ? "" : "s"} scanned)`,
 );

@@ -311,7 +311,15 @@ describe("writeTowerToStore honors the tower's origin", () => {
     await prepareSaveStore();
     noteTowerOrigin({ id: "slot-1", scope: ACCOUNT });
 
-    expect(await writeTowerToStore("slot-1", "VCTOWER1\nAAA\n")).toEqual({ ok: false, refusal: "origin-gone" });
+    expect(await writeTowerToStore("slot-1", "VCTOWER1\nAAA\n")).toEqual({
+      ok: false,
+      refusal: "origin-gone",
+      // Never safe to write to localStorage instead: this is precisely the
+      // tower whose scope vanished, and localStorage carries no scope, so the
+      // next boot's migration would read it as ownerless and move it into the
+      // SHARED namespace.
+      localFallbackSafe: false,
+    });
     expect(calls.writes).toEqual([]);
   });
 
@@ -362,12 +370,59 @@ describe("writeTowerToStore honors the tower's origin", () => {
     injectedStore = port;
     await prepareSaveStore();
 
-    expect(await writeTowerToStore("auto", "x")).toEqual({ ok: false, refusal: "failed", code: "full" });
+    // Headed for LOCAL, the shared scope, so localStorage adds no exposure the
+    // tower did not already have and the caller may fall back.
+    expect(await writeTowerToStore("auto", "x")).toEqual({
+      ok: false,
+      refusal: "failed",
+      code: "full",
+      localFallbackSafe: true,
+    });
   });
 
   it("refuses when there is no store at all", async () => {
     await prepareSaveStore();
-    expect(await writeTowerToStore("auto", "x")).toEqual({ ok: false, refusal: "no-store" });
+    // No store means no account context at all, so localStorage cannot leak
+    // between accounts and is simply the only place a tower can go.
+    expect(await writeTowerToStore("auto", "x")).toEqual({
+      ok: false,
+      refusal: "no-store",
+      localFallbackSafe: true,
+    });
+  });
+
+  it("REGRESSION: a failed write on an ACCOUNT-scoped tower is not fallback-safe", async () => {
+    // The leak the confirming pass found in the previous fix. Falling back on
+    // any refusal except `origin-gone` meant one disk-full tick wrote an
+    // account's tower to localStorage, where it carries no scope; the next
+    // boot's migration then correctly read it as ownerless and moved it into
+    // the SHARED namespace, reachable by every account on the machine. Two
+    // steps to the destination `origin-gone` refuses in one.
+    const { port } = fakeStore(SCOPES);
+    port.write = () => Promise.reject(Object.assign(new Error("full"), { code: "full" }));
+    injectedStore = port;
+    await prepareSaveStore();
+    noteTowerOrigin({ id: "slot-1", scope: ACCOUNT });
+
+    expect(await writeTowerToStore("slot-1", "x")).toEqual({
+      ok: false,
+      refusal: "failed",
+      code: "full",
+      localFallbackSafe: false,
+    });
+  });
+
+  it("does not overwrite the live tower's origin id on a successful write", async () => {
+    // `loadedFrom = resolved.target` was unconditional, so a tower opened from
+    // slot-2 reported its origin as `auto` after one autosave tick.
+    const { port } = fakeStore(SCOPES);
+    injectedStore = port;
+    await prepareSaveStore();
+    noteTowerOrigin({ id: "slot-2", scope: LOCAL });
+
+    await writeTowerToStore("auto", "x");
+
+    expect(towerOrigin()).toEqual({ id: "slot-2", scope: LOCAL });
   });
 
   it("REGRESSION (AC5): writing a tower never touches localStorage", async () => {

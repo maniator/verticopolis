@@ -153,3 +153,52 @@ describe("persistAutosave on a wrapped build", () => {
     await expect(persistAutosave(Simulation.newGame(7))).resolves.toBeUndefined();
   });
 });
+
+describe("the localStorage fallback cannot leak an account's tower", () => {
+  it("REGRESSION: a failed write on an ACCOUNT-scoped tower writes nowhere", async () => {
+    // The leak a confirming pass found in an earlier fix. Keying the fallback on
+    // the refusal NAME, and falling back for everything except `origin-gone`,
+    // meant one disk-full tick wrote an account's tower into localStorage.
+    // localStorage carries no scope, so the next boot's migration correctly
+    // read it as ownerless and moved it into the SHARED namespace, where every
+    // account on the machine can read it. That reaches in two steps the
+    // destination `origin-gone` refuses to reach in one.
+    //
+    // This test fails if the check goes back to `result.refusal === "origin-gone"`.
+    const ACCOUNT = asScopeToken("account:test-scope");
+    const port: SaveStorePort = {
+      list: (): Promise<SaveStoreSnapshot> =>
+        Promise.resolve({
+          scopes: [
+            { token: LOCAL, label: "This computer", shared: true },
+            { token: ACCOUNT, label: "Your towers" },
+          ],
+          records: [],
+        }),
+      read: () => Promise.resolve(null),
+      write: () => Promise.reject(Object.assign(new Error("no space"), { code: "full" })),
+      delete: () => Promise.resolve(),
+    };
+    injectedStore = port;
+    await prepareSaveStore();
+    noteTowerOrigin({ id: "auto", scope: ACCOUNT });
+
+    await persistAutosave(Simulation.newGame(7));
+
+    expect(localStorage.length).toBe(0);
+  });
+
+  it("but a SHARED-scoped tower may fall back, since that adds no exposure", async () => {
+    // The other half, and why this is not just "never fall back": a tower headed
+    // for the shared scope is already readable by every account on the machine,
+    // so localStorage costs it nothing and losing the save costs the player.
+    const { port } = fakeStore();
+    port.write = () => Promise.reject(Object.assign(new Error("no space"), { code: "full" }));
+    injectedStore = port;
+    await prepareSaveStore();
+
+    await persistAutosave(Simulation.newGame(7));
+
+    expect(localStorage.getItem("verticopolis-save")).not.toBeNull();
+  });
+});

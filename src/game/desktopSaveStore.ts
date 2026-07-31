@@ -151,11 +151,20 @@ async function runPrepare(): Promise<void> {
  */
 const BOOT_STORE_TIMEOUT_MS = 3000;
 
-function withTimeout<T>(work: Promise<T>): Promise<T | null> {
-  return Promise.race([
-    work,
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), BOOT_STORE_TIMEOUT_MS)),
-  ]);
+async function withTimeout<T>(work: Promise<T>): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), BOOT_STORE_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    // Cleared on the winning path too. Losing the race does not cancel the
+    // timer, so a fast success still left a 3s handle holding the race closure.
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }
 
 /** The store as resolved at boot, or null when there is none this session.
@@ -174,7 +183,13 @@ export function saveMigrationReport(): MigrationReport | null {
  *
  * FALSE, deliberately, and this is a tripwire rather than a feature flag.
  *
- * The write path is finished and tested; the READ path is not. `SaveGame` still
+ * ONE of four write sites is routed (the periodic autosave, via
+ * `persistAutosave`). Quick Save, the pre-reload flush, context-loss recovery
+ * and slot saves all still call `SaveGame` directly, so flipping this without
+ * routing them would put the autosave in the store and the pre-reload flush in
+ * localStorage: two writers disagreeing about where the tower lives.
+ *
+ * The READ path is not routed at all. `SaveGame` still
  * answers `load`, `hasSave`, `listSlots` and `hasSlot` from localStorage across
  * twenty call sites. Writing autosaves to the store while reads come from
  * localStorage would mean a player's progress went somewhere nothing reads: the
@@ -221,8 +236,27 @@ export function towerOrigin(): SaveAddress | undefined {
 
 export type StoreWriteResult =
   | { readonly ok: true }
-  | { readonly ok: false; readonly refusal: WriteRefusal }
-  | { readonly ok: false; readonly refusal: "failed"; readonly code?: string };
+  | {
+      readonly ok: false;
+      readonly refusal: WriteRefusal | "failed";
+      readonly code?: string;
+      /**
+       * Whether writing this tower to localStorage instead would be safe.
+       *
+       * localStorage is per-origin and carries no scope, so anything written
+       * there is INDISTINGUISHABLE from a pre-account-era tower, and the
+       * migration will later sweep it into the shared namespace on the
+       * reasoning that it has no knowable owner. That reasoning is sound for
+       * towers that were already there. It is false for one this build put
+       * there from an account-scoped session, and writing it anyway reaches
+       * the same place `origin-gone` refuses to reach, just in two steps.
+       *
+       * So a fallback is safe only when the tower was headed for the SHARED
+       * scope anyway, or when there is no store at all and therefore no
+       * account context to leak between.
+       */
+      readonly localFallbackSafe: boolean;
+    };
 
 /**
  * Write a tower to the store, honoring the origin rule.
@@ -238,22 +272,35 @@ export type StoreWriteResult =
  */
 export async function writeTowerToStore(id: SaveSlotId, contents: string): Promise<StoreWriteResult> {
   const store = getPlatform().saveStore;
-  if (!store || !session) return { ok: false, refusal: "no-store" };
+  // No store at all means no account context either, so localStorage is simply
+  // the only place a tower can go and nothing can leak between accounts.
+  if (!store || !session) return { ok: false, refusal: "no-store", localFallbackSafe: true };
 
   const resolved = resolveWriteTarget(session, id, loadedFrom);
-  if (!resolved.ok) return { ok: false, refusal: resolved.refusal };
+  if (!resolved.ok) {
+    // `origin-gone` is never safe to fall back from: the tower belongs to a
+    // scope that disappeared, which is exactly the tower that must not land
+    // somewhere ownerless.
+    return { ok: false, refusal: resolved.refusal, localFallbackSafe: false };
+  }
+  const headedForShared = resolved.target.scope === session.sharedScope;
 
   try {
     await store.write(resolved.target.id, contents, resolved.target.scope, nextSeq(resolved.target));
   } catch (err) {
     const code = (err as { code?: unknown } | null | undefined)?.code;
-    return { ok: false, refusal: "failed", ...(typeof code === "string" ? { code } : {}) };
+    return {
+      ok: false,
+      refusal: "failed",
+      ...(typeof code === "string" ? { code } : {}),
+      localFallbackSafe: headedForShared,
+    };
   }
-  // A tower that had no origin has one now, so the NEXT autosave targets the
-  // scope this one landed in rather than re-deciding from the default. Without
-  // this, a shell that changed its default scope mid-session would scatter one
-  // tower's autosaves across two namespaces.
-  loadedFrom = resolved.target;
+  // A tower that had NO origin has one now, so the next autosave targets the
+  // scope this one landed in rather than re-deciding from the default. Guarded
+  // on absence: an unconditional assignment also overwrote the id, so a tower
+  // opened from slot-2 reported its origin as `auto` after one autosave tick.
+  loadedFrom ??= resolved.target;
   return { ok: true };
 }
 
