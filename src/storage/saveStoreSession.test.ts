@@ -14,7 +14,7 @@ const LOCAL: SaveScopeToken = asScopeToken("local");
 /** A SECOND scope, which no shell offers today. Every account-selective rule in
  *  this module is unreachable without one, so the fixture is what makes those
  *  rules testable now instead of after they are needed. */
-const ACCOUNT: SaveScopeToken = asScopeToken("account:76561198027391269");
+const ACCOUNT: SaveScopeToken = asScopeToken("account:test-scope");
 
 const SNAPSHOT = {
   scopes: [

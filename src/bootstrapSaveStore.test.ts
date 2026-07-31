@@ -54,7 +54,7 @@ function stubWebGL(): void {
 
 beforeEach(() => {
   order.length = 0;
-  prepareSaveStore.mockClear();
+  prepareSaveStore.mockReset();
   document.body.innerHTML = `<div id="stage"></div>`;
   vi.restoreAllMocks();
   stubWebGL();

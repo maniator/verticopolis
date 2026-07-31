@@ -41,7 +41,7 @@ import type { SaveSlotId } from "../storage/saveMigration";
 
 let session: SaveStoreSession | null = null;
 let migration: MigrationReport | null = null;
-let prepared = false;
+let inflight: Promise<void> | null = null;
 
 /**
  * Where the LIVE tower was opened from, or undefined for one that has never
@@ -55,16 +55,21 @@ let prepared = false;
 let loadedFrom: SaveAddress | undefined;
 
 /**
- * Per-id write counter. Session-scoped, and deliberately NOT persisted: the
- * port contract states the shell's high-water mark must not survive a restart
- * either, because a persisted mark would silently drop every write of the next
- * session once the game's counter started over.
+ * Per-ADDRESS write counter. Session-scoped, and deliberately NOT persisted:
+ * the port contract states the shell's high-water mark must not survive a
+ * restart either, because a persisted mark would silently drop every write of
+ * the next session once the game's counter started over.
  */
-const seqById = new Map<string, number>();
+const seqByAddress = new Map<string, number>();
 
-function nextSeq(id: string): number {
-  const next = (seqById.get(id) ?? 0) + 1;
-  seqById.set(id, next);
+function nextSeq(address: SaveAddress): number {
+  // Keyed by (id, scope), not by id. An id is unique only WITHIN a scope, which
+  // is this module's whole thesis, so two different towers sharing an id
+  // across scopes must not share one counter: whichever way the shell keys its
+  // high-water mark, one of them would lose writes.
+  const key = `${address.scope}|${address.id}`;
+  const next = (seqByAddress.get(key) ?? 0) + 1;
+  seqByAddress.set(key, next);
   return next;
 }
 
@@ -77,20 +82,46 @@ function nextSeq(id: string): number {
  * already swallowed by `openSaveStore` and `migrateSavesToStore`; the outer
  * guard is for the ones neither of them owns.
  */
-export async function prepareSaveStore(): Promise<void> {
-  if (prepared) return;
-  prepared = true;
-  try {
-    const store = getPlatform().saveStore;
-    if (!store) return;
-    session = await openSaveStore(store);
-    if (!session) return;
+export function prepareSaveStore(): Promise<void> {
+  // The PROMISE is memoized, not a boolean. A boolean latch set before the
+  // first await let a second caller during the in-flight window return
+  // immediately with `session` still null, and take the localStorage fallback
+  // for the whole page load. Sequential awaits in a test cannot tell the two
+  // apart, which is why the old test passed.
+  inflight ??= runPrepare();
+  return inflight;
+}
 
+async function runPrepare(): Promise<void> {
+  const store = getPlatform().saveStore;
+  if (!store) return;
+
+  try {
+    session = await withTimeout(openSaveStore(store));
+  } catch {
+    // A port that throws synchronously, or one that never answers.
+    session = null;
+  }
+  if (!session) return;
+
+  // The migration is gated on the SAME tripwire as the write path, and leaving
+  // it ungated was a real defect rather than an oversight worth arguing about.
+  //
+  // Migrating while writes still go to localStorage produces exactly the
+  // divergence the tripwire exists to prevent: boot 1 copies the towers into
+  // the store, every autosave afterwards lands in localStorage, and boot 2 sees
+  // the destinations already occupied and skips (correctly, per the derived
+  // done-marker). The store is then frozen at boot 1 forever, and the day the
+  // readers are routed the player loads a tower missing every session since.
+  // Gating the harmless half and leaving the dangerous half open is worse than
+  // gating neither.
+  if (!storeIsAuthoritative()) return;
+
+  try {
     // The migration may only ever write into the shell-marked SHARED scope, and
     // it comes from `migrationTarget` rather than from `defaultScope` so that
     // aiming it at an account is not expressible. Null means the shell marked
-    // no shared scope, and the correct answer is to skip: localStorage keeps
-    // the towers, and a later boot with a properly marked scope moves them.
+    // no shared scope, and the correct answer is to skip.
     const target = migrationTarget(session);
     if (target === null) return;
     migration = await migrateSavesToStore(store, target, idsInScope(session, target));
@@ -99,12 +130,32 @@ export async function prepareSaveStore(): Promise<void> {
     // just wrote. Without this, everything it moved would be invisible for the
     // rest of the session and the next boot would find it "already present"
     // while the player saw an empty saves list.
-    if (migration.migratedAny) session = (await openSaveStore(store)) ?? session;
+    if (migration.migratedAny) session = (await withTimeout(openSaveStore(store))) ?? session;
   } catch {
-    // A shell whose port throws synchronously, or any failure the inner guards
-    // do not own. Boot continues on localStorage.
-    session = null;
+    // A migration failure does NOT discard an already-resolved session. The
+    // store is still readable and writable; only the one-time move failed, and
+    // it retries on the next boot because localStorage is never cleared.
+    // Nulling the session here would abandon a working store for the whole
+    // page load over a recoverable problem.
+    migration = null;
   }
+}
+
+/**
+ * Bound anything that crosses the bridge during boot.
+ *
+ * "Never rejects" was not the same as "never hangs", and the difference is the
+ * whole boot: this is awaited before first paint, so a shell that accepts a
+ * call and never answers leaves the player on a blank page with no splash, no
+ * message, and no reload button. A rejection at least degrades to localStorage.
+ */
+const BOOT_STORE_TIMEOUT_MS = 3000;
+
+function withTimeout<T>(work: Promise<T>): Promise<T | null> {
+  return Promise.race([
+    work,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), BOOT_STORE_TIMEOUT_MS)),
+  ]);
 }
 
 /** The store as resolved at boot, or null when there is none this session.
@@ -193,7 +244,7 @@ export async function writeTowerToStore(id: SaveSlotId, contents: string): Promi
   if (!resolved.ok) return { ok: false, refusal: resolved.refusal };
 
   try {
-    await store.write(resolved.target.id, contents, resolved.target.scope, nextSeq(id));
+    await store.write(resolved.target.id, contents, resolved.target.scope, nextSeq(resolved.target));
   } catch (err) {
     const code = (err as { code?: unknown } | null | undefined)?.code;
     return { ok: false, refusal: "failed", ...(typeof code === "string" ? { code } : {}) };
@@ -211,8 +262,8 @@ export async function writeTowerToStore(id: SaveSlotId, contents: string): Promi
 export function resetSaveStoreForTests(): void {
   session = null;
   migration = null;
-  prepared = false;
+  inflight = null;
   loadedFrom = undefined;
-  seqById.clear();
+  seqByAddress.clear();
   authoritative = false;
 }

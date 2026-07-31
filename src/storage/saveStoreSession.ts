@@ -26,6 +26,21 @@ import { isSaveSlotId, type SaveSlotId } from "./saveMigration";
  * branch with a test behind it.
  */
 
+declare const SHARED_SCOPE: unique symbol;
+
+/**
+ * A scope token the shell marked SHARED, distinguished at the type level.
+ *
+ * `migrationTarget` is the only producer, and `migrateSavesToStore` takes this
+ * rather than a bare `SaveScopeToken`. That is the difference between the
+ * unsafe call being discouraged and being inexpressible: with a plain token
+ * parameter, `migrateSavesToStore(store, session.defaultScope!, ...)`
+ * typechecked, compiled, and passed the whole suite, and a doc comment saying
+ * "MUST be the shared scope" was the only thing standing between that and one
+ * account's towers landing in another's Steam Cloud.
+ */
+export type SharedScopeToken = SaveScopeToken & { readonly [SHARED_SCOPE]: true };
+
 /** How the game addresses a stored tower: an id is unique only within a scope. */
 export interface SaveAddress {
   readonly id: SaveSlotId;
@@ -76,9 +91,9 @@ export function sessionFromSnapshot(snapshot: unknown): SaveStoreSession {
           isSaveSlotId(r?.id) && typeof r?.scope === "string" && known.has(r.scope as SaveScopeToken),
       )
     : [];
-  // The FIRST scope marked shared, not "any" and not "the only one". A shell
-  // that marks two is malformed, and picking one arbitrarily would make the
-  // migration's destination depend on array order.
+  // Exactly ONE, or nothing. A shell that marks two is malformed, and picking
+  // either would make the migration's destination depend on array order, which
+  // is the same class of bug as guessing.
   const shared = scopes.filter((s) => s.shared === true);
   return {
     records,
@@ -142,8 +157,8 @@ export function resolveWriteTarget(
  * entirely, which is the correct conservative answer: localStorage keeps the
  * towers and a later boot with a properly marked scope moves them.
  */
-export function migrationTarget(session: SaveStoreSession): SaveScopeToken | null {
-  return session.sharedScope ?? null;
+export function migrationTarget(session: SaveStoreSession): SharedScopeToken | null {
+  return session.sharedScope === undefined ? null : (session.sharedScope as SharedScopeToken);
 }
 
 /**

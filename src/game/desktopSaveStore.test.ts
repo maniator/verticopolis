@@ -16,7 +16,7 @@ import { STORE_MAGIC, toBase64 } from "../storage/saveCompression";
  */
 
 const LOCAL: SaveScopeToken = asScopeToken("local");
-const ACCOUNT: SaveScopeToken = asScopeToken("account:76561198027391269");
+const ACCOUNT: SaveScopeToken = asScopeToken("account:test-scope");
 
 let injectedStore: SaveStorePort | undefined;
 
@@ -33,9 +33,16 @@ vi.mock("../platform", async (importOriginal) => ({
   }),
 }));
 
-const { prepareSaveStore, saveStoreSession, saveMigrationReport, resetSaveStoreForTests, writeTowerToStore, noteTowerOrigin, towerOrigin } = await import(
-  "./desktopSaveStore"
-);
+const {
+  prepareSaveStore,
+  saveStoreSession,
+  saveMigrationReport,
+  resetSaveStoreForTests,
+  setStoreAuthoritativeForTests,
+  writeTowerToStore,
+  noteTowerOrigin,
+  towerOrigin,
+} = await import("./desktopSaveStore");
 
 const TOWER = { minutes: 4321, units: [{ t: "office" }], towerName: "Old Guard", money: 500 };
 
@@ -76,6 +83,33 @@ beforeEach(() => {
   resetSaveStoreForTests();
   injectedStore = undefined;
   localStorage.clear();
+  // The migration and the write path are BOTH gated on the tripwire, so these
+  // tests arm it. One test below deliberately does not, and pins that a
+  // non-authoritative store migrates nothing: gating only the write path left
+  // boot 1 copying towers into a store that boot 2 then froze forever.
+  setStoreAuthoritativeForTests(true);
+});
+
+describe("the tripwire gates the MIGRATION, not just the write path", () => {
+  it("migrates nothing while the store is not authoritative", async () => {
+    // The defect this pins. Migrating while autosaves still go to localStorage
+    // copies the towers at boot 1, and boot 2 finds the destinations occupied
+    // and skips (correctly, per the derived done-marker), so the store is
+    // frozen at boot 1. The day the readers are routed, the player loads a
+    // tower missing every session since.
+    resetSaveStoreForTests();
+    const { port, calls } = fakeStore([{ token: LOCAL, label: "This computer", shared: true }]);
+    injectedStore = port;
+    localStorage.setItem("verticopolis-save", storeValue(TOWER));
+
+    await prepareSaveStore();
+
+    // The session still resolves, so reads are ready the moment the gate flips.
+    expect(saveStoreSession()?.defaultScope).toBe(LOCAL);
+    expect(saveMigrationReport()).toBeNull();
+    expect(calls.writes).toEqual([]);
+    expect(localStorage.getItem("verticopolis-save")).not.toBeNull();
+  });
 });
 
 describe("prepareSaveStore", () => {

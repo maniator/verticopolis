@@ -61,6 +61,19 @@ interface Seam {
   readonly markers: readonly string[];
   /** Appended to the browser-direction failure: what pulled it back in. */
   readonly guardHint: string;
+  /**
+   * Set false for a seam that is expected in NO build yet, because the feature
+   * is gated off behind a runtime constant Rollup can fold.
+   *
+   * Only the browser direction is then checked, and that is a deliberate,
+   * temporary weakening rather than the one-sided check this script warns
+   * about: the positive direction exists to catch a seam that vanished from
+   * every build, and here it is SUPPOSED to be absent from every build.
+   * Asserting presence would fail honestly-correct builds, and dropping the
+   * seam entirely would stop watching the browser side. Restore it with the
+   * change that opens the gate.
+   */
+  readonly expectedInWrappedBuilds?: boolean;
 }
 
 const SEAMS: readonly Seam[] = [
@@ -83,18 +96,16 @@ const SEAMS: readonly Seam[] = [
     // `simtower-clone-unreadable` are deliberately NOT here: both live in
     // SaveGame.ts, which every build ships.
     //
-    // `origin-gone` is NOT listed, and its absence is currently CORRECT rather
-    // than an oversight. It is the account-isolation refusal, reached only
-    // through the autosave write path, and that path is gated behind
-    // `storeIsAuthoritative()` until the readers are routed too (see
-    // `desktopSaveStore.ts`). Rollup proves the gate constant, folds the branch,
-    // and genuinely drops the refusal from the bundle. Asserting it here would
-    // fail every desktop build over code that really is not shipping.
-    //
-    // Add it back in the change that flips that gate. At that point its absence
-    // WOULD mean the refusal was eliminated, which is the one failure in this
-    // seam that costs privacy rather than a feature.
-    markers: ["auto-legacy", "already-present", "write-failed"],
+    // `origin-gone` is the account-isolation refusal, and it is listed because
+    // once the gate opens its ABSENCE would mean that refusal was eliminated,
+    // which is the one failure in this seam that costs privacy rather than a
+    // feature. It is not checked yet; see `expectedInWrappedBuilds` below.
+    markers: ["auto-legacy", "already-present", "write-failed", "origin-gone"],
+    // The whole feature is behind `storeIsAuthoritative()`, which is false
+    // until the read path lands. Rollup folds it, so the migration AND the
+    // write path drop out of the desktop bundle too, correctly. There is no
+    // honest desktop-present marker while that holds. Flip this with the gate.
+    expectedInWrappedBuilds: false,
     guardHint:
       "something now imports src/game/desktopSaveStore.ts (or the storage modules under it) outside an " +
       "IS_WRAPPED_BUILD branch, so every web player downloads a save store and a localStorage migration that " +
@@ -136,8 +147,9 @@ for (const seam of SEAMS) {
 
 for (const seam of SEAMS) {
   const found = foundBySeam.get(seam.name)!;
+  const expectPresent = shouldBePresent && seam.expectedInWrappedBuilds !== false;
 
-  if (shouldBePresent && found.size !== seam.markers.length) {
+  if (expectPresent && found.size !== seam.markers.length) {
     const missing = seam.markers.filter((m) => !found.has(m));
     fail(
       `a "${arg}" build must CONTAIN the ${seam.name}, but ${missing.length} of ${seam.markers.length} markers ` +
@@ -160,6 +172,9 @@ for (const seam of SEAMS) {
 
 console.log(
   `verify-wrapper-seam: ${arg} build is correct (` +
-    SEAMS.map((s) => `${s.name} ${shouldBePresent ? "present" : "absent"}`).join(", ") +
+    SEAMS.map((s) => {
+      const gatedOff = shouldBePresent && s.expectedInWrappedBuilds === false;
+      return `${s.name} ${gatedOff ? "gated off, browser-absent only" : shouldBePresent ? "present" : "absent"}`;
+    }).join(", ") +
     `, ${files.length} file${files.length === 1 ? "" : "s"} scanned)`,
 );

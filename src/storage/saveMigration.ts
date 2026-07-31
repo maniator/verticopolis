@@ -1,6 +1,7 @@
 import { deflateSync } from "fflate";
 import { fromBase64, inflateCapped, STORE_MAGIC, toBase64, TOWER_FILE_MAGIC } from "./saveCompression";
-import { saveStoreErrorCode, type SaveScopeToken, type SaveStoreErrorCode, type SaveStorePort } from "../platform/saveStore";
+import { saveStoreErrorCode, type SaveStoreErrorCode, type SaveStorePort } from "../platform/saveStore";
+import type { SharedScopeToken } from "./saveStoreSession";
 
 /**
  * One-time migration of localStorage towers into a shell-provided save store.
@@ -297,18 +298,20 @@ const MIGRATION_SEQ = 1;
  * snapshot, because a record in some other scope must not suppress a migration
  * into this one.
  *
- * `scope` MUST be the shared scope. Callers get it from
- * `SaveStoreSession.sharedScope`, never from `defaultScope`, and the two are
- * the same token today only because a shell offers one scope. A tower found in
- * localStorage has no knowable owner: localStorage is per-origin and predates
- * any notion of an account, so the previous account on this machine may have
- * left it. Once a default scope means "the account logged in right now",
- * migrating into it would sweep the previous player's towers into this
- * player's Steam Cloud.
+ * `scope` is a `SharedScopeToken`, whose only producer is `migrationTarget`.
+ * The type is the enforcement: a doc comment saying "MUST be the shared scope"
+ * left `migrateSavesToStore(store, session.defaultScope!, ...)` compiling
+ * cleanly and passing the whole suite.
+ *
+ * A tower found in localStorage has no knowable owner. localStorage is
+ * per-origin and predates any notion of an account, so the previous account on
+ * this machine may have left it. Once a default scope means "the account logged
+ * in right now", migrating into it would sweep the previous player's towers
+ * into this player's Steam Cloud.
  */
 export async function migrateSavesToStore(
   store: SaveStorePort,
-  scope: SaveScopeToken,
+  scope: SharedScopeToken,
   existingIds: ReadonlySet<string>,
   read: RawSaveReader = localStorageReader,
 ): Promise<MigrationReport> {

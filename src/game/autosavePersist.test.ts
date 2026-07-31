@@ -94,6 +94,15 @@ describe("persistAutosave on a wrapped build", () => {
     // from localStorage would send a player's progress somewhere nothing
     // reads: the next launch would load the pre-migration copy and the session
     // would silently vanish. The two halves ship together.
+    // Read the module's INITIAL value, not one the test seam just wrote.
+    // Asserting after `resetSaveStoreForTests()` was a tautology: that helper
+    // sets the flag false, so flipping the production default to true left the
+    // test green and the guard inert.
+    vi.resetModules();
+    const fresh = await import("./desktopSaveStore");
+    expect(fresh.storeIsAuthoritative()).toBe(false);
+    // Then put the LIVE module (the one `persistAutosave` closed over) back to
+    // that default, since `beforeEach` arms it for the routing tests.
     resetSaveStoreForTests();
     expect(storeIsAuthoritative()).toBe(false);
 

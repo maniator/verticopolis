@@ -42,15 +42,23 @@ export async function persistAutosave(sim: Simulation): Promise<void> {
     // `export` rather than `saveAsync`: the store holds `.vctower` text, the
     // same container the migration writes and `SaveGame.import` reads, so one
     // format crosses the bridge instead of two.
+    const result = await writeTowerToStore("auto", await SaveGame.export(sim));
+    if (result.ok) return;
+
+    // ONLY `origin-gone` forbids a fallback, and conflating the refusals cost a
+    // save. That one means the tower's own scope disappeared mid-session, and
+    // the entire point of refusing is to avoid writing it somewhere every
+    // account on the machine can read; falling back would do exactly that. A
+    // periodic autosave is best effort, and the next tick retries once the
+    // shell reports the scope again.
     //
-    // A refusal is deliberately NOT retried against localStorage. The one
-    // refusal that can fire is `origin-gone`, meaning the tower's own scope
-    // disappeared mid-session, and the whole point of refusing is to avoid
-    // writing it somewhere every account on the machine can read. Falling back
-    // would do exactly that. A periodic autosave is best effort; the next tick
-    // tries again once the shell reports the scope.
-    await writeTowerToStore("auto", await SaveGame.export(sim));
-    return;
+    // Every other refusal is an ordinary failure with no privacy dimension. A
+    // full disk, an IO error, or a store that vanished are all reasons to keep
+    // the tower SOMEWHERE rather than nowhere, so they fall through to
+    // localStorage exactly as a browser session would. Treating them like
+    // `origin-gone` meant a disk-full desktop session wrote to neither store
+    // and lost every autosave with no log and no UI.
+    if (result.refusal === "origin-gone") return;
   }
   await SaveGame.saveAsync(sim);
 }
