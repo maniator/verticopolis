@@ -215,6 +215,25 @@ describe("sparse v3 unit serialization", () => {
     expect(round.units.find((u) => u.kind === "office")!.noRate).toBeUndefined();
   });
 
+  it("clamps a forged wide STRUCTURAL tile to the catalog but preserves room widths (#731)", () => {
+    // #731: a sky lobby upgrades a floor tile in place by clearing one underlying
+    // tile per width-1 lobby tile, so a forged wide "floor" would orphan its
+    // outer tiles. deserialize clamps a structural (floor/lobby) width to the
+    // catalog (1). Rooms are deliberately NOT clamped: TDT import and legacy
+    // reflow legitimately carry a room wider than the current catalog, and
+    // clamping would betray that preserved-size fidelity.
+    const { sim, officeId } = classicOfficeSim();
+    const save = sim.serialize();
+    const floorU = save.units.find((u) => u.kind === "floor")!;
+    (floorU as { width?: number }).width = 4; // forge a 4-wide structural tile
+    const wideOffice = FACILITIES.office.width + 2;
+    (save.units.find((u) => u.id === officeId) as { width?: number }).width = wideOffice; // forged over-wide room
+    const loaded = Simulation.deserialize(JSON.parse(JSON.stringify(save)) as SerializedGame);
+    const lf = loaded.tower.units.find((u) => u.kind === "floor" && u.floor === floorU.floor && u.x === floorU.x)!;
+    expect(lf.width).toBe(1); // structural clamped to FACILITIES.floor.width
+    expect(loaded.tower.getUnit(officeId)!.width).toBe(wideOffice); // room width preserved, never clamped
+  });
+
   it("shrinks the REAL 12,975-unit tower to under half its full-shape JSON and reloads identically", () => {
     const sim = Simulation.deserialize(decodeVctower(towerFile)); // v1 fixture -> reflow -> live tower
     const sparse = sim.serialize();
