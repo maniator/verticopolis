@@ -59,19 +59,30 @@ export interface SaveScope {
    */
   readonly label: string;
   /**
-   * True for the one scope that is SHARED across accounts on this machine, and
-   * absent on an account-private one. Exactly one scope should carry it.
+   * True for the one scope SHARED across accounts on this machine, false for an
+   * account-private one. REQUIRED, and exactly one scope should be true.
    *
-   * It exists so the localStorage migration can be aimed structurally rather
-   * than by convention. localStorage is per-origin and predates any notion of
-   * an account, so a tower found there has no knowable owner: the previous
-   * account on this machine may have left it. Migrating into whatever scope
-   * happened to be default would, once a default means "the account logged in
-   * right now", sweep the previous player's towers into this player's Steam
-   * Cloud. Marking the shared scope lets the migration refuse to write anywhere
-   * else, so the unsafe version is not expressible.
+   * Required rather than optional, and that is load-bearing. The game cannot
+   * infer which namespace is shared, and every fallback it makes depends on
+   * knowing: localStorage is per-origin and carries no scope, so writing a
+   * tower there is safe only when the tower was headed somewhere equally
+   * shared. An optional flag meant the obvious first shell (one scope, left
+   * unmarked) answered "no scope is shared", which made every fallback unsafe
+   * and silently sent autosaves nowhere at all.
+   *
+   * A scope missing this is DROPPED by `sessionFromSnapshot`, so an
+   * under-specified shell degrades to plain localStorage rather than to a
+   * half-working store. That is the safe direction: it is the behavior every
+   * browser session already has.
+   *
+   * It also lets the localStorage migration be aimed structurally rather than
+   * by convention. A tower found in localStorage has no knowable owner (the
+   * previous account on this machine may have left it), so migrating into
+   * whatever scope happened to be default would, once a default means "the
+   * account logged in right now", sweep the previous player's towers into this
+   * player's Steam Cloud.
    */
-  readonly shared?: boolean;
+  readonly shared: boolean;
 }
 
 /**

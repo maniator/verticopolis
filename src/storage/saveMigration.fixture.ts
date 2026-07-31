@@ -50,7 +50,7 @@ export function fakeStore(existing: Record<string, string> = {}) {
   let dropSilently: string | null = null;
   const port: SaveStorePort = {
     list(): Promise<SaveStoreSnapshot> {
-      return Promise.resolve({ scopes: [{ token: SCOPE, label: "This computer" }], records: [] });
+      return Promise.resolve({ scopes: [{ token: SCOPE, label: "This computer", shared: true }], records: [] });
     },
     read(id: string): Promise<string | null> {
       return Promise.resolve(written.get(id)?.contents ?? existing[id] ?? null);

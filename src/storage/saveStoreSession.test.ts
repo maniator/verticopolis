@@ -18,8 +18,8 @@ const ACCOUNT: SaveScopeToken = asScopeToken("account:test-scope");
 
 const SNAPSHOT = {
   scopes: [
-    { token: LOCAL, label: "Towers on this computer" },
-    { token: ACCOUNT, label: "Your towers" },
+    { token: LOCAL, label: "Towers on this computer", shared: true },
+    { token: ACCOUNT, label: "Your towers", shared: false },
   ],
   records: [
     { id: "auto", scope: LOCAL, bytes: 100 },
@@ -44,7 +44,7 @@ describe("sessionFromSnapshot treats the snapshot as untrusted", () => {
     // nothing about what they resolve to. An unrecognized id carried through
     // would surface as a phantom slot in the saves list.
     const s = sessionOf({
-      scopes: [{ token: LOCAL, label: "L" }],
+      scopes: [{ token: LOCAL, label: "L", shared: true }],
       records: [
         { id: "auto", scope: LOCAL, bytes: 1 },
         { id: "slot-9", scope: LOCAL, bytes: 1 },
@@ -59,7 +59,7 @@ describe("sessionFromSnapshot treats the snapshot as untrusted", () => {
     // Otherwise the UI holds a token it has no label for, and a write could be
     // aimed at a scope the shell never said it had.
     const s = sessionOf({
-      scopes: [{ token: LOCAL, label: "L" }],
+      scopes: [{ token: LOCAL, label: "L", shared: true }],
       records: [
         { id: "auto", scope: LOCAL, bytes: 1 },
         { id: "slot-1", scope: asScopeToken("ghost"), bytes: 1 },
@@ -103,8 +103,8 @@ describe("idsInScope is scope-aware", () => {
     // in both, and they are different towers.
     const s = sessionOf({
       scopes: [
-        { token: LOCAL, label: "L" },
-        { token: ACCOUNT, label: "A" },
+        { token: LOCAL, label: "L", shared: true },
+        { token: ACCOUNT, label: "A", shared: false },
       ],
       records: [
         { id: "slot-1", scope: LOCAL, bytes: 1 },
@@ -136,7 +136,7 @@ describe("resolveWriteTarget: autosave follows the tower's ORIGIN", () => {
     // On a desktop shell this is the account changing mid-session. Falling back
     // to the default scope here is the specific mistake this function exists to
     // prevent, so the refusal is asserted rather than the fallback.
-    const onlyLocal = sessionOf({ scopes: [{ token: LOCAL, label: "L" }], records: [] });
+    const onlyLocal = sessionOf({ scopes: [{ token: LOCAL, label: "L", shared: true }], records: [] });
     expect(resolveWriteTarget(onlyLocal, "slot-1", { id: "slot-1", scope: ACCOUNT })).toEqual({
       ok: false,
       refusal: "origin-gone",
@@ -212,7 +212,7 @@ describe("sharedScope: the migration's only legal destination", () => {
     // is shared across accounts; the game does not infer it.
     const s = sessionFromSnapshot({
       scopes: [
-        { token: ACCOUNT, label: "Your towers" },
+        { token: ACCOUNT, label: "Your towers", shared: false },
         { token: LOCAL, label: "Towers on this computer", shared: true },
       ],
       records: [],
@@ -227,7 +227,7 @@ describe("sharedScope: the migration's only legal destination", () => {
     // defaultScope here is exactly how the previous account's leftover towers
     // would end up in the current account's Steam Cloud. Skipping costs
     // nothing: localStorage keeps them and a later boot moves them.
-    const s = sessionFromSnapshot({ scopes: [{ token: ACCOUNT, label: "A" }], records: [] });
+    const s = sessionFromSnapshot({ scopes: [{ token: ACCOUNT, label: "A", shared: false }], records: [] });
     expect(s.defaultScope).toBe(ACCOUNT);
     expect(s.sharedScope).toBeUndefined();
     expect(migrationTarget(s)).toBeNull();
@@ -258,8 +258,8 @@ describe("sharedScope: the migration's only legal destination", () => {
     // migration's destination is either the shell-marked shared scope or
     // nothing. There is no input that makes it name an unmarked scope.
     const snapshots = [
-      { scopes: [{ token: ACCOUNT, label: "A" }], records: [] },
-      { scopes: [{ token: ACCOUNT, label: "A" }, { token: LOCAL, label: "L", shared: true }], records: [] },
+      { scopes: [{ token: ACCOUNT, label: "A", shared: false }], records: [] },
+      { scopes: [{ token: ACCOUNT, label: "A", shared: false }, { token: LOCAL, label: "L", shared: true }], records: [] },
       { scopes: [{ token: ACCOUNT, label: "A", shared: true }], records: [] },
     ];
     for (const snap of snapshots) {
@@ -270,5 +270,46 @@ describe("sharedScope: the migration's only legal destination", () => {
         expect(sessionFromSnapshot(snap).scopes.find((x) => x.token === target)?.shared).toBe(true);
       }
     }
+  });
+});
+
+describe("the shared flag is required, not inferred", () => {
+  it("drops a scope that omits it, degrading to no store at all", () => {
+    // The obvious first shell implementation is one scope, and leaving `shared`
+    // optional meant that shell answered "nothing is shared". Every localStorage
+    // fallback then read as unsafe and the periodic autosave wrote NOWHERE,
+    // which is worse than the browser behavior it replaced. Dropping the scope
+    // instead degrades the whole store to plain localStorage, which is the
+    // behavior every browser session already has.
+    const s = sessionFromSnapshot({
+      scopes: [{ token: LOCAL, label: "This computer" }],
+      records: [{ id: "auto", scope: LOCAL, bytes: 1 }],
+    });
+    expect(s.scopes).toEqual([]);
+    expect(s.defaultScope).toBeUndefined();
+    expect(s.records).toEqual([]);
+  });
+
+  it("keeps a scope that declares it either way", () => {
+    const s = sessionFromSnapshot({
+      scopes: [
+        { token: ACCOUNT, label: "Your towers", shared: false },
+        { token: LOCAL, label: "This computer", shared: true },
+      ],
+      records: [],
+    });
+    expect(s.scopes.map((x) => x.token)).toEqual([ACCOUNT, LOCAL]);
+    expect(s.sharedScope).toBe(LOCAL);
+  });
+
+  it("drops a scope whose token is the empty string", () => {
+    // `defaultScope` would be "" and pass every `!== undefined` guard, so writes
+    // would target a scope the shell never named.
+    const s = sessionFromSnapshot({
+      scopes: [{ token: asScopeToken(""), label: "Nameless", shared: true }],
+      records: [],
+    });
+    expect(s.scopes).toEqual([]);
+    expect(s.defaultScope).toBeUndefined();
   });
 });

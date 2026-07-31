@@ -171,7 +171,7 @@ describe("the localStorage fallback cannot leak an account's tower", () => {
         Promise.resolve({
           scopes: [
             { token: LOCAL, label: "This computer", shared: true },
-            { token: ACCOUNT, label: "Your towers" },
+            { token: ACCOUNT, label: "Your towers", shared: false },
           ],
           records: [],
         }),

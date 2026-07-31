@@ -70,6 +70,18 @@ interface Seam {
    * positive direction stopped watching for a seam that vanished everywhere.
    */
   readonly gatedMarkers?: readonly string[];
+  /**
+   * Require each marker to be a COMPLETE string literal rather than a substring.
+   *
+   * Off by default because the command seam's markers are fragments of longer
+   * messages (the refusal copy is interpolated: "[platform] Ignoring unknown
+   * host command: ${command}"), so demanding a whole literal would fail a
+   * correct build. On for seams whose markers really are whole literals, where
+   * a bare substring test fails OPEN: "auto-legacy" matched "auto-legacyX", so
+   * renaming a marker to a superset kept the check green while the literal it
+   * was watching no longer existed.
+   */
+  readonly wholeLiterals?: boolean;
 }
 
 const SEAMS: readonly Seam[] = [
@@ -104,6 +116,9 @@ const SEAMS: readonly Seam[] = [
     // `origin-gone` going missing would mean the account-isolation refusal was
     // eliminated, which is the one failure here that costs privacy.
     gatedMarkers: ["already-present", "write-failed", "origin-gone"],
+    // These are whole literals (slot ids and outcome names), so they can be
+    // matched exactly rather than by substring.
+    wholeLiterals: true,
     guardHint:
       "something now imports src/game/desktopSaveStore.ts (or the storage modules under it) outside an " +
       "IS_WRAPPED_BUILD branch, so every web player downloads a save store and a localStorage migration that " +
@@ -111,6 +126,19 @@ const SEAMS: readonly Seam[] = [
       "statically replaces import.meta.env.MODE.",
   },
 ];
+
+/**
+ * Whether the emitted JS contains this marker as a WHOLE string literal.
+ *
+ * A bare `includes` fails OPEN on supersets: `auto-legacy` matched
+ * `auto-legacyX`, so renaming a marker to something longer kept the desktop
+ * check green while the literal it was watching no longer existed. Minifiers
+ * preserve string literals along with their quotes and may pick either style,
+ * so both are tried, plus the template form.
+ */
+function containsLiteral(text: string, marker: string): boolean {
+  return ['"', "'", "`"].some((q) => text.includes(q + marker + q));
+}
 
 function fail(msg: string): never {
   console.error(`verify-wrapper-seam: ${msg}`);
@@ -139,7 +167,7 @@ for (const seam of SEAMS) {
   const found = new Set<string>();
   for (const text of texts) {
     for (const marker of [...seam.markers, ...(seam.gatedMarkers ?? [])]) {
-      if (text.includes(marker)) found.add(marker);
+      if (seam.wholeLiterals ? containsLiteral(text, marker) : text.includes(marker)) found.add(marker);
     }
   }
   foundBySeam.set(seam.name, found);

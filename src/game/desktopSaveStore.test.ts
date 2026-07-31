@@ -51,7 +51,7 @@ function storeValue(obj: unknown): string {
 }
 
 /** A store whose scopes are configurable, so the shared-scope gating is testable. */
-function fakeStore(scopes: { token: SaveScopeToken; label: string; shared?: boolean }[]) {
+function fakeStore(scopes: { token: SaveScopeToken; label: string; shared: boolean }[]) {
   const held = new Map<string, string>();
   const calls = { list: 0, writes: [] as { id: string; scope: SaveScopeToken }[] };
   const port: SaveStorePort = {
@@ -138,7 +138,7 @@ describe("prepareSaveStore", () => {
     // leftover localStorage towers into this player's Steam Cloud. A tower found
     // in localStorage has no knowable owner, so with no shell-marked shared
     // scope the only safe answer is to write nothing at all.
-    const { port, calls } = fakeStore([{ token: ACCOUNT, label: "Your towers" }]);
+    const { port, calls } = fakeStore([{ token: ACCOUNT, label: "Your towers", shared: false }]);
     injectedStore = port;
     localStorage.setItem("verticopolis-save", storeValue(TOWER));
 
@@ -156,7 +156,7 @@ describe("prepareSaveStore", () => {
     // Order must not decide where towers land, and "default" must never stand in
     // for "shared".
     const { port, calls } = fakeStore([
-      { token: ACCOUNT, label: "Your towers" },
+      { token: ACCOUNT, label: "Your towers", shared: false },
       { token: LOCAL, label: "This computer", shared: true },
     ]);
     injectedStore = port;
@@ -278,7 +278,7 @@ describe("prepareSaveStore", () => {
 describe("writeTowerToStore honors the tower's origin", () => {
   const SCOPES = [
     { token: LOCAL, label: "This computer", shared: true },
-    { token: ACCOUNT, label: "Your towers" },
+    { token: ACCOUNT, label: "Your towers", shared: false },
   ];
 
   it("sends a tower with no origin to the default scope", async () => {

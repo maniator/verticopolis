@@ -82,7 +82,17 @@ export interface SaveStoreSession {
 export function sessionFromSnapshot(snapshot: unknown): SaveStoreSession {
   const raw = snapshot as Partial<SaveStoreSnapshot> | null | undefined;
   const scopes = Array.isArray(raw?.scopes)
-    ? raw.scopes.filter((s): s is SaveScope => typeof s?.token === "string" && typeof s?.label === "string")
+    ? raw.scopes.filter(
+        (s): s is SaveScope =>
+          typeof s?.token === "string" &&
+          s.token !== "" &&
+          typeof s?.label === "string" &&
+          // `shared` is REQUIRED. A scope that omits it is dropped rather than
+          // assumed private, because assuming makes every localStorage fallback
+          // unsafe and sends autosaves nowhere. Dropping degrades the whole
+          // store to plain localStorage, which is what a browser already does.
+          typeof s?.shared === "boolean",
+      )
     : [];
   const known = new Set(scopes.map((s) => s.token));
   const records = Array.isArray(raw?.records)

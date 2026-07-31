@@ -54,6 +54,10 @@ let inflight: Promise<void> | null = null;
  */
 let loadedFrom: SaveAddress | undefined;
 
+/** Whether {@link loadedFrom}'s scope was the shared one, remembered at the
+ *  moment it was resolved so the question survives the session going away. */
+let loadedFromShared = false;
+
 /**
  * Per-ADDRESS write counter. Session-scoped, and deliberately NOT persisted:
  * the port contract states the shell's high-water mark must not survive a
@@ -227,6 +231,9 @@ export function setStoreAuthoritativeForTests(value: boolean): void {
  */
 export function noteTowerOrigin(address: SaveAddress | undefined): void {
   loadedFrom = address;
+  // Recomputed rather than assumed: the caller knows the address, not whether
+  // that scope is the shared one.
+  loadedFromShared = address !== undefined && address.scope === session?.sharedScope;
 }
 
 /** Where the live tower came from, for the saves UI and for tests. */
@@ -272,16 +279,32 @@ export type StoreWriteResult =
  */
 export async function writeTowerToStore(id: SaveSlotId, contents: string): Promise<StoreWriteResult> {
   const store = getPlatform().saveStore;
-  // No store at all means no account context either, so localStorage is simply
-  // the only place a tower can go and nothing can leak between accounts.
-  if (!store || !session) return { ok: false, refusal: "no-store", localFallbackSafe: true };
+  if (!store || !session) {
+    // No store means no account context of its own, but the LIVE tower may
+    // still have come from one earlier in this session. Consulting the
+    // remembered shared-ness rather than answering `true` unconditionally is
+    // what keeps this from becoming a leak if a store ever vanishes mid-session
+    // while an account-scoped tower is open.
+    return { ok: false, refusal: "no-store", localFallbackSafe: loadedFrom === undefined || loadedFromShared };
+  }
 
   const resolved = resolveWriteTarget(session, id, loadedFrom);
   if (!resolved.ok) {
-    // `origin-gone` is never safe to fall back from: the tower belongs to a
-    // scope that disappeared, which is exactly the tower that must not land
-    // somewhere ownerless.
-    return { ok: false, refusal: resolved.refusal, localFallbackSafe: false };
+    // The two refusals differ, and treating them alike was a trap waiting for
+    // whoever wired the read path.
+    //
+    // `origin-gone`: the tower belongs to a scope that disappeared, which is
+    // exactly the tower that must not land somewhere ownerless. Never safe.
+    //
+    // `no-store` from here means the session offered no scope at all, so there
+    // is no account context to leak between and localStorage is the only place
+    // a tower can go. Same situation as the branch above, and it must give the
+    // same answer.
+    return {
+      ok: false,
+      refusal: resolved.refusal,
+      localFallbackSafe: resolved.refusal === "no-store",
+    };
   }
   const headedForShared = resolved.target.scope === session.sharedScope;
 
@@ -300,7 +323,12 @@ export async function writeTowerToStore(id: SaveSlotId, contents: string): Promi
   // scope this one landed in rather than re-deciding from the default. Guarded
   // on absence: an unconditional assignment also overwrote the id, so a tower
   // opened from slot-2 reported its origin as `auto` after one autosave tick.
-  loadedFrom ??= resolved.target;
+  if (loadedFrom === undefined) {
+    loadedFrom = resolved.target;
+    // Remembered alongside the address, so a later question about fallback
+    // safety can be answered even if the session is gone by then.
+    loadedFromShared = headedForShared;
+  }
   return { ok: true };
 }
 
@@ -311,6 +339,7 @@ export function resetSaveStoreForTests(): void {
   migration = null;
   inflight = null;
   loadedFrom = undefined;
+  loadedFromShared = false;
   seqByAddress.clear();
   authoritative = false;
 }
