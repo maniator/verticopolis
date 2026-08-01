@@ -1,9 +1,7 @@
 import {
-  TDT_ELEVATOR_BUILT_FIXED,
   TDT_ELEVATOR_HEADER_SIZE,
-  TDT_ELEVATOR_CAR_BLOCK_SIZE,
-  TDT_ELEVATOR_PER_FLOOR_SIZE,
   TDT_ELEVATOR_SLOTS,
+  builtShaftPayloadSize,
   TDT_FINANCE_SIZE,
   TDT_FLOOR_COUNT,
   TDT_FLOOR_INDEX_ENTRIES,
@@ -199,19 +197,14 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     const serviced = new Set(
       e.serviced ?? Array.from({ length: e.topFloor - e.bottomFloor + 1 }, (_, i) => e.bottomFloor + i),
     );
-    let servicedCount = 0;
-    for (let fl = 0; fl < TDT_FLOOR_COUNT; fl++) {
-      const stops = serviced.has(fl);
-      u8(stops ? 1 : 0);
-      if (stops) servicedCount++;
-    }
+    for (let fl = 0; fl < TDT_FLOOR_COUNT; fl++) u8(serviced.has(fl) ? 1 : 0);
     for (let c = 0; c < 8; c++) u8(e.carHomes?.[c] ?? e.bottomFloor);
-    // Built-shaft payload (live passenger state); zero-filled, sized exactly as
-    // the parser skips it: a fixed block, one per-floor entry per SERVICED
-    // floor, then a SINGLE car block (cars-INDEPENDENT, harness-confirmed on the
-    // real 1994 game). NOT `cars *`: that overran multi-car shafts and desynced
-    // the retail game's elevator table. See tdtFormat.ts / tdtExport.ts.
-    pad(TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_CAR_BLOCK_SIZE);
+    // Built-shaft payload (live passenger state); zero-filled, sized by the same
+    // shared helper the writer and the reader's skip use, so a fixture can never
+    // quietly encode a different rule than the code under test. An inverted spec
+    // span throws there rather than padding a negative (silently zero) length,
+    // which would hand the suite a file with a header and no payload.
+    pad(builtShaftPayloadSize(e.bottomFloor, e.topFloor));
   }
 
   // ---- Finance + parking + stairs -------------------------------------------

@@ -4,7 +4,7 @@ import { FACILITIES, GRID, facilityFloors, isCommercialKind, isHotelKind, reside
 import type { SerializedGame, SerializedUnit } from "../engine/types";
 import { isPresent } from "../engine/types";
 import { TDT_FLOOR_OFFSET } from "./tdtConstants";
-import { HOTEL_ASLEEP_FLAG, HOTEL_DIRTY_FLAG, HOTEL_OCCUPANT_MASK, TDT_BURNED, isLobbyFloor } from "./tdtTables";
+import { HOTEL_ASLEEP_FLAG, HOTEL_DIRTY_FLAG, HOTEL_OCCUPANT_MASK, isLobbyFloor } from "./tdtTables";
 import { rentFromClass } from "./tdtTables";
 import { KIND_TENANT, PART_STACKS, classFromRent, type OutTenant } from "./tdtExportTables";
 
@@ -28,8 +28,17 @@ function norm(u: SerializedUnit) {
   };
 }
 
-/** A normalized room (a unit with its optional fields defaulted). */
-export type GatheredRoom = ReturnType<typeof norm>;
+/** A normalized room (a unit with its optional fields defaulted), plus whether
+ *  the gather pass wrote a tenant record for it, and why not when it did not.
+ *  A room that emits nothing (a burned shell, or a footprint that does not fit
+ *  the TDT rows) still appears here, so anything reasoning about what the FILE
+ *  contains must read `emitted` rather than re-derive the test. Out-of-range is
+ *  checked first, so a burned room that ALSO falls outside the rows reports as
+ *  out of range, matching the order the tenant loop used to test them in. */
+export type GatheredRoom = ReturnType<typeof norm> & {
+  emitted: boolean;
+  skipReason?: "outOfRange" | "burned" | "unmappable";
+};
 
 /** Loss/quirk tally the exporter fills while gathering; consumed by the report. */
 export interface ExportCounts {
@@ -160,29 +169,62 @@ export function gatherTower(save: SerializedGame): GatheredTower {
       widen(u.floor, u.x, u.x + u.width);
       continue;
     }
-    rooms.push(u);
+    // Decide ONCE whether this room will produce a tenant record, and carry the
+    // answer on the room itself. Two kinds of room reach `rooms` and write
+    // nothing: a footprint that does not fit the TDT rows, and a burned shell.
+    // The format HAS a burned marker (type 48) but the retail game renders such
+    // a record as garbage pixels (measured on the Wine harness, one wide record
+    // and a strip of 1-tile records alike), so a burned room is cleared instead:
+    // emitting nothing leaves the tiles to the paving pass, which fills them
+    // with bare floor (lobby on the ground row) exactly as the original shows
+    // once debris is cleared, and matches what our own importer does with a
+    // type-48 record it reads. The EXPORT report carries that loss; the file
+    // cannot, since nothing then distinguishes those tiles from floor that never
+    // burned. See docs/canon/tdt-format.md §5.
+    //
+    // Every consumer that reasons about what is IN the file (the tenant loop
+    // below, the parking chain, the cathedral stack probe) reads this flag.
+    // Re-deriving the test per site is how three separate consumers each ended
+    // up wrong in their own way.
+    const burned = u.state === "fire" || u.state === "gutted";
+    const fits = fitsTdtRows(u.floor, facilityFloors(u.kind));
+    // A kind with no 1994 equivalent writes nothing either (no tenant id and no
+    // part stack). Nothing buildable in Classic lands here today, but a forged
+    // or mode-mismatched save carrying a Modern-only room would, and the flag
+    // has to describe the FILE, not the intent.
+    const mappable = KIND_TENANT.has(u.kind) || PART_STACKS[u.kind] !== undefined;
+    const room: GatheredRoom = {
+      ...u,
+      emitted: !burned && fits && mappable,
+      skipReason: !fits ? "outOfRange" : burned ? "burned" : mappable ? undefined : "unmappable",
+    };
+    rooms.push(room);
+    // A non-emitting room's tiles are filled by the paving pass instead, and
+    // that pass clamps its runs into the lot, so widen the extent by the CLAMPED
+    // footprint: an unclamped one (a forged unit hanging off the lot edge) would
+    // advertise a floor extent whose tail no record fills, the same
+    // header/record inconsistency as the #318 sky gap. Non-finite coordinates
+    // are refused outright, since NaN survives every comparison below.
+    const clamp = (v: number) => Math.max(0, Math.min(GRID.width, v));
+    const finite = Number.isFinite(u.x) && Number.isFinite(u.width);
+    const left = room.emitted ? u.x : finite ? clamp(u.x) : 0;
+    const right = room.emitted ? u.x + u.width : finite ? clamp(u.x + u.width) : 0;
+    if (!room.emitted && right <= left) continue; // wholly off-lot or unusable: claim nothing
     for (let fl = u.floor; fl < u.floor + facilityFloors(u.kind); fl++) {
-      widen(fl, u.x, u.x + u.width);
+      widen(fl, left, right);
     }
   }
 
   for (const u of rooms) {
-    if (!fitsTdtRows(u.floor, facilityFloors(u.kind))) {
-      counts.outOfRange++;
-      continue;
-    }
-    // A burned-out shell (or a room mid-fire) is not a healthy tenant: the
-    // format has its own marker (type 48), which the importer clears back to
-    // bare floor with a report line, exactly what 1994 would show.
-    if (u.state === "fire" || u.state === "gutted") {
-      pushTenant(u.floor, {
-        left: u.x,
-        right: u.x + u.width,
-        type: TDT_BURNED,
-        status: 0,
-        rentClass: 2,
-      });
-      counts.burnedOut++;
+    // Consume the flag decided above rather than re-deriving its inputs here:
+    // this loop IS what "emitted" describes, so re-testing the same conditions
+    // is exactly how the flag and the file could drift apart again.
+    if (!u.emitted) {
+      if (u.skipReason === "outOfRange") counts.outOfRange++;
+      else if (u.skipReason === "burned") counts.burnedOut++;
+      // "unmappable" is counted nowhere on purpose: no Classic kind reaches it,
+      // and inventing a player-facing line for a state only a forged save can
+      // produce would say more than we know.
       continue;
     }
     const construction = u.state === "construction";
@@ -283,6 +325,11 @@ export function gatherTower(save: SerializedGame): GatheredTower {
               rooms.some(
                 (o) =>
                   o !== u &&
+                  // Only a room that actually writes a record can collide. A
+                  // burned shell (cleared to paving) or an out-of-range
+                  // footprint writes nothing, so letting either block the stack
+                  // truncates the cathedral with nothing in the file to show why.
+                  o.emitted &&
                   fl >= o.floor &&
                   fl < o.floor + facilityFloors(o.kind) &&
                   o.x < u.x + u.width &&

@@ -51,9 +51,19 @@ export function buildExportReport(save: SerializedGame, gathered: GatheredTower,
     `Your funds (${fmtMoney(balance * 100)}), star rating, and the clock.`,
   ];
   const staysBehind: string[] = [];
+  // The 1994 game loses every shaft written after an express one. We order
+  // express shafts last so a tower with one loses nothing, but a second express
+  // still costs the player the shafts behind it, and the modal must not claim
+  // every shaft arrives. See the backlog's `tdt-express-desync`.
+  if (stats.expressLen > 1) {
+    const lost = stats.expressLen - 1;
+    staysBehind.push(
+      `${lost} express elevator${lost === 1 ? "" : "s"} won't appear in 1994: the original loses any shaft built after the first express. Rebuild ${lost === 1 ? "it" : "them"} there.`,
+    );
+  }
   if (counts.burnedOut > 0) {
     staysBehind.push(
-      `${counts.burnedOut} burned-out room${counts.burnedOut === 1 ? "" : "s"} export as burned floor; rebuild them in 1994.`,
+      `${counts.burnedOut} burned or burning room${counts.burnedOut === 1 ? " arrives" : "s arrive"} cleared (bare floor, or lobby on a lobby row); rebuild ${counts.burnedOut === 1 ? "it" : "them"} in 1994.`,
     );
   }
   if (counts.vacancyHistoryLost > 0) {

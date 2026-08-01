@@ -6,11 +6,9 @@
  */
 import { ByteReader } from "./tdtByteReader";
 import {
-  TDT_ELEVATOR_BUILT_FIXED,
   TDT_ELEVATOR_HEADER_SIZE,
-  TDT_ELEVATOR_CAR_BLOCK_SIZE,
-  TDT_ELEVATOR_PER_FLOOR_SIZE,
   TDT_ELEVATOR_SLOTS,
+  builtShaftPayloadSize,
   TDT_FINANCE_SIZE,
   TDT_FLOOR_COUNT,
   TDT_MAX_PEOPLE,
@@ -178,25 +176,25 @@ export function walkTolerantTail(r: ByteReader): TdtTail {
     const carHomes: number[] = [];
     for (let c = 0; c < 8; c++) carHomes.push(r.u8());
     if (used === 0) continue; // empty slot: header only, no payload
-    if (used !== 1 || type > 2 || cars < 1 || cars > 8) {
+    // `topFloor`/`bottomFloor` join the checked fields now that the payload size
+    // is derived from the span: an INVERTED or out-of-range pair would size the
+    // skip below from garbage. A zero-height shaft is NOT rejected here (its
+    // one-floor payload is well defined); it decodes and is dropped later as
+    // degenerate geometry, exactly as before this change.
+    if (used !== 1 || type > 2 || cars < 1 || cars > 8 || topFloor < bottomFloor || topFloor >= TDT_FLOOR_COUNT) {
       // The entry doesn't parse as documented; the payload size below would
-      // be a guess, and every later slot would misalign. Bail to synthesis.
+      // be a guess, and every later slot would misalign. Bail to synthesis:
+      // the same posture this reader already took for a bad type or car count,
+      // and safer than skipping a guessed distance into the middle of a record.
       warnings.push("The elevator table doesn't match the documented layout, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.");
       return tail;
     }
-    // Built shafts append live passenger/queue state we deliberately skip:
-    // our crowd re-simulates. One 324-byte entry per SERVICED floor, then a
-    // SINGLE 348-byte car block (NOT one per car). Harness-confirmed against the
-    // real 1994 game (tools/simtower Wine loads): the appended block is
-    // cars-INDEPENDENT. A `cars * 348` size (the old extrapolation, only ever
-    // validated on 1-car saves like my_tower) overruns every multi-car shaft, so
-    // the retail game desynced the whole elevator table after the first such
-    // shaft and rendered a single elevator (and mis-read the parking/basement
-    // block that follows). See docs/canon/tdt-format.md and the backlog.
-    let servicedCount = 0;
-    for (let i = 0; i < serviced.length; i++) if (serviced[i] !== 0) servicedCount++;
-    const payload =
-      TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_CAR_BLOCK_SIZE;
+    // Built shafts append live passenger/queue state we deliberately skip: our
+    // crowd re-simulates. The size comes from the shared helper, which the
+    // writer and the test fixture use too, so the three cannot drift apart (see
+    // builtShaftPayloadSize). The guard above already rejected the only input it
+    // refuses, so it cannot throw here.
+    const payload = builtShaftPayloadSize(bottomFloor, topFloor);
     if (r.remaining() < payload) {
       warnings.push("The elevator table is cut short, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.");
       return tail;

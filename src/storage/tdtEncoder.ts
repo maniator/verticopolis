@@ -5,11 +5,9 @@ import { ByteWriter } from "./tdtByteWriter";
 import {
   TDT_DEFAULT_VIEW_X,
   TDT_DEFAULT_VIEW_Y,
-  TDT_ELEVATOR_BUILT_FIXED,
   TDT_ELEVATOR_HEADER_SIZE,
-  TDT_ELEVATOR_CAR_BLOCK_SIZE,
-  TDT_ELEVATOR_PER_FLOOR_SIZE,
   TDT_ELEVATOR_SCHEDULE_DEFAULT,
+  builtShaftPayloadSize,
   TDT_ELEVATOR_SLOTS,
   TDT_FINANCE_SIZE,
   TDT_FLOOR_COUNT,
@@ -31,6 +29,7 @@ import { viewWordsFromView } from "./tdtViewMapping";
 import { ELEVATOR_KINDS } from "./tdtTables";
 import { LegacyExportError } from "./tdtExportTables";
 import type { GatheredTower } from "./tdtExportGather";
+import { connectedStallCount } from "./tdtExportParking";
 
 /**
  * The encode pass of the `.TDT` export: turn the {@link GatheredTower} into the
@@ -51,6 +50,10 @@ export interface EncodeStats {
   /** Elevator/walkway counts BEFORE the table caps, for the report's tallies. */
   elevatorsLen: number;
   walkwaysLen: number;
+  /** Express shafts written. The retail game loses every shaft after the FIRST
+   *  express slot, so anything past one costs the player real transport in 1994
+   *  and the report has to say so. See `tdt-express-desync`. */
+  expressLen: number;
 }
 
 export interface EncodeResult {
@@ -135,9 +138,24 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
     const ours = index - TDT_FLOOR_OFFSET;
     const tenants = tenantsByTdt.get(index) ?? [];
     const ext = ours <= GRID.maxFloor ? extents.get(ours) : undefined;
+    // Clamp the advertised extent into the lot. The paving pass already clamps
+    // the RUNS it emits, so an unclamped extent here makes the header and the
+    // records disagree, and `w.u16` masks rather than clamps: a forged unit of
+    // infinite width wrote `right = 0` (Infinity & 0xffff) over a row whose
+    // records span the whole lot, the same header/record split as the #318 sky
+    // gap. A NON-FINITE bound collapses to an empty extent rather than
+    // saturating to the lot edge, because the paving pass refuses to emit runs
+    // for one (`Number.isFinite` guard there): saturating here would advertise
+    // a full-lot row with no records behind it, which is the same split from the
+    // other side. A finite bound past the lot edge DOES saturate, matching the
+    // clamped run paving emits for it.
+    const clampTile = (v: number | undefined) =>
+      Number.isFinite(v) ? Math.max(0, Math.min(GRID.width, v as number)) : 0;
+    const extLeft = clampTile(ext?.left);
+    const extRight = Math.max(extLeft, clampTile(ext?.right));
     w.u16(tenants.length);
-    w.u16(ext?.left ?? 0);
-    w.u16(ext?.right ?? 0);
+    w.u16(extLeft);
+    w.u16(extRight);
     // Game-written saves list a floor's unit records in ascending left-edge
     // order, with the empty-floor (type-0) paving spans interleaved at their
     // real x-position. Our gather appends the type-0 fillers after the rooms,
@@ -154,8 +172,13 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
     const leftKey = (t: { left: number }) => t.left & 0xffff;
     const ordered = [...tenants].sort((a, b) => leftKey(a) - leftKey(b));
     for (const t of ordered) {
-      w.u16(t.left);
-      w.u16(t.right);
+      // Clamp record bounds the same way the extent above is clamped. A legal
+      // room is inside the lot already; a forged one (x past the lot edge, or a
+      // non-finite width) would otherwise write a record reaching past the
+      // extent that the header advertises, which is the header/record split
+      // the extent clamp exists to prevent, just from the other side.
+      w.u16(clampTile(t.left));
+      w.u16(Math.max(clampTile(t.left), clampTile(t.right)));
       w.u8(t.type); // i8 via two's complement
       w.u8(t.status);
       // Byte 6: canon retail variant, where the real 1994 game reads it (for
@@ -267,8 +290,19 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
     });
   }
   // The 24-slot table can't hold more (only forged saves exceed the pooled
-  // cap); the drop is counted for the report, never silent.
+  // cap); the drop is counted for the report, never silent. Truncate BEFORE the
+  // ordering below, so which shafts a full tower loses stays a function of the
+  // tower, not of the workaround: sorting first would push express shafts into
+  // the truncated tail and silently drop the whole-tower transport instead.
   const shaftsDropped = Math.max(0, elevators.length - TDT_ELEVATOR_SLOTS);
+  elevators.length = Math.min(elevators.length, TDT_ELEVATOR_SLOTS);
+  // Then write EXPRESS shafts last: the retail game loses every shaft written
+  // after an express slot (harness-measured 2026-07-31; the express itself
+  // renders, and shafts before it are fine). A MITIGATION, not the fix, and a
+  // stable sort so everything else keeps its order: one express costs a tower
+  // nothing, a second still loses what follows it. Evidence and the ruled-out
+  // size theories: docs/canon/tdt-format.md §8, backlog `tdt-express-desync`.
+  elevators.sort((a, b) => Number(a.kind === "elevatorExpress") - Number(b.kind === "elevatorExpress"));
   for (let slot = 0; slot < TDT_ELEVATOR_SLOTS; slot++) {
     const e = elevators[slot];
     // Inverse of the importer's shared ELEVATOR_KINDS order.
@@ -296,7 +330,6 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
     w.u8(e.top + TDT_FLOOR_OFFSET);
     w.u8(e.bottom + TDT_FLOOR_OFFSET);
     const skip = new Set(e.skipFloors ?? []);
-    let servicedCount = 0;
     for (let fl = 0; fl < TDT_FLOOR_COUNT; fl++) {
       const ours = fl - TDT_FLOOR_OFFSET;
       // Endpoints always stop (the importer reads skip flags for interior
@@ -306,52 +339,26 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
         ours <= e.top &&
         (!skip.has(ours) || ours === e.bottom || ours === e.top);
       w.u8(stops ? 1 : 0);
-      if (stops) servicedCount++;
     }
     for (let c = 0; c < 8; c++) {
       const raw = e.carPositions[c];
       const home = Number.isFinite(raw) ? Math.round(raw) : e.bottom;
       w.u8(Math.max(e.bottom, Math.min(e.top, home)) + TDT_FLOOR_OFFSET);
     }
-    // The appended built-shaft block is cars-INDEPENDENT: a fixed block, one
-    // 324-byte entry per SERVICED floor, then a SINGLE 348-byte car block (NOT
-    // one per car). Harness-confirmed against the real 1994 game: writing
-    // `cars * 348` overran every multi-car shaft and desynced the retail game's
-    // elevator table (only one shaft rendered, and the parking/basement block
-    // after it mis-read). Must match walkTolerantTail's skip. See tdtConstants.ts.
-    w.pad(TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_CAR_BLOCK_SIZE);
+    // The appended built-shaft payload, sized by the shared helper so the
+    // writer, the reader's skip, and the test fixture cannot drift apart (see
+    // builtShaftPayloadSize for what the game measures and why). The floors
+    // passed are TDT floor bytes, matching the header written just above; the
+    // gather pass upstream already dropped inverted spans and clamped both ends
+    // into the buildable range, so the helper's range check cannot fire here.
+    w.pad(builtShaftPayloadSize(e.bottom + TDT_FLOOR_OFFSET, e.top + TDT_FLOOR_OFFSET));
   }
 
   // Finance history: not modeled; zero-filled at the documented size.
   w.pad(TDT_FINANCE_SIZE);
 
-  // Parking: the connected count is CHAINED stalls only (canon: a space works
-  // only when contiguous spaces link it back to a ramp on its floor); a lot
-  // full of orphan stalls exports 0, exactly what 1994 could produce itself.
-  const connectedStalls = (() => {
-    const byFloor = new Map<number, { x: number; w: number; ramp: boolean }[]>();
-    for (const u of rooms) {
-      if (u.kind !== "parking" && u.kind !== "parkingRamp") continue;
-      const arr = byFloor.get(u.floor) ?? [];
-      arr.push({ x: u.x, w: u.width, ramp: u.kind === "parkingRamp" });
-      byFloor.set(u.floor, arr);
-    }
-    let connected = 0;
-    for (const arr of byFloor.values()) {
-      arr.sort((a, b) => a.x - b.x);
-      const linked = arr.map((it) => it.ramp);
-      // Chains are one-dimensional: two sweeps settle flush adjacency.
-      for (let i = 1; i < arr.length; i++) {
-        if (!linked[i] && linked[i - 1] && arr[i - 1].x + arr[i - 1].w >= arr[i].x) linked[i] = true;
-      }
-      for (let i = arr.length - 2; i >= 0; i--) {
-        if (!linked[i] && linked[i + 1] && arr[i].x + arr[i].w >= arr[i + 1].x) linked[i] = true;
-      }
-      for (let i = 0; i < arr.length; i++) if (linked[i] && !arr[i].ramp) connected++;
-    }
-    return connected;
-  })();
-  w.u16(Math.min((TDT_PARKING_SIZE - 2) / 2, connectedStalls)); // 512-slot stall table
+  // Parking: the connected count is CHAINED stalls only (see tdtExportParking).
+  w.u16(Math.min((TDT_PARKING_SIZE - 2) / 2, connectedStallCount(rooms))); // 512-slot stall table
   w.pad(TDT_PARKING_SIZE - 2);
 
   // Stairs table: 64 slots (doc §8). Our walkways are one-story flights;
@@ -473,6 +480,7 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
       flightsDropped,
       transportsDropped,
       elevatorsLen: elevators.length,
+      expressLen: elevators.filter((e) => e.kind === "elevatorExpress").length,
       walkwaysLen: walkways.length,
     },
   };
