@@ -111,8 +111,17 @@ export interface PlatformPort {
    * browser port and take its native file save with it.
    *
    * Omitted rather than stubbed on ports that have no store (see
-   * `./browser.ts`), so the desktop path is one `if (port.saveStore)` and folds
-   * out of a browser bundle entirely.
+   * `./browser.ts`), so a caller can ask `if (port.saveStore)` and get a
+   * truthful runtime answer.
+   *
+   * That check does NOT make the store code fold out of a browser bundle, and
+   * an earlier version of this comment claimed it did. `port.saveStore` is a
+   * property read on a value returned by `getPlatform()`, which Rollup cannot
+   * prove undefined, so the branch and everything it references ship to every
+   * player. Only `IS_WRAPPED_BUILD` folds, because Vite statically replaces
+   * `import.meta.env.MODE` (see `./index.ts`). Anything that must stay out of
+   * the browser bundle goes behind that, and is checked in the built artifact
+   * by `scripts/verify-wrapper-seam.ts`, since a source test cannot see it.
    *
    * See `./saveStore.ts` for the blob shape and the opaque scope token.
    */
