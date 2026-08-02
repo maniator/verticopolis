@@ -92,7 +92,7 @@
         </p>
       </noscript>
       <header id="topbar">
-        <div class="brand">🏙️ <span>VERTICO<b>POLIS</b></span></div>
+        <div class="brand"><span>VERTICO<b>POLIS</b></span></div>
         <div id="status">
           <div class="stat" title="Star rating">
             <span class="label">RATING</span>
@@ -121,17 +121,17 @@
           </div>
         </div>
         <div id="speed">
-          <button class="btn" data-speed="0" title="Pause">⏸</button>
-          <button class="btn active" data-speed="1" title="Slow">▶</button>
-          <button class="btn" data-speed="2" title="Medium">▶▶</button>
-          <button class="btn" data-speed="3" title="Fast">▶▶▶</button>
-          <button class="btn" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo">↩</button>
-          <button class="btn" id="btn-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↪</button>
-          <button class="btn" id="btn-save-top" title="Quick Save" aria-label="Quick Save">💾</button>
-          <button class="btn" id="audio-toggle" title="Toggle sound">🔊</button>
-          <button class="btn" id="panel-toggle" title="Show/hide panels">☰</button>
-          <button class="btn" id="btn-update" title="An update is ready. Tap to review." aria-label="An update is ready. Tap to review." hidden>↻ <span class="btn-label">Update</span></button>
-          <button class="btn" id="btn-install" title="Install Verticopolis: play offline, fullscreen, from your home screen." aria-label="Install Verticopolis" hidden>⤓ <span class="btn-label">Install</span></button>
+          <button class="btn" data-speed="0" title="Pause" aria-label="Pause"></button>
+          <button class="btn active" data-speed="1" title="Play (slow speed)" aria-label="Play (slow speed)"></button>
+          <button class="btn" data-speed="2" title="Medium" aria-label="Medium speed"></button>
+          <button class="btn" data-speed="3" title="Fast" aria-label="Fast speed"></button>
+          <button class="btn" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo"></button>
+          <button class="btn" id="btn-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"></button>
+          <button class="btn" id="btn-save-top" title="Quick Save" aria-label="Quick Save"></button>
+          <button class="btn" id="audio-toggle" title="Toggle sound" aria-label="Mute sound" aria-pressed="false"></button>
+          <button class="btn" id="panel-toggle" title="Show/hide panels" aria-label="Show/hide panels"></button>
+          <button class="btn" id="btn-update" title="An update is ready. Tap to review." aria-label="An update is ready. Tap to review." hidden><span class="btn-label">Update</span></button>
+          <button class="btn" id="btn-install" title="Install Verticopolis: play offline, fullscreen, from your home screen." aria-label="Install Verticopolis" hidden><span class="btn-label">Install</span></button>
         </div>
       </header>
 
@@ -164,9 +164,9 @@
                  data-mode="classic" seed would skip the first Modern-boot repaint). -->
             <button id="btn-mode" class="mode-badge is-classic btn" type="button" title="This tower's rule-set. Click for the full Classic vs Modern comparison.">This tower: Classic</button>
             <div id="tower-stats" class="kv"></div>
-            <button id="btn-stats" class="wide-btn btn">📊 Full Statistics</button>
+            <button id="btn-stats" class="wide-btn btn">Full Statistics</button>
             <label class="overlay-picker" title="Tint every floor by a live metric, like the original's evaluation maps">
-              <span>🗺️ Map overlay</span>
+              <span class="overlay-label">Map overlay</span>
               <select id="overlay-mode" class="field">
                 <option value="">Off</option>
                 <option value="congestion">Congestion</option>
@@ -186,7 +186,7 @@
                  this panel keeps the save MANAGER and the tower-level actions. -->
             <div class="btn-row">
               <button class="btn" id="btn-load">Saves…</button>
-              <button class="btn" id="btn-settings">⚙️ Settings</button>
+              <button class="btn" id="btn-settings">Settings</button>
             </div>
             <div class="btn-row">
               <button class="btn" id="btn-new">New Tower</button>
@@ -195,7 +195,7 @@
             <!-- The permanent, passive home of the install offer: present only
                  when the app can be installed and is not already installed
                  (the controller toggles hidden). -->
-            <button class="btn wide-btn" id="btn-install-menu" hidden>⤓ Install app</button>
+            <button class="btn wide-btn" id="btn-install-menu" hidden>Install app</button>
           </div>
         </aside>
       </main>

@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { Simulation } from "../../engine/Simulation";
+import { iconTemplate } from "../icons";
 import { LEDGER_CATS, LEDGER_LABELS } from "../../engine/Ledger";
 import { residentCount } from "../../engine/facilities";
 import { isPresent } from "../../engine/types";
@@ -303,5 +304,5 @@ export function milestonesSection(sim: Simulation): TemplateResult {
         html`<span class="k${m.done ? " ms-done" : ""}">${m.done ? "✓" : "·"} ${m.label}</span><span class="v">${m.desc}</span>`,
     )}</div>`;
   const pct = mp.total ? Math.round((mp.achieved / mp.total) * 100) : 0;
-  return html`<div class="stats-section win-title sm">🏅 Milestones (${mp.achieved}/${mp.total})<span class="evalbar"><span style="width:${pct}%"></span></span></div>${col(mp.list.slice(0, half))}${col(mp.list.slice(half))}`;
+  return html`<div class="stats-section win-title sm">${iconTemplate("milestone", { size: 14 })}Milestones (${mp.achieved}/${mp.total})<span class="evalbar"><span style="width:${pct}%"></span></span></div>${col(mp.list.slice(0, half))}${col(mp.list.slice(half))}`;
 }

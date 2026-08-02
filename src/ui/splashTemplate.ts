@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
+import { iconTemplate } from "./icons";
 
 /**
  * The "Metropolis Dusk" splash/title-screen body, split out of the onboarding
@@ -91,10 +92,10 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
          NOTE: no backticks in this comment. It sits inside a tagged template
          literal, so one would end the template. -->
     <div class="splash-actions">
-      ${hasSave ? html`<button class="splash-btn primary" data-splash="continue" @click=${h.onContinue}>▶ Continue</button>` : nothing}
-      <button class="splash-btn" data-splash="load" @click=${h.onLoadTower}>▤ Load Tower</button>
-      <button class="splash-btn ${hasSave ? "" : "primary"}" data-splash="new" @click=${h.onNewTower}>＋ New Tower</button>
-      <button class="splash-btn ghost" data-splash="help" @click=${h.onHelp}>？ How to Play</button>
+      ${hasSave ? html`<button class="splash-btn primary" data-splash="continue" @click=${h.onContinue}>${iconTemplate("play", { size: 14 })}Continue</button>` : nothing}
+      <button class="splash-btn" data-splash="load" @click=${h.onLoadTower}>${iconTemplate("folder", { size: 14 })}Load Tower</button>
+      <button class="splash-btn ${hasSave ? "" : "primary"}" data-splash="new" @click=${h.onNewTower}>${iconTemplate("plus", { size: 14 })}New Tower</button>
+      <button class="splash-btn ghost" data-splash="help" @click=${h.onHelp}>${iconTemplate("help", { size: 14 })}How to Play</button>
     </div>
     <p class="splash-attrib">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.</p>
     <p class="splash-version">v${APP_VERSION}</p>
@@ -115,7 +116,7 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
          state; the glyph flips for sighted users. An absent onToggleMute binds
          no @click, so a caller that can't toggle gets an inert, truthful
          button. SPEC-splash-mute CAP-1. -->
-    <button class="splash-mute" data-splash="mute" aria-pressed=${muted ? "true" : "false"} aria-label="Mute sound" @click=${h.onToggleMute}>${muted ? "🔇" : "🔊"}</button>
+    <button class="splash-mute" data-splash="mute" aria-pressed=${muted ? "true" : "false"} aria-label="Mute sound" @click=${h.onToggleMute}>${iconTemplate(muted ? "mute" : "sound", { size: 16 })}</button>
     <!-- The persistent install button (SPEC-pwa-install CAP-5): a quiet front door
          shown in a not-standalone browser session, rendered after the mute so the utility
          cluster sits at the tail of the Tab order. Rendered only when offered AND a
@@ -125,6 +126,6 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
          promises an outcome (title), never "one-tap"; a tap degrades to an honest
          how-to in the shared activation. -->
     ${installOffered && h.onInstall
-      ? html`<button class="splash-install" data-splash="install" aria-label="Install Verticopolis" title="Install Verticopolis: play offline, fullscreen, from your home screen." @click=${h.onInstall}><span class="splash-install-glyph" aria-hidden="true">⤓</span> Install</button>`
+      ? html`<button class="splash-install" data-splash="install" aria-label="Install Verticopolis" title="Install Verticopolis: play offline, fullscreen, from your home screen." @click=${h.onInstall}>${iconTemplate("install", { size: 14 })}Install</button>`
       : nothing}`;
 }

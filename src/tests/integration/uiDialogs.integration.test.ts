@@ -77,6 +77,7 @@ function mountAppDom(): void {
       <button class="btn" data-speed="0">⏸</button>
       <button class="btn" data-speed="1">▶</button>
       <button class="btn" data-speed="2">▶▶</button>
+      <button class="btn" data-speed="3">▶▶▶</button>
       <button id="btn-update" hidden>Update</button>
     </div>
     <button id="audio-toggle">🔊</button>
@@ -1788,10 +1789,12 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     app.ui = ui;
 
     const topbar = () => document.getElementById("audio-toggle")!;
-    expect(topbar().textContent).toBe("🔊");
+    expect(topbar().querySelector("svg")?.getAttribute("data-icon")).toBe("sound");
+    expect(topbar().getAttribute("aria-pressed")).toBe("false"); // icon-only toggle exposes its state to AT
     topbar().click();
     expect(audio.muted).toBe(true);
-    expect(topbar().textContent).toBe("🔇"); // topbar view: the setAudioGlyph side effect
+    expect(topbar().querySelector("svg")?.getAttribute("data-icon")).toBe("mute"); // topbar view: the setAudioGlyph side effect
+    expect(topbar().getAttribute("aria-pressed")).toBe("true"); // pressed follows the muted state
     expect(lastReturn).toBe(true); // splash view: the real command returns the new state, not void
     expect(loadPrefs().muted).toBe(true); // persisted for real
 
@@ -1801,7 +1804,40 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     mountAppDom();
     expect(document.querySelectorAll("#audio-toggle")).toHaveLength(1); // no stale toggle survives the reload
     makeUI({ isMuted: () => loadPrefs().muted === true });
-    expect(topbar().textContent).toBe("🔇");
+    expect(topbar().querySelector("svg")?.getAttribute("data-icon")).toBe("mute");
+    expect(topbar().getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("prepends exactly one static icon into each toolbar control at boot", () => {
+    // mountToolbarIcons injects the chrome glyphs the index.html shell no longer
+    // carries (#721). One construction, one glyph per host, each ahead of any
+    // label text so "[icon] Full Statistics" reads in order. (The minimal test
+    // DOM omits .brand and the overlay-picker wrapper; the three buttons here
+    // exercise the same single injection path.)
+    makeUI();
+    const expected: Record<string, string> = {
+      "#btn-save-top": "save",
+      "#btn-stats": "stats",
+      "#btn-settings": "settings",
+      "#btn-undo": "undo",
+      "#btn-redo": "redo",
+      "#panel-toggle": "menu",
+    };
+    for (const [sel, name] of Object.entries(expected)) {
+      const icons = document.querySelectorAll<SVGElement>(`${sel} > .vc-icon`);
+      expect(icons, `${sel} should hold exactly one icon`).toHaveLength(1);
+      expect(icons[0].getAttribute("data-icon")).toBe(name);
+      expect(icons[0]).toBe(document.querySelector(sel)!.firstElementChild); // prepended, ahead of the label
+    }
+    // The speed row swaps its ⏸ ▶ ▶▶ ▶▶▶ text for one icon per level, the
+    // fast-speed (level 3) button included (replaceChildren).
+    const speed: Record<string, string> = { "0": "pause", "1": "speed1", "2": "speed2", "3": "speed3" };
+    for (const [level, name] of Object.entries(speed)) {
+      const btn = document.querySelector<HTMLElement>(`#speed button[data-speed="${level}"]`)!;
+      const icons = btn.querySelectorAll<SVGElement>(":scope > .vc-icon");
+      expect(icons, `speed ${level} should hold exactly one icon`).toHaveLength(1);
+      expect(icons[0].getAttribute("data-icon")).toBe(name);
+    }
   });
 
   it("the Settings button opens the Settings dialog", () => {

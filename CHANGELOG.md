@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.11.0
+
+- The toolbar, menus, and in-game bulletins now use crisp pixel icons instead of emoji, so they look the same on every system rather than turning into empty boxes where no emoji font is installed.
+- The bulldoze tool now shows a red wrecking ball.
+
 ## 2.10.0
 
 - A tower you export to SimTower (1994) now arrives with its elevators. A tower with an express shaft used to lose most of the others on the way over, stranding the floors they served.

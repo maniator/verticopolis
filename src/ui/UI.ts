@@ -9,6 +9,8 @@ import type { CalendarKind } from "../engine/calendar";
 import type { UpdateInfo } from "../pwa";
 import { getPlatform } from "../platform";
 import { render, type TemplateResult } from "lit-html";
+import { iconElement } from "./icons";
+import { mountToolbarIcons } from "./uiToolbarIcons";
 import { toolInfoTemplate, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO } from "./templates/toolInfo";
 import * as dialogs from "./uiDialogs";
 import * as panels from "./uiPanels";
@@ -169,6 +171,7 @@ export class UI {
     // Init from persisted state; toggleMute owns every later update (splash too).
     this.setAudioGlyph(this.cb.isMuted());
     this.el.audioToggle.addEventListener("click", () => this.cb.onToggleAudio());
+    mountToolbarIcons();
     document.getElementById("btn-undo")?.addEventListener("click", () => this.cb.onUndo());
     document.getElementById("btn-redo")?.addEventListener("click", () => this.cb.onRedo());
 
@@ -319,7 +322,8 @@ export class UI {
 
   /** Topbar mute glyph, set by toggleMute for every caller so all views agree (SPEC-splash-mute CAP-2). */
   setAudioGlyph(muted: boolean): void {
-    this.el.audioToggle.textContent = muted ? "🔇" : "🔊";
+    this.el.audioToggle.replaceChildren(iconElement(muted ? "mute" : "sound"));
+    this.el.audioToggle.setAttribute("aria-pressed", String(muted));
   }
 
   /** Hand the player an exported file. Routed through the platform port so a
