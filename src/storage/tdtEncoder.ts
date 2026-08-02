@@ -479,7 +479,13 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
       shaftsColliding,
       flightsDropped,
       transportsDropped,
-      elevatorsLen: elevators.length,
+      // PRE-cap, as documented and as `walkwaysLen` is: `elevators` was
+      // truncated to the 24 slots in place above, so add the drop back rather
+      // than report the truncated length and quietly change what this field
+      // means. `expressLen` is deliberately POST-cap: it exists to say what the
+      // 1994 game will lose to the express desync, which can only be a shaft the
+      // file actually carries.
+      elevatorsLen: elevators.length + shaftsDropped,
       expressLen: elevators.filter((e) => e.kind === "elevatorExpress").length,
       walkwaysLen: walkways.length,
     },

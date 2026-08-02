@@ -1484,6 +1484,42 @@ describe("buildTDT: lobby (type 24) and empty-floor (type 0) paving records", ()
     const again = buildTDT(parseTDT(bytes.buffer as ArrayBuffer, "C.TDT").save).bytes;
     expect(again).toEqual(bytes);
   });
+
+  it("only a room that is IN the file can shorten the cathedral stack", () => {
+    // The stack walks down from floor 100 and stops at the first floor another
+    // room occupies, so the file never carries overlapping records. A BURNED
+    // room writes no record at all (it is cleared to paving), so letting it
+    // block would truncate the cathedral with nothing in the file to explain the
+    // gap. Same geometry, same room, only its state differs.
+    const cathedralIds = new Set([36, 37, 38, 39, 40]);
+    const partsOf = (blockerState: "occupied" | "gutted") => {
+      const units: Unit[] = [];
+      let id = 1;
+      for (let fl = 96; fl <= 100; fl++) {
+        for (let x = 0; x < 40; x++) units.push(unit({ id: id++, kind: "floor", floor: fl, x, width: 1 }));
+      }
+      units.push(unit({ id: id++, kind: "weddingHall", floor: 100, x: 5, width: 16 }));
+      // An office on floor 98 straddling the cathedral's [5, 21) footprint.
+      units.push(unit({ id: id++, kind: "office", floor: 98, x: 8, width: 9, state: blockerState }));
+      const { bytes } = buildTDT(tower(units));
+      let count = 0;
+      for (let fl = 96; fl <= 100; fl++) {
+        count += floorTenants(bytes, fl + 9).filter((t) => cathedralIds.has(Math.abs(t.type))).length;
+      }
+      return { count, bytes };
+    };
+
+    // An emitted blocker DOES truncate: the stack stops above floor 98, so only
+    // floors 99 and 100 carry a part.
+    const blocked = partsOf("occupied");
+    expect(blocked.count).toBe(2);
+    expect(parseTdtBinary(blocked.bytes).warnings).toEqual([]);
+
+    // The same room burned writes nothing, so all five parts survive.
+    const cleared = partsOf("gutted");
+    expect(cleared.count).toBe(5);
+    expect(parseTdtBinary(cleared.bytes).warnings).toEqual([]);
+  });
 });
 
 describe("shared-table tripwires: the writer's inversions match the importer", () => {
