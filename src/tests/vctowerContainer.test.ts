@@ -46,6 +46,19 @@ describe("vctower container decode", () => {
     expect(decodeVctower(wrapped)).toEqual({ towerName: "Wrapped" });
   });
 
+  it("refuses a decompression bomb instead of allocating it", () => {
+    // A few-KB container can be crafted to inflate to gigabytes. The cap has to
+    // be enforced while inflating, not after: a plain inflateSync allocates the
+    // whole output before anyone can object. 40 MB of zeros compresses to a few
+    // KB and sits over the 32 MB cap.
+    const bomb = "VCTOWER1\n" + Buffer.from(deflateSync(new Uint8Array(40 * 1024 * 1024))).toString("base64");
+    expect(bomb.length).toBeLessThan(200_000); // the file itself really is small
+    expect(() => decodeVctower(bomb, "bomb.vctower")).toThrow(/bomb\.vctower: this \.vctower expands to more data/);
+    // And it is NOT reported as damaged or as a version problem: those send the
+    // reader looking for the wrong thing.
+    expect(() => decodeVctower(bomb, "bomb.vctower")).not.toThrow(/damaged|version/);
+  });
+
   it("refuses a file that is not a tower file at all", () => {
     expect(() => decodeVctower("hello", "x.vctower")).toThrow(/x\.vctower: not a \.vctower file/);
   });

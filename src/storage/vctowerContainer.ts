@@ -1,8 +1,13 @@
-import { inflateSync } from "fflate";
+import { SaveTooLargeError, inflateCapped } from "./saveCompression";
 
 /**
  * Synchronous decode of the `.vctower` container (magic, then base64 of DEFLATE
  * JSON; see `saveCompression.ts`) for callers running under Node.
+ *
+ * Every path here treats its input as UNTRUSTED, so the payload goes through
+ * `inflateCapped` rather than a bare `inflateSync`: a few-KB file can be crafted
+ * to inflate to gigabytes, and the plain call allocates the whole output before
+ * anyone can object. That is the same posture the browser import path takes.
  *
  * The APP reads tower files through `SaveGame.import`, which is async because it
  * inflates with the platform `DecompressionStream` and goes on to build a
@@ -33,8 +38,16 @@ export function decodeVctower(text: string, label = "vctower"): unknown {
   if (/^VCTOWER1/.test(trimmed)) {
     try {
       const b64 = trimmed.slice("VCTOWER1".length).replace(/\s+/g, "");
-      return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(inflateSync(Buffer.from(b64, "base64"))));
+      return JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(Buffer.from(b64, "base64"))),
+      );
     } catch (e) {
+      // A decompression bomb is not a version question and not a damaged file:
+      // it decoded fine and is simply too big to hold, so say that instead of
+      // falling into the version reasoning below.
+      if (e instanceof SaveTooLargeError) {
+        throw new Error(`${label}: this .vctower expands to more data than we will hold; it looks crafted, not saved.`);
+      }
       // Only a version OTHER than 1 can hide here, and only in a file with no
       // separator; with one, the digits are unambiguous and this is simply a
       // damaged v1 file.
