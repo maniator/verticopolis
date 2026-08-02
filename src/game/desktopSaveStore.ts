@@ -1,4 +1,5 @@
 import { getPlatform } from "../platform";
+import { saveStoreErrorCode } from "../platform/saveStore";
 import { migrateSavesToStore, type MigrationReport } from "../storage/saveMigration";
 import {
   idsInScope,
@@ -10,6 +11,7 @@ import {
   type WriteRefusal,
 } from "../storage/saveStoreSession";
 import type { SaveSlotId } from "../storage/saveMigration";
+import type { SaveScopeToken } from "../platform/saveStore";
 
 /**
  * The one entry point the boot path uses to bring up a wrapper shell's save
@@ -64,16 +66,27 @@ let loadedFromShared = false;
  * restart either, because a persisted mark would silently drop every write of
  * the next session once the game's counter started over.
  */
-const seqByAddress = new Map<string, number>();
+const seqByScope = new Map<SaveScopeToken, Map<string, number>>();
 
 function nextSeq(address: SaveAddress): number {
   // Keyed by (id, scope), not by id. An id is unique only WITHIN a scope, which
-  // is this module's whole thesis, so two different towers sharing an id
-  // across scopes must not share one counter: whichever way the shell keys its
+  // is this module's whole thesis, so two different towers sharing an id across
+  // scopes must not share one counter: whichever way the shell keys its
   // high-water mark, one of them would lose writes.
-  const key = `${address.scope}|${address.id}`;
-  const next = (seqByAddress.get(key) ?? 0) + 1;
-  seqByAddress.set(key, next);
+  //
+  // NESTED maps rather than a `${scope}|${id}` composite. The composite was
+  // safe, but only because slot ids are a closed list containing no `|`, so the
+  // last separator always split it unambiguously. That is a load-bearing
+  // accident resting on a fact two modules away, and scope tokens are opaque
+  // and shell-controlled, so they may legitimately contain anything. Nesting
+  // removes the question instead of answering it.
+  let byId = seqByScope.get(address.scope);
+  if (!byId) {
+    byId = new Map<string, number>();
+    seqByScope.set(address.scope, byId);
+  }
+  const next = (byId.get(address.id) ?? 0) + 1;
+  byId.set(address.id, next);
   return next;
 }
 
@@ -128,7 +141,15 @@ async function runPrepare(): Promise<void> {
     // no shared scope, and the correct answer is to skip.
     const target = migrationTarget(session);
     if (target === null) return;
-    migration = await migrateSavesToStore(store, target, idsInScope(session, target));
+    // Bounded too, and NOT covered by the `list()` timeout above. The migration
+    // awaits a write and a read-back per slot, so a shell that answers `list()`
+    // promptly and then hangs on the first write would still block boot on a
+    // blank page: the exact failure the timeout exists to prevent, one call
+    // deeper. Abandoning a half-finished migration is safe by construction,
+    // because it never deletes localStorage, refuses an occupied destination,
+    // and derives its done-marker from the store, so the next boot resumes it.
+    migration = await withTimeout(migrateSavesToStore(store, target, idsInScope(session, target)));
+    if (migration === null) return;
 
     // Re-read the snapshot so the synchronous readers see what the migration
     // just wrote. Without this, everything it moved would be invisible for the
@@ -311,11 +332,17 @@ export async function writeTowerToStore(id: SaveSlotId, contents: string): Promi
   try {
     await store.write(resolved.target.id, contents, resolved.target.scope, nextSeq(resolved.target));
   } catch (err) {
-    const code = (err as { code?: unknown } | null | undefined)?.code;
+    // Via `saveStoreErrorCode`, which guards the property read, rather than
+    // reading `err.code` here. This runs inside a catch, so a rejection
+    // carrying a throwing getter or a revoked Proxy would throw a SECOND time
+    // and turn a handled store failure into an unhandled rejection. That guard
+    // already existed one module over and this call site duplicated the
+    // unguarded version of it.
+    const code = saveStoreErrorCode(err);
     return {
       ok: false,
       refusal: "failed",
-      ...(typeof code === "string" ? { code } : {}),
+      ...(code !== undefined ? { code } : {}),
       localFallbackSafe: headedForShared,
     };
   }
@@ -340,6 +367,6 @@ export function resetSaveStoreForTests(): void {
   inflight = null;
   loadedFrom = undefined;
   loadedFromShared = false;
-  seqByAddress.clear();
+  seqByScope.clear();
   authoritative = false;
 }
