@@ -223,3 +223,40 @@ internal callers are untouched.)
   sky-lobby behavior is unchanged (regression guard).
 - Player-facing, so it takes a **minor** version bump. Reviewed under
   /gds-code-review (gameplay). House prose rules apply to all new copy.
+
+## 9. Amendment (2026-07-30): sky lobbies, after driving the 1994 game
+
+The owner asked whether "a lobby can be built on top of floor" on the SKY-lobby
+stories (15/30/45/60/75/90), and to verify against the real 1994 game. Findings
+from the Wine harness this session: the retail palette groups Floor and Lobby
+under one structural button (press-and-hold reveals "Flr"/"Lb"), and the Floor
+tool "creates blank floor spaces" while sky lobbies are "optionally" on the 15th
+stories (community docs). The direct build-rule test (Floor drag on story 15)
+could not be automated (the headless harness routes tool selection but not build
+clicks), so that one observation stays open.
+
+A four-agent party (independent, repo-reading: Game Designer, Game Architect,
+QA/Adversary, Canon/Parity) ruled on two separable proposals:
+
+- **REJECTED: extend the Floor-tool auto-convert to sky-lobby stories.** Floor 1
+  is UNCONDITIONALLY a lobby (rooms are impossible there); a sky story is only
+  CONDITIONALLY lobby-only and is commonly a plain office floor. Coercing the
+  Floor tool there would remove a legitimate build (bare floor / office prep) and
+  force a permanent, 10x-price, room-blocking, express-rerouting sky lobby behind
+  the player's back. **The Non-goal in section 5 ("do not extend auto-convert to
+  sky lobbies; the asymmetry is intentional") STANDS** and is now party-ratified
+  a second time. `groundFloorStructureKind` remains floor-1-only.
+- **RATIFIED: the Lobby tool upgrades bare floor in place on a sky story.** This
+  is the owner's actual ask ("a lobby on top of floor"), and it matches the
+  ground concourse and the 1994 overlay. The change is one predicate:
+  `placement.ts` refuses a sky lobby only when the floor carries a ROOM
+  (`floorHasRoom`, whole-floor) rather than any non-lobby content; bare floor is
+  upgraded in place by the existing 116-126 path. No coercion, so build/preview/
+  cost/import are untouched; a new O(1) `roomTiles` counter mirrors
+  `nonLobbyTiles`. Save-load unaffected (no migration; a legacy mixed
+  lobby+floor sky story even becomes finishable). Engine-local and fully
+  headless-testable, so no live-game gate is required for this narrow change.
+
+Version 2.9.0. The open live build-rule observation (does the retail Floor tool
+convert or refuse on an unclaimed story 15?) is not needed for the ratified fix
+and is left as a note, not a blocker.

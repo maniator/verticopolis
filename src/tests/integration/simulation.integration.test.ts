@@ -1229,7 +1229,7 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
     expect(r.reason).toBe("This room would sit on a sky lobby. Move it up or down a story.");
   });
 
-  it("refuses a sky lobby on a floor that already carries rooms", () => {
+  it("refuses a sky lobby on a floor that already carries ROOMS (rooms are the blocker)", () => {
     const sim = newSeededGame(7);
     const x0 = towerToFloor(sim, 15); // includes plain floor on 15, no rooms yet
     sim.star = 5;
@@ -1237,20 +1237,22 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
     sim.tower.place("office", 15, x0); // room on floor 15 while it's unclaimed
     const r = sim.build("lobby", 15, x0 + 20);
     expect(r.ok).toBe(false);
-    expect(r.reason).toBe("Clear the floor tiles or rooms here first, then place your sky lobby.");
+    expect(r.reason).toBe("Clear the rooms here first, then place your sky lobby.");
   });
 
-  it("refuses a sky lobby over plain floor tiles too (lay lobbies first, or clear the tiles)", () => {
-    // The exact silent-degradation mode that rotted the phase2 endgame fixture:
-    // floor tiles laid across a sky-lobby floor, then a lobby placed on top.
-    // Every tile of the lobby must be refused, loudly, so a fixture (or player)
-    // that skips checking ok ends up with NO sky lobby rather than a partial one.
+  it("upgrades bare floor to a sky lobby in place (lobby over plain floor, no rooms)", () => {
+    // A lobby placed over plain floor tiles on a sky story UPGRADES them in
+    // place, exactly like the ground concourse and the 1994 overlay. Bare floor
+    // is no longer a blocker; only rooms are. (Was previously refused with
+    // "Clear the floor tiles or rooms here first"; a deliberate reversal (party
+    // 2026-07-30), verified against 1994: a lobby can be built on top of floor.)
     const sim = newSeededGame(7);
     const x0 = towerToFloor(sim, 15); // lays plain floor tiles up through 15
-    const r = sim.build("lobby", 15, x0);
-    expect(r.ok).toBe(false);
-    expect(r.reason).toBe("Clear the floor tiles or rooms here first, then place your sky lobby.");
     expect(sim.tower.floorHasLobby(15)).toBe(false);
+    const r = sim.build("lobby", 15, x0);
+    expect(r.ok).toBe(true);
+    expect(sim.tower.structureKindAt(15, x0)).toBe("lobby"); // the floor tile became a lobby
+    expect(sim.tower.floorHasLobby(15)).toBe(true);
   });
 
   it("does not restrict a plain floor on an unclaimed sky-lobby floor", () => {

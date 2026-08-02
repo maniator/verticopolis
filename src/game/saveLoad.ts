@@ -2,10 +2,10 @@ import { Simulation } from "../engine/Simulation";
 import type { GameMode, SerializedView } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
 import { SLOT_COUNT, SaveGame, isStorageWriteError, saveFailureMessage } from "../storage/SaveGame";
-import { LegacyExportError, buildTDT } from "../storage/tdtExport";
-import type { BuiltLegacyTower } from "../storage/tdtExport";
+import { LegacyExportError, buildTDT, type BuiltLegacyTower } from "../storage/tdtExport";
 import { LegacyImportError, parseTDT } from "../storage/tdtImport";
 import type { ImportReport } from "../storage/tdtImport";
+import { persistAutosave } from "./autosavePersist";
 import { shouldArm } from "../ui/Onboarding";
 import { gameplaySession } from "../analytics";
 import { isCrashed, isSplashUp } from "./interactionState";
@@ -159,7 +159,7 @@ export class SaveLoad {
         // Re-stamp per iteration: the camera may have moved while the
         // previous async compression was in flight.
         this.stampView(sim);
-        await SaveGame.saveAsync(sim);
+        await persistAutosave(sim);
       } while (this.autosaveQueued);
     } catch {
       /* periodic autosave is best effort and has no UI surface; manual and pre-reload saves still report errors */

@@ -4,6 +4,8 @@ import { injectVercelTelemetry } from "./telemetry";
 import { startGameplaySession, trackAppActionOnce } from "./analytics";
 import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
+import { IS_WRAPPED_BUILD } from "./platform";
+import { prepareSaveStore } from "./game/desktopSaveStore";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -100,9 +102,14 @@ export function showBootMessage(content: TemplateResult | string, withReload = f
 /** Boot the game once the DOM is ready. `create` builds the app instance (a
  *  `() => new GameApp()` thunk from `main.ts`), kept as a factory so this module
  *  imports no `GameApp` value and stays cycle-free. */
-export function bootGame(create: () => BootApp): void {
-  if (typeof document === "undefined") return;
-  const boot = () => {
+export function bootGame(create: () => BootApp): Promise<void> {
+  if (typeof document === "undefined") return Promise.resolve();
+  // Async only so the wrapper save store can resolve before the game
+  // constructs. The rethrow below therefore becomes a REJECTION rather than a
+  // synchronous throw, which is still captured: `installErrorTracking` binds
+  // `unhandledrejection` alongside `error` (see analyticsErrors.ts), and it is
+  // installed as the first statement here, so the listener is already up.
+  const boot = async () => {
     // Install the cookieless error listeners first, so an uncaught throw during
     // the rest of boot is captured (a throw during module eval, before this line,
     // is inherently out of reach). Host-gated per report (nothing is sent on a
@@ -144,6 +151,24 @@ export function bootGame(create: () => BootApp): void {
     // session never opens and can't dilute the length signal. Host-gated inside,
     // like the page-view inject just above.
     startGameplaySession();
+    // Bring up a wrapper shell's save store BEFORE the game constructs, so the
+    // synchronous save readers (`SaveGame.load`, `hasSave`, `listSlots`,
+    // `hasSlot`) can answer from a resolved snapshot rather than being made
+    // async all the way up through the splash controller. Never rejects, so a
+    // broken or slow shell degrades to localStorage instead of stalling boot.
+    //
+    // Behind `IS_WRAPPED_BUILD`, not `if (port.saveStore)`: only the former is
+    // statically replaced by Vite, so only the former lets Rollup drop the
+    // store, the session model, and the migration out of a browser bundle.
+    // `scripts/verify-wrapper-seam.ts` checks the built artifact both ways.
+    //
+    // `.catch` even though `prepareSaveStore` is documented and tested never to
+    // reject. This await sits OUTSIDE the try below, so a rejection would skip
+    // the boot message and leave the player on a blank page. Making the
+    // "cannot take boot down" property structural at the call site costs one
+    // line and does not depend on a module three imports away keeping its
+    // promise. Boot continues on localStorage either way.
+    if (IS_WRAPPED_BUILD) await prepareSaveStore().catch(() => {});
     try {
       const app = create();
       // Publish the tooling handle only where tooling runs: dev serves and
@@ -168,9 +193,21 @@ export function bootGame(create: () => BootApp): void {
       throw err;
     }
   };
+  // Returns the boot promise rather than firing and forgetting it. `boot` became
+  // async so the wrapper save store can resolve before the game constructs, and
+  // its rethrow would otherwise be a floating rejection nothing could observe:
+  // not the caller, and not a test.
+  //
+  // `main.ts` still VOIDS the result, deliberately. There is nothing useful to
+  // do with a boot failure beyond the message already rendered, so an unhandled
+  // rejection reaches `installErrorTracking`'s `unhandledrejection` listener
+  // exactly as an uncaught throw used to reach its `error` listener. Both are
+  // bound by the first statement in `boot`, so the listener is up before
+  // anything here can fail.
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
-  } else {
-    boot();
+    return new Promise<void>((resolve, reject) => {
+      document.addEventListener("DOMContentLoaded", () => void boot().then(resolve, reject));
+    });
   }
+  return boot();
 }

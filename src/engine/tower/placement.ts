@@ -99,19 +99,21 @@ export function canPlace(tower: Tower, kind: FacilityKind, floor: number, x: num
     if (kind === "lobby" && !isLobbyFloor(floor)) {
       return { ok: false, reason: "Lobbies only go on the ground floor and every 15th floor (15, 30, 45…)." };
     }
-    // Sky-lobby canon (floors 15/30/45/60/75/90): a floor becomes lobby-only
-    // the moment the player commits a lobby to it. Refuse plain floor tiles
-    // there, and refuse a lobby on a sky-lobby floor that already carries
-    // non-lobby content (which would leave the concourse mixed). Ground floor
-    // 1 is out of scope for THIS PLACEMENT RULE only (rooms are already
-    // blocked by coversGroundFloor, and the ground concourse keeps its
-    // in-place floor-to-lobby upgrade). Lobby permanence in removalReason is
-    // a separate rule and covers every floor including ground.
+    // Sky-lobby canon (floors 15/30/45/60/75/90): once a lobby is committed to a
+    // sky story, the story is a concourse and refuses further plain floor (the
+    // kind === "floor" rule below). A lobby placed over BARE FLOOR upgrades it in
+    // place (like the ground concourse and the 1994 overlay), so only ROOMS block
+    // a sky lobby (a lobby is transit-only and can't sit on a room). The rooms
+    // gate is WHOLE-FLOOR so a lobby can never claim a story that still carries a
+    // room; leftover plain floor at other spans is fine (a later lobby upgrades
+    // it), the same mixed floor+lobby state the ground concourse already allows.
+    // Ground floor 1 keeps its own upgrade (never a room floor: coversGroundFloor
+    // blocks rooms). Lobby permanence lives separately in removalReason.
     if (kind === "floor" && isSkyLobbyFloor(floor) && tower.floorHasLobby(floor)) {
       return { ok: false, reason: "Sky lobbies are concourses. Only lobby tiles go here." };
     }
-    if (kind === "lobby" && isSkyLobbyFloor(floor) && tower.floorHasNonLobbyContent(floor)) {
-      return { ok: false, reason: "Clear the floor tiles or rooms here first, then place your sky lobby." };
+    if (kind === "lobby" && isSkyLobbyFloor(floor) && tower.floorHasRoom(floor)) {
+      return { ok: false, reason: "Clear the rooms here first, then place your sky lobby." };
     }
     if (!tower.structureSpanFree(floor, x, f.width)) {
       // A lobby may upgrade plain floor tiles in place (the sky-lobby

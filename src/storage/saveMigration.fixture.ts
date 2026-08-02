@@ -2,6 +2,7 @@ import { expect } from "vitest";
 import { deflateSync } from "fflate";
 import { fromBase64, inflateCapped, STORE_MAGIC, toBase64, TOWER_FILE_MAGIC } from "./saveCompression";
 import { asScopeToken, type SaveScopeToken, type SaveStorePort, type SaveStoreSnapshot } from "../platform/saveStore";
+import type { SharedScopeToken } from "./saveStoreSession";
 
 /**
  * Shared fixtures for the save-migration tests, split out when the single test
@@ -17,7 +18,13 @@ import { asScopeToken, type SaveScopeToken, type SaveStorePort, type SaveStoreSn
  */
 export const PRE_2_0_SAVE = { minutes: 4321, units: [{ t: "office" }], towerName: "Old Guard", money: 500 };
 
-export const SCOPE: SaveScopeToken = asScopeToken("scope-token");
+/**
+ * A migration destination. Cast rather than built, because `migrationTarget` is
+ * the only real producer of a `SharedScopeToken` and these tests drive
+ * `migrateSavesToStore` directly. The cast being NECESSARY here is the point:
+ * before the brand existed, `session.defaultScope` was accepted without one.
+ */
+export const SCOPE = asScopeToken("scope-token") as SharedScopeToken;
 
 /** Packs a value exactly as `SaveGame.saveTo` writes it into localStorage. */
 export function storeValue(obj: unknown): string {
@@ -43,7 +50,7 @@ export function fakeStore(existing: Record<string, string> = {}) {
   let dropSilently: string | null = null;
   const port: SaveStorePort = {
     list(): Promise<SaveStoreSnapshot> {
-      return Promise.resolve({ scopes: [{ token: SCOPE, label: "This computer" }], records: [] });
+      return Promise.resolve({ scopes: [{ token: SCOPE, label: "This computer", shared: true }], records: [] });
     },
     read(id: string): Promise<string | null> {
       return Promise.resolve(written.get(id)?.contents ?? existing[id] ?? null);

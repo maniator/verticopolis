@@ -35,15 +35,12 @@ export class Tower {
   byId = new Map<number, Unit>();
   /** id → transport, kept in lockstep with `transports` (mirror of `byId`). */
   transportsById = new Map<number, Transport>();
-  /** floor → number of lobby structural tiles on it, so "is this a lobby floor?"
-   *  is O(1). Used to keep express-elevator stops synced with sky lobbies as they
-   *  are built or removed, regardless of the order relative to the elevator. */
+  /** Per-floor tile counters, kept live by register/unregister/reindex so the
+   *  placement rules read them in O(1) on every hover-preview frame: lobby tiles
+   *  ("is this a lobby floor?", syncs express stops) and ROOM tiles (so a sky
+   *  lobby refuses rooms but upgrades bare floor in place). */
   lobbyTiles = new Map<number, number>();
-  /** floor → number of NON-lobby tiles on it: plain floor plus every tile a
-   *  room's footprint covers on this story. Mirror of `lobbyTiles`, kept live by
-   *  register/unregister/reindex so `floorHasNonLobbyContent` is O(1) on every
-   *  hover-preview frame. */
-  nonLobbyTiles = new Map<number, number>();
+  roomTiles = new Map<number, number>();
 
   key(floor: number, x: number): string {
     return `${floor}:${x}`;
@@ -177,16 +174,12 @@ export class Tower {
         map.set(k, unit.id);
         if (structural) this.structKind.set(k, unit.kind as "floor" | "lobby");
       }
-      // Non-lobby tile counter (mirror of lobbyTiles). A plain floor tile is
-      // non-lobby; a room's every-story footprint is non-lobby; a lobby is not.
-      if (unit.kind !== "lobby") {
+      if (!structural) {
         const story = unit.floor + fl;
-        this.nonLobbyTiles.set(story, (this.nonLobbyTiles.get(story) ?? 0) + unit.width);
+        this.roomTiles.set(story, (this.roomTiles.get(story) ?? 0) + unit.width);
       }
     }
-    if (unit.kind === "lobby") {
-      this.lobbyTiles.set(unit.floor, (this.lobbyTiles.get(unit.floor) ?? 0) + unit.width);
-    }
+    if (unit.kind === "lobby") this.lobbyTiles.set(unit.floor, (this.lobbyTiles.get(unit.floor) ?? 0) + unit.width);
   }
 
   unregister(unit: Unit): void {
@@ -200,18 +193,15 @@ export class Tower {
         map.delete(k);
         if (structural) this.structKind.delete(k);
       }
-      if (unit.kind !== "lobby") {
-        const story = unit.floor + fl;
-        const left = (this.nonLobbyTiles.get(story) ?? 0) - unit.width;
-        if (left > 0) this.nonLobbyTiles.set(story, left);
-        else this.nonLobbyTiles.delete(story);
-      }
+      if (!structural) this.decCount(this.roomTiles, unit.floor + fl, unit.width);
     }
-    if (unit.kind === "lobby") {
-      const left = (this.lobbyTiles.get(unit.floor) ?? 0) - unit.width;
-      if (left > 0) this.lobbyTiles.set(unit.floor, left);
-      else this.lobbyTiles.delete(unit.floor);
-    }
+    if (unit.kind === "lobby") this.decCount(this.lobbyTiles, unit.floor, unit.width);
+  }
+
+  private decCount(m: Map<number, number>, k: number, n: number): void {
+    const left = (m.get(k) ?? 0) - n;
+    if (left > 0) m.set(k, left);
+    else m.delete(k);
   }
 
   reindex(): void {
@@ -220,7 +210,7 @@ export class Tower {
     this.rooms.clear();
     this.byId.clear();
     this.lobbyTiles.clear();
-    this.nonLobbyTiles.clear();
+    this.roomTiles.clear();
     for (const u of this.units) this.register(u);
     // Deserialize bulk-assigns `this.transports` before calling reindex, so
     // rebuild the transport index (and drop any stale stop lists) here too.
@@ -380,9 +370,9 @@ export class Tower {
     return transport.floorHasLobby(this, floor);
   }
 
-  floorHasNonLobbyContent(floor: number): boolean {
-    return transport.floorHasNonLobbyContent(this, floor);
-  }
+  /** True when floor carries a ROOM tile. Bare floor and lobby tiles do not
+   *  count, so a sky lobby refuses only rooms and upgrades bare floor in place. */
+  floorHasRoom(floor: number): boolean { return (this.roomTiles.get(floor) ?? 0) > 0; }
 
   syncExpressStopsForFloor(floor: number): void {
     expressStops.syncExpressStopsForFloor(this, floor);
