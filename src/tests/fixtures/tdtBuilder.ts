@@ -102,6 +102,10 @@ export interface TdtSpec {
    *  falls back to synthesizing a transport layout. */
   includeTransports?: boolean;
   elevators?: ElevatorSpec[];
+  /** Size each built shaft's payload the way Verticopolis 2.9.0 and earlier did,
+   *  one entry per SERVICED floor rather than per spanned floor. Only for
+   *  testing the reader's fallback for those files; never for anything else. */
+  legacyServicedPayload?: boolean;
   stairs?: StairSpec[];
   /** The parking block's connected-stall count (default 0). */
   parkingConnected?: number;
@@ -204,7 +208,17 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     // quietly encode a different rule than the code under test. An inverted spec
     // span throws there rather than padding a negative (silently zero) length,
     // which would hand the suite a file with a header and no payload.
-    pad(builtShaftPayloadSize(e.bottomFloor, e.topFloor));
+    //
+    // `legacyServicedPayload` reproduces what Verticopolis 2.9.0 and earlier
+    // wrote instead: one per-floor entry per SERVICED floor. It exists so the
+    // reader's fallback for those files can be tested against a real one, and it
+    // is the ONLY thing in this fixture that deliberately encodes a superseded
+    // layout; leave it off for anything else.
+    if (spec.legacyServicedPayload) {
+      pad(builtShaftPayloadSize(1, [...serviced].length));
+    } else {
+      pad(builtShaftPayloadSize(e.bottomFloor, e.topFloor));
+    }
   }
 
   // ---- Finance + parking + stairs -------------------------------------------

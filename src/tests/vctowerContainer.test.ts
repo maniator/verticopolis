@@ -75,6 +75,26 @@ describe("vctower container decode", () => {
     );
   });
 
+  it("settles a SEPARATED version before trying to read it as v1", () => {
+    // A version like 17 shares the "VCTOWER1" prefix, so a prefix test alone
+    // enters the v1 path for "VCTOWER17\n<payload>". If the leftover digit plus
+    // the payload happened to form a valid stream, a file explicitly labelled a
+    // version we do not read would be accepted and handed on as a tower. The
+    // separator makes the version exact, so it is now settled first.
+    //
+    // The full exploit needs a digit-leading payload to move into the version
+    // token, which our own writer cannot produce (see the digit test above), so
+    // what is pinned here is the contract: every separated non-v1 version is
+    // refused as a VERSION, never attempted and never reported as damaged.
+    for (const version of ["2", "17", "10", "100"]) {
+      const file = pack({ towerName: "T" }, `VCTOWER${version}`);
+      expect(() => decodeVctower(file, "future.vctower")).toThrow(
+        new RegExp(`unsupported \\.vctower version \\(VCTOWER${version};`),
+      );
+      expect(() => decodeVctower(file, "future.vctower")).not.toThrow(/damaged|unreadable/);
+    }
+  });
+
   it("names a non-v1 version when a single digit makes it unambiguous", () => {
     // "VCTOWER2zzzz" has no separator, but one digit can only be the version:
     // nothing else could belong to it.

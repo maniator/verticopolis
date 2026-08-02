@@ -35,6 +35,16 @@ import { SaveTooLargeError, inflateCapped } from "./saveCompression";
 export function decodeVctower(text: string, label = "vctower"): unknown {
   const trimmed = text.trim();
   if (!/^VCTOWER\d/.test(trimmed)) throw new Error(`${label}: not a .vctower file (no VCTOWER magic)`);
+  // A SEPARATED version is unambiguous, so settle it before the v1 attempt
+  // below. Otherwise `VCTOWER17\n<payload>` enters that attempt on the strength
+  // of its "VCTOWER1" prefix, and if the leftover digit plus the payload happen
+  // to form a valid stream (constructible: move a digit-leading v1 payload's
+  // first digit into the version token) the decoder would accept a file
+  // explicitly labelled a version it does not read.
+  const separated = /^VCTOWER(\d+)(?=\s|$)/.exec(trimmed)?.[1];
+  if (separated !== undefined && separated !== "1") {
+    throw new Error(`${label}: unsupported .vctower version (VCTOWER${separated}; this decoder reads VCTOWER1)`);
+  }
   if (/^VCTOWER1/.test(trimmed)) {
     try {
       const b64 = trimmed.slice("VCTOWER1".length).replace(/\s+/g, "");
@@ -68,15 +78,15 @@ export function decodeVctower(text: string, label = "vctower"): unknown {
       );
     }
   }
-  // Not v1. Name the version only when it can be read exactly: with a separator
-  // the digits are unambiguous, and so is a single digit (nothing else could
-  // belong to the version). Two or more digits with no separator could split
-  // either way ("VCTOWER27z" is version 27, or version 2 with payload "7z"), and
-  // this decoder cannot try the payload to find out, so it says what it knows
-  // instead of asserting a version that may not exist.
+  // Not v1, and NOT separated: the separated case is settled at the top, so
+  // everything reaching here has version digits running into the payload. One
+  // digit is still unambiguous (nothing else could belong to the version); two
+  // or more could split either way ("VCTOWER27z" is version 27, or version 2
+  // with payload "7z"), and this decoder cannot try a non-v1 payload to find
+  // out, so it says what it knows instead of asserting a version that may not
+  // exist.
   const digits = /^VCTOWER(\d+)/.exec(trimmed)![1];
-  const separated = /^VCTOWER(\d+)(?=\s|$)/.test(trimmed);
-  if (separated || digits.length === 1) {
+  if (digits.length === 1) {
     throw new Error(`${label}: unsupported .vctower version (VCTOWER${digits}; this decoder reads VCTOWER1)`);
   }
   throw new Error(

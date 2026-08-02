@@ -865,6 +865,48 @@ describe("transport decode: the save's own shafts and flights", () => {
     expect(t.skipFloors).not.toContain(45);
   });
 
+  it("a .TDT from OUR older builds still imports every shaft (legacy payload layout)", () => {
+    // Verticopolis 2.9.0 and earlier sized a built shaft's payload by SERVICED
+    // floors. Reading such a file with the current spanned-floor rule walks past
+    // the next slot into zeros, where `used === 0` reads as an empty slot, so
+    // every later shaft vanishes with nothing to warn about: export from an old
+    // build, import into a new one, and the tower quietly loses its transport.
+    const legacy: TdtSpec = {
+      elevators: [
+        // Stops at 7 of the 12 floors it spans, so the two layouts differ by
+        // 5 * 324 bytes and the landing tells them apart.
+        { type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 21, serviced: [10, 11, 12, 18, 19, 20, 21] },
+        { type: 2, cars: 3, x: 140, bottomFloor: 10, topFloor: 18 },
+      ],
+      legacyServicedPayload: true,
+    };
+    const walked = parseTdtBinary(buildTdt(legacy));
+    expect(walked.elevators).toHaveLength(2);
+    expect(walked.elevators!.map((e) => e.x)).toEqual([100, 140]);
+    expect(walked.elevators![1].cars).toBe(3);
+    expect(walked.warnings).toEqual([]);
+    // And the skipping shaft's own stop settings survive the fallback.
+    const skipper = parse(legacy).save.transports.find((t) => t.x === 100)!;
+    expect(skipper.skipFloors).toEqual([4, 5, 6, 7, 8]);
+  });
+
+  it("a CURRENT-layout file is unaffected by the legacy fallback", () => {
+    // The fallback must never fire on a file written the documented way. The two
+    // sizes only differ when a shaft skips floors, and even then the spanned
+    // landing is the one that looks like a slot.
+    const walked = parseTdtBinary(
+      buildTdt({
+        elevators: [
+          { type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 21, serviced: [10, 11, 12, 18, 19, 20, 21] },
+          { type: 2, cars: 3, x: 140, bottomFloor: 10, topFloor: 18 },
+        ],
+      }),
+    );
+    expect(walked.elevators).toHaveLength(2);
+    expect(walked.elevators!.map((e) => e.x)).toEqual([100, 140]);
+    expect(walked.warnings).toEqual([]);
+  });
+
   it("an INVERTED shaft span is refused, and the importer falls back rather than mis-skipping", () => {
     // The payload size is derived from the span, so an inverted pair cannot be
     // skipped by a guessed distance without landing mid-record and garbling
