@@ -43,9 +43,9 @@ export const TDT_MAX_PEOPLE = 100_000;
  * Byte sizes for the tail blocks (doc §6–§10): 16-byte person records after a
  * u32 count; 512 × 18-byte retail rows; 24 elevator entries (194-byte header
  * each, built shafts appending a 3,140-byte fixed block, then one 324-byte entry
- * per serviced floor and one 348-byte entry per car; the 3,140 was measured, see
- * TDT_ELEVATOR_BUILT_FIXED); a 132-byte finance block; a 1,026-byte parking
- * block; and 64 × 10-byte stair/escalator records.
+ * per SPANNED floor and a SINGLE 348-byte car block; see
+ * {@link builtShaftPayloadSize}, which owns that arithmetic); a 132-byte finance
+ * block; a 1,026-byte parking block; and 64 × 10-byte stair/escalator records.
  */
 export const TDT_PERSON_RECORD_SIZE = 16;
 /** Upper bound the exporter clamps its people count to: the canon TOWER census
@@ -89,7 +89,7 @@ export const TDT_ELEVATOR_HEADER_SIZE = 194;
 // Built shafts append a fixed block whose true size (3140 B) was measured from
 // real 1994 saves via the tools/simtower round-trip harness: walking the three
 // shafts in my_tower.TDT, the record stride
-//   194-byte header + 3140 + 324 * servicedFloors + 348
+//   194-byte header + 3140 + 324 * spannedFloors + 348
 // reproduces every shaft's exact file offset. The earlier 480 + 2 * 120 = 720
 // estimate undercounted this block by 2420 B, which desynced the whole table
 // after the first shaft and forced the importer to synthesize fakes instead.
@@ -118,6 +118,44 @@ export const TDT_ELEVATOR_SCHEDULE_DEFAULT: readonly number[] = [
   ...(Array(14).fill(0x05) as number[]),
   ...(Array(28).fill(0x00) as number[]),
 ];
+
+/**
+ * Bytes a BUILT elevator slot appends after its 194-byte header: the fixed
+ * block, one per-floor entry for every floor the shaft SPANS (`bottomFloor..
+ * topFloor` inclusive, whether or not it stops there), and a SINGLE car block.
+ *
+ * The writer, the reader's skip, and the test fixture must agree byte for byte
+ * or the whole elevator table desyncs after the first shaft, so they all call
+ * THIS function rather than re-typing the arithmetic. Both operands have been
+ * wrong before, each time because every reference save on hand happened to make
+ * the wrong rule indistinguishable from the right one: `* cars` looked right on
+ * 1-car saves, and counting serviced floors looked right until a save arrived
+ * whose shafts skip floors. Floors are TDT floor bytes, not our floor numbers.
+ *
+ * A degenerate span (`top === bottom`) sizes as one entry; an INVERTED pair is
+ * not a shaft the game can have written, so it throws rather than return a
+ * nonsense (possibly negative) size that a caller would pad or skip by. A
+ * FRACTIONAL span throws for the same reason: it returns a fractional size,
+ * which a writer pads up to the next whole byte while a reader skips the
+ * fraction, so the two disagree by a byte with nothing to show for it.
+ *
+ * Both operands must be in the SAME space (TDT floor bytes at every call site
+ * today). Only their difference is used, so a uniform offset cancels out; what
+ * would NOT cancel, and what nothing here can detect, is passing one operand in
+ * engine floors and the other in TDT bytes.
+ */
+export function builtShaftPayloadSize(bottomFloor: number, topFloor: number): number {
+  const spannedFloors = topFloor - bottomFloor + 1;
+  // Check the OPERANDS, not just their difference: two matching fractions
+  // (1.5 and 3.5) cancel into a whole span while describing floors that do not
+  // exist, so the size would look valid and mean nothing.
+  if (!Number.isInteger(bottomFloor) || !Number.isInteger(topFloor) || spannedFloors < 1) {
+    throw new RangeError(
+      `elevator span must be a whole number of floors, at least one (bottom ${bottomFloor}, top ${topFloor})`,
+    );
+  }
+  return TDT_ELEVATOR_BUILT_FIXED + spannedFloors * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_CAR_BLOCK_SIZE;
+}
 export const TDT_FINANCE_SIZE = 132;
 export const TDT_PARKING_SIZE = 2 + 512 * 2;
 export const TDT_STAIR_SLOTS = 64;

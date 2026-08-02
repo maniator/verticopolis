@@ -12,25 +12,12 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { basename, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { inflateSync } from "fflate";
+import type { SerializedGame } from "../../src/engine/types";
 import { buildTDT } from "../../src/storage/tdtExport";
+import { decodeVctower } from "../../src/storage/vctowerContainer";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SAVES = resolve(HERE, "saves");
-
-function decodeVctower(path: string) {
-  const text = readFileSync(path, "utf8");
-  const nl = text.indexOf("\n");
-  if (nl < 0) throw new Error(`${path}: not a .vctower file (no header line)`);
-  const magic = text.slice(0, nl).trim();
-  // Only VCTOWER1 is decoded below (base64 of DEFLATE JSON). Refuse other
-  // versions loudly rather than mis-decode a future container format.
-  if (magic !== "VCTOWER1")
-    throw new Error(`${path}: unsupported .vctower version (magic="${magic}"; this tool decodes VCTOWER1)`);
-  const b64 = text.slice(nl + 1).trim();
-  const json = new TextDecoder("utf-8", { fatal: true }).decode(inflateSync(Buffer.from(b64, "base64")));
-  return JSON.parse(json);
-}
 
 function main() {
   const inputs = process.argv.slice(2);
@@ -52,7 +39,7 @@ function main() {
     // Wrap the WHOLE per-input body (decode included): a bad base64 / JSON /
     // magic on one file should skip that file, not abort the rest of the batch.
     try {
-      const save = decodeVctower(input);
+      const save = decodeVctower(readFileSync(input, "utf8"), input) as SerializedGame;
       const label = `${basename(input)}  [${save.towerName ?? "?"}, ${save.mode ?? "classic"} mode, ${save.star ?? "?"}★]`;
       const built = buildTDT(save);
       const name = outName(input, i);

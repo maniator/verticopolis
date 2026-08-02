@@ -5,6 +5,7 @@ import { SAVE_VERSION } from "../../engine/saveMigration";
 import {
   TDT_DEFAULT_VIEW_X,
   TDT_DEFAULT_VIEW_Y,
+  TDT_ELEVATOR_PER_FLOOR_SIZE,
   TDT_ELEVATOR_SCHEDULE_DEFAULT,
   TDT_FLOOR_COUNT,
   TDT_FLOOR_INDEX_ENTRIES,
@@ -16,7 +17,7 @@ import {
   parseTdtBinary,
 } from "../../storage/tdtFormat";
 import { LegacyExportError, buildTDT, classFromRent, legacyFilename } from "../../storage/tdtExport";
-import { GRID } from "../../engine/facilities";
+import { FACILITIES, GRID } from "../../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { FAMILY_STORIES, PART_FAMILY, parseTDT } from "../../storage/tdtImport";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
@@ -57,6 +58,34 @@ function readFloorRecords(bytes: Uint8Array, tdtIndex: number): { left: number; 
   }
   return [];
 }
+
+/** Walk to one floor's record block and hand the caller its 6-byte header plus
+ *  every record's full span. Used by the coverage tests, which have to ask what
+ *  TILES a row's records actually cover, not just which types appear on it. */
+function readFloor(
+  bytes: Uint8Array,
+  tdtIndex: number,
+): { extent: { left: number; right: number }; spans: { left: number; right: number; type: number }[] } {
+  const u16 = (off: number) => bytes[off] | (bytes[off + 1] << 8);
+  let off = TDT_HEADER_SIZE;
+  for (let index = 0; index < TDT_FLOOR_COUNT; index++) {
+    const count = u16(off);
+    const base = off + 6;
+    if (index === tdtIndex) {
+      const spans: { left: number; right: number; type: number }[] = [];
+      for (let k = 0; k < count; k++) {
+        const ro = base + k * TDT_TENANT_RECORD_SIZE;
+        spans.push({ left: u16(ro), right: u16(ro + 2), type: (bytes[ro + 4] << 24) >> 24 });
+      }
+      return { extent: { left: u16(off + 2), right: u16(off + 4) }, spans };
+    }
+    off = base + count * TDT_TENANT_RECORD_SIZE + TDT_FLOOR_INDEX_ENTRIES * 2;
+  }
+  return { extent: { left: 0, right: 0 }, spans: [] };
+}
+
+const recordSpans = (bytes: Uint8Array, tdtIndex: number) => readFloor(bytes, tdtIndex).spans;
+const floorExtent = (bytes: Uint8Array, tdtIndex: number) => readFloor(bytes, tdtIndex).extent;
 
 /** A realistic serialized tower: the sample fixture pulled through the
  *  importer, so it carries rooms, hotel states, transports and paving in
@@ -150,6 +179,156 @@ describe("buildTDT: export → import round trip", () => {
     const eightCars = sampleSave();
     eightCars.transports.push(shaft(8));
     expect(buildTDT(eightCars).bytes.length).toBe(buildTDT(oneCar).bytes.length);
+  });
+
+  it("the built-shaft payload size counts SPANNED floors, not serviced ones", () => {
+    // Sibling of the car-count guard above, and the same class of bug. The
+    // appended per-floor entries run bottom..top INCLUSIVE, whether or not the
+    // shaft stops on a floor: every reference save we had stopped everywhere,
+    // so serviced == spanned there and the wrong rule looked right. Sizing by
+    // serviced floors under-ran any shaft with skip floors, and the real 1994
+    // game then lost every shaft after it (measured on the Wine harness: a
+    // 4-shaft tower rendered 2). Two exports identical except one shaft's stop
+    // settings MUST be the same length; a serviced-floor size makes the skipping
+    // one shorter.
+    const shaft = (skipFloors: number[]) => ({
+      id: 100,
+      kind: "elevatorStandard" as FacilityKind,
+      x: 100,
+      width: 4,
+      bottom: 1,
+      top: 12,
+      cars: 2,
+      carPositions: [1, 1],
+      carDir: [0, 0],
+      load: 0,
+      skipFloors,
+    });
+    const stopsEverywhere = sampleSave();
+    stopsEverywhere.transports.push(shaft([]));
+    const skipsFive = sampleSave();
+    skipsFive.transports.push(shaft([4, 5, 6, 7, 8]));
+    expect(buildTDT(skipsFive).bytes.length).toBe(buildTDT(stopsEverywhere).bytes.length);
+    // Same length only proves the size ignores stop flags; it would also hold
+    // for a fixed 120-entry block or any other skip-independent rule. Pin the
+    // rule itself: growing a shaft's SPAN by N floors must grow the file by
+    // exactly N per-floor entries. The taller shaft skips ten INTERIOR floors,
+    // so both shafts stop at exactly 12 floors (endpoints always stop): under
+    // the old serviced-floor rule this delta would be 0, not 10 entries.
+    const shorter = sampleSave();
+    shorter.transports.push({ ...shaft([]), top: 12 });
+    const taller = sampleSave();
+    taller.transports.push({ ...shaft([12, 13, 14, 15, 16, 17, 18, 19, 20, 21]), top: 22 });
+    expect(buildTDT(taller).bytes.length - buildTDT(shorter).bytes.length).toBe(
+      10 * TDT_ELEVATOR_PER_FLOOR_SIZE,
+    );
+    // And the stop settings themselves still round-trip (the bitmap is written
+    // whatever the payload size is).
+    const back = parseTDT(buildTDT(skipsFive).bytes.buffer as ArrayBuffer, "S.TDT").save;
+    const imported = back.transports.find((t) => t.x === 100 && t.kind === "elevatorStandard")!;
+    expect(imported.skipFloors).toEqual([4, 5, 6, 7, 8]);
+  });
+
+  it("a fixed tower exports to a GOLDEN byte length (pins the absolute block sizes)", () => {
+    // Every other size test here is relative, and the writer, the reader's skip,
+    // and the fixture all share one helper, so they move together: a wrong value
+    // for TDT_ELEVATOR_BUILT_FIXED (3140), TDT_ELEVATOR_PER_FLOOR_SIZE (324) or
+    // TDT_ELEVATOR_CAR_BLOCK_SIZE (348) round-trips through our own code
+    // perfectly while the real 1994 game desyncs. Those three numbers are
+    // measured against the retail game (docs/canon/tdt-format.md §8), not
+    // derivable, so pin them with a LITERAL: this tower must export to exactly
+    // this many bytes.
+    //
+    // If this fails, do NOT just update the number. The likely causes, in order:
+    // the three elevator block sizes (re-measure on the tools/simtower harness
+    // and update the canon doc), TDT_ROUTING_TAIL_SIZE (25,600 here, and still
+    // provisional per its own docstring), or a change to the fixed header /
+    // retail / finance / parking / stairs block sizes. Work out which, and say
+    // so here.
+    //
+    // The tower is deliberately POPULATION-FREE (structure and one shaft, no
+    // tenants): the people block is 16 bytes per resident, so a census-bearing
+    // tower would make this literal move whenever an economy knob like office
+    // population is tuned, firing a byte-layout test for a balance change.
+    const units: Unit[] = [unit({ id: 1, kind: "lobby", floor: 1, x: 100, width: 1, state: "occupied" })];
+    for (let i = 0; i < 4; i++) {
+      units.push(unit({ id: 10 + i, kind: "floor", floor: 2 + i, x: 100, width: 9 }));
+    }
+    const save: SerializedGame = {
+      version: SAVE_VERSION, seed: 1, money: 1_000_000, star: 1, minutes: 600, mode: "classic",
+      units, nextId: 100, towerName: "GOLD", builtWeddingHall: false, evaluatedTower: false,
+      transports: [
+        {
+          id: 50, kind: "elevatorStandard", x: 90, width: 4, bottom: 1, top: 8, cars: 2,
+          carPositions: [1, 1], carDir: [0, 0], load: 0, skipFloors: [3, 4],
+        },
+      ],
+    };
+    const built = buildTDT(save);
+    expect(built.report.comesAlong[0]).toMatch(/^0 rooms/); // no census: see above
+    expect(built.bytes.length).toBe(71_284);
+  });
+
+  // `builtShaftPayloadSize`'s own arithmetic contract is pinned at the UNIT
+  // tier, in src/storage/tdtConstants.test.ts, so `npm run test:unit` covers the
+  // root byte-layout invariant without the heavier integration project. What
+  // the tests here own is the part only a whole encoded file can show: that the
+  // writer, the reader's skip and the fixture actually AGREE on that size.
+
+  it("a shaft AFTER a skip-floor shaft still decodes (the desync the game showed)", () => {
+    // The guard the previous test cannot be: a writer/reader disagreement about
+    // the payload rule only bites the slots that FOLLOW a shaft whose serviced
+    // count differs from its span. With the skipping shaft last, a wrong skip
+    // lands in trailing padding, every later slot reads as empty, and nothing
+    // fails. So: skipping shaft first, ordinary shaft after it, and the second
+    // shaft's geometry must survive the round trip. In the real 1994 game this
+    // exact shape rendered 2 of 4 shafts before the fix.
+    const save = sampleSave();
+    save.transports.push({
+      id: 200,
+      kind: "elevatorStandard" as FacilityKind,
+      x: 100,
+      width: 4,
+      bottom: 1,
+      top: 12,
+      cars: 2,
+      carPositions: [1, 1],
+      carDir: [0, 0],
+      load: 0,
+      skipFloors: [4, 5, 6, 7, 8],
+    });
+    save.transports.push({
+      id: 201,
+      kind: "elevatorService" as FacilityKind,
+      x: 120,
+      width: 4,
+      bottom: 2,
+      top: 9,
+      cars: 3,
+      carPositions: [2, 2, 2],
+      carDir: [0, 0, 0],
+      load: 0,
+    });
+    const { bytes } = buildTDT(save);
+    expect(parseTdtBinary(bytes).warnings).toEqual([]);
+    // The test only has teeth while the skipping shaft is written to an EARLIER
+    // slot than the plain one: with it last, a wrong skip lands in trailing
+    // padding, every later slot reads as empty, and nothing fails. Pin the order
+    // in the file so a future change that sorts shafts cannot quietly neuter it.
+    const decoded = parseTdtBinary(bytes).elevators!;
+    const skipperSlot = decoded.findIndex((e) => e.x === 100);
+    const trailingSlot = decoded.findIndex((e) => e.x === 120);
+    expect(skipperSlot).toBeGreaterThanOrEqual(0);
+    expect(trailingSlot).toBeGreaterThan(skipperSlot);
+    const back = parseTDT(bytes.buffer as ArrayBuffer, "S.TDT").save;
+    const trailing = back.transports.find((t) => t.kind === "elevatorService" && t.x === 120);
+    expect(trailing).toBeDefined();
+    expect(trailing!.bottom).toBe(2);
+    expect(trailing!.top).toBe(9);
+    expect(trailing!.cars).toBe(3);
+    // The skipping shaft ahead of it kept its own stop settings.
+    const skipper = back.transports.find((t) => t.kind === "elevatorStandard" && t.x === 100)!;
+    expect(skipper.skipFloors).toEqual([4, 5, 6, 7, 8]);
   });
 
   it("a modern-mode tower is refused with a typed error", () => {
@@ -699,19 +878,208 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
     expect(backOffice.everOccupied).toBe(true);
   });
 
-  it("burned-out and burning rooms export as burned floor (type 48), not healthy rooms", () => {
+  it("burned-out and burning rooms export as bare floor, never as a type-48 record", () => {
+    // The 1994 game draws a type-48 (burned area) record as garbage pixels,
+    // measured on the Wine harness, so the exporter clears the debris instead:
+    // the tiles come out as ordinary paving and the loss is reported.
     const save = sampleSave();
     const office = save.units.find((u) => u.kind === "office" && u.state === "occupied")!;
     office.state = "gutted";
     const { bytes, report } = buildTDT(save);
-    expect(report.staysBehind.join(" ")).toMatch(/burned-out room/);
+    expect(report.staysBehind.join(" ")).toMatch(/burned or burning room arrives cleared/);
+    const records = readFloorRecords(bytes, office.floor + TDT_FLOOR_OFFSET);
+    expect(records.some((r) => r.type === 48)).toBe(false);
+    // EVERY tile the room occupied must come back as paving. Asserting only
+    // that SOME paving record exists on the row would pass even if the vacated
+    // span were left as a hole (which reads as unbuilt lot, the #318 sky gap).
+    const paved = new Set<number>();
+    for (const r of recordSpans(bytes, office.floor + TDT_FLOOR_OFFSET)) {
+      if (r.type !== 0 && r.type !== 24) continue;
+      for (let x = r.left; x < r.right; x++) paved.add(x);
+    }
+    const width = office.width ?? FACILITIES.office.width;
+    for (let x = office.x; x < office.x + width; x++) {
+      expect(paved.has(x)).toBe(true);
+    }
     const back = parseTDT(bytes.buffer as ArrayBuffer, "S.TDT");
     expect(
       back.save.units.some(
         (u) => u.kind === "office" && u.x === office.x && u.floor === office.floor,
       ),
     ).toBe(false);
-    expect(back.report.couldNotBring.join(" ")).toMatch(/burned/i);
+  });
+
+  it("a floor whose ONLY room burned still exports, paved end to end", () => {
+    // The shape the wide-record test cannot reach: nothing else on the row to
+    // pave around, so if the vacated tiles did not claim the extent themselves
+    // the floor would vanish from the file (or come back as unbuilt lot).
+    const save = sampleSave();
+    const floor = 7;
+    save.units = save.units.filter((u) => u.floor !== floor);
+    save.units.push(unit({ id: 9_400, kind: "office", floor, x: 120, width: 9, state: "gutted" }));
+    const { bytes } = buildTDT(save);
+    const spans = recordSpans(bytes, floor + TDT_FLOOR_OFFSET);
+    expect(spans.some((r) => r.type === 48)).toBe(false);
+    const paved = new Set<number>();
+    for (const r of spans) {
+      if (r.type !== 0 && r.type !== 24) continue;
+      for (let x = r.left; x < r.right; x++) paved.add(x);
+    }
+    for (let x = 120; x < 129; x++) expect(paved.has(x)).toBe(true);
+    expect(parseTdtBinary(bytes).warnings).toEqual([]);
+  });
+
+  it("a burned room hanging off the lot edge claims no extent it cannot fill", () => {
+    // A forged/legacy unit whose footprint runs past the lot: the paving pass
+    // clamps its runs into [0, GRID.width], so the floor's advertised extent
+    // must be clamped the same way. An unclamped extent leaves a tail of the
+    // row with no record behind it.
+    const save = sampleSave();
+    const floor = 8;
+    save.units = save.units.filter((u) => u.floor !== floor);
+    save.units.push(
+      unit({ id: 9_401, kind: "office", floor, x: GRID.width - 4, width: 9, state: "gutted" }),
+    );
+    const { bytes } = buildTDT(save);
+    const spans = recordSpans(bytes, floor + TDT_FLOOR_OFFSET);
+    // The row must actually EXIST (an empty walk would satisfy every bound
+    // below vacuously) and its paving must reach the lot edge.
+    expect(spans.length).toBeGreaterThan(0);
+    const right = Math.max(...spans.map((r) => r.right));
+    expect(right).toBe(GRID.width);
+    // The header extent is the assertion with teeth: `w.u16` masks rather than
+    // clamps, so an unclamped extent wraps instead of saturating.
+    const extent = floorExtent(bytes, floor + TDT_FLOOR_OFFSET);
+    expect(extent.right).toBe(GRID.width);
+    expect(extent.right).toBeGreaterThanOrEqual(extent.left);
+    expect(parseTdtBinary(bytes).warnings).toEqual([]);
+  });
+
+  it("a row's encoded left edges never go backwards, even from a negative x", () => {
+    // The 1994 renderer truncates a floor at the first record whose left edge
+    // goes backwards (the #318 sky gap), so the record ORDER must match the
+    // bytes actually written. Clamping the written left without re-keying the
+    // sort broke exactly that: a left of -1 sorts LAST under the old mask key
+    // (65535) but writes as 0, putting a 0 after a 40 in the file.
+    const save = sampleSave();
+    const floor = 6;
+    save.units = save.units.filter((u) => u.floor !== floor);
+    save.units.push(unit({ id: 9_500, kind: "office", floor, x: -1, width: 9, state: "occupied" }));
+    save.units.push(unit({ id: 9_501, kind: "office", floor, x: 40, width: 9, state: "occupied" }));
+    const { bytes } = buildTDT(save);
+    const lefts = recordSpans(bytes, floor + TDT_FLOOR_OFFSET).map((r) => r.left);
+    expect(lefts.length).toBeGreaterThan(1);
+    for (let i = 1; i < lefts.length; i++) expect(lefts[i]).toBeGreaterThanOrEqual(lefts[i - 1]);
+    expect(parseTdtBinary(bytes).warnings).toEqual([]);
+  });
+
+  it("a forged unit's row never advertises an extent its records contradict", () => {
+    // `w.u16` masks rather than clamps, so a forged width could put a row's
+    // header and its records on different stories: the #318 sky gap in
+    // miniature. The invariant is agreement, in BOTH directions, whatever the
+    // paving pass decides to emit (an infinite width it refuses outright, which
+    // is why asserting "records exist" here would be asserting the wrong thing).
+    for (const [floor, width] of [
+      [9, Number.POSITIVE_INFINITY],
+      [8, 400], // finite but past the lot edge
+    ] as const) {
+      const save = sampleSave();
+      save.units = save.units.filter((u) => u.floor !== floor);
+      save.units.push(unit({ id: 9_402 + floor, kind: "floor", floor, x: 0, width }));
+      const { bytes } = buildTDT(save);
+      const spans = recordSpans(bytes, floor + TDT_FLOOR_OFFSET);
+      const extent = floorExtent(bytes, floor + TDT_FLOOR_OFFSET);
+      expect(extent.right).toBeLessThanOrEqual(GRID.width);
+      expect(extent.right).toBeGreaterThanOrEqual(extent.left);
+      for (const r of spans) {
+        expect(r.left).toBeGreaterThanOrEqual(extent.left);
+        expect(r.right).toBeLessThanOrEqual(extent.right);
+      }
+      // An empty extent must mean an empty row, and a non-empty row a non-empty
+      // extent; either half alone can be satisfied by dropping the other.
+      expect(spans.length > 0).toBe(extent.right > extent.left);
+      expect(parseTdtBinary(bytes).warnings).toEqual([]);
+    }
+  });
+
+  it("a burned room on the GROUND row comes back as lobby, not bare floor", () => {
+    // The one row where the paving pass picks a different type, and the row the
+    // export report's wording ("bare floor, or lobby on a lobby row") promises.
+    const save = sampleSave();
+    save.units = save.units.filter((u) => u.floor !== 1);
+    save.units.push(unit({ id: 9_404, kind: "lobby", floor: 1, x: 100, width: 1, state: "occupied" }));
+    save.units.push(unit({ id: 9_405, kind: "office", floor: 1, x: 101, width: 9, state: "gutted" }));
+    const { bytes } = buildTDT(save);
+    const lobbyTiles = new Set<number>();
+    for (const r of recordSpans(bytes, 1 + TDT_FLOOR_OFFSET)) {
+      if (r.type !== 24) continue;
+      for (let x = r.left; x < r.right; x++) lobbyTiles.add(x);
+    }
+    for (let x = 101; x < 110; x++) expect(lobbyTiles.has(x)).toBe(true);
+    expect(parseTdtBinary(bytes).warnings).toEqual([]);
+  });
+
+  it("express shafts are written to LATER slots than the rest (the desync workaround)", () => {
+    // The retail game loses every shaft written after an express slot, so the
+    // exporter orders express last. Nothing else pins that, and losing it
+    // silently re-breaks every exported tower that has an express.
+    const save = sampleSave();
+    const mk = (kind: FacilityKind, x: number, bottom: number, top: number): Transport => ({
+      id: 300 + x, kind, x, width: kind === "elevatorExpress" ? 8 : 4, bottom, top,
+      cars: 2, carPositions: [bottom, bottom], carDir: [0, 0], load: 0,
+    });
+    save.transports.push(mk("elevatorExpress", 60, 1, 30));
+    save.transports.push(mk("elevatorStandard", 80, 1, 12));
+    save.transports.push(mk("elevatorService", 90, 1, 12));
+    const decoded = parseTdtBinary(buildTDT(save).bytes).elevators!;
+    const expressSlot = decoded.findIndex((e) => e.x === 60);
+    expect(expressSlot).toBeGreaterThanOrEqual(0);
+    for (const other of [80, 90]) {
+      const slot = decoded.findIndex((e) => e.x === other);
+      expect(slot).toBeGreaterThanOrEqual(0);
+      expect(slot).toBeLessThan(expressSlot);
+    }
+  });
+
+  it("the 24-slot cap drops by tower order, so the express workaround cannot eat the express", () => {
+    // Truncation must run BEFORE the express reordering: sorting first would
+    // push express shafts into the dropped tail, so a full tower would silently
+    // lose its whole-tower transport instead of the shaft it actually built last.
+    const save = sampleSave();
+    save.transports = [];
+    save.transports.push({
+      id: 400, kind: "elevatorExpress" as FacilityKind, x: 40, width: 8, bottom: 1, top: 30,
+      cars: 2, carPositions: [1, 1], carDir: [0, 0], load: 0,
+    });
+    for (let i = 0; i < 30; i++) {
+      save.transports.push({
+        id: 500 + i, kind: "elevatorStandard" as FacilityKind, x: 60 + i * 5, width: 4, bottom: 1, top: 12,
+        cars: 1, carPositions: [1], carDir: [0], load: 0,
+      });
+    }
+    const decoded = parseTdtBinary(buildTDT(save).bytes).elevators!;
+    expect(decoded.length).toBe(24);
+    expect(decoded.some((e) => e.x === 40)).toBe(true); // the express survived the cap
+    expect(decoded[decoded.length - 1].x).toBe(40); // and still sits last
+  });
+
+  it("a burned MULTI-STORY unit leaves every one of its rows paved", () => {
+    // A gutted 2-story facility claims extent on both rows while emitting no
+    // record on either. Only the paving pass fills them, and the single-floor
+    // office tests cannot reach the upper row.
+    const save = sampleSave();
+    for (const floor of [11, 12]) save.units = save.units.filter((u) => u.floor !== floor);
+    save.units.push(unit({ id: 9_403, kind: "cinema", floor: 11, x: 100, width: 31, state: "gutted" }));
+    const { bytes } = buildTDT(save);
+    for (const floor of [11, 12]) {
+      const paved = new Set<number>();
+      for (const r of recordSpans(bytes, floor + TDT_FLOOR_OFFSET)) {
+        if (r.type !== 0 && r.type !== 24) continue;
+        for (let x = r.left; x < r.right; x++) paved.add(x);
+      }
+      for (let x = 100; x < 131; x++) expect(paved.has(x)).toBe(true);
+    }
+    expect(parseTdtBinary(bytes).warnings).toEqual([]);
   });
 
   it("a vacant-but-once-rented office loses its history, and the report says so", () => {
@@ -1115,6 +1483,42 @@ describe("buildTDT: lobby (type 24) and empty-floor (type 0) paving records", ()
     expect(parseTdtBinary(bytes).warnings).toEqual([]);
     const again = buildTDT(parseTDT(bytes.buffer as ArrayBuffer, "C.TDT").save).bytes;
     expect(again).toEqual(bytes);
+  });
+
+  it("only a room that is IN the file can shorten the cathedral stack", () => {
+    // The stack walks down from floor 100 and stops at the first floor another
+    // room occupies, so the file never carries overlapping records. A BURNED
+    // room writes no record at all (it is cleared to paving), so letting it
+    // block would truncate the cathedral with nothing in the file to explain the
+    // gap. Same geometry, same room, only its state differs.
+    const cathedralIds = new Set([36, 37, 38, 39, 40]);
+    const partsOf = (blockerState: "occupied" | "gutted") => {
+      const units: Unit[] = [];
+      let id = 1;
+      for (let fl = 96; fl <= 100; fl++) {
+        for (let x = 0; x < 40; x++) units.push(unit({ id: id++, kind: "floor", floor: fl, x, width: 1 }));
+      }
+      units.push(unit({ id: id++, kind: "weddingHall", floor: 100, x: 5, width: 16 }));
+      // An office on floor 98 straddling the cathedral's [5, 21) footprint.
+      units.push(unit({ id: id++, kind: "office", floor: 98, x: 8, width: 9, state: blockerState }));
+      const { bytes } = buildTDT(tower(units));
+      let count = 0;
+      for (let fl = 96; fl <= 100; fl++) {
+        count += floorTenants(bytes, fl + 9).filter((t) => cathedralIds.has(Math.abs(t.type))).length;
+      }
+      return { count, bytes };
+    };
+
+    // An emitted blocker DOES truncate: the stack stops above floor 98, so only
+    // floors 99 and 100 carry a part.
+    const blocked = partsOf("occupied");
+    expect(blocked.count).toBe(2);
+    expect(parseTdtBinary(blocked.bytes).warnings).toEqual([]);
+
+    // The same room burned writes nothing, so all five parts survive.
+    const cleared = partsOf("gutted");
+    expect(cleared.count).toBe(5);
+    expect(parseTdtBinary(cleared.bytes).warnings).toEqual([]);
   });
 });
 

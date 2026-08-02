@@ -196,7 +196,18 @@ etc.); an importer must merge parts into one unit, never place each part.
 | 42 | "Structures" (string table only) [OS] | — |
 | 44 | Parkade ramp [TD] | `parkingRamp` |
 | 45 | Metro tunnel [TD] ([OS] read this as "parking ramp"; [TD]'s reading is the better-evidenced one) | full-lot metro backdrop |
-| 48 | Burned area (fire/bomb damage) | cleared floor (report) |
+| 48 | Burned area (fire/bomb damage); **the retail game does not render one, see below** | cleared floor (report) |
+
+> **Writer note (harness-confirmed, 2026-07-31).** Do **not** write type 48. The
+> retail game draws such a record as **garbage pixels** (a block of colored
+> static where the room was), measured on the Wine harness with both shapes: one
+> record spanning the whole room and a strip of 1-tile records. The ID is real
+> (the importer still reads it, and reports the area as cleared), but nothing we
+> can write makes the 1994 renderer draw a burned shell. Our exporter therefore
+> emits **no record** for a burned-out or burning room and lets the paving pass
+> fill those tiles with bare floor (lobby on the ground row), which is what the
+> original shows once debris is cleared, and matches what our own importer does
+> with a type-48 record it reads. The loss is reported to the player either way.
 
 ## 6. People
 
@@ -256,12 +267,34 @@ a **194-byte header** (byte layout: `used` u8 @0; `type` u8 @1; capacity byte
 position; top/bottom floor; the serviced-floors bitmap (per-floor stop
 configuration!); and the 8 per-car home floors. Built shafts append a fixed
 **3,140-byte block** (see the measured note below), then **324-byte per-floor
-entries** (per serviced floor: waiting-up/down counts + up to 40 queued person
-indices each way), then a **single 348-byte car block** (current floor,
+entries** (one per SPANNED floor, carrying that floor's waiting-up/down counts
+and up to 40 queued person indices each way; a floor the shaft passes without
+stopping still gets its entry), then a **single 348-byte car block** (current floor,
 passenger count, turnaround floor, up to 42 passenger indices, their destination
 floors, and per-floor destination counts). So one built shaft's record stride is
-`194 + 3140 + 324 * servicedFloors + 348` (the 348 block is **cars-INDEPENDENT**,
-NOT `* cars`).
+`194 + 3140 + 324 * spannedFloors + 348`, where `spannedFloors` is
+`topFloor - bottomFloor + 1` (**every floor the shaft passes, stop or not**, see
+the correction below) and the 348 block is **cars-INDEPENDENT**, NOT `* cars`.
+
+> **OPEN (Verticopolis RE, 2026-07-31, Wine harness): the retail game loses
+> every shaft written AFTER an express slot.** Isolated with minimal two-shaft
+> towers: express then standard loses the standard; standard then express keeps
+> both; a standard shaft skipping 27 of its 30 floors keeps both, so neither
+> stop-skipping nor span is the trigger. The express itself always renders. Six
+> byte-level probes on the express payload (+348, +9,720, +29,160, -348, -3,140,
+> -9,720) all still lost the following shaft, so the size is not simply a
+> multiple of the blocks we know. **The trigger is the `type` byte @1**: flipping
+> it from 0 (express) to 1 (standard) on an otherwise byte-identical file makes
+> the following shaft render, so a `type = 0` record has a DIFFERENT size than a
+> type 1/2 one, and our writer emits one size for all three kinds. Patching the
+> capacity byte (42 → 21) or the car count changes nothing. The exact size cannot
+> be brute-forced from the render: the game resumes reading 194-byte headers from
+> wherever it thinks the payload ended, and zero padding preserves that
+> misalignment, so only the exact value works and there is nothing to bisect on.
+> **Measuring it needs a game-written save containing an express shaft**, the same
+> way the 3,140-byte block was measured on my_tower. Until then the exporter
+> writes express shafts LAST, so a tower with one express keeps every other
+> shaft. See the backlog's `tdt-express-desync` (#740).
 
 > **Corrected (Verticopolis RE, 2026-07-13, Wine harness vs the real 1994
 > game):** the appended 348-byte block appears **ONCE per built shaft, not once
@@ -274,6 +307,22 @@ NOT `* cars`).
 > that follows the table mis-read too.** Forcing the payload to the fixed size
 > (car count kept in the header) made all shafts render in the real game.
 > Fixed in `tdtExport.ts` + `tdtFormat.ts` (and the `tdtBuilder` test fixture).
+
+> **Corrected (Verticopolis RE, 2026-07-31, Wine harness vs the real 1994
+> game):** the 324-byte per-floor entries run over the shaft's **whole span**
+> (`bottomFloor..topFloor` inclusive), NOT over the floors it stops at. The
+> serviced-floor reading was indistinguishable on every reference save we had,
+> because each of their shafts stopped at every floor it passed
+> (`serviced == spanned`), the same blind spot that hid the `* cars` bug: both
+> old rules were only ever checked where the two coincide. A tower whose express
+> shaft skipped 83 of its 91 floors under-ran that shaft's payload by
+> `83 * 324` bytes and desynced the rest of the table, so the retail game
+> dropped every shaft after it. Measured with a 4-shaft test tower whose second
+> shaft skips five floors: sized by serviced floors the game rendered **2 of 4**
+> shafts (and the tower sat dark and unpopulated); sized by spanned floors it
+> rendered **4 of 4**, with the skipping shaft correctly showing no stops on its
+> skipped floors. Fixed in `tdtEncoder.ts`, `tdtTail.ts`, and the `tdtBuilder`
+> fixture; guarded by a payload-length test in `tdtExport.integration.test.ts`.
 
 > **Measured (Verticopolis RE, tools/simtower round-trip vs the real 1994 game):**
 > the fixed appended block is **3,140 bytes**, not the 480 + 2 * 120 = 720 this

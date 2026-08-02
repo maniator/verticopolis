@@ -365,6 +365,42 @@ describe("parseTDT: golden mappings", () => {
     expect(centers.map((u) => u.x).sort((a, b) => a - b)).toEqual([100, 120]);
   });
 
+  it("flush neighbors that chain through a building below stay separate units", () => {
+    // The shape a real 100-floor save hit: two recycling centers built flush on
+    // B2 (x 92 and x 112) plus a third on B4 at x 107, whose upper story
+    // overlaps BOTH of them one floor down. All three land in one cluster, so a
+    // split by floor alone fused the flush pair into a single 40-wide unit and
+    // lost a center.
+    const { save } = parse({
+      floors: [
+        { index: 6, tenants: [{ left: 107, right: 127, type: 21 }] }, // B4 center, bottom
+        { index: 7, tenants: [{ left: 107, right: 127, type: 20 }] }, // its top, on B3
+        {
+          index: 8,
+          tenants: [
+            { left: 92, right: 112, type: 21 }, // B2 center, bottom
+            { left: 112, right: 132, type: 21 }, // its flush neighbor, bottom
+          ],
+        },
+        {
+          index: 9,
+          tenants: [
+            { left: 92, right: 112, type: 20 },
+            { left: 112, right: 132, type: 20 },
+          ],
+        },
+      ],
+    });
+    const centers = save.units.filter((u) => u.kind === "recycling");
+    expect(centers).toHaveLength(3);
+    expect(centers.map((u) => u.x).sort((a, b) => a - b)).toEqual([92, 107, 112]);
+    expect(centers.every((u) => u.width === FACILITIES.recycling.width)).toBe(true);
+    // Each center must also land on its OWN base floor: a unit is anchored at
+    // its lowest story, and a split that got the width right while anchoring a
+    // building one floor off would otherwise pass unnoticed.
+    expect(centers.map((u) => `${u.x}@${u.floor}`).sort()).toEqual(["107@-3", "112@-1", "92@-1"].sort());
+  });
+
   it("a merged unit claims EVERY story: a room on its upper floor blocks it", () => {
     const { save, report } = parse({
       floors: [
@@ -827,6 +863,59 @@ describe("transport decode: the save's own shafts and flights", () => {
     expect(t.skipFloors).not.toContain(15); // sky lobbies stop
     expect(t.skipFloors).not.toContain(30);
     expect(t.skipFloors).not.toContain(45);
+  });
+
+  it("an INVERTED shaft span is refused, and the importer falls back rather than mis-skipping", () => {
+    // The payload size is derived from the span, so an inverted pair cannot be
+    // skipped by a guessed distance without landing mid-record and garbling
+    // every later slot. It must bail to synthesis with a warning instead.
+    // The fixture refuses to BUILD an inverted span (by design), so corrupt a
+    // healthy file the way a real damaged save would: flip the topFloor byte of
+    // the first built slot to sit below its bottomFloor.
+    const bytes = buildTdt({
+      elevators: [
+        { type: 1, cars: 2, x: 100, bottomFloor: 20, topFloor: 40 },
+        { type: 1, cars: 2, x: 140, bottomFloor: 10, topFloor: 20 },
+      ],
+    });
+    const u16 = (o: number) => bytes[o] | (bytes[o + 1] << 8);
+    let o = TDT_HEADER_SIZE;
+    for (let i = 0; i < 120; i++) o += 6 + u16(o) * 18 + 94 * 2;
+    o += 4 + u16(o) * 16; // people count + records (this fixture writes none)
+    o += 512 * 18; // retail table -> first elevator slot
+    expect(bytes[o]).toBe(1); // the slot we are about to corrupt is built
+    bytes[o + 64] = 15; // topFloor, now below bottomFloor (20)
+    const walked = parseTdtBinary(bytes);
+    expect(walked.warnings.join(" ")).toMatch(/elevator table doesn't match/i);
+    // The table is abandoned rather than skipped by a guessed distance, and the
+    // stairs table that follows it is not read from a desynced position.
+    expect(walked.elevators).toBeNull();
+    expect(walked.stairs).toBeNull();
+    // And through the full importer: the decoded table is discarded, so the x
+    // positions we fed are not the ones that come back.
+    const imported = parseTDT(bytes.buffer as ArrayBuffer, "TOWER.TDT");
+    expect(imported.save.transports.some((t) => t.x === 140 && t.kind === "elevatorStandard")).toBe(false);
+  });
+
+  it("a type-48 burned area still READS as cleared floor with a report line", () => {
+    // Our exporter no longer writes type 48 (the retail game renders it as
+    // garbage), but real saves can carry it, so the read path has to keep
+    // working. Nothing else covers this now that the export test cannot.
+    const { save, report } = parse({
+      floors: [
+        {
+          index: 20,
+          tenants: [
+            { left: 100, right: 109, type: 48 },
+            { left: 109, right: 118, type: 7 },
+          ],
+        },
+      ],
+    });
+    expect(save.units.some((u) => u.kind === "office" && u.x === 109)).toBe(true);
+    // The burned span comes in as bare floor, never as a room.
+    expect(save.units.some((u) => u.x >= 100 && u.x < 109 && u.kind !== "floor" && u.kind !== "lobby")).toBe(false);
+    expect(report.couldNotBring.join(" ")).toMatch(/burned/i);
   });
 
   it("service shafts decode as staff elevators; corrupt geometry is clamped or dropped", () => {

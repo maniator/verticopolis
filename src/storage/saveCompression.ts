@@ -57,7 +57,11 @@ export function fromBase64(b64: string): Uint8Array {
 // passes the cap (inflateSync would allocate the whole buffer first).
 const MAX_SAVE_INFLATED_BYTES = 32 * 1024 * 1024;
 
-class SaveTooLargeError extends Error {}
+/** Thrown by {@link inflateCapped} when the output passes
+ *  MAX_SAVE_INFLATED_BYTES. Exported so a caller can tell "this expands to more
+ *  than we will hold" apart from "these bytes are damaged", which are different
+ *  things to tell a player. */
+export class SaveTooLargeError extends Error {}
 
 export function inflateCapped(packed: Uint8Array): Uint8Array {
   const chunks: Uint8Array[] = [];

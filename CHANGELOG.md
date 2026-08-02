@@ -13,6 +13,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.10.0
+
+- A tower you export to SimTower (1994) now arrives with its elevators. A tower with an express shaft used to lose most of the others on the way over, stranding the floors they served.
+- Burned-out rooms used to arrive as a block of colored static. They now come across as cleared floor, the way the original shows a room once its debris is gone.
+- Loading a 1994 save no longer fuses two recycling centers built side by side into a single oversized one.
+
 ## 2.7.0
 
 - Modern towers that badly outgrow their shops now really lose tenants: past heavy oversubscription they sour within a day or two, then move out after the notice window. Classic still only caps.
