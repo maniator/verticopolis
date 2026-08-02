@@ -58,6 +58,19 @@ body.retro-page {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* The inline pixel icons (#721) get their baseline and spacing from the app's
+   styles.css, which these standalone pages (/help, /gallery) do not load. Mirror
+   the two rules the page shell needs: baseline alignment plus a small gap after
+   the Back-to-game arrow, and no trailing margin on the title glyph (the title
+   bar's own 10px gap separates it from the title text). */
+.vc-icon {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 5px;
+}
+.page-icon .vc-icon {
+  margin-right: 0;
+}
 /* The sibling-nav + Back-to-game links sit at the right of the title bar. */
 .page-nav {
   display: flex;
