@@ -32,7 +32,8 @@ describe("buildPalette", () => {
     const inspect = palette.querySelector<HTMLElement>('.pal-pinned .pal-item[data-tool="inspect"]')!;
     expect(inspect).not.toBeNull();
     expect(inspect.querySelector(".pal-swatch")).not.toBeNull();
-    expect(inspect.querySelector(".pal-name")?.textContent).toBe("🔍 Inspect");
+    expect(inspect.querySelector(".pal-name svg")?.getAttribute("data-icon")).toBe("inspect");
+    expect(inspect.querySelector(".pal-name")?.textContent?.trim()).toBe("Inspect");
     expect(inspect.getAttribute("role")).toBe("button");
     expect(inspect.tabIndex).toBe(0);
     expect(palette.querySelector('.pal-pinned .pal-item[data-tool="bulldoze"]')).not.toBeNull();

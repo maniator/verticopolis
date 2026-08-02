@@ -101,7 +101,7 @@ describe("splash mute toggle (CAP-1)", () => {
     const el = mountSplash({});
     const btn = el.querySelector<HTMLButtonElement>('button.splash-mute[data-splash="mute"]');
     expect(btn).not.toBeNull();
-    expect(btn!.textContent).toBe("🔊");
+    expect(btn!.querySelector("svg")?.getAttribute("data-icon")).toBe("sound");
     expect(btn!.getAttribute("aria-pressed")).toBe("false");
     expect(btn!.getAttribute("aria-label")).toBe("Mute sound");
     // Initial focus belongs to the action stack (New Tower on a first run),
@@ -112,7 +112,7 @@ describe("splash mute toggle (CAP-1)", () => {
   it("mounts already-muted for a returning player who muted last session", () => {
     const el = mountSplash({ muted: true });
     const btn = el.querySelector<HTMLButtonElement>('[data-splash="mute"]')!;
-    expect(btn.textContent).toBe("🔇");
+    expect(btn.querySelector("svg")?.getAttribute("data-icon")).toBe("mute");
     // Toggle-button pattern: the name is STABLE; aria-pressed carries state.
     expect(btn.getAttribute("aria-pressed")).toBe("true");
     expect(btn.getAttribute("aria-label")).toBe("Mute sound");
@@ -154,14 +154,14 @@ describe("splash mute binding (CAP-2)", () => {
 
     btn.click();
     expect(onToggleMute).toHaveBeenCalledTimes(1);
-    expect(btn.textContent).toBe("🔇");
+    expect(btn.querySelector("svg")?.getAttribute("data-icon")).toBe("mute");
     expect(btn.getAttribute("aria-pressed")).toBe("true");
     // The name never changes across states (toggle-button pattern).
     expect(btn.getAttribute("aria-label")).toBe("Mute sound");
 
     btn.click();
     expect(onToggleMute).toHaveBeenCalledTimes(2);
-    expect(btn.textContent).toBe("🔊");
+    expect(btn.querySelector("svg")?.getAttribute("data-icon")).toBe("sound");
     expect(btn.getAttribute("aria-pressed")).toBe("false");
     expect(btn.getAttribute("aria-label")).toBe("Mute sound");
   });
@@ -179,7 +179,7 @@ describe("splash mute binding (CAP-2)", () => {
     const el = mountSplash({ muted: true }); // onToggleMute omitted
     const btn = el.querySelector<HTMLButtonElement>('[data-splash="mute"]')!;
     btn.click();
-    expect(btn.textContent).toBe("🔇"); // unchanged: never lied
+    expect(btn.querySelector("svg")?.getAttribute("data-icon")).toBe("mute"); // unchanged: never lied
     expect(btn.getAttribute("aria-pressed")).toBe("true");
   });
 });

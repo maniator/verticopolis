@@ -3,6 +3,7 @@ import { ALL_KINDS, FACILITIES } from "../engine/facilities";
 import type { FacilityCategory, FacilityKind } from "../engine/types";
 import type { Tool, UI } from "./UI";
 import { shortMoney } from "./format";
+import { iconTemplate } from "./icons";
 
 /**
  * Build-palette construction for {@link UI}, as friend functions taking the UI
@@ -33,8 +34,8 @@ export function buildPalette(ui: UI): void {
   const pinned = document.createElement("div");
   pinned.className = "pal-pinned";
   pinned.appendChild(groupTitle("Tools", undefined));
-  pinned.appendChild(toolButton(ui, "inspect", "🔍 Inspect", "#9aa6bd"));
-  pinned.appendChild(toolButton(ui, "bulldoze", "🧨 Bulldoze", "#ff6b6b"));
+  pinned.appendChild(toolButton(ui, "inspect", "Inspect", "#9aa6bd"));
+  pinned.appendChild(toolButton(ui, "bulldoze", "Bulldoze", "#ff6b6b"));
 
   // One section per build category.
   const groups = document.createElement("div");
@@ -185,7 +186,10 @@ function toolButton(ui: UI, type: "inspect" | "bulldoze", label: string, color: 
   // lit render for the inner swatch/label (built once at construction, from
   // trusted catalog constants); the container's a11y wiring stays imperative in
   // makeActivatable so a future re-render can't drop its listeners.
-  render(html`<span class="pal-swatch" style="background:${color}"></span><span class="pal-name">${label}</span>`, item);
+  render(
+    html`<span class="pal-swatch" style="background:${color}"></span><span class="pal-name">${iconTemplate(type, { size: 14, className: "pal-ic" })}${label}</span>`,
+    item,
+  );
   makeActivatable(item, label, () => ui.selectTool({ type } as Tool));
   return item;
 }

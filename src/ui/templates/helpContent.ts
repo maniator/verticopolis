@@ -29,7 +29,7 @@ export interface HelpSection {
 export function helpLede(): TemplateResult {
   return html`
     <p>Build a thriving high-rise and earn your way to a coveted <b>TOWER</b> rating.</p>
-    <p style="color:var(--muted)">Mouse: drag to pan with the Inspect tool; with a build tool, hold <b>Shift</b> (or Space) and drag to pan, and a middle or right button drag pans too. Scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the ↩ button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
+    <p style="color:var(--muted)">Mouse: drag to pan with the Inspect tool; with a build tool, hold <b>Shift</b> (or Space) and drag to pan, and a middle or right button drag pans too. Scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the Undo button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
     <p style="color:var(--muted)">Touch: press and drag on the tower to build (a ghost shows where the room lands), two fingers to pan, pinch to zoom, tap a room with Inspect to edit it. Full guide under <b>Playing on a phone</b> below.</p>
   `;
 }
@@ -82,7 +82,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
         <li><b>Move around.</b> Drag with <b>two fingers</b> to pan (or one finger with <b>Inspect</b> selected), and <b>pinch</b> to zoom.</li>
         <li><b>Peek at a room.</b> Press and hold a room (any tool) to read its card without opening it, the way a mouse hover does. Lift to close. A quick tap still does the armed tool's action: with <b>Inspect</b> it opens the full panel.</li>
         <li><b>Edit or remove.</b> Tap a room with <b>Inspect</b> to open its panel; tap with <b>Bulldoze</b> to demolish it.</li>
-        <li><b>Menus.</b> The build menu groups tools under category tabs, and a tab with a dot just gained new tools. The <b>☰</b> button opens stats and the game menu, and <b>↩</b> undoes.</li>
+        <li><b>Menus.</b> The build menu groups tools under category tabs, and a tab with a dot just gained new tools. The <b>menu</b> button (top bar) opens stats and the game menu, and the <b>Undo</b> button steps a change back.</li>
       </ul>
     `,
   },

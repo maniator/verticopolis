@@ -231,6 +231,34 @@ html.reduce-motion *::after {
 #traffic-floor { font-size: 0.82em; font-weight: 500; }
 #status .traffic-warn { color: var(--bad); font-weight: 700; }
 
+/* Inline pixel icons (#721): baseline-aligned, ink by default, currentColor so a
+   bulletin line's severity color carries into the icon. A small gap sits before
+   any following text; icon-only toolbar buttons drop it so the glyph centers. */
+.vc-icon {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 5px;
+}
+.vc-icon-inline {
+  margin-right: 4px;
+}
+/* Icon-only buttons drop the trailing 5px so the glyph centers, and flex
+   buttons that space with `gap` drop it too so it does not stack on the gap.
+   Every other icon keeps the base 5px before its label (brand, stats, settings,
+   map, the update/install toolbar buttons, and the labeled .splash-btn stack,
+   which have text right after the icon). .splash-mute is a bare glyph;
+   .splash-install spaces its icon and "Install" label with `gap`. */
+#speed button[data-speed] .vc-icon,
+#btn-undo .vc-icon,
+#btn-redo .vc-icon,
+#panel-toggle .vc-icon,
+#btn-save-top .vc-icon,
+#audio-toggle .vc-icon,
+.splash-mute .vc-icon,
+.splash-install .vc-icon {
+  margin-right: 0;
+}
+
 #speed {
   display: flex;
   gap: 4px;
@@ -1709,10 +1737,6 @@ ul.slots .slot-actions .btn {
   border-radius: 8px;
   cursor: pointer;
 }
-.splash-install-glyph {
-  font-size: 20px;
-  line-height: 1;
-}
 .splash-install:hover { background: rgba(13, 13, 16, 0.55); }
 .splash-install:focus-visible { outline: 2px solid #ffc94a; outline-offset: 2px; }
 
@@ -1887,6 +1911,13 @@ body.splash-up #toast-wrap { z-index: 45; }
   }
   #speed .btn-label {
     display: none;
+  }
+  /* With the label hidden the update/install chips are icon-only, so drop the
+     icon's trailing margin too or the glyph sits off-center (as on every other
+     icon-only button above). */
+  #btn-update .vc-icon,
+  #btn-install .vc-icon {
+    margin-right: 0;
   }
 
   /* Stats/milestones: stack the two columns into one so each row gets the full

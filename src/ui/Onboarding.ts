@@ -3,6 +3,7 @@ import type { Simulation } from "../engine/Simulation";
 import { splashTemplate, type SplashHandlers } from "./splashTemplate";
 import { setLiveSplashActions } from "./splashActions";
 import { isDialogOpen } from "../game/interactionState";
+import { iconElement } from "./icons";
 
 /**
  * First-run experience — splash/title screen + a non-blocking "Getting Started"
@@ -98,9 +99,9 @@ export const ONBOARD_STEPS: OnboardStep[] = [
   {
     id: "play",
     title: "Press Play & wait",
-    sub: "Hit ▶ Play. A tenant moves in within a day or two. Rent lands each quarter.",
-    hintDesktop: "Press ▶ Play in the top bar and let time run.",
-    hintMobile: "Tap ▶ Play in the top bar and let time run.",
+    sub: "Hit Play. A tenant moves in within a day or two. Rent lands each quarter.",
+    hintDesktop: "Press Play in the top bar and let time run.",
+    hintMobile: "Tap Play in the top bar and let time run.",
     pulse: '#speed button[data-speed="1"]',
     done: (sim) => sim.tower.units.some((u) => u.kind === "office" && u.state === "occupied"),
   },
@@ -242,7 +243,7 @@ export class OnboardingController {
         ? (e: Event) => {
             const btn = e.currentTarget as HTMLButtonElement;
             const muted = onToggleMute();
-            btn.textContent = muted ? "🔇" : "🔊";
+            btn.replaceChildren(iconElement(muted ? "mute" : "sound"));
             btn.setAttribute("aria-pressed", String(muted));
           }
         : undefined,
@@ -464,7 +465,7 @@ export class OnboardingController {
     this.setDefaultHint();
     if (this.panelEl) {
       litRender(
-        html`<div class="win-title">Nice. You're a landlord.</div><p class="ob-sendoff">The rest is in Help (？). Build up!</p>`,
+        html`<div class="win-title">Nice. You're a landlord.</div><p class="ob-sendoff">The rest is in Help. Build up!</p>`,
         this.panelEl,
       );
       this.panelEl.addEventListener("click", () => this.clearSession(), { once: true });

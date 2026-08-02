@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
+import { iconTemplate, type IconName } from "../icons";
 
 /** A sibling-page link in the title-bar nav (e.g. the Sprite Gallery). */
 export interface PageShellLink {
@@ -18,8 +19,8 @@ export interface PageShellOptions {
   links?: PageShellLink[];
   /** Optional left-side footer content; the shell always adds Back to game at the right. */
   footer?: TemplateResult;
-  /** Title-bar emoji app icon. */
-  icon?: string;
+  /** Title-bar app icon (defaults to the brand building). */
+  icon?: IconName;
 }
 
 /**
@@ -37,13 +38,13 @@ export interface PageShellOptions {
  * this helper only supplies structure and the shared class names.
  */
 export function pageShell(opts: PageShellOptions): TemplateResult {
-  const { title, backHref, main, links = [], footer, icon = "🏙" } = opts;
+  const { title, backHref, main, links = [], footer, icon = "brand" } = opts;
   const back = (cls: string): TemplateResult =>
-    html`<a class="btn ${cls}" href=${backHref}>◄ Back to game</a>`;
+    html`<a class="btn ${cls}" href=${backHref}>${iconTemplate("back", { size: 12 })}Back to game</a>`;
   return html`
     <main class="page-win win">
       <div class="win-title">
-        <span class="page-icon" aria-hidden="true">${icon}</span>
+        <span class="page-icon" aria-hidden="true">${iconTemplate(icon, { size: 18 })}</span>
         <span class="page-title-text">${title}</span>
         <nav class="page-nav" aria-label="Pages">
           ${links.map((l) => html`<a class="btn xs" href=${l.href}>${l.label}</a>`)}
