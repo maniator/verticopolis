@@ -162,14 +162,14 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
     // so without this sort a wide floor's records arrive out of x-order and the
     // 1994 renderer truncates the floor at the first out-of-place record (the
     // #318 sky-gap: everything past the misplaced type-0 span draws as sky).
-    // Sort on the u16 value that actually gets WRITTEN (`w.u16` masks with
-    // & 0xffff), not the raw left. On a forged save a negative or out-of-range
-    // left encodes to a different u16 than it sorts as (e.g. -1 sorts first but
-    // writes 65535), so keying on the raw value could still emit records whose
-    // encoded left goes backwards and re-trip the game's truncation. Masking
-    // also coalesces a non-finite left to 0 (NaN & 0xffff === 0), matching the
-    // byte the writer emits, so the sorted order always matches the file order.
-    const leftKey = (t: { left: number }) => t.left & 0xffff;
+    // Sort on the value that actually gets WRITTEN, which is now the CLAMPED
+    // left (see the write below), not the raw one and no longer the masked one.
+    // On a forged save those disagree: a left of -1 sorts LAST under masking
+    // (65535) but writes as 0, so a masked key emits a row whose encoded left
+    // edges go backwards and re-trips the game's truncation. Keying on the same
+    // function the writer calls keeps sorted order and file order identical by
+    // construction, non-finite values included.
+    const leftKey = (t: { left: number }) => clampTile(t.left);
     const ordered = [...tenants].sort((a, b) => leftKey(a) - leftKey(b));
     for (const t of ordered) {
       // Clamp record bounds the same way the extent above is clamped. A legal

@@ -43,7 +43,11 @@ export function buildExportReport(save: SerializedGame, gathered: GatheredTower,
     if (floor > topFloor) topFloor = floor;
     if (floor < 1) basements = Math.max(basements, 1 - floor);
   }
-  const shafts = Math.min(stats.elevatorsLen, TDT_ELEVATOR_SLOTS);
+  // Shafts that will actually be THERE in 1994. Every express after the first
+  // is lost to the game-side desync (see the staysBehind line below), so
+  // counting encoded records here would have the modal promise a shaft in one
+  // breath and take it away in the next.
+  const shafts = Math.min(stats.elevatorsLen, TDT_ELEVATOR_SLOTS) - Math.max(0, stats.expressLen - 1);
   const flights = stats.walkwaysLen - stats.flightsDropped;
   const comesAlong: string[] = [
     `${counts.rooms.toLocaleString()} room${counts.rooms === 1 ? "" : "s"} with their occupancy and hotel states.`,

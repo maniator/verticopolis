@@ -5,12 +5,9 @@ import { SAVE_VERSION } from "../../engine/saveMigration";
 import {
   TDT_DEFAULT_VIEW_X,
   TDT_DEFAULT_VIEW_Y,
-  TDT_ELEVATOR_BUILT_FIXED,
-  TDT_ELEVATOR_CAR_BLOCK_SIZE,
   TDT_ELEVATOR_PER_FLOOR_SIZE,
   TDT_ELEVATOR_SCHEDULE_DEFAULT,
   TDT_FLOOR_COUNT,
-  builtShaftPayloadSize,
   TDT_FLOOR_INDEX_ENTRIES,
   TDT_FLOOR_OFFSET,
   TDT_HEADER_SIZE,
@@ -272,20 +269,11 @@ describe("buildTDT: export → import round trip", () => {
     expect(built.bytes.length).toBe(71_284);
   });
 
-  it("builtShaftPayloadSize sizes by span and refuses spans it cannot size", () => {
-    // The helper is the single place the writer, the reader's skip, and the
-    // fixture agree on, so its own contract needs cover: three callers assert in
-    // comments that the throw cannot fire, which left it untested.
-    const base = TDT_ELEVATOR_BUILT_FIXED + TDT_ELEVATOR_CAR_BLOCK_SIZE;
-    expect(builtShaftPayloadSize(10, 10)).toBe(base + TDT_ELEVATOR_PER_FLOOR_SIZE); // one floor
-    expect(builtShaftPayloadSize(10, 21)).toBe(base + 12 * TDT_ELEVATOR_PER_FLOOR_SIZE);
-    // Inverted: sizing it would pad or skip by a negative distance.
-    expect(() => builtShaftPayloadSize(40, 20)).toThrow(/whole number of floors/);
-    // Fractional: a writer pads up to the next byte, a reader skips the
-    // fraction, and the two silently disagree.
-    expect(() => builtShaftPayloadSize(1.5, 3)).toThrow(/whole number of floors/);
-    expect(() => builtShaftPayloadSize(0, Number.POSITIVE_INFINITY)).toThrow(/whole number of floors/);
-  });
+  // `builtShaftPayloadSize`'s own arithmetic contract is pinned at the UNIT
+  // tier, in src/storage/tdtConstants.test.ts, so `npm run test:unit` covers the
+  // root byte-layout invariant without the heavier integration project. What
+  // the tests here own is the part only a whole encoded file can show: that the
+  // writer, the reader's skip and the fixture actually AGREE on that size.
 
   it("a shaft AFTER a skip-floor shaft still decodes (the desync the game showed)", () => {
     // The guard the previous test cannot be: a writer/reader disagreement about
@@ -964,6 +952,24 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
     const extent = floorExtent(bytes, floor + TDT_FLOOR_OFFSET);
     expect(extent.right).toBe(GRID.width);
     expect(extent.right).toBeGreaterThanOrEqual(extent.left);
+    expect(parseTdtBinary(bytes).warnings).toEqual([]);
+  });
+
+  it("a row's encoded left edges never go backwards, even from a negative x", () => {
+    // The 1994 renderer truncates a floor at the first record whose left edge
+    // goes backwards (the #318 sky gap), so the record ORDER must match the
+    // bytes actually written. Clamping the written left without re-keying the
+    // sort broke exactly that: a left of -1 sorts LAST under the old mask key
+    // (65535) but writes as 0, putting a 0 after a 40 in the file.
+    const save = sampleSave();
+    const floor = 6;
+    save.units = save.units.filter((u) => u.floor !== floor);
+    save.units.push(unit({ id: 9_500, kind: "office", floor, x: -1, width: 9, state: "occupied" }));
+    save.units.push(unit({ id: 9_501, kind: "office", floor, x: 40, width: 9, state: "occupied" }));
+    const { bytes } = buildTDT(save);
+    const lefts = recordSpans(bytes, floor + TDT_FLOOR_OFFSET).map((r) => r.left);
+    expect(lefts.length).toBeGreaterThan(1);
+    for (let i = 1; i < lefts.length; i++) expect(lefts[i]).toBeGreaterThanOrEqual(lefts[i - 1]);
     expect(parseTdtBinary(bytes).warnings).toEqual([]);
   });
 
