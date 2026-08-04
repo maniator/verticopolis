@@ -1,4 +1,5 @@
 import { html, type TemplateResult } from "lit-html";
+import { iconTemplate, messageWithIcons } from "../icons";
 
 /**
  * The emergency event-choice dialog (a fire, a bomb threat, etc.): a message, the
@@ -31,8 +32,8 @@ export function eventChoiceTemplate(
   actions: EventChoiceActions,
 ): TemplateResult {
   return html`
-      <h2>⚠️ Emergency</h2>
-      <p>${message}</p>
+      <h2>${iconTemplate("warning", { size: 16 })}Emergency</h2>
+      <p>${messageWithIcons(message)}</p>
       <div class="modal-actions">
         <button class="btn primary" data-act="accept" @click=${actions.onAccept}>Pay ${costLabel}</button>
         <button class="btn" data-act="decline" @click=${actions.onDecline}>Decline</button>

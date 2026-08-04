@@ -3,6 +3,7 @@ import { FACILITIES } from "../engine/facilities";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { UI } from "./UI";
 import { render } from "lit-html";
+import { appendMessageWithIcons } from "./icons";
 import { syncPaletteTabs } from "./uiPalette";
 import { towerStatsTemplate } from "./templates/towerStats";
 
@@ -159,12 +160,15 @@ function renderLog(ui: UI, log: LogEntry[], logSeq: number): void {
   while (ui.el.log.childElementCount > LOG_DOM_CAP) ui.el.log.firstElementChild!.remove();
 }
 
-/** One bulletin line. `textContent` auto-escapes, never interpolate engine text
- *  into innerHTML. */
+/** One bulletin line. Still never interpolates engine text into innerHTML:
+ *  `appendMessageWithIcons` keeps every character of `e.text` as a TEXT NODE and
+ *  only swaps a known leading emoji for a trusted, code-built icon element (#721).
+ *  The icon is `currentColor`, so it inherits this line's severity color (the
+ *  `${e.kind}` class), matching the text. */
 function logLine(e: LogEntry): HTMLDivElement {
   const d = document.createElement("div");
   d.className = `log-line ${e.kind}`;
-  d.textContent = e.text;
+  appendMessageWithIcons(d, e.text);
   return d;
 }
 
@@ -180,7 +184,7 @@ export function resetLog(ui: UI, sim: Simulation): void {
 export function toast(ui: UI, text: string, kind: LogEntry["kind"] = "info"): void {
   const t = document.createElement("div");
   t.className = `toast ${kind}`;
-  t.textContent = text;
+  appendMessageWithIcons(t, text);
   // The rail is polite (role="status") so routine good/info toasts never
   // interrupt a screen reader mid-sentence, and a catch-up flush of several at
   // once queues instead of barging. A genuine error is the exception: mark it

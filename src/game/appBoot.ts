@@ -204,7 +204,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     // a loaded slot, a .vctower, or a 1994 .TDT. dismissSplash has already
     // re-paused through pauseForSplash, so this is only the greeting that says
     // why the tower is sitting still, matching Continue's.
-    onEnterTower: () => app.ui.toast("Welcome back. Press ▶ to resume.", "info"),
+    onEnterTower: () => app.ui.toast("Welcome back. Press Play to resume.", "info"),
     // Splash theme on the start screen, calm bed in the tower. Audio is
     // autoplay-gated (it only sounds after a gesture), so the splash theme is
     // heard on the New Tower path, where the splash stays up through the
@@ -308,7 +308,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     // "Welcome back" (a successful GPU recovery is deliberately undramatic).
     app.setSpeed(0);
     app.ui.toast(
-      justUpdated ? `Updated to v${APP_VERSION}. Press ▶ to resume.` : "Welcome back. Press ▶ to resume.",
+      justUpdated ? `Updated to v${APP_VERSION}. Press Play to resume.` : "Welcome back. Press Play to resume.",
       "info",
     );
     welcomeFounder();
@@ -341,7 +341,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
         // paused, the ▶ Play control being the single resume (as in the reload
         // path above).
         app.setSpeed(0);
-        app.ui.toast("Welcome back. Press ▶ to resume.", "info");
+        app.ui.toast("Welcome back. Press Play to resume.", "info");
         welcomeFounder(); // one-time thank-you once they land in the tower
       },
       // The load-only tower picker (SPEC-splash-load-tower). Offered on every

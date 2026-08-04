@@ -15,7 +15,8 @@ const noop = { onAccept: () => {}, onDecline: () => {} };
 describe("eventChoiceTemplate structure", () => {
   it("renders the emergency heading, message, and a two-button actions row", () => {
     const frag = renderToFragment(eventChoiceTemplate("A fire has broken out!", "$50,000", noop));
-    expect(frag.querySelector("h2")?.textContent).toBe("⚠️ Emergency");
+    expect(frag.querySelector("h2 svg")?.getAttribute("data-icon")).toBe("warning");
+    expect(frag.querySelector("h2")?.textContent?.trim()).toBe("Emergency");
     expect(frag.querySelector("p")?.textContent).toBe("A fire has broken out!");
     expect(frag.querySelectorAll(".modal-actions button")).toHaveLength(2);
   });

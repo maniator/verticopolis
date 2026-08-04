@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { compareTemplate } from "./compare";
+import { iconTemplate } from "../icons";
 
 /**
  * The Found a New Tower rule-set picker body. The dialog leads with the one
@@ -37,7 +38,7 @@ import { compareTemplate } from "./compare";
  */
 export function newTowerTemplate(hasSave: boolean): TemplateResult {
   const abandon = hasSave
-    ? html`<p class="nt-abandon">⚠️ This abandons your current tower (it is not auto-saved).</p>`
+    ? html`<p class="nt-abandon">${iconTemplate("warning", { size: 14 })}This abandons your current tower (it is not auto-saved).</p>`
     : nothing;
   return html`<h2>Found a New Tower</h2>
        <p class="nt-lede">Choose your rule-set. This is set once and <b>cannot be changed</b> for this tower. Start another to play the other way.</p>
