@@ -240,7 +240,13 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     } else if (spec.spannedExpressPayload) {
       pad(spannedSize); // generation 1: every kind by span, express included
     } else {
-      pad(builtShaftPayloadSizeFor(e.type, e.bottomFloor, e.topFloor, serviced.size));
+      // Count the stops the bitmap LOOP writes, not the spec's raw set: a spec
+      // entry outside 0..119 (or outside the span) never reaches the file, so
+      // sizing off it would emit a payload the header does not justify and hand
+      // the suite a fixture that disagrees with every reader.
+      let written = 0;
+      for (const f of serviced) if (f >= 0 && f < TDT_FLOOR_COUNT && f >= e.bottomFloor && f <= e.topFloor) written++;
+      pad(builtShaftPayloadSizeFor(e.type, e.bottomFloor, e.topFloor, written));
     }
   }
 

@@ -188,7 +188,13 @@ export function builtShaftPayloadSizeFor(
   topFloor: number,
   servicedCount: number,
 ): number {
-  if (type !== TDT_ELEVATOR_TYPE_EXPRESS) return builtShaftPayloadSize(bottomFloor, topFloor);
+  // Validate the SPAN for every kind, express included. The express branch does
+  // not use the span to size anything, but this is the entry point a writer is
+  // told to call, and an inverted or fractional span is a bug either way: it
+  // would be caught for a standard shaft and wave through for an express, which
+  // is the least useful place to be lenient.
+  const spanned = builtShaftPayloadSize(bottomFloor, topFloor);
+  if (type !== TDT_ELEVATOR_TYPE_EXPRESS) return spanned;
   if (!Number.isInteger(servicedCount)) {
     throw new RangeError(`express stop count must be a whole number of floors (got ${servicedCount})`);
   }
