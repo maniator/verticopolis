@@ -104,18 +104,12 @@ const SEAMS: readonly Seam[] = [
     // `simtower-clone-unreadable` are deliberately NOT here: both live in
     // SaveGame.ts, which every build ships.
     //
-    // `auto-legacy` reaches a desktop bundle even with the gate closed, via
-    // `openSaveStore` -> `sessionFromSnapshot` -> `isSaveSlotId` -> the slot id
-    // list, all of which run BEFORE the tripwire is consulted. So the positive
-    // direction still has something real to assert.
-    markers: ["auto-legacy"],
-    // These three are reached only past `storeIsAuthoritative()`, which is
-    // false until the read path lands, so the minifier proves the branch dead
-    // and drops them. Absence from a desktop build is correct today. Move them
-    // up into `markers` with the change that opens the gate: at that point
-    // `origin-gone` going missing would mean the account-isolation refusal was
-    // eliminated, which is the one failure here that costs privacy.
-    gatedMarkers: ["already-present", "write-failed", "origin-gone"],
+    // The write path is LIVE (the tripwire is deleted; hydration itself is the
+    // gate), so the migration outcomes and the account-isolation refusal must
+    // all ship in a wrapped build. `origin-gone` going missing would mean the
+    // account-isolation refusal was eliminated, which is the one failure here
+    // that costs privacy.
+    markers: ["auto-legacy", "already-present", "write-failed", "origin-gone"],
     // These are whole literals (slot ids and outcome names), so they can be
     // matched exactly rather than by substring.
     wholeLiterals: true,

@@ -22,36 +22,12 @@ const {
   saveStoreSession,
   saveMigrationReport,
   resetSaveStoreForTests,
-  setStoreAuthoritativeForTests,
 } = await import("./desktopSaveStore");
 
 beforeEach(() => {
   resetSaveStoreForTests();
   injectedStore = undefined;
   localStorage.clear();
-  setStoreAuthoritativeForTests(true);
-});
-
-describe("the tripwire gates the MIGRATION, not just the write path", () => {
-  it("migrates nothing while the store is not authoritative", async () => {
-    // The defect this pins. Migrating while autosaves still go to localStorage
-    // copies the towers at boot 1, and boot 2 finds the destinations occupied
-    // and skips (correctly, per the derived done-marker), so the store is
-    // frozen at boot 1. The day the readers are routed, the player loads a
-    // tower missing every session since.
-    resetSaveStoreForTests();
-    const { port, calls } = fakeStore([{ token: LOCAL, label: "This computer", shared: true }]);
-    injectedStore = port;
-    localStorage.setItem("verticopolis-save", storeValue(TOWER));
-
-    await prepareSaveStore();
-
-    // The session still resolves, so reads are ready the moment the gate flips.
-    expect(saveStoreSession()?.defaultScope).toBe(LOCAL);
-    expect(saveMigrationReport()).toBeNull();
-    expect(calls.writes).toEqual([]);
-    expect(localStorage.getItem("verticopolis-save")).not.toBeNull();
-  });
 });
 
 describe("prepareSaveStore", () => {
@@ -187,11 +163,14 @@ describe("prepareSaveStore", () => {
     expect(calls.list).toBe(1);
   });
 
-  it("REGRESSION (AC5): never writes localStorage", async () => {
-    // The desktop build's standing rule. localStorage stays READABLE, because
-    // the migration has to read it, and is never written. Asserted with a spy
-    // rather than by inspection, so a NEW write anywhere under prepareSaveStore
-    // fails here rather than on a player's machine.
+  it("REGRESSION (AC5): never writes a SAVE key it did not hydrate", async () => {
+    // The desktop build's standing rule, post-hydration form. The migration
+    // itself never writes localStorage; hydration MAY write save keys, but only
+    // to materialize store records, and here both records round-trip to exactly
+    // what localStorage already holds, so the only write left is the coherence
+    // stamp (`vc-store-acked`, its own meta key). Asserted with a spy rather
+    // than by inspection, so a NEW write anywhere under prepareSaveStore fails
+    // here rather than on a player's machine.
     const { port } = fakeStore([{ token: LOCAL, label: "L", shared: true }]);
     injectedStore = port;
     localStorage.setItem("verticopolis-save", storeValue(TOWER));
@@ -202,7 +181,7 @@ describe("prepareSaveStore", () => {
     const clear = vi.spyOn(Storage.prototype, "clear");
     try {
       await prepareSaveStore();
-      expect(setItem).not.toHaveBeenCalled();
+      expect(setItem.mock.calls.filter(([key]) => key !== "vc-store-acked")).toEqual([]);
       expect(removeItem).not.toHaveBeenCalled();
       expect(clear).not.toHaveBeenCalled();
     } finally {

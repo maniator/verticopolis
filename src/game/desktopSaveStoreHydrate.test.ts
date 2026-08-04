@@ -33,7 +33,6 @@ vi.mock("../platform", async (importOriginal) => ({
 const {
   prepareSaveStore,
   resetSaveStoreForTests,
-  setStoreAuthoritativeForTests,
   storeIsAuthoritative,
   storeReadDegraded,
   noteTowerOriginForSlot,
@@ -53,7 +52,6 @@ beforeEach(() => {
   resetSaveStoreForTests();
   injectedStore = undefined;
   localStorage.clear();
-  setStoreAuthoritativeForTests(true);
 });
 
 describe("hydration materializes the store into localStorage", () => {
@@ -207,13 +205,12 @@ describe("a degraded session is distinguished from no store at all", () => {
     expect(storeReadDegraded()).toBe(true);
 
     resetSaveStoreForTests();
-    setStoreAuthoritativeForTests(true);
     injectedStore = undefined; // no store at all
     await prepareSaveStore();
     expect(storeReadDegraded()).toBe(false);
 
     resetSaveStoreForTests();
-    // Tripwire off: hydration never attempted, store mode simply not enabled.
+    // A healthy store: hydration runs and succeeds, so nothing is degraded.
     const idle = fakeStore(SHARED);
     seed(idle, "auto", TOWER);
     injectedStore = idle.port;

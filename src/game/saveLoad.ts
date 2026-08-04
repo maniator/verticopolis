@@ -6,6 +6,7 @@ import { LegacyExportError, buildTDT, type BuiltLegacyTower } from "../storage/t
 import { LegacyImportError, parseTDT } from "../storage/tdtImport";
 import type { ImportReport } from "../storage/tdtImport";
 import { persistAutosave } from "./autosavePersist";
+import { persistManualSave } from "./manualSavePersist";
 import { IS_WRAPPED_BUILD } from "../platform";
 import { noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
@@ -131,7 +132,15 @@ export class SaveLoad {
       // callers see no change: they caught a stampView throw before this
       // reorder too, via the rethrow below.
       this.stampView(sim);
-      SaveGame.save(sim);
+      // Route through the store on a hydrated desktop session (the crash and
+      // update flushes come through here too, which is why the routed path is
+      // synchronous). "fallback" means browser-equivalent: no authoritative
+      // store, or a shell predating writeSync, and SaveGame's localStorage
+      // write is the correct behavior for both. A store failure THROWS into
+      // the same catch every localStorage failure reaches.
+      if (!(IS_WRAPPED_BUILD && persistManualSave(sim, "auto") === "stored")) {
+        SaveGame.save(sim);
+      }
     } catch (err) {
       // Silent callers rely on the THROW: saveBeforeUpdate's caller must not
       // reload on a failed write, recoverFromContextLoss words the failure on

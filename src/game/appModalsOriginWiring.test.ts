@@ -30,7 +30,6 @@ vi.mock("./desktopSaveStore", () => ({
   prepareSaveStore: vi.fn(),
   saveMigrationReport: () => null,
   resetSaveStoreForTests: vi.fn(),
-  setStoreAuthoritativeForTests: vi.fn(),
   noteTowerOrigin: vi.fn(),
   towerOrigin: () => undefined,
 }));

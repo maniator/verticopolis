@@ -5,6 +5,7 @@ import { canCallExterminator, statsTemplate } from "../ui/templates/stats";
 import { trackAppAction } from "../analytics";
 import { IS_WRAPPED_BUILD } from "../platform";
 import { noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
+import { deleteSlotRouted, persistManualSave, slotDeletePending } from "./manualSavePersist";
 
 /**
  * The tower-statistics modal, its exterminator action, and the manual save-slot
@@ -85,12 +86,23 @@ export function saveToSlot(app: GameApp, slot: number): void {
     if (IS_WRAPPED_BUILD && storeReadDegraded()) {
       throw new Error("Saved towers could not be read this session, so saving is paused. Restart to try again.");
     }
+    // A slot with a store delete still in flight is refused: a save landing
+    // between the delete's dispatch and its answer would be unlinked by the
+    // pending delete right after "Saved to slot N" toasted.
+    if (IS_WRAPPED_BUILD && slotDeletePending(slot)) {
+      throw new Error(`Slot ${slot} is still being deleted. Try again in a moment.`);
+    }
     // Manual slots carry the view too: stamp the live camera the same way
     // SaveLoad does for the autosave and exports. Inside the try on purpose:
     // a disposed or context-lost engine can throw from viewState() too, and
     // that failure must reach the same honest toast, not the click handler.
     app.sim.view = app.engine.viewState();
-    SaveGame.saveSlot(slot, app.sim);
+    // Same routing contract as Quick Save (see SaveLoad.save): store on a
+    // hydrated desktop session, SaveGame's localStorage write otherwise, and
+    // a store failure throws into the honest toast below.
+    if (!(IS_WRAPPED_BUILD && persistManualSave(app.sim, slot) === "stored")) {
+      SaveGame.saveSlot(slot, app.sim);
+    }
   } catch (err) {
     // Same contract as Quick Save: a manual save must never fail silently or
     // toast success on a failed write (the throw would otherwise escape the
@@ -189,7 +201,15 @@ export function loadFromSplash(app: GameApp, slot: number | "auto"): boolean {
 }
 
 export function deleteSlot(app: GameApp, slot: number): void {
-  SaveGame.deleteSlot(slot);
+  if (IS_WRAPPED_BUILD) {
+    // Cache row goes now, store record in the background; a store refusal
+    // restores the cache, toasts, and re-renders the saves list (see
+    // deleteSlotRouted). The optimistic toast below is honest either way:
+    // the failure path SAYS the restore happened.
+    deleteSlotRouted(slot, app.ui, () => showSaves(app));
+  } else {
+    SaveGame.deleteSlot(slot);
+  }
   trackAppAction("delete_save"); // slot cleared
   app.ui.toast(`Deleted slot ${slot}.`, "info");
 }

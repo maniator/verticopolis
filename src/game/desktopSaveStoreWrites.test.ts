@@ -21,7 +21,6 @@ const {
   prepareSaveStore,
   saveStoreSession,
   resetSaveStoreForTests,
-  setStoreAuthoritativeForTests,
   writeTowerToStore,
   noteTowerOrigin,
   towerOrigin,
@@ -31,7 +30,6 @@ beforeEach(() => {
   resetSaveStoreForTests();
   injectedStore = undefined;
   localStorage.clear();
-  setStoreAuthoritativeForTests(true);
 });
 
 describe("writeTowerToStore honors the tower's origin", () => {
@@ -102,10 +100,12 @@ describe("writeTowerToStore honors the tower's origin", () => {
     // The port contract: the shell's high-water mark is session-scoped, because
     // a persisted mark would drop every write of the next session once the
     // game's counter started over.
-    const { port } = fakeStore(SCOPES);
+    const { port, held } = fakeStore(SCOPES);
     const seqs: number[] = [];
-    port.write = (_id, _c, _s, seq) => {
+    port.write = (id, contents, scope, seq) => {
       seqs.push(seq);
+      // Still persists, so the first-write read-back sees what was written.
+      held.set(`${scope}|${id}`, contents);
       return Promise.resolve();
     };
     injectedStore = port;
@@ -184,7 +184,11 @@ describe("writeTowerToStore honors the tower's origin", () => {
     expect(towerOrigin()).toEqual({ id: "slot-2", scope: LOCAL });
   });
 
-  it("REGRESSION (AC5): writing a tower never touches localStorage", async () => {
+  it("REGRESSION (AC5): a payload the cache cannot round-trip writes NO localStorage at all", async () => {
+    // The write-through derives the cache entry by converting the committed
+    // `.vctower` text back to a store value. When that conversion fails, the
+    // correct cache is UNKNOWN, and writing anything (the raw text, a guess)
+    // would be a save target again. Nothing is written, not even the stamp.
     const { port } = fakeStore(SCOPES);
     injectedStore = port;
     await prepareSaveStore();
@@ -249,13 +253,14 @@ describe("Copilot review findings", () => {
     // The composite key `${scope}|${id}` was safe only because slot ids are a
     // closed list with no `|`. Scope tokens are opaque and shell-controlled.
     const weird = asScopeToken("a|b");
-    const { port } = fakeStore([
+    const { port, held } = fakeStore([
       { token: weird, label: "Odd", shared: true },
       { token: LOCAL, label: "This computer", shared: false },
     ]);
     const seqs: { scope: SaveScopeToken; seq: number }[] = [];
-    port.write = (_id, _c, scope, seq) => {
+    port.write = (id, contents, scope, seq) => {
       seqs.push({ scope, seq });
+      held.set(`${scope}|${id}`, contents);
       return Promise.resolve();
     };
     injectedStore = port;

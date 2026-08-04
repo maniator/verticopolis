@@ -18,8 +18,15 @@ import { saveStoreSession, storeIsAuthoritative, storeReadDegraded, writeTowerTo
  * rule cannot see it, and a boot-time promote would write it wherever the
  * current default points.
  *
- * localStorage stays READABLE on desktop, because the migration has to read it.
- * It is simply never written there.
+ * The boot-hydrated CACHE is refreshed by the write path itself, from the value
+ * the store committed, which is a derived copy rather than a second save
+ * target. This module never writes localStorage on a hydrated session, not
+ * even when the store write FAILS: the failure paths that used to fall back
+ * are covered by the coherence stamp's reconcile-forward at the next boot for
+ * shared towers, and were a two-step account leak for account-scoped ones
+ * (localStorage carries no scope, so the next boot's migration sweeps the copy
+ * into the SHARED namespace). A periodic autosave is best effort; the next
+ * tick retries.
  *
  * ## The gate is IS_WRAPPED_BUILD
  *
@@ -28,49 +35,43 @@ import { saveStoreSession, storeIsAuthoritative, storeReadDegraded, writeTowerTo
  * out of a browser bundle. `scripts/verify-wrapper-seam.ts` checks the built
  * artifact in both directions rather than trusting this comment.
  *
- * The session check is separate and load-bearing: a wrapped build whose shell
- * offers no store, or whose `list()` failed, still has to save somewhere, and
- * that somewhere is localStorage exactly as on the web.
+ * The `storeIsAuthoritative()` check is separate and load-bearing: it is the
+ * FACT that this boot's hydration materialized the store into the readers. A
+ * wrapped build whose shell offers no store, or whose hydration found a
+ * disagreement, is browser-equivalent and saves to localStorage exactly as on
+ * the web; writing to the store there would put progress where nothing reads.
  */
+
+/** Sims already told their autosaves are paused, so the bulletin fires once
+ *  per tower rather than every tick. A WeakSet so a discarded sim does not
+ *  pin itself here for the life of the page. */
+const warnedDegraded = new WeakSet<Simulation>();
+
 export async function persistAutosave(sim: Simulation): Promise<void> {
   // A degraded session (the shell listed towers hydration could not read)
   // autosaves NOWHERE, deliberately. The store is not hydrated, so a store
   // write would land where no reader looks. And a localStorage write would be
   // OVERWRITTEN by the next boot's successful hydration, which materializes
   // the store over these very keys: the degraded session's progress would be
-  // resurrected-over by an older copy, the exact failure #736 F1 names. A
-  // periodic autosave is best effort, and manual saves already refuse with
-  // honest wording, so the player is not being silently strung along.
-  if (IS_WRAPPED_BUILD && storeReadDegraded()) return;
-  // `storeIsAuthoritative()` is false until the READ path lands, and the check
-  // is here rather than assumed. Writing to the store while `SaveGame` still
-  // reads localStorage would put a player's progress somewhere nothing reads,
-  // and the next launch would load the pre-migration copy as if the session had
-  // never happened. The two halves ship together.
+  // resurrected-over by an older copy, the exact failure #736 F1 names.
+  // Said ONCE in the bulletin log, because manual saves refuse with modal
+  // wording but a periodic autosave has no surface of its own, and silence
+  // here would string the player along for a whole session.
+  if (IS_WRAPPED_BUILD && storeReadDegraded()) {
+    if (!warnedDegraded.has(sim)) {
+      warnedDegraded.add(sim);
+      sim.emit("Autosave is paused: the save store could not be read. Restart the game to retry.", "bad");
+    }
+    return;
+  }
   if (IS_WRAPPED_BUILD && storeIsAuthoritative() && saveStoreSession()) {
     // `export` rather than `saveAsync`: the store holds `.vctower` text, the
     // same container the migration writes and `SaveGame.import` reads, so one
-    // format crosses the bridge instead of two.
-    const result = await writeTowerToStore("auto", await SaveGame.export(sim));
-    if (result.ok) return;
-
-    // The store decides whether a localStorage fallback is safe, because only
-    // it knows which scope the tower was headed for.
-    //
-    // An earlier version keyed this on the refusal NAME and fell back for
-    // everything except `origin-gone`. That reopened the leak it was avoiding,
-    // one step further out: a single disk-full tick on an account-scoped tower
-    // wrote it to localStorage, where it carries no scope, and the next boot's
-    // migration correctly read it as ownerless and moved it into the SHARED
-    // namespace, where every account on the machine can read it. Reaching that
-    // destination in two steps is not better than reaching it in one.
-    //
-    // A fallback is safe when the tower was headed for the shared scope anyway,
-    // or when there is no store and therefore no account context at all. Those
-    // are the cases where localStorage adds no exposure the tower did not
-    // already have. Everything else keeps the tower out of localStorage and
-    // retries on the next tick, which is what a best-effort autosave is for.
-    if (!result.localFallbackSafe) return;
+    // format crosses the bridge instead of two. A refusal or failure saves
+    // nowhere this tick (see the module note), and `stale` never surfaces
+    // here: the write path already reports it as success-by-supersession.
+    await writeTowerToStore("auto", await SaveGame.export(sim));
+    return;
   }
   await SaveGame.saveAsync(sim);
 }

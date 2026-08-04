@@ -91,7 +91,7 @@ export interface SaveScope {
  * crosses the bridge, and so the game's copy does not have to guess at the
  * cause of a failure it cannot see.
  */
-export type SaveStoreErrorCode = "full" | "denied" | "io" | "not-found" | "too-large";
+export type SaveStoreErrorCode = "full" | "denied" | "io" | "not-found" | "too-large" | "stale";
 
 /** A rejection from any {@link SaveStorePort} member. */
 export interface SaveStoreError {
@@ -107,6 +107,12 @@ const SAVE_STORE_ERROR_CODES: readonly SaveStoreErrorCode[] = [
   "io",
   "not-found",
   "too-large",
+  // A write superseded by a HIGHER seq at the same address. Not a failure:
+  // the store already holds newer content, so the correct caller response is
+  // a silent skip, never a fallback and never a scary toast. Without this
+  // code, the ordinary interleave (an async autosave parked mid-flight while
+  // a sync manual save commits first) read as disk-full.
+  "stale",
 ];
 
 /**
@@ -185,6 +191,41 @@ export interface SaveStorePort {
    */
   write(id: string, contents: string, scope: SaveScopeToken, seq: number): Promise<void>;
   delete(id: string, scope: SaveScopeToken): Promise<void>;
+  /**
+   * Durably store `contents` and return only once the bytes are COMMITTED.
+   *
+   * Exists for exactly two kinds of caller: a manual save whose UI confirms
+   * success synchronously, and the crash flush that runs immediately before a
+   * reload, where an async write could be interrupted mid-flight. Everything
+   * else uses `write`.
+   *
+   * CONTRACT OBLIGATIONS ON THE SHELL, all load-bearing:
+   *
+   *  - BOUNDED. The game's crash screen blocks on this call, and a renderer
+   *    cannot time out a synchronous IPC round trip, so an unbounded
+   *    implementation would freeze the one screen that exists to survive
+   *    failure. Cap the total write-plus-retry budget and return
+   *    `{ok:false, code:"io"}` past it, never block indefinitely.
+   *  - The seq high-water mark is SHARED with `write`, per (id, scope), and
+   *    checked AT COMMIT TIME. Mixed sync and async traffic makes arrival
+   *    order different from commit order: this call can run to completion
+   *    while an async write sits parked mid-await, so a mark checked at
+   *    message arrival lets older bytes commit over newer ones after the
+   *    caller already reported success.
+   *  - A write superseded by a higher seq returns `{ok:false, code:"stale"}`,
+   *    which the game treats as a silent skip (the store holds newer content),
+   *    never as a failure.
+   *
+   * Optional like every member added after the original three: a shell without
+   * it simply leaves the game's synchronous save paths on their existing
+   * localStorage behavior.
+   */
+  writeSync?(
+    id: string,
+    contents: string,
+    scope: SaveScopeToken,
+    seq: number,
+  ): { ok: true } | { ok: false; code?: SaveStoreErrorCode };
 }
 
 /**
@@ -202,11 +243,15 @@ export function isSaveStorePort(value: unknown): value is SaveStorePort {
   if (typeof value !== "object" || value === null) return false;
   try {
     const port = value as Record<string, unknown>;
+    // `writeSync` is optional (absent-or-function), like every member added
+    // after the original contract: requiring it would demote a shell built
+    // against the four-member revision.
     return (
       typeof port.list === "function" &&
       typeof port.read === "function" &&
       typeof port.write === "function" &&
-      typeof port.delete === "function"
+      typeof port.delete === "function" &&
+      (port.writeSync === undefined || typeof port.writeSync === "function")
     );
   } catch {
     return false;

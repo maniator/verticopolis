@@ -2,6 +2,7 @@ import type { Simulation } from "../engine/Simulation";
 import { SLOT_COUNT, SaveGame } from "../storage/SaveGame";
 import { IS_WRAPPED_BUILD } from "../platform";
 import { noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
+import { persistManualSave, slotDeletePending } from "./manualSavePersist";
 import type { SaveLoadDeps } from "./saveLoad";
 
 /**
@@ -59,8 +60,17 @@ export function adoptConfirmedLegacyImport(
   if (!degraded) {
     try {
       for (let n = 1; n <= SLOT_COUNT; n++) {
+        // A slot whose store delete is still in flight LOOKS free (its cache
+        // row is already gone) but is not a safe destination: a failed delete
+        // restores it, and the copy written meanwhile would be unlinked.
+        if (IS_WRAPPED_BUILD && slotDeletePending(n)) continue;
         if (!SaveGame.hasSlot(n)) {
-          SaveGame.saveSlot(n, sim);
+          // Same routing contract as the manual slot saves: store on a
+          // hydrated desktop session, localStorage otherwise, throw on a
+          // store failure (caught below as the same honest outcome).
+          if (!(IS_WRAPPED_BUILD && persistManualSave(sim, n) === "stored")) {
+            SaveGame.saveSlot(n, sim);
+          }
           savedTo = n;
           break;
         }

@@ -282,6 +282,19 @@ export const SaveGame = {
     return slots;
   },
 
+  /**
+   * Pack a sim into the `VCZ1:` store value SYNCHRONOUSLY, without writing it
+   * anywhere. The desktop sync save path needs the packed value to hand to
+   * `writeSync` (converted to `.vctower` by the pure re-header), and it cannot
+   * await: the crash flush running right before a reload is the documented
+   * reason this codec is synchronous at all. Identical stamping and packing to
+   * {@link SaveGame.saveTo}, which now delegates here.
+   */
+  packSync(sim: Simulation): string {
+    const data = stamp(sim.serialize());
+    return STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(data)), { level: 1 }));
+  },
+
   // ---- Shared writer + export/import -----------------------------------
   saveTo(key: string, sim: Simulation): void {
     // Only an AUTOSAVE-slot write invalidates an in-flight async autosave (the
@@ -290,18 +303,12 @@ export const SaveGame = {
     // it must not cancel the pending autosave commit; that would leave the
     // autosave slot stale until the next timer tick.
     if (key === AUTO_KEY) latestAsyncSave = null;
-    const data = stamp(sim.serialize());
-    // DEFLATE the JSON so four full-tower slots stay well under the ~5MB
-    // localStorage quota (see STORE_MAGIC). Synchronous by design — this runs
-    // just before a reload in the crash-recovery path, where an async write
-    // could be lost. base64 keeps the value a safe ASCII string.
-    //
-    // Level 1 on purpose: sparse v3 saves (serializeUnit omits default fields)
-    // have already shed their redundancy, so on a real 12,975-unit tower level 1
-    // compressed within 0.8% of the level-6 size at a third of the cost (7ms vs
-    // 21ms), keeping the pre-reload flush short.
-    const packed = STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(data)), { level: 1 }));
-    writeSlot(key, packed);
+    // DEFLATE via packSync (level 1 on purpose: sparse v3 saves have already
+    // shed their redundancy, so level 1 compresses within 0.8% of level 6 at a
+    // third of the cost, keeping the pre-reload flush short). Synchronous by
+    // design: this runs just before a reload in the crash-recovery path, where
+    // an async write could be lost.
+    writeSlot(key, this.packSync(sim));
   },
   async saveToAsync(key: string, sim: Simulation): Promise<void> {
     if (!compressionEncodeSupported()) {

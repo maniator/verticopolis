@@ -1,0 +1,186 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { SaveScopeToken, SaveStorePort } from "../platform/saveStore";
+import { ackedHash, coherenceHash, noteAcked } from "../storage/saveStoreAcked";
+import { toTowerFile } from "../storage/saveMigration";
+import { LOCAL, TOWER, fakeStore, storeValue } from "./desktopSaveStore.fixture";
+
+/**
+ * Hydration's THREE-WAY, decided by the coherence stamp: which side moved
+ * since the store last acknowledged a value. This replaces the party-rejected
+ * "store wins, no comparison" (#736 F1), whose two tower-loss constructions —
+ * a browser-equivalent session's progress bulldozed when a stray heals, and
+ * Steam Cloud replacing store files under a newer cache — both came from
+ * overwriting without knowing which side moved.
+ */
+
+let injectedStore: SaveStorePort | undefined;
+
+vi.mock("../platform", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../platform")>()),
+  IS_WRAPPED_BUILD: true,
+  getPlatform: () => ({
+    isNativeWrapper: true,
+    saveFile: () => Promise.resolve(),
+    openExternal: () => {},
+    get saveStore() {
+      return injectedStore;
+    },
+  }),
+}));
+
+const { prepareSaveStore, resetSaveStoreForTests, storeIsAuthoritative, hydrationConflictIds } =
+  await import("./desktopSaveStore");
+
+const SHARED = [{ token: LOCAL, label: "This computer", shared: true }];
+const V1 = storeValue(TOWER);
+const V2 = storeValue({ ...TOWER, towerName: "Newer" });
+
+/** Seed the store with `value` (a VCZ1 store value) under `id`. */
+function seed(store: ReturnType<typeof fakeStore>, id: string, value: string, scope: SaveScopeToken = LOCAL): void {
+  const converted = toTowerFile(value);
+  if (!converted.ok) throw new Error("fixture is not convertible");
+  store.held.set(`${scope}|${id}`, converted.text);
+}
+
+beforeEach(() => {
+  resetSaveStoreForTests();
+  injectedStore = undefined;
+  localStorage.clear();
+});
+
+describe("the coherence three-way at hydration", () => {
+  it("store == cache: coherent, and the stamp is refreshed", async () => {
+    const store = fakeStore(SHARED);
+    seed(store, "auto", V1);
+    localStorage.setItem("verticopolis-save", V1);
+    injectedStore = store.port;
+
+    await prepareSaveStore();
+
+    expect(storeIsAuthoritative()).toBe(true);
+    expect(localStorage.getItem("verticopolis-save")).toBe(V1);
+    expect(ackedHash("auto")).toBe(coherenceHash(V1));
+    expect(store.calls.writes).toEqual([]);
+    expect(hydrationConflictIds()).toEqual([]);
+  });
+
+  it("the STORE moved (cache == acked): store wins, legitimately", async () => {
+    // Steam Cloud brought another machine's progress, which syncs before
+    // launch by design. The cache is exactly what the store last acknowledged,
+    // so overwriting it loses nothing.
+    const store = fakeStore(SHARED);
+    seed(store, "auto", V2);
+    localStorage.setItem("verticopolis-save", V1);
+    noteAcked("auto", V1);
+    injectedStore = store.port;
+
+    await prepareSaveStore();
+
+    expect(storeIsAuthoritative()).toBe(true);
+    expect(localStorage.getItem("verticopolis-save")).toBe(V2);
+    expect(ackedHash("auto")).toBe(coherenceHash(V2));
+    // No stash: nothing was lost, so nothing to recover.
+    expect(localStorage.getItem("vc-conflict-auto")).toBeNull();
+    expect(hydrationConflictIds()).toEqual([]);
+    expect(store.calls.writes).toEqual([]);
+  });
+
+  it("REGRESSION (#736 F1): the CACHE moved (store == acked): reconciled FORWARD, never bulldozed", async () => {
+    // The party-blocking construction: a browser-equivalent session saved real
+    // progress to localStorage (say, an old shell without writeSync), and the
+    // pre-stamp rule would have overwritten it with the older store copy at
+    // the next boot. The stamp proves the store did NOT move, so the cache is
+    // strictly newer and is pushed INTO the store instead.
+    const store = fakeStore(SHARED);
+    seed(store, "auto", V1);
+    localStorage.setItem("verticopolis-save", V2);
+    noteAcked("auto", V1);
+    injectedStore = store.port;
+
+    await prepareSaveStore();
+
+    expect(storeIsAuthoritative()).toBe(true);
+    // The newer local tower SURVIVES...
+    expect(localStorage.getItem("verticopolis-save")).toBe(V2);
+    // ...and the store was brought up to it, with a real seq.
+    expect(store.calls.writes).toEqual([{ id: "auto", scope: LOCAL }]);
+    const forward = toTowerFile(V2);
+    if (!forward.ok) throw new Error("fixture is not convertible");
+    expect(store.held.get(`${LOCAL}|auto`)).toBe(forward.text);
+    expect(ackedHash("auto")).toBe(coherenceHash(V2));
+    expect(hydrationConflictIds()).toEqual([]);
+  });
+
+  it("a FAILED reconcile-forward keeps the newer cache and retries next boot", async () => {
+    const store = fakeStore(SHARED);
+    seed(store, "auto", V1);
+    localStorage.setItem("verticopolis-save", V2);
+    noteAcked("auto", V1);
+    store.port.write = () => Promise.reject(new Error("io"));
+    injectedStore = store.port;
+
+    await prepareSaveStore();
+
+    // Hydration still SUCCEEDS: the failure cost is a retry, never the session.
+    expect(storeIsAuthoritative()).toBe(true);
+    expect(localStorage.getItem("verticopolis-save")).toBe(V2);
+    // The stamp still says V1 was the last acknowledged value, so the next
+    // boot re-runs the same reconcile rather than reading V2 as a conflict.
+    expect(ackedHash("auto")).toBe(coherenceHash(V1));
+  });
+
+  it("BOTH moved: the local copy is stashed, the store wins, and the caller is told", async () => {
+    const store = fakeStore(SHARED);
+    const V3 = storeValue({ ...TOWER, towerName: "Store side" });
+    seed(store, "auto", V3);
+    localStorage.setItem("verticopolis-save", V2);
+    noteAcked("auto", V1); // matches NEITHER side
+    injectedStore = store.port;
+
+    await prepareSaveStore();
+
+    expect(storeIsAuthoritative()).toBe(true);
+    expect(localStorage.getItem("verticopolis-save")).toBe(V3);
+    // The losing copy is evidence for recovery, not silently gone.
+    expect(localStorage.getItem("vc-conflict-auto")).toBe(V2);
+    expect(hydrationConflictIds()).toEqual(["auto"]);
+    expect(ackedHash("auto")).toBe(coherenceHash(V3));
+  });
+
+  it("NOTHING ever acked reads conservatively, as a conflict", async () => {
+    // A legacy machine's first boot with divergent copies has no stamp to
+    // consult. Guessing either way risks a tower; stashing risks nothing.
+    const store = fakeStore(SHARED);
+    seed(store, "auto", V1);
+    localStorage.setItem("verticopolis-save", V2);
+    injectedStore = store.port;
+
+    await prepareSaveStore();
+
+    expect(storeIsAuthoritative()).toBe(true);
+    expect(localStorage.getItem("verticopolis-save")).toBe(V1);
+    expect(localStorage.getItem("vc-conflict-auto")).toBe(V2);
+    expect(hydrationConflictIds()).toEqual(["auto"]);
+  });
+
+  it("the unreadable stash reconciles the OTHER way: localStorage wins", async () => {
+    // The stash is preserved bytes, and a fresh local stash is by definition
+    // the copy worth keeping; the store's older one was already superseded on
+    // this machine.
+    const store = fakeStore(SHARED);
+    // Preserve mode: the store-side stash round-trips verbatim.
+    const stored = toTowerFile("old-stash-bytes", true);
+    if (!stored.ok) throw new Error("fixture");
+    store.held.set(`${LOCAL}|unreadable`, stored.text);
+    localStorage.setItem("simtower-clone-unreadable", "new-stash-bytes");
+    injectedStore = store.port;
+
+    await prepareSaveStore();
+
+    expect(storeIsAuthoritative()).toBe(true);
+    expect(localStorage.getItem("simtower-clone-unreadable")).toBe("new-stash-bytes");
+    expect(store.calls.writes).toEqual([{ id: "unreadable", scope: LOCAL }]);
+    const forwarded = toTowerFile("new-stash-bytes", true);
+    expect(forwarded.ok && store.held.get(`${LOCAL}|unreadable`) === forwarded.text).toBe(true);
+  });
+});
