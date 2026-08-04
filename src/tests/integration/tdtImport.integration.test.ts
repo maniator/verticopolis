@@ -974,11 +974,15 @@ describe("transport decode: the save's own shafts and flights", () => {
     }
   });
 
-  it("a stairless legacy export from BEFORE the routing region still imports", () => {
-    // The oldest shape: exported before v1.14.0 added the 0xFF routing region,
-    // so the file simply stops after the stairs table, and stairless, so those
-    // 64 records say nothing either. What is left is the file's own end, which
-    // sits exactly where the old writer's last block did.
+  it("a stairless PRE-routing-region export is refused loudly, not read wrongly", () => {
+    // An accepted limit, recorded so it is a decision and not a surprise. This
+    // shape (exported before v1.14.0, so the file stops after the stairs table,
+    // AND stairless, so those 64 records say nothing) offers no structure to
+    // corroborate the legacy layout. Anchoring on the file's END instead was
+    // tried and withdrawn: a CURRENT file truncated at exactly the shorter
+    // walk's end plus finance, parking and stairs is byte-identical to it when
+    // both regions are zeros. Nothing can separate them, so the old file is
+    // given up on rather than the damaged one being read wrongly.
     const legacy: TdtSpec = {
       elevators: [
         { type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] },
@@ -987,13 +991,31 @@ describe("transport decode: the save's own shafts and flights", () => {
       stairs: [],
       parkingConnected: 7,
       legacyServicedPayload: true,
-      // No trailing bytes and no routing region: the file ends at the stairs table.
     };
     const walked = parseTdtBinary(buildTdt(legacy));
-    expect(walked.elevators).toHaveLength(2);
-    expect(walked.elevators!.map((e) => e.x)).toEqual([100, 140]);
-    expect(walked.parkingConnected).toBe(7);
-    expect(walked.warnings).toEqual([]);
+    expect(walked.elevators).toBeNull(); // synthesized transports, with a warning
+    expect(walked.warnings.join(" ")).toMatch(/elevator/i);
+  });
+
+  it("a current file truncated at the LEGACY tail length is refused, not read as legacy", () => {
+    // The trap that withdrew the EOF anchor: cut a current-layout file at
+    // exactly where a legacy one carrying the same shafts would have ended, and
+    // its own end corroborates the shorter walk. It then returns a table that
+    // is not there, with the parking count read out of payload zero-fill.
+    const full = buildTdt({
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] }],
+      stairs: [{ type: 1, x: 120, floor: 10 }],
+      parkingConnected: 7,
+    });
+    const legacyLength = buildTdt({
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] }],
+      stairs: [{ type: 1, x: 120, floor: 10 }],
+      parkingConnected: 7,
+      legacyServicedPayload: true,
+    }).length;
+    const walked = parseTdtBinary(full.slice(0, legacyLength));
+    expect(walked.elevators).toBeNull();
+    expect(walked.warnings.join(" ")).toMatch(/elevator/i);
   });
 
   it("a STAIRLESS current-layout tower is still read as current", () => {

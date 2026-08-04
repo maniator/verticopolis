@@ -278,21 +278,25 @@ function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
   // layout stays on `spanned`, which is what the retail game writes and what
   // this reader documents.
   //
-  // All three markers are the same question asked of a different structure:
-  // does something whose position under the old writer we know exactly sit
-  // where this walk's table would put it? The last covers the oldest exports,
-  // from before v1.14.0 added the routing region, where the writer simply
-  // STOPPED after the stairs table: for a stairless tower of that era the file
-  // ending exactly there is the only evidence left, and EOF is as exact as any
-  // offset. Beyond that the file offers nothing to prove either layout, and it
-  // stays on `spanned` rather than guessing.
+  // Both markers are the same question asked of a different structure: does
+  // something whose position under the old writer we know exactly sit where
+  // this walk's table would put it? Each is a STRUCTURE, deliberately. Using
+  // the file's end as a third marker was tried, to reach exports older than
+  // v1.14.0 (which stopped after the stairs table instead of writing the
+  // routing region), and it had to be withdrawn: a CURRENT file truncated at
+  // exactly the shorter walk's end plus finance, parking and stairs is
+  // byte-identical to such an export when both regions are zeros, which they
+  // are for a stairless tower with no connected stalls. Nothing can tell those
+  // two apart, so an EOF anchor cannot help the old file without silently
+  // mis-reading the damaged one, and a silent wrong answer is the worse of the
+  // two. A pre-v1.14.0 stairless export therefore falls back to `spanned`,
+  // fails to walk, and reaches the player as synthesized transports WITH a
+  // warning. See the backlog's `tdt-legacy-pre-tail-import`.
   const anchored = (end: number) => {
     const afterParking = end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE;
-    const afterStairs = afterParking + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE;
     return (
       stairsTableStartsAt(bytes, afterParking) ||
-      routingTailStartsAt(bytes, afterStairs) ||
-      bytes.length === afterStairs
+      routingTailStartsAt(bytes, afterParking + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE)
     );
   };
   return anchored(serviced.end) && !anchored(spanned.end) ? "serviced" : "spanned";
