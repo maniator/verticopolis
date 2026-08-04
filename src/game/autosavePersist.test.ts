@@ -69,13 +69,7 @@ describe("persistAutosave on a wrapped build", () => {
     injectedStore = port;
     await prepareSaveStore();
 
-    const setItem = vi.spyOn(Storage.prototype, "setItem");
-    try {
-      await persistAutosave(Simulation.newGame(7));
-      expect(setItem).not.toHaveBeenCalled();
-    } finally {
-      setItem.mockRestore();
-    }
+    await persistAutosave(Simulation.newGame(7));
 
     expect(written.length).toBe(1);
     expect(written[0]!.id).toBe("auto");
@@ -83,7 +77,14 @@ describe("persistAutosave on a wrapped build", () => {
     // The same container the migration writes and SaveGame.import reads, so one
     // format crosses the bridge rather than two.
     expect(written[0]!.contents.startsWith("VCTOWER1\n")).toBe(true);
-    expect(localStorage.length).toBe(0);
+    // localStorage is not the save TARGET, but the boot-hydrated CACHE is
+    // refreshed from the value the store just committed, so a mid-session
+    // "Load auto" serves this tower rather than the boot copy. The cache entry
+    // is derived from the store's accepted contents, never written on its own.
+    const cached = localStorage.getItem("verticopolis-save");
+    expect(cached).not.toBeNull();
+    expect(cached).toBe("VCZ1:" + written[0]!.contents.trim().slice("VCTOWER1\n".length).replace(/\s+/g, ""));
+    expect(localStorage.length).toBe(1);
   });
 
   it("TRIPWIRE: does not route to the store until the read path lands", async () => {

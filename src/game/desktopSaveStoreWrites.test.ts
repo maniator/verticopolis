@@ -272,3 +272,35 @@ describe("Copilot review findings", () => {
     ]);
   });
 });
+
+describe("a committed store write refreshes the boot-hydrated cache", () => {
+  it("REGRESSION: mid-session Load auto serves the just-autosaved tower, not the boot copy", async () => {
+    // Found by the real-towers Electron harness: autosave routed to the store,
+    // but localStorage kept the boot-hydrated copy, so "Load auto" served a
+    // stale tower while the newer one sat in the store.
+    const { port } = fakeStore([{ token: LOCAL, label: "This computer", shared: true }]);
+    injectedStore = port;
+    await prepareSaveStore();
+
+    const newer = "VCTOWER1\n" + storeValue({ ...TOWER, towerName: "Newer" }).slice("VCZ1:".length) + "\n";
+    const result = await writeTowerToStore("auto", newer);
+    expect(result).toEqual({ ok: true });
+
+    const cached = localStorage.getItem("verticopolis-save");
+    expect(cached).not.toBeNull();
+    expect(cached!.startsWith("VCZ1:")).toBe(true);
+    expect(cached).toBe("VCZ1:" + newer.trim().slice("VCTOWER1\n".length).replace(/\s+/g, ""));
+  });
+
+  it("a REFUSED write leaves the cache untouched", async () => {
+    // The cache is only ever written from a value the store COMMITTED. A
+    // refusal writing it would recreate the mirror the design forbids.
+    const { port } = fakeStore([{ token: LOCAL, label: "This computer", shared: true }]);
+    port.write = () => Promise.reject(Object.assign(new Error("full"), { code: "full" }));
+    injectedStore = port;
+    await prepareSaveStore();
+
+    await writeTowerToStore("auto", "VCTOWER1\nAAAA\n");
+    expect(localStorage.getItem("verticopolis-save")).toBeNull();
+  });
+});

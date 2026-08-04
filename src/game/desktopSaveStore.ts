@@ -1,7 +1,14 @@
 import { getPlatform } from "../platform";
-import { saveStoreErrorCode } from "../platform/saveStore";
+import { saveStoreErrorCode, type SaveScopeToken } from "../platform/saveStore";
 import { hydrateFromStore, withTimeout } from "./desktopSaveHydrate";
-import { isSaveSlotId, migrateSavesToStore, type MigrationReport } from "../storage/saveMigration";
+import {
+  fromTowerFile,
+  isSaveSlotId,
+  localStorageKeyFor,
+  migrateSavesToStore,
+  type MigrationReport,
+  type SaveSlotId,
+} from "../storage/saveMigration";
 import {
   idsInScope,
   migrationTarget,
@@ -11,8 +18,6 @@ import {
   type SaveStoreSession,
   type WriteRefusal,
 } from "../storage/saveStoreSession";
-import type { SaveSlotId } from "../storage/saveMigration";
-import type { SaveScopeToken } from "../platform/saveStore";
 
 /**
  * The one entry point the boot path uses to bring up a wrapper shell's save
@@ -97,17 +102,11 @@ const hydratedOrigins = new Map<string, SaveAddress>();
 const seqByScope = new Map<SaveScopeToken, Map<string, number>>();
 
 function nextSeq(address: SaveAddress): number {
-  // Keyed by (id, scope), not by id. An id is unique only WITHIN a scope, which
-  // is this module's whole thesis, so two different towers sharing an id across
-  // scopes must not share one counter: whichever way the shell keys its
-  // high-water mark, one of them would lose writes.
-  //
-  // NESTED maps rather than a `${scope}|${id}` composite. The composite was
-  // safe, but only because slot ids are a closed list containing no `|`, so the
-  // last separator always split it unambiguously. That is a load-bearing
-  // accident resting on a fact two modules away, and scope tokens are opaque
-  // and shell-controlled, so they may legitimately contain anything. Nesting
-  // removes the question instead of answering it.
+  // Keyed by (id, scope), not by id: an id is unique only WITHIN a scope, so
+  // two towers sharing an id across scopes must not share one counter. NESTED
+  // maps rather than a `${scope}|${id}` composite, because scope tokens are
+  // opaque and shell-controlled and may legitimately contain the separator;
+  // nesting removes the question instead of answering it.
   let byId = seqByScope.get(address.scope);
   if (!byId) {
     byId = new Map<string, number>();
@@ -459,6 +458,27 @@ export async function writeTowerToStore(id: SaveSlotId, contents: string): Promi
     // Remembered alongside the address, so a later question about fallback
     // safety can be answered even if the session is gone by then.
     loadedFromShared = headedForShared;
+  }
+  // WRITE-THROUGH to the boot-hydrated cache, and only now, after the store
+  // acknowledged the write. Without this, a mid-session "Load auto" served the
+  // BOOT-TIME copy while the newer tower sat in the store: the real-towers
+  // Electron harness caught exactly that. This does not make localStorage a
+  // save target again. The cache is only ever written FROM a value the store
+  // committed, so there is no independent copy, no reconciliation, and no
+  // which-is-newer question; a failed cache write costs staleness until the
+  // next boot, never data.
+  if (hydrated) {
+    const key = localStorageKeyFor(resolved.target.id);
+    if (key !== undefined) {
+      const back = fromTowerFile(contents);
+      if (back.ok) {
+        try {
+          localStorage.setItem(key, back.value);
+        } catch {
+          /* a stale cache is survivable; the store has the tower */
+        }
+      }
+    }
   }
   return { ok: true };
 }
