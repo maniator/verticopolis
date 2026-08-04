@@ -156,6 +156,45 @@ export function builtShaftPayloadSize(bottomFloor: number, topFloor: number): nu
   }
   return TDT_ELEVATOR_BUILT_FIXED + spannedFloors * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_CAR_BLOCK_SIZE;
 }
+
+/** Elevator `type` byte for an express shaft (first entry in ELEVATOR_KINDS).
+ *  Named because the payload rule below turns on it. */
+export const TDT_ELEVATOR_TYPE_EXPRESS = 0;
+
+/**
+ * One built shaft's payload size, BY KIND, and the only entry point a writer or
+ * reader should use.
+ *
+ * Standard and service shafts hold one per-floor entry for every floor they
+ * span. An EXPRESS shaft holds one for every floor it STOPS at. That is the
+ * only place the two rules can differ: an express is the one kind that skips
+ * most of what it spans, and every other shaft stops everywhere it passes,
+ * which is exactly why this went unnoticed for so long.
+ *
+ * Harness-measured 2026-08-04 against a save retail SimTower wrote: an express
+ * spanning floors 10..100 and stopping at 8 of them occupies 6,274 bytes, which
+ * is `194 + 3140 + 324 * 8 + 348`. Sizing that same shaft by its 91 spanned
+ * floors gives 33,166, so a writer that spans runs 26,892 bytes long and the
+ * 1994 game loses every shaft after the express. Issue #740 and doc §8.
+ *
+ * `servicedCount` is clamped up to one entry. Our writer always stops at both
+ * endpoints so it cannot emit zero, and a file claiming zero is malformed
+ * either way; what matters is that the reader and the writer size such a record
+ * the SAME, which they do only by both coming through here.
+ */
+export function builtShaftPayloadSizeFor(
+  type: number,
+  bottomFloor: number,
+  topFloor: number,
+  servicedCount: number,
+): number {
+  if (type !== TDT_ELEVATOR_TYPE_EXPRESS) return builtShaftPayloadSize(bottomFloor, topFloor);
+  if (!Number.isInteger(servicedCount)) {
+    throw new RangeError(`express stop count must be a whole number of floors (got ${servicedCount})`);
+  }
+  // Expressed as a 1..n range so ALL of the arithmetic stays in one function.
+  return builtShaftPayloadSize(1, Math.max(1, servicedCount));
+}
 export const TDT_FINANCE_SIZE = 132;
 export const TDT_PARKING_SIZE = 2 + 512 * 2;
 export const TDT_STAIR_SLOTS = 64;
@@ -211,7 +250,10 @@ export const TDT_ROUTING_TAIL_SIZE = 0x6400;
  */
 export const TDT_STAMP_MAGIC = "VCTDT";
 /** Bumped when OUR writer changes the bytes in a way a reader must know about.
- *  1 = the spanned-floor elevator payload (see {@link builtShaftPayloadSize}). */
+ *  1 = every built shaft sized by its SPANNED floors, express included. That is
+ *  NOT what the 1994 game writes for an express (see
+ *  {@link builtShaftPayloadSizeFor}), but it is what our writer emits and what
+ *  the game accepts, so it stays generation 1 until the writer itself changes. */
 export const TDT_STAMP_GENERATION = 1;
 /** Magic bytes plus a u16 generation. */
 export const TDT_STAMP_SIZE = TDT_STAMP_MAGIC.length + 2;

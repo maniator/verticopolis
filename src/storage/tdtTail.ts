@@ -9,6 +9,7 @@ import {
   TDT_ELEVATOR_HEADER_SIZE,
   TDT_ELEVATOR_SLOTS,
   builtShaftPayloadSize,
+  builtShaftPayloadSizeFor,
   TDT_FINANCE_SIZE,
   TDT_FLOOR_COUNT,
   TDT_MAX_PEOPLE,
@@ -155,22 +156,41 @@ export function stairsTableStartsAt(bytes: Uint8Array, at: number): boolean {
 }
 
 /**
- * How a built elevator slot's payload is sized.
+ * How a built elevator slot's payload is sized. Three writers have to be read:
  *
- * `spanned` is the documented layout and what the retail game writes: one
- * per-floor entry for every floor the shaft passes. `serviced` is what
- * Verticopolis 2.9.0 and earlier wrote, one entry per floor it STOPS at. The two
- * are identical unless a shaft skips a floor, so only files with a skip-floor
- * shaft can be ambiguous at all.
+ * - `expressServiced`: an express shaft sized by the floors it STOPS at, every
+ *   other kind by the floors it spans. What the retail game writes (measured,
+ *   see {@link builtShaftPayloadSizeFor}) and what we write from generation 2 on.
+ * - `spanned`: every kind sized by spanned floors. Our generation 1 (v2.12.x),
+ *   right for standard and service, wrong for express.
+ * - `serviced`: every kind sized by stops. Verticopolis 2.9.0 and earlier.
+ *
+ * All three agree on a shaft that stops at every floor it passes, which is every
+ * standard and service shaft in practice, so only a file with a skip-stopping
+ * shaft can be ambiguous at all, and an express is the kind that always skips.
  */
-type PayloadLayout = "spanned" | "serviced";
+type PayloadLayout = "expressServiced" | "spanned" | "serviced";
 
-/** One built slot's payload size under `layout`. */
-function payloadSize(layout: PayloadLayout, bottomFloor: number, topFloor: number, serviced: Uint8Array): number {
-  if (layout === "spanned") return builtShaftPayloadSize(bottomFloor, topFloor);
+/** Stops recorded in a slot's 120-byte serviced bitmap. */
+function stopCount(serviced: Uint8Array): number {
   let stops = 0;
   for (let i = 0; i < serviced.length; i++) if (serviced[i] !== 0) stops++;
-  return builtShaftPayloadSize(1, Math.max(1, stops)); // same shape, stop count
+  return stops;
+}
+
+/** One built slot's payload size under `layout`. */
+function payloadSize(
+  layout: PayloadLayout,
+  type: number,
+  bottomFloor: number,
+  topFloor: number,
+  serviced: Uint8Array,
+): number {
+  if (layout === "expressServiced") {
+    return builtShaftPayloadSizeFor(type, bottomFloor, topFloor, stopCount(serviced));
+  }
+  if (layout === "spanned") return builtShaftPayloadSize(bottomFloor, topFloor);
+  return builtShaftPayloadSize(1, Math.max(1, stopCount(serviced))); // same shape, stop count
 }
 
 /** Result of walking the 24-slot elevator table with one layout. `elevators` is
@@ -220,7 +240,7 @@ function readElevatorTable(r: ByteReader, layout: PayloadLayout): TableWalk {
     }
     // Built shafts append live passenger/queue state we deliberately skip: our
     // crowd re-simulates.
-    const payload = payloadSize(layout, bottomFloor, topFloor, serviced);
+    const payload = payloadSize(layout, type, bottomFloor, topFloor, serviced);
     if (r.remaining() < payload) return { elevators: null, warning: CUT_SHORT, end: r.offset() };
     r.skip(payload);
     elevators.push({ type, capacity, cars, x, topFloor, bottomFloor, serviced, carHomes });
@@ -256,7 +276,7 @@ function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
   // can only ever help. A future generation adds its case here.
   switch (stampedGeneration(bytes)) {
     case TDT_STAMP_GENERATION:
-      return "spanned";
+      return "spanned"; // our own writer, which spans every kind including express
     default:
       break; // unstamped, or a generation this reader does not know
   }
@@ -265,17 +285,13 @@ function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
     r.skip(tableStart);
     return readElevatorTable(r, layout);
   };
-  const spanned = walk("spanned");
-  // No skip-floor shaft means no ambiguity: the two layouts size every payload
-  // identically, so there is nothing to choose and nothing to pay for.
-  const ambiguous = (spanned.elevators ?? []).some((e) => {
-    let stops = 0;
-    for (let i = 0; i < e.serviced.length; i++) if (e.serviced[i] !== 0) stops++;
-    return stops >= 1 && stops !== e.topFloor - e.bottomFloor + 1;
-  });
-  if (spanned.elevators !== null && !ambiguous) return "spanned";
-  const serviced = walk("serviced");
-  if (serviced.elevators === null) return "spanned";
+  const current = walk("expressServiced");
+  // No skip-stopping shaft means no ambiguity: all three layouts size every
+  // payload identically, so there is nothing to choose and nothing to pay for.
+  const ambiguous = (current.elevators ?? []).some(
+    (e) => stopCount(e.serviced) >= 1 && stopCount(e.serviced) !== e.topFloor - e.bottomFloor + 1,
+  );
+  if (current.elevators !== null && !ambiguous) return "expressServiced";
   // ONE rule decides it: the legacy layout is taken only when the file itself
   // corroborates it, by placing a structure we know the old writer's position
   // for exactly where that walk's table would have ended. Two such markers,
@@ -315,7 +331,17 @@ function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
       routingTailStartsAt(bytes, afterParking + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE)
     );
   };
-  return anchored(serviced.end) && !anchored(spanned.end) ? "serviced" : "spanned";
+  // An older layout is taken only when the file corroborates it AND the current
+  // one is not itself corroborated, so evidence, never preference, is what moves
+  // the answer off the default. Tried in age order; they are mutually exclusive
+  // on any file that can tell them apart.
+  if (!anchored(current.end)) {
+    for (const older of ["spanned", "serviced"] as const) {
+      const alt = walk(older);
+      if (alt.elevators !== null && anchored(alt.end)) return older;
+    }
+  }
+  return "expressServiced";
 }
 
 /**

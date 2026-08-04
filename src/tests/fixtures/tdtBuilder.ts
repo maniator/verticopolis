@@ -2,6 +2,7 @@ import {
   TDT_ELEVATOR_HEADER_SIZE,
   TDT_ELEVATOR_SLOTS,
   builtShaftPayloadSize,
+  builtShaftPayloadSizeFor,
   TDT_FINANCE_SIZE,
   TDT_FLOOR_COUNT,
   TDT_FLOOR_INDEX_ENTRIES,
@@ -106,6 +107,11 @@ export interface TdtSpec {
    *  one entry per SERVICED floor rather than per spanned floor. Only for
    *  testing the reader's fallback for those files; never for anything else. */
   legacyServicedPayload?: boolean;
+  /** Size EVERY shaft by its spanned floors, express included: the generation-1
+   *  layout Verticopolis 2.12.x wrote, before an express was measured to be
+   *  sized by its stops (#740). Like `legacyServicedPayload`, this deliberately
+   *  encodes a superseded layout so the reader's fallback can be tested. */
+  spannedExpressPayload?: boolean;
   stairs?: StairSpec[];
   /** The parking block's connected-stall count (default 0). */
   parkingConnected?: number;
@@ -229,7 +235,13 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     // an inverted or fractional span and emit a fixture whose header and payload
     // disagree, which is exactly the loud early failure this call exists to give.
     const spannedSize = builtShaftPayloadSize(e.bottomFloor, e.topFloor);
-    pad(spec.legacyServicedPayload ? builtShaftPayloadSize(1, Math.max(1, serviced.size)) : spannedSize);
+    if (spec.legacyServicedPayload) {
+      pad(builtShaftPayloadSize(1, Math.max(1, serviced.size)));
+    } else if (spec.spannedExpressPayload) {
+      pad(spannedSize); // generation 1: every kind by span, express included
+    } else {
+      pad(builtShaftPayloadSizeFor(e.type, e.bottomFloor, e.topFloor, serviced.size));
+    }
   }
 
   // ---- Finance + parking + stairs -------------------------------------------
