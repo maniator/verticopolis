@@ -79,18 +79,15 @@ let hydrated = false;
 /** Whether hydration RAN this boot, regardless of outcome. */
 let hydrationAttempted = false;
 
-/** Whether hydration failed because the BRIDGE failed (a read rejected, timed
- *  out, or broke its contract), as opposed to a content disagreement. Only
- *  this reads as degraded: a bridge failure is transient and a restart may
- *  genuinely fix it, while a disagreement recurs every boot by construction,
- *  so pausing saves over one would be a permanent lockout behind copy that
- *  promises a remedy. */
+/** Whether hydration failed because the BRIDGE failed, as opposed to a content
+ *  disagreement. Only this reads as degraded: a bridge failure is transient
+ *  and a restart may fix it, while a disagreement recurs every boot, so
+ *  pausing saves over one would be a permanent lockout. */
 let hydrationReadFailed = false;
 
-/** Where each hydrated slot came from, keyed by slot id. What
- *  {@link noteTowerOriginForSlot} consults, captured during hydration because
- *  that is the one moment the store's answer and localStorage's contents are
- *  known to agree. */
+/** Where each hydrated slot came from, keyed by slot id; what
+ *  {@link noteTowerOriginForSlot} consults. Captured during hydration, the one
+ *  moment the store's answer and localStorage are known to agree. */
 const hydratedOrigins = new Map<string, SaveAddress>();
 
 /**
@@ -185,12 +182,15 @@ async function runPrepare(): Promise<void> {
     if (migration.migratedAny) {
       const fresh = await withTimeout(openSaveStore(store));
       if (fresh === null) {
-        // The re-read failed, so the snapshot in hand PREDATES the migration.
-        // Hydrating from it would find the just-migrated localStorage keys
-        // "not in the store" and misread a healthy boot as disagreement, so
-        // skip hydration entirely this boot; the next one hydrates from a
-        // fresh snapshot. An earlier revision fell back to the stale snapshot
-        // and hydrated anyway, under a comment claiming the opposite.
+        // The snapshot in hand PREDATES the migration, so hydrating from it
+        // would misread a healthy boot as disagreement: skip this boot.
+        // Skipped AND marked DEGRADED (a review caught the omission): the
+        // migration just copied towers into the store, so a localStorage save
+        // now would put newer progress beside an older store copy for the next
+        // boot's hydration to overwrite (#736 F1, made reachable right here).
+        // The failed re-read is a bridge failure, so degraded is also honest.
+        hydrationAttempted = true;
+        hydrationReadFailed = true;
         return;
       }
       session = fresh;

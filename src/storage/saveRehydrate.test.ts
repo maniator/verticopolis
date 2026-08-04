@@ -141,3 +141,37 @@ describe("a CompressionStream-written tower reads back through fflate", () => {
     expect(loaded.tower.towerName).toBe(sim.tower.towerName);
   });
 });
+
+describe("PR review findings: the reverse path validates by doing, not pattern-matching", () => {
+  it("refuses base64 that atob throws on, despite matching the alphabet", () => {
+    // Copilot: a regex accepted strings with invalid length or padding, so a
+    // corrupted record with an intact header overwrote a readable tower with a
+    // value readSlot then called corrupt.
+    for (const bad of ["AAAAA", "AA=A", "A", "====", "AAAA="]) {
+      expect(fromTowerFile("VCTOWER1\n" + bad + "\n"), JSON.stringify(bad)).toEqual({
+        ok: false,
+        reason: "unreadable",
+      });
+    }
+  });
+
+  it("refuses a payload that decodes to a non-tower", async () => {
+    // Codex: Simulation.deserialize COERCES rather than throws, so a deflated
+    // "42" would have hydrated, parsed, and presented a fresh tower as the
+    // player autosave. Same bar as the forward direction now.
+    const { deflateSync } = await import("fflate");
+    const { toBase64 } = await import("./saveCompression");
+    for (const junk of ["42", "null", "[]", "{}", "\"hi\"", "{\"minutes\":1}"]) {
+      const payload = toBase64(deflateSync(new TextEncoder().encode(junk), { level: 1 }));
+      expect(fromTowerFile("VCTOWER1\n" + payload + "\n"), junk).toEqual({ ok: false, reason: "unreadable" });
+    }
+  });
+
+  it("still accepts every real tower shape, and never touches the payload", () => {
+    // Validate-then-discard: the returned value is the ORIGINAL base64, so the
+    // decode above cannot have re-encoded anything and Founder stays safe.
+    const original = storeValue(PRE_2_0_SAVE);
+    const back = fromTowerFile("VCTOWER1\n" + original.slice(STORE_MAGIC.length) + "\n");
+    expect(back).toEqual({ ok: true, value: original });
+  });
+});

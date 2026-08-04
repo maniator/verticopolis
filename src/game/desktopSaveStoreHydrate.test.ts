@@ -274,3 +274,35 @@ describe("hydration records each slot's origin", () => {
     expect(towerOrigin()).toBeUndefined();
   });
 });
+
+describe("PR review P1: a migrated boot whose snapshot re-read fails is DEGRADED", () => {
+  it("pauses saves rather than letting localStorage race the just-migrated store copy", async () => {
+    // Codex's find. The migration copied towers into the store, then the
+    // re-read failed and the boot returned neither hydrated nor degraded.
+    // Saves then fell back to localStorage, putting NEWER progress beside the
+    // OLDER store copy, and the next boot's hydration overwrote the newer
+    // with the older: #736 F1's resurrection, made reachable by this branch.
+    // The re-read failing is a bridge failure, so degraded is also the honest
+    // description.
+    const store = fakeStore(SHARED);
+    localStorage.setItem("verticopolis-save", storeValue(TOWER));
+    let lists = 0;
+    const realList = store.port.list.bind(store.port);
+    store.port.list = () => (++lists === 1 ? realList() : Promise.reject(new Error("io")));
+    injectedStore = store.port;
+
+    await prepareSaveStore();
+
+    // The migration ran and moved the tower.
+    expect(store.calls.writes.map((w) => w.id)).toEqual(["auto"]);
+    // And the session is degraded: not silently browser-equivalent.
+    expect(storeReadDegraded()).toBe(true);
+    expect(storeIsAuthoritative()).toBe(false);
+
+    const { persistAutosave } = await import("./autosavePersist");
+    const { Simulation } = await import("../engine/Simulation");
+    const before = localStorage.getItem("verticopolis-save");
+    await persistAutosave(Simulation.newGame(5));
+    expect(localStorage.getItem("verticopolis-save")).toBe(before);
+  });
+});

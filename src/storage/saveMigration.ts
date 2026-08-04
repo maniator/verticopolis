@@ -251,14 +251,24 @@ export function fromTowerFile(text: string, preserve = false): FromTowerFileResu
   // to be applied HERE rather than relied on downstream.
   const payload = trimmed.slice(magic[0].length).replace(/\s+/g, "");
   if (payload === "") return { ok: false, reason: "unreadable" };
-  // The payload must actually BE base64 before this claims ok. Without the
-  // check, a corrupted record with an intact eight-byte header converted into
-  // a VCZ1-prefixed value that readSlot then reports as a corrupt slot, and on
-  // an owned key that value OVERWRITES a readable localStorage tower: the
-  // store resurrecting a worse copy over a better one, which is the exact
-  // class everything here exists to prevent. Refused, it hydrates verbatim as
-  // present-but-unreadable instead, keeping both the bytes and the slot row.
-  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(payload)) return { ok: false, reason: "unreadable" };
+  // Validated to the SAME bar as the forward direction, and by DOING the work
+  // rather than pattern-matching it: decode, inflate, fatal-UTF-8, parse,
+  // tower shape, then THROW THE DECODED BYTES AWAY and re-header the original,
+  // so Founder is untouched (see the module header). Two review findings
+  // forced each half. A base64 regex still accepted strings `atob` throws on
+  // (bad length or padding), so a corrupted record with an intact header
+  // OVERWROTE a readable localStorage tower with a value `readSlot` then
+  // called corrupt. And a payload that decodes to a non-tower ("42", a bare
+  // object) would sail through `readSlot` into `Simulation.deserialize`, which
+  // COERCES rather than throws, silently presenting a fresh tower as the
+  // player's autosave. Refused instead, the record hydrates verbatim as
+  // present-but-unreadable, keeping both the bytes and the slot row.
+  try {
+    const json = new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(fromBase64(payload)));
+    if (!looksLikeTower(JSON.parse(json))) return { ok: false, reason: "unreadable" };
+  } catch {
+    return { ok: false, reason: "unreadable" };
+  }
   return { ok: true, value: STORE_MAGIC + payload };
 }
 
