@@ -24,15 +24,24 @@ export function adoptConfirmedLegacyImport(
   // in-progress tower even if they never saved manually. A failure must not
   // block the adoption the player just asked for, but it must be SAID: the
   // report modal promised the autosave.
+  // A DEGRADED session changes this whole flow's wording, not just one branch:
+  // the flush would throw the pause message, the fresh-slot copy cannot be
+  // trusted, and "storage is full or blocked" would be a double misdiagnosis.
+  // Checked once here so every branch below tells the player the same truth.
+  const degraded = IS_WRAPPED_BUILD && storeReadDegraded();
+
   let flushFailed = false;
-  try {
-    flushCurrent();
-  } catch {
-    flushFailed = true;
+  if (!degraded) {
+    try {
+      flushCurrent();
+    } catch {
+      flushFailed = true;
+    }
   }
-  // A TDT import has no stored origin either (see importGame).
-  if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(undefined);
   deps.adoptSim(sim);
+  // A TDT import has no stored origin either, cleared AFTER adoption like
+  // every other path (see importGame).
+  if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(undefined);
   // Auto-save the IMPORTED tower to a fresh slot so a bad import can't clobber
   // anything and the player can always get back to it. "Fresh" is a RAW
   // presence check (hasSlot), never the parse-based listSlots().exists: a
@@ -47,9 +56,7 @@ export function adoptConfirmedLegacyImport(
   // right advice here too.
   let savedTo: number | null = null;
   let slotWriteFailed = false;
-  if (IS_WRAPPED_BUILD && storeReadDegraded()) {
-    slotWriteFailed = true;
-  } else {
+  if (!degraded) {
     try {
       for (let n = 1; n <= SLOT_COUNT; n++) {
         if (!SaveGame.hasSlot(n)) {
@@ -65,7 +72,17 @@ export function adoptConfirmedLegacyImport(
   // "info" keeps this bulletin log-only: renderLog also toasts "good" entries,
   // and the explicit success toast below already covers that.
   deps.getSim().emit(`Imported from SimTower (1994): welcome back to ${sim.tower.towerName}.`, "info");
-  // Honest feedback: distinguish "no free slot" from "the write failed".
+  // Honest feedback, in THREE cases, not two. A degraded session must say what
+  // is actually happening (saving is paused) rather than misdiagnose it as
+  // "storage is full or blocked", and the export advice is the one action that
+  // genuinely works there, since exports go to a file the player picks.
+  if (degraded) {
+    deps.ui.toast(
+      "Tower imported. Saving is paused this session, so export it to a file to keep it safe.",
+      "bad",
+    );
+    return;
+  }
   if (slotWriteFailed) {
     deps.ui.toast(
       "Tower imported, but the slot copy failed (storage is full or blocked). Export it to a file soon.",

@@ -335,10 +335,10 @@ export class SaveLoad {
   load(): void {
     const loaded = SaveGame.load();
     if (loaded) {
-      // The autosave slot's origin, so a later autosave writes back to the
-      // scope this tower actually came from rather than the current default.
-      if (IS_WRAPPED_BUILD) noteTowerOriginForSlot("auto");
       this.deps.adoptSim(loaded);
+      // AFTER adoption (importGame's rule): a failed adoption must leave the
+      // live tower's origin untouched.
+      if (IS_WRAPPED_BUILD) noteTowerOriginForSlot("auto");
       this.deps.ui.toast("Tower loaded.", "good");
     } else {
       this.deps.ui.toast("No saved tower found.", "bad");
@@ -392,11 +392,11 @@ export class SaveLoad {
   async importGame(data: string): Promise<void> {
     try {
       const sim = await SaveGame.import(data);
-      // An imported tower has no stored origin; clearing keeps it from
-      // inheriting the previous tower's scope. AFTER the import succeeds, so a
-      // failed import leaves the live tower's origin untouched.
-      if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(undefined);
       this.deps.adoptSim(sim);
+      // An imported tower has no stored origin; clearing keeps it from
+      // inheriting the previous tower's scope. AFTER adoption succeeds, so any
+      // failure on this path leaves the live tower's origin untouched.
+      if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(undefined);
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
       this.deps.ui.sayVisibly("Import failed: " + (err as Error).message);
@@ -446,11 +446,12 @@ export class SaveLoad {
    *  runs the canon calendar and auto structure, so `modernCalendar` and
    *  `startUnbridged` is only consulted for Modern. */
   newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", startUnbridged = false): void {
-    // CLEARED, not inherited. A new tower has no stored origin, and without
-    // this it would inherit the previous tower's scope and autosave into a
-    // namespace it never came from (#736 F5, the account-leak class).
-    if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(undefined);
     this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff, mode, modernCalendar, startUnbridged));
+    // CLEARED, not inherited, and after adoption like every other path. A new
+    // tower has no stored origin, and without this it would inherit the
+    // previous tower's scope and autosave into a namespace it never came from
+    // (#736 F5, the account-leak class).
+    if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(undefined);
     gameplaySession.noteNewGame(mode); // funnel entry: a fresh tower was founded
     // Both rule-sets found an empty lot now, so the toast is the actionable
     // first-lobby cue (the engine's welcome log entry is rebased past by the UI

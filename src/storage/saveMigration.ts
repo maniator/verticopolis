@@ -227,13 +227,22 @@ export type FromTowerFileResult =
   | { readonly ok: true; readonly value: string }
   | { readonly ok: false; readonly reason: "too-new" | "unreadable" };
 
-export function fromTowerFile(text: string): FromTowerFileResult {
+export function fromTowerFile(text: string, preserve = false): FromTowerFileResult {
   const trimmed = text.trim();
   // Matches the whole VCTOWER family, exactly as `SaveGame.import` does, so a
   // newer container is RECOGNIZED before it is refused.
   const magic = /^VCTOWER(\d+)/.exec(trimmed);
   if (!magic) return { ok: false, reason: "unreadable" };
   if (magic[0] !== TOWER_FILE_MAGIC) return { ok: false, reason: "too-new" };
+
+  // PRESERVE mode mirrors the forward migration's: the unreadable stash holds
+  // bytes, not a tower, so its payload comes back verbatim rather than
+  // whitespace-normalized. Verbatim in must mean verbatim out.
+  if (preserve) {
+    const body = trimmed.slice(magic[0].length);
+    if (body.trim() === "") return { ok: false, reason: "unreadable" };
+    return { ok: true, value: STORE_MAGIC + body };
+  }
 
   // Whitespace-stripped, because `readSlot` does NOT strip it: it hands the
   // payload straight to `fromBase64`. `SaveGame.import` strips because a file
@@ -242,6 +251,14 @@ export function fromTowerFile(text: string): FromTowerFileResult {
   // to be applied HERE rather than relied on downstream.
   const payload = trimmed.slice(magic[0].length).replace(/\s+/g, "");
   if (payload === "") return { ok: false, reason: "unreadable" };
+  // The payload must actually BE base64 before this claims ok. Without the
+  // check, a corrupted record with an intact eight-byte header converted into
+  // a VCZ1-prefixed value that readSlot then reports as a corrupt slot, and on
+  // an owned key that value OVERWRITES a readable localStorage tower: the
+  // store resurrecting a worse copy over a better one, which is the exact
+  // class everything here exists to prevent. Refused, it hydrates verbatim as
+  // present-but-unreadable instead, keeping both the bytes and the slot row.
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(payload)) return { ok: false, reason: "unreadable" };
   return { ok: true, value: STORE_MAGIC + payload };
 }
 

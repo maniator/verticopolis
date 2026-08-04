@@ -106,10 +106,11 @@ export function saveToSlot(app: GameApp, slot: number): void {
 export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
   const loaded = slot === "auto" ? SaveGame.load() : SaveGame.loadSlot(slot);
   if (loaded) {
-    // The slot's stored origin, so autosave writes this tower back where it
-    // came from rather than to the current default scope.
-    if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(slot);
     app.adoptSim(loaded);
+    // AFTER adoption, matching importGame's stated rule: a load that fails to
+    // adopt must leave the live tower's origin untouched, or the still-live
+    // previous tower autosaves toward a scope it never came from.
+    if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(slot);
     trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
     app.ui.toast("Tower loaded.", "good");
   } else {
@@ -179,11 +180,10 @@ export function loadFromSplash(app: GameApp, slot: number | "auto"): boolean {
     return false;
   }
   if (!loaded) return false;
-  // Same origin note as loadFromSlot: the two are the same operation from
-  // different screens, and the scope a tower came from does not depend on
-  // which screen loaded it.
-  if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(slot);
   app.adoptSim(loaded);
+  // Same origin note as loadFromSlot, and in the same AFTER-adoption position:
+  // the two are the same operation from different screens.
+  if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(slot);
   trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
   return true;
 }

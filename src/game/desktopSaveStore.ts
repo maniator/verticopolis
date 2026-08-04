@@ -71,11 +71,16 @@ let loadedFromShared = false;
  */
 let hydrated = false;
 
-/** Whether hydration RAN this boot, regardless of outcome. The pair
- *  distinguishes "store mode not enabled" (normal, browser-equivalent) from
- *  "we tried to read the store and could not" (degraded), which have the same
- *  `hydrated === false` and must not be treated alike. */
+/** Whether hydration RAN this boot, regardless of outcome. */
 let hydrationAttempted = false;
+
+/** Whether hydration failed because the BRIDGE failed (a read rejected, timed
+ *  out, or broke its contract), as opposed to a content disagreement. Only
+ *  this reads as degraded: a bridge failure is transient and a restart may
+ *  genuinely fix it, while a disagreement recurs every boot by construction,
+ *  so pausing saves over one would be a permanent lockout behind copy that
+ *  promises a remedy. */
+let hydrationReadFailed = false;
 
 /** Where each hydrated slot came from, keyed by slot id. What
  *  {@link noteTowerOriginForSlot} consults, captured during hydration because
@@ -178,7 +183,19 @@ async function runPrepare(): Promise<void> {
     // just wrote. Without this, everything it moved would be invisible for the
     // rest of the session and the next boot would find it "already present"
     // while the player saw an empty saves list.
-    if (migration.migratedAny) session = (await withTimeout(openSaveStore(store))) ?? session;
+    if (migration.migratedAny) {
+      const fresh = await withTimeout(openSaveStore(store));
+      if (fresh === null) {
+        // The re-read failed, so the snapshot in hand PREDATES the migration.
+        // Hydrating from it would find the just-migrated localStorage keys
+        // "not in the store" and misread a healthy boot as disagreement, so
+        // skip hydration entirely this boot; the next one hydrates from a
+        // fresh snapshot. An earlier revision fell back to the stale snapshot
+        // and hydrated anyway, under a comment claiming the opposite.
+        return;
+      }
+      session = fresh;
+    }
 
     // LAST, after the migration, so the snapshot being hydrated already
     // includes anything just moved. Hydrating first would materialize the
@@ -187,6 +204,11 @@ async function runPrepare(): Promise<void> {
     hydrationAttempted = true;
     const outcome = await hydrateFromStore(store, session);
     hydrated = outcome.ok;
+    // Only a BRIDGE failure reads as degraded. A disagreement recurs every
+    // boot by construction (the same comparison runs each launch), so pausing
+    // saves over it, behind copy promising a restart will fix it, was a
+    // permanent lockout. Disagreement leaves the session browser-equivalent.
+    hydrationReadFailed = !outcome.ok && outcome.reason === "read-failed";
     if (outcome.ok) {
       for (const [id, address] of outcome.origins) hydratedOrigins.set(id, address);
     }
@@ -221,7 +243,7 @@ async function runPrepare(): Promise<void> {
  * reload, and the crash screen says the tower was not saved.
  */
 export function storeReadDegraded(): boolean {
-  return hydrationAttempted && !hydrated;
+  return hydrationAttempted && hydrationReadFailed;
 }
 
 /**
@@ -239,7 +261,19 @@ export function noteTowerOriginForSlot(slot: number | "auto" | undefined): void 
     noteTowerOrigin(undefined);
     return;
   }
-  const id = slot === "auto" ? "auto" : `slot-${slot}`;
+  if (slot === "auto") {
+    // `loadResult` prefers the current autosave key and falls back to the
+    // legacy one, and the store mirrors that as two records (`auto`,
+    // `auto-legacy`). When the store holds no `auto` record the fallback is
+    // what loaded, so its origin applies. KNOWN NARROW GAP: when both records
+    // exist and the primary is present-but-corrupt, the legacy record served
+    // the tower but `auto`'s origin is reported; closing that needs
+    // `loadResult` to say which key it read, which is a public SaveGame API
+    // change deferred to the story that routes the write paths.
+    noteTowerOrigin(hydratedOrigins.get("auto") ?? hydratedOrigins.get("auto-legacy"));
+    return;
+  }
+  const id = `slot-${slot}`;
   // Membership-tested rather than cast: a slot number outside the closed list
   // maps to no id and therefore to no origin, never to a synthesized one.
   noteTowerOrigin(isSaveSlotId(id) ? hydratedOrigins.get(id) : undefined);
@@ -439,6 +473,7 @@ export function resetSaveStoreForTests(): void {
   loadedFromShared = false;
   hydrated = false;
   hydrationAttempted = false;
+  hydrationReadFailed = false;
   hydratedOrigins.clear();
   seqByScope.clear();
   authoritative = false;
