@@ -102,9 +102,23 @@ export interface TdtSpec {
    *  falls back to synthesizing a transport layout. */
   includeTransports?: boolean;
   elevators?: ElevatorSpec[];
+  /** Size each built shaft's payload the way Verticopolis 2.9.0 and earlier did,
+   *  one entry per SERVICED floor rather than per spanned floor. Only for
+   *  testing the reader's fallback for those files; never for anything else. */
+  legacyServicedPayload?: boolean;
   stairs?: StairSpec[];
   /** The parking block's connected-stall count (default 0). */
   parkingConnected?: number;
+  /** Zero bytes appended after the stairs table. Real saves carry a trailing
+   *  routing region there (ours a fixed 25,600-byte one), and a reader that
+   *  mis-sizes a payload lands IN that slack instead of running off the end, so
+   *  a fixture without it cannot reproduce the silent-shift failures, only the
+   *  loud truncation ones. */
+  trailingBytes?: number;
+  /** Like {@link trailingBytes} but `0xFF`-filled, which is what our exporter
+   *  actually writes for the trailing routing region (doc §11). Use this when a
+   *  test depends on that region's CONTENT or on where it begins. */
+  routingTailBytes?: number;
   /** Wrong magic / truncation knobs for the hostile-file tests. */
   magic?: number;
   truncateAt?: number;
@@ -204,7 +218,18 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     // quietly encode a different rule than the code under test. An inverted spec
     // span throws there rather than padding a negative (silently zero) length,
     // which would hand the suite a file with a header and no payload.
-    pad(builtShaftPayloadSize(e.bottomFloor, e.topFloor));
+    //
+    // `legacyServicedPayload` reproduces what Verticopolis 2.9.0 and earlier
+    // wrote instead: one per-floor entry per SERVICED floor. It exists so the
+    // reader's fallback for those files can be tested against a real one, and it
+    // is the ONLY thing in this fixture that deliberately encodes a superseded
+    // layout; leave it off for anything else.
+    // Size by the spec's layout, but validate the SPAN either way: the legacy
+    // sizing is driven by the stop count, so on its own it would happily accept
+    // an inverted or fractional span and emit a fixture whose header and payload
+    // disagree, which is exactly the loud early failure this call exists to give.
+    const spannedSize = builtShaftPayloadSize(e.bottomFloor, e.topFloor);
+    pad(spec.legacyServicedPayload ? builtShaftPayloadSize(1, Math.max(1, serviced.size)) : spannedSize);
   }
 
   // ---- Finance + parking + stairs -------------------------------------------
@@ -225,6 +250,9 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     u16(0); // people up (live state)
     u16(0); // people down
   }
+
+  if (spec.trailingBytes) pad(spec.trailingBytes);
+  for (let i = 0; i < (spec.routingTailBytes ?? 0); i++) u8(0xff);
 
   return finish(chunks, spec);
 }

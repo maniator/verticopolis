@@ -35,6 +35,20 @@ import { SaveTooLargeError, inflateCapped } from "./saveCompression";
 export function decodeVctower(text: string, label = "vctower"): unknown {
   const trimmed = text.trim();
   if (!/^VCTOWER\d/.test(trimmed)) throw new Error(`${label}: not a .vctower file (no VCTOWER magic)`);
+  // DECODE FIRST, then reason about the version. A separator looks like it
+  // settles the version, and settling it first was tried here, but it rejects
+  // real files: `VCTOWER17\n<rest>` is equally a v17 file AND a v1 file whose
+  // payload begins with `7` and was re-wrapped after that digit, which is
+  // ordinary whitespace tolerance. Both readings are genuinely available for the
+  // same bytes, and our own writer does produce digit-leading payloads (a tower
+  // with a long run of repeated characters compresses to one), so refusing on
+  // the version claim throws away a tower that opens perfectly.
+  //
+  // Trying v1 first resolves it the only way that cannot lose data: if those
+  // bytes ARE a v1 payload, the file is one, whatever the digits looked like. A
+  // genuine future version is still named below, because its payload will not
+  // decode as v1 JSON, and a file that both claims v17 and decodes as a valid v1
+  // tower is one we should open rather than argue with.
   if (/^VCTOWER1/.test(trimmed)) {
     try {
       const b64 = trimmed.slice("VCTOWER1".length).replace(/\s+/g, "");
@@ -53,7 +67,7 @@ export function decodeVctower(text: string, label = "vctower"): unknown {
       // damaged v1 file.
       const claimed = /^VCTOWER(\d+)(?=\s|$)/.exec(trimmed)?.[1];
       if (claimed !== undefined && claimed !== "1") {
-        throw new Error(`${label}: unsupported .vctower version (VCTOWER${claimed}; this tool decodes VCTOWER1)`);
+        throw new Error(`${label}: unsupported .vctower version (VCTOWER${claimed}; this decoder reads VCTOWER1)`);
       }
       // Buffer.from(..., "base64") drops anything outside the alphabet instead
       // of failing, so a truncated or mangled container surfaces as a raw fflate
@@ -68,15 +82,18 @@ export function decodeVctower(text: string, label = "vctower"): unknown {
       );
     }
   }
-  // Not v1. Name the version only when it can be read exactly: with a separator
-  // the digits are unambiguous, and so is a single digit (nothing else could
-  // belong to the version). Two or more digits with no separator could split
-  // either way ("VCTOWER27z" is version 27, or version 2 with payload "7z"), and
-  // this decoder cannot try the payload to find out, so it says what it knows
-  // instead of asserting a version that may not exist.
+  // Reached by a file whose magic is not "VCTOWER1" at all, so its version is
+  // whatever its digits say. (A v1-looking file that failed to decode is
+  // answered inside the branch above, where the failure is the evidence.)
+  //
+  // Name the version only when it can be read exactly: a separator, or a single
+  // digit, leaves nothing else it could be. Two or more digits running into the
+  // payload could split either way ("VCTOWER27z" is version 27, or version 2
+  // with payload "7z"), and this decoder cannot try a non-v1 payload to find
+  // out, so it says what it knows instead of asserting a version that may not
+  // exist.
   const digits = /^VCTOWER(\d+)/.exec(trimmed)![1];
-  const separated = /^VCTOWER(\d+)(?=\s|$)/.test(trimmed);
-  if (separated || digits.length === 1) {
+  if (/^VCTOWER\d+(?=\s|$)/.test(trimmed) || digits.length === 1) {
     throw new Error(`${label}: unsupported .vctower version (VCTOWER${digits}; this decoder reads VCTOWER1)`);
   }
   throw new Error(

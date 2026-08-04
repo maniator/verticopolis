@@ -865,6 +865,257 @@ describe("transport decode: the save's own shafts and flights", () => {
     expect(t.skipFloors).not.toContain(45);
   });
 
+  it("a .TDT from OUR older builds still imports every shaft (legacy payload layout)", () => {
+    // Verticopolis 2.9.0 and earlier sized a built shaft's payload by SERVICED
+    // floors. Reading such a file with the current spanned-floor rule walks past
+    // the next slot into zeros, where `used === 0` reads as an empty slot, so
+    // every later shaft vanishes with nothing to warn about: export from an old
+    // build, import into a new one, and the tower quietly loses its transport.
+    //
+    // The routing tail is not decoration here. The reader takes the legacy
+    // layout only when the file CORROBORATES it, and every real export since
+    // v1.14.0 ends with that 0xFF region, so a fixture without one is not a
+    // legacy save the reader should be willing to recognize.
+    const legacy: TdtSpec = {
+      elevators: [
+        // Stops at 7 of the 12 floors it spans, so the two layouts differ by
+        // 5 * 324 bytes and the landing tells them apart.
+        { type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 21, serviced: [10, 11, 12, 18, 19, 20, 21] },
+        { type: 2, cars: 3, x: 140, bottomFloor: 10, topFloor: 18 },
+      ],
+      routingTailBytes: 20_000,
+      legacyServicedPayload: true,
+    };
+    const walked = parseTdtBinary(buildTdt(legacy));
+    expect(walked.elevators).toHaveLength(2);
+    expect(walked.elevators!.map((e) => e.x)).toEqual([100, 140]);
+    expect(walked.elevators![1].cars).toBe(3);
+    expect(walked.warnings).toEqual([]);
+    // And the skipping shaft's own stop settings survive the fallback.
+    const skipper = parse(legacy).save.transports.find((t) => t.x === 100)!;
+    expect(skipper.skipFloors).toEqual([4, 5, 6, 7, 8]);
+  });
+
+  it("a TRUNCATED current-layout file is refused, not read as legacy", () => {
+    // The trap in accepting the shorter walk whenever the documented one fails:
+    // a current file cut off inside a skip-floor shaft's payload still has
+    // enough zero fill for the serviced walk to finish, reading those zeros as
+    // the remaining empty headers. It would then "succeed" with a table that is
+    // not there, silently dropping parking and stairs, where the honest answer
+    // is to give up and let the importer synthesize transports with a warning.
+    const full = buildTdt({
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] }],
+      stairs: [{ type: 1, x: 120, floor: 10 }],
+      parkingConnected: 7,
+    });
+    // Cut inside the built shaft's payload: past where the serviced walk would
+    // have ended, short of where the spanned one needs to reach.
+    const walked = parseTdtBinary(full.slice(0, full.length - 2_000));
+    expect(walked.elevators).toBeNull(); // bail, so the importer synthesizes
+    expect(walked.warnings.join(" ")).toMatch(/elevator/i);
+  });
+
+  it("NO truncation of a current-layout file yields a silently wrong table", () => {
+    // Sweeping beats guessing an offset here. Truncating a current file at just
+    // the right byte can leave a residual stair-shaped record exactly where the
+    // shorter serviced walk's anchor looks, corroborating a layout the file does
+    // not have; the reader then returns the shaft with a bogus stair and a
+    // parking count of 0 and says nothing. The invariant is simple and covers
+    // every such offset at once: either the walk gives up, or the parking count
+    // it reports is the one that was saved. Never a confident zero.
+    const full = buildTdt({
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] }],
+      stairs: [{ type: 1, x: 120, floor: 10 }],
+      parkingConnected: 7,
+    });
+    // Byte-by-byte over the TAIL, where a truncation can land mid-structure and
+    // where every failure of this kind has been; a coarse stride over the rest,
+    // since sweeping all ~50 KB at stride 1 is tens of thousands of parses for
+    // no extra coverage. The stride is prime so it cannot fall into step with
+    // any record size.
+    const tailFrom = Math.max(3_000, full.length - 6_000);
+    const lengths: number[] = [];
+    for (let len = 3_000; len < tailFrom; len += 97) lengths.push(len);
+    for (let len = tailFrom; len < full.length; len++) lengths.push(len);
+    for (const len of lengths) {
+      let walked;
+      try {
+        walked = parseTdtBinary(full.slice(0, len));
+      } catch {
+        continue; // refused outright (the floor map itself is cut): honest
+      }
+      if (walked.elevators === null) continue; // gave up: honest
+      if (walked.warnings.length > 0) continue; // said what it lost: honest
+      // A confident answer has to be the RIGHT one.
+      expect(walked.parkingConnected, `truncated to ${len}`).toBe(7);
+    }
+  });
+
+  it("a STAIRLESS legacy tower keeps its parking count too", () => {
+    // Both stairs signals go quiet when the tower has no stairways: the exact
+    // anchor has 64 empty records to look at and the flight counts are both 0,
+    // so the tie fell back to spanned and the parking count came from zero fill.
+    // The remaining exact marker is where our writer's 0xFF routing region
+    // BEGINS, one stairs table past the stairs table.
+    for (const skipped of [1, 5, 29]) {
+      const serviced: number[] = [];
+      for (let f = 10; f <= 40; f++) if (f < 12 || f >= 12 + skipped) serviced.push(f);
+      const legacy: TdtSpec = {
+        elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced }],
+        stairs: [], // the case at issue: no stairways at all
+        parkingConnected: 7,
+        routingTailBytes: 20_000, // what our exporter really writes there
+        legacyServicedPayload: true,
+      };
+      const walked = parseTdtBinary(buildTdt(legacy));
+      expect(walked.elevators, `skipped ${skipped}`).toHaveLength(1);
+      expect(walked.parkingConnected, `skipped ${skipped}`).toBe(7);
+      expect(walked.warnings, `skipped ${skipped}`).toEqual([]);
+    }
+  });
+
+  it("a stairless PRE-routing-region export is refused loudly, not read wrongly", () => {
+    // An accepted limit, recorded so it is a decision and not a surprise. This
+    // shape (exported before v1.14.0, so the file stops after the stairs table,
+    // AND stairless, so those 64 records say nothing) offers no structure to
+    // corroborate the legacy layout. Anchoring on the file's END instead was
+    // tried and withdrawn: a CURRENT file truncated at exactly the shorter
+    // walk's end plus finance, parking and stairs is byte-identical to it when
+    // both regions are zeros. Nothing can separate them, so the old file is
+    // given up on rather than the damaged one being read wrongly.
+    const legacy: TdtSpec = {
+      elevators: [
+        { type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] },
+        { type: 2, cars: 3, x: 140, bottomFloor: 10, topFloor: 18 },
+      ],
+      stairs: [],
+      parkingConnected: 7,
+      legacyServicedPayload: true,
+    };
+    const walked = parseTdtBinary(buildTdt(legacy));
+    expect(walked.elevators).toBeNull(); // synthesized transports, with a warning
+    expect(walked.warnings.join(" ")).toMatch(/elevator/i);
+  });
+
+  it("a current file truncated at the LEGACY tail length is refused, not read as legacy", () => {
+    // The trap that withdrew the EOF anchor: cut a current-layout file at
+    // exactly where a legacy one carrying the same shafts would have ended, and
+    // its own end corroborates the shorter walk. It then returns a table that
+    // is not there, with the parking count read out of payload zero-fill.
+    const full = buildTdt({
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] }],
+      stairs: [{ type: 1, x: 120, floor: 10 }],
+      parkingConnected: 7,
+    });
+    const legacyLength = buildTdt({
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] }],
+      stairs: [{ type: 1, x: 120, floor: 10 }],
+      parkingConnected: 7,
+      legacyServicedPayload: true,
+    }).length;
+    const walked = parseTdtBinary(full.slice(0, legacyLength));
+    expect(walked.elevators).toBeNull();
+    expect(walked.warnings.join(" ")).toMatch(/elevator/i);
+  });
+
+  it("a STAIRLESS current-layout tower is still read as current", () => {
+    const spec: TdtSpec = {
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 20, 40] }],
+      stairs: [],
+      parkingConnected: 7,
+      routingTailBytes: 20_000,
+    };
+    const walked = parseTdtBinary(buildTdt(spec));
+    expect(walked.elevators).toHaveLength(1);
+    expect(walked.parkingConnected).toBe(7);
+    expect(walked.warnings).toEqual([]);
+  });
+
+  it("a legacy file whose skip-floor shaft is the ONLY one keeps its stairs and parking", () => {
+    // The case a per-slot choice cannot settle: with no built shaft after it,
+    // both candidate landings fall in zero fill and look identical, so the
+    // layout has to be decided from the tail instead. Picking wrong here shifts
+    // everything AFTER the table, which costs the parking count and, once the
+    // shift passes the stairs scan window, the stairways too.
+    const legacy: TdtSpec = {
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] }],
+      stairs: [
+        { type: 1, x: 120, floor: 10 },
+        { type: 0, x: 140, floor: 11 },
+      ],
+      parkingConnected: 7,
+      trailingBytes: 20_000, // the slack a real save carries, so a wrong size shifts rather than truncates
+      legacyServicedPayload: true,
+    };
+    const walked = parseTdtBinary(buildTdt(legacy));
+    expect(walked.elevators).toHaveLength(1);
+    expect(walked.elevators![0].x).toBe(100);
+    expect(walked.stairs).toHaveLength(2); // the tail survived the layout choice
+    expect(walked.parkingConnected).toBe(7);
+    expect(walked.warnings).toEqual([]);
+  });
+
+  it("a legacy last shaft skipping ONE floor still keeps its parking count", () => {
+    // The narrow case a flight COUNT cannot decide: one skipped floor moves the
+    // table end by a single 324-byte entry, so both candidate ends sit well
+    // inside the 4 KB stairs scan window and find the SAME table. The loser then
+    // reads the parking count out of zero fill. The tie-break anchors on WHERE
+    // the stairs table starts, which in a file we wrote is exactly finance plus
+    // parking past the true end, so one candidate matches and the other cannot.
+    for (const skipped of [1, 2, 3]) {
+      const serviced: number[] = [];
+      for (let f = 10; f <= 25; f++) if (f < 12 || f >= 12 + skipped) serviced.push(f);
+      const legacy: TdtSpec = {
+        elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 25, serviced }],
+        stairs: [{ type: 1, x: 120, floor: 10 }],
+        parkingConnected: 9,
+        trailingBytes: 20_000,
+        legacyServicedPayload: true,
+      };
+      const walked = parseTdtBinary(buildTdt(legacy));
+      expect(walked.elevators, `skipped ${skipped}`).toHaveLength(1);
+      expect(walked.parkingConnected, `skipped ${skipped}`).toBe(9);
+      expect(walked.stairs, `skipped ${skipped}`).toHaveLength(1);
+      expect(walked.warnings, `skipped ${skipped}`).toEqual([]);
+    }
+  });
+
+  it("a CURRENT-layout file whose skip-floor shaft is the only one is still read as current", () => {
+    // The same shape written the documented way must not be mistaken for legacy:
+    // the tie-break keeps `spanned` unless the other layout is strictly better.
+    const spec: TdtSpec = {
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] }],
+      stairs: [
+        { type: 1, x: 120, floor: 10 },
+        { type: 0, x: 140, floor: 11 },
+      ],
+      parkingConnected: 7,
+      trailingBytes: 20_000,
+    };
+    const walked = parseTdtBinary(buildTdt(spec));
+    expect(walked.elevators).toHaveLength(1);
+    expect(walked.stairs).toHaveLength(2);
+    expect(walked.parkingConnected).toBe(7);
+    expect(walked.warnings).toEqual([]);
+  });
+
+  it("a CURRENT-layout file is unaffected by the legacy fallback", () => {
+    // The fallback must never fire on a file written the documented way. The two
+    // sizes only differ when a shaft skips floors, and even then the spanned
+    // landing is the one that looks like a slot.
+    const walked = parseTdtBinary(
+      buildTdt({
+        elevators: [
+          { type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 21, serviced: [10, 11, 12, 18, 19, 20, 21] },
+          { type: 2, cars: 3, x: 140, bottomFloor: 10, topFloor: 18 },
+        ],
+      }),
+    );
+    expect(walked.elevators).toHaveLength(2);
+    expect(walked.elevators!.map((e) => e.x)).toEqual([100, 140]);
+    expect(walked.warnings).toEqual([]);
+  });
+
   it("an INVERTED shaft span is refused, and the importer falls back rather than mis-skipping", () => {
     // The payload size is derived from the span, so an inverted pair cannot be
     // skipped by a guessed distance without landing mid-record and garbling

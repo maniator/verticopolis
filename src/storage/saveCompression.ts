@@ -55,13 +55,22 @@ export function fromBase64(b64: string): Uint8Array {
 // enormously and hang the tab at boot, so, like the .vctower import path, we
 // bound it. fflate's streaming Inflate lets us abort as soon as the output
 // passes the cap (inflateSync would allocate the whole buffer first).
-const MAX_SAVE_INFLATED_BYTES = 32 * 1024 * 1024;
+export const MAX_SAVE_INFLATED_BYTES = 32 * 1024 * 1024;
 
 /** Thrown by {@link inflateCapped} when the output passes
  *  MAX_SAVE_INFLATED_BYTES. Exported so a caller can tell "this expands to more
  *  than we will hold" apart from "these bytes are damaged", which are different
  *  things to tell a player. */
 export class SaveTooLargeError extends Error {}
+
+/** Compressed bytes fed to the inflater per push. The cap can only be enforced
+ *  BETWEEN pushes, so this is what actually bounds a decompression bomb: the
+ *  overshoot past {@link MAX_SAVE_INFLATED_BYTES} is at most what one push can
+ *  produce, and deflate's ceiling is ~1032x. At 8 KiB that is ~8.5 MB on top of
+ *  the 32 MB cap; a 64 KiB slice would allow ~66 MB, more than the cap itself,
+ *  which is not much of a bound. Smaller costs only push calls: even a 2 MB
+ *  save is a few hundred, and fflate carries its state across them. */
+export const INFLATE_CHUNK_BYTES = 8 * 1024;
 
 export function inflateCapped(packed: Uint8Array): Uint8Array {
   const chunks: Uint8Array[] = [];
@@ -71,7 +80,16 @@ export function inflateCapped(packed: Uint8Array): Uint8Array {
     if (total > MAX_SAVE_INFLATED_BYTES) throw new SaveTooLargeError();
     chunks.push(chunk);
   });
-  inflater.push(packed, true); // ondata fires synchronously; a throw aborts here
+  // Feed the input in slices rather than one push. `ondata` fires synchronously
+  // per push, so the cap is checked as the output grows; a single push of the
+  // whole input lets fflate inflate EVERYTHING first and only then hand it over,
+  // which means a crafted bomb is fully allocated before the check that is
+  // supposed to refuse it ever runs.
+  for (let at = 0; at < packed.length; at += INFLATE_CHUNK_BYTES) {
+    const end = Math.min(at + INFLATE_CHUNK_BYTES, packed.length);
+    inflater.push(packed.subarray(at, end), end === packed.length);
+  }
+  if (packed.length === 0) inflater.push(packed, true);
   const out = new Uint8Array(total);
   let offset = 0;
   for (const chunk of chunks) {

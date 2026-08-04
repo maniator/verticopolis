@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.11.1
+
+- A SimTower (1994) file you exported from an earlier Verticopolis build now imports with all of its elevators again. If one of them skipped floors, the shafts after it were quietly dropped.
+
 ## 2.11.0
 
 - The toolbar, menus, and in-game bulletins now use crisp pixel icons instead of emoji, so they look the same on every system rather than turning into empty boxes where no emoji font is installed.
