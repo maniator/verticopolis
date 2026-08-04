@@ -176,11 +176,17 @@ describe("prepareSaveStore", () => {
     localStorage.setItem("verticopolis-save", storeValue(TOWER));
     localStorage.setItem("simtower-clone-slot-1", storeValue(TOWER));
 
-    const setItem = vi.spyOn(Storage.prototype, "setItem");
-    const removeItem = vi.spyOn(Storage.prototype, "removeItem");
-    const clear = vi.spyOn(Storage.prototype, "clear");
+    // INSTANCE spies: happy-dom's localStorage does not dispatch through
+    // Storage.prototype, so prototype spies intercept nothing and this whole
+    // test would pass vacuously.
+    const setItem = vi.spyOn(localStorage, "setItem");
+    const removeItem = vi.spyOn(localStorage, "removeItem");
+    const clear = vi.spyOn(localStorage, "clear");
     try {
       await prepareSaveStore();
+      // The coherence stamp for the two hydrated records is the ONLY write,
+      // and asserting it happened proves the spy genuinely intercepts.
+      expect(setItem).toHaveBeenCalled();
       expect(setItem.mock.calls.filter(([key]) => key !== "vc-store-acked")).toEqual([]);
       expect(removeItem).not.toHaveBeenCalled();
       expect(clear).not.toHaveBeenCalled();

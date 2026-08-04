@@ -61,23 +61,32 @@ describe("noteAcked / ackedHash / clearAcked", () => {
 
   it("a quota failure writing the stamp never throws into the caller", () => {
     // noteAcked runs inside write paths (the write-through, hydration); a
-    // throw here would turn a committed save into a reported failure.
-    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    // throw here would turn a committed save into a reported failure. The spy
+    // targets the INSTANCE: happy-dom's localStorage does not dispatch
+    // through Storage.prototype, so a prototype spy intercepts nothing.
+    noteAcked("slot-1", "existing"); // so clearAcked below genuinely writes
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
       throw Object.assign(new Error("quota"), { name: "QuotaExceededError" });
     });
     try {
       expect(() => noteAcked("auto", "value")).not.toThrow();
-      expect(() => clearAcked("auto")).not.toThrow();
+      expect(() => clearAcked("slot-1")).not.toThrow();
+      // The throws genuinely fired (guards against a vacuous pass).
+      expect(setItem).toHaveBeenCalledTimes(2);
     } finally {
       setItem.mockRestore();
     }
+    expect(ackedHash("auto")).toBeUndefined();
   });
 
   it("clearAcked on an absent id writes nothing at all", () => {
-    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    noteAcked("slot-1", "kept"); // so readMap has content and the guard is real
+    const setItem = vi.spyOn(localStorage, "setItem");
     try {
       clearAcked("never-acked");
       expect(setItem).not.toHaveBeenCalled();
+      clearAcked("slot-1");
+      expect(setItem).toHaveBeenCalledTimes(1);
     } finally {
       setItem.mockRestore();
     }

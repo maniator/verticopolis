@@ -76,7 +76,18 @@ let firstWriteVerified = false;
 const inflightWriteStarts: number[] = [];
 const STALLED_WRITE_MS = 5000;
 
+/** Evidence from OUTSIDE this module that a bridge write hung: boot's
+ *  reconcile-forward timing out is the same symptom seen earlier. Standing
+ *  evidence, cleared by the next async write that actually commits, so one
+ *  transient boot hiccup does not refuse manual saves all session. */
+let bridgeStallEvidence = false;
+
+export function noteBridgeStallEvidence(): void {
+  bridgeStallEvidence = true;
+}
+
 export function storeWriteStalled(): boolean {
+  if (bridgeStallEvidence) return true;
   const now = Date.now();
   return inflightWriteStarts.some((started) => now - started > STALLED_WRITE_MS);
 }
@@ -205,6 +216,8 @@ export async function writeTowerToStore(id: SaveSlotId, contents: string): Promi
   inflightWriteStarts.push(startedAt);
   try {
     await store.write(resolved.target.id, contents, resolved.target.scope, seq);
+    // A committed async write is proof the bridge is alive again.
+    bridgeStallEvidence = false;
   } catch (err) {
     // Via `saveStoreErrorCode`, which guards the property read, rather than
     // reading `err.code` here. This runs inside a catch, so a rejection
@@ -368,4 +381,5 @@ export function resetSaveWriteForTests(): void {
   committedByScope.clear();
   firstWriteVerified = false;
   inflightWriteStarts.length = 0;
+  bridgeStallEvidence = false;
 }

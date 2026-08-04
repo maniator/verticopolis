@@ -74,6 +74,11 @@ export type HydrationOutcome =
       /** Slot ids where BOTH sides had moved: the local value was stashed to a
        *  conflict key and the store won. The caller tells the player. */
       readonly conflicts: readonly string[];
+      /** Whether a reconcile-forward write TIMED OUT: evidence the main
+       *  process may be hung, which the caller hands to the write path's
+       *  circuit breaker rather than discarding. Not a failed hydration; the
+       *  reconcile retries next boot either way. */
+      readonly reconcileTimedOut: boolean;
     }
   | { readonly ok: false; readonly reason: "read-failed" | "disagreement" };
 
@@ -316,6 +321,7 @@ export async function hydrateFromStore(
   // stamp is written for that id, and the next boot simply retries. mintSeq is
   // the caller's counter so these writes obey the same per-address ordering as
   // every other.
+  let reconcileTimedOut = false;
   for (const plan of plans) {
     if (plan.kind !== "reconcile") continue;
     const forward = toTowerFile(plan.cache, plan.id === "unreadable");
@@ -329,7 +335,10 @@ export async function hydrateFromStore(
       // win, silently, over the newer local tower (the one branch of the
       // three-way with no stash). No stamp on timeout; if the write actually
       // landed late, the next boot finds store == cache and stamps then.
-      if (settled === null) continue;
+      if (settled === null) {
+        reconcileTimedOut = true;
+        continue;
+      }
       noteAcked(plan.id, plan.cache);
     } catch {
       /* retried next boot; the newer local value is untouched */
@@ -347,5 +356,5 @@ export async function hydrateFromStore(
   for (const { record } of owned) {
     if (isSaveSlotId(record.id)) origins.set(record.id, { id: record.id, scope: record.scope });
   }
-  return { ok: true, origins, conflicts };
+  return { ok: true, origins, conflicts, reconcileTimedOut };
 }

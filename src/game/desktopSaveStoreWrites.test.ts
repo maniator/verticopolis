@@ -193,7 +193,9 @@ describe("writeTowerToStore honors the tower's origin", () => {
     injectedStore = port;
     await prepareSaveStore();
 
-    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    // An INSTANCE spy; a Storage.prototype spy intercepts nothing under
+    // happy-dom and would pass this vacuously.
+    const setItem = vi.spyOn(localStorage, "setItem");
     try {
       expect(await writeTowerToStore("auto", "VCTOWER1\nAAA\n")).toEqual({ ok: true });
       expect(setItem).not.toHaveBeenCalled();

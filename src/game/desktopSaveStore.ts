@@ -1,7 +1,7 @@
 import { getPlatform } from "../platform";
 import { hydrateFromStore, withTimeout } from "./desktopSaveHydrate";
 import * as origin from "./desktopSaveOrigin";
-import { nextSeq, resetSaveWriteForTests } from "./desktopSaveWrite";
+import { nextSeq, noteBridgeStallEvidence, resetSaveWriteForTests } from "./desktopSaveWrite";
 import { migrateSavesToStore, type MigrationReport } from "../storage/saveMigration";
 import {
   idsInScope,
@@ -155,6 +155,11 @@ async function runPrepare(): Promise<void> {
     if (outcome.ok) {
       origin.recordHydratedOrigins(outcome.origins);
       hydrationConflicts = outcome.conflicts;
+      // A reconcile-forward write hanging at boot is the circuit breaker's
+      // symptom seen early: hand the evidence over instead of discarding it,
+      // so the first sendSync of the session cannot freeze the renderer on a
+      // main process that was already hanging writes.
+      if (outcome.reconcileTimedOut) noteBridgeStallEvidence();
     }
   } catch {
     // A migration failure does NOT discard an already-resolved session. The

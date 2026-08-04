@@ -209,9 +209,62 @@ describe("the coherence three-way at hydration", () => {
       // Still V1: the next boot re-runs the same reconcile instead of
       // misreading V2 as what the store acknowledged.
       expect(ackedHash("auto")).toBe(coherenceHash(V1));
+      // And the evidence of a hung write reaches the circuit breaker, so the
+      // session's first sendSync cannot freeze the renderer on a main
+      // process that was already hanging writes at boot.
+      const { writeTowerToStoreSync } = await import("./desktopSaveStore");
+      store.port.writeSync = () => ({ ok: true });
+      expect(writeTowerToStoreSync("auto", "x")).toEqual({
+        ok: false,
+        refusal: "failed",
+        code: "stalled",
+        localFallbackSafe: false,
+      });
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("a quota failure mid-write rolls back the conflict STASH too, not just the slot keys", async () => {
+    // The stash is part of the same transaction: written before a later
+    // setItem hits quota, it would otherwise survive the rollback as debris
+    // that makes the next boot's quota failure strictly likelier.
+    const store = fakeStore(SHARED);
+    const V3 = storeValue({ ...TOWER, towerName: "Store A" });
+    const V4 = storeValue({ ...TOWER, towerName: "Store B" });
+    seed(store, "auto", V3);
+    seed(store, "slot-1", V4);
+    localStorage.setItem("verticopolis-save", V1); // conflicts with V3, no stamp
+    localStorage.setItem("simtower-clone-slot-1", V2); // conflicts with V4, no stamp
+    injectedStore = store.port;
+
+    // Let the FIRST conflict's stash and value land, then hit quota ONCE (the
+    // second conflict's stash). The rollback's own restores go through, which
+    // is the realistic shape: the failing write was the biggest one. The spy
+    // targets the INSTANCE: happy-dom's localStorage does not dispatch
+    // through Storage.prototype, so a prototype spy intercepts nothing.
+    let writes = 0;
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
+      writes += 1;
+      if (writes === 3) throw Object.assign(new Error("quota"), { name: "QuotaExceededError" });
+      realSetItem(key, value);
+    });
+    try {
+      await prepareSaveStore();
+    } finally {
+      setItem.mockRestore();
+    }
+
+    // The interception genuinely fired (guards against a vacuous pass).
+    expect(writes).toBeGreaterThanOrEqual(3);
+    // The whole hydration failed as a disagreement, and localStorage is
+    // EXACTLY as it stood: values restored, no stash debris for either slot.
+    expect(storeIsAuthoritative()).toBe(false);
+    expect(localStorage.getItem("verticopolis-save")).toBe(V1);
+    expect(localStorage.getItem("simtower-clone-slot-1")).toBe(V2);
+    expect(localStorage.getItem("vc-conflict-auto")).toBeNull();
+    expect(localStorage.getItem("vc-conflict-slot-1")).toBeNull();
   });
 
   it("the unreadable stash CONVERGES: the boot after a reconcile writes nothing", async () => {
