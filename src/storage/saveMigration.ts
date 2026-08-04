@@ -82,6 +82,14 @@ export const MIGRATION_SOURCES: readonly {
   { key: "simtower-clone-unreadable", id: "unreadable", preserve: true },
 ];
 
+/** The localStorage key a store id hydrates back into, or undefined for an id
+ *  the game does not own. The inverse of {@link MIGRATION_SOURCES}, derived
+ *  from it rather than restated, so the two can never disagree about which key
+ *  a slot lives under. */
+export function localStorageKeyFor(id: string): string | undefined {
+  return MIGRATION_SOURCES.find((s) => s.id === id)?.key;
+}
+
 /** Outcome of converting one stored value into `.vctower` text. */
 export type ConversionResult =
   | { readonly ok: true; readonly text: string; readonly kind: "reheadered" | "compressed" }

@@ -1,6 +1,12 @@
 import { getPlatform } from "../platform";
-import { saveStoreErrorCode } from "../platform/saveStore";
-import { migrateSavesToStore, type MigrationReport } from "../storage/saveMigration";
+import { saveStoreErrorCode, type SaveRecord, type SaveStorePort } from "../platform/saveStore";
+import {
+  MIGRATION_SOURCES,
+  fromTowerFile,
+  localStorageKeyFor,
+  migrateSavesToStore,
+  type MigrationReport,
+} from "../storage/saveMigration";
 import {
   idsInScope,
   migrationTarget,
@@ -59,6 +65,16 @@ let loadedFrom: SaveAddress | undefined;
 /** Whether {@link loadedFrom}'s scope was the shared one, remembered at the
  *  moment it was resolved so the question survives the session going away. */
 let loadedFromShared = false;
+
+/**
+ * Whether the store's records were materialized into localStorage this boot.
+ *
+ * False means every reader is looking at whatever localStorage already held, so
+ * the store must not be treated as authoritative for reads OR writes: routing
+ * writes to a store the readers cannot see is the split-brain the tripwire
+ * exists to prevent.
+ */
+let hydrated = false;
 
 /**
  * Per-ADDRESS write counter. Session-scoped, and deliberately NOT persisted:
@@ -132,7 +148,7 @@ async function runPrepare(): Promise<void> {
   // readers are routed the player loads a tower missing every session since.
   // Gating the harmless half and leaving the dangerous half open is worse than
   // gating neither.
-  if (!storeIsAuthoritative()) return;
+  if (!migrationEnabled()) return;
 
   try {
     // The migration may only ever write into the shell-marked SHARED scope, and
@@ -156,6 +172,12 @@ async function runPrepare(): Promise<void> {
     // rest of the session and the next boot would find it "already present"
     // while the player saw an empty saves list.
     if (migration.migratedAny) session = (await withTimeout(openSaveStore(store))) ?? session;
+
+    // LAST, after the migration, so the snapshot being hydrated already
+    // includes anything just moved. Hydrating first would materialize the
+    // pre-migration view and the player would not see their own towers until
+    // the following launch.
+    hydrated = await hydrateFromStore(store, session);
   } catch {
     // A migration failure does NOT discard an already-resolved session. The
     // store is still readable and writable; only the one-time move failed, and
@@ -190,6 +212,92 @@ async function withTimeout<T>(work: Promise<T>): Promise<T | null> {
     // timer, so a fast success still left a 3s handle holding the race closure.
     if (timer !== undefined) clearTimeout(timer);
   }
+}
+
+/**
+ * Materialize the store's records into localStorage, once, before `SaveGame` is
+ * first touched.
+ *
+ * HYDRATION rather than substitution, and the difference is the whole design.
+ * Swapping `SaveGame`'s storage accessor for a map over the async store looked
+ * tidier and was rejected: `SaveGame`'s logic is written against storage that is
+ * synchronous, atomic, THROWING and quota-bounded, and it never restates those
+ * assumptions because it never had to. A map is none of the four, so the swap
+ * silently reroutes four write paths, turns `writeSlot`'s quota dance into an
+ * unconditional delete, and makes `saveBeforeUpdate` report success for a write
+ * still in flight. Writing real values into real localStorage keeps every one of
+ * those invariants literally true.
+ *
+ * ALL OR NOTHING. If any record cannot be READ, hydration is abandoned whole and
+ * the caller keeps localStorage as it stands. A partial hydration is the one
+ * outcome that must never happen: a missing key reads as ABSENT, `hasSave()`
+ * goes false, the splash offers New Tower instead of Continue, and the first
+ * autosave commits over a real save. A slow disk would delete a tower, with a UI
+ * that invited it.
+ *
+ * A record that cannot be CONVERTED is a different matter and is written
+ * VERBATIM. Its `.vctower` text does not start with `VCZ1:`, so `readSlot`
+ * treats it as a legacy raw-JSON value, fails to parse it, and returns null,
+ * while `getItem` still reports the key present. That is exactly the
+ * present-but-unreadable state the saves UI already has wording for, and it
+ * keeps the bytes for a build that can read them. Skipping such a record would
+ * reintroduce the false absence above.
+ *
+ * Returns whether it hydrated.
+ */
+async function hydrateFromStore(store: SaveStorePort, resolved: SaveStoreSession): Promise<boolean> {
+  const owned = resolved.records
+    .map((record) => ({ record, key: localStorageKeyFor(record.id) }))
+    .filter((entry): entry is { record: SaveRecord; key: string } => entry.key !== undefined);
+
+  // Read EVERYTHING first, and only then write. Interleaving would leave
+  // localStorage half-overwritten when a later read fails, which is the partial
+  // state this is built to avoid.
+  const pending: { key: string; value: string }[] = [];
+  for (const { record, key } of owned) {
+    let text: string | null;
+    try {
+      text = await withTimeout(store.read(record.id, record.scope));
+    } catch {
+      return false;
+    }
+    // A null here is ambiguous: absent, or a read that timed out. Neither is
+    // safe to treat as "no tower", so both abandon the whole hydration.
+    if (text === null) return false;
+    const converted = fromTowerFile(text);
+    pending.push({ key, value: converted.ok ? converted.value : text });
+  }
+
+  try {
+    for (const { key, value } of pending) localStorage.setItem(key, value);
+  } catch {
+    // Quota, or storage disabled. localStorage is left partly written, so say
+    // so rather than claim a hydrated view: the caller treats false as "no
+    // store this session" and every reader falls back to what is already there.
+    return false;
+  }
+
+  // A tower sitting in localStorage that the store knows nothing about means
+  // the two do NOT agree, and hydrating says they do.
+  //
+  // An EMPTY store is not a failure: a fresh install has nothing to hydrate and
+  // is trivially consistent, which is why this is checked instead of returning
+  // early on an empty record list. But an empty store beside a localStorage
+  // tower is the case that matters, and it is reachable today: the migration
+  // skips entirely when the shell marks no shared scope. Routing writes then
+  // would send the tower somewhere the readers cannot see, which is the exact
+  // split-brain the whole arrangement is built to avoid.
+  const hydratedKeys = new Set(owned.map((entry) => entry.key));
+  for (const { key } of MIGRATION_SOURCES) {
+    if (hydratedKeys.has(key)) continue;
+    try {
+      if (localStorage.getItem(key) !== null) return false;
+    } catch {
+      // Storage that refuses to be read cannot be shown to agree either.
+      return false;
+    }
+  }
+  return true;
 }
 
 /** The store as resolved at boot, or null when there is none this session.
@@ -231,6 +339,23 @@ export function saveMigrationReport(): MigrationReport | null {
  * than assuming a store means a store worth writing to.
  */
 export function storeIsAuthoritative(): boolean {
+  // BOTH conditions, and the second is the real one. `authoritative` is the
+  // temporary tripwire; `hydrated` is the actual precondition, because routing
+  // a write to a store the readers cannot see is the split-brain this whole
+  // arrangement exists to prevent. When the tripwire is deleted (story D3 AC8)
+  // this becomes `return hydrated`, which is a fact rather than a setting.
+  return authoritative && hydrated;
+}
+
+/**
+ * Whether the one-time localStorage migration may run.
+ *
+ * Separate from {@link storeIsAuthoritative} because they are gated on
+ * different things and collapsing them deadlocks: hydration runs after the
+ * migration, so a migration waiting on `hydrated` would never run, and
+ * `hydrated` would never become true.
+ */
+function migrationEnabled(): boolean {
   return authoritative;
 }
 
@@ -367,6 +492,7 @@ export function resetSaveStoreForTests(): void {
   inflight = null;
   loadedFrom = undefined;
   loadedFromShared = false;
+  hydrated = false;
   seqByScope.clear();
   authoritative = false;
 }
