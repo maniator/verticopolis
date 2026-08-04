@@ -115,6 +115,10 @@ export interface TdtSpec {
    *  a fixture without it cannot reproduce the silent-shift failures, only the
    *  loud truncation ones. */
   trailingBytes?: number;
+  /** Like {@link trailingBytes} but `0xFF`-filled, which is what our exporter
+   *  actually writes for the trailing routing region (doc §11). Use this when a
+   *  test depends on that region's CONTENT or on where it begins. */
+  routingTailBytes?: number;
   /** Wrong magic / truncation knobs for the hostile-file tests. */
   magic?: number;
   truncateAt?: number;
@@ -221,7 +225,7 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     // is the ONLY thing in this fixture that deliberately encodes a superseded
     // layout; leave it off for anything else.
     if (spec.legacyServicedPayload) {
-      pad(builtShaftPayloadSize(1, [...serviced].length));
+      pad(builtShaftPayloadSize(1, Math.max(1, serviced.size))); // 0 stops sizes as 1, matching the reader
     } else {
       pad(builtShaftPayloadSize(e.bottomFloor, e.topFloor));
     }
@@ -247,6 +251,7 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
   }
 
   if (spec.trailingBytes) pad(spec.trailingBytes);
+  for (let i = 0; i < (spec.routingTailBytes ?? 0); i++) u8(0xff);
 
   return finish(chunks, spec);
 }

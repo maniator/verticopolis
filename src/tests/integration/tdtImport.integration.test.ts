@@ -890,6 +890,42 @@ describe("transport decode: the save's own shafts and flights", () => {
     expect(skipper.skipFloors).toEqual([4, 5, 6, 7, 8]);
   });
 
+  it("a STAIRLESS legacy tower keeps its parking count too", () => {
+    // Both stairs signals go quiet when the tower has no stairways: the exact
+    // anchor has 64 empty records to look at and the flight counts are both 0,
+    // so the tie fell back to spanned and the parking count came from zero fill.
+    // The remaining exact marker is where our writer's 0xFF routing region
+    // BEGINS, one stairs table past the stairs table.
+    for (const skipped of [1, 5, 29]) {
+      const serviced: number[] = [];
+      for (let f = 10; f <= 40; f++) if (f < 12 || f >= 12 + skipped) serviced.push(f);
+      const legacy: TdtSpec = {
+        elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced }],
+        stairs: [], // the case at issue: no stairways at all
+        parkingConnected: 7,
+        routingTailBytes: 20_000, // what our exporter really writes there
+        legacyServicedPayload: true,
+      };
+      const walked = parseTdtBinary(buildTdt(legacy));
+      expect(walked.elevators, `skipped ${skipped}`).toHaveLength(1);
+      expect(walked.parkingConnected, `skipped ${skipped}`).toBe(7);
+      expect(walked.warnings, `skipped ${skipped}`).toEqual([]);
+    }
+  });
+
+  it("a STAIRLESS current-layout tower is still read as current", () => {
+    const spec: TdtSpec = {
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 20, 40] }],
+      stairs: [],
+      parkingConnected: 7,
+      routingTailBytes: 20_000,
+    };
+    const walked = parseTdtBinary(buildTdt(spec));
+    expect(walked.elevators).toHaveLength(1);
+    expect(walked.parkingConnected).toBe(7);
+    expect(walked.warnings).toEqual([]);
+  });
+
   it("a legacy file whose skip-floor shaft is the ONLY one keeps its stairs and parking", () => {
     // The case a per-slot choice cannot settle: with no built shaft after it,
     // both candidate landings fall in zero fill and look identical, so the

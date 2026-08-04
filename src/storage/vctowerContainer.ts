@@ -63,7 +63,7 @@ export function decodeVctower(text: string, label = "vctower"): unknown {
       // damaged v1 file.
       const claimed = /^VCTOWER(\d+)(?=\s|$)/.exec(trimmed)?.[1];
       if (claimed !== undefined && claimed !== "1") {
-        throw new Error(`${label}: unsupported .vctower version (VCTOWER${claimed}; this tool decodes VCTOWER1)`);
+        throw new Error(`${label}: unsupported .vctower version (VCTOWER${claimed}; this decoder reads VCTOWER1)`);
       }
       // Buffer.from(..., "base64") drops anything outside the alphabet instead
       // of failing, so a truncated or mangled container surfaces as a raw fflate

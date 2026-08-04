@@ -106,8 +106,10 @@ export function locateStairs(bytes: Uint8Array, from: number): TdtStair[] {
 }
 
 /**
- * Could a stairs table start EXACTLY at `at`? Every one of its 64 records must
- * read as a stair record, and at least one must be built.
+ * Could a stairs table start EXACTLY at `at`? Every record present must read as
+ * a stair record and at least one must be built. Records are checked up to the
+ * table's 64 or to EOF, whichever comes first, since the table can legitimately
+ * be the file's last structure (synthetic fixtures do exactly that).
  *
  * Note this is deliberately not "where did locateStairs find the table": that
  * scan takes the EARLIEST window holding the most built flights, and since an
@@ -115,6 +117,25 @@ export function locateStairs(bytes: Uint8Array, from: number): TdtStair[] {
  * 63 records before its true start. Fine for reading the flights, useless as an
  * alignment marker, which is what the payload-layout choice needs.
  */
+/**
+ * Does the trailing routing region BEGIN exactly at `at`? Our writer emits that
+ * region `0xFF`-filled (doc §11), so its first byte is `0xFF` and the byte
+ * before it, the last of the stairs table, is not.
+ *
+ * That boundary is what makes this usable as an alignment marker. The region is
+ * 25,600 bytes long, so "a run of 0xFF starts here" is true at 25,600 offsets;
+ * only "the run STARTS here" is true at one. It is the marker of last resort for
+ * the payload-layout choice, and the only one left for a tower with no
+ * stairways, where the stairs table is 64 empty records and says nothing.
+ */
+function routingTailStartsAt(bytes: Uint8Array, at: number): boolean {
+  const RUN = 64; // enough 0xFF to not be a coincidence, short enough to survive truncation
+  if (at <= 0 || at + RUN > bytes.length) return false;
+  if (bytes[at - 1] === 0xff) return false; // already inside the region, not at its start
+  for (let i = 0; i < RUN; i++) if (bytes[at + i] !== 0xff) return false;
+  return true;
+}
+
 export function stairsTableStartsAt(bytes: Uint8Array, at: number): boolean {
   const REC = TDT_STAIR_RECORD_SIZE;
   if (at < 0 || at + REC > bytes.length) return false;
@@ -251,7 +272,14 @@ function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
   // the scan window (a shaft skipping 1-3 floors moves the end by only 324-972
   // bytes, so both scans find the same table), and the loser then reads the
   // parking count out of zero fill.
-  const anchored = (end: number) => stairsTableStartsAt(bytes, end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE);
+  // Two exact markers, both keyed off our own writer's fixed block sizes: the
+  // stairs table starts finance + parking past the end, and the 0xFF routing
+  // region starts one stairs table further on. The second carries the case the
+  // first cannot: a tower with NO stairways has 64 empty records that say
+  // nothing, which is common enough that locateStairs documents it.
+  const anchored = (end: number) =>
+    stairsTableStartsAt(bytes, end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE) ||
+    routingTailStartsAt(bytes, end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE);
   const spannedAnchored = anchored(spanned.end);
   const servicedAnchored = anchored(serviced.end);
   if (spannedAnchored !== servicedAnchored) return servicedAnchored ? "serviced" : "spanned";
