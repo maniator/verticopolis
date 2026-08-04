@@ -442,6 +442,12 @@ one of ours from before the trailer, or a save the game wrote. Both fall back to
 the structural reasoning in `chooseLayout`. A reader must never REQUIRE the
 trailer, and the game's own re-save of one of our files will not carry it.
 
+Only a generation the reader KNOWS is a shortcut. A generation from a later
+build, or a garbled trailer, falls back to the same structural reasoning an
+unstamped file gets. The trailer exists because a later writer may lay the bytes
+out differently, so reading an unknown generation as "current" would assert the
+one thing it cannot know. A stamp can only ever help, never mislead.
+
 ## 13. Caveats for the importer
 
 - The original game barely validates its own saves; treat every count and

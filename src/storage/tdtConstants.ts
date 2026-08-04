@@ -202,7 +202,7 @@ export const TDT_ROUTING_TAIL_SIZE = 0x6400;
  * reads: the game reads a fixed extent and ignores trailing slack (our exports
  * already run ~150 KB past its own re-saves and load fine). That placement is
  * harness-verified against the real game, not assumed; see
- * docs/canon/tdt-format.md §12.
+ * docs/canon/tdt-format.md §12a.
  *
  * A file WITHOUT the trailer is one of ours from before it existed, or a save
  * the 1994 game wrote; the reader keeps its existing inference for those. This

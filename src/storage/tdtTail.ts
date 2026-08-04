@@ -20,6 +20,7 @@ import {
   TDT_RETAIL_SLOTS,
   TDT_STAIR_RECORD_SIZE,
   TDT_STAIR_SCAN_WINDOW,
+  TDT_STAMP_GENERATION,
   TDT_STAIR_SLOTS,
 } from "./tdtConstants";
 import type { TdtElevator, TdtStair, TdtTail } from "./tdtTypes";
@@ -245,12 +246,20 @@ function readElevatorTable(r: ByteReader, layout: PayloadLayout): TableWalk {
  * written the documented way is never re-read as a legacy one.
  */
 function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
-  // A stamped file states its writer, so there is nothing to deduce. Every
-  // generation so far writes the documented spanned-floor payload; a future one
-  // that changes the layout adds its case here, and the reader will KNOW rather
-  // than guess, which is the entire point of the trailer.
-  const generation = stampedGeneration(bytes);
-  if (generation !== null) return "spanned";
+  // A file stamped with a generation we KNOW states its writer, so there is
+  // nothing to deduce. Only known ones count. A generation this reader has
+  // never heard of comes from a build newer than itself, and the trailer exists
+  // precisely BECAUSE a later writer may lay bytes out differently, so treating
+  // an unknown one as "current" would assert the one thing it cannot know. A
+  // garbled trailer lands in the same bucket. Both fall through to the
+  // structural reasoning below, exactly as an unstamped file does, so a stamp
+  // can only ever help. A future generation adds its case here.
+  switch (stampedGeneration(bytes)) {
+    case TDT_STAMP_GENERATION:
+      return "spanned";
+    default:
+      break; // unstamped, or a generation this reader does not know
+  }
   const walk = (layout: PayloadLayout): TableWalk => {
     const r = new ByteReader(bytes);
     r.skip(tableStart);
