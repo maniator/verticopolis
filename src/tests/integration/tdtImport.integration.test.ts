@@ -914,6 +914,31 @@ describe("transport decode: the save's own shafts and flights", () => {
     expect(walked.warnings).toEqual([]);
   });
 
+  it("a legacy last shaft skipping ONE floor still keeps its parking count", () => {
+    // The narrow case a flight COUNT cannot decide: one skipped floor moves the
+    // table end by a single 324-byte entry, so both candidate ends sit well
+    // inside the 4 KB stairs scan window and find the SAME table. The loser then
+    // reads the parking count out of zero fill. The tie-break anchors on WHERE
+    // the stairs table starts, which in a file we wrote is exactly finance plus
+    // parking past the true end, so one candidate matches and the other cannot.
+    for (const skipped of [1, 2, 3]) {
+      const serviced: number[] = [];
+      for (let f = 10; f <= 25; f++) if (f < 12 || f >= 12 + skipped) serviced.push(f);
+      const legacy: TdtSpec = {
+        elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 25, serviced }],
+        stairs: [{ type: 1, x: 120, floor: 10 }],
+        parkingConnected: 9,
+        trailingBytes: 20_000,
+        legacyServicedPayload: true,
+      };
+      const walked = parseTdtBinary(buildTdt(legacy));
+      expect(walked.elevators, `skipped ${skipped}`).toHaveLength(1);
+      expect(walked.parkingConnected, `skipped ${skipped}`).toBe(9);
+      expect(walked.stairs, `skipped ${skipped}`).toHaveLength(1);
+      expect(walked.warnings, `skipped ${skipped}`).toEqual([]);
+    }
+  });
+
   it("a CURRENT-layout file whose skip-floor shaft is the only one is still read as current", () => {
     // The same shape written the documented way must not be mistaken for legacy:
     // the tie-break keeps `spanned` unless the other layout is strictly better.

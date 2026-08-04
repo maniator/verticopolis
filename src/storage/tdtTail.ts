@@ -44,27 +44,32 @@ import type { TdtElevator, TdtStair, TdtTail } from "./tdtTypes";
  * anchor on, which is indistinguishable from an all-empty table and is the
  * common case, not an error).
  */
+/** Read one stairs record: 0 = empty slot, 1 = built flight, -1 = not a stair
+ *  record at all. Shared by the scan and by {@link stairsTableStartsAt}. */
+function classifyStairRecord(bytes: Uint8Array, o: number): number {
+  const REC = TDT_STAIR_RECORD_SIZE;
+  const rd16 = (at: number): number => bytes[at] | (bytes[at + 1] << 8);
+  if (o + REC > bytes.length) return -1;
+  const built = bytes[o];
+  if (built === 0) return 0;
+  if (built !== 1) return -1;
+  const type = bytes[o + 1];
+  const x = rd16(o + 2);
+  const floor = rd16(o + 4);
+  if (type > 5) return -1;
+  // x >= 1: tile 0 is the lot's extreme left edge, never a real flight column, and
+  // rejecting it stops a lone "01 00 .." byte from posing as a stair at 0,0 (which
+  // would out-count a small real table). floor 0 (= B10) IS a valid TDT floor.
+  if (x < 1 || x > TDT_MAX_TILE) return -1;
+  if (floor >= TDT_FLOOR_COUNT) return -1; // floor is a TDT index 0..119; 0 = B10 is valid
+  if (rd16(o + 6) > TDT_MAX_STAIR_CROWD || rd16(o + 8) > TDT_MAX_STAIR_CROWD) return -1;
+  return 1;
+}
+
 export function locateStairs(bytes: Uint8Array, from: number): TdtStair[] {
   const REC = TDT_STAIR_RECORD_SIZE;
   const rd16 = (o: number): number => bytes[o] | (bytes[o + 1] << 8);
-  // 0 = empty, 1 = built, -1 = not a stair record.
-  const classify = (o: number): number => {
-    if (o + REC > bytes.length) return -1;
-    const built = bytes[o];
-    if (built === 0) return 0;
-    if (built !== 1) return -1;
-    const type = bytes[o + 1];
-    const x = rd16(o + 2);
-    const floor = rd16(o + 4);
-    if (type > 5) return -1;
-    // x >= 1: tile 0 is the lot's extreme left edge, never a real flight column, and
-    // rejecting it stops a lone "01 00 .." byte from posing as a stair at 0,0 (which
-    // would out-count a small real table). floor 0 (= B10) IS a valid TDT floor.
-    if (x < 1 || x > TDT_MAX_TILE) return -1;
-    if (floor >= TDT_FLOOR_COUNT) return -1; // floor is a TDT index 0..119; 0 = B10 is valid
-    if (rd16(o + 6) > TDT_MAX_STAIR_CROWD || rd16(o + 8) > TDT_MAX_STAIR_CROWD) return -1;
-    return 1;
-  };
+  const classify = (o: number): number => classifyStairRecord(bytes, o);
   // Bound the scan: the table sits just past the finance + parking/lobby blocks,
   // well within a few KB of the elevator table even in tall towers. A window may
   // run up against EOF (when the stairs table is the file's last structure, as in
@@ -98,6 +103,30 @@ export function locateStairs(bytes: Uint8Array, from: number): TdtStair[] {
     if (bytes[o] === 1) stairs.push({ type: bytes[o + 1], x: rd16(o + 2), floor: rd16(o + 4) });
   }
   return stairs;
+}
+
+/**
+ * Could a stairs table start EXACTLY at `at`? Every one of its 64 records must
+ * read as a stair record, and at least one must be built.
+ *
+ * Note this is deliberately not "where did locateStairs find the table": that
+ * scan takes the EARLIEST window holding the most built flights, and since an
+ * all-zero record is a valid empty slot, a sparse table's window can begin up to
+ * 63 records before its true start. Fine for reading the flights, useless as an
+ * alignment marker, which is what the payload-layout choice needs.
+ */
+export function stairsTableStartsAt(bytes: Uint8Array, at: number): boolean {
+  const REC = TDT_STAIR_RECORD_SIZE;
+  if (at < 0 || at + REC > bytes.length) return false;
+  let built = 0;
+  for (let s = 0; s < TDT_STAIR_SLOTS; s++) {
+    const o = at + s * REC;
+    if (o + REC > bytes.length) break; // table runs to EOF; later slots absent
+    const c = classifyStairRecord(bytes, o);
+    if (c < 0) return false;
+    built += c;
+  }
+  return built > 0;
 }
 
 /**
@@ -209,11 +238,26 @@ function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
   const serviced = walk("serviced");
   if (serviced.elevators === null) return "spanned";
   if (spanned.elevators === null) return "serviced";
-  // More shafts decoded is the strongest signal (a wrong size swallows the ones
-  // that follow it); then a tail that actually parses.
+  // More shafts decoded is the strongest signal, since a wrong size swallows the
+  // ones that follow it.
   if (serviced.elevators.length !== spanned.elevators.length) {
     return serviced.elevators.length > spanned.elevators.length ? "serviced" : "spanned";
   }
+  // Otherwise anchor on WHERE the stairs table starts, not merely on finding
+  // one. A legacy file is by definition one WE wrote, and our writer puts the
+  // finance and parking blocks between the elevator table and the stairs at
+  // known sizes, so the correct end is exactly that far ahead of the stairs. A
+  // flight COUNT cannot separate the candidates when they differ by less than
+  // the scan window (a shaft skipping 1-3 floors moves the end by only 324-972
+  // bytes, so both scans find the same table), and the loser then reads the
+  // parking count out of zero fill.
+  const anchored = (end: number) => stairsTableStartsAt(bytes, end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE);
+  const spannedAnchored = anchored(spanned.end);
+  const servicedAnchored = anchored(serviced.end);
+  if (spannedAnchored !== servicedAnchored) return servicedAnchored ? "serviced" : "spanned";
+  // Neither anchors (a game-written save, whose block sizes between the table
+  // and the stairs are not fixed): fall back to which end finds a table at all,
+  // then to the documented layout.
   const flights = (end: number) => locateStairs(bytes, end).length;
   return flights(serviced.end) > flights(spanned.end) ? "serviced" : "spanned";
 }
