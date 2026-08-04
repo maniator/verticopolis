@@ -80,6 +80,21 @@ describe("iconElement", () => {
     // none here, but the default must stay intact for the rest of the set).
     expect(svg.getAttribute("fill")).toBe("currentColor");
   });
+
+  it("draws the mute speaker on the same volume-2 speaker as sound, so the toggle does not shift it", () => {
+    // Regression guard: the audio toggle used to flip between two different
+    // speakers (sound on the volume-2 speaker whose cone reaches x3, mute on the
+    // narrower volume-1 speaker whose cone reaches only x5), so the speaker
+    // jumped under the glyph. Mute now reuses the exact volume-2 speaker cone
+    // that sound draws, and this pins it: it fails on the old volume-1 path.
+    const mutePaths = [...iconElement("mute").querySelectorAll("path")].map((p) => p.getAttribute("d")!);
+    const soundD = iconElement("sound").querySelector("path")!.getAttribute("d")!;
+    expect(mutePaths).toHaveLength(2); // the speaker, then the X that replaces the waves
+    const volume2Cone = "M7 10H5v4h2v2H3V8h4v2Z"; // the left cone at x3, shared with sound
+    expect(soundD, "sound should draw the volume-2 speaker").toContain(volume2Cone);
+    expect(mutePaths[0], "mute speaker must match the sound speaker").toContain(volume2Cone);
+    expect(mutePaths[0], "mute must not fall back to the old volume-1 cone at x5").not.toContain("H5V8");
+  });
 });
 
 describe("iconTemplate", () => {

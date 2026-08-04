@@ -54,7 +54,10 @@ export const ACCENT_FILLS = ["#ff6b6b", "#ffb454"] as const;
  *  else comes from {@link VENDORED_ICON_PATHS} (generated from the package).
  *  Keyed by `IconName` so a typo'd name is a compile error, not a runtime miss. */
 const CUSTOM: Partial<Record<IconName, IconPath[]>> = {
-  mute: [{ d: "M15 22h-2v-2h-2v-2h2V6h-2V4h2V2h2v20Zm-4-4H9v-2h2v2ZM9 8v2H7v4h2v2H5V8h4Zm2-2H9V6h2v2Z" }, { d: "M15 8h2v2h-2zM19 8h2v2h-2zM17 10h2v2h-2zM15 12h2v2h-2zM19 12h2v2h-2z" }],
+  // The muted speaker shares the exact `sound` speaker (pixelarticons volume-2,
+  // waves removed) so the toggle only swaps the two waves for an X, and the
+  // speaker never shifts under the glyph as it flips.
+  mute: [{ d: "M13 22h-2v-2H9v-2h2V6H9V4h2V2h2v20ZM9 18H7v-2h2v2ZM7 10H5v4h2v2H3V8h4v2ZM9 8H7V6h2v2Z" }, { d: "M15 8h2v2h-2zM19 8h2v2h-2zM17 10h2v2h-2zM15 12h2v2h-2zM19 12h2v2h-2z" }],
   bomb: [{ d: "M8 12h8v2H8zM6 14h12v6H6zM8 20h8v2H8zM15 10h2v2h-2zM17 8h2v2h-2zM19 6h2v2h-2zM19 2h2v2h-2zM17 4h2v2h-2zM21 4h2v2h-2z" }],
   // A two-tone wrecking ball for demolish: an amber chain slung from the top
   // corner down to a red iron ball. The red matches the tool palette's bulldoze
