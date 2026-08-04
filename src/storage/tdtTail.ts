@@ -23,6 +23,7 @@ import {
   TDT_STAIR_SLOTS,
 } from "./tdtConstants";
 import type { TdtElevator, TdtStair, TdtTail } from "./tdtTypes";
+import { stampedGeneration } from "./tdtStamp";
 
 /**
  * Locate and decode the 64 × 10-byte stairs/escalator table (doc §8) by
@@ -244,6 +245,12 @@ function readElevatorTable(r: ByteReader, layout: PayloadLayout): TableWalk {
  * written the documented way is never re-read as a legacy one.
  */
 function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
+  // A stamped file states its writer, so there is nothing to deduce. Every
+  // generation so far writes the documented spanned-floor payload; a future one
+  // that changes the layout adds its case here, and the reader will KNOW rather
+  // than guess, which is the entire point of the trailer.
+  const generation = stampedGeneration(bytes);
+  if (generation !== null) return "spanned";
   const walk = (layout: PayloadLayout): TableWalk => {
     const r = new ByteReader(bytes);
     r.skip(tableStart);

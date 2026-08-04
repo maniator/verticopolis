@@ -186,6 +186,36 @@ export const TDT_STAIR_RECORD_SIZE = 10;
  * ignores trailing slack); under-emitting is the crash, so this is generous.
  */
 export const TDT_ROUTING_TAIL_SIZE = 0x6400;
+
+/**
+ * Trailer stamped on the very end of a `.TDT` WE write, so a later reader knows
+ * which of our writers produced it instead of inferring that from the bytes.
+ *
+ * The importer spent four review rounds telling one of our own payload layouts
+ * from another by hunting for structures at known offsets, because a file
+ * carries no statement of who wrote it. Every one of those tests is an
+ * inference a truncated or unusual file can defeat. A stamp is a fact.
+ *
+ * Layout: the ASCII magic, then a u16 generation, little-endian like every other
+ * word in the format. It goes AFTER the routing region, at the very end, which
+ * is the one place bytes can be added without disturbing anything the 1994 game
+ * reads: the game reads a fixed extent and ignores trailing slack (our exports
+ * already run ~150 KB past its own re-saves and load fine). That placement is
+ * harness-verified against the real game, not assumed; see
+ * docs/canon/tdt-format.md §12.
+ *
+ * A file WITHOUT the trailer is one of ours from before it existed, or a save
+ * the 1994 game wrote; the reader keeps its existing inference for those. This
+ * cannot help a file already in the wild. It exists so the NEXT layout change
+ * is a fact rather than another round of guessing.
+ */
+export const TDT_STAMP_MAGIC = "VCTDT";
+/** Bumped when OUR writer changes the bytes in a way a reader must know about.
+ *  1 = the spanned-floor elevator payload (see {@link builtShaftPayloadSize}). */
+export const TDT_STAMP_GENERATION = 1;
+/** Magic bytes plus a u16 generation. */
+export const TDT_STAMP_SIZE = TDT_STAMP_MAGIC.length + 2;
+
 /** Sanity bounds used to recognize a real stair record while scanning for the
  *  table: a built flight sits within the tower's tile span, on a valid floor,
  *  with a plausible waiting-crowd count. Generous on purpose (validation, not
