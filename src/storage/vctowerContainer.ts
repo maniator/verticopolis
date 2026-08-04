@@ -35,16 +35,20 @@ import { SaveTooLargeError, inflateCapped } from "./saveCompression";
 export function decodeVctower(text: string, label = "vctower"): unknown {
   const trimmed = text.trim();
   if (!/^VCTOWER\d/.test(trimmed)) throw new Error(`${label}: not a .vctower file (no VCTOWER magic)`);
-  // A SEPARATED version is unambiguous, so settle it before the v1 attempt
-  // below. Otherwise `VCTOWER17\n<payload>` enters that attempt on the strength
-  // of its "VCTOWER1" prefix, and if the leftover digit plus the payload happen
-  // to form a valid stream (constructible: move a digit-leading v1 payload's
-  // first digit into the version token) the decoder would accept a file
-  // explicitly labelled a version it does not read.
-  const separated = /^VCTOWER(\d+)(?=\s|$)/.exec(trimmed)?.[1];
-  if (separated !== undefined && separated !== "1") {
-    throw new Error(`${label}: unsupported .vctower version (VCTOWER${separated}; this decoder reads VCTOWER1)`);
-  }
+  // DECODE FIRST, then reason about the version. A separator looks like it
+  // settles the version, and settling it first was tried here, but it rejects
+  // real files: `VCTOWER17\n<rest>` is equally a v17 file AND a v1 file whose
+  // payload begins with `7` and was re-wrapped after that digit, which is
+  // ordinary whitespace tolerance. Both readings are genuinely available for the
+  // same bytes, and our own writer does produce digit-leading payloads (a tower
+  // with a long run of repeated characters compresses to one), so refusing on
+  // the version claim throws away a tower that opens perfectly.
+  //
+  // Trying v1 first resolves it the only way that cannot lose data: if those
+  // bytes ARE a v1 payload, the file is one, whatever the digits looked like. A
+  // genuine future version is still named below, because its payload will not
+  // decode as v1 JSON, and a file that both claims v17 and decodes as a valid v1
+  // tower is one we should open rather than argue with.
   if (/^VCTOWER1/.test(trimmed)) {
     try {
       const b64 = trimmed.slice("VCTOWER1".length).replace(/\s+/g, "");
