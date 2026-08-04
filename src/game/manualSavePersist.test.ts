@@ -62,6 +62,20 @@ describe("persistManualSave", () => {
     expect(persistManualSave(Simulation.newGame(7), "auto")).toBe("fallback");
   });
 
+  it("an out-of-range slot number falls back rather than minting a store id", async () => {
+    // Unreachable from the saves dialog (a closed 1..SLOT_COUNT list), but a
+    // future caller must not be able to write `slot-7` into the store and
+    // poison the origin bookkeeping. SaveGame accepts any slot number, so the
+    // fallback keeps browser equivalence.
+    const store = fakeStore(SHARED);
+    const syncCalls = withWriteSync(store);
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    expect(persistManualSave(Simulation.newGame(7), 7)).toBe("fallback");
+    expect(syncCalls).toEqual([]);
+  });
+
   it("is a fallback when the shell predates writeSync", async () => {
     const store = fakeStore(SHARED);
     injectedStore = store.port;

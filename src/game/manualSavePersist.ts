@@ -1,7 +1,7 @@
 import { getPlatform } from "../platform";
 import type { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
-import { localStorageKeyFor, toTowerFile, type SaveSlotId } from "../storage/saveMigration";
+import { isSaveSlotId, localStorageKeyFor, toTowerFile } from "../storage/saveMigration";
 import { clearAcked } from "../storage/saveStoreAcked";
 import { forgetRecordAt, hydratedOriginFor } from "./desktopSaveOrigin";
 import { withTimeout } from "./desktopSaveHydrate";
@@ -39,11 +39,17 @@ import { storeIsAuthoritative, writeTowerToStoreSync } from "./desktopSaveStore"
  */
 export function persistManualSave(sim: Simulation, slot: number | "auto"): "stored" | "fallback" {
   if (!storeIsAuthoritative()) return "fallback";
+  // Membership-tested rather than cast: every production caller passes "auto"
+  // or a slot from the closed 1..SLOT_COUNT list, but a number outside it must
+  // not mint a store id the game does not own (it would poison the origin
+  // bookkeeping). Falling back keeps browser equivalence: SaveGame accepts
+  // any slot number, and always has.
+  const id = slot === "auto" ? "auto" : `slot-${slot}`;
+  if (!isSaveSlotId(id)) return "fallback";
   const converted = toTowerFile(SaveGame.packSync(sim));
   // packSync always emits a VCZ1 value, so this cannot fail today; if it ever
   // does, localStorage still holds the tower and the stamp heals the store.
   if (!converted.ok) return "fallback";
-  const id = (slot === "auto" ? "auto" : `slot-${slot}`) as SaveSlotId;
   const result = writeTowerToStoreSync(id, converted.text);
   if (result === "unsupported") return "fallback";
   if (result.ok) return "stored";

@@ -57,7 +57,8 @@ function writeMap(map: Record<string, string>): void {
     localStorage.setItem(ACKED_KEY, JSON.stringify(map));
   } catch {
     // Quota. Losing the stamp costs conservatism, never data: an absent stamp
-    // reads as "cache moved", which stashes rather than bulldozes.
+    // makes the three-way take its conservative branch (stash the local copy,
+    // then the store wins, and the player is told), never a silent overwrite.
   }
 }
 
