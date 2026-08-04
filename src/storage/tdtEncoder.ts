@@ -30,6 +30,7 @@ import { ELEVATOR_KINDS } from "./tdtTables";
 import { LegacyExportError } from "./tdtExportTables";
 import type { GatheredTower } from "./tdtExportGather";
 import { connectedStallCount } from "./tdtExportParking";
+import { writeFormatStamp } from "./tdtStamp";
 
 /**
  * The encode pass of the `.TDT` export: turn the {@link GatheredTower} into the
@@ -468,6 +469,9 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
   // crowd from the floor map rather than reading the fill as live population.
   // See TDT_ROUTING_TAIL_SIZE for the harness evidence and the size caveat.
   w.padFF(TDT_ROUTING_TAIL_SIZE);
+
+  // Our own trailer, last of all, past everything the game reads. See tdtStamp.
+  writeFormatStamp(w);
 
   return {
     bytes: w.toBytes(),

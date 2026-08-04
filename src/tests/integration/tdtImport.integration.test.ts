@@ -896,6 +896,39 @@ describe("transport decode: the save's own shafts and flights", () => {
     expect(skipper.skipFloors).toEqual([4, 5, 6, 7, 8]);
   });
 
+  it("a stamp from a generation we do not know does NOT override the structural read", () => {
+    // The stamp is a shortcut only for generations this build understands. A
+    // generation from a LATER build says "written by something newer", and the
+    // trailer exists precisely because a later writer may lay the bytes out
+    // differently, so honoring it as "current" would assert the one thing it
+    // cannot know. Same for a garbled trailer, or five ASCII bytes that happen
+    // to spell VCTDT at the end of a file nobody stamped. All of them fall back
+    // to the inference an unstamped file gets, so the shafts survive.
+    const legacy: TdtSpec = {
+      elevators: [
+        { type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 21, serviced: [10, 11, 12, 18, 19, 20, 21] },
+        { type: 2, cars: 3, x: 140, bottomFloor: 10, topFloor: 18 },
+      ],
+      routingTailBytes: 20_000,
+      legacyServicedPayload: true,
+    };
+    const base = buildTdt(legacy);
+    const stamped = (generation: number): Uint8Array => {
+      const out = new Uint8Array(base.length + 7);
+      out.set(base);
+      for (let i = 0; i < 5; i++) out[base.length + i] = "VCTDT".charCodeAt(i);
+      out[base.length + 5] = generation & 0xff;
+      out[base.length + 6] = generation >> 8;
+      return out;
+    };
+    for (const generation of [2, 7, 0, 0xffff]) {
+      const walked = parseTdtBinary(stamped(generation));
+      expect(walked.elevators, `generation ${generation}`).toHaveLength(2);
+      expect(walked.elevators!.map((e) => e.x), `generation ${generation}`).toEqual([100, 140]);
+      expect(walked.warnings, `generation ${generation}`).toEqual([]);
+    }
+  });
+
   it("a TRUNCATED current-layout file is refused, not read as legacy", () => {
     // The trap in accepting the shorter walk whenever the documented one fails:
     // a current file cut off inside a skip-floor shaft's payload still has

@@ -14,12 +14,16 @@ import {
   TDT_PERSON_RECORD_SIZE,
   TDT_TENANT_RECORD_SIZE,
   TDT_ROUTING_TAIL_SIZE,
+  TDT_STAMP_GENERATION,
+  TDT_STAMP_MAGIC,
+  TDT_STAMP_SIZE,
   parseTdtBinary,
 } from "../../storage/tdtFormat";
 import { LegacyExportError, buildTDT, classFromRent, legacyFilename } from "../../storage/tdtExport";
 import { FACILITIES, GRID } from "../../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { FAMILY_STORIES, PART_FAMILY, parseTDT } from "../../storage/tdtImport";
+import { stampedGeneration } from "../../storage/tdtStamp";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
 
 /** A bare room unit for hand-built saves. */
@@ -266,7 +270,7 @@ describe("buildTDT: export → import round trip", () => {
     };
     const built = buildTDT(save);
     expect(built.report.comesAlong[0]).toMatch(/^0 rooms/); // no census: see above
-    expect(built.bytes.length).toBe(71_284);
+    expect(built.bytes.length).toBe(71_291);
   });
 
   // `builtShaftPayloadSize`'s own arithmetic contract is pinned at the UNIT
@@ -1667,9 +1671,23 @@ describe("buildTDT: real-game loadability (people, routing tail, schedule, camer
 
   it("emits the 0xff routing tail so the file reaches the length the game reads", () => {
     const { bytes } = buildTDT(tower([unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 })]));
-    const tail = bytes.subarray(bytes.length - TDT_ROUTING_TAIL_SIZE);
+    // Our own trailer sits after the routing region (see TDT_STAMP_MAGIC), so
+    // the 0xFF run ends where the stamp begins, not at EOF.
+    const tail = bytes.subarray(bytes.length - TDT_STAMP_SIZE - TDT_ROUTING_TAIL_SIZE, bytes.length - TDT_STAMP_SIZE);
     expect(tail).toHaveLength(TDT_ROUTING_TAIL_SIZE);
     expect(tail.every((x) => x === 0xff)).toBe(true);
+  });
+
+  it("stamps the file with our format generation, after everything the game reads", () => {
+    const { bytes } = buildTDT(tower([unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 })]));
+    // Last of all, so it cannot disturb any structure the 1994 game walks: the
+    // game reads a fixed extent and ignores what follows.
+    const at = bytes.length - TDT_STAMP_SIZE;
+    expect(new TextDecoder().decode(bytes.subarray(at, at + TDT_STAMP_MAGIC.length))).toBe(TDT_STAMP_MAGIC);
+    expect(u16(bytes, at + TDT_STAMP_MAGIC.length)).toBe(TDT_STAMP_GENERATION);
+    expect(stampedGeneration(bytes)).toBe(TDT_STAMP_GENERATION);
+    // A file without one reads as unstamped rather than as generation 0.
+    expect(stampedGeneration(bytes.subarray(0, bytes.length - 1))).toBeNull();
   });
 
   it("writes the New Tower view-scroll default so a load opens on the ground lobby", () => {

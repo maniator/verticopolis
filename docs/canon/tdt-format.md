@@ -413,6 +413,41 @@ Lobbies observed at in-game floors 1, 15, 30, 45, 60, 75, 90: the canon
 header carries named-unit and named-people counts (§1). The name↔tenant
 linking mechanism is undocumented.
 
+## 12a. Our own trailer (NOT part of the 1994 format)
+
+Everything above describes the original's format. This section describes bytes
+**we** add, which the 1994 game never wrote and never reads.
+
+A `.TDT` Verticopolis writes ends with a small trailer: the ASCII magic
+`VCTDT`, then a **u16 generation** (little-endian, like every other word here).
+Generation `1` is the spanned-floor elevator payload (§8).
+
+**Why.** A `.TDT` carries no statement of who wrote it, so when our own writer's
+layout changed, the importer had to *infer* which of our writers produced a file
+by hunting for structures at known offsets. That inference took four review
+rounds to make safe and still cannot cover every shape (see the backlog's
+`tdt-legacy-pre-tail-import`). The trailer replaces the inference with a fact for
+every file written from here on. It does nothing for files already in the wild.
+
+**Where, and why there.** After the routing region, at the very end of the file.
+That is the one place bytes can be added without disturbing anything the game
+walks: it reads a fixed extent and ignores trailing slack, which is already
+proven at scale (our exports run ~150 KB past the game's own re-saves and load
+fine). **Harness-verified 2026-08-04:** a stamped 4★ export loads in retail
+SimTower and renders identically to the same tower unstamped, with its rating,
+funds, population and shafts intact.
+
+**Reading it.** A file whose last bytes are not the magic is unstamped: either
+one of ours from before the trailer, or a save the game wrote. Both fall back to
+the structural reasoning in `chooseLayout`. A reader must never REQUIRE the
+trailer, and the game's own re-save of one of our files will not carry it.
+
+Only a generation the reader KNOWS is a shortcut. A generation from a later
+build, or a garbled trailer, falls back to the same structural reasoning an
+unstamped file gets. The trailer exists because a later writer may lay the bytes
+out differently, so reading an unknown generation as "current" would assert the
+one thing it cannot know. A stamp can only ever help, never mislead.
+
 ## 13. Caveats for the importer
 
 - The original game barely validates its own saves; treat every count and
