@@ -30,9 +30,15 @@ vi.mock("../platform", async (importOriginal) => ({
   }),
 }));
 
-const { prepareSaveStore, resetSaveStoreForTests, setStoreAuthoritativeForTests, storeIsAuthoritative } = await import(
-  "./desktopSaveStore"
-);
+const {
+  prepareSaveStore,
+  resetSaveStoreForTests,
+  setStoreAuthoritativeForTests,
+  storeIsAuthoritative,
+  storeReadDegraded,
+  noteTowerOriginForSlot,
+  towerOrigin,
+} = await import("./desktopSaveStore");
 
 const SHARED = [{ token: LOCAL, label: "This computer", shared: true }];
 
@@ -185,5 +191,86 @@ describe("a record this build cannot read stays visible", () => {
     await prepareSaveStore();
 
     expect(localStorage.getItem("simtower-clone-slot-1")).toContain("PAYLOAD");
+  });
+});
+
+describe("a degraded session is distinguished from no store at all", () => {
+  it("reports degraded only when hydration RAN and failed", async () => {
+    // Three boots that all end with hydrated === false, and only one of them
+    // is degraded. Conflating them would either pause saving in a plain
+    // browser-equivalent session or let a degraded one write.
+    const store = fakeStore(SHARED);
+    seed(store, "auto", TOWER);
+    store.port.read = () => Promise.reject(new Error("io"));
+    injectedStore = store.port;
+    await prepareSaveStore();
+    expect(storeReadDegraded()).toBe(true);
+
+    resetSaveStoreForTests();
+    setStoreAuthoritativeForTests(true);
+    injectedStore = undefined; // no store at all
+    await prepareSaveStore();
+    expect(storeReadDegraded()).toBe(false);
+
+    resetSaveStoreForTests();
+    // Tripwire off: hydration never attempted, store mode simply not enabled.
+    const idle = fakeStore(SHARED);
+    seed(idle, "auto", TOWER);
+    injectedStore = idle.port;
+    await prepareSaveStore();
+    expect(storeReadDegraded()).toBe(false);
+  });
+
+  it("REGRESSION (#736 F1): a degraded session autosaves NOWHERE", async () => {
+    // A localStorage write here would be overwritten by the next boot's
+    // successful hydration, which materializes the store over these very keys.
+    // The degraded session's progress would be resurrected-over by an older
+    // copy, so the honest answer is to write nothing and say saving is paused.
+    const store = fakeStore(SHARED);
+    seed(store, "auto", TOWER);
+    store.port.read = () => Promise.reject(new Error("io"));
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    const { persistAutosave } = await import("./autosavePersist");
+    const { Simulation } = await import("../engine/Simulation");
+    await persistAutosave(Simulation.newGame(5));
+
+    expect(localStorage.length).toBe(0);
+    expect(store.calls.writes).toEqual([]);
+  });
+});
+
+describe("hydration records each slot's origin", () => {
+  it("captures the scope a hydrated tower came from, for the origin rule", async () => {
+    const store = fakeStore(SHARED);
+    seed(store, "slot-2", TOWER);
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    noteTowerOriginForSlot(2);
+    expect(towerOrigin()).toEqual({ id: "slot-2", scope: LOCAL });
+  });
+
+  it("clears the origin for a slot that has no hydrated record", async () => {
+    const store = fakeStore(SHARED);
+    seed(store, "slot-2", TOWER);
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    noteTowerOriginForSlot(2);
+    noteTowerOriginForSlot(1); // never hydrated
+    expect(towerOrigin()).toBeUndefined();
+  });
+
+  it("records no origins when hydration failed, so autosave cannot target an unseen scope", async () => {
+    const store = fakeStore(SHARED);
+    seed(store, "auto", TOWER);
+    store.port.read = () => Promise.reject(new Error("io"));
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    noteTowerOriginForSlot("auto");
+    expect(towerOrigin()).toBeUndefined();
   });
 });

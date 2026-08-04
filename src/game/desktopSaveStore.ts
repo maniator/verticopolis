@@ -1,12 +1,7 @@
 import { getPlatform } from "../platform";
-import { saveStoreErrorCode, type SaveRecord, type SaveStorePort } from "../platform/saveStore";
-import {
-  MIGRATION_SOURCES,
-  fromTowerFile,
-  localStorageKeyFor,
-  migrateSavesToStore,
-  type MigrationReport,
-} from "../storage/saveMigration";
+import { saveStoreErrorCode } from "../platform/saveStore";
+import { hydrateFromStore, withTimeout } from "./desktopSaveHydrate";
+import { isSaveSlotId, migrateSavesToStore, type MigrationReport } from "../storage/saveMigration";
 import {
   idsInScope,
   migrationTarget,
@@ -75,6 +70,18 @@ let loadedFromShared = false;
  * exists to prevent.
  */
 let hydrated = false;
+
+/** Whether hydration RAN this boot, regardless of outcome. The pair
+ *  distinguishes "store mode not enabled" (normal, browser-equivalent) from
+ *  "we tried to read the store and could not" (degraded), which have the same
+ *  `hydrated === false` and must not be treated alike. */
+let hydrationAttempted = false;
+
+/** Where each hydrated slot came from, keyed by slot id. What
+ *  {@link noteTowerOriginForSlot} consults, captured during hydration because
+ *  that is the one moment the store's answer and localStorage's contents are
+ *  known to agree. */
+const hydratedOrigins = new Map<string, SaveAddress>();
 
 /**
  * Per-ADDRESS write counter. Session-scoped, and deliberately NOT persisted:
@@ -177,7 +184,12 @@ async function runPrepare(): Promise<void> {
     // includes anything just moved. Hydrating first would materialize the
     // pre-migration view and the player would not see their own towers until
     // the following launch.
-    hydrated = await hydrateFromStore(store, session);
+    hydrationAttempted = true;
+    const outcome = await hydrateFromStore(store, session);
+    hydrated = outcome.ok;
+    if (outcome.ok) {
+      for (const [id, address] of outcome.origins) hydratedOrigins.set(id, address);
+    }
   } catch {
     // A migration failure does NOT discard an already-resolved session. The
     // store is still readable and writable; only the one-time move failed, and
@@ -189,115 +201,48 @@ async function runPrepare(): Promise<void> {
 }
 
 /**
- * Bound anything that crosses the bridge during boot.
+ * The store was reachable, and its towers could not be read.
  *
- * "Never rejects" was not the same as "never hangs", and the difference is the
- * whole boot: this is awaited before first paint, so a shell that accepts a
- * call and never answers leaves the player on a blank page with no splash, no
- * message, and no reload button. A rejection at least degrades to localStorage.
+ * Distinct from "no store this session", which is normal and browser
+ * equivalent. Degraded means the shell LISTED records and hydration failed, so
+ * the game knows towers exist that it cannot show, and it must not write:
+ *
+ *  - Not to the store, which is not hydrated, so a write would land where no
+ *    reader looks (the split-brain rule).
+ *  - Not to localStorage either, and this is the subtle half. A fallback write
+ *    would be OVERWRITTEN by the next boot's successful hydration, because
+ *    hydration materializes the store over these very keys. The degraded
+ *    session's progress would be resurrected-over by an older copy, which is
+ *    the exact failure #736 F1 describes.
+ *
+ * So a degraded session refuses saves honestly rather than accepting them into
+ * a location with no future. The refusal surfaces through the existing failure
+ * wording: Quick Save toasts, `saveBeforeUpdate` throws so the caller does not
+ * reload, and the crash screen says the tower was not saved.
  */
-const BOOT_STORE_TIMEOUT_MS = 3000;
-
-async function withTimeout<T>(work: Promise<T>): Promise<T | null> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      work,
-      new Promise<null>((resolve) => {
-        timer = setTimeout(() => resolve(null), BOOT_STORE_TIMEOUT_MS);
-      }),
-    ]);
-  } finally {
-    // Cleared on the winning path too. Losing the race does not cancel the
-    // timer, so a fast success still left a 3s handle holding the race closure.
-    if (timer !== undefined) clearTimeout(timer);
-  }
+export function storeReadDegraded(): boolean {
+  return hydrationAttempted && !hydrated;
 }
 
 /**
- * Materialize the store's records into localStorage, once, before `SaveGame` is
- * first touched.
+ * Record the live tower's origin from the slot it was LOADED from, or clear it
+ * for a tower that has no stored origin (New Game, an import).
  *
- * HYDRATION rather than substitution, and the difference is the whole design.
- * Swapping `SaveGame`'s storage accessor for a map over the async store looked
- * tidier and was rejected: `SaveGame`'s logic is written against storage that is
- * synchronous, atomic, THROWING and quota-bounded, and it never restates those
- * assumptions because it never had to. A map is none of the four, so the swap
- * silently reroutes four write paths, turns `writeSlot`'s quota dance into an
- * unconditional delete, and makes `saveBeforeUpdate` report success for a write
- * still in flight. Writing real values into real localStorage keeps every one of
- * those invariants literally true.
- *
- * ALL OR NOTHING. If any record cannot be READ, hydration is abandoned whole and
- * the caller keeps localStorage as it stands. A partial hydration is the one
- * outcome that must never happen: a missing key reads as ABSENT, `hasSave()`
- * goes false, the splash offers New Tower instead of Continue, and the first
- * autosave commits over a real save. A slow disk would delete a tower, with a UI
- * that invited it.
- *
- * A record that cannot be CONVERTED is a different matter and is written
- * VERBATIM. Its `.vctower` text does not start with `VCZ1:`, so `readSlot`
- * treats it as a legacy raw-JSON value, fails to parse it, and returns null,
- * while `getItem` still reports the key present. That is exactly the
- * present-but-unreadable state the saves UI already has wording for, and it
- * keeps the bytes for a build that can read them. Skipping such a record would
- * reintroduce the false absence above.
- *
- * Returns whether it hydrated.
+ * The address comes from {@link hydratedOrigins}, captured at hydration time,
+ * because that is the one moment the store's scope answer and localStorage's
+ * contents are known to describe the same bytes. When the store is not
+ * hydrated there is no origin to record and the answer is undefined, which
+ * `resolveWriteTarget` treats as "goes to the default scope".
  */
-async function hydrateFromStore(store: SaveStorePort, resolved: SaveStoreSession): Promise<boolean> {
-  const owned = resolved.records
-    .map((record) => ({ record, key: localStorageKeyFor(record.id) }))
-    .filter((entry): entry is { record: SaveRecord; key: string } => entry.key !== undefined);
-
-  // Read EVERYTHING first, and only then write. Interleaving would leave
-  // localStorage half-overwritten when a later read fails, which is the partial
-  // state this is built to avoid.
-  const pending: { key: string; value: string }[] = [];
-  for (const { record, key } of owned) {
-    let text: string | null;
-    try {
-      text = await withTimeout(store.read(record.id, record.scope));
-    } catch {
-      return false;
-    }
-    // A null here is ambiguous: absent, or a read that timed out. Neither is
-    // safe to treat as "no tower", so both abandon the whole hydration.
-    if (text === null) return false;
-    const converted = fromTowerFile(text);
-    pending.push({ key, value: converted.ok ? converted.value : text });
+export function noteTowerOriginForSlot(slot: number | "auto" | undefined): void {
+  if (slot === undefined) {
+    noteTowerOrigin(undefined);
+    return;
   }
-
-  try {
-    for (const { key, value } of pending) localStorage.setItem(key, value);
-  } catch {
-    // Quota, or storage disabled. localStorage is left partly written, so say
-    // so rather than claim a hydrated view: the caller treats false as "no
-    // store this session" and every reader falls back to what is already there.
-    return false;
-  }
-
-  // A tower sitting in localStorage that the store knows nothing about means
-  // the two do NOT agree, and hydrating says they do.
-  //
-  // An EMPTY store is not a failure: a fresh install has nothing to hydrate and
-  // is trivially consistent, which is why this is checked instead of returning
-  // early on an empty record list. But an empty store beside a localStorage
-  // tower is the case that matters, and it is reachable today: the migration
-  // skips entirely when the shell marks no shared scope. Routing writes then
-  // would send the tower somewhere the readers cannot see, which is the exact
-  // split-brain the whole arrangement is built to avoid.
-  const hydratedKeys = new Set(owned.map((entry) => entry.key));
-  for (const { key } of MIGRATION_SOURCES) {
-    if (hydratedKeys.has(key)) continue;
-    try {
-      if (localStorage.getItem(key) !== null) return false;
-    } catch {
-      // Storage that refuses to be read cannot be shown to agree either.
-      return false;
-    }
-  }
-  return true;
+  const id = slot === "auto" ? "auto" : `slot-${slot}`;
+  // Membership-tested rather than cast: a slot number outside the closed list
+  // maps to no id and therefore to no origin, never to a synthesized one.
+  noteTowerOrigin(isSaveSlotId(id) ? hydratedOrigins.get(id) : undefined);
 }
 
 /** The store as resolved at boot, or null when there is none this session.
@@ -493,6 +438,8 @@ export function resetSaveStoreForTests(): void {
   loadedFrom = undefined;
   loadedFromShared = false;
   hydrated = false;
+  hydrationAttempted = false;
+  hydratedOrigins.clear();
   seqByScope.clear();
   authoritative = false;
 }

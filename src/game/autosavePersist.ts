@@ -1,7 +1,7 @@
 import type { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
 import { IS_WRAPPED_BUILD } from "../platform";
-import { saveStoreSession, storeIsAuthoritative, writeTowerToStore } from "./desktopSaveStore";
+import { saveStoreSession, storeIsAuthoritative, storeReadDegraded, writeTowerToStore } from "./desktopSaveStore";
 
 /**
  * Where a periodic autosave actually lands.
@@ -33,6 +33,15 @@ import { saveStoreSession, storeIsAuthoritative, writeTowerToStore } from "./des
  * that somewhere is localStorage exactly as on the web.
  */
 export async function persistAutosave(sim: Simulation): Promise<void> {
+  // A degraded session (the shell listed towers hydration could not read)
+  // autosaves NOWHERE, deliberately. The store is not hydrated, so a store
+  // write would land where no reader looks. And a localStorage write would be
+  // OVERWRITTEN by the next boot's successful hydration, which materializes
+  // the store over these very keys: the degraded session's progress would be
+  // resurrected-over by an older copy, the exact failure #736 F1 names. A
+  // periodic autosave is best effort, and manual saves already refuse with
+  // honest wording, so the player is not being silently strung along.
+  if (IS_WRAPPED_BUILD && storeReadDegraded()) return;
   // `storeIsAuthoritative()` is false until the READ path lands, and the check
   // is here rather than assumed. Writing to the store while `SaveGame` still
   // reads localStorage would put a player's progress somewhere nothing reads,
