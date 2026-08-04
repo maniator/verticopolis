@@ -1,6 +1,14 @@
 import { getPlatform } from "../platform";
-import { saveStoreErrorCode } from "../platform/saveStore";
-import { migrateSavesToStore, type MigrationReport } from "../storage/saveMigration";
+import { saveStoreErrorCode, type SaveScopeToken } from "../platform/saveStore";
+import { hydrateFromStore, withTimeout } from "./desktopSaveHydrate";
+import {
+  fromTowerFile,
+  isSaveSlotId,
+  localStorageKeyFor,
+  migrateSavesToStore,
+  type MigrationReport,
+  type SaveSlotId,
+} from "../storage/saveMigration";
 import {
   idsInScope,
   migrationTarget,
@@ -10,8 +18,6 @@ import {
   type SaveStoreSession,
   type WriteRefusal,
 } from "../storage/saveStoreSession";
-import type { SaveSlotId } from "../storage/saveMigration";
-import type { SaveScopeToken } from "../platform/saveStore";
 
 /**
  * The one entry point the boot path uses to bring up a wrapper shell's save
@@ -61,6 +67,30 @@ let loadedFrom: SaveAddress | undefined;
 let loadedFromShared = false;
 
 /**
+ * Whether the store's records were materialized into localStorage this boot.
+ *
+ * False means every reader is looking at whatever localStorage already held, so
+ * the store must not be treated as authoritative for reads OR writes: routing
+ * writes to a store the readers cannot see is the split-brain the tripwire
+ * exists to prevent.
+ */
+let hydrated = false;
+
+/** Whether hydration RAN this boot, regardless of outcome. */
+let hydrationAttempted = false;
+
+/** Whether hydration failed because the BRIDGE failed, as opposed to a content
+ *  disagreement. Only this reads as degraded: a bridge failure is transient
+ *  and a restart may fix it, while a disagreement recurs every boot, so
+ *  pausing saves over one would be a permanent lockout. */
+let hydrationReadFailed = false;
+
+/** Where each hydrated slot came from, keyed by slot id; what
+ *  {@link noteTowerOriginForSlot} consults. Captured during hydration, the one
+ *  moment the store's answer and localStorage are known to agree. */
+const hydratedOrigins = new Map<string, SaveAddress>();
+
+/**
  * Per-ADDRESS write counter. Session-scoped, and deliberately NOT persisted:
  * the port contract states the shell's high-water mark must not survive a
  * restart either, because a persisted mark would silently drop every write of
@@ -69,17 +99,11 @@ let loadedFromShared = false;
 const seqByScope = new Map<SaveScopeToken, Map<string, number>>();
 
 function nextSeq(address: SaveAddress): number {
-  // Keyed by (id, scope), not by id. An id is unique only WITHIN a scope, which
-  // is this module's whole thesis, so two different towers sharing an id across
-  // scopes must not share one counter: whichever way the shell keys its
-  // high-water mark, one of them would lose writes.
-  //
-  // NESTED maps rather than a `${scope}|${id}` composite. The composite was
-  // safe, but only because slot ids are a closed list containing no `|`, so the
-  // last separator always split it unambiguously. That is a load-bearing
-  // accident resting on a fact two modules away, and scope tokens are opaque
-  // and shell-controlled, so they may legitimately contain anything. Nesting
-  // removes the question instead of answering it.
+  // Keyed by (id, scope), not by id: an id is unique only WITHIN a scope, so
+  // two towers sharing an id across scopes must not share one counter. NESTED
+  // maps rather than a `${scope}|${id}` composite, because scope tokens are
+  // opaque and shell-controlled and may legitimately contain the separator;
+  // nesting removes the question instead of answering it.
   let byId = seqByScope.get(address.scope);
   if (!byId) {
     byId = new Map<string, number>();
@@ -132,7 +156,7 @@ async function runPrepare(): Promise<void> {
   // readers are routed the player loads a tower missing every session since.
   // Gating the harmless half and leaving the dangerous half open is worse than
   // gating neither.
-  if (!storeIsAuthoritative()) return;
+  if (!migrationEnabled()) return;
 
   try {
     // The migration may only ever write into the shell-marked SHARED scope, and
@@ -155,7 +179,38 @@ async function runPrepare(): Promise<void> {
     // just wrote. Without this, everything it moved would be invisible for the
     // rest of the session and the next boot would find it "already present"
     // while the player saw an empty saves list.
-    if (migration.migratedAny) session = (await withTimeout(openSaveStore(store))) ?? session;
+    if (migration.migratedAny) {
+      const fresh = await withTimeout(openSaveStore(store));
+      if (fresh === null) {
+        // The snapshot in hand PREDATES the migration, so hydrating from it
+        // would misread a healthy boot as disagreement: skip this boot.
+        // Skipped AND marked DEGRADED (a review caught the omission): the
+        // migration just copied towers into the store, so a localStorage save
+        // now would put newer progress beside an older store copy for the next
+        // boot's hydration to overwrite (#736 F1, made reachable right here).
+        // The failed re-read is a bridge failure, so degraded is also honest.
+        hydrationAttempted = true;
+        hydrationReadFailed = true;
+        return;
+      }
+      session = fresh;
+    }
+
+    // LAST, after the migration, so the snapshot being hydrated already
+    // includes anything just moved. Hydrating first would materialize the
+    // pre-migration view and the player would not see their own towers until
+    // the following launch.
+    hydrationAttempted = true;
+    const outcome = await hydrateFromStore(store, session);
+    hydrated = outcome.ok;
+    // Only a BRIDGE failure reads as degraded. A disagreement recurs every
+    // boot by construction (the same comparison runs each launch), so pausing
+    // saves over it, behind copy promising a restart will fix it, was a
+    // permanent lockout. Disagreement leaves the session browser-equivalent.
+    hydrationReadFailed = !outcome.ok && outcome.reason === "read-failed";
+    if (outcome.ok) {
+      for (const [id, address] of outcome.origins) hydratedOrigins.set(id, address);
+    }
   } catch {
     // A migration failure does NOT discard an already-resolved session. The
     // store is still readable and writable; only the one-time move failed, and
@@ -167,29 +222,60 @@ async function runPrepare(): Promise<void> {
 }
 
 /**
- * Bound anything that crosses the bridge during boot.
+ * The store was reachable, and its towers could not be read.
  *
- * "Never rejects" was not the same as "never hangs", and the difference is the
- * whole boot: this is awaited before first paint, so a shell that accepts a
- * call and never answers leaves the player on a blank page with no splash, no
- * message, and no reload button. A rejection at least degrades to localStorage.
+ * Distinct from "no store this session", which is normal and browser
+ * equivalent. Degraded means the shell LISTED records and hydration failed, so
+ * the game knows towers exist that it cannot show, and it must not write:
+ *
+ *  - Not to the store, which is not hydrated, so a write would land where no
+ *    reader looks (the split-brain rule).
+ *  - Not to localStorage either, and this is the subtle half. A fallback write
+ *    would be OVERWRITTEN by the next boot's successful hydration, because
+ *    hydration materializes the store over these very keys. The degraded
+ *    session's progress would be resurrected-over by an older copy, which is
+ *    the exact failure #736 F1 describes.
+ *
+ * So a degraded session refuses saves honestly rather than accepting them into
+ * a location with no future. The refusal surfaces through the existing failure
+ * wording: Quick Save toasts, `saveBeforeUpdate` throws so the caller does not
+ * reload, and the crash screen says the tower was not saved.
  */
-const BOOT_STORE_TIMEOUT_MS = 3000;
+export function storeReadDegraded(): boolean {
+  return hydrationAttempted && hydrationReadFailed;
+}
 
-async function withTimeout<T>(work: Promise<T>): Promise<T | null> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      work,
-      new Promise<null>((resolve) => {
-        timer = setTimeout(() => resolve(null), BOOT_STORE_TIMEOUT_MS);
-      }),
-    ]);
-  } finally {
-    // Cleared on the winning path too. Losing the race does not cancel the
-    // timer, so a fast success still left a 3s handle holding the race closure.
-    if (timer !== undefined) clearTimeout(timer);
+/**
+ * Record the live tower's origin from the slot it was LOADED from, or clear it
+ * for a tower that has no stored origin (New Game, an import).
+ *
+ * The address comes from {@link hydratedOrigins}, captured at hydration time,
+ * because that is the one moment the store's scope answer and localStorage's
+ * contents are known to describe the same bytes. When the store is not
+ * hydrated there is no origin to record and the answer is undefined, which
+ * `resolveWriteTarget` treats as "goes to the default scope".
+ */
+export function noteTowerOriginForSlot(slot: number | "auto" | undefined): void {
+  if (slot === undefined) {
+    noteTowerOrigin(undefined);
+    return;
   }
+  if (slot === "auto") {
+    // `loadResult` prefers the current autosave key and falls back to the
+    // legacy one, and the store mirrors that as two records (`auto`,
+    // `auto-legacy`). When the store holds no `auto` record the fallback is
+    // what loaded, so its origin applies. KNOWN NARROW GAP: when both records
+    // exist and the primary is present-but-corrupt, the legacy record served
+    // the tower but `auto`'s origin is reported; closing that needs
+    // `loadResult` to say which key it read, which is a public SaveGame API
+    // change deferred to the story that routes the write paths.
+    noteTowerOrigin(hydratedOrigins.get("auto") ?? hydratedOrigins.get("auto-legacy"));
+    return;
+  }
+  const id = `slot-${slot}`;
+  // Membership-tested rather than cast: a slot number outside the closed list
+  // maps to no id and therefore to no origin, never to a synthesized one.
+  noteTowerOrigin(isSaveSlotId(id) ? hydratedOrigins.get(id) : undefined);
 }
 
 /** The store as resolved at boot, or null when there is none this session.
@@ -231,6 +317,23 @@ export function saveMigrationReport(): MigrationReport | null {
  * than assuming a store means a store worth writing to.
  */
 export function storeIsAuthoritative(): boolean {
+  // BOTH conditions, and the second is the real one. `authoritative` is the
+  // temporary tripwire; `hydrated` is the actual precondition, because routing
+  // a write to a store the readers cannot see is the split-brain this whole
+  // arrangement exists to prevent. When the tripwire is deleted (story D3 AC8)
+  // this becomes `return hydrated`, which is a fact rather than a setting.
+  return authoritative && hydrated;
+}
+
+/**
+ * Whether the one-time localStorage migration may run.
+ *
+ * Separate from {@link storeIsAuthoritative} because they are gated on
+ * different things and collapsing them deadlocks: hydration runs after the
+ * migration, so a migration waiting on `hydrated` would never run, and
+ * `hydrated` would never become true.
+ */
+function migrationEnabled(): boolean {
   return authoritative;
 }
 
@@ -356,6 +459,27 @@ export async function writeTowerToStore(id: SaveSlotId, contents: string): Promi
     // safety can be answered even if the session is gone by then.
     loadedFromShared = headedForShared;
   }
+  // WRITE-THROUGH to the boot-hydrated cache, and only now, after the store
+  // acknowledged the write. Without this, a mid-session "Load auto" served the
+  // BOOT-TIME copy while the newer tower sat in the store: the real-towers
+  // Electron harness caught exactly that. This does not make localStorage a
+  // save target again. The cache is only ever written FROM a value the store
+  // committed, so there is no independent copy, no reconciliation, and no
+  // which-is-newer question; a failed cache write costs staleness until the
+  // next boot, never data.
+  if (hydrated) {
+    const key = localStorageKeyFor(resolved.target.id);
+    if (key !== undefined) {
+      const back = fromTowerFile(contents);
+      if (back.ok) {
+        try {
+          localStorage.setItem(key, back.value);
+        } catch {
+          /* a stale cache is survivable; the store has the tower */
+        }
+      }
+    }
+  }
   return { ok: true };
 }
 
@@ -367,6 +491,10 @@ export function resetSaveStoreForTests(): void {
   inflight = null;
   loadedFrom = undefined;
   loadedFromShared = false;
+  hydrated = false;
+  hydrationAttempted = false;
+  hydrationReadFailed = false;
+  hydratedOrigins.clear();
   seqByScope.clear();
   authoritative = false;
 }

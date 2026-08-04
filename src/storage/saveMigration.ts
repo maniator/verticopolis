@@ -82,6 +82,14 @@ export const MIGRATION_SOURCES: readonly {
   { key: "simtower-clone-unreadable", id: "unreadable", preserve: true },
 ];
 
+/** The localStorage key a store id hydrates back into, or undefined for an id
+ *  the game does not own. The inverse of {@link MIGRATION_SOURCES}, derived
+ *  from it rather than restated, so the two can never disagree about which key
+ *  a slot lives under. */
+export function localStorageKeyFor(id: string): string | undefined {
+  return MIGRATION_SOURCES.find((s) => s.id === id)?.key;
+}
+
 /** Outcome of converting one stored value into `.vctower` text. */
 export type ConversionResult =
   | { readonly ok: true; readonly text: string; readonly kind: "reheadered" | "compressed" }
@@ -190,6 +198,78 @@ export function toTowerFile(raw: string, preserve = false): ConversionResult {
   }
   const packed = deflateSync(new TextEncoder().encode(trimmed), { level: 1 });
   return { ok: true, kind: "compressed", text: TOWER_FILE_MAGIC + "\n" + toBase64(packed) + "\n" };
+}
+
+/**
+ * The reverse of {@link toTowerFile}: `.vctower` text back to the `VCZ1:` form
+ * `readSlot` expects.
+ *
+ * THREE-WAY, and that is the whole point of putting it here rather than
+ * reaching for `SaveGame.import`. Import handles a newer container correctly
+ * ("made by a newer version, update the game to load it") and it also
+ * deserializes, which would burn Founder status on the way (see the module
+ * header). This has to preserve the same distinction WITHOUT decoding, so it
+ * reports the three outcomes the caller actually has to tell apart:
+ *
+ *  - `ok`: a `VCTOWER1` payload, re-headered. Same bytes, no decode.
+ *  - `too-new`: a `VCTOWER<n>` this build cannot read. NOT an error, and
+ *    emphatically not "absent". The record is real, may be recoverable by a
+ *    later build, and must be preserved rather than reported as an empty slot
+ *    that autosave may overwrite.
+ *  - `unreadable`: not a tower container at all.
+ *
+ * Collapsing `too-new` into either of the others is the failure this shape
+ * exists to prevent: as `unreadable` a newer save gets stashed and then
+ * overwritten by the 30 second autosave; as absent, the splash offers New Tower
+ * and the first save commits over it.
+ */
+export type FromTowerFileResult =
+  | { readonly ok: true; readonly value: string }
+  | { readonly ok: false; readonly reason: "too-new" | "unreadable" };
+
+export function fromTowerFile(text: string, preserve = false): FromTowerFileResult {
+  const trimmed = text.trim();
+  // Matches the whole VCTOWER family, exactly as `SaveGame.import` does, so a
+  // newer container is RECOGNIZED before it is refused.
+  const magic = /^VCTOWER(\d+)/.exec(trimmed);
+  if (!magic) return { ok: false, reason: "unreadable" };
+  if (magic[0] !== TOWER_FILE_MAGIC) return { ok: false, reason: "too-new" };
+
+  // PRESERVE mode mirrors the forward migration's: the unreadable stash holds
+  // bytes, not a tower, so its payload comes back verbatim rather than
+  // whitespace-normalized. Verbatim in must mean verbatim out.
+  if (preserve) {
+    const body = trimmed.slice(magic[0].length);
+    if (body.trim() === "") return { ok: false, reason: "unreadable" };
+    return { ok: true, value: STORE_MAGIC + body };
+  }
+
+  // Whitespace-stripped, because `readSlot` does NOT strip it: it hands the
+  // payload straight to `fromBase64`. `SaveGame.import` strips because a file
+  // can be re-wrapped in transit, and a store is entitled to normalize line
+  // endings on the way through (see `sameTowerFile`), so the same tolerance has
+  // to be applied HERE rather than relied on downstream.
+  const payload = trimmed.slice(magic[0].length).replace(/\s+/g, "");
+  if (payload === "") return { ok: false, reason: "unreadable" };
+  // Validated to the SAME bar as the forward direction, and by DOING the work
+  // rather than pattern-matching it: decode, inflate, fatal-UTF-8, parse,
+  // tower shape, then THROW THE DECODED BYTES AWAY and re-header the original,
+  // so Founder is untouched (see the module header). Two review findings
+  // forced each half. A base64 regex still accepted strings `atob` throws on
+  // (bad length or padding), so a corrupted record with an intact header
+  // OVERWROTE a readable localStorage tower with a value `readSlot` then
+  // called corrupt. And a payload that decodes to a non-tower ("42", a bare
+  // object) would sail through `readSlot` into `Simulation.deserialize`, which
+  // COERCES rather than throws, silently presenting a fresh tower as the
+  // player's autosave. Refused instead, the record hydrates verbatim as
+  // present-but-unreadable, keeping both the bytes and the slot row.
+  try {
+    const json = new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(fromBase64(payload)));
+    if (!looksLikeTower(JSON.parse(json))) return { ok: false, reason: "unreadable" };
+  } catch {
+    return { ok: false, reason: "unreadable" };
+  }
+  return { ok: true, value: STORE_MAGIC + payload };
 }
 
 /** What one source key did during a migration run. */

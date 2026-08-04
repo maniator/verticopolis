@@ -19,6 +19,7 @@ import { isStandalone } from "../pwaInstall";
 import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
 import { bindHostCommands, tickHostCommands } from "./hostCommands";
 import { IS_WRAPPED_BUILD } from "../platform";
+import { noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
 import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
 
@@ -381,6 +382,27 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
       app.hadReadableSave
         ? "⚠️ Your latest autosave couldn't be read, so an older saved tower was loaded instead."
         : "⚠️ Your saved tower couldn't be read. It may be corrupted or from a newer version. Starting a new tower.",
+      "bad",
+    );
+  }
+
+  // The BOOT tower's origin: the autosave slot's when a save loaded, cleared
+  // when the sim behind the splash is the throwaway boot sim, so a later
+  // autosave can never inherit a scope from a tower that was not adopted. Set
+  // here rather than in the constructor because this runs synchronously at the
+  // end of construction, before any save path can fire, and this module
+  // already owns the wrapped-build boot wiring.
+  if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(app.hadReadableSave ? "auto" : undefined);
+
+  // A degraded desktop session: the shell listed saved towers and they could
+  // not be read this boot. Said HERE, in the same bulletin channel as the
+  // corrupt-save warning, because the failure modes rhyme: the player must not
+  // conclude their towers are gone, and must know saving is paused (every save
+  // path refuses in a degraded session; see storeReadDegraded for why a
+  // localStorage write would have no future).
+  if (IS_WRAPPED_BUILD && storeReadDegraded()) {
+    app.sim.emit(
+      "⚠️ Saved towers on this computer couldn't be read this session, so saving is paused. Your towers are safe; restart to try again.",
       "bad",
     );
   }

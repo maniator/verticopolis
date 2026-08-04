@@ -1,11 +1,14 @@
 import { Simulation } from "../engine/Simulation";
 import type { GameMode, SerializedView } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
-import { SLOT_COUNT, SaveGame, isStorageWriteError, saveFailureMessage } from "../storage/SaveGame";
+import { SaveGame, isStorageWriteError, saveFailureMessage } from "../storage/SaveGame";
 import { LegacyExportError, buildTDT, type BuiltLegacyTower } from "../storage/tdtExport";
 import { LegacyImportError, parseTDT } from "../storage/tdtImport";
 import type { ImportReport } from "../storage/tdtImport";
 import { persistAutosave } from "./autosavePersist";
+import { IS_WRAPPED_BUILD } from "../platform";
+import { noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
+import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
 import { shouldArm } from "../ui/Onboarding";
 import { gameplaySession } from "../analytics";
 import { isCrashed, isSplashUp } from "./interactionState";
@@ -112,6 +115,16 @@ export class SaveLoad {
   save(silent = false): void {
     const sim = this.deps.getSim();
     try {
+      // A degraded desktop session refuses the write INSIDE the try, so both
+      // caller contracts hold unchanged: silent callers get the throw
+      // (saveBeforeUpdate must not reload, the crash screen says not saved),
+      // and Quick Save gets its honest toast. Degraded means the shell listed
+      // towers hydration could not read, so a localStorage write here would be
+      // overwritten by the next boot's successful hydration: accepting the
+      // save would hand it a location with no future.
+      if (IS_WRAPPED_BUILD && storeReadDegraded()) {
+        throw new Error("Saved towers could not be read this session, so saving is paused. Restart to try again.");
+      }
       // Stamp inside the try: a disposed or context-lost engine can throw
       // from viewState() too, and the manual path's no-escaped-throw contract
       // must cover it (saveToSlot makes the same call the same way). Silent
@@ -323,6 +336,9 @@ export class SaveLoad {
     const loaded = SaveGame.load();
     if (loaded) {
       this.deps.adoptSim(loaded);
+      // AFTER adoption (importGame's rule): a failed adoption must leave the
+      // live tower's origin untouched.
+      if (IS_WRAPPED_BUILD) noteTowerOriginForSlot("auto");
       this.deps.ui.toast("Tower loaded.", "good");
     } else {
       this.deps.ui.toast("No saved tower found.", "bad");
@@ -375,7 +391,12 @@ export class SaveLoad {
 
   async importGame(data: string): Promise<void> {
     try {
-      this.deps.adoptSim(await SaveGame.import(data));
+      const sim = await SaveGame.import(data);
+      this.deps.adoptSim(sim);
+      // An imported tower has no stored origin; clearing keeps it from
+      // inheriting the previous tower's scope. AFTER adoption succeeds, so any
+      // failure on this path leaves the live tower's origin untouched.
+      if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(undefined);
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
       this.deps.ui.sayVisibly("Import failed: " + (err as Error).message);
@@ -412,63 +433,10 @@ export class SaveLoad {
       return;
     }
     this.deps.ui.showImportReport(report, {
-      onOpen: () => {
-        // Flush the CURRENT tower to the autosave slot first (same splash
-        // guard as every other flush), so adopting the import can't cost the
-        // player their in-progress tower even if they never saved manually.
-        // A failure must not block the adoption the player just asked for,
-        // but it must be SAID: the report modal promised the autosave.
-        let flushFailed = false;
-        try {
-          this.saveBeforeUpdate();
-        } catch {
-          flushFailed = true;
-        }
-        this.deps.adoptSim(sim);
-        // Auto-save the IMPORTED tower to a fresh slot so a bad import can't
-        // clobber anything and the player can always get back to it. "Fresh"
-        // is a RAW presence check (hasSlot), never the parse-based
-        // listSlots().exists: a corrupt-but-present slot may still be
-        // recoverable by a later build and must not be an overwrite target.
-        let savedTo: number | null = null;
-        let slotWriteFailed = false;
-        try {
-          for (let n = 1; n <= SLOT_COUNT; n++) {
-            if (!SaveGame.hasSlot(n)) {
-              SaveGame.saveSlot(n, sim);
-              savedTo = n;
-              break;
-            }
-          }
-        } catch {
-          slotWriteFailed = true; // quota/disabled storage, NOT "slots full"
-        }
-        // "info" keeps this bulletin log-only: renderLog also toasts "good"
-        // entries, and the explicit success toast below already covers that.
-        this.deps
-          .getSim()
-          .emit(`Imported from SimTower (1994): welcome back to ${sim.tower.towerName}.`, "info");
-        // Honest feedback: distinguish "no free slot" from "the write failed".
-        if (slotWriteFailed) {
-          this.deps.ui.toast(
-            "Tower imported, but the slot copy failed (storage is full or blocked). Export it to a file soon.",
-            "bad",
-          );
-        } else {
-          this.deps.ui.toast(
-            savedTo !== null
-              ? `Tower imported and saved to slot ${savedTo}.`
-              : "Tower imported. All save slots are full, so save it yourself soon.",
-            "good",
-          );
-        }
-        if (flushFailed) {
-          this.deps.ui.toast(
-            "Your previous tower couldn't be backed up to the autosave (storage is full or blocked).",
-            "bad",
-          );
-        }
-      },
+      // The confirmed-adoption flow (flush, adopt, fresh-slot copy, honest
+      // toasts) lives in ./legacyImportAdopt, split out at the 500-line guard.
+      // The flush stays a bound thunk so its throw contract is owned here.
+      onOpen: () => adoptConfirmedLegacyImport(this.deps, sim, () => this.saveBeforeUpdate()),
     });
   }
 
@@ -479,6 +447,11 @@ export class SaveLoad {
    *  `startUnbridged` is only consulted for Modern. */
   newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", startUnbridged = false): void {
     this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff, mode, modernCalendar, startUnbridged));
+    // CLEARED, not inherited, and after adoption like every other path. A new
+    // tower has no stored origin, and without this it would inherit the
+    // previous tower's scope and autosave into a namespace it never came from
+    // (#736 F5, the account-leak class).
+    if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(undefined);
     gameplaySession.noteNewGame(mode); // funnel entry: a fresh tower was founded
     // Both rule-sets found an empty lot now, so the toast is the actionable
     // first-lobby cue (the engine's welcome log entry is rebased past by the UI

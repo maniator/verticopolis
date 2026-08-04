@@ -3,6 +3,8 @@ import type { Simulation } from "../engine/Simulation";
 import { SaveGame, saveFailureMessage } from "../storage/SaveGame";
 import { canCallExterminator, statsTemplate } from "../ui/templates/stats";
 import { trackAppAction } from "../analytics";
+import { IS_WRAPPED_BUILD } from "../platform";
+import { noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
 
 /**
  * The tower-statistics modal, its exterminator action, and the manual save-slot
@@ -77,6 +79,12 @@ export function showSaves(app: GameApp): void {
 /** Save the live tower into a manual slot, stamping the live camera view. */
 export function saveToSlot(app: GameApp, slot: number): void {
   try {
+    // Same degraded-session refusal as Quick Save, inside the try so it
+    // reaches the same honest toast. A localStorage write in a degraded
+    // session would be overwritten by the next boot's successful hydration.
+    if (IS_WRAPPED_BUILD && storeReadDegraded()) {
+      throw new Error("Saved towers could not be read this session, so saving is paused. Restart to try again.");
+    }
     // Manual slots carry the view too: stamp the live camera the same way
     // SaveLoad does for the autosave and exports. Inside the try on purpose:
     // a disposed or context-lost engine can throw from viewState() too, and
@@ -99,6 +107,10 @@ export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
   const loaded = slot === "auto" ? SaveGame.load() : SaveGame.loadSlot(slot);
   if (loaded) {
     app.adoptSim(loaded);
+    // AFTER adoption, matching importGame's stated rule: a load that fails to
+    // adopt must leave the live tower's origin untouched, or the still-live
+    // previous tower autosaves toward a scope it never came from.
+    if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(slot);
     trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
     app.ui.toast("Tower loaded.", "good");
   } else {
@@ -169,6 +181,9 @@ export function loadFromSplash(app: GameApp, slot: number | "auto"): boolean {
   }
   if (!loaded) return false;
   app.adoptSim(loaded);
+  // Same origin note as loadFromSlot, and in the same AFTER-adoption position:
+  // the two are the same operation from different screens.
+  if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(slot);
   trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
   return true;
 }
