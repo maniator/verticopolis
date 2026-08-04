@@ -871,6 +871,11 @@ describe("transport decode: the save's own shafts and flights", () => {
     // the next slot into zeros, where `used === 0` reads as an empty slot, so
     // every later shaft vanishes with nothing to warn about: export from an old
     // build, import into a new one, and the tower quietly loses its transport.
+    //
+    // The routing tail is not decoration here. The reader takes the legacy
+    // layout only when the file CORROBORATES it, and every real export since
+    // v1.14.0 ends with that 0xFF region, so a fixture without one is not a
+    // legacy save the reader should be willing to recognize.
     const legacy: TdtSpec = {
       elevators: [
         // Stops at 7 of the 12 floors it spans, so the two layouts differ by
@@ -878,6 +883,7 @@ describe("transport decode: the save's own shafts and flights", () => {
         { type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 21, serviced: [10, 11, 12, 18, 19, 20, 21] },
         { type: 2, cars: 3, x: 140, bottomFloor: 10, topFloor: 18 },
       ],
+      routingTailBytes: 20_000,
       legacyServicedPayload: true,
     };
     const walked = parseTdtBinary(buildTdt(legacy));
@@ -888,6 +894,25 @@ describe("transport decode: the save's own shafts and flights", () => {
     // And the skipping shaft's own stop settings survive the fallback.
     const skipper = parse(legacy).save.transports.find((t) => t.x === 100)!;
     expect(skipper.skipFloors).toEqual([4, 5, 6, 7, 8]);
+  });
+
+  it("a TRUNCATED current-layout file is refused, not read as legacy", () => {
+    // The trap in accepting the shorter walk whenever the documented one fails:
+    // a current file cut off inside a skip-floor shaft's payload still has
+    // enough zero fill for the serviced walk to finish, reading those zeros as
+    // the remaining empty headers. It would then "succeed" with a table that is
+    // not there, silently dropping parking and stairs, where the honest answer
+    // is to give up and let the importer synthesize transports with a warning.
+    const full = buildTdt({
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] }],
+      stairs: [{ type: 1, x: 120, floor: 10 }],
+      parkingConnected: 7,
+    });
+    // Cut inside the built shaft's payload: past where the serviced walk would
+    // have ended, short of where the spanned one needs to reach.
+    const walked = parseTdtBinary(full.slice(0, full.length - 2_000));
+    expect(walked.elevators).toBeNull(); // bail, so the importer synthesizes
+    expect(walked.warnings.join(" ")).toMatch(/elevator/i);
   });
 
   it("a STAIRLESS legacy tower keeps its parking count too", () => {

@@ -258,36 +258,27 @@ function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
   if (spanned.elevators !== null && !ambiguous) return "spanned";
   const serviced = walk("serviced");
   if (serviced.elevators === null) return "spanned";
-  if (spanned.elevators === null) return "serviced";
-  // More shafts decoded is the strongest signal, since a wrong size swallows the
-  // ones that follow it.
-  if (serviced.elevators.length !== spanned.elevators.length) {
-    return serviced.elevators.length > spanned.elevators.length ? "serviced" : "spanned";
-  }
-  // Otherwise anchor on WHERE the stairs table starts, not merely on finding
-  // one. A legacy file is by definition one WE wrote, and our writer puts the
-  // finance and parking blocks between the elevator table and the stairs at
-  // known sizes, so the correct end is exactly that far ahead of the stairs. A
-  // flight COUNT cannot separate the candidates when they differ by less than
-  // the scan window (a shaft skipping 1-3 floors moves the end by only 324-972
-  // bytes, so both scans find the same table), and the loser then reads the
-  // parking count out of zero fill.
-  // Two exact markers, both keyed off our own writer's fixed block sizes: the
-  // stairs table starts finance + parking past the end, and the 0xFF routing
-  // region starts one stairs table further on. The second carries the case the
-  // first cannot: a tower with NO stairways has 64 empty records that say
-  // nothing, which is common enough that locateStairs documents it.
+  // ONE rule decides it: the legacy layout is taken only when the file itself
+  // corroborates it, by placing a structure we know the old writer's position
+  // for exactly where that walk's table would have ended. Two such markers,
+  // both keyed off our own writer's fixed block sizes: the stairs table starts
+  // finance + parking past the end, and the 0xFF routing region starts one
+  // stairs table further on. The second carries what the first cannot, a tower
+  // with NO stairways, whose 64 empty records say nothing.
+  //
+  // Requiring evidence rather than merely preferring `spanned` is what makes
+  // this safe. Every weaker rule tried here let some file through wrongly: a
+  // per-slot landing check cannot see past the last built shaft; "more shafts
+  // decoded" reads a truncated CURRENT file as legacy, because the short walk
+  // takes the zero fill for empty headers and finishes where the honest walk
+  // correctly gave up; and a stairs flight COUNT cannot separate ends that
+  // differ by less than the scan window. A file that corroborates neither
+  // layout stays on `spanned`, which is what the retail game writes and what
+  // this reader documents.
   const anchored = (end: number) =>
     stairsTableStartsAt(bytes, end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE) ||
     routingTailStartsAt(bytes, end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE);
-  const spannedAnchored = anchored(spanned.end);
-  const servicedAnchored = anchored(serviced.end);
-  if (spannedAnchored !== servicedAnchored) return servicedAnchored ? "serviced" : "spanned";
-  // Neither anchors (a game-written save, whose block sizes between the table
-  // and the stairs are not fixed): fall back to which end finds a table at all,
-  // then to the documented layout.
-  const flights = (end: number) => locateStairs(bytes, end).length;
-  return flights(serviced.end) > flights(spanned.end) ? "serviced" : "spanned";
+  return anchored(serviced.end) && !anchored(spanned.end) ? "serviced" : "spanned";
 }
 
 /**
@@ -349,23 +340,16 @@ export function walkTolerantTail(r: ByteReader): TdtTail {
   // The elevator table is walked with a LAYOUT chosen for the whole file, not
   // per slot. See `readElevatorTable` for the two layouts and `chooseLayout` for
   // how they are told apart.
+  // The layout is chosen for the whole file, and `chooseLayout` only answers
+  // "serviced" when the file corroborates it, so there is no second-chance
+  // retry here. A retry that accepted the shorter walk merely because the
+  // documented one failed would take a TRUNCATED current-layout file for a
+  // legacy one: the short walk reads the zero fill as the remaining empty
+  // headers and finishes where the honest walk correctly gave up, turning a
+  // clean bail into a silent, wrong table with no parking and no stairs.
   const tableStart = r.offset();
-  const chosen = chooseLayout(r.raw(), tableStart);
-  let reader = r;
-  let table = readElevatorTable(reader, chosen);
-  if (table.elevators === null && chosen === "spanned") {
-    // The documented layout could not be walked at all. Before falling back to
-    // synthesized transports, try the legacy one: a file our own older builds
-    // wrote can fail this way outright when its shorter payloads run the reader
-    // off the end.
-    const retryReader = new ByteReader(r.raw());
-    retryReader.skip(tableStart);
-    const retry = readElevatorTable(retryReader, "serviced");
-    if (retry.elevators !== null) {
-      reader = retryReader;
-      table = retry;
-    }
-  }
+  const reader = r;
+  const table = readElevatorTable(reader, chooseLayout(r.raw(), tableStart));
   if (table.elevators === null) {
     warnings.push(table.warning!);
     return tail;
