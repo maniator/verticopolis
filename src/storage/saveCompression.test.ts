@@ -24,13 +24,14 @@ describe("inflateCapped", () => {
 
   it("round-trips data larger than one push, so the chunking carries state", () => {
     // The input has to span several INFLATE_CHUNK_BYTES slices to prove the
-    // inflater keeps its state across pushes, which needs data that does NOT
-    // compress away: a deterministic LCG, so the fixture is stable.
+    // inflater keeps its state across pushes, so it needs bytes that do NOT
+    // compress away, generated deterministically to keep the fixture stable.
+    // xorshift32 rather than a linear congruential generator: an LCG's low bits
+    // carry enough structure that deflate still squeezed 300 KB down to 18 KB,
+    // which would have quietly made this a single-push test.
     const data = new Uint8Array(300_000);
     let s = 0x9e3779b9;
     for (let i = 0; i < data.length; i++) {
-      // xorshift32: an LCG's low bits carry enough structure that deflate still
-      // squeezes it 16:1, which would leave this a single-push test.
       s ^= s << 13;
       s ^= s >>> 17;
       s ^= s << 5;

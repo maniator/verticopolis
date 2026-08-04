@@ -224,11 +224,12 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     // reader's fallback for those files can be tested against a real one, and it
     // is the ONLY thing in this fixture that deliberately encodes a superseded
     // layout; leave it off for anything else.
-    if (spec.legacyServicedPayload) {
-      pad(builtShaftPayloadSize(1, Math.max(1, serviced.size))); // 0 stops sizes as 1, matching the reader
-    } else {
-      pad(builtShaftPayloadSize(e.bottomFloor, e.topFloor));
-    }
+    // Size by the spec's layout, but validate the SPAN either way: the legacy
+    // sizing is driven by the stop count, so on its own it would happily accept
+    // an inverted or fractional span and emit a fixture whose header and payload
+    // disagree, which is exactly the loud early failure this call exists to give.
+    const spannedSize = builtShaftPayloadSize(e.bottomFloor, e.topFloor);
+    pad(spec.legacyServicedPayload ? builtShaftPayloadSize(1, Math.max(1, serviced.size)) : spannedSize);
   }
 
   // ---- Finance + parking + stairs -------------------------------------------
