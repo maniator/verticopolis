@@ -928,7 +928,16 @@ describe("transport decode: the save's own shafts and flights", () => {
       stairs: [{ type: 1, x: 120, floor: 10 }],
       parkingConnected: 7,
     });
-    for (let len = 3_000; len < full.length; len++) {
+    // Byte-by-byte over the TAIL, where a truncation can land mid-structure and
+    // where every failure of this kind has been; a coarse stride over the rest,
+    // since sweeping all ~50 KB at stride 1 is tens of thousands of parses for
+    // no extra coverage. The stride is prime so it cannot fall into step with
+    // any record size.
+    const tailFrom = Math.max(3_000, full.length - 6_000);
+    const lengths: number[] = [];
+    for (let len = 3_000; len < tailFrom; len += 97) lengths.push(len);
+    for (let len = tailFrom; len < full.length; len++) lengths.push(len);
+    for (const len of lengths) {
       let walked;
       try {
         walked = parseTdtBinary(full.slice(0, len));
@@ -963,6 +972,28 @@ describe("transport decode: the save's own shafts and flights", () => {
       expect(walked.parkingConnected, `skipped ${skipped}`).toBe(7);
       expect(walked.warnings, `skipped ${skipped}`).toEqual([]);
     }
+  });
+
+  it("a stairless legacy export from BEFORE the routing region still imports", () => {
+    // The oldest shape: exported before v1.14.0 added the 0xFF routing region,
+    // so the file simply stops after the stairs table, and stairless, so those
+    // 64 records say nothing either. What is left is the file's own end, which
+    // sits exactly where the old writer's last block did.
+    const legacy: TdtSpec = {
+      elevators: [
+        { type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] },
+        { type: 2, cars: 3, x: 140, bottomFloor: 10, topFloor: 18 },
+      ],
+      stairs: [],
+      parkingConnected: 7,
+      legacyServicedPayload: true,
+      // No trailing bytes and no routing region: the file ends at the stairs table.
+    };
+    const walked = parseTdtBinary(buildTdt(legacy));
+    expect(walked.elevators).toHaveLength(2);
+    expect(walked.elevators!.map((e) => e.x)).toEqual([100, 140]);
+    expect(walked.parkingConnected).toBe(7);
+    expect(walked.warnings).toEqual([]);
   });
 
   it("a STAIRLESS current-layout tower is still read as current", () => {

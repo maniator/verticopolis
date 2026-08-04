@@ -18,9 +18,9 @@ const pack = (obj: unknown, magic = "VCTOWER1", separator = "\n") => magic + sep
 /** A tower whose payload really does base64 to a leading DIGIT, so the version
  *  digits and the payload run together with no separator. A long run of one
  *  character does it; short varied JSON never does, which is what made an
- *  earlier search for one conclude, wrongly, that our writer cannot produce
- *  them. Asserted below rather than assumed, so a codec change cannot leave
- *  these tests quietly exercising the easy case. */
+ *  earlier search for one conclude, wrongly, that our writer could not produce
+ *  them at all. Asserted below rather than assumed, so a codec change cannot
+ *  leave these tests quietly exercising the easy case. */
 const DIGIT_LEADING_TOWER = { towerName: "DigitLead", filler: "a".repeat(4096) };
 
 describe("vctower container decode", () => {

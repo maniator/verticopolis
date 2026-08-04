@@ -277,9 +277,24 @@ function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
   // differ by less than the scan window. A file that corroborates neither
   // layout stays on `spanned`, which is what the retail game writes and what
   // this reader documents.
-  const anchored = (end: number) =>
-    stairsTableStartsAt(bytes, end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE) ||
-    routingTailStartsAt(bytes, end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE);
+  //
+  // All three markers are the same question asked of a different structure:
+  // does something whose position under the old writer we know exactly sit
+  // where this walk's table would put it? The last covers the oldest exports,
+  // from before v1.14.0 added the routing region, where the writer simply
+  // STOPPED after the stairs table: for a stairless tower of that era the file
+  // ending exactly there is the only evidence left, and EOF is as exact as any
+  // offset. Beyond that the file offers nothing to prove either layout, and it
+  // stays on `spanned` rather than guessing.
+  const anchored = (end: number) => {
+    const afterParking = end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE;
+    const afterStairs = afterParking + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE;
+    return (
+      stairsTableStartsAt(bytes, afterParking) ||
+      routingTailStartsAt(bytes, afterStairs) ||
+      bytes.length === afterStairs
+    );
+  };
   return anchored(serviced.end) && !anchored(spanned.end) ? "serviced" : "spanned";
 }
 
