@@ -82,15 +82,18 @@ export function decodeVctower(text: string, label = "vctower"): unknown {
       );
     }
   }
-  // Not v1, and NOT separated: the separated case is settled at the top, so
-  // everything reaching here has version digits running into the payload. One
-  // digit is still unambiguous (nothing else could belong to the version); two
-  // or more could split either way ("VCTOWER27z" is version 27, or version 2
+  // Reached by a file whose magic is not "VCTOWER1" at all, so its version is
+  // whatever its digits say. (A v1-looking file that failed to decode is
+  // answered inside the branch above, where the failure is the evidence.)
+  //
+  // Name the version only when it can be read exactly: a separator, or a single
+  // digit, leaves nothing else it could be. Two or more digits running into the
+  // payload could split either way ("VCTOWER27z" is version 27, or version 2
   // with payload "7z"), and this decoder cannot try a non-v1 payload to find
   // out, so it says what it knows instead of asserting a version that may not
   // exist.
   const digits = /^VCTOWER(\d+)/.exec(trimmed)![1];
-  if (digits.length === 1) {
+  if (/^VCTOWER\d+(?=\s|$)/.test(trimmed) || digits.length === 1) {
     throw new Error(`${label}: unsupported .vctower version (VCTOWER${digits}; this decoder reads VCTOWER1)`);
   }
   throw new Error(

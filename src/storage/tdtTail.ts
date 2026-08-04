@@ -106,18 +106,6 @@ export function locateStairs(bytes: Uint8Array, from: number): TdtStair[] {
 }
 
 /**
- * Could a stairs table start EXACTLY at `at`? Every record present must read as
- * a stair record and at least one must be built. Records are checked up to the
- * table's 64 or to EOF, whichever comes first, since the table can legitimately
- * be the file's last structure (synthetic fixtures do exactly that).
- *
- * Note this is deliberately not "where did locateStairs find the table": that
- * scan takes the EARLIEST window holding the most built flights, and since an
- * all-zero record is a valid empty slot, a sparse table's window can begin up to
- * 63 records before its true start. Fine for reading the flights, useless as an
- * alignment marker, which is what the payload-layout choice needs.
- */
-/**
  * Does the trailing routing region BEGIN exactly at `at`? Our writer emits that
  * region `0xFF`-filled (doc §11), so its first byte is `0xFF` and the byte
  * before it, the last of the stairs table, is not.
@@ -136,14 +124,28 @@ function routingTailStartsAt(bytes: Uint8Array, at: number): boolean {
   return true;
 }
 
+/**
+ * Could a COMPLETE stairs table start exactly at `at`? All 64 records must be
+ * present and read as stair records, and at least one must be built.
+ *
+ * Completeness is the load-bearing part. This is only ever used as an alignment
+ * marker, and accepting a table that runs into EOF lets a single residual
+ * 10-byte stair-shaped record at the end of a TRUNCATED file corroborate a
+ * layout that file does not have. `locateStairs` is the tolerant one, because
+ * reading whatever flights survive is a different job from proving an offset.
+ *
+ * Note this is deliberately not "where did locateStairs find the table": that
+ * scan takes the EARLIEST window holding the most built flights, and since an
+ * all-zero record is a valid empty slot, a sparse table's window can begin up to
+ * 63 records before its true start. Fine for reading the flights, useless as an
+ * alignment marker, which is what the payload-layout choice needs.
+ */
 export function stairsTableStartsAt(bytes: Uint8Array, at: number): boolean {
   const REC = TDT_STAIR_RECORD_SIZE;
-  if (at < 0 || at + REC > bytes.length) return false;
+  if (at < 0 || at + TDT_STAIR_SLOTS * REC > bytes.length) return false; // must be whole
   let built = 0;
   for (let s = 0; s < TDT_STAIR_SLOTS; s++) {
-    const o = at + s * REC;
-    if (o + REC > bytes.length) break; // table runs to EOF; later slots absent
-    const c = classifyStairRecord(bytes, o);
+    const c = classifyStairRecord(bytes, at + s * REC);
     if (c < 0) return false;
     built += c;
   }
@@ -371,6 +373,11 @@ export function walkTolerantTail(r: ByteReader): TdtTail {
     if (r.remaining() >= TDT_PARKING_SIZE) {
       tail.parkingConnected = r.u16();
       r.skip(TDT_PARKING_SIZE - 2); // advance past the stall table so the reader position stays honest
+    } else {
+      // The finance block fit but the parking block does not: the file stops in
+      // between. Leaving `parkingConnected` null without saying so reports "no
+      // parking data" in the same voice as a tower that genuinely has none.
+      warnings.push("The save ends inside its parking data, so the connected-stall count could not be read.");
     }
   } else {
     // The file ends right after the elevator table, before even the finance

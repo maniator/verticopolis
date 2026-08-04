@@ -915,6 +915,33 @@ describe("transport decode: the save's own shafts and flights", () => {
     expect(walked.warnings.join(" ")).toMatch(/elevator/i);
   });
 
+  it("NO truncation of a current-layout file yields a silently wrong table", () => {
+    // Sweeping beats guessing an offset here. Truncating a current file at just
+    // the right byte can leave a residual stair-shaped record exactly where the
+    // shorter serviced walk's anchor looks, corroborating a layout the file does
+    // not have; the reader then returns the shaft with a bogus stair and a
+    // parking count of 0 and says nothing. The invariant is simple and covers
+    // every such offset at once: either the walk gives up, or the parking count
+    // it reports is the one that was saved. Never a confident zero.
+    const full = buildTdt({
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] }],
+      stairs: [{ type: 1, x: 120, floor: 10 }],
+      parkingConnected: 7,
+    });
+    for (let len = 3_000; len < full.length; len++) {
+      let walked;
+      try {
+        walked = parseTdtBinary(full.slice(0, len));
+      } catch {
+        continue; // refused outright (the floor map itself is cut): honest
+      }
+      if (walked.elevators === null) continue; // gave up: honest
+      if (walked.warnings.length > 0) continue; // said what it lost: honest
+      // A confident answer has to be the RIGHT one.
+      expect(walked.parkingConnected, `truncated to ${len}`).toBe(7);
+    }
+  });
+
   it("a STAIRLESS legacy tower keeps its parking count too", () => {
     // Both stairs signals go quiet when the tower has no stairways: the exact
     // anchor has 64 empty records to look at and the flight counts are both 0,

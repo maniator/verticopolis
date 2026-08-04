@@ -100,7 +100,10 @@ describe("vctower container decode", () => {
     // claim is what is left to say. Settling the version BEFORE decoding was
     // tried instead, and the test above is why it did not survive: the same
     // bytes are also a v1 tower re-wrapped after a digit.
-    for (const version of ["2", "17", "10", "100"]) {
+    // "17", "10" and "100" share the v1 prefix and are answered after the decode
+    // fails; "2" and "27" never enter that branch at all. Both paths must name
+    // the version rather than call the file damaged.
+    for (const version of ["2", "17", "10", "100", "27"]) {
       const file = pack({ towerName: "T" }, `VCTOWER${version}`);
       expect(() => decodeVctower(file, "future.vctower")).toThrow(
         new RegExp(`unsupported \\.vctower version \\(VCTOWER${version};`),
