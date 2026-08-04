@@ -232,12 +232,130 @@ describe("the first routed write per session is READ BACK", () => {
   });
 });
 
+describe("review findings: the write paths under interleave and hostile shells", () => {
+  it("REGRESSION: a sync save landing inside the read-back window is NOT a lying shell", async () => {
+    // The async autosave's first write commits; before its read-back resolves,
+    // the player Quick Saves through writeSync (newer seq, commits synchronously).
+    // The read then returns the NEWER bytes. An earlier revision compared
+    // strictly against this write's own contents and flipped the session to
+    // degraded-refuse; and its write-through then regressed the cache and the
+    // stamp to the older tower.
+    const store = fakeStore(SHARED);
+    const syncCalls = withWriteSync(store);
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    // Park the read-back until released, so the sync write can land inside it.
+    const realRead = store.port.read.bind(store.port);
+    let releaseRead: (() => void) | undefined;
+    store.port.read = (id, scope) =>
+      new Promise((resolve) => {
+        releaseRead = () => void realRead(id, scope).then(resolve);
+      });
+
+    const older = towerText("Older autosave");
+    const newer = towerText("Newer quick save");
+    const asyncWrite = writeTowerToStore("auto", older);
+    await new Promise((r) => setTimeout(r, 0)); // write acked; read parked
+    expect(writeTowerToStoreSync("auto", newer)).toEqual({ ok: true });
+    expect(releaseRead).toBeDefined();
+    releaseRead!();
+
+    expect(await asyncWrite).toEqual({ ok: true });
+    expect(storeReadDegraded()).toBe(false);
+    expect(syncCalls).toEqual([{ id: "auto", scope: LOCAL, seq: 2 }]);
+    // The cache serves the NEWER tower, not the async write's older one.
+    const cached = localStorage.getItem("verticopolis-save");
+    expect(cached).toBe("VCZ1:" + newer.trim().slice("VCTOWER1\n".length).replace(/\s+/g, ""));
+  });
+
+  it("REGRESSION: a shell that normalizes line endings passes the read-back", async () => {
+    // The migration's own read-back comparator exists because a store is
+    // entitled to normalize line endings on the way through; the first-write
+    // read-back owes the same store the same tolerance, or every session on
+    // such a shell flips to degraded-refuse and a restart never fixes it.
+    const store = fakeStore(SHARED);
+    const realRead = store.port.read.bind(store.port);
+    store.port.read = (id, scope) => realRead(id, scope).then((v) => (v === null ? null : v.replace(/\n/g, "\r\n")));
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    expect(await writeTowerToStore("auto", towerText("Normalized"))).toEqual({ ok: true });
+    expect(storeReadDegraded()).toBe(false);
+  });
+
+  it("CIRCUIT BREAKER: a hung async write makes the sync path refuse instead of block", async () => {
+    // sendSync has no timeout, so a hung MAIN process would freeze the crash
+    // path forever. An async write pending past the threshold is the
+    // observable symptom; while it stands, writeSync is refused with the
+    // stalled code and the crash flush shows the screen with flushed:false.
+    vi.useFakeTimers();
+    try {
+      const store = fakeStore(SHARED);
+      withWriteSync(store);
+      injectedStore = store.port;
+      await prepareSaveStore();
+      store.port.write = () => new Promise<void>(() => {}); // never settles
+
+      void writeTowerToStore("auto", "hung");
+      await vi.advanceTimersByTimeAsync(6000);
+
+      expect(writeTowerToStoreSync("auto", towerText("Blocked"))).toEqual({
+        ok: false,
+        refusal: "failed",
+        code: "stalled",
+        localFallbackSafe: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("REGRESSION: the unsupported fallback is refused for an ACCOUNT-headed tower", async () => {
+    // The 'unsupported' answer used to be returned before the origin was ever
+    // consulted, so an account tower's Quick Save fell back to localStorage,
+    // where the next boot's migration swept it into the SHARED namespace: the
+    // two-step leak every other path closes.
+    const SCOPES = [
+      { token: LOCAL, label: "This computer", shared: true },
+      { token: ACCOUNT, label: "Your towers", shared: false },
+    ];
+    const store = fakeStore(SCOPES); // no writeSync member
+    injectedStore = store.port;
+    await prepareSaveStore();
+    noteTowerOrigin({ id: "auto", scope: ACCOUNT });
+
+    expect(writeTowerToStoreSync("auto", "x")).toEqual({
+      ok: false,
+      refusal: "failed",
+      code: "unsupported",
+      localFallbackSafe: false,
+    });
+    // While a SHARED-headed tower still gets the localStorage fallback.
+    noteTowerOrigin({ id: "auto", scope: LOCAL });
+    expect(writeTowerToStoreSync("auto", "x")).toBe("unsupported");
+  });
+
+  it("a writeSync answering GARBAGE reads as a failure, not a TypeError", async () => {
+    const store = fakeStore(SHARED);
+    store.port.writeSync = (() => undefined) as unknown as NonNullable<SaveStorePort["writeSync"]>;
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    expect(writeTowerToStoreSync("auto", "x")).toEqual({
+      ok: false,
+      refusal: "failed",
+      localFallbackSafe: false,
+    });
+  });
+});
+
 describe("the slot-target rule", () => {
   it("overwrites an EXISTING slot record where it lives, not at the live tower's origin", async () => {
     // A tower opened from the account scope, saved to a slot that already
     // exists in the shared one: without this rule the write would create a
     // second slot-2 in the account namespace while the player's existing
-    // slot-2 sat untouched — two towers under one label.
+    // slot-2 sat untouched, leaving two towers under one label.
     const SCOPES = [
       { token: LOCAL, label: "This computer", shared: true },
       { token: ACCOUNT, label: "Your towers", shared: false },

@@ -3,7 +3,8 @@ import type { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
 import { localStorageKeyFor, toTowerFile, type SaveSlotId } from "../storage/saveMigration";
 import { clearAcked } from "../storage/saveStoreAcked";
-import { hydratedOriginFor } from "./desktopSaveOrigin";
+import { forgetRecordAt, hydratedOriginFor } from "./desktopSaveOrigin";
+import { withTimeout } from "./desktopSaveHydrate";
 import { storeIsAuthoritative, writeTowerToStoreSync } from "./desktopSaveStore";
 
 /**
@@ -59,8 +60,28 @@ export function persistManualSave(sim: Simulation, slot: number | "auto"): "stor
     if (result.localFallbackSafe) return "fallback";
     throw new Error("This tower's save location is no longer available, so it was not saved. Export it to a file to keep it safe.");
   }
+  if (result.code === "unsupported") {
+    // A writeSync-less shell with an account-headed tower: the localStorage
+    // fallback would be the two-step leak (see writeTowerToStoreSync), so the
+    // honest outcome is the same refusal as a vanished location.
+    throw new Error("This tower's save location is no longer available, so it was not saved. Export it to a file to keep it safe.");
+  }
+  if (result.code === "stalled") {
+    // The circuit breaker: an async write has been hanging past its
+    // threshold, so a sendSync into the same main process would hang the
+    // renderer (and the crash flush with it).
+    throw new Error("The save store is not responding, so the tower was not saved. Try again in a moment.");
+  }
+  // `full` and `denied` read as STORAGE-blame: those are the names
+  // `isStorageWriteError` recognizes, which routes the player to the "free up
+  // space or allow site storage" advice instead of a raw code. `denied` rides
+  // a real DOMException because the comparator only trusts SecurityError on
+  // one (the name is too generic on arbitrary objects).
   if (result.code === "full") {
     throw Object.assign(new Error("The disk is full."), { name: "QuotaExceededError" });
+  }
+  if (result.code === "denied") {
+    throw new DOMException("The save location refused the write.", "SecurityError");
   }
   throw new Error(`The tower could not be written to the save store${result.code !== undefined ? ` (${result.code})` : ""}. Try again.`);
 }
@@ -93,9 +114,22 @@ export function deleteSlotFromStore(slot: number): Promise<boolean> {
   if (!store || !storeIsAuthoritative() || address === undefined) return Promise.resolve(true);
   pendingDeletes.add(slot);
   clearAcked(`slot-${slot}`);
-  return store
-    .delete(address.id, address.scope)
-    .then(() => true)
+  // Bounded like every other bridge call: "never rejects" is not "never
+  // hangs", and a delete that never settled kept `pendingDeletes` armed for
+  // the whole session, so `saveToSlot` refused the slot forever while the
+  // restore path never fired. A timeout reads as failure (`withTimeout`
+  // resolves null), the caller restores the cache row, and if the delete
+  // actually landed late the next boot simply finds nothing to resurrect.
+  return withTimeout(store.delete(address.id, address.scope).then(() => true as const))
+    .then((settled) => {
+      if (settled !== true) return false;
+      // The record is GONE, and the session must know it: a review found
+      // that leaving the boot snapshot in place made a later save to this
+      // slot target the dead record's scope instead of following the live
+      // tower's origin.
+      forgetRecordAt(`slot-${slot}`);
+      return true;
+    })
     .catch(() => false)
     .finally(() => {
       pendingDeletes.delete(slot);

@@ -157,6 +157,32 @@ describe("persistAutosave on a wrapped build", () => {
     await expect(persistAutosave(Simulation.newGame(7))).resolves.toBeUndefined();
   });
 
+  it("a FAILED store write says so once per streak, and a recovery re-arms the warning", async () => {
+    // The spec's rule: a failed store write in store mode says so honestly
+    // (the "bad" bulletin channel toasts). Once per STREAK, not per tick, or
+    // a full disk would toast every thirty seconds; and a success clears the
+    // latch so a new streak warns again.
+    const { port, written } = fakeStore();
+    injectedStore = port;
+    await prepareSaveStore();
+    const realWrite = port.write.bind(port);
+    port.write = () => Promise.reject(Object.assign(new Error("no space"), { code: "full" }));
+
+    const sim = Simulation.newGame(7);
+    const emit = vi.spyOn(sim, "emit");
+    await persistAutosave(sim);
+    await persistAutosave(sim);
+    expect(emit.mock.calls.filter(([text]) => text.includes("Autosave failed")).length).toBe(1);
+
+    port.write = realWrite; // the disk recovered
+    await persistAutosave(sim);
+    expect(written.length).toBe(1);
+
+    port.write = () => Promise.reject(Object.assign(new Error("no space"), { code: "full" }));
+    await persistAutosave(sim);
+    expect(emit.mock.calls.filter(([text]) => text.includes("Autosave failed")).length).toBe(2);
+  });
+
   it("a DEGRADED session saves nowhere, and says so once per tower", async () => {
     // The shell listed towers hydration could not read. A store write would
     // land where no reader looks; a localStorage write would be overwritten by

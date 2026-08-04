@@ -47,6 +47,12 @@ import { saveStoreSession, storeIsAuthoritative, storeReadDegraded, writeTowerTo
  *  pin itself here for the life of the page. */
 const warnedDegraded = new WeakSet<Simulation>();
 
+/** Sims told about the CURRENT failure streak. Cleared on the next success,
+ *  so a new streak warns again: the spec's rule is that a failed store write
+ *  in store mode says so honestly, and a per-streak latch is what keeps that
+ *  from becoming a toast every thirty seconds while a disk stays full. */
+const warnedFailed = new WeakSet<Simulation>();
+
 export async function persistAutosave(sim: Simulation): Promise<void> {
   // A degraded session (the shell listed towers hydration could not read)
   // autosaves NOWHERE, deliberately. The store is not hydrated, so a store
@@ -70,7 +76,19 @@ export async function persistAutosave(sim: Simulation): Promise<void> {
     // format crosses the bridge instead of two. A refusal or failure saves
     // nowhere this tick (see the module note), and `stale` never surfaces
     // here: the write path already reports it as success-by-supersession.
-    await writeTowerToStore("auto", await SaveGame.export(sim));
+    const result = await writeTowerToStore("auto", await SaveGame.export(sim));
+    if (result.ok) {
+      warnedFailed.delete(sim);
+      return;
+    }
+    // Said once per failure streak, in the bulletin channel ("bad" entries
+    // toast). A read-back mismatch flips the session to degraded instead;
+    // that case gets the degraded wording above on the next tick, so this
+    // stays quiet for it rather than saying two different things.
+    if (!storeReadDegraded() && !warnedFailed.has(sim)) {
+      warnedFailed.add(sim);
+      sim.emit("Autosave failed: the tower could not be written to the save store. It will keep retrying.", "bad");
+    }
     return;
   }
   await SaveGame.saveAsync(sim);

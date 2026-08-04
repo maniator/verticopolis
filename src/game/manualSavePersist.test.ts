@@ -9,8 +9,8 @@ import { LOCAL, TOWER, fakeStore, storeValue } from "./desktopSaveStore.fixture"
 /**
  * The manual-save seam and the routed slot delete. `persistManualSave`'s
  * contract is three-valued by design: "stored" (the store committed),
- * "fallback" (browser-equivalent — the caller runs its SaveGame path), and a
- * THROW (the store failed, worded for the callers' existing toast/flush
+ * "fallback" (browser-equivalent, so the caller runs its SaveGame path), and
+ * a THROW (the store failed, worded for the callers' existing toast/flush
  * contracts).
  */
 
@@ -133,6 +133,42 @@ describe("persistManualSave", () => {
 
     expect(persistManualSave(Simulation.newGame(7), "auto")).toBe("stored");
   });
+
+  it("REGRESSION: 'denied' reads as storage-blame too, per the spec's wording rule", async () => {
+    // Both `full` and `denied` route to the "free up space or allow site
+    // storage" advice; an earlier revision gave `denied` the neutral wording,
+    // which sent the player chasing a code bug for a permissions problem.
+    const store = fakeStore(SHARED);
+    withWriteSync(store, { ok: false, code: "denied" });
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    let thrown: unknown;
+    try {
+      persistManualSave(Simulation.newGame(7), "auto");
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeDefined();
+    expect(isStorageWriteError(thrown)).toBe(true);
+  });
+
+  it("the circuit breaker's 'stalled' code throws the not-responding wording", async () => {
+    const store = fakeStore(SHARED);
+    withWriteSync(store, { ok: false, code: "stale" }); // present, never reached
+    injectedStore = store.port;
+    await prepareSaveStore();
+    store.port.write = () => new Promise<void>(() => {}); // hangs forever
+    vi.useFakeTimers();
+    try {
+      const { writeTowerToStore } = await import("./desktopSaveStore");
+      void writeTowerToStore("auto", "hung");
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(() => persistManualSave(Simulation.newGame(7), "auto")).toThrowError(/not responding/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("deleteSlotFromStore", () => {
@@ -181,6 +217,52 @@ describe("deleteSlotFromStore", () => {
     reject(new Error("io"));
     await expect(outcome).resolves.toBe(false);
     expect(slotDeletePending(1)).toBe(false);
+  });
+
+  it("REGRESSION: a hung delete times out as a failure instead of wedging the slot forever", async () => {
+    // Unbounded, a delete that never settled kept the slot pending for the
+    // whole session: saveToSlot refused it forever, and the restore path
+    // never fired.
+    vi.useFakeTimers();
+    try {
+      const store = await hydratedWithSlot1();
+      store.port.delete = () => new Promise<void>(() => {}); // never settles
+
+      const outcome = deleteSlotFromStore(1);
+      expect(slotDeletePending(1)).toBe(true);
+      await vi.advanceTimersByTimeAsync(4000);
+      await expect(outcome).resolves.toBe(false);
+      expect(slotDeletePending(1)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("REGRESSION: a slot CREATED this session is deletable, and a re-save follows the origin rule", async () => {
+    // The boot snapshot said slot-2 had no record. An earlier revision never
+    // updated it, so deleting a slot saved this session reported success
+    // without calling the store, and the record resurrected every boot (and
+    // kept syncing through Steam Cloud).
+    const store = fakeStore(SHARED);
+    store.port.writeSync = (id, contents, scope) => {
+      store.held.set(`${scope}|${id}`, contents);
+      return { ok: true };
+    };
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    expect(persistManualSave(Simulation.newGame(7), 2)).toBe("stored");
+    expect(store.held.has(`${LOCAL}|slot-2`)).toBe(true);
+
+    await expect(deleteSlotFromStore(2)).resolves.toBe(true);
+    // The record is genuinely gone from the store, not just from the cache.
+    expect(store.held.has(`${LOCAL}|slot-2`)).toBe(false);
+    expect(ackedHash("slot-2")).toBeUndefined();
+
+    // And a save AFTER the delete is a new record again (the dead record's
+    // address was forgotten), not a write into a stale snapshot entry.
+    expect(persistManualSave(Simulation.newGame(9), 2)).toBe("stored");
+    expect(store.held.has(`${LOCAL}|slot-2`)).toBe(true);
   });
 });
 

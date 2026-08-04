@@ -237,9 +237,14 @@ export function fromTowerFile(text: string, preserve = false): FromTowerFileResu
 
   // PRESERVE mode mirrors the forward migration's: the unreadable stash holds
   // bytes, not a tower, so its payload comes back verbatim rather than
-  // whitespace-normalized. Verbatim in must mean verbatim out.
+  // whitespace-normalized. Verbatim in must mean verbatim out. ONE leading
+  // newline is stripped, because that newline is the CONTAINER's own separator
+  // (`toTowerFile` writes `VCTOWER1\n<payload>\n`), not part of the payload: a
+  // review probe showed that keeping it turned every round trip into
+  // `VCZ1:\n<payload>`, so the stash never matched its own cache again and
+  // hydration reconciled it forward on every boot forever.
   if (preserve) {
-    const body = trimmed.slice(magic[0].length);
+    const body = trimmed.slice(magic[0].length).replace(/^\r?\n/, "");
     if (body.trim() === "") return { ok: false, reason: "unreadable" };
     return { ok: true, value: STORE_MAGIC + body };
   }
@@ -316,8 +321,14 @@ export interface MigrationReport {
  * way through, and a strict comparison would call every one of those a failed
  * write, forever, on every boot. What has to match is the payload the reader
  * will actually see.
+ *
+ * Exported for the write path's first-write read-back, which faces the same
+ * store and therefore owes it the same tolerance: a review found the strict
+ * `!==` it shipped with would flip every session on a normalizing shell to
+ * degraded-refuse, permanently, while this comparator right here documented
+ * why that is wrong.
  */
-function sameTowerFile(a: string, b: string): boolean {
+export function sameTowerFile(a: string, b: string): boolean {
   // The two halves are normalized SEPARATELY, because `SaveGame.import` anchors
   // on /^VCTOWER(\d+)/ first and only strips whitespace after that anchor.
   // Stripping across the boundary erases it, and `\d+` is greedy, so a payload

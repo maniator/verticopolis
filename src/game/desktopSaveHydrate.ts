@@ -84,6 +84,39 @@ export function conflictStashKey(id: string): string {
   return `vc-conflict-${id}`;
 }
 
+/** Player-facing wording for a both-moved conflict, per slot id. Lives beside
+ *  the three-way that produces the ids so the wording and the mechanism stay
+ *  in one view, and so the boot flow's bulletin is unit-testable without a
+ *  DOM app shell. */
+export function conflictBulletinText(id: string): string {
+  const label = id === "auto" || id === "auto-legacy" ? "your autosave" : `save slot ${id.replace("slot-", "")}`;
+  return (
+    `⚠️ This computer and your synced saves disagreed about ${label}. ` +
+    "The synced copy was kept; the local copy was set aside in case you need it."
+  );
+}
+
+/**
+ * Whether `cache` and `value` describe the SAME stored bytes, differing only
+ * by representation: a pre-compression raw-JSON cache beside the VCZ1 form
+ * the migration deflated it into, or a preserve stash beside its re-encoded
+ * store form. Decided by running the cache through the same forward-and-back
+ * pipeline the migration and hydration themselves use, so the comparison is
+ * exact for anything they produced and never a heuristic.
+ *
+ * Without this, a legacy player's FIRST desktop boot read its own migration's
+ * output as a both-moved conflict: no stamp exists yet, the raw-JSON cache
+ * does not string-match the deflated store value, and the conservative branch
+ * stashed the cache and warned about a sync divergence on a machine that has
+ * never synced anything.
+ */
+function sameStoredValue(cache: string, value: string, preserve: boolean): boolean {
+  const forward = toTowerFile(cache, preserve);
+  if (!forward.ok) return false;
+  const round = fromTowerFile(forward.text, preserve);
+  return round.ok && round.value === value;
+}
+
 /**
  * ALL OR NOTHING, in every phase.
  *
@@ -207,6 +240,13 @@ export async function hydrateFromStore(
       plans.push({ kind: "write", key: entry.key, id: entry.id, value: entry.value });
       continue;
     }
+    if (sameStoredValue(cache, entry.value, entry.id === "unreadable")) {
+      // Same bytes, two representations (see sameStoredValue): coherent. The
+      // CACHE value is kept and stamped, so the readers keep serving exactly
+      // what they already had and the next boot short-circuits here again.
+      plans.push({ kind: "keep-acked", id: entry.id, value: cache });
+      continue;
+    }
     if (entry.id === "unreadable") {
       // The stash is preserved bytes and localStorage WINS for it: a fresh
       // stash is by definition the copy worth keeping, and the store's older
@@ -244,6 +284,10 @@ export async function hydrateFromStore(
   try {
     for (const plan of plans) {
       if (plan.kind === "write" || plan.kind === "conflict") previous.set(plan.key, localStorage.getItem(plan.key));
+      // The stash key is part of the same transaction: a stash written before
+      // a LATER setItem hit quota would otherwise survive the rollback as
+      // debris, making the next boot's quota failure strictly likelier.
+      if (plan.kind === "conflict") previous.set(conflictStashKey(plan.id), localStorage.getItem(conflictStashKey(plan.id)));
     }
     for (const plan of plans) {
       if (plan.kind === "conflict") {
@@ -277,7 +321,15 @@ export async function hydrateFromStore(
     const forward = toTowerFile(plan.cache, plan.id === "unreadable");
     if (!forward.ok) continue; // unconvertible local bytes stay local
     try {
-      await withTimeout(store.write(plan.record.id, forward.text, plan.record.scope, mintSeq(plan.record)));
+      const settled = await withTimeout(store.write(plan.record.id, forward.text, plan.record.scope, mintSeq(plan.record)));
+      // `withTimeout` RESOLVES null on a timeout rather than rejecting, so a
+      // hung write must be told apart from a committed one here: stamping a
+      // write the shell may have dropped would make the NEXT boot read the
+      // cache as "what the store acknowledged" and let the older store copy
+      // win, silently, over the newer local tower (the one branch of the
+      // three-way with no stash). No stamp on timeout; if the write actually
+      // landed late, the next boot finds store == cache and stamps then.
+      if (settled === null) continue;
       noteAcked(plan.id, plan.cache);
     } catch {
       /* retried next boot; the newer local value is untouched */

@@ -184,6 +184,11 @@ export interface SaveStorePort {
    * high-water mark across restarts. A persisted mark would silently drop every
    * write of the next session, because the game's counter starts over.
    * Cross-process safety is the single-instance lock's job, not this counter's.
+   * For the same reason a shell must not serve TWO game windows from one mark:
+   * each window mints its own counter from 1, so the idler window's high seq
+   * would make the store report the active window's newer saves as `stale`,
+   * which the game rightly treats as success-by-supersession. One game window
+   * per shell instance, or a mark per connection.
    *
    * A write the shell DISCARDS as stale must REJECT, never resolve. A resolved
    * promise is a commit, so resolving on a drop would let a caller report a

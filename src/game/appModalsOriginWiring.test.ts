@@ -20,6 +20,12 @@ vi.mock("../platform", async (importOriginal) => ({
 
 const noteTowerOriginForSlot = vi.fn();
 const storeReadDegraded = vi.fn(() => false);
+const slotDeletePendingMock = vi.fn((_slot: number) => false);
+
+vi.mock("./manualSavePersist", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./manualSavePersist")>()),
+  slotDeletePending: (slot: number) => slotDeletePendingMock(slot),
+}));
 
 vi.mock("./desktopSaveStore", () => ({
   noteTowerOriginForSlot: (slot: unknown) => noteTowerOriginForSlot(slot),
@@ -51,6 +57,7 @@ beforeEach(() => {
   localStorage.clear();
   noteTowerOriginForSlot.mockClear();
   storeReadDegraded.mockReturnValue(false);
+  slotDeletePendingMock.mockImplementation(() => false);
 });
 
 describe("appModals load paths report the origin, AFTER adoption", () => {
@@ -106,6 +113,19 @@ describe("appModals slot save refuses in a degraded session", () => {
     expect(localStorage.getItem("simtower-clone-slot-1")).not.toBeNull();
     expect(toasts[0]).toContain("Saved to slot 1");
   });
+
+  it("saveToSlot refuses while the slot's store delete is in flight", () => {
+    // A save landing between the delete's dispatch and its answer would be
+    // unlinked by the pending delete right after "Saved to slot N" toasted.
+    slotDeletePendingMock.mockImplementation((slot) => slot === 2);
+    const { app, toasts } = fakeApp();
+
+    saveToSlot(app, 2);
+
+    expect(localStorage.getItem("simtower-clone-slot-2")).toBeNull();
+    expect(toasts.length).toBe(1);
+    expect(toasts[0]).toContain("still being deleted");
+  });
 });
 
 describe("the confirmed legacy import in a degraded session", () => {
@@ -151,5 +171,18 @@ describe("the confirmed legacy import in a degraded session", () => {
     const { deps, sim, toasts } = makeDeps();
     adoptConfirmedLegacyImport(deps as never, sim, vi.fn());
     expect(toasts.some((t) => t.includes("saved to slot 1"))).toBe(true);
+  });
+
+  it("the fresh-slot pick SKIPS a slot whose store delete is in flight", () => {
+    // The slot LOOKS free (its cache row is already gone), but a failed
+    // delete restores it, and the copy written meanwhile would be unlinked.
+    slotDeletePendingMock.mockImplementation((slot) => slot === 1);
+    const { deps, sim, toasts } = makeDeps();
+
+    adoptConfirmedLegacyImport(deps as never, sim, vi.fn());
+
+    expect(localStorage.getItem("simtower-clone-slot-1")).toBeNull();
+    expect(localStorage.getItem("simtower-clone-slot-2")).not.toBeNull();
+    expect(toasts.some((t) => t.includes("saved to slot 2"))).toBe(true);
   });
 });

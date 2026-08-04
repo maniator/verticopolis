@@ -20,6 +20,7 @@ import { initInstallAffordance, splashInstallOffered, activateInstall } from "./
 import { bindHostCommands, tickHostCommands } from "./hostCommands";
 import { IS_WRAPPED_BUILD } from "../platform";
 import { hydrationConflictIds, noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
+import { conflictBulletinText } from "./desktopSaveHydrate";
 import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
 
@@ -414,11 +415,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // missing hour of progress.
   if (IS_WRAPPED_BUILD) {
     for (const id of hydrationConflictIds()) {
-      const label = id === "auto" || id === "auto-legacy" ? "your autosave" : `save slot ${id.replace("slot-", "")}`;
-      app.sim.emit(
-        `⚠️ This computer and your synced saves disagreed about ${label}. The synced copy was kept; the local copy was set aside in case you need it.`,
-        "bad",
-      );
+      app.sim.emit(conflictBulletinText(id), "bad");
     }
   }
 

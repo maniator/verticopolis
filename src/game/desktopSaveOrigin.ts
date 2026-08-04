@@ -19,9 +19,13 @@ let loadedFrom: SaveAddress | undefined;
  *  moment it was resolved so the question survives the session going away. */
 let loadedFromShared = false;
 
-/** Where each hydrated slot came from, keyed by slot id. Captured during
- *  hydration, the one moment the store's answer and localStorage are known to
- *  agree. */
+/** Where each slot's LIVE store record is, keyed by slot id. Seeded during
+ *  hydration (the one moment the store's answer and localStorage are known to
+ *  agree) and then maintained by the session's own committed writes and
+ *  deletes: a review found that a snapshot never updated mid-session made a
+ *  slot created this session undeletable (its delete found no address and
+ *  reported success while the record survived to resurrect every boot), and a
+ *  slot deleted this session kept steering later saves to its dead scope. */
 const hydratedOrigins = new Map<string, SaveAddress>();
 
 export function towerOrigin(): SaveAddress | undefined {
@@ -58,6 +62,19 @@ export function recordHydratedOrigins(origins: ReadonlyMap<string, SaveAddress>)
 /** The hydrated origin for a slot id, or undefined. */
 export function hydratedOriginFor(id: string): SaveAddress | undefined {
   return hydratedOrigins.get(id);
+}
+
+/** A write COMMITTED at `address` this session: the id's live record is there
+ *  now, whatever hydration saw at boot. */
+export function noteRecordAt(id: string, address: SaveAddress): void {
+  hydratedOrigins.set(id, address);
+}
+
+/** A delete for `id` was ACKNOWLEDGED: there is no live record any more, so a
+ *  later save to this id is a NEW record that follows the live tower's origin
+ *  rather than the dead record's scope. */
+export function forgetRecordAt(id: string): void {
+  hydratedOrigins.delete(id);
 }
 
 /**
