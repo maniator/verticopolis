@@ -109,6 +109,12 @@ export interface TdtSpec {
   stairs?: StairSpec[];
   /** The parking block's connected-stall count (default 0). */
   parkingConnected?: number;
+  /** Zero bytes appended after the stairs table. Real saves carry a trailing
+   *  routing region there (ours a fixed 25,600-byte one), and a reader that
+   *  mis-sizes a payload lands IN that slack instead of running off the end, so
+   *  a fixture without it cannot reproduce the silent-shift failures, only the
+   *  loud truncation ones. */
+  trailingBytes?: number;
   /** Wrong magic / truncation knobs for the hostile-file tests. */
   magic?: number;
   truncateAt?: number;
@@ -239,6 +245,8 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     u16(0); // people up (live state)
     u16(0); // people down
   }
+
+  if (spec.trailingBytes) pad(spec.trailingBytes);
 
   return finish(chunks, spec);
 }

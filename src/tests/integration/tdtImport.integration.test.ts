@@ -890,6 +890,49 @@ describe("transport decode: the save's own shafts and flights", () => {
     expect(skipper.skipFloors).toEqual([4, 5, 6, 7, 8]);
   });
 
+  it("a legacy file whose skip-floor shaft is the ONLY one keeps its stairs and parking", () => {
+    // The case a per-slot choice cannot settle: with no built shaft after it,
+    // both candidate landings fall in zero fill and look identical, so the
+    // layout has to be decided from the tail instead. Picking wrong here shifts
+    // everything AFTER the table, which costs the parking count and, once the
+    // shift passes the stairs scan window, the stairways too.
+    const legacy: TdtSpec = {
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] }],
+      stairs: [
+        { type: 1, x: 120, floor: 10 },
+        { type: 0, x: 140, floor: 11 },
+      ],
+      parkingConnected: 7,
+      trailingBytes: 20_000, // the slack a real save carries, so a wrong size shifts rather than truncates
+      legacyServicedPayload: true,
+    };
+    const walked = parseTdtBinary(buildTdt(legacy));
+    expect(walked.elevators).toHaveLength(1);
+    expect(walked.elevators![0].x).toBe(100);
+    expect(walked.stairs).toHaveLength(2); // the tail survived the layout choice
+    expect(walked.parkingConnected).toBe(7);
+    expect(walked.warnings).toEqual([]);
+  });
+
+  it("a CURRENT-layout file whose skip-floor shaft is the only one is still read as current", () => {
+    // The same shape written the documented way must not be mistaken for legacy:
+    // the tie-break keeps `spanned` unless the other layout is strictly better.
+    const spec: TdtSpec = {
+      elevators: [{ type: 1, cars: 2, x: 100, bottomFloor: 10, topFloor: 40, serviced: [10, 40] }],
+      stairs: [
+        { type: 1, x: 120, floor: 10 },
+        { type: 0, x: 140, floor: 11 },
+      ],
+      parkingConnected: 7,
+      trailingBytes: 20_000,
+    };
+    const walked = parseTdtBinary(buildTdt(spec));
+    expect(walked.elevators).toHaveLength(1);
+    expect(walked.stairs).toHaveLength(2);
+    expect(walked.parkingConnected).toBe(7);
+    expect(walked.warnings).toEqual([]);
+  });
+
   it("a CURRENT-layout file is unaffected by the legacy fallback", () => {
     // The fallback must never fire on a file written the documented way. The two
     // sizes only differ when a shaft skips floors, and even then the spanned

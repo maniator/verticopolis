@@ -101,30 +101,121 @@ export function locateStairs(bytes: Uint8Array, from: number): TdtStair[] {
 }
 
 /**
- * How much does skipping `payload` bytes look like it lands on the START of the
- * next elevator slot? 2 = a plausible BUILT header, 1 = zeros (an empty slot, or
- * the fill past the last built shaft), 0 = it cannot be a slot boundary.
+ * How a built elevator slot's payload is sized.
  *
- * Used only to tell the current spanned-floor payload layout from the
- * serviced-floor one Verticopolis 2.9.0 and earlier wrote. The three levels are
- * the point: a wrong size usually lands in the zero-filled MIDDLE of a payload,
- * which on its own is indistinguishable from an empty slot, so "landed on a real
- * header" has to outrank "landed on zeros" rather than merely tie with it.
+ * `spanned` is the documented layout and what the retail game writes: one
+ * per-floor entry for every floor the shaft passes. `serviced` is what
+ * Verticopolis 2.9.0 and earlier wrote, one entry per floor it STOPS at. The two
+ * are identical unless a shaft skips a floor, so only files with a skip-floor
+ * shaft can be ambiguous at all.
  */
-function slotStartScore(r: ByteReader, payload: number): 0 | 1 | 2 {
-  const at = r.offset() + payload;
-  const bytes = r.raw();
-  if (at > bytes.length) return 0;
-  if (bytes.length - at < TDT_ELEVATOR_HEADER_SIZE) return at === bytes.length ? 1 : 0;
-  const used = bytes[at];
-  if (used === 0) return 1; // an empty slot, the fill past the table, or a miss
-  if (used !== 1) return 0;
-  const type = bytes[at + 1];
-  const cars = bytes[at + 3];
-  const topFloor = bytes[at + 64];
-  const bottomFloor = bytes[at + 65];
-  const sane = type <= 2 && cars >= 1 && cars <= 8 && topFloor >= bottomFloor && topFloor < TDT_FLOOR_COUNT;
-  return sane ? 2 : 0;
+type PayloadLayout = "spanned" | "serviced";
+
+/** One built slot's payload size under `layout`. */
+function payloadSize(layout: PayloadLayout, bottomFloor: number, topFloor: number, serviced: Uint8Array): number {
+  if (layout === "spanned") return builtShaftPayloadSize(bottomFloor, topFloor);
+  let stops = 0;
+  for (let i = 0; i < serviced.length; i++) if (serviced[i] !== 0) stops++;
+  return builtShaftPayloadSize(1, Math.max(1, stops)); // same shape, stop count
+}
+
+/** Result of walking the 24-slot elevator table with one layout. `elevators` is
+ *  null when the walk could not complete, with `warning` saying why. */
+interface TableWalk {
+  elevators: TdtElevator[] | null;
+  warning?: string;
+  /** Offset just past the table, for the tail that follows it. */
+  end: number;
+}
+
+const CUT_SHORT =
+  "The elevator table is cut short, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.";
+const NOT_DOCUMENTED =
+  "The elevator table doesn't match the documented layout, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.";
+
+/** Walk the 24-slot elevator table, sizing built payloads per `layout`. */
+function readElevatorTable(r: ByteReader, layout: PayloadLayout): TableWalk {
+  r.enterBlock("elevator table");
+  const elevators: TdtElevator[] = [];
+  for (let slot = 0; slot < TDT_ELEVATOR_SLOTS; slot++) {
+    if (r.remaining() < TDT_ELEVATOR_HEADER_SIZE) return { elevators: null, warning: CUT_SHORT, end: r.offset() };
+    const used = r.u8();
+    const type = r.u8();
+    const capacity = r.u8(); // byte 2; NOT a reliable kind signal (a real service shaft read 21). Kind comes from `type`; see TdtElevator.capacity.
+    const cars = r.u8();
+    r.skip(56); // per-day-type car schedule block (not imported)
+    r.skip(2); // visibility flag + reserved byte
+    const x = r.u16();
+    const topFloor = r.u8();
+    const bottomFloor = r.u8();
+    const serviced = r.bytes(TDT_FLOOR_COUNT);
+    const carHomes: number[] = [];
+    for (let c = 0; c < 8; c++) carHomes.push(r.u8());
+    if (used === 0) continue; // empty slot: header only, no payload
+    // `topFloor`/`bottomFloor` join the checked fields because the payload size
+    // is derived from the span: an INVERTED or out-of-range pair would size the
+    // skip below from garbage. A zero-height shaft is NOT rejected here (its
+    // one-floor payload is well defined); it decodes and is dropped later as
+    // degenerate geometry.
+    if (used !== 1 || type > 2 || cars < 1 || cars > 8 || topFloor < bottomFloor || topFloor >= TDT_FLOOR_COUNT) {
+      // The entry doesn't parse as documented; the payload size would be a
+      // guess, and every later slot would misalign. Bail to synthesis: the same
+      // posture this reader takes for a bad type or car count, and safer than
+      // skipping a guessed distance into the middle of a record.
+      return { elevators: null, warning: NOT_DOCUMENTED, end: r.offset() };
+    }
+    // Built shafts append live passenger/queue state we deliberately skip: our
+    // crowd re-simulates.
+    const payload = payloadSize(layout, bottomFloor, topFloor, serviced);
+    if (r.remaining() < payload) return { elevators: null, warning: CUT_SHORT, end: r.offset() };
+    r.skip(payload);
+    elevators.push({ type, capacity, cars, x, topFloor, bottomFloor, serviced, carHomes });
+  }
+  return { elevators, end: r.offset() };
+}
+
+/**
+ * Which payload layout does this file use?
+ *
+ * Decided ONCE for the whole file rather than per slot. A per-slot choice looks
+ * appealing (each shaft carries its own stop bitmap) but cannot settle the case
+ * that matters: when the skip-floor shaft is the last built one, both candidate
+ * landings fall in zero fill and look identical, and picking wrong there shifts
+ * everything AFTER the table, losing the parking count and, when the shift
+ * exceeds the stairs scan window, the stairways too.
+ *
+ * `spanned` is the default and the answer for every file without a skip-floor
+ * shaft, since the layouts coincide there. When a file does have one, both walks
+ * run and the one whose table END is followed by a readable tail wins: the
+ * stairs table has a strong 64-record signature, so finding flights from one end
+ * offset and not the other is real evidence. Ties keep `spanned`, so a file
+ * written the documented way is never re-read as a legacy one.
+ */
+function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
+  const walk = (layout: PayloadLayout): TableWalk => {
+    const r = new ByteReader(bytes);
+    r.skip(tableStart);
+    return readElevatorTable(r, layout);
+  };
+  const spanned = walk("spanned");
+  // No skip-floor shaft means no ambiguity: the two layouts size every payload
+  // identically, so there is nothing to choose and nothing to pay for.
+  const ambiguous = (spanned.elevators ?? []).some((e) => {
+    let stops = 0;
+    for (let i = 0; i < e.serviced.length; i++) if (e.serviced[i] !== 0) stops++;
+    return stops >= 1 && stops !== e.topFloor - e.bottomFloor + 1;
+  });
+  if (spanned.elevators !== null && !ambiguous) return "spanned";
+  const serviced = walk("serviced");
+  if (serviced.elevators === null) return "spanned";
+  if (spanned.elevators === null) return "serviced";
+  // More shafts decoded is the strongest signal (a wrong size swallows the ones
+  // that follow it); then a tail that actually parses.
+  if (serviced.elevators.length !== spanned.elevators.length) {
+    return serviced.elevators.length > spanned.elevators.length ? "serviced" : "spanned";
+  }
+  const flights = (end: number) => locateStairs(bytes, end).length;
+  return flights(serviced.end) > flights(spanned.end) ? "serviced" : "spanned";
 }
 
 /**
@@ -183,76 +274,36 @@ export function walkTolerantTail(r: ByteReader): TdtTail {
   tail.retailRows = occupied;
 
   // ---- Elevator table (doc §8): 24 entries, variable-width when built -----
-  r.enterBlock("elevator table");
-  const elevators: TdtElevator[] = [];
-  for (let slot = 0; slot < TDT_ELEVATOR_SLOTS; slot++) {
-    if (r.remaining() < TDT_ELEVATOR_HEADER_SIZE) {
-      warnings.push("The elevator table is cut short, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.");
-      return tail;
+  // The elevator table is walked with a LAYOUT chosen for the whole file, not
+  // per slot. See `readElevatorTable` for the two layouts and `chooseLayout` for
+  // how they are told apart.
+  const tableStart = r.offset();
+  const chosen = chooseLayout(r.raw(), tableStart);
+  let reader = r;
+  let table = readElevatorTable(reader, chosen);
+  if (table.elevators === null && chosen === "spanned") {
+    // The documented layout could not be walked at all. Before falling back to
+    // synthesized transports, try the legacy one: a file our own older builds
+    // wrote can fail this way outright when its shorter payloads run the reader
+    // off the end.
+    const retryReader = new ByteReader(r.raw());
+    retryReader.skip(tableStart);
+    const retry = readElevatorTable(retryReader, "serviced");
+    if (retry.elevators !== null) {
+      reader = retryReader;
+      table = retry;
     }
-    const used = r.u8();
-    const type = r.u8();
-    const capacity = r.u8(); // byte 2; NOT a reliable kind signal (a real service shaft read 21). Kind comes from `type`; see TdtElevator.capacity.
-    const cars = r.u8();
-    r.skip(56); // per-day-type car schedule block (not imported)
-    r.skip(2); // visibility flag + reserved byte
-    const x = r.u16();
-    const topFloor = r.u8();
-    const bottomFloor = r.u8();
-    const serviced = r.bytes(TDT_FLOOR_COUNT);
-    const carHomes: number[] = [];
-    for (let c = 0; c < 8; c++) carHomes.push(r.u8());
-    if (used === 0) continue; // empty slot: header only, no payload
-    // `topFloor`/`bottomFloor` join the checked fields now that the payload size
-    // is derived from the span: an INVERTED or out-of-range pair would size the
-    // skip below from garbage. A zero-height shaft is NOT rejected here (its
-    // one-floor payload is well defined); it decodes and is dropped later as
-    // degenerate geometry, exactly as before this change.
-    if (used !== 1 || type > 2 || cars < 1 || cars > 8 || topFloor < bottomFloor || topFloor >= TDT_FLOOR_COUNT) {
-      // The entry doesn't parse as documented; the payload size below would
-      // be a guess, and every later slot would misalign. Bail to synthesis:
-      // the same posture this reader already took for a bad type or car count,
-      // and safer than skipping a guessed distance into the middle of a record.
-      warnings.push("The elevator table doesn't match the documented layout, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.");
-      return tail;
-    }
-    // Built shafts append live passenger/queue state we deliberately skip: our
-    // crowd re-simulates. The size comes from the shared helper, which the
-    // writer and the test fixture use too, so the three cannot drift apart (see
-    // builtShaftPayloadSize). The guard above already rejected the only input it
-    // refuses, so it cannot throw here.
-    const payload = builtShaftPayloadSize(bottomFloor, topFloor);
-    // LEGACY FALLBACK. Verticopolis 2.9.0 and earlier wrote one per-floor entry
-    // per SERVICED floor rather than per spanned floor (that was the bug this
-    // reader's rule fixed). The retail game always writes the spanned layout, so
-    // spanned stays the default, but a `.TDT` OUR older builds exported with a
-    // skip-floor shaft is shorter, and skipping the spanned distance walks past
-    // the next slot into zeros, where `used === 0` reads as an empty slot and
-    // every later shaft disappears with nothing to warn about. The two sizes are
-    // identical unless the shaft skips a floor, so this only ever engages on the
-    // files that need it: when they differ, take whichever landing actually
-    // looks like the next slot.
-    let servicedCount = 0;
-    for (let i = 0; i < serviced.length; i++) if (serviced[i] !== 0) servicedCount++;
-    let chosen = payload;
-    if (servicedCount !== topFloor - bottomFloor + 1 && servicedCount >= 1) {
-      const legacy = builtShaftPayloadSize(1, servicedCount); // same shape, serviced-floor count
-      // Spanned stays the default and only loses to a STRICTLY better landing,
-      // so a file written the documented way is never re-read as a legacy one.
-      if (slotStartScore(r, legacy) > slotStartScore(r, payload)) chosen = legacy;
-    }
-    if (r.remaining() < chosen) {
-      warnings.push("The elevator table is cut short, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.");
-      return tail;
-    }
-    r.skip(chosen);
-    elevators.push({ type, capacity, cars, x, topFloor, bottomFloor, serviced, carHomes });
   }
-  tail.elevators = elevators;
+  if (table.elevators === null) {
+    warnings.push(table.warning!);
+    return tail;
+  }
+  tail.elevators = table.elevators;
   // The stairs table lives after the finance and parking/lobby blocks, whose
   // sizes we can't yet pin down across saves, so we locate it by signature from
   // here (the end of the elevator table) rather than by summing those blocks.
-  const afterElevators = r.offset();
+  const afterElevators = reader.offset();
+  r = reader;
 
   // ---- Finance block (doc §9): best-effort; only used for parkingConnected.
   // Stairs no longer depend on landing exactly after it. ----
