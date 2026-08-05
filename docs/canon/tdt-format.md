@@ -339,6 +339,38 @@ that skips most of what it spans.
 >   the game persists stairways in a re-save is an open question; the genuine
 >   from-play saves that defined the stairs table in this doc do carry them.)
 >
+> **Four controlled probes, 2026-08-04 evening: the trigger is the express
+> RECORD, and it is NOT its length.** Each variant was built by rewriting only
+> the elevator table of one 23-shaft export, leaving every other byte and the
+> file length alone, then loaded and re-saved by the game:
+>
+> | variant | shafts the game keeps |
+> |---|---|
+> | no express at all (both express records deleted) | **21 of 21** |
+> | express LAST, span-sized (what we ship) | **22 of 23** (loses only the second express) |
+> | express FIRST, span-sized | **1** (the express alone) |
+> | express FIRST, stop-sized (the game's own sizing) | **2** (express + 1) |
+>
+> The no-express row kills the "8-shaft ceiling" reading outright: with no
+> express the game keeps every shaft, so shaft COUNT was never the limit. The
+> last two rows kill the size theory: giving the express exactly the length the
+> game itself writes (6,274 bytes, verified byte-for-byte) still loses the 20
+> shafts behind it. So an express record ends the useful read of the table
+> whatever its length, and the surviving-tail count (0, 1, or 2 shafts observed)
+> does not track the sizing in any way we can yet explain.
+>
+> That leaves the express record's CONTENT, not its extent: our per-floor
+> entries are zero-filled where the game's carry live queue state, and the same
+> zero-fill is harmless for standard and service shafts. Whether the game
+> chokes on that, on the express's stop bitmap, or on something in the fixed
+> block is the open question. The practical consequence is settled either way:
+> ordering express last is not a stopgap for a sizing bug, it is the correct
+> shipping answer until the content question is understood, because it puts the
+> unreadable record where nothing follows it.
+>
+> A re-save of a re-save is a **fixpoint**: the 8-shaft file re-saves to the
+> same 8 shafts, same table end, same 5,672-byte tail.
+>
 > **What that pins, and what it does not.** The game WRITES the express
 > stop-sized (measured directly on one game-written save by header-to-header
 > distance, and independently on the 384,658-byte re-save by the EOF fit above),
