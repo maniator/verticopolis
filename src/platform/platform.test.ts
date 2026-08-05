@@ -249,6 +249,18 @@ describe("isPlatformPort: onHostCommand is optional on purpose", () => {
     expect(resolvePlatform("desktop", full)).toBe(full);
   });
 
+  it("onFlushRequest follows the same rule: absent fine, function fine, junk rejected", () => {
+    // Story D6's member. Pinned here so deleting its duck-check clause (or
+    // the browser port growing the member) cannot go green.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const withFlush = { ...fakePort(), onFlushRequest: vi.fn() };
+    expect(resolvePlatform("desktop", withFlush)).toBe(withFlush);
+    expect(resolvePlatform("desktop", { ...fakePort(), onFlushRequest: 42 })).toBe(browserPlatform);
+    expect(resolvePlatform("desktop", { ...fakePort(), onFlushRequest: {} })).toBe(browserPlatform);
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(browserPlatform.onFlushRequest).toBeUndefined();
+  });
+
   it("the browser default defines neither, so the browser binds nothing", () => {
     expect(browserPlatform.onHostCommand).toBeUndefined();
     expect(browserPlatform.setCommandsAvailable).toBeUndefined();
