@@ -131,7 +131,16 @@ export async function exportStoredTower(
   const committed = committedAddressFor("auto");
   if (committed === undefined) return "fallback";
   try {
-    return (await store.exportRecord("auto", committed.scope, suggestedName)) === true ? "exported" : "canceled";
+    const outcome: unknown = await store.exportRecord("auto", committed.scope, suggestedName);
+    if (outcome === true) return "exported";
+    if (outcome === false) return "canceled";
+    // A malformed resolution (undefined, null, an object) is a broken shell,
+    // not a player's choice. Reading it as "canceled" would pick the one
+    // branch with zero feedback, so on that shell Export would silently do
+    // nothing forever; the live path at least hands the player a file. The
+    // same posture writeTowerToStoreSync takes with a malformed writeSync
+    // answer (both review hunters converged on this line).
+    return "fallback";
   } catch {
     return "fallback";
   }

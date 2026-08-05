@@ -246,7 +246,19 @@ export interface SaveStorePort {
    * canceled the dialog. Cancel is a choice, not an error: the caller must
    * neither claim success (a review caught the success toast firing on a
    * canceled dialog) nor fall back to another export path, which would
-   * greet the cancel with a second dialog.
+   * greet the cancel with a second dialog. Anything other than a strict
+   * boolean is read as a broken shell and sends the caller to its fallback.
+   *
+   * TWO TIMING OBLIGATIONS ON THE SHELL, because the dialog can sit open for
+   * minutes while the renderer keeps autosaving to the same record:
+   *
+   *  - Capture the record's BYTES at call time, BEFORE showing the dialog.
+   *    Copying the file after the dialog closes is a TOCTOU: the record can
+   *    have been rewritten (or replaced by a different tower routed to the
+   *    same address) while the dialog sat open, and the player then receives
+   *    other bytes under the filename they chose.
+   *  - Show the dialog MODAL to the game window, so the game cannot be
+   *    driven into a second export (or a tower switch) mid-dialog.
    *
    * Optional like every member added after the original three: the export
    * flow falls back to its live-serialize path when this is absent.

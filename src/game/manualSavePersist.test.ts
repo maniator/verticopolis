@@ -299,6 +299,21 @@ describe("exportStoredTower (story D7, D2's AC22)", () => {
     expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe("canceled");
   });
 
+  it("a MALFORMED resolution falls back, never reads as a silent cancel", async () => {
+    // Both review hunters converged here: a non-boolean resolution mapped to
+    // "canceled" picks the one branch with zero feedback, so on a broken
+    // shell Export would silently do nothing forever. Strict true and strict
+    // false are the only choices; everything else is the fallback.
+    const store = fakeStore(SHARED);
+    withWriteSync(store);
+    store.port.exportRecord = () => Promise.resolve(undefined as never);
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    const { exportStoredTower } = await import("./manualSavePersist");
+    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe("fallback");
+  });
+
   it("a rejecting exportRecord falls back to the live path", async () => {
     const store = fakeStore(SHARED);
     withWriteSync(store);
