@@ -8,6 +8,9 @@ import {
   TDT_HEADER_SIZE,
   TDT_MAX_FILE_BYTES,
   TDT_STAIR_RECORD_SIZE,
+  TDT_STAMP_GENERATION,
+  TDT_STAMP_MAGIC,
+  TDT_STAMP_SIZE,
   locateStairs,
   parseTdtBinary,
 } from "../../storage/tdtFormat";
@@ -48,6 +51,21 @@ function oneTenant(type: number, left = 100, right = 109, status = 0): TdtSpec {
   const id = Math.abs(type);
   const index = BASEMENT_ONLY_IDS.has(id) ? 6 : CATHEDRAL_IDS.has(id) ? 109 : 20;
   return { floors: [{ index, tenants: [{ left, right, type, status }] }] };
+}
+
+/** Append our trailer (magic + u16 generation) to a fixture, the way the
+ *  exporter does. Fixtures are unstamped by default, since that is what the
+ *  1994 game writes. */
+function withStamp(bytes: Uint8Array, generation: number): Uint8Array {
+  const out = new Uint8Array(bytes.length + TDT_STAMP_SIZE);
+  out.set(bytes);
+  for (let i = 0; i < TDT_STAMP_MAGIC.length; i++) {
+    out[bytes.length + i] = TDT_STAMP_MAGIC.charCodeAt(i);
+  }
+  const g = bytes.length + TDT_STAMP_MAGIC.length;
+  out[g] = generation & 0xff;
+  out[g + 1] = (generation >> 8) & 0xff;
+  return out;
 }
 
 describe("tdtFormat: hostile-file hardening (typed errors, never hangs)", () => {
@@ -896,6 +914,142 @@ describe("transport decode: the save's own shafts and flights", () => {
     expect(skipper.skipFloors).toEqual([4, 5, 6, 7, 8]);
   });
 
+  it("a game-written EXPRESS shaft keeps the shafts, stairs and parking after it", () => {
+    // #740, measured on the Wine harness 2026-08-04: retail SimTower sizes an
+    // express shaft's payload by the floors it STOPS at, not the floors it
+    // spans. Reading such a file with the spanned rule overshoots by 324 bytes
+    // per skipped floor (26,892 on the save that found this), so the walk lands
+    // mid-record and the table, the stairways and the parking count are all
+    // lost. An express spanning 91 floors and stopping at 8 is that save's shape.
+    const stops = [10, 25, 40, 55, 70, 85, 99, 100];
+    const spec: TdtSpec = {
+      elevators: [
+        { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: stops },
+        // What the desync used to eat: everything written after the express.
+        { type: 1, cars: 6, x: 145, bottomFloor: 10, topFloor: 24 },
+        // A STANDARD shaft that also skips floors, which is what makes this file
+        // readable under exactly one rule: the old span-everything walk mis-sizes
+        // the express, and the old stops-everything walk mis-sizes this one, so
+        // neither predecessor can parse the file and pass by luck.
+        { type: 1, cars: 4, x: 251, bottomFloor: 24, topFloor: 39, serviced: [24, 25, 30, 39] },
+        { type: 2, cars: 3, x: 209, bottomFloor: 39, topFloor: 54 },
+      ],
+      stairs: [{ type: 1, x: 120, floor: 10 }],
+      parkingConnected: 302,
+      routingTailBytes: 20_000,
+    };
+    const walked = parseTdtBinary(buildTdt(spec));
+    expect(walked.warnings).toEqual([]);
+    expect(walked.elevators!.map((e) => e.x)).toEqual([175, 145, 251, 209]);
+    expect(walked.stairs).toHaveLength(1);
+    expect(walked.parkingConnected).toBe(302); // the tail a missized express shifts off
+    expect(walked.elevators![0].serviced.filter((s) => s !== 0).length).toBe(stops.length);
+  });
+
+  it("OUR OWN span-sized express reads correctly, stamped or not", () => {
+    // Our writer spans every kind, express included, and the 1994 game accepts
+    // that. Both routes to reading it back are pinned here, deliberately with
+    // NOTHING for the inference to anchor on (no stairways, no routing region):
+    // the trailer states the layout outright, and without it the fallback still
+    // lands on the longest walk that completes, which is the same answer.
+    //
+    // So the stamp is not load-bearing for this shape, and the test says so
+    // rather than implying it. What the stamp buys is skipping the inference
+    // entirely, which is what keeps a future layout from having to be guessed.
+    const spec: TdtSpec = {
+      elevators: [
+        { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: [10, 55, 100] },
+        { type: 1, cars: 6, x: 145, bottomFloor: 10, topFloor: 24 },
+      ],
+      stairs: [],
+      parkingConnected: 7,
+      spannedExpressPayload: true,
+    };
+    const bare = buildTdt(spec);
+    for (const [label, bytes] of [
+      ["stamped", withStamp(bare, TDT_STAMP_GENERATION)],
+      ["unstamped", bare],
+    ] as const) {
+      const walked = parseTdtBinary(bytes);
+      expect(walked.warnings, label).toEqual([]);
+      expect(walked.elevators!.map((e) => e.x), label).toEqual([175, 145]);
+      expect(walked.parkingConnected, label).toBe(7);
+    }
+  });
+
+  it("an UNSTAMPED span-sized express is still read, on the file's own evidence", () => {
+    // The same shape without a trailer, which is what a v2.12.0 export is: that
+    // build wrote the span layout before the stamp existed. Nothing states the
+    // layout, so the structural inference has to carry it, exactly as it does
+    // for the older stop-sized files.
+    const spec: TdtSpec = {
+      elevators: [
+        { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: [10, 55, 100] },
+        { type: 1, cars: 6, x: 145, bottomFloor: 10, topFloor: 24 },
+      ],
+      stairs: [{ type: 1, x: 120, floor: 10 }],
+      parkingConnected: 7,
+      routingTailBytes: 20_000,
+      spannedExpressPayload: true,
+    };
+    const walked = parseTdtBinary(buildTdt(spec));
+    expect(walked.elevators!.map((e) => e.x)).toEqual([175, 145]);
+    expect(walked.parkingConnected).toBe(7);
+    expect(walked.warnings).toEqual([]);
+  });
+
+
+  it("an unstamped span-sized express with NOTHING to anchor on is still read", () => {
+    // The shape that made the shorter layout dangerous as a fallback: a v2.12.0
+    // export (span-sized express, no trailer) that is stairless AND cut inside
+    // the routing region, so neither anchor can fire. Reading it with the
+    // express rule under-skips, takes our zero fill for empty slot headers, and
+    // returns a table that is not there with the parking count read out of
+    // padding. The fallback is the LONGEST walk precisely so this bails instead.
+    for (const tailBytes of [0, 32, 63]) {
+      const spec: TdtSpec = {
+        elevators: [
+          { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: [10, 55, 100] },
+          { type: 1, cars: 6, x: 145, bottomFloor: 10, topFloor: 24 },
+        ],
+        stairs: [],
+        parkingConnected: 7,
+        routingTailBytes: tailBytes,
+        spannedExpressPayload: true,
+      };
+      const walked = parseTdtBinary(buildTdt(spec));
+      // The longest walk that completes IS the right one here, so this shape
+      // reads correctly rather than merely failing loudly. The weaker promise
+      // is the floor: never a confident table with parking read from zero fill.
+      expect(walked.elevators!.map((e) => e.x), `tail ${tailBytes}`).toEqual([175, 145]);
+      expect(walked.parkingConnected, `tail ${tailBytes}`).toBe(7);
+      expect(walked.warnings, `tail ${tailBytes}`).toEqual([]);
+    }
+  });
+
+
+  it("an express with NO stops recorded does not get the default handed to it", () => {
+    // The layouts disagree most at zero stops: the stop-based ones floor the
+    // payload at a single entry while the spanned one sizes it by the whole
+    // span, so calling that shape "unambiguous" (as a `stops >= 1` guard did)
+    // skipped the evidence and silently dropped whatever followed the express.
+    const spec: TdtSpec = {
+      elevators: [
+        { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: [] },
+        { type: 1, cars: 6, x: 145, bottomFloor: 10, topFloor: 24 },
+      ],
+      stairs: [{ type: 1, x: 120, floor: 10 }],
+      parkingConnected: 7,
+      routingTailBytes: 20_000,
+      spannedExpressPayload: true,
+    };
+    const walked = parseTdtBinary(buildTdt(spec));
+    expect(walked.elevators!.map((e) => e.x)).toEqual([175, 145]);
+    expect(walked.parkingConnected).toBe(7);
+    expect(walked.stairs).toHaveLength(1);
+    expect(walked.warnings).toEqual([]);
+  });
+
   it("a stamp from a generation we do not know does NOT override the structural read", () => {
     // The stamp is a shortcut only for generations this build understands. A
     // generation from a LATER build says "written by something newer", and the
@@ -913,16 +1067,8 @@ describe("transport decode: the save's own shafts and flights", () => {
       legacyServicedPayload: true,
     };
     const base = buildTdt(legacy);
-    const stamped = (generation: number): Uint8Array => {
-      const out = new Uint8Array(base.length + 7);
-      out.set(base);
-      for (let i = 0; i < 5; i++) out[base.length + i] = "VCTDT".charCodeAt(i);
-      out[base.length + 5] = generation & 0xff;
-      out[base.length + 6] = generation >> 8;
-      return out;
-    };
-    for (const generation of [2, 7, 0, 0xffff]) {
-      const walked = parseTdtBinary(stamped(generation));
+    for (const generation of [2, 3, 7, 0, 0xffff]) {
+      const walked = parseTdtBinary(withStamp(base, generation));
       expect(walked.elevators, `generation ${generation}`).toHaveLength(2);
       expect(walked.elevators!.map((e) => e.x), `generation ${generation}`).toEqual([100, 140]);
       expect(walked.warnings, `generation ${generation}`).toEqual([]);

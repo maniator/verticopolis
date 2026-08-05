@@ -156,6 +156,61 @@ export function builtShaftPayloadSize(bottomFloor: number, topFloor: number): nu
   }
   return TDT_ELEVATOR_BUILT_FIXED + spannedFloors * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_CAR_BLOCK_SIZE;
 }
+
+/** Elevator `type` byte for an express shaft (first entry in ELEVATOR_KINDS).
+ *  Named because the payload rule below turns on it. */
+export const TDT_ELEVATOR_TYPE_EXPRESS = 0;
+
+/**
+ * One built shaft's payload size the way the 1994 GAME sizes it, by kind.
+ *
+ * Standard and service shafts hold one per-floor entry for every floor they
+ * span. An EXPRESS shaft holds one for every floor it STOPS at. That is the
+ * only place the two rules can differ: an express is the kind that skips most
+ * of what it spans, while a standard or service shaft usually stops everywhere
+ * it passes, which is why this went unnoticed for so long. (Usually, not
+ * always: a standard shaft CAN be given skip floors, and whether the game spans
+ * or stops for that case is unmeasured. Both this reader and our writer span it,
+ * per the 2026-07-13 measurement in doc §8.)
+ *
+ * **Our own EXPORTER does not call this, on purpose.** It sizes every kind by
+ * span via {@link builtShaftPayloadSize}, express included, and the game accepts
+ * those files. Aligning the writer with the game here looks like the obvious
+ * follow-up and was tried: the same tower exported both ways loads with the SAME
+ * shafts, so nothing is gained, and the "write express last" workaround it would
+ * have justified removing is still doing real work. Do not "fix" the exporter to
+ * call this without new evidence; see issue #740.
+ *
+ * Harness-measured 2026-08-04 against a save retail SimTower wrote: an express
+ * spanning floors 10..100 and stopping at 8 of them occupies 6,274 bytes, which
+ * is `194 + 3140 + 324 * 8 + 348`. Sizing that same shaft by its 91 spanned
+ * floors gives 33,166, so a writer that spans runs 26,892 bytes long and the
+ * 1994 game loses every shaft after the express. Issue #740 and doc §8.
+ *
+ * `servicedCount` is clamped up to one entry. Our writer always stops at both
+ * endpoints so it cannot emit zero, and a file claiming zero is malformed
+ * either way; what matters is that the reader and the writer size such a record
+ * the SAME, which they do only by both coming through here.
+ */
+export function builtShaftPayloadSizeFor(
+  type: number,
+  bottomFloor: number,
+  topFloor: number,
+  servicedCount: number,
+): number {
+  // Validate the SPAN for every kind, express included. The express branch does
+  // not use the span to size anything, but this is the entry point a writer is
+  // told to call, and an inverted or fractional span is a bug either way: it
+  // would be caught for a standard shaft and wave through for an express, which
+  // is the least useful place to be lenient.
+  const spanned = builtShaftPayloadSize(bottomFloor, topFloor);
+  if (type !== TDT_ELEVATOR_TYPE_EXPRESS) return spanned;
+  if (!Number.isInteger(servicedCount)) {
+    throw new RangeError(`express stop count must be a whole number of floors (got ${servicedCount})`);
+  }
+  // Expressed as a 1..n range so ALL of the arithmetic stays in one function.
+  return builtShaftPayloadSize(1, Math.max(1, servicedCount));
+}
 export const TDT_FINANCE_SIZE = 132;
 export const TDT_PARKING_SIZE = 2 + 512 * 2;
 export const TDT_STAIR_SLOTS = 64;
@@ -211,7 +266,10 @@ export const TDT_ROUTING_TAIL_SIZE = 0x6400;
  */
 export const TDT_STAMP_MAGIC = "VCTDT";
 /** Bumped when OUR writer changes the bytes in a way a reader must know about.
- *  1 = the spanned-floor elevator payload (see {@link builtShaftPayloadSize}). */
+ *  1 = every built shaft sized by its SPANNED floors, express included. That is
+ *  NOT what the 1994 game writes for an express (see
+ *  {@link builtShaftPayloadSizeFor}), but it is what our writer emits and what
+ *  the game accepts, so it stays generation 1 until the writer itself changes. */
 export const TDT_STAMP_GENERATION = 1;
 /** Magic bytes plus a u16 generation. */
 export const TDT_STAMP_SIZE = TDT_STAMP_MAGIC.length + 2;

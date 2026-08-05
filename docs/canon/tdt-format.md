@@ -272,29 +272,56 @@ and up to 40 queued person indices each way; a floor the shaft passes without
 stopping still gets its entry), then a **single 348-byte car block** (current floor,
 passenger count, turnaround floor, up to 42 passenger indices, their destination
 floors, and per-floor destination counts). So one built shaft's record stride is
-`194 + 3140 + 324 * spannedFloors + 348`, where `spannedFloors` is
-`topFloor - bottomFloor + 1` (**every floor the shaft passes, stop or not**, see
-the correction below) and the 348 block is **cars-INDEPENDENT**, NOT `* cars`.
+`194 + 3140 + 324 * perFloorEntries + 348`, and the 348 block is
+**cars-INDEPENDENT**, NOT `* cars`.
 
-> **OPEN (Verticopolis RE, 2026-07-31, Wine harness): the retail game loses
-> every shaft written AFTER an express slot.** Isolated with minimal two-shaft
-> towers: express then standard loses the standard; standard then express keeps
-> both; a standard shaft skipping 27 of its 30 floors keeps both, so neither
-> stop-skipping nor span is the trigger. The express itself always renders. Six
-> byte-level probes on the express payload (+348, +9,720, +29,160, -348, -3,140,
-> -9,720) all still lost the following shaft, so the size is not simply a
-> multiple of the blocks we know. **The trigger is the `type` byte @1**: flipping
-> it from 0 (express) to 1 (standard) on an otherwise byte-identical file makes
-> the following shaft render, so a `type = 0` record has a DIFFERENT size than a
-> type 1/2 one, and our writer emits one size for all three kinds. Patching the
-> capacity byte (42 → 21) or the car count changes nothing. The exact size cannot
-> be brute-forced from the render: the game resumes reading 194-byte headers from
-> wherever it thinks the payload ended, and zero padding preserves that
-> misalignment, so only the exact value works and there is nothing to bisect on.
-> **Measuring it needs a game-written save containing an express shaft**, the same
-> way the 3,140-byte block was measured on my_tower. Until then the exporter
-> writes express shafts LAST, so a tower with one express keeps every other
-> shaft. See the backlog's `tdt-express-desync` (#740).
+`perFloorEntries` depends on the shaft's KIND:
+
+- **standard and service** (`type` 1 and 2): one entry per SPANNED floor,
+  `topFloor - bottomFloor + 1`, **every floor the shaft passes, stop or not**
+  (see the 2026-07-13 correction below).
+- **express** (`type` 0): one entry per **SERVICED** floor, the count of set
+  bytes in the header's 120-byte stop bitmap, in files the 1994 game wrote (see
+  the 2026-08-04 measurement below). Our own exporter still spans this kind too,
+  which the game accepts; the importer tells the two apart by the trailer (§12a).
+
+The distinction is invisible on standard and service shafts, which stop at every
+floor they pass, and that is why it went unnoticed: an express is the one kind
+that skips most of what it spans.
+
+> **MEASURED (Verticopolis RE, 2026-08-04, Wine harness): the retail game
+> WRITES an express shaft's payload sized by its SERVICED floors.** From a save
+> SimTower itself wrote (4-star tower loaded, nothing built, `File > Save`),
+> scanned for the 194-byte slot-header signature and measured by the distance
+> between consecutive headers, which is the size the writer actually used. An
+> express spanning floors 10..100 and stopping at 8 of them occupies
+> **6,274 bytes** = `194 + 3140 + 324 * 8 + 348`. The same shaft sized by its 91
+> spanned floors would be 33,166. Every standard and service record in that file
+> matched the spanned prediction exactly, so the divergence is specific to
+> `type = 0`, which is consistent with the earlier probe isolating the trigger to
+> the `type` byte.
+>
+> **The importer must handle it, and now does.** Before this, a game-written file
+> containing a skip-stopping express could not be read at all: the walk overshot
+> by 324 bytes per skipped floor, landed mid-record, and lost the elevator table,
+> the stairs table and the parking count together. It now reads with no warnings.
+>
+> **The exporter is deliberately NOT changed.** The obvious inference, that our
+> span-sized express is what makes the game lose the shafts after it, does not
+> survive testing: a real tower exported both ways (span-sized and stop-sized
+> express) loads in the game with the SAME shafts either way, so the game's
+> reader accepts both. Whatever truncates the table is something else, and the
+> "write express shafts last" mitigation stays until it is understood.
+>
+> **Still open, and now the sharper question:** loading a 23-shaft export, the
+> game keeps exactly the first 8 shafts, in file order, and re-saves only those.
+> The cut does not move when the express payload is resized, and it does not move
+> when the two duplicate columns in that tower are relocated. See issue #740.
+>
+> **Not settled by this save:** every non-express shaft in it stops at every
+> floor it spans, so spanned and serviced predict the same size for them. The
+> spanned rule for standard and service still rests on the 2026-07-13
+> measurement below.
 
 > **Corrected (Verticopolis RE, 2026-07-13, Wine harness vs the real 1994
 > game):** the appended 348-byte block appears **ONCE per built shaft, not once
@@ -420,7 +447,11 @@ Everything above describes the original's format. This section describes bytes
 
 A `.TDT` Verticopolis writes ends with a small trailer: the ASCII magic
 `VCTDT`, then a **u16 generation** (little-endian, like every other word here).
-Generation `1` is the spanned-floor elevator payload (§8).
+Generation `1` is the spanned-floor elevator payload (§8), which our writer uses
+for every kind, express included. An UNSTAMPED file gets no such statement and
+is decided by the structural reasoning described under "Reading it" below: it
+may be a save the 1994 game wrote, or one of ours from before the trailer
+existed, and those two want different rules.
 
 **Why.** A `.TDT` carries no statement of who wrote it, so when our own writer's
 layout changed, the importer had to *infer* which of our writers produced a file

@@ -9,6 +9,7 @@ import {
   TDT_ELEVATOR_HEADER_SIZE,
   TDT_ELEVATOR_SLOTS,
   builtShaftPayloadSize,
+  builtShaftPayloadSizeFor,
   TDT_FINANCE_SIZE,
   TDT_FLOOR_COUNT,
   TDT_MAX_PEOPLE,
@@ -155,22 +156,54 @@ export function stairsTableStartsAt(bytes: Uint8Array, at: number): boolean {
 }
 
 /**
- * How a built elevator slot's payload is sized.
+ * How a built elevator slot's payload is sized. Three writers have to be read:
  *
- * `spanned` is the documented layout and what the retail game writes: one
- * per-floor entry for every floor the shaft passes. `serviced` is what
- * Verticopolis 2.9.0 and earlier wrote, one entry per floor it STOPS at. The two
- * are identical unless a shaft skips a floor, so only files with a skip-floor
- * shaft can be ambiguous at all.
+ * - `expressServiced`: an express shaft sized by the floors it STOPS at, every
+ *   other kind by the floors it spans. What the retail game writes (measured;
+ *   see {@link builtShaftPayloadSizeFor}), so it leads for an UNSTAMPED file.
+ * - `spanned`: every kind sized by spanned floors. What OUR writer emits and
+ *   what a stamped file is read with. Also the longest walk, which is why it is
+ *   preferred when nothing is corroborated: overshooting bails loudly.
+ * - `serviced`: every kind sized by stops. Verticopolis 2.9.0 and earlier.
+ *
+ * All three agree on a shaft that stops at every floor it passes, which is every
+ * standard and service shaft in practice, so only a file with a skip-stopping
+ * shaft can be ambiguous at all, and an express is the kind that always skips.
  */
-type PayloadLayout = "spanned" | "serviced";
+type PayloadLayout = "expressServiced" | "spanned" | "serviced";
+
+/**
+ * Stops recorded in a slot's 120-byte serviced bitmap, counting only floors the
+ * shaft actually spans.
+ *
+ * The clamp is the safer read of an unmeasured detail: the harness measurement
+ * (324 * 8 for a shaft stopping at 8 of its 91 floors) cannot tell "every set
+ * bit" from "set bits within the span", since that save has none outside. A
+ * shaft shortened after it was built is the obvious way a stale bit could sit
+ * out there, and counting one sizes the payload 324 bytes long and lands the
+ * walk mid-record. Counting only what the shaft spans cannot err that way.
+ */
+function stopCount(serviced: Uint8Array, bottomFloor: number, topFloor: number): number {
+  let stops = 0;
+  const from = Math.max(0, bottomFloor);
+  const to = Math.min(serviced.length - 1, topFloor);
+  for (let i = from; i <= to; i++) if (serviced[i] !== 0) stops++;
+  return stops;
+}
 
 /** One built slot's payload size under `layout`. */
-function payloadSize(layout: PayloadLayout, bottomFloor: number, topFloor: number, serviced: Uint8Array): number {
+function payloadSize(
+  layout: PayloadLayout,
+  type: number,
+  bottomFloor: number,
+  topFloor: number,
+  serviced: Uint8Array,
+): number {
+  if (layout === "expressServiced") {
+    return builtShaftPayloadSizeFor(type, bottomFloor, topFloor, stopCount(serviced, bottomFloor, topFloor));
+  }
   if (layout === "spanned") return builtShaftPayloadSize(bottomFloor, topFloor);
-  let stops = 0;
-  for (let i = 0; i < serviced.length; i++) if (serviced[i] !== 0) stops++;
-  return builtShaftPayloadSize(1, Math.max(1, stops)); // same shape, stop count
+  return builtShaftPayloadSize(1, Math.max(1, stopCount(serviced, bottomFloor, topFloor))); // same shape, stop count
 }
 
 /** Result of walking the 24-slot elevator table with one layout. `elevators` is
@@ -220,7 +253,7 @@ function readElevatorTable(r: ByteReader, layout: PayloadLayout): TableWalk {
     }
     // Built shafts append live passenger/queue state we deliberately skip: our
     // crowd re-simulates.
-    const payload = payloadSize(layout, bottomFloor, topFloor, serviced);
+    const payload = payloadSize(layout, type, bottomFloor, topFloor, serviced);
     if (r.remaining() < payload) return { elevators: null, warning: CUT_SHORT, end: r.offset() };
     r.skip(payload);
     elevators.push({ type, capacity, cars, x, topFloor, bottomFloor, serviced, carHomes });
@@ -238,12 +271,12 @@ function readElevatorTable(r: ByteReader, layout: PayloadLayout): TableWalk {
  * everything AFTER the table, losing the parking count and, when the shift
  * exceeds the stairs scan window, the stairways too.
  *
- * `spanned` is the default and the answer for every file without a skip-floor
- * shaft, since the layouts coincide there. When a file does have one, both walks
- * run and the one whose table END is followed by a readable tail wins: the
+ * Every file without a skip-stopping shaft reads the same under all three layouts,
+ * so there is nothing to decide there. When a file does have one, each layout is
+ * walked and the first whose table END is followed by a readable tail wins: the
  * stairs table has a strong 64-record signature, so finding flights from one end
- * offset and not the other is real evidence. Ties keep `spanned`, so a file
- * written the documented way is never re-read as a legacy one.
+ * offset and not another is real evidence. A file that corroborates none falls
+ * back to `spanned`, the longest walk, whose wrong guess fails loudly.
  */
 function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
   // A file stamped with a generation we KNOW states its writer, so there is
@@ -256,7 +289,7 @@ function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
   // can only ever help. A future generation adds its case here.
   switch (stampedGeneration(bytes)) {
     case TDT_STAMP_GENERATION:
-      return "spanned";
+      return "spanned"; // our own writer, which spans every kind including express
     default:
       break; // unstamped, or a generation this reader does not know
   }
@@ -265,17 +298,17 @@ function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
     r.skip(tableStart);
     return readElevatorTable(r, layout);
   };
-  const spanned = walk("spanned");
-  // No skip-floor shaft means no ambiguity: the two layouts size every payload
-  // identically, so there is nothing to choose and nothing to pay for.
-  const ambiguous = (spanned.elevators ?? []).some((e) => {
-    let stops = 0;
-    for (let i = 0; i < e.serviced.length; i++) if (e.serviced[i] !== 0) stops++;
-    return stops >= 1 && stops !== e.topFloor - e.bottomFloor + 1;
-  });
-  if (spanned.elevators !== null && !ambiguous) return "spanned";
-  const serviced = walk("serviced");
-  if (serviced.elevators === null) return "spanned";
+  const current = walk("expressServiced");
+  // A shaft that stops at every floor it passes sizes the same under all three
+  // layouts, so a file with only those has nothing to choose and pays nothing.
+  //
+  // ZERO stops is NOT such a shaft: the stop-based layouts floor it at a single
+  // entry (see builtShaftPayloadSizeFor) while `spanned` sizes it by the whole
+  // span, so they disagree most exactly there. It earns its answer below.
+  const ambiguous = (current.elevators ?? []).some(
+    (e) => stopCount(e.serviced, e.bottomFloor, e.topFloor) !== e.topFloor - e.bottomFloor + 1,
+  );
+  if (current.elevators !== null && !ambiguous) return "expressServiced";
   // ONE rule decides it: the legacy layout is taken only when the file itself
   // corroborates it, by placing a structure we know the old writer's position
   // for exactly where that walk's table would have ended. Two such markers,
@@ -284,15 +317,21 @@ function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
   // stairs table further on. The second carries what the first cannot, a tower
   // with NO stairways, whose 64 empty records say nothing.
   //
-  // Requiring evidence rather than merely preferring `spanned` is what makes
+  // Requiring evidence rather than merely preferring one layout is what makes
   // this safe. Every weaker rule tried here let some file through wrongly: a
   // per-slot landing check cannot see past the last built shaft; "more shafts
-  // decoded" reads a truncated CURRENT file as legacy, because the short walk
-  // takes the zero fill for empty headers and finishes where the honest walk
-  // correctly gave up; and a stairs flight COUNT cannot separate ends that
-  // differ by less than the scan window. A file that corroborates neither
-  // layout stays on `spanned`, which is what the retail game writes and what
-  // this reader documents.
+  // decoded" reads a truncated file as legacy, because the short walk takes the
+  // zero fill for empty headers and finishes where the honest walk correctly
+  // gave up; and a stairs flight COUNT cannot separate ends that differ by less
+  // than the scan window.
+  //
+  // A file that corroborates NOTHING falls back to `spanned`, and which layout
+  // that is matters more than it looks. `spanned` is the LONGEST walk, so
+  // guessing it wrongly runs off the end of the file and bails with a warning,
+  // where guessing a shorter one wrongly under-skips, reads the zero fill as
+  // empty slot headers, and returns a table that is not there with nothing said.
+  // A loud wrong answer the player can see beats a silent one, so the fallback
+  // is the layout that fails loudly, not the one this build writes.
   //
   // Both markers are the same question asked of a different structure: does
   // something whose position under the old writer we know exactly sit where
@@ -305,9 +344,9 @@ function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
   // are for a stairless tower with no connected stalls. Nothing can tell those
   // two apart, so an EOF anchor cannot help the old file without silently
   // mis-reading the damaged one, and a silent wrong answer is the worse of the
-  // two. A pre-v1.14.0 stairless export therefore falls back to `spanned`,
-  // fails to walk, and reaches the player as synthesized transports WITH a
-  // warning. See the backlog's `tdt-legacy-pre-tail-import`.
+  // two. A pre-v1.14.0 stairless export therefore corroborates nothing, fails to
+  // walk under whichever layout the fallback picks, and reaches the player as
+  // synthesized transports WITH a warning. See the backlog's `tdt-legacy-pre-tail-import`.
   const anchored = (end: number) => {
     const afterParking = end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE;
     return (
@@ -315,7 +354,32 @@ function chooseLayout(bytes: Uint8Array, tableStart: number): PayloadLayout {
       routingTailStartsAt(bytes, afterParking + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE)
     );
   };
-  return anchored(serviced.end) && !anchored(spanned.end) ? "serviced" : "spanned";
+  // Every layout is put to the same question, newest first: did this walk COMPLETE,
+  // and does a structure we know the position of sit exactly where it ends? The
+  // first to answer yes wins. Completion is checked for each candidate, not just
+  // the alternates: a walk that gave up mid-table has an `end` that means nothing,
+  // and letting it anchor by coincidence would return the layout that just failed.
+  const walks = {
+    expressServiced: current,
+    spanned: walk("spanned"),
+    serviced: walk("serviced"),
+  } as const;
+  for (const layout of ["expressServiced", "spanned", "serviced"] as const) {
+    const w = walks[layout];
+    if (w.elevators !== null && anchored(w.end)) return layout;
+  }
+  // Nothing corroborated: take the LONGEST walk that still COMPLETES. Both
+  // halves carry weight. Longest, because overshooting runs off the end and
+  // bails with a warning while undershooting reads zero fill as empty headers
+  // and returns a table that is not there; with no evidence, the failure the
+  // player can see beats the one they cannot. Only if it completes, because
+  // `spanned` is OUR layout and the files with no anchor to offer are mostly the
+  // 1994 game's, whose tail sits where our anchors are not keyed (a real save
+  // put its stairs 436 bytes before our block sizes predict). Handing those the
+  // one layout that cannot read them is the bug this started from, and
+  // over-skipping is what makes such a file fail to walk, so "did the longer
+  // walk survive" separates the two cases.
+  return walks.spanned.elevators !== null ? "spanned" : "expressServiced";
 }
 
 /**
@@ -375,7 +439,7 @@ export function walkTolerantTail(r: ByteReader): TdtTail {
 
   // ---- Elevator table (doc §8): 24 entries, variable-width when built -----
   // The elevator table is walked with a LAYOUT chosen for the whole file, not
-  // per slot. See `readElevatorTable` for the two layouts and `chooseLayout` for
+  // per slot. See `readElevatorTable` for the three layouts and `chooseLayout` for
   // how they are told apart.
   // The layout is chosen for the whole file, and `chooseLayout` only answers
   // "serviced" when the file corroborates it, so there is no second-chance
