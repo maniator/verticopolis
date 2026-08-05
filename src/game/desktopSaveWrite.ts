@@ -61,6 +61,22 @@ function committedAt(address: SaveAddress): { seq: number; contents: string } | 
   return committedByScope.get(address.scope)?.get(address.id);
 }
 
+/**
+ * The ADDRESS of `id`'s newest committed write this session, or undefined
+ * when nothing committed. The stored-byte export needs it because a review
+ * caught the id-only shape: the flush routes origin-aware, so `auto` can
+ * live in a non-default scope, and the shell must be told WHICH record to
+ * copy rather than guessing between scopes.
+ */
+export function committedAddressFor(id: string): SaveAddress | undefined {
+  let best: { scope: SaveScopeToken; seq: number } | undefined;
+  for (const [scope, byId] of committedByScope) {
+    const entry = byId.get(id);
+    if (entry && (best === undefined || entry.seq > best.seq)) best = { scope, seq: entry.seq };
+  }
+  return best === undefined ? undefined : { id: id as SaveAddress["id"], scope: best.scope };
+}
+
 /** Whether the first routed ASYNC write of this session was verified yet; see
  *  the read-back in {@link writeTowerToStore}. */
 let firstWriteVerified = false;

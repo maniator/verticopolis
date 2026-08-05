@@ -236,8 +236,11 @@ export interface SaveStorePort {
    * closing D2's AC22). The shell resolves the record, runs its own save
    * dialog, and copies the file: no re-serialization, so the destination
    * bytes equal the stored bytes, and nothing that re-stamps a save can run.
-   * The renderer supplies an id from the closed list and a suggested NAME
-   * only; no path crosses in either direction.
+   * The renderer supplies an id from the closed list, the SCOPE the record
+   * lives in (an id is unique only within a scope, so `(id, scope)` is the
+   * record's address, exactly as `read` and `delete` take it; a review
+   * caught the id-only draft, which would have made the shell guess between
+   * scopes), and a suggested NAME. No path crosses in either direction.
    *
    * Resolves `true` when the file was WRITTEN and `false` when the player
    * canceled the dialog. Cancel is a choice, not an error: the caller must
@@ -248,7 +251,7 @@ export interface SaveStorePort {
    * Optional like every member added after the original three: the export
    * flow falls back to its live-serialize path when this is absent.
    */
-  exportRecord?(id: string, suggestedName: string): Promise<boolean>;
+  exportRecord?(id: string, scope: SaveScopeToken, suggestedName: string): Promise<boolean>;
 }
 
 /**

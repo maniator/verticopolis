@@ -6,6 +6,7 @@ import { clearAcked } from "../storage/saveStoreAcked";
 import { forgetRecordAt, hydratedOriginFor } from "./desktopSaveOrigin";
 import { withTimeout } from "./desktopSaveHydrate";
 import { storeIsAuthoritative, writeTowerToStoreSync } from "./desktopSaveStore";
+import { committedAddressFor } from "./desktopSaveWrite";
 
 /**
  * The MANUAL half of desktop write routing: Quick Save, the slot saves, the
@@ -122,8 +123,15 @@ export async function exportStoredTower(
   } catch {
     return "fallback";
   }
+  // The address the flush actually COMMITTED to, because the routing is
+  // origin-aware: an account tower's auto lives in the account scope, and an
+  // id-only export would make the shell guess between scopes (a review
+  // catch). No committed address after a "stored" answer would be a
+  // bookkeeping contradiction; fall back rather than guess.
+  const committed = committedAddressFor("auto");
+  if (committed === undefined) return "fallback";
   try {
-    return (await store.exportRecord("auto", suggestedName)) === true ? "exported" : "canceled";
+    return (await store.exportRecord("auto", committed.scope, suggestedName)) === true ? "exported" : "canceled";
   } catch {
     return "fallback";
   }

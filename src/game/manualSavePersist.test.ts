@@ -194,8 +194,8 @@ describe("exportStoredTower (story D7, D2's AC22)", () => {
       store.held.set(`${scope}|${id}`, contents);
       return { ok: true };
     };
-    store.port.exportRecord = (id: string, name: string) => {
-      order.push(`export:${id}:${name}`);
+    store.port.exportRecord = (id: string, scope: string, name: string) => {
+      order.push(`export:${id}:${scope}:${name}`);
       return Promise.resolve(true);
     };
     injectedStore = store.port;
@@ -203,7 +203,7 @@ describe("exportStoredTower (story D7, D2's AC22)", () => {
 
     const { exportStoredTower } = await import("./manualSavePersist");
     expect(await exportStoredTower(Simulation.newGame(7), "my-tower.vctower")).toBe("exported");
-    expect(order).toEqual(["flush:auto", "export:auto:my-tower.vctower"]);
+    expect(order).toEqual(["flush:auto", `export:auto:${LOCAL}:my-tower.vctower`]);
   });
 
   it("falls back to live when the member is absent, without flushing", async () => {
