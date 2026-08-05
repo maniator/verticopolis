@@ -4,7 +4,7 @@ import type { SaveStoreErrorCode, SaveStorePort } from "../platform/saveStore";
 import { isStorageWriteError } from "../storage/SaveGame";
 import { ackedHash } from "../storage/saveStoreAcked";
 import { toTowerFile } from "../storage/saveMigration";
-import { LOCAL, TOWER, fakeStore, storeValue } from "./desktopSaveStore.fixture";
+import { ACCOUNT, LOCAL, TOWER, fakeStore, storeValue } from "./desktopSaveStore.fixture";
 
 /**
  * The manual-save seam and the routed slot delete. `persistManualSave`'s
@@ -204,6 +204,37 @@ describe("exportStoredTower (story D7, D2's AC22)", () => {
     const { exportStoredTower } = await import("./manualSavePersist");
     expect(await exportStoredTower(Simulation.newGame(7), "my-tower.vctower")).toBe("exported");
     expect(order).toEqual(["flush:auto", `export:auto:${LOCAL}:my-tower.vctower`]);
+  });
+
+  it("REGRESSION: exports the LAST-COMMITTED scope, not the highest cross-scope seq", async () => {
+    // A review caught the seq comparison: seq is minted per (id, scope), so
+    // after a shared tower ran auto's counter up and an account tower's scope
+    // started fresh at 1, "highest seq" pointed at the OLD tower's record.
+    // Recency across scopes is renderer commit order, nothing else.
+    const store = fakeStore([
+      { token: LOCAL, label: "This computer", shared: true },
+      { token: ACCOUNT, label: "This account", shared: false },
+    ]);
+    withWriteSync(store);
+    const exportedScopes: string[] = [];
+    store.port.exportRecord = (_id: string, scope: string) => {
+      exportedScopes.push(scope);
+      return Promise.resolve(true);
+    };
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    // The shared tower's session: auto's LOCAL counter climbs past 1.
+    expect(persistManualSave(Simulation.newGame(7), "auto")).toBe("stored");
+    expect(persistManualSave(Simulation.newGame(7), "auto")).toBe("stored");
+    expect(persistManualSave(Simulation.newGame(7), "auto")).toBe("stored");
+
+    // The player loads an account tower; its scope's counter starts at 1.
+    noteTowerOrigin({ id: "auto", scope: ACCOUNT });
+
+    const { exportStoredTower } = await import("./manualSavePersist");
+    expect(await exportStoredTower(Simulation.newGame(9), "t.vctower")).toBe("exported");
+    expect(exportedScopes).toEqual([ACCOUNT]);
   });
 
   it("falls back to live when the member is absent, without flushing", async () => {
