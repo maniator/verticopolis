@@ -52,8 +52,9 @@ export interface EncodeStats {
   elevatorsLen: number;
   walkwaysLen: number;
   /** Express shafts written. The retail game loses every shaft after the FIRST
-   *  express slot, so anything past one costs the player real transport in 1994
-   *  and the report has to say so. See `tdt-express-desync`. */
+   *  express slot in files WE write (our express records are span-sized, doc
+   *  §8), so anything past one costs the player real transport in 1994 and
+   *  the report has to say so. See `tdt-express-desync`. */
   expressLen: number;
 }
 
@@ -298,11 +299,11 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
   const shaftsDropped = Math.max(0, elevators.length - TDT_ELEVATOR_SLOTS);
   elevators.length = Math.min(elevators.length, TDT_ELEVATOR_SLOTS);
   // Then write EXPRESS shafts last: the retail game loses every shaft written
-  // after an express slot (harness-measured 2026-07-31; the express itself
-  // renders, and shafts before it are fine). A MITIGATION, not the fix, and a
-  // stable sort so everything else keeps its order: one express costs a tower
-  // nothing, a second still loses what follows it. Evidence and the ruled-out
-  // size theories: docs/canon/tdt-format.md §8, backlog `tdt-express-desync`.
+  // after an express slot in OUR files (harness-measured 2026-07-31, and
+  // re-save-measured 2026-08-04: with this ordering the game keeps 22 of 23,
+  // losing exactly the second express). A MITIGATION, not the fix, and a stable
+  // sort so everything else keeps its order. Evidence and open questions:
+  // docs/canon/tdt-format.md §8, backlog `tdt-express-desync`.
   elevators.sort((a, b) => Number(a.kind === "elevatorExpress") - Number(b.kind === "elevatorExpress"));
   for (let slot = 0; slot < TDT_ELEVATOR_SLOTS; slot++) {
     const e = elevators[slot];

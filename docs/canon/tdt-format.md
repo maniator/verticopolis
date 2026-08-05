@@ -281,9 +281,17 @@ floors, and per-floor destination counts). So one built shaft's record stride is
   `topFloor - bottomFloor + 1`, **every floor the shaft passes, stop or not**
   (see the 2026-07-13 correction below).
 - **express** (`type` 0): one entry per **SERVICED** floor, the count of set
-  bytes in the header's 120-byte stop bitmap, in files the 1994 game wrote (see
-  the 2026-08-04 measurement below). Our own exporter still spans this kind too,
-  which the game accepts; the importer tells the two apart by the trailer (§12a).
+  bytes in the header's 120-byte stop bitmap **within the shaft's own span**, in
+  files the 1994 game wrote (see the 2026-08-04 measurement below). The in-span
+  qualifier is the SAFE reading of a measured hazard: game re-saves carry stray
+  set bits OUTSIDE a shaft's span (a standard shaft at floors 54..69 carried 2,
+  seen 2026-08-04), and counting a stray would size an express record a full
+  entry long, so a reader clamps the count to the span. Whether the game itself
+  counts strays is unmeasured (the only express measured so far has none). Our
+  own exporter still spans this kind, which the game accepts on load (it loses
+  only what FOLLOWS the oversized record, which is why the exporter orders
+  express last); the importer tells our files from the game's by the trailer
+  (§12a).
 
 The distinction is invisible on standard and service shafts, which stop at every
 floor they pass, and that is why it went unnoticed: an express is the one kind
@@ -306,17 +314,43 @@ that skips most of what it spans.
 > by 324 bytes per skipped floor, landed mid-record, and lost the elevator table,
 > the stairs table and the parking count together. It now reads with no warnings.
 >
-> **The exporter is deliberately NOT changed.** The obvious inference, that our
-> span-sized express is what makes the game lose the shafts after it, does not
-> survive testing: a real tower exported both ways (span-sized and stop-sized
-> express) loads in the game with the SAME shafts either way, so the game's
-> reader accepts both. Whatever truncates the table is something else, and the
-> "write express shafts last" mitigation stays until it is understood.
+> **Corrected later the same day (2026-08-04), retracting the "both sizings
+> load the same" claim above.** The two files behind that claim both carried a stop-sized
+> express, so the comparison tested nothing. Re-run by re-saving each variant
+> through the game (`File > Save` needs no dialog: a tower loaded from a path
+> saves back over it), the outcomes differ dramatically on the same 23-shaft
+> tower. The two variants differ in the express's POSITION as well as its
+> sizing (the stop-sized files come from pre-mitigation and experimental
+> encoders that do not sort express last), so this contrast proves the shipping
+> path safe without isolating sizing as the sole variable:
 >
-> **Still open, and now the sharper question:** loading a 23-shaft export, the
-> game keeps exactly the first 8 shafts, in file order, and re-saves only those.
-> The cut does not move when the express payload is resized, and it does not move
-> when the two duplicate columns in that tower are relocated. See issue #740.
+> - **Span-sized express, sorted last** (what our exporter ships): the game
+>   keeps **22 of 23** in file order, losing exactly the SECOND express, and its
+>   re-save (384,658 bytes) writes the kept express STOP-sized: the stop-rule
+>   walk of that re-save completes with 18,880 bytes left in the file, less than
+>   the 324 x 83 = 26,892 more a span-sized record would need, so span sizing is
+>   arithmetically impossible there. The "write express shafts last" mitigation
+>   is doing exactly what it promises, and stays.
+> - **Stop-sized express at slot 5** (two variants, measured twice): the game
+>   keeps only **slots 0-7** in file order, and its re-save (247,774 bytes)
+>   carries no recognizable stairway records or parking count; the ~5.7 KB after
+>   its elevator table is all zeros. (A reload of that re-save still RENDERS an
+>   escalator, and neither re-save carries canon-shaped stair records, so where
+>   the game persists stairways in a re-save is an open question; the genuine
+>   from-play saves that defined the stairs table in this doc do carry them.)
+>
+> **What that pins, and what it does not.** The game WRITES the express
+> stop-sized (measured directly on one game-written save by header-to-header
+> distance, and independently on the 384,658-byte re-save by the EOF fit above),
+> so the
+> importer's read rule for game files is right. But no single read-side sizing
+> rule explains both rows above: two shafts AFTER the stop-sized express
+> survive, which rules out the game reading it span-sized (a span read would
+> desync inside the express and read zeros from there on), while the cut three
+> slots later rules out a plain stop-sized read being the whole story. The
+> exporter therefore stays as it is, mitigation included, and issue #740 stays
+> open on the read-side question. The cut is not the columns: relocating the
+> tower's two duplicate columns does not move it.
 >
 > **Not settled by this save:** every non-express shaft in it stops at every
 > floor it spans, so spanned and serviced predict the same size for them. The
@@ -423,16 +457,32 @@ elevator bitmask (bit N ⇒ elevator N serves this lobby) and the lobby's floor.
 Lobbies observed at in-game floors 1, 15, 30, 45, 60, 75, 90: the canon
 15-floor sky-lobby ladder (§4's floor-mapping proof).
 
-> **Writer note (harness-confirmed).** The game reads a fixed trailing region
-> here after the stairs table; if the file ends early (as our exporter used to,
+> **Writer note (harness-confirmed).** The game reads a trailing region here
+> after the stairs table, whose extent depends on the file's own content (see
+> the size note below); if the file ends too early (as our exporter used to,
 > right after the stairs table) it reads past EOF and page-faults (0x0799). The
 > exporter now emits this region **`0xFF`-filled** (the empty-slot sentinel) out
 > to `TDT_ROUTING_TAIL_SIZE`: zero-filling instead is read as live routing data
 > and invents a phantom population, while `0xFF` reads as "all slots empty" so
 > the game rebuilds reachability from the floor map. Blanking this whole region
 > to `0xFF` in a real save still loads, so its live content is not required on
-> read; only its presence and size are. The exact per-tower size for larger
-> (3★+) towers is not yet pinned; see the backlog's `tdt-export-routing-tail`.
+> read; only its presence and size are.
+>
+> **Size, measured further at 4★ (2026-08-04).** The fixed
+> `TDT_ROUTING_TAIL_SIZE` over-emit holds at 4★: three variants of a 4★
+> 23-shaft export (399,256 / 399,263 / 453,047 bytes; the last is the earlier
+> 453,040 export plus the 7-byte §12a trailer) all load in the retail game with
+> no 0x0799 crash and can be re-saved. (Two of those loads lose shafts, a §8
+> elevator-payload matter, not a tail one.) And no FIXED extent is required on
+> read: the game's own re-save of the degraded 8-shaft load is 247,774 bytes
+> with only **5,672 bytes past its elevator table** (that span covers stairs,
+> finance, parking AND this region, all zeros), and the game re-opens that file
+> cleanly. A fixed 25,600-byte read after the stairs table would run off that
+> file's end, so the extent the game reads depends on the file's own content.
+> Because that small file comes from a degraded load, it bounds the extent only
+> for its own content; healthy-content extents at 5★/6★ remain unvalidated, and
+> over-emitting the fixed constant remains the safe side of every measured case.
+> See the backlog's `tdt-export-routing-tail`.
 
 ## 12. Named tenants / people
 
@@ -466,7 +516,7 @@ walks: it reads a fixed extent and ignores trailing slack, which is already
 proven at scale (our exports run ~150 KB past the game's own re-saves and load
 fine). **Harness-verified 2026-08-04:** a stamped 4★ export loads in retail
 SimTower and renders identically to the same tower unstamped, with its rating,
-funds, population and shafts intact.
+funds, population and the same shafts as the unstamped load (both lose the second express to the §8 desync).
 
 **Reading it.** A file whose last bytes are not the magic is unstamped: either
 one of ours from before the trailer, or a save the game wrote. Both fall back to
