@@ -366,11 +366,17 @@ export class SaveLoad {
       this.stampView(sim);
       // Stored-byte export (story D7, D2's AC22): on a hydrated desktop
       // session, flush to auto and let the shell COPY the stored file, so
-      // the destination bytes equal the stored bytes. `false` falls through
-      // to the live-serialize path, which is what every other build runs.
-      if (IS_WRAPPED_BUILD && (await exportStoredTower(sim, SaveGame.exportFilename(sim)))) {
-        this.deps.ui.toast("Tower exported. Check where you saved it.", "good");
-        return;
+      // the destination bytes equal the stored bytes. Cancel is a CHOICE
+      // (Copilot caught the success toast firing on it): say nothing, open
+      // nothing else. Only "fallback" runs the live-serialize path below,
+      // which is what every other build runs.
+      if (IS_WRAPPED_BUILD) {
+        const stored = await exportStoredTower(sim, SaveGame.exportFilename(sim));
+        if (stored === "exported") {
+          this.deps.ui.toast("Tower exported. Check where you saved it.", "good");
+          return;
+        }
+        if (stored === "canceled") return;
       }
       const file = await SaveGame.export(sim);
       this.deps.ui.downloadFile(SaveGame.exportFilename(sim), file);

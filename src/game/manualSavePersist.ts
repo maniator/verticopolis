@@ -103,25 +103,29 @@ export function persistManualSave(sim: Simulation, slot: number | "auto"): "stor
  * as the last manual save there, and exporting it would hand the player a
  * stale file labeled as their tower (the party's second-sharpest ruling).
  *
- * `false` means "use the live-serialize path": absent member, no
- * authoritative store, a flush that answered fallback or threw, or a copy
- * that failed. The party's rule: fall back to live, never copy stale, never
- * refuse the export. The live path is Founder-safe since serialize persists
- * the explicit flag.
+ * Three outcomes, because cancel is neither success nor failure:
+ * "exported" (the file was written), "canceled" (the player closed the
+ * dialog; say nothing and open nothing else), and "fallback" (use the
+ * live-serialize path: absent member, no authoritative store, a flush that
+ * answered fallback or threw, or a copy that failed). The party's rule:
+ * fall back to live, never copy stale, never refuse the export. The live
+ * path is Founder-safe since serialize persists the explicit flag.
  */
-export async function exportStoredTower(sim: Simulation, suggestedName: string): Promise<boolean> {
+export async function exportStoredTower(
+  sim: Simulation,
+  suggestedName: string,
+): Promise<"exported" | "canceled" | "fallback"> {
   const store = getPlatform().saveStore;
-  if (!store || typeof store.exportRecord !== "function" || !storeIsAuthoritative()) return false;
+  if (!store || typeof store.exportRecord !== "function" || !storeIsAuthoritative()) return "fallback";
   try {
-    if (persistManualSave(sim, "auto") !== "stored") return false;
+    if (persistManualSave(sim, "auto") !== "stored") return "fallback";
   } catch {
-    return false;
+    return "fallback";
   }
   try {
-    await store.exportRecord("auto", suggestedName);
-    return true;
+    return (await store.exportRecord("auto", suggestedName)) === true ? "exported" : "canceled";
   } catch {
-    return false;
+    return "fallback";
   }
 }
 

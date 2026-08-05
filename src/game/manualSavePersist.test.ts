@@ -196,13 +196,13 @@ describe("exportStoredTower (story D7, D2's AC22)", () => {
     };
     store.port.exportRecord = (id: string, name: string) => {
       order.push(`export:${id}:${name}`);
-      return Promise.resolve();
+      return Promise.resolve(true);
     };
     injectedStore = store.port;
     await prepareSaveStore();
 
     const { exportStoredTower } = await import("./manualSavePersist");
-    expect(await exportStoredTower(Simulation.newGame(7), "my-tower.vctower")).toBe(true);
+    expect(await exportStoredTower(Simulation.newGame(7), "my-tower.vctower")).toBe("exported");
     expect(order).toEqual(["flush:auto", "export:auto:my-tower.vctower"]);
   });
 
@@ -213,7 +213,7 @@ describe("exportStoredTower (story D7, D2's AC22)", () => {
     await prepareSaveStore();
 
     const { exportStoredTower } = await import("./manualSavePersist");
-    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe(false);
+    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe("fallback");
     // No flush either: the point of the flush is the copy that will not happen.
     expect(syncCalls).toEqual([]);
   });
@@ -227,13 +227,13 @@ describe("exportStoredTower (story D7, D2's AC22)", () => {
     const exported: string[] = [];
     store.port.exportRecord = (id: string) => {
       exported.push(id);
-      return Promise.resolve();
+      return Promise.resolve(true);
     };
     injectedStore = store.port;
     await prepareSaveStore();
 
     const { exportStoredTower } = await import("./manualSavePersist");
-    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe(false);
+    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe("fallback");
     expect(exported).toEqual([]);
   });
 
@@ -242,14 +242,30 @@ describe("exportStoredTower (story D7, D2's AC22)", () => {
     const exported: string[] = [];
     store.port.exportRecord = (id: string) => {
       exported.push(id);
-      return Promise.resolve();
+      return Promise.resolve(true);
     };
     injectedStore = store.port;
     await prepareSaveStore();
 
     const { exportStoredTower } = await import("./manualSavePersist");
-    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe(false);
+    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe("fallback");
     expect(exported).toEqual([]);
+  });
+
+  it("a CANCELED dialog is a choice: no success claim and no second dialog", async () => {
+    // Copilot's catch on the public flow: exportRecord resolving on cancel
+    // let the success toast fire on a canceled dialog. The contract now
+    // resolves false on cancel, and the caller says nothing and opens
+    // nothing else (a fallback here would greet the cancel with a second
+    // dialog).
+    const store = fakeStore(SHARED);
+    withWriteSync(store);
+    store.port.exportRecord = () => Promise.resolve(false);
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    const { exportStoredTower } = await import("./manualSavePersist");
+    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe("canceled");
   });
 
   it("a rejecting exportRecord falls back to the live path", async () => {
@@ -260,12 +276,12 @@ describe("exportStoredTower (story D7, D2's AC22)", () => {
     await prepareSaveStore();
 
     const { exportStoredTower } = await import("./manualSavePersist");
-    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe(false);
+    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe("fallback");
   });
 
   it("no authoritative store means the live path, member or not", async () => {
     const { exportStoredTower } = await import("./manualSavePersist");
-    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe(false);
+    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe("fallback");
   });
 });
 

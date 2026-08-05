@@ -237,13 +237,18 @@ export interface SaveStorePort {
    * dialog, and copies the file: no re-serialization, so the destination
    * bytes equal the stored bytes, and nothing that re-stamps a save can run.
    * The renderer supplies an id from the closed list and a suggested NAME
-   * only; no path crosses in either direction. Resolves on cancel, like
-   * `saveFile`, because cancel is not an error.
+   * only; no path crosses in either direction.
+   *
+   * Resolves `true` when the file was WRITTEN and `false` when the player
+   * canceled the dialog. Cancel is a choice, not an error: the caller must
+   * neither claim success (a review caught the success toast firing on a
+   * canceled dialog) nor fall back to another export path, which would
+   * greet the cancel with a second dialog.
    *
    * Optional like every member added after the original three: the export
    * flow falls back to its live-serialize path when this is absent.
    */
-  exportRecord?(id: string, suggestedName: string): Promise<void>;
+  exportRecord?(id: string, suggestedName: string): Promise<boolean>;
 }
 
 /**
