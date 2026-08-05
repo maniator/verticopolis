@@ -6,7 +6,7 @@ import { LegacyExportError, buildTDT, type BuiltLegacyTower } from "../storage/t
 import { LegacyImportError, parseTDT } from "../storage/tdtImport";
 import type { ImportReport } from "../storage/tdtImport";
 import { persistAutosave } from "./autosavePersist";
-import { persistManualSave } from "./manualSavePersist";
+import { exportStoredTower, persistManualSave } from "./manualSavePersist";
 import { IS_WRAPPED_BUILD } from "../platform";
 import { noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
@@ -360,7 +360,24 @@ export class SaveLoad {
   async exportGame(): Promise<void> {
     try {
       const sim = this.deps.getSim();
+      // stampView FIRST, before either path: the stored-byte flush below
+      // must carry the camera exactly as the live-serialize path always has
+      // (a party catch: dropping it would export towers at a stale view).
       this.stampView(sim);
+      // Stored-byte export (story D7, D2's AC22): on a hydrated desktop
+      // session, flush to auto and let the shell COPY the stored file, so
+      // the destination bytes equal the stored bytes. Cancel is a CHOICE
+      // (Copilot caught the success toast firing on it): say nothing, open
+      // nothing else. Only "fallback" runs the live-serialize path below,
+      // which is what every other build runs.
+      if (IS_WRAPPED_BUILD) {
+        const stored = await exportStoredTower(sim, SaveGame.exportFilename(sim));
+        if (stored === "exported") {
+          this.deps.ui.toast("Tower exported. Check where you saved it.", "good");
+          return;
+        }
+        if (stored === "canceled") return;
+      }
       const file = await SaveGame.export(sim);
       this.deps.ui.downloadFile(SaveGame.exportFilename(sim), file);
       // The container is pure ASCII, so string length == bytes on disk.

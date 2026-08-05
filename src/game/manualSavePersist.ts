@@ -6,6 +6,7 @@ import { clearAcked } from "../storage/saveStoreAcked";
 import { forgetRecordAt, hydratedOriginFor } from "./desktopSaveOrigin";
 import { withTimeout } from "./desktopSaveHydrate";
 import { storeIsAuthoritative, writeTowerToStoreSync } from "./desktopSaveStore";
+import { committedAddressFor } from "./desktopSaveWrite";
 
 /**
  * The MANUAL half of desktop write routing: Quick Save, the slot saves, the
@@ -90,6 +91,59 @@ export function persistManualSave(sim: Simulation, slot: number | "auto"): "stor
     throw new DOMException("The save location refused the write.", "SecurityError");
   }
   throw new Error(`The tower could not be written to the save store${result.code !== undefined ? ` (${result.code})` : ""}. Try again.`);
+}
+
+/**
+ * Export the STORED bytes (story D7, closing D2's AC22): flush the live
+ * tower to AUTO through the D4 sync path, so the stored record IS the live
+ * tower at this moment, then ask the shell to copy that file to a
+ * player-chosen destination. No re-serialization, so nothing that re-stamps
+ * a save can run between the flush and the file.
+ *
+ * AUTO on purpose, never the origin slot: the origin slot's record is as old
+ * as the last manual save there, and exporting it would hand the player a
+ * stale file labeled as their tower (the party's second-sharpest ruling).
+ *
+ * Three outcomes, because cancel is neither success nor failure:
+ * "exported" (the file was written), "canceled" (the player closed the
+ * dialog; say nothing and open nothing else), and "fallback" (use the
+ * live-serialize path: absent member, no authoritative store, a flush that
+ * answered fallback or threw, or a copy that failed). The party's rule:
+ * fall back to live, never copy stale, never refuse the export. The live
+ * path is Founder-safe since serialize persists the explicit flag.
+ */
+export async function exportStoredTower(
+  sim: Simulation,
+  suggestedName: string,
+): Promise<"exported" | "canceled" | "fallback"> {
+  const store = getPlatform().saveStore;
+  if (!store || typeof store.exportRecord !== "function" || !storeIsAuthoritative()) return "fallback";
+  try {
+    if (persistManualSave(sim, "auto") !== "stored") return "fallback";
+  } catch {
+    return "fallback";
+  }
+  // The address the flush actually COMMITTED to, because the routing is
+  // origin-aware: an account tower's auto lives in the account scope, and an
+  // id-only export would make the shell guess between scopes (a review
+  // catch). No committed address after a "stored" answer would be a
+  // bookkeeping contradiction; fall back rather than guess.
+  const committed = committedAddressFor("auto");
+  if (committed === undefined) return "fallback";
+  try {
+    const outcome: unknown = await store.exportRecord("auto", committed.scope, suggestedName);
+    if (outcome === true) return "exported";
+    if (outcome === false) return "canceled";
+    // A malformed resolution (undefined, null, an object) is a broken shell,
+    // not a player's choice. Reading it as "canceled" would pick the one
+    // branch with zero feedback, so on that shell Export would silently do
+    // nothing forever; the live path at least hands the player a file. The
+    // same posture writeTowerToStoreSync takes with a malformed writeSync
+    // answer (both review hunters converged on this line).
+    return "fallback";
+  } catch {
+    return "fallback";
+  }
 }
 
 /** Store deletes in flight, keyed by slot; `saveToSlot` refuses these,

@@ -98,6 +98,43 @@ describe("persistManualSave", () => {
     expect(localStorage.getItem("simtower-clone-slot-2")).not.toBeNull();
   });
 
+  it("REGRESSION: the FIRST manual save after a migration boot lands (the seq counter is shared)", async () => {
+    // The packaged smoke caught this: the migration wrote auto with a
+    // constant seq 1 while the session's own counter still read 0, so the
+    // session's first Quick Save minted seq 1 too and the shell refused it
+    // as stale, which the game deliberately reads as success-by-supersession.
+    // Player-visible outcome: a "Saved" toast over a save that never
+    // happened. The fake here enforces the shell's real high-water rule,
+    // shared between the async and sync paths, so the assertion below fails
+    // if the migration ever stops minting from the session counter.
+    const store = fakeStore(SHARED);
+    const committed = new Map<string, number>();
+    const origWrite = store.port.write;
+    store.port.write = (id, contents, scope, seq) => {
+      const key = `${scope}|${id}`;
+      if (seq <= (committed.get(key) ?? 0)) return Promise.reject(Object.assign(new Error("stale"), { code: "stale" }));
+      committed.set(key, seq);
+      return origWrite(id, contents, scope, seq);
+    };
+    store.port.writeSync = (id, contents, scope, seq) => {
+      const key = `${scope}|${id}`;
+      if (seq <= (committed.get(key) ?? 0)) return { ok: false, code: "stale" };
+      committed.set(key, seq);
+      store.held.set(key, contents);
+      return { ok: true };
+    };
+    injectedStore = store.port;
+    localStorage.setItem("verticopolis-save", storeValue(TOWER));
+    await prepareSaveStore();
+
+    const migrated = store.held.get(`${LOCAL}|auto`);
+    expect(migrated).toContain("VCTOWER1");
+    // "stored" alone cannot discriminate (stale also reads as stored); the
+    // store's CONTENT changing is the proof the save actually committed.
+    expect(persistManualSave(Simulation.newGame(7), "auto")).toBe("stored");
+    expect(store.held.get(`${LOCAL}|auto`)).not.toBe(migrated);
+  });
+
   it("a 'full' failure throws the error isStorageWriteError recognizes", async () => {
     // That name is what routes the player to the storage-blame advice in
     // saveFailureMessage, rather than a raw code.
@@ -184,6 +221,7 @@ describe("persistManualSave", () => {
     }
   });
 });
+
 
 describe("deleteSlotFromStore", () => {
   /** Boot a session with slot-1 hydrated from the store. */

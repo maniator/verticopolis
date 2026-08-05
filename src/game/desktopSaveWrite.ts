@@ -55,10 +55,38 @@ export function nextSeq(address: { id: string; scope: SaveScopeToken }): number 
  * the coherence stamp to the older tower, so a mid-session Load served a save
  * the player had already superseded.
  */
-const committedByScope = new Map<SaveScopeToken, Map<string, { seq: number; contents: string }>>();
+const committedByScope = new Map<SaveScopeToken, Map<string, { seq: number; order: number; contents: string }>>();
+
+/** Renderer-order commit ordinal, GLOBAL across addresses. Exists because
+ *  `seq` cannot order commits across scopes: it is minted per (id, scope), so
+ *  a fresh scope's seq 1 can be newer in time than another scope's seq 10. */
+let commitOrder = 0;
 
 function committedAt(address: SaveAddress): { seq: number; contents: string } | undefined {
   return committedByScope.get(address.scope)?.get(address.id);
+}
+
+/**
+ * The ADDRESS of `id`'s newest committed write this session, or undefined
+ * when nothing committed. The stored-byte export needs it because a review
+ * caught the id-only shape: the flush routes origin-aware, so `auto` can
+ * live in a non-default scope, and the shell must be told WHICH record to
+ * copy rather than guessing between scopes.
+ *
+ * Newest by COMMIT ORDER, not by seq: a second review pass caught that
+ * comparing seq across scopes compares unrelated counters (play a shared
+ * tower until its auto seq reaches 10, load an account tower whose scope's
+ * counter starts at 1, and the seq comparison hands back the OLD tower's
+ * record). The ordinal reflects renderer commit order, which is exact for
+ * the export flow because its sync flush and this read share one task.
+ */
+export function committedAddressFor(id: string): SaveAddress | undefined {
+  let best: { scope: SaveScopeToken; order: number } | undefined;
+  for (const [scope, byId] of committedByScope) {
+    const entry = byId.get(id);
+    if (entry && (best === undefined || entry.order > best.order)) best = { scope, order: entry.order };
+  }
+  return best === undefined ? undefined : { id: id as SaveAddress["id"], scope: best.scope };
 }
 
 /** Whether the first routed ASYNC write of this session was verified yet; see
@@ -158,7 +186,7 @@ function commitWrite(target: SaveAddress, seq: number, contents: string): void {
     byId = new Map();
     committedByScope.set(target.scope, byId);
   }
-  byId.set(target.id, { seq, contents });
+  byId.set(target.id, { seq, order: ++commitOrder, contents });
   writeThroughCache(target.id, contents);
 }
 
@@ -379,6 +407,7 @@ export function writeTowerToStoreSync(id: SaveSlotId, contents: string): StoreWr
 export function resetSaveWriteForTests(): void {
   seqByScope.clear();
   committedByScope.clear();
+  commitOrder = 0;
   firstWriteVerified = false;
   inflightWriteStarts.length = 0;
   bridgeStallEvidence = false;

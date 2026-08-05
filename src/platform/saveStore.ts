@@ -122,18 +122,36 @@ const SAVE_STORE_ERROR_CODES: readonly SaveStoreErrorCode[] = [
  * Exists because a taxonomy nothing narrows to is documentation rather than a
  * contract: without this, every caller writes `catch {}` and the codes are
  * decorative.
+ *
+ * The MESSAGE is consulted when no `code` property matches, and only when it
+ * is EXACTLY one of the codes. That is not sloppiness, it is the bridge:
+ * Electron's contextBridge strips custom properties from a rejection crossing
+ * isolated worlds, so a shell that throws `Object.assign(new Error(code),
+ * {code})` in its preload delivers an error whose only surviving carrier of
+ * the code is the message. The real-shell harness caught this: every
+ * async-path rejection arrived here unshaped, which read a superseded
+ * autosave (`stale`, a success) as a failure and stripped `full`/`denied` of
+ * their storage-blame advice. The exact-match rule keeps a human sentence
+ * ("something not-found happened") from ever narrowing.
  */
 export function saveStoreErrorCode(err: unknown): SaveStoreErrorCode | undefined {
-  // The property read is guarded because this runs INSIDE a catch: a rejection
-  // carrying a throwing getter or a revoked Proxy would otherwise throw a
-  // second time from the handler, abandoning the remaining slots.
+  // The property reads are guarded because this runs INSIDE a catch: a
+  // rejection carrying a throwing getter or a revoked Proxy would otherwise
+  // throw a second time from the handler, abandoning the remaining slots.
   let code: unknown;
   try {
     code = (err as { code?: unknown } | null | undefined)?.code;
   } catch {
     return undefined;
   }
-  return SAVE_STORE_ERROR_CODES.includes(code as SaveStoreErrorCode) ? (code as SaveStoreErrorCode) : undefined;
+  if (SAVE_STORE_ERROR_CODES.includes(code as SaveStoreErrorCode)) return code as SaveStoreErrorCode;
+  let message: unknown;
+  try {
+    message = (err as { message?: unknown } | null | undefined)?.message;
+  } catch {
+    return undefined;
+  }
+  return SAVE_STORE_ERROR_CODES.includes(message as SaveStoreErrorCode) ? (message as SaveStoreErrorCode) : undefined;
 }
 
 /** One stored tower, as the shell describes it. Note the absence of a path. */
@@ -231,6 +249,39 @@ export interface SaveStorePort {
     scope: SaveScopeToken,
     seq: number,
   ): { ok: true } | { ok: false; code?: SaveStoreErrorCode };
+  /**
+   * Export a STORED record's bytes to a player-chosen destination (story D7,
+   * closing D2's AC22). The shell resolves the record, runs its own save
+   * dialog, and copies the file: no re-serialization, so the destination
+   * bytes equal the stored bytes, and nothing that re-stamps a save can run.
+   * The renderer supplies an id from the closed list, the SCOPE the record
+   * lives in (an id is unique only within a scope, so `(id, scope)` is the
+   * record's address, exactly as `read` and `delete` take it; a review
+   * caught the id-only draft, which would have made the shell guess between
+   * scopes), and a suggested NAME. No path crosses in either direction.
+   *
+   * Resolves `true` when the file was WRITTEN and `false` when the player
+   * canceled the dialog. Cancel is a choice, not an error: the caller must
+   * neither claim success (a review caught the success toast firing on a
+   * canceled dialog) nor fall back to another export path, which would
+   * greet the cancel with a second dialog. Anything other than a strict
+   * boolean is read as a broken shell and sends the caller to its fallback.
+   *
+   * TWO TIMING OBLIGATIONS ON THE SHELL, because the dialog can sit open for
+   * minutes while the renderer keeps autosaving to the same record:
+   *
+   *  - Capture the record's BYTES at call time, BEFORE showing the dialog.
+   *    Copying the file after the dialog closes is a TOCTOU: the record can
+   *    have been rewritten (or replaced by a different tower routed to the
+   *    same address) while the dialog sat open, and the player then receives
+   *    other bytes under the filename they chose.
+   *  - Show the dialog MODAL to the game window, so the game cannot be
+   *    driven into a second export (or a tower switch) mid-dialog.
+   *
+   * Optional like every member added after the original three: the export
+   * flow falls back to its live-serialize path when this is absent.
+   */
+  exportRecord?(id: string, scope: SaveScopeToken, suggestedName: string): Promise<boolean>;
 }
 
 /**
@@ -256,7 +307,8 @@ export function isSaveStorePort(value: unknown): value is SaveStorePort {
       typeof port.read === "function" &&
       typeof port.write === "function" &&
       typeof port.delete === "function" &&
-      (port.writeSync === undefined || typeof port.writeSync === "function")
+      (port.writeSync === undefined || typeof port.writeSync === "function") &&
+      (port.exportRecord === undefined || typeof port.exportRecord === "function")
     );
   } catch {
     return false;
