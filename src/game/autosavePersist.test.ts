@@ -2,19 +2,20 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import type { SaveScopeToken, SaveStorePort, SaveStoreSnapshot } from "../platform/saveStore";
 import { asScopeToken } from "../platform/saveStore";
+import { TOWER, storeValue } from "./desktopSaveStore.fixture";
 
 /**
  * Where a periodic autosave lands on a wrapped build.
  *
- * The branch is `IS_WRAPPED_BUILD && saveStoreSession()`, and that constant is
- * false under vitest by construction, so without mocking `../platform` this
+ * The branch is `IS_WRAPPED_BUILD && storeIsAuthoritative()`, and that constant
+ * is false under vitest by construction, so without mocking `../platform` this
  * module's desktop half never runs in any test. The build guard cannot cover it
  * either: it greps the emitted bundle for literals, so it can prove the store
  * SHIPPED and not that autosave actually routes to it.
  *
  * The property under test is the one that would otherwise be discovered by a
- * player: on desktop the tower goes to the file store and localStorage is not
- * written at all.
+ * player: on desktop the tower goes to the file store, and localStorage is only
+ * ever a cache DERIVED from what the store committed, never a save target.
  */
 
 const LOCAL: SaveScopeToken = asScopeToken("local");
@@ -35,15 +36,20 @@ vi.mock("../platform", async (importOriginal) => ({
 }));
 
 const { persistAutosave } = await import("./autosavePersist");
-const { prepareSaveStore, resetSaveStoreForTests, noteTowerOrigin, setStoreAuthoritativeForTests, storeIsAuthoritative } =
-  await import("./desktopSaveStore");
+const { prepareSaveStore, resetSaveStoreForTests, noteTowerOrigin } = await import("./desktopSaveStore");
 
 function fakeStore(shared = true) {
   const written: { id: string; scope: SaveScopeToken; contents: string }[] = [];
   const port: SaveStorePort = {
     list: (): Promise<SaveStoreSnapshot> =>
       Promise.resolve({ scopes: [{ token: LOCAL, label: "This computer", shared }], records: [] }),
-    read: () => Promise.resolve(null),
+    // Serves the last write back, because the store's first routed write per
+    // session is READ BACK and compared; a read that ignored writes would flag
+    // every fake store as a lying shell.
+    read: (id, scope) => {
+      const hit = [...written].reverse().find((w) => w.id === id && w.scope === scope);
+      return Promise.resolve(hit?.contents ?? null);
+    },
     write: (id, contents, scope) => {
       written.push({ id, scope, contents });
       return Promise.resolve();
@@ -57,14 +63,10 @@ beforeEach(() => {
   resetSaveStoreForTests();
   injectedStore = undefined;
   localStorage.clear();
-  // The store-routing tests below arm the tripwire explicitly. It is OFF in
-  // production until the read path lands, and the last test in this file pins
-  // that default, so the routing stays covered without pretending it is live.
-  setStoreAuthoritativeForTests(true);
 });
 
 describe("persistAutosave on a wrapped build", () => {
-  it("writes the tower to the store as .vctower text, and NOT to localStorage", async () => {
+  it("writes the tower to the store as .vctower text, and localStorage only as the derived cache", async () => {
     const { port, written } = fakeStore();
     injectedStore = port;
     await prepareSaveStore();
@@ -80,40 +82,41 @@ describe("persistAutosave on a wrapped build", () => {
     // localStorage is not the save TARGET, but the boot-hydrated CACHE is
     // refreshed from the value the store just committed, so a mid-session
     // "Load auto" serves this tower rather than the boot copy. The cache entry
-    // is derived from the store's accepted contents, never written on its own.
+    // is derived from the store's accepted contents, never written on its own,
+    // and the coherence stamp is updated in the same motion.
     const cached = localStorage.getItem("verticopolis-save");
     expect(cached).not.toBeNull();
     expect(cached).toBe("VCZ1:" + written[0]!.contents.trim().slice("VCTOWER1\n".length).replace(/\s+/g, ""));
-    expect(localStorage.length).toBe(1);
+    expect(localStorage.getItem("vc-store-acked")).not.toBeNull();
+    expect(localStorage.length).toBe(2);
   });
 
-  it("TRIPWIRE: does not route to the store until the read path lands", async () => {
-    // The production default, asserted so this cannot be flipped by accident and
-    // so the reason is discoverable from a failing test rather than a comment.
-    // SaveGame answers load, hasSave, listSlots and hasSlot from localStorage
-    // across twenty call sites. Writing autosaves to the store while reads come
-    // from localStorage would send a player's progress somewhere nothing
-    // reads: the next launch would load the pre-migration copy and the session
-    // would silently vanish. The two halves ship together.
-    // Read the module's INITIAL value, not one the test seam just wrote.
-    // Asserting after `resetSaveStoreForTests()` was a tautology: that helper
-    // sets the flag false, so flipping the production default to true left the
-    // test green and the guard inert.
-    vi.resetModules();
-    const fresh = await import("./desktopSaveStore");
-    expect(fresh.storeIsAuthoritative()).toBe(false);
-    // Then put the LIVE module (the one `persistAutosave` closed over) back to
-    // that default, since `beforeEach` arms it for the routing tests.
-    resetSaveStoreForTests();
-    expect(storeIsAuthoritative()).toBe(false);
-
+  it("a session whose hydration DISAGREED stays browser-equivalent", async () => {
+    // The tripwire's replacement, from the other side. `storeIsAuthoritative()`
+    // is now the FACT that hydration materialized the store into the readers;
+    // when it did not (here: a readable localStorage tower the store knows
+    // nothing about), routing writes to the store would put progress where no
+    // reader looks. The session saves to localStorage exactly as on the web,
+    // and the same comparison reruns next boot.
     const { port, written } = fakeStore();
+    // The migration's write fails, so the readable localStorage tower stays a
+    // STRAY the store has no record of, which is the shape hydration reads as
+    // disagreement (recurring, self-healing when the migration succeeds) and
+    // never as degraded (which would pause saving).
+    port.write = () => Promise.reject(Object.assign(new Error("no space"), { code: "full" }));
     injectedStore = port;
+    const stray = storeValue(TOWER);
+    localStorage.setItem("verticopolis-save", stray);
     await prepareSaveStore();
+
     await persistAutosave(Simulation.newGame(7));
 
     expect(written).toEqual([]);
-    expect(localStorage.getItem("verticopolis-save")).not.toBeNull();
+    const after = localStorage.getItem("verticopolis-save");
+    expect(after).not.toBeNull();
+    // And it genuinely SAVED there, rather than skipping: the new game's tower
+    // replaced the stray.
+    expect(after).not.toBe(stray);
   });
 
   it("falls back to localStorage when the shell offers no store", async () => {
@@ -127,11 +130,11 @@ describe("persistAutosave on a wrapped build", () => {
   });
 
   it("REGRESSION: does not fall back to localStorage when the store REFUSES", async () => {
-    // The refusal that can fire is `origin-gone`: the tower's own scope
-    // disappeared mid-session. The entire point of refusing is to avoid writing
-    // it somewhere every account on the machine can read, so a localStorage
-    // fallback here would do the thing the refusal exists to prevent. A
-    // periodic autosave is best effort; the next tick tries again.
+    // `origin-gone`: the tower's own scope disappeared mid-session. The entire
+    // point of refusing is to avoid writing it somewhere every account on the
+    // machine can read, so a localStorage fallback here would do the thing the
+    // refusal exists to prevent. A periodic autosave is best effort; the next
+    // tick tries again.
     const { port, written } = fakeStore();
     injectedStore = port;
     await prepareSaveStore();
@@ -153,9 +156,64 @@ describe("persistAutosave on a wrapped build", () => {
 
     await expect(persistAutosave(Simulation.newGame(7))).resolves.toBeUndefined();
   });
+
+  it("a FAILED store write says so once per streak, and a recovery re-arms the warning", async () => {
+    // The spec's rule: a failed store write in store mode says so honestly
+    // (the "bad" bulletin channel toasts). Once per STREAK, not per tick, or
+    // a full disk would toast every thirty seconds; and a success clears the
+    // latch so a new streak warns again.
+    const { port, written } = fakeStore();
+    injectedStore = port;
+    await prepareSaveStore();
+    const realWrite = port.write.bind(port);
+    port.write = () => Promise.reject(Object.assign(new Error("no space"), { code: "full" }));
+
+    const sim = Simulation.newGame(7);
+    const emit = vi.spyOn(sim, "emit");
+    await persistAutosave(sim);
+    await persistAutosave(sim);
+    expect(emit.mock.calls.filter(([text]) => text.includes("Autosave failed")).length).toBe(1);
+
+    port.write = realWrite; // the disk recovered
+    await persistAutosave(sim);
+    expect(written.length).toBe(1);
+
+    port.write = () => Promise.reject(Object.assign(new Error("no space"), { code: "full" }));
+    await persistAutosave(sim);
+    expect(emit.mock.calls.filter(([text]) => text.includes("Autosave failed")).length).toBe(2);
+  });
+
+  it("a DEGRADED session saves nowhere, and says so once per tower", async () => {
+    // The shell listed towers hydration could not read. A store write would
+    // land where no reader looks; a localStorage write would be overwritten by
+    // the next boot's successful hydration (#736 F1). Manual saves refuse with
+    // modal wording, but the periodic autosave has no surface, so it logs one
+    // bulletin per sim rather than staying silent all session.
+    injectedStore = {
+      list: (): Promise<SaveStoreSnapshot> =>
+        Promise.resolve({
+          scopes: [{ token: LOCAL, label: "This computer", shared: true }],
+          records: [{ id: "auto", scope: LOCAL, bytes: 5 }],
+        }),
+      read: () => Promise.reject(new Error("io")),
+      write: () => Promise.resolve(),
+      delete: () => Promise.resolve(),
+    };
+    await prepareSaveStore();
+
+    const sim = Simulation.newGame(7);
+    const emit = vi.spyOn(sim, "emit");
+    await persistAutosave(sim);
+    await persistAutosave(sim);
+
+    expect(localStorage.length).toBe(0);
+    const pauses = emit.mock.calls.filter(([text]) => text.includes("Autosave is paused"));
+    expect(pauses.length).toBe(1);
+    expect(pauses[0]![1]).toBe("bad");
+  });
 });
 
-describe("the localStorage fallback cannot leak an account's tower", () => {
+describe("a hydrated session never writes localStorage as a save target", () => {
   it("REGRESSION: a failed write on an ACCOUNT-scoped tower writes nowhere", async () => {
     // The leak a confirming pass found in an earlier fix. Keying the fallback on
     // the refusal NAME, and falling back for everything except `origin-gone`,
@@ -164,8 +222,6 @@ describe("the localStorage fallback cannot leak an account's tower", () => {
     // read it as ownerless and moved it into the SHARED namespace, where every
     // account on the machine can read it. That reaches in two steps the
     // destination `origin-gone` refuses to reach in one.
-    //
-    // This test fails if the check goes back to `result.refusal === "origin-gone"`.
     const ACCOUNT = asScopeToken("account:test-scope");
     const port: SaveStorePort = {
       list: (): Promise<SaveStoreSnapshot> =>
@@ -189,10 +245,13 @@ describe("the localStorage fallback cannot leak an account's tower", () => {
     expect(localStorage.length).toBe(0);
   });
 
-  it("but a SHARED-scoped tower may fall back, since that adds no exposure", async () => {
-    // The other half, and why this is not just "never fall back": a tower headed
-    // for the shared scope is already readable by every account on the machine,
-    // so localStorage costs it nothing and losing the save costs the player.
+  it("and neither does a SHARED-scoped tower: a failed tick retries, it does not fork", async () => {
+    // This used to fall back, on the reasoning that a shared-headed tower had
+    // no exposure to lose. D4 removed the fallback entirely for hydrated
+    // sessions: a localStorage copy written past the store makes the cache
+    // disagree with the stamp, and while the next boot's reconcile-forward
+    // would heal it, healing a fork every failed tick is strictly worse than
+    // retrying the write next tick with nothing forked.
     const { port } = fakeStore();
     port.write = () => Promise.reject(Object.assign(new Error("no space"), { code: "full" }));
     injectedStore = port;
@@ -200,6 +259,6 @@ describe("the localStorage fallback cannot leak an account's tower", () => {
 
     await persistAutosave(Simulation.newGame(7));
 
-    expect(localStorage.getItem("verticopolis-save")).not.toBeNull();
+    expect(localStorage.length).toBe(0);
   });
 });

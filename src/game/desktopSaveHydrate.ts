@@ -1,6 +1,7 @@
 import type { SaveRecord, SaveStorePort } from "../platform/saveStore";
 import type { SaveAddress, SaveStoreSession } from "../storage/saveStoreSession";
-import { MIGRATION_SOURCES, fromTowerFile, isSaveSlotId, localStorageKeyFor } from "../storage/saveMigration";
+import { MIGRATION_SOURCES, fromTowerFile, isSaveSlotId, localStorageKeyFor, toTowerFile } from "../storage/saveMigration";
+import { ackedHash, coherenceHash, noteAcked } from "../storage/saveStoreAcked";
 
 /**
  * Boot-time hydration: materializing the store's records into localStorage,
@@ -67,8 +68,59 @@ export async function withTimeout<T>(work: Promise<T>): Promise<T | null> {
  * keeps working exactly as it always has.
  */
 export type HydrationOutcome =
-  | { readonly ok: true; readonly origins: ReadonlyMap<string, SaveAddress> }
+  | {
+      readonly ok: true;
+      readonly origins: ReadonlyMap<string, SaveAddress>;
+      /** Slot ids where BOTH sides had moved: the local value was stashed to a
+       *  conflict key and the store won. The caller tells the player. */
+      readonly conflicts: readonly string[];
+      /** Whether a reconcile-forward write TIMED OUT: evidence the main
+       *  process may be hung, which the caller hands to the write path's
+       *  circuit breaker rather than discarding. Not a failed hydration; the
+       *  reconcile retries next boot either way. */
+      readonly reconcileTimedOut: boolean;
+    }
   | { readonly ok: false; readonly reason: "read-failed" | "disagreement" };
+
+/** Where a both-moved conflict's local value is stashed before the store wins.
+ *  Machine-local, never migrated, never synced, and deliberately not a slot
+ *  key: it is evidence for recovery, not a save. */
+export function conflictStashKey(id: string): string {
+  return `vc-conflict-${id}`;
+}
+
+/** Player-facing wording for a both-moved conflict, per slot id. Lives beside
+ *  the three-way that produces the ids so the wording and the mechanism stay
+ *  in one view, and so the boot flow's bulletin is unit-testable without a
+ *  DOM app shell. */
+export function conflictBulletinText(id: string): string {
+  const label = id === "auto" || id === "auto-legacy" ? "your autosave" : `save slot ${id.replace("slot-", "")}`;
+  return (
+    `⚠️ This computer and your synced saves disagreed about ${label}. ` +
+    "The synced copy was kept; the local copy was set aside in case you need it."
+  );
+}
+
+/**
+ * Whether `cache` and `value` describe the SAME stored bytes, differing only
+ * by representation: a pre-compression raw-JSON cache beside the VCZ1 form
+ * the migration deflated it into, or a preserve stash beside its re-encoded
+ * store form. Decided by running the cache through the same forward-and-back
+ * pipeline the migration and hydration themselves use, so the comparison is
+ * exact for anything they produced and never a heuristic.
+ *
+ * Without this, a legacy player's FIRST desktop boot read its own migration's
+ * output as a both-moved conflict: no stamp exists yet, the raw-JSON cache
+ * does not string-match the deflated store value, and the conservative branch
+ * stashed the cache and warned about a sync divergence on a machine that has
+ * never synced anything.
+ */
+function sameStoredValue(cache: string, value: string, preserve: boolean): boolean {
+  const forward = toTowerFile(cache, preserve);
+  if (!forward.ok) return false;
+  const round = fromTowerFile(forward.text, preserve);
+  return round.ok && round.value === value;
+}
 
 /**
  * ALL OR NOTHING, in every phase.
@@ -98,7 +150,11 @@ export type HydrationOutcome =
  * from), captured here because this is the one moment the store's answer and
  * localStorage's contents are known to describe the same bytes.
  */
-export async function hydrateFromStore(store: SaveStorePort, resolved: SaveStoreSession): Promise<HydrationOutcome> {
+export async function hydrateFromStore(
+  store: SaveStorePort,
+  resolved: SaveStoreSession,
+  mintSeq: (address: { id: string; scope: SaveRecord["scope"] }) => number,
+): Promise<HydrationOutcome> {
   const owned = resolved.records
     .map((record) => ({ record, key: localStorageKeyFor(record.id) }))
     .filter((entry): entry is { record: SaveRecord; key: string } => entry.key !== undefined);
@@ -112,21 +168,22 @@ export async function hydrateFromStore(store: SaveStorePort, resolved: SaveStore
     seenIds.add(record.id);
   }
 
-  // AGREEMENT FIRST, before any read or write. A tower sitting in localStorage
-  // that the store knows nothing about means the two do not describe the same
-  // world, and hydrating would claim they do.
+  // AGREEMENT FIRST, before any read or write, for STRAY keys: a READABLE
+  // localStorage tower the store knows nothing about means the two do not
+  // describe the same world (the migration could not move it, and retries
+  // every boot, so this self-heals and must never read as degraded).
   //
-  // An EMPTY store is not a failure: a fresh install has nothing to hydrate
-  // and is trivially consistent. The case that matters is an empty store
-  // beside a localStorage tower, reachable whenever the migration could not
-  // move a value (no shared scope marked, a write that failed, a value the
-  // codec refuses). All of those RECUR, which is why disagreement must never
-  // read as degraded.
+  // An UNREADABLE stray is exempt, per the party-corrected F1 rule. It is
+  // preserved bytes the migration reports `unreadable` forever, so treating it
+  // as disagreement bricked store mode permanently. It stays where it is,
+  // untouched: `hasSlot` still reports it present, the saves UI still shows
+  // its row, and nothing here can write its id (the store has no record).
   const hydratedKeys = new Set(owned.map((entry) => entry.key));
   for (const { key } of MIGRATION_SOURCES) {
     if (hydratedKeys.has(key)) continue;
     try {
-      if (localStorage.getItem(key) !== null) return { ok: false, reason: "disagreement" };
+      const stray = localStorage.getItem(key);
+      if (stray !== null && toTowerFile(stray).ok) return { ok: false, reason: "disagreement" };
     } catch {
       // Storage that refuses to be read cannot be shown to agree either, and
       // a broken localStorage is not the bridge's fault.
@@ -156,12 +213,96 @@ export async function hydrateFromStore(store: SaveStorePort, resolved: SaveStore
     pending.push({ key, value: converted.ok ? converted.value : text, id: record.id });
   }
 
+  // THE THREE-WAY, per held key, decided by the coherence stamp: which side
+  // moved since the store last acknowledged a value. This replaces the
+  // party-rejected "store wins, no comparison", whose two tower-loss
+  // constructions (a browser-equivalent session's progress bulldozed when a
+  // stray heals; Steam Cloud replacing files under a newer cache) both came
+  // from overwriting without knowing which side moved.
+  type Plan =
+    | { kind: "write"; key: string; id: string; value: string }
+    | { kind: "keep-acked"; id: string; value: string }
+    | { kind: "reconcile"; key: string; id: string; cache: string; record: SaveRecord }
+    | { kind: "conflict"; key: string; id: string; cache: string; value: string };
+  const plans: Plan[] = [];
+  for (const entry of pending) {
+    const record = owned.find((o) => o.record.id === entry.id)!.record;
+    let cache: string | null;
+    try {
+      cache = localStorage.getItem(entry.key);
+    } catch {
+      return { ok: false, reason: "disagreement" };
+    }
+    if (cache === entry.value) {
+      // Coherent already; just refresh the stamp.
+      plans.push({ kind: "keep-acked", id: entry.id, value: entry.value });
+      continue;
+    }
+    if (cache === null) {
+      // Nothing local: first hydration of this record, or a locally deleted
+      // slot whose store delete did not land (resurrection is the accepted
+      // lossless annoyance). Store wins.
+      plans.push({ kind: "write", key: entry.key, id: entry.id, value: entry.value });
+      continue;
+    }
+    if (sameStoredValue(cache, entry.value, entry.id === "unreadable")) {
+      // Same bytes, two representations (see sameStoredValue): coherent. The
+      // CACHE value is kept and stamped, so the readers keep serving exactly
+      // what they already had and the next boot short-circuits here again.
+      plans.push({ kind: "keep-acked", id: entry.id, value: cache });
+      continue;
+    }
+    if (entry.id === "unreadable") {
+      // The stash is preserved bytes and localStorage WINS for it: a fresh
+      // stash is by definition the copy worth keeping, and the store's older
+      // one was already superseded on this machine. The migration's
+      // compare-and-replace pushes it forward.
+      plans.push({ kind: "reconcile", key: entry.key, id: entry.id, cache, record });
+      continue;
+    }
+    const acked = ackedHash(entry.id);
+    if (acked !== undefined && coherenceHash(cache) === acked) {
+      // The cache is exactly what the store last acknowledged, so the STORE
+      // moved: Steam Cloud brought another machine's progress, which syncs
+      // before launch by design. Store wins, legitimately.
+      plans.push({ kind: "write", key: entry.key, id: entry.id, value: entry.value });
+      continue;
+    }
+    if (acked !== undefined && coherenceHash(entry.value) === acked) {
+      // The store is what it last acknowledged and the CACHE moved: local
+      // progress from a browser-equivalent session. Reconcile it FORWARD into
+      // the store rather than bulldozing it; the cache stays.
+      plans.push({ kind: "reconcile", key: entry.key, id: entry.id, cache, record });
+      continue;
+    }
+    // Both moved, or nothing was ever acknowledged (which must read
+    // conservatively). Stash the local value first, then the store wins, and
+    // the caller tells the player. Steam's own conflict dialog owns the
+    // store-file side; this owns the residual.
+    plans.push({ kind: "conflict", key: entry.key, id: entry.id, cache, value: entry.value });
+  }
+
   // Snapshot before writing, so a quota failure part-way can put back exactly
   // what was there rather than leaving a store-flavored hybrid.
   const previous = new Map<string, string | null>();
+  const conflicts: string[] = [];
   try {
-    for (const { key } of pending) previous.set(key, localStorage.getItem(key));
-    for (const { key, value } of pending) localStorage.setItem(key, value);
+    for (const plan of plans) {
+      if (plan.kind === "write" || plan.kind === "conflict") previous.set(plan.key, localStorage.getItem(plan.key));
+      // The stash key is part of the same transaction: a stash written before
+      // a LATER setItem hit quota would otherwise survive the rollback as
+      // debris, making the next boot's quota failure strictly likelier.
+      if (plan.kind === "conflict") previous.set(conflictStashKey(plan.id), localStorage.getItem(conflictStashKey(plan.id)));
+    }
+    for (const plan of plans) {
+      if (plan.kind === "conflict") {
+        localStorage.setItem(conflictStashKey(plan.id), plan.cache);
+        localStorage.setItem(plan.key, plan.value);
+        conflicts.push(plan.id);
+      } else if (plan.kind === "write") {
+        localStorage.setItem(plan.key, plan.value);
+      }
+    }
   } catch {
     for (const [key, value] of previous) {
       try {
@@ -175,6 +316,39 @@ export async function hydrateFromStore(store: SaveStorePort, resolved: SaveStore
     return { ok: false, reason: "disagreement" };
   }
 
+  // Reconcile-forward writes go LAST, after localStorage is settled, and a
+  // failure does not fail the hydration: the cache keeps the newer value, no
+  // stamp is written for that id, and the next boot simply retries. mintSeq is
+  // the caller's counter so these writes obey the same per-address ordering as
+  // every other.
+  let reconcileTimedOut = false;
+  for (const plan of plans) {
+    if (plan.kind !== "reconcile") continue;
+    const forward = toTowerFile(plan.cache, plan.id === "unreadable");
+    if (!forward.ok) continue; // unconvertible local bytes stay local
+    try {
+      const settled = await withTimeout(store.write(plan.record.id, forward.text, plan.record.scope, mintSeq(plan.record)));
+      // `withTimeout` RESOLVES null on a timeout rather than rejecting, so a
+      // hung write must be told apart from a committed one here: stamping a
+      // write the shell may have dropped would make the NEXT boot read the
+      // cache as "what the store acknowledged" and let the older store copy
+      // win, silently, over the newer local tower (the one branch of the
+      // three-way with no stash). No stamp on timeout; if the write actually
+      // landed late, the next boot finds store == cache and stamps then.
+      if (settled === null) {
+        reconcileTimedOut = true;
+        continue;
+      }
+      noteAcked(plan.id, plan.cache);
+    } catch {
+      /* retried next boot; the newer local value is untouched */
+    }
+  }
+  for (const plan of plans) {
+    if (plan.kind === "write" || plan.kind === "conflict") noteAcked(plan.id, plan.value);
+    else if (plan.kind === "keep-acked") noteAcked(plan.id, plan.value);
+  }
+
   // Origins only once the hydration is KNOWN good: an origin recorded for a
   // slot that was then abandoned would let autosave target a scope the readers
   // never saw.
@@ -182,5 +356,5 @@ export async function hydrateFromStore(store: SaveStorePort, resolved: SaveStore
   for (const { record } of owned) {
     if (isSaveSlotId(record.id)) origins.set(record.id, { id: record.id, scope: record.scope });
   }
-  return { ok: true, origins };
+  return { ok: true, origins, conflicts, reconcileTimedOut };
 }

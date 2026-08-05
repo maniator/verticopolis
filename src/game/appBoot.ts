@@ -19,7 +19,8 @@ import { isStandalone } from "../pwaInstall";
 import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
 import { bindHostCommands, tickHostCommands } from "./hostCommands";
 import { IS_WRAPPED_BUILD } from "../platform";
-import { noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
+import { hydrationConflictIds, noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
+import { conflictBulletinText } from "./desktopSaveHydrate";
 import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
 
@@ -405,6 +406,17 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
       "⚠️ Saved towers on this computer couldn't be read this session, so saving is paused. Your towers are safe; restart to try again.",
       "bad",
     );
+  }
+
+  // Hydration resolved a both-moved conflict for these slots: the local copy
+  // was stashed and the synced (store) copy won. Same bulletin channel and the
+  // same reason: the player must learn a divergence was resolved FOR them, and
+  // that the losing copy still exists, from the game rather than from a
+  // missing hour of progress.
+  if (IS_WRAPPED_BUILD) {
+    for (const id of hydrationConflictIds()) {
+      app.sim.emit(conflictBulletinText(id), "bad");
+    }
   }
 
   // Autosave periodically, but never while the first-run splash is up, so an
