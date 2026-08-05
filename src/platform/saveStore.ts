@@ -231,6 +231,19 @@ export interface SaveStorePort {
     scope: SaveScopeToken,
     seq: number,
   ): { ok: true } | { ok: false; code?: SaveStoreErrorCode };
+  /**
+   * Export a STORED record's bytes to a player-chosen destination (story D7,
+   * closing D2's AC22). The shell resolves the record, runs its own save
+   * dialog, and copies the file: no re-serialization, so the destination
+   * bytes equal the stored bytes, and nothing that re-stamps a save can run.
+   * The renderer supplies an id from the closed list and a suggested NAME
+   * only; no path crosses in either direction. Resolves on cancel, like
+   * `saveFile`, because cancel is not an error.
+   *
+   * Optional like every member added after the original three: the export
+   * flow falls back to its live-serialize path when this is absent.
+   */
+  exportRecord?(id: string, suggestedName: string): Promise<void>;
 }
 
 /**
@@ -256,7 +269,8 @@ export function isSaveStorePort(value: unknown): value is SaveStorePort {
       typeof port.read === "function" &&
       typeof port.write === "function" &&
       typeof port.delete === "function" &&
-      (port.writeSync === undefined || typeof port.writeSync === "function")
+      (port.writeSync === undefined || typeof port.writeSync === "function") &&
+      (port.exportRecord === undefined || typeof port.exportRecord === "function")
     );
   } catch {
     return false;

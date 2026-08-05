@@ -185,6 +185,90 @@ describe("persistManualSave", () => {
   });
 });
 
+describe("exportStoredTower (story D7, D2's AC22)", () => {
+  it("flushes to AUTO first, then exports the auto record, in that order", async () => {
+    const store = fakeStore(SHARED);
+    const order: string[] = [];
+    store.port.writeSync = (id, contents, scope) => {
+      order.push(`flush:${id}`);
+      store.held.set(`${scope}|${id}`, contents);
+      return { ok: true };
+    };
+    store.port.exportRecord = (id: string, name: string) => {
+      order.push(`export:${id}:${name}`);
+      return Promise.resolve();
+    };
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    const { exportStoredTower } = await import("./manualSavePersist");
+    expect(await exportStoredTower(Simulation.newGame(7), "my-tower.vctower")).toBe(true);
+    expect(order).toEqual(["flush:auto", "export:auto:my-tower.vctower"]);
+  });
+
+  it("falls back to live when the member is absent, without flushing", async () => {
+    const store = fakeStore(SHARED);
+    const syncCalls = withWriteSync(store);
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    const { exportStoredTower } = await import("./manualSavePersist");
+    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe(false);
+    // No flush either: the point of the flush is the copy that will not happen.
+    expect(syncCalls).toEqual([]);
+  });
+
+  it("NEVER copies stale bytes: a failed flush falls back without exporting", async () => {
+    // The party's rule. A flush that fails leaves the auto record older than
+    // the live tower, and copying it would hand the player a backup missing
+    // their session.
+    const store = fakeStore(SHARED);
+    withWriteSync(store, { ok: false, code: "full" });
+    const exported: string[] = [];
+    store.port.exportRecord = (id: string) => {
+      exported.push(id);
+      return Promise.resolve();
+    };
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    const { exportStoredTower } = await import("./manualSavePersist");
+    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe(false);
+    expect(exported).toEqual([]);
+  });
+
+  it("a flush that answers fallback (writeSync-less shell) falls back too", async () => {
+    const store = fakeStore(SHARED); // no writeSync member
+    const exported: string[] = [];
+    store.port.exportRecord = (id: string) => {
+      exported.push(id);
+      return Promise.resolve();
+    };
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    const { exportStoredTower } = await import("./manualSavePersist");
+    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe(false);
+    expect(exported).toEqual([]);
+  });
+
+  it("a rejecting exportRecord falls back to the live path", async () => {
+    const store = fakeStore(SHARED);
+    withWriteSync(store);
+    store.port.exportRecord = () => Promise.reject(new Error("io"));
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    const { exportStoredTower } = await import("./manualSavePersist");
+    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe(false);
+  });
+
+  it("no authoritative store means the live path, member or not", async () => {
+    const { exportStoredTower } = await import("./manualSavePersist");
+    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe(false);
+  });
+});
+
 describe("deleteSlotFromStore", () => {
   /** Boot a session with slot-1 hydrated from the store. */
   async function hydratedWithSlot1() {

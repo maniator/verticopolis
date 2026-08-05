@@ -92,6 +92,39 @@ export function persistManualSave(sim: Simulation, slot: number | "auto"): "stor
   throw new Error(`The tower could not be written to the save store${result.code !== undefined ? ` (${result.code})` : ""}. Try again.`);
 }
 
+/**
+ * Export the STORED bytes (story D7, closing D2's AC22): flush the live
+ * tower to AUTO through the D4 sync path, so the stored record IS the live
+ * tower at this moment, then ask the shell to copy that file to a
+ * player-chosen destination. No re-serialization, so nothing that re-stamps
+ * a save can run between the flush and the file.
+ *
+ * AUTO on purpose, never the origin slot: the origin slot's record is as old
+ * as the last manual save there, and exporting it would hand the player a
+ * stale file labeled as their tower (the party's second-sharpest ruling).
+ *
+ * `false` means "use the live-serialize path": absent member, no
+ * authoritative store, a flush that answered fallback or threw, or a copy
+ * that failed. The party's rule: fall back to live, never copy stale, never
+ * refuse the export. The live path is Founder-safe since serialize persists
+ * the explicit flag.
+ */
+export async function exportStoredTower(sim: Simulation, suggestedName: string): Promise<boolean> {
+  const store = getPlatform().saveStore;
+  if (!store || typeof store.exportRecord !== "function" || !storeIsAuthoritative()) return false;
+  try {
+    if (persistManualSave(sim, "auto") !== "stored") return false;
+  } catch {
+    return false;
+  }
+  try {
+    await store.exportRecord("auto", suggestedName);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Store deletes in flight, keyed by slot; `saveToSlot` refuses these,
  *  because a sync save landing between a delete handler's awaits would be
  *  unlinked by the pending delete after "Saved to slot N" already toasted.
