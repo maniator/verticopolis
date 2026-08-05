@@ -20,6 +20,12 @@ import { saveStoreSession } from "./desktopSaveStore";
  * dangerous detail."; the visible caption carries all of it, while the
  * accessible name wants the same scope in fewer words, and deriving it
  * beats a second cross-repo string that can drift from the first.
+ *
+ * Known limit of the split, accepted while the shell owns the copy: a label
+ * whose first "sentence" ends at an abbreviation or decimal ("Dr.", "1.5")
+ * would mis-derive the accessible name. The visible caption always carries
+ * the full label, and the ratified copy splits correctly; revisit the
+ * derivation if the shell's wording ever grows a mid-sentence period.
  */
 export function saveScopeCaption(): SaveScopeCaption | undefined {
   const session = saveStoreSession();
