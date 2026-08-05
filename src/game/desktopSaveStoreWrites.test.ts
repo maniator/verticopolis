@@ -228,6 +228,31 @@ describe("Copilot review findings", () => {
     expect(result).toEqual({ ok: false, refusal: "failed", localFallbackSafe: true });
   });
 
+  it("REGRESSION: a real-bridge rejection carries its code in the MESSAGE only, and stale still reads as success", async () => {
+    // Electron's contextBridge strips custom properties from a rejection
+    // crossing isolated worlds, so the preload's Object.assign(new Error(code),
+    // {code}) arrives as a bare Error whose message IS the code. The packaged
+    // real-shell harness caught this: every async rejection read as unshaped,
+    // so a superseded autosave (stale = success-by-supersession) surfaced as
+    // a failure toast.
+    const { port } = fakeStore(SHARED);
+    port.write = () => Promise.reject(new Error("stale"));
+    injectedStore = port;
+    await prepareSaveStore();
+
+    expect(await writeTowerToStore("auto", "x")).toEqual({ ok: true });
+  });
+
+  it("a human SENTENCE mentioning a code never narrows (exact match only)", async () => {
+    const { port } = fakeStore(SHARED);
+    port.write = () => Promise.reject(new Error("the record was not-found on disk"));
+    injectedStore = port;
+    await prepareSaveStore();
+
+    const result = await writeTowerToStore("auto", "x");
+    expect(result).toEqual({ ok: false, refusal: "failed", localFallbackSafe: true });
+  });
+
   it("bounds the MIGRATION, not just list(), so a shell that hangs mid-write cannot block boot", async () => {
     // The timeout covered `list()` only. The migration then awaits a write and
     // a read-back per slot, so a shell that answers list() promptly and hangs on

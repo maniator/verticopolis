@@ -122,18 +122,36 @@ const SAVE_STORE_ERROR_CODES: readonly SaveStoreErrorCode[] = [
  * Exists because a taxonomy nothing narrows to is documentation rather than a
  * contract: without this, every caller writes `catch {}` and the codes are
  * decorative.
+ *
+ * The MESSAGE is consulted when no `code` property matches, and only when it
+ * is EXACTLY one of the codes. That is not sloppiness, it is the bridge:
+ * Electron's contextBridge strips custom properties from a rejection crossing
+ * isolated worlds, so a shell that throws `Object.assign(new Error(code),
+ * {code})` in its preload delivers an error whose only surviving carrier of
+ * the code is the message. The real-shell harness caught this: every
+ * async-path rejection arrived here unshaped, which read a superseded
+ * autosave (`stale`, a success) as a failure and stripped `full`/`denied` of
+ * their storage-blame advice. The exact-match rule keeps a human sentence
+ * ("something not-found happened") from ever narrowing.
  */
 export function saveStoreErrorCode(err: unknown): SaveStoreErrorCode | undefined {
-  // The property read is guarded because this runs INSIDE a catch: a rejection
-  // carrying a throwing getter or a revoked Proxy would otherwise throw a
-  // second time from the handler, abandoning the remaining slots.
+  // The property reads are guarded because this runs INSIDE a catch: a
+  // rejection carrying a throwing getter or a revoked Proxy would otherwise
+  // throw a second time from the handler, abandoning the remaining slots.
   let code: unknown;
   try {
     code = (err as { code?: unknown } | null | undefined)?.code;
   } catch {
     return undefined;
   }
-  return SAVE_STORE_ERROR_CODES.includes(code as SaveStoreErrorCode) ? (code as SaveStoreErrorCode) : undefined;
+  if (SAVE_STORE_ERROR_CODES.includes(code as SaveStoreErrorCode)) return code as SaveStoreErrorCode;
+  let message: unknown;
+  try {
+    message = (err as { message?: unknown } | null | undefined)?.message;
+  } catch {
+    return undefined;
+  }
+  return SAVE_STORE_ERROR_CODES.includes(message as SaveStoreErrorCode) ? (message as SaveStoreErrorCode) : undefined;
 }
 
 /** One stored tower, as the shell describes it. Note the absence of a path. */
