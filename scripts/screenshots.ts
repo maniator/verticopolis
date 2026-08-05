@@ -223,6 +223,23 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
     }
     if (scene.initScript) await page.addInitScript(scene.initScript);
     await page.goto(scene.route ? `${BASE}/${scene.route}` : BASE, { waitUntil: "networkidle" });
+    // Scrollbars are hidden for every capture, because they were the LAST
+    // wall-clock leak (#762). The stepped TestClock pins page time, but a
+    // fluent overlay scrollbar fades on the COMPOSITOR's own wall clock, so a
+    // shot that scrolls a container (27b/27c scroll the schedule dialog's
+    // .modal-box and crop exactly that region) captured whatever fade phase
+    // CI load happened to land on: usually fully faded (the committed
+    // gallery shows a clean gutter), occasionally mid-fade, which is the
+    // intermittent "pixel bytes differ" failure. Hiding them renders the
+    // faded end state every time. Layout is unaffected where it matters:
+    // overlay scrollbars occupy no layout space in the pinned container
+    // (host classic scrollbars do, but host renders are preview-only by
+    // rule). Both spellings on purpose: `scrollbar-width` is the standard
+    // Chromium honors today, the `::-webkit-scrollbar` block is the belt for
+    // engines that route overlay painting through the legacy pseudo-element.
+    await page.addStyleTag({
+      content: "* { scrollbar-width: none !important; } *::-webkit-scrollbar { display: none !important; }",
+    });
     if (scene.route) {
       // Route pages set their own ready flag (galleryReady / previewReady).
       // A missing flag means the page never finished rendering, so capturing now would
