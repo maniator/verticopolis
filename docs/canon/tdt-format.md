@@ -402,6 +402,28 @@ that skips most of what it spans.
 > case), which is why the export report still warns the player, and why this
 > issue stays open. Ordering buys the common case, not the general one.
 >
+> **Narrowed further, 2026-08-05: the table needs no global ordering, and the
+> loss scales with how EARLY the express sits.** Both probes reorder the game's
+> own 8-shaft fixpoint save, never altering a byte of any record.
+>
+> | change | shafts kept |
+> |---|---|
+> | swap two STANDARD shafts, express left at index 5 | **8 of 8** (and the game re-saves them in the swapped order) |
+> | express moved to index 1 | **4 of 8** |
+> | express moved to index 0 | **2 of 8** |
+> | express left at index 5 (unmodified) | **8 of 8** |
+>
+> The first row is the important control: reordering non-express records is
+> harmless, and the game writes the new order back, so the elevator table is NOT
+> required to be sorted by column, kind, or anything else. Only the express's
+> own position matters, and the count kept grows with its index rather than
+> flipping at some threshold, which argues against a simple validity check on
+> slot 0 and for something cumulative in how the game walks the table.
+>
+> That makes express-LAST optimal rather than merely safe: it is the position
+> that maximizes what survives. It still cannot save a SECOND express, which is
+> the 22-of-23 case, so the export report's warning stands.
+>
 > **What that pins, and what it does not.** The game WRITES the express
 > stop-sized (measured directly on one game-written save by header-to-header
 > distance, and independently on the 384,658-byte re-save by the EOF fit above),
