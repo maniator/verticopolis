@@ -56,8 +56,8 @@ export function savesTemplate(slots: SlotInfo[], scope?: SaveScopeCaption): Temp
         ${slots.map(slotRow)}
       </div>
       <div class="modal-actions">
-        <button class="btn" data-act="export">Export to file</button>
-        <button class="btn" data-act="import">Import from file</button>
+        <button class="btn" data-act="export">Export to file…</button>
+        <button class="btn" data-act="import">Import from file…</button>
         <button class="btn primary" data-act="close">Close</button>
       </div>`;
 }
