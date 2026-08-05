@@ -116,7 +116,11 @@ async function runPrepare(): Promise<void> {
     // deeper. Abandoning a half-finished migration is safe by construction,
     // because it never deletes localStorage, refuses an occupied destination,
     // and derives its done-marker from the store, so the next boot resumes it.
-    migration = await withTimeout(migrateSavesToStore(store, target, idsInScope(session, target)));
+    // `nextSeq` threaded in like the hydration below: migration writes count
+    // toward the shell's high-water mark, so they must spend the SAME
+    // per-address counter the session's own saves mint from, or the first
+    // real save re-mints the migration's seq and silently vanishes as stale.
+    migration = await withTimeout(migrateSavesToStore(store, target, idsInScope(session, target), undefined, nextSeq));
     if (migration === null) return;
 
     // Re-read the snapshot so the synchronous readers see what the migration
