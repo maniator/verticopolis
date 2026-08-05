@@ -233,6 +233,26 @@ describe("deleteSlotFromStore", () => {
     expect(slotDeletePending(1)).toBe(false);
   });
 
+  it("REGRESSION: a second delete for the same slot observes the first, never races it", async () => {
+    // With a bare pending set, the first delete's cleanup cleared the flag
+    // while the second was still in flight, so slotDeletePending read false
+    // and a save could land inside the remaining window.
+    const store = await hydratedWithSlot1();
+    let release!: () => void;
+    store.port.delete = () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+    const first = deleteSlotFromStore(1);
+    const second = deleteSlotFromStore(1);
+    expect(second).toBe(first);
+    expect(slotDeletePending(1)).toBe(true);
+    release();
+    await expect(first).resolves.toBe(true);
+    expect(slotDeletePending(1)).toBe(false);
+  });
+
   it("REGRESSION: a hung delete times out as a failure instead of wedging the slot forever", async () => {
     // Unbounded, a delete that never settled kept the slot pending for the
     // whole session: saveToSlot refused it forever, and the restore path

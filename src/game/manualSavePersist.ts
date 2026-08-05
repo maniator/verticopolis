@@ -92,10 +92,14 @@ export function persistManualSave(sim: Simulation, slot: number | "auto"): "stor
   throw new Error(`The tower could not be written to the save store${result.code !== undefined ? ` (${result.code})` : ""}. Try again.`);
 }
 
-/** Slots with a store delete in flight; `saveToSlot` refuses these, because a
- *  sync save landing between a delete handler's awaits would be unlinked by
- *  the pending delete after "Saved to slot N" already toasted. */
-const pendingDeletes = new Set<number>();
+/** Store deletes in flight, keyed by slot; `saveToSlot` refuses these,
+ *  because a sync save landing between a delete handler's awaits would be
+ *  unlinked by the pending delete after "Saved to slot N" already toasted.
+ *  The VALUE is the in-flight promise, so a second delete request for the
+ *  same slot observes the first instead of racing it: with a bare set, the
+ *  first delete's cleanup cleared the pending flag while the second was
+ *  still in flight, reopening the save window this exists to close. */
+const pendingDeletes = new Map<number, Promise<boolean>>();
 
 export function slotDeletePending(slot: number): boolean {
   return pendingDeletes.has(slot);
@@ -115,10 +119,14 @@ export function slotDeletePending(slot: number): boolean {
  * restore its localStorage removal and say so.
  */
 export function deleteSlotFromStore(slot: number): Promise<boolean> {
+  // A second request while one is in flight OBSERVES the first rather than
+  // racing it (see pendingDeletes): both callers get the same outcome, and
+  // the pending flag holds until the one real delete settles.
+  const inFlight = pendingDeletes.get(slot);
+  if (inFlight !== undefined) return inFlight;
   const store = getPlatform().saveStore;
   const address = hydratedOriginFor(`slot-${slot}`);
   if (!store || !storeIsAuthoritative() || address === undefined) return Promise.resolve(true);
-  pendingDeletes.add(slot);
   clearAcked(`slot-${slot}`);
   // Bounded like every other bridge call: "never rejects" is not "never
   // hangs", and a delete that never settled kept `pendingDeletes` armed for
@@ -126,7 +134,7 @@ export function deleteSlotFromStore(slot: number): Promise<boolean> {
   // restore path never fired. A timeout reads as failure (`withTimeout`
   // resolves null), the caller restores the cache row, and if the delete
   // actually landed late the next boot simply finds nothing to resurrect.
-  return withTimeout(store.delete(address.id, address.scope).then(() => true as const))
+  const run = withTimeout(store.delete(address.id, address.scope).then(() => true as const))
     .then((settled) => {
       if (settled !== true) return false;
       // The record is GONE, and the session must know it: a review found
@@ -140,6 +148,8 @@ export function deleteSlotFromStore(slot: number): Promise<boolean> {
     .finally(() => {
       pendingDeletes.delete(slot);
     });
+  pendingDeletes.set(slot, run);
+  return run;
 }
 
 /** Test seam, mirroring `resetSaveStoreForTests` for this module's state. */
