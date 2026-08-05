@@ -179,7 +179,7 @@ describe("the confirmed legacy import in a degraded session", () => {
   });
 
   it("the scope caption reaches BOTH saves surfaces from the shell's data", () => {
-    // The D2 labelling ruling's last mile: the ratified copy travels from the
+    // The D2 labeling ruling's last mile: the ratified copy travels from the
     // shell's scope label through list() to the templates. An audit found the
     // templates shipped with caption parameters no caller constructed, so the
     // copy reached no screen; this pins both call sites.

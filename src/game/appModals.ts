@@ -76,7 +76,7 @@ function confirmExterminate(app: GameApp): void {
 export function showSaves(app: GameApp): void {
   trackAppAction("saves_open"); // saves manager modal opening
   // The scope caption is DATA from the shell's own scope label (the D2
-  // labelling ruling: rendered from data, never a constant), so only a
+  // labeling ruling: rendered from data, never a constant), so only a
   // wrapped build can have one; the fold keeps the desktop modules out of a
   // browser bundle.
   app.ui.showSaves(SaveGame.listSlots(), IS_WRAPPED_BUILD ? saveScopeCaption() : undefined);

@@ -3,7 +3,7 @@ import { saveStoreSession } from "./desktopSaveStore";
 
 /**
  * The saves UI's scope caption, built FROM DATA (the shell's scope label),
- * never from a constant: the labelling party's ruling for story D2. The
+ * never from a constant: the labeling party's ruling for story D2. The
  * ratified copy ("Towers on this computer. Anyone who plays here can open
  * them.") travels from the shell through `list()` to here, so the day the
  * shell offers a second namespace, the same code renders its words with no

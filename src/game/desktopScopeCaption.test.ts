@@ -3,7 +3,7 @@ import type { SaveStorePort, SaveStoreSnapshot } from "../platform/saveStore";
 import { LOCAL } from "./desktopSaveStore.fixture";
 
 /**
- * The scope caption is DATA from the shell's scope label (the D2 labelling
+ * The scope caption is DATA from the shell's scope label (the D2 labeling
  * ruling), so these tests drive it through a real resolved session rather
  * than a stub, and pin the derivation against the RATIFIED copy the real
  * shell sends.
