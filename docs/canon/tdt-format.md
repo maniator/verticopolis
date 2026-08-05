@@ -360,7 +360,7 @@ that skips most of what it spans.
 > does not track the sizing in any way we can yet explain.
 >
 > That leaves the express record's CONTENT, not its extent: our per-floor
-> entries are zero-filled where the game's carry live queue state, and the same
+> entries are zero-filled where the game's own entries carry live queue state, and the same
 > zero-fill is harmless for standard and service shafts. Whether the game
 > chokes on that, on the express's stop bitmap, or on something in the fixed
 > block is the open question. The practical consequence is settled either way:
