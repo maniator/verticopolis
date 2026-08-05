@@ -104,6 +104,20 @@ export interface PlatformPort {
    */
   setCommandsAvailable?(commands: readonly HostCommand[]): void;
   /**
+   * Subscribe to the shell's QUIT-TIME flush request (story D6). The shell
+   * calls the handler when the player quits (menu, Cmd+Q, or the window's
+   * close button), and the handler runs the same splash-guarded SYNCHRONOUS
+   * flush the update path uses, so the tower the player was just playing is
+   * on disk before the process exits. Synchronous is the contract: the shell
+   * observes the flush as the `writeSync` arriving on its own channel, so an
+   * async handler would look like no flush at all.
+   *
+   * Optional like every member added after the original three, and latched
+   * to at most one registration like `onHostCommand`. A shell that omits it
+   * simply keeps the current loss bound (one autosave interval).
+   */
+  onFlushRequest?(handler: () => void): void;
+  /**
    * Durable storage the game uses in place of localStorage when a shell offers
    * it. Optional for the same reason as the two members above, and the reason
    * bites harder here: the iOS Capacitor shell implements the three-member

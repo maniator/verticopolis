@@ -30,6 +30,7 @@ function isPlatformPort(value: unknown): value is PlatformPort {
       typeof port.openExternal === "function" &&
       optionalFn(port.onHostCommand) &&
       optionalFn(port.setCommandsAvailable) &&
+      optionalFn(port.onFlushRequest) &&
       optionalStore(port.saveStore)
     );
   } catch {

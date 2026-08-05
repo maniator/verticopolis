@@ -422,6 +422,27 @@ export function bindHostCommands(app: GameApp, platform = getPlatform()): void {
     // intended behavior; this call is not a guarantee.
     tickHostCommands();
   }
+  // The quit-time flush (story D6). The handler is the same splash-guarded
+  // SYNCHRONOUS flush the update path uses, but the failure posture inverts:
+  // saveBeforeUpdate THROWS so its caller can refuse the reload, while at
+  // quit there is no "decline", so a failure is swallowed (quit proceeds,
+  // the store never clobbers on failure, the previous autosave is intact)
+  // and logged, because a permanently failing quit flush must not be
+  // invisible forever. Synchronous is the contract: the shell observes the
+  // flush as the writeSync arriving on its own channel before this handler
+  // returns, so nothing here may defer the save.
+  const flushSubscribe = platform.onFlushRequest;
+  try {
+    flushSubscribe?.call(platform, () => {
+      try {
+        app.saveLoad.saveBeforeUpdate();
+      } catch (err) {
+        console.error("[platform] Quit-time flush failed; the previous autosave is intact:", err);
+      }
+    });
+  } catch (err) {
+    console.warn("[platform] Flush-request subscription failed:", err);
+  }
 }
 
 /** Test-only reset of the module's push state. The availability dirty-gate is
