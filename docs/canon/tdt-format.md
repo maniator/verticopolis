@@ -371,6 +371,33 @@ that skips most of what it spans.
 > A re-save of a re-save is a **fixpoint**: the 8-shaft file re-saves to the
 > same 8 shafts, same table end, same 5,672-byte tail.
 >
+> **SETTLED 2026-08-05: the trigger is the express record's POSITION in the
+> table, not its length and not its content.** Two probes closed this, both
+> built from bytes the game itself wrote:
+>
+> - **Content is identical.** A game-written express record is 51 non-zero
+>   bytes of header followed by an ENTIRELY ZERO payload: the 3,140-byte fixed
+>   block, all eight per-floor entries, and the 348-byte car block are zeros.
+>   Ours is byte-for-byte the same 6,274 bytes, followed by 26,892 more zeros
+>   from the span sizing. So the game does not keep live queue state in an
+>   express payload, our zero-fill was never a divergence, and splicing the
+>   game's record into our file is a no-op that changes nothing.
+> - **Order alone flips the outcome.** Taking the game's own 8-shaft save (a
+>   known fixpoint: re-saving it reproduces all 8) and REORDERING its records so
+>   the express sits first, without altering one byte of any record, the game
+>   keeps **2 of 8**. Same records, same lengths, same file length, same
+>   everything but the sequence.
+>
+> That explains every earlier row at once. Express last: everything before it
+> survives. Express at slot 5 in the game's own file: all 8 survive. Express
+> first: the express plus one shaft, whether the record is span-sized (1 kept
+> plus nothing) or the game's own stop-sized bytes (2 kept). The mechanism is
+> still unknown, and the plausible shapes are a required ordering (by column, by
+> kind, by floor) or an express being read before the structures a later shaft
+> depends on. What is no longer in doubt is that **writing express shafts last
+> is the correct construction of the table**, not a workaround: it is the one
+> arrangement measured to cost a tower nothing.
+>
 > **What that pins, and what it does not.** The game WRITES the express
 > stop-sized (measured directly on one game-written save by header-to-header
 > distance, and independently on the 384,658-byte re-save by the EOF fit above),
