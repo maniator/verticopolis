@@ -162,14 +162,24 @@ export function builtShaftPayloadSize(bottomFloor: number, topFloor: number): nu
 export const TDT_ELEVATOR_TYPE_EXPRESS = 0;
 
 /**
- * One built shaft's payload size, BY KIND, and the only entry point a writer or
- * reader should use.
+ * One built shaft's payload size the way the 1994 GAME sizes it, by kind.
  *
  * Standard and service shafts hold one per-floor entry for every floor they
  * span. An EXPRESS shaft holds one for every floor it STOPS at. That is the
- * only place the two rules can differ: an express is the one kind that skips
- * most of what it spans, and every other shaft stops everywhere it passes,
- * which is exactly why this went unnoticed for so long.
+ * only place the two rules can differ: an express is the kind that skips most
+ * of what it spans, while a standard or service shaft usually stops everywhere
+ * it passes, which is why this went unnoticed for so long. (Usually, not
+ * always: a standard shaft CAN be given skip floors, and whether the game spans
+ * or stops for that case is unmeasured. Both this reader and our writer span it,
+ * per the 2026-07-13 measurement in doc §8.)
+ *
+ * **Our own EXPORTER does not call this, on purpose.** It sizes every kind by
+ * span via {@link builtShaftPayloadSize}, express included, and the game accepts
+ * those files. Aligning the writer with the game here looks like the obvious
+ * follow-up and was tried: the same tower exported both ways loads with the SAME
+ * shafts, so nothing is gained, and the "write express last" workaround it would
+ * have justified removing is still doing real work. Do not "fix" the exporter to
+ * call this without new evidence; see issue #740.
  *
  * Harness-measured 2026-08-04 against a save retail SimTower wrote: an express
  * spanning floors 10..100 and stopping at 8 of them occupies 6,274 bytes, which

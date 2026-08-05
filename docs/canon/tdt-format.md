@@ -448,8 +448,10 @@ Everything above describes the original's format. This section describes bytes
 A `.TDT` Verticopolis writes ends with a small trailer: the ASCII magic
 `VCTDT`, then a **u16 generation** (little-endian, like every other word here).
 Generation `1` is the spanned-floor elevator payload (§8), which our writer uses
-for every kind, express included. An UNSTAMPED file is read with the game's own
-layout instead (express by serviced floors), since that is what wrote it.
+for every kind, express included. An UNSTAMPED file gets no such statement and
+is decided by the structural reasoning described under "Reading it" below: it
+may be a save the 1994 game wrote, or one of ours from before the trailer
+existed, and those two want different rules.
 
 **Why.** A `.TDT` carries no statement of who wrote it, so when our own writer's
 layout changed, the importer had to *infer* which of our writers produced a file
