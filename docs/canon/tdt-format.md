@@ -359,14 +359,13 @@ that skips most of what it spans.
 > whatever its length, and the surviving-tail count (0, 1, or 2 shafts observed)
 > does not track the sizing in any way we can yet explain.
 >
-> That leaves the express record's CONTENT, not its extent: our per-floor
-> entries are zero-filled where the game's own entries carry live queue state, and the same
-> zero-fill is harmless for standard and service shafts. Whether the game
-> chokes on that, on the express's stop bitmap, or on something in the fixed
-> block is the open question. The practical consequence is settled either way:
-> ordering express last is not a stopgap for a sizing bug, it is the correct
-> shipping answer until the content question is understood, because it puts the
-> unreadable record where nothing follows it.
+> That left the express record's CONTENT as the remaining suspect, on the guess
+> that our zero-filled per-floor entries stood where the game's carried live
+> queue state. **That guess was wrong, and the next note records the
+> measurement that killed it: the two records are byte-identical.** The
+> practical consequence was already settled and is unchanged: ordering express
+> last is not a stopgap for a sizing bug, because it puts the record the game
+> cannot read past where nothing follows it.
 >
 > A re-save of a re-save is a **fixpoint**: the 8-shaft file re-saves to the
 > same 8 shafts, same table end, same 5,672-byte tail.
@@ -395,8 +394,13 @@ that skips most of what it spans.
 > still unknown, and the plausible shapes are a required ordering (by column, by
 > kind, by floor) or an express being read before the structures a later shaft
 > depends on. What is no longer in doubt is that **writing express shafts last
-> is the correct construction of the table**, not a workaround: it is the one
-> arrangement measured to cost a tower nothing.
+> is the best available construction of the table**, not a workaround for a
+> sizing bug: it is the arrangement that costs a tower with ONE express nothing.
+>
+> It does not make #740 solved for every tower. A tower with a SECOND express
+> still loses it and anything after it (the 22-of-23 row above is exactly that
+> case), which is why the export report still warns the player, and why this
+> issue stays open. Ordering buys the common case, not the general one.
 >
 > **What that pins, and what it does not.** The game WRITES the express
 > stop-sized (measured directly on one game-written save by header-to-header
