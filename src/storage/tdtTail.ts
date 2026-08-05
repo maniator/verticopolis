@@ -176,12 +176,12 @@ type PayloadLayout = "expressServiced" | "spanned" | "serviced";
  * Stops recorded in a slot's 120-byte serviced bitmap, counting only floors the
  * shaft actually spans.
  *
- * The clamp is the safer read of an unmeasured detail: the harness measurement
- * (324 * 8 for a shaft stopping at 8 of its 91 floors) cannot tell "every set
- * bit" from "set bits within the span", since that save has none outside. A
- * shaft shortened after it was built is the obvious way a stale bit could sit
- * out there, and counting one sizes the payload 324 bytes long and lands the
- * walk mid-record. Counting only what the shaft spans cannot err that way.
+ * The clamp guards a measured hazard whose sizing side is still unmeasured:
+ * game re-saves DO carry stray set bits outside a shaft's span (a standard
+ * shaft at floors 54..69 carried 2, harness 2026-08-04), while the one express
+ * measured so far has none, so whether the game's own sizing counts strays is
+ * unknown. Counting one would size the payload a full entry long and land the
+ * walk mid-record; counting only what the shaft spans cannot err that way.
  */
 function stopCount(serviced: Uint8Array, bottomFloor: number, topFloor: number): number {
   let stops = 0;

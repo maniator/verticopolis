@@ -175,11 +175,12 @@ export const TDT_ELEVATOR_TYPE_EXPRESS = 0;
  *
  * **Our own EXPORTER does not call this, on purpose.** It sizes every kind by
  * span via {@link builtShaftPayloadSize}, express included, and the game accepts
- * those files. Aligning the writer with the game here looks like the obvious
- * follow-up and was tried: the same tower exported both ways loads with the SAME
- * shafts, so nothing is gained, and the "write express last" workaround it would
- * have justified removing is still doing real work. Do not "fix" the exporter to
- * call this without new evidence; see issue #740.
+ * those files, losing only what follows the first express (which the express-
+ * last ordering makes the second express alone; re-save-measured 22 of 23 kept).
+ * Aligning the writer with the game looks like the obvious follow-up, but the
+ * one stop-sized-express experiment run so far fared far WORSE in the game
+ * (8 of 23 kept), confounded though it is with express position. Do not "fix"
+ * the exporter to call this without isolating that; see issue #740 and doc §8.
  *
  * Harness-measured 2026-08-04 against a save retail SimTower wrote: an express
  * spanning floors 10..100 and stopping at 8 of them occupies 6,274 bytes, which
@@ -220,11 +221,13 @@ export const TDT_STAIR_RECORD_SIZE = 10;
  * the stairs table (doc §11+: lobby/reachability tables and related caches).
  *
  * The importer skips this region (its live crowd re-simulates), but the real
- * game reads it at a FIXED extent on load. Our exporter used to end right after
- * the stairs table, ~25 KB short of that extent, so the game read off the end of
- * the file and page-faulted (0x0799, surfaced as "This file is already open, or
- * damaged"). The exporter now emits this region so the file reaches the length
- * the game expects.
+ * game reads it on load, to an extent that depends on the file's own content
+ * (doc §11: its own re-saves carry far less than this constant and re-open
+ * fine). Our exporter used to end right after the stairs table, well short of
+ * what the game read from our files, so it read off the end and page-faulted
+ * (0x0799, surfaced as "This file is already open, or damaged"). Emitting this
+ * fixed region is the over-emit that keeps every measured case (through 4-star
+ * towers) safely inside the file.
  *
  * It is filled with 0xFF, the format's empty-slot sentinel. That choice is
  * load-bearing and was confirmed with the SimTower harness (tools/simtower/):
