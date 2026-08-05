@@ -169,6 +169,48 @@ describe("bindHostCommands: inert in the browser, live in a shell", () => {
     expect(spies.showHelp).toHaveBeenCalledOnce();
   });
 
+  it("binds the quit-time flush and runs the update path's flush when the shell asks", () => {
+    // Story D6 AC2/AC3: the handler is the same splash-guarded synchronous
+    // flush the update path uses.
+    const { app, spies } = makeApp();
+    let requestFlush: (() => void) | undefined;
+    const onFlushRequest = vi.fn((handler: () => void) => {
+      requestFlush = handler;
+    });
+    bindHostCommands(app, { ...basePort(), onFlushRequest });
+    expect(onFlushRequest).toHaveBeenCalledOnce();
+    requestFlush?.();
+    expect(spies.saveBeforeUpdate).toHaveBeenCalledOnce();
+  });
+
+  it("SWALLOWS a failed quit flush with a console.error, so quit can proceed", () => {
+    // The inverse of the update path's throw-block: at quit there is no
+    // "decline", and the store never clobbers on failure, so the previous
+    // autosave is intact; the error is logged so a permanently failing quit
+    // flush is not invisible forever.
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { app, spies } = makeApp();
+    spies.saveBeforeUpdate.mockImplementation(() => {
+      throw new Error("quota");
+    });
+    let requestFlush: (() => void) | undefined;
+    bindHostCommands(app, {
+      ...basePort(),
+      onFlushRequest: (handler: () => void) => {
+        requestFlush = handler;
+      },
+    });
+    expect(() => requestFlush?.()).not.toThrow();
+    expect(error).toHaveBeenCalledOnce();
+    error.mockRestore();
+  });
+
+  it("a port without onFlushRequest binds nothing and changes nothing", () => {
+    const { app, spies } = makeApp();
+    expect(() => bindHostCommands(app, basePort())).not.toThrow();
+    expect(spies.saveBeforeUpdate).not.toHaveBeenCalled();
+  });
+
   it("refuses a second bind, so no command can run twice", () => {
     // The shell side registers an ipcRenderer listener per call with no removal
     // path, so a second bind would mean two pickers, two saves, two undos.

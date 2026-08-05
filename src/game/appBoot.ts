@@ -431,7 +431,8 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // nothing: the port member is optional and only a wrapper defines it.
   //
   // LAST, deliberately, and this ordering is load-bearing. `bindHostCommands`
-  // publishes the opening availability set as its final step, so binding before
+  // publishes the opening availability set (and then registers the quit-time
+  // flush, whose ordering is not load-bearing), so binding before
   // the title screen was decided meant the shell's first news was "all eight
   // commands are available", computed with no splash up, immediately followed by
   // a title screen where four of them are refused. The menu showed Save, Undo,

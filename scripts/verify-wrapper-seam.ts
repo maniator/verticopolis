@@ -93,6 +93,10 @@ const SEAMS: readonly Seam[] = [
       "Not available right now",
       "Finish what you are doing first",
       "Ignoring unknown host command",
+      // The quit-time flush (story D6): its failure log is the one literal
+      // unique to the flush binding, so its presence proves the binding
+      // shipped in a wrapped build and its absence proves the browser fold.
+      "Quit-time flush failed",
     ],
     guardHint:
       "a new unguarded caller of src/game/hostCommands.ts has pulled it back into every player's bundle: " +

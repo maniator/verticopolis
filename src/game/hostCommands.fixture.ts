@@ -29,7 +29,8 @@ export type Spies = Record<
   | "showHelp"
   | "showSettings"
   | "sayVisibly"
-  | "isEditorBusy",
+  | "isEditorBusy"
+  | "saveBeforeUpdate",
   ReturnType<typeof vi.fn>
 > & {
   splashNew: Mock<() => void>;
@@ -48,6 +49,10 @@ export function makeApp(): { app: GameApp; spies: Spies } {
     showSettings: vi.fn(),
     sayVisibly: vi.fn(),
     isEditorBusy: vi.fn(() => false),
+    // The quit-time flush target (story D6): the same splash-guarded
+    // synchronous flush the update path uses, spied so the binding tests can
+    // assert it ran without touching real storage.
+    saveBeforeUpdate: vi.fn(),
     // The title screen's own two buttons. Registered through the real
     // `setLiveSplashActions` by `mountSplash` below, not injected, so these tests
     // exercise the same registry `OnboardingController.showSplash` publishes to.
@@ -60,6 +65,7 @@ export function makeApp(): { app: GameApp; spies: Spies } {
     // "no choice pending" the real app boots with rather than undefined.
     shownChoice: false,
     shownUpdate: false,
+    saveLoad: { saveBeforeUpdate: spies.saveBeforeUpdate },
     ui: {
       promptNewTower: spies.promptNewTower,
       showHelp: spies.showHelp,
