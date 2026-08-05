@@ -112,5 +112,5 @@ function pickerRow(s: SlotInfo, h: TowerPickerHandlers): TemplateResult {
  *  `alone` drops the divider: with no slot rows above it, the heavier rule
  *  would be dividing the row from nothing. */
 function fileRow(h: TowerPickerHandlers, alone: boolean): TemplateResult {
-  return html`<li class="slot slot-file ${alone ? "slot-file--alone" : ""}"><div class="slot-head"><b>Load from a file...</b><div class="slot-detail">A .vctower export, or an original SimTower .TDT save.</div></div><div class="slot-actions"><button class="btn" data-picker="file" aria-label="Load a tower from a file" @click=${h.onFile}>Choose file</button></div></li>`;
+  return html`<li class="slot slot-file ${alone ? "slot-file--alone" : ""}"><div class="slot-head"><b>Load from a file…</b><div class="slot-detail">A .vctower export, or an original SimTower .TDT save.</div></div><div class="slot-actions"><button class="btn" data-picker="file" aria-label="Load a tower from a file" @click=${h.onFile}>Choose file…</button></div></li>`;
 }
