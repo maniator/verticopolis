@@ -203,7 +203,10 @@ describe("showSaves", () => {
     const { app, ui } = makeApp(sim);
     showSaves(app);
     expect(SaveGame.listSlots).toHaveBeenCalledTimes(1);
-    expect(ui.showSaves).toHaveBeenCalledExactlyOnceWith([{ slot: "auto", exists: false }]);
+    // The second argument is the scope caption, absent outside a wrapped
+    // build (IS_WRAPPED_BUILD is false under vitest); the wrapped-side wiring
+    // is pinned in appModalsOriginWiring.test.ts.
+    expect(ui.showSaves).toHaveBeenCalledExactlyOnceWith([{ slot: "auto", exists: false }], undefined);
   });
 });
 

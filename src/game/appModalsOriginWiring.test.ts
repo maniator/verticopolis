@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
 import type { GameApp } from "../main";
-import { loadFromSlot, loadFromSplash, saveToSlot } from "./appModals";
+import { loadFromSlot, loadFromSplash, saveToSlot, showSaves, showTowerPicker } from "./appModals";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
 
 /**
@@ -25,6 +25,11 @@ const slotDeletePendingMock = vi.fn((_slot: number) => false);
 vi.mock("./manualSavePersist", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./manualSavePersist")>()),
   slotDeletePending: (slot: number) => slotDeletePendingMock(slot),
+}));
+
+const saveScopeCaptionMock = vi.fn<() => { text: string; listLabel: string } | undefined>(() => undefined);
+vi.mock("./desktopScopeCaption", () => ({
+  saveScopeCaption: () => saveScopeCaptionMock(),
 }));
 
 vi.mock("./desktopSaveStore", () => ({
@@ -171,6 +176,29 @@ describe("the confirmed legacy import in a degraded session", () => {
     const { deps, sim, toasts } = makeDeps();
     adoptConfirmedLegacyImport(deps as never, sim, vi.fn());
     expect(toasts.some((t) => t.includes("saved to slot 1"))).toBe(true);
+  });
+
+  it("the scope caption reaches BOTH saves surfaces from the shell's data", () => {
+    // The D2 labelling ruling's last mile: the ratified copy travels from the
+    // shell's scope label through list() to the templates. An audit found the
+    // templates shipped with caption parameters no caller constructed, so the
+    // copy reached no screen; this pins both call sites.
+    const caption = { text: "Towers here. Everyone opens them.", listLabel: "Towers here" };
+    saveScopeCaptionMock.mockReturnValue(caption);
+    const seen: unknown[] = [];
+    const app = {
+      sim: Simulation.newGame(1),
+      ui: {
+        toast: () => {},
+        showSaves: (_slots: unknown, scope: unknown) => seen.push(scope),
+        showTowerPicker: (ctx: { scope?: unknown }) => seen.push(ctx.scope),
+      },
+    } as unknown as GameApp;
+
+    showSaves(app);
+    showTowerPicker(app);
+
+    expect(seen).toEqual([caption, caption]);
   });
 
   it("the fresh-slot pick SKIPS a slot whose store delete is in flight", () => {

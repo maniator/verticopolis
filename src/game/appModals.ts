@@ -6,6 +6,7 @@ import { trackAppAction } from "../analytics";
 import { IS_WRAPPED_BUILD } from "../platform";
 import { noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
 import { deleteSlotRouted, persistManualSave, slotDeletePending } from "./manualSavePersist";
+import { saveScopeCaption } from "./desktopScopeCaption";
 
 /**
  * The tower-statistics modal, its exterminator action, and the manual save-slot
@@ -74,7 +75,11 @@ function confirmExterminate(app: GameApp): void {
 
 export function showSaves(app: GameApp): void {
   trackAppAction("saves_open"); // saves manager modal opening
-  app.ui.showSaves(SaveGame.listSlots());
+  // The scope caption is DATA from the shell's own scope label (the D2
+  // labelling ruling: rendered from data, never a constant), so only a
+  // wrapped build can have one; the fold keeps the desktop modules out of a
+  // browser bundle.
+  app.ui.showSaves(SaveGame.listSlots(), IS_WRAPPED_BUILD ? saveScopeCaption() : undefined);
 }
 
 /** Save the live tower into a manual slot, stamping the live camera view. */
@@ -145,7 +150,12 @@ export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
  */
 export function showTowerPicker(app: GameApp, onAdopted?: () => void): void {
   trackAppAction("splash_load_open"); // distinct from the in-game manager's saves_open
+  // Same caption injection as showSaves, and the same fold; the value is
+  // spread conditionally so the optional property is absent rather than
+  // explicitly undefined (exactOptionalPropertyTypes).
+  const scope = IS_WRAPPED_BUILD ? saveScopeCaption() : undefined;
   app.ui.showTowerPicker({
+    ...(scope ? { scope } : {}),
     getSlots: () => {
       try {
         return { slots: SaveGame.listSlots(), storageBlocked: false };

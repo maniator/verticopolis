@@ -1,6 +1,7 @@
 import type { UI } from "./UI";
 import { openImport } from "./uiImport";
 import { towerPickerTemplate } from "./templates/towerPicker";
+import type { SaveScopeCaption } from "./templates/saves";
 import type { SlotInfo } from "../storage/SaveGame";
 
 /**
@@ -19,6 +20,10 @@ export interface TowerPickerCtx {
   /** Adopt a slot, returning whether a tower actually arrived. False re-renders
    *  the picker with the reason in it. */
   onLoad: (slot: number | "auto") => boolean;
+  /** The storage-scope caption, injected by callers that know what the storage
+   *  area is (the desktop build passes the shell's own words); everyone else
+   *  omits it and the list keeps its generic name. */
+  scope?: SaveScopeCaption;
 }
 
 export function showTowerPicker(ui: UI, ctx: TowerPickerCtx): void {
@@ -67,7 +72,8 @@ export function showTowerPicker(ui: UI, ctx: TowerPickerCtx): void {
           document.querySelector<HTMLElement>('#splash [data-splash="load"]')?.focus();
         },
       },
-      storageBlocked),
+      storageBlocked,
+      ctx.scope),
       // Load-only and read-only: nothing here is unsaved and nothing is a
       // pending decision, so a fidelity report arriving behind it may take the
       // dialog rather than wait for it.
