@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.20.0
+
+- The Help dialog (and any other long dialog) scrolls as one piece again in current browsers, instead of wearing a second scrollbar on the window itself.
+
 ## 2.12.0
 
 - The sound and mute buttons now share the same speaker, so the icon no longer shifts when you toggle audio; muting just swaps the sound waves for an X.
