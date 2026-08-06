@@ -3,7 +3,7 @@ title: Crowd Din and Venue Ambience
 game_type: simulation
 platforms: browser
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-08-06
 ---
 
 # Verticopolis Crowd Din and Venue Ambience - Game Design Document
@@ -207,6 +207,40 @@ and highpass are fixed in the engine; the per-scene cutoff and level still
 come from `SCENES[].amb`, so the bed reads as a soft low room rush rather than
 mid hiss while keeping each scene's own level (a deeper rumble under the
 cinema and metro, a lighter rush elsewhere).
+
+### Human-voiced action jingles (amendment, 2026-08-06)
+
+The owner recorded two sounds with their own voice; both were transcribed and
+re-synthesized in Tone.js, and both are approved by ear. They begin migrating
+the six action jingles from raw sine presets to a warm, human-derived family.
+Party-vetted mapping (decision log, 2026-08-06):
+
+- **Bloop** replaces the `build` cue at every call site: a single smooth sine
+  drop from 520 Hz to 180 Hz over about 0.2 s (attack 8 ms, decay 0.2 s, no
+  sustain), dry. The falling contour is a placement gesture (the piece lands),
+  distinct from `sell`'s two discrete falling notes. It stays the confirm for
+  facility placement, shaft builds, and the editor actions that currently play
+  `build`.
+- **Ping** is a soft two-sine bell: G4 fundamental (about 392 Hz, decay 1.1 s,
+  no sustain) plus a D6 partial about 16 dB quieter with a 0.5 s decay. Two
+  uses:
+  - A new `notify` cue: the onboarding step chime plays ONE ping instead of
+    borrowing the full `promote` fanfare (a fanfare per tutorial step
+    overstates the moment).
+  - `promote` keeps its five-note melody (C-E-G-C-E) but is re-voiced on the
+    ping's bell timbre, a small carillon, so star promotions and the tower win
+    keep their size while joining the human-derived family.
+- `sell`, `error`, and `click` stay as they are until the recorded main theme
+  lands and the rest of the family is re-voiced together. `money` remains
+  defined but has no call site (dead cue, tracked for that pass).
+
+Boundaries this amendment keeps: every cue remains strictly action-triggered
+(the retired-accents rule above is untouched; nothing ambient, nothing
+random). The SFX bus stays dry: a reverb send for the bell was considered and
+rejected because it would bypass the SFX volume slider (the tail would not
+follow the player's setting); if the bell reads flat in-game, the fix is its
+envelope, not the graph. Player notes must say the sounds are made from the
+owner's own recordings (human-made, not AI-generated).
 
 ---
 
