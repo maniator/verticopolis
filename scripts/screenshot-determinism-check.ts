@@ -37,7 +37,7 @@
  * via native type-stripping, and import siblings with an explicit `.ts` extension.
  */
 import { spawn, execFileSync, type ChildProcess, type SpawnOptions } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -251,8 +251,16 @@ function listFiles(root: string): string[] {
 }
 
 /** Byte-compare two output roots. Returns a human reason on a difference, or null
- *  when the two are identical (the deterministic case). */
-function diffRoots(a: string, b: string): string | null {
+ *  when the two are identical (the deterministic case).
+ *
+ *  On a pixel mismatch, BOTH legs' copies of every differing file are saved
+ *  under `determinism-diff/<label>/{a,b}/` for the workflow to upload as an
+ *  artifact. Diagnosability was the missing half of #762: the first fix for
+ *  that flake was built on inference because the differing pixels were
+ *  discarded with the leg roots, and the flake outlived the theory. ALL
+ *  differing files are collected, not just the first, for the same reason.
+ */
+function diffRoots(label: string, a: string, b: string): string | null {
   const la = listFiles(a);
   const lb = listFiles(b);
   const sb = new Set(lb);
@@ -262,12 +270,19 @@ function diffRoots(a: string, b: string): string | null {
   if (onlyA.length || onlyB.length) {
     return `the two renders produced different file sets (only in a: ${onlyA.join(", ") || "none"}; only in b: ${onlyB.join(", ") || "none"})`;
   }
-  for (const f of la) {
-    if (!readFileSync(join(a, f)).equals(readFileSync(join(b, f)))) {
-      return `pixel bytes differ for ${f}`;
+  const differing = la.filter((f) => !readFileSync(join(a, f)).equals(readFileSync(join(b, f))));
+  if (differing.length === 0) return null;
+  const evidenceRoot = join(ROOT, "determinism-diff", label);
+  for (const side of ["a", "b"] as const) {
+    const src = side === "a" ? a : b;
+    for (const f of differing) {
+      const dest = join(evidenceRoot, side, f);
+      mkdirSync(dirname(dest), { recursive: true });
+      copyFileSync(join(src, f), dest);
     }
   }
-  return null;
+  process.stdout.write(`evidence: both legs' copies of ${differing.length} differing file(s) saved under ${evidenceRoot}\n`);
+  return `pixel bytes differ for ${differing.join(", ")}`;
 }
 
 function countPngs(root: string): number {
@@ -300,7 +315,7 @@ async function checkOnly(label: string, only: string): Promise<boolean> {
     process.stdout.write(`::error::screenshot check '${label}' failed to render (leg a exit=${rcA}, leg b exit=${rcB}); see the [a]/[b] output above.\n`);
     return false;
   }
-  const reason = diffRoots(LEGS[0].dest, LEGS[1].dest);
+  const reason = diffRoots(label, LEGS[0].dest, LEGS[1].dest);
   if (reason) {
     process.stdout.write(`::error::screenshot check '${label}' is nondeterministic: ${reason}. A wall-clock/RNG read leaked into the build or a capture (likely a new time-driven decoration in the engine render path, or a build-time timestamp); fix it before screenshots can update.\n`);
     return false;

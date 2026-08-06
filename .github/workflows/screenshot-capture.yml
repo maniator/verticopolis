@@ -212,5 +212,19 @@ jobs:
           name: shots-${{ matrix.shard }}
           path: /tmp/stage
           retention-days: 5
+
+      - name: Upload the nondeterminism evidence
+        # Only exists when the byte-diff tripped: both legs' copies of every
+        # differing file (see diffRoots in the check script). Diagnosability
+        # was the missing half of #762: the first fix was built on inference
+        # because the differing pixels were discarded with the leg roots, and
+        # the flake outlived the theory.
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: determinism-diff-${{ matrix.shard }}
+          path: determinism-diff
+          if-no-files-found: ignore
+          retention-days: 14
           if-no-files-found: error
           include-hidden-files: true
