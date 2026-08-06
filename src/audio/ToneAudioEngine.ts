@@ -14,6 +14,7 @@ import {
 } from "./toneScenes";
 import { createSfxVoices, playSfx, type SfxVoices } from "./toneVoices";
 import { createPercussion, type PercVoices } from "./tonePercussion";
+import { createRain, type RainVoices } from "./toneRain";
 import { programFor, type Program, type ProgramKind, type TrackVoice } from "./toneTracks";
 import { CrowdLayer } from "./toneCrowd";
 
@@ -23,10 +24,8 @@ type NoteVoice = { triggerAttackRelease: (f: number, d: number, t: number, v: nu
  * Music + ambient audio for the tower, built on Tone.js.
  *
  * The music is two looping tracks transcribed from the owner's own recordings
- * (see `./toneTracks.ts`): the "Terrace + Heartbeat" SPLASH theme and the
- * "Two Chapters" in-game bed, played by a looping {@link Tone.Part} through a
- * small warm palette (bass, held-fifth pad, melody voice, two percussion
- * membranes). {@link setProgram} picks the track at the splash boundary.
+ * (see `./toneTracks.ts`), played by a looping {@link Tone.Part} through bass,
+ * pad, melody, and percussion voices; {@link setProgram} picks the track.
  *
  * Layered under it is the building's ambient life: a per-area "room tone" bed
  * (filtered noise), an outdoor rain layer, and the crowd/venue ambience layer
@@ -88,14 +87,7 @@ export class ToneAudioEngine {
   /** Fixed roll-off on the ambient bed so it never turns into bright hiss. */
   private ambTone: Tone.Filter | null = null;
   private ambGain: Tone.Gain | null = null;
-  private rainNoise: Tone.Noise | null = null;
-  private rainFilter: Tone.Filter | null = null;
-  /** Caps the rain band's top end so it reads as rainfall rather than hiss. */
-  private rainTone: Tone.Filter | null = null;
-  /** Slow gust swell on the rain bed (an LFO breathes the level). */
-  private rainSwell: Tone.Gain | null = null;
-  private rainLfo: Tone.LFO | null = null;
-  private rainGain: Tone.Gain | null = null;
+  private rain: RainVoices | null = null; // outdoor rain bed; character doc in toneRain
 
   private scene: Scene = "lobby";
   private targetScene: Scene = "lobby";
@@ -222,22 +214,8 @@ export class ToneAudioEngine {
       this.ambNoise.volume.value = -20;
       this.ambNoise.start();
 
-      // Outdoor rain layer (dry, off the distance filter): a 600..3000 Hz band
-      // with a slow gust swell so it reads as weather, not flat static.
-      this.rainGain = new Tone.Gain(0).connect(this.ambDryBus);
-      this.rainSwell = new Tone.Gain(1).connect(this.rainGain);
-      this.rainLfo = new Tone.LFO({ frequency: 0.3, min: 0.7, max: 1 });
-      this.rainLfo.connect(this.rainSwell.gain);
-      this.rainLfo.start();
-      this.rainTone = new Tone.Filter({ type: "lowpass", frequency: 3000, Q: 0.5 }).connect(
-        this.rainSwell,
-      );
-      this.rainFilter = new Tone.Filter({ type: "highpass", frequency: 600, Q: 0.5 }).connect(
-        this.rainTone,
-      );
-      this.rainNoise = new Tone.Noise({ type: "pink", playbackRate: 1.3 }).connect(this.rainFilter);
-      this.rainNoise.volume.value = -12;
-      this.rainNoise.start();
+      // Outdoor rain layer (dry, off the distance filter; see toneRain).
+      this.rain = createRain(this.ambDryBus);
 
       // One-shot action jingles (the human-voiced bloop and bell family plus
       // the legacy money synth; recipes and dry-bus rationale in toneVoices).
@@ -342,9 +320,9 @@ export class ToneAudioEngine {
       // Outdoor rain only when the sky is visible (overview or the street), so
       // it reads as a real weather tell, not a smear behind indoor scenes.
       const wantRain = focus.weather === "rain" && (s === "outside" || s === "overview") ? 0.13 : 0;
-      if (wantRain !== this.rainTarget && this.rainGain) {
+      if (wantRain !== this.rainTarget && this.rain) {
         this.rainTarget = wantRain;
-        this.rainGain.gain.rampTo(wantRain, 1.5);
+        this.rain.rainGain.gain.rampTo(wantRain, 1.5);
       }
     } catch {
       /* transient Tone/context error — recover on the next update */
@@ -362,16 +340,10 @@ export class ToneAudioEngine {
       this.musicPart?.dispose();
       this.musicPart = null;
       const prog: Program = programFor(this.program);
-      const voice = (v: TrackVoice): NoteVoice | null =>
-        v === "thump"
-          ? (this.perc?.thump ?? null)
-          : v === "tap"
-            ? (this.perc?.tap ?? null)
-            : { arp: this.arp, bass: this.bassVoice, hook: this.hook }[v];
       const part = new Tone.Part((time, ev) => {
         try {
           if (this.muted) return; // a stray Tone error must not stop the Transport
-          voice(ev.voice)?.triggerAttackRelease(midiToFreq(ev.midi), ev.dur, time, ev.vel);
+          this.noteVoice(ev.voice)?.triggerAttackRelease(midiToFreq(ev.midi), ev.dur, time, ev.vel);
         } catch {
           /* skip this note */
         }
@@ -382,6 +354,22 @@ export class ToneAudioEngine {
       this.musicPart = part;
     } catch {
       /* rebuild failed; leave the part null so a later setProgram can retry */
+    }
+  }
+
+  /** Resolve a track voice tag to its live synth (owner request: a switch). */
+  private noteVoice(v: TrackVoice): NoteVoice | null {
+    switch (v) {
+      case "arp":
+        return this.arp;
+      case "bass":
+        return this.bassVoice;
+      case "hook":
+        return this.hook;
+      case "thump":
+        return this.perc?.thump ?? null;
+      case "tap":
+        return this.perc?.tap ?? null;
     }
   }
 
@@ -459,12 +447,7 @@ export class ToneAudioEngine {
       this.ambFilter,
       this.ambTone,
       this.ambGain,
-      this.rainNoise,
-      this.rainFilter,
-      this.rainTone,
-      this.rainLfo,
-      this.rainSwell,
-      this.rainGain,
+      ...(this.rain ? Object.values(this.rain) : []),
       this.bedFilter,
       this.reverb,
       this.musicBus,
@@ -484,13 +467,11 @@ export class ToneAudioEngine {
     this.arp = this.hook = this.bassVoice = null;
     this.perc = null;
     this.sfxVoices = null;
-    this.ambNoise = this.rainNoise = null;
-    this.ambFilter = this.ambTone = this.rainFilter = this.bedFilter = null;
+    this.ambNoise = null;
+    this.ambFilter = this.ambTone = this.bedFilter = null;
     this.musicTone = this.musicSub = null;
-    this.rainTone = null;
-    this.rainLfo = null;
-    this.rainSwell = null;
-    this.ambGain = this.rainGain = null;
+    this.rain = null;
+    this.ambGain = null;
     this.musicGain = null;
     this.reverb = null;
     this.musicBus = this.ambBus = this.ambDryBus = this.sfxBus = null;
