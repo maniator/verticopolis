@@ -224,7 +224,10 @@ jobs:
         with:
           name: determinism-diff-${{ matrix.shard }}
           path: determinism-diff
+          # "ignore", not "error": the step runs on EVERY job failure via
+          # if: failure(), and evidence only exists when the byte-diff itself
+          # tripped; a build or render failure has none to upload and must not
+          # stack a second red herring on the real one.
           if-no-files-found: ignore
           retention-days: 14
-          if-no-files-found: error
           include-hidden-files: true
