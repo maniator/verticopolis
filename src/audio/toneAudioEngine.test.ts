@@ -100,7 +100,7 @@ describe("inert-without-AudioContext contract", () => {
     const eng = new ToneAudioEngine();
     eng.start(); // inert
     expect(() => eng.update(focus())).not.toThrow();
-    const names: SfxName[] = ["build", "sell", "error", "promote", "money", "click"];
+    const names: SfxName[] = ["build", "sell", "error", "promote", "money", "notify", "click"];
     for (const n of names) expect(() => eng.sfx(n)).not.toThrow();
     expect(() => eng.setMuted(true)).not.toThrow();
     expect(() => eng.setVolumes(0.5, 0.5, 0.5)).not.toThrow();

@@ -175,15 +175,26 @@ describe("party remix", () => {
     }
   });
 
-  it("plays the game's own splash hook, re-timed to the party tempo", () => {
+  it("quotes the splash hook's first phrase, re-timed to the party tempo", () => {
     const party = partyHookEvents();
-    const hook = splashProgram().events.filter((e) => e.voice === "hook");
-    expect(party.length).toBe(hook.length);
-    expect(new Set(party.map((e) => e.midi))).toEqual(new Set(hook.map((e) => e.midi)));
-    const scale = 92 / PARTY_BPM;
-    for (let i = 0; i < party.length; i++) {
-      expect(party[i].t).toBeCloseTo(hook[i].t * scale);
+    // Pinned, not re-derived: the Terrace tune's first phrase is 16 notes and
+    // opens D4 E4 D4 E4 (the owner's hummed rise, up an octave). A silent
+    // tempo or cutoff drift in the production constants must fail here.
+    expect(party.length).toBe(16);
+    expect(party.slice(0, 4).map((e) => e.midi)).toEqual([62, 64, 62, 64]);
+    const loopEnd = 16 * (60 / PARTY_BPM);
+    for (const e of party) {
+      expect(e.t).toBeGreaterThanOrEqual(0);
+      // The quote is clipped so no tail rings across the party loop restart.
+      expect(e.t + e.dur).toBeLessThanOrEqual(loopEnd + 1e-6);
     }
+    // Still the game's own tune: every quoted note exists in the splash hook.
+    const hookMidis = new Set(
+      splashProgram()
+        .events.filter((e) => e.voice === "hook")
+        .map((e) => e.midi),
+    );
+    for (const e of party) expect(hookMidis.has(e.midi)).toBe(true);
   });
 });
 

@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.21.0
+
+- The whole soundtrack is now ours: the title theme, the in-game music, and the milestone chime are all made from recordings of our own voice, chest taps, and finger drumming (human-made, not AI). The title screen hums our tune over a heartbeat, and the tower drifts through a two-part hum with a gentle tap groove.
+- Placing, selling, clicking, and errors all speak in the recorded "bloop" now, tuned so the low notes carry on phone speakers, and star promotions ring the title tune's four-bell peak.
+
 ## 2.20.0
 
 - The Help dialog (and any other long dialog) scrolls as one piece again in current browsers, instead of wearing a second scrollbar on the window itself.
