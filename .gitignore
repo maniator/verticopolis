@@ -32,3 +32,6 @@ node_modules
 # never committed (the committed docs/screenshots gallery comes only from the
 # pinned-container pipeline).
 /e2e/output/
+
+# Nondeterminism evidence from scripts/screenshot-determinism-check.ts
+determinism-diff/
