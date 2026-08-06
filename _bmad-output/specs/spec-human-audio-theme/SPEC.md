@@ -52,11 +52,13 @@ and it supersedes #776. The exact approved note data lives in
     with the specified partials), and each cue is audible on a phone speaker.
 - **CAP-5**
   - **intent:** Percussion (heartbeat, taps) plays as ordinary track data
-    through a dedicated voice that keeps its body and click at any music
+    through dedicated voices that keep their body and click at any music
     volume.
-  - **success:** `"perc"` events flow through `Tone.Part` like other voices,
-    the perc synth connects directly to `musicBus` (bypassing the 2400 Hz
-    lowpass and 90 Hz highpass), and a graph test pins that routing.
+  - **success:** `"thump"` and `"tap"` events flow through `Tone.Part` like
+    other voices (two membrane voices; one tuning cannot voice both, party
+    refinement 2026-08-06), their shared gain connects directly to `musicBus`
+    (bypassing the 2400 Hz lowpass and 90 Hz highpass), and a graph test pins
+    the bypass itself, not mere connection.
 
 ## Constraints
 
@@ -83,7 +85,10 @@ and it supersedes #776. The exact approved note data lives in
 - No sampled-audio playback of the recordings themselves (the sampled-voice
   splash variant was auditioned and not chosen).
 - No change to the `money` cue (defined, uncalled, legacy recipe).
-- No changes to the crowd/venue ambience layer, room tone, or rain beds.
+- No changes to the crowd/venue ambience layer, room tone, or rain beds,
+  except the party remix's splash-hook derivation, which must follow the new
+  tune (its authoring tempo and a first-phrase quote cut for the 16-beat party
+  loop); everything else in the layer stays untouched.
 - No simulation, engine, or gameplay behavior changes; Classic parity is
   untouched.
 - No continuation of PR #776's branch; its recipes carry over, its branch is

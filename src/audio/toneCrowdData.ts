@@ -364,7 +364,13 @@ export function partyHookEvents(): Array<{ t: number; midi: number; dur: number 
   const cutoff = HOOK_QUOTE_BEATS * (60 / HOOK_BPM);
   return splashProgram()
     .events.filter((e) => e.voice === "hook" && e.t < cutoff)
-    .map((e) => ({ t: e.t * scale, midi: e.midi, dur: e.dur * scale }));
+    .map((e) => ({
+      t: e.t * scale,
+      midi: e.midi,
+      // Clip the quote's tail at the cutoff so the last note never rings
+      // across the party Part's loop restart onto the next pass's downbeat.
+      dur: Math.min(e.dur, cutoff - e.t) * scale,
+    }));
 }
 
 /** Party band bar: root MIDI notes per 4-beat bar (D, A, Bm, G world). */

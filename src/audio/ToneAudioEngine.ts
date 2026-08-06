@@ -17,6 +17,8 @@ import { createPercussion, type PercVoices } from "./tonePercussion";
 import { programFor, type Program, type ProgramKind, type TrackVoice } from "./toneTracks";
 import { CrowdLayer } from "./toneCrowd";
 
+type NoteVoice = { triggerAttackRelease: (f: number, d: number, t: number, v: number) => unknown };
+
 /**
  * Music + ambient audio for the tower, built on Tone.js.
  *
@@ -63,8 +65,7 @@ export class ToneAudioEngine {
   private arp: Tone.PolySynth | null = null;
   private bassVoice: Tone.Synth | null = null;
   private hook: Tone.PolySynth | null = null;
-  /** Recorded percussion (heartbeat + taps); see tonePercussion for routing. */
-  private perc: PercVoices | null = null;
+  private perc: PercVoices | null = null; // heartbeat + taps; routing doc in tonePercussion
   private musicGain: Tone.Gain | null = null;
   /** Warm lowpass + sub high-pass on the music (never bright/harsh, no rumble). */
   private musicTone: Tone.Filter | null = null;
@@ -191,7 +192,6 @@ export class ToneAudioEngine {
       this.hook.volume.value = -6;
       this.hook.maxPolyphony = 12;
 
-      // Recorded percussion, straight into the music bus (see tonePercussion).
       this.perc = createPercussion(this.musicBus, this.musicLevel);
 
       // The crowd/venue ambience layer rides the distance-filtered bed so
@@ -289,8 +289,7 @@ export class ToneAudioEngine {
     if (this.started) this.crossfadeProgram();
   }
 
-  /** Dip to silence, swap the looping part at the bottom, swell back up. The
-   *  percussion level rides the same dip (it bypasses the filtered chain). */
+  /** Dip to silence, swap the part at the bottom, swell back up; percGain rides the dip. */
   private crossfadeProgram(): void {
     if (!this.musicGain) return this.buildMusicPart();
     const FADE = 0.8;
@@ -363,10 +362,12 @@ export class ToneAudioEngine {
       this.musicPart?.dispose();
       this.musicPart = null;
       const prog: Program = programFor(this.program);
-      const voice = (v: TrackVoice): Tone.PolySynth | Tone.Synth | Tone.MembraneSynth | null => {
-        const map = { arp: this.arp, bass: this.bassVoice, hook: this.hook };
-        return v === "thump" ? (this.perc?.thump ?? null) : v === "tap" ? (this.perc?.tap ?? null) : map[v];
-      };
+      const voice = (v: TrackVoice): NoteVoice | null =>
+        v === "thump"
+          ? (this.perc?.thump ?? null)
+          : v === "tap"
+            ? (this.perc?.tap ?? null)
+            : { arp: this.arp, bass: this.bassVoice, hook: this.hook }[v];
       const part = new Tone.Part((time, ev) => {
         try {
           if (this.muted) return; // a stray Tone error must not stop the Transport
@@ -480,10 +481,9 @@ export class ToneAudioEngine {
       }
     }
     this.musicPart = null;
-    this.arp = this.hook = null;
+    this.arp = this.hook = this.bassVoice = null;
     this.perc = null;
     this.sfxVoices = null;
-    this.bassVoice = null;
     this.ambNoise = this.rainNoise = null;
     this.ambFilter = this.ambTone = this.rainFilter = this.bedFilter = null;
     this.musicTone = this.musicSub = null;

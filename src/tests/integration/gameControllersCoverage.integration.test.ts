@@ -73,7 +73,7 @@ function fakes() {
       },
     },
     audio: {
-      sfx: (name: "build" | "sell" | "error" | "promote" | "money" | "click") => {
+      sfx: (name: "build" | "sell" | "error" | "promote" | "money" | "notify" | "click") => {
         sfx.push(name);
       },
     },

@@ -12,7 +12,9 @@ bass (root per bar), pad (root+19 st, quiet fifth, vel 0.18), perc (heartbeat).
 
 Chords, one per bar: Dm C G F Dm C Am F Dm DmL (DmL = Dm with the bass an octave lower).
 
-Hook melody (bar, beat, durBeats, note, vel), played +12 st:
+Hook melody (bar, beat, durBeats, note, vel), played +12 st. Playback lifts
+each recorded velocity by +0.25 (capped 0.85), exactly as the approved
+previews did:
 
 | bar | beat | dur | note | vel |
 |----:|-----:|----:|:-----|----:|
@@ -63,7 +65,9 @@ Chapter two: the Hummm tune as sung (low register) over roots from
 Seam two: half-bar F root then half-bar Bb root, hook C3 then D3 rising into
 the wrap. Wrap resolves Dm into Gm (v-i).
 Support per bar in both chapters: bass root vel 0.5 + quiet fifth (root+19,
-vel 0.16). Melody vel = recorded vel + 0.12, capped 0.7.
+vel 0.16). Melody vel = (recorded vel + 0.12, capped 0.7) x 0.8: the trim is
+the party refinement that seats the in-game melody under crowd din (the
+audition previews were heard in isolation).
 
 
 Chapter one melody (New_humm, dedup-quantized): (beat, durBeats, note, vel)
@@ -232,8 +236,9 @@ relative velocity:
 | 14.0 | 0.3 |
 | 15.5 | 0.25 |
 
-Tap level: 0.4 under chapter one, 0.3 under chapter two, 0.2 in seams; within
-two bars of any seam the level ramps down to 30% and back (no hard stops).
+Tap level: 0.4 under chapter one, 0.3 under chapter two; within two bars of
+any seam (the loop wrap included, measured circularly) the level ramps down
+to 30% of base and back. No hard stops anywhere.
 
 ## Fanfare: "Terrace Peak", bells only (F4)
 
@@ -259,11 +264,14 @@ New in this package (family extensions PR #776 deferred):
 
 | cue | recipe |
 |:----|:-------|
-| click | bloop swoop 700 to 380 Hz, ramp 0.10 s, decay 0.09, vel 0.5 |
-| sell | two falling bloops: 420 to 200 Hz then 320 to 160 Hz, 0.12 s apart |
-| error | slow double bloop: 440 to 170 Hz (ramp 0.24 s) then 340 to 160 Hz at +0.28 s |
+| click | bloop swoop 700 to 380 Hz, ramp 0.10 s, envelope decay 0.09, vel 0.5 |
+| sell | two falling bloops: 420 to 200 Hz then 320 to 160 Hz, 0.12 s apart, second on its own voice |
+| error | slow double bloop: 440 to 170 Hz (ramp 0.24 s) then 340 to 160 Hz at +0.28 s, envelope decay 0.3, second on its own voice, 0.65 s retrigger holdoff |
 
 Audibility rules (owner-tested on phone/laptop speakers, two audition rounds):
-every bloop floors at 160 Hz minimum and carries 2nd partial at 0.6 and 3rd at
-0.28 gain. The chest thump body sweeps 130 to 92 Hz (exp decay 16) with the
-same partial mix at 0.4/0.15 plus a 15% noise click, total decay ~0.16 s.
+every bloop (the click included) floors at 160 Hz minimum and carries quiet
+octave and twelfth partials, triggered at 0.32 and 0.14 of the swoop's
+velocity (the perceptual equivalent of the preview waveform's normalized
+0.6/0.28 harmonic mix). The chest thump is authored at midi 42 (~92.5 Hz);
+its membrane sweeps a half octave (~131 down to 92 Hz, decay ~0.16 s) with
+partials at 0.4/0.15 of the hit, the membrane attack supplying the click.

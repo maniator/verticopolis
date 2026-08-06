@@ -183,26 +183,36 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
         [0.045, 0.008].includes((n.args[0] as { pitchDecay?: number } | undefined)?.pitchDecay ?? -1),
     );
     expect(membranes.length).toBe(2);
-    for (const m of membranes) {
-      const path: string[] = [];
-      let cur: NodeRec | undefined = m;
-      for (let hop = 0; cur && cur.kind !== "Reverb" && hop < 10; hop++) {
-        cur = cur.connects[0];
-        if (cur) path.push(cur.kind);
+    // Walk EVERY connect edge (not just the first) so a second connection
+    // sneaking a Filter onto the perc path cannot hide from this test.
+    const reachable = (from: NodeRec): NodeRec[] => {
+      const seen = new Set<NodeRec>();
+      const queue = [from];
+      while (queue.length) {
+        const cur = queue.pop()!;
+        for (const next of cur.connects) {
+          if (!seen.has(next)) {
+            seen.add(next);
+            queue.push(next);
+          }
+        }
       }
-      expect(cur?.kind, `membrane path ${path.join(" -> ")}`).toBe("Reverb");
-      expect(path).not.toContain("Filter");
+      return [...seen];
+    };
+    for (const m of membranes) {
+      const downstream = reachable(m);
+      expect(
+        downstream.some((n) => n.kind === "Reverb"),
+        "membrane never reaches the reverb",
+      ).toBe(true);
+      expect(
+        downstream.filter((n) => n.kind === "Filter"),
+        "a Filter sneaked onto the perc path",
+      ).toEqual([]);
     }
     // Contrast: the melody path deliberately DOES pass the warm filters.
     const poly = graph.nodes.filter((n) => n.kind === "PolySynth");
-    const filtered = poly.some((p) => {
-      let cur: NodeRec | undefined = p;
-      for (let hop = 0; cur && hop < 10; hop++) {
-        cur = cur.connects[0];
-        if (cur?.kind === "Filter") return true;
-      }
-      return false;
-    });
+    const filtered = poly.some((p) => reachable(p).some((n) => n.kind === "Filter"));
     expect(filtered).toBe(true);
   });
 

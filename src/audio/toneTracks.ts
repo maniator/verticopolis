@@ -246,7 +246,9 @@ const TAP_CYCLE: ReadonlyArray<readonly [number, number]> = [
 ];
 
 /** Chord bank: bar root (low midi). The quiet pad plays a fifth (+19 st)
- *  above whichever root is active; there is no arpeggio voice in this music. */
+ *  above whichever root is active. The pad rides the `arp` voice name (the
+ *  engine's old arpeggio synth, reused as-is); no arpeggio RUNS exist in this
+ *  music, only these held fifths. */
 const ROOTS: Record<string, number> = {
   Dm: 50, C: 48, G: 43, F: 53, Am: 45, DmLow: 38,
   Gm: 43, Eb: 51, Bb: 46, Cm: 48,
@@ -305,10 +307,12 @@ export function splashProgram(): Program {
   });
   events.push(...melody(TERRACE_TUNE, beat, 0, { transpose: 12, lift: 0.25, cap: 0.85 }));
   const loopEnd = SPLASH_CHORDS.length * barLen;
+  // Heartbeat events sit at midi 42 (~92.5 Hz): the bottom of the owner-tested
+  // audible band; the thump voice's half-octave sweep starts each hit ~131 Hz.
   for (let i = 0; i * (beat / 2) < loopEnd - 0.05; i++) {
     events.push({
       t: i * (beat / 2),
-      midi: 33,
+      midi: 42,
       dur: 0.16,
       vel: i % 2 === 0 ? 1 : 0.55,
       voice: "thump",
@@ -319,12 +323,15 @@ export function splashProgram(): Program {
 
 /** Tap level across the bed: quieter in chapter two, breathing down to 30%
  *  within two bars of each seam (and of the loop wrap) instead of stopping. */
-function bedTapLevel(t: number, seams: readonly number[], ch2Start: number): number {
+function bedTapLevel(t: number, seams: readonly number[], ch2Start: number, loopEnd: number): number {
   const base = t >= ch2Start ? 0.3 : 0.4;
   const breathe = 2 * 4 * (60 / BED_BPM);
   let g = 1;
   for (const s of seams) {
-    const d = Math.abs(t - s);
+    // Circular distance, so the wrap seam breathes on BOTH sides: taps ease
+    // down into the loop end and ease back up out of t=0, never snapping.
+    const lin = Math.abs(t - s);
+    const d = Math.min(lin, loopEnd - lin);
     if (d < breathe) g = Math.min(g, Math.max(0.3, d / breathe));
   }
   return base * g;
@@ -375,7 +382,13 @@ export function gameProgram(): Program {
     for (const [pos, vel] of TAP_CYCLE) {
       const t = cycle * 16 * beat + pos * beat;
       if (t >= loopEnd - 0.05) break;
-      events.push({ t, midi: 93, dur: 0.07, vel: vel * bedTapLevel(t, seams, ch2Start), voice: "tap" });
+      events.push({
+        t,
+        midi: 93,
+        dur: 0.07,
+        vel: vel * bedTapLevel(t, seams, ch2Start, loopEnd),
+        voice: "tap",
+      });
     }
   }
   return { events, loopEnd };

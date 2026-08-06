@@ -66,9 +66,25 @@ describe("toneTracks", () => {
       const pos = e.t / (beat / 2);
       expect(Math.abs(pos - Math.round(pos))).toBeLessThan(1e-6);
     }
-    const cycle = 16 * beat;
+    // The groove's widest authored gap is 2.5 beats; anything larger means a
+    // cycle was dropped and the "never breaks" claim is false.
     for (let i = 1; i < taps.length; i++) {
-      expect(taps[i].t - taps[i - 1].t).toBeLessThanOrEqual(cycle);
+      expect(taps[i].t - taps[i - 1].t).toBeLessThanOrEqual(3 * beat);
+    }
+    // The wrap breathes on both sides: the last taps before the seam and the
+    // first taps after t=0 are both attenuated below their chapter base.
+    expect(taps[0].vel).toBeLessThan(0.4 * (taps[0].t / (8 * beat)) + 0.15);
+    expect(taps[taps.length - 1].vel).toBeLessThan(0.3);
+  });
+
+  it("every pitched note in both programs ends at or before the loop seam", () => {
+    for (const kind of ["splash", "game"] as const) {
+      const p = programFor(kind);
+      for (const e of p.events) {
+        if (e.voice === "hook" || e.voice === "bass" || e.voice === "arp") {
+          expect(e.t + e.dur, `${kind} ${e.voice} @${e.t}`).toBeLessThanOrEqual(p.loopEnd + 1e-6);
+        }
+      }
     }
   });
 

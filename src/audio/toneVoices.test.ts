@@ -19,17 +19,23 @@ import type { SfxName } from "./toneScenes";
  * mid-gesture retriggers.
  */
 
+function fakeGlideSynth() {
+  return {
+    triggerAttackRelease: vi.fn(),
+    envelope: { decay: 0.2 },
+    frequency: {
+      cancelScheduledValues: vi.fn(),
+      setValueAtTime: vi.fn(),
+      exponentialRampToValueAtTime: vi.fn(),
+    },
+  };
+}
+
 function fakeVoices() {
   return {
     jingle: { triggerAttackRelease: vi.fn() },
-    bloop: {
-      triggerAttackRelease: vi.fn(),
-      frequency: {
-        cancelScheduledValues: vi.fn(),
-        setValueAtTime: vi.fn(),
-        exponentialRampToValueAtTime: vi.fn(),
-      },
-    },
+    bloop: fakeGlideSynth(),
+    bloop2: fakeGlideSynth(),
     bloopPartial: { triggerAttackRelease: vi.fn() },
     bell: { triggerAttackRelease: vi.fn() },
     bellPartial: { triggerAttackRelease: vi.fn() },
@@ -44,10 +50,21 @@ function noteCalls(v: FakeVoices) {
   return [
     ...v.jingle.triggerAttackRelease.mock.calls,
     ...v.bloop.triggerAttackRelease.mock.calls,
+    ...v.bloop2.triggerAttackRelease.mock.calls,
     ...v.bloopPartial.triggerAttackRelease.mock.calls,
     ...v.bell.triggerAttackRelease.mock.calls,
     ...v.bellPartial.triggerAttackRelease.mock.calls,
   ];
+}
+
+/** Both mono glide voices' ramp schedules, in call order per voice. */
+function glideRamps(v: FakeVoices) {
+  return [v.bloop, v.bloop2].flatMap((g) =>
+    g.frequency.exponentialRampToValueAtTime.mock.calls.map((ramp, i) => ({
+      target: ramp[0] as number,
+      start: g.frequency.setValueAtTime.mock.calls[i][0] as number,
+    })),
+  );
 }
 
 beforeEach(() => {
@@ -72,12 +89,9 @@ describe("playSfx", () => {
     for (const name of ["build", "click", "sell", "error"] as SfxName[]) {
       const v = fakeVoices();
       playSfx(asVoices(v), name);
-      const ramps = v.bloop.frequency.exponentialRampToValueAtTime.mock.calls;
-      const starts = v.bloop.frequency.setValueAtTime.mock.calls;
+      const ramps = glideRamps(v);
       expect(ramps.length, `${name} scheduled no ramp`).toBeGreaterThan(0);
-      for (let i = 0; i < ramps.length; i++) {
-        const target = ramps[i][0] as number;
-        const start = starts[i][0] as number;
+      for (const { target, start } of ramps) {
         // An exponential ramp to 0 throws in the native AudioParam; the target
         // must sit below the start for the swoop to fall, and at or above the
         // small-speaker floor so the owner can hear it on a phone.
@@ -92,51 +106,66 @@ describe("playSfx", () => {
     }
   });
 
-  it("deep bloops carry their small-speaker partials; the click stays bare", () => {
-    for (const name of ["build", "sell", "error"] as SfxName[]) {
+  it("a two-bloop gesture splits across the two glide voices, so the second swoop cannot cancel the first's ramp", () => {
+    for (const name of ["sell", "error"] as SfxName[]) {
       const v = fakeVoices();
       playSfx(asVoices(v), name);
-      expect(
-        v.bloopPartial.triggerAttackRelease.mock.calls.length,
-        `${name} played no partials`,
-      ).toBeGreaterThan(0);
+      expect(v.bloop.triggerAttackRelease, name).toHaveBeenCalledTimes(1);
+      expect(v.bloop2.triggerAttackRelease, name).toHaveBeenCalledTimes(1);
     }
-    // The click's floor (380 Hz) is high enough to need no reinforcement.
-    const v = fakeVoices();
-    playSfx(asVoices(v), "click");
-    expect(v.bloopPartial.triggerAttackRelease).not.toHaveBeenCalled();
   });
 
-  it("sell and error are two-bloop gestures; build and click are one", () => {
-    const counts: Array<[SfxName, number]> = [
+  it("every bloop carries its small-speaker partials (two per swoop)", () => {
+    const swoops: Array<[SfxName, number]> = [
       ["build", 1],
       ["click", 1],
       ["sell", 2],
       ["error", 2],
     ];
-    for (const [name, n] of counts) {
+    for (const [name, n] of swoops) {
       const v = fakeVoices();
       playSfx(asVoices(v), name);
-      expect(v.bloop.triggerAttackRelease.mock.calls.length, name).toBe(n);
+      expect(v.bloopPartial.triggerAttackRelease.mock.calls.length, name).toBe(n * 2);
     }
   });
 
-  it("error holds off retriggers inside its gesture, then fires again", () => {
+  it("cue-specific envelope decays are applied before the trigger", () => {
+    const v = fakeVoices();
+    playSfx(asVoices(v), "click");
+    expect(v.bloop.envelope.decay).toBeCloseTo(0.09);
+    playSfx(asVoices(v), "error");
+    expect(v.bloop.envelope.decay).toBeCloseTo(0.3);
+    expect(v.bloop2.envelope.decay).toBeCloseTo(0.3);
+  });
+
+  it("error holds off retriggers across its whole gesture, then fires again", () => {
     const v = fakeVoices();
     playSfx(asVoices(v), "error");
-    expect(v.bloop.triggerAttackRelease.mock.calls.length).toBe(2);
-    // Drag-painting an invalid zone: repeats inside the holdoff are dropped.
-    clock.now = 0.1;
-    playSfx(asVoices(v), "error");
-    expect(v.bloop.triggerAttackRelease.mock.calls.length).toBe(2);
-    // Past the holdoff the cue speaks again.
+    expect(v.bloop.triggerAttackRelease.mock.calls.length).toBe(1);
+    // Drag-painting an invalid zone: repeats inside the holdoff are dropped,
+    // including one landing mid-second-swoop (0.4-0.6 s in).
     clock.now = 0.5;
     playSfx(asVoices(v), "error");
-    expect(v.bloop.triggerAttackRelease.mock.calls.length).toBe(4);
+    expect(v.bloop.triggerAttackRelease.mock.calls.length).toBe(1);
+    // Past the holdoff the cue speaks again.
+    clock.now = 0.7;
+    playSfx(asVoices(v), "error");
+    expect(v.bloop.triggerAttackRelease.mock.calls.length).toBe(2);
     // The holdoff never gags OTHER bloop cues.
-    clock.now = 0.55;
+    clock.now = 0.75;
     playSfx(asVoices(v), "build");
-    expect(v.bloop.triggerAttackRelease.mock.calls.length).toBe(5);
+    expect(v.bloop.triggerAttackRelease.mock.calls.length).toBe(3);
+  });
+
+  it("a restarted audio clock resets the holdoff instead of gagging the cue", () => {
+    const v = fakeVoices();
+    clock.now = 500; // a long session on the old context
+    playSfx(asVoices(v), "error");
+    expect(v.bloop.triggerAttackRelease.mock.calls.length).toBe(1);
+    // Engine disposed and rebuilt: the fresh context's clock restarts near 0.
+    clock.now = 0.2;
+    playSfx(asVoices(v), "error");
+    expect(v.bloop.triggerAttackRelease.mock.calls.length).toBe(2);
   });
 
   it("promote is the splash theme's peak turn on the bell voice", () => {
