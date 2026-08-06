@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const clock = vi.hoisted(() => ({ now: 0 }));
 vi.mock("tone", () => ({ now: () => clock.now }));
 
-import { playSfx, resetSfxHoldoff, type SfxVoices } from "./toneVoices";
+import { playSfx, type SfxVoices } from "./toneVoices";
 import type { SfxName } from "./toneScenes";
 
 /**
@@ -69,7 +69,6 @@ function glideRamps(v: FakeVoices) {
 
 beforeEach(() => {
   clock.now = 0;
-  resetSfxHoldoff();
 });
 
 describe("playSfx", () => {

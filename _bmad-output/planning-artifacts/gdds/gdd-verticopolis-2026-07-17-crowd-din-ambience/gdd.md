@@ -240,8 +240,8 @@ party-ratified engineering refinements are in the party memlog (2026-08-06).
   phrase. The five-note carillon run of the superseded plan is retired.
 - **Jingles**: `build` keeps the approved 520-to-180 Hz bloop; `click` is a
   small high bloop; `sell` two falling bloops; `error` a slow sighing double
-  bloop with a 0.4 s retrigger holdoff (drag-painting an invalid zone must
-  not stack the mono voice's ramps). `notify` keeps its single ping. `money`
+  bloop with a 0.65 s retrigger holdoff covering the whole gesture
+  (drag-painting an invalid zone must not stack the glide voices' ramps). `notify` keeps its single ping. `money`
   stays on the legacy jingle synth, defined but uncalled.
 - **Small-speaker rule** (owner-tested on phone and laptop speakers over two
   audition rounds): no bloop ramp lands below 160 Hz, deep bloops add quiet

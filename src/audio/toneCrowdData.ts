@@ -369,7 +369,9 @@ export function partyHookEvents(): Array<{ t: number; midi: number; dur: number 
       midi: e.midi,
       // Clip the quote's tail at the cutoff so the last note never rings
       // across the party Part's loop restart onto the next pass's downbeat.
-      dur: Math.min(e.dur, cutoff - e.t) * scale,
+      // The floor guards future data: a note authored right at the cutoff
+      // must clip to a tiny blip, never a zero or negative duration.
+      dur: Math.max(0.01, Math.min(e.dur, cutoff - e.t)) * scale,
     }));
 }
 

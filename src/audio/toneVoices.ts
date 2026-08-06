@@ -160,14 +160,11 @@ const PROMOTE_BELLS: ReadonlyArray<readonly [number, number, number]> = [
 /** The error double bloop spans ~0.6 s across its two voices; retriggering
  *  mid-gesture would stack cancel-and-ramp schedules into an audible pop, so
  *  repeats inside the WHOLE gesture are dropped (drag-painting an invalid
- *  zone fires error every frame). Seconds, on the Tone clock. */
+ *  zone fires error every frame). Seconds, on the Tone clock. The stamp is
+ *  keyed to the voice set, so a disposed-and-rebuilt engine (a fresh
+ *  SfxVoices) starts clean instead of inheriting an old clock. */
 const ERROR_HOLDOFF = 0.65;
-let lastErrorAt = -Infinity;
-
-/** Exposed for tests: reset the error holdoff clock. */
-export function resetSfxHoldoff(): void {
-  lastErrorAt = -Infinity;
-}
+const errorHeldSince = new WeakMap<SfxVoices, number>();
 
 /** Play a one-shot action jingle through the sfx voices. */
 export function playSfx(voices: SfxVoices, name: SfxName): void {
@@ -191,12 +188,11 @@ export function playSfx(voices: SfxVoices, name: SfxName): void {
       break;
     case "error": {
       // A slow, sighing double bloop. Guarded: see ERROR_HOLDOFF. A restarted
-      // audio context rewinds the Tone clock; a stored timestamp from the old
-      // clock would then gag the cue for minutes, so a stamp in the future
+      // audio context rewinds the Tone clock; a stamp in the future therefore
       // means the clock restarted and the holdoff resets.
-      if (t < lastErrorAt) lastErrorAt = -Infinity;
-      if (t - lastErrorAt < ERROR_HOLDOFF) return;
-      lastErrorAt = t;
+      const held = errorHeldSince.get(voices) ?? -Infinity;
+      if (t >= held && t - held < ERROR_HOLDOFF) return;
+      errorHeldSince.set(voices, t);
       swoopBloop(voices.bloop, voices, 440, 170, 0.24, t, 1, 0.3);
       swoopBloop(voices.bloop2, voices, 340, 160, 0.24, t + 0.28, 1, 0.3);
       break;
