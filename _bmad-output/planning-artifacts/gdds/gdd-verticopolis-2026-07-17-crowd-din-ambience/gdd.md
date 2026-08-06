@@ -3,7 +3,7 @@ title: Crowd Din and Venue Ambience
 game_type: simulation
 platforms: browser
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-08-06
 ---
 
 # Verticopolis Crowd Din and Venue Ambience - Game Design Document
@@ -207,6 +207,58 @@ and highpass are fixed in the engine; the per-scene cutoff and level still
 come from `SCENES[].amb`, so the bed reads as a soft low room rush rather than
 mid hiss while keeping each scene's own level (a deeper rumble under the
 cinema and metro, a lighter rush elsewhere).
+
+
+### Human-recorded audio theme (amendment, 2026-08-06)
+
+The owner recorded six sources with their own voice and hands (three hums, a
+chest-hit pulse, object taps, a "bloop", and a "ping"); over five audition
+rounds these were transcribed, arranged, and approved by ear into the game's
+whole musical identity, replacing the agent-composed D-major tracks and the
+raw sine jingles. This supersedes the "Human-voiced action jingles" plan of
+draft PR #776, carrying its ear-approved bloop and ping recipes forward. The
+exact note tables live in `_bmad-output/specs/spec-human-audio-theme/`;
+party-ratified engineering refinements are in the party memlog (2026-08-06).
+
+- **Splash, "Terrace + Heartbeat"**: the owner's hummed tune (D dorian, 96
+  BPM, 10 bars) as the hook an octave up, over one bass root and a quiet held
+  fifth per bar, with their chest-hit pulse as strong/soft eighth-note thumps.
+  The old rolling-arpeggio accompaniment is retired everywhere: the owner
+  ruled it out as not theirs.
+- **In-game bed, "Two Chapters"**: their long wandering hum verbatim (G minor
+  territory), then the splash tune slow and in its sung register (D minor),
+  one shared 76 BPM pulse end to end, about 101 seconds per loop. Their
+  object-tap groove runs on one continuous 16-beat grid, breathing quieter
+  near the two seam bars instead of stopping. The first chapter opens on G
+  minor so the second chapter's D-minor ending resolves v-i at the loop wrap.
+  The bed melody sits 20 percent under the audition mix (it plays beneath
+  crowd din and jingles).
+- **Milestone fanfare**: `promote` plays the splash tune's peak turn (C5 D5
+  B4 A4) struck on the ping bell voice, bells only; the owner auditioned six
+  fanfare shapes and vetoed bloops and thumps inside fanfares, and vetoed a
+  louder win variant, so star promotions and the tower win share the same
+  phrase. The five-note carillon run of the superseded plan is retired.
+- **Jingles**: `build` keeps the approved 520-to-180 Hz bloop; `click` is a
+  small high bloop; `sell` two falling bloops; `error` a slow sighing double
+  bloop with a 0.65 s retrigger holdoff covering the whole gesture
+  (drag-painting an invalid zone must not stack the glide voices' ramps). `notify` keeps its single ping. `money`
+  stays on the legacy jingle synth, defined but uncalled.
+- **Small-speaker rule** (owner-tested on phone and laptop speakers over two
+  audition rounds): no bloop ramp lands below 160 Hz, deep bloops add quiet
+  octave and twelfth partials, and the heartbeat thump keeps its body between
+  92 and 130 Hz with the same reinforcement. Depth alone is never a cue's
+  signal.
+- **Percussion routing**: the heartbeat and taps play through two dedicated
+  membrane voices feeding the music bus directly, bypassing the music chain's
+  2400 Hz lowpass and 90 Hz highpass (which would gut them), while still
+  following the music volume slider, the shared reverb, the master mute, and
+  the crossfade dip.
+- The party venue remix quotes the new tune's first phrase (its loop is 16
+  beats; the full tune is 36), so the tower still dances to the game's own
+  melody.
+
+Player notes must say the music, rhythm, and sound effects are made from the
+owner's own recordings: human-made, not AI-generated.
 
 ---
 

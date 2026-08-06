@@ -352,15 +352,27 @@ export const LAUGH_REGIONS: ReadonlyArray<readonly [number, number]> = [
 
 export const PARTY_BPM = 124;
 /** Hook tempo the splash theme is authored at (see toneTracks). */
-const HOOK_BPM = 92;
+const HOOK_BPM = 96;
+/** The party's loop is 16 beats; the full Terrace tune runs 36, so the remix
+ *  quotes its first phrase (the rise and fall) and loops that. Authored beats. */
+const HOOK_QUOTE_BEATS = 16;
 
 /** The party plays the game's own splash hook, re-timed to the party tempo.
  *  Derived from {@link splashProgram} so the tune stays canonical. */
 export function partyHookEvents(): Array<{ t: number; midi: number; dur: number }> {
   const scale = HOOK_BPM / PARTY_BPM;
+  const cutoff = HOOK_QUOTE_BEATS * (60 / HOOK_BPM);
   return splashProgram()
-    .events.filter((e) => e.voice === "hook")
-    .map((e) => ({ t: e.t * scale, midi: e.midi, dur: e.dur * scale }));
+    .events.filter((e) => e.voice === "hook" && e.t < cutoff)
+    .map((e) => ({
+      t: e.t * scale,
+      midi: e.midi,
+      // Clip the quote's tail at the cutoff so the last note never rings
+      // across the party Part's loop restart onto the next pass's downbeat.
+      // The floor guards future data: a note authored right at the cutoff
+      // must clip to a tiny blip, never a zero or negative duration.
+      dur: Math.max(0.01, Math.min(e.dur, cutoff - e.t)) * scale,
+    }));
 }
 
 /** Party band bar: root MIDI notes per 4-beat bar (D, A, Bm, G world). */
