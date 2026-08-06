@@ -216,12 +216,10 @@ export class EconomySystem {
       // to exactly `filmMult` times the advertised figure, so income can never run
       // away. The retail `?? 0` is a guard (a reachable, open retail venue always
       // has a map entry).
-      const frac =
-        attendanceCapV !== undefined
-          ? attendanceCapV > 0
-            ? Math.min(1, Math.max(0, u.customersIn ?? 0) / attendanceCapV)
-            : 0
-          : (demandMap.fractionByUnit.get(u.id) ?? 0);
+      let frac: number;
+      if (attendanceCapV === undefined) frac = demandMap.fractionByUnit.get(u.id) ?? 0;
+      else if (attendanceCapV > 0) frac = Math.min(1, Math.max(0, u.customersIn ?? 0) / attendanceCapV);
+      else frac = 0;
       // Rain keeps shoppers away (canon) — it bites fast food hardest; a metro
       // (underground visitors) softens the blow. Cosmetic-only on non-rainy days.
       // Any venue with an attendance cap (`attendanceCapV !== undefined`) is

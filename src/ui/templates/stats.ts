@@ -81,12 +81,9 @@ export function statsTemplate(sim: Simulation): TemplateResult {
   // The review verdict trusts vipFavorable alone (it is what gates 4★), so a
   // favorable flag with no recorded visits (fixtures, tampered saves) still
   // reads "Review earned" in the good color; only the count goes unspoken.
-  const vipText =
-    sim.vipVisits === 0
-      ? sim.vipFavorable
-        ? "Review earned"
-        : "None yet"
-      : `${fmt(sim.vipVisits)} · review ${sim.vipFavorable ? "earned" : "not yet earned"}`;
+  let vipText: string;
+  if (sim.vipVisits === 0) vipText = sim.vipFavorable ? "Review earned" : "None yet";
+  else vipText = `${fmt(sim.vipVisits)} · review ${sim.vipFavorable ? "earned" : "not yet earned"}`;
   const vipRow =
     sim.vipVisits > 0 || sim.vipFavorable || s.star >= 3
       ? html`<span class="k">VIP visits</span><span class="v" style="color:${sim.vipFavorable ? "var(--good)" : "var(--muted)"}">${vipText}</span>`

@@ -160,12 +160,9 @@ export class CrowdLayer {
       const spec = CROWD_SCENES[key];
       const hour = Number.isFinite(focus.hour) ? focus.hour : 12;
       const rawCrowd = Number.isFinite(focus.crowd) ? focus.crowd : 0.5;
-      const crowd =
-        spec.gate === "attendance"
-          ? rawCrowd < EMPTY_CROWD
-            ? 0
-            : rawCrowd
-          : Math.max(rawCrowd, spec.crowdFloor ?? 0);
+      let crowd: number;
+      if (spec.gate === "attendance") crowd = rawCrowd < EMPTY_CROWD ? 0 : rawCrowd;
+      else crowd = Math.max(rawCrowd, spec.crowdFloor ?? 0);
       this.activity = hourActivity(spec.gate, hour) * (crowd < EMPTY_CROWD ? 0 : crowd);
       // Honest loudness: the layer level scales with activity (clock times
       // occupancy) as well as zoom, so a near-empty room is near-silent. The
@@ -230,7 +227,14 @@ export class CrowdLayer {
   }
 
   private programFor(name: "party" | "cinema" | "metro"): PartyBand | CinemaProgram | MetroProgram | null {
-    return name === "party" ? this.party : name === "cinema" ? this.cinema : this.metro;
+    switch (name) {
+      case "party":
+        return this.party;
+      case "cinema":
+        return this.cinema;
+      default:
+        return this.metro;
+    }
   }
 
   /** Start or stop one talker slot's phrase loop. */

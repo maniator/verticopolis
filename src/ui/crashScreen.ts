@@ -40,18 +40,19 @@ export interface CrashScreenOptions {
  *  the sim behind the card, after the flush the card just described). */
 export const CRASH_SCREEN_ID = "crash-screen";
 
+/** The one-sentence save-outcome line, best case first. */
+function saveLineFor(save: CrashScreenOptions["save"]): string {
+  if (save.behindSplash) return "No game was in progress; your saved towers are untouched.";
+  if (save.flushed) return "Your tower was saved. Nothing is lost.";
+  const priorNote = save.hadPriorSave ? " Your last saved tower is safe." : "";
+  if (save.storageBlame) return "Your latest changes couldn't be saved: storage is full or blocked." + priorNote;
+  return "Your latest changes couldn't be saved: the save hit an unexpected error." + priorNote;
+}
+
 export function showCrashScreen(opts: CrashScreenOptions): void {
   if (document.getElementById(CRASH_SCREEN_ID)) return;
 
-  const saveLine = opts.save.behindSplash
-    ? "No game was in progress; your saved towers are untouched."
-    : opts.save.flushed
-      ? "Your tower was saved. Nothing is lost."
-      : opts.save.storageBlame
-        ? "Your latest changes couldn't be saved: storage is full or blocked." +
-          (opts.save.hadPriorSave ? " Your last saved tower is safe." : "")
-        : "Your latest changes couldn't be saved: the save hit an unexpected error." +
-          (opts.save.hadPriorSave ? " Your last saved tower is safe." : "");
+  const saveLine = saveLineFor(opts.save);
   // Device-distress advice: shown for a rapid double crash AND for a first
   // loss whose in-place recovery failed or timed out (the GPU stayed wedged
   // for seconds, which is the same distress signal by another route).

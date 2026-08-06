@@ -355,8 +355,16 @@ export class ToneAudioEngine {
       this.musicPart?.dispose();
       this.musicPart = null;
       const prog: Program = programFor(this.program);
-      const voice = (v: TrackVoice): Tone.PolySynth | Tone.Synth | null =>
-        v === "arp" ? this.arp : v === "bass" ? this.bassVoice : this.hook;
+      const voice = (v: TrackVoice): Tone.PolySynth | Tone.Synth | null => {
+        switch (v) {
+          case "arp":
+            return this.arp;
+          case "bass":
+            return this.bassVoice;
+          default:
+            return this.hook;
+        }
+      };
       const part = new Tone.Part((time, ev) => {
         try {
           if (this.muted) return; // a stray Tone error must not stop the Transport

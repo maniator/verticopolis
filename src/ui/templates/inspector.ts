@@ -24,25 +24,28 @@ import { floorTag } from "../format";
  * content, so the modal ✕ and the inspector ✕ can't drift apart.
  */
 
+/** Plain-language phrasing for the lifecycle states that would otherwise read
+ *  as bare enums ("dirty", "asleep"); the diagnostics block adds the why + the
+ *  fix. A relocation is a life event (Modern condos), not a complaint, so its
+ *  status line reads differently. */
+function statusTextFor(u: Unit): string {
+  switch (u.state) {
+    case "vacating":
+      return u.vacateReason === "relocation" ? "on notice (household relocating)" : "on notice (tenant leaving)";
+    case "dirty":
+      return "dirty (awaiting housekeeping)";
+    case "infested":
+      return "cockroach infested";
+    case "asleep":
+      return "occupied (guest asleep)";
+    default:
+      return u.state;
+  }
+}
+
 export function unitInspectorTemplate(sim: Simulation, u: Unit): TemplateResult {
   const f = FACILITIES[u.kind];
-  // A relocation is a life event (Modern condos), not a complaint, so the
-  // status line reads differently; the diagnostics block explains the rest.
-  const isRelocation = u.state === "vacating" && u.vacateReason === "relocation";
-  // Hotel lifecycle states read as bare enums otherwise ("dirty", "asleep"); give
-  // them plain-language phrasing (the diagnostics block adds the why + the fix).
-  const statusText =
-    u.state === "vacating"
-      ? isRelocation
-        ? "on notice (household relocating)"
-        : "on notice (tenant leaving)"
-      : u.state === "dirty"
-        ? "dirty (awaiting housekeeping)"
-        : u.state === "infested"
-          ? "cockroach infested"
-          : u.state === "asleep"
-            ? "occupied (guest asleep)"
-            : u.state;
+  const statusText = statusTextFor(u);
   // Canon retail variant (§7): a shop / fastFood / restaurant with a subtype
   // titles as its specific name ("Chinese Cafe"), not the generic kind name.
   const title = u.subtype ?? f.name;

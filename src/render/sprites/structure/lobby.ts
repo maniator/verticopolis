@@ -54,6 +54,15 @@ export const ENTRANCE_SERVICE = LOBBY_VARIANTS + 3;
  *  fallback for lobbies too narrow to fit the wide version. `service` is the
  *  quiet mirrored door at the opposite frontage edge. */
 export type EntranceKind = "grand-left" | "grand-right" | "grand-solo" | "service";
+
+/** Entrance kind to its baked sentinel variant. */
+const ENTRANCE_VARIANT: Record<EntranceKind, number> = {
+  "grand-left": ENTRANCE_GRAND_LEFT,
+  "grand-right": ENTRANCE_GRAND_RIGHT,
+  "grand-solo": ENTRANCE_GRAND_SOLO,
+  service: ENTRANCE_SERVICE,
+};
+
 export function drawLobbyEntrance(
   d: DrawCtx,
   kind: EntranceKind,
@@ -62,15 +71,9 @@ export function drawLobbyEntrance(
   w: number,
   h: number,
 ): void {
-  const v =
-    kind === "grand-left"
-      ? ENTRANCE_GRAND_LEFT
-      : kind === "grand-right"
-        ? ENTRANCE_GRAND_RIGHT
-        : kind === "grand-solo"
-          ? ENTRANCE_GRAND_SOLO
-          : ENTRANCE_SERVICE;
-  drawLobbyTile(d, x, y, w, h, v, true);
+  // The `??` mirrors the old ladder's fallback: an unlisted kind from an
+  // untyped caller still lands on the quiet service door.
+  drawLobbyTile(d, x, y, w, h, ENTRANCE_VARIANT[kind] ?? ENTRANCE_SERVICE, true);
 }
 
 export function drawLobby(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number) {

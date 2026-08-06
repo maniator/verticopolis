@@ -109,7 +109,8 @@ export function syncScene(engine: TowerEngine): void {
       // hour-dependent bits, a commercial unit's open/closed shutter and a
       // condo's late-night "asleep" look, otherwise a shop baked closed at
       // dawn would wrongly stay shuttered all day until the next lighting flip.
-      const open = hasBusinessHours(u.kind) ? (isOpenAt(u.kind, engine.d.hour) ? "o" : "c") : "";
+      let open = "";
+      if (hasBusinessHours(u.kind)) open = isOpenAt(u.kind, engine.d.hour) ? "o" : "c";
       const lateNight = u.kind === "condo" && (engine.d.hour >= 23 || engine.d.hour < 6) ? "s" : "";
       // Only mark a SETTLED space dead, a mid-build (or burning) space is
       // excluded from the set for other reasons and isn't a connectivity fault.

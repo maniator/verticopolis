@@ -19,7 +19,7 @@ import { VACATE_NOTICE_MINUTES } from "./constants";
 
 import { buildSatisfactionContext, wouldEvictFreshTenant, type SatisfactionContext } from "./satisfactionStep";
 import { foldOriginDemand } from "./demand";
-import { bindingTransportClassAt } from "./gripe";
+import { bindingTransportClassAt, type CongestionBindingClass } from "./gripe";
 
 /** Vacate, move-in, subtype churn for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -29,18 +29,19 @@ import { bindingTransportClassAt } from "./gripe";
  *  gripe line so the toast and the card can never disagree. "Add cars" holds
  *  only when elevators bind; a walkway-bound floor gets the honest lever
  *  (capacity), because cars cannot clear a reading a stair link owns. */
+const BINDING_NOUN: Record<CongestionBindingClass, string> = {
+  elevator: "elevators",
+  walkways: "stairs and escalators",
+  stairs: "stairs",
+  escalator: "escalators",
+  none: "vertical transport",
+};
+
 function congestionChurnNote(sim: Simulation, floor: number): string {
   const binding = bindingTransportClassAt(sim, floor);
-  const noun =
-    binding === "elevator"
-      ? "elevators"
-      : binding === "walkways"
-        ? "stairs and escalators"
-        : binding === "stairs"
-          ? "stairs"
-          : binding === "escalator"
-            ? "escalators"
-            : "vertical transport";
+  // The `??` keeps the old ladder's catch-all: a value outside the union (a
+  // cast gone wrong) still reads as generic transport, never "undefined".
+  const noun = BINDING_NOUN[binding] ?? "vertical transport";
   const lever = binding === "elevator" ? "add cars" : "add capacity";
   return ` A new owner will buy in, but the crowded ${noun} will wear them down too until you ${lever}.`;
 }
