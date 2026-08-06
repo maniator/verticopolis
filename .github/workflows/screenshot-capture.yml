@@ -212,6 +212,8 @@ jobs:
           name: shots-${{ matrix.shard }}
           path: /tmp/stage
           retention-days: 5
+          if-no-files-found: error
+          include-hidden-files: true
 
       - name: Upload the nondeterminism evidence
         # Only exists when the byte-diff tripped: both legs' copies of every
