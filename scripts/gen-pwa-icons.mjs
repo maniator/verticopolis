@@ -103,6 +103,12 @@ const TARGETS = [
   { name: "pwa-maskable-512x512.png", size: 512, maskable: true },
   { name: "apple-touch-icon.png", size: 180, maskable: false },
   { name: "favicon.png", size: 64, maskable: false },
+  // The desktop icon master (#761). Not referenced by the manifest: the PWA
+  // needs nothing this large, but macOS icns wants a true 1024 (ic10) and
+  // the mark is an in-code SVG, so the "art gap" was only ever the largest
+  // size this list emitted. The private packager prefers this over the 512
+  // when the dist carries it.
+  { name: "icon-1024x1024.png", size: 1024, maskable: false },
 ];
 
 async function main() {
