@@ -7,8 +7,11 @@ import type { UI } from "../ui/UI";
 /**
  * The .vctower export flow, split out of `saveLoad.ts` at the 500-line guard
  * when the single-flight latch landed (GH #760). `SaveLoad.exportGame` is a
- * thin delegation here, so the latch guards the one choke point every export
- * entry (menu command, keyboard, save dialog button) converges on.
+ * thin delegation here, so the latch guards the one choke point on the sole
+ * production route to an export: the saves dialog's Export button
+ * (`confirmExport` in uiDialogs, then `onExport`, then `exportGame`). There
+ * is no menu command or keyboard shortcut for export today; if one lands, it
+ * must route through `exportGame` to stay inside the latch.
  */
 
 /** The slice of {@link import("./saveLoad").SaveLoadDeps} the flow touches. */
@@ -55,9 +58,13 @@ export function resetExportFlowForTests(): void {
  * The watchdog is the latch's escape hatch, and deliberately does NOT abandon
  * the awaited call: it frees the latch and tells the player, and if the
  * original dialog settles late its outcome still lands (a late success still
- * exports; a late cancel still says nothing). The settle path releases only a
- * latch its own run still holds, so a late settle can never unlock a newer
- * export's dialog.
+ * exports; a late cancel still says nothing). The one exception is a late
+ * "fallback": every other late outcome finishes something, but fallback would
+ * START the live path and drop a fresh dialog on top of whatever the player
+ * is doing minutes later, so a run that no longer holds the latch stops there
+ * (the Edge Case Hunter demonstrated the collision). The settle path releases
+ * only a latch its own run still holds, so a late settle can never unlock a
+ * newer export's dialog.
  */
 export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simulation) => void): Promise<void> {
   if (latchOwner !== 0) return;
@@ -87,6 +94,12 @@ export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simul
         return;
       }
       if (stored === "canceled") return;
+      // A late "fallback" (the hung bridge finally rejected or answered
+      // malformed, long after the watchdog freed the latch) must not run the
+      // live path: that OPENS a download or saveFile dialog, possibly on top
+      // of a retry's dialog, the exact collision the latch exists to stop.
+      // An immediate fallback still owns the latch and proceeds normally.
+      if (latchOwner !== run) return;
     }
     const file = await SaveGame.export(sim);
     deps.ui.downloadFile(SaveGame.exportFilename(sim), file);
