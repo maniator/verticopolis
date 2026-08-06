@@ -175,14 +175,16 @@ describe("party remix", () => {
     }
   });
 
-  it("plays the game's own splash hook, re-timed to the party tempo", () => {
+  it("quotes the splash hook's first phrase, re-timed to the party tempo", () => {
     const party = partyHookEvents();
-    const hook = splashProgram().events.filter((e) => e.voice === "hook");
-    expect(party.length).toBe(hook.length);
-    expect(new Set(party.map((e) => e.midi))).toEqual(new Set(hook.map((e) => e.midi)));
-    const scale = 92 / PARTY_BPM;
+    const cutoff = 16 * (60 / 96);
+    const quoted = splashProgram().events.filter((e) => e.voice === "hook" && e.t < cutoff);
+    expect(party.length).toBeGreaterThan(4); // a real phrase, not a stray note
+    expect(party.length).toBe(quoted.length);
+    expect(new Set(party.map((e) => e.midi))).toEqual(new Set(quoted.map((e) => e.midi)));
+    const scale = 96 / PARTY_BPM;
     for (let i = 0; i < party.length; i++) {
-      expect(party[i].t).toBeCloseTo(hook[i].t * scale);
+      expect(party[i].t).toBeCloseTo(quoted[i].t * scale);
     }
   });
 });

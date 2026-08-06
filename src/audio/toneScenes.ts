@@ -11,7 +11,7 @@ import type { ViewFocus } from "../render/excalibur/TowerEngine";
  */
 
 /** Action jingles the game can fire on demand. Shared with the facade. */
-export type SfxName = "build" | "sell" | "error" | "promote" | "money" | "click";
+export type SfxName = "build" | "sell" | "error" | "promote" | "money" | "notify" | "click";
 
 export type Scene =
   | "overview"

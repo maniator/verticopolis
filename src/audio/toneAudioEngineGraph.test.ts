@@ -164,8 +164,46 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
   it("sfx() plays every cue once the graph is up", () => {
     const eng = new ToneAudioEngine();
     eng.start();
-    const names: SfxName[] = ["build", "sell", "error", "promote", "money", "click"];
+    const names: SfxName[] = ["build", "sell", "error", "promote", "money", "notify", "click"];
     for (const n of names) expect(() => eng.sfx(n)).not.toThrow();
+  });
+
+  it("the recorded percussion bypasses the music tone filters on its way to the bus", () => {
+    const eng = new ToneAudioEngine();
+    eng.start();
+    // Both membranes (heartbeat thump + object tap) must reach the reverb via
+    // gain nodes ONLY: the music chain's lowpass would dull the tap's click
+    // and its highpass would gut the thump's body, so a Filter anywhere on the
+    // path is the regression this test exists to catch.
+    // The crowd layer builds membranes of its own (the party kick), so pick
+    // the two percussion voices by their authored tunings.
+    const membranes = graph.nodes.filter(
+      (n) =>
+        n.kind === "MembraneSynth" &&
+        [0.045, 0.008].includes((n.args[0] as { pitchDecay?: number } | undefined)?.pitchDecay ?? -1),
+    );
+    expect(membranes.length).toBe(2);
+    for (const m of membranes) {
+      const path: string[] = [];
+      let cur: NodeRec | undefined = m;
+      for (let hop = 0; cur && cur.kind !== "Reverb" && hop < 10; hop++) {
+        cur = cur.connects[0];
+        if (cur) path.push(cur.kind);
+      }
+      expect(cur?.kind, `membrane path ${path.join(" -> ")}`).toBe("Reverb");
+      expect(path).not.toContain("Filter");
+    }
+    // Contrast: the melody path deliberately DOES pass the warm filters.
+    const poly = graph.nodes.filter((n) => n.kind === "PolySynth");
+    const filtered = poly.some((p) => {
+      let cur: NodeRec | undefined = p;
+      for (let hop = 0; cur && hop < 10; hop++) {
+        cur = cur.connects[0];
+        if (cur?.kind === "Filter") return true;
+      }
+      return false;
+    });
+    expect(filtered).toBe(true);
   });
 
   it("mute silences sfx; unmute restores — neither throws", () => {

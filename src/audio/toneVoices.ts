@@ -7,33 +7,164 @@ import { midiToFreq, type SfxName } from "./toneScenes";
  * scene melody and the close-up accent cues; the melody was replaced by the
  * composed tracks (`./toneTracks.ts`) and the accents by the crowd/venue
  * ambience layer (`./toneCrowd.ts`), leaving the jingles as its whole job.
+ *
+ * Every cue is human-voiced: the owner recorded a "bloop" and a "ping" with
+ * their own voice, and the synth recipes here are ear-approved recreations
+ * (GDD crowd-din-ambience, "Human-recorded audio theme" amendment). The bloop
+ * family carries build, click, sell, and error; the ping bell carries notify
+ * and the promote phrase, which quotes the splash theme's peak turn so the
+ * milestones ring the same tune the start screen sings. `money` keeps the
+ * legacy jingle recipe, defined but uncalled.
+ *
+ * Audibility rule (owner-tested on phone and laptop speakers): no bloop ramps
+ * below 160 Hz, and the deep cues add quiet octave/twelfth partials so small
+ * speakers reconstruct the low pitch. The error cue reads by its slow
+ * double-bloop gesture, never by depth alone.
  */
 
-/** Play a one-shot action jingle through the sfx synth. */
-export function playSfx(synth: Tone.PolySynth, name: SfxName): void {
+/** The instrument set `playSfx` plays through. All owned by ToneAudioEngine
+ *  and connected to the sfx bus, so every cue follows the Effects slider. */
+export interface SfxVoices {
+  /** Short percussive sine synth: the legacy money jingle. */
+  jingle: Tone.PolySynth;
+  /** Mono sine with a schedulable frequency glide: every bloop is a ramp. */
+  bloop: Tone.Synth;
+  /** Quiet partials over the deeper bloops (octave + twelfth), poly so a
+   *  double bloop's partials can overlap. */
+  bloopPartial: Tone.PolySynth;
+  /** Bell fundamentals: long natural decay, no sustain. */
+  bell: Tone.PolySynth;
+  /** Bell color: one quiet inharmonic partial per strike, shorter decay. */
+  bellPartial: Tone.PolySynth;
+}
+
+/** Build the full jingle instrument set on the given bus, deliberately dry:
+ *  a reverb send here would escape the Effects slider. The recipes live in
+ *  this module beside the cues that play them; ToneAudioEngine owns the
+ *  lifecycle (it disposes every synth returned here). */
+export function createSfxVoices(bus: Tone.ToneAudioNode): SfxVoices {
+  const jingle = new Tone.PolySynth(Tone.Synth, {
+    envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.12 },
+  }).connect(bus);
+  jingle.maxPolyphony = 12;
+  // The bloop is a mono voice because its swoop is a scheduled frequency ramp.
+  const bloop = new Tone.Synth({
+    oscillator: { type: "sine" },
+    envelope: { attack: 0.008, decay: 0.2, sustain: 0, release: 0.08 },
+  }).connect(bus);
+  const bloopPartial = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: "sine" },
+    envelope: { attack: 0.008, decay: 0.18, sustain: 0, release: 0.06 },
+  }).connect(bus);
+  bloopPartial.maxPolyphony = 8;
+  const bell = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: "sine" },
+    envelope: { attack: 0.002, decay: 1.1, sustain: 0, release: 0.4 },
+  }).connect(bus);
+  bell.maxPolyphony = 12;
+  const bellPartial = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: "sine" },
+    envelope: { attack: 0.002, decay: 0.5, sustain: 0, release: 0.2 },
+  }).connect(bus);
+  bellPartial.maxPolyphony = 12;
+  return { jingle, bloop, bloopPartial, bell, bellPartial };
+}
+
+/** One bell strike: the fundamental plus a partial 19 semitones up (just shy
+ *  of the 3rd harmonic; the slight inharmonicity is what reads as "bell") at
+ *  about -16 dB relative to the strike. */
+function strikeBell(voices: SfxVoices, midi: number, t: number, vel: number): void {
+  voices.bell.triggerAttackRelease(midiToFreq(midi), 1.1, t, vel);
+  voices.bellPartial.triggerAttackRelease(midiToFreq(midi + 19), 0.5, t, vel * 0.16);
+}
+
+/** One bloop: a smooth exponential swoop from `f0` down to `f1` Hz. The ramp
+ *  must be scheduled AFTER the trigger so it overrides the setValueAtTime the
+ *  trigger itself schedules. `f1` never goes below 160 Hz (small speakers).
+ *  Deep landings (under 250 Hz) add quiet octave and twelfth partials so the
+ *  pitch reads on a phone. */
+function swoopBloop(
+  voices: SfxVoices,
+  f0: number,
+  f1: number,
+  ramp: number,
+  t: number,
+  vel: number,
+): void {
+  const floor = Math.max(f1, 160);
+  voices.bloop.triggerAttackRelease(f0, ramp + 0.06, t, vel);
+  voices.bloop.frequency.cancelScheduledValues(t);
+  voices.bloop.frequency.setValueAtTime(f0, t);
+  voices.bloop.frequency.exponentialRampToValueAtTime(floor, t + ramp);
+  if (floor < 250) {
+    voices.bloopPartial.triggerAttackRelease(floor * 2, ramp + 0.05, t, vel * 0.32);
+    voices.bloopPartial.triggerAttackRelease(floor * 3, ramp + 0.04, t, vel * 0.14);
+  }
+}
+
+/** The promote phrase: the splash theme's peak turn (C5 D5 B4 A4) struck as
+ *  bells. [midi, offsetSeconds, vel]; shared by star promotions and the win. */
+const PROMOTE_BELLS: ReadonlyArray<readonly [number, number, number]> = [
+  [72, 0, 0.45],
+  [74, 0.2, 0.5],
+  [71, 0.52, 0.55],
+  [69, 1.0, 0.4],
+];
+
+/** The error double bloop spans ~0.6 s on the mono bloop voice; retriggering
+ *  mid-gesture would stack cancel-and-ramp schedules into noise, so repeats
+ *  inside this window are dropped (drag-painting an invalid zone fires error
+ *  every frame). Seconds, on the Tone clock. */
+const ERROR_HOLDOFF = 0.4;
+let lastErrorAt = -Infinity;
+
+/** Exposed for tests: reset the error holdoff clock. */
+export function resetSfxHoldoff(): void {
+  lastErrorAt = -Infinity;
+}
+
+/** Play a one-shot action jingle through the sfx voices. */
+export function playSfx(voices: SfxVoices, name: SfxName): void {
   const t = Tone.now();
   const play = (midi: number, dur: Tone.Unit.Time, offset: number, vel = 0.5) =>
-    synth.triggerAttackRelease(midiToFreq(midi), dur, t + offset, vel);
+    voices.jingle.triggerAttackRelease(midiToFreq(midi), dur, t + offset, vel);
   switch (name) {
     case "build":
-      play(72, "16n", 0);
-      play(79, "16n", 0.07);
-      break;
-    case "sell":
-      play(67, "16n", 0);
-      play(60, "16n", 0.08);
-      break;
-    case "error":
-      play(48, "8n", 0, 0.6);
-      break;
-    case "money":
-      [76, 80, 83, 88].forEach((n, i) => play(n, "16n", i * 0.06, 0.45));
-      break;
-    case "promote":
-      [60, 64, 67, 72, 76].forEach((n, i) => play(n, "8n", i * 0.1, 0.55));
+      // The bloop: one smooth swoop from 520 Hz down to 180 Hz, the piece
+      // landing where it belongs.
+      swoopBloop(voices, 520, 180, 0.16, t, 0.9);
       break;
     case "click":
-      play(84, "32n", 0, 0.3);
+      // A tiny high bloop: the same gesture, small and quick.
+      swoopBloop(voices, 700, 380, 0.1, t, 0.5);
+      break;
+    case "sell":
+      // Two falling bloops: the piece leaves in two steps.
+      swoopBloop(voices, 420, 200, 0.12, t, 0.8);
+      swoopBloop(voices, 320, 160, 0.12, t + 0.12, 0.8);
+      break;
+    case "error": {
+      // A slow, sighing double bloop. Guarded: see ERROR_HOLDOFF.
+      if (t - lastErrorAt < ERROR_HOLDOFF) return;
+      lastErrorAt = t;
+      swoopBloop(voices, 440, 170, 0.24, t, 1);
+      swoopBloop(voices, 340, 160, 0.24, t + 0.28, 1);
+      break;
+    }
+    case "money":
+      play(76, "16n", 0, 0.45);
+      play(80, "16n", 0.06, 0.45);
+      play(83, "16n", 0.12, 0.45);
+      play(88, "16n", 0.18, 0.45);
+      break;
+    case "promote":
+      // The splash theme's peak turn on the ping bell: the tower sings its
+      // own tune back at every star promotion and the win.
+      for (const [midi, offset, vel] of PROMOTE_BELLS) strikeBell(voices, midi, t + offset, vel);
+      break;
+    case "notify":
+      // A single ping on G4: the onboarding step chime and other small nudges.
+      strikeBell(voices, 67, t, 0.7);
       break;
   }
 }

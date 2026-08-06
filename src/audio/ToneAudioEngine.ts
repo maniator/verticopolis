@@ -12,19 +12,19 @@ import {
   type Scene,
   type SfxName,
 } from "./toneScenes";
-import { playSfx } from "./toneVoices";
+import { createSfxVoices, playSfx, type SfxVoices } from "./toneVoices";
+import { createPercussion, type PercVoices } from "./tonePercussion";
 import { programFor, type Program, type ProgramKind, type TrackVoice } from "./toneTracks";
 import { CrowdLayer } from "./toneCrowd";
 
 /**
  * Music + ambient audio for the tower, built on Tone.js.
  *
- * The music is two hand-composed looping tracks (see `./toneTracks.ts`): a
- * catchy SPLASH theme for the start screen and a calm, drifting in-game bed,
- * played through a small warm palette (triangle bass, rolling sine arpeggio,
- * and, on the splash, a triangle hook) by a looping {@link Tone.Part}. The
- * active track is chosen by {@link setProgram}: `"splash"` while the start
- * screen is up, `"game"` in the tower.
+ * The music is two looping tracks transcribed from the owner's own recordings
+ * (see `./toneTracks.ts`): the "Terrace + Heartbeat" SPLASH theme and the
+ * "Two Chapters" in-game bed, played by a looping {@link Tone.Part} through a
+ * small warm palette (bass, held-fifth pad, melody voice, two percussion
+ * membranes). {@link setProgram} picks the track at the splash boundary.
  *
  * Layered under it is the building's ambient life: a per-area "room tone" bed
  * (filtered noise), an outdoor rain layer, and the crowd/venue ambience layer
@@ -63,6 +63,8 @@ export class ToneAudioEngine {
   private arp: Tone.PolySynth | null = null;
   private bassVoice: Tone.Synth | null = null;
   private hook: Tone.PolySynth | null = null;
+  /** Recorded percussion (heartbeat + taps); see tonePercussion for routing. */
+  private perc: PercVoices | null = null;
   private musicGain: Tone.Gain | null = null;
   /** Warm lowpass + sub high-pass on the music (never bright/harsh, no rumble). */
   private musicTone: Tone.Filter | null = null;
@@ -74,7 +76,8 @@ export class ToneAudioEngine {
   /** Pending track-swap during a crossfade, so a re-switch can cancel it. */
   private swapTimer: ReturnType<typeof setTimeout> | null = null;
 
-  private sfxSynth: Tone.PolySynth | null = null;
+  /** The jingle instrument set (recipes and construction in toneVoices.ts). */
+  private sfxVoices: SfxVoices | null = null;
   /** The crowd/venue ambience layer (talkers, venue detail, venue programs). */
   private crowd: CrowdLayer | null = null;
 
@@ -179,13 +182,17 @@ export class ToneAudioEngine {
       }).connect(this.musicGain);
       this.bassVoice.volume.value = -8;
 
-      // The hummable hook (splash theme only); silent in the game bed.
+      // The melody voice: the owner's hummed tune (splash hook and, since the
+      // Two Chapters bed, the in-game lead as well).
       this.hook = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: "triangle" },
         envelope: { attack: 0.025, decay: 0.3, sustain: 0.2, release: 0.3 },
       }).connect(this.musicGain);
       this.hook.volume.value = -6;
       this.hook.maxPolyphony = 12;
+
+      // Recorded percussion, straight into the music bus (see tonePercussion).
+      this.perc = createPercussion(this.musicBus, this.musicLevel);
 
       // The crowd/venue ambience layer rides the distance-filtered bed so
       // zoom muffles and opens it with everything else. Its two voice seeds
@@ -232,11 +239,9 @@ export class ToneAudioEngine {
       this.rainNoise.volume.value = -12;
       this.rainNoise.start();
 
-      // One-shot action jingles.
-      this.sfxSynth = new Tone.PolySynth(Tone.Synth, {
-        envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.12 },
-      }).connect(this.sfxBus);
-      this.sfxSynth.maxPolyphony = 12;
+      // One-shot action jingles (the human-voiced bloop and bell family plus
+      // the legacy money synth; recipes and dry-bus rationale in toneVoices).
+      this.sfxVoices = createSfxVoices(this.sfxBus);
 
       // Kick off the Transport (the looping music part and the venue programs
       // schedule on it).
@@ -284,16 +289,19 @@ export class ToneAudioEngine {
     if (this.started) this.crossfadeProgram();
   }
 
-  /** Dip to silence, swap the looping part at the bottom, swell back up. */
+  /** Dip to silence, swap the looping part at the bottom, swell back up. The
+   *  percussion level rides the same dip (it bypasses the filtered chain). */
   private crossfadeProgram(): void {
     if (!this.musicGain) return this.buildMusicPart();
     const FADE = 0.8;
     this.musicGain.gain.rampTo(0, FADE);
+    this.perc?.percGain.gain.rampTo(0, FADE);
     if (this.swapTimer !== null) clearTimeout(this.swapTimer);
     this.swapTimer = setTimeout(() => {
       this.swapTimer = null;
       this.buildMusicPart();
       this.musicGain?.gain.rampTo(this.musicLevel, FADE);
+      this.perc?.percGain.gain.rampTo(this.musicLevel, FADE);
     }, FADE * 1000);
   }
 
@@ -355,8 +363,10 @@ export class ToneAudioEngine {
       this.musicPart?.dispose();
       this.musicPart = null;
       const prog: Program = programFor(this.program);
-      const voice = (v: TrackVoice): Tone.PolySynth | Tone.Synth | null =>
-        v === "arp" ? this.arp : v === "bass" ? this.bassVoice : this.hook;
+      const voice = (v: TrackVoice): Tone.PolySynth | Tone.Synth | Tone.MembraneSynth | null => {
+        const map = { arp: this.arp, bass: this.bassVoice, hook: this.hook };
+        return v === "thump" ? (this.perc?.thump ?? null) : v === "tap" ? (this.perc?.tap ?? null) : map[v];
+      };
       const part = new Tone.Part((time, ev) => {
         try {
           if (this.muted) return; // a stray Tone error must not stop the Transport
@@ -413,8 +423,8 @@ export class ToneAudioEngine {
   // ---- One-shot action jingles ------------------------------------------
 
   sfx(name: SfxName): void {
-    if (!this.started || !this.sfxSynth || this.muted) return;
-    playSfx(this.sfxSynth, name);
+    if (!this.started || !this.sfxVoices || this.muted) return;
+    playSfx(this.sfxVoices, name);
   }
 
   dispose(): void {
@@ -439,10 +449,11 @@ export class ToneAudioEngine {
       this.arp,
       this.bassVoice,
       this.hook,
+      ...(this.perc ? Object.values(this.perc) : []),
       this.musicGain,
       this.musicTone,
       this.musicSub,
-      this.sfxSynth,
+      ...(this.sfxVoices ? Object.values(this.sfxVoices) : []),
       this.ambNoise,
       this.ambFilter,
       this.ambTone,
@@ -469,7 +480,9 @@ export class ToneAudioEngine {
       }
     }
     this.musicPart = null;
-    this.arp = this.hook = this.sfxSynth = null;
+    this.arp = this.hook = null;
+    this.perc = null;
+    this.sfxVoices = null;
     this.bassVoice = null;
     this.ambNoise = this.rainNoise = null;
     this.ambFilter = this.ambTone = this.rainFilter = this.bedFilter = null;
