@@ -388,7 +388,7 @@ describe("runBootFlow", () => {
     opts.pauseForSplash(false);
     expect(app.setSpeed).toHaveBeenCalledWith(1);
     opts.chime();
-    expect(app.audio.sfx).toHaveBeenCalledWith("promote");
+    expect(app.audio.sfx).toHaveBeenCalledWith("notify");
     opts.setMusicProgram(true);
     expect(app.audio.setProgram).toHaveBeenCalledWith("splash");
     opts.setMusicProgram(false);

@@ -201,7 +201,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     mq: app.mobileMq,
     showHelp: () => app.ui.showHelp(),
     pauseForSplash: (paused) => app.setSpeed(paused ? 0 : 1),
-    chime: () => app.audio.sfx("promote"),
+    chime: () => app.audio.sfx("notify"),
     // A tower arrived over the title screen (SPEC-splash-load-tower CAP-6):
     // a loaded slot, a .vctower, or a 1994 .TDT. dismissSplash has already
     // re-paused through pauseForSplash, so this is only the greeting that says

@@ -164,7 +164,7 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
   it("sfx() plays every cue once the graph is up", () => {
     const eng = new ToneAudioEngine();
     eng.start();
-    const names: SfxName[] = ["build", "sell", "error", "promote", "money", "click"];
+    const names: SfxName[] = ["build", "sell", "error", "promote", "money", "notify", "click"];
     for (const n of names) expect(() => eng.sfx(n)).not.toThrow();
   });
 

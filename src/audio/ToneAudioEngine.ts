@@ -12,7 +12,7 @@ import {
   type Scene,
   type SfxName,
 } from "./toneScenes";
-import { playSfx } from "./toneVoices";
+import { createSfxVoices, playSfx, type SfxVoices } from "./toneVoices";
 import { programFor, type Program, type ProgramKind, type TrackVoice } from "./toneTracks";
 import { CrowdLayer } from "./toneCrowd";
 
@@ -74,7 +74,8 @@ export class ToneAudioEngine {
   /** Pending track-swap during a crossfade, so a re-switch can cancel it. */
   private swapTimer: ReturnType<typeof setTimeout> | null = null;
 
-  private sfxSynth: Tone.PolySynth | null = null;
+  /** The jingle instrument set (recipes and construction in toneVoices.ts). */
+  private sfxVoices: SfxVoices | null = null;
   /** The crowd/venue ambience layer (talkers, venue detail, venue programs). */
   private crowd: CrowdLayer | null = null;
 
@@ -232,11 +233,9 @@ export class ToneAudioEngine {
       this.rainNoise.volume.value = -12;
       this.rainNoise.start();
 
-      // One-shot action jingles.
-      this.sfxSynth = new Tone.PolySynth(Tone.Synth, {
-        envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.12 },
-      }).connect(this.sfxBus);
-      this.sfxSynth.maxPolyphony = 12;
+      // One-shot action jingles (the legacy sine synth plus the human-voiced
+      // bloop and bell pair; recipes and the dry-bus rationale in toneVoices).
+      this.sfxVoices = createSfxVoices(this.sfxBus);
 
       // Kick off the Transport (the looping music part and the venue programs
       // schedule on it).
@@ -413,8 +412,8 @@ export class ToneAudioEngine {
   // ---- One-shot action jingles ------------------------------------------
 
   sfx(name: SfxName): void {
-    if (!this.started || !this.sfxSynth || this.muted) return;
-    playSfx(this.sfxSynth, name);
+    if (!this.started || !this.sfxVoices || this.muted) return;
+    playSfx(this.sfxVoices, name);
   }
 
   dispose(): void {
@@ -442,7 +441,10 @@ export class ToneAudioEngine {
       this.musicGain,
       this.musicTone,
       this.musicSub,
-      this.sfxSynth,
+      this.sfxVoices?.jingle,
+      this.sfxVoices?.bloop,
+      this.sfxVoices?.bell,
+      this.sfxVoices?.bellPartial,
       this.ambNoise,
       this.ambFilter,
       this.ambTone,
@@ -469,7 +471,8 @@ export class ToneAudioEngine {
       }
     }
     this.musicPart = null;
-    this.arp = this.hook = this.sfxSynth = null;
+    this.arp = this.hook = null;
+    this.sfxVoices = null;
     this.bassVoice = null;
     this.ambNoise = this.rainNoise = null;
     this.ambFilter = this.ambTone = this.rainFilter = this.bedFilter = null;

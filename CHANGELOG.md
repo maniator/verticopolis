@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.21.0
+
+- New build and chime sounds, made from recordings of our own voice (human-made, not AI): placing something now lands with a soft bloop, star promotions ring a small bell fanfare, and the tutorial advances with a single gentle ping.
+
 ## 2.20.0
 
 - The Help dialog (and any other long dialog) scrolls as one piece again in current browsers, instead of wearing a second scrollbar on the window itself.
