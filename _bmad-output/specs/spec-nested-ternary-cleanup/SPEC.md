@@ -31,20 +31,18 @@ An audit with `npx eslint src api --rule '{"no-nested-ternary": "error"}'` finds
 ## Constraints
 
 - Behavior-preserving refactor only: no logic changes, no altered strings, numbers, or branch conditions, and no change to the order effectful expressions run in.
-- Banded ladders are the sanctioned idiom and stay: a tail-chained 2-3 band ladder with short branches is not churned, even where it technically nests.
-- No eslint config change in this PR; `no-nested-ternary` stays off in `eslint.config.js`.
-- The 500-line file-size guard (`src/tests/fileSize.guard.test.ts`) holds: `src/engine/sim/serialization.ts` sits at exactly 500 lines, so edits there must not grow the file, and every other touched file stays at or under the ceiling.
+- Owner decision (2026-08-06): `no-nested-ternary` is enabled as an error in `eslint.config.js` and every remaining ladder site is swept, with zero inline disables. This retires the earlier sanctioned-ladder carve-out and brings the eslint config change into scope; round one's carve-out text is preserved in the audit for the record.
+- The 500-line file-size guard (`src/tests/fileSize.guard.test.ts`) holds: ceiling-adjacent files (`serialization.ts`, `EconomySystem.ts`, `facilityDiagnostics.ts`, `towerInputCamera.ts`, `uiElevatorSchedule.ts`) must stay at or under 500 lines, trimming or extracting where an if/else rewrite would cross it.
 - American English, no em-dashes in new prose, comments only where the code cannot say it.
 
 ## Non-goals
 
-- No repo-wide `no-nested-ternary` ban. Recorded as an open question below for the owner.
-- No sweep of the sanctioned ladder sites, and no drive-by cleanups (shared helpers across files, comment rewrites, style normalization) beyond the qualifying sites.
+- No behavior changes of any kind, and no cleanups beyond what the sweep itself requires.
 - No change to `src/tests/fileSize.ratchet.txt`.
 
 ## Success signal
 
-A reader opening any formerly qualifying site sees the structure the logic always had: a switch or lookup for a dispatch, an if/else for a guard, a named helper for a message picker. `git diff` against `main` shows no string or number changed, all four gates are green, and the remaining nested ternaries are exactly the sanctioned banded ladders the audit lists as "stay".
+A reader opening any formerly qualifying site sees the structure the logic always had: a switch or lookup for a dispatch, an if/else for a guard, a named helper for a message picker. `git diff` against `main` shows no string or number changed, all four gates are green (lint now enforcing `no-nested-ternary`), and `npx eslint src api` reports zero nested-ternary occurrences.
 
 ## Assumptions
 
@@ -52,4 +50,4 @@ A reader opening any formerly qualifying site sees the structure the logic alway
 
 ## Open questions
 
-- Enable `no-nested-ternary` in `eslint.config.js` and sweep the remaining ladder sites (~83 total)? Owner call; this PR deliberately leaves the rule off and the ladders alone.
+- None. The round-one open question (enable the rule and sweep the ladders?) was answered by the owner on 2026-08-06: yes to both, in the strongest form. Round two implements it.

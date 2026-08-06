@@ -49,7 +49,9 @@ const CATHEDRAL_IDS = new Set([36, 37, 38, 39, 40]);
  *  crown). */
 function oneTenant(type: number, left = 100, right = 109, status = 0): TdtSpec {
   const id = Math.abs(type);
-  const index = BASEMENT_ONLY_IDS.has(id) ? 6 : CATHEDRAL_IDS.has(id) ? 109 : 20;
+  let index = 20;
+  if (BASEMENT_ONLY_IDS.has(id)) index = 6;
+  else if (CATHEDRAL_IDS.has(id)) index = 109;
   return { floors: [{ index, tenants: [{ left, right, type, status }] }] };
 }
 

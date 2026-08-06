@@ -1,6 +1,8 @@
 # Nested-ternary audit
 
-Companion to [SPEC.md](./SPEC.md). Source list: `npx eslint src api --rule '{"no-nested-ternary": "error"}'` on this branch (84 occurrences across 46 files; eslint flags each nesting point, so one expression can count several times). Grouped below by distinct expression: 17 expressions fixed (28 occurrences), 52 expressions stay (56 occurrences; a few rows fold sibling expressions from the same lines together).
+Companion to [SPEC.md](./SPEC.md). Source list: `npx eslint src api --rule '{"no-nested-ternary": "error"}'` on this branch (84 occurrences across 46 files; eslint flags each nesting point, so one expression can count several times). Grouped below by distinct expression: 17 expressions fixed in round one (28 occurrences), 52 expressions initially kept as sanctioned ladders (56 occurrences; a few rows fold sibling expressions from the same lines together).
+
+**Round two (2026-08-06): the owner opted for the full ban.** `no-nested-ternary` is now an error in `eslint.config.js`, and every row in the "Stay" table below was swept in round two with the same behavior-preserving treatment (if/else chains, small named helpers, lookup tables). The table and its reasons are preserved as the record of the round-one judgment; zero nested-ternary occurrences remain.
 
 Rubric (from SPEC Constraints, clauses referenced per row):
 
@@ -32,7 +34,7 @@ Rubric (from SPEC Constraints, clauses referenced per row):
 | `src/ui/templates/inspector.ts:35` (3 occ.) | b, d | Five-band status ladder with nesting in its first branch; now a switch helper. |
 | `src/ui/templates/stats.ts:85` | b | VIP text nested in the true branch; now an if/else. |
 
-## Stay (52 expressions, 56 occurrences)
+## Stay (52 expressions, 56 occurrences); all swept in round two per the owner's full-ban decision
 
 | Site | Reason |
 | --- | --- |

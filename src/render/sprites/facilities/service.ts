@@ -284,7 +284,9 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   const gY = 14;
   const gH = deck - 18;
   F(W - 6, gY, 4, gH, "#1B2A14");
-  const gauge = fill >= 1 ? "#d6342f" : fill > 0.7 ? "#e0a94e" : "#6bd47a";
+  let gauge = "#6bd47a";
+  if (fill >= 1) gauge = "#d6342f";
+  else if (fill > 0.7) gauge = "#e0a94e";
   const gaugeH = Math.round(gH * fill);
   F(W - 5, gY + gH - gaugeH, 2, gaugeH, gauge);
   if (fill >= 1) serviceLabel(ctx, "FULL", sx(W - 34), y, "#ffd2c8", 44, w);

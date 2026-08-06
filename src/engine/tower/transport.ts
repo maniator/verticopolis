@@ -483,7 +483,9 @@ export function nearestTransportDistance(tower: Tower, u: Unit): number {
   let best = Infinity;
   for (const [x0, x1] of cols) {
     // Overlap ⇒ 0; shaft entirely left ⇒ left - x1; entirely right ⇒ x0 - right.
-    const gap = x1 <= left ? left - x1 : x0 >= right ? x0 - right : 0;
+    let gap = 0;
+    if (x1 <= left) gap = left - x1;
+    else if (x0 >= right) gap = x0 - right;
     if (gap < best) best = gap;
     if (best === 0) break;
   }

@@ -76,7 +76,9 @@ describe("save round-trip paints identical pixels (.vctower serialize/deserializ
     let f = 8;
     let x = 0;
     const placeRetail = (kind: FacilityKind, subtype: string) => {
-      const width = kind === "restaurant" ? 24 : kind === "fastFood" ? 16 : 12;
+      let width = 12;
+      if (kind === "restaurant") width = 24;
+      else if (kind === "fastFood") width = 16;
       if (x + width >= 120) {
         f += 1;
         x = 0;
@@ -147,7 +149,9 @@ describe("TDT round-trip preserves the retail varieties' paint (geometry + subty
     let x = x0;
     const spots: { kind: FacilityKind; subtype: string; floor: number; x: number }[] = [];
     const placeRetail = (kind: FacilityKind, subtype: string) => {
-      const width = kind === "restaurant" ? 24 : kind === "fastFood" ? 16 : 12;
+      let width = 12;
+      if (kind === "restaurant") width = 24;
+      else if (kind === "fastFood") width = 16;
       if (x + width >= x0 + 110) {
         f += 1;
         x = x0;

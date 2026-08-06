@@ -87,7 +87,8 @@ function nearestFloorDist(floors: number[], floor: number): number {
  *  vacant. The per-tick update keeps the live congestion (default false). */
 export function buildSatisfactionContext(sim: Simulation, neutralizeCongestion = false): SatisfactionContext {
   const congMap = !neutralizeCongestion && sim.simModel === "v2" ? sim.spatialCongestionByFloor() : null;
-  const globalCong = neutralizeCongestion ? 0 : congMap ? Math.max(0, ...[0, ...congMap.values()]) : sim.congestion();
+  let globalCong = 0;
+  if (!neutralizeCongestion) globalCong = congMap ? Math.max(0, ...[0, ...congMap.values()]) : sim.congestion();
   const servedSet = sim.tower.servedFloors();
   const clubFloors: number[] = [];
   const nightclubFloors: number[] = [];

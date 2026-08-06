@@ -292,7 +292,9 @@ export class EditorActions {
           } else {
             const rung = shape.rungs[Number(sel.value)];
             if (rung && sim.priceUnit(u, rung.value) !== null) {
-              const what = u.kind === "condo" ? "Sale price" : isHotelKind(u.kind) ? "Room rate" : "Rent";
+              let what = "Rent";
+              if (u.kind === "condo") what = "Sale price";
+              else if (isHotelKind(u.kind)) what = "Room rate";
               trackEconomyActionOnce("price_tune"); // engaged with pricing (latched; no value)
               this.deps.audio.sfx("click");
               this.deps.announce(`${what} set to ${rung.label} ($${rung.value.toLocaleString()}).`);

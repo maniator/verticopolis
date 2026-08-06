@@ -99,15 +99,13 @@ export function announceForPlacement(placed: PlaceOutcome, kind: FacilityKind, f
   // spoken line must name a lobby too, matching the visual toast (a screen-reader
   // user was otherwise told "Floor" for a lobby that was built).
   const name = FACILITIES[groundFloorStructureKind(kind, floor)].name;
-  return placed.what === "paint"
-    ? placed.ok
-      ? `Placed ${name} on floor ${floor}`
-      : (placed.reason ?? `Can't place ${name} here`)
-    : placed.what === "flight"
-      ? placed.ok
-        ? `${name} built, floors ${floor} to ${floor + 1}`
-        : placed.reason
-      : placed.ok
-        ? `Placed ${name}`
-        : `Can't place ${name} here`;
+  if (placed.what === "paint") {
+    if (placed.ok) return `Placed ${name} on floor ${floor}`;
+    return placed.reason ?? `Can't place ${name} here`;
+  }
+  if (placed.what === "flight") {
+    if (placed.ok) return `${name} built, floors ${floor} to ${floor + 1}`;
+    return placed.reason;
+  }
+  return placed.ok ? `Placed ${name}` : `Can't place ${name} here`;
 }

@@ -425,7 +425,10 @@ function drawStrip(ctx: CanvasRenderingContext2D, rec: SceneryRec, x0: number, w
       }
     } else {
       const shade = hash01(tile * 17);
-      ctx.fillStyle = shade < 0.33 ? "#4e7a34" : shade < 0.66 ? "#5b8a3c" : "#446c2e";
+      let grass = "#446c2e";
+      if (shade < 0.33) grass = "#4e7a34";
+      else if (shade < 0.66) grass = "#5b8a3c";
+      ctx.fillStyle = grass;
       const wob = hash01(tile * 29) < 0.2 ? 1 : 0;
       ctx.fillRect(px, STRIP_ABOVE - gh - wob, TILE + 1, gh + wob + STRIP_BELOW);
       ctx.fillStyle = "#3c5c28";

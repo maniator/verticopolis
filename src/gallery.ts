@@ -311,7 +311,9 @@ function relayout(): void {
   // the sideways scroll this whole function exists to kill would come back on a
   // very narrow screen. The sprites scale to whatever cell width results.
   const avail = Math.max(1, (canvas.parentElement?.clientWidth ?? window.innerWidth) - PAD * 2);
-  COLS = avail >= 860 ? 3 : avail >= 560 ? 2 : 1;
+  if (avail >= 860) COLS = 3;
+  else if (avail >= 560) COLS = 2;
+  else COLS = 1;
   CELL_W = Math.min(300, Math.floor(avail / COLS));
   const laid = layoutItems(ITEMS);
   placed = laid.placed;

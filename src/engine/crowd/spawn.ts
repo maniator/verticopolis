@@ -460,7 +460,9 @@ export function spawnStep(
   // Spawn at a rate that scales with how busy the hour is AND how populated the tower is (review
   // F39): a 6-office tower and a 12,000-pop tower no longer spawn identically. The MAX_PEOPLE cap
   // in spawnTrips still bounds the total.
-  const timeRate = clock.isNight() ? 0.3 : clock.isWeekend ? 1.2 : 2.2;
+  let timeRate = 2.2;
+  if (clock.isNight()) timeRate = 0.3;
+  else if (clock.isWeekend) timeRate = 1.2;
   const popFactor = Math.min(3, 0.4 + tower.totalPopulation() / 2000);
   // Rain thins the people out and about (weather-shapes-crowd, #430): fewer spawns on a rainy day,
   // so the visible crowd empties and attendance houses fill less. Reads the SAME authoritative

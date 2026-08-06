@@ -56,11 +56,11 @@ export function showCrashScreen(opts: CrashScreenOptions): void {
   // Device-distress advice: shown for a rapid double crash AND for a first
   // loss whose in-place recovery failed or timed out (the GPU stayed wedged
   // for seconds, which is the same distress signal by another route).
-  const repeatLine = opts.crash.repeat
-    ? `<p><b>This is the second crash in a row.</b> Closing other tabs or apps before reloading may help.</p>`
-    : opts.crash.recoveryFailed
-      ? `<p><b>The game tried to restart its graphics and couldn't.</b> Closing other tabs or apps before reloading may help.</p>`
-      : "";
+  let repeatLine = "";
+  if (opts.crash.repeat)
+    repeatLine = `<p><b>This is the second crash in a row.</b> Closing other tabs or apps before reloading may help.</p>`;
+  else if (opts.crash.recoveryFailed)
+    repeatLine = `<p><b>The game tried to restart its graphics and couldn't.</b> Closing other tabs or apps before reloading may help.</p>`;
 
   const dialog = document.createElement("dialog");
   dialog.id = CRASH_SCREEN_ID;

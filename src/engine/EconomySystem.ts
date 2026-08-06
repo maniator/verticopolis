@@ -473,8 +473,10 @@ export class EconomySystem {
       // "auto" policy draws RNG (same order), so default cinemas are stream-identical.
       if (u.kind === "cinema" && operational) {
         const policy = u.filmPolicy ?? "auto";
-        const blockbuster =
-          policy === "blockbuster" ? true : policy === "feature" ? false : this.sim.rng.chance(0.4);
+        let blockbuster: boolean;
+        if (policy === "blockbuster") blockbuster = true;
+        else if (policy === "feature") blockbuster = false;
+        else blockbuster = this.sim.rng.chance(0.4);
         const booking = blockbuster ? ECON.cinemaBookingBlockbuster : ECON.cinemaBookingMonthly;
         if (blockbuster) this.blockbusters.add(u.id);
         charge("entertainment", booking);

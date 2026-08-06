@@ -339,7 +339,10 @@ export function drawCar(
   // Cab frame, then the warm walnut interior with a brass ceiling rail. Service
   // reads as a grayer staff freight cab; express keeps the walnut interior but
   // wears its blue livery band below.
-  ctx.fillStyle = svc ? "#54584C" : express ? "#3A4048" : "#4A4238";
+  let cabFrame = "#4A4238";
+  if (svc) cabFrame = "#54584C";
+  else if (express) cabFrame = "#3A4048";
+  ctx.fillStyle = cabFrame;
   ctx.fillRect(1, 1, cw - 2, floorH - 2);
   ctx.fillStyle = express ? "#5A6472" : "#6A6E62"; // frame top rail
   ctx.fillRect(1, 1, cw - 2, 1);

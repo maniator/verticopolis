@@ -216,6 +216,14 @@ export const TDT_FINANCE_SIZE = 132;
 export const TDT_PARKING_SIZE = 2 + 512 * 2;
 export const TDT_STAIR_SLOTS = 64;
 export const TDT_STAIR_RECORD_SIZE = 10;
+/** Stories a stair-table record spans, from its type ordinal: 0-1 one story,
+ *  2-3 two, 4-5 three. One source for the exporter's flight accounting and the
+ *  importer's reconstruction, so the two can never disagree. */
+export function tdtStairStories(type: number): number {
+  if (type <= 1) return 1;
+  if (type <= 3) return 2;
+  return 3;
+}
 /**
  * Size of the trailing routing/reachability region the 1994 game reads AFTER
  * the stairs table (doc §11+: lobby/reachability tables and related caches).

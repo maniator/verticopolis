@@ -114,15 +114,12 @@ export function retailStatsLines(
   // or weather is dragging trade well below par), 0.5-0.85 neutral, >0.85 green
   // (near-ideal conditions: high appeal, well placed, dry). A mature tower with
   // a metro pushes appeal to 1, so the green band is genuinely reachable.
-  const yRatio = patronageYest === undefined ? undefined : baseline > 0 ? Math.max(0, patronageYest) / baseline : 0;
-  const tier =
-    yRatio === undefined
-      ? { color: "", verdict: "Just opened, no data yet." }
-      : yRatio < 0.5
-        ? { color: "var(--bad)", verdict: "Very few customers." }
-        : yRatio > 0.85
-          ? { color: "var(--good)", verdict: "Business is booming." }
-          : { color: "", verdict: "Business is average." };
+  let yRatio: number | undefined;
+  if (patronageYest !== undefined) yRatio = baseline > 0 ? Math.max(0, patronageYest) / baseline : 0;
+  let tier = { color: "", verdict: "Business is average." };
+  if (yRatio === undefined) tier = { color: "", verdict: "Just opened, no data yet." };
+  else if (yRatio < 0.5) tier = { color: "var(--bad)", verdict: "Very few customers." };
+  else if (yRatio > 0.85) tier = { color: "var(--good)", verdict: "Business is booming." };
   // Each line is its own `<div>`, in card order: today's running count with its
   // progress bar, the verdict (colored only when it is a red/green tier), then
   // the optional yesterday-profit and rain lines. The verdict's `style` binding
@@ -429,12 +426,9 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     // Framed as an honest UPPER bound ("under N") using ceil, so the block
     // never implies the tenant has *more* time than they do. Once the notice
     // has elapsed, say so plainly: they leave on the next hourly tick.
-    const left =
-      minsLeft <= 0
-        ? "any moment now"
-        : minsLeft >= 24 * 60
-          ? `in under ${Math.ceil(minsLeft / (24 * 60))} day(s)`
-          : `in under ${Math.ceil(minsLeft / 60)} hour(s)`;
+    let left = "any moment now";
+    if (minsLeft >= 24 * 60) left = `in under ${Math.ceil(minsLeft / (24 * 60))} day(s)`;
+    else if (minsLeft > 0) left = `in under ${Math.ceil(minsLeft / 60)} hour(s)`;
     // The reason text is a fixed internal enum string; lit auto-escapes it as a
     // text binding regardless, so no escapeHtml call is needed.
     if (isRelocation) {

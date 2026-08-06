@@ -24,6 +24,7 @@ import {
   TDT_ROUTING_TAIL_SIZE,
   TDT_STAIR_RECORD_SIZE,
   TDT_STAIR_SLOTS,
+  tdtStairStories,
 } from "./tdtConstants";
 import { viewWordsFromView } from "./tdtViewMapping";
 import { ELEVATOR_KINDS } from "./tdtTables";
@@ -398,8 +399,7 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
   // record is 3 flights); the report never overstates what made the trip.
   let flightsDropped = 0;
   for (let slot = TDT_STAIR_SLOTS; slot < stairRecords.length; slot++) {
-    const type = stairRecords[slot].type;
-    flightsDropped += type <= 1 ? 1 : type <= 3 ? 2 : 3;
+    flightsDropped += tdtStairStories(stairRecords[slot].type);
   }
   // The 1994 format has no transport-width field: every exported elevator and
   // walkway reconstructs at the fixed catalog footprint on load. A kept-legacy
@@ -429,7 +429,7 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
       walkway: false,
     })),
     ...stairRecords.slice(0, TDT_STAIR_SLOTS).map((s) => {
-      const stories = s.type <= 1 ? 1 : s.type <= 3 ? 2 : 3;
+      const stories = tdtStairStories(s.type);
       const kind = s.type % 2 === 1 ? "stairs" : "escalator";
       const bottom = s.floor - TDT_FLOOR_OFFSET;
       return { x: s.x, w: FACILITIES[kind].width, bottom, top: bottom + stories, walkway: true };

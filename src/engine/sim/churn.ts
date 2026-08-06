@@ -132,11 +132,10 @@ export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
   // say (not "fix the cause" or "a new owner will buy in").
   let buybackNote = "";
   if (buyback > 0) {
-    buybackNote = u.noRate
-      ? " It is off the market (No Rate); set a rate to sell it again."
-      : wouldEvictFreshTenant(sim, u, buildSatisfactionContext(sim, true))
-        ? " It stays empty until you fix the cause."
-        : congNote;
+    if (u.noRate) buybackNote = " It is off the market (No Rate); set a rate to sell it again.";
+    else if (wouldEvictFreshTenant(sim, u, buildSatisfactionContext(sim, true)))
+      buybackNote = " It stays empty until you fix the cause.";
+    else buybackNote = congNote;
   }
   sim.emit(
     buyback > 0

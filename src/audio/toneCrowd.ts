@@ -295,11 +295,10 @@ export class CrowdLayer {
         this.fireElement(el);
         if (el.cluster) clusterLeft--;
         const inCluster = el.cluster !== undefined && clusterLeft > 0;
-        const base = inCluster
-          ? draw(el.rateMin, el.rateVar, 1)
-          : el.cluster
-            ? draw(el.cluster.pauseMin, el.cluster.pauseVar, 3)
-            : draw(el.rateMin, el.rateVar, 1);
+        let base: number;
+        if (inCluster) base = draw(el.rateMin, el.rateVar, 1);
+        else if (el.cluster) base = draw(el.cluster.pauseMin, el.cluster.pauseVar, 3);
+        else base = draw(el.rateMin, el.rateVar, 1);
         gap = base / Math.max(0.2, Math.min(1, this.activity));
       } else {
         // Gated-off scene in view (an office at night): idle slowly instead of

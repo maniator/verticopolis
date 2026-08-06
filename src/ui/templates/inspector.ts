@@ -62,15 +62,13 @@ export function unitInspectorTemplate(sim: Simulation, u: Unit): TemplateResult 
   // 0) show the same live line from their routed attendance tally: a mid-show
   // house must never inspect as empty while the audience is visibly seated.
   const closed = isTenanted(u) && !isOpenAt(u.kind, sim.clock.hour);
+  let peopleLine: TemplateResult | typeof nothing = nothing;
+  if ((isCommercialKind(u.kind) && f.population > 0) || f.attendance !== undefined)
+    peopleLine = html`<div>Customers: ${u.customersIn ?? 0}${closed ? " (closed)" : ""}</div>`;
+  else if (f.population) peopleLine = html`<div>Occupants: ${u.occupants}/${residentCount(u)}</div>`;
   return html`<h4 class="win-title">${title}</h4><div>${labelIsExtra ? html`${u.label}<br />` : nothing}${
     u.floor >= 1 ? `Floor ${u.floor}` : `B${1 - u.floor}`
-  }</div><div>Status: ${statusText}</div>${
-    (isCommercialKind(u.kind) && f.population > 0) || f.attendance !== undefined
-      ? html`<div>Customers: ${u.customersIn ?? 0}${closed ? " (closed)" : ""}</div>`
-      : f.population
-        ? html`<div>Occupants: ${u.occupants}/${residentCount(u)}</div>`
-        : nothing
-  }${facilityDiagnostics(sim, u)}<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`;
+  }</div><div>Status: ${statusText}</div>${peopleLine}${facilityDiagnostics(sim, u)}<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`;
 }
 
 export function transportInspectorTemplate(sim: Simulation, t: Transport): TemplateResult {
