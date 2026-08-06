@@ -391,9 +391,11 @@ that skips most of what it spans.
 > survives. Express at slot 5 in the game's own file: all 8 survive. Express
 > first: the express plus one shaft, whether the record is span-sized (1 kept
 > plus nothing) or the game's own stop-sized bytes (2 kept). The mechanism is
-> still unknown, and the plausible shapes are a required ordering (by column, by
-> kind, by floor) or an express being read before the structures a later shaft
-> depends on. What is no longer in doubt is that **writing express shafts last
+> still unknown. Two shapes were plausible when this was written: a required
+> record ordering, or an express being read before the structures a later shaft
+> depends on. **The ordering half is since refuted** (see the next note: swapping
+> two standard shafts is harmless and the game keeps the swapped order), leaving
+> the second. What is no longer in doubt is that **writing express shafts last
 > is the best available construction of the table**, not a workaround for a
 > sizing bug: it is the arrangement that costs a tower with ONE express nothing.
 >
@@ -405,6 +407,10 @@ that skips most of what it spans.
 > **Narrowed further, 2026-08-05: the table needs no global ordering, and the
 > loss scales with how EARLY the express sits.** Both probes reorder the game's
 > own 8-shaft fixpoint save, never altering a byte of any record.
+>
+> Indices below are **0-based positions among the BUILT records** in the
+> elevator table, counting only slots the game filled, so "index 0" is the first
+> built shaft and the express originally sits sixth of eight.
 >
 > | change | shafts kept |
 > |---|---|
