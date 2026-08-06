@@ -55,14 +55,20 @@ export function buildExportReport(save: SerializedGame, gathered: GatheredTower,
     `Your funds (${fmtMoney(balance * 100)}), star rating, and the clock.`,
   ];
   const staysBehind: string[] = [];
-  // The 1994 game loses every shaft written after an express one. We order
-  // express shafts last so a tower with one loses nothing, but a second express
-  // still costs the player the shafts behind it, and the modal must not claim
-  // every shaft arrives. See the backlog's `tdt-express-desync`.
+  // The 1994 game stops reading the elevator table at an express slot, so we
+  // write express shafts LAST and exactly one of them survives; the extras, and
+  // anything that followed them, do not. Measured by reordering the game's own
+  // save: an express at the first slot costs it 6 of 8 shafts, at the sixth it
+  // costs nothing. Doc §8 and the backlog's `tdt-express-desync`.
+  //
+  // The copy says what the player loses, not how the format fails. "The
+  // original loses any shaft built after the first express" was accurate and
+  // read as a threat to every elevator they own; with express written last the
+  // only casualties are the surplus expresses themselves.
   if (stats.expressLen > 1) {
     const lost = stats.expressLen - 1;
     staysBehind.push(
-      `${lost} express elevator${lost === 1 ? "" : "s"} won't appear in 1994: the original loses any shaft built after the first express. Rebuild ${lost === 1 ? "it" : "them"} there.`,
+      `${lost} of your express elevators won't appear in 1994: the original keeps only one. Rebuild ${lost === 1 ? "it" : "them"} there.`,
     );
   }
   if (counts.burnedOut > 0) {

@@ -1023,6 +1023,34 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
     expect(parseTdtBinary(bytes).warnings).toEqual([]);
   });
 
+  it("the export report says only the SURPLUS express elevators stay behind", () => {
+    // The modal is the only place a player learns this, and the old wording
+    // ("the original loses any shaft built after the first express") read as a
+    // threat to every elevator they own. With express written last the only
+    // casualties are the extra expresses, so the copy must say that and must
+    // not appear at all for a tower with one.
+    const mk = (x: number): Transport => ({
+      id: 800 + x, kind: "elevatorExpress" as FacilityKind, x, width: 8, bottom: 1, top: 30,
+      cars: 2, carPositions: [1, 1], carDir: [0, 0], load: 0,
+    });
+    const one = sampleSave();
+    one.transports.push(mk(60));
+    expect(buildTDT(one).report.staysBehind.join(" ")).not.toMatch(/express/i);
+
+    const three = sampleSave();
+    for (const x of [60, 80, 100]) three.transports.push(mk(x));
+    const line = buildTDT(three).report.staysBehind.find((s) => /express/i.test(s))!;
+    expect(line).toBe(
+      "2 of your express elevators won't appear in 1994: the original keeps only one. Rebuild them there.",
+    );
+    // Singular reads correctly too.
+    const two = sampleSave();
+    for (const x of [60, 80]) two.transports.push(mk(x));
+    expect(buildTDT(two).report.staysBehind.find((s) => /express/i.test(s))).toBe(
+      "1 of your express elevators won't appear in 1994: the original keeps only one. Rebuild it there.",
+    );
+  });
+
   it("express shafts are written to LATER slots than the rest (the desync workaround)", () => {
     // The retail game loses every shaft written after an express slot, so the
     // exporter orders express last. Nothing else pins that, and losing it
