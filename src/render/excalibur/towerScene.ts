@@ -424,3 +424,5 @@ export function dispose(engine: TowerEngine): void {
   engine.engine.browser.clear();
   engine.engine.dispose();
 }
+
+// Flake-hunt marker (#762): render-path touch so the drift captures run on this draft PR; reverted before close.
