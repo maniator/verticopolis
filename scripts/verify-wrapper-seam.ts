@@ -171,6 +171,39 @@ for (const seam of SEAMS) {
   foundBySeam.set(seam.name, found);
 }
 
+/**
+ * BROWSER-ONLY surfaces: the inverse polarity of SEAMS. The Help dialog's
+ * full-page link is withheld from wrapped builds (#720: target=_blank is
+ * denied there and /help is an extensionless route the app protocol cannot
+ * serve), and the withholding lives in Rollup's constant folding, which no
+ * unit test can see: the wrapped-mode test mocks the constant, and a
+ * reordered && chain silently stops folding (demonstrated in review by
+ * swapping the operands: every test stayed green while the desktop bundle
+ * shipped the dead link again). The dist is the only place the property
+ * exists, so the dist is where it is checked, in both directions.
+ */
+const BROWSER_ONLY: readonly { name: string; marker: string; guardHint: string }[] = [
+  {
+    name: "help full-page link",
+    marker: "Open the full help page",
+    guardHint:
+      "the !IS_WRAPPED_BUILD gate in src/ui/templates/help.ts stopped folding. The constant must LEAD the " +
+      "&& chain; in trailing position Rollup keeps the branch, which is exactly how this regressed in review.",
+  },
+];
+for (const item of BROWSER_ONLY) {
+  const present = texts.some((t) => t.includes(item.marker));
+  if (shouldBePresent && present) {
+    fail(`a "${arg}" build must NOT contain the ${item.name} (${JSON.stringify(item.marker)}): ${item.guardHint}`);
+  }
+  if (!shouldBePresent && !present) {
+    fail(
+      `a browser build must CONTAIN the ${item.name} (${JSON.stringify(item.marker)}); either the copy was ` +
+        `reworded (update BROWSER_ONLY to match) or the surface was eliminated from every build.`,
+    );
+  }
+}
+
 for (const seam of SEAMS) {
   const found = foundBySeam.get(seam.name)!;
   const expectPresent = shouldBePresent;

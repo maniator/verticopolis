@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { HELP_SECTIONS, helpLede, helpAboutBody, helpPrivacyBody, helpReportBlock } from "./helpContent";
+import { IS_WRAPPED_BUILD } from "../../platform";
 
 /**
  * The How-to-play / Help dialog. Organized so it opens SHORT: a lead and the
@@ -15,7 +16,20 @@ import { HELP_SECTIONS, helpLede, helpAboutBody, helpPrivacyBody, helpReportBloc
  * between them. This dialog wraps each section in a `<details>`; the page renders
  * the same sections expanded. Only the Classic vs Modern section additionally
  * gets the "Open full help page" link here (it deep-links to
- * `/help#classic-vs-modern`); the page itself is that destination. The external report link (with `rel="noopener
+ * `/help#classic-vs-modern`); the page itself is that destination. Wrapped
+ * builds (the Capacitor and Electron shells) withhold that link entirely (#720):
+ * the shell serves no `/help` route and denies every window open, so the anchor
+ * would be a dead control there, and the section already renders the same
+ * comparison inline. The gate is `IS_WRAPPED_BUILD`, the same compile-time
+ * constant behind the hostCommands and desktopSaveStore folds (NOT the splash
+ * install affordance, which gates at runtime on `isWrappedMode` and ships its
+ * markup everywhere), so a wrapped bundle does not carry the anchor at all
+ * (the interim stand-in until #718's secondary help window).
+ * `scripts/verify-wrapper-seam.ts` pins the fold in both build directions,
+ * because no unit test can. The constant must LEAD the condition: Rollup folds a leading
+ * known-false term (`false && ...`) and drops the anchor markup, but leaves the
+ * whole expression alive when the constant sits behind the runtime `s.id`
+ * comparison. The external report link (with `rel="noopener
  * noreferrer"` and its visually-hidden "opens GitHub in a new tab" span, routed
  * through the platform wrapper by the controller) stays out in the open as a
  * call to action, between the collapsible sections and the About section. Each
@@ -48,7 +62,7 @@ export function helpTemplate(onSplash: boolean, version: string, actions: HelpAc
       <details class="help-modes" ?open=${i === 0}>
         <summary><span role="heading" aria-level="3">${s.title}</span></summary>
         ${s.body()}
-        ${s.id === "classic-vs-modern"
+        ${!IS_WRAPPED_BUILD && s.id === "classic-vs-modern"
           ? html`<p class="help-fullpage"><a class="btn" href="/help#classic-vs-modern" target="_blank" rel="noopener noreferrer" data-act="open-help">Open the full help page<span class="visually-hidden"> (opens in a new tab)</span></a></p>`
           : nothing}
       </details>`,

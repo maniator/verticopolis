@@ -289,16 +289,16 @@ export function showHelp(ui: UI): void {
   // "Open the full help page" is a real <a href="/help#classic-vs-modern"
   // target="_blank">, so a plain browser tab opens the shareable help page
   // (deep-linked to the comparison section) as written. But from an installed
-  // standalone PWA (or the native shell, which has no /help route) a new tab
-  // drops to the system browser and loses the session, so there we keep the
-  // player in the running sim: swap the navigation for the in-app compare modal,
-  // which pauses the tower and shows the same comparison.
+  // standalone PWA a new tab drops to the system browser and loses the session,
+  // so there we keep the player in the running sim: swap the navigation for the
+  // in-app compare modal, which pauses the tower and shows the same comparison.
+  // Wrapped builds render no anchor at all (helpTemplate withholds it behind
+  // IS_WRAPPED_BUILD, #720), so `fullPage` is null there and this wiring no-ops.
   const fullPage = box.querySelector<HTMLAnchorElement>('a[data-act="open-help"]');
   fullPage?.addEventListener("click", (e) => {
-    // Downgrade in an installed standalone PWA AND in the native Capacitor shell:
-    // the shell renders the bundled snapshot with no /help route (and no Vercel
-    // rewrite), so a new tab would 404 or lose the session there just as it would
-    // for a standalone PWA.
+    // Downgrade in an installed standalone PWA. The isNativeWrapper arm is a
+    // runtime backstop (a shell has no /help route either); with the anchor
+    // withheld from wrapped bundles it should never fire in a real build.
     if (isInstalledStandalone() || getPlatform().isNativeWrapper) {
       e.preventDefault();
       showCompare(ui);

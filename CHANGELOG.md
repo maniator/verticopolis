@@ -13,7 +13,7 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.19.0
+## 2.20.0
 
 - The Help dialog (and any other long dialog) scrolls as one piece again in current browsers, instead of wearing a second scrollbar on the window itself.
 
