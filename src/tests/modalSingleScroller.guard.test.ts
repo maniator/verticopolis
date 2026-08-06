@@ -66,6 +66,16 @@ function rules(css: string): Rule[] {
     }
     base += css.slice(i, at);
     const open = css.indexOf("{", at);
+    const semi = css.indexOf(";", at);
+    if (semi !== -1 && (open === -1 || semi < open)) {
+      // A STATEMENT at-rule (@import, @charset) carries no block. The old
+      // assumption grabbed the next real rule's brace, which silently
+      // discarded that rule's selector: the review showed the `*` reset
+      // right after the imports was absent from ALL_RULES while the sanity
+      // test stayed green. Skip the statement and keep parsing.
+      i = semi + 1;
+      continue;
+    }
     let depth = 1;
     let j = open + 1;
     while (j < css.length && depth > 0) {
@@ -86,10 +96,10 @@ function rules(css: string): Rule[] {
 
 const ALL_RULES = SHEETS.flatMap(rules);
 
-/** Whether a declaration block leaves the element scrolling on the y axis.
+/** The block's resolved overflow-y value, or undefined when it declares none.
  *  Handles the shorthand's one- and two-value forms and later declarations
  *  overriding earlier ones inside the same block. */
-function scrollsVertically(body: string): boolean {
+function resolvedOverflowY(body: string): string | undefined {
   let y: string | undefined;
   for (const m of body.matchAll(/(?:^|;)\s*overflow(-x|-y)?\s*:\s*([^;]+)/g)) {
     const axis = m[1] ?? "";
@@ -97,7 +107,15 @@ function scrollsVertically(body: string): boolean {
     if (axis === "-y") y = vals[0];
     else if (axis === "") y = vals[1] ?? vals[0];
   }
-  return y === "auto" || y === "scroll";
+  return y;
+}
+
+/** Whether a declaration block leaves the element scrolling on the y axis.
+ *  `overlay` is legacy Chromium's scroll-with-overlay-bars value, a scroller
+ *  all the same. */
+function scrollsVertically(body: string): boolean {
+  const y = resolvedOverflowY(body);
+  return y === "auto" || y === "scroll" || y === "overlay";
 }
 
 /** Every class literal the dialog templates render (plus the box shell classes
@@ -109,8 +127,17 @@ function templateClassTokens(): Set<string> {
   const tokens = new Set<string>(["modal-box", "win"]);
   for (const f of readdirSync(dir)) {
     if (!f.endsWith(".ts") || f.endsWith(".test.ts")) continue;
-    const src = readFileSync(resolve(dir, f), "utf8");
-    for (const m of src.matchAll(/class="([^"$]+)"/g)) {
+    // Interpolations are BLANKED, not used as an exclusion: the codebase's
+    // standard conditional idiom (class="es-bar${cond ? " sel" : ""}") put a
+    // `$` in the attribute, and the old `[^"$]` scan then skipped the whole
+    // attribute, so `.es-bar` contributed no token and a scroller on it
+    // passed the guard (a review recreated that exactly). The literal parts
+    // around each interpolation are precisely the classes scrolling can hang
+    // on; a class living ONLY inside a nested interpolation stays invisible,
+    // which the token filter below reduces to a miss rather than a junk
+    // token.
+    const src = readFileSync(resolve(dir, f), "utf8").replace(/\$\{[^{}]*\}/g, " ");
+    for (const m of src.matchAll(/class="([^"]*)"/g)) {
       for (const t of m[1].split(/\s+/)) {
         if (/^[A-Za-z_-][\w-]*$/.test(t)) tokens.add(t);
       }
@@ -121,10 +148,19 @@ function templateClassTokens(): Set<string> {
 
 const TOKENS = templateClassTokens();
 
-/** True when a selector can style the dialog subtree: it names `#modal`
+/** True when a selector can style the DIALOG ELEMENT itself. `#modal` is the
+ *  document's only `<dialog>`, so a bare type selector or `:modal` styles it
+ *  just as surely as the id does; a review recreated #717 with
+ *  `dialog { overflow-y: auto }` that an id-only check waved through. The
+ *  lookarounds keep class names like `.dialog-foo` from matching the type. */
+function targetsDialogElement(selector: string): boolean {
+  return selector.includes("#modal") || /(^|[^.#\w-])dialog(?![\w-])/.test(selector) || selector.includes(":modal");
+}
+
+/** True when a selector can style the dialog subtree: the dialog element
  *  itself or any class the dialog templates render. */
 function inDialogSubtree(selector: string): boolean {
-  if (selector.includes("#modal")) return true;
+  if (targetsDialogElement(selector)) return true;
   const classes = selector.match(/\.[A-Za-z_-][\w-]*/g) ?? [];
   return classes.some((c) => TOKENS.has(c.slice(1)));
 }
@@ -136,6 +172,15 @@ describe("one scroll container per dialog", () => {
     expect(ALL_RULES.length).toBeGreaterThan(100);
     expect(ALL_RULES.some((r) => r.conditional)).toBe(true);
     expect(TOKENS.has("help-modes")).toBe(true);
+    // A class whose only appearance is inside an interpolated attribute: its
+    // presence pins the interpolation-blanking scan (the old scan skipped
+    // any attribute containing `$`, so this token vanished, and a scroller
+    // on it passed).
+    expect(TOKENS.has("es-bar")).toBe(true);
+    // The rule immediately after the @import statements: its presence pins
+    // the statement-at-rule handling (the old walker assumed every `@` had
+    // a block and swallowed this rule's selector).
+    expect(ALL_RULES.some((r) => !r.conditional && r.selector === "*")).toBe(true);
     expect(ALL_RULES.some((r) => !r.conditional && r.selector === ".modal-box" && scrollsVertically(r.body))).toBe(
       true,
     );
@@ -150,10 +195,18 @@ describe("one scroll container per dialog", () => {
     expect(modal.some((r) => /overflow\s*:\s*visible/.test(r.body))).toBe(true);
   });
 
-  it("never turns #modal into a scroller, in any rule or media block", () => {
+  it("keeps every overflow the dialog element ever declares at visible", () => {
+    // Stronger than not-a-scroller (the review's defer): a later
+    // `#modal { overflow: hidden }` in a media block would re-clip the .win
+    // drop shadow, half of what #717's fix restored, while a scroll-only
+    // check stayed green. Any overflow declaration on the dialog element,
+    // by id, type, or :modal, base or media, must resolve to visible.
     for (const r of ALL_RULES) {
-      if (r.selector.includes("#modal")) {
-        expect(scrollsVertically(r.body), `#modal must not scroll: \`${r.selector}\``).toBe(false);
+      if (targetsDialogElement(r.selector)) {
+        const y = resolvedOverflowY(r.body);
+        if (y !== undefined) {
+          expect(y, `the dialog element must stay overflow: visible: \`${r.selector}\``).toBe("visible");
+        }
       }
     }
   });
