@@ -210,7 +210,11 @@ export default defineConfig({
         // not `help-`) is left precached, because the in-game Help modal imports
         // it and needs it offline. A broad `**/help*` would wrongly sweep
         // `helpContent-*.js` too.
-        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**"],
+        // `icon-1024x1024.png` is the DESKTOP icns master (#761), not part of
+        // the game shell: the PWA needs nothing that large, so it stays out
+        // of every web player's offline precache (a review catch on the PR
+        // that added it).
+        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png"],
         navigateFallback: "index.html",
         // Keep the non-game pages and the real static files out of the app-shell
         // fallback, letting them fall through to the network rather than the game
