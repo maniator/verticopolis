@@ -8,8 +8,10 @@ import { renderToFragment } from "../testing/litTestUtils";
  * can honor neither half: it serves no `/help` route and its window-open
  * handler denies every new window, so a trusted click did nothing in the
  * packaged desktop shell (#720). `helpTemplate` therefore withholds the anchor
- * behind `IS_WRAPPED_BUILD`, the same compile-time gate that withholds the
- * splash install button, and that constant is false under vitest by
+ * behind `IS_WRAPPED_BUILD`, the same compile-time gate behind the
+ * hostCommands and desktopSaveStore folds (the splash install button is a
+ * different animal: it gates at runtime on `isWrappedMode` and ships its
+ * markup everywhere), and that constant is false under vitest by
  * construction (the mode is `"test"`). No default-mode test can reach the
  * wrapped branch, so this file mocks the platform module the way
  * `hostCommandsWiring.test.ts` does and pins the anchor's absence. The

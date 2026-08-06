@@ -21,9 +21,12 @@ import { IS_WRAPPED_BUILD } from "../../platform";
  * the shell serves no `/help` route and denies every window open, so the anchor
  * would be a dead control there, and the section already renders the same
  * comparison inline. The gate is `IS_WRAPPED_BUILD`, the same compile-time
- * constant that withholds the install affordance, so a wrapped bundle does not
- * carry the anchor at all (the interim stand-in until #718's secondary help
- * window). The constant must LEAD the condition: Rollup folds a leading
+ * constant behind the hostCommands and desktopSaveStore folds (NOT the splash
+ * install affordance, which gates at runtime on `isWrappedMode` and ships its
+ * markup everywhere), so a wrapped bundle does not carry the anchor at all
+ * (the interim stand-in until #718's secondary help window).
+ * `scripts/verify-wrapper-seam.ts` pins the fold in both build directions,
+ * because no unit test can. The constant must LEAD the condition: Rollup folds a leading
  * known-false term (`false && ...`) and drops the anchor markup, but leaves the
  * whole expression alive when the constant sits behind the runtime `s.id`
  * comparison. The external report link (with `rel="noopener
