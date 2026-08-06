@@ -35,10 +35,17 @@ export class ThumpVoice {
       envelope: { attack: 0.001, decay: 0.16, sustain: 0, release: 0.05 },
     }).connect(dest);
     this.drum.volume.value = -10;
-    this.partials = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "sine" },
-      envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.03 },
-    }).connect(dest);
+    try {
+      this.partials = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.03 },
+      }).connect(dest);
+    } catch (err) {
+      // The factory's reap list only learns about this voice as a whole, so a
+      // second-constructor throw must not strand the already-connected drum.
+      this.drum.dispose();
+      throw err;
+    }
     this.partials.volume.value = -10;
     this.partials.maxPolyphony = 8;
   }

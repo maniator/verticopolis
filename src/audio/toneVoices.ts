@@ -30,8 +30,12 @@ export interface SfxVoices {
   /** Mono sine with a schedulable frequency glide: every bloop is a ramp. */
   bloop: Tone.Synth;
   /** Second mono glide voice: the trailing bloop of a two-bloop gesture
-   *  (sell, error) lives here so a cross-cue retrigger on the first voice
-   *  cannot cancel a pending second swoop into a stray flat note. */
+   *  (sell, error) lives here so a gesture's own second swoop can never
+   *  cancel its first's ramp, and a build or click can never cancel a
+   *  pending second swoop. Two OVERLAPPING two-bloop gestures can still
+   *  collide here; error-into-error is holdoff-guarded, and the remaining
+   *  window (a sell inside an error's 0.28 s gap) is accepted as rare and
+   *  brief rather than guarded. */
   bloop2: Tone.Synth;
   /** Quiet partials over the deeper bloops (octave + twelfth), poly so a
    *  double bloop's partials can overlap. */
