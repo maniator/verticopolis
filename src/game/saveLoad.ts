@@ -6,7 +6,8 @@ import { LegacyExportError, buildTDT, type BuiltLegacyTower } from "../storage/t
 import { LegacyImportError, parseTDT } from "../storage/tdtImport";
 import type { ImportReport } from "../storage/tdtImport";
 import { persistAutosave } from "./autosavePersist";
-import { exportStoredTower, persistManualSave } from "./manualSavePersist";
+import { runExportFlow } from "./exportFlow";
+import { persistManualSave } from "./manualSavePersist";
 import { IS_WRAPPED_BUILD } from "../platform";
 import { noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
@@ -356,37 +357,13 @@ export class SaveLoad {
 
   /** Hand the player their tower as a compressed .vctower file download.
    *  Only ever called from the export confirm dialog — the tower is not
-   *  serialized or packed until the player has actually clicked Export. */
-  async exportGame(): Promise<void> {
-    try {
-      const sim = this.deps.getSim();
-      // stampView FIRST, before either path: the stored-byte flush below
-      // must carry the camera exactly as the live-serialize path always has
-      // (a party catch: dropping it would export towers at a stale view).
-      this.stampView(sim);
-      // Stored-byte export (story D7, D2's AC22): on a hydrated desktop
-      // session, flush to auto and let the shell COPY the stored file, so
-      // the destination bytes equal the stored bytes. Cancel is a CHOICE
-      // (Copilot caught the success toast firing on it): say nothing, open
-      // nothing else. Only "fallback" runs the live-serialize path below,
-      // which is what every other build runs.
-      if (IS_WRAPPED_BUILD) {
-        const stored = await exportStoredTower(sim, SaveGame.exportFilename(sim));
-        if (stored === "exported") {
-          this.deps.ui.toast("Tower exported. Check where you saved it.", "good");
-          return;
-        }
-        if (stored === "canceled") return;
-      }
-      const file = await SaveGame.export(sim);
-      this.deps.ui.downloadFile(SaveGame.exportFilename(sim), file);
-      // The container is pure ASCII, so string length == bytes on disk.
-      this.deps.ui.toast(`Tower exported (${(file.length / 1024).toFixed(1)} KB). Check your downloads.`, "good");
-    } catch (err) {
-      // Never fail silently: main.ts fires this with `void`, so an unhandled
-      // rejection here would leave the player with no download and no feedback.
-      this.deps.ui.toast("Export failed: " + (err as Error).message, "bad");
-    }
+   *  serialized or packed until the player has actually clicked Export. The
+   *  flow body (stored-byte vs live path, plus the single-flight latch and
+   *  its watchdog, GH #760) lives in ./exportFlow, split out at the 500-line
+   *  guard; delegating keeps the latch on the one choke point every export
+   *  entry converges on. */
+  exportGame(): Promise<void> {
+    return runExportFlow(this.deps, (sim) => this.stampView(sim));
   }
 
   /**
