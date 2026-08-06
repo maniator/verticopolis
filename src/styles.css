@@ -640,6 +640,15 @@ html.reduce-motion *::after {
   max-width: min(560px, 94vw);
   color: var(--ink);
   margin: auto; /* center the dialog over its backdrop instead of top-left */
+  /* One scroll container per dialog (#717): current Chromium's UA stylesheet
+     makes an open <dialog> `overflow: auto`, so relying on the old `visible`
+     default silently stacked a second live vertical scrollbar on the dialog
+     element, outside .modal-box's own, on every dialog tall enough to hit the
+     box's 82vh cap (Help was the reported one). It also clipped the box's
+     .win drop shadow, since the box fills the dialog exactly. The box owns
+     ALL of a dialog's scrolling; the dialog element itself must never scroll
+     or clip. Guarded by modalSingleScroller.guard.test.ts. */
+  overflow: visible;
 }
 #modal::backdrop {
   background: rgba(0, 0, 0, 0.62);
