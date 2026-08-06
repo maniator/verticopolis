@@ -88,7 +88,9 @@ export function createPercussion(musicBus: Tone.ToneAudioNode, level: number): P
       octaves: 0.5,
       oscillator: { type: "sine" },
       envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.02 },
-    }).connect(percGain);
+    });
+    built.push(tap);
+    tap.connect(percGain);
     tap.volume.value = -14;
     return { percGain, thump, tap };
   } catch (err) {
