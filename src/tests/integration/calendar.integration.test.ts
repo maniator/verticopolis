@@ -462,7 +462,9 @@ describe("Classic canon (3/3/12) end-to-end regression: fires on the canon beat"
       const slot = d % 3;
       expect(c.dayOfWeek).toBe(slot);
       expect(c.isWeekend).toBe(slot === 2);
-      const expected = slot === 2 ? "WE1" : slot === 0 ? "WD1" : "WD2";
+      let expected = "WD2";
+      if (slot === 2) expected = "WE1";
+      else if (slot === 0) expected = "WD1";
       expect(c.dayName).toBe(expected);
     }
   });

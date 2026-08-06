@@ -286,5 +286,7 @@ export function weatherFor(day: number): WeatherKind {
   h ^= h >>> 13;
   h = Math.imul(h, 1274126177) >>> 0;
   const r = ((h >>> 8) & 0xffff) / 0x10000;
-  return r < 0.62 ? "clear" : r < 0.85 ? "cloudy" : "rain";
+  if (r < 0.62) return "clear";
+  if (r < 0.85) return "cloudy";
+  return "rain";
 }

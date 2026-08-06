@@ -93,11 +93,9 @@ export interface DemandMap {
  *  minimal hand-rolled context that omits the crowd BFS. On a gap-free floor a
  *  floor is one segment, so all three agree (byte-identical). */
 export function unitReachable(sim: SimContext, floor: number, x: number): boolean {
-  return sim.positionReachable
-    ? sim.positionReachable(floor, x)
-    : sim.floorReachable
-      ? sim.floorReachable(floor)
-      : sim.tower.isFloorServed(floor);
+  if (sim.positionReachable) return sim.positionReachable(floor, x);
+  if (sim.floorReachable) return sim.floorReachable(floor);
+  return sim.tower.isFloorServed(floor);
 }
 
 /** The demand weight of an origin kind, reusing the meal-cadence origin weights

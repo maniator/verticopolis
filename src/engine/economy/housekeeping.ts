@@ -271,7 +271,8 @@ export class Housekeeping {
       candidates = [...candidates].sort((a, b) => {
         const sa = scores.get(a.id)!;
         const sb = scores.get(b.id)!;
-        return sa === sb ? a.id - b.id : sb > sa ? 1 : -1;
+        if (sa === sb) return a.id - b.id;
+        return sb > sa ? 1 : -1;
       });
       const crewOrderByFloor = new Map<number, Unit[]>();
       crewsFor = (room) => {

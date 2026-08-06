@@ -429,8 +429,12 @@ export class OnboardingController {
   private render(): void {
     if (!this.panelEl) return;
     const items = ONBOARD_STEPS.map((st, i) => {
-      const state = i < this.step ? "done" : i === this.step ? "cur" : "todo";
-      const mark = state === "done" ? "✓" : i === this.step ? "▸" : "·";
+      let state = "todo";
+      if (i < this.step) state = "done";
+      else if (i === this.step) state = "cur";
+      let mark = "·";
+      if (state === "done") mark = "✓";
+      else if (i === this.step) mark = "▸";
       // The current step folds in its one-line sub; the win-title text stays
       // adjacent to the Skip button so its title-bar layout is unchanged.
       return html`<li class="ob-step ob-${state}"><span class="ob-mark">${mark}</span><span class="ob-text"><b>${st.title}</b>${i === this.step ? html`<span class="ob-sub">${st.sub}</span>` : nothing}</span></li>`;

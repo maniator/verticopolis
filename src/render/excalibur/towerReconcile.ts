@@ -109,7 +109,8 @@ export function syncScene(engine: TowerEngine): void {
       // hour-dependent bits, a commercial unit's open/closed shutter and a
       // condo's late-night "asleep" look, otherwise a shop baked closed at
       // dawn would wrongly stay shuttered all day until the next lighting flip.
-      const open = hasBusinessHours(u.kind) ? (isOpenAt(u.kind, engine.d.hour) ? "o" : "c") : "";
+      let open = "";
+      if (hasBusinessHours(u.kind)) open = isOpenAt(u.kind, engine.d.hour) ? "o" : "c";
       const lateNight = u.kind === "condo" && (engine.d.hour >= 23 || engine.d.hour < 6) ? "s" : "";
       // Only mark a SETTLED space dead, a mid-build (or burning) space is
       // excluded from the set for other reasons and isn't a connectivity fault.
@@ -118,12 +119,9 @@ export function syncScene(engine: TowerEngine): void {
       // Hour-bucketed live-display bits: how full the garage is (cars) and how
       // full the recycling centers are (garbage pile). syncScene already runs
       // on the hour, so these advance the same cadence as open/lateNight.
-      const liveBits =
-        u.kind === "parking"
-          ? `:p${Math.round((engine.d.parkingUse ?? 0) * 6)}`
-          : u.kind === "recycling"
-            ? `:r${Math.round((engine.d.recycleFill ?? 0) * 8)}`
-            : "";
+      let liveBits = "";
+      if (u.kind === "parking") liveBits = `:p${Math.round((engine.d.parkingUse ?? 0) * 6)}`;
+      else if (u.kind === "recycling") liveBits = `:r${Math.round((engine.d.recycleFill ?? 0) * 8)}`;
       // Include `outForMeal` in the cache key: pixelSprites reads visible
       // occupants via `u.occupants - (u.outForMeal ?? 0)`, so the sprite must
       // re-raster when the visible dip changes even though canonical

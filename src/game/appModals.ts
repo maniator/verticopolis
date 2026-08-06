@@ -57,14 +57,20 @@ function confirmExterminate(app: GameApp): void {
       // dispatch already booked), so a silent no-op would leave the player
       // wondering why nothing happened.
       if (!res.ok) {
-        const why =
-          res.reason === "funds"
-            ? `Not enough funds to book the exterminator ($${(res.cost ?? cost).toLocaleString()}).`
-            : res.reason === "pending"
-              ? "An exterminator is already on the way."
-              : res.reason === "none"
-                ? "No infested rooms left to treat."
-                : "The exterminator is unavailable.";
+        let why: string;
+        switch (res.reason) {
+          case "funds":
+            why = `Not enough funds to book the exterminator ($${(res.cost ?? cost).toLocaleString()}).`;
+            break;
+          case "pending":
+            why = "An exterminator is already on the way.";
+            break;
+          case "none":
+            why = "No infested rooms left to treat.";
+            break;
+          default:
+            why = "The exterminator is unavailable.";
+        }
         app.sim.emit(why, "bad");
       }
       showStats(app);

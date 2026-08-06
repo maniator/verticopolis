@@ -133,8 +133,8 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const stripCost = laid === 0 ? 0 : can.cost + (laid - 1) * perTile;
     const affordsStrip = app.sim.money >= stripCost;
     const valid = can.ok && affordsStrip;
-    const reason =
-      !valid && app.sim.rules.showsPreviewReason ? (!can.ok ? can.reason : "Not enough money.") : undefined;
+    let reason: string | undefined;
+    if (!valid && app.sim.rules.showsPreviewReason) reason = !can.ok ? can.reason : "Not enough money.";
     app.engine.preview = { kind: ghostKind, floor, x: left, span, valid, reason };
     app.engine.transportPreview = null;
     if (showReasonCard) updateBuildRefusal(app, reason, floor, left + Math.floor(span / 2));

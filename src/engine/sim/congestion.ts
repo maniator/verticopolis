@@ -326,7 +326,9 @@ export function floorHeatmap(sim: Simulation, mode: HeatmapMode): HeatCell[] {
       // Unreachable is the worst (red): no crew can ever service it. A
       // reachable dirty room is amber (waiting its turn), a clean covered
       // room green.
-      const severity = !reachable ? 1 : u.state === "dirty" ? 0.6 : 0;
+      let severity = 0;
+      if (!reachable) severity = 1;
+      else if (u.state === "dirty") severity = 0.6;
       out.push({ floor: u.floor, minX: u.x, maxX: u.x + u.width - 1, severity });
     }
     return out;
