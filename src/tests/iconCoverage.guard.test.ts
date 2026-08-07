@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve, relative, basename } from "node:path";
+import { dirname, resolve, relative } from "node:path";
 import { EMOJI_ICONS, ICON_NAMES, ACCENT_FILLS, iconElement } from "../ui/icons";
 
 /**
@@ -15,10 +15,17 @@ import { EMOJI_ICONS, ICON_NAMES, ACCENT_FILLS, iconElement } from "../ui/icons"
  * have an entry there: an unmapped one would render as tofu again, defeating the
  * whole change.
  *
- * This guard scans the message-source layers (`src/engine` and `src/game`, e.g.
- * the corrupt-save `⚠️` bulletin in `appBoot.ts`) for the emoji they emit and
- * asserts each is mapped. If someone adds a new bulletin emoji without a
- * mapping, this fails with the exact codepoint to add.
+ * This guard scans the message-source layers for the emoji they emit and asserts
+ * each is mapped. If someone adds a new bulletin emoji without a mapping, this
+ * fails with the exact codepoint to add.
+ *
+ * The scan covers ALL of `src` (issue #782). It started at `src/engine` plus
+ * `src/game`, but the engine is not the only layer that puts player-facing text
+ * on screen: `src/main.ts` raises toasts, and the render, ui, storage, platform,
+ * and audio layers all reach the same rail. A mapped emoji written mid-message
+ * from any of those files was caught by neither assertion below. Scanning the
+ * whole tree means the guard does not have to be widened again the next time a
+ * new layer starts talking to the player.
  *
  * Scope, stated honestly: this pins the emoji that appear as literal characters
  * in source, in code (comments are stripped first, so a note that mentions a
@@ -30,8 +37,11 @@ import { EMOJI_ICONS, ICON_NAMES, ACCENT_FILLS, iconElement } from "../ui/icons"
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
-const messageRoots = [resolve(here, "..", "engine"), resolve(here, "..", "game")];
+const srcRoot = resolve(here, "..");
 const iconsPath = resolve(here, "..", "ui", "icons.ts");
+/** `src`-relative, forward-slashed, so a path comparison behaves the same on
+ *  Windows and on CI's Linux. */
+const ICON_MODULE = "ui/icons.ts";
 
 /** Every character that is actually RENDERED as an emoji (and so tofus without a
  *  color-emoji font): either a default-emoji-presentation code point
@@ -45,16 +55,40 @@ const iconsPath = resolve(here, "..", "ui", "icons.ts");
  *  is stripped in {@link messageEmoji} so the key matches EMOJI_ICONS. */
 const EMOJI_SCAN = /\p{Emoji_Presentation}|\p{Emoji}\uFE0F/gu;
 
-function tsFiles(dir: string): string[] {
+/** The `src`-relative path used in a failure line, forward-slashed so the
+ *  message reads the same on either OS. */
+function where(file: string): string {
+  return relative(srcRoot, file).replace(/\\/g, "/");
+}
+
+/** Every file the guard treats as a message emitter: all TypeScript under `src`,
+ *  minus the two kinds of file that do not emit messages.
+ *
+ *  `src/ui/icons.ts` is skipped because it IS the mapping table. Its
+ *  `EMOJI_ICONS` keys are every mapped glyph written as a literal, so scanning
+ *  it would only assert the table against itself, and the leading check would
+ *  ride on how the object literal happens to be formatted.
+ *
+ *  `*.test.ts` files are skipped because a test asserts ABOUT messages rather
+ *  than emitting them: it stages tower names and DOM fixtures that hold emoji
+ *  for reasons that have nothing to do with the bulletin rail. This was already
+ *  the rule for the message-leading check (issue #743); widening the scan to the
+ *  whole tree extends it to the coverage check too, which costs nothing under
+ *  the original roots (no `src/engine` or `src/game` test carries an emoji its
+ *  own emitter does not). */
+function scannedFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = resolve(dir, entry.name);
     if (entry.isDirectory()) {
       if (entry.name === "node_modules") continue;
-      out.push(...tsFiles(full));
-    } else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".d.ts")) {
-      out.push(full);
+      out.push(...scannedFiles(full));
+      continue;
     }
+    if (!entry.name.endsWith(".ts") || entry.name.endsWith(".d.ts")) continue;
+    if (entry.name.endsWith(".test.ts")) continue;
+    if (where(full) === ICON_MODULE) continue;
+    out.push(full);
   }
   return out;
 }
@@ -68,20 +102,17 @@ function stripComments(src: string): string {
 }
 
 /** Every distinct emoji the message layers emit as a source literal (comments
- *  stripped), mapped to the "root/file" it first appears in (for a legible
- *  failure). The captured glyph is the base code point, matching the
+ *  stripped), mapped to the `src`-relative file it first appears in (for a
+ *  legible failure). The captured glyph is the base code point, matching the
  *  base-codepoint keys of EMOJI_ICONS. */
 function messageEmoji(): Map<string, string> {
   const found = new Map<string, string>();
-  for (const root of messageRoots) {
-    for (const file of tsFiles(root)) {
-      const text = stripComments(readFileSync(file, "utf8"));
-      EMOJI_SCAN.lastIndex = 0;
-      for (let m = EMOJI_SCAN.exec(text); m; m = EMOJI_SCAN.exec(text)) {
-        const ch = m[0].replace(/️/g, ""); // drop the VS16 the \p{Emoji}️ branch captures
-        const where = `${basename(root)}/${relative(root, file).replace(/\\/g, "/")}`;
-        if (!found.has(ch)) found.set(ch, where);
-      }
+  for (const file of scannedFiles(srcRoot)) {
+    const text = stripComments(readFileSync(file, "utf8"));
+    EMOJI_SCAN.lastIndex = 0;
+    for (let m = EMOJI_SCAN.exec(text); m; m = EMOJI_SCAN.exec(text)) {
+      const ch = m[0].replace(/️/g, ""); // drop the VS16 the \p{Emoji}️ branch captures
+      if (!found.has(ch)) found.set(ch, where(file));
     }
   }
   return found;
@@ -95,36 +126,32 @@ function messageEmoji(): Map<string, string> {
  *  optionally followed by whitespace, so `"🔥 Fire..."` and a backtick template
  *  both pass while `"Day 5: 🔥..."` and `` `${day}: 🔥` `` fail.
  *
- *  Three deliberate narrowings, each closing a false positive a review probe
+ *  Two deliberate narrowings, each closing a false positive a review probe
  *  demonstrated. Only emoji that {@link EMOJI_ICONS} actually maps are checked,
  *  because the scan matches each code point of a multi-codepoint sequence
  *  separately and a skin-tone or flag continuation is never delimiter-adjacent
- *  (`👋🏽` reported its modifier even at the head of its string). Test files are
- *  skipped, since they assert about messages rather than emit them. `/` and `[`
+ *  (`👋🏽` reported its modifier even at the head of its string). `/` and `[`
  *  count as delimiters alongside the quotes, so a regex literal or character
  *  class holding a marker (`text.split(/🔥/)`) is not read as a prefixed
- *  message.
+ *  message. The third narrowing, skipping test files, now lives in
+ *  {@link scannedFiles} because both assertions want it.
  *
  *  Same honesty note as {@link messageEmoji}: this checks source literals, so a
  *  prefix concatenated at runtime from a separate string slips past, but the
  *  emitters build their messages as single literals today. */
 function nonLeadingEmoji(): string[] {
   const out: string[] = [];
-  for (const root of messageRoots) {
-    for (const file of tsFiles(root)) {
-      if (file.endsWith(".test.ts")) continue;
-      const text = stripComments(readFileSync(file, "utf8"));
-      EMOJI_SCAN.lastIndex = 0;
-      for (let m = EMOJI_SCAN.exec(text); m; m = EMOJI_SCAN.exec(text)) {
-        const ch = m[0].replace(/️/g, "");
-        if (!(ch in EMOJI_ICONS)) continue;
-        if (/["'`/[]\s*$/.test(text.slice(0, m.index))) continue;
-        const where = `${basename(root)}/${relative(root, file).replace(/\\/g, "/")}`;
-        // An excerpt, not an offset: the offset indexes the comment-stripped
-        // text, so it cannot be used to find the line in the real file.
-        const excerpt = text.slice(Math.max(0, m.index - 24), m.index + 8).replace(/\s+/g, " ");
-        out.push(`${ch} in ${where} (near "...${excerpt}...")`);
-      }
+  for (const file of scannedFiles(srcRoot)) {
+    const text = stripComments(readFileSync(file, "utf8"));
+    EMOJI_SCAN.lastIndex = 0;
+    for (let m = EMOJI_SCAN.exec(text); m; m = EMOJI_SCAN.exec(text)) {
+      const ch = m[0].replace(/️/g, "");
+      if (!(ch in EMOJI_ICONS)) continue;
+      if (/["'`/[]\s*$/.test(text.slice(0, m.index))) continue;
+      // An excerpt, not an offset: the offset indexes the comment-stripped
+      // text, so it cannot be used to find the line in the real file.
+      const excerpt = text.slice(Math.max(0, m.index - 24), m.index + 8).replace(/\s+/g, " ");
+      out.push(`${ch} in ${where(file)} (near "...${excerpt}...")`);
     }
   }
   return out;
@@ -133,10 +160,10 @@ function nonLeadingEmoji(): string[] {
 describe("bulletin icon coverage (issue #721)", () => {
   it("maps every emoji the message layers emit", () => {
     const unmapped: string[] = [];
-    for (const [ch, where] of messageEmoji()) {
+    for (const [ch, firstSeenIn] of messageEmoji()) {
       if (!(ch in EMOJI_ICONS)) {
         const cp = "U+" + ch.codePointAt(0)!.toString(16).toUpperCase();
-        unmapped.push(`${ch} (${cp}) first in ${where}`);
+        unmapped.push(`${ch} (${cp}) first in ${firstSeenIn}`);
       }
     }
     expect(
@@ -165,6 +192,25 @@ describe("bulletin icon coverage (issue #721)", () => {
     // engine emits at least the fire/money/milestone bulletins, so a zero here
     // means the scan or the message path broke, not that coverage is complete.
     expect(messageEmoji().size).toBeGreaterThan(0);
+  });
+
+  it("reaches past the engine into every other message layer (issue #782)", () => {
+    // The scan used to stop at `src/engine` and `src/game`, which let a toast
+    // raised from `src/main.ts` or anywhere in the UI layer carry an unmapped or
+    // mid-message emoji unchallenged. Pin the reach itself, since a narrowing
+    // back to the old roots would leave both assertions above still green and
+    // silently stop covering the layers that regressed.
+    const scanned = new Set(scannedFiles(srcRoot).map(where));
+    // `main.ts` by name: it is the toast caller the issue was filed over.
+    expect(scanned.has("main.ts"), "main.ts is not in the icon guard's scan").toBe(true);
+    // The rest by layer, so a file rename inside a layer does not fail this.
+    const layers = new Set([...scanned].map((f) => (f.includes("/") ? f.slice(0, f.indexOf("/")) : "")));
+    for (const layer of ["engine", "game", "ui", "render", "storage", "platform", "audio"]) {
+      expect(layers.has(layer), `src/${layer} is not in the icon guard's scan`).toBe(true);
+    }
+    // The mapping table is not an emitter, and neither is a test.
+    expect(scanned.has(ICON_MODULE)).toBe(false);
+    expect([...scanned].filter((f) => f.endsWith(".test.ts"))).toEqual([]);
   });
 
   it("keeps every bulletin icon currentColor-only (so severity color carries)", () => {
