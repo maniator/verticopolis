@@ -42,9 +42,24 @@ import { isWrappedMode } from "./platform";
  * from the client and is refused (403) by the relay. That is rare and accepted,
  * since production traffic comes from the custom domain.
  *
+ * The desktop surface is a THIRD pair on the same rule, and it is not this
+ * predicate: the desktop client's ingest URL constant (landing in a later stage
+ * of the desktop epic) pairs with `desktopOriginAllowed` on the server, which
+ * guards `POST /api/ingest/desktop` and accepts only the shell's own origin, the
+ * literal opaque `"null"`, and an absent header. Each pair moves together, and no
+ * pair may be folded into another: the desktop route refuses every web host and
+ * `originAllowed` refuses the shell's origin, so widening one route can never
+ * widen the other.
+ *
  * This is a functional gate (only where the endpoints are served), not a security
  * boundary: a non-Vercel look-alike such as `verticopolis.com.evil.example` falls
- * outside it (it does not end with `.verticopolis.com`).
+ * outside it (it does not end with `.verticopolis.com`). The same holds on the
+ * server side of both pairs. `/api/ingest` and `/api/ingest/desktop` are
+ * unauthenticated public endpoints: there is no token, and an absent `Origin`
+ * header passes on both, so anyone with `curl` can already post to them. The
+ * origin filters buy one narrow thing, that a hostile page cannot post
+ * cross-site, because a browser always attaches its real origin. What bounds
+ * abuse is the relay's per-IP rate limiter and its 8 KiB body cap.
  */
 export function telemetryHostAllowed(mode: string = import.meta.env.MODE): boolean {
   // Wrapped builds (Capacitor, Electron) never report telemetry, whatever host
