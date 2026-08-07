@@ -281,9 +281,13 @@ export interface SaveStorePort {
    *    by name): a staged file would put a second transient artifact class
    *    next to the cloud-sync root, where only a narrow pattern rule decides
    *    what belongs there, and quitting while the dialog sits open would
-   *    strand it, since the shutdown budget has no room to unlink it. This
-   *    repo cannot observe either obligation, so both are pinned by tests in
-   *    the shell repo.
+   *    strand it, since the shutdown budget has no room to unlink it. Two
+   *    different things are pinned in two different places: this repo cannot
+   *    observe what the shell does at runtime, so CONFORMANCE is pinned by
+   *    the shell repo's own tests, while what is pinned HERE is only that
+   *    these obligations stay written down at all
+   *    (`src/tests/saveStoreExportContract.test.ts` fails if this paragraph
+   *    is deleted or drifts off `exportRecord`).
    *  - Show the dialog MODAL to the game window, so the game cannot be
    *    driven into a second export (or a tower switch) mid-dialog.
    *
