@@ -46,7 +46,8 @@ export const EXPORT_WATCHDOG_MS = 10 * 60_000;
 const TOAST_NAME_MAX = 28;
 
 /**
- * Format characters the toast's display name deletes, sparing the two joiners.
+ * Format characters the toast's display name deletes, sparing the two joiners
+ * and the tag range.
  *
  * Written as the whole `\p{Cf}` category minus an exception rather than as a
  * list of code points. The list form was tried three times and came up short
@@ -62,21 +63,37 @@ const TOAST_NAME_MAX = 28;
  * now: a name of nothing but joiners carries no ink, so {@link TOAST_INK}
  * sends it to the fallback without the strip having to catch it.
  *
+ * The tag range U+E0020 to U+E007F is spared for the same reason. Tag
+ * characters are format characters, and they are how a subdivision flag is
+ * spelled: U+1F3F4 followed by the tags for "gbeng" or "gbsct" and a
+ * terminator. Taking them left the base flag standing alone, so England and
+ * Scotland quoted identically and rendered as a bare black flag, in this toast
+ * while every other surface showed the flag whole. A subdivision flag is 14
+ * UTF-16 units, which the rename input's `maxlength="28"` admits. Sparing the
+ * range is as free as sparing the joiners: tags are `Default_Ignorable`, so a
+ * name of nothing but tags carries no ink and still takes the fallback, and no
+ * tag is a `\p{Bidi_Control}` code point, so all 12 of those still go.
+ *
  * All 12 `\p{Bidi_Control}` code points are format characters, so this covers
  * the override (U+202E and its neighbors) that would otherwise reverse the
  * tail of the sentence, since nothing later in the toast terminates one. That
  * job stays separate from the ink test and neither replaces the other: a name
  * with plenty of ink can still carry an override.
  *
- * Accepted cost: the prepended concatenation marks (the Arabic number sign and
- * its family) are format characters too and go with the rest. They render
- * nothing on their own and shape only the digits that follow them, which is
- * not something a name quoted inside one toast needs to reproduce.
+ * Accepted cost, stated in full: 98 of the category's code points survive (the
+ * two joiners and the 96 tags), and every other format character goes. The
+ * only ones that cost anything are the prepended concatenation marks, the
+ * Arabic number sign and its family. They render nothing on their own and
+ * shape only the digits that follow them, which is not something a name quoted
+ * inside one toast needs to reproduce. The rest of what goes renders nothing
+ * under any circumstances.
  *
- * The two spared code points are written as escapes because as literals they
- * are invisible in a diff.
+ * The spared code points are written as escapes because as literals they are
+ * invisible in a diff. The tag range is written in `\u{...}` form so the
+ * lookahead tests whole code points; a `\uDB40` in the class would test a lone
+ * surrogate and spare far more than the range.
  */
-const TOAST_STRIPPED_FORMATS = /(?![\u200C\u200D])\p{Cf}/gu;
+const TOAST_STRIPPED_FORMATS = /(?![\u200C\u200D]|[\u{E0020}-\u{E007F}])\p{Cf}/gu;
 
 /**
  * Matches one character that renders ink, which is what the named form of the
@@ -114,12 +131,12 @@ const TOAST_INK = /[^\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Z}\p{Mn}\p{Me}\p{Default_I
  * Exported and tested in its own right, because three of the categories in
  * {@link TOAST_INK} cannot be reached through {@link toastDisplayName}: the
  * cleaning steps ahead of it already delete every `\p{Cc}` and every
- * `\p{Cf}` other than the two joiners, and every `\p{Z}` is JavaScript `\s`,
- * so the collapse and the trim take those. Left to the flow alone, dropping
- * any of the three would change nothing a test could see. They stay in the
- * rule anyway, so that it states "renders nothing" completely on its own
- * terms and a later reordering of the cleaning steps cannot quietly un-cover
- * a category.
+ * `\p{Cf}` other than the joiners and the tags, and every `\p{Z}` is
+ * JavaScript `\s`, so the collapse and the trim take those. Left to the flow
+ * alone, dropping any of the three would change nothing a test could see. They
+ * stay in the rule anyway, so that it states "renders nothing" completely on
+ * its own terms and a later reordering of the cleaning steps cannot quietly
+ * un-cover a category.
  */
 export function hasVisibleInk(text: string): boolean {
   return TOAST_INK.test(text);

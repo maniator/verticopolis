@@ -290,6 +290,7 @@ describe("visible-ink rule (GH #774)", () => {
     ["combining marks, U+0301 U+0302 U+0303 (Mn)", chars(0x0301, 0x0302, 0x0303)],
     ["joiners, U+200D twice (Cf, and spared by the strip)", chars(0x200d, 0x200d)],
     ["a non-joiner, U+200C (Cf, and spared by the strip)", chars(0x200c)],
+    ["tags with no base flag, U+E0067 U+E0062 U+E007F (Cf, and spared)", chars(0xe0067, 0xe0062, 0xe007f)],
     ["an unpaired surrogate, U+D800 (Cs)", chars(0xd800)],
     ["a private use character, U+E000 (Co)", chars(0xe000)],
     ["an unassigned code point, U+0378 (Cn)", chars(0x0378)],
@@ -316,7 +317,7 @@ describe("visible-ink rule (GH #774)", () => {
   it("states 'renders nothing' on its own, past what the cleaning steps already remove", () => {
     // Three of the rule's categories cannot reach it through the sanitizer:
     // the control strip takes `\p{Cc}`, the format strip takes every `\p{Cf}`
-    // but the two joiners, and every `\p{Z}` is JavaScript `\s`, so the
+    // but the joiners and the tags, and every `\p{Z}` is JavaScript `\s`, so the
     // collapse and the trim take those. Dropping any of the three would be
     // invisible to a test that only drives the sanitizer. Pinned here so the
     // rule stays a complete statement of what prints nothing, and so a later
@@ -351,6 +352,22 @@ describe("visible-ink rule (GH #774)", () => {
     expect(toastDisplayName(nurse)).toBe(nurse);
   });
 
+  it("REGRESSION: a subdivision flag survives whole, tag characters included", () => {
+    // The second carve-out in the format-character strip, and the failure that
+    // put it there. Tag characters U+E0020 to U+E007F are `Cf`, so the category
+    // strip ate them and left the base flag standing alone: England and
+    // Scotland then quoted identically and both rendered as a bare black flag,
+    // in this toast while every other surface showed the flag whole. A whole
+    // flag is 14 UTF-16 units, inside the rename input's `maxlength="28"`.
+    const flag = (...letters: number[]) => chars(0x1f3f4, ...letters, 0xe007f);
+    const england = flag(0xe0067, 0xe0062, 0xe0065, 0xe006e, 0xe0067);
+    const scotland = flag(0xe0067, 0xe0062, 0xe0073, 0xe0063, 0xe0074);
+    expect(england).toHaveLength(14);
+    expect(toastDisplayName(england)).toBe(england);
+    expect(toastDisplayName(scotland)).toBe(scotland);
+    expect(toastDisplayName(england)).not.toBe(toastDisplayName(scotland));
+  });
+
   it("strips every one of the 12 bidi controls out of a name that does have ink", () => {
     // The ink test does not stand in for this. A name with real letters can
     // still carry an override, and nothing later in the toast terminates one,
@@ -369,18 +386,29 @@ describe("visible-ink rule (GH #774)", () => {
     }
   });
 
-  it("PROPERTY: every code point that prints nothing takes the fallback on its own", () => {
+  it("PROPERTY: every assigned code point that prints nothing takes the fallback on its own", () => {
     // What would have caught all three deny-list rounds at once, and the
-    // reason this round stopped extending a list. The sweep covers the whole
-    // BMP plus the two supplementary ranges that carry invisibles: the tag and
-    // variation selector block, and the start of private use area A.
-    const survivors: string[] = [];
-    let swept = 0;
-    for (const [from, to] of [
+    // reason this round stopped extending a list.
+    //
+    // Swept in full: the BMP, plane 1 and plane 2, the plane 14 tag and
+    // variation selector block, and the first 256 code points of plane 15.
+    // Plane 1 is here because it carries around 744 assigned inkless code
+    // points of its own (U+101FD, U+110BD, U+13430, U+1D167 and the rest),
+    // which an earlier BMP-only sweep skipped while claiming to cover
+    // everything that prints nothing. Every assigned inkless code point left
+    // unswept is private use in planes 15 and 16, uniform `Co` that the last
+    // range samples; the rest of the unswept space is unassigned `Cn`, which
+    // the BMP already covers by the thousand.
+    const ranges: [number, number][] = [
       [0, 0xffff],
+      [0x10000, 0x1ffff],
+      [0x20000, 0x2ffff],
       [0xe0000, 0xe01ff],
       [0xf0000, 0xf00ff],
-    ]) {
+    ];
+    const survivors: string[] = [];
+    let swept = 0;
+    for (const [from, to] of ranges) {
       for (let cp = from; cp <= to; cp++) {
         const char = chars(cp);
         if (!isInkless(char)) continue;
@@ -391,6 +419,13 @@ describe("visible-ink rule (GH #774)", () => {
     expect(survivors).toEqual([]);
     // Guards the sweep itself: a filter that matched nothing would pass above.
     expect(swept).toBeGreaterThan(10_000);
+    // Guards the range list, which a BMP-only sweep would shrink back to while
+    // still passing everything above. One witness from each plane 1 block that
+    // carries assigned inkless code points.
+    const covered = (cp: number) => ranges.some(([from, to]) => cp >= from && cp <= to);
+    for (const cp of [0x101fd, 0x102e0, 0x10a01, 0x110bd, 0x13430, 0x1bca0, 0x1d167, 0x1e08f]) {
+      expect(covered(cp)).toBe(true);
+    }
   });
 
   it("PROPERTY: an inkless code point next to a letter never costs the letter", () => {
