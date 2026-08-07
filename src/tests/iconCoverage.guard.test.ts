@@ -44,9 +44,18 @@ const iconsPath = resolve(here, "..", "ui", "icons.ts");
 /** `src/tests`, `src`-relative. Everything under it is test code, including the
  *  fixtures and helpers that are not named `*.test.ts`. */
 const TEST_DIR = "tests";
+/** A `tests/` directory at any depth, `src`-relative. `src/tests/` is the only
+ *  one today, and matching deeper too means a future `src/ui/tests/helper.ts`
+ *  reads as test code the day it lands instead of demanding an `EMOJI_ICONS`
+ *  entry for a fixture glyph no player ever sees. The by-name `*.test.ts` rule
+ *  is already location-agnostic; this matches it. */
+const TEST_LOCATION = new RegExp(`(^|/)${TEST_DIR}/`);
 /** The two roots this guard scanned before #782 widened it. The coverage check
  *  used to read their test files as well, so it keeps doing so through
- *  {@link legacyRootTests} even though tests are otherwise out of the scan. */
+ *  {@link legacyRootTests} even though tests are otherwise out of the scan.
+ *  Nothing in the tree can yield this list (colocated tests live under seven
+ *  top-level directories today), so it is a record of history and the test
+ *  restates it to keep it from being trimmed. */
 const LEGACY_ROOTS = ["engine", "game"];
 
 /** Every character that is actually RENDERED as an emoji (and so tofus without a
@@ -91,14 +100,15 @@ function where(file: string): string {
  *  reasons that have nothing to do with the bulletin rail (`storage`'s
  *  integration test names a tower `"✨✨"`). Skipping it by NAME alone would
  *  miss the support files that carry exactly those fixtures without the
- *  `.test.ts` suffix, so `src/tests/` is skipped by LOCATION too: hoisting that
- *  tower name into `tests/fixtures/towerFixtures.ts` must not start demanding an
- *  `EMOJI_ICONS` entry for it. Colocated tests (`src/engine/*.test.ts`) are
- *  still caught by the suffix. */
+ *  `.test.ts` suffix, so a `tests/` directory is skipped by LOCATION too (see
+ *  {@link TEST_LOCATION}): hoisting that tower name into
+ *  `tests/fixtures/towerFixtures.ts` must not start demanding an `EMOJI_ICONS`
+ *  entry for it. Colocated tests (`src/engine/*.test.ts`) are still caught by
+ *  the suffix. */
 function isEmitterFile(abs: string, rel: string): boolean {
   if (abs === iconsPath) return false;
   if (rel.endsWith(".test.ts")) return false;
-  if (rel.startsWith(`${TEST_DIR}/`)) return false;
+  if (TEST_LOCATION.test(rel)) return false;
   return true;
 }
 
@@ -183,14 +193,16 @@ function unmappedEmoji(files: readonly Source[]): string[] {
   return out;
 }
 
-/** The test files under the pre-#782 roots, read on demand. They are out of
+/** The test files under ONE pre-#782 root, read on demand. They are out of
  *  {@link SOURCES} like all test code, and the coverage check used to reach
  *  them, so this keeps that ground rather than trusting a note that no engine
- *  or game test has ever carried an unmapped emoji. */
-function legacyRootTests(): Source[] {
-  return ALL_TS.filter(
-    (f) => f.rel.endsWith(".test.ts") && LEGACY_ROOTS.some((root) => f.rel.startsWith(`${root}/`)),
-  ).map(readStripped);
+ *  or game test has ever carried an unmapped emoji. One root at a time so the
+ *  caller can hold each to its own non-empty check; a single list over the union
+ *  hides a root that has gone empty behind the other root's files. */
+function legacyRootTests(root: string): Source[] {
+  return ALL_TS.filter((f) => f.rel.endsWith(".test.ts") && f.rel.startsWith(`${root}/`)).map(
+    readStripped,
+  );
 }
 
 /** Occurrences of a MAPPED emoji that are not message-leading: the mapper only
@@ -231,23 +243,38 @@ function nonLeadingEmoji(): string[] {
   return out;
 }
 
-/** An independent witness for the reach assertion: does `dir` hold any file
- *  shaped like a message emitter (a `.ts` that is neither a declaration nor a
- *  test)? Deliberately a second, simpler traversal. Deriving the expectation
- *  from {@link ALL_TS} would shrink alongside any narrowing of the shared walk
- *  and so could never catch one. Directory entries only, no file reads. */
-function holdsEmitterFile(dir: string): boolean {
+/** An independent witness for the reach assertion: every file under `dir` shaped
+ *  like a message emitter (a `.ts` that is neither a declaration nor a test),
+ *  `src`-relative. Deliberately a second, simpler traversal. Deriving the
+ *  expectation from {@link ALL_TS} would shrink alongside any narrowing of the
+ *  shared walk and so could never catch one. Directory entries only, no file
+ *  reads.
+ *
+ *  It ENUMERATES rather than answering "does this directory hold one?". The
+ *  yes/no form could only see a narrowing that emptied a whole layer: dropping
+ *  `src/main.ts`, the toast caller #782 was filed over, or all 22 files under
+ *  `src/ui/templates/`, left every assertion green. Naming each file catches a
+ *  narrowing at any granularity, including one scattered across layers (a
+ *  `*.generated.ts` or `*Prefs.ts` skip added to the walk).
+ *
+ *  Its rules are a strict subset of the shared walk's: both skip `node_modules`
+ *  and `.d.ts` and take only `.ts`, and this one drops `*.test.ts` on top. So
+ *  every file it names must be in {@link ALL_TS}, and a gap is a real narrowing
+ *  rather than a difference of opinion between the two traversals. */
+function emitterShapedFiles(dir: string): string[] {
+  const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const abs = resolve(dir, entry.name);
     if (entry.isDirectory()) {
       if (entry.name === "node_modules") continue;
-      if (holdsEmitterFile(resolve(dir, entry.name))) return true;
+      out.push(...emitterShapedFiles(abs));
       continue;
     }
     if (!entry.name.endsWith(".ts") || entry.name.endsWith(".d.ts")) continue;
     if (entry.name.endsWith(".test.ts")) continue;
-    return true;
+    out.push(where(abs));
   }
-  return false;
+  return out;
 }
 
 describe("bulletin icon coverage (issue #721)", () => {
@@ -267,11 +294,30 @@ describe("bulletin icon coverage (issue #721)", () => {
     // keep that ground. It is scoped to the two old roots because that is
     // exactly what was covered before; test code elsewhere stages fixtures
     // (a "✨✨" tower name) that were never in reach and should not be.
-    const legacy = legacyRootTests();
+    //
+    // Two halves, because two different edits can hand that ground back. The
+    // list is a record of history the tree cannot yield, so trimming it to
+    // ["engine"] would drop 37 game test files with every other assertion still
+    // green: restating it here means a rename has to touch both spellings, which
+    // is the friction this pin exists for.
     expect(
-      legacy.length,
-      `no test file was found under src/{${LEGACY_ROOTS.join(",")}}; this check is reading nothing`,
-    ).toBeGreaterThan(0);
+      [...LEGACY_ROOTS].sort(),
+      "LEGACY_ROOTS no longer names both roots the pre-#782 scan walked, so this check " +
+        "covers less than it did; restore the missing root or retire the pin deliberately",
+    ).toEqual(["engine", "game"]);
+    // The other half is per ROOT rather than over the union. A union count stays
+    // positive while one root goes stale, so renaming src/game would leave this
+    // reading engine alone, 29 files, still passing, and 37 files out of reach.
+    const legacy: Source[] = [];
+    for (const root of LEGACY_ROOTS) {
+      const rootTests = legacyRootTests(root);
+      expect(
+        rootTests.length,
+        `no test file was found under src/${root}/, so this check reads nothing from that ` +
+          `root; point LEGACY_ROOTS at wherever it moved`,
+      ).toBeGreaterThan(0);
+      legacy.push(...rootTests);
+    }
     const unmapped = unmappedEmoji(legacy);
     expect(
       unmapped,
@@ -311,27 +357,34 @@ describe("bulletin icon coverage (issue #721)", () => {
     //
     // Every expectation here is derived from the tree, so a rename, a split, or
     // a new layer moves it automatically and only a real narrowing fails it.
-    expect(where(iconsPath), "srcRoot no longer resolves to src/").toBe("ui/icons.ts");
-    const scanned = SOURCES.map((s) => s.rel);
-    const layers = new Set(scanned.filter((r) => r.includes("/")).map((r) => r.slice(0, r.indexOf("/"))));
-    for (const entry of readdirSync(srcRoot, { withFileTypes: true })) {
-      if (!entry.isDirectory() || entry.name === "node_modules") continue;
-      // src/tests is test code by location, excluded on purpose.
-      if (entry.name === TEST_DIR) continue;
-      // Asset directories (public, styles) hold no TypeScript to scan.
-      if (!holdsEmitterFile(resolve(srcRoot, entry.name))) continue;
-      expect(
-        layers.has(entry.name),
-        `src/${entry.name} holds message-layer TypeScript the scan never reaches`,
-      ).toBe(true);
-    }
-    // The files directly under src/ (main.ts and its siblings) raise the toasts
-    // the issue was filed over, so a walk that only descends into layers misses
-    // the callers that started this.
+    const iconsRel = where(iconsPath);
+    expect(iconsRel, "srcRoot no longer resolves to src/").toBe("ui/icons.ts");
+
+    // The witness names every emitter-shaped file it can see, file by file. An
+    // earlier form asked each top-level directory "do you hold one?", which only
+    // ever noticed a narrowing that emptied a whole layer: losing src/main.ts by
+    // itself, or all of src/ui/templates/, read as fine.
+    const witness = emitterShapedFiles(srcRoot);
+    expect(witness.length, "the witness traversal found no TypeScript under src/ at all").toBeGreaterThan(
+      0,
+    );
+    const walked = new Set(ALL_TS.map((f) => f.rel));
     expect(
-      scanned.some((r) => !r.includes("/")),
-      "no file directly under src/ is in the scan",
-    ).toBe(true);
+      witness.filter((r) => !walked.has(r)),
+      "the shared walk skips TypeScript the witness can see; a file the walk never " +
+        "visits is a file no assertion in this guard covers",
+    ).toEqual([]);
+
+    // Reaching a file is not scanning it, so hold SOURCES to the same list less
+    // the exclusions this guard declares out loud. Those two stay honest through
+    // the by-name, by-location, and icons-module checks below, which prove each
+    // applies to a file that is really on disk.
+    const scanned = new Set(SOURCES.map((s) => s.rel));
+    expect(
+      witness.filter((r) => !scanned.has(r) && r !== iconsRel && !TEST_LOCATION.test(r)),
+      "these files hold message-layer TypeScript the scan never reads; either they are " +
+        "in reach of the guard or the exclusion that drops them belongs in isEmitterFile",
+    ).toEqual([]);
 
     // Each exclusion has to apply to a file that is really there, or it would
     // hold trivially: an absent path is absent from any list.
