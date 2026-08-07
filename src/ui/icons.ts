@@ -162,18 +162,24 @@ export const EMOJI_ICONS: Record<string, IconName> = {
 };
 
 const EMOJI_KEYS = Object.keys(EMOJI_ICONS);
-/** Matches ONLY a mapped bulletin emoji at the very start of a message (the
- *  leading severity marker the engine emits), plus a trailing VS16. Anchored so
- *  a mapped emoji later in the text (a tower name, a restored save) is left as
- *  text, per the contract above: only the leading marker becomes an icon. */
+/** Matches ONLY a mapped bulletin emoji at the head of a message (the leading
+ *  severity marker the engine emits), plus a trailing VS16. Leading whitespace
+ *  is tolerated and consumed with the marker (issue #743), so a stray space
+ *  before the emoji cannot silently turn the icon back into tofu text. Still
+ *  anchored past that: a mapped emoji after any non-whitespace prefix (a tower
+ *  name, a "Day 5:" label, a quote) is left as text, per the contract above.
+ *  The emitter side of the invariant is pinned by
+ *  `iconCoverage.guard.test.ts`, which fails CI if a message layer ever writes
+ *  a mapped emoji that is not message-leading. */
 const LEADING_EMOJI_RE = new RegExp(
-  "^(" + EMOJI_KEYS.map((e) => e.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")\\uFE0F?",
+  "^\\s*(" + EMOJI_KEYS.map((e) => e.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")\\uFE0F?",
   "u",
 );
 
 /**
- * Append `message` to `el`. If it starts with a mapped bulletin emoji, that
- * leading marker becomes a trusted icon element and the rest stays a TEXT NODE;
+ * Append `message` to `el`. If it starts with a mapped bulletin emoji (leading
+ * whitespace allowed, and consumed along with the marker), that leading marker
+ * becomes a trusted icon element and the rest stays a TEXT NODE;
  * otherwise the whole message is one text node. The text is never set as
  * innerHTML, so an engine string (or a tower name inside it) can never inject
  * markup, and any mapped emoji NOT at the start survives as text (so an

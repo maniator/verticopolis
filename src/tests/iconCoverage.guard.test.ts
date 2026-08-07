@@ -87,6 +87,49 @@ function messageEmoji(): Map<string, string> {
   return found;
 }
 
+/** Occurrences of a MAPPED emoji that are not message-leading: the mapper only
+ *  swaps a marker at the head of a message (whitespace tolerated), so an emoji
+ *  written after any other prefix ("Day 5: 🔥...", a template interpolation)
+ *  would render as plain text and tofu again (issue #743). A literal is
+ *  "message-leading" when the text before it ends with a string delimiter,
+ *  optionally followed by whitespace, so `"🔥 Fire..."` and a backtick template
+ *  both pass while `"Day 5: 🔥..."` and `` `${day}: 🔥` `` fail.
+ *
+ *  Three deliberate narrowings, each closing a false positive a review probe
+ *  demonstrated. Only emoji that {@link EMOJI_ICONS} actually maps are checked,
+ *  because the scan matches each code point of a multi-codepoint sequence
+ *  separately and a skin-tone or flag continuation is never delimiter-adjacent
+ *  (`👋🏽` reported its modifier even at the head of its string). Test files are
+ *  skipped, since they assert about messages rather than emit them. `/` and `[`
+ *  count as delimiters alongside the quotes, so a regex literal or character
+ *  class holding a marker (`text.split(/🔥/)`) is not read as a prefixed
+ *  message.
+ *
+ *  Same honesty note as {@link messageEmoji}: this checks source literals, so a
+ *  prefix concatenated at runtime from a separate string slips past, but the
+ *  emitters build their messages as single literals today. */
+function nonLeadingEmoji(): string[] {
+  const out: string[] = [];
+  for (const root of messageRoots) {
+    for (const file of tsFiles(root)) {
+      if (file.endsWith(".test.ts")) continue;
+      const text = stripComments(readFileSync(file, "utf8"));
+      EMOJI_SCAN.lastIndex = 0;
+      for (let m = EMOJI_SCAN.exec(text); m; m = EMOJI_SCAN.exec(text)) {
+        const ch = m[0].replace(/️/g, "");
+        if (!(ch in EMOJI_ICONS)) continue;
+        if (/["'`/[]\s*$/.test(text.slice(0, m.index))) continue;
+        const where = `${basename(root)}/${relative(root, file).replace(/\\/g, "/")}`;
+        // An excerpt, not an offset: the offset indexes the comment-stripped
+        // text, so it cannot be used to find the line in the real file.
+        const excerpt = text.slice(Math.max(0, m.index - 24), m.index + 8).replace(/\s+/g, " ");
+        out.push(`${ch} in ${where} (near "...${excerpt}...")`);
+      }
+    }
+  }
+  return out;
+}
+
 describe("bulletin icon coverage (issue #721)", () => {
   it("maps every emoji the message layers emit", () => {
     const unmapped: string[] = [];
@@ -100,6 +143,20 @@ describe("bulletin icon coverage (issue #721)", () => {
       unmapped,
       `These bulletin emoji have no EMOJI_ICONS entry and would render as ` +
         `tofu. Add each to EMOJI_ICONS in src/ui/icons.ts: ${unmapped.join(", ")}`,
+    ).toEqual([]);
+  });
+
+  it("keeps every emitted bulletin emoji message-leading (issue #743)", () => {
+    // The render mapper swaps only the marker at the head of a message, so an
+    // emoji the message layers emit anywhere else would stay literal text and
+    // tofu on a no-emoji-font system with no error. Pin the emitter half of
+    // that contract: every emoji literal must sit at the start of its string.
+    const violations = nonLeadingEmoji();
+    expect(
+      violations,
+      `These bulletin emoji are not message-leading, so the icon mapper would ` +
+        `leave them as tofu-prone text. Move each marker to the start of its ` +
+        `message string: ${violations.join(", ")}`,
     ).toEqual([]);
   });
 
