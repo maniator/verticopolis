@@ -357,9 +357,11 @@ const DESKTOP_ROUTE: IngestRoute = {
 async function handleIngestRoute(request: Request, deps: IngestDeps, route: IngestRoute): Promise<Response> {
   if (request.method !== "POST") return new Response(null, { status: 405 });
 
-  // Reject a cross-site browser POST before doing any work: a foreign Origin has
-  // no business posting to our relay. What counts as foreign is the route's own
-  // call (see `originAllowed` and `desktopOriginAllowed`).
+  // Reject a foreign Origin before doing any work. Each route defines "foreign"
+  // through its own origin predicate: `originAllowed` for the web route,
+  // `desktopOriginAllowed` for the desktop one. They are deliberately separate,
+  // since the origins a browser presents and the ones a packaged shell presents
+  // have nothing in common.
   if (!route.acceptOrigin(request.headers.get("origin"), deps.environment)) {
     return new Response(null, { status: 403 });
   }
