@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendToRelay } from "./analyticsRelay";
 import { gameplaySession, setCommonProps, startGameplaySession } from "./analytics";
+import { trackEvent, type GameplayEvents } from "./analyticsCore";
+import { bootCommonProps } from "./analyticsEnrichment";
 
 // The custom-event channel is host-gated and best-effort; events go relay-only
 // after the D-1 cutover, so `sendToRelay` is the wire contract these tests pin.
@@ -349,5 +351,82 @@ describe("startGameplaySession wiring", () => {
     setVisibility("visible");
     document.dispatchEvent(new Event("visibilitychange"));
     expect(sendToRelay).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * One sample payload per event in the typed vocabulary, declared as a FULL map
+ * so a new event is a compile error here until it is listed. That is what makes
+ * the loop below a real "every event" claim rather than a spot check of the
+ * events someone happened to remember.
+ */
+const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
+  game_started: { mode: "modern" },
+  first_build: { tool: "office" },
+  tool_used: { tool: "lobby" },
+  star_reached: { star: 3 },
+  session_end: { seconds: 42 },
+  boot: { reason: "continue", version: "1.0.0", mode: "modern", star: 2, floors: 10, population: 90 },
+  crash: {
+    kind: "webgl-context-lost",
+    repeat: false,
+    recoveryFailed: false,
+    saveFlushed: true,
+    behindSplash: false,
+    version: "1.0.0",
+    star: 2,
+    population: 90,
+  },
+  update: { from: "1.0.0", to: "1.1.0" },
+  tool_session_uses: { tool: "office", uses: 4 },
+  session_builds: { builds: 7 },
+  session_peak_floors: { floors: 12 },
+  session_fps: { p50: 60, low: 31, samples: 900 },
+  app_action: { action: "quick_save" },
+  economy_action: { action: "demolish", detail: "sell" },
+  emergency_choice: { kind: "fireRescue", decision: "accept" },
+  session_emergencies: { fires: 1, firesGutRooms: 2, bombs: 0 },
+};
+
+describe("the platform and channel dimensions ride every event", () => {
+  beforeEach(() => {
+    window.location.href = prod;
+    gameplaySession.reset();
+    vi.mocked(sendToRelay).mockReset();
+  });
+
+  afterEach(() => {
+    window.location.href = localhost;
+  });
+
+  it("stamps both dimensions on every event in the vocabulary", () => {
+    // Assembled through the real bootCommonProps rather than a hand-written
+    // literal, so dropping `channel` from the assembled set fails here too, not
+    // only in the enrichment suite. A desktop/steam session is the case worth
+    // naming: it is the one where the two dimensions differ, so neither can be
+    // inferred from the other downstream.
+    setCommonProps(
+      bootCommonProps({
+        platform: "desktop",
+        channel: "steam",
+        onboarded: true,
+        tenureDay: 3,
+        savedAt: undefined,
+        standalone: false,
+        now: 1_000,
+      }),
+    );
+    const send = <K extends keyof GameplayEvents>(name: K) => trackEvent(name, EVERY_EVENT[name]);
+    const names = Object.keys(EVERY_EVENT) as (keyof GameplayEvents)[];
+    for (const name of names) send(name);
+
+    expect(names.length).toBeGreaterThan(0);
+    expect(sendToRelay).toHaveBeenCalledTimes(names.length);
+    for (const [i, name] of names.entries()) {
+      const [sentName, props] = vi.mocked(sendToRelay).mock.calls[i];
+      expect(sentName).toBe(name);
+      expect(props.platform, `${name} lost the platform dimension`).toBe("desktop");
+      expect(props.channel, `${name} lost the channel dimension`).toBe("steam");
+    }
   });
 });

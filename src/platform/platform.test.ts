@@ -318,6 +318,52 @@ describe("isPlatformPort: saveStore is optional on the same grounds", () => {
   });
 });
 
+describe("isPlatformPort: channel is a data member, so it is not shape-checked", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("accepts a port that omits it, so an existing iOS shell keeps validating", () => {
+    // The optional-member rule again: the iOS shell has no storefront to name,
+    // and demanding the member would demote it to the browser port and cost it
+    // its native file save.
+    const noChannel = fakePort();
+    expect("channel" in noChannel).toBe(false);
+    expect(resolvePlatform("native", noChannel)).toBe(noChannel);
+    expect(resolvePlatform("desktop", noChannel)).toBe(noChannel);
+  });
+
+  it("accepts a port that names one", () => {
+    const steam = { ...fakePort(), channel: "steam" };
+    expect(resolvePlatform("desktop", steam)).toBe(steam);
+  });
+
+  it("accepts a port whose channel is hostile, because the VALUE is sanitized at read time", () => {
+    // Deliberately unlike the function members. A junk `channel` cannot throw
+    // during boot the way a non-callable `onHostCommand` would, so refusing the
+    // whole port over one would trade a working shell's file save for a
+    // telemetry label. `resolveChannel` (src/analyticsEnrichment.ts) is what
+    // turns any of these into `unknown`.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    for (const channel of [42, null, {}, "evil", "STEAM", "steam "]) {
+      const port = { ...fakePort(), channel };
+      expect(resolvePlatform("desktop", port)).toBe(port);
+    }
+    const trapped = Object.defineProperty({ ...fakePort() }, "channel", {
+      get() {
+        throw new Error("revoked");
+      },
+    });
+    expect(resolvePlatform("desktop", trapped)).toBe(trapped);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("the browser default omits it", () => {
+    expect(browserPlatform.channel).toBeUndefined();
+    expect("channel" in browserPlatform).toBe(false);
+  });
+});
+
 describe("resolvePlatform: desktop mode binds like native", () => {
   const port = {
     isNativeWrapper: true as const,

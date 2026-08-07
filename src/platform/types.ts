@@ -36,9 +36,14 @@
  *    an earlier revision of this contract carries only the three members above
  *    and must keep duck-validating (see `isPlatformPort`). A required fourth
  *    member would silently demote such a shell to the browser port and take
- *    its native file save with it. `setCommandsAvailable` and `saveStore` are
- *    optional on the same grounds; every member added here after the original
- *    three must be.
+ *    its native file save with it. `setCommandsAvailable`, `onFlushRequest`,
+ *    `saveStore`, and `channel` are optional on the same grounds; every member
+ *    added here after the original three must be.
+ *  - `channel` names the storefront a DESKTOP build was packaged for, and a
+ *    shell that ships to more than one store must stamp it per artifact. The
+ *    game reads it only as an analytics dimension and accepts exactly the two
+ *    documented values; see the member's own note for what an unrecognized one
+ *    reports.
  */
 
 import type { SaveStorePort } from "./saveStore";
@@ -140,6 +145,25 @@ export interface PlatformPort {
    * See `./saveStore.ts` for the blob shape and the opaque scope token.
    */
   saveStore?: SaveStorePort;
+  /**
+   * The commercial channel a DESKTOP artifact was packaged for: `"steam"` or
+   * `"itch"`. Stamped by the shell at package time (the same renderer bundle
+   * ships to both, so the value has to come from outside it), and read only as
+   * an analytics dimension: the game's behavior never branches on it.
+   *
+   * Optional like every member added after the original three, and the reason
+   * is the usual one: the iOS shell has no storefront to name here, and a
+   * required member would demote it to the browser port.
+   *
+   * Typed as a plain `string` rather than a union so a wrapper repo pinned to
+   * an older revision of this contract still compiles, and because the VALUE is
+   * not trusted anyway. `isPlatformPort` checks the port's shape and lets any
+   * `channel` through on purpose, since a bad one cannot throw at boot the way a
+   * non-callable `onHostCommand` would; the sanitizing happens where the value
+   * is read (`resolveChannel` in `src/analyticsEnrichment.ts`), and anything but
+   * the two exact values above reports the channel as `unknown`.
+   */
+  readonly channel?: string;
 }
 
 declare global {
