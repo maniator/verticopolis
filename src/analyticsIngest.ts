@@ -3,14 +3,14 @@
  * `reverse-proxy.md`). This module is pure and transport-agnostic: it takes a
  * web-standard `Request` plus injected dependencies (the environment secrets, a
  * `fetch`, a `waitUntil`, a clock, the resolved client IP, a rate limiter) and
- * returns a `Response`. All platform wiring lives in the thin `api/ingest.ts`
- * entry, so this logic stays fully unit-testable and carries no Vercel or DOM
- * dependency.
+ * returns a `Response`. All platform wiring lives in `api/_deps.ts` and the thin
+ * route entries, so this logic stays fully unit-testable and carries no Vercel
+ * or DOM dependency.
  *
  * What it does, per the spec:
  * - Accept only POST; other methods get 405.
- * - Reject a cross-site browser POST (a present, foreign `Origin`) with 403, so
- *   the public endpoint cannot be used as a cross-site spam target.
+ * - Reject a POST whose `Origin` the route does not accept with 403 (a filter
+ *   with a narrower reach than it may read; see the note further down).
  * - No-op with 204 when the PostHog secrets are absent, so a missing env var can
  *   never break the site (telemetry is best-effort).
  * - Rate-limit per client IP with a fixed window; over-limit requests get 429
@@ -34,25 +34,39 @@
  *
  * TWO ROUTES, ONE PIPELINE. {@link handleIngest} serves the web relay at
  * `POST /api/ingest`; {@link handleDesktopIngest} serves the packaged Electron
- * build at `POST /api/ingest/desktop`. They share everything above (the method
- * check, the secrets no-op, the per-IP rate limiter, the 8 KiB body cap, the
+ * build at `POST /api/ingest/desktop`. They share every step above (the method
+ * check, the secrets no-op, the per-IP rate-limit check, the 8 KiB body cap, the
  * parse and validation, the background forward, and every response shape) and
  * differ in exactly two places: which `Origin` values they accept
  * ({@link originAllowed} vs {@link desktopOriginAllowed}), and the two extra
  * server-authored properties the desktop route stamps
  * ({@link buildDesktopCaptureBody}). Anything else added to the path applies to
- * both, so the two cannot drift.
+ * both, so the two cannot drift. What they share is CODE. The rate-limit STATE
+ * is per module instance, and Vercel builds each route under `api/` as its own
+ * function, so the deployed routes hold separate per-IP budgets: posting to both
+ * buys two windows.
  *
  * BOTH ROUTES ARE UNAUTHENTICATED PUBLIC ENDPOINTS, and their origin filters are
  * functional rather than a security boundary. There is no token and no session,
  * and an absent `Origin` header passes on both, so the web route is already
  * postable by anyone with `curl` today and the desktop route is no different.
- * What the origin check buys is narrow and real: a browser always sends its true
- * `Origin` on a cross-origin POST, so a hostile PAGE cannot use either route as a
- * cross-site spam target. The defenses that actually bound abuse are the rate
- * limiter and the body cap, and the blast radius of a forged post is anonymous
- * noise in the dataset: it carries no key and no cookie, it gets no response
- * body, and nothing it sends can override a server-authored property.
+ * The check also buys less than it may read. A browser does attach its true
+ * `Origin` to a cross-origin POST, which keeps an ordinary page on a named host
+ * out, but a sandboxed iframe's true origin IS the literal "null", which
+ * {@link desktopOriginAllowed} accepts, and the parse below ignores
+ * `content-type`, so a `text/plain` POST is a simple request that never
+ * preflights. Any site can therefore drive its visitors' browsers into the
+ * desktop route. That is accepted: the endpoint is meant to be unauthenticated,
+ * and the filter keeps casual traffic out rather than saying who called.
+ *
+ * What bounds abuse is the per-IP rate limiter (best-effort and per instance;
+ * see {@link RateLimiter}) and the 8 KiB body cap (read from `content-length`,
+ * so a chunked request omitting the header is not bounded by it). A forged
+ * post's blast radius is anonymous noise in the dataset: no key, no cookie, no
+ * response body. On the DESKTOP route a forged body also cannot choose its own
+ * `platform` or `distribution_channel`; on the WEB route it can, since that
+ * route forwards those two exactly as the client sent them (see
+ * {@link buildDesktopCaptureBody}).
  */
 
 /** The minimal request body the client relay posts (see the client transport in
@@ -253,9 +267,10 @@ const OPAQUE_ORIGIN = "null";
  * Like the web guard, this is a functional filter and not a security boundary
  * (see the module comment). The "null" form is not evidence of a desktop client
  * (a sandboxed iframe and a `file://` page serialize the same way), and the
- * absent form cannot be evidence of anything. What both routes get from the
- * check is that a hostile PAGE cannot post here, since a browser attaches its
- * real origin to a cross-origin POST.
+ * absent form cannot be evidence of anything. Accepting "null" is what makes a
+ * hostile page's sandboxed iframe a valid caller here, so do not read this check
+ * as protection against a cross-site POST. It keeps out an ordinary page on a
+ * named host, whose real `Origin` the browser attaches, and that is all.
  */
 export function desktopOriginAllowed(origin: string | null): boolean {
   return origin === null || origin === DESKTOP_ORIGIN || origin === OPAQUE_ORIGIN;
@@ -329,8 +344,18 @@ export function buildCaptureBody(
  * The desktop route's capture body: {@link buildCaptureBody}'s result plus the
  * two dimensions this route authors itself. Both are written AFTER the client
  * property spread the shared builder already applied, in the same position as
- * `distinct_id` and the rest, so a crafted desktop body cannot label itself a web
- * session or invent a storefront and land in the wrong slice of the dataset.
+ * `distinct_id` and the rest, so a body posted TO THIS ROUTE cannot label itself
+ * a web session or invent a storefront.
+ *
+ * THAT HOLDS ON `/api/ingest/desktop` AND NOWHERE ELSE. The web route shares
+ * this module's pipeline but not this builder: it forwards whatever `platform`
+ * and `distribution_channel` the client sent, and it accepts an absent `Origin`,
+ * so a bare `curl -X POST /api/ingest` with no `Origin` header and a body naming
+ * `platform: "desktop"` and `distribution_channel: "steam"` lands a fabricated
+ * Steam desktop session (`analyticsIngestDesktop.test.ts` pins that
+ * pass-through). These two are authoritative for desktop-route traffic only, so
+ * the dataset cannot read `platform: "desktop"` as proof of where an event came
+ * from until the web route validates the pair too. Tracked as GH #TBD.
  *
  * `platform` is fixed rather than validated: only a desktop build has any reason
  * to post here, so there is nothing for the client to say. `distribution_channel`
@@ -462,8 +487,10 @@ export function handleIngest(request: Request, deps: IngestDeps): Promise<Respon
 /** Handle one request to the desktop relay (`POST /api/ingest/desktop`), the
  *  packaged Electron build's cross-origin path. Bound by
  *  `api/ingest/desktop.ts`. Same pipeline and same response shapes as
- *  {@link handleIngest}, including one shared per-IP rate-limit budget when no
- *  limiter is injected, so posting to both routes cannot buy a second quota. */
+ *  {@link handleIngest}. Both handlers read `deps.rateLimiter` and both fall
+ *  back to the same module singleton, so one injected limiter counts both
+ *  routes' hits; deployed, each route is its own function with its own module
+ *  instance, so their real budgets are separate. */
 export function handleDesktopIngest(request: Request, deps: IngestDeps): Promise<Response> {
   return handleIngestRoute(request, deps, DESKTOP_ROUTE);
 }

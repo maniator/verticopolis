@@ -8,6 +8,7 @@ import {
   handleIngest,
   MAX_BODY_BYTES,
   originAllowed,
+  RATE_LIMIT_MAX,
   RateLimiter,
   type IngestDeps,
 } from "./analyticsIngest";
@@ -163,9 +164,21 @@ describe("buildDesktopCaptureBody", () => {
     // compiles into the Vercel function and stays free of the client tree), so a
     // storefront added to `DistributionChannelLabel` without being taught here
     // fails this rather than arriving as `unknown` for every session of that build.
+    //
+    // `surfaces` names the labels that are NOT storefronts, so every other label
+    // in the client union has to appear in the server list. Compared as sorted
+    // sets: both are vocabularies, and reordering either is not a defect.
     const surfaces = new Set(["web", "twa", "ios", "unknown"]);
     const storefronts = DISTRIBUTION_CHANNEL_LABELS.filter((label) => !surfaces.has(label));
-    expect([...DESKTOP_DISTRIBUTION_CHANNELS]).toEqual(storefronts);
+    expect(
+      [...new Set(storefronts)].sort(),
+      "`DISTRIBUTION_CHANNEL_LABELS` and `DESKTOP_DISTRIBUTION_CHANNELS` disagree. If the new " +
+        "label names a STOREFRONT a packaged build is stamped with, add it to " +
+        "`DESKTOP_DISTRIBUTION_CHANNELS` in `analyticsIngest.ts`. If it names anything else (a " +
+        "runtime surface, a marketing source), add it to `surfaces` in this test instead: " +
+        "putting a non-storefront in the server list would make the desktop route accept it " +
+        "from an untrusted body.",
+    ).toEqual([...new Set(DESKTOP_DISTRIBUTION_CHANNELS)].sort());
   });
 });
 
@@ -216,20 +229,31 @@ describe("handleDesktopIngest", () => {
     expect(deps.fetchImpl).toHaveBeenCalledTimes(2);
   });
 
-  it("shares one rate-limit budget with the web route", async () => {
-    // One limiter, one IP: posting to the desktop route must not buy a second
-    // quota for a client already at the web route's limit.
+  it("honors an injected limiter, which both handlers consult", async () => {
+    // Both handlers read `deps.rateLimiter`, so one limiter and one IP counts
+    // both routes' hits together. This pins the injection seam only. It is NOT
+    // evidence of a shared production budget: each route is built as its own
+    // Vercel function with its own module instance, so the singleton the real
+    // deps fall through to is per route.
     const deps = makeDeps({ rateLimiter: new RateLimiter(1, 60_000) });
     expect((await handleIngest(postRequest({ event: "boot" }), deps)).status).toBe(204);
     expect((await handleDesktopIngest(postRequest({ event: "boot" }), deps)).status).toBe(429);
     expect(deps.fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("uses the module's default limiter when none is injected", async () => {
-    const deps = makeDeps({ rateLimiter: undefined, clientIp: "198.51.100.77" });
-    const res = await handleDesktopIngest(postRequest({ event: "boot" }), deps);
-    expect(res.status).toBe(204);
-    expect(deps.fetchImpl).toHaveBeenCalledTimes(1);
+  it("falls through to the module's default limiter, which persists across requests", async () => {
+    // Nothing injected, so every request lands on the module singleton. The
+    // persistence is what makes this bite: a build that dropped the limiter, or
+    // minted a fresh one per request, would answer 204 forever. An IP of its own
+    // keeps this window clear of the rest of the file (which all inject).
+    const clientIp = "198.51.100.77";
+    const statuses: number[] = [];
+    for (let i = 0; i < RATE_LIMIT_MAX + 1; i += 1) {
+      const deps = makeDeps({ rateLimiter: undefined, clientIp });
+      statuses.push((await handleDesktopIngest(postRequest({ event: "boot" }), deps)).status);
+    }
+    expect(statuses.slice(0, RATE_LIMIT_MAX)).toEqual(new Array<number>(RATE_LIMIT_MAX).fill(204));
+    expect(statuses[RATE_LIMIT_MAX]).toBe(429);
   });
 
   it("rejects an oversized body with 413 before parsing", async () => {

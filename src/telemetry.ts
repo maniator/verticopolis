@@ -54,12 +54,17 @@ import { isWrappedMode } from "./platform";
  * This is a functional gate (only where the endpoints are served), not a security
  * boundary: a non-Vercel look-alike such as `verticopolis.com.evil.example` falls
  * outside it (it does not end with `.verticopolis.com`). The same holds on the
- * server side of both pairs. `/api/ingest` and `/api/ingest/desktop` are
- * unauthenticated public endpoints: there is no token, and an absent `Origin`
- * header passes on both, so anyone with `curl` can already post to them. The
- * origin filters buy one narrow thing, that a hostile page cannot post
- * cross-site, because a browser always attaches its real origin. What bounds
- * abuse is the relay's per-IP rate limiter and its 8 KiB body cap.
+ * server side of both pairs, and more weakly than it may read. `/api/ingest` and
+ * `/api/ingest/desktop` are unauthenticated public endpoints: there is no token,
+ * and an absent `Origin` header passes on both, so anyone with `curl` can
+ * already post to them. The origin filters keep an ordinary page on a named host
+ * out and no more than that: a sandboxed iframe's real origin is the literal
+ * `"null"`, which the desktop guard accepts, and the relay parses the body text
+ * without consulting `content-type`, so a `text/plain` POST is a simple request
+ * that never preflights. A hostile page can drive its visitors' browsers into
+ * the desktop route that way. What bounds abuse is the relay's per-IP rate
+ * limiter (best-effort per function instance rather than a global quota) and its
+ * 8 KiB body cap.
  */
 export function telemetryHostAllowed(mode: string = import.meta.env.MODE): boolean {
   // Wrapped builds (Capacitor, Electron) never report telemetry, whatever host
