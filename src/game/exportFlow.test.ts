@@ -54,7 +54,9 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function fakeUi() {
+/** `downloadResults` are consumed in call order; the default is an already
+ *  settled dialog, which is what every pre-#773 test assumed. */
+function fakeUi(downloadResults?: Promise<void>[]) {
   const toasts: { text: string; kind: string }[] = [];
   const downloads: string[] = [];
   return {
@@ -66,6 +68,7 @@ function fakeUi() {
       },
       downloadFile: (filename: string) => {
         downloads.push(filename);
+        return downloadResults?.shift() ?? Promise.resolve();
       },
     },
   };
@@ -77,6 +80,9 @@ function flowDeps(ui: ReturnType<typeof fakeUi>["ui"], sim = Simulation.newGame(
 
 const HUNG_TOAST = { text: "The export is not responding. You can try exporting again.", kind: "bad" };
 const STORED_TOAST = { text: "Tower exported. Check where you saved it.", kind: "good" };
+// The size line for the 13-byte payload the GH #773 tests mock into
+// SaveGame.export ("VCTOWER1\nfake" rounds to 0.0 KB).
+const LIVE_TOAST = { text: "Tower exported (0.0 KB). Check your downloads.", kind: "good" };
 
 beforeEach(() => {
   resetSaveStoreForTests();
@@ -319,5 +325,80 @@ describe("export single-flight latch (GH #760)", () => {
     second.resolve(true);
     await run2;
     expect(toasts).toEqual([HUNG_TOAST, STORED_TOAST]);
+  });
+});
+
+describe("wrapped fallback dialog (GH #773)", () => {
+  // No store in these tests, so the flow falls back to the live path, which on
+  // a wrapped session routes downloadFile to the shell's saveFile dialog.
+
+  it("REGRESSION: the latch spans the shell's saveFile dialog on the live fallback", async () => {
+    const { SaveGame } = await import("../storage/SaveGame");
+    const spy = vi.spyOn(SaveGame, "export").mockResolvedValue("VCTOWER1\nfake");
+    const gate = deferred<void>();
+    const { ui, toasts, downloads } = fakeUi([gate.promise]);
+    const deps = flowDeps(ui);
+
+    const first = runExportFlow(deps, () => {});
+    await vi.waitFor(() => expect(downloads).toHaveLength(1));
+
+    // Reentry while the dialog sits open: pre-fix, downloadFile was
+    // fire-and-forget, so the latch had already released and this stacked a
+    // second flush plus a second dialog (the #760 collision, back again).
+    await runExportFlow(deps, () => {});
+    expect(downloads).toHaveLength(1);
+
+    // The size toast keeps its pre-settle timing: the port contract resolves
+    // saveFile identically for a written file and a canceled dialog
+    // (types.ts, cancel is not an error), so a post-settle toast could not be
+    // more honest about cancel, only later. The residual is that a cancel
+    // still gets this toast; pinned so a port contract change that CAN
+    // distinguish revisits it deliberately.
+    expect(toasts).toEqual([LIVE_TOAST]);
+
+    gate.resolve();
+    await first;
+    expect(toasts).toEqual([LIVE_TOAST]); // the settle adds nothing
+
+    // The settle released the latch, so the next export runs.
+    await runExportFlow(deps, () => {});
+    expect(downloads).toHaveLength(2);
+    spy.mockRestore();
+  });
+
+  it("REGRESSION: the watchdog frees a hung saveFile dialog, and a late settle never unlocks the retry", async () => {
+    const { SaveGame } = await import("../storage/SaveGame");
+    const spy = vi.spyOn(SaveGame, "export").mockResolvedValue("VCTOWER1\nfake");
+    vi.useFakeTimers();
+    const first = deferred<void>();
+    const second = deferred<void>();
+    const { ui, toasts, downloads } = fakeUi([first.promise, second.promise]);
+    const deps = flowDeps(ui);
+
+    const run1 = runExportFlow(deps, () => {});
+    await vi.advanceTimersByTimeAsync(0);
+    expect(downloads).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS - 1);
+    expect(toasts).toEqual([LIVE_TOAST]); // a long dialog session is not a hang
+    await vi.advanceTimersByTimeAsync(1);
+    expect(toasts).toEqual([LIVE_TOAST, HUNG_TOAST]);
+
+    // The whole point of the watchdog: Export is not bricked for the session.
+    const run2 = runExportFlow(deps, () => {});
+    await vi.advanceTimersByTimeAsync(0);
+    expect(downloads).toHaveLength(2);
+
+    // Run 1's dialog settles late while run 2's is open: run 2 keeps the
+    // latch, so a third attempt is still a quiet no-op.
+    first.resolve();
+    await run1;
+    void runExportFlow(deps, () => {});
+    await vi.advanceTimersByTimeAsync(0);
+    expect(downloads).toHaveLength(2);
+
+    second.resolve();
+    await run2;
+    expect(toasts).toEqual([LIVE_TOAST, HUNG_TOAST, LIVE_TOAST]);
+    spy.mockRestore();
   });
 });

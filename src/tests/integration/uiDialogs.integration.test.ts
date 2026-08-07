@@ -809,6 +809,52 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     expect(saveFile).toHaveBeenCalledExactlyOnceWith("my-tower.vctower", "VCTOWER1\npayload", "application/octet-stream");
   });
 
+  it("REGRESSION (GH #773): downloadFile's promise tracks the port dialog, settling only when saveFile does", async () => {
+    // The export flow's single-flight latch spans the wrapped fallback dialog
+    // by awaiting this promise, so it must stay PENDING while the shell's
+    // save dialog is open. A fire-and-forget downloadFile that returns an
+    // already-resolved dummy reopens GH #773 while every flow-level test
+    // stays green (they stub this seam), which is why this pins the UI side.
+    let resolveSave!: () => void;
+    const gate = new Promise<void>((res) => {
+      resolveSave = res;
+    });
+    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
+      isNativeWrapper: true,
+      saveFile: () => gate,
+      openExternal: () => {},
+    });
+    const { ui } = makeUI();
+    let settled = false;
+    const delivered = ui.downloadFile("t.vctower", "payload").then(() => {
+      settled = true;
+    });
+    // Drain the microtask queue and a macrotask: the dialog is still open, so
+    // the promise must still be pending.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(settled).toBe(false);
+    resolveSave();
+    await delivered;
+    expect(settled).toBe(true);
+  });
+
+  it("REGRESSION (GH #773): a rejecting saveFile still resolves the returned promise, after its own toast", async () => {
+    // The export flow awaits this promise inside its try; a rejection there
+    // would stack the generic "Export failed" toast on top of downloadFile's
+    // own failure toast. The internal catch folds the rejection into the
+    // toast and resolves, and awaiting the return proves the toast landed.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
+      isNativeWrapper: true,
+      saveFile: () => Promise.reject(new Error("disk full")),
+      openExternal: () => {},
+    });
+    const { ui } = makeUI();
+    await expect(ui.downloadFile("t.vctower", "payload")).resolves.toBeUndefined();
+    const toasts = [...document.getElementById("toast-wrap")!.children];
+    expect(toasts.some((t) => t.className.includes("bad") && t.textContent!.includes("Couldn't save your tower file"))).toBe(true);
+  });
+
   it("downloadFile toasts when the port's saveFile rejects (a native real-failure path)", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(platformModule, "getPlatform").mockReturnValue({
