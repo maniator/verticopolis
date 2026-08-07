@@ -164,8 +164,56 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
   it("sfx() plays every cue once the graph is up", () => {
     const eng = new ToneAudioEngine();
     eng.start();
-    const names: SfxName[] = ["build", "sell", "error", "promote", "money", "click"];
+    const names: SfxName[] = ["build", "sell", "error", "promote", "money", "notify", "click"];
     for (const n of names) expect(() => eng.sfx(n)).not.toThrow();
+  });
+
+  it("the recorded percussion bypasses the music tone filters on its way to the bus", () => {
+    const eng = new ToneAudioEngine();
+    eng.start();
+    // Both membranes (heartbeat thump + object tap) must reach the reverb via
+    // gain nodes ONLY: the music chain's lowpass would dull the tap's click
+    // and its highpass would gut the thump's body, so a Filter anywhere on the
+    // path is the regression this test exists to catch.
+    // The crowd layer builds membranes of its own (the party kick), so pick
+    // the two percussion voices by their authored tunings.
+    const membranes = graph.nodes.filter(
+      (n) =>
+        n.kind === "MembraneSynth" &&
+        [0.045, 0.008].includes((n.args[0] as { pitchDecay?: number } | undefined)?.pitchDecay ?? -1),
+    );
+    expect(membranes.length).toBe(2);
+    // Walk EVERY connect edge (not just the first) so a second connection
+    // sneaking a Filter onto the perc path cannot hide from this test.
+    const reachable = (from: NodeRec): NodeRec[] => {
+      const seen = new Set<NodeRec>();
+      const queue = [from];
+      while (queue.length) {
+        const cur = queue.pop()!;
+        for (const next of cur.connects) {
+          if (!seen.has(next)) {
+            seen.add(next);
+            queue.push(next);
+          }
+        }
+      }
+      return [...seen];
+    };
+    for (const m of membranes) {
+      const downstream = reachable(m);
+      expect(
+        downstream.some((n) => n.kind === "Reverb"),
+        "membrane never reaches the reverb",
+      ).toBe(true);
+      expect(
+        downstream.filter((n) => n.kind === "Filter"),
+        "a Filter sneaked onto the perc path",
+      ).toEqual([]);
+    }
+    // Contrast: the melody path deliberately DOES pass the warm filters.
+    const poly = graph.nodes.filter((n) => n.kind === "PolySynth");
+    const filtered = poly.some((p) => reachable(p).some((n) => n.kind === "Filter"));
+    expect(filtered).toBe(true);
   });
 
   it("mute silences sfx; unmute restores — neither throws", () => {

@@ -1,6 +1,6 @@
 import { FACILITIES, GRID, maxCarsFor, maxSpanFor } from "../engine/facilities";
 import type { FacilityKind, Transport } from "../engine/types";
-import { TDT_FLOOR_OFFSET } from "./tdtConstants";
+import { TDT_FLOOR_OFFSET, tdtStairStories } from "./tdtConstants";
 import type { TdtElevator, TdtStair } from "./tdtTypes";
 import { ELEVATOR_KINDS, isLobbyFloor } from "./tdtTables";
 
@@ -131,7 +131,7 @@ export function transportsFromDecoded(
   for (const s of stairs) {
     if (s.type > 5) continue; // undocumented variant in a corrupt save
     const kind: FacilityKind = s.type % 2 === 1 ? "stairs" : "escalator";
-    const stories = s.type <= 1 ? 1 : s.type <= 3 ? 2 : 3;
+    const stories = tdtStairStories(s.type);
     const width = FACILITIES[kind].width;
     const x = Math.max(0, Math.min(GRID.width - width, s.x));
     const base = s.floor - TDT_FLOOR_OFFSET;

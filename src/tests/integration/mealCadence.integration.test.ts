@@ -284,7 +284,10 @@ describe("MAX_PEOPLE cap holds through a lunch peak", () => {
     // Beef up the tower so lunch has plenty to spawn.
     for (let f = 2; f <= 5; f++)
       for (let x = 0; x < 8; x++) {
-        const r = sim.tower.place(f === 4 ? "hotelSingle" : f === 3 ? "condo" : "office", f, x * 4);
+        let kind: "hotelSingle" | "condo" | "office" = "office";
+        if (f === 4) kind = "hotelSingle";
+        else if (f === 3) kind = "condo";
+        const r = sim.tower.place(kind, f, x * 4);
         const u = sim.tower.units.find((x) => x.id === r.unitId);
         if (u) u.state = "occupied";
       }

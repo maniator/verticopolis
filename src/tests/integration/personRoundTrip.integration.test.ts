@@ -214,7 +214,9 @@ describe("MAX_PEOPLE cap holds under real round-trip density", () => {
     // Beef the tower up: more offices, condos, hotels so meal density peaks.
     for (let f = 2; f <= 5; f++) {
       for (let x = 0; x < 6; x++) {
-        const kind = f === 4 ? "hotelSingle" : f === 3 ? "condo" : "office";
+        let kind: "hotelSingle" | "condo" | "office" = "office";
+        if (f === 4) kind = "hotelSingle";
+        else if (f === 3) kind = "condo";
         const r = sim.tower.place(kind, f, x * 4);
         const u = sim.tower.units.find((x) => x.id === r.unitId);
         if (u) {

@@ -229,14 +229,10 @@ export function deserialize(raw: SerializedGame): Simulation {
       // buy-back mirror, bounded so a forged rent cannot drive an unbounded
       // buy-back drain (ladder mode bounds that sale to the ladder extremes).
       const ladderPriced = sim.rules.priceOptions(u.kind)?.shape === "ladder";
-      let rent =
-        u.rent === undefined
-          ? undefined
-          : ladderPriced
-            ? typeof u.rent === "number"
-              ? u.rent
-              : Number.NaN
-            : num(u.rent, rentConfig(u.kind)?.default ?? 0);
+      let rent: number | undefined;
+      if (u.rent === undefined) rent = undefined;
+      else if (ladderPriced) rent = typeof u.rent === "number" ? u.rent : Number.NaN;
+      else rent = num(u.rent, rentConfig(u.kind)?.default ?? 0);
       if (rent !== undefined && u.kind === "condo") {
         const condoOpts = sim.rules.priceOptions("condo");
         const ladderMode = condoOpts?.shape === "ladder";

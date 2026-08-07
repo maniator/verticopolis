@@ -54,7 +54,8 @@ export const LEGEND_TINT_COLORS: Record<"infested" | "na", string> = {
 export function heatColor(severity: number): string {
   // Clamp to [0,1]; the `> 0` form also folds NaN to 0 so a poisoned severity
   // can never index past the palette and throw on the draw path.
-  const s = severity > 0 ? (severity > 1 ? 1 : severity) : 0;
+  let s = 0;
+  if (severity > 0) s = severity > 1 ? 1 : severity;
   const seg = Math.min(HEAT_SEGS - 1, Math.floor(s * HEAT_SEGS));
   const t = s * HEAT_SEGS - seg; // 0..1 within the segment
   const a = HEAT_STOPS[seg];

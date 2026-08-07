@@ -40,26 +40,27 @@ export interface CrashScreenOptions {
  *  the sim behind the card, after the flush the card just described). */
 export const CRASH_SCREEN_ID = "crash-screen";
 
+/** The one-sentence save-outcome line, best case first. */
+function saveLineFor(save: CrashScreenOptions["save"]): string {
+  if (save.behindSplash) return "No game was in progress; your saved towers are untouched.";
+  if (save.flushed) return "Your tower was saved. Nothing is lost.";
+  const priorNote = save.hadPriorSave ? " Your last saved tower is safe." : "";
+  if (save.storageBlame) return "Your latest changes couldn't be saved: storage is full or blocked." + priorNote;
+  return "Your latest changes couldn't be saved: the save hit an unexpected error." + priorNote;
+}
+
 export function showCrashScreen(opts: CrashScreenOptions): void {
   if (document.getElementById(CRASH_SCREEN_ID)) return;
 
-  const saveLine = opts.save.behindSplash
-    ? "No game was in progress; your saved towers are untouched."
-    : opts.save.flushed
-      ? "Your tower was saved. Nothing is lost."
-      : opts.save.storageBlame
-        ? "Your latest changes couldn't be saved: storage is full or blocked." +
-          (opts.save.hadPriorSave ? " Your last saved tower is safe." : "")
-        : "Your latest changes couldn't be saved: the save hit an unexpected error." +
-          (opts.save.hadPriorSave ? " Your last saved tower is safe." : "");
+  const saveLine = saveLineFor(opts.save);
   // Device-distress advice: shown for a rapid double crash AND for a first
   // loss whose in-place recovery failed or timed out (the GPU stayed wedged
   // for seconds, which is the same distress signal by another route).
-  const repeatLine = opts.crash.repeat
-    ? `<p><b>This is the second crash in a row.</b> Closing other tabs or apps before reloading may help.</p>`
-    : opts.crash.recoveryFailed
-      ? `<p><b>The game tried to restart its graphics and couldn't.</b> Closing other tabs or apps before reloading may help.</p>`
-      : "";
+  let repeatLine = "";
+  if (opts.crash.repeat)
+    repeatLine = `<p><b>This is the second crash in a row.</b> Closing other tabs or apps before reloading may help.</p>`;
+  else if (opts.crash.recoveryFailed)
+    repeatLine = `<p><b>The game tried to restart its graphics and couldn't.</b> Closing other tabs or apps before reloading may help.</p>`;
 
   const dialog = document.createElement("dialog");
   dialog.id = CRASH_SCREEN_ID;

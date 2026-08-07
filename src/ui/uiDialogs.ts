@@ -203,12 +203,9 @@ function waitForDialog(ui: UI, reopen: () => void, kind: "import" | "export"): v
     // One announcement, not two: `mountNotice` carries `role="alert"`, so
     // writing the same sentence to the polite region as well would either be
     // read out twice or be swallowed as a duplicate.
-    const because =
-      reason === "superseded"
-        ? "another file was picked"
-        : reason === "tower-swapped"
-          ? "you started a different tower"
-          : "another window took over";
+    let because = "another window took over";
+    if (reason === "superseded") because = "another file was picked";
+    else if (reason === "tower-swapped") because = "you started a different tower";
     ui.sayVisibly(`The ${kind} was dropped: ${because} before it could open. Try again.`);
   });
 }

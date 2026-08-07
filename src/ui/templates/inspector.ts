@@ -24,25 +24,28 @@ import { floorTag } from "../format";
  * content, so the modal ✕ and the inspector ✕ can't drift apart.
  */
 
+/** Plain-language phrasing for the lifecycle states that would otherwise read
+ *  as bare enums ("dirty", "asleep"); the diagnostics block adds the why + the
+ *  fix. A relocation is a life event (Modern condos), not a complaint, so its
+ *  status line reads differently. */
+function statusTextFor(u: Unit): string {
+  switch (u.state) {
+    case "vacating":
+      return u.vacateReason === "relocation" ? "on notice (household relocating)" : "on notice (tenant leaving)";
+    case "dirty":
+      return "dirty (awaiting housekeeping)";
+    case "infested":
+      return "cockroach infested";
+    case "asleep":
+      return "occupied (guest asleep)";
+    default:
+      return u.state;
+  }
+}
+
 export function unitInspectorTemplate(sim: Simulation, u: Unit): TemplateResult {
   const f = FACILITIES[u.kind];
-  // A relocation is a life event (Modern condos), not a complaint, so the
-  // status line reads differently; the diagnostics block explains the rest.
-  const isRelocation = u.state === "vacating" && u.vacateReason === "relocation";
-  // Hotel lifecycle states read as bare enums otherwise ("dirty", "asleep"); give
-  // them plain-language phrasing (the diagnostics block adds the why + the fix).
-  const statusText =
-    u.state === "vacating"
-      ? isRelocation
-        ? "on notice (household relocating)"
-        : "on notice (tenant leaving)"
-      : u.state === "dirty"
-        ? "dirty (awaiting housekeeping)"
-        : u.state === "infested"
-          ? "cockroach infested"
-          : u.state === "asleep"
-            ? "occupied (guest asleep)"
-            : u.state;
+  const statusText = statusTextFor(u);
   // Canon retail variant (§7): a shop / fastFood / restaurant with a subtype
   // titles as its specific name ("Chinese Cafe"), not the generic kind name.
   const title = u.subtype ?? f.name;
@@ -59,15 +62,13 @@ export function unitInspectorTemplate(sim: Simulation, u: Unit): TemplateResult 
   // 0) show the same live line from their routed attendance tally: a mid-show
   // house must never inspect as empty while the audience is visibly seated.
   const closed = isTenanted(u) && !isOpenAt(u.kind, sim.clock.hour);
+  let peopleLine: TemplateResult | typeof nothing = nothing;
+  if ((isCommercialKind(u.kind) && f.population > 0) || f.attendance !== undefined)
+    peopleLine = html`<div>Customers: ${u.customersIn ?? 0}${closed ? " (closed)" : ""}</div>`;
+  else if (f.population) peopleLine = html`<div>Occupants: ${u.occupants}/${residentCount(u)}</div>`;
   return html`<h4 class="win-title">${title}</h4><div>${labelIsExtra ? html`${u.label}<br />` : nothing}${
     u.floor >= 1 ? `Floor ${u.floor}` : `B${1 - u.floor}`
-  }</div><div>Status: ${statusText}</div>${
-    (isCommercialKind(u.kind) && f.population > 0) || f.attendance !== undefined
-      ? html`<div>Customers: ${u.customersIn ?? 0}${closed ? " (closed)" : ""}</div>`
-      : f.population
-        ? html`<div>Occupants: ${u.occupants}/${residentCount(u)}</div>`
-        : nothing
-  }${facilityDiagnostics(sim, u)}<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`;
+  }</div><div>Status: ${statusText}</div>${peopleLine}${facilityDiagnostics(sim, u)}<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`;
 }
 
 export function transportInspectorTemplate(sim: Simulation, t: Transport): TemplateResult {

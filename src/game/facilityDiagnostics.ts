@@ -114,15 +114,12 @@ export function retailStatsLines(
   // or weather is dragging trade well below par), 0.5-0.85 neutral, >0.85 green
   // (near-ideal conditions: high appeal, well placed, dry). A mature tower with
   // a metro pushes appeal to 1, so the green band is genuinely reachable.
-  const yRatio = patronageYest === undefined ? undefined : baseline > 0 ? Math.max(0, patronageYest) / baseline : 0;
-  const tier =
-    yRatio === undefined
-      ? { color: "", verdict: "Just opened, no data yet." }
-      : yRatio < 0.5
-        ? { color: "var(--bad)", verdict: "Very few customers." }
-        : yRatio > 0.85
-          ? { color: "var(--good)", verdict: "Business is booming." }
-          : { color: "", verdict: "Business is average." };
+  let yRatio: number | undefined;
+  if (patronageYest !== undefined) yRatio = baseline > 0 ? Math.max(0, patronageYest) / baseline : 0;
+  let tier = { color: "", verdict: "Business is average." };
+  if (yRatio === undefined) tier = { color: "", verdict: "Just opened, no data yet." };
+  else if (yRatio < 0.5) tier = { color: "var(--bad)", verdict: "Very few customers." };
+  else if (yRatio > 0.85) tier = { color: "var(--good)", verdict: "Business is booming." };
   // Each line is its own `<div>`, in card order: today's running count with its
   // progress bar, the verdict (colored only when it is a red/green tier), then
   // the optional yesterday-profit and rain lines. The verdict's `style` binding
@@ -191,6 +188,41 @@ export function hasAccessDiagnostic(u: Unit): boolean {
   return f.population > 0 || ECON.dailyTrafficIncome[u.kind] !== undefined;
 }
 
+/** The access line, worst condition first. Segment-aware (#647): a unit can sit
+ *  on a section of its floor walled off from every stair and elevator by an open
+ *  gap, while another section of the SAME floor still reaches the lobby.
+ *  `reachesLobby` is the unit's own segment reaching the lobby; a gap-free floor
+ *  has one segment, so the older whole-floor line is unchanged there. */
+function accessLine(sim: Simulation, u: Unit): TemplateResult {
+  if (!sim.tower.isFloorServed(u.floor))
+    return html`<div style="color:var(--bad)">Access: not connected. No elevator or stair reaches this floor.</div>`;
+  if (!reachesLobby(sim, u))
+    return html`<div style="color:var(--bad)">Access: no way to transportation from here. A gap cuts this section of the floor off from the elevators and stairs. Bridge the gap, or add a stair or elevator that reaches this section.</div>`;
+  if (sim.positionReachable(u.floor, u.x))
+    return html`<div style="color:var(--good)">Access: reachable from the lobby.</div>`;
+  return html`<div style="color:var(--bad)">Access: no route. The only way to this floor is a stairway or escalator climb longer than anyone will make, so no one travels here. Add an elevator that reaches it.</div>`;
+}
+
+/** The exact buildable sky-lobby project, phrased for the eroding "sinks until notice"
+ *  warning. Precedence: on the slot itself, above the built top, slot carries a room. */
+function skyLobbySinkingFix(slot: number, onSlot: boolean, needsSupport: boolean, clearFirst: boolean): string {
+  if (onSlot)
+    return `This unit sits on the empty sky lobby slot; move it, clear the story, and build the lobby on floor ${slot} to anchor the block.`;
+  if (needsSupport) return `Build floors up to ${slot - 1}, then put the sky lobby on floor ${slot} to lift these tenants.`;
+  if (clearFirst) return `Clear floor ${slot} and build the sky lobby there to lift these tenants.`;
+  return `Build the sky lobby on floor ${slot} to lift these tenants.`;
+}
+
+/** The same project, phrased for the gentler capped-satisfaction band. */
+function skyLobbyCappedFix(slot: number, onSlot: boolean, needsSupport: boolean, clearFirst: boolean): string {
+  if (onSlot)
+    return `This unit sits on the sky lobby slot itself; a lobby here, once it moves and the story is cleared, would lift the block.`;
+  if (needsSupport)
+    return `A sky lobby on floor ${slot} would lift it (build floors up to ${slot - 1} first; the slot story itself stays clear for the lobby).`;
+  if (clearFirst) return `A sky lobby on floor ${slot} would lift it (clear that floor first).`;
+  return `A sky lobby on floor ${slot} would lift it.`;
+}
+
 /**
  * The diagnostic lines for a unit, in card order: access, hotel star-count,
  * parking ramp/demand, office long-walk, commercial lobby distance, recycling
@@ -211,22 +243,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // connected only by a stair/escalator climb longer than the budget is served
   // yet not reachably-close, and no commuter ever comes. (In Modern, served
   // always equals reachable, so this middle state is Classic-only.)
-  if (hasAccessDiagnostic(u)) {
-    // Segment-aware (#647): a unit can sit on a section of its floor walled off
-    // from every stair and elevator by an open gap, while another section of the
-    // SAME floor still reaches the lobby. `reachesLobby` is the unit's own
-    // segment reaching the lobby; a gap-free floor has one segment, so the older
-    // whole-floor line is unchanged there.
-    lines.push(
-      !sim.tower.isFloorServed(u.floor)
-        ? html`<div style="color:var(--bad)">Access: not connected. No elevator or stair reaches this floor.</div>`
-        : !reachesLobby(sim, u)
-          ? html`<div style="color:var(--bad)">Access: no way to transportation from here. A gap cuts this section of the floor off from the elevators and stairs. Bridge the gap, or add a stair or elevator that reaches this section.</div>`
-          : sim.positionReachable(u.floor, u.x)
-            ? html`<div style="color:var(--good)">Access: reachable from the lobby.</div>`
-            : html`<div style="color:var(--bad)">Access: no route. The only way to this floor is a stairway or escalator climb longer than anyone will make, so no one travels here. Add an elevator that reaches it.</div>`,
-    );
-  }
+  if (hasAccessDiagnostic(u)) lines.push(accessLine(sim, u));
   // No Rate (off-market) legibility: a chosen setting, so plain ink, neither
   // --good nor --bad. The occupied line states the census fact out loud on
   // purpose (free tenants still count is canon, the 1994 cheap-rent lever
@@ -354,26 +371,14 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
           // The strong "sinks until notice" warning only when the distance erosion
           // actually outpaces the served recovery, so the tenant really is sliding
           // out (a genuinely skipped sky lobby). Name the exact slot that fixes it.
-          const fix = onSlot
-            ? `This unit sits on the empty sky lobby slot; move it, clear the story, and build the lobby on floor ${slot} to anchor the block.`
-            : needsSupport
-              ? `Build floors up to ${slot - 1}, then put the sky lobby on floor ${slot} to lift these tenants.`
-              : clearFirst
-                ? `Clear floor ${slot} and build the sky lobby there to lift these tenants.`
-                : `Build the sky lobby on floor ${slot} to lift these tenants.`;
+          const fix = skyLobbySinkingFix(slot, onSlot, needsSupport, clearFirst);
           lines.push(
             html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. ${fix}</div>`,
           );
         } else {
           // The ceiling holds satisfaction down without evicting; the gentler line
           // describes that honestly and names the buildable fix.
-          const fix = onSlot
-            ? `This unit sits on the sky lobby slot itself; a lobby here, once it moves and the story is cleared, would lift the block.`
-            : needsSupport
-              ? `A sky lobby on floor ${slot} would lift it (build floors up to ${slot - 1} first; the slot story itself stays clear for the lobby).`
-              : clearFirst
-                ? `A sky lobby on floor ${slot} would lift it (clear that floor first).`
-                : `A sky lobby on floor ${slot} would lift it.`;
+          const fix = skyLobbyCappedFix(slot, onSlot, needsSupport, clearFirst);
           lines.push(
             html`<div style="color:var(--bad)">Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. ${fix}</div>`,
           );
@@ -421,12 +426,9 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     // Framed as an honest UPPER bound ("under N") using ceil, so the block
     // never implies the tenant has *more* time than they do. Once the notice
     // has elapsed, say so plainly: they leave on the next hourly tick.
-    const left =
-      minsLeft <= 0
-        ? "any moment now"
-        : minsLeft >= 24 * 60
-          ? `in under ${Math.ceil(minsLeft / (24 * 60))} day(s)`
-          : `in under ${Math.ceil(minsLeft / 60)} hour(s)`;
+    let left = "any moment now";
+    if (minsLeft >= 24 * 60) left = `in under ${Math.ceil(minsLeft / (24 * 60))} day(s)`;
+    else if (minsLeft > 0) left = `in under ${Math.ceil(minsLeft / 60)} hour(s)`;
     // The reason text is a fixed internal enum string; lit auto-escapes it as a
     // text binding regardless, so no escapeHtml call is needed.
     if (isRelocation) {

@@ -21,8 +21,7 @@ import type { TowerEngine } from "./TowerEngine";
  *  deserialize trust boundary); re-exported under the familiar names. */
 export const MIN_ZOOM = VIEW_ZOOM_MIN;
 export const MAX_ZOOM = VIEW_ZOOM_MAX;
-const clampZoom = (z: number): number =>
-  Number.isFinite(z) ? Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z)) : MIN_ZOOM;
+const clampZoom = (z: number): number => (Number.isFinite(z) ? Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z)) : MIN_ZOOM);
 
 /** Movement value far above every tap-slop threshold. Assigned to `moved` when
  *  a pinch hands off to one surviving finger, so its release can't tap-place. */
@@ -90,7 +89,8 @@ export function bindInput(engine: TowerEngine): void {
     const w = ev as ex.WheelEvent;
     // Browsers remap Shift+wheel to horizontal scroll (deltaY 0), so under the
     // Shift pan key deltaX carries the zoom; ungated sideways swipes still scroll.
-    const d = w.deltaY !== 0 ? w.deltaY : (w.ev as { shiftKey?: boolean } | undefined)?.shiftKey ? w.deltaX : 0;
+    let d = w.deltaY;
+    if (d === 0) d = (w.ev as { shiftKey?: boolean } | undefined)?.shiftKey ? w.deltaX : 0;
     if (d === 0) return;
     zoomAt(engine, d < 0 ? 1.12 : 0.89, w.x, w.y);
   });
@@ -161,7 +161,9 @@ function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
     const ps = ev.screenPos;
     const inRect = (r?: ScreenRect) =>
       !!r && ps.x >= r.x && ps.x <= r.x + r.w && ps.y >= r.y && ps.y <= r.y + r.h;
-    const end = inRect(engine.arrowHit.up) ? "up" : inRect(engine.arrowHit.down) ? "down" : null;
+    let end: "up" | "down" | null = null;
+    if (inRect(engine.arrowHit.up)) end = "up";
+    else if (inRect(engine.arrowHit.down)) end = "down";
     if (end) {
       // A plain click extends one floor (on pointer-up); a drag goes floor-by-floor.
       engine.arrowDrag = { end };
@@ -430,10 +432,7 @@ function censusCrowd(
         // (`customersIn` is not persisted: just after a save load a busy venue
         // reads empty for the seconds the crowd system takes to re-route diners
         // in. That is honest and self-heals; see the ambience backlog.)
-        occ +=
-          isCommercialKind(u.kind) && def.population > 0
-            ? (u.customersIn ?? 0)
-            : (u.occupants ?? 0);
+        occ += isCommercialKind(u.kind) && def.population > 0 ? (u.customersIn ?? 0) : (u.occupants ?? 0);
         cap += unitCap;
       }
     }

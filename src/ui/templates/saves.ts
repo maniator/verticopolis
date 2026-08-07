@@ -176,11 +176,10 @@ function slotRow(s: SlotInfo): TemplateResult {
   // destroys the evidence. Delete stays, because clearing a slot you have been
   // told is unreadable is a deliberate choice rather than a silent loss.
   const unreadable = s.present && !s.exists;
-  const detail = s.exists
-    ? slotDetail(s)
-    : unreadable
-      ? html`<div class="slot-detail slot-unreadable">Couldn't be read by this version.</div>`
-      : html`<div class="slot-detail slot-empty">empty</div>`;
+  let detail: TemplateResult;
+  if (s.exists) detail = slotDetail(s);
+  else if (unreadable) detail = html`<div class="slot-detail slot-unreadable">Couldn't be read by this version.</div>`;
+  else detail = html`<div class="slot-detail slot-empty">empty</div>`;
   const saveBtn =
     s.slot === "auto" || unreadable ? nothing : html`<button class="btn" data-save="${s.slot}">Save</button>`;
   const loadBtn = s.exists ? html`<button class="btn" data-load="${s.slot}">Load</button>` : nothing;

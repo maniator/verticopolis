@@ -37,7 +37,8 @@ export function updateTraffic(app: GameApp): void {
   // Above ground the HUD keeps its own "NF" footnote form (the lobby is "1F").
   // A basement hotspot uses the game's "B1"/"B2" grammar (never "0F"/"-1F"), the
   // same basement labels the ruler and `floorLabel` use.
-  const tag = floor === null ? "" : floor >= 1 ? `${floor}F` : floorLabel(floor);
+  let tag = "";
+  if (floor !== null) tag = floor >= 1 ? `${floor}F` : floorLabel(floor);
   const floorText = floor !== null ? ` · ${tag}` : "";
   // aria keeps the spoken "worst on floor N" phrasing (no trailing "F"), and the
   // "B1"/"B2" grammar for a basement, so a screen reader announces the same

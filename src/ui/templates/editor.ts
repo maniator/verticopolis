@@ -97,7 +97,9 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
     // diagnostics line uses); zero-population service kinds keep plain Yes/No.
     // "No route" echoes the inspector sentence and the stats footnote.
     const cutOff = served && hasAccessDiagnostic(u) && !sim.floorReachable(u.floor);
-    const text = !served ? "No" : cutOff ? "No route" : "Yes";
+    let text = "Yes";
+    if (!served) text = "No";
+    else if (cutOff) text = "No route";
     rows.push(
       kv(
         "Elevator access",
@@ -111,7 +113,10 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
     kv("Eval", html`<span class="evalbar"><span style="width:${evalPct}%"></span></span> ${evalPct}%`, "eval"),
   );
   if (rcfg) {
-    const label = u.kind === "condo" ? "Sale price" : isHotelKind(u.kind) ? "Room rate" : isRentalKind(u.kind) ? "Monthly rent" : "Quarterly rent";
+    let label = "Quarterly rent";
+    if (u.kind === "condo") label = "Sale price";
+    else if (isHotelKind(u.kind)) label = "Room rate";
+    else if (isRentalKind(u.kind)) label = "Monthly rent";
     // For a SOLD condo the "Sale price" is what it actually fetched, the
     // household-scaled amount (and exactly what the buy-back will reclaim), not
     // the base asking. householdPrice falls back to the base when there's no
@@ -153,7 +158,9 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
   if (priceShape?.shape === "ladder") {
     const locked = u.kind === "condo" && u.everOccupied;
     const current: RungChoice = u.noRate ? "noRate" : ladderRungFor(priceShape.rungs, rentOf(u)).level;
-    const ariaLabel = u.kind === "condo" ? "Sale price level" : isHotelKind(u.kind) ? "Room rate level" : "Rent level";
+    let ariaLabel = "Rent level";
+    if (u.kind === "condo") ariaLabel = "Sale price level";
+    else if (isHotelKind(u.kind)) ariaLabel = "Room rate level";
     actions.push(
       edRow(
         rungPickerTemplate({

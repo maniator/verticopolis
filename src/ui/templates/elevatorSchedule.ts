@@ -302,15 +302,19 @@ function floorsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Tem
         </div>
         ${state.floors.map((f) => {
           const isBase = f.floor === state.base;
+          // Express shafts have no per-floor serve column at all; on the rest,
+          // endpoints render the always-on check and other floors the checkbox.
+          let serveCell: TemplateResult | typeof nothing = nothing;
+          if (!ctx.isExpress) {
+            serveCell = f.endpoint
+              ? html`<span class="es-cell-serve es-always" title="The top and bottom stay connected: endpoints always stop">✓</span>`
+              : html`<span class="es-cell-serve"><input type="checkbox" aria-label="Serve floor ${floorLabel(f.floor)}"
+                    .checked=${live(f.served)} @change=${(e: Event) => h.onServe(f.floor, (e.target as HTMLInputElement).checked)} /></span>`;
+          }
           return html`
           <div class="es-grid-row${f.served ? "" : " es-skipped"}">
             <span class="es-cell-floor">${isBase ? html`<span class="es-base" title="Base floor: unhomed cars wait here">◎</span>` : nothing}${floorLabel(f.floor)}${f.lobby ? html`<span class="es-lobby-mark" title="Lobby floor">L</span>` : nothing}${state.originFloors.includes(f.floor) ? html`<span class="es-origin" role="img" aria-label="Demand hotspot: many riders board here at the busiest ${state.day} hour" title="Demand hotspot: many riders board here at the busiest ${state.day} hour">▲</span>` : nothing}</span>
-            ${ctx.isExpress
-              ? nothing
-              : f.endpoint
-                ? html`<span class="es-cell-serve es-always" title="The top and bottom stay connected: endpoints always stop">✓</span>`
-                : html`<span class="es-cell-serve"><input type="checkbox" aria-label="Serve floor ${floorLabel(f.floor)}"
-                    .checked=${live(f.served)} @change=${(e: Event) => h.onServe(f.floor, (e.target as HTMLInputElement).checked)} /></span>`}
+            ${serveCell}
             <span class="es-cell-cars">
               ${f.served
                 ? Array.from({ length: ctx.cars }, (_, car) => {

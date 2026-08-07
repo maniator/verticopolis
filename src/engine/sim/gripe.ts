@@ -351,11 +351,9 @@ export function dominantGripe(
  *  erosion and the gripe ladder's harshest-drain comparison (#548) so the two
  *  can never disagree about how hard noise actually bites a kind. */
 export function noiseBaseErosionFor(u: Pick<Unit, "kind" | "everOccupied">): number {
-  return u.kind === "rentalStudio"
-    ? RENTAL_STUDIO_NOISE_EROSION
-    : u.kind === "condo" && u.everOccupied
-      ? CONDO_NOISE_EROSION
-      : NOISE_EROSION;
+  if (u.kind === "rentalStudio") return RENTAL_STUDIO_NOISE_EROSION;
+  if (u.kind === "condo" && u.everOccupied) return CONDO_NOISE_EROSION;
+  return NOISE_EROSION;
 }
 
 /** True when an operational, served nightclub sits within its noise range of `u`

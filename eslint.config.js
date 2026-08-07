@@ -23,6 +23,7 @@ export default [
       ],
       "prefer-const": "error",
       "no-var": "error",
+      "no-nested-ternary": "error",
     },
   },
   {
@@ -47,6 +48,7 @@ export default [
       ],
       "prefer-const": "error",
       "no-var": "error",
+      "no-nested-ternary": "error",
     },
   },
 ];

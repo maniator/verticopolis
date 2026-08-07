@@ -1,25 +1,10 @@
 import type { UI } from "./UI";
 import { render } from "lit-html";
-import {
-  elevatorScheduleTemplate,
-  floorLabel,
-  type FloorRow,
-  type SchedCtx,
-  type SchedState,
-  type SchedHandlers,
-} from "./templates/elevatorSchedule";
+import { elevatorScheduleTemplate, floorLabel, type FloorRow, type SchedCtx, type SchedState, type SchedHandlers } from "./templates/elevatorSchedule";
 import { SCHEDULE_HOURS, type ElevatorSchedule, type ElevatorScheduleUX } from "../engine/elevatorSchedule";
 import { ORIGIN_HOURS, dayOriginTotals, peakOriginFloor, topOriginFloors, type OriginRings } from "../engine/scheduleOrigins";
 import { hh, fmtHours, originClause } from "./scheduleFormat";
-import {
-  presetSchedule,
-  autoTuneSchedule,
-  scheduleAdvice,
-  stagingSummary,
-  recommendedPreset,
-  type ShaftContext,
-  type SchedulePreset,
-} from "../engine/scheduleAuthoring";
+import { presetSchedule, autoTuneSchedule, scheduleAdvice, stagingSummary, recommendedPreset, type ShaftContext, type SchedulePreset } from "../engine/scheduleAuthoring";
 
 /**
  * The per-shaft elevator Schedule dialog controller (elevator-scheduling #305
@@ -77,6 +62,13 @@ const DEFAULT_SFD = 48; // the second-equivalent of the 0.8 game-minute dwell (D
  *  must not arm Auto-tune and advice against 23 empty slots; the on-screen note
  *  promises "a day or two", so the gate waits for a real spread of the day. */
 const WARMED_MIN_HOURS = 6;
+
+/** Announcement-cased preset names for the applied-schedule toast. */
+const PRESET_LABEL: Record<SchedulePreset, string> = {
+  rush: "Rush",
+  balanced: "Balanced",
+  feeder: "Feeder",
+};
 
 export function showElevatorScheduleDialog(
   ui: UI,
@@ -202,8 +194,10 @@ export function showElevatorScheduleDialog(
   // the "line up" fallback follow the day tab, so an unmeasured weekend shows no
   // ghost even while the weekday curve is warm. `recompute` keeps them current.
   const dayWarmed = (): boolean => (state.day === "weekend" ? warmedWe() : warmedWd());
-  const dayCurve = (): readonly number[] | undefined =>
-    state.day === "weekend" ? (warmedWe() ? ctx.hourly?.weekend : undefined) : (warmedWd() ? ctx.hourly?.weekday : undefined);
+  const dayCurve = (): readonly number[] | undefined => {
+    if (state.day === "weekend") return warmedWe() ? ctx.hourly?.weekend : undefined;
+    return warmedWd() ? ctx.hourly?.weekday : undefined;
+  };
 
   const sctx: SchedCtx = {
     title: ctx.title,
@@ -419,7 +413,7 @@ export function showElevatorScheduleDialog(
       // A preset re-stages only staging the player has not hand-set (spec §14.3):
       // counts are its business, a hand-placed fleet is not.
       if (!homesDirty && preset.homeFloors) state.schedule.homeFloors = [...preset.homeFloors];
-      announce(`Applied the ${p === "rush" ? "Rush" : p === "balanced" ? "Balanced" : "Feeder"} schedule.`);
+      announce(`Applied the ${PRESET_LABEL[p] ?? "Feeder"} schedule.`);
       after();
     },
     onAutoTune: () => {

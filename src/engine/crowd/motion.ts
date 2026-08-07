@@ -323,11 +323,9 @@ function transitionToReturn(crowd: Crowd, tower: Tower, p: Person): void {
   // the station deck, and a lobby-origin visitor on the ground concourse (one
   // contiguous run, so pickX already stays on it). On a gap-free floor
   // pickXInSegment returns exactly what pickX would, keeping the stream identical.
-  p.destX = station
-    ? insideX(crowd, station, 2)
-    : origin
-      ? pickXInSegment(tower, originFloor, p.seed, origin.x)
-      : pickX(tower, originFloor, p.seed);
+  if (station) p.destX = insideX(crowd, station, 2);
+  else if (origin) p.destX = pickXInSegment(tower, originFloor, p.seed, origin.x);
+  else p.destX = pickX(tower, originFloor, p.seed);
   p.returning = true;
 }
 

@@ -30,7 +30,9 @@ export function carIndicator(dir: number, load: number, cap: number): CarIndicat
   const safeLoad = Number.isFinite(load) ? Math.max(0, load) : 0;
   const safeDir = Number.isFinite(dir) ? dir : 0;
   const riders = Math.max(0, Math.min(4, Math.round((safeLoad / safeCap) * 4)));
-  const arrow: CarArrow = safeDir > 0 ? "up" : safeDir < 0 ? "down" : null;
+  let arrow: CarArrow = null;
+  if (safeDir > 0) arrow = "up";
+  else if (safeDir < 0) arrow = "down";
   const full = validCap && safeLoad >= cap;
   return { riders, arrow, full };
 }

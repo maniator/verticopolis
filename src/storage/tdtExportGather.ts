@@ -193,10 +193,14 @@ export function gatherTower(save: SerializedGame): GatheredTower {
     // or mode-mismatched save carrying a Modern-only room would, and the flag
     // has to describe the FILE, not the intent.
     const mappable = KIND_TENANT.has(u.kind) || PART_STACKS[u.kind] !== undefined;
+    let skipReason: GatheredRoom["skipReason"];
+    if (!fits) skipReason = "outOfRange";
+    else if (burned) skipReason = "burned";
+    else if (!mappable) skipReason = "unmappable";
     const room: GatheredRoom = {
       ...u,
       emitted: !burned && fits && mappable,
-      skipReason: !fits ? "outOfRange" : burned ? "burned" : mappable ? undefined : "unmappable",
+      skipReason,
     };
     rooms.push(room);
     // A non-emitting room's tiles are filled by the paving pass instead, and
@@ -207,8 +211,15 @@ export function gatherTower(save: SerializedGame): GatheredTower {
     // are refused outright, since NaN survives every comparison below.
     const clamp = (v: number) => Math.max(0, Math.min(GRID.width, v));
     const finite = Number.isFinite(u.x) && Number.isFinite(u.width);
-    const left = room.emitted ? u.x : finite ? clamp(u.x) : 0;
-    const right = room.emitted ? u.x + u.width : finite ? clamp(u.x + u.width) : 0;
+    let left = 0;
+    let right = 0;
+    if (room.emitted) {
+      left = u.x;
+      right = u.x + u.width;
+    } else if (finite) {
+      left = clamp(u.x);
+      right = clamp(u.x + u.width);
+    }
     if (!room.emitted && right <= left) continue; // wholly off-lot or unusable: claim nothing
     for (let fl = u.floor; fl < u.floor + facilityFloors(u.kind); fl++) {
       widen(fl, left, right);

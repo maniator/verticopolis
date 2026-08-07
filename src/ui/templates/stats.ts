@@ -81,16 +81,19 @@ export function statsTemplate(sim: Simulation): TemplateResult {
   // The review verdict trusts vipFavorable alone (it is what gates 4★), so a
   // favorable flag with no recorded visits (fixtures, tampered saves) still
   // reads "Review earned" in the good color; only the count goes unspoken.
-  const vipText =
-    sim.vipVisits === 0
-      ? sim.vipFavorable
-        ? "Review earned"
-        : "None yet"
-      : `${fmt(sim.vipVisits)} · review ${sim.vipFavorable ? "earned" : "not yet earned"}`;
+  let vipText: string;
+  if (sim.vipVisits === 0) vipText = sim.vipFavorable ? "Review earned" : "None yet";
+  else vipText = `${fmt(sim.vipVisits)} · review ${sim.vipFavorable ? "earned" : "not yet earned"}`;
   const vipRow =
     sim.vipVisits > 0 || sim.vipFavorable || s.star >= 3
       ? html`<span class="k">VIP visits</span><span class="v" style="color:${sim.vipFavorable ? "var(--good)" : "var(--muted)"}">${vipText}</span>`
       : nothing;
+  // En-route beats the call-to-action; with no infestation either way, no row.
+  let extermRow: TemplateResult | typeof nothing = nothing;
+  if (extermPending)
+    extermRow = html`<div class="col kv"><span class="k">Exterminator</span><span class="v" style="color:var(--muted)">en route: the booked rooms clear tomorrow</span></div>`;
+  else if (canCallExterminator(sim))
+    extermRow = html`<div class="modal-actions"><button type="button" class="btn" data-act="exterminate">Call exterminator: $${fmt(extermCost)} for ${fmt(hk.infested)} room(s)</button></div>`;
   return html`<div class="stats-grid">
       <div class="stats-section win-title sm">Overview</div>
       <div class="col kv">
@@ -132,13 +135,7 @@ export function statsTemplate(sim: Simulation): TemplateResult {
         <span class="k">Shops / Food</span><span class="v">${s.shops} / ${s.restaurants}</span>
         <span class="k">On fire</span><span class="v" style="color:${s.fires ? "var(--bad)" : "var(--good)"}">${s.fires || "None"}</span>
       </div>
-      ${
-        extermPending
-          ? html`<div class="col kv"><span class="k">Exterminator</span><span class="v" style="color:var(--muted)">en route: the booked rooms clear tomorrow</span></div>`
-          : canCallExterminator(sim)
-            ? html`<div class="modal-actions"><button type="button" class="btn" data-act="exterminate">Call exterminator: $${fmt(extermCost)} for ${fmt(hk.infested)} room(s)</button></div>`
-            : nothing
-      }
+      ${extermRow}
       ${sim.rules.hasVariantHouseholds ? householdSection(sim) : nothing}
       <div class="stats-section win-title sm">Transport &amp; access</div>
       <div class="col kv">
@@ -193,7 +190,9 @@ export function elevatorSection(sim: Simulation): TemplateResult | typeof nothin
   };
   const row = (sh: (typeof shafts)[number]): TemplateResult => {
     const pct = Math.round(sh.utilization * 100);
-    const color = pct > 85 ? "var(--bad)" : pct < 10 ? "var(--muted)" : "var(--good)";
+    let color = "var(--good)";
+    if (pct > 85) color = "var(--bad)";
+    else if (pct < 10) color = "var(--muted)";
     const label = `${kindName[sh.kind] ?? "Elevator"} ${floorTag(sh.bottom)}–${floorTag(sh.top)}`;
     return html`<span class="k">${label} · ${sh.cars} car${sh.cars === 1 ? "" : "s"}</span><span class="v" style="color:${color}">${pct}% full</span>`;
   };
