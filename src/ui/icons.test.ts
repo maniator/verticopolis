@@ -176,6 +176,39 @@ describe("appendMessageWithIcons", () => {
     expect(el.querySelector("svg")).toBeNull();
     expect(el.textContent).toBe("Rent up! 💰 collected");
   });
+
+  it("tolerates leading whitespace before the marker (issue #743)", () => {
+    // A stray space ahead of the marker must not silently demote the icon back
+    // to tofu-prone emoji text. The whitespace is consumed with the marker.
+    const el = document.createElement("div");
+    const inserted = appendMessageWithIcons(el, " 🔥 Fire broke out on Floor 3!");
+    expect(inserted).toBe(true);
+    expect(el.querySelectorAll("svg").length).toBe(1);
+    expect(el.querySelector("svg")?.getAttribute("data-icon")).toBe("fire");
+    expect(el.textContent).toBe(" Fire broke out on Floor 3!");
+  });
+
+  it("consumes the VS16 behind whitespace too", () => {
+    const el = document.createElement("div");
+    const inserted = appendMessageWithIcons(el, "  ⚠️ Save could not be read.");
+    expect(inserted).toBe(true);
+    expect(el.querySelector("svg")?.getAttribute("data-icon")).toBe("warning");
+    expect(el.textContent).toBe(" Save could not be read.");
+  });
+
+  it("keeps a labeled or quoted prefix message as plain text (issue #743)", () => {
+    // A non-whitespace prefix means the emoji is not the leading severity
+    // marker, so it stays text here; the emitter-side guard in
+    // iconCoverage.guard.test.ts is what forbids the engine from ever writing
+    // this shape, keeping the invariant structural instead of assumed.
+    for (const message of ["Day 5: 🔥 Blaze in the lobby", '"🔥 Blaze in the lobby" was the bulletin']) {
+      const el = document.createElement("div");
+      const inserted = appendMessageWithIcons(el, message);
+      expect(inserted, message).toBe(false);
+      expect(el.querySelector("svg"), message).toBeNull();
+      expect(el.textContent, message).toBe(message);
+    }
+  });
 });
 
 describe("messageWithIcons", () => {
@@ -192,6 +225,21 @@ describe("messageWithIcons", () => {
   it("returns a single text run for an unmapped message", () => {
     const parts = messageWithIcons("Nothing to see here");
     expect(parts).toEqual(["Nothing to see here"]);
+  });
+
+  it("tolerates leading whitespace before the marker (issue #743)", () => {
+    const parts = messageWithIcons(" 💰 Treasure found!");
+    expect(parts.length).toBe(2);
+    expect(typeof parts[0]).not.toBe("string");
+    expect(parts[1]).toBe(" Treasure found!");
+    const frag = renderToFragment(html`<p>${parts}</p>`);
+    expect(frag.querySelector("svg")?.getAttribute("data-icon")).toBe("money");
+    expect(frag.textContent).toBe(" Treasure found!");
+  });
+
+  it("keeps a labeled prefix message as a single text run (issue #743)", () => {
+    const parts = messageWithIcons("Day 5: 🔥 Blaze in the lobby");
+    expect(parts).toEqual(["Day 5: 🔥 Blaze in the lobby"]);
   });
 
   it("only swaps the leading marker: a mapped emoji mid-message stays text", () => {
