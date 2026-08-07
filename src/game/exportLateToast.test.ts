@@ -116,6 +116,56 @@ describe("late-success wording (GH #774)", () => {
     expect(quotedName(toasts[1].text)).toBe("Skyline Heights");
   });
 
+  it("drops a bidi override so it cannot reverse the rest of the sentence", async () => {
+    // U+202E is a format character, not a C0/C1 control, and nothing later in
+    // the toast terminates an override, so one that survived the sanitizer
+    // would render everything after the quoted name right to left.
+    const toasts = await lateSuccessToasts(named(String.fromCharCode(0x202e) + "Something"));
+    expect(toasts[1].text).toBe(`${LATE_PREFIX}Something${LATE_SUFFIX}`);
+  });
+
+  it("drops the naming clause for a name of only zero width spaces", async () => {
+    // Two U+200B characters have `length` 2, so a name made of them alone
+    // would otherwise take the NAMED branch and render as empty quote marks,
+    // reading as a tower somebody actually called that.
+    const toasts = await lateSuccessToasts(named(String.fromCharCode(0x200b, 0x200b)));
+    expect(toasts[1]).toEqual({ text: "The earlier export finished. Check where you saved it.", kind: "good" });
+  });
+
+  it("REGRESSION: a ZWJ emoji name survives whole (do not strip the whole Cf category)", async () => {
+    // A family emoji is spelled with U+200D joiners, the rename input's
+    // maxlength admits one, and every other surface renders it whole. A
+    // blanket format-character strip would split it into separate glyphs here
+    // and nowhere else, which is a new defect traded for the bidi fix.
+    const family = String.fromCodePoint(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467);
+    const toasts = await lateSuccessToasts(named(family));
+    expect(quotedName(toasts[1].text)).toBe(family);
+  });
+
+  it("keeps the word break when a newline separates the words", async () => {
+    // A newline is a control AND whitespace. Stripping controls before
+    // collapsing whitespace deletes it and joins the words into "SkyHigh".
+    const toasts = await lateSuccessToasts(named("Sky\nHigh"));
+    expect(quotedName(toasts[1].text)).toBe("Sky High");
+  });
+
+  it("keeps the word break when a tab separates the words", async () => {
+    const toasts = await lateSuccessToasts(named("Sky\tHigh"));
+    expect(quotedName(toasts[1].text)).toBe("Sky High");
+  });
+
+  it("a non-string name takes the fallback rather than throwing the export away", async () => {
+    // Reachable: `serialization.ts` assigns `data.towerName` from the file with
+    // no coercion, and `SaveGame.exportFilename` reads it through `|| ""`, so a
+    // null name from a hand-edited save survives to the capture here. Without
+    // the guard the player would get "Export failed" in place of an export
+    // that actually landed on disk.
+    const sim = Simulation.newGame(7);
+    (sim.tower as unknown as { towerName: unknown }).towerName = null;
+    const toasts = await lateSuccessToasts(sim);
+    expect(toasts[1]).toEqual({ text: "The earlier export finished. Check where you saved it.", kind: "good" });
+  });
+
   it("turns a double quote in the name into an apostrophe so the quoting cannot nest", async () => {
     const toasts = await lateSuccessToasts(named('Bob "The Builder" Tower'));
     expect(toasts[1].text).toBe(`${LATE_PREFIX}Bob 'The Builder' Tower${LATE_SUFFIX}`);
@@ -148,5 +198,29 @@ describe("late-success wording (GH #774)", () => {
 
     await runExportFlow(flowDeps(ui, named("Skyline Heights")), () => {});
     expect(toasts).toEqual([STORED_TOAST]);
+  });
+
+  it("REGRESSION: run ids stay unique across a reset, so neither run reads the other's latch", async () => {
+    // `latchOwner !== run` now decides wording as well as reentry, so a
+    // recycled run id inverts both branches: the older run would claim the
+    // in-latch sentence and free the newer run's latch on its way out, and the
+    // newer run would then answer with the late wording. Dispatch by suggested
+    // filename so neither run depends on microtask ordering.
+    const first = deferred<boolean>();
+    const second = deferred<boolean>();
+    const store = storeWithExport((_id, _scope, name) => (name.startsWith("first") ? first.promise : second.promise));
+    injectedStore = store.port;
+    await prepareSaveStore();
+    const { ui, toasts } = fakeUi();
+
+    const runA = runExportFlow(flowDeps(ui, named("First Tower")), () => {});
+    resetExportFlowForTests();
+    const runB = runExportFlow(flowDeps(ui, named("Second Tower")), () => {});
+
+    first.resolve(true);
+    await runA;
+    second.resolve(true);
+    await runB;
+    expect(toasts).toEqual([{ text: `${LATE_PREFIX}First Tower${LATE_SUFFIX}`, kind: "good" }, STORED_TOAST]);
   });
 });

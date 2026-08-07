@@ -46,6 +46,25 @@ export const EXPORT_WATCHDOG_MS = 10 * 60_000;
 const TOAST_NAME_MAX = 28;
 
 /**
+ * Invisible and bidi-affecting characters the toast's display name removes.
+ *
+ * Named one by one rather than taken as the whole `\p{Cf}` category, and the
+ * omissions are the point: U+200C (zero width non-joiner) and U+200D (zero
+ * width joiner) STAY. A ZWJ sequence is how a family emoji or a professional
+ * emoji is spelled, the rename input's `maxlength="28"` admits one, and every
+ * other surface renders it whole. Stripping the category would break such a
+ * name in this toast alone. Do not "complete" this set.
+ *
+ * What is here: the soft hyphen, the zero width space, the bidi marks
+ * (including the Arabic letter mark, the same family as LRM and RLM), the
+ * embedding and override block, the isolate block, and the interlinear
+ * annotation characters. U+FEFF needs no entry of its own: it is whitespace to
+ * the collapse step. Written as escapes because as literals they are invisible
+ * in a diff.
+ */
+const TOAST_INVISIBLES = /[\u00AD\u061C\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFFF9-\uFFFB]/g;
+
+/**
  * The tower name as the late-success toast may quote it (GH #774).
  *
  * Sanitize then bound, mirroring the shape `towerNameFromFilename` already
@@ -54,11 +73,32 @@ const TOAST_NAME_MAX = 28;
  * cannot nest, and the cap counts and cuts by code point so an astral emoji
  * is never split into a lone surrogate. An empty result is the caller's
  * signal to drop the naming clause entirely.
+ *
+ * Two places where this reads wider than the copy ruling's literal steps, both
+ * deliberate rather than drift:
+ *
+ *  - The ruling names C0/C1 (`\p{Cc}`) only. {@link TOAST_INVISIBLES} goes on
+ *    top of that, because two of the characters it lists do exactly the damage
+ *    the rule exists to stop. Nothing in the toast terminates a bidi override
+ *    (U+202E), so one that survived would render the tail of the sentence
+ *    reversed. And a name of nothing but zero width spaces is non-empty by
+ *    `length`, so it would take the named branch and show empty quote marks,
+ *    which is the "reads as a tower actually called that" failure the fallback
+ *    exists to prevent. Residual, accepted for the sake of emoji names: a name
+ *    of nothing but joiners still quotes as empty, since joiners are kept.
+ *  - Whitespace maps to a space BEFORE the strip. The ruling strips first and
+ *    collapses second, but the newline, carriage return, tab, vertical tab and
+ *    form feed are controls AND whitespace, so that order deletes them and
+ *    joins the words around them ("Sky", newline, "High" would read
+ *    "SkyHigh"). Mapping first keeps the break the name was written with,
+ *    while a control that is not whitespace still goes.
  */
 function toastDisplayName(name: unknown): string {
   if (typeof name !== "string") return "";
   const cleaned = name
+    .replace(/\s/g, " ")
     .replace(/\p{Cc}/gu, "")
+    .replace(TOAST_INVISIBLES, "")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/"/g, "'");
@@ -85,10 +125,19 @@ function lateExportedToast(name: string): string {
 let latchOwner = 0;
 let nextRun = 0;
 
-/** Test seam, mirroring `resetManualSaveForTests` for this module's state. */
+/**
+ * Test seam, mirroring `resetManualSaveForTests` for this module's state.
+ *
+ * Frees the latch but leaves `nextRun` alone, so run ids stay unique for the
+ * life of the module. Resetting the counter recycled them, and a run still in
+ * flight across a reset would then read a LATER run's latch as its own: it
+ * would take the in-latch wording it is no longer entitled to and free the new
+ * run's latch on the way out, pushing that new run onto the late path. That
+ * inverts both sides of the `latchOwner !== run` test, which now decides
+ * wording as well as reentry.
+ */
 export function resetExportFlowForTests(): void {
   latchOwner = 0;
-  nextRun = 0;
 }
 
 /**
