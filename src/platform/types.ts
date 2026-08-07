@@ -37,14 +37,13 @@
  *    and must keep duck-validating (see `isPlatformPort`). A required fourth
  *    member would silently demote such a shell to the browser port and take
  *    its native file save with it. `setCommandsAvailable`, `onFlushRequest`,
- *    `saveStore`, and `channel` are optional on the same grounds; every member
- *    added here after the original three must be.
- *  - `channel` names the storefront a DESKTOP build was packaged for, and a
- *    shell that ships to more than one store must stamp it per artifact. The
- *    game reads it only as an analytics dimension and accepts exactly the two
- *    documented values; see the member's own note for what an unrecognized one
- *    reports. The member keeps the short name even though the game EMITS the
- *    value as `distribution_channel`; see that note for why the two differ.
+ *    `saveStore`, and `distributionChannel` are optional on the same grounds;
+ *    every member added here after the original three must be.
+ *  - `distributionChannel` names the storefront a DESKTOP build was packaged
+ *    for, and a shell that ships to more than one store must stamp it per
+ *    artifact. The game reads it only as an analytics dimension and accepts
+ *    exactly the two documented values; see the member's own note for what an
+ *    unrecognized one reports.
  */
 
 import type { SaveStorePort } from "./saveStore";
@@ -150,31 +149,22 @@ export interface PlatformPort {
    * The commercial channel a DESKTOP artifact was packaged for: `"steam"` or
    * `"itch"`. Stamped by the shell at package time (the same renderer bundle
    * ships to both, so the value has to come from outside it), and read only as
-   * an analytics dimension: the game's behavior never branches on it.
+   * an analytics dimension: the game's behavior never branches on it. The game
+   * emits it as the analytics property `distribution_channel`.
    *
    * Optional like every member added after the original three, and the reason
    * is the usual one: the iOS shell has no storefront to name here, and a
    * required member would demote it to the browser port.
    *
-   * NAMED DIFFERENTLY AT THE TWO ENDS ON PURPOSE. The game emits this value as
-   * the analytics property `distribution_channel`, because a bare `channel`
-   * collides with PostHog's built-in `$channel_type` and would read as marketing
-   * attribution in the property picker. This member stays `channel`: it is the
-   * cross-repo contract the private shell already implements, renaming it would
-   * be a breaking change for no benefit, and the collision it would be dodging
-   * does not exist on this side. Leave the asymmetry alone; the resolver
-   * (`resolveDistributionChannel` in `src/analyticsEnrichment.ts`) carries the
-   * same note at the other end.
-   *
    * Typed as a plain `string` rather than a union so a wrapper repo pinned to
    * an older revision of this contract still compiles, and because the VALUE is
    * not trusted anyway. `isPlatformPort` checks the port's shape and lets any
-   * `channel` through on purpose, since a bad one cannot throw at boot the way a
-   * non-callable `onHostCommand` would; the sanitizing happens where the value
-   * is read, and anything but the two exact values above reports the channel as
-   * `unknown`.
+   * `distributionChannel` through on purpose, since a bad one cannot throw at
+   * boot the way a non-callable `onHostCommand` would; the sanitizing happens
+   * where the value is read, and anything but the two exact values above
+   * reports the channel as `unknown`.
    */
-  readonly channel?: string;
+  readonly distributionChannel?: string;
 }
 
 declare global {

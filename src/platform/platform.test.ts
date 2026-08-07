@@ -336,7 +336,7 @@ describe("isPlatformPort: saveStore is optional on the same grounds", () => {
   });
 });
 
-describe("isPlatformPort: channel is a data member, so it is not shape-checked", () => {
+describe("isPlatformPort: distributionChannel is a data member, so it is not shape-checked", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -346,29 +346,28 @@ describe("isPlatformPort: channel is a data member, so it is not shape-checked",
     // and demanding the member would demote it to the browser port and cost it
     // its native file save.
     const noChannel = fakePort();
-    expect("channel" in noChannel).toBe(false);
+    expect("distributionChannel" in noChannel).toBe(false);
     expect(resolvePlatform("native", noChannel)).toBe(noChannel);
     expect(resolvePlatform("desktop", noChannel)).toBe(noChannel);
   });
 
   it("accepts a port that names one", () => {
-    const steam = { ...fakePort(), channel: "steam" };
+    const steam = { ...fakePort(), distributionChannel: "steam" };
     expect(resolvePlatform("desktop", steam)).toBe(steam);
   });
 
-  it("accepts a port whose channel is hostile, because the VALUE is sanitized at read time", () => {
-    // Deliberately unlike the function members. A junk `channel` cannot throw
-    // during boot the way a non-callable `onHostCommand` would, so refusing the
-    // whole port over one would trade a working shell's file save for a
-    // telemetry label. `resolveDistributionChannel` (src/analyticsEnrichment.ts)
-    // is what turns any of these into `unknown`. The member stays `channel`
-    // here while the emitted property is `distribution_channel`; see types.ts.
+  it("accepts a port whose distributionChannel is hostile, because the VALUE is sanitized at read time", () => {
+    // Deliberately unlike the function members. A junk `distributionChannel`
+    // cannot throw during boot the way a non-callable `onHostCommand` would, so
+    // refusing the whole port over one would trade a working shell's file save
+    // for a telemetry label. `resolveDistributionChannel`
+    // (src/analyticsEnrichment.ts) is what turns any of these into `unknown`.
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    for (const channel of [42, null, {}, "evil", "STEAM", "steam "]) {
-      const port = { ...fakePort(), channel };
+    for (const distributionChannel of [42, null, {}, "evil", "STEAM", "steam "]) {
+      const port = { ...fakePort(), distributionChannel };
       expect(resolvePlatform("desktop", port)).toBe(port);
     }
-    const trapped = Object.defineProperty({ ...fakePort() }, "channel", {
+    const trapped = Object.defineProperty({ ...fakePort() }, "distributionChannel", {
       get() {
         throw new Error("revoked");
       },
@@ -378,8 +377,8 @@ describe("isPlatformPort: channel is a data member, so it is not shape-checked",
   });
 
   it("the browser default omits it", () => {
-    expect(browserPlatform.channel).toBeUndefined();
-    expect("channel" in browserPlatform).toBe(false);
+    expect(browserPlatform.distributionChannel).toBeUndefined();
+    expect("distributionChannel" in browserPlatform).toBe(false);
   });
 });
 

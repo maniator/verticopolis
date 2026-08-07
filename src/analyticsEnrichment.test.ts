@@ -154,11 +154,6 @@ describe("resolvePlatformLabel", () => {
 });
 
 describe("resolveDistributionChannel", () => {
-  // Every port literal below spells the member `channel`, not
-  // `distributionChannel`, and that is the contract: the PORT member keeps the
-  // short name the private shell already implements, while the game EMITS the
-  // value as `distribution_channel` to stay clear of PostHog's `$channel_type`.
-  // These assertions are what stops a later tidy-up from renaming the member.
   it("maps each non-desktop surface to its own channel", () => {
     expect(resolveDistributionChannel("web", {})).toBe("web");
     expect(resolveDistributionChannel("twa", {})).toBe("twa");
@@ -168,12 +163,12 @@ describe("resolveDistributionChannel", () => {
   it("ignores a channel a non-desktop port has no business stamping", () => {
     // Only a desktop artifact is packaged per store, so the member is not even
     // read elsewhere: an iOS shell that stamped `steam` reports `ios`.
-    expect(resolveDistributionChannel("ios", { channel: "steam" })).toBe("ios");
+    expect(resolveDistributionChannel("ios", { distributionChannel: "steam" })).toBe("ios");
   });
 
   it("reports the two named desktop storefronts", () => {
-    expect(resolveDistributionChannel("desktop", { channel: "steam" })).toBe("steam");
-    expect(resolveDistributionChannel("desktop", { channel: "itch" })).toBe("itch");
+    expect(resolveDistributionChannel("desktop", { distributionChannel: "steam" })).toBe("steam");
+    expect(resolveDistributionChannel("desktop", { distributionChannel: "itch" })).toBe("itch");
   });
 
   it("reports unknown for anything else the shell injects, exact match only", () => {
@@ -183,26 +178,26 @@ describe("resolveDistributionChannel", () => {
     // folding, because a shell stamping `"STEAM"` has a packaging bug worth
     // seeing rather than papering over.
     expect(resolveDistributionChannel("desktop", {})).toBe("unknown");
-    expect(resolveDistributionChannel("desktop", { channel: undefined })).toBe("unknown");
-    expect(resolveDistributionChannel("desktop", { channel: "steam " })).toBe("unknown");
-    expect(resolveDistributionChannel("desktop", { channel: " steam" })).toBe("unknown");
-    expect(resolveDistributionChannel("desktop", { channel: "STEAM" })).toBe("unknown");
-    expect(resolveDistributionChannel("desktop", { channel: "Itch" })).toBe("unknown");
-    expect(resolveDistributionChannel("desktop", { channel: "evil" })).toBe("unknown");
-    expect(resolveDistributionChannel("desktop", { channel: 42 })).toBe("unknown");
-    expect(resolveDistributionChannel("desktop", { channel: null })).toBe("unknown");
-    expect(resolveDistributionChannel("desktop", { channel: { toString: () => "steam" } })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { distributionChannel: undefined })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { distributionChannel: "steam " })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { distributionChannel: " steam" })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { distributionChannel: "STEAM" })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { distributionChannel: "Itch" })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { distributionChannel: "evil" })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { distributionChannel: 42 })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { distributionChannel: null })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { distributionChannel: { toString: () => "steam" } })).toBe("unknown");
   });
 
-  it("survives a hostile port whose channel getter throws", () => {
+  it("survives a hostile port whose distributionChannel getter throws", () => {
     // A dimension read must never throw out of boot enrichment. The port comes
     // from another repository, so a revoked Proxy or a booby-trapped getter is
     // in scope exactly as it is for `isPlatformPort`.
-    const trapped = Object.defineProperty({}, "channel", {
+    const trapped = Object.defineProperty({}, "distributionChannel", {
       get() {
         throw new Error("revoked");
       },
-    }) as { readonly channel?: unknown };
+    }) as { readonly distributionChannel?: unknown };
     expect(() => resolveDistributionChannel("desktop", trapped)).not.toThrow();
     expect(resolveDistributionChannel("desktop", trapped)).toBe("unknown");
   });

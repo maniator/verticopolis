@@ -126,40 +126,33 @@ export function resolvePlatformLabel(mode: BuildMode, isNativeWrapper: boolean, 
  * Resolve the distribution channel from the already-resolved platform plus the
  * injected port. Every non-desktop surface is its own channel; only a desktop
  * build has a storefront to name, and it names it through the port's optional
- * `channel` member (stamped by the shell at package time).
- *
- * The PORT member is `channel` while the EMITTED property is
- * `distribution_channel`, and that asymmetry is deliberate. The port is a
- * cross-repo contract the private shell already implements, so renaming the
- * member would break it for nothing; the collision being avoided is with
- * PostHog's `$channel_type` and lives entirely on the analytics side (see
- * {@link DistributionChannelLabel}). Do not "tidy" the two into agreement;
- * `src/platform/types.ts` carries the same note at the other end.
+ * `distributionChannel` member (stamped by the shell at package time).
  *
  * That member is UNTRUSTED input from another repository, exactly like the rest
  * of the port, so it is sanitized here rather than at validation time: only the
  * two exact values pass, and everything else (a near miss like `"STEAM"` or a
  * stray space, a non-string, a member that is not there at all) reports
  * `unknown`. `isPlatformPort` checks the port's SHAPE and deliberately lets any
- * `channel` value through, because a bad one must not demote a working shell to
- * the browser port over a telemetry dimension. Reading the member can itself
- * throw (a hostile getter, a revoked Proxy), so the read is guarded: a
- * dimension is never worth throwing out of boot for.
+ * `distributionChannel` value through, because a bad one must not demote a
+ * working shell to the browser port over a telemetry dimension. Reading the
+ * member can itself throw (a hostile getter, a revoked Proxy), so the read is
+ * guarded: a dimension is never worth throwing out of boot for.
  */
 export function resolveDistributionChannel(
   platform: PlatformLabel,
-  port: { readonly channel?: unknown },
+  port: { readonly distributionChannel?: unknown },
 ): DistributionChannelLabel {
   if (platform !== "desktop") return platform;
   let named: unknown;
   try {
-    named = port.channel;
+    named = port.distributionChannel;
   } catch {
     return "unknown";
   }
-  if (named === "steam") return "steam";
-  if (named === "itch") return "itch";
-  return "unknown";
+  // The comparison narrows `named` (typed `unknown`, since the shell's value is
+  // not trusted) to the two accepted literals, so the match can be returned
+  // directly rather than restated.
+  return named === "steam" || named === "itch" ? named : "unknown";
 }
 
 /**

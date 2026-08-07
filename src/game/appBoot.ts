@@ -251,11 +251,11 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // buckets. Where each one comes from, since this is what rides on every event:
   // `platform` is the build mode, then the injected port's wrapper flag, then
   // the `?src=twa` marker on the launch URL; `distribution_channel` is the same
-  // injected port's optional `channel` member, read on desktop builds only. So
-  // only the build mode is fixed in the bundle; the wrapper flag, the marker,
-  // and the channel member are all live reads at boot. All four still describe
-  // the build and the shell it launched in; nothing about the device, the
-  // browser, or the player is probed. The remaining buckets are
+  // injected port's optional `distributionChannel` member, read on desktop
+  // builds only. So only the build mode is fixed in the bundle; the wrapper
+  // flag, the marker, and the channel member are all live reads at boot. All
+  // four still describe the build and the shell it launched in; nothing about
+  // the device, the browser, or the player is probed. The remaining buckets are
   // cookieless too, derived from state the device already holds (the onboarding
   // flag, the loaded tower's in-game age, and the autosave's write time), with
   // no id and no new storage.
