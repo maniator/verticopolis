@@ -118,7 +118,7 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
       ui: {
         toast: () => {},
         sayVisibly: vi.fn(),
-        downloadFile: () => {},
+        downloadFile: () => Promise.resolve(),
         showImportReport: (_report, cb) => importReports.push({ open: cb.onOpen }),
         showExportReport: () => {},
       },
@@ -139,7 +139,7 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
       getSim: () => sim,
       getView: () => null,
       adoptSim: () => {},
-      ui: { toast: () => {}, sayVisibly: () => {}, downloadFile: () => {}, showImportReport: () => {}, showExportReport: () => {} },
+      ui: { toast: () => {}, sayVisibly: () => {}, downloadFile: () => Promise.resolve(), showImportReport: () => {}, showExportReport: () => {} },
       showCrashScreen: () => {},
       attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
@@ -165,6 +165,7 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
         sayVisibly: vi.fn(),
         downloadFile: (_name, contents) => {
           file = contents as string;
+          return Promise.resolve();
         },
         showImportReport: () => {},
         showExportReport: () => {},

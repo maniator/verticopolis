@@ -29,7 +29,9 @@ export interface ExportFlowDeps {
  * a single-flight latch would let a hung bridge brick Export for the rest of
  * the session, which is worse than the reentry the latch exists to stop. Ten
  * minutes is far past any plausible dialog session, so tripping it means the
- * bridge is stuck, and the honest move is to free the latch and say so.
+ * bridge is stuck, and the honest move is to free the latch and say so. The
+ * wrapped fallback's saveFile dialog is awaited raw under this same watchdog
+ * (GH #773), on the same reasoning.
  */
 export const EXPORT_WATCHDOG_MS = 10 * 60_000;
 
@@ -102,9 +104,20 @@ export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simul
       if (latchOwner !== run) return;
     }
     const file = await SaveGame.export(sim);
-    deps.ui.downloadFile(SaveGame.exportFilename(sim), file);
+    const delivered = deps.ui.downloadFile(SaveGame.exportFilename(sim), file);
     // The container is pure ASCII, so string length == bytes on disk.
     deps.ui.toast(`Tower exported (${(file.length / 1024).toFixed(1)} KB). Check your downloads.`, "good");
+    // On a wrapped session this live path opened the shell's saveFile dialog,
+    // which outlives the call, so hold the latch until it settles (GH #773):
+    // releasing on return reopened the reentry window the latch exists to
+    // close (a second flush plus a second dialog off the macOS menu). The
+    // toast stays above the await on purpose: the port contract resolves
+    // saveFile identically for a written file and a canceled dialog (types.ts,
+    // cancel is not an error), so waiting for the settle could not tell the
+    // player anything more, and the residual is that a cancel still gets this
+    // toast. In a browser build the branch folds away and the anchor-click
+    // download keeps its synchronous timing, toast included.
+    if (IS_WRAPPED_BUILD) await delivered;
   } catch (err) {
     // Never fail silently: main.ts fires this with `void`, so an unhandled
     // rejection here would leave the player with no download and no feedback.

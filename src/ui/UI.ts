@@ -332,8 +332,14 @@ export class UI {
    *  keeps the pre-port blob-anchor download exactly. Callers decide the name and
    *  contents (see SaveGame.export); raw bytes flow through too, for the binary
    *  .TDT export. The type mirrors the platform port's saveFile seam (a
-   *  cross-repo contract), which is why it is narrower than BlobPart. */
-  downloadFile(filename: string, contents: string | Uint8Array): void {
+   *  cross-repo contract), which is why it is narrower than BlobPart.
+   *
+   *  Returns a promise that settles when the port's saveFile does and never
+   *  rejects (every failure lands in the toast below). The export flow awaits
+   *  it on a wrapped session so its single-flight latch spans the shell's save
+   *  dialog (GH #773). Every other caller may ignore it: the call itself stays
+   *  synchronous, and the browser port resolves right after its anchor click. */
+  downloadFile(filename: string, contents: string | Uint8Array): Promise<void> {
     // octet-stream (not application/json, the payload isn't) so the browser
     // downloads our made-up .vctower type instead of trying to display it.
     //
@@ -348,9 +354,10 @@ export class UI {
       this.toast("Couldn't save your tower file. Please try again.", "bad");
     };
     try {
-      void Promise.resolve(getPlatform().saveFile(filename, contents, "application/octet-stream")).catch(fail);
+      return Promise.resolve(getPlatform().saveFile(filename, contents, "application/octet-stream")).catch(fail);
     } catch (err) {
       fail(err);
+      return Promise.resolve();
     }
   }
 
