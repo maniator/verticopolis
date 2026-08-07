@@ -35,6 +35,52 @@ export interface ExportFlowDeps {
  */
 export const EXPORT_WATCHDOG_MS = 10 * 60_000;
 
+/**
+ * Longest tower name the late-success toast will quote, in CODE POINTS.
+ *
+ * 28 matches the rename input's `maxlength`, and TDT import caps at 24, so no
+ * name a player can make in the game is ever truncated here. The cap exists
+ * for a save file edited outside the game: `serialization.ts` assigns
+ * `data.towerName` with no coercion while every UI path coerces.
+ */
+const TOAST_NAME_MAX = 28;
+
+/**
+ * The tower name as the late-success toast may quote it (GH #774).
+ *
+ * Sanitize then bound, mirroring the shape `towerNameFromFilename` already
+ * uses for the import side. Two steps carry weight beyond tidiness: the
+ * straight double quote becomes an apostrophe so the quoting in the toast
+ * cannot nest, and the cap counts and cuts by code point so an astral emoji
+ * is never split into a lone surrogate. An empty result is the caller's
+ * signal to drop the naming clause entirely.
+ */
+function toastDisplayName(name: unknown): string {
+  if (typeof name !== "string") return "";
+  const cleaned = name
+    .replace(/\p{Cc}/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/"/g, "'");
+  const points = Array.from(cleaned);
+  if (points.length <= TOAST_NAME_MAX) return cleaned;
+  return points.slice(0, TOAST_NAME_MAX - 1).join("") + "…";
+}
+
+/**
+ * What to say when an export the player was told had stalled finally lands.
+ *
+ * The player has moved on, usually into another tower, and was told minutes
+ * ago that the export was not responding, so naming the tower is what closes
+ * the loop. With no usable name the sentence drops the clause and still says
+ * the true thing; a placeholder name inside quote marks would read as a tower
+ * actually called that.
+ */
+function lateExportedToast(name: string): string {
+  if (name === "") return "The earlier export finished. Check where you saved it.";
+  return `The earlier export of "${name}" finished. Check where you saved it.`;
+}
+
 /** The run id currently holding the single-flight latch; 0 when free. */
 let latchOwner = 0;
 let nextRun = 0;
@@ -60,13 +106,13 @@ export function resetExportFlowForTests(): void {
  * The watchdog is the latch's escape hatch, and deliberately does NOT abandon
  * the awaited call: it frees the latch and tells the player, and if the
  * original dialog settles late its outcome still lands (a late success still
- * exports; a late cancel still says nothing). The one exception is a late
- * "fallback": every other late outcome finishes something, but fallback would
- * START the live path and drop a fresh dialog on top of whatever the player
- * is doing minutes later, so a run that no longer holds the latch stops there
- * (the Edge Case Hunter demonstrated the collision). The settle path releases
- * only a latch its own run still holds, so a late settle can never unlock a
- * newer export's dialog.
+ * exports, and names the tower it exported; a late cancel still says nothing).
+ * The one exception is a late "fallback": every other late outcome finishes
+ * something, but fallback would START the live path and drop a fresh dialog on
+ * top of whatever the player is doing minutes later, so a run that no longer
+ * holds the latch stops there (the Edge Case Hunter demonstrated the
+ * collision). The settle path releases only a latch its own run still holds,
+ * so a late settle can never unlock a newer export's dialog.
  */
 export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simulation) => void): Promise<void> {
   if (latchOwner !== 0) return;
@@ -83,6 +129,11 @@ export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simul
     // must carry the camera exactly as the live-serialize path always has
     // (a party catch: dropping it would export towers at a stale view).
     stampView(sim);
+    // Capture the display name HERE, in the same synchronous step, for the
+    // late-success toast below (GH #774). The `sim` local does survive an
+    // `adoptSim` swap, so reading the name at settle time is usually right,
+    // but a rename of this sim before the swap would drift it.
+    const towerName = toastDisplayName(sim.tower.towerName);
     // Stored-byte export (story D7, D2's AC22): on a hydrated desktop
     // session, flush to auto and let the shell COPY the stored file, so
     // the destination bytes equal the stored bytes. Cancel is a CHOICE
@@ -92,6 +143,15 @@ export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simul
     if (IS_WRAPPED_BUILD) {
       const stored = await exportStoredTower(sim, SaveGame.exportFilename(sim));
       if (stored === "exported") {
+        // A success that lands after the watchdog freed the latch gets its
+        // own wording: the file really was written, but the player has since
+        // been told the export stalled and has probably moved on, so the
+        // toast has to say which export this is. A run still holding the
+        // latch is the ordinary case and keeps the ordinary sentence.
+        if (latchOwner !== run) {
+          deps.ui.toast(lateExportedToast(towerName), "good");
+          return;
+        }
         deps.ui.toast("Tower exported. Check where you saved it.", "good");
         return;
       }

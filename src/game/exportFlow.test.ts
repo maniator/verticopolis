@@ -1,15 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import type { SaveStorePort } from "../platform/saveStore";
-import { LOCAL, fakeStore } from "./desktopSaveStore.fixture";
+import {
+  HUNG_TOAST,
+  LATE_STORED_TOAST,
+  LIVE_TOAST,
+  STORED_TOAST,
+  deferred,
+  fakeUi,
+  flowDeps,
+  storeWithExport,
+} from "./exportFlow.fixture";
 
 /**
  * The export flow's single-flight latch and its watchdog (GH #760). The
  * desktop contract makes the shell's save dialog window-modal, but a macOS
  * app menu (or a nonconforming shell) can fire Export mid-dialog, and a hung
  * `exportRecord` bridge must not hold the latch forever. The `vi.mock`
- * preamble is repeated here because vi.mock is file-scoped and hoisted; the
- * fixture module carries everything shareable.
+ * preamble is repeated here because vi.mock is file-scoped and hoisted;
+ * `exportFlow.fixture` carries everything shareable. The late-success wording
+ * these tests drive past lives in `exportLateToast.test.ts` (GH #774).
  */
 
 let injectedStore: SaveStorePort | undefined;
@@ -30,59 +40,6 @@ vi.mock("../platform", async (importOriginal) => ({
 const { prepareSaveStore, resetSaveStoreForTests } = await import("./desktopSaveStore");
 const { resetManualSaveForTests } = await import("./manualSavePersist");
 const { runExportFlow, resetExportFlowForTests, EXPORT_WATCHDOG_MS } = await import("./exportFlow");
-
-const SHARED = [{ token: LOCAL, label: "This computer", shared: true }];
-
-/** A store whose flush succeeds and whose exportRecord the test controls. */
-function storeWithExport(exportRecord: SaveStorePort["exportRecord"]) {
-  const store = fakeStore(SHARED);
-  store.port.writeSync = (id, contents, scope) => {
-    store.held.set(`${scope}|${id}`, contents);
-    return { ok: true };
-  };
-  store.port.exportRecord = exportRecord;
-  return store;
-}
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (err: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
-
-/** `downloadResults` are consumed in call order; the default is an already
- *  settled dialog, which is what every pre-#773 test assumed. */
-function fakeUi(downloadResults?: Promise<void>[]) {
-  const toasts: { text: string; kind: string }[] = [];
-  const downloads: string[] = [];
-  return {
-    toasts,
-    downloads,
-    ui: {
-      toast: (text: string, kind?: string) => {
-        toasts.push({ text, kind: kind ?? "info" });
-      },
-      downloadFile: (filename: string) => {
-        downloads.push(filename);
-        return downloadResults?.shift() ?? Promise.resolve();
-      },
-    },
-  };
-}
-
-function flowDeps(ui: ReturnType<typeof fakeUi>["ui"], sim = Simulation.newGame(7)) {
-  return { getSim: () => sim, ui };
-}
-
-const HUNG_TOAST = { text: "The export is not responding. You can try exporting again.", kind: "bad" };
-const STORED_TOAST = { text: "Tower exported. Check where you saved it.", kind: "good" };
-// The size line for the 13-byte payload the GH #773 tests mock into
-// SaveGame.export ("VCTOWER1\nfake" rounds to 0.0 KB).
-const LIVE_TOAST = { text: "Tower exported (0.0 KB). Check your downloads.", kind: "good" };
 
 beforeEach(() => {
   resetSaveStoreForTests();
@@ -194,11 +151,13 @@ describe("export single-flight latch (GH #760)", () => {
     expect(toasts).toEqual([HUNG_TOAST]);
 
     // The bridge finally answers: the file WAS written, so the success toast
-    // is honest, and it lands once (the watchdog never fires again).
+    // is honest, and it lands once (the watchdog never fires again). Its
+    // wording is the late one (GH #774), which the suite below covers; what
+    // this test still owns is the exactly-once part.
     gate.resolve(true);
     await first;
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS * 2);
-    expect(toasts).toEqual([HUNG_TOAST, STORED_TOAST]);
+    expect(toasts).toEqual([HUNG_TOAST, LATE_STORED_TOAST]);
   });
 
   it("REGRESSION: a late fallback never runs the live path, only an owned one does", async () => {
