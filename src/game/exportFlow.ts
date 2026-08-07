@@ -46,23 +46,84 @@ export const EXPORT_WATCHDOG_MS = 10 * 60_000;
 const TOAST_NAME_MAX = 28;
 
 /**
- * Invisible and bidi-affecting characters the toast's display name removes.
+ * Format characters the toast's display name deletes, sparing the two joiners.
  *
- * Named one by one rather than taken as the whole `\p{Cf}` category, and the
- * omissions are the point: U+200C (zero width non-joiner) and U+200D (zero
- * width joiner) STAY. A ZWJ sequence is how a family emoji or a professional
- * emoji is spelled, the rename input's `maxlength="28"` admits one, and every
- * other surface renders it whole. Stripping the category would break such a
- * name in this toast alone. Do not "complete" this set.
+ * Written as the whole `\p{Cf}` category minus an exception rather than as a
+ * list of code points. The list form was tried three times and came up short
+ * every time: first it held the C0/C1 controls alone, then it grew the bidi
+ * controls and the zero width space, and the confirming review pass showed 152
+ * of the 170 format characters still getting through. A category is complete
+ * by construction, so there is nothing left here to omit.
  *
- * What is here: the soft hyphen, the zero width space, the bidi marks
- * (including the Arabic letter mark, the same family as LRM and RLM), the
- * embedding and override block, the isolate block, and the interlinear
- * annotation characters. U+FEFF needs no entry of its own: it is whitespace to
- * the collapse step. Written as escapes because as literals they are invisible
- * in a diff.
+ * The exception is load-bearing. U+200C (zero width non-joiner) and U+200D
+ * (zero width joiner) stay, because a ZWJ sequence is how a family emoji or a
+ * professional emoji is spelled, the rename input's `maxlength="28"` admits
+ * one, and every other surface renders it whole. Keeping them costs nothing
+ * now: a name of nothing but joiners carries no ink, so {@link TOAST_INK}
+ * sends it to the fallback without the strip having to catch it.
+ *
+ * All 12 `\p{Bidi_Control}` code points are format characters, so this covers
+ * the override (U+202E and its neighbors) that would otherwise reverse the
+ * tail of the sentence, since nothing later in the toast terminates one. That
+ * job stays separate from the ink test and neither replaces the other: a name
+ * with plenty of ink can still carry an override.
+ *
+ * Accepted cost: the prepended concatenation marks (the Arabic number sign and
+ * its family) are format characters too and go with the rest. They render
+ * nothing on their own and shape only the digits that follow them, which is
+ * not something a name quoted inside one toast needs to reproduce.
+ *
+ * The two spared code points are written as escapes because as literals they
+ * are invisible in a diff.
  */
-const TOAST_INVISIBLES = /[\u00AD\u061C\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFFF9-\uFFFB]/g;
+const TOAST_STRIPPED_FORMATS = /(?![\u200C\u200D])\p{Cf}/gu;
+
+/**
+ * Matches one character that renders ink, which is what the named form of the
+ * toast requires before it will quote anything.
+ *
+ * A positive test, phrased as "not one of the categories that render nothing".
+ * The deny list it replaces could not close this class: no rule about format
+ * characters reaches U+3164 HANGUL FILLER (`Lo`), U+2800 BRAILLE PATTERN BLANK
+ * (`So`), or the variation selectors (`Mn`), and those are the characters an
+ * invisible name is usually built from.
+ *
+ * What counts as inkless here, and why:
+ *
+ *  - `\p{Cc}`, `\p{Cf}`, `\p{Cs}`, `\p{Co}`, `\p{Cn}`: controls, format
+ *    characters, unpaired surrogates, private use (no assigned appearance
+ *    outside one particular font), and unassigned code points.
+ *  - `\p{Z}`: every space separator, so a name of exotic spaces is not a name.
+ *  - `\p{Mn}` and `\p{Me}`: a nonspacing or enclosing mark has no advance
+ *    width and no standalone form, so a name of nothing but marks renders as
+ *    marks hung on a dotted circle or on nothing at all. This is the judgment
+ *    call in the set, and it is also what covers both variation selector
+ *    ranges, U+FE00-U+FE0F and U+E0100-U+E01EF. `\p{Mc}` is deliberately NOT
+ *    here: a spacing combining mark advances the pen and shows.
+ *  - `\p{Default_Ignorable_Code_Point}`: Unicode's own name for code points a
+ *    renderer is meant to show nothing for. It is what reaches U+3164 and the
+ *    other Hangul fillers, U+115F, U+1160 and U+FFA0, which are `Lo`.
+ *  - U+2800: an assigned printing character whose printed form is empty. It
+ *    sits in no category of invisibles, so it is named on its own.
+ */
+const TOAST_INK = /[^\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Z}\p{Mn}\p{Me}\p{Default_Ignorable_Code_Point}\u2800]/u;
+
+/**
+ * Whether `text` holds at least one character that renders ink.
+ *
+ * Exported and tested in its own right, because three of the categories in
+ * {@link TOAST_INK} cannot be reached through {@link toastDisplayName}: the
+ * cleaning steps ahead of it already delete every `\p{Cc}` and every
+ * `\p{Cf}` other than the two joiners, and every `\p{Z}` is JavaScript `\s`,
+ * so the collapse and the trim take those. Left to the flow alone, dropping
+ * any of the three would change nothing a test could see. They stay in the
+ * rule anyway, so that it states "renders nothing" completely on its own
+ * terms and a later reordering of the cleaning steps cannot quietly un-cover
+ * a category.
+ */
+export function hasVisibleInk(text: string): boolean {
+  return TOAST_INK.test(text);
+}
 
 /**
  * The tower name as the late-success toast may quote it (GH #774).
@@ -71,37 +132,61 @@ const TOAST_INVISIBLES = /[\u00AD\u061C\u200B\u200E\u200F\u202A-\u202E\u2066-\u2
  * uses for the import side. Two steps carry weight beyond tidiness: the
  * straight double quote becomes an apostrophe so the quoting in the toast
  * cannot nest, and the cap counts and cuts by code point so an astral emoji
- * is never split into a lone surrogate. An empty result is the caller's
+ * is never split into a lone surrogate. An empty return is the caller's
  * signal to drop the naming clause entirely.
  *
- * Two places where this reads wider than the copy ruling's literal steps, both
- * deliberate rather than drift:
+ * Exported for the sweep in the wording suite, which walks whole Unicode
+ * categories and would be far too slow driven through the flow.
  *
- *  - The ruling names C0/C1 (`\p{Cc}`) only. {@link TOAST_INVISIBLES} goes on
- *    top of that, because two of the characters it lists do exactly the damage
- *    the rule exists to stop. Nothing in the toast terminates a bidi override
- *    (U+202E), so one that survived would render the tail of the sentence
- *    reversed. And a name of nothing but zero width spaces is non-empty by
- *    `length`, so it would take the named branch and show empty quote marks,
- *    which is the "reads as a tower actually called that" failure the fallback
- *    exists to prevent. Residual, accepted for the sake of emoji names: a name
- *    of nothing but joiners still quotes as empty, since joiners are kept.
- *  - Whitespace maps to a space BEFORE the strip. The ruling strips first and
- *    collapses second, but the newline, carriage return, tab, vertical tab and
- *    form feed are controls AND whitespace, so that order deletes them and
- *    joins the words around them ("Sky", newline, "High" would read
- *    "SkyHigh"). Mapping first keeps the break the name was written with,
- *    while a control that is not whitespace still goes.
+ * ## Deviation from the copy ruling, recorded rather than silent
+ *
+ * The copy ruling on #774 specified a strip-based step list ending at "empty
+ * result takes the fallback". Three review rounds then showed that a deny list
+ * of invisible characters cannot close the invisible-name class. The list grew
+ * from the C0/C1 controls, to those plus bidi and the zero width space, and
+ * the confirming pass still found 152 of the 170 format characters surviving,
+ * with U+2060 WORD JOINER reproducing the exact empty-quotes failure the round
+ * before it claimed to have closed. Worse, U+3164 HANGUL FILLER (the canonical
+ * invisible name character), U+115F, U+1160, U+FFA0, the variation selectors
+ * and U+2800 are `Lo`, `Mn` and `So`, so no rule written about format
+ * characters could ever have reached them.
+ *
+ * The repo owner authorized a positive visible-ink test in place of the
+ * ruling's step 5: after cleaning, a name holding no character that renders
+ * ink takes the fallback. Every other ruled step stands. The deviation is
+ * recorded in a comment on #774, so a reader of the ruling can see why the
+ * shipped code differs from the ruled steps.
+ *
+ * ## What the rule guarantees
+ *
+ * Whenever the toast takes the NAMED form, the quoted span renders at least
+ * one visible glyph. The truncating branch holds it too, since U+2026 is
+ * itself ink. What it does not promise is that the visible glyph is the one a
+ * reader would have picked. A hand-edited name whose only ink sits past the
+ * 28th code point truncates to invisible characters plus the ellipsis and
+ * shows as "…" inside the quotes. That still says something true, that the
+ * name ran longer than the toast will print, and it is reachable only from a
+ * save edited outside the game.
+ *
+ * ## The other place this reads wider than the ruled steps
+ *
+ * Whitespace maps to a space BEFORE the strip. The ruling strips first and
+ * collapses second, but the newline, carriage return, tab, vertical tab and
+ * form feed are controls AND whitespace, so that order deletes them and joins
+ * the words around them ("Sky", newline, "High" would read "SkyHigh"). Mapping
+ * first keeps the break the name was written with, while a control that is not
+ * whitespace still goes.
  */
-function toastDisplayName(name: unknown): string {
+export function toastDisplayName(name: unknown): string {
   if (typeof name !== "string") return "";
   const cleaned = name
     .replace(/\s/g, " ")
     .replace(/\p{Cc}/gu, "")
-    .replace(TOAST_INVISIBLES, "")
+    .replace(TOAST_STRIPPED_FORMATS, "")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/"/g, "'");
+  if (!hasVisibleInk(cleaned)) return "";
   const points = Array.from(cleaned);
   if (points.length <= TOAST_NAME_MAX) return cleaned;
   return points.slice(0, TOAST_NAME_MAX - 1).join("") + "…";

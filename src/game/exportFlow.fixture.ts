@@ -71,3 +71,6 @@ export const LATE_SUFFIX = '" finished. Check where you saved it.';
 /** The same success arriving after the watchdog freed the latch, naming the
  *  default tower the fixtures build. */
 export const LATE_STORED_TOAST = { text: `${LATE_PREFIX}Tower One${LATE_SUFFIX}`, kind: "good" };
+/** The late-success wording with the naming clause dropped, which is what a
+ *  name carrying no visible ink falls back to. */
+export const LATE_UNNAMED_TOAST = { text: "The earlier export finished. Check where you saved it.", kind: "good" };
