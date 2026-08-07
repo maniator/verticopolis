@@ -12,7 +12,7 @@ import {
   RateLimiter,
   type IngestDeps,
 } from "./analyticsIngest";
-import { DISTRIBUTION_CHANNEL_LABELS } from "./analyticsEnrichment";
+import { DISTRIBUTION_CHANNEL_LABELS, PLATFORM_LABELS } from "./analyticsEnrichment";
 
 /**
  * The desktop ingest route (`POST /api/ingest/desktop`, issue #781). Its
@@ -159,7 +159,15 @@ describe("buildDesktopCaptureBody", () => {
     }
   });
 
-  it("pins the accepted storefronts against the client vocabulary", () => {
+  it("pins the stamped platform and the accepted storefronts against the client vocabulary", () => {
+    // `platform` is a hardcoded literal here rather than a validated field, so
+    // nothing else stops it drifting from `PlatformLabel` if the client union is
+    // ever renamed or re-spelled; the dimension would then split into two values
+    // with no failure anywhere.
+    expect([...PLATFORM_LABELS] as unknown[]).toContain(
+      buildDesktopCaptureBody({ event: "boot" }, "test").properties.platform,
+    );
+
     // The server restates the pair rather than importing the client resolver (it
     // compiles into the Vercel function and stays free of the client tree), so a
     // storefront added to `DistributionChannelLabel` without being taught here

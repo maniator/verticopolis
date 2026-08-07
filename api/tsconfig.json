@@ -8,5 +8,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["**/*.ts", "../src/analyticsIngest.ts"]
+  "include": ["**/*.ts", "../src/analyticsIngest.ts", "../src/analyticsRateLimit.ts"]
 }

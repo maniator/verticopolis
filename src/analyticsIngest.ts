@@ -69,6 +69,13 @@
  * {@link buildDesktopCaptureBody}).
  */
 
+import { defaultRateLimiter, RateLimiter } from "./analyticsRateLimit.js";
+
+// The limiter lives in its own module (see `analyticsRateLimit.ts`); it is
+// re-exported here so importers and tests keep this file as the single entry
+// point for the ingest core.
+export { RateLimiter, RATE_LIMIT_MAX, RATE_LIMIT_MAX_KEYS, RATE_LIMIT_WINDOW_MS } from "./analyticsRateLimit.js";
+
 /** The minimal request body the client relay posts (see the client transport in
  *  a later story). No API key, no cookie. All fields are untrusted. */
 export interface IngestBody {
@@ -104,72 +111,15 @@ export interface IngestDeps {
   /** The client IP, resolved by the caller from Vercel's trusted source
    *  (`ipAddress`), used only as the rate-limit key. Never logged or forwarded. */
   clientIp: string;
-  /** The rate limiter. Defaults to the module singleton; tests inject a fresh
-   *  one to avoid shared state. */
+  /** The rate limiter. Defaults to {@link defaultRateLimiter}; tests inject a
+   *  fresh one to avoid shared state. */
   rateLimiter?: RateLimiter;
 }
 
-/** Requests allowed per IP per fixed window before a 429. A play session emits
- *  on the order of a few dozen events over minutes, so this is generous for
- *  legitimate use while capping a hostile burst. */
-export const RATE_LIMIT_MAX = 100;
-/** The fixed rate-limit window, in ms. */
-export const RATE_LIMIT_WINDOW_MS = 60_000;
-/** Hard ceiling on tracked IPs. The map never exceeds this: once full, the
- *  oldest entry is evicted on each new key, so a stream of unique IPs cannot grow
- *  memory without bound and each request stays O(1). */
-export const RATE_LIMIT_MAX_KEYS = 10_000;
 /** Largest ingest body accepted, in bytes. Events are a handful of primitive
  *  props, so this is generous while rejecting an oversized POST before it is
  *  parsed. Vercel's platform body limit is the outer backstop. */
 export const MAX_BODY_BYTES = 8_192;
-
-/**
- * A per-instance fixed-window rate limiter with a hard key ceiling. Best-effort
- * by design: serverless instances are ephemeral and requests spread across
- * several, so this caps abuse per instance rather than enforcing a global quota.
- * It holds only a count and a window start per IP, never the request content.
- * Memory is bounded: at the ceiling, inserting a new key evicts the oldest, so a
- * flood of unique keys cannot grow the map, and every operation is O(1).
- */
-export class RateLimiter {
-  private readonly hits = new Map<string, { count: number; windowStart: number }>();
-
-  constructor(
-    private readonly max: number = RATE_LIMIT_MAX,
-    private readonly windowMs: number = RATE_LIMIT_WINDOW_MS,
-    private readonly maxKeys: number = RATE_LIMIT_MAX_KEYS,
-  ) {}
-
-  /** Record a hit for `key` at `now`; return false once the window is full. */
-  allow(key: string, now: number): boolean {
-    const rec = this.hits.get(key);
-    if (rec && now - rec.windowStart < this.windowMs) {
-      // Touch the key so any active key (hot or currently blocked) moves to the
-      // newest position: `Map` insertion order does not update on `get`, so
-      // without this a frequently-hit key could be the oldest and get evicted
-      // below, resetting its window. Eviction then only ever removes idle keys.
-      this.hits.delete(key);
-      this.hits.set(key, rec);
-      if (rec.count >= this.max) return false;
-      rec.count += 1;
-      return true;
-    }
-    // Start a fresh window for this key. At the ceiling, evict the oldest (least
-    // recently touched) entry first, so a flood of unique keys cannot grow the
-    // map and an active key is never the one dropped.
-    this.hits.delete(key);
-    if (this.hits.size >= this.maxKeys) {
-      const oldest = this.hits.keys().next().value;
-      if (oldest !== undefined) this.hits.delete(oldest);
-    }
-    this.hits.set(key, { count: 1, windowStart: now });
-    return true;
-  }
-}
-
-/** The process-wide limiter used by the real handler. */
-const defaultLimiter = new RateLimiter();
 
 /** Normalize the configured host: strip surrounding whitespace (env vars often
  *  pick it up from a copy/paste) and every trailing slash, so `${host}/capture/`
@@ -355,7 +305,7 @@ export function buildCaptureBody(
  * Steam desktop session (`analyticsIngestDesktop.test.ts` pins that
  * pass-through). These two are authoritative for desktop-route traffic only, so
  * the dataset cannot read `platform: "desktop"` as proof of where an event came
- * from until the web route validates the pair too. Tracked as GH #TBD.
+ * from until the web route validates the pair too. Tracked as GH #788.
  *
  * `platform` is fixed rather than validated: only a desktop build has any reason
  * to post here, so there is nothing for the client to say. `distribution_channel`
@@ -420,7 +370,7 @@ async function handleIngestRoute(request: Request, deps: IngestDeps, route: Inge
   if (!key || !host) return new Response(null, { status: 204 });
 
   // Rate-limit before any parsing or forwarding, so a flood is cheap to reject.
-  const limiter = deps.rateLimiter ?? defaultLimiter;
+  const limiter = deps.rateLimiter ?? defaultRateLimiter;
   if (!limiter.allow(deps.clientIp, deps.now())) return new Response(null, { status: 429 });
 
   // Reject an oversized body before buffering it into memory.
