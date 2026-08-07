@@ -12,7 +12,16 @@ import { isSaveStorePort } from "./saveStore";
  *  the three-member revision of this contract (the iOS Capacitor shell) must
  *  keep validating: demanding a fourth would demote them here, silently, and
  *  take their native file save with them. Present-but-not-callable is still a
- *  malformed injection, since the game would throw on it at boot. */
+ *  malformed injection, since the game would throw on it at boot.
+ *
+ *  `distributionChannel` is deliberately not checked AT ALL, not even for its
+ *  type. It is a data member the game only ever reads defensively as an
+ *  analytics dimension, so no value of it can throw at boot the way a
+ *  non-callable member would, and refusing a port over a bad one would cost a
+ *  working shell its native file save to protect a telemetry label. The value
+ *  is sanitized where it is read
+ *  (`resolveDistributionChannel` in `src/analyticsEnrichment.ts`): validation
+ *  here is about shape, sanitizing happens at use. */
 function isPlatformPort(value: unknown): value is PlatformPort {
   if (typeof value !== "object" || value === null) return false;
   // Even the property reads are untrusted: a throwing getter or revoked Proxy

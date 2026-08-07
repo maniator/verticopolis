@@ -10,7 +10,8 @@ import { getCommonProps } from "./analytics";
  * shipping `posthog-js` and without a cookie, a persistent id, or a consent
  * banner. The report carries only the per-tab session id every event already
  * carries (so a crash correlates with its play session) plus the boot common
- * props (platform / build version), never an identifier.
+ * props (platform, distribution channel, and the coarse returning / tenure /
+ * recency / display buckets), never an identifier.
  *
  * What this captures, and what it does NOT: only GENUINELY uncaught errors that
  * reach `window`, which the game today has no visibility into: a throw during
@@ -164,7 +165,7 @@ function report(
     reported++;
 
     const properties: Record<string, unknown> = {
-      ...getCommonProps(), // platform / build version / returning buckets
+      ...getCommonProps(), // platform / distribution_channel / returning / tenure / recency / display
       // Canonical PostHog Error Tracking shape. Frames are left empty in this
       // first version (no source maps); the raw stack below carries the trace.
       $exception_list: [

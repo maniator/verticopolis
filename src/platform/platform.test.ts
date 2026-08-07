@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import { resolvePlatform, getPlatform, isWrappedMode, IS_WRAPPED_BUILD } from "./index";
 import { browserPlatform } from "./browser";
 import type { PlatformPort } from "./types";
@@ -11,6 +13,11 @@ import type { PlatformPort } from "./types";
  * browser, and the browser default that must stay byte-identical to the
  * pre-port export behavior (mobile-distribution arch §2, PRD F1/F3/F4/N1).
  */
+
+/** Sources read by the wrapped-mode literal guard below, resolved from THIS
+ *  file rather than the process CWD so the guard keeps proving something when
+ *  the suite runs from anywhere but the repo root. */
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 const fakePort = (): PlatformPort => ({
   isNativeWrapper: true,
@@ -166,7 +173,7 @@ describe("IS_WRAPPED_BUILD: the build-time twin of the predicate", () => {
     expect(IS_WRAPPED_BUILD).toBe(isWrappedMode(import.meta.env.MODE));
   });
 
-  it("covers exactly the same modes as isWrappedMode, checked in the source", () => {
+  it("covers exactly the same modes as isWrappedMode and the analytics resolver, in the source", () => {
     // Asserted against the SOURCE TEXT, and that is the whole point. Under vitest
     // `import.meta.env.MODE` is "test", so comparing the constant to the
     // predicate compares false to false and would stay green if someone dropped
@@ -177,9 +184,7 @@ describe("IS_WRAPPED_BUILD: the build-time twin of the predicate", () => {
     // comparison, and Rollup will not inline a cross-module call to decide a
     // branch is dead. So the duplication is forced, and this is what keeps it
     // honest, the same technique the private shell uses on its sandboxed preload.
-    // A plain path from the repo root: under vitest `import.meta.url` is not a
-    // file: URL, so `new URL("./index.ts", import.meta.url)` cannot be read.
-    const source = readFileSync("src/platform/index.ts", "utf8");
+    const source = readFileSync(resolve(HERE, "./index.ts"), "utf8");
     expect(source, "the source file could not be read, so this test proves nothing").toContain("isWrappedMode");
 
     const predicate = /export function isWrappedMode[^{]*\{\s*return ([^;]+);/.exec(source);
@@ -197,6 +202,19 @@ describe("IS_WRAPPED_BUILD: the build-time twin of the predicate", () => {
     // `import.meta.env.MODE`, or Vite cannot fold it and the tree-shake silently
     // stops working while every other test stays green.
     expect(constant![1]).toContain("import.meta.env.MODE");
+
+    // A THIRD copy of the same literals lives in `resolvePlatformLabel`
+    // (src/analyticsEnrichment.ts), which has to tell the two wrapper shells
+    // apart and so cannot call the wrapped-or-not predicate. Pin it here with
+    // the other two: a wrapped mode added to the seam but never taught to the
+    // resolver would report `web` for every session of that build, which is
+    // #710 one level up. Only the `mode === "..."` comparisons are collected,
+    // since the resolver's body also carries platform labels and a query key.
+    const enrichment = readFileSync(resolve(HERE, "../analyticsEnrichment.ts"), "utf8");
+    const resolver = /export function resolvePlatformLabel[^{]*\{([\s\S]*?)\n\}/.exec(enrichment);
+    expect(resolver, "could not find resolvePlatformLabel in the enrichment source").not.toBeNull();
+    const resolverModes = [...resolver![1].matchAll(/mode === "([a-z-]+)"/g)].map((m) => m[1]).sort();
+    expect(resolverModes, "expected resolvePlatformLabel to compare mode literals").toEqual(predicateModes);
   });
 });
 
@@ -315,6 +333,52 @@ describe("isPlatformPort: saveStore is optional on the same grounds", () => {
     // is what lets the store code drop from a browser build entirely.
     expect(browserPlatform.saveStore).toBeUndefined();
     expect("saveStore" in browserPlatform).toBe(false);
+  });
+});
+
+describe("isPlatformPort: distributionChannel is a data member, so it is not shape-checked", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("accepts a port that omits it, so an existing iOS shell keeps validating", () => {
+    // The optional-member rule again: the iOS shell has no storefront to name,
+    // and demanding the member would demote it to the browser port and cost it
+    // its native file save.
+    const noChannel = fakePort();
+    expect("distributionChannel" in noChannel).toBe(false);
+    expect(resolvePlatform("native", noChannel)).toBe(noChannel);
+    expect(resolvePlatform("desktop", noChannel)).toBe(noChannel);
+  });
+
+  it("accepts a port that names one", () => {
+    const steam = { ...fakePort(), distributionChannel: "steam" };
+    expect(resolvePlatform("desktop", steam)).toBe(steam);
+  });
+
+  it("accepts a port whose distributionChannel is hostile, because the VALUE is sanitized at read time", () => {
+    // Deliberately unlike the function members. A junk `distributionChannel`
+    // cannot throw during boot the way a non-callable `onHostCommand` would, so
+    // refusing the whole port over one would trade a working shell's file save
+    // for a telemetry label. `resolveDistributionChannel`
+    // (src/analyticsEnrichment.ts) is what turns any of these into `unknown`.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    for (const distributionChannel of [42, null, {}, "evil", "STEAM", "steam "]) {
+      const port = { ...fakePort(), distributionChannel };
+      expect(resolvePlatform("desktop", port)).toBe(port);
+    }
+    const trapped = Object.defineProperty({ ...fakePort() }, "distributionChannel", {
+      get() {
+        throw new Error("revoked");
+      },
+    });
+    expect(resolvePlatform("desktop", trapped)).toBe(trapped);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("the browser default omits it", () => {
+    expect(browserPlatform.distributionChannel).toBeUndefined();
+    expect("distributionChannel" in browserPlatform).toBe(false);
   });
 });
 

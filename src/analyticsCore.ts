@@ -189,7 +189,8 @@ export type AppActionName =
   | "install_offer";
 
 /**
- * Cross-cutting props merged into EVERY event: the platform dimension plus the
+ * Cross-cutting props merged into EVERY event: the platform and
+ * distribution-channel dimensions plus the
  * anonymous on-device returning / tenure / recency buckets (S4). Populated once
  * at boot via {@link setCommonProps}; empty until then, so the merge is a no-op
  * before boot and every existing per-event assertion is unaffected. These are
@@ -206,8 +207,8 @@ export function setCommonProps(props: EventProps): void {
   commonProps = { ...props };
 }
 
-/** A copy of the boot-computed common props (platform / version / returning /
- *  tenure / recency), for a surface that sends OUTSIDE the typed gameplay
+/** A copy of the boot-computed common props (platform / distribution_channel /
+ *  returning / tenure / recency / display), for a surface that sends OUTSIDE the typed gameplay
  *  vocabulary and so does not flow through `trackEvent`'s merge, namely the
  *  cookieless error reporter (`analyticsErrors.ts`): a `$exception` should carry
  *  the same platform and build context every gameplay event does. Copied so a

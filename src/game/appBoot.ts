@@ -14,7 +14,7 @@ import { rebuildEngine } from "./engineWiring";
 import { RESUME_AFTER_UPDATE_KEY, RESUME_RELOAD_MAX_AGE_MS } from "./updateFlow";
 import { gameplaySession, setCommonProps } from "../analytics";
 import { reportCrashException } from "../analyticsErrors";
-import { bootCommonProps, platformLabel } from "../analyticsEnrichment";
+import { bootCommonProps, distributionChannelLabel, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
 import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
 import { bindHostCommands, tickHostCommands } from "./hostCommands";
@@ -246,18 +246,32 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   } catch {
     /* sessionStorage can throw in private mode, so treat it as not-a-recovery */
   }
-  // One-time boot enrichment merged into EVERY event (S4): the platform
-  // dimension (AUD-036) plus anonymous on-device buckets. Cookieless: coarse
-  // buckets derived from state the device already holds (the onboarding flag,
-  // the loaded tower's in-game age, and the autosave's write time), no id and no
-  // new storage. Set BEFORE the boot event below so the very first event carries
-  // it. Each read is individually defensive, but the whole compute is wrapped so
-  // an enrichment hiccup can never throw past this point and abort boot: matching
+  // One-time boot enrichment merged into EVERY event (S4): the platform and
+  // distribution-channel dimensions (AUD-036, #710) plus anonymous on-device
+  // buckets. Where each one comes from, since this is what rides on every event:
+  // `platform` is the build mode, then the injected port's wrapper flag, then
+  // the `?src=twa` marker on the launch URL; `distribution_channel` is the same
+  // injected port's optional `distributionChannel` member, read on desktop
+  // builds only. So only the build mode is fixed in the bundle; the wrapper
+  // flag, the marker, and the channel member are all live reads at boot. All
+  // four still describe the build and the shell it launched in; nothing about
+  // the device, the browser, or the player is probed. The remaining buckets are
+  // cookieless too, derived from state the device already holds (the onboarding
+  // flag, the loaded tower's in-game age, and the autosave's write time), with
+  // no id and no new storage.
+  //
+  // Set BEFORE the boot event below so the very first event carries it. Each
+  // read is individually defensive, but the whole compute is wrapped so an
+  // enrichment hiccup can never throw past this point and abort boot, matching
   // the never-block-boot posture the boot snapshot below relies on.
   try {
+    // One platform read feeds both dimensions: the channel is resolved FROM the
+    // platform, so the runtime surface and the storefront cannot disagree.
+    const platform = platformLabel();
     setCommonProps(
       bootCommonProps({
-        platform: platformLabel(),
+        platform,
+        distributionChannel: distributionChannelLabel(platform),
         onboarded: isOnboarded(),
         tenureDay: app.sim?.clock?.day,
         savedAt: savedAtBoot,
