@@ -218,15 +218,21 @@ together ahead of S5 so the data goes clean immediately (decided in party-mode).
   swap is unaffected. `commonProps` starts empty (a no-op merge before boot) and
   is cleared by `reset()` for test isolation.
 - **`src/analyticsEnrichment.ts` is the pure, fully tested enrichment core.**
-  `resolvePlatformLabel(isNativeWrapper, search)` resolves the platform dimension
-  (AUD-036) in priority order: the native wrapper port (`ios`) outranks the TWA
-  start-URL marker (`?src=twa` -> `twa`), else `web`; `platformLabel()` is the
-  thin wrapper reading the live `getPlatform()` flag and `location.search`.
+  `resolvePlatformLabel(mode, isNativeWrapper, search)` resolves the platform
+  dimension (AUD-036) in priority order: the BUILD MODE first (`desktop` ->
+  `desktop`, `native` -> `ios`), then a port claiming `isNativeWrapper` under any
+  other mode (`ios`), then the TWA start-URL marker (`?src=twa` -> `twa`), else
+  `web`; `platformLabel()` is the thin wrapper reading the live build mode, the
+  `getPlatform()` flag, and `location.search`. `resolveDistributionChannel(platform,
+  port)` resolves the sibling channel dimension, emitted as `distribution_channel`.
   `tenureBucket(day)` and `recencyBucket(msSinceSave)` are coarse anonymous
   buckets (tenure `d0`/`d1-6`/`d7-29`/`d30+`; recency `1d`/`7d`/`30d`/`30d+`),
   each reading a missing/non-finite/negative input as `unknown`. `bootCommonProps`
-  assembles the four props from live signals passed in, so the field mapping and
-  the recency delta are unit-testable without the boot harness.
+  assembles the six props (`platform`, `distribution_channel`, `returning`,
+  `tenure`, `recency`, `display`) from live signals passed in, so the field
+  mapping and the recency delta are unit-testable without the boot harness. The
+  mode-first order and the channel dimension landed later, in stage 1 of the
+  desktop analytics epic (#781, closing #710); the rest is as S4 shipped.
 - **Computed once at boot, banner-free, no new storage.** `runBootFlow` calls
   `setCommonProps(bootCommonProps(...))` just BEFORE the `boot` event, so every
   event (boot included) carries the enrichment. `returning` is `isOnboarded()`
@@ -242,7 +248,8 @@ together ahead of S5 so the data goes clean immediately (decided in party-mode).
   never throw past boot, matching the boot snapshot's never-block posture.
 - **The first-tower funnel** (`game_started` -> `first_build` -> `star_reached(2)`)
   is composed of events that already fire; S4 makes each one carry `platform` /
-  `returning` / `tenure` / `recency`, so the funnel is segmentable. Modeling it
+  `distribution_channel` / `returning` / `tenure` / `recency`, so the funnel is
+  segmentable (the channel arrived with #781 stage 1). Modeling it
   as a real PostHog funnel insight (with drop rates) is report-side and lands at
   S5 with the report re-target.
 - **No id, nothing persisted, nothing crosses a session or device**, so this

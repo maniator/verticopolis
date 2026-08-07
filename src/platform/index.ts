@@ -19,8 +19,8 @@ import { isSaveStorePort } from "./saveStore";
  *  so no value of it can throw at boot the way a non-callable member would, and
  *  refusing a port over a bad one would cost a working shell its native file
  *  save to protect a telemetry label. The value is sanitized where it is read
- *  (`resolveChannel` in `src/analyticsEnrichment.ts`): validation here is about
- *  shape, sanitizing happens at use. */
+ *  (`resolveDistributionChannel` in `src/analyticsEnrichment.ts`): validation
+ *  here is about shape, sanitizing happens at use. */
 function isPlatformPort(value: unknown): value is PlatformPort {
   if (typeof value !== "object" || value === null) return false;
   // Even the property reads are untrusted: a throwing getter or revoked Proxy

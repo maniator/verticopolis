@@ -1,19 +1,47 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import {
   bootCommonProps,
-  channelLabel,
+  buildMode,
+  distributionChannelLabel,
   platformLabel,
   recencyBucket,
   displayModeBucket,
-  resolveChannel,
+  resolveDistributionChannel,
   resolvePlatformLabel,
   tenureBucket,
-  CHANNEL_LABELS,
+  DISTRIBUTION_CHANNEL_LABELS,
   PLATFORM_LABELS,
-  type ChannelLabel,
+  type DistributionChannelLabel,
   type PlatformLabel,
 } from "./analyticsEnrichment";
+
+/** The enrichment source, read for the wiring guards below. Resolved from this
+ *  file rather than the process CWD, so the guards keep proving something when
+ *  the suite is run from anywhere but the repo root. */
+const ENRICHMENT_SOURCE = resolve(dirname(fileURLToPath(import.meta.url)), "./analyticsEnrichment.ts");
+
+/** The body of a top-level exported function, by name. Anchored to the closing
+ *  brace in column 0, so a guard written against one function can never drift
+ *  into a later helper's text. */
+function bodyOf(source: string, name: string): string {
+  const found = new RegExp(String.raw`export function ${name}\([^)]*\)[^{]*\{([\s\S]*?)\n\}`).exec(source);
+  expect(found, `could not find ${name} in the enrichment source`).not.toBeNull();
+  return found![1];
+}
+
+/** The argument list of `call(...)` inside `body`, split into its arguments so
+ *  a guard can assert ORDER. A containment check over the whole list would pass
+ *  on a swapped call, which is exactly the mistake worth catching here. Split
+ *  on plain commas: an argument that ever contains one fails the arity
+ *  assertion loudly rather than mismatching in silence. */
+function argsOf(body: string, call: string): string[] {
+  const found = new RegExp(String.raw`return ${call}\((.+)\);`).exec(body);
+  expect(found, `could not find the ${call} call`).not.toBeNull();
+  return found![1].split(",").map((arg) => arg.trim());
+}
 
 /**
  * The cookieless, on-device event enrichment (S4). Every value is a coarse
@@ -29,8 +57,8 @@ describe("the two dimensions are closed sets", () => {
   // rather than something that rides along in a resolver change.
   const everyPlatformIsListed: (typeof PLATFORM_LABELS)[number] = "web" as PlatformLabel;
   const everyListedIsAPlatform: PlatformLabel[] = [...PLATFORM_LABELS];
-  const everyChannelIsListed: (typeof CHANNEL_LABELS)[number] = "web" as ChannelLabel;
-  const everyListedIsAChannel: ChannelLabel[] = [...CHANNEL_LABELS];
+  const everyChannelIsListed: (typeof DISTRIBUTION_CHANNEL_LABELS)[number] = "web" as DistributionChannelLabel;
+  const everyListedIsAChannel: DistributionChannelLabel[] = [...DISTRIBUTION_CHANNEL_LABELS];
   void everyPlatformIsListed;
   void everyListedIsAPlatform;
   void everyChannelIsListed;
@@ -41,11 +69,11 @@ describe("the two dimensions are closed sets", () => {
     expect(PLATFORM_LABELS).toHaveLength(4);
   });
 
-  it("ChannelLabel is exactly the six channels, unknown included", () => {
+  it("DistributionChannelLabel is exactly the six channels, unknown included", () => {
     // `unknown` is a member rather than an absence: a desktop build whose shell
     // named nothing must still land in the dataset, or the denominator lies.
-    expect([...CHANNEL_LABELS]).toEqual(["web", "twa", "ios", "steam", "itch", "unknown"]);
-    expect(CHANNEL_LABELS).toHaveLength(6);
+    expect([...DISTRIBUTION_CHANNEL_LABELS]).toEqual(["web", "twa", "ios", "steam", "itch", "unknown"]);
+    expect(DISTRIBUTION_CHANNEL_LABELS).toHaveLength(6);
   });
 });
 
@@ -86,24 +114,54 @@ describe("resolvePlatformLabel", () => {
     expect(resolvePlatformLabel("production", false, "?src=web")).toBe("web");
     expect(resolvePlatformLabel("production", false, "?other=twa")).toBe("web");
   });
+
+  it("still reports web for a mode nothing here names", () => {
+    // The BuildMode brand narrows the TYPE, and it must not narrow the runtime
+    // contract with it: a mode added to the build later, before anyone teaches
+    // this resolver about it, keeps falling through to `web` rather than
+    // becoming a new label. `buildMode` is the tag, so an unnamed mode stays
+    // expressible.
+    expect(resolvePlatformLabel(buildMode("staging"), false, "")).toBe("web");
+    expect(resolvePlatformLabel(buildMode(""), false, "?src=twa")).toBe("twa");
+  });
+
+  it("refuses a query string in the mode slot at COMPILE time", () => {
+    // The reason `mode` is a branded BuildMode and not a bare `string`. With
+    // both slots typed `string`, swapping arguments 1 and 3 typechecks, builds,
+    // and reports `web` for every desktop and iOS session forever, while every
+    // test in this file stays green (the runner's own mode is always "test").
+    // The two @ts-expect-error lines below are the assertion: each FAILS if the
+    // call ever starts compiling again.
+    const search = "?src=twa";
+    // @ts-expect-error a query string is not a build mode
+    expect(resolvePlatformLabel(search, false, "desktop")).toBe("web");
+    const mode: string = "desktop";
+    // @ts-expect-error an untagged string is not a build mode either
+    expect(resolvePlatformLabel(mode, false, "")).toBe("desktop");
+  });
 });
 
-describe("resolveChannel", () => {
+describe("resolveDistributionChannel", () => {
+  // Every port literal below spells the member `channel`, not
+  // `distributionChannel`, and that is the contract: the PORT member keeps the
+  // short name the private shell already implements, while the game EMITS the
+  // value as `distribution_channel` to stay clear of PostHog's `$channel_type`.
+  // These assertions are what stops a later tidy-up from renaming the member.
   it("maps each non-desktop surface to its own channel", () => {
-    expect(resolveChannel("web", {})).toBe("web");
-    expect(resolveChannel("twa", {})).toBe("twa");
-    expect(resolveChannel("ios", {})).toBe("ios");
+    expect(resolveDistributionChannel("web", {})).toBe("web");
+    expect(resolveDistributionChannel("twa", {})).toBe("twa");
+    expect(resolveDistributionChannel("ios", {})).toBe("ios");
   });
 
   it("ignores a channel a non-desktop port has no business stamping", () => {
     // Only a desktop artifact is packaged per store, so the member is not even
     // read elsewhere: an iOS shell that stamped `steam` reports `ios`.
-    expect(resolveChannel("ios", { channel: "steam" })).toBe("ios");
+    expect(resolveDistributionChannel("ios", { channel: "steam" })).toBe("ios");
   });
 
   it("reports the two named desktop storefronts", () => {
-    expect(resolveChannel("desktop", { channel: "steam" })).toBe("steam");
-    expect(resolveChannel("desktop", { channel: "itch" })).toBe("itch");
+    expect(resolveDistributionChannel("desktop", { channel: "steam" })).toBe("steam");
+    expect(resolveDistributionChannel("desktop", { channel: "itch" })).toBe("itch");
   });
 
   it("reports unknown for anything else the shell injects, exact match only", () => {
@@ -112,16 +170,16 @@ describe("resolveChannel", () => {
     // channel value nothing downstream knows about. No trimming and no case
     // folding, because a shell stamping `"STEAM"` has a packaging bug worth
     // seeing rather than papering over.
-    expect(resolveChannel("desktop", {})).toBe("unknown");
-    expect(resolveChannel("desktop", { channel: undefined })).toBe("unknown");
-    expect(resolveChannel("desktop", { channel: "steam " })).toBe("unknown");
-    expect(resolveChannel("desktop", { channel: " steam" })).toBe("unknown");
-    expect(resolveChannel("desktop", { channel: "STEAM" })).toBe("unknown");
-    expect(resolveChannel("desktop", { channel: "Itch" })).toBe("unknown");
-    expect(resolveChannel("desktop", { channel: "evil" })).toBe("unknown");
-    expect(resolveChannel("desktop", { channel: 42 })).toBe("unknown");
-    expect(resolveChannel("desktop", { channel: null })).toBe("unknown");
-    expect(resolveChannel("desktop", { channel: { toString: () => "steam" } })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", {})).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { channel: undefined })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { channel: "steam " })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { channel: " steam" })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { channel: "STEAM" })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { channel: "Itch" })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { channel: "evil" })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { channel: 42 })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { channel: null })).toBe("unknown");
+    expect(resolveDistributionChannel("desktop", { channel: { toString: () => "steam" } })).toBe("unknown");
   });
 
   it("survives a hostile port whose channel getter throws", () => {
@@ -133,12 +191,12 @@ describe("resolveChannel", () => {
         throw new Error("revoked");
       },
     }) as { readonly channel?: unknown };
-    expect(() => resolveChannel("desktop", trapped)).not.toThrow();
-    expect(resolveChannel("desktop", trapped)).toBe("unknown");
+    expect(() => resolveDistributionChannel("desktop", trapped)).not.toThrow();
+    expect(resolveDistributionChannel("desktop", trapped)).toBe("unknown");
   });
 });
 
-describe("platformLabel / channelLabel (live globals)", () => {
+describe("platformLabel / distributionChannelLabel (live globals)", () => {
   afterEach(() => {
     window.location.href = "https://verticopolis.com/";
   });
@@ -146,13 +204,13 @@ describe("platformLabel / channelLabel (live globals)", () => {
   it("reads the twa marker off the launch URL, and the channel follows it", () => {
     window.location.href = "https://verticopolis.com/?src=twa";
     expect(platformLabel()).toBe("twa");
-    expect(channelLabel(platformLabel())).toBe("twa");
+    expect(distributionChannelLabel(platformLabel())).toBe("twa");
   });
 
   it("reads web with no marker (the test runner's mode is unwrapped and binds no port)", () => {
     window.location.href = "https://verticopolis.com/";
     expect(platformLabel()).toBe("web");
-    expect(channelLabel(platformLabel())).toBe("web");
+    expect(distributionChannelLabel(platformLabel())).toBe("web");
   });
 
   it("feeds the REAL build mode and the REAL port in, checked in the source", () => {
@@ -163,17 +221,30 @@ describe("platformLabel / channelLabel (live globals)", () => {
     // (a hardcoded mode, an empty object for the port) and stay green here
     // while every desktop build reported `web` and `unknown` forever. The same
     // technique platform.test.ts uses on IS_WRAPPED_BUILD, for the same reason.
-    const source = readFileSync("src/analyticsEnrichment.ts", "utf8");
+    const source = readFileSync(ENRICHMENT_SOURCE, "utf8");
     expect(source, "the source file could not be read, so this test proves nothing").toContain("platformLabel");
 
-    const platformCall = /export function platformLabel\(\)[\s\S]*?return resolvePlatformLabel\(([^;]*);/.exec(source);
-    expect(platformCall, "could not find the resolvePlatformLabel call in platformLabel").not.toBeNull();
-    expect(platformCall![1]).toContain("import.meta.env.MODE");
-    expect(platformCall![1]).toContain("isNativeWrapper");
+    // POSITIONAL, because the resolver's mode and query-string arguments are
+    // both text: a guard that only asked whether the argument LIST mentions
+    // both would pass on a call that hands the query string to the mode slot,
+    // and that call reports `web` for every desktop and iOS session forever.
+    // The BuildMode brand makes the swap a compile error too; this is the
+    // second lock, since the brand can be reapplied by hand.
+    const platformArgs = argsOf(bodyOf(source, "platformLabel"), "resolvePlatformLabel");
+    expect(platformArgs, "expected the three-argument resolvePlatformLabel call").toHaveLength(3);
+    expect(platformArgs[0], "the build mode must be the FIRST argument").toContain("import.meta.env.MODE");
+    expect(platformArgs[1], "the injected wrapper flag must be the SECOND argument").toContain(
+      "getPlatform().isNativeWrapper",
+    );
+    expect(platformArgs[2], "the launch URL's query string must be the THIRD argument").toBe("search");
 
-    const channelCall = /export function channelLabel\([\s\S]*?return resolveChannel\(([^;]*);/.exec(source);
-    expect(channelCall, "could not find the resolveChannel call in channelLabel").not.toBeNull();
-    expect(channelCall![1]).toContain("getPlatform()");
+    // The channel must be resolved FROM the platform the caller already has.
+    // A second independent `platformLabel()` read here would satisfy a "mentions
+    // getPlatform()" check while letting the two dimensions disagree.
+    const channelArgs = argsOf(bodyOf(source, "distributionChannelLabel"), "resolveDistributionChannel");
+    expect(channelArgs, "expected the two-argument resolveDistributionChannel call").toHaveLength(2);
+    expect(channelArgs[0], "the incoming platform parameter must be the FIRST argument").toBe("platform");
+    expect(channelArgs[1], "the live port must be the SECOND argument").toContain("getPlatform()");
   });
 });
 
@@ -223,30 +294,45 @@ describe("recencyBucket", () => {
 describe("bootCommonProps", () => {
   const DAY = 86_400_000;
 
-  it("maps each live signal to its bucket and passes platform + channel + returning through", () => {
+  it("maps each live signal to its bucket and passes both dimensions + returning through", () => {
+    // The emitted KEY is `distribution_channel` while the input field is
+    // `distributionChannel`: PostHog's built-in `$channel_type` already owns the
+    // word `channel` in the property picker, so the wire name carries the
+    // prefix. `toEqual` pins the whole emitted shape, so a key edit fails here.
     const now = 1_000 * DAY;
     expect(
       bootCommonProps({
         platform: "twa",
-        channel: "twa",
+        distributionChannel: "twa",
         onboarded: true,
         tenureDay: 12,
         savedAt: now - 3 * DAY,
         standalone: false,
         now,
       }),
-    ).toEqual({ platform: "twa", channel: "twa", returning: true, tenure: "d7-29", recency: "7d", display: "browser" });
+    ).toEqual({
+      platform: "twa",
+      distribution_channel: "twa",
+      returning: true,
+      tenure: "d7-29",
+      recency: "7d",
+      display: "browser",
+    });
   });
 
   it("carries the desktop pair as two separate dimensions", () => {
     // The whole point of the split: one runtime surface, several storefronts.
-    // Two desktop sessions differ only in `channel`, so a per-store read is a
+    // Two desktop sessions differ only in the channel, so a per-store read is a
     // filter on the same platform rather than a second platform value.
     const now = 1_000 * DAY;
     const base = { onboarded: true, tenureDay: 2, savedAt: now - DAY, standalone: false, now } as const;
-    expect(bootCommonProps({ platform: "desktop", channel: "steam", ...base }).platform).toBe("desktop");
-    expect(bootCommonProps({ platform: "desktop", channel: "steam", ...base }).channel).toBe("steam");
-    expect(bootCommonProps({ platform: "desktop", channel: "itch", ...base }).channel).toBe("itch");
+    expect(bootCommonProps({ platform: "desktop", distributionChannel: "steam", ...base }).platform).toBe("desktop");
+    expect(bootCommonProps({ platform: "desktop", distributionChannel: "steam", ...base }).distribution_channel).toBe(
+      "steam",
+    );
+    expect(bootCommonProps({ platform: "desktop", distributionChannel: "itch", ...base }).distribution_channel).toBe(
+      "itch",
+    );
   });
 
   it("reports unknown buckets for a fresh visit with no tower and no save, and the standalone display bucket", () => {
@@ -254,7 +340,7 @@ describe("bootCommonProps", () => {
     expect(
       bootCommonProps({
         platform: "web",
-        channel: "web",
+        distributionChannel: "web",
         onboarded: false,
         tenureDay: undefined,
         savedAt: undefined,
@@ -263,7 +349,7 @@ describe("bootCommonProps", () => {
       }),
     ).toEqual({
       platform: "web",
-      channel: "web",
+      distribution_channel: "web",
       returning: false,
       tenure: "unknown",
       recency: "unknown",
@@ -276,7 +362,14 @@ describe("bootCommonProps", () => {
     // savedAt is a forgery. It must read as "unknown", not turn `now - savedAt`
     // into an inflated positive delta that lands in "30d+".
     const now = 1_000 * DAY;
-    const base = { platform: "web", channel: "web", onboarded: false, tenureDay: 3, standalone: false, now } as const;
+    const base = {
+      platform: "web",
+      distributionChannel: "web",
+      onboarded: false,
+      tenureDay: 3,
+      standalone: false,
+      now,
+    } as const;
     expect(bootCommonProps({ ...base, savedAt: -5 }).recency).toBe("unknown");
     expect(bootCommonProps({ ...base, savedAt: 0 }).recency).toBe("unknown");
   });
@@ -288,14 +381,21 @@ describe("bootCommonProps", () => {
     expect(
       bootCommonProps({
         platform: "ios",
-        channel: "ios",
+        distributionChannel: "ios",
         onboarded: true,
         tenureDay: 0,
         savedAt: now - 10 * DAY,
         standalone: false,
         now,
       }),
-    ).toEqual({ platform: "ios", channel: "ios", returning: true, tenure: "d0", recency: "30d", display: "browser" });
+    ).toEqual({
+      platform: "ios",
+      distribution_channel: "ios",
+      returning: true,
+      tenure: "d0",
+      recency: "30d",
+      display: "browser",
+    });
   });
 });
 

@@ -43,7 +43,8 @@
  *    shell that ships to more than one store must stamp it per artifact. The
  *    game reads it only as an analytics dimension and accepts exactly the two
  *    documented values; see the member's own note for what an unrecognized one
- *    reports.
+ *    reports. The member keeps the short name even though the game EMITS the
+ *    value as `distribution_channel`; see that note for why the two differ.
  */
 
 import type { SaveStorePort } from "./saveStore";
@@ -155,13 +156,23 @@ export interface PlatformPort {
    * is the usual one: the iOS shell has no storefront to name here, and a
    * required member would demote it to the browser port.
    *
+   * NAMED DIFFERENTLY AT THE TWO ENDS ON PURPOSE. The game emits this value as
+   * the analytics property `distribution_channel`, because a bare `channel`
+   * collides with PostHog's built-in `$channel_type` and would read as marketing
+   * attribution in the property picker. This member stays `channel`: it is the
+   * cross-repo contract the private shell already implements, renaming it would
+   * be a breaking change for no benefit, and the collision it would be dodging
+   * does not exist on this side. Leave the asymmetry alone; the resolver
+   * (`resolveDistributionChannel` in `src/analyticsEnrichment.ts`) carries the
+   * same note at the other end.
+   *
    * Typed as a plain `string` rather than a union so a wrapper repo pinned to
    * an older revision of this contract still compiles, and because the VALUE is
    * not trusted anyway. `isPlatformPort` checks the port's shape and lets any
    * `channel` through on purpose, since a bad one cannot throw at boot the way a
    * non-callable `onHostCommand` would; the sanitizing happens where the value
-   * is read (`resolveChannel` in `src/analyticsEnrichment.ts`), and anything but
-   * the two exact values above reports the channel as `unknown`.
+   * is read, and anything but the two exact values above reports the channel as
+   * `unknown`.
    */
   readonly channel?: string;
 }

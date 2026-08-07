@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendToRelay } from "./analyticsRelay";
 import { gameplaySession, setCommonProps, startGameplaySession } from "./analytics";
-import { trackEvent, type GameplayEvents } from "./analyticsCore";
+import { getCommonProps, trackEvent, type GameplayEvents } from "./analyticsCore";
 import { bootCommonProps } from "./analyticsEnrichment";
+import type { EventProps } from "./analyticsAdapter";
 
 // The custom-event channel is host-gated and best-effort; events go relay-only
 // after the D-1 cutover, so `sendToRelay` is the wire contract these tests pin.
@@ -388,27 +389,36 @@ const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
   session_emergencies: { fires: 1, firesGutRooms: 2, bombs: 0 },
 };
 
-describe("the platform and channel dimensions ride every event", () => {
+describe("the platform and distribution-channel dimensions ride every event", () => {
+  // The common props are MODULE state, so a suite that installs a boot set and
+  // walks away stamps `platform: "desktop"` on every event of every describe
+  // added below this one. Captured and restored rather than cleared, so this
+  // block stays honest about what it found even if the file grows a suite above
+  // it that installs its own set.
+  let priorCommonProps: EventProps = {};
+
   beforeEach(() => {
     window.location.href = prod;
+    priorCommonProps = getCommonProps();
     gameplaySession.reset();
     vi.mocked(sendToRelay).mockReset();
   });
 
   afterEach(() => {
     window.location.href = localhost;
+    setCommonProps(priorCommonProps);
   });
 
   it("stamps both dimensions on every event in the vocabulary", () => {
     // Assembled through the real bootCommonProps rather than a hand-written
-    // literal, so dropping `channel` from the assembled set fails here too, not
-    // only in the enrichment suite. A desktop/steam session is the case worth
-    // naming: it is the one where the two dimensions differ, so neither can be
-    // inferred from the other downstream.
+    // literal, so dropping the channel from the assembled set fails here too,
+    // not only in the enrichment suite. A desktop/steam session is the case
+    // worth naming: it is the one where the two dimensions differ, so neither
+    // can be inferred from the other downstream.
     setCommonProps(
       bootCommonProps({
         platform: "desktop",
-        channel: "steam",
+        distributionChannel: "steam",
         onboarded: true,
         tenureDay: 3,
         savedAt: undefined,
@@ -426,7 +436,19 @@ describe("the platform and channel dimensions ride every event", () => {
       const [sentName, props] = vi.mocked(sendToRelay).mock.calls[i];
       expect(sentName).toBe(name);
       expect(props.platform, `${name} lost the platform dimension`).toBe("desktop");
-      expect(props.channel, `${name} lost the channel dimension`).toBe("steam");
+      expect(props.distribution_channel, `${name} lost the distribution-channel dimension`).toBe("steam");
     }
+  });
+});
+
+describe("no suite leaves its common props installed", () => {
+  // A tripwire, deliberately last in the file. The common props are module
+  // state that every event in every later suite would inherit, and the leak is
+  // invisible while the suite that installs them happens to be the last one:
+  // the next describe someone appends silently gets `platform: "desktop"` on
+  // every event and no failure says why. This fails the moment a suite above
+  // stops restoring what it found.
+  it("leaves the module-level common props empty for whatever runs next", () => {
+    expect(getCommonProps()).toEqual({});
   });
 });

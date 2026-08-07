@@ -91,7 +91,7 @@ describe("runBootFlow analytics enrichment wiring (S4)", () => {
     // matching pair rather than two independently-read signals.
     expect(setSpy).toHaveBeenCalledWith({
       platform: "twa",
-      channel: "twa",
+      distribution_channel: "twa",
       returning: true,
       tenure: "d7-29",
       recency: "1d",
@@ -115,7 +115,7 @@ describe("runBootFlow analytics enrichment wiring (S4)", () => {
 
     expect(setSpy).toHaveBeenCalledWith({
       platform: "web",
-      channel: "web",
+      distribution_channel: "web",
       returning: true,
       tenure: "d0",
       recency: "30d",
