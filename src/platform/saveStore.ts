@@ -275,6 +275,19 @@ export interface SaveStorePort {
    *    have been rewritten (or replaced by a different tower routed to the
    *    same address) while the dialog sat open, and the player then receives
    *    other bytes under the filename they chose.
+   *    Hold that capture in the shell's process memory. The shell must not
+   *    create an on-disk staging or temp copy of the record for this purpose
+   *    (GH #774 ratified the in-memory capture and rejected the staging file
+   *    by name): a staged file would put a second transient artifact class
+   *    next to the cloud-sync root, where only a narrow pattern rule decides
+   *    what belongs there, and quitting while the dialog sits open would
+   *    strand it, since the shutdown budget has no room to unlink it. Two
+   *    different things are pinned in two different places: this repo cannot
+   *    observe what the shell does at runtime, so CONFORMANCE is pinned by
+   *    the shell repo's own tests, while what is pinned HERE is only that
+   *    these obligations stay written down at all
+   *    (`src/tests/saveStoreExportContract.test.ts` fails if this paragraph
+   *    is deleted or drifts off `exportRecord`).
    *  - Show the dialog MODAL to the game window, so the game cannot be
    *    driven into a second export (or a tower switch) mid-dialog.
    *

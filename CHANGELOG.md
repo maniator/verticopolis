@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.22.0
+
+- An export that looked stuck and then finishes anyway now names the tower it saved, so you can tell which one landed on disk after you have moved on to another.
+
 ## 2.21.0
 
 - The whole soundtrack is now ours: the title theme, the in-game music, and the milestone chime are all made from recordings of our own voice, chest taps, and finger drumming (human-made, not AI). The title screen hums our tune over a heartbeat, and the tower drifts through a two-part hum with a gentle tap groove.

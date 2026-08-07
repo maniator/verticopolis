@@ -193,4 +193,36 @@ describe("exportStoredTower (story D7, D2's AC22)", () => {
     const { exportStoredTower } = await import("./manualSavePersist");
     expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe("fallback");
   });
+
+  it("PIN (GH #774): shell conformance is not observable from this suite", async () => {
+    // The half that decides whether the exported bytes match the filename is
+    // the shell's: it must capture the record's bytes at call time, before the
+    // dialog opens, and hold that capture in memory rather than staging a copy
+    // on disk (see the exportRecord doc in src/platform/saveStore.ts). This
+    // test shows why nothing above can speak to that, rather than asserting
+    // it: the successful export below resolved through a port the test itself
+    // fabricated, which has no bytes, no dialog, and no ordering to get wrong.
+    //
+    // The enforcing test lives in the private shell repo, at
+    // desktop/shell/test/storeIpc.test.ts, named "export: bytes are read
+    // BEFORE the dialog opens". Anyone reasoning about GH #774 from this repo
+    // alone will conclude the timing is untested; it is tested, over there.
+    // What this repo can hold is the contract prose, pinned by
+    // src/tests/saveStoreExportContract.test.ts.
+    const store = fakeStore(SHARED);
+    withWriteSync(store);
+    const exported: string[] = [];
+    store.port.exportRecord = (id: string) => {
+      exported.push(id);
+      return Promise.resolve(true);
+    };
+    injectedStore = store.port;
+    await prepareSaveStore();
+
+    const { getPlatform } = await import("../platform");
+    const { exportStoredTower } = await import("./manualSavePersist");
+    expect(await exportStoredTower(Simulation.newGame(7), "t.vctower")).toBe("exported");
+    expect(exported).toEqual(["auto"]);
+    expect(getPlatform().saveStore).toBe(store.port);
+  });
 });
