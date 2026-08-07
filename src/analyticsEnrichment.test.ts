@@ -36,10 +36,22 @@ function bodyOf(source: string, name: string): string {
  *  a guard can assert ORDER. A containment check over the whole list would pass
  *  on a swapped call, which is exactly the mistake worth catching here. Split
  *  on plain commas: an argument that ever contains one fails the arity
- *  assertion loudly rather than mismatching in silence. */
+ *  assertion loudly rather than mismatching in silence.
+ *
+ *  The call must also be the function's ONE call site and its ONE return, and
+ *  sit at the outer indentation. `bodyOf` hands back the whole body, nested
+ *  declarations included, so without those three the guard reads a call that
+ *  never runs. The realistic mutation (a plain hardcoded `return "web"`) was
+ *  already caught, since the call goes missing with it; what this closes is the
+ *  deliberate-dead-code variant, a hardcoded return that parks a correct-looking
+ *  call in a nested function nobody invokes. */
 function argsOf(body: string, call: string): string[] {
-  const found = new RegExp(String.raw`return ${call}\((.+)\);`).exec(body);
-  expect(found, `could not find the ${call} call`).not.toBeNull();
+  const callSites = body.split(`${call}(`).length - 1;
+  expect(callSites, `expected exactly one ${call} call in the body`).toBe(1);
+  const returns = body.split(/\breturn\b/).length - 1;
+  expect(returns, `expected the body to return exactly once, through ${call}`).toBe(1);
+  const found = new RegExp(String.raw`^  return ${call}\((.+)\);$`, "m").exec(body);
+  expect(found, `could not find the ${call} call as the function's own return`).not.toBeNull();
   return found![1].split(",").map((arg) => arg.trim());
 }
 

@@ -147,6 +147,12 @@ describe("common event enrichment (S4)", () => {
   afterEach(() => {
     window.location.href = localhost;
     setVisibility("visible");
+    // This suite installs common props, which are MODULE state, so it clears
+    // them itself rather than relying on a later `gameplaySession.reset()` to do
+    // it as a side effect. The state it finds is always empty (its own
+    // `beforeEach` resets the session), so clearing IS restoring here, and the
+    // tripwire at the end of the file gets to mean what it says.
+    setCommonProps({});
   });
 
   it("merges the boot-set common props into every event", () => {
