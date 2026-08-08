@@ -386,6 +386,19 @@ describe("bulletin icon coverage (issue #721)", () => {
         "in reach of the guard or the exclusion that drops them belongs in isEmitterFile",
     ).toEqual([]);
 
+    // The location exclusion is the one exception the guard reads from the same
+    // constant the scan does, so widening TEST_LOCATION would widen the excuse
+    // and the exclusion together and quietly shrink the scan (GH #795: adding
+    // `templates` to the pattern dropped 22 files with the suite still green).
+    // Hold every file it excuses to a real path segment named TEST_DIR, which
+    // rejects a widening to any non-test directory while still allowing a
+    // genuine nested test directory such as src/ui/tests/.
+    expect(
+      witness.filter((r) => TEST_LOCATION.test(r) && !r.split("/").includes(TEST_DIR)),
+      `TEST_LOCATION excuses a file that sits in no directory named ${TEST_DIR}; the pattern ` +
+        `has been widened past test code, so the scan is dropping files this guard no longer sees`,
+    ).toEqual([]);
+
     // Each exclusion has to apply to a file that is really there, or it would
     // hold trivially: an absent path is absent from any list.
     const icons = ALL_TS.find((f) => f.abs === iconsPath);
