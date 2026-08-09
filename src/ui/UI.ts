@@ -160,6 +160,13 @@ export class UI {
     this.newTowerModal({ hasSave: true, onFound: (mode, cal, manual) => this.cb.onNew(mode, cal, manual) });
   }
 
+  /** Open the two-step export choice dialog (.vctower primary, 1994 .TDT
+   *  legacy). The same entry the in-game Saves dialog's Export button uses, so
+   *  the desktop File menu's Export Tower... is additive to an existing control. */
+  promptExport(): void {
+    dialogs.confirmExport(this);
+  }
+
   private wireControls(): void {
     document.querySelectorAll<HTMLButtonElement>("#speed button[data-speed]").forEach((b) => {
       b.addEventListener("click", () => {

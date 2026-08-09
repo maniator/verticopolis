@@ -39,7 +39,7 @@ vi.mock("../platform", async (importOriginal) => ({
 
 const { prepareSaveStore, resetSaveStoreForTests } = await import("./desktopSaveStore");
 const { resetManualSaveForTests } = await import("./manualSavePersist");
-const { runExportFlow, resetExportFlowForTests, EXPORT_WATCHDOG_MS } = await import("./exportFlow");
+const { runExportFlow, runLegacyDownload, resetExportFlowForTests, EXPORT_WATCHDOG_MS } = await import("./exportFlow");
 
 beforeEach(() => {
   resetSaveStoreForTests();
@@ -359,5 +359,62 @@ describe("wrapped fallback dialog (GH #773)", () => {
     await run2;
     expect(toasts).toEqual([LIVE_TOAST, HUNG_TOAST, LIVE_TOAST]);
     spy.mockRestore();
+  });
+});
+
+describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", () => {
+  it("REGRESSION: a second legacy download while the first is open is a quiet no-op, and the latch frees on settle", async () => {
+    const { ui } = fakeUi();
+    const gate = deferred<void>();
+    let downloads = 0;
+    const dl = () => {
+      downloads++;
+      return gate.promise;
+    };
+    const first = runLegacyDownload(ui, dl);
+    // The macOS-menu path: File > Export Tower fires again, choosing the legacy
+    // format, while the first native save dialog sits open. No second download.
+    await runLegacyDownload(ui, dl);
+    expect(downloads).toBe(1);
+    gate.resolve();
+    await first;
+    // Latch freed on settle: the next legacy download runs.
+    await runLegacyDownload(ui, () => {
+      downloads++;
+      return Promise.resolve();
+    });
+    expect(downloads).toBe(2);
+  });
+
+  it("a legacy download and a .vctower export are mutually exclusive on the shared latch", async () => {
+    const { ui, downloads } = fakeUi();
+    const gate = deferred<void>();
+    let legacy = 0;
+    const held = runLegacyDownload(ui, () => {
+      legacy++;
+      return gate.promise;
+    });
+    // A .vctower export fired while the legacy download holds the latch bails
+    // before it serializes or opens anything.
+    await runExportFlow(flowDeps(ui), () => {});
+    expect(legacy).toBe(1);
+    expect(downloads).toEqual([]);
+    gate.resolve();
+    await held;
+  });
+
+  it("the watchdog frees a latch held by a hung legacy download and says so", async () => {
+    vi.useFakeTimers();
+    const { ui, toasts } = fakeUi();
+    void runLegacyDownload(ui, () => new Promise<void>(() => {})); // never settles
+    await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS + 1);
+    expect(toasts).toEqual([{ text: "The export is not responding. You can try exporting again.", kind: "bad" }]);
+    // The freed latch lets a fresh legacy download run.
+    let ran = false;
+    await runLegacyDownload(ui, () => {
+      ran = true;
+      return Promise.resolve();
+    });
+    expect(ran).toBe(true);
   });
 });

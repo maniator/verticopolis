@@ -40,9 +40,9 @@ export type InteractionMode = "crash" | "splash" | "dialog" | "live";
 
 /**
  * The five sources plus the editor-busy predicate, read once. Kept as a flat
- * bag because the host-command guard (`refusalForState`) asks about all eight
+ * bag because the host-command guard (`refusalForState`) asks about all nine
  * commands against one snapshot, and reading each source per command meant the
- * DOM was hit eight times a tick. Hoisting the reads also makes that guard a
+ * DOM was hit nine times a tick. Hoisting the reads also makes that guard a
  * pure function of a plain object, testable without a DOM.
  */
 export interface InteractionState {

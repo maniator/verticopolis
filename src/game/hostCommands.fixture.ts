@@ -21,6 +21,7 @@ import { setLiveSplashActions } from "../ui/splashActions";
  *  the port that production code depends on. */
 export type Spies = Record<
   | "promptNewTower"
+  | "promptExport"
   | "onSave"
   | "onShowSaves"
   | "onShowStats"
@@ -40,6 +41,7 @@ export type Spies = Record<
 export function makeApp(): { app: GameApp; spies: Spies } {
   const spies: Spies = {
     promptNewTower: vi.fn(),
+    promptExport: vi.fn(),
     onSave: vi.fn(),
     onShowSaves: vi.fn(),
     onShowStats: vi.fn(),
@@ -68,6 +70,7 @@ export function makeApp(): { app: GameApp; spies: Spies } {
     saveLoad: { saveBeforeUpdate: spies.saveBeforeUpdate },
     ui: {
       promptNewTower: spies.promptNewTower,
+      promptExport: spies.promptExport,
       showHelp: spies.showHelp,
       showSettings: spies.showSettings,
       sayVisibly: spies.sayVisibly,
@@ -88,6 +91,7 @@ export function makeApp(): { app: GameApp; spies: Spies } {
  *  than only checking the one command it sent. */
 export const TARGETS = [
   "promptNewTower",
+  "promptExport",
   "onSave",
   "onShowSaves",
   "onShowStats",
@@ -107,6 +111,7 @@ export const ALL_COMMANDS: HostCommand[] = [
   "new-game",
   "save",
   "open-saves",
+  "export",
   "undo",
   "redo",
   "stats",
