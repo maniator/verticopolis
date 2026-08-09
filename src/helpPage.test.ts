@@ -66,6 +66,12 @@ describe("helpPageTemplate", () => {
     // And the retired same-origin/no-consent claims are really gone.
     expect(shared).not.toContain("through our own site");
     expect(shared).not.toContain("nothing here to consent to");
+    // The browser half of that sentence is an IDENTITY claim, and it has to
+    // stay one. "Nothing is kept about you" is a data claim, and a false one:
+    // this same copy describes a session-scoped id and an on-device returning
+    // bucket, both of them kept. What is true is that none of it identifies you.
+    expect(shared).toContain("no consent banner, because nothing that identifies you is kept");
+    expect(shared).not.toContain("nothing is kept about you");
   });
 
   it("carries the Classic vs Modern comparison as a deep-linkable section", () => {

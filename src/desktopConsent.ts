@@ -52,10 +52,22 @@ export type DesktopConsentState = "pending" | "granted" | "declined";
 
 /**
  * True only in a `vite build --mode desktop` bundle. Vite statically replaces
- * `import.meta.env.MODE`, so this folds to a literal at build time and Rollup
- * drops the notice and the Settings row out of a web bundle entirely, the same
+ * `import.meta.env.MODE`, so this folds to a literal at build time, the same
  * technique `IS_WRAPPED_BUILD` uses in the platform seam. A property check on a
  * resolved value would read the same to a human and fold nothing.
+ *
+ * What that actually removes from a web bundle, checked against the built
+ * output rather than assumed: the notice TEMPLATE and its copy, because its only
+ * caller sits behind `if (IS_DESKTOP_BUILD)` in the boot flow, and with it the
+ * desktop ingest URL and the `no-cors` shaping. What it does NOT remove is the
+ * Settings row: `settingsTemplate` takes `showAnalytics` as an ordinary runtime
+ * parameter, so the row's markup and its copy live inside a shared template
+ * function that a browser build still ships and simply never renders, and
+ * `wireDesktopAnalyticsToggle` is called unconditionally beside it. A web player
+ * is never shown any of it; it is dead weight in the bundle, not a live surface.
+ * Making that half fold too would mean lifting the row out of the shared
+ * template, which is a change to make on its own terms rather than a claim to
+ * make in a comment.
  */
 export const IS_DESKTOP_BUILD = import.meta.env.MODE === "desktop";
 
@@ -67,7 +79,15 @@ const CONSENT_KEY = "vc.desktop-analytics";
  *  emits a handful (the boot snapshot, a founding, the first placements), so 32
  *  covers the real window with room to spare while bounding what an unanswered
  *  notice can pin in memory. Past the cap the OLDEST is dropped, because the
- *  events nearest the answer describe the session that is actually underway. */
+ *  events nearest the answer describe the session that is actually underway.
+ *
+ *  Say what that costs, since the boot snapshot is the oldest event of all: a
+ *  session that emits more than 32 events with the notice still open loses the
+ *  boot snapshot first. The hold is not a promise to keep any particular event.
+ *  It is a promise that a first run which says yes is not silently empty. The
+ *  alternative (an exception that pins the first entry) buys back one event in a
+ *  session that has already gone strange, at the price of a queue rule that no
+ *  longer reads as one sentence, so the plain bound wins. */
 const PENDING_CAP = 32;
 
 /** The live answer, memoized so the gate never re-reads storage per event and so
@@ -124,10 +144,17 @@ export function desktopAnalyticsAllowed(mode: string): boolean {
 /**
  * Record the player's answer and settle whatever was held.
  *
- * A grant flushes the held events in the order they were emitted, so the boot
- * snapshot still leads the session. A decline discards them without sending,
- * and they were never anywhere but memory. Each flushed send is wrapped: one
- * failing event must not strand the rest of the queue.
+ * A grant flushes whatever is held in the order it was emitted, so the stream
+ * still reads as the session it came from. A decline discards it without
+ * sending, and it was never anywhere but memory. Each flushed send is wrapped:
+ * one failing event must not strand the rest of the queue.
+ *
+ * The loop re-reads `consent` on every iteration, because a held thunk runs
+ * arbitrary caller code and that code can reach a Settings switch. Snapshotting
+ * the answer would let a decline raised mid-flush record itself and still have
+ * the rest of the queue go out behind it, which is the one thing a decline must
+ * stop. No held event does that today; this makes the invariant structural
+ * rather than a property of who happens to be in the queue.
  */
 export function setDesktopConsent(state: DesktopConsentState): void {
   consent = state;
@@ -137,6 +164,7 @@ export function setDesktopConsent(state: DesktopConsentState): void {
   held = [];
   if (state !== "granted") return; // declined: discard, never send
   for (const send of queued) {
+    if (consent !== "granted") return; // answered again mid-flush: stop sending
     try {
       send();
     } catch {

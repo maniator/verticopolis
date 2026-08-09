@@ -51,9 +51,11 @@ function isPlatformPort(value: unknown): value is PlatformPort {
  *  tab: `--mode native` (the iOS Capacitor shell) and `--mode desktop` (the
  *  Electron shell). Wrapped builds skip service-worker registration and the
  *  update poll (updates come from the store or the wrapper's own channel),
- *  offer no PWA install affordance, keep the telemetry host gate closed, and
- *  may bind an injected platform port. Pure so every gate that consults it is
- *  unit-testable without faking the build mode. */
+ *  offer no PWA install affordance, answer the telemetry gate from the build
+ *  mode rather than from a hostname (`native` stays dark; `desktop` follows the
+ *  player's consent, see `desktopConsent.ts`), and may bind an injected platform
+ *  port. Pure so every gate that consults it is unit-testable without faking the
+ *  build mode. */
 export function isWrappedMode(mode: string): boolean {
   return mode === "native" || mode === "desktop";
 }

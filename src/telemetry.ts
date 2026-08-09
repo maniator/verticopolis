@@ -100,10 +100,15 @@ export function telemetryHostAllowed(mode: string = import.meta.env.MODE): boole
 export function injectVercelTelemetry(mode: string = import.meta.env.MODE): void {
   // The Vercel page-level pair is served by OUR deployment at `/_vercel/*`, so
   // it only exists on a page loaded from it. A wrapped shell loads from its own
-  // app protocol, where those paths 404, and the desktop shell's injected CSP
-  // allows exactly one outbound URL (the ingest route). Granting desktop consent
-  // opens the GAMEPLAY events, which have an absolute URL to reach; this inject
-  // has no such route, so it stays dark on every wrapped build regardless.
+  // app protocol, so `/_vercel/insights/script.js` resolves to a path on that
+  // protocol and the protocol handler answers 404. The shell's CSP is NOT what
+  // stops it: that URL is same-origin to the shell, which `connect-src 'self'`
+  // and a `script-src` naming the app origin both allow. Granting desktop
+  // consent opens the GAMEPLAY events, which have an absolute URL to reach; this
+  // inject has no route to reach at all, so it stays dark on every wrapped build
+  // regardless of consent. (The shell's outbound rules are a later stage of this
+  // epic. Today it refuses everything but its own protocol, so even the gameplay
+  // events go nowhere until that lands.)
   // Checked here rather than folded into the gate because the two questions are
   // genuinely different: "may we report" versus "is this page served by us".
   if (isWrappedMode(mode)) return;

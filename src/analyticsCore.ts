@@ -239,8 +239,11 @@ function deliver(name: string, props: EventProps): void {
  * The gate saying no still means nothing is sent. The one thing that changed
  * with the desktop epic is what happens to the event afterward: a desktop build
  * whose first-run notice has not resolved HOLDS it in memory rather than
- * dropping it, so a player who says yes ten seconds into their first launch does
- * not lose the boot snapshot that describes it. Every other dark surface
+ * dropping it, so a player who says yes ten seconds into their first launch
+ * still reports that first launch instead of starting the record at the click.
+ * The hold is bounded and drops its oldest first, so it is that much of a
+ * session rather than a guarantee about any one event (see `desktopConsent.ts`).
+ * Every other dark surface
  * (localhost, the e2e preview server, the iOS shell, and a desktop player who
  * declined) falls straight through `holdWhilePending` and drops the event
  * exactly as before.

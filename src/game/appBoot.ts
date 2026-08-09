@@ -466,9 +466,10 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // Nothing has been SENT by this point on a desktop build, whatever the boot
   // path did: the gate is closed while consent is pending, and the boot snapshot
   // fired above is held in memory until this resolves (see `desktopConsent.ts`).
-  // Behind `IS_DESKTOP_BUILD` so Rollup drops the notice, its template, and the
-  // consent surfaces out of a browser bundle; `showDesktopAnalyticsNotice`
-  // re-checks the mode itself, so the guard is a bundling choice rather than the
-  // correctness argument.
+  // Behind `IS_DESKTOP_BUILD` so Rollup drops the notice and its template out of
+  // a browser bundle (the Settings row's copy stays: see the note on
+  // `IS_DESKTOP_BUILD` in `desktopConsent.ts` for what folds and what does not).
+  // `showDesktopAnalyticsNotice` re-checks the mode itself, so the guard is a
+  // bundling choice rather than the correctness argument.
   if (IS_DESKTOP_BUILD) showDesktopAnalyticsNotice(app.ui);
 }

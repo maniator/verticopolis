@@ -122,7 +122,16 @@ export function helpAboutBody(version: string): TemplateResult {
  *  is nothing here to consent to", which stopped being true the moment one
  *  edition started asking. The crash-report caveat was also moved out of the
  *  middle of a long sentence into its own paragraph, because it is the one place
- *  free text can travel and it should not have to be hunted for. */
+ *  free text can travel and it should not have to be hunted for.
+ *
+ *  Every claim in here is an IDENTITY claim, and that is deliberate. The
+ *  replacement for the consent-banner sentence briefly said "nothing is kept
+ *  about you to consent to", which is a data claim and a false one: the
+ *  transparency note two paragraphs down describes a session-scoped id in
+ *  `sessionStorage` and an on-device returning bucket, both of them kept. What
+ *  is true, and what this copy says instead, is that none of it identifies you
+ *  or points back to you across visits. Keep any future edit on that side of the
+ *  line. */
 export function helpPrivacyBody(): TemplateResult {
   return html`<p style="color:var(--muted)">
       Verticopolis keeps a small, anonymous read on how the game is going: whether new players place their first
@@ -138,8 +147,8 @@ export function helpPrivacyBody(): TemplateResult {
     </p>
     <p style="color:var(--muted)">
       There are no accounts and no ads: the game never asks for your name or email, keeps no profile, and nothing
-      recognizes you from one day to the next. In a browser there is no consent banner, because nothing is kept about
-      you to consent to. The desktop app is the one edition that asks. It runs from your own machine rather than from a
+      recognizes you from one day to the next. In a browser there is no consent banner, because nothing that identifies
+      you is kept. The desktop app is the one edition that asks. It runs from your own machine rather than from a
       page we serve, so its counts travel across the internet to our site, and it puts the question to you the first
       time you open it; the switch then lives in Settings, under Privacy. Saves live in your own storage and leave your
       device only when you export them. The counts help decide what to improve; they are never sold or shared.

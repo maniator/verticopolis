@@ -37,9 +37,17 @@ const INGEST_PATH = "/api/ingest";
 /**
  * The desktop build's ingest URL, absolute because it has to be: a packaged
  * shell loads from its own app protocol, so `/api/ingest` would resolve through
- * the protocol handler and 404. It names the production domain outright, which
- * is also what the shell's network allowlist and its `connect-src` are pinned to
- * (one URL, by full prefix, in the distribution repo).
+ * the protocol handler and 404. It names the production domain outright.
+ *
+ * The shell has to be taught to let that request out, and that is a LATER stage
+ * of this epic, not something that has landed. Today the distribution repo's
+ * shell cancels every request that is not its own app protocol and injects
+ * `connect-src 'self'`, so both `sendBeacon` and the `fetch` fallback are
+ * refused before they reach the network. Until the shell stage ships, a desktop
+ * player who grants consent still sends nothing: this half decides WHETHER to
+ * report and where to, and the shell half decides whether the packet leaves the
+ * machine. That is also why this stage must not ship as a desktop artifact on
+ * its own.
  *
  * Its server half is `POST /api/ingest/desktop` (`api/ingest/desktop.ts`, guarded
  * by `desktopOriginAllowed`), a route that refuses every web host just as

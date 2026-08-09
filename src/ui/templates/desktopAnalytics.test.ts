@@ -16,17 +16,27 @@ describe("desktopAnalyticsNoticeTemplate", () => {
   const render = () =>
     renderToFragment(desktopAnalyticsNoticeTemplate({ onAccept: () => {}, onDecline: () => {} }));
 
-  it("says what is measured, in plain terms", () => {
+  it("says what is measured, in plain terms, all four signals", () => {
+    // All four, matching Help's Privacy list. The returning-player signal was
+    // missing here at first, and its absence is how the notice came to claim
+    // nothing carried over between visits: the one measured thing that does was
+    // the one thing the copy did not name.
     const text = render().textContent ?? "";
     expect(text).toContain("anonymous counts");
     expect(text).toContain("place a first facility");
     expect(text).toContain("which tools get used");
+    expect(text).toContain("whether returning players get further than first-timers");
   });
 
-  it("says it is anonymous and carries no cross-visit identifier", () => {
+  it("makes an identity claim about the counts, never an absolute one", () => {
+    // `getCommonProps` carries `returning`, `recency`, and `tenure` on every
+    // event, all of them derived from state that survives a visit. They are
+    // coarse buckets rather than identifiers, so the promise the copy can keep is
+    // about identity. An absolute "nothing carries over" would be false.
     const text = render().textContent ?? "";
     expect(text).toContain("Nothing here identifies you");
-    expect(text).toContain("nothing carries over from one visit to the next");
+    expect(text).toContain("nothing is kept that could point back to you across visits");
+    expect(text).not.toContain("carries over");
   });
 
   it("surfaces the crash-report caveat about quoting game text", () => {

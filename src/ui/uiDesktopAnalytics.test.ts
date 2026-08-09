@@ -6,6 +6,9 @@ import { render, type TemplateResult } from "lit-html";
 import { showDesktopAnalyticsNotice, wireDesktopAnalyticsToggle } from "./uiDesktopAnalytics";
 import { settingsTemplate } from "./templates/settings";
 import { renderToFragment, change } from "./testing/litTestUtils";
+import type { ModalOpts } from "./modalPrecedence";
+import { gameplaySession, startGameplaySession } from "../analytics";
+import { setAnalyticsAdapter, type AnalyticsAdapter, type EventProps } from "../analyticsAdapter";
 import {
   desktopAnalyticsAllowed,
   desktopConsentState,
@@ -14,6 +17,20 @@ import {
   resetDesktopConsentForTests,
   setDesktopConsent,
 } from "../desktopConsent";
+
+/**
+ * Answer the telemetry gate from the DESKTOP CONSENT rather than from the
+ * hostname, which is what the live gate does for a wrapped build
+ * (`telemetryHostAllowed` hands every wrapped mode to `desktopAnalyticsAllowed`).
+ * Under vitest the build mode is always "test", so the unmocked gate would read
+ * a hostname and the consent state could never open or shut it, which is exactly
+ * the coupling the session-arming tests below are about.
+ */
+vi.mock("../telemetry", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../telemetry")>();
+  const consent = await import("../desktopConsent");
+  return { ...real, telemetryHostAllowed: () => consent.desktopAnalyticsAllowed("desktop") };
+});
 
 /**
  * The two desktop consent surfaces (issue #781): the first-run notice and the
@@ -25,21 +42,29 @@ import {
  * both dispatch) are exercised for real rather than simulated.
  */
 function makeHost(): {
-  host: { el: { modal: HTMLElement }; openModalTemplate: (r: TemplateResult) => HTMLElement; closeModal: () => void };
+  host: {
+    el: { modal: HTMLElement };
+    openModalTemplate: (r: TemplateResult, opts?: ModalOpts) => HTMLElement;
+    closeModal: () => void;
+  };
   dialog: HTMLDialogElement;
   box: HTMLElement;
   closes: number;
   opened: () => number;
+  opts: () => ModalOpts | undefined;
+  displace: () => void;
 } {
   const dialog = document.createElement("dialog");
   document.body.appendChild(dialog);
   const box = document.createElement("div");
   let opens = 0;
+  let opts: ModalOpts | undefined;
   const state = { closes: 0 };
   const host = {
     el: { modal: dialog as HTMLElement },
-    openModalTemplate: (r: TemplateResult): HTMLElement => {
+    openModalTemplate: (r: TemplateResult, o?: ModalOpts): HTMLElement => {
       opens++;
+      opts = o;
       dialog.appendChild(box);
       render(r, box);
       return box;
@@ -56,6 +81,13 @@ function makeHost(): {
       return state.closes;
     },
     opened: () => opens,
+    opts: () => opts,
+    // What another opener does to the incumbent: the shared dialog's contents
+    // are replaced and the incumbent's goodbye runs (`ModalPrecedence.opening`).
+    displace: (): void => {
+      dialog.replaceChildren();
+      opts?.onDisplaced?.();
+    },
   };
 }
 
@@ -103,7 +135,7 @@ describe("showDesktopAnalyticsNotice", () => {
 
   it("emits NOTHING before the notice resolves, then flushes in order on accept", () => {
     // The whole point of the first-run hold: a desktop session is dark until the
-    // player answers, and answering yes does not cost them the boot snapshot.
+    // player answers, and answering yes does not cost them the run-up to it.
     const sent: string[] = [];
     const h = makeHost();
     showDesktopAnalyticsNotice(h.host, "desktop");
@@ -146,6 +178,45 @@ describe("showDesktopAnalyticsNotice", () => {
     expect(desktopConsentState()).toBe("granted");
   });
 
+  it("records nothing when the notice never mounted into the shared dialog", () => {
+    // A host that hands back a box it did not mount stands in for an open that
+    // did not take. Both overrides GRANT, so installing them against a dialog
+    // the notice is not inside would record a yes for a question nobody saw.
+    const dialog = document.createElement("dialog");
+    document.body.appendChild(dialog);
+    const orphan = document.createElement("div");
+    let closes = 0;
+    showDesktopAnalyticsNotice(
+      {
+        el: { modal: dialog as HTMLElement },
+        openModalTemplate: (): HTMLElement => orphan,
+        closeModal: (): void => void closes++,
+      },
+      "desktop",
+    );
+    dialog.dispatchEvent(new Event("cancel", { cancelable: true }));
+    dialog.dispatchEvent(new Event("click", { bubbles: true }));
+    expect(desktopConsentState(), "an unmounted notice is not an answer").toBe("pending");
+    expect(closes, "and nothing was closed on its behalf either").toBe(0);
+  });
+
+  it("leaves the answer pending when another modal displaces the notice", () => {
+    // `hasBlockingModal` (the emergency choice's gate in frameLoop.ts) does not
+    // read the dialog, so the notice can genuinely be replaced mid-question. The
+    // player saw a privacy question flash past, which is not a yes.
+    const sent: string[] = [];
+    const h = makeHost();
+    showDesktopAnalyticsNotice(h.host, "desktop");
+    holdWhilePending(() => sent.push("boot"), "desktop");
+    h.displace();
+    // Whatever took the dialog is dismissed: that must not answer for us.
+    h.dialog.dispatchEvent(new Event("cancel", { cancelable: true }));
+    h.dialog.dispatchEvent(new Event("click", { bubbles: true }));
+    expect(desktopConsentState(), "the question died with the dialog; ask again next launch").toBe("pending");
+    expect(sent, "and nothing may be flushed on a question that was never answered").toEqual([]);
+    expect(desktopAnalyticsAllowed("desktop")).toBe(false);
+  });
+
   it("records the answer exactly once however many times it is dismissed", () => {
     const sent: string[] = [];
     const h = makeHost();
@@ -157,6 +228,73 @@ describe("showDesktopAnalyticsNotice", () => {
     expect(desktopConsentState(), "a later decline must not overturn the recorded answer").toBe("granted");
     expect(sent, "and the queue must not flush twice").toEqual(["boot"]);
     expect(h.closes, "the modal is closed once").toBe(1);
+  });
+});
+
+describe("a grant starts the gameplay session boot could not", () => {
+  /**
+   * `bootstrap.ts` calls `startGameplaySession` once, before the notice
+   * resolves, so on a first launch it meets a shut gate and attaches no
+   * `pagehide` or `visibilitychange` listener. Nothing re-ran it, so the whole
+   * first desktop session, the acquisition session, reported no session summary
+   * at all however long the player played after saying yes. The held queue could
+   * not cover for it: those events were never emitted in the first place.
+   */
+  const sent: { event: string; props: EventProps }[] = [];
+  let restore: AnalyticsAdapter | undefined;
+
+  beforeEach(() => {
+    localStorage.clear();
+    resetDesktopConsentForTests();
+    document.body.replaceChildren();
+    gameplaySession.reset();
+    sent.length = 0;
+    restore = setAnalyticsAdapter({
+      send: (event, props) => void sent.push({ event, props }),
+      injectPageTelemetry: () => {},
+    });
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    if (restore) setAnalyticsAdapter(restore);
+    gameplaySession.reset();
+    resetDesktopConsentForTests();
+    localStorage.clear();
+    document.body.replaceChildren();
+  });
+
+  it("a first launch that says yes still reports its session summary", () => {
+    vi.setSystemTime(0);
+    startGameplaySession(); // boot, consent pending: the gate is shut
+    const h = makeHost();
+    showDesktopAnalyticsNotice(h.host, "desktop");
+    // The probe that makes the assertion after it mean something: had boot
+    // armed the listeners, this page-hide would report a four second session.
+    vi.setSystemTime(4000);
+    window.dispatchEvent(new Event("pagehide"));
+    expect(sent, "a pending first run is dark, its session listeners included").toEqual([]);
+    h.box.querySelector<HTMLButtonElement>('[data-act="accept"]')!.click();
+    vi.setSystemTime(7000);
+    window.dispatchEvent(new Event("pagehide"));
+    expect(sent, "the session that follows the yes has to end somewhere").toEqual([
+      { event: "session_end", props: { seconds: 3 } },
+    ]);
+  });
+
+  it("turning it back on from Settings arms the session too", () => {
+    setDesktopConsent("declined");
+    startGameplaySession(); // a declined launch is just as unarmed
+    const box = document.createElement("div");
+    box.appendChild(renderToFragment(settingsTemplate("1.2.3", false, true)));
+    wireDesktopAnalyticsToggle(box, true);
+    change(box.querySelector<HTMLInputElement>("#set-analytics")!);
+    expect(desktopConsentState()).toBe("granted");
+    // `arm` is the claim `startGameplaySession` stakes before wiring its
+    // listeners: true once, false forever after. False here means the grant
+    // already took it, so the listeners are attached.
+    expect(gameplaySession.arm(), "the Settings grant must have armed the session").toBe(false);
   });
 });
 

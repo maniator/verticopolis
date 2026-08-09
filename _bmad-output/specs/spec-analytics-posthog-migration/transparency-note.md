@@ -4,6 +4,8 @@ Spec-authored companion to `SPEC.md`. Ready-to-drop copy for the "what we measur
 
 **Updated 2026-08-07 for the desktop build (issue #781).** Two claims below were true of the web edition only and are gone: that the counts travel "through our own site" (a same-origin phrasing that a packaged app posting across the internet does not keep), and that there is no consent banner "because there is nothing here to consent to" (one edition now asks). The crash-report caveat was also promoted out of a subordinate clause: it is the one place a player's own words can travel, so it says so on its own.
 
+**Corrected 2026-08-08 in review.** Every anonymity line here is an IDENTITY claim, and two of them had slipped into being data claims. The desktop notice said "nothing carries over from one visit to the next" and the Help paragraph said there is no browser consent banner "because nothing is kept about you to consent to". Both are false as written: `returning`, `recency`, and `tenure` ride on every event and are derived from on-device state that outlives a visit, and the session id and returning bucket described in the copy rules below are kept too. They are coarse buckets rather than identifiers, so the posture was sound and the sentences were the problem. The notice also gained the fourth measured signal (returning players), whose absence is how an absolute claim slipped past in the first place.
+
 ## Short line (Settings footer or Help privacy row)
 
 > **What we measure.** The game keeps a few anonymous counts to see how new players get started, how far towers get, and whether returning players progress further. We use no cookies and store nothing that identifies you. In a browser there is nothing to accept or turn off. The desktop app asks the first time you open it, and its switch lives in Settings, under Privacy.
@@ -14,17 +16,17 @@ Spec-authored companion to `SPEC.md`. Ready-to-drop copy for the "what we measur
 >
 > Crash reports are the one place your own words can travel. They carry the technical details of the error and the same kind of anonymous totals, and an error message can occasionally quote a bit of game text, such as a tower's name.
 >
-> There are no accounts and no ads. In a browser there is no consent banner, because nothing is kept about you to consent to. The desktop app is the one edition that asks. It runs from your own machine rather than from a page we serve, so its counts travel across the internet to our site, and it puts the question to you the first time you open it; the switch then lives in Settings, under Privacy. The counts help decide what to improve; they are never sold or shared.
+> There are no accounts and no ads. In a browser there is no consent banner, because nothing that identifies you is kept. The desktop app is the one edition that asks. It runs from your own machine rather than from a page we serve, so its counts travel across the internet to our site, and it puts the question to you the first time you open it; the switch then lives in Settings, under Privacy. The counts help decide what to improve; they are never sold or shared.
 
 ## Desktop first-run notice (shown once, before anything is sent)
 
-Lives in `src/ui/templates/desktopAnalytics.ts`. Shown only on a packaged desktop build whose consent is still `pending`. The primary button grants, "No thanks" declines, and any other dismissal (Esc, the backdrop, the title-bar x) grants, per the party ruling's default-on posture.
+Lives in `src/ui/templates/desktopAnalytics.ts`. Shown only on a packaged desktop build whose consent is still `pending`. The primary button grants, "No thanks" declines, and any other dismissal the player performs (Esc, the backdrop, the title-bar x) grants, per the party ruling's default-on posture. The notice leaving the screen without the player dismissing it is not an answer: a programmatic close, or another modal taking the shared dialog, leaves the consent `pending` and the next launch asks again.
 
 > **A word about counts**
 >
-> Verticopolis keeps a few anonymous counts: whether players place a first facility, how far towers climb, and which tools get used.
+> Verticopolis keeps a few anonymous counts: whether players place a first facility, how far towers climb, which tools get used, and whether returning players get further than first-timers.
 >
-> Nothing here identifies you, and nothing carries over from one visit to the next.
+> Nothing here identifies you, and nothing is kept that could point back to you across visits.
 >
 > Crash reports carry the technical details of the error. An error message can occasionally quote a bit of game text, such as a tower's name.
 >

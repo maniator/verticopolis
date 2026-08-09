@@ -150,6 +150,24 @@ describe("the pending hold (memory only, bounded, ordered)", () => {
     expect(flushed[31]).toBe(32);
   });
 
+  it("stops the flush the moment a held event turns the answer around", () => {
+    // A held thunk runs arbitrary caller code, and that code can reach the
+    // Settings switch. A decline raised part way through the flush must stop the
+    // rest of the queue, not merely be recorded while it keeps sending behind
+    // the player's back.
+    const sent: string[] = [];
+    holdWhilePending(() => {
+      sent.push("boot");
+      setDesktopConsent("declined");
+    }, "desktop");
+    holdWhilePending(() => sent.push("game_started"), "desktop");
+    holdWhilePending(() => sent.push("first_build"), "desktop");
+    setDesktopConsent("granted");
+    expect(sent, "nothing may go out after the decline was recorded").toEqual(["boot"]);
+    expect(desktopConsentState()).toBe("declined");
+    expect(heldEventCount()).toBe(0);
+  });
+
   it("holds nothing on any mode but desktop, so the web build is untouched", () => {
     for (const mode of ["production", "development", "test", "native"]) {
       holdWhilePending(() => {}, mode);

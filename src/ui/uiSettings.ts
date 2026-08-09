@@ -22,7 +22,11 @@ export function showSettings(ui: UI): void {
   // renders it (bridging is forced on and can't be toggled there).
   const modern = ui.cb.getMode() === "modern";
   // The Privacy section is desktop-only. `IS_DESKTOP_BUILD` folds to a literal at
-  // build time, so a web bundle drops the row AND the consent surfaces it wires.
+  // build time, so a browser session renders no row and wires no switch. It does
+  // not drop them from the bundle: `settingsTemplate` takes `showAnalytics` as an
+  // ordinary parameter, so the row's markup rides inside a shared template a web
+  // build still ships and never renders (see `desktopConsent.ts` for what does
+  // fold).
   const box = ui.openModalTemplate(settingsTemplate(version, modern, IS_DESKTOP_BUILD), { displaceable: true });
   // Volume sliders: initialize from the live levels, apply on every input tick
   // (persistence is debounced by the onSetVolume handler in main.ts), and keep
@@ -69,6 +73,12 @@ export function showSettings(ui: UI): void {
   // through `ui.cb`: the consent value is owned by `desktopConsent.ts` and needs
   // nothing from `GameApp`, so routing it through the callback seam would add
   // four indirections around a module-level read.
+  //
+  // Turning it ON is the player's permission, and until the shell stage of this
+  // epic lands it is only that: the packaged shell refuses every outbound
+  // request today, so a consented desktop build still sends nothing (see
+  // `analyticsRelay.ts`). Turning it OFF is complete on its own, since the gate
+  // it closes is in this bundle.
   wireDesktopAnalyticsToggle(box, IS_DESKTOP_BUILD);
   // The controller wires every stateful control above; the plain Close action is
   // the one [data-act] button, so wireActions binds it (its loud lookup throws at
