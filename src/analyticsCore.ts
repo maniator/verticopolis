@@ -1,4 +1,5 @@
 import { analyticsAdapter, type EventProps } from "./analyticsAdapter";
+import { APP_VERSION } from "./appVersion";
 import { telemetryHostAllowed } from "./telemetry";
 
 /**
@@ -192,11 +193,20 @@ export type AppActionName =
  * Cross-cutting props merged into EVERY event: the platform and
  * distribution-channel dimensions plus the
  * anonymous on-device returning / tenure / recency buckets (S4). Populated once
- * at boot via {@link setCommonProps}; empty until then, so the merge is a no-op
- * before boot and every existing per-event assertion is unaffected. These are
- * coarse, cookieless buckets, never an identifier (see `analyticsEnrichment.ts`).
+ * at boot via {@link setCommonProps}. These are coarse, cookieless buckets,
+ * never an identifier (see `analyticsEnrichment.ts`).
+ *
+ * The build version is here from MODULE LOAD rather than waiting for boot, so
+ * that every event can name the build that sent it whatever the entry point.
+ * Three paths would otherwise miss it: an uncaught error thrown before the boot
+ * enrichment runs (the window that produced the largest real error signal in
+ * production, `WebGL context lost (at boot)`), a boot where the enrichment's own
+ * optional reads throw and its catch leaves the props untouched, and the
+ * standalone `/help` and `/gallery` pages, which never call `bootGame` at all
+ * and fire their page events immediately. A compile-time constant needs no
+ * boot to be known, so nothing is gained by deferring it.
  */
-let commonProps: EventProps = {};
+let commonProps: EventProps = { version: APP_VERSION };
 
 /** Install the boot-computed common props (see `analyticsEnrichment.ts`). Called
  *  once from the boot flow BEFORE the first event so `boot` already carries them.
@@ -207,12 +217,17 @@ export function setCommonProps(props: EventProps): void {
   commonProps = { ...props };
 }
 
-/** A copy of the boot-computed common props (platform / distribution_channel /
- *  returning / tenure / recency / display), for a surface that sends OUTSIDE the typed gameplay
- *  vocabulary and so does not flow through `trackEvent`'s merge, namely the
- *  cookieless error reporter (`analyticsErrors.ts`): a `$exception` should carry
- *  the same platform and build context every gameplay event does. Copied so a
- *  caller cannot mutate the shared set. */
+/** A copy of the current common props, for a surface that sends OUTSIDE the
+ *  typed gameplay vocabulary and so does not flow through `trackEvent`'s merge,
+ *  namely the cookieless error reporter (`analyticsErrors.ts`): a `$exception`
+ *  should carry the same build and platform context every gameplay event does.
+ *
+ *  Two sources, and the distinction matters to a caller reading this before
+ *  boot: `version` is here from module load, while the rest
+ *  (platform / distribution_channel / returning / tenure / recency / display)
+ *  arrives once the boot enrichment runs. So an early crash report carries the
+ *  build but not yet the buckets. Copied so a caller cannot mutate the shared
+ *  set. */
 export function getCommonProps(): EventProps {
   return { ...commonProps };
 }
