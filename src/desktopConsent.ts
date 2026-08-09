@@ -99,6 +99,33 @@ let consent: DesktopConsentState | undefined;
  *  anything the caller can send. MEMORY ONLY; see the module note. */
 let held: (() => void)[] = [];
 
+/** Run whenever the answer CHANGES value. Opaque callbacks for the same reason
+ *  the held events are opaque thunks: this module sits BELOW analytics and must
+ *  not learn what a watcher does with the news. Registered at import time and
+ *  never removed, so {@link resetDesktopConsentForTests} deliberately leaves the
+ *  list alone (dropping it would unsubscribe the tracker for the rest of the
+ *  process). */
+const watchers: (() => void)[] = [];
+
+/**
+ * Watch for a change of answer.
+ *
+ * The one thing a watcher is used for today is the analytics measurement window:
+ * the totals a session summary is computed from have to start over when the
+ * answer changes, or a summary sent after a grant would describe play from
+ * before it. That reset cannot be called from here, because analytics sits ABOVE
+ * this module (it reaches the gate through `telemetry.ts`) and importing it back
+ * would close a cycle, so the news travels outward instead and the subscriber
+ * lives beside the state it resets. See the subscription at the foot of
+ * `analytics.ts`.
+ *
+ * Watchers fire on a real change only, so a surface that rewrites the answer it
+ * already holds does not tear down a live measurement window for nothing.
+ */
+export function onDesktopConsentChange(watcher: () => void): void {
+  watchers.push(watcher);
+}
+
 /** Read the stored answer. Anything that is not one of the two resolved values
  *  (absent, corrupt, a blocked storage that throws) reads as `pending`, so the
  *  failure direction is always "ask again and send nothing". */
@@ -157,8 +184,25 @@ export function desktopAnalyticsAllowed(mode: string): boolean {
  * rather than a property of who happens to be in the queue.
  */
 export function setDesktopConsent(state: DesktopConsentState): void {
+  const changed = desktopConsentState() !== state;
   consent = state;
   storeConsent(state);
+  // Tell the watchers before anything is flushed and after the gate has already
+  // taken the new value. Both halves of that order matter: a decline has shut
+  // the gate by this line, so nothing a watcher does on its way out can still be
+  // sent, and a grant hands the watchers a live "on" to open a fresh measurement
+  // window against, ahead of the queue that is about to drain into it. Each call
+  // is wrapped for the same reason the flush below is: one bad watcher must not
+  // strand the answer or the queue.
+  if (changed) {
+    for (const watcher of watchers) {
+      try {
+        watcher();
+      } catch {
+        /* best-effort: a watcher must not strand the answer or the flush */
+      }
+    }
+  }
   if (state === "pending") return; // nothing has been answered, so nothing settles
   const queued = held;
   held = [];
@@ -213,7 +257,9 @@ export function toggleDesktopAnalytics(): boolean {
 }
 
 /** Test seam: clear the memo, the held events, and the stored answer so each
- *  test starts from a genuine first run. */
+ *  test starts from a genuine first run. The watchers are NOT cleared: they are
+ *  registered once at import time, so dropping them would leave the tracker
+ *  deaf for every test that follows. */
 export function resetDesktopConsentForTests(): void {
   consent = undefined;
   held = [];

@@ -7,9 +7,11 @@ import {
   desktopConsentState,
   heldEventCount,
   holdWhilePending,
+  onDesktopConsentChange,
   resetDesktopConsentForTests,
   setDesktopConsent,
   toggleDesktopAnalytics,
+  type DesktopConsentState,
 } from "./desktopConsent";
 
 const CONSENT_SOURCE = resolve(dirname(fileURLToPath(import.meta.url)), "./desktopConsent.ts");
@@ -17,6 +19,30 @@ const CONSENT_SOURCE = resolve(dirname(fileURLToPath(import.meta.url)), "./deskt
 /** The key the consent value rides. Spelled out here rather than imported, so a
  *  rename has to be a deliberate edit in two places. */
 const CONSENT_KEY = "vc.desktop-analytics";
+
+/** The answer each notification carried. A watcher cannot be unregistered (in
+ *  production they are wired once at import time), so the suite registers its
+ *  three below at module scope and clears their record per test rather than
+ *  subscribing and unsubscribing around each one. */
+const seen: DesktopConsentState[] = [];
+/** The gate's answer as of each notification, which pins the ORDER: the new
+ *  answer has to be in force before the watcher hears about it. */
+const gateWhenSeen: boolean[] = [];
+/** Set by the one test that needs a watcher to blow up mid-notification. */
+let watcherThrows = false;
+/** One-shot watchers, queued by {@link watchOnce} and drained per notification. */
+const extra: (() => void)[] = [];
+
+onDesktopConsentChange(() => {
+  seen.push(desktopConsentState());
+  gateWhenSeen.push(desktopAnalyticsAllowed("desktop"));
+});
+onDesktopConsentChange(() => {
+  if (watcherThrows) throw new Error("a watcher blew up");
+});
+onDesktopConsentChange(() => {
+  for (const fn of extra.splice(0)) fn();
+});
 
 describe("desktop consent state", () => {
   beforeEach(() => {
@@ -244,6 +270,58 @@ describe("toggleDesktopAnalytics", () => {
   });
 });
 
+describe("onDesktopConsentChange", () => {
+  // The one thing a watcher does today is start a fresh analytics measurement
+  // window (see the subscription at the foot of `analytics.ts`), so what it needs
+  // from here is a call on every real change, the new answer already live when it
+  // arrives, and no call at all for a rewrite of the answer that already stands.
+  beforeEach(() => {
+    localStorage.clear();
+    resetDesktopConsentForTests();
+    forgetNotifications();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetDesktopConsentForTests();
+    localStorage.clear();
+    forgetNotifications();
+  });
+
+  it("fires on every change of answer, in both directions", () => {
+    setDesktopConsent("granted");
+    setDesktopConsent("declined");
+    toggleDesktopAnalytics();
+    expect(seen).toEqual(["granted", "declined", "granted"]);
+  });
+
+  it("does not fire when the answer is rewritten with the value it already has", () => {
+    setDesktopConsent("granted");
+    setDesktopConsent("granted");
+    expect(seen, "a redundant write must not tear down a live window").toEqual(["granted"]);
+  });
+
+  it("hands the watcher the answer already in force", () => {
+    // Ordering, not decoration: a watcher told about a decline while the gate still
+    // answers yes could send on its way out, which is the one thing an opt-out has
+    // to stop.
+    setDesktopConsent("granted");
+    forgetNotifications();
+    setDesktopConsent("declined");
+    expect(gateWhenSeen, "the gate must already be shut when the news arrives").toEqual([false]);
+  });
+
+  it("fires before the held queue drains, and a throwing watcher strands neither", () => {
+    watcherThrows = true;
+    const order: string[] = [];
+    holdWhilePending(() => order.push("boot"), "desktop");
+    watchOnce(() => order.push("watcher"));
+    expect(() => setDesktopConsent("granted")).not.toThrow();
+    expect(order, "the window opens before the queue drains into it").toEqual(["watcher", "boot"]);
+    expect(desktopConsentState(), "and the answer still stands").toBe("granted");
+    expect(heldEventCount()).toBe(0);
+  });
+});
+
 describe("the live build-mode reads, checked in the source", () => {
   // Asserted against the SOURCE TEXT, and that is the point: under vitest
   // `import.meta.env.MODE` is "test", so every behavioral assertion above passes
@@ -272,6 +350,21 @@ describe("the live build-mode reads, checked in the source", () => {
     expect(found![1]).toContain("mode: string =");
   });
 });
+
+/** Forget everything the standing watchers recorded, and anything queued for
+ *  them, so each test reads its own notifications. */
+function forgetNotifications(): void {
+  seen.length = 0;
+  gateWhenSeen.length = 0;
+  extra.length = 0;
+  watcherThrows = false;
+}
+
+/** Run `fn` on the next notification only. Queued rather than registered, since
+ *  a real watcher stays for the life of the module. */
+function watchOnce(fn: () => void): void {
+  extra.push(fn);
+}
 
 /** A storage object whose every access throws, as in a locked-down profile. */
 function blockedStorage(): Storage {
