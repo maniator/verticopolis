@@ -121,9 +121,16 @@ than assumed: production already serves `https://verticopolis.com/version.json` 
 
 ## Open questions
 
-- **Does the owner want the sideload fingerprint in production at all**, or would
-  they rather wait and publish once with only the Play fingerprint? Shipping it now
-  is what makes a test APK verify today; waiting costs only that test. **This was
-  never put to the owner before the file was written**, so the implementation
-  answered it by default. If the answer is no, the fix is to delete one line from
-  the array and redeploy.
+None. The one that stood here is answered below.
+
+## Decided since drafting
+
+- **Ship the sideload fingerprint now: YES, owner, 2026-08-09.** The question was
+  whether to publish it at all or wait and publish once with only the Play App
+  Signing fingerprint. The owner chose to ship, wanting a verified build on a
+  phone immediately, and judged the exposure acceptable: the attack needs the
+  keystore lifted off their machine, and the prize is a marginally more
+  convincing copy of a free, open-source game with no account and no payment.
+  Removing it at store launch is still required, because nothing in the build
+  will ever complain if it is left in; that is backlog row
+  `assetlinks-sideload-fingerprint` and issue #799.
