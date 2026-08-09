@@ -110,23 +110,40 @@ export function helpAboutBody(version: string): TemplateResult {
  *  `/help` page (each surface supplies its own heading, like About). One home for
  *  the promise so the two surfaces can never disagree about what is collected.
  *  Keep this in step with reality: the gameplay counters (`analytics.ts`, relayed
- *  same-origin by `analyticsIngest.ts`), the page/performance metrics
- *  (`telemetry.ts`), and the error reporter (`analyticsErrors.ts`) are all
- *  cookieless and carry no personal data or durable identifier; if any of that
- *  posture changes, this copy must change in the same PR. */
+ *  by `analyticsIngest.ts`), the page/performance metrics (`telemetry.ts`), and
+ *  the error reporter (`analyticsErrors.ts`) are all cookieless and carry no
+ *  personal data or durable identifier; if any of that posture changes, this copy
+ *  must change in the same PR.
+ *
+ *  Two sentences were rewritten for the desktop build (issue #781), and the
+ *  reasons are worth keeping: the old text said counts go "through our own site",
+ *  which read as a same-origin promise that a packaged app posting across the
+ *  internet does not keep; and it said there is no consent banner "because there
+ *  is nothing here to consent to", which stopped being true the moment one
+ *  edition started asking. The crash-report caveat was also moved out of the
+ *  middle of a long sentence into its own paragraph, because it is the one place
+ *  free text can travel and it should not have to be hunted for. */
 export function helpPrivacyBody(): TemplateResult {
   return html`<p style="color:var(--muted)">
-    Verticopolis keeps a small, anonymous read on how the game is going: whether new players place their first
-    facility, how far towers climb the star ladder, which tools get used, and whether returning players get further
-    than first-timers. Those signals are worked out on your own device and sent as coarse, anonymous counts through
-    our own site, with no cookie and nothing that could point back to you across visits, plus anonymous page-visit
-    counts and page performance metrics. There are no accounts and no ads: the game never asks for your name or email, keeps no
-    profile, and nothing recognizes you from one day to the next, so there is no consent banner because there is
-    nothing here to consent to. Crash reports carry the technical details of the error and the same kind of anonymous
-    totals, though an error message can occasionally quote a bit of game text, such as a tower's name. Saves live in
-    your own browser's storage and leave your device only when you export them. The counts help decide what to
-    improve; they are never sold or shared.
-  </p>`;
+      Verticopolis keeps a small, anonymous read on how the game is going: whether new players place their first
+      facility, how far towers climb the star ladder, which tools get used, and whether returning players get further
+      than first-timers. Those signals are worked out on your own device and sent as coarse, anonymous counts to our
+      own site, with no cookie and nothing that could point back to you across visits, plus anonymous page-visit
+      counts and page performance metrics.
+    </p>
+    <p style="color:var(--muted)">
+      Crash reports are the one place your own words can travel. They carry the technical details of the error and the
+      same kind of anonymous totals, and an error message can occasionally quote a bit of game text, such as a tower's
+      name.
+    </p>
+    <p style="color:var(--muted)">
+      There are no accounts and no ads: the game never asks for your name or email, keeps no profile, and nothing
+      recognizes you from one day to the next. In a browser there is no consent banner, because nothing is kept about
+      you to consent to. The desktop app is the one edition that asks. It runs from your own machine rather than from a
+      page we serve, so its counts travel across the internet to our site, and it puts the question to you the first
+      time you open it; the switch then lives in Settings, under Privacy. Saves live in your own storage and leave your
+      device only when you export them. The counts help decide what to improve; they are never sold or shared.
+    </p>`;
 }
 
 /** The "Found a bug?" report call to action (heading + blurb + external link).

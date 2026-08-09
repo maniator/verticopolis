@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.23.0
+
+- The desktop app now asks, the first time you open it, whether it may keep the same anonymous counts the browser version keeps, and it sends nothing until you answer. A switch in Settings, under Privacy, turns it off again whenever you like.
+- The Privacy section in Help now says plainly what the desktop app does differently, and that a crash report can occasionally quote a bit of game text such as a tower's name.
+
 ## 2.22.0
 
 - An export that looked stuck and then finishes anyway now names the tower it saved, so you can tell which one landed on disk after you have moved on to another.

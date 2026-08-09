@@ -1,4 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+import { DESKTOP_INGEST_URL, ingestEndpoint, relayFetchInit } from "./analyticsRelay";
+
+const RELAY_SOURCE = resolve(dirname(fileURLToPath(import.meta.url)), "./analyticsRelay.ts");
+
+/** The relative path the web, TWA, and iOS builds have always posted to. */
+const WEB_PATH = "/api/ingest";
 
 /** Parse the JSON body handed to a transport spy (sendBeacon or fetch). */
 function bodyOf(arg: unknown): { event: string; properties: unknown; session: string; ts: string } {
@@ -185,5 +194,84 @@ describe("sendToRelay", () => {
       },
     });
     expect(() => sendToRelay("boot", {})).not.toThrow();
+  });
+});
+
+/**
+ * The desktop split (issue #781): where one build posts, and how the `fetch`
+ * fallback has to be shaped to survive a route that answers `OPTIONS` with 405.
+ *
+ * Both are pure, mode-taking helpers because under vitest `import.meta.env.MODE`
+ * is always `"test"`, so nothing driven only through the live read could ever be
+ * shown to pick the desktop URL. That the LIVE path feeds the real mode into both
+ * is pinned against the source text at the bottom of this file.
+ */
+describe("ingestEndpoint", () => {
+  it("keeps the unchanged relative path for the web build, and never an absolute URL", () => {
+    for (const mode of ["production", "development", "test", "native", "staging"]) {
+      expect(ingestEndpoint(mode), `${mode} must post to the relative path`).toBe(WEB_PATH);
+      expect(ingestEndpoint(mode)).not.toMatch(/^https?:\/\//);
+    }
+  });
+
+  it("posts the desktop build to one absolute URL, and never the relative path", () => {
+    expect(ingestEndpoint("desktop")).toBe(DESKTOP_INGEST_URL);
+    expect(ingestEndpoint("desktop")).not.toBe(WEB_PATH);
+    expect(ingestEndpoint("desktop")).toMatch(/^https:\/\//);
+  });
+
+  it("names the production domain and the desktop route the server actually serves", () => {
+    // Its server half is `POST /api/ingest/desktop` (api/ingest/desktop.ts), and
+    // the shell's network allowlist is pinned to this exact URL by full prefix.
+    // A typo here is a build that reports nothing and cannot say why.
+    expect(DESKTOP_INGEST_URL).toBe("https://verticopolis.com/api/ingest/desktop");
+  });
+});
+
+describe("relayFetchInit", () => {
+  it("keeps the web fallback exactly as it was: POST + keepalive, no mode, no headers", () => {
+    const init = relayFetchInit("production", "{}");
+    expect(init.method).toBe("POST");
+    expect(init.keepalive).toBe(true);
+    expect(init.body).toBe("{}");
+    expect(init.mode, "the web request must stay a plain same-origin POST").toBeUndefined();
+    expect(init.headers).toBeUndefined();
+  });
+
+  it("sends the desktop fallback no-cors and sets NO content-type", () => {
+    // The desktop route sends no CORS headers and answers OPTIONS with 405
+    // (#791), so anything that triggers a preflight never arrives. A JSON
+    // content-type or any custom header would do exactly that.
+    const init = relayFetchInit("desktop", "{}");
+    expect(init.mode).toBe("no-cors");
+    expect(init.keepalive).toBe(true);
+    expect(init.method).toBe("POST");
+    expect(init.headers, "any header at all would preflight this route away").toBeUndefined();
+  });
+});
+
+describe("the live endpoint choice, checked in the source", () => {
+  // Asserted against the SOURCE TEXT, and that is the point: the runner's mode
+  // is always "test", so `postToRelay` could hardcode the web path and every
+  // behavioral test above would still pass while no desktop build ever reported.
+  // The same technique platform.test.ts and analyticsEnrichment.test.ts use.
+  const source = readFileSync(RELAY_SOURCE, "utf8");
+
+  it("the source was actually read", () => {
+    expect(source, "the source file could not be read, so these tests prove nothing").toContain("postToRelay");
+  });
+
+  it("postToRelay resolves the endpoint from the REAL build mode", () => {
+    const body = /function postToRelay\([\s\S]*?\n\}/.exec(source);
+    expect(body, "could not find postToRelay in the source").not.toBeNull();
+    expect(body![0], "the mode must come from the live build mode").toContain("import.meta.env.MODE");
+    expect(body![0]).toContain("ingestEndpoint(mode)");
+    expect(body![0]).toContain("relayFetchInit(mode, body)");
+    // Both transports must use the SAME resolved endpoint, or a beacon and its
+    // fetch fallback would post to different places.
+    expect(body![0]).toContain("navigator.sendBeacon(endpoint, body)");
+    expect(body![0]).toContain("fetch(endpoint,");
+    // And no literal path may be left behind in the send path.
+    expect(body![0], "the relative path must not be hardcoded in the send path").not.toContain('"/api/ingest"');
   });
 });

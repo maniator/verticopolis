@@ -1,5 +1,6 @@
 import { analyticsAdapter } from "./analyticsAdapter";
 import { isWrappedMode } from "./platform";
+import { desktopAnalyticsAllowed } from "./desktopConsent";
 
 /**
  * Shared page-view + Core Web Vitals inject for every deployed page: the game
@@ -43,13 +44,14 @@ import { isWrappedMode } from "./platform";
  * since production traffic comes from the custom domain.
  *
  * The desktop surface is a THIRD pair on the same rule, and it is not this
- * predicate: the desktop client's ingest URL constant (landing in a later stage
- * of the desktop epic) pairs with `desktopOriginAllowed` on the server, which
+ * host set: the desktop client's ingest URL constant (`DESKTOP_INGEST_URL` in
+ * `analyticsRelay.ts`) pairs with `desktopOriginAllowed` on the server, which
  * guards `POST /api/ingest/desktop` and accepts only the shell's own origin, the
  * literal opaque `"null"`, and an absent header. Each pair moves together, and no
  * pair may be folded into another: the desktop route refuses every web host and
  * `originAllowed` refuses the shell's origin, so widening one route can never
- * widen the other.
+ * widen the other. The desktop client's half of the gate is still THIS function,
+ * answered by the consent state rather than by a hostname (see below).
  *
  * This is a functional gate (only where the endpoints are served), not a security
  * boundary: a non-Vercel look-alike such as `verticopolis.com.evil.example` falls
@@ -67,14 +69,23 @@ import { isWrappedMode } from "./platform";
  * 8 KiB body cap.
  */
 export function telemetryHostAllowed(mode: string = import.meta.env.MODE): boolean {
-  // Wrapped builds (Capacitor, Electron) never report telemetry, whatever host
-  // they are served from. The host check below already excludes every wrapper
-  // origin in practice, but a wrapper shell could serve its bundle from a
-  // hostname on this list (an app protocol host named after the production
-  // domain), and that must not silently open the gate. Structural, per the
-  // distribution plan: enabling desktop analytics is a reviewed change here,
-  // never a wrapper-side hostname choice.
-  if (isWrappedMode(mode)) return false;
+  // Wrapped builds (Capacitor, Electron) are decided by the MODE, before any
+  // hostname is read, and the reason is unchanged by the desktop epic: a wrapper
+  // shell could serve its bundle from a hostname on the list below (an app
+  // protocol host named after the production domain), and that must never
+  // silently open the gate. Enabling a wrapped surface stays a reviewed change
+  // in this repo rather than a wrapper-side hostname choice.
+  //
+  // What the desktop epic changed is WHICH reviewed answer this returns, not
+  // where the decision is made. `desktopAnalyticsAllowed` is false for every
+  // wrapped mode except `desktop`, so the iOS Capacitor shell stays
+  // unconditionally dark exactly as before, and a desktop build answers with the
+  // player's own consent state: nothing at all until the first-run notice
+  // resolves, and nothing again the moment they turn it off in Settings. The
+  // host set below is deliberately never consulted for a wrapped build, because
+  // the desktop client posts to an absolute ingest URL rather than to a path on
+  // whatever origin it happens to be served from.
+  if (isWrappedMode(mode)) return desktopAnalyticsAllowed(mode);
   if (typeof window === "undefined") return false;
   // Strip a trailing dot so the canonical absolute FQDN (`verticopolis.com.`) is
   // matched like the usual form. Mirror this in `originAllowed`.
@@ -86,8 +97,17 @@ export function telemetryHostAllowed(mode: string = import.meta.env.MODE): boole
   );
 }
 
-export function injectVercelTelemetry(): void {
-  if (!telemetryHostAllowed()) return;
+export function injectVercelTelemetry(mode: string = import.meta.env.MODE): void {
+  // The Vercel page-level pair is served by OUR deployment at `/_vercel/*`, so
+  // it only exists on a page loaded from it. A wrapped shell loads from its own
+  // app protocol, where those paths 404, and the desktop shell's injected CSP
+  // allows exactly one outbound URL (the ingest route). Granting desktop consent
+  // opens the GAMEPLAY events, which have an absolute URL to reach; this inject
+  // has no such route, so it stays dark on every wrapped build regardless.
+  // Checked here rather than folded into the gate because the two questions are
+  // genuinely different: "may we report" versus "is this page served by us".
+  if (isWrappedMode(mode)) return;
+  if (!telemetryHostAllowed(mode)) return;
   try {
     analyticsAdapter().injectPageTelemetry();
   } catch {

@@ -1,5 +1,6 @@
 import { analyticsAdapter, type EventProps } from "./analyticsAdapter";
 import { telemetryHostAllowed } from "./telemetry";
+import { holdWhilePending } from "./desktopConsent";
 
 /**
  * Gameplay analytics core: the typed event vocabulary, the cross-cutting common
@@ -217,16 +218,41 @@ export function getCommonProps(): EventProps {
   return { ...commonProps };
 }
 
-/** Host-gated, best-effort custom-event send. The single choke point every
- *  gameplay event flows through, so the gate and the never-throw guarantee live
- *  in one place. The common props are spread FIRST so a per-event prop always
- *  wins on a key collision (the typed vocabulary is never shadowed by an
- *  enrichment key). */
-export function trackEvent<K extends keyof GameplayEvents>(name: K, props: GameplayEvents[K]): void {
-  if (!telemetryHostAllowed()) return;
+/** Hand one already-merged event to the active adapter, best-effort. Split out
+ *  of {@link trackEvent} so the immediate send and a held first-run send are
+ *  literally the same call, rather than two spellings that could drift. */
+function deliver(name: string, props: EventProps): void {
   try {
-    analyticsAdapter().send(name, { ...commonProps, ...props });
+    analyticsAdapter().send(name, props);
   } catch {
     /* best-effort telemetry; never block gameplay on it */
   }
+}
+
+/**
+ * Host-gated, best-effort custom-event send. The single choke point every
+ * gameplay event flows through, so the gate and the never-throw guarantee live
+ * in one place. The common props are spread FIRST so a per-event prop always
+ * wins on a key collision (the typed vocabulary is never shadowed by an
+ * enrichment key).
+ *
+ * The gate saying no still means nothing is sent. The one thing that changed
+ * with the desktop epic is what happens to the event afterward: a desktop build
+ * whose first-run notice has not resolved HOLDS it in memory rather than
+ * dropping it, so a player who says yes ten seconds into their first launch does
+ * not lose the boot snapshot that describes it. Every other dark surface
+ * (localhost, the e2e preview server, the iOS shell, and a desktop player who
+ * declined) falls straight through `holdWhilePending` and drops the event
+ * exactly as before.
+ *
+ * The merge happens before the gate so a held event carries the props it had at
+ * EMIT time rather than whatever the common props say when the queue flushes.
+ */
+export function trackEvent<K extends keyof GameplayEvents>(name: K, props: GameplayEvents[K]): void {
+  const merged: EventProps = { ...commonProps, ...props };
+  if (telemetryHostAllowed()) {
+    deliver(name, merged);
+    return;
+  }
+  holdWhilePending(() => deliver(name, merged));
 }

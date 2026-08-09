@@ -41,11 +41,31 @@ describe("helpPageTemplate", () => {
     expect(norm(privacy!.textContent ?? "")).toContain(shared);
     // And the shared body itself still makes the promise (guards against it
     // being hollowed out while both containments keep passing). These phrases
-    // are the transparency note's load-bearing claims: same-origin transport,
-    // no cookie, no cross-visit identity, saves stay local.
-    expect(shared).toContain("anonymous counts through our own site");
+    // are the transparency note's load-bearing claims: the counts go to our own
+    // site, no cookie, no cross-visit identity, saves stay local.
+    expect(shared).toContain("anonymous counts to our own site");
     expect(shared).toContain("with no cookie and nothing that could point back to you across visits");
     expect(shared).toContain("leave your device only when you export them");
+  });
+
+  it("tells the desktop truth: it asks, it posts across, and crash reports can quote game text", () => {
+    // The desktop build (issue #781) broke two claims this copy used to make: a
+    // same-origin transport, and "there is nothing here to consent to". Both were
+    // rewritten in the same PR that shipped the desktop client, and these pins
+    // are what stop the old wording drifting back in.
+    const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+    const shared = norm(renderToFragment(helpPrivacyBody()).textContent ?? "");
+    // The desktop edition asks, and the off switch is named where it lives.
+    expect(shared).toContain("The desktop app is the one edition that asks");
+    expect(shared).toContain("the switch then lives in Settings, under Privacy");
+    // The transport is described honestly for a build with no server behind it.
+    expect(shared).toContain("its counts travel across the internet to our site");
+    // The crash caveat is surfaced as its own claim rather than buried.
+    expect(shared).toContain("Crash reports are the one place your own words can travel");
+    expect(shared).toContain("quote a bit of game text, such as a tower's name");
+    // And the retired same-origin/no-consent claims are really gone.
+    expect(shared).not.toContain("through our own site");
+    expect(shared).not.toContain("nothing here to consent to");
   });
 
   it("carries the Classic vs Modern comparison as a deep-linkable section", () => {
