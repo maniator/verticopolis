@@ -425,6 +425,7 @@ describe("the platform and distribution-channel dimensions ride every event", ()
       bootCommonProps({
         platform: "desktop",
         distributionChannel: "steam",
+        version: "9.9.9",
         onboarded: true,
         tenureDay: 3,
         savedAt: undefined,
@@ -458,3 +459,4 @@ describe("no suite leaves its common props installed", () => {
     expect(getCommonProps()).toEqual({});
   });
 });
+

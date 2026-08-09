@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
-import { runBootFlow } from "./appBoot";
+import { APP_VERSION, runBootFlow } from "./appBoot";
 import { gameplaySession } from "../analytics";
 import * as analyticsModule from "../analytics";
 import { isOnboarded } from "../ui/Onboarding";
@@ -92,6 +92,7 @@ describe("runBootFlow analytics enrichment wiring (S4)", () => {
     expect(setSpy).toHaveBeenCalledWith({
       platform: "twa",
       distribution_channel: "twa",
+      version: APP_VERSION,
       returning: true,
       tenure: "d7-29",
       recency: "1d",
@@ -116,6 +117,7 @@ describe("runBootFlow analytics enrichment wiring (S4)", () => {
     expect(setSpy).toHaveBeenCalledWith({
       platform: "web",
       distribution_channel: "web",
+      version: APP_VERSION,
       returning: true,
       tenure: "d0",
       recency: "30d",
