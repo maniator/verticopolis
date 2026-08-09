@@ -243,7 +243,25 @@ export default defineConfig({
         // generateSW it would make Workbox fetch `/help` at install, which 404s
         // anywhere the Vercel rewrite is absent (`vite preview`, the e2e harness),
         // failing the whole precache and taking the game's offline down with it.
-        navigateFallbackDenylist: [/gallery/, /help/, /preview/, /version\.json$/, /robots\.txt$/, /sitemap\.xml$/, /og-image\.png$/],
+        // `.well-known/` joins the machine-readable files for the same reason
+        // robots.txt and sitemap.xml are here: they are documents ABOUT the
+        // site rather than pages of it, and answering one with the game shell
+        // makes a person checking it think it is missing. Android's Digital
+        // Asset Links verifier fetches server-side and never meets a service
+        // worker, so this changes nothing for verification itself; it is what
+        // makes checking the file by hand tell the truth.
+        navigateFallbackDenylist: [
+          /gallery/,
+          /help/,
+          /preview/,
+          /version\.json$/,
+          /robots\.txt$/,
+          /sitemap\.xml$/,
+          /og-image\.png$/,
+          // No trailing slash: a bare `/.well-known` navigation should reach the
+          // host's own 404 rather than the game shell, same as the file below it.
+          /\.well-known/,
+        ],
         cleanupOutdatedCaches: true,
         // Excalibur's bundle is comfortably large; lift the precache ceiling.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
