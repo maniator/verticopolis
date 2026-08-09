@@ -23,6 +23,8 @@ import { hydrationConflictIds, noteTowerOriginForSlot, storeReadDegraded } from 
 import { conflictBulletinText } from "./desktopSaveHydrate";
 import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
+import { IS_DESKTOP_BUILD } from "../desktopConsent";
+import { showDesktopAnalyticsNotice } from "../ui/uiDesktopAnalytics";
 
 /**
  * Constructor collaborators for `GameApp`, split out to keep the class body a
@@ -455,4 +457,19 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // screen the player is looking at. Inbound commands are unaffected: one cannot
   // arrive until the shell has a window, which is later than any of this.
   if (IS_WRAPPED_BUILD) bindHostCommands(app);
+
+  // The desktop build's first-run analytics notice (issue #781), and only on a
+  // genuine first run: it no-ops once the player has answered. Last, after every
+  // branch above has decided what is on screen, so it opens over a settled
+  // title screen or a settled resumed tower rather than racing either.
+  //
+  // Nothing has been SENT by this point on a desktop build, whatever the boot
+  // path did: the gate is closed while consent is pending, and the boot snapshot
+  // fired above is held in memory until this resolves (see `desktopConsent.ts`).
+  // Behind `IS_DESKTOP_BUILD` so Rollup drops the notice and its template out of
+  // a browser bundle (the Settings row's copy stays: see the note on
+  // `IS_DESKTOP_BUILD` in `desktopConsent.ts` for what folds and what does not).
+  // `showDesktopAnalyticsNotice` re-checks the mode itself, so the guard is a
+  // bundling choice rather than the correctness argument.
+  if (IS_DESKTOP_BUILD) showDesktopAnalyticsNotice(app.ui);
 }

@@ -41,11 +41,61 @@ describe("helpPageTemplate", () => {
     expect(norm(privacy!.textContent ?? "")).toContain(shared);
     // And the shared body itself still makes the promise (guards against it
     // being hollowed out while both containments keep passing). These phrases
-    // are the transparency note's load-bearing claims: same-origin transport,
-    // no cookie, no cross-visit identity, saves stay local.
-    expect(shared).toContain("anonymous counts through our own site");
+    // are the transparency note's load-bearing claims: the counts go to our own
+    // site, no cookie, no cross-visit identity, saves stay local.
+    expect(shared).toContain("anonymous counts to our own site");
     expect(shared).toContain("with no cookie and nothing that could point back to you across visits");
     expect(shared).toContain("leave your device only when you export them");
+  });
+
+  it("states the packaging rule rather than a product, and keeps the crash caveat", () => {
+    // The desktop build (issue #781) broke two claims this copy used to make: a
+    // same-origin transport, and "there is nothing here to consent to". Both were
+    // rewritten in the same PR that shipped the desktop client, and these pins
+    // are what stop the old wording drifting back in.
+    const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+    const shared = norm(renderToFragment(helpPrivacyBody()).textContent ?? "");
+    // This body ships in the WEB build, read by players who can only play in a
+    // browser, so it says what is true today before it says anything about a
+    // packaged edition.
+    expect(shared).toContain("Today Verticopolis runs in your browser, and that is the only edition you can play");
+    // The packaged case is stated as a rule, in the conditional, and the off
+    // switch is still named where it lives.
+    expect(shared).toContain("A packaged edition would be different");
+    expect(shared).toContain("so its counts would have to travel across the internet to our site");
+    expect(shared).toContain(
+      "Any edition we package that way asks on the first launch, before it counts anything, and the switch then lives in Settings, under Privacy",
+    );
+    expect(shared).toContain("the switch then lives in Settings, under Privacy");
+    // The OTHER edition-conditional, pointing the opposite way: a browser sends
+    // page metrics a packaged edition never sends. `injectVercelTelemetry`
+    // returns on `isWrappedMode` before it consults consent, because /_vercel/*
+    // resolves to a path on the shell's app protocol and 404s there.
+    expect(shared).toContain(
+      "In a browser, the page we serve also sends anonymous page-visit counts and page performance metrics; a packaged edition sends neither",
+    );
+    // The bare unscoped clause claimed both metric classes for every edition,
+    // which told a packaged player we collect what we never collect.
+    expect(shared).not.toContain("plus anonymous page-visit counts and page performance metrics");
+    // And the present-tense product claims are really gone. Neither string is a
+    // substring of the replacement wording, so these fail the moment the old
+    // sentences come back. The claim was false twice over: no desktop artifact
+    // existed that a reader could obtain, and the shell canceled the ingest
+    // request, so nothing was traveling anywhere.
+    expect(shared).not.toContain("The desktop app is");
+    expect(shared).not.toContain("its counts travel across the internet to our site");
+    // The crash caveat is surfaced as its own claim rather than buried.
+    expect(shared).toContain("Crash reports are the one place your own words can travel");
+    expect(shared).toContain("quote a bit of game text, such as a tower's name");
+    // And the retired same-origin/no-consent claims are really gone.
+    expect(shared).not.toContain("through our own site");
+    expect(shared).not.toContain("nothing here to consent to");
+    // The browser half of that sentence is an IDENTITY claim, and it has to
+    // stay one. "Nothing is kept about you" is a data claim, and a false one:
+    // this same copy describes a session-scoped id and an on-device returning
+    // bucket, both of them kept. What is true is that none of it identifies you.
+    expect(shared).toContain("no consent banner, because nothing that identifies you is kept");
+    expect(shared).not.toContain("nothing is kept about you");
   });
 
   it("carries the Classic vs Modern comparison as a deep-linkable section", () => {

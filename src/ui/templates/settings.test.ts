@@ -54,6 +54,23 @@ describe("settingsTemplate structure and a11y", () => {
     expect(frag.querySelector("#note-auto-bridge")).not.toBeNull();
   });
 
+  it("omits the Privacy section off desktop, renders it as a switch on a desktop build", () => {
+    // Desktop-only (issue #781): the switch answers the consent question only
+    // the desktop build asks, so a browser session gets no row at all.
+    expect(renderToFragment(settingsTemplate("1.2.3")).querySelector("#set-analytics")).toBeNull();
+    expect(renderToFragment(settingsTemplate("1.2.3", true)).querySelector("#set-analytics")).toBeNull();
+    const frag = renderToFragment(settingsTemplate("1.2.3", false, true));
+    const sw = frag.querySelector<HTMLInputElement>("#set-analytics")!;
+    expect(sw.getAttribute("type")).toBe("checkbox");
+    expect(sw.getAttribute("role")).toBe("switch");
+    expect(sw.getAttribute("aria-describedby")).toBe("note-analytics");
+    expect(frag.querySelector("#note-analytics")).not.toBeNull();
+    // It points at the in-game Privacy text and carries no link: the shell's
+    // external-link policy allows one host, and the full note already ships here.
+    expect(frag.querySelector("#note-analytics")!.textContent).toContain("Help, under Privacy");
+    expect(frag.querySelector("#note-analytics")!.querySelector("a")).toBeNull();
+  });
+
   it("renders the primary Close action with autofocus", () => {
     const frag = renderToFragment(settingsTemplate("1.2.3"));
     const close = frag.querySelector<HTMLButtonElement>('[data-act="close"]')!;

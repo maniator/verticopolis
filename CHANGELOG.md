@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.23.0
+
+- The Privacy section in Help now spells out what the game counts and how those counts travel, and says plainly that a crash report can occasionally quote a bit of game text, such as a tower's name.
+
 ## 2.22.0
 
 - An export that looked stuck and then finishes anyway now names the tower it saved, so you can tell which one landed on disk after you have moved on to another.

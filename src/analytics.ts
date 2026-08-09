@@ -1,6 +1,7 @@
 import { telemetryHostAllowed } from "./telemetry";
 import { trackEvent, setCommonProps, type GameplayEvents } from "./analyticsCore";
 import { clearActionLatches } from "./analyticsActions";
+import { onDesktopConsentChange } from "./desktopConsent";
 
 /**
  * Gameplay analytics: the per-tab {@link GameplaySession} that tracks the funnel
@@ -53,6 +54,19 @@ const FPS_MIN_SAMPLES = 120;
  *  dropped instead. Realistic device jank down to 1fps is still captured. */
 const FPS_MAX_FRAME_MS = 1000;
 
+/** The cumulative emergency counters the frame loop samples, in the shape the
+ *  session banks and reports them. */
+interface EmergencyCounts {
+  fires: number;
+  gutRooms: number;
+  bombs: number;
+}
+
+/** A zeroed set of counters, fresh per call since the session mutates them. */
+function noEmergencies(): EmergencyCounts {
+  return { fires: 0, gutRooms: 0, bombs: 0 };
+}
+
 /**
  * Per-tab session bookkeeping for the funnel and engagement events. One instance
  * (the exported {@link gameplaySession}) lives for the page's lifetime: the game
@@ -98,11 +112,18 @@ class GameplaySession {
    *  game or a loaded save builds a fresh EventSystem whose counters restart at
    *  zero, so the current tower's live counts alone would undercount (report a
    *  clean zero for) a session that had a fire in an earlier tower. */
-  private emergBanked = { fires: 0, gutRooms: 0, bombs: 0 };
+  private emergBanked: EmergencyCounts = noEmergencies();
   /** The last sampled CURRENT-tower cumulative emergency counts. A counter going
    *  backwards between samples means the tower was replaced, so the prior peak is
    *  banked into {@link emergBanked} before the new tower's counts take over. */
-  private emergLast = { fires: 0, gutRooms: 0, bombs: 0 };
+  private emergLast: EmergencyCounts = noEmergencies();
+  /** What the CURRENT tower's counters already read when this measurement window
+   *  opened, subtracted from the total so the window is charged only for the
+   *  outbreaks it covers. Zero for a tab that has been in one window since boot,
+   *  since every tower it saw started from zero inside that window. `null` means
+   *  the next sample sets it: a consent flip lands mid-tower, and what the live
+   *  counters read right then is only knowable from the sample after it. */
+  private emergBase: EmergencyCounts | null = noEmergencies();
   /** True once the emergency sampler has run at least once, i.e. the game frame
    *  loop actually ticked. Gates `session_emergencies` so a no-play prerender/hide
    *  (frame loop never ran) does not emit a spurious zero into the denominator. */
@@ -228,14 +249,18 @@ class GameplaySession {
    *  throttled UI-update path it rides. */
   noteEmergencyCounts(fires: number, firesGutRooms: number, bombs: number): void {
     this.emergSampled = true;
+    // A window that opened mid-tower takes this first sample as its baseline, so
+    // what the tower had been through before the window is not charged to it. A
+    // window open since boot already holds a zero baseline and is unaffected.
+    this.emergBase ??= { fires, gutRooms: firesGutRooms, bombs };
     if (fires < this.emergLast.fires || firesGutRooms < this.emergLast.gutRooms || bombs < this.emergLast.bombs) {
-      this.emergBanked.fires += this.emergLast.fires;
-      this.emergBanked.gutRooms += this.emergLast.gutRooms;
-      this.emergBanked.bombs += this.emergLast.bombs;
+      this.emergBanked.fires += this.emergLast.fires - this.emergBase.fires;
+      this.emergBanked.gutRooms += this.emergLast.gutRooms - this.emergBase.gutRooms;
+      this.emergBanked.bombs += this.emergLast.bombs - this.emergBase.bombs;
+      // The replacement starts from zero, so the baseline leaves with the old tower.
+      this.emergBase = noEmergencies();
     }
-    this.emergLast.fires = fires;
-    this.emergLast.gutRooms = firesGutRooms;
-    this.emergLast.bombs = bombs;
+    this.emergLast = { fires, gutRooms: firesGutRooms, bombs };
   }
 
   /** Bank the current foreground segment and report cumulative play seconds.
@@ -251,6 +276,17 @@ class GameplaySession {
       this.activeMs += Date.now() - this.resumedAt;
       this.resumedAt = null;
     }
+    // Nothing below runs while the gate is shut, and the reason is the LATCHES
+    // rather than the sends. Every `trackEvent` here already declines to send with
+    // sharing off, but each latch is set BEFORE the call it guards, so a page-hide
+    // during an off stretch would mark the depth and fps summaries reported and
+    // suppress them for the rest of the session even after the player turned
+    // sharing back on. It also keeps a summary out of the first-run hold, which a
+    // later reset could not undo: a held event freezes its payload at emit time,
+    // so a summary computed before the answer would still carry those totals when
+    // the queue drains after a grant (see `desktopConsent.ts`). The clock above is
+    // banked either way, so an off-stretch hide still stops counting time.
+    if (!telemetryHostAllowed()) return;
     // Session depth, emitted AT MOST ONCE per session (the first `end` after
     // something was built). `end` re-fires on every tab-hide, and these events
     // carry no session id, so re-emitting the growing cumulative totals would
@@ -298,10 +334,13 @@ class GameplaySession {
     // both the numerator and the denominator, so the RATE stays unbiased.
     if (isFinal && this.emergSampled && !this.emergReported) {
       this.emergReported = true;
+      // Net of the window's opening baseline (zero unless the window opened
+      // mid-tower on a consent change), so the summary covers this window only.
+      const base = this.emergBase ?? noEmergencies();
       trackEvent("session_emergencies", {
-        fires: this.emergBanked.fires + this.emergLast.fires,
-        firesGutRooms: this.emergBanked.gutRooms + this.emergLast.gutRooms,
-        bombs: this.emergBanked.bombs + this.emergLast.bombs,
+        fires: this.emergBanked.fires + this.emergLast.fires - base.fires,
+        firesGutRooms: this.emergBanked.gutRooms + this.emergLast.gutRooms - base.gutRooms,
+        bombs: this.emergBanked.bombs + this.emergLast.bombs - base.bombs,
       });
     }
     const seconds = Math.round(this.activeMs / 1000);
@@ -319,15 +358,38 @@ class GameplaySession {
     return true;
   }
 
-  /** Test hook: forget all session state, including the boot-set common props and
-   *  the once-per-session action latches (both module-level, so cleared here to
-   *  keep tests isolated). */
-  reset(): void {
+  /**
+   * Open a fresh measurement window: drop everything banked so far, and re-open
+   * every latch, so the next summary describes only what happens from here.
+   *
+   * Called on any change of the desktop consent answer, in BOTH directions (see
+   * the subscription below this class), which is what keeps the accumulators
+   * describing one consent state at a time:
+   *
+   * - Turning sharing ON drops what came before it, so no summary emitted after
+   *   the grant can describe play the player had not agreed to share. That is the
+   *   half that matters most: the totals are cumulative and the summaries fire
+   *   late, so without this a grant at the end of a session would report the
+   *   whole session.
+   * - Turning sharing OFF drops the same way, which is what stops the window up
+   *   to that moment from being transmitted later.
+   *
+   * Two things deliberately survive. `armed` does, because the page-hide listeners
+   * are wired once per tab and a second pair would double-count `session_end`. The
+   * boot-set common props do, because they describe the build and the device
+   * rather than the play.
+   *
+   * The per-tower `first_build` latch and the per-tool `tool_used` latch re-open
+   * with everything else, so a window that opens mid-play reports the funnel step
+   * and the tool mix it sees rather than staying silenced by an earlier window
+   * nothing was sent from. The price is one repeat of each on the one path where
+   * the earlier window WAS transmitted (a first run whose held queue flushed on
+   * the grant), the cheaper side of that trade for two deduped, rare events.
+   */
+  startEpoch(): void {
     this.activeMs = 0;
-    this.resumedAt = null;
     this.lastReportedSec = 0;
     this.built = false;
-    this.armed = false;
     this.builds = 0;
     this.peakFloors = Number.NEGATIVE_INFINITY;
     this.depthReported = false;
@@ -337,11 +399,31 @@ class GameplaySession {
     this.lastFrameAt = null;
     this.toolsSeen.clear();
     this.toolUses.clear();
-    this.emergBanked = { fires: 0, gutRooms: 0, bombs: 0 };
-    this.emergLast = { fires: 0, gutRooms: 0, bombs: 0 };
+    this.emergBanked = noEmergencies();
+    this.emergLast = noEmergencies();
+    // Unknown until the next sample: this window may have opened in the middle of
+    // a tower that already has counts. See `emergBase`.
+    this.emergBase = null;
     this.emergSampled = false;
     this.emergReported = false;
-    clearActionLatches(); // test-only reset path: keep test sessions independent
+    clearActionLatches();
+    // Re-anchor a running foreground segment on now, so the clock keeps running
+    // for the new window while the time already spent in the old one is dropped
+    // with everything else.
+    if (this.resumedAt !== null) this.resumedAt = Date.now();
+  }
+
+  /** Test hook: forget all session state. A fresh window, plus the few things a
+   *  window deliberately outlives (the listener claim and the module-level common
+   *  props, both cleared here to keep tests isolated). */
+  reset(): void {
+    this.startEpoch();
+    this.resumedAt = null;
+    this.armed = false;
+    // A reset stands in for a brand-new tab, whose towers all start from zero
+    // inside the window. Only a mid-flight consent flip needs a baseline read
+    // from the next sample.
+    this.emergBase = noEmergencies();
     setCommonProps({});
   }
 }
@@ -349,6 +431,34 @@ class GameplaySession {
 /** The process-wide gameplay session. The shell imports this and calls its
  *  `note*` hooks; boot arms its end via {@link startGameplaySession}. */
 export const gameplaySession = new GameplaySession();
+
+/**
+ * Start a fresh measurement window whenever the desktop consent answer changes.
+ *
+ * Wired here, beside the session it resets, rather than at the two consent
+ * surfaces: `setDesktopConsent` is the single place the answer is ever written, so
+ * hanging the reset off that is one hook a future third surface cannot forget to
+ * call. (`armSessionOnGrant` in `uiDesktopAnalytics.ts` is where the two surfaces
+ * share their grant work, but it is a helper each of them opts into, and it never
+ * runs on the way OFF.) The callback travels outward because `desktopConsent.ts`
+ * sits BELOW analytics and importing analytics back would close a cycle through
+ * `telemetry.ts`.
+ *
+ * Turning sharing OFF drops the window rather than emitting a farewell summary of
+ * the play up to that instant, which is a deliberate choice between two defensible
+ * ones. A player who turns the switch off expects the switch to stop traffic; a
+ * summary sent BY the act of turning it off is traffic caused by opting out, and
+ * it would also be a timestamped marker of the decision, which is the one thing
+ * these surfaces go out of their way never to report (see the note at the top of
+ * `uiDesktopAnalytics.ts`). The cost is small: the summaries are once-per-session
+ * lower bounds by design, so a dropped partial window reads one session shallower
+ * rather than losing a measurement anyone could otherwise recover.
+ *
+ * A browser build never writes the consent value at all (both surfaces are behind
+ * `IS_DESKTOP_BUILD`), so this never fires there and the web session behaves
+ * exactly as it did before any of this landed.
+ */
+onDesktopConsentChange(() => gameplaySession.startEpoch());
 
 /**
  * Start the gameplay session at boot and keep its foreground clock in step with

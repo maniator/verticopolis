@@ -9,6 +9,12 @@ import type { EventProps } from "./analyticsAdapter";
  * with `keepalive`. Best-effort and never-throw; since the D-1 cutover this is
  * the only custom-event transport (the dual-write window is closed).
  *
+ * The desktop build is the one exception to "same-origin", and only to that: it
+ * posts the same bodies to {@link DESKTOP_INGEST_URL} instead, because a
+ * packaged shell has no server behind its own origin. Everything else about the
+ * transport (the payload, the per-session id, the never-throw posture) is shared,
+ * so there is one relay rather than two.
+ *
  * Within-session correlation comes from the per-session id (see {@link
  * sessionId}), created lazily on the first send and cached in `sessionStorage` so
  * it survives a reload within the tab (an "Update now" or WebGL-recovery resume
@@ -27,6 +33,68 @@ import type { EventProps } from "./analyticsAdapter";
 
 /** The same-origin relay path. No key, no cookie, no third-party domain. */
 const INGEST_PATH = "/api/ingest";
+
+/**
+ * The desktop build's ingest URL, absolute because it has to be: a packaged
+ * shell loads from its own app protocol, so `/api/ingest` would resolve through
+ * the protocol handler and 404. It names the production domain outright.
+ *
+ * The shell has to be taught to let that request out, and that is a LATER stage
+ * of this epic, not something that has landed. Today the distribution repo's
+ * shell cancels every request that is not its own app protocol and injects
+ * `connect-src 'self'`, so both `sendBeacon` and the `fetch` fallback are
+ * refused before they reach the network. Until the shell stage ships, a desktop
+ * player who grants consent still sends nothing: this half decides WHETHER to
+ * report and where to, and the shell half decides whether the packet leaves the
+ * machine. That is also why this stage must not ship as a desktop artifact on
+ * its own.
+ *
+ * Its server half is `POST /api/ingest/desktop` (`api/ingest/desktop.ts`, guarded
+ * by `desktopOriginAllowed`), a route that refuses every web host just as
+ * `originAllowed` refuses the shell's origin. The two ingest paths are separate
+ * end to end and must stay that way.
+ */
+export const DESKTOP_INGEST_URL = "https://verticopolis.com/api/ingest/desktop";
+
+/**
+ * Where one build posts. Desktop gets the absolute URL above; every other mode
+ * keeps the unchanged relative path, so the web, TWA, and iOS builds send
+ * exactly what they sent before.
+ *
+ * Pure and mode-taking so both directions are assertable: under vitest
+ * `import.meta.env.MODE` is always `"test"`, so a live-read-only version could
+ * never be shown to pick the desktop URL for anything.
+ */
+export function ingestEndpoint(mode: string): string {
+  return mode === "desktop" ? DESKTOP_INGEST_URL : INGEST_PATH;
+}
+
+/**
+ * The `fetch` fallback's init for one build.
+ *
+ * Desktop adds `mode: "no-cors"` and nothing else. The desktop route sends no
+ * CORS response headers and answers `OPTIONS` with 405 (issue #791), so the
+ * request has to stay a SIMPLE request: a JSON `content-type`, or any custom
+ * header, would trigger a preflight that the route refuses, and the event would
+ * never arrive. No header is set here for exactly that reason, and the relay
+ * parses the body text without consulting `content-type`, so nothing is lost.
+ *
+ * The consequence is worth stating plainly, because it shapes everything
+ * downstream: under `no-cors` the response is OPAQUE. The client cannot read the
+ * status, so it cannot see a 429 rate limit or a 400 rejection, and there is
+ * nothing to react to even in principle. Every desktop send is fire-and-forget:
+ * no retry, no backoff, no error surface. That is also why an offline send is
+ * simply dropped rather than queued (see `desktopConsent.ts`).
+ *
+ * `sendBeacon` is untouched by any of this. It has always been a simple,
+ * no-cors-by-definition POST, so the preferred path needed no change at all.
+ */
+export function relayFetchInit(mode: string, body: string): RequestInit {
+  // `keepalive` lets the request outlive a page-hide, matching sendBeacon.
+  const init: RequestInit = { method: "POST", body, keepalive: true };
+  if (mode === "desktop") init.mode = "no-cors";
+  return init;
+}
 
 /** The body shape the relay expects (matches `IngestBody` on the server side).
  *  `properties` is widened to arbitrary JSON here (not just the primitive
@@ -138,16 +206,21 @@ function postToRelay(event: string, properties: Record<string, unknown>): void {
   } catch {
     return; // an unserializable payload is dropped, never thrown
   }
+  // One mode read feeds both transports, so the beacon and the fallback can
+  // never post to different places.
+  const mode = import.meta.env.MODE;
+  const endpoint = ingestEndpoint(mode);
   try {
     // Prefer sendBeacon (survives page-hide). It returns false when the user
     // agent cannot queue the payload (buffer full); fall through to fetch then.
     if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
-      if (navigator.sendBeacon(INGEST_PATH, body)) return;
+      if (navigator.sendBeacon(endpoint, body)) return;
     }
-    // `keepalive` lets the request outlive a page-hide, matching sendBeacon. The
-    // returned promise is caught so a rejected fetch (offline, DNS) cannot become
-    // an unhandled rejection: the whole path stays best-effort.
-    void fetch(INGEST_PATH, { method: "POST", body, keepalive: true }).catch(() => {});
+    // The returned promise is caught so a rejected fetch (offline, DNS) cannot
+    // become an unhandled rejection: the whole path stays best-effort. A desktop
+    // send is opaque as well as best-effort, so there is nothing here to inspect
+    // and nothing to retry; the event is simply gone.
+    void fetch(endpoint, relayFetchInit(mode, body)).catch(() => {});
   } catch {
     /* best-effort telemetry; never block the caller */
   }

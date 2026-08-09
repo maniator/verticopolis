@@ -25,8 +25,28 @@ import { html, nothing, type TemplateResult } from "lit-html";
  * itself is a STATIC structure like the others; `showSettings` reads the live
  * tower state, sets the initial checked value, and disables it when Manual
  * Structure was chosen at founding (which already places every tile by hand).
+ *
+ * The Privacy section is desktop-only, on the same conditional shape:
+ * `showAnalytics` is true only in a packaged desktop build, because that is the
+ * only edition with a consent decision to hold (issue #781). A browser session
+ * renders no row, because it has no such decision to make. Its note points at
+ * Help's Privacy section for the whole story, and carries no link: the shell's
+ * external-link policy allows one host, and the full text already ships inside
+ * the game.
+ *
+ * The note's anonymity line is an identity claim on purpose, worded to match the
+ * first-run notice and Help. See the head of `templates/desktopAnalytics.ts` for
+ * why an absolute "nothing carries over" would be false.
  */
-export function settingsTemplate(version: string, showBuilding = false): TemplateResult {
+export function settingsTemplate(version: string, showBuilding = false, showAnalytics = false): TemplateResult {
+  const analytics = showAnalytics
+    ? html`
+      <h3>Privacy</h3>
+      <div class="set-row">
+        <label class="set-switch"><input type="checkbox" id="set-analytics" role="switch" aria-describedby="note-analytics"><span>Share anonymous counts</span></label>
+        <p class="set-note" id="note-analytics">A few anonymous counts about how the game is going: first facilities placed, how far towers climb, which tools get used, whether returning players get further. Nothing identifies you, and nothing is kept that could point back to you across visits. Turn it off and this build sends nothing at all. The full note is in Help, under Privacy.</p>
+      </div>`
+    : nothing;
   const building = showBuilding
     ? html`
       <h3>Building</h3>
@@ -52,6 +72,7 @@ export function settingsTemplate(version: string, showBuilding = false): Templat
         <p class="set-note" id="note-steady-clock">As in 1994, the clock normally runs slow through the lunch rush and fast overnight (a full day takes the same real time either way). Turn on for an even pace all day.</p>
       </div>
       ${building}
+      ${analytics}
       <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Close</button></div>
       <p class="set-version">Verticopolis <span class="app-version">v${version}</span></p>
     `;
