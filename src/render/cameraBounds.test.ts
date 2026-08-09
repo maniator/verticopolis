@@ -105,10 +105,11 @@ describe("fitZoom (tower-aware zoom-out floor)", () => {
     const span = 82;
     const z = fit(viewH, span);
     // Pin the actual zoom to a number worked out by hand, independent of the
-    // formula under test: 567 / ((82 + 6) * 44) = 567 / 3872 = 0.14644. A wrong
+    // formula under test: 567 / ((82 + 6) * 45) = 567 / 3960 = 0.143182. A wrong
     // FLOOR or a dropped sky margin would move this; framedFloors alone can't
-    // catch that (the FLOOR term cancels out of it).
-    expect(z).toBeCloseTo(0.14644, 5);
+    // catch that (the FLOOR term cancels out of it). The hand figure tracks the
+    // world scale: at the old FLOOR of 44 it read 567 / 3872 = 0.14644.
+    expect(z).toBeCloseTo(0.143182, 5);
     expect(framedFloors(viewH, z)).toBeCloseTo(span + FIT_SKY_FLOORS, 5);
     // ...and that is a lot further out than the old fixed 0.3 min.
     expect(z).toBeLessThan(0.3);
