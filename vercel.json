@@ -3,6 +3,7 @@
   "framework": null,
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
+  "devCommand": "npm run dev -- --port $PORT",
   "outputDirectory": "dist",
   "redirects": [
     { "source": "/help/", "destination": "/help", "permanent": true },
