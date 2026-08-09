@@ -38,8 +38,8 @@ export interface DesktopConsentHost {
 }
 
 /**
- * Record the player's answer, and on a grant start the gameplay session that
- * boot could not.
+ * Start the gameplay session boot could not, if the consent now stands at
+ * granted. Call it after any write to the consent, from either surface.
  *
  * `bootstrap.ts` calls `startGameplaySession` once, well before the notice
  * resolves. On a first launch it meets a shut gate (consent is `pending`),
@@ -50,22 +50,26 @@ export interface DesktopConsentHost {
  * That is the acquisition session, which is the one this whole epic exists to
  * measure, so the grant path restarts it.
  *
- * It lives here rather than inside `setDesktopConsent` for two reasons. The
- * consent module sits BELOW analytics on purpose (it holds opaque thunks and
- * never learns the event vocabulary), and `analytics.ts` already reaches it
- * through `telemetry.ts`, so a call back the other way would close an import
- * cycle. And both consent surfaces live in this file, so one helper covers the
- * notice and the Settings switch alike: a player who declines at first run and
- * turns it on an hour later has exactly the same unarmed session.
+ * It lives here rather than inside `setDesktopConsent` because the consent
+ * module sits BELOW analytics on purpose (it holds opaque thunks and never
+ * learns the event vocabulary), and `analytics.ts` already reaches it through
+ * `telemetry.ts`, so a call back the other way would close an import cycle.
+ *
+ * The two surfaces write the answer differently and cannot share that half: the
+ * notice knows the state it is recording, while the switch flips whatever is
+ * stored and needs the resulting "on" back to redraw itself. What they do share
+ * is everything that has to happen once a grant lands, which is why this reads
+ * the live state instead of taking one: both call it right after their own
+ * write, and anything added here reaches both. A player who declines at first
+ * run and turns it on an hour later has exactly the same unarmed session.
  *
  * `startGameplaySession` is idempotent (it claims its wiring through
  * `GameplaySession.arm`), so a grant on an already-armed session is a no-op
  * rather than a second pair of listeners double-counting `session_end`. It runs
  * AFTER the answer is stored, because it re-reads the same gate the answer feeds.
  */
-function recordDesktopConsent(state: DesktopConsentState): void {
-  setDesktopConsent(state);
-  if (state === "granted") startGameplaySession();
+function armSessionOnGrant(): void {
+  if (desktopConsentState() === "granted") startGameplaySession();
 }
 
 /**
@@ -107,7 +111,8 @@ export function showDesktopAnalyticsNotice(host: DesktopConsentHost, mode: strin
     // Close first, then record: settling the consent flushes the held events,
     // and there is no reason for that work to run behind an open dialog.
     host.closeModal();
-    recordDesktopConsent(state);
+    setDesktopConsent(state);
+    armSessionOnGrant();
   };
   // No `displaceable`, deliberately: this modal owns a pending decision, so it
   // takes the protective default and no arriving report may take the dialog.
@@ -154,18 +159,17 @@ export function showDesktopAnalyticsNotice(host: DesktopConsentHost, mode: strin
  * stay loud (a template typo throws at open) while a build that renders no row
  * looks for nothing, matching the Modern-only bridging toggle.
  *
- * Turning it ON also starts the gameplay session, for the same reason the notice
- * does: a player who declined at first run has an unarmed session, and switching
- * back on mid-play would otherwise report the delta events and no summary at all
- * until the next launch. See {@link recordDesktopConsent}.
+ * Turning it ON also starts the gameplay session, through the same helper the
+ * notice uses: a player who declined at first run has an unarmed session, and
+ * switching back on mid-play would otherwise report the delta events and no
+ * summary at all until the next launch. See {@link armSessionOnGrant}.
  */
 export function wireDesktopAnalyticsToggle(box: HTMLElement, shown: boolean): void {
   if (!shown) return;
   const el = box.querySelector<HTMLInputElement>("#set-analytics")!;
   el.checked = desktopConsentState() === "granted";
   el.addEventListener("change", () => {
-    const on = toggleDesktopAnalytics();
-    el.checked = on;
-    if (on) startGameplaySession();
+    el.checked = toggleDesktopAnalytics();
+    armSessionOnGrant();
   });
 }

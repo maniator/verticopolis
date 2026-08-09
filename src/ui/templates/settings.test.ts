@@ -55,8 +55,8 @@ describe("settingsTemplate structure and a11y", () => {
   });
 
   it("omits the Privacy section off desktop, renders it as a switch on a desktop build", () => {
-    // Desktop-only (issue #781): a browser session keeps nothing about the
-    // player to turn off, so it gets no row at all.
+    // Desktop-only (issue #781): the switch answers the consent question only
+    // the desktop build asks, so a browser session gets no row at all.
     expect(renderToFragment(settingsTemplate("1.2.3")).querySelector("#set-analytics")).toBeNull();
     expect(renderToFragment(settingsTemplate("1.2.3", true)).querySelector("#set-analytics")).toBeNull();
     const frag = renderToFragment(settingsTemplate("1.2.3", false, true));

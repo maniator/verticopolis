@@ -15,8 +15,7 @@ notes, never a past version's.
 
 ## 2.23.0
 
-- The desktop app now asks, the first time you open it, whether it may keep the same anonymous counts the browser version keeps, and it sends nothing until you answer. A switch in Settings, under Privacy, turns it off again whenever you like.
-- The Privacy section in Help now says plainly what the desktop app does differently, and that a crash report can occasionally quote a bit of game text such as a tower's name.
+- The Privacy section in Help now spells out what the game counts and how those counts travel, and says plainly that a crash report can occasionally quote a bit of game text, such as a tower's name.
 
 ## 2.22.0
 
