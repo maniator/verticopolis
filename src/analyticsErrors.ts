@@ -165,7 +165,7 @@ function report(
     reported++;
 
     const properties: Record<string, unknown> = {
-      ...getCommonProps(), // platform / distribution_channel / returning / tenure / recency / display
+      ...getCommonProps(), // version / platform / distribution_channel / returning / tenure / recency / display
       // Canonical PostHog Error Tracking shape. Frames are left empty in this
       // first version (no source maps); the raw stack below carries the trace.
       $exception_list: [

@@ -301,6 +301,28 @@ describe("recencyBucket", () => {
 describe("bootCommonProps", () => {
   const DAY = 86_400_000;
 
+  it("carries the build version, so an error can be tied to the build that threw it", () => {
+    // REGRESSION GUARD. This shipped missing: every `$exception` in production
+    // recorded a null version, which made it impossible to tell which release an
+    // error came from, and cost real time during an investigation into a gap in
+    // error reporting. It survived because the error reporter's own suite MOCKS
+    // `getCommonProps` to return a version, so those tests asserted a contract
+    // the production path never met. Asserting it on the real builder is what
+    // closes that gap.
+    expect(
+      bootCommonProps({
+        platform: "web",
+        distributionChannel: "web",
+        version: "2.22.0",
+        onboarded: false,
+        tenureDay: undefined,
+        savedAt: undefined,
+        standalone: false,
+        now: 0,
+      }).version,
+    ).toBe("2.22.0");
+  });
+
   it("maps each live signal to its bucket and passes both dimensions + returning through", () => {
     // The emitted KEY is `distribution_channel` while the input field is
     // `distributionChannel`: PostHog's built-in `$channel_type` already owns the
@@ -311,6 +333,7 @@ describe("bootCommonProps", () => {
       bootCommonProps({
         platform: "twa",
         distributionChannel: "twa",
+        version: "9.9.9",
         onboarded: true,
         tenureDay: 12,
         savedAt: now - 3 * DAY,
@@ -320,6 +343,7 @@ describe("bootCommonProps", () => {
     ).toEqual({
       platform: "twa",
       distribution_channel: "twa",
+      version: "9.9.9",
       returning: true,
       tenure: "d7-29",
       recency: "7d",
@@ -333,11 +357,11 @@ describe("bootCommonProps", () => {
     // filter on the same platform rather than a second platform value.
     const now = 1_000 * DAY;
     const base = { onboarded: true, tenureDay: 2, savedAt: now - DAY, standalone: false, now } as const;
-    expect(bootCommonProps({ platform: "desktop", distributionChannel: "steam", ...base }).platform).toBe("desktop");
-    expect(bootCommonProps({ platform: "desktop", distributionChannel: "steam", ...base }).distribution_channel).toBe(
+    expect(bootCommonProps({ platform: "desktop", distributionChannel: "steam", version: "9.9.9", ...base }).platform).toBe("desktop");
+    expect(bootCommonProps({ platform: "desktop", distributionChannel: "steam", version: "9.9.9", ...base }).distribution_channel).toBe(
       "steam",
     );
-    expect(bootCommonProps({ platform: "desktop", distributionChannel: "itch", ...base }).distribution_channel).toBe(
+    expect(bootCommonProps({ platform: "desktop", distributionChannel: "itch", version: "9.9.9", ...base }).distribution_channel).toBe(
       "itch",
     );
   });
@@ -348,6 +372,7 @@ describe("bootCommonProps", () => {
       bootCommonProps({
         platform: "web",
         distributionChannel: "web",
+        version: "9.9.9",
         onboarded: false,
         tenureDay: undefined,
         savedAt: undefined,
@@ -357,6 +382,7 @@ describe("bootCommonProps", () => {
     ).toEqual({
       platform: "web",
       distribution_channel: "web",
+      version: "9.9.9",
       returning: false,
       tenure: "unknown",
       recency: "unknown",
@@ -372,6 +398,7 @@ describe("bootCommonProps", () => {
     const base = {
       platform: "web",
       distributionChannel: "web",
+      version: "9.9.9",
       onboarded: false,
       tenureDay: 3,
       standalone: false,
@@ -389,6 +416,7 @@ describe("bootCommonProps", () => {
       bootCommonProps({
         platform: "ios",
         distributionChannel: "ios",
+        version: "9.9.9",
         onboarded: true,
         tenureDay: 0,
         savedAt: now - 10 * DAY,
@@ -398,6 +426,7 @@ describe("bootCommonProps", () => {
     ).toEqual({
       platform: "ios",
       distribution_channel: "ios",
+      version: "9.9.9",
       returning: true,
       tenure: "d0",
       recency: "30d",
