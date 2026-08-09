@@ -41,10 +41,11 @@ const PACKAGE = "io.github.maniator.verticopolis";
 const HANDLE_ALL_URLS = "delegate_permission/common.handle_all_urls";
 /** 32 colon-separated hex pairs: 64 hex characters, the SHA-256 of the signing
  *  certificate. Case is accepted either way because the comparison Google makes
- *  is on the decoded bytes, and `apksigner` prints lowercase while `keytool`
- *  prints uppercase; rejecting one of them would red-build a valid file. The
- *  error message still asks for the keytool form, so the committed file stays
- *  consistent. */
+ *  is on the decoded bytes, so a lowercase file verifies exactly as well and
+ *  rejecting it would turn the build red over nothing. The colons are still
+ *  required, which does rule out `apksigner verify --print-certs` output: that
+ *  prints the digest unseparated, and the error message asks for the `keytool`
+ *  form so the committed file keeps one shape. */
 const FINGERPRINT = /^([0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$/;
 
 function fail(msg: string): never {
