@@ -9,6 +9,17 @@ import { FACILITIES } from "../engine/facilities";
  * only in comments before; these guards make a drive-by change fail loudly.
  */
 describe("render scale", () => {
+  it("keeps both constants whole, because they are canvas dimensions", () => {
+    // TILE and FLOOR size real bitmaps (a transport band is `floors * FLOOR` px
+    // tall) and anchor pixel-art alignment. A fractional value would be rounded
+    // or truncated by the canvas behind our back and show up as 1px seams and
+    // drift rather than as a failure. 4.5 tiles per floor is only safe because
+    // TILE is even; picking an odd TILE again would make FLOOR fractional, and
+    // this is the guard that says so.
+    expect(Number.isInteger(TILE)).toBe(true);
+    expect(Number.isInteger(FLOOR)).toBe(true);
+  });
+
   it("keeps the original's 4.5 tiles per floor", () => {
     // Measured off a retail SimTower render (Wine harness, TOWER13.TDT): nine
     // consecutive floor gaps of exactly 36px, shafts 31-32px wide for a 4-tile

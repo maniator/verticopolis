@@ -55,7 +55,7 @@ against the same save imported into Verticopolis.
 floor gaps measured at 36) and an elevator shaft is 31-32 px wide, which is 4 tiles
 at 8 px. The original is therefore `TILE = 8`, `FLOOR = 36`, a ratio of 4.5:1.
 Verticopolis is `TILE = 11`, `FLOOR = 4 x TILE = 44`, a ratio of 4:1, so our tiles
-are 12.5% wide relative to floor height. The comment in `src/render/scale.ts`
+are 12.5% too wide relative to floor height. The comment in `src/render/scale.ts`
 justifies 4:1 on the grounds that it makes a 4-tile elevator car "read square, as in
 the 1994 original." The measurement contradicts this: the original's 4-tile car is
 32 x 36, taller than it is wide. The rationale is wrong and has propagated into every
