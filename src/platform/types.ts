@@ -61,6 +61,7 @@ export type HostCommand =
   | "new-game"
   | "save"
   | "open-saves"
+  | "export"
   | "undo"
   | "redo"
   | "stats"

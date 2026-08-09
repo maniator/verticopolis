@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { runHostCommand, availableCommands } from "./hostCommands";
+import { runLegacyDownload, resetExportFlowForTests } from "./exportFlow";
 import { CRASH_SCREEN_ID } from "../ui/crashScreen";
 import {
   makeApp,
@@ -29,6 +30,7 @@ describe("runHostCommand: each command runs the control's own code path", () => 
     ["new-game", "promptNewTower"],
     ["save", "onSave"],
     ["open-saves", "onShowSaves"],
+    ["export", "promptExport"],
     ["undo", "onUndo"],
     ["redo", "onRedo"],
     ["stats", "onShowStats"],
@@ -73,19 +75,19 @@ describe("runHostCommand: the game owns availability, not the shell", () => {
     expect(spies.sayVisibly).not.toHaveBeenCalled();
   });
 
-  it("refuses only the four commands with no tower to act on behind the splash", () => {
+  it("refuses only the five commands with no tower to act on behind the splash", () => {
     // New Tower and Load Tower are NOT in this list, and that is the point: they
     // are the two things the title screen exists for, so graying them out on the
     // very screen whose job is starting or loading a tower is the wrong answer.
-    // These four have nothing to act on before a tower exists.
+    // These five have nothing to act on before a tower exists.
     const { app, spies } = makeApp();
     mountSplash(spies);
-    const refused = ["save", "undo", "redo", "stats"] as const;
+    const refused = ["save", "export", "undo", "redo", "stats"] as const;
     for (const command of refused) runHostCommand(app, command);
     expect(totalDispatch(spies)).toBe(0);
     expect(spies.sayVisibly).toHaveBeenCalledTimes(refused.length);
     // Every call, not just the last: asserting only the final message would let
-    // three of the four say something else, or nothing recognizable, unnoticed.
+    // four of the five say something else, or nothing recognizable, unnoticed.
     for (const call of spies.sayVisibly.mock.calls) {
       expect(call).toEqual(["Start or load a tower first", "info"]);
     }
@@ -229,5 +231,27 @@ describe("runHostCommand: input from another repository is untrusted", () => {
       expect(totalCalls(spies), `${command} reached no handler`).toBe(before + 1);
     }
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("export refuses re-entry while an export is in flight (GH #760 follow-on)", () => {
+  afterEach(() => resetExportFlowForTests());
+
+  it("refuses Export Tower with a visible message while the export latch is held, then allows it once freed", async () => {
+    const { app, spies } = makeApp();
+    // An export is mid native save dialog, holding the shared single-flight
+    // latch. On macOS the app menu stays live, so Export Tower can fire again.
+    let settle!: () => void;
+    const flight = runLegacyDownload({ toast: () => {} }, () => new Promise<void>((r) => (settle = r)));
+
+    runHostCommand(app, "export");
+    expect(spies.promptExport).not.toHaveBeenCalled();
+    expect(spies.sayVisibly).toHaveBeenCalledWith("An export is already in progress.", "info");
+
+    // The latch frees when the export settles; a fresh Export Tower dispatches.
+    settle();
+    await flight;
+    runHostCommand(app, "export");
+    expect(spies.promptExport).toHaveBeenCalledTimes(1);
   });
 });

@@ -2,6 +2,7 @@ import type { GameApp } from "../main";
 import type { HostCommand } from "../platform/types";
 import { getPlatform } from "../platform";
 import { runSplashAction } from "../ui/splashActions";
+import { isExportInFlight } from "./exportFlow";
 import {
   type InteractionState,
   isCrashed,
@@ -81,6 +82,7 @@ const HANDLED_RECORD = {
   "new-game": true,
   save: true,
   "open-saves": true,
+  export: true,
   undo: true,
   redo: true,
   stats: true,
@@ -111,15 +113,19 @@ const HANDLED: ReadonlySet<string> = new Set(Object.keys(HANDLED_RECORD));
  * Load Tower opens the load-only picker, and its New Tower carries the dismiss
  * callback that keeps the title screen standing if the player backs out.
  *
- * The four that stay refused are refused for their own reasons, not a blanket
- * one. `save` would write the untouched boot tower over a real save. `undo` and
- * `redo` have no history to walk before a tower exists. `stats` would report on
- * a tower the player has not opened.
+ * The five that stay refused are refused for their own reasons, not a blanket
+ * one. `save` would write the untouched boot tower over a real save. `export`
+ * has no tower to pack into a file yet. `undo` and `redo` have no history to
+ * walk before a tower exists. `stats` would report on a tower the player has
+ * not opened.
  */
 const SPLASH_SAFE: ReadonlySet<HostCommand> = setFromFlags({
   "new-game": true,
   save: false,
   "open-saves": true,
+  // No tower exists on the title screen, so there is nothing to export; refused
+  // for the same reason as save and stats.
+  export: false,
   undo: false,
   redo: false,
   stats: false,
@@ -186,6 +192,15 @@ function refusalFor(app: GameApp, command: HostCommand): Refusal | null {
   // Crash first, without reading anything else. The extraction made every source
   // eager, and on the crash path the app is the least trustworthy thing to read.
   if (isCrashed()) return { reason: "Not available right now", speakable: false };
+  // An export already holds the single-flight latch, so its native save dialog is
+  // open. On macOS the app menu stays live during that dialog, so File > Export
+  // Tower can fire again; refuse it visibly here rather than let it open a second
+  // wizard that would silently do nothing. Checked outside `refusalForState` (the
+  // pure, state-driven guard) because the latch is a live runtime flag, not part
+  // of the hoisted InteractionState snapshot, exactly like the crash check above.
+  if (command === "export" && isExportInFlight()) {
+    return { reason: "An export is already in progress.", speakable: true };
+  }
   return refusalForState(readInteractionState(app), command);
 }
 
@@ -195,6 +210,9 @@ const OPENS_A_DIALOG: ReadonlySet<HostCommand> = setFromFlags({
   "new-game": true,
   save: false,
   "open-saves": true,
+  // Export opens the two-step export choice dialog, so an in-flight editor press
+  // matters, exactly like open-saves and stats.
+  export: true,
   undo: false,
   redo: false,
   stats: true,
@@ -280,6 +298,14 @@ function dispatch(app: GameApp, command: HostCommand): void {
         return;
       }
       app.ui.cb.onShowSaves();
+      return;
+    case "export":
+      // The same UI entry the in-game export control uses: the two-step export
+      // choice dialog (.vctower primary, 1994 .TDT legacy). Routed through a UI
+      // method like New Tower above, not a bare call, so guard and dispatch stay
+      // symmetric. It refuses on the splash via SPLASH_SAFE, so a tower always
+      // exists by the time we reach it.
+      app.ui.promptExport();
       return;
     case "undo":
       // Through the same callback the toolbar arrow uses. Every other command

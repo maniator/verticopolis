@@ -7,11 +7,14 @@ import type { UI } from "../ui/UI";
 /**
  * The .vctower export flow, split out of `saveLoad.ts` at the 500-line guard
  * when the single-flight latch landed (GH #760). `SaveLoad.exportGame` is a
- * thin delegation here, so the latch guards the one choke point on the sole
- * production route to an export: the saves dialog's Export button
- * (`confirmExport` in uiDialogs, then `onExport`, then `exportGame`). There
- * is no menu command or keyboard shortcut for export today; if one lands, it
- * must route through `exportGame` to stay inside the latch.
+ * thin delegation here, so the latch guards the choke points every export
+ * converges on: the saves dialog's Export button and the desktop File > Export
+ * Tower menu command both open `confirmExport` (in uiDialogs), whose two
+ * choices are `.vctower` (via `onExport` -> `exportGame` -> `runExportFlow`) and
+ * the legacy `.TDT` (via `onExportLegacy`, whose download runs through
+ * {@link runLegacyDownload}). Both formats share the one latch, so neither can
+ * be re-fired mid-dialog, which matters now that a menu command exists and
+ * macOS keeps the app menu live during a native save dialog.
  */
 
 /** The slice of {@link import("./saveLoad").SaveLoadDeps} the flow touches. */
@@ -227,6 +230,15 @@ function lateExportedToast(name: string): string {
 let latchOwner = 0;
 let nextRun = 0;
 
+/** Whether an export (either format) is holding the single-flight latch right
+ *  now. The wizard entry ({@link import("../ui/uiDialogs").confirmExport})
+ *  reads this to refuse opening a second export choice dialog while one is in
+ *  flight, which on macOS the app menu could otherwise do behind a native save
+ *  dialog. */
+export function isExportInFlight(): boolean {
+  return latchOwner !== 0;
+}
+
 /**
  * Test seam, mirroring `resetManualSaveForTests` for this module's state.
  *
@@ -333,6 +345,34 @@ export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simul
     // Never fail silently: main.ts fires this with `void`, so an unhandled
     // rejection here would leave the player with no download and no feedback.
     deps.ui.toast("Export failed: " + (err as Error).message, "bad");
+  } finally {
+    clearTimeout(watchdog);
+    if (latchOwner === run) latchOwner = 0;
+  }
+}
+
+/**
+ * Single-flight wrapper for the LEGACY (`.TDT`) download, sharing the SAME latch
+ * as {@link runExportFlow} so the two export formats are mutually exclusive and
+ * neither can be re-fired mid-dialog. The legacy path builds its bytes before
+ * the confirm dialog, so only the download itself needs guarding: hold the latch
+ * until `download()` settles (on desktop that is until the native save dialog
+ * closes), with the same watchdog escape hatch and the same quiet-no-op reentry
+ * (the first dialog is already on screen). Reachable now that File > Export
+ * Tower sends a host command into `confirmExport`, and macOS leaves the app menu
+ * live during a native save dialog.
+ */
+export async function runLegacyDownload(ui: Pick<UI, "toast">, download: () => void | Promise<void>): Promise<void> {
+  if (latchOwner !== 0) return;
+  const run = ++nextRun;
+  latchOwner = run;
+  const watchdog = setTimeout(() => {
+    if (latchOwner !== run) return;
+    latchOwner = 0;
+    ui.toast("The export is not responding. You can try exporting again.", "bad");
+  }, EXPORT_WATCHDOG_MS);
+  try {
+    await download();
   } finally {
     clearTimeout(watchdog);
     if (latchOwner === run) latchOwner = 0;

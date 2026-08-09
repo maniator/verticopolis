@@ -6,7 +6,7 @@ import { LegacyExportError, buildTDT, type BuiltLegacyTower } from "../storage/t
 import { LegacyImportError, parseTDT } from "../storage/tdtImport";
 import type { ImportReport } from "../storage/tdtImport";
 import { persistAutosave } from "./autosavePersist";
-import { runExportFlow } from "./exportFlow";
+import { runExportFlow, runLegacyDownload } from "./exportFlow";
 import { persistManualSave } from "./manualSavePersist";
 import { IS_WRAPPED_BUILD } from "../platform";
 import { noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
@@ -388,7 +388,11 @@ export class SaveLoad {
       return;
     }
     this.deps.ui.showExportReport(built.report, {
-      onDownload: () => this.deps.ui.downloadFile(built.report.filename, built.bytes),
+      // Through the shared export latch (GH #760 follow-on): the File > Export
+      // Tower menu command can reach this legacy download, and macOS keeps the
+      // app menu live during a native save dialog, so an unlatched download
+      // could stack dialogs. Held until downloadFile settles.
+      onDownload: () => void runLegacyDownload(this.deps.ui, () => this.deps.ui.downloadFile(built.report.filename, built.bytes)),
     });
   }
 

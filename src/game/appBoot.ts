@@ -454,10 +454,10 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // LAST, deliberately, and this ordering is load-bearing. `bindHostCommands`
   // publishes the opening availability set (and then registers the quit-time
   // flush, whose ordering is not load-bearing), so binding before
-  // the title screen was decided meant the shell's first news was "all eight
+  // the title screen was decided meant the shell's first news was "all nine
   // commands are available", computed with no splash up, immediately followed by
-  // a title screen where four of them are refused. The menu showed Save, Undo,
-  // Redo, and Statistics enabled until the next pump tick corrected it. Binding
+  // a title screen where five of them are refused. The menu showed Save, Export,
+  // Undo, Redo, and Statistics enabled until the next pump tick corrected it. Binding
   // after every branch above has run means the first push already describes the
   // screen the player is looking at. Inbound commands are unaffected: one cannot
   // arrive until the shell has a window, which is later than any of this.
