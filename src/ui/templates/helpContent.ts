@@ -131,14 +131,61 @@ export function helpAboutBody(version: string): TemplateResult {
  *  `sessionStorage` and an on-device returning bucket, both of them kept. What
  *  is true, and what this copy says instead, is that none of it identifies you
  *  or points back to you across visits. Keep any future edit on that side of the
- *  line. */
+ *  line.
+ *
+ *  ## TWO edition-conditionals, and they point opposite ways. Keep both.
+ *
+ *  One body serves both editions (the two surfaces' containment tests depend on
+ *  there being exactly one), so wherever the editions genuinely differ this copy
+ *  names the rule for both instead of describing whichever edition the author
+ *  had in mind. There are two such places, and because they cut in OPPOSITE
+ *  directions, an editor who notices only one of them will read the other as
+ *  redundant hedging and flatten it. They are not redundant:
+ *
+ *  1. A packaged edition sends gameplay counts a browser does not have to send
+ *     across the internet, because it runs from the player's own machine rather
+ *     than from a page we serve. That is the third paragraph's "would" wording.
+ *  2. A browser sends page-visit counts and page performance metrics a packaged
+ *     edition never sends. `injectVercelTelemetry` (`telemetry.ts`) returns on
+ *     `isWrappedMode` BEFORE it consults consent, because `/_vercel/*` resolves
+ *     to a path on the shell's app protocol and 404s there. Granting desktop
+ *     consent opens the gameplay events and does nothing for this pair. That is
+ *     the first paragraph's "a packaged edition sends neither".
+ *
+ *  Point 2 was an overstatement rather than an understatement (the old clause
+ *  told a packaged player we collect two metric classes we never collect), but
+ *  it still had a real cost: a player could decline over a metric class that
+ *  does not exist on their edition.
+ *
+ *  ## Why the packaged-edition sentences are conditional (party ruling)
+ *
+ *  This body ships in the WEB build and is read by players who can only play in
+ *  a browser, so it states the RULE rather than a product. An earlier draft
+ *  described the desktop app in the present tense, which was false twice over:
+ *  no desktop artifact existed that a reader could obtain, and the shell
+ *  canceled the ingest request anyway (`onBeforeRequest` allowed only
+ *  `app://game`, and the injected CSP was `connect-src 'self'`), so the counts
+ *  it claimed were crossing the internet were not being sent at all. A privacy
+ *  disclosure that misdescribes where data goes is the one thing this copy
+ *  exists to get right, so the wording was made true today, true when a
+ *  packaged edition ships, and an announcement of nothing.
+ *
+ *  REVERT TRIGGER, and it is a distribution event rather than a code event:
+ *  flip "Today Verticopolis runs in your browser, and that is the only edition
+ *  you can play" and the conditional "would" sentences back to the present
+ *  tense the first time a desktop artifact is handed to ANYONE outside this
+ *  repository, playtest builds included. Merging a stage does not make the
+ *  sentence false; handing somebody a binary does. The first-run notice
+ *  (`templates/desktopAnalytics.ts`) and the Settings Privacy row stay in the
+ *  present tense either way, because both render only on a packaged build,
+ *  where the present tense is already correct. */
 export function helpPrivacyBody(): TemplateResult {
   return html`<p style="color:var(--muted)">
       Verticopolis keeps a small, anonymous read on how the game is going: whether new players place their first
       facility, how far towers climb the star ladder, which tools get used, and whether returning players get further
       than first-timers. Those signals are worked out on your own device and sent as coarse, anonymous counts to our
-      own site, with no cookie and nothing that could point back to you across visits, plus anonymous page-visit
-      counts and page performance metrics.
+      own site, with no cookie and nothing that could point back to you across visits. In a browser, the page we serve
+      also sends anonymous page-visit counts and page performance metrics; a packaged edition sends neither.
     </p>
     <p style="color:var(--muted)">
       Crash reports are the one place your own words can travel. They carry the technical details of the error and the
@@ -147,11 +194,13 @@ export function helpPrivacyBody(): TemplateResult {
     </p>
     <p style="color:var(--muted)">
       There are no accounts and no ads: the game never asks for your name or email, keeps no profile, and nothing
-      recognizes you from one day to the next. In a browser there is no consent banner, because nothing that identifies
-      you is kept. The desktop app is the one edition that asks. It runs from your own machine rather than from a
-      page we serve, so its counts travel across the internet to our site, and it puts the question to you the first
-      time you open it; the switch then lives in Settings, under Privacy. Saves live in your own storage and leave your
-      device only when you export them. The counts help decide what to improve; they are never sold or shared.
+      recognizes you from one day to the next. Today Verticopolis runs in your browser, and that is the only edition
+      you can play. In a browser there is no consent banner, because nothing that identifies you is kept. A packaged
+      edition would be different: it runs from your own machine rather than from a page we serve, so its counts would
+      have to travel across the internet to our site. Any edition we package that way asks on the first launch, before
+      it counts anything, and the switch then lives in Settings, under Privacy. Saves live in your own storage and
+      leave your device only when you export them. The counts help decide what to improve; they are never sold or
+      shared.
     </p>`;
 }
 
