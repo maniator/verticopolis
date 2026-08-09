@@ -258,7 +258,9 @@ export default defineConfig({
           /robots\.txt$/,
           /sitemap\.xml$/,
           /og-image\.png$/,
-          /\.well-known\//,
+          // No trailing slash: a bare `/.well-known` navigation should reach the
+          // host's own 404 rather than the game shell, same as the file below it.
+          /\.well-known/,
         ],
         cleanupOutdatedCaches: true,
         // Excalibur's bundle is comfortably large; lift the precache ceiling.
