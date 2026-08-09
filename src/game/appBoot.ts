@@ -33,8 +33,12 @@ import { showTowerPicker } from "./appModals";
  * Behavior unchanged from the former inline constructor bodies.
  */
 
-/** Compile-time app version (see vite.config.ts `define`); "dev" outside a build. */
-export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
+// Re-exported rather than defined: the constant lives in `src/appVersion.ts`,
+// which carries the reason it has to be a leaf module. Imported as well as
+// re-exported because the boot snapshot below reads it, and the alias stays so
+// the suites that import it from here keep resolving.
+import { APP_VERSION } from "../appVersion";
+export { APP_VERSION };
 
 /** Classify why this boot happened, for the analytics boot snapshot. Mirrors
  *  `resolveBootScreen`: an "Update now" or WebGL-recovery reload only actually
@@ -272,6 +276,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
       bootCommonProps({
         platform,
         distributionChannel: distributionChannelLabel(platform),
+        version: APP_VERSION,
         onboarded: isOnboarded(),
         tenureDay: app.sim?.clock?.day,
         savedAt: savedAtBoot,
