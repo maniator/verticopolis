@@ -23,20 +23,22 @@ export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: num
   const ctx = d.ctx;
   const RW = 88;
   const RH = 44;
-  const { F, sx, sy } = refMap(ctx, x, y, w, h, RW, RH);
+  const { F, Fu, sx, sy } = refMap(ctx, x, y, w, h, RW, RH);
   const W = RW;
   const fy = RH - 6;
   wallp(F, 0, 0, W, fy, "#2C3A5A", false);
   floorb(F, 0, fy, W, 6, "#242A38");
-  // Two-by-five wall of green-dot camera monitors.
+  // Two-by-five wall of green-dot camera monitors. These are ten copies of one
+  // object, so they take the uniform fill: sized from mapped edges instead, the
+  // bodies came out 8,7,7,7,7 across a row and the grid read broken.
   for (let r = 0; r < 2; r++) {
     for (let cN = 0; cN < 5; cN++) {
       const mx = 6 + cN * 10;
       const my = 6 + r * 11;
-      box(F, mx, my, 8, 9, "#0E1420");
-      F(mx + 1, my + 1, 6, 5, "#1A3A2A");
-      F(mx + 1 + ((r + cN) % 3), my + 2, 1, 3, "#6bd47a", 0.8);
-      F(mx + 1, my + 1, 6, 1, "#2A4A3A");
+      box(Fu, mx, my, 8, 9, "#0E1420");
+      Fu(mx + 1, my + 1, 6, 5, "#1A3A2A");
+      Fu(mx + 1 + ((r + cN) % 3), my + 2, 1, 3, "#6bd47a", 0.8);
+      Fu(mx + 1, my + 1, 6, 1, "#2A4A3A");
     }
   }
   // Console desk with a seated guard behind it.
@@ -47,7 +49,7 @@ export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: num
   F(60, fy - 14, 6, 6, "#D8B05A");
   F(62, fy - 13, 2, 4, "#8A6A2A");
   F(78, 8, 8, 5, "#5A4A36");
-  for (let k = 0; k < 4; k++) F(79 + k * 2, 13, 1, 2, "#D8B05A");
+  for (let k = 0; k < 4; k++) Fu(79 + k * 2, 13, 1, 2, "#D8B05A"); // key rack pins, one object repeated
   F(W - 8, 7, 4, 4, "#E85D5D");
   glow(F, W - 6, 9, "#FF6B6B");
   // A warm ceiling light over the console keys on the lit (evening) state.
@@ -166,19 +168,21 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   const ctx = d.ctx;
   const RW = 220;
   const RH = 88;
-  const { F, sx, sy } = refMap(ctx, x, y, w, h, RW, RH);
+  const { F, Fu, sx, sy } = refMap(ctx, x, y, w, h, RW, RH);
   const W = RW;
   const H = RH;
   const deck = H - 7;
-  // Concrete hall: walls, roof ribs, girders, and a service pipe.
+  // Concrete hall: walls, roof ribs, girders, and a service pipe. The full-width
+  // bands stay on the edge-derived fill so they meet without a seam; the ribs,
+  // studs and pipe brackets are repeated objects and take the uniform one.
   F(0, 0, W, H, "#6C6C64");
   F(0, 0, W, Math.round(H * 0.5), "#75756B");
-  for (let px = 0; px < W; px += 22) F(px, 2, 1, deck - 2, "#5A5A52");
+  for (let px = 0; px < W; px += 22) Fu(px, 2, 1, deck - 2, "#5A5A52");
   for (let py = 10; py < deck; py += 11) F(0, py, W, 1, "#616159");
-  for (let px = 6; px < W; px += 22) F(px, 12, 1, 1, "#8A8A80");
+  for (let px = 6; px < W; px += 22) Fu(px, 12, 1, 1, "#8A8A80");
   F(0, 3, W, 2, "#7A8088");
   F(0, 3, W, 1, "#9AA0A8");
-  for (let px = 6; px < W; px += 16) F(px, 2, 2, 4, "#5A6068");
+  for (let px = 6; px < W; px += 16) Fu(px, 2, 2, 4, "#5A6068");
   F(0, 7, W, 3, "#565C64");
   F(0, 7, W, 1, "#6A727A");
   // Compactor housing with a peek of sorted waste.
@@ -197,19 +201,19 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   }
   // Overhead sorting sign.
   box(F, 92, 5, 70, 10, "#2A6E3A");
-  for (let i = 0; i < 11; i++) F(96 + i * 6, 8, 3, 4, "#DCE8C0");
+  for (let i = 0; i < 11; i++) Fu(96 + i * 6, 8, 3, 4, "#DCE8C0"); // sign letters
   // Conveyor belt carrying baled recyclables (no reserved red bale).
   const by = deck - 24;
   F(26, by, 120, 6, "#3A3E44");
   F(26, by, 120, 1, "#4E545C");
   F(26, by + 5, 120, 1, "#242830");
-  for (let bx = 28; bx < 144; bx += 6) F(bx, by + 1, 3, 4, "#2E323A");
+  for (let bx = 28; bx < 144; bx += 6) Fu(bx, by + 1, 3, 4, "#2E323A"); // baled recyclables
   F(24, by - 1, 4, 8, "#4A4E54");
   F(144, by - 1, 4, 8, "#4A4E54");
   const items = ["#4E7A4A", "#3E6A9E", "#C8A24A", "#C87A32", "#DCDCE0", "#8C5A3A"];
   for (let ix = 30, k = 0; ix < 140; ix += 13, k++) {
-    F(ix, by - 4, 5, 4, items[k % items.length]);
-    F(ix, by - 4, 5, 1, "#FFFFFF", 0.22);
+    Fu(ix, by - 4, 5, 4, items[k % items.length]);
+    Fu(ix, by - 4, 5, 1, "#FFFFFF", 0.22);
   }
   // Baler machine with control panel and status lamps.
   const cx = W - 52;
@@ -231,13 +235,15 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   ];
   bins.forEach((c, i) => {
     const bx = 30 + i * 20;
-    box(F, bx, deck - 16, 16, 16, c[0]);
-    F(bx, deck - 16, 16, 2, c[1]);
-    F(bx + 5, deck - 19, 6, 3, c[1]);
-    F(bx + 4, deck - 11, 4, 1, "#FFFFFF", 0.85);
-    F(bx + 7, deck - 12, 1, 3, "#FFFFFF", 0.85);
-    F(bx + 8, deck - 8, 4, 1, "#FFFFFF", 0.85);
-    F(bx + 8, deck - 9, 1, 2, "#FFFFFF", 0.85);
+    // One bin repeated along the deck, arrow glyph and all, so the whole
+    // motif takes the uniform fill or the arrows fray bin to bin.
+    box(Fu, bx, deck - 16, 16, 16, c[0]);
+    Fu(bx, deck - 16, 16, 2, c[1]);
+    Fu(bx + 5, deck - 19, 6, 3, c[1]);
+    Fu(bx + 4, deck - 11, 4, 1, "#FFFFFF", 0.85);
+    Fu(bx + 7, deck - 12, 1, 3, "#FFFFFF", 0.85);
+    Fu(bx + 8, deck - 8, 4, 1, "#FFFFFF", 0.85);
+    Fu(bx + 8, deck - 9, 1, 2, "#FFFFFF", 0.85);
   });
   // Stacked cardboard bales.
   for (let r = 0; r < 2; r++) {
@@ -252,15 +258,15 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   // Compacted cubes waiting by the baler.
   for (let i = 0; i < 5; i++) {
     const gx2 = cx - 4 - i * 6;
-    F(gx2, deck - 5, 6, 5, i % 2 ? "#3A4232" : "#2F3628");
-    F(gx2 + 2, deck - 6, 2, 2, "#FFFFFF", 0.28);
+    Fu(gx2, deck - 5, 6, 5, i % 2 ? "#3A4232" : "#2F3628");
+    Fu(gx2 + 2, deck - 6, 2, 2, "#FFFFFF", 0.28);
   }
   // Painted deck curb with hazard stripes.
   F(0, deck, W, 7, "#4A4A44");
   F(0, deck, W, 1, "#5E5E56");
   for (let i = 0; i < W; i += 6) {
-    F(i, deck + 1, 3, 2, "#D8B23A");
-    F(i + 3, deck + 1, 3, 2, "#2A2418");
+    Fu(i, deck + 1, 3, 2, "#D8B23A");
+    Fu(i + 3, deck + 1, 3, 2, "#2A2418");
   }
   F(20, deck + 3, W - 40, 1, "#000000", 0.2);
   // Live behavior: the day's waste piles up until the morning truck. The pile
@@ -276,7 +282,7 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
     const bx = pileX0 + i * 7;
     const jit = Math.floor(rand((u.id * 31 + i) | 0) * 3);
     F(bx, deck - 6 - jit, 6, 6 + jit, i % 3 === 2 ? "#4a5a3a" : "#3a4232");
-    F(bx + 2, deck - 7 - jit, 2, 2, "#FFFFFF", 0.35);
+    Fu(bx + 2, deck - 7 - jit, 2, 2, "#FFFFFF", 0.35);
     if (fill > 0.5 && i % 2 === 0 && i < bags - 1) F(bx + 3, deck - 11 - jit, 6, 5, "#2f3628");
   }
   // Live wall gauge: green, then amber past 0.7, then red with the FULL cue at

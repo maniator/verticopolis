@@ -2,10 +2,19 @@ import { shade } from "../common";
 
 /**
  * Shared drawing idioms for the ported utilities-and-service looks. The Figma
- * reference build scripts author each tile at the canonical footprint
- * (TILE 11 by FLOOR 44); {@link refMap} maps that reference space onto the
- * actual screen rect so a bake is pixel-exact (scale 1) and any other rect fills
- * gracefully. Every rectangle snaps to integer edges.
+ * reference build scripts authored each tile against a footprint of TILE 11 by
+ * FLOOR 44, and {@link refMap} maps that reference space onto the actual screen
+ * rect.
+ *
+ * That footprint is HISTORY, not the current scale. The world moved to TILE 10
+ * by FLOOR 45 to match the 1994 original's 4.5 tiles per floor, so no caller
+ * reaches `refMap`'s identity any more and every rect is resampled. Resampling
+ * is fine for a surface and bad for a repeated object: {@link Fill} derives a
+ * rect's size from its mapped EDGES, which keeps tiling seams closed but makes
+ * two identically authored objects render at different sizes depending on where
+ * their sub-pixel position lands. That is what {@link refMap}'s second fill,
+ * `Fu`, exists to prevent. Re-authoring these references on the 10 by 45 grid is
+ * tracked as issue #812 and belongs to the room-art pass.
  */
 
 /** Paint one reference-space rectangle. Coordinates are in the reference tile
@@ -16,10 +25,27 @@ export type Fill = (rx: number, ry: number, rw: number, rh: number, color: strin
  *  reference composition authored at `RW` by `RH` onto the screen rect. Edges
  *  snap to integers so adjacent rectangles tile without seams, and a 1px
  *  reference detail never collapses below 1px. At the canonical bake size
- *  (`w === RW`, `h === RH`) the map is the identity, so the port is pixel-exact. */
+ *  (`w === RW`, `h === RH`) the map is the identity, so the port is pixel-exact.
+ *
+ *  Returns two fills, and which one a caller wants depends on what it is
+ *  painting:
+ *
+ *  - `F` sizes a rect from its mapped edges, so it always meets its neighbor.
+ *    Right for a SURFACE: wall paper, floor bands, backing rects.
+ *  - `Fu` sizes a rect from its authored size, rounded once, so every instance
+ *    of one authored size renders at one size wherever it sits. Right for a
+ *    DISCRETE object: a monitor in a wall of monitors, a bottle in a row. It can
+ *    leave a 1px gap against a neighbor, which is why it is not the default. */
 export function refMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, RW: number, RH: number) {
   const sx = (rx: number): number => x + Math.round((rx * w) / RW);
   const sy = (ry: number): number => y + Math.round((ry * h) / RH);
+  const paint = (x0: number, y0: number, pw: number, ph: number, color: string, alpha: number): void => {
+    const prevAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.fillRect(x0, y0, pw, ph);
+    if (alpha !== prevAlpha) ctx.globalAlpha = prevAlpha;
+  };
   const F: Fill = (rx, ry, rw, rh, color, alpha = 1) => {
     // A zero (or negative) reference-size rect paints nothing, matching the
     // pixel-exact reference F. Only a positive reference size that scales below
@@ -29,13 +55,17 @@ export function refMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
     if (rw <= 0 || rh <= 0) return;
     const x0 = sx(rx);
     const y0 = sy(ry);
-    const prevAlpha = ctx.globalAlpha;
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = color;
-    ctx.fillRect(x0, y0, Math.max(1, sx(rx + rw) - x0), Math.max(1, sy(ry + rh) - y0));
-    if (alpha !== prevAlpha) ctx.globalAlpha = prevAlpha;
+    paint(x0, y0, Math.max(1, sx(rx + rw) - x0), Math.max(1, sy(ry + rh) - y0), color, alpha);
   };
-  return { F, sx, sy };
+  /** Uniform-size fill. Position maps exactly as `F` does; the SIZE comes from
+   *  the authored size scaled and rounded on its own, so it cannot vary with the
+   *  sub-pixel position of the rect. At identity this rounds to the authored
+   *  size, so it is byte-identical to `F`. */
+  const Fu: Fill = (rx, ry, rw, rh, color, alpha = 1) => {
+    if (rw <= 0 || rh <= 0) return;
+    paint(sx(rx), sy(ry), Math.max(1, Math.round((rw * w) / RW)), Math.max(1, Math.round((rh * h) / RH)), color, alpha);
+  };
+  return { F, Fu, sx, sy };
 }
 
 /** A beveled box: drop shadow, fill, lit top and left, shaded right and bottom. */
