@@ -5,6 +5,7 @@ import { drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../sprites/
 import { FLOOR, TILE } from "../scale";
 import type { ScreenRect } from "./towerInputCamera";
 import type { TowerEngine } from "./TowerEngine";
+import { drawShaftNumbers } from "./towerShaftNumbers";
 
 /**
  * The 2D canvas overlay and sky painters for {@link TowerEngine}, plus the
@@ -129,6 +130,7 @@ export function drawOverlay(engine: TowerEngine, ctx: CanvasRenderingContext2D):
   }
   ctx.clearRect(0, 0, engine.viewWidth, engine.viewHeight);
   drawStatsMap(engine, ctx);
+  drawShaftNumbers(engine, ctx);
   drawRain(engine, ctx);
   renderExplosions(engine, ctx);
   renderTreasures(engine, ctx);

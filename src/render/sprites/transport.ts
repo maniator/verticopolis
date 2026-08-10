@@ -71,34 +71,23 @@ export function drawTransport(
       ctx.fillRect(sx + 3, topY, 2, height);
       ctx.fillRect(sx + w - 5, topY, 2, height);
     }
-    // Floor numbers painted on the shaft backing, as in the original — the car
-    // (a separate actor) rides over them, so only the empty shaft shows them.
-    // (fillStyle is set per-element inside the loop below.)
-    ctx.font = `bold ${Math.min(floorH - 4, 8)}px "MS Sans Serif", monospace`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
+    // Per-floor stop lines painted on the shaft backing, as in the original.
     // Express elevators skip floors; like the original, a floor the car doesn't
-    // stop at shows no stop line and no number — the shaft just passes through.
+    // stop at shows no stop line, the shaft just passes through.
     const skip = t.skipFloors && t.skipFloors.length ? new Set(t.skipFloors) : null;
     for (let fl = 0; fl <= t.top - t.bottom; fl++) {
       const num = t.top - fl; // band fl counts down from the top floor
-      if (skip && skip.has(num)) continue; // not a stop — leave the shaft blank here
+      if (skip && skip.has(num)) continue; // not a stop, leave the shaft blank here
       const fy = topY + fl * floorH;
       ctx.fillStyle = "rgba(255,255,255,0.05)";
       ctx.fillRect(sx + 1, fy, w - 2, 1); // per-floor stop line
-      const label = num >= 1 ? String(num) : `B${1 - num}`;
-      const lx = sx + w / 2;
-      const ly = fy + floorH / 2;
-      // A dark drop-shadow behind a NEAR-WHITE glyph so the number reads on any
-      // shaft tint. Standard and service shafts darken to near-black and express
-      // is a semi-transparent glass, and at the small bold font a tall tower
-      // uses, the old 0.62 white washed out to an unreadable gray against the
-      // dark backing; a bright glyph over a firmer shadow is what makes it read.
-      ctx.fillStyle = "rgba(0,0,0,0.78)";
-      ctx.fillText(label, lx + 1, ly + 1);
-      ctx.fillStyle = "rgba(255,255,255,0.92)";
-      ctx.fillText(label, lx, ly);
     }
+    // The floor NUMBERS are not baked here: this bitmap is cached at logical size
+    // (quality 1 in towerReconcile) and upscaled nearest-neighbor (pixelArt), so
+    // a baked label garbles under a fractional device-pixel ratio. They are drawn
+    // fresh each frame in screen space by towerShaftNumbers.drawShaftNumbers
+    // (wired through towerOverlay.drawOverlay) instead, which renders at the real
+    // display resolution and stays crisp at any zoom.
     // Machine housings cap the shaft top and bottom (where the extend-taller
     // arrows also live in the original — that interaction is a planned
     // follow-up). The board's darker motor gray.

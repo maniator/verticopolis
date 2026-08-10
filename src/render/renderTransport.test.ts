@@ -36,12 +36,6 @@ function recordingCtx() {
   return { ctx, rects, lines, texts };
 }
 
-/** Parse the alpha from an `rgba(r,g,b,a)` string (1 if opaque/unknown). */
-function alphaOf(style: string): number {
-  const m = /rgba?\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\s*\)/.exec(style);
-  return m ? Number(m[1]) : 1;
-}
-
 function transport(kind: Transport["kind"], bottom: number, top: number): Transport {
   return {
     id: 1,
@@ -95,44 +89,29 @@ describe("transport sprite geometry", () => {
   });
 });
 
-describe("elevator floor-number legibility", () => {
+describe("elevator shaft stop lines", () => {
   const TOP_Y = 100;
-  const FLOOR_H = 22; // a small band, the tall-tower case where contrast bites
+  const FLOOR_H = 22;
+  const W = 44;
+  /** A per-floor stop line is the only full-width, 1px-tall rect the shaft
+   *  bakes (backing is full width, guide rails and edge shadows are vertical). */
+  const stopLines = (rects: { w: number; h: number }[]) => rects.filter((r) => r.h === 1 && r.w === W - 2);
 
-  it("draws each floor number as a dark shadow behind a brighter glyph", () => {
-    const { ctx, texts } = recordingCtx();
-    // A 3-floor standard shaft: floors 3, 2, 1 each get a label.
-    drawTransport(ctx, transport("elevatorStandard", 1, 3), 0, TOP_Y, 44, FLOOR_H);
-    const ones = texts.filter((t) => t.text === "1");
-    // The single "1" label is now drawn twice: a shadow and the glyph.
-    expect(ones.length).toBe(2);
-    const shadow = ones.find((t) => t.style.startsWith("rgba(0,0,0"));
-    const glyph = ones.find((t) => t.style.startsWith("rgba(255,255,255"));
-    expect(shadow).toBeDefined();
-    expect(glyph).toBeDefined();
-    // The shadow is painted FIRST so the bright glyph lands ON TOP of it. Paint
-    // the shadow last and it would obscure the number, which is the exact
-    // regression this guards; `texts` records the calls in draw order.
-    expect(texts.indexOf(shadow!)).toBeLessThan(texts.indexOf(glyph!));
-    // The shadow sits one pixel down-right of the glyph, and is a dark fill.
-    expect(shadow!.x).toBe(glyph!.x + 1);
-    expect(shadow!.y).toBe(glyph!.y + 1);
-    expect(alphaOf(shadow!.style)).toBeCloseTo(0.78);
-    // The glyph is near-white, not the old dim 0.62 gray that washed out on the
-    // near-black shaft (the reported "unreadable" bug). Regression guard against
-    // dropping the brightness back down to a wash.
-    expect(alphaOf(glyph!.style)).toBeGreaterThanOrEqual(0.85);
+  it("bakes a stop line per served floor and NO number text", () => {
+    const { ctx, texts, rects } = recordingCtx();
+    drawTransport(ctx, transport("elevatorStandard", 1, 3), 0, TOP_Y, W, FLOOR_H);
+    // Floor numbers now render on the screen-space overlay (towerOverlay
+    // drawShaftNumbers), not baked into this upscaled pixel bitmap.
+    expect(texts.length).toBe(0);
+    expect(stopLines(rects).length).toBe(3); // floors 1, 2, 3
   });
 
-  it("labels every served floor and skips express skip-floors", () => {
-    const { ctx, texts } = recordingCtx();
+  it("skips the stop line on express skip-floors", () => {
+    const { ctx, texts, rects } = recordingCtx();
     const t = transport("elevatorExpress", 1, 4);
     (t as unknown as { skipFloors: number[] }).skipFloors = [2, 3]; // stops only at 1 and 4
-    drawTransport(ctx, t, 0, TOP_Y, 44, FLOOR_H);
-    const labels = new Set(texts.map((r) => r.text));
-    expect(labels.has("1")).toBe(true);
-    expect(labels.has("4")).toBe(true);
-    expect(labels.has("2")).toBe(false); // skipped floors show no number
-    expect(labels.has("3")).toBe(false);
+    drawTransport(ctx, t, 0, TOP_Y, W, FLOOR_H);
+    expect(texts.length).toBe(0);
+    expect(stopLines(rects).length).toBe(2); // only the served floors 1 and 4
   });
 });
