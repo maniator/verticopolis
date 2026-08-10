@@ -54,6 +54,37 @@ raised as a possible import defect. It was not. The original's office art is
 furnished with chairs, plants and framed pictures, which read as living-room
 furniture at a glance. Both games agree on 616 offices and 447 condos. No import bug.
 
+## 2026-08-09 - How the pixel sets get regenerated during the art epics
+
+Learned the expensive way on PR #811. Any change to rendering invalidates TWO
+committed pixel sets, and they refresh through different flows: `docs/screenshots`
+through the `commit-on-approval` job (owner approves), and
+`e2e/visual.spec.ts-snapshots` through `update-visual-baselines.yml` (the
+`[update-baselines]` marker on the head commit). Both bots push with
+`GITHUB_TOKEN`, which never triggers workflows, so each bot commit lands as PR
+head with checks that never started. That is three round trips per art change,
+two of them needing the owner.
+
+**Decision: regeneration is a RELEASE step of an art branch, not a per-commit
+step.** Concretely, for Epics 2 through 4:
+
+- Art commits land with the visual checks RED. That is correct, not a failure:
+  the art changed, so the baselines should not match.
+- Do not regenerate mid-flight. Nobody draws one sprite and waits for a bot.
+- Regenerate BOTH sets once, immediately before requesting review, with the
+  `[update-baselines]` marker riding the last REAL commit. Never an empty commit
+  to nudge CI; ask the owner to approve the run instead (see the standing note in
+  the owner's memory).
+- The branch is not reviewable while red. A reviewer cannot tell an intended
+  pixel change from a regression, so review starts after regeneration.
+- Treat the resulting pixel diff as EVIDENCE, not noise. When six sprite
+  references are re-authored, that gallery diff is the only place a human sees
+  what actually changed.
+
+Corollary from the same PR: verify with `CI=true` before pushing. Vitest rejects
+an orphaned snapshot only under CI, so a local run passed while CI failed the
+whole unit suite on six obsolete snapshots.
+
 ## Open items
 
 - Whether Epic 3's density work covers every room kind at once, or leads with the
