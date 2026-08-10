@@ -89,6 +89,7 @@ function eng(over: Record<string, any> = {}): any {
       tower: {
         revision: 1,
         mealOverlayRevision: 0,
+        transports: [],
         getUnit: () => undefined,
         getTransport: () => undefined,
         facilityOf: () => ({ width: 3 }),
@@ -288,6 +289,20 @@ describe("preview and selection painters", () => {
     drawOverlay(e, s.ctx);
     expect(e.arrowHit).toEqual({}); // stairs/escalators never extend by a tappable arrow
     expect(s.painted()).toBe(true);
+  });
+});
+
+describe("elevator floor numbers wired into the overlay", () => {
+  it("paints shaft numbers in the shaft column (drawOverlay calls drawShaftNumbers)", () => {
+    const s = spyCtx();
+    const e = eng();
+    e.sim.tower.transports = [{ id: 1, kind: "elevatorStandard", x: 100, width: 4, bottom: 1, top: 3, carPositions: [] }];
+    drawOverlay(e, s.ctx);
+    // Assert on strokeText, which only drawShaftNumbers emits (the ruler and
+    // legend use fillText), at x === 102 (the shaft center, x:100 + width 4 / 2).
+    // That pins both that the renderer ran and that it ran through drawOverlay.
+    const inColumn = s.log.filter((l) => l.startsWith("strokeText:") && JSON.parse(l.slice(11))[1] === 102);
+    expect(inColumn.length).toBeGreaterThan(0);
   });
 });
 

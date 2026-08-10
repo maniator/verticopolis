@@ -2826,3 +2826,46 @@ same as the gallery.
 | 2026-08-09 | assetlinks-sideload-fingerprint | #799 | mobile-distribution | security-followup | P2 | medium | — | open | **Gated on the Play Console record.** `src/public/.well-known/assetlinks.json` lists one SHA-256 fingerprint and it belongs to a SIDELOAD key on the owner's machine, published so a test build could be installed on a phone before a Play record existed. While it is listed, any app signed with that key is trusted by Android as a verified first-party app for verticopolis.com, with no browser bar and no warning. At store launch: add the Play App Signing fingerprint, DELETE the sideload one, redeploy, and re-check with Google's asset-links tester. Delete it immediately if the keystore is ever lost or copied. Needs tracking because nothing fails if it is left in: `scripts/verify-assetlinks.ts` requires at least one fingerprint and is deliberately blind to whether a given one still belongs, so the build stays green forever with the temporary key in place. The script header points at this row so the reminder sits in the file a maintainer opens. |
 | 2026-08-09 | assetlinks-guard-wrapper-lanes | #804 | mobile-distribution | review-deferral | P3 | low | — | open | **Ready.** `scripts/verify-assetlinks.ts` runs from `verify:dist`, which is also the tail of `build:desktop` and `build:native`, so an ANDROID verification file now gates the Electron and iOS bundles: trim or relocate the public dir for a wrapper and those two lanes go red for a reason that has nothing to do with them. The same coupling ships `assetlinks.json` and its certificate fingerprint inside both wrapper bundles, where nothing can ever fetch it. Harmless today (the file is a few hundred bytes, carries no secret, and every lane keeps `copyPublicDir` on), and the alternative costs something real: teaching the guard which mode it is running under adds a branch to the one script whose job is to be dumb and certain. Flagged by two independent reviewers, so recorded rather than left to be rediscovered. Revisit when a wrapper build first needs a trimmed public dir. |
 | 2026-08-09 | analytics-version-two-mechanisms | #805 | analytics | review-deferral | P3 | low | — | open | **Ready.** `analyticsCore.ts` seeds `commonProps` with `{ version: APP_VERSION }` at module load so every event names its build whatever the entry point, but `setCommonProps` replaces the object wholesale, and the guarantee survives only because the one production caller happens to re-supply the same constant (`bootCommonProps` takes `version` as a parameter and `appBoot` passes `APP_VERSION` back in). Two mechanisms for one fact: a future direct `setCommonProps({...})` that omits `version` would strip it from every later event in that session and nothing would fail, since the tripwire suite asserts the props are `{}` after a reset. Not a live bug (the only callers are the boot enrichment, which carries it, and a test-only reset). Close it either by having `setCommonProps` preserve `version` across a replace, or by having `bootCommonProps` read `APP_VERSION` itself so there is only one source. Found by the confirming pass on #801. |
+
+### Deferred from: `/gds-code-review` of elevator floor-number overlay (v2.25.1, 2026-08-09)
+
+The fix moved elevator floor numbers out of the baked shaft bitmap (which
+garbled under a fractional device-pixel ratio) into a screen-space overlay
+renderer (`src/render/excalibur/towerShaftNumbers.ts`). Patch findings were all
+fixed in the same change (shared-ctx save/restore, O(floors+cars) car-occlusion
+precompute with a `carPositions` guard, an em-dash in a rewritten comment, and a
+tightened wiring test). Two findings are deferred:
+
+- **Numbers now paint over sim people standing in the shaft column** (low,
+  parity/cosmetic). The overlay is the topmost layer (`z:100`), so where the old
+  baked numbers sat under cars (`z:2`) and walkers (`z:3`), a digit can now draw
+  over a person waiting inside the shaft footprint. Car occlusion is handled
+  (`carPositions`); people are not. Marginal in practice (the digit is centered
+  in the shaft; riders in cars are already occluded), but it is a real z-order
+  change from the baked path. Fix shape if ever wanted: skip a floor whose
+  centered digit overlaps a routed person in that column, or accept it as the
+  cost of screen-space text.
+
+- **Per-frame text-op worst case on a wide+tall low-zoom view** (low, perf). The
+  renderer runs every frame; the readable-zoom gate (`FLOOR*zoom >= 13`, i.e.
+  zoom >= ~0.29) plus the visible-floor-band and horizontal shaft culls bound
+  typical cost to a few dozen `strokeText`/`fillText` calls, but a pathological
+  view (many distinct shafts across a wide viewport, ~60 floors tall, at the gate
+  zoom) could reach ~2,900 text ops per frame. The engine disabled physics
+  specifically to keep phones above 2fps, so this is worth watching. Not observed
+  as a regression in normal play (few shafts align horizontally at readable
+  zoom). Fix shape if it bites: a per-frame text-op cap, a coarser zoom gate, or
+  a cached per-shaft number strip.
+
+Also note (not a code defect): the `/gallery` facility catalog draws its elevator
+previews via `drawTransport` directly (`src/gallery.ts`), so those thumbnails now
+render numberless shafts and `docs/screenshots/**` gallery images will drift.
+Regenerate the gallery via the pinned-container drift flow when this ships.
+
+Dismissed with reason: fractional-floor iteration (screenToFloor uses Math.ceil,
+always integer); the cy vertical anchor (verified to match the ruler and
+explosion painters, `worldToScreenY(floor)` is the floor's top edge); a NaN car
+position (carPositions is a required number[] and dispatch never yields NaN);
+`new Set(t.skipFloors)` per express shaft per frame (a Set is the correct
+structure for a large express skip list, and it is one allocation per express
+shaft, not per floor).
