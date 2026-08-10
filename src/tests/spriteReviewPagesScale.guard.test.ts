@@ -25,6 +25,7 @@ const rec = vi.hoisted(() => ({
   rooms: [] as Array<{ u: Unit; w: number; h: number }>,
   units: [] as Array<{ u: Unit; w: number; h: number }>,
   transports: [] as Array<{ t: Transport; w: number; floorH: number }>,
+  scales: [] as number[],
 }));
 
 // Recording stand-ins for the painters. What they draw is not this file's
@@ -59,6 +60,9 @@ function fakeContext(): CanvasRenderingContext2D {
         return () => ({ addColorStop: () => {} });
       }
       if (prop === "measureText") return () => ({ width: 4 });
+      // The pages magnify by TRANSFORMING the context, not by inflating the box,
+      // so the scale factor is only observable here.
+      if (prop === "scale") return (sx: number) => { rec.scales.push(sx); };
       if (prop in store) return store[prop];
       return () => {};
     },
@@ -169,14 +173,20 @@ describe("the sprite-review pages draw at the world scale", () => {
     // shrinking keeps the aspect, which the assertions above already prove), so
     // what has to be a whole number is each page's ceiling: the magnification
     // its roomiest cell reaches.
-    const magOf = (tiles: number, w: number): number => w / (tiles * TILE);
-    const previewCeiling = Math.max(...rec.rooms.map((r) => magOf(r.u.width, r.w)));
-    const galleryCeiling = Math.max(
-      ...rec.units.filter((r) => r.u.id === 1 && !isFullLot(r.u)).map((r) => magOf(r.u.width, r.w)),
-    );
-    for (const [page, ceiling] of [["preview.html", previewCeiling], ["gallery.html", galleryCeiling]] as const) {
-      expect(ceiling, `${page} never reaches its own magnification`).toBeGreaterThanOrEqual(1);
-      expect(Number.isInteger(ceiling), `${page} magnifies by ${ceiling}x`).toBe(true);
+    // Magnification is applied to the CONTEXT, so the boxes handed to painters
+    // are world-size and carry no scale information at all. Reading the ceiling
+    // off them would assert 1 === 1 forever. The recorded transform is the only
+    // place the real factor exists.
+    expect(rec.scales.length, "no page transformed its context").toBeGreaterThan(10);
+    const ceiling = Math.max(...rec.scales);
+    expect(ceiling, "no cell reaches its page's magnification").toBeGreaterThanOrEqual(1);
+    expect(Number.isInteger(ceiling), `a page magnifies by ${ceiling}x`).toBe(true);
+    // Anything below the ceiling is a footprint that did not fit and shrank
+    // uniformly. Nothing may exceed the ceiling, which would mean a cell
+    // magnified past what the page asked for.
+    for (const s of rec.scales) {
+      expect(s, `a cell scaled to ${s}, past the page ceiling ${ceiling}`).toBeLessThanOrEqual(ceiling);
+      expect(s, "a cell scaled to nothing").toBeGreaterThan(0);
     }
   });
 });

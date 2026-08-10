@@ -1,6 +1,7 @@
 import { FACILITIES } from "./engine/facilities";
 import type { FacilityKind, Unit, UnitState } from "./engine/types";
 import { fitAtGameScale } from "./render/catalogScale";
+import { FLOOR, TILE } from "./render/scale";
 import { drawRoom, type RoomCtx } from "./render/pixelSprites";
 
 interface Entry {
@@ -91,13 +92,28 @@ function frame() {
     // Size by the facility's own footprint, its floor count included: a cinema
     // is two floors tall, and drawing it one floor tall squashed art the game
     // never squashes.
-    const { w, h } = fitAtGameScale(u.width, FACILITIES[e.kind].floors ?? 1, CELL_W - 28, CELL_H - ROOM_TOP - SLAB_H - CAPTION_H, MAG);
-    const rx = cx + (CELL_W - 8 - w) / 2;
+    const floors = FACILITIES[e.kind].floors ?? 1;
+    const box = fitAtGameScale(u.width, floors, CELL_W - 28, CELL_H - ROOM_TOP - SLAB_H - CAPTION_H, MAG);
+    const { w, h } = box;
+    if (w < 1 || h < 1) return;
+    const rx = Math.round(cx + (CELL_W - 8 - w) / 2);
     const ry = cy + ROOM_TOP;
-    // Floor slab under the room for context.
+    // Floor slab under the room for context. Rounded because a fractional scale
+    // (the cinema is the one entry that cannot fit at 1x) would otherwise leave
+    // both slab ends antialiased into a soft column.
     ctx.fillStyle = "#9a9483";
-    ctx.fillRect(rx - 6, ry + h, w + 12, SLAB_H);
-    drawRoom(d, u, rx, ry, w, h);
+    ctx.fillRect(rx - 6, Math.round(ry + h), Math.round(w) + 12, SLAB_H);
+    // The room painters are fixed-pixel: they draw a 6px seat row whatever box
+    // they are handed, because the game always rasterizes a unit at its world
+    // size and lets the camera zoom. So scale the context and hand the painter
+    // its world box. Sizing the box instead left the cinema's seat rows at their
+    // authored pitch inside a squashed room, overlapping the balcony rail.
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.translate(rx, ry);
+    ctx.scale(box.scale, box.scale);
+    drawRoom(d, u, 0, 0, u.width * TILE, floors * FLOOR);
+    ctx.restore();
 
     ctx.fillStyle = "#cdd6e6";
     ctx.font = "12px system-ui, sans-serif";

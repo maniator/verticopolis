@@ -3,6 +3,7 @@ import { FACILITIES, GRID } from "./engine/facilities";
 import { CLINIC_SUBTYPES, AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "./engine/retailSubtypes";
 import type { FacilityKind, Transport, Unit, UnitState } from "./engine/types";
 import { fitAtGameScale } from "./render/catalogScale";
+import { FLOOR, TILE } from "./render/scale";
 import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites";
 import { pageShell } from "./ui/templates/pageShell";
 import { injectVercelTelemetry } from "./telemetry";
@@ -74,17 +75,32 @@ function roomEntry(
       const box = fitAtGameScale(f.width, floors, fullLot ? Infinity : cw - 16, ch - CAPTION_H, MAG);
       const w = fullLot ? Math.max(0, cw - 16) : box.w;
       const h = box.h;
-      // A cell can measure zero before the container has laid out. The fitter
-      // returns an empty box for that, but drawing it anyway is not harmless:
-      // drawFloor clamps height to at least 1px, so an empty box paints a stray
-      // hairline instead of nothing. Skip the entry entirely.
-      if (w <= 0 || h <= 0) return;
+      // Under 1px is as unusable as zero, and worse than nothing: drawFloor
+      // clamps height up to 1, so a sub-pixel box paints a stray hairline. Both
+      // are skipped, which is what "a degenerate cell draws nothing" has to mean.
+      if (w < 1 || h < 1) return;
       const x = cx + (cw - w) / 2;
-      const y = cy + (ch - CAPTION_H - h) / 2 + 4;
-      // Floor strip for context.
+      const y = cy + (ch - CAPTION_H - h) / 2;
+      // The painters are FIXED-PIXEL: they draw a 17px cubicle whatever box they
+      // are handed, because the game always rasterizes a unit at exactly its
+      // world size and lets the camera do the zooming. So magnify the way the
+      // camera does, by transforming the context, and hand the painter its world
+      // box. Inflating the box instead would grow the room while its furniture
+      // stayed put, which is the same wrong-proportion defect this page was fixed
+      // to stop, just moved from aspect to interior scale.
+      const worldW = fullLot ? w / box.scale : f.width * TILE;
+      const worldH = floors * FLOOR;
+      const ctx = d.ctx;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.translate(x, y);
+      ctx.scale(box.scale, box.scale);
+      // Floor strip for context, in world units like everything else here.
       const floorU = makeUnit("floor", "occupied", 0, 999);
-      drawUnit(d, floorU, x - 6, y, w + 12, h);
-      drawUnit(d, makeUnit(kind, state, occ ?? (state === "occupied" ? f.population : 0), 1, subtype, floorOverride), x, y, w, h);
+      const pad = 6 / box.scale;
+      drawUnit(d, floorU, -pad, 0, worldW + pad * 2, worldH);
+      drawUnit(d, makeUnit(kind, state, occ ?? (state === "occupied" ? f.population : 0), 1, subtype, floorOverride), 0, 0, worldW, worldH);
+      ctx.restore();
     },
   };
 }
@@ -106,11 +122,14 @@ function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
       // other in the catalog are honest about their relative proportions.
       const floors = span + 1;
       const box = fitAtGameScale(f.width, floors, cw - 16, ch - CAPTION_H, MAG);
-      const floorH = box.h / floors;
+      // World units, like the room path: the shaft art is fixed-pixel too, so the
+      // context carries the magnification and the painter is handed its true box.
+      const worldW = f.width * TILE;
+      const floorH = FLOOR;
       const w = box.w;
-      // Same degenerate-cell guard as the room path above: an empty box must
-      // draw nothing rather than a clamped 1px sliver.
-      if (w <= 0 || box.h <= 0) return;
+      // Same degenerate-cell guard as the room path above: sub-pixel counts as
+      // empty, because drawFloor clamps a zero height up to a visible 1px.
+      if (w < 1 || box.h < 1) return;
       const cars = kind.startsWith("elevator") ? 2 : 0;
       const t: Transport = {
         id: 1,
@@ -125,22 +144,30 @@ function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
         load: 1,
       };
       const x = cx + (cw - w) / 2;
-      const topY = cy + (ch - CAPTION_H - box.h) / 2 + 4;
-      // Backing floors so the shaft reads in context.
+      const topY = cy + (ch - CAPTION_H - box.h) / 2;
+      const ctx = d.ctx;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.translate(x, topY);
+      ctx.scale(box.scale, box.scale);
+      // Backing floors so the shaft reads in context, in world units.
+      const pad = 8 / box.scale;
       for (let i = 0; i <= span; i++) {
-        drawUnit(d, makeUnit("floor", "occupied", 0, 500 + i), x - 8, topY + i * floorH, w + 16, floorH);
+        drawUnit(d, makeUnit("floor", "occupied", 0, 500 + i), -pad, i * floorH, worldW + pad * 2, floorH);
       }
-      drawTransport(d.ctx, t, x, topY, w, floorH);
+      drawTransport(ctx, t, 0, 0, worldW, floorH);
       // Elevator entries also show their cars so the per-kind cab dressing
       // (standard / service / express) is visible in the catalog.
       for (let i = 0; i < cars; i++) {
-        d.ctx.save();
-        // Integer translate so the cab's 1px dressing rows (hazard stripes,
-        // livery pinstripe) land on whole pixels instead of antialiasing.
-        d.ctx.translate(Math.round(x), Math.round(topY + (t.top - t.carPositions[i]) * floorH));
-        drawCar(d.ctx, i * 7 + 1, w, floorH, i === 0 ? 2 : 0, i === 0 ? "up" : "down", false, kind);
-        d.ctx.restore();
+        ctx.save();
+        // Whole world units so the cab's 1px dressing rows (hazard stripes,
+        // livery pinstripe) sit on the world grid; the outer transform then
+        // magnifies them as a block rather than resampling each row.
+        ctx.translate(0, Math.round((t.top - t.carPositions[i]) * floorH));
+        drawCar(ctx, i * 7 + 1, worldW, floorH, i === 0 ? 2 : 0, i === 0 ? "up" : "down", false, kind);
+        ctx.restore();
       }
+      ctx.restore();
     },
   };
 }

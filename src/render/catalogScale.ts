@@ -43,7 +43,16 @@ export function fitAtGameScale(tiles: number, floors: number, maxW: number, maxH
   // A degenerate footprint has no box rather than a NaN one: both budgets can be
   // zero on a very narrow viewport, and 0 / 0 would poison every coordinate
   // downstream instead of simply drawing nothing.
-  if (tiles <= 0 || floors <= 0) return { w: 0, h: 0, tile: 0, scale: 0 };
-  const scale = Math.max(0, Math.min(mag, maxW / (tiles * TILE), maxH / (floors * FLOOR)));
+  // A degenerate or non-finite footprint has no box rather than a NaN one. The
+  // comparison alone would let NaN through (every comparison against NaN is
+  // false), which is the exact coordinate poisoning this guard exists to stop.
+  if (!Number.isFinite(tiles) || !Number.isFinite(floors) || tiles <= 0 || floors <= 0) {
+    return { w: 0, h: 0, tile: 0, scale: 0 };
+  }
+  // Magnification is a WHOLE multiple of world scale, enforced here rather than
+  // trusted to callers: this module exists to hold that invariant, and a
+  // fractional mag would put half a world tile on screen.
+  const whole = Math.max(1, Math.floor(Number.isFinite(mag) ? mag : 1));
+  const scale = Math.max(0, Math.min(whole, maxW / (tiles * TILE), maxH / (floors * FLOOR)));
   return { w: tiles * TILE * scale, h: floors * FLOOR * scale, tile: TILE * scale, scale };
 }
