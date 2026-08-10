@@ -1,4 +1,5 @@
 import * as ex from "excalibur";
+import { ACTOR_NAMES } from "./actorNames";
 import { coveredUpperStories, lotCovered, lobbyLaneSpan } from "./towerCrowdLayout";
 import { FLOOR } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
@@ -148,7 +149,7 @@ function spawnWalker(
 ): void {
   const gfx = engine.personGfx[Math.abs(seed) % engine.personGfx.length];
   // Actor bounds track the baked canvas footprint (see reconcileCrowd).
-  const a = new ex.Actor({ pos: ex.vec(x0w, y0w), width: gfx.width, height: gfx.height, anchor: ex.vec(0.5, 1), z: 0.4 });
+  const a = new ex.Actor({ name: ACTOR_NAMES.walker, pos: ex.vec(x0w, y0w), width: gfx.width, height: gfx.height, anchor: ex.vec(0.5, 1), z: 0.4 });
   a.graphics.use(gfx);
   engine.engine.add(a);
   engine.walkers.push({

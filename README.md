@@ -33,6 +33,10 @@ Contributing? See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the dev workflow:
 the quality gates (`typecheck`, `lint`, `test`, `build`), the two test tiers, and
 the enforced coverage floors.
 
+Debugging at runtime? **[DEBUGGING.md](DEBUGGING.md)** covers the `?debug=` launch
+flags and the `window.vcdebug` console surface: a frame-cost panel, per-system ECS
+timings, draw-call and batching counters, and Excalibur's geometry overlay.
+
 ## Install it (PWA)
 
 The production build (`npm run build`) is an installable **Progressive Web App**.

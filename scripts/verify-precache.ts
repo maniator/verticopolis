@@ -12,7 +12,7 @@
  *
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -73,4 +73,34 @@ if (dupes.length > 0) fail(`duplicate precache entries (each asset must be liste
 const missing = REQUIRED_ICONS.filter((icon) => !seen.has(icon));
 if (missing.length > 0) fail(`expected icons missing from the precache manifest (a narrowed glob or moved file?): ${missing.join(", ")}`);
 
-console.log(`verify-precache: ${urls.length} unique precache entries; all ${REQUIRED_ICONS.length} required icons present exactly once`);
+// The developer debug surface (src/debug/**, see DEBUGGING.md) must stay OUT of
+// the precache: it is a dynamic import no player ever executes, and precaching
+// it makes every PWA install download it.
+//
+// Both halves are asserted, because each guards a different silent failure.
+// The chunk must EXIST under its expected name: the `**/debug-surface*`
+// globIgnore only matches because `chunkFileNames` in vite.config.ts renames
+// this one chunk, and that rename keys off `facadeModuleId`, which Rollup sets
+// to null whenever the dynamic entry stops being a chunk's sole facade. The
+// name would then silently revert to the generic `index-<hash>.js`, the glob
+// would stop matching, and the chunk would quietly re-enter the precache with
+// nothing failing. And it must not be PRECACHED, which is the property itself.
+const assets = readdirSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist", "assets"));
+const debugChunks = assets.filter((f) => f.startsWith("debug-surface-") && f.endsWith(".js"));
+if (debugChunks.length === 0) {
+  fail(
+    "no debug-surface-*.js chunk in dist/assets. The `chunkFileNames` rename in vite.config.ts has stopped " +
+      "matching src/debug/index.ts (Rollup nulls `facadeModuleId` when the dynamic entry is no longer a chunk's " +
+      "sole facade), so the `**/debug-surface*` globIgnore now matches nothing and the debug chunk is precached " +
+      "into every PWA install.",
+  );
+}
+const precachedDebug = [...seen.keys()].filter((u) => u.includes("debug-surface"));
+if (precachedDebug.length > 0) {
+  fail(`the debug surface is in the precache manifest (${precachedDebug.join(", ")}); check the globIgnores in vite.config.ts`);
+}
+
+console.log(
+  `verify-precache: ${urls.length} unique precache entries; all ${REQUIRED_ICONS.length} required icons present exactly once; ` +
+    `debug surface built (${debugChunks.join(", ")}) and excluded`,
+);

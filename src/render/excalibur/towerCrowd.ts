@@ -4,6 +4,7 @@ import type { FacilityKind } from "../../engine/types";
 import { isOperational } from "../../engine/types";
 import { drawCar, drawGarbageTruck, drawMetroTrain, drawStreetCar } from "../sprites";
 import { METRO_TRAIN_H, GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
+import { ACTOR_NAMES } from "./actorNames";
 import { buildWalkers } from "./towerWalkerBuild";
 import { carIndicator, type CarIndicator } from "../carIndicator";
 import { stepCarPursuit, type CarDrawState } from "../carMotion";
@@ -92,7 +93,7 @@ export function reconcileCrowd(engine: TowerEngine): void {
       const gfx = p.staff ? engine.personGfxStaff : engine.personGfx[Math.abs(p.seed) % engine.personGfx.length];
       // Size the actor from the baked canvas so the collider and ground-line
       // anchor can never drift from the sprite's real footprint.
-      const a = new ex.Actor({ pos: ex.vec(0, 0), width: gfx.width, height: gfx.height, anchor: ex.vec(0.5, 1), z: 3 });
+      const a = new ex.Actor({ name: ACTOR_NAMES.person, pos: ex.vec(0, 0), width: gfx.width, height: gfx.height, anchor: ex.vec(0.5, 1), z: 3 });
       a.graphics.use(gfx);
       engine.engine.add(a);
       rec = { actor: a, gfx, red: false };
@@ -192,7 +193,7 @@ export function syncMotion(engine: TowerEngine): void {
       // Cab graphics are built lazily and cached by indicator state (rider
       // count, direction lantern, FULL) so we only ever draw each variant once.
       const gfx = new Map<string, ex.Canvas>();
-      const a = new ex.Actor({ pos: ex.vec(engine.worldX(t.x), -t.carPositions[i] * FLOOR), width: w, height: FLOOR, anchor: ex.vec(0, 0), z: 2 });
+      const a = new ex.Actor({ name: ACTOR_NAMES.car, pos: ex.vec(engine.worldX(t.x), -t.carPositions[i] * FLOOR), width: w, height: FLOOR, anchor: ex.vec(0, 0), z: 2 });
       a.graphics.use(carGfx({ seed, w, kind: t.kind, gfx }, IDLE_CAR));
       engine.engine.add(a);
       const entry = { actor: a, t, i, seed, w, kind: t.kind, gfx, shown: carKey(IDLE_CAR) };
@@ -209,7 +210,7 @@ export function syncMotion(engine: TowerEngine): void {
     // stranded mid-trough).
     const trainY = engine.worldYTop(u.floor) + FLOOR - 3 - METRO_TRAIN_H;
     const cv = new ex.Canvas({ width: w, height: METRO_TRAIN_H, cache: true, draw: (ctx) => drawMetroTrain(ctx, w, true) });
-    const a = new ex.Actor({ pos: ex.vec(engine.worldX(u.x) + 3, trainY), width: w, height: METRO_TRAIN_H, anchor: ex.vec(0, 0), z: 0.6 });
+    const a = new ex.Actor({ name: ACTOR_NAMES.train, pos: ex.vec(engine.worldX(u.x) + 3, trainY), width: w, height: METRO_TRAIN_H, anchor: ex.vec(0, 0), z: 0.6 });
     a.graphics.use(cv);
     engine.engine.add(a);
     engine.trainActors.push({ actor: a, u, w });
@@ -222,6 +223,7 @@ export function syncMotion(engine: TowerEngine): void {
     const w = 68;
     const cv = new ex.Canvas({ width: w, height: GARBAGE_TRUCK_H, cache: true, draw: (ctx) => drawGarbageTruck(ctx, w) });
     const a = new ex.Actor({
+      name: ACTOR_NAMES.truck,
       pos: ex.vec(engine.worldX(u.x), engine.worldYTop(u.floor) + FLOOR - GARBAGE_TRUCK_H),
       width: w,
       height: GARBAGE_TRUCK_H,
@@ -255,7 +257,7 @@ export function syncMotion(engine: TowerEngine): void {
     if (x1w <= x0w) continue;
     const seed = (floor * 97 + r.min * 13) | 0;
     const cv = new ex.Canvas({ width: 16, height: 8, cache: true, draw: (ctx) => drawStreetCar(ctx, seed) });
-    const a = new ex.Actor({ pos: ex.vec(x0w, engine.worldYTop(floor) + FLOOR - 10), width: 16, height: 8, anchor: ex.vec(0, 0), z: 0.5 });
+    const a = new ex.Actor({ name: ACTOR_NAMES.garageCar, pos: ex.vec(x0w, engine.worldYTop(floor) + FLOOR - 10), width: 16, height: 8, anchor: ex.vec(0, 0), z: 0.5 });
     a.graphics.use(cv);
     a.graphics.visible = false;
     engine.engine.add(a);

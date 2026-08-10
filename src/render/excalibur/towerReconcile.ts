@@ -14,6 +14,7 @@ import {
 } from "../sprites";
 import { facadeGeometry, type FloorEdge } from "../facadeGeometry";
 import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "../scale";
+import { ACTOR_NAMES, type ActorName } from "./actorNames";
 import { reap } from "./towerCrowd";
 import { dropRegionUnit, markRegionUnit } from "./towerRegions";
 import { syncScenery } from "./towerScenery";
@@ -244,7 +245,7 @@ function syncEscapes(engine: TowerEngine, edges: Map<number, FloorEdge>): void {
     }
     const parity = (floor % 2) as 0 | 1;
     const hang = (x: number, side: "left" | "right"): ex.Actor => {
-      const a = new ex.Actor({ pos: ex.vec(x, y), width: segW, height: FLOOR, anchor: ex.vec(0, 0), z: -2 });
+      const a = new ex.Actor({ name: ACTOR_NAMES.escape, pos: ex.vec(x, y), width: segW, height: FLOOR, anchor: ex.vec(0, 0), z: -2 });
       a.graphics.use(ground ? engine.awningGfx[side] : engine.escGfx[side][parity]);
       engine.engine.add(a);
       return a;
@@ -289,6 +290,7 @@ function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void
       draw: (ctx) => drawCrane(ctx, engine.d.anim, engine.d.lit),
     });
     engine.craneActor = new ex.Actor({
+      name: ACTOR_NAMES.crane,
       pos,
       width: CRANE_W,
       height: CRANE_H,
@@ -303,9 +305,19 @@ function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void
 }
 
 /** The shared retained-actor ritual: top-left anchored, box collider the
- *  size of the graphic, added to the engine. Callers keep their own maps. */
-function addBoxActor(engine: TowerEngine, pos: ex.Vector, w: number, h: number, z: number, gfx: ex.Graphic): ex.Actor {
-  const a = new ex.Actor({ pos, width: w, height: h, anchor: ex.vec(0, 0), z });
+ *  size of the graphic, added to the engine. Callers keep their own maps and
+ *  supply the debug `name` (see actorNames.ts), which differs per caller even
+ *  though the actor shape does not. */
+function addBoxActor(
+  engine: TowerEngine,
+  name: ActorName,
+  pos: ex.Vector,
+  w: number,
+  h: number,
+  z: number,
+  gfx: ex.Graphic,
+): ex.Actor {
+  const a = new ex.Actor({ name, pos, width: w, height: h, anchor: ex.vec(0, 0), z });
   a.graphics.use(gfx);
   a.collider.set(ex.Shape.Box(w, h, ex.vec(0, 0)));
   engine.engine.add(a);
@@ -433,7 +445,7 @@ function addRoom(engine: TowerEngine, u: Unit): void {
       drawUnit(engine.d, u, 0, 0, w, h);
     },
   });
-  const a = addBoxActor(engine, ex.vec(engine.worldX(u.x), engine.worldYTop(u.floor, hgt)), w, h, 0.45, cv);
+  const a = addBoxActor(engine, ACTOR_NAMES.room, ex.vec(engine.worldX(u.x), engine.worldYTop(u.floor, hgt)), w, h, 0.45, cv);
   engine.animatedRooms.set(u.id, a);
 }
 
@@ -442,7 +454,10 @@ function addTransport(engine: TowerEngine, t: Transport): void {
   const totalFloors = t.top - t.bottom + 1;
   const h = totalFloors * FLOOR;
   const gfx = transportGraphic(engine, t, w, totalFloors);
-  engine.transportActors.set(t.id, addBoxActor(engine, ex.vec(engine.worldX(t.x), engine.worldYTop(t.top)), w, h, 1, gfx));
+  engine.transportActors.set(
+    t.id,
+    addBoxActor(engine, ACTOR_NAMES.transport, ex.vec(engine.worldX(t.x), engine.worldYTop(t.top)), w, h, 1, gfx),
+  );
 }
 
 /**

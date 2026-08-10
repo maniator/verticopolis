@@ -23,6 +23,7 @@ import { hydrationConflictIds, noteTowerOriginForSlot, storeReadDegraded } from 
 import { conflictBulletinText } from "./desktopSaveHydrate";
 import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
+import { startDebugSurface } from "../debug/start";
 import { IS_DESKTOP_BUILD } from "../desktopConsent";
 import { showDesktopAnalyticsNotice } from "../ui/uiDesktopAnalytics";
 
@@ -477,4 +478,8 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // `showDesktopAnalyticsNotice` re-checks the mode itself, so the guard is a
   // bundling choice rather than the correctness argument.
   if (IS_DESKTOP_BUILD) showDesktopAnalyticsNotice(app.ui);
+
+  // The developer debug surface (metrics HUD, geometry draw, `window.vcdebug`).
+  // Policy and the lazy import live in src/debug/start.ts; see DEBUGGING.md.
+  startDebugSurface(app);
 }

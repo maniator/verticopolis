@@ -1,4 +1,5 @@
 import * as ex from "excalibur";
+import { ACTOR_NAMES } from "./actorNames";
 import { GRID } from "../../engine/facilities";
 import { FLOOR, TILE } from "../scale";
 import {
@@ -114,7 +115,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
         for (let x = 0; x < w; x += TILE) ctx.fillRect(x, 0, 1, 7);
       },
     });
-    const a = new ex.Actor({ pos: ex.vec(-PLAZA_SIDEWALK_TILES * TILE, -7), width: w, height: 11, anchor: ex.vec(0, 0), z: Z_EDGE });
+    const a = new ex.Actor({ name: ACTOR_NAMES.sidewalk, pos: ex.vec(-PLAZA_SIDEWALK_TILES * TILE, -7), width: w, height: 11, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
@@ -123,7 +124,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
     const w = ROUNDABOUT_TILES * TILE;
     const h = 48;
     const cv = new ex.Canvas({ width: w, height: h, cache: true, draw: (ctx) => drawRoundabout(ctx, w) });
-    const a = new ex.Actor({ pos: ex.vec(ROUNDABOUT_START * TILE, -30), width: w, height: h, anchor: ex.vec(0, 0), z: Z_EDGE });
+    const a = new ex.Actor({ name: ACTOR_NAMES.roundabout, pos: ex.vec(ROUNDABOUT_START * TILE, -30), width: w, height: h, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
@@ -136,7 +137,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
     const w = 100;
     const h = 112;
     const cv = new ex.Canvas({ width: w, height: h, cache: false, draw: (ctx) => drawFountain(ctx, w, h, engine.d.anim) });
-    const a = new ex.Actor({ pos: ex.vec(FOUNTAIN_TILE * TILE - w / 2, -102), width: w, height: h, anchor: ex.vec(0, 0), z: Z_PLANT });
+    const a = new ex.Actor({ name: ACTOR_NAMES.fountain, pos: ex.vec(FOUNTAIN_TILE * TILE - w / 2, -102), width: w, height: h, anchor: ex.vec(0, 0), z: Z_PLANT });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
@@ -154,7 +155,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
         cache: false,
         draw: (ctx) => drawPlazaLamp(ctx, w, h, lampAlpha(engine.sim.clock.minuteOfDay / 60)),
       });
-      const a = new ex.Actor({ pos: ex.vec(tile * TILE - w / 2, -h + 4), width: w, height: h, anchor: ex.vec(0, 0), z: Z_PLANT });
+      const a = new ex.Actor({ name: ACTOR_NAMES.lamp, pos: ex.vec(tile * TILE - w / 2, -h + 4), width: w, height: h, anchor: ex.vec(0, 0), z: Z_PLANT });
       a.graphics.use(cv);
       engine.engine.add(a);
     }
@@ -185,7 +186,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
           for (let x = phase - period; x < w; x += period) ctx.fillRect(x, 6, TILE, 2);
         },
       });
-      const a = new ex.Actor({ pos: ex.vec(x0, -2), width: w, height: 14, anchor: ex.vec(0, 0), z: Z_EDGE });
+      const a = new ex.Actor({ name: ACTOR_NAMES.road, pos: ex.vec(x0, -2), width: w, height: 14, anchor: ex.vec(0, 0), z: Z_EDGE });
       a.graphics.use(cv);
       engine.engine.add(a);
     }
@@ -205,7 +206,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
         for (let x = 0; x < w; x += TILE * 2) ctx.fillRect(x, 0, 1, 6);
       },
     });
-    const a = new ex.Actor({ pos: ex.vec(GRID.width * TILE, -6), width: w, height: 10, anchor: ex.vec(0, 0), z: Z_EDGE });
+    const a = new ex.Actor({ name: ACTOR_NAMES.pavement, pos: ex.vec(GRID.width * TILE, -6), width: w, height: 10, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
@@ -224,7 +225,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
         for (let x = 0; x < w; x += TILE) ctx.fillRect(x, 0, 1, 7);
       },
     });
-    const a = new ex.Actor({ pos: ex.vec(SIDEWALK_START * TILE, -7), width: w, height: 11, anchor: ex.vec(0, 0), z: Z_EDGE });
+    const a = new ex.Actor({ name: ACTOR_NAMES.sidewalk, pos: ex.vec(SIDEWALK_START * TILE, -7), width: w, height: 11, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
@@ -243,7 +244,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
         for (let x = 4; x < w; x += TILE * 4) ctx.fillRect(x, 6, TILE, 2);
       },
     });
-    const a = new ex.Actor({ pos: ex.vec(ROAD_START * TILE, -2), width: w, height: 14, anchor: ex.vec(0, 0), z: Z_EDGE });
+    const a = new ex.Actor({ name: ACTOR_NAMES.road, pos: ex.vec(ROAD_START * TILE, -2), width: w, height: 14, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
@@ -260,6 +261,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
       draw: (ctx) => drawStreetLamp(ctx, w, h, lampAlpha(engine.sim.clock.minuteOfDay / 60)),
     });
     const a = new ex.Actor({
+      name: ACTOR_NAMES.lamp,
       pos: ex.vec(Math.round((SIDEWALK_START + 1) * TILE - w / 2), -h - 7),
       width: w,
       height: h,
@@ -276,6 +278,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
     const h = 18;
     const cv = new ex.Canvas({ width: w, height: h, cache: true, draw: (ctx) => drawPlanter(ctx, w, h) });
     const a = new ex.Actor({
+      name: ACTOR_NAMES.plant,
       pos: ex.vec(Math.round((GRID.width + FORECOURT_TILES / 2) * TILE - w / 2), -h - 6),
       width: w,
       height: h,
@@ -305,6 +308,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
         draw: (ctx) => drawStrip(ctx, rec, x0, w),
       });
       const a = new ex.Actor({
+        name: ACTOR_NAMES.groundStrip,
         pos: ex.vec(x0, -STRIP_ABOVE),
         width: w + 1,
         height: STRIP_ABOVE + STRIP_BELOW,
@@ -371,6 +375,7 @@ function rebuildSeeded(engine: TowerEngine, rec: SceneryRec, seed: number): void
   for (const r of skylineRects(seed)) {
     const h = r.hFloors * FLOOR;
     const a = new ex.Actor({
+      name: ACTOR_NAMES.skyline,
       pos: ex.vec(r.tile * TILE, -h),
       width: 2,
       height: 2,
@@ -395,6 +400,7 @@ function rebuildSeeded(engine: TowerEngine, rec: SceneryRec, seed: number): void
       draw: (ctx) => (tree ? drawTree(ctx, w, h, seed + spot.tile) : drawBush(ctx, w, h)),
     });
     const a = new ex.Actor({
+      name: ACTOR_NAMES.plant,
       pos: ex.vec(spot.tile * TILE - w / 2, -h - STRIP_ABOVE + 2),
       width: w,
       height: h,
