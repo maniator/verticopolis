@@ -14,20 +14,35 @@ import type { TowerEngine } from "./TowerEngine";
  * fresh fillText each frame, every digit is rasterized once at the final display
  * size, so it stays crisp at any zoom and DPR. The cost is per-frame work bounded
  * by the two culls below (readable-zoom gate, then visible floor band per shaft).
+ *
+ * The font scales with the floor band (like the baked labels did) rather than
+ * being clamped to a fixed size: a fixed size grew relative to a shrinking band
+ * as you zoomed out and read as giant digits. Below a band height that can hold a
+ * readable digit without it dominating the floor, the numbers hide entirely and
+ * the left-edge ruler carries the floor reference. Numbers are NOT hidden behind
+ * a passing cab: doing so blinked them on and off as cars crossed floors (worse
+ * at fast-forward), so a steady digit that a moving cab passes over is preferred.
  */
 export function drawShaftNumbers(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   const z = engine.cam.zoom;
   const floorHpx = FLOOR * z;
-  // Below this the digits are too small for the pixel font to read; drawing them
-  // is just noise (and unbounded work), exactly as the baked labels were when
-  // zoomed this far out. Return before save() so the save/restore stays balanced.
-  if (floorHpx < 13) return;
+  // Hide numbers once a floor band is too short to hold a readable digit that
+  // does not dominate it (below this a fixed-size font looked giant and a scaled
+  // one was an unreadable smudge). The finiteness check also hides a non-finite
+  // zoom (NaN or Infinity), which would otherwise write "bold Infinitypx" as the
+  // font. Return before save() so save/restore balances.
+  if (!Number.isFinite(floorHpx) || floorHpx < 30) return;
   // Save/restore because this shares the overlay's 2D context with painters that
   // run after it (drawRuler draws its labels at x=3 assuming the default left
   // textAlign, drawRain strokes at its own lineWidth): leaving textAlign,
   // textBaseline, lineJoin, miterLimit or lineWidth dirty would corrupt them.
   ctx.save();
-  const fontPx = Math.max(8, Math.round(8 * z));
+  // ~18% of the floor band (matching the old baked proportion), floored at 7px
+  // for legibility. The 7px floor binds just above the gate (roughly zoom
+  // 0.67-0.81, where a proportional digit would fall under 7px); there the number
+  // is at most ~23% of the band, still readable and far from the giant sizes the
+  // old fixed 8px clamp produced when zoomed out.
+  const fontPx = Math.max(7, Math.round(8 * z));
   ctx.font = `bold ${fontPx}px "MS Sans Serif", monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -48,17 +63,10 @@ export function drawShaftNumbers(engine: TowerEngine, ctx: CanvasRenderingContex
     const halfW = shaftWpx / 2;
     if (cx < -halfW || cx > engine.viewWidth + halfW) continue; // off-screen left/right
     const skip = t.skipFloors && t.skipFloors.length ? new Set(t.skipFloors) : null;
-    // Floors a car currently sits over, precomputed once per shaft (O(cars)) so
-    // the floor loop stays O(1) per floor instead of scanning every car. The car
-    // rides over the shaft numbers in the original, so its floor shows no digit;
-    // rounding the continuous position hides the nearest floor (and, at a
-    // mid-transit half-step, the one the cab has mostly reached).
-    const covered = t.carPositions?.length ? new Set(t.carPositions.map((cp) => Math.round(cp))) : null;
     const lo = Math.max(t.bottom, botFloor);
     const hi = Math.min(t.top, topFloor);
     for (let num = lo; num <= hi; num++) {
       if (skip && skip.has(num)) continue; // express: not a stop, no number
-      if (covered && covered.has(num)) continue; // a cab is over this floor
       const cy = engine.worldToScreenY(num) + floorHpx / 2;
       const label = num >= 1 ? String(num) : `B${1 - num}`;
       // A dark outline (stroke) then a near-white fill, both on the same path so
