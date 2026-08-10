@@ -1,6 +1,7 @@
 import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { castShadow, hash, personStanding, shade, shell, type RoomCtx } from "./common";
+import { busyStations, castShadow, personStanding, shade, shell, type RoomCtx } from "./common";
+import { artRow, artUnits } from "./artScale";
 
 /**
  * Modern Amusements art: an arcade / games hall with four attraction types
@@ -80,8 +81,19 @@ function drawArcade(ctx: CanvasRenderingContext2D, x: number, floorY: number, w:
   const gap = 4;
   const cabH = Math.min(floorY - top - 2, 22);
   const cabY = floorY - cabH;
-  let i = 0;
-  for (let cx = x + 3; cx + cabW <= x + w - 3; cx += cabW + gap, i++) {
+  // Cabinet anchors: the cabinet-plus-gap slot is authored art, so the row is
+  // counted at the authored tile (the hall's width in tiles) and stepped at the
+  // current one. Counting slots off the pixel width retired a cabinet, and the
+  // player standing at it, when the tile narrowed. The far margin is 5 rather
+  // than the near 3 because a player stands at the cabinet's right edge and
+  // carries a contact-shadow column past it; at 3 the last one reached outside
+  // the hall and was clipped, which is this same bug wearing a different hat.
+  // At the 12-tile hall the catalog ships, the count is the same either way; at
+  // a few other widths the wider margin does cost a cabinet, which is the price
+  // of keeping every player whole.
+  const spots = artRow(artUnits(w) - 3 - 5 - cabW, x + 3, x + w - 5 - cabW, cabW + gap);
+  const busy = busyStations(spots.length, occ, seed * 31);
+  spots.forEach((cx, i) => {
     ctx.fillStyle = shade(look.wall, 26); // cabinet body
     ctx.fillRect(cx, cabY, cabW, cabH);
     ctx.fillStyle = shade(look.wall, 44); // lit side edge
@@ -90,9 +102,9 @@ function drawArcade(ctx: CanvasRenderingContext2D, x: number, floorY: number, w:
     ctx.fillStyle = look.neon; // control-panel light strip
     ctx.fillRect(cx + 1, cabY + Math.round(cabH * 0.62), cabW - 2, 1);
     castShadow(ctx, cx, floorY, cabW);
-    // A player at roughly every other cabinet, up to the real occupancy.
-    if (i < occ * 2 && hash(seed * 31 + i) > 0.35) personStanding(ctx, cx + cabW - 2, floorY, seed + i * 7);
-  }
+    // A player at the cabinets the occupancy fills, scattered by the hash.
+    if (busy.has(i)) personStanding(ctx, cx + cabW - 2, floorY, seed + i * 7);
+  });
 }
 
 function drawVr(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, top: number, look: AmusementsLook, occ: number, seed: number): void {
@@ -127,8 +139,12 @@ function drawClaw(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   const gap = 4;
   const macH = Math.min(floorY - top - 2, 24);
   const macY = floorY - macH;
-  let i = 0;
-  for (let mx = x + 3; mx + macW <= x + w - 3; mx += macW + gap, i++) {
+  // Machine anchors, on the same rule as the arcade row: counted at the
+  // authored tile, stepped at the current one, with the far margin widened to
+  // hold the player who stands at the last machine's edge.
+  const spots = artRow(artUnits(w) - 3 - 5 - macW, x + 3, x + w - 5 - macW, macW + gap);
+  const busy = busyStations(spots.length, occ, seed * 23);
+  spots.forEach((mx, i) => {
     ctx.fillStyle = shade(look.neon, -30); // machine frame
     ctx.fillRect(mx, macY, macW, macH);
     const glassY = macY + 4;
@@ -148,8 +164,8 @@ function drawClaw(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
     ctx.fillStyle = look.neon; // prize-chute glow
     ctx.fillRect(mx + 1, macY + macH - 3, macW - 2, 1);
     castShadow(ctx, mx, floorY, macW);
-    if (i < occ * 2 && hash(seed * 23 + i) > 0.4) personStanding(ctx, mx + macW - 2, floorY, seed + i * 5);
-  }
+    if (busy.has(i)) personStanding(ctx, mx + macW - 2, floorY, seed + i * 5);
+  });
 }
 
 function drawGolf(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, look: AmusementsLook, occ: number, seed: number): void {
@@ -158,7 +174,10 @@ function drawGolf(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   ctx.fillStyle = look.floor; // extend the turf up a little as a putting green
   ctx.fillRect(x, floorY - 3, w, 3);
   ctx.fillStyle = shade(look.floor, 22); // mown highlight stripes
-  for (let sx = x; sx < x + w; sx += 8) ctx.fillRect(sx, floorY - 3, 4, 1);
+  // The last stripe is cut to the wall rather than drawn 4 wide past it: at
+  // widths where the 8px stride lands within 4px of the far edge it reached into
+  // the neighboring unit, where both draw paths clip it away unseen.
+  for (let sx = x; sx < x + w; sx += 8) ctx.fillRect(sx, floorY - 3, Math.max(0, Math.min(4, Math.floor(x + w - sx))), 1);
   // Holes with pin flags.
   const flags = ["#F0503A", "#F0C43A"];
   let f = 0;
@@ -178,19 +197,24 @@ function drawGolf(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   ctx.fillRect(wmX - 3, floorY - 15, 12, 2); // sail bar
   ctx.fillRect(wmX + 2, floorY - 20, 2, 12);
   // A golfer mid-putt (only when someone is here), plus any extra visitors
-  // watching. The watcher loop is bounded by the bay WIDTH, not the raw occupant
-  // count, so a forged/corrupt save with a huge `occupants` can never over-iterate.
+  // watching. The watcher row is bounded by the bay WIDTH, not the raw occupant
+  // count, so a forged/corrupt save with a huge `occupants` can never
+  // over-iterate. Its 12px pitch is authored art, so the row is counted at the
+  // authored tile and stepped at the current one: read off the pixel width, the
+  // bay lost a standing spot when the tile narrowed. The start clearance stays
+  // in screen pixels because what it clears (the golfer and the putter) is
+  // fixed-size art, and a bay too short for a watcher gets none.
   if (occ > 0) {
     personStanding(ctx, x + 6, floorY, seed);
     ctx.fillStyle = "#D8D0B8"; // putter
     ctx.fillRect(x + 11, floorY - 6, 5, 1);
     ctx.fillRect(x + 15, floorY - 3, 1, 3);
   }
-  for (let i = 1; i < occ; i++) {
-    const px = x + 20 + i * 12;
-    if (px >= x + w - 6) break;
-    personStanding(ctx, px, floorY, seed + i * 9);
-  }
+  const spots = artRow(artUnits(w) - 32 - 7, x + 32, x + w - 7, 12);
+  // Floored to match every other row: a forged fractional count must not round
+  // a watcher into existence.
+  const watchers = Math.min(Math.max(0, Math.floor(occ) - 1), spots.length);
+  for (let i = 0; i < watchers; i++) personStanding(ctx, spots[i], floorY, seed + (i + 1) * 9);
 }
 
 /** The Modern Amusements hall. Reused for every attraction subtype; the look's

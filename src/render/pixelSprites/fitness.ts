@@ -1,6 +1,7 @@
 import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { castShadow, hash, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
+import { busyStations, castShadow, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
+import { artRow, artUnits } from "./artScale";
 
 /**
  * Modern Fitness Club art: a members' gym in one of five formats (a weight
@@ -79,12 +80,20 @@ function drawWeights(ctx: CanvasRenderingContext2D, x: number, floorY: number, w
 
 function drawYoga(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, look: FitnessLook, occ: number, seed: number): void {
   // A calm studio: mats laid on the floor, standing figures mid-pose, a plant.
-  let i = 0;
-  for (let mx = x + 5; mx + 9 < x + w - 4; mx += 12, i++) {
+  // Mat anchors: the 12px pitch is authored art, counted at the tile it was
+  // drawn for and stepped at the current one. Read off the room's pixel width
+  // the studio lost two mats when the tile narrowed, and two members standing on
+  // them went undrawn. A class fills its mats from the front by design, which is
+  // why this row counts in order rather than scattering like the others: every
+  // mat is drawn either way, so an empty mat still reads as an empty mat.
+  // Floored, so a forged save carrying a fractional count cannot round a member
+  // into existence here when the other rows would round one away.
+  const members = Math.max(0, Math.floor(occ));
+  artRow(artUnits(w) - 5 - 14, x + 5, x + w - 14, 12).forEach((mx, i) => {
     ctx.fillStyle = i % 2 === 0 ? look.accent : shade(look.accent, 30); // rolled/laid mats
     ctx.fillRect(mx, floorY - 2, 9, 2);
-    if (i < occ) personStanding(ctx, mx + 2, floorY - 1, seed + i * 7);
-  }
+    if (i < members) personStanding(ctx, mx + 2, floorY - 1, seed + i * 7);
+  });
   // A potted plant in the corner.
   const pX = x + w - 6;
   ctx.fillStyle = "#7A5A3A";
@@ -97,16 +106,23 @@ function drawSpin(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   // A dim room of stationary bikes lit by an accent glow, riders on some.
   ctx.fillStyle = shade(look.accent, -30); // floor light wash
   ctx.fillRect(x + 2, floorY - 1, w - 4, 1);
-  let i = 0;
-  for (let bx = x + 5; bx + 5 < x + w - 3; bx += 8, i++) {
+  // Bike anchors: the 8px pitch is authored art, counted at the tile it was
+  // drawn for and stepped at the current one, so a narrower tile tightens the
+  // row instead of wheeling a bike out of the studio.
+  const bikes = artRow(artUnits(w) - 5 - 9, x + 5, x + w - 9, 8);
+  // Which bikes have riders: the hash scatters them, the occupancy says how
+  // many. Rolling the hash per bike left riders who were in the class undrawn,
+  // so a full studio could show a handful of people on twenty bikes.
+  const riding = busyStations(bikes.length, occ, seed * 13);
+  bikes.forEach((bx, i) => {
     ctx.fillStyle = "#14141A"; // bike frame
     ctx.fillRect(bx, floorY - 9, 5, 9);
     ctx.fillStyle = look.accent; // flywheel accent
     ctx.fillRect(bx + 1, floorY - 7, 3, 3);
     ctx.fillStyle = "#2A2A32"; // handlebar
     ctx.fillRect(bx, floorY - 11, 3, 1);
-    if (i < occ && hash(seed * 13 + i) > 0.25) personSeated(ctx, bx, floorY - 6, seed + i * 5);
-  }
+    if (riding.has(i)) personSeated(ctx, bx, floorY - 6, seed + i * 5);
+  });
 }
 
 function drawBoxing(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, look: FitnessLook, occ: number, seed: number): void {

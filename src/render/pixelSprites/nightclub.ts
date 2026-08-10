@@ -1,6 +1,7 @@
 import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { hash, personStanding, shade, shell, type RoomCtx } from "./common";
+import { busyStations, personStanding, shade, shell, type RoomCtx } from "./common";
+import { artRow, artUnits } from "./artScale";
 
 /**
  * Modern Nightclub art: a single dark room lit by colored beams, with a DJ booth,
@@ -48,9 +49,12 @@ export function nightclub(d: RoomCtx, u: Unit, x: number, y: number, w: number, 
     }
   }
 
-  // A glowing checkered dance floor strip along the floor line.
+  // A glowing checkered dance floor strip along the floor line. The floor is
+  // drawn at its screen size, but its AUTHORED width is what decides how many
+  // dancers it holds, so that is worked out separately and handed to the row.
   const danceX0 = x + 4;
   const danceX1 = x + Math.round(w * 0.66);
+  const danceArtW = Math.round(artUnits(w) * 0.66) - 4;
   for (let fx = danceX0, k = 0; fx + 3 < danceX1; fx += 4, k++) {
     ctx.fillStyle = (k % 2 === 0) ? shade(BEAMS[(k + seed) % BEAMS.length], -10) : "#14101E";
     ctx.fillRect(fx, floorY - 2, 4, 2);
@@ -67,18 +71,25 @@ export function nightclub(d: RoomCtx, u: Unit, x: number, y: number, w: number, 
   ctx.fillStyle = BEAMS[seed % BEAMS.length];
   ctx.fillRect(boothX + 1, floorY - 8, 2, 2);
   ctx.fillRect(boothX + boothW - 3, floorY - 8, 2, 2);
-  // The DJ behind the booth (only when the club is live, so an empty room reads empty).
+  // The DJ behind the booth (only when the club is live, so an empty room reads
+  // empty). The DJ is staff, not one of the room's occupants, so the dance floor
+  // still holds its full crowd beside him.
   if (occ > 0) personStanding(ctx, boothX + Math.round(boothW / 2) - 3, floorY - 8, seed + 3);
 
-  // Dancers on the floor, filling in with occupancy. Bounded by the dance-floor
-  // width, so a forged occupant count can never over-iterate.
-  let drawn = 0;
-  for (let dx = danceX0 + 3; dx + 4 < danceX1 && drawn < occ; dx += 6, drawn++) {
-    if (hash(seed * 17 + drawn) > 0.15) {
-      personStanding(ctx, dx, floorY, seed + drawn * 7);
-      // A colored uplight glow at the dancer's feet.
-      ctx.fillStyle = BEAMS[(drawn + seed) % BEAMS.length];
-      ctx.fillRect(dx - 1, floorY - 1, 5, 1);
-    }
-  }
+  // Dancer anchors: the 6px pitch is authored art, counted against the DANCE
+  // FLOOR at the tile it was drawn for and stepped at the current one. Read off
+  // the floor's pixel width the club lost two dancing spots when the tile
+  // narrowed, and two people who were in the club went undrawn.
+  const spots = artRow(danceArtW - 3 - 5, danceX0 + 3, danceX1 - 5, 6);
+  // Who is dancing: the hash scatters them, the occupancy says how many. The old
+  // loop counted a hash-skipped spot against the occupancy as if someone were
+  // standing there, so a club with five people could show three.
+  const dancing = busyStations(spots.length, occ, seed * 17);
+  spots.forEach((dx, i) => {
+    if (!dancing.has(i)) return;
+    personStanding(ctx, dx, floorY, seed + i * 7);
+    // A colored uplight glow at the dancer's feet.
+    ctx.fillStyle = BEAMS[(i + seed) % BEAMS.length];
+    ctx.fillRect(dx - 1, floorY - 1, 5, 1);
+  });
 }

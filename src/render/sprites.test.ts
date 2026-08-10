@@ -278,20 +278,11 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
     expect(sigs.size, "two practices drew identically").toBe(CLINIC_SUBTYPES.length);
   });
 
-  it("a Boutique Bay's browsers are bounded and gated on occupancy", () => {
-    // The browsing-customer loop is width-bounded (a forged occupant count can't
-    // spin it), and an empty shop draws no customer.
-    const empty = spyCtx();
-    const full = spyCtx();
-    const forged = spyCtx();
-    drawUnit(draw({}, empty.ctx), unit({ kind: "boutiqueBay", subtype: "Florist", occupants: 0 }), 0, 0, 132, 44);
-    drawUnit(draw({}, full.ctx), unit({ kind: "boutiqueBay", subtype: "Florist", occupants: 3 }), 0, 0, 132, 44);
-    expect(() => drawUnit(draw({}, forged.ctx), unit({ kind: "boutiqueBay", subtype: "Florist", occupants: 1e9 }), 0, 0, 132, 44)).not.toThrow();
-    const occupant = "fillStyle=rgba(0,0,0,0.24)";
-    expect(empty.log).not.toContain(occupant);
-    expect(full.log).toContain(occupant);
-    expect(forged.log.filter((l) => l === occupant).length).toBeLessThan(20);
-  });
+  // The Boutique Bay's occupancy gate and its forged-count bound moved to
+  // `pixelSprites/roomCapacity.test.ts`, next to the rest of the bay's capacity
+  // coverage, where they now run at the bay's real rect. The rects in this file
+  // are still the retired 11px tile (132 by 44 and friends); that is a sweep of
+  // its own, recorded in the backlog's deferral inbox.
 });
 
 describe("service facilities — reserved colors, integer pixels, and state cues", () => {

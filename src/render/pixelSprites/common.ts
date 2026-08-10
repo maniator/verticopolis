@@ -76,6 +76,34 @@ export function hash(seed: number): number {
   return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
 }
 
+/**
+ * Which of a room's `stations` (stools, dance-floor spots, machines, mats,
+ * bikes, places on a mat) have someone at them: a stable pseudo-random subset of
+ * exactly `min(people, stations)` of them.
+ *
+ * The count is the point. Deciding each station on its own hash roll broke the
+ * honest-occupancy rule in both directions at once: a hall with two visitors
+ * could paint four figures at one column and none at the next, and where the
+ * loop counted a skipped station against the occupancy anyway, people who were
+ * in the room were simply never drawn.
+ *
+ * WHICH stations matters almost as much. Filling from one end would satisfy the
+ * count and turn a quiet room into a solid block of figures against one wall
+ * with an empty half beside it, so the subset is chosen by ranking the stations
+ * on their hash and taking the busiest. That spreads a small crowd over the
+ * whole row and is still a pure function of the room's own seed, which is what
+ * lets these rooms bake to a cached sprite.
+ */
+export function busyStations(stations: number, people: number, seed: number): Set<number> {
+  // Floored so a forged save carrying a fractional count rounds the same way
+  // here as a plain counting loop would.
+  const want = Math.max(0, Math.min(Math.floor(people), stations));
+  if (!(want > 0)) return new Set(); // nobody here, or a nonsense count
+  const ranked = Array.from({ length: stations }, (_, i) => i);
+  ranked.sort((a, b) => hash(seed + b) - hash(seed + a) || a - b); // index breaks a tie
+  return new Set(ranked.slice(0, want));
+}
+
 // ---- Per-unit variety (geo-seeded) ----------------------------------------
 //
 // Same-kind rooms vary like the 1994 original. The law (party-ratified after

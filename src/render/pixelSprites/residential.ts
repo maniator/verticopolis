@@ -1,8 +1,10 @@
 import type { Unit } from "../../engine/types";
 import { visibleOccupants } from "../../engine/Crowd";
 import { PAL, SKIN, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, shade, vacancy, windowView, type RoomCtx } from "./common";
+import { artRow, artUnits, screenLength } from "./artScale";
 import { bevelBox, ceilingCap, curtain, downlights, fill, framedArt, glow, interiorWall, plankFloor } from "./dollhouse";
 import { CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, SUITE_WALLS } from "./residential.looks";
+import { ROACH_AMBER, ROACH_CHESTNUT, drawRoach } from "./residential.roaches";
 
 /**
  * Residential and lodging room art: office, condo, and the three hotel grades,
@@ -96,53 +98,83 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
     if (layout === 3) {
       // Meeting room: one long table with a laptop and papers, high-back chairs
       // both sides, seated staff up to the chair count, a corner plant.
-      const tw = Math.min(Math.round(w * 0.6), 60);
+      // The table is worked out in authored units and then brought back to
+      // screen. Its 60px ceiling is a fixed art literal that did not shrink with
+      // the tile, so sizing the table on screen and counting its chairs in
+      // authored units would credit a capped table with 66 authored pixels and
+      // seat a sixth worker the room was never drawn to hold.
+      const atw = Math.min(Math.round(artUnits(w) * 0.6), 60);
+      const tw = Math.round(screenLength(atw));
       const tx = x + Math.round((w - tw) / 2);
       fill(ctx, tx, floorY, tw, 1, "#000000", 0.16);
       bevelBox(ctx, tx, floorY - 7, tw, 4, PAL.walnut);
       fill(ctx, tx + 6, floorY - 8, 4, 1, PAL.white); // papers
       fill(ctx, tx + tw - 12, floorY - 8, 4, 1, PAL.white);
       fill(ctx, tx + Math.round(tw / 2) - 3, floorY - 9, 6, 2, PAL.ink); // laptop
-      const chairs = Math.max(1, Math.floor(tw / 11)); // only count chairs that actually fit
-      const seated = Math.min(filled, chairs);
-      for (let i = 0; i < chairs; i++) {
-        const sx = tx + 3 + i * 11;
-        if (sx + 6 > tx + tw) break;
+      // Chair anchors, counted against the TABLE at the tile its 11px pitch was
+      // drawn for. Counting seats off the table's pixel width lost the fifth
+      // chair when the tile narrowed, and the fifth worker present went undrawn
+      // with it. A table too short for a chair seats none, which is what the
+      // per-chair fit check used to do.
+      const chairs = artRow(atw - 3 - 6, tx + 3, tx + tw - 6, 11);
+      const seated = Math.min(filled, chairs.length);
+      chairs.forEach((sx, i) => {
         fill(ctx, sx - 1, floorY - 12, 7, 5, "#3A3F4A"); // high-back chair
         fill(ctx, sx - 1, floorY - 12, 7, 1, "#4A5058");
         if (i < seated) personSeated(ctx, sx, floorY - 1, (u.id * 7 + i * 31) | 0);
-      }
+      });
       fill(ctx, x + w - 9, floorY - 6, 3, 6, "#7A5A3A"); // corner plant
       fill(ctx, x + w - 12, floorY - 13, 8, 8, "#4E7A3E");
       fill(ctx, x + w - 10, floorY - 16, 4, 4, PAL.green);
     } else if (layout === 4) {
       // Executive corner: a big desk with a seated executive, a tall binder
       // cabinet, plus two side cubicles so a staffed office still shows people.
-      fill(ctx, x + 6, floorY, 26, 1, "#000000", 0.16);
-      bevelBox(ctx, x + 6, floorY - 8, 26, 6, "#71512F"); // executive desk
-      fill(ctx, x + 9, floorY - 15, 8, 7, "#20242C"); // monitor bezel
-      fill(ctx, x + 10, floorY - 14, 6, 5, filled > 0 ? "#5FB0DC" : "#2E3640");
-      fill(ctx, x + 23, floorY - 17, 7, 17, "#5A3A2A"); // high-back leather chair
-      fill(ctx, x + 23, floorY - 17, 7, 1, "#6A4A38");
-      if (filled > 0) personSeated(ctx, x + 22, floorY - 1, (u.id * 7) | 0);
-      bevelBox(ctx, x + 36, floorY - 18, 14, 18, "#5A4436"); // binder cabinet
+      // The layout is one chain of absolute anchors authored to just fill the
+      // office at the retired 11px tile, so every anchor is restated at the
+      // current one. Left alone, the chain overran the narrower room and the
+      // second cubicle's worker dropped out of a fully staffed office. Only the
+      // anchors move: the items keep their authored widths, so the chain's slack
+      // is 1px rather than the 3 it was drawn with, and the fit check below is
+      // what holds it honest if a room narrower than the office ever renders it.
+      const ax = (n: number): number => x + Math.round(screenLength(n));
+      fill(ctx, ax(6), floorY, 26, 1, "#000000", 0.16);
+      bevelBox(ctx, ax(6), floorY - 8, 26, 6, "#71512F"); // executive desk
+      fill(ctx, ax(9), floorY - 15, 8, 7, "#20242C"); // monitor bezel
+      fill(ctx, ax(10), floorY - 14, 6, 5, filled > 0 ? "#5FB0DC" : "#2E3640");
+      fill(ctx, ax(23), floorY - 17, 7, 17, "#5A3A2A"); // high-back leather chair
+      fill(ctx, ax(23), floorY - 17, 7, 1, "#6A4A38");
+      if (filled > 0) personSeated(ctx, ax(22), floorY - 1, (u.id * 7) | 0);
+      bevelBox(ctx, ax(36), floorY - 18, 14, 18, "#5A4436"); // binder cabinet
       const spines = ["#8C3A32", "#3E5A8C", "#B08A3E", "#4A7A4A"];
-      for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) fill(ctx, x + 38 + k * 3, floorY - 16 + r * 4, 2, 3, spines[(k + r) % 4]);
+      for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) fill(ctx, ax(38) + k * 3, floorY - 16 + r * 4, 2, 3, spines[(k + r) % 4]);
       for (let i = 0; i < 2; i++) {
-        const cx = x + 54 + i * 22;
+        const cx = ax(54 + i * 22);
         if (cx + 18 > x + w - 2) break;
         cube(ctx, cx, floorY, i + 1 < filled, (u.id * 7 + (i + 1) * 31) | 0);
       }
     } else {
       // Classic cubicle row (the anchor layout): a bank of cubicles, staffed in
       // seat order up to the visible occupant count, one with an aisle plant.
-      const slot = 22;
+      // The bank is counted against the room measured at the authored tile (its
+      // width in tiles, which the scale change did not move) and stepped at the
+      // current one, so a narrower tile tightens the aisles instead of retiring
+      // a desk and the worker sitting at it. It keeps its own count formula
+      // rather than `artRow`'s: this row reserves 12px of room where `artRow`
+      // would reserve a whole cubicle, and switching would add a fourth desk the
+      // office was never drawn with. The slot then holds its authored 22px
+      // wherever that still fits, so the 9-tile office the catalog ships is
+      // spaced exactly as it was drawn, and only tightens on the wide rooms
+      // where the bank would otherwise run out through the far wall. That leaves
+      // the fit check below as a backstop for the single-desk case, which has no
+      // pitch to compress.
       const start = x + 7;
-      const count = Math.max(1, Math.floor((w - 12) / slot));
+      const last = x + w - 2 - 18; // the furthest a desk can start and still fit
+      const count = Math.max(1, Math.floor((artUnits(w) - 12) / 22));
+      const slot = count > 1 ? Math.min(22, (last - start) / (count - 1)) : 22;
       const plantDesk = geoVariant(u, 2, count);
       const seated = Math.min(count, filled);
       for (let i = 0; i < count; i++) {
-        const dx = start + i * slot;
+        const dx = start + Math.round(i * slot);
         if (dx + 18 > x + w - 2) break;
         cube(ctx, dx, floorY, i < seated, (u.id * 7 + i * 31) | 0);
         if (i === plantDesk) {
@@ -284,81 +316,6 @@ export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
 }
 
 // ---- Hotel --------------------------------------------------------------
-
-/** Cockroach decal palettes (owner-approved redesign, 2026-07-16). Chestnut for
- *  a full infestation (dark and obvious, but clearly a roach); warmer amber for
- *  the single dirty-room warning. The pale `rim` keeps them legible over any
- *  wall tint. */
-const ROACH_CHESTNUT = { dark: "#2A1A0E", head: "#1E1208", collar: "#6A4A28", rim: "#EFE7D2", sheen: "#7A5230", seam: "#140C05", leg: "#160E05" };
-const ROACH_AMBER = { dark: "#4A331A", head: "#341F0E", collar: "#7A5A30", rim: "#EFE7D2", sheen: "#8A6A3A", seam: "#241608", leg: "#241608" };
-type RoachPalette = typeof ROACH_CHESTNUT;
-
-/** A crisp filled pixel ellipse (integer scanlines, no anti-aliasing). Radii are
- *  floored to 1 so a degenerate call (`ry <= 0`) can never divide by zero into a
- *  NaN rect; every current caller already passes `rx, ry >= 2`. */
-function roachOval(ctx: CanvasRenderingContext2D, cx: number, cy: number, rx: number, ry: number, color: string, alpha = 1): void {
-  rx = Math.max(1, rx);
-  ry = Math.max(1, ry);
-  const prevAlpha = ctx.globalAlpha; // restore the caller's alpha, don't assume 1
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
-  for (let iy = -ry; iy <= ry; iy++) {
-    const t = 1 - (iy * iy) / (ry * ry);
-    if (t < 0) continue;
-    const hw = Math.round(rx * Math.sqrt(t));
-    ctx.fillRect(Math.round(cx - hw), Math.round(cy + iy), hw * 2 + 1, 1);
-  }
-  ctx.globalAlpha = prevAlpha;
-}
-
-/** A crisp pixel line (Bresenham) for legs and antennae. */
-function roachLine(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, color: string): void {
-  x0 = Math.round(x0);
-  y0 = Math.round(y0);
-  x1 = Math.round(x1);
-  y1 = Math.round(y1);
-  const dx = Math.abs(x1 - x0);
-  const dy = Math.abs(y1 - y0);
-  const sx = x0 < x1 ? 1 : -1;
-  const sy = y0 < y1 ? 1 : -1;
-  let e = dx - dy;
-  ctx.fillStyle = color;
-  for (;;) {
-    ctx.fillRect(x0, y0, 1, 1);
-    if (x0 === x1 && y0 === y1) break;
-    const e2 = 2 * e;
-    if (e2 > -dy) { e -= dy; x0 += sx; }
-    if (e2 < dx) { e += dx; y0 += sy; }
-  }
-}
-
-/** One cockroach decal, big and unmistakable, drawn crisp and axis-aligned so it
- *  stays pixel art. `fx`/`fy` (each +/-1) flip it for scatter variety; `L` is the
- *  body length in pixels. Ported from the owner-approved redesign preview. */
-function drawRoach(ctx: CanvasRenderingContext2D, cx: number, cy: number, L: number, fx: number, fy: number, pal: RoachPalette): void {
-  cx = Math.round(cx);
-  cy = Math.round(cy);
-  const rx = Math.round(L * 0.34);
-  const ry = Math.round(L * 0.5);
-  const X = (dx: number): number => cx + fx * dx;
-  const Y = (dy: number): number => cy + fy * dy;
-  // six legs, splayed out and back
-  for (const s of [-1, 1]) for (const ay of [-0.16, 0.08, 0.3]) {
-    roachLine(ctx, X(s * rx * 0.65), Y(ay * L), X(s * (rx + L * 0.34)), Y(ay * L + L * 0.16), pal.leg);
-  }
-  // two antennae sweeping forward from the head
-  for (const s of [-1, 1]) roachLine(ctx, X(s), Y(-ry * 0.9), X(s * (rx + L * 0.18)), Y(-ry - L * 0.34), pal.leg);
-  // pale rim, then the body, so it separates from any wall color
-  roachOval(ctx, cx, Y(ry * 0.06), rx + 1, ry + 1, pal.rim, 0.95);
-  roachOval(ctx, cx, Y(ry * 0.06), rx, ry, pal.dark);
-  // head shield + a pale collar edge, a domed sheen, and a center wing seam
-  roachOval(ctx, cx, Y(-ry * 0.6), Math.round(rx * 0.85), Math.round(ry * 0.34), pal.head);
-  ctx.fillStyle = pal.collar;
-  ctx.fillRect(cx - Math.round(rx * 0.6), Math.round(Y(-ry * 0.86)), Math.round(rx * 1.2), 1);
-  roachOval(ctx, cx, Y(ry * 0.05), Math.max(1, Math.round(rx * 0.3)), Math.round(ry * 0.6), pal.sheen, 0.85);
-  ctx.fillStyle = pal.seam;
-  ctx.fillRect(cx, cy - Math.round(ry * 0.2), 1, Math.round(ry * 0.95));
-}
 
 export function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number, grade: number): void {
   const { ctx } = d;
