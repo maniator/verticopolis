@@ -79,6 +79,22 @@ function paint(sp: (typeof SPRITES)[number], w: number, h: number) {
 }
 
 describe("service sprites survive a non-identity reference map", () => {
+  it.each(SPRITES.map((s) => [s.name, s] as const))(
+    "%s keeps every rect inside its own canvas at the shipped scale",
+    (_name, sp) => {
+      // The real protection against #812 re-opening. The references are authored
+      // on the CURRENT grid, so if TILE or FLOOR moves again the coordinates stay
+      // put while the canvas changes size, and rects fall off the edge. Deriving
+      // RW/RH from the world constants makes refMap keep hitting identity, which
+      // would otherwise hide that silently: the map would stop resampling and the
+      // art would simply be wrong. This is what fails loudly and says re-author.
+      const w = sp.tiles * TILE;
+      const h = sp.floors * FLOOR;
+      const outside = paint(sp, w, h).filter((r) => r.x < 0 || r.y < 0 || r.x + r.w > w || r.y + r.h > h);
+      expect(outside.map((r) => `${r.x},${r.y} ${r.w}x${r.h} ${r.c}`)).toEqual([]);
+    },
+  );
+
   it("renders the security monitor wall at ONE width, not a split family", () => {
     // Ten monitors, two rows of five, each body authored 7 wide in #0E1420.
     // Edge-derived sizing landed them 8,7,7,7,7 per row, so a regular 2x5 grid

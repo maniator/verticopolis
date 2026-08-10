@@ -2,6 +2,7 @@ import type { Unit } from "../../../engine/types";
 import { ceilingFixture, personHiVis, personSeated, personStanding, roomGlow, SKIN } from "../../pixelSprites/common";
 import { rand, serviceLabel, type DrawCtx } from "../common";
 import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./serviceKit";
+import { FLOOR, TILE } from "../../scale";
 
 /**
  * In-tower service and utility facilities: security, the clinic, housekeeping,
@@ -26,8 +27,8 @@ import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./servic
 
 export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
-  const RW = 8 * 10; // 8 tiles at TILE 10
-  const RH = 45; // 1 floor at FLOOR 45
+  const RW = 8 * TILE;
+  const RH = FLOOR;
   const { F, Fu, sx, sy } = refMap(ctx, x, y, w, h, RW, RH);
   const W = RW;
   const fy = RH - 6;
@@ -70,9 +71,9 @@ export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: num
 
 export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
-  const RW = 16 * 10; // 16 tiles at TILE 10
-  const RH = 45; // 1 floor at FLOOR 45
-  const { F, sx, sy } = refMap(ctx, x, y, w, h, RW, RH);
+  const RW = 16 * TILE;
+  const RH = FLOOR;
+  const { F, Fu, sx, sy } = refMap(ctx, x, y, w, h, RW, RH);
   const W = RW;
   const fy = RH - 6;
   const lamp = roomGlow(d.lit);
@@ -122,7 +123,8 @@ export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: numb
   const cabX = 95, cabW = 21;
   box(F, cabX, fy - 16, cabW, 16, "#F4F4F0");
   const bottles = ["#9FD0C8", "#E8C9A0", "#5db4e8", "#F4A0A0", "#DcE8C0"];
-  for (let r = 0; r < 2; r++) for (let k = 0; k < 5; k++) F(cabX + 1 + k * 4, fy - 14 + r * 7, 3, 4, bottles[k]);
+  // Ten copies of one bottle; /gallery is not at identity and frayed them.
+  for (let r = 0; r < 2; r++) for (let k = 0; k < 5; k++) Fu(cabX + 1 + k * 4, fy - 14 + r * 7, 3, 4, bottles[k]);
   F(cabX, fy - 16, cabW, 1, "#D8D8D0");
   // Wheelchair.
   F(120, fy - 8, 6, 5, "#3A4250");
@@ -140,9 +142,9 @@ export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: numb
 
 export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
-  const RW = 8 * 10; // 8 tiles at TILE 10
-  const RH = 45; // 1 floor at FLOOR 45
-  const { F, sx, sy } = refMap(ctx, x, y, w, h, RW, RH);
+  const RW = 8 * TILE;
+  const RH = FLOOR;
+  const { F, Fu, sx, sy } = refMap(ctx, x, y, w, h, RW, RH);
   const W = RW;
   const fy = RH - 6;
   wallp(F, 0, 0, W, fy, "#D8D0BE", false);
@@ -154,7 +156,7 @@ export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h:
   const linens = ["#F4F0EC", "#CFE0FF", "#F4F0EC", "#E8D8C0"];
   for (let r = 0; r < 3; r++) {
     F(shelfX + 2, 9 + r * 8, shelfW - 4, 1, "#7A664C");
-    for (let k = 0; k < 4; k++) F(shelfX + 2 + k * 6, 10 + r * 8, 5, 5, linens[(k + r) % 4]);
+    for (let k = 0; k < 4; k++) Fu(shelfX + 2 + k * 6, 10 + r * 8, 5, 5, linens[(k + r) % 4]);
   }
   // Teal supply cart with towels and spray bottles, plus its wheels.
   const cartX = 40, cartW = 18;
@@ -182,8 +184,8 @@ export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h:
 
 export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
-  const RW = 20 * 10; // 20 tiles at TILE 10
-  const RH = 2 * 45; // 2 floors at FLOOR 45
+  const RW = 20 * TILE;
+  const RH = 2 * FLOOR;
   const { F, Fu, sx, sy } = refMap(ctx, x, y, w, h, RW, RH);
   const W = RW;
   const H = RH;
@@ -200,7 +202,9 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   for (let px = 6; px < W; px += ribPitch) Fu(px, 12, 1, 1, "#8A8A80");
   F(0, 3, W, 2, "#7A8088");
   F(0, 3, W, 1, "#9AA0A8");
-  for (let px = 6; px < W; px += 14) Fu(px, 2, 2, 4, "#5A6068");
+  // Bracket run on the ribs' derived pitch; a restated 14 ran lopsided.
+  const bracketPitch = ribPitch * 1.4, brackets = Math.floor((W - 12) / bracketPitch) + 1;
+  for (let b = 0; b < brackets; b++) Fu(Math.round(6 + b * bracketPitch), 2, 2, 4, "#5A6068");
   F(0, 7, W, 3, "#565C64");
   F(0, 7, W, 1, "#6A727A");
   // Compactor housing with a peek of sorted waste.
@@ -240,7 +244,9 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   }
   // Baler machine. Its vents and status lamps are inset off their own panels,
   // so each pair sits centered in the plate that carries it.
-  const cx = W - 47, balerW = 42;
+  // Width stops at the gauge channel (W - 6) so the gauge cannot paint over the
+  // baler's right bevel and flatten it.
+  const cx = W - 47, balerW = W - 6 - cx - 1;
   box(F, cx, by - 18, balerW, deck - (by - 18), "#7E828A");
   F(cx + 2, by - 16, 18, 14, "#5A5E66");
   F(cx + 2, by - 16, 18, 1, "#3A3E44");

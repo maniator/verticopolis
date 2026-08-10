@@ -1,6 +1,7 @@
 import type { Unit } from "../../../engine/types";
 import { ACCENTS, rand, shade, type DrawCtx } from "../common";
 import { box, floorb, refMap } from "./serviceKit";
+import { FLOOR, TILE } from "../../scale";
 
 /**
  * The basement garage kinds: a single parking space and the parking ramp.
@@ -20,8 +21,8 @@ import { box, floorb, refMap } from "./serviceKit";
 
 export function drawParking(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
-  const RW = 4 * 10; // 4 tiles at TILE 10
-  const RH = 45; // 1 floor at FLOOR 45
+  const RW = 4 * TILE;
+  const RH = FLOOR;
   const { F } = refMap(ctx, x, y, w, h, RW, RH);
   const W = RW;
   const fy = RH - 6;
@@ -64,8 +65,8 @@ export function drawParking(d: DrawCtx, u: Unit, x: number, y: number, w: number
 // ---- Parking ramp -----------------------------------------------------------
 
 export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: Unit, x: number, y: number, w: number, h: number): void {
-  const RW = 16 * 10; // 16 tiles at TILE 10
-  const RH = 45; // 1 floor at FLOOR 45
+  const RW = 16 * TILE;
+  const RH = FLOOR;
   const { F } = refMap(ctx, x, y, w, h, RW, RH);
   const W = RW;
   // The ramp reads as a raised driving surface via a shaded slab, a dark void
@@ -88,11 +89,10 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: Unit, x: numbe
   const pipeX = 15;
   const pipeW = 131;
   const joists = 10;
-  // Pitch follows the pipe run rather than restating a number, so the joists
-  // stay evenly spaced if the run or the count ever moves. The last joist stops
-  // short of the run's end: spanning it exactly would need a fractional pitch.
-  const joistPitch = Math.floor((pipeW - 1) / (joists - 1));
-  for (let k = 0; k < joists; k++) F(pipeX + k * joistPitch, 5, 1, 2, "#34383E");
+  // Rounded per joist rather than stepped by a fixed pitch, so the run closes
+  // on the pipe's last pixel instead of stopping short of it. Spacing stays
+  // within a pixel of even, which a single integer pitch cannot manage here.
+  for (let k = 0; k < joists; k++) F(pipeX + Math.round((k * (pipeW - 1)) / (joists - 1)), 5, 1, 2, "#34383E");
   F(pipeX, 6, pipeW, 1, "#6C7684");
   F(pipeX, 8, pipeW, 1, "#4A525C");
   for (let k = 0; k < 4; k++) F(36 + k * 29, 4, 1, 2, "#34383E");
