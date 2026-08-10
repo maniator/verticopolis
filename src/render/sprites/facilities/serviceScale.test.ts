@@ -131,7 +131,9 @@ describe("service sprites survive a non-identity reference map", () => {
       [0, 0, 80, 45], [6, 6, 7, 9], [15, 6, 7, 9], [53, 31, 24, 8],
       [71, 13, 1, 2], [0, 0, 1, 1], [79, 44, 1, 1], [3, 7, 5, 13],
     ];
-    for (const [RW, RH] of [[80, 45], [160, 45], [200, 90]] as const) {
+    // Every footprint this file draws, parking's 40 x 45 included: the identity
+    // guarantee is per-caller, so a footprint left out is a footprint unproven.
+    for (const [RW, RH] of [[40, 45], [80, 45], [160, 45], [200, 90]] as const) {
       const a = recorder();
       const b = recorder();
       const fa = refMap(a.ctx, 0, 0, RW, RH, RW, RH);

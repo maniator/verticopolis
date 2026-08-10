@@ -13,7 +13,8 @@ import { shade } from "../common";
  * map is the identity again.
  *
  * Keep it that way. Resampling is fine for a surface and bad for a repeated
- * object: {@link Fill} derives a rect's size from its mapped EDGES, which keeps
+ * object. {@link refMap} returns TWO fills, both of the {@link Fill} type. `F`
+ * derives a rect's size from its mapped EDGES, which keeps
  * tiling seams closed but makes two identically authored objects render at
  * different sizes depending on where their sub-pixel position lands. That is
  * what {@link refMap}'s second fill, `Fu`, exists to prevent, and it is still

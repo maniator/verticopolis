@@ -88,7 +88,10 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: Unit, x: numbe
   const pipeX = 15;
   const pipeW = 131;
   const joists = 10;
-  const joistPitch = 14;
+  // Pitch follows the pipe run rather than restating a number, so the joists
+  // stay evenly spaced if the run or the count ever moves. The last joist stops
+  // short of the run's end: spanning it exactly would need a fractional pitch.
+  const joistPitch = Math.floor((pipeW - 1) / (joists - 1));
   for (let k = 0; k < joists; k++) F(pipeX + k * joistPitch, 5, 1, 2, "#34383E");
   F(pipeX, 6, pipeW, 1, "#6C7684");
   F(pipeX, 8, pipeW, 1, "#4A525C");
