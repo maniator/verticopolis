@@ -1,5 +1,6 @@
 import { FACILITIES } from "./engine/facilities";
 import type { FacilityKind, Unit, UnitState } from "./engine/types";
+import { fitAtGameScale } from "./render/catalogScale";
 import { drawRoom, type RoomCtx } from "./render/pixelSprites";
 
 interface Entry {
@@ -42,11 +43,22 @@ function makeUnit(e: Entry): Unit {
   };
 }
 
-const TILE = 12; // on-screen px per tile, matching the game scale feel
 const COLS = 2;
 const CELL_W = 440;
 const CELL_H = 110;
 const PAD = 14;
+// Rooms draw at the world's own scale, so the page shows what the game shows and
+// any two cells can be compared by eye. A whole multiple of it would be legible
+// but does not fit this row: a cell has to hold the room, the slab under it, and
+// the caption inside CELL_H, and even 2x is taller than the whole cell.
+const MAG = 1;
+/** Where the room box starts inside its cell, and what has to clear underneath
+ *  it: the floor slab, then the caption band. Together these are the room's
+ *  height budget, so a room too tall for them shrinks instead of overprinting
+ *  its own label. */
+const ROOM_TOP = 14;
+const SLAB_H = 4;
+const CAPTION_H = 24;
 
 const canvas = document.getElementById("preview") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
@@ -76,19 +88,21 @@ function frame() {
     const u = makeUnit(e);
     const lit = e.hour >= 17 || e.hour < 6;
     const d: RoomCtx = { ctx, lit, anim, hour: e.hour };
-    const w = Math.min(CELL_W - 28, u.width * TILE);
-    const h = 44;
+    // Size by the facility's own footprint, its floor count included: a cinema
+    // is two floors tall, and drawing it one floor tall squashed art the game
+    // never squashes.
+    const { w, h } = fitAtGameScale(u.width, FACILITIES[e.kind].floors ?? 1, CELL_W - 28, CELL_H - ROOM_TOP - SLAB_H - CAPTION_H, MAG);
     const rx = cx + (CELL_W - 8 - w) / 2;
-    const ry = cy + 14;
+    const ry = cy + ROOM_TOP;
     // Floor slab under the room for context.
     ctx.fillStyle = "#9a9483";
-    ctx.fillRect(rx - 6, ry + h, w + 12, 4);
+    ctx.fillRect(rx - 6, ry + h, w + 12, SLAB_H);
     drawRoom(d, u, rx, ry, w, h);
 
     ctx.fillStyle = "#cdd6e6";
     ctx.font = "12px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(e.label, cx + (CELL_W - 8) / 2, cy + CELL_H - 14);
+    ctx.fillText(e.label, cx + (CELL_W - 8) / 2, cy + CELL_H - CAPTION_H + 10);
     ctx.textAlign = "left";
   });
   requestAnimationFrame(frame);

@@ -2,6 +2,7 @@ import { html, render } from "lit-html";
 import { FACILITIES, GRID } from "./engine/facilities";
 import { CLINIC_SUBTYPES, AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "./engine/retailSubtypes";
 import type { FacilityKind, Transport, Unit, UnitState } from "./engine/types";
+import { fitAtGameScale } from "./render/catalogScale";
 import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites";
 import { pageShell } from "./ui/templates/pageShell";
 import { injectVercelTelemetry } from "./telemetry";
@@ -12,6 +13,18 @@ interface Entry {
   label: string;
   draw(d: DrawCtx, cx: number, cy: number, cw: number, ch: number): void;
 }
+
+/** How much larger than the world a cell may draw. Sprites at world scale are
+ *  too small to judge in a catalog cell, so the page magnifies, and a whole
+ *  multiple is the only magnification that keeps the aspect the game draws at.
+ *  Three is what the cell height affords: a single-floor room at 3x is 3 * FLOOR
+ *  tall, which is the tallest box `CELL_H` can hold under its caption. */
+const MAG = 3;
+
+/** Height reserved at the bottom of every cell for its caption. Rooms are fitted
+ *  into what is left, so a tall footprint shrinks rather than printing over its
+ *  own label. */
+const CAPTION_H = 26;
 
 function makeUnit(kind: FacilityKind, state: UnitState, occupants: number, id = 1, subtype?: string, floorOverride?: number): Unit {
   const f = FACILITIES[kind];
@@ -48,8 +61,9 @@ function roomEntry(
     draw(d, cx, cy, cw, ch) {
       // Size the cell by the facility's own floor count so a genuinely multi-
       // floor kind (cinema, party hall, metro) shows at its true proportion
-      // instead of squished into one floor. Scale the width down to preserve
-      // aspect if the full height would overflow the cell.
+      // instead of squished into one floor. `fitAtGameScale` shrinks the whole
+      // box uniformly when the magnified footprint overflows the cell, so a
+      // room that cannot fit loses size rather than shape.
       const floors = f.floors ?? 1;
       // The metro spans the full lot (GRID.width columns): an aspect so wide that
       // fitting its true width shrinks the tile to nearly nothing and collapses
@@ -57,16 +71,11 @@ function roomEntry(
       // a whole station into whatever box it is handed), so size it by HEIGHT like
       // the other multi-floor rooms and let it fill the cell width.
       const fullLot = f.width >= GRID.width;
-      const tile = fullLot ? 9 * 2.0 : Math.min(9 * 2.0, (cw - 16) / f.width);
-      let w = fullLot ? cw - 16 : f.width * tile;
-      let h = 26 * (tile / 9) * floors;
-      const maxH = ch - 26;
-      if (h > maxH) {
-        if (!fullLot) w *= maxH / h;
-        h = maxH;
-      }
+      const box = fitAtGameScale(f.width, floors, fullLot ? Infinity : cw - 16, ch - CAPTION_H, MAG);
+      const w = fullLot ? Math.max(0, cw - 16) : box.w;
+      const h = box.h;
       const x = cx + (cw - w) / 2;
-      const y = cy + (ch - 26 - h) / 2 + 4;
+      const y = cy + (ch - CAPTION_H - h) / 2 + 4;
       // Floor strip for context.
       const floorU = makeUnit("floor", "occupied", 0, 999);
       drawUnit(d, floorU, x - 6, y, w + 12, h);
@@ -86,8 +95,14 @@ function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
   return {
     label,
     draw(d, cx, cy, cw, ch) {
-      const floorH = Math.min(26 * 1.1, (ch - 26) / (span + 1));
-      const w = f.width * (floorH / 26) * 9 * 1.0;
+      // A shaft is drawn as its span plus the floor it lands on, so it is sized
+      // as a `span + 1` floor footprint and its per-floor pitch falls out of the
+      // fitted box. Same scale as the rooms, so a shaft and a room next to each
+      // other in the catalog are honest about their relative proportions.
+      const floors = span + 1;
+      const box = fitAtGameScale(f.width, floors, cw - 16, ch - CAPTION_H, MAG);
+      const floorH = box.h / floors;
+      const w = box.w;
       const cars = kind.startsWith("elevator") ? 2 : 0;
       const t: Transport = {
         id: 1,
@@ -102,7 +117,7 @@ function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
         load: 1,
       };
       const x = cx + (cw - w) / 2;
-      const topY = cy + (ch - 26 - floorH * (span + 1)) / 2 + 4;
+      const topY = cy + (ch - CAPTION_H - box.h) / 2 + 4;
       // Backing floors so the shaft reads in context.
       for (let i = 0; i <= span; i++) {
         drawUnit(d, makeUnit("floor", "occupied", 0, 500 + i), x - 8, topY + i * floorH, w + 16, floorH);
@@ -166,11 +181,12 @@ const ENTRIES: Entry[] = [
 // sideways on a phone (3 columns wide, 2 on a tablet, 1 on a phone).
 let COLS = 3;
 let CELL_W = 300;
-// Tall enough that even the tallest kind renders at its TRUE proportion, never
-// shrunk to fit: a three-floor metro at full tile is 26 * 2 * 3 = 156px, and the
-// sprite box is `CELL_H - 8 - 26`, so this clears it (200 - 34 = 166 >= 156). The
-// two-floor kinds (cinema, party hall) and every single-floor room sit inside the
-// same box with headroom, so no cell is vertically compressed next to another.
+// Tall enough to hold a single-floor room at the full `MAG` magnification: the
+// sprite box is `CELL_H - 8 - CAPTION_H`, so 200 leaves 166 for a box that wants
+// 3 * FLOOR = 135. Kinds that are wider or taller than that shrink uniformly
+// (`fitAtGameScale`), so they render smaller than their neighbors but never at a
+// proportion the game would not draw. Raising `MAG` without raising this would
+// only mean more kinds shrinking, which buys nothing.
 const CELL_H = 200;
 const PAD = 12;
 const HEADER_H = 48;
