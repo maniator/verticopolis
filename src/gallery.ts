@@ -74,6 +74,11 @@ function roomEntry(
       const box = fitAtGameScale(f.width, floors, fullLot ? Infinity : cw - 16, ch - CAPTION_H, MAG);
       const w = fullLot ? Math.max(0, cw - 16) : box.w;
       const h = box.h;
+      // A cell can measure zero before the container has laid out. The fitter
+      // returns an empty box for that, but drawing it anyway is not harmless:
+      // drawFloor clamps height to at least 1px, so an empty box paints a stray
+      // hairline instead of nothing. Skip the entry entirely.
+      if (w <= 0 || h <= 0) return;
       const x = cx + (cw - w) / 2;
       const y = cy + (ch - CAPTION_H - h) / 2 + 4;
       // Floor strip for context.
@@ -103,6 +108,9 @@ function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
       const box = fitAtGameScale(f.width, floors, cw - 16, ch - CAPTION_H, MAG);
       const floorH = box.h / floors;
       const w = box.w;
+      // Same degenerate-cell guard as the room path above: an empty box must
+      // draw nothing rather than a clamped 1px sliver.
+      if (w <= 0 || box.h <= 0) return;
       const cars = kind.startsWith("elevator") ? 2 : 0;
       const t: Transport = {
         id: 1,
