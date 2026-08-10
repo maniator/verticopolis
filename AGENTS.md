@@ -147,6 +147,23 @@ These rules sit on top of the two test tiers in
   tower shipped for months with no sky lobbies and no express elevators
   because nothing checked `ok`, and it kept passing for the wrong reason.
 
+## Debugging a running game
+
+Before guessing at a performance problem, measure it. The game has a runtime
+debug surface documented in **[DEBUGGING.md](./DEBUGGING.md)**: `?debug=fps`
+brings up a panel with frame cost, the sim-tick split, draw-call and batching
+counters, and the costliest ECS systems, and `window.vcdebug` drives the same
+state from the console. The per-system timings and the draw counters are
+populated by Excalibur every frame whether or not anything reads them, so this
+costs nothing to consult and settles questions ("is it drawing or is it
+motion", "would atlasing help") that are otherwise guesswork.
+
+Two things to know before quoting a number from it: geometry draw
+(`?debug=draw`) renders through the same graphics context, so it inflates the
+draw-call and swap counters it sits next to, and the panel says so when both
+are on. And `p5` frame rate, not instantaneous fps, is the number that tells
+you whether the game stutters.
+
 ## Docker housekeeping: clean up after yourself
 
 Agent runs that spin up Docker (most often the pinned Playwright screenshot

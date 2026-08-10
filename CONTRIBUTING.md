@@ -439,6 +439,7 @@ alone.
 | `src/main.ts` | Composition root: wires input, engine, and the game loop. |
 | `src/tests/` | Vitest fixtures and integration suites (`*.integration.test.ts`); unit tests colocate next to their source. |
 | `e2e/` | Tier-2 Playwright end-to-end specs. |
+| `src/debug/` | The developer debug surface (`?debug=` flags, the metrics HUD, `window.vcdebug`). Lazily imported; see [DEBUGGING.md](./DEBUGGING.md). |
 | `docs/` | Contributor docs, including `screenshots.md`. |
 
 ## License

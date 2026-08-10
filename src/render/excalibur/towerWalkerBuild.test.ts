@@ -4,6 +4,7 @@ import { Tower } from "../../engine/Tower";
 import { landingSegs, segAt, segmentsOf } from "../../engine/tower/segments";
 import { NEEDS_FLOORS } from "../../engine/tower/towerTopology";
 import { buildWalkers, landingTile } from "./towerWalkerBuild";
+import { ACTOR_NAMES } from "./actorNames";
 
 /**
  * Construction of the ambient walker population. This path allocates `ex.Actor`s
@@ -229,5 +230,19 @@ describe("floor and lobby figures stand on one spot", () => {
       expect(w.altTileX).toBe(w.tileX);
       expect(w.tileX).toBe(4); // the run's origin tile
     }
+  });
+});
+
+describe("walker actors carry their debug name", () => {
+  it("names every figure so engine.debug.filter can scope to them", () => {
+    // Excalibur's debug filter matches on actor NAME, and an unnamed actor can
+    // never match a nameQuery, so the filter would silently do nothing without
+    // this. See actorNames.ts and DEBUGGING.md.
+    const units = [];
+    for (let x = 4; x < 40; x++) units.push({ kind: "lobby", floor: 3, x, width: 1 });
+    const e = eng({ units });
+    buildWalkers(e);
+    expect(e.walkers.length).toBeGreaterThan(0);
+    for (const w of e.walkers) expect(w.actor.name).toBe(ACTOR_NAMES.walker);
   });
 });

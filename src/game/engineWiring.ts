@@ -6,6 +6,7 @@ import { classifyGesture, isPaintKind } from "./gesture";
 import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors, clearBuildRefusal } from "./buildPreview";
 import { runFrame, SPEEDS } from "./frameLoop";
 import { applyReducedMotion } from "./audioPrefs";
+import { beginSimTick, endSimTick } from "../debug/simTimer";
 
 /**
  * Engine wiring and post-context-loss engine rebuild, split out of the `GameApp`
@@ -229,6 +230,12 @@ export function wireEngine(app: GameApp): void {
 
   // Per-frame: advance the sim and (throttled) refresh DOM/audio.
   app.engine.onUpdate = (ms) => {
+    // Time the sim tick for the debug HUD. runFrame runs inside Excalibur's
+    // onUpdate, so its cost is folded into `stats.duration.update` and never
+    // reaches `stats.systemDuration`; this is the only place that can separate
+    // sim cost from render cost. Off unless a debug flag switched it on, in
+    // which case this is one boolean read and no clock call (see simTimer.ts).
+    const simStart = beginSimTick();
     // A thrown frame must NEVER escape to Excalibur: its game loop calls
     // stop() on any uncaught exception, which freezes the whole game dead
     // (seen at high speed, where far more sim work runs per frame). Contain it
@@ -251,6 +258,10 @@ export function wireEngine(app: GameApp): void {
         if (app.frameErrors.length > MAX_FRAME_ERRORS) app.frameErrors.shift();
       }
     }
+    // Banked after the guard, so a frame that THREW still reports the time it
+    // burned before throwing. That frame really did cost the player something,
+    // and a HUD that hid it would understate the sim exactly when it is worst.
+    endSimTick(simStart);
   };
 
   // The GPU dropped the WebGL context (mobile browsers reset it under memory

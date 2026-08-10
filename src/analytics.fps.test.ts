@@ -169,4 +169,68 @@ describe("session frame-rate (session_fps)", () => {
     // If the gap had leaked in, `low` would be ~0; it is a clean 30fps.
     expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 30, low: 30, samples: 130 });
   });
+
+  // fpsPercentiles is the read-only accessor the debug HUD polls; the
+  // session_fps flush above reads the same one, so there is a single percentile
+  // implementation rather than two that can drift apart.
+  describe("fpsPercentiles (the live accessor)", () => {
+    it("is null below the minimum sample count", () => {
+      gameplaySession.begin();
+      steady(119, MS60);
+      expect(gameplaySession.fpsPercentiles()).toBeNull();
+    });
+
+    it("reports the same percentiles the session_fps event carries", () => {
+      gameplaySession.begin();
+      steady(130, MS30);
+      expect(gameplaySession.fpsPercentiles()).toEqual({ p50: 30, p5: 30, samples: 130 });
+      gameplaySession.end();
+      expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 30, low: 30, samples: 130 });
+    });
+
+    it("surfaces a hitch in p5 while p50 stays healthy", () => {
+      gameplaySession.begin();
+      steady(200, MS60);
+      // Enough 10fps frames to actually reach the 5th percentile: with 220
+      // samples the p5 index is 11, so fewer than 12 slow frames would sort
+      // below it and p5 would still read a healthy 60.
+      for (let i = 0; i < 20; i++) frame(MS10);
+      expect(gameplaySession.fpsPercentiles()).toEqual({ p50: 60, p5: 10, samples: 220 });
+    });
+
+    it("keeps sampling correctly across a poll", () => {
+      // Deliberately NOT claiming to guard the copying sort. Algorithm R picks
+      // its replacement index uniformly at random and never reads element
+      // order, so an in-place sort would not bias the reservoir and no
+      // black-box test can distinguish the two (verified by mutation: swapping
+      // the copy for an in-place sort leaves every assertion here green). The
+      // copy is side-effect hygiene, not a correctness guard, and pretending
+      // otherwise would be a test that only looks like protection.
+      //
+      // What this DOES pin is the property that matters to a caller: polling
+      // mid-session neither breaks nor freezes later sampling.
+      gameplaySession.begin();
+      steady(130, MS60);
+      expect(gameplaySession.fpsPercentiles()!.p50).toBe(60);
+      for (let i = 0; i < 400; i++) frame(MS30); // keep playing, slower
+      const after = gameplaySession.fpsPercentiles()!;
+      expect(after.samples).toBe(530);
+      expect(after.p50).toBe(30); // the newer, slower frames dominate
+    });
+
+    it("does not consume the one-shot session_fps report", () => {
+      gameplaySession.begin();
+      steady(130, MS60);
+      gameplaySession.fpsPercentiles();
+      gameplaySession.end();
+      expect(sendToRelay).toHaveBeenCalledWith("session_fps", { p50: 60, low: 60, samples: 130 });
+    });
+
+    it("is null again after a reset", () => {
+      gameplaySession.begin();
+      steady(200, MS60);
+      gameplaySession.reset();
+      expect(gameplaySession.fpsPercentiles()).toBeNull();
+    });
+  });
 });

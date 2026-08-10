@@ -1,6 +1,7 @@
 import { telemetryHostAllowed } from "./telemetry";
 import { trackEvent, setCommonProps, type GameplayEvents } from "./analyticsCore";
 import { clearActionLatches } from "./analyticsActions";
+import { FPS_MAX_FRAME_MS, FPS_RESERVOIR, fpsPercentilesOf, type FpsPercentiles } from "./analyticsFps";
 import { onDesktopConsentChange } from "./desktopConsent";
 
 /**
@@ -37,22 +38,6 @@ export {
   trackEmergencyChoice,
 } from "./analyticsActions";
 
-/** Fixed cap on the per-session fps sample reservoir: bounded memory no matter
- *  how long a session runs, large enough for a stable p50/p5. */
-const FPS_RESERVOIR = 256;
-/** Minimum foreground frames before `session_fps` is worth emitting (about two
- *  seconds at 60fps), so a blink-and-leave visit does not report a meaningless
- *  percentile. */
-const FPS_MIN_SAMPLES = 120;
-/** Longest wall-clock gap still treated as one rendered frame (1 second = 1fps).
- *  A gap longer than this is not a slow frame but a loop interruption that did
- *  not route through hide/resume: an in-place WebGL context-loss recovery
- *  (`rebuildEngine`) restarts the render loop while this same page-lifetime
- *  session stays active, so its first frame back would otherwise charge the whole
- *  outage as one sub-1fps sample straight into the worst-frame `low` tail (the
- *  Pixel 8a recovery is exactly #538's scenario). Such a gap re-anchors and is
- *  dropped instead. Realistic device jank down to 1fps is still captured. */
-const FPS_MAX_FRAME_MS = 1000;
 
 /** The cumulative emergency counters the frame loop samples, in the shape the
  *  session banks and reports them. */
@@ -239,6 +224,13 @@ class GameplaySession {
     if (j < FPS_RESERVOIR) this.fpsSamples[j] = fps;
   }
 
+  /** The session's frame-rate percentiles, or null below the minimum sample
+   *  count. The `session_fps` flush in {@link end} reads this too, so the HUD
+   *  and the event cannot disagree. Read-only: safe to poll repeatedly. */
+  fpsPercentiles(): FpsPercentiles | null {
+    return fpsPercentilesOf(this.fpsSamples, this.fpsSeen);
+  }
+
   /** Sample the live tower's cumulative emergency counters, called from the frame
    *  loop. The engine (EventSystem) owns the counters as plain integers and never
    *  imports analytics; the shell reads them here, mirroring how `noteBuild` is
@@ -304,17 +296,23 @@ class GameplaySession {
     }
     // Per-session frame-rate summary, emitted once per session above a minimum
     // sample count. Latched on its own flag (independent of the build depth
-    // above) so a build-free but long session still reports its fps. `low` is the
-    // 5th-percentile fps: sorted ascending, the low tail IS the worst frames, the
-    // hitch signal. The percentiles are computed over the bounded reservoir (so
-    // they are session estimates, not exact), while `samples` is the true
-    // foreground frame count behind them. Rounded to whole fps; PostHog does the
+    // above) so a build-free but long session still reports its fps. The
+    // percentiles come from `fpsPercentiles`, the same accessor the debug HUD
+    // reads, so the two can never disagree; it returns null below the
+    // minimum-samples gate, which is what makes it the whole condition here. The
+    // event keeps calling the 5th percentile `low` (an established property
+    // name in the analytics schema). Rounded to whole fps; PostHog does the
     // exact cross-session percentiles.
-    if (this.fpsSeen >= FPS_MIN_SAMPLES && !this.fpsReported) {
-      this.fpsReported = true;
-      const sorted = [...this.fpsSamples].sort((a, b) => a - b);
-      const at = (p: number) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
-      trackEvent("session_fps", { p50: Math.round(at(0.5)), low: Math.round(at(0.05)), samples: this.fpsSeen });
+    //
+    // The report latch is checked FIRST: `fpsPercentiles` sorts a copy of the
+    // reservoir, and there is no reason to pay for that on the later flushes of
+    // a session that has already reported.
+    if (!this.fpsReported) {
+      const fps = this.fpsPercentiles();
+      if (fps) {
+        this.fpsReported = true;
+        trackEvent("session_fps", { p50: fps.p50, low: fps.p5, samples: fps.samples });
+      }
     }
     // Per-session emergency summary, emitted once per session that actually
     // played (the sampler ran). Unlike the depth/fps events it is NOT gated on

@@ -1,4 +1,5 @@
 import * as ex from "excalibur";
+import { ACTOR_NAMES } from "./actorNames";
 import type { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import type { Unit } from "../../engine/types";
@@ -50,6 +51,7 @@ export function makeGround(engine: TowerEngine): void {
   for (let i = 0; i < segments; i++) {
     const segCx = leftEdge + segW * (i + 0.5);
     const dirt = new ex.Actor({
+      name: ACTOR_NAMES.dirt,
       pos: ex.vec(segCx, 0),
       width: segW + 1, // overlap neighbors by 1px to hide any seam
       height: depth,
@@ -60,6 +62,7 @@ export function makeGround(engine: TowerEngine): void {
     engine.engine.add(dirt);
     engine.engine.add(
       new ex.Actor({
+        name: ACTOR_NAMES.dirt,
         pos: ex.vec(segCx, 0),
         width: segW + 1,
         height: 6,
@@ -89,7 +92,7 @@ export function makeSky(engine: TowerEngine): void {
     cache: false,
     draw: (ctx) => drawSky(engine, ctx),
   });
-  engine.sky = new ex.ScreenElement({ x: 0, y: 0, z: -60 });
+  engine.sky = new ex.ScreenElement({ name: ACTOR_NAMES.sky, x: 0, y: 0, z: -60 });
   engine.sky.graphics.use(engine.skyCanvas);
   engine.engine.add(engine.sky);
 }
@@ -109,7 +112,7 @@ export function makeOverlay(engine: TowerEngine): void {
     cache: false,
     draw: (ctx) => overlayFx.drawOverlay(engine, ctx),
   });
-  engine.overlay = new ex.ScreenElement({ x: 0, y: 0, z: 100 });
+  engine.overlay = new ex.ScreenElement({ name: ACTOR_NAMES.overlay, x: 0, y: 0, z: 100 });
   engine.overlay.graphics.use(engine.overlayCanvas);
   engine.engine.add(engine.overlay);
 }

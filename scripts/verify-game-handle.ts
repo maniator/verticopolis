@@ -57,8 +57,37 @@ if (!tooling && carriers.length > 0) {
       "never ship to players. Check the __TOOLING_BUILD__ gate in bootstrap.ts and the define in vite.config.ts.",
   );
 }
+// The same property, one level down: `window.vcdebug` (see src/debug/) splits
+// into a read-only half that ships everywhere and a MUTATOR half
+// (`vcdebug.unsafe`: set money, set speed, reach the GameApp) gated on the same
+// `import.meta.env.DEV || __TOOLING_BUILD__` condition. The read-only half is
+// deliberately allowed in production, so its presence proves nothing; the
+// mutators are what must never ship, for exactly the reason window.game does
+// not. Detected by the one-time warning string the block logs when it installs:
+// minifiers rewrite identifiers but preserve string CONTENTS, so a literal is
+// the honest thing to assert against. Keep this in sync with UNSAFE_MARKER in
+// src/debug/debugConsole.ts (a drift makes this guard vacuous, so the tooling
+// side below is asserted too, which is what catches the drift).
+const UNSAFE = "[vcdebug] unsafe mutators enabled";
+const unsafeCarriers = files.filter((f) => readFileSync(join(ASSETS, f), "utf8").includes(UNSAFE));
+
+if (tooling && unsafeCarriers.length === 0) {
+  fail(
+    "VC_TOOLING=1 build, but no bundle carries the vcdebug unsafe mutators. Either the gate in " +
+      "src/debug/debugConsole.ts regressed, or UNSAFE_MARKER changed without updating this script " +
+      "(which would leave the production assertion below passing vacuously).",
+  );
+}
+if (!tooling && unsafeCarriers.length > 0) {
+  fail(
+    `production build, but ${unsafeCarriers.join(", ")} still carries the vcdebug unsafe mutators; ` +
+      "setting money and speed from the console must never ship to players. Check the " +
+      "`import.meta.env.DEV || __TOOLING_BUILD__` gate in src/debug/debugConsole.ts.",
+  );
+}
+
 console.log(
   tooling
-    ? `verify-game-handle: tooling build publishes window.game (${carriers.join(", ")})`
-    : `verify-game-handle: production build ships no window.game handle (${files.length} bundles scanned)`,
+    ? `verify-game-handle: tooling build publishes window.game (${carriers.join(", ")}) and the vcdebug mutators (${unsafeCarriers.join(", ")})`
+    : `verify-game-handle: production build ships no window.game handle and no vcdebug mutators (${files.length} bundles scanned)`,
 );

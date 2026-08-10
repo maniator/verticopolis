@@ -214,7 +214,14 @@ export default defineConfig({
         // the game shell: the PWA needs nothing that large, so it stays out
         // of every web player's offline precache (a review catch on the PR
         // that added it).
-        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png"],
+        // `debug-surface*` is the developer debug tree (src/debug/**, see
+        // DEBUGGING.md): a dynamic import that only loads when a `?debug=` flag
+        // or a stored spec asks for it. Precaching it would mean every PWA
+        // install downloads a chunk no player ever executes, so it is excluded
+        // for the same reason as the tooling pages. The chunk's stable name
+        // comes from the `manualChunks` entry below; without that name it built
+        // as `index-<hash>.js`, far too generic to glob safely.
+        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png", "**/debug-surface*"],
         navigateFallback: "index.html",
         // Keep the non-game pages and the real static files out of the app-shell
         // fallback, letting them fall through to the network rather than the game
@@ -313,6 +320,23 @@ export default defineConfig({
           // module ids, but be defensive so the split still holds if a build
           // (e.g. Windows) surfaces backslashes.
           if (id.replace(/\\/g, "/").includes("node_modules/excalibur")) return "vendor-excalibur";
+        },
+        // Name the lazily-imported debug surface's chunk (src/debug/index.ts,
+        // see DEBUGGING.md) so the `**/debug-surface*` globIgnore above can keep
+        // it OUT of the service-worker precache. Under Rollup's default name it
+        // built as `index-<hash>.js`, too generic to glob safely, and every PWA
+        // install downloaded a chunk no player will ever execute.
+        //
+        // Done HERE rather than in `manualChunks` on purpose. Assigning
+        // `src/debug/**` to a manual chunk also severs it from the shared graph:
+        // Rollup then inlined private copies of the analytics stack and
+        // lit-html into it, taking the chunk from 6.7 kB to 26 kB. Renaming
+        // leaves the module graph exactly as Rollup already split it (the
+        // dynamic import in appBoot is the only edge into this tree) and just
+        // gives the resulting chunk a stable, matchable name.
+        chunkFileNames(info) {
+          const facade = info.facadeModuleId?.replace(/\\/g, "/") ?? "";
+          return facade.endsWith("/src/debug/index.ts") ? "assets/debug-surface-[hash].js" : "assets/[name]-[hash].js";
         },
       },
     },
