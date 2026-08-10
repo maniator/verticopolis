@@ -1,20 +1,24 @@
 import { shade } from "../common";
 
 /**
- * Shared drawing idioms for the ported utilities-and-service looks. The Figma
- * reference build scripts authored each tile against a footprint of TILE 11 by
- * FLOOR 44, and {@link refMap} maps that reference space onto the actual screen
- * rect.
+ * Shared drawing idioms for the ported utilities-and-service looks.
+ * {@link refMap} maps a sprite's reference composition onto the screen rect it
+ * is handed.
  *
- * That footprint is HISTORY, not the current scale. The world moved to TILE 10
- * by FLOOR 45 to match the 1994 original's 4.5 tiles per floor, so no caller
- * reaches `refMap`'s identity any more and every rect is resampled. Resampling
- * is fine for a surface and bad for a repeated object: {@link Fill} derives a
- * rect's size from its mapped EDGES, which keeps tiling seams closed but makes
- * two identically authored objects render at different sizes depending on where
- * their sub-pixel position lands. That is what {@link refMap}'s second fill,
- * `Fu`, exists to prevent. Re-authoring these references on the 10 by 45 grid is
- * tracked as issue #812 and belongs to the room-art pass.
+ * The Figma reference build scripts originally authored each tile against TILE
+ * 11 by FLOOR 44. The world then moved to TILE 10 by FLOOR 45 to match the 1994
+ * original's 4.5 tiles per floor, which knocked every caller off identity and
+ * resampled every rect. The references were re-authored onto 10 by 45 (issue
+ * #812), so each caller's `RW`/`RH` is now its true on-screen footprint and the
+ * map is the identity again.
+ *
+ * Keep it that way. Resampling is fine for a surface and bad for a repeated
+ * object: {@link Fill} derives a rect's size from its mapped EDGES, which keeps
+ * tiling seams closed but makes two identically authored objects render at
+ * different sizes depending on where their sub-pixel position lands. That is
+ * what {@link refMap}'s second fill, `Fu`, exists to prevent, and it is still
+ * the right fill for a repeated object because it holds one size for one
+ * authored size at any scale.
  */
 
 /** Paint one reference-space rectangle. Coordinates are in the reference tile

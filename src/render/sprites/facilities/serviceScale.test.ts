@@ -7,18 +7,20 @@ import { drawParking, drawParkingRamp } from "./garage";
 import { drawSecurity, drawMedical, drawHousekeeping, drawRecycling } from "./service";
 
 /**
- * The service sprites are authored in a reference space (TILE 11 by FLOOR 44)
- * that the world no longer uses, so `refMap` resamples every rect. Resampling is
- * acceptable; resampling INCONSISTENTLY is not. When a rect's size is derived
- * from its mapped edges, two identically authored objects land at different
- * sizes depending on where their sub-pixel position falls, and a wall of
- * monitors renders 8,7,7,7,7 instead of five of a kind.
+ * The service sprites were once authored in a reference space (TILE 11 by
+ * FLOOR 44) that the world no longer uses, so `refMap` resampled every rect.
+ * Resampling is acceptable; resampling INCONSISTENTLY is not. When a rect's size
+ * is derived from its mapped edges, two identically authored objects land at
+ * different sizes depending on where their sub-pixel position falls, and a wall
+ * of monitors renders 8,7,7,7,7 instead of five of a kind.
  *
  * Nothing covered this family before, which is why a P1 shipped inside a diff of
  * three constants (issue #812). These guards are about UNIFORMITY, not beauty.
- * Pitch is deliberately not asserted: the security wall's five monitors span
- * 37px after mapping and 37 does not divide into four equal gaps, so an even
- * pitch is unreachable at this scale and is left to the room-art pass.
+ * Even PITCH is now reachable too: the references were re-authored onto the live
+ * 10 by 45 grid, so the security wall's five monitors are 7 wide on a 9 pitch
+ * and the gaps between them are all 2. Pitch still is not asserted here, because
+ * an assertion on it would pin one art choice rather than the renderer, and the
+ * pitch is only even because a whole number of them fits the authored wall.
  */
 
 /** Records fillRect geometry. A Proxy absorbs every other context call, which
@@ -62,9 +64,11 @@ const SPRITES = [
   { name: "recycling", tiles: 20, floors: 2, draw: (c: CanvasRenderingContext2D, w: number, h: number) => drawRecycling(dc(c), UNIT, 0, 0, w, h) },
 ];
 
-/** The footprint each reference was drawn against, kept as literals on purpose:
- *  they are history, and pinning them to the live constants would hide the very
- *  drift this file guards. */
+/** The RETIRED footprint the references used to be drawn against, kept as
+ *  literals on purpose: they are history, and pinning them to the live constants
+ *  would hide the very drift this file guards. Painting at this size is now a
+ *  deliberately off-identity scale, which is exactly what the count guard below
+ *  wants to exercise. */
 const REF_TILE = 11;
 const REF_FLOOR = 44;
 
@@ -76,7 +80,7 @@ function paint(sp: (typeof SPRITES)[number], w: number, h: number) {
 
 describe("service sprites survive a non-identity reference map", () => {
   it("renders the security monitor wall at ONE width, not a split family", () => {
-    // Ten monitors, two rows of five, each body authored 8 wide in #0E1420.
+    // Ten monitors, two rows of five, each body authored 7 wide in #0E1420.
     // Edge-derived sizing landed them 8,7,7,7,7 per row, so a regular 2x5 grid
     // read broken. Selecting by the body color pins the monitors themselves
     // rather than whatever else happens to share a width.
@@ -108,9 +112,11 @@ describe("service sprites survive a non-identity reference map", () => {
   });
 
   it.each(SPRITES.map((s) => [s.name, s] as const))(
-    "%s draws the same rect count at the shipped scale as at the reference",
+    "%s draws the same rect count at the shipped scale as at the retired one",
     (_name, sp) => {
-      // Nothing may be dropped or invented by the map, only resized.
+      // Nothing may be dropped or invented by the map, only resized. The shipped
+      // scale is now identity, so this compares it against the old 11 by 44
+      // footprint to keep an off-identity case under the guard.
       const ref = paint(sp, sp.tiles * REF_TILE, sp.floors * REF_FLOOR);
       const now = paint(sp, sp.tiles * TILE, sp.floors * FLOOR);
       expect(now.length).toBe(ref.length);
@@ -119,13 +125,13 @@ describe("service sprites survive a non-identity reference map", () => {
 
   it("paints identically through both fills at the authored footprint", () => {
     // The proof that the uniform fill corrected the MAP rather than redrawing
-    // art. At identity the two sizing rules must agree exactly, so any sprite
-    // still rendered at its authored footprint is untouched by this change.
+    // art. At identity the two sizing rules must agree exactly, and every sprite
+    // now ships at its authored footprint, so this is the case they all run in.
     const probe: Array<[number, number, number, number]> = [
-      [0, 0, 88, 44], [6, 6, 8, 9], [16, 6, 8, 9], [58, 30, 26, 8],
-      [79, 13, 1, 2], [0, 0, 1, 1], [87, 43, 1, 1], [3, 7, 5, 13],
+      [0, 0, 80, 45], [6, 6, 7, 9], [15, 6, 7, 9], [53, 31, 24, 8],
+      [71, 13, 1, 2], [0, 0, 1, 1], [79, 44, 1, 1], [3, 7, 5, 13],
     ];
-    for (const [RW, RH] of [[88, 44], [176, 44], [220, 88]] as const) {
+    for (const [RW, RH] of [[80, 45], [160, 45], [200, 90]] as const) {
       const a = recorder();
       const b = recorder();
       const fa = refMap(a.ctx, 0, 0, RW, RH, RW, RH);
