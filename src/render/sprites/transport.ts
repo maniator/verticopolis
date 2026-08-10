@@ -89,12 +89,14 @@ export function drawTransport(
       const label = num >= 1 ? String(num) : `B${1 - num}`;
       const lx = sx + w / 2;
       const ly = fy + floorH / 2;
-      // A dark drop-shadow behind a brighter glyph so the number reads on any
-      // shaft tint (standard/service/express all darken to near-black, where a
-      // faint fill washed out at the small font a tall tower uses).
-      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      // A dark drop-shadow behind a NEAR-WHITE glyph so the number reads on any
+      // shaft tint. Standard and service shafts darken to near-black and express
+      // is a semi-transparent glass, and at the small bold font a tall tower
+      // uses, the old 0.62 white washed out to an unreadable gray against the
+      // dark backing; a bright glyph over a firmer shadow is what makes it read.
+      ctx.fillStyle = "rgba(0,0,0,0.78)";
       ctx.fillText(label, lx + 1, ly + 1);
-      ctx.fillStyle = "rgba(255,255,255,0.62)";
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
       ctx.fillText(label, lx, ly);
     }
     // Machine housings cap the shaft top and bottom (where the extend-taller
