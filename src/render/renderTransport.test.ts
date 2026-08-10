@@ -117,10 +117,11 @@ describe("elevator floor-number legibility", () => {
     // The shadow sits one pixel down-right of the glyph, and is a dark fill.
     expect(shadow!.x).toBe(glyph!.x + 1);
     expect(shadow!.y).toBe(glyph!.y + 1);
-    expect(alphaOf(shadow!.style)).toBeCloseTo(0.55);
-    // The glyph is far brighter than the old faint 0.28 fill, so it reads on
-    // the near-black shaft (regression guard against dropping back to a wash).
-    expect(alphaOf(glyph!.style)).toBeGreaterThanOrEqual(0.5);
+    expect(alphaOf(shadow!.style)).toBeCloseTo(0.78);
+    // The glyph is near-white, not the old dim 0.62 gray that washed out on the
+    // near-black shaft (the reported "unreadable" bug). Regression guard against
+    // dropping the brightness back down to a wash.
+    expect(alphaOf(glyph!.style)).toBeGreaterThanOrEqual(0.85);
   });
 
   it("labels every served floor and skips express skip-floors", () => {
