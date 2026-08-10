@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.25.2
+
+- Elevator floor numbers now scale with the zoom level instead of looking oversized when zoomed out, and they no longer flicker as elevator cars pass a floor.
+
 ## 2.25.1
 
 - Elevator floor numbers now stay crisp at every zoom level and on high-resolution phone screens, where they could look doubled or smeared before.
