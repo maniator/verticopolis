@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.24.0
+
+- Floors and rooms now sit at the proportions of the 1994 game this one is modeled on: a floor is half a tile taller for its width than before. Towers read a little narrower and taller, and an elevator car is no longer square.
+
 ## 2.23.0
 
 - The Privacy section in Help now spells out what the game counts and how those counts travel, and says plainly that a crash report can occasionally quote a bit of game text, such as a tower's name.

@@ -75,7 +75,12 @@ const Z_PLANT = -46;
 // line: blades rise above it, a soil lip hangs just below.
 const STRIP_ABOVE = 7;
 const STRIP_BELOW = 4;
-const STRIP_MAX_SEG = 1800; // stay under the 2048 mobile texture cap
+/** Longest strip canvas in world px, under the 2048 mobile texture cap. Strips
+ *  past this split into `ceil(total / STRIP_MAX_SEG)` segments, so the SEGMENT
+ *  COUNT moves with `TILE`: a smaller tile shortens every strip and can drop a
+ *  segment. Exported so tests derive that count rather than hardcode one that
+ *  quietly rots the next time the world scale changes. */
+export const STRIP_MAX_SEG = 1800;
 
 const PAVE = "#b0b0a8";
 const PAVE_JOINT = "#8a8a82";

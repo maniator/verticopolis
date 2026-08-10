@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { FLOOR } from "../src/render/scale";
 
 /**
  * Regression coverage for the mobile multi-touch bugs fixed in 1.18.2: pinch
@@ -259,13 +260,16 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
 });
 
 /** True camera zoom (screen px per world px): the on-screen height of one floor
- *  divided by its world height (FLOOR = 44). */
+ *  divided by its world height. The divisor is the real `FLOOR`, passed in, not
+ *  a literal: it was hardcoded to 44 and silently became wrong when the world
+ *  scale moved to 45, leaving the helper returning a zoom 2.3% high while its
+ *  assertions still passed. */
 async function trueZoom(page: import("@playwright/test").Page): Promise<number> {
-  return page.evaluate(() => {
+  return page.evaluate((floorPx) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const e = (window as any).game.engine;
-    return Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2)) / 44;
-  });
+    return Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2)) / floorPx;
+  }, FLOOR);
 }
 
 /** Drive one pinch-OUT gesture (fingers start far apart, close toward the

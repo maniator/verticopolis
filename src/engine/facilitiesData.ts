@@ -303,9 +303,12 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     category: "transport",
     name: "Standard Elevator",
     // Canon footprint: 4 tiles, the same as the service elevator (a service
-    // elevator is a staff-only standard elevator, not a reduced one). The
-    // render floor height is 4 tiles (44px) so the car reads square, as in
-    // the original.
+    // elevator is a staff-only standard elevator, not a reduced one). The car
+    // draws 4 tiles wide against a floor 4.5 tiles tall, so it is TALLER than
+    // it is wide, as the original's is: measured off a retail render, its car
+    // is 32 x 36. An earlier note here claimed a floor was 4 tiles (44px) and
+    // the car therefore square; both were wrong, and `render/scale.test.ts`
+    // now pins the real proportion.
     width: 4,
     cost: 200000,
     minStar: 1,

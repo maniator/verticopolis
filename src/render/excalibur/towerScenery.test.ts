@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import * as ex from "excalibur";
 import { Simulation } from "../../engine/Simulation";
 import { newSeededGame } from "../../tests/fixtures/towerFixtures";
-import { apronRange, plantSpots, plantVisible, skylineRects } from "../sceneryLayout";
-import { syncScenery } from "./towerScenery";
+import { apronRange, plantSpots, plantVisible, ROUNDABOUT_START, skylineRects } from "../sceneryLayout";
+import { GRID } from "../../engine/facilities";
+import { TILE } from "../scale";
+import { STRIP_MAX_SEG, syncScenery } from "./towerScenery";
 import type { TowerEngine } from "./TowerEngine";
 
 /**
@@ -21,10 +23,17 @@ import type { TowerEngine } from "./TowerEngine";
  *  skyline tuning cannot stale this comment. */
 const SEED = 4400;
 
-/** Static actors makeScenery adds once: the left plaza (sidewalk, roundabout,
- *  fountain, 2 lamps, 3 road segments), the right street (forecourt, sidewalk,
- *  road, street lamp, planter), and 3 ground-strip segments. */
-const STATIC_ACTORS = 16;
+/** Static actors makeScenery adds once, with the two segmented strips DERIVED.
+ *  Ten are fixed: the left plaza (sidewalk, roundabout, fountain, 2 lamps) and
+ *  the right street (forecourt, sidewalk, road, street lamp, planter). The plaza
+ *  road and the lot's ground strip each split into texture-safe segments whose
+ *  count falls out of `TILE`, so they are computed here exactly as
+ *  `towerScenery` computes them. Pinning a literal went stale the moment the
+ *  world scale moved: TILE 11 -> 10 shortened both strips and dropped one. */
+const FIXED_ACTORS = 10;
+const ROAD_SEGMENTS = Math.ceil(((ROUNDABOUT_START + GRID.width) * TILE) / STRIP_MAX_SEG);
+const GROUND_SEGMENTS = Math.ceil((GRID.width * TILE) / STRIP_MAX_SEG);
+const STATIC_ACTORS = FIXED_ACTORS + ROAD_SEGMENTS + GROUND_SEGMENTS;
 
 // happy-dom canvases have no 2d context, which excalibur's Raster requires at
 // construction (bootstrap.test.ts stubs the same seam). A permissive Proxy

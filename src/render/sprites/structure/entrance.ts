@@ -198,10 +198,15 @@ export function drawGrandCompact(d: DrawCtx, x: number, y: number, w: number, h:
   const lc = Math.floor(w / 2); // local center column
   // Sky + skyline.
   R(0, 0, w, 10, lit ? "#2A3350" : "#AFC8DE");
+  // Blocks are 3 wide on a 4px pitch. Clamp the last one to the canvas instead
+  // of letting it run past: at an 11px tile the final block started at 8 and
+  // ended exactly on the edge, but at 10px it overhung by a column and left a
+  // notch of raw sky where the block was cut.
   for (let bx = 0, bi = 0; bx < w; bx += 4, bi++) {
     const bh = 3 + ((bi * 3) % 4);
-    R(bx, 10 - bh, 3, bh, lit ? "#1E2740" : "#7EA0C0");
-    if (lit) R(bx + 1, 10 - bh + 1, 1, 1, "#F3D08A");
+    const bw = Math.min(3, w - bx);
+    R(bx, 10 - bh, bw, bh, lit ? "#1E2740" : "#7EA0C0");
+    if (lit && bw > 1) R(bx + 1, 10 - bh + 1, 1, 1, "#F3D08A");
   }
   R(0, 10, w, 1, "#3A4658");
   // Gold cornice cap matching the concourse ceiling line (drawLobbyTile).
@@ -243,9 +248,14 @@ export function drawGrandCompact(d: DrawCtx, x: number, y: number, w: number, h:
   R(1, fy - 8, 1, 5, "#6A5240"); // trunk
   R(0, fy - 12, 3, 4, "#4E7A3E"); // fronds
   R(1, fy - 14, 1, 2, "#4E7A3E"); // top frond
-  // Doorman on the carpet just right of the doors. lc + 3 keeps his 2px sway
-  // frame inside the 11px tile (lc + 4 would clip his rightmost column at x=11).
-  if (d.staffed !== false) drawDoorman(ctx, Math.round(x + lc + 3), y + h - 4, anim);
+  // Doorman on the carpet just right of the doors. He is 2px wide and sways 1px
+  // right, so his rightmost column is baseX + 2 and baseX must stay at or under
+  // w - 3. `lc + 3` alone assumed an 11px tile, where it landed exactly on the
+  // limit; at a 10px tile it ran a column off the canvas and clipped his sway
+  // frame. Deriving the bound from `w` keeps the old placement at 11 and pulls
+  // him in wherever the tile is narrower.
+  const doormanX = Math.min(lc + 3, w - 3);
+  if (d.staffed !== false) drawDoorman(ctx, Math.round(x + doormanX), y + h - 4, anim);
 }
 
 /**
@@ -256,7 +266,7 @@ export function drawGrandCompact(d: DrawCtx, x: number, y: number, w: number, h:
  * No glow, no doorman, no reflection: staff-only, quiet, but with enough
  * ornament to feel like a real detail rather than a shrunken grand entrance.
  */
-export function drawServiceEntrance(ctx: CanvasRenderingContext2D, x: number, y: number, _w: number, h: number): void {
+export function drawServiceEntrance(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
   // Door on the left half of the tile so the plant + plate can share the right
   // half. Same top / bottom rows as the grand door so the two entrances read
   // as living on the same ground plane.
@@ -321,7 +331,13 @@ export function drawServiceEntrance(ctx: CanvasRenderingContext2D, x: number, y:
   // Potted plant beside the door: brass/copper pot with a green shrub, the
   // same shrub language the sky-lobby planter uses so plants read as one
   // family across the concourse. Sits on the polished floor above the carpet.
-  const potCx = x + 8;
+  // The pot is 5px wide drawn from potCx - 2, so its rightmost column is
+  // potCx + 2 and potCx must stay at or under w - 3. A flat `x + 8` assumed an
+  // 11px tile, where it sat exactly on the limit; at 10px it lost the pot's
+  // right edge. This holds the old position at 11 and slides it in when the
+  // tile is narrower. (The width parameter was `_w`, unused, which is how the
+  // assumption went unnoticed.)
+  const potCx = x + Math.min(8, w - 3);
   const potY = y + h - 9;
   ctx.fillStyle = "#8a6a30"; // brass pot
   ctx.fillRect(potCx - 2, potY, 5, 4);
