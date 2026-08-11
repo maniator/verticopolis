@@ -95,11 +95,10 @@ don't claim a skill was invoked:
 
 > **Maintainer note: why there is no `.github/skills` review skill.** Copilot
 > code review *can* load agent skills from `.github/skills/`, but this repo
-> commits the full BMGD/BMAD skill library under `.claude/skills/` and
-> `.agents/skills/` (~515 files each). Copilot's skill loader has a ~508-file
-> budget those trees blow past, so it drops **all** base-branch skills for safety.
-> A `.github/skills/code-review` skill can't load here. The reviewer's run log
-> states it outright:
+> commits the full BMGD/BMAD skill library, 515 files, and Copilot's skill
+> loader has a ~508-file budget that one tree already blows past. It responds by
+> dropping **all** base-branch skills for safety, so a `.github/skills/code-review`
+> skill can't load here. The reviewer's run log states it outright:
 >
 > ```
 > [skills] Materialization aborted (convention .claude/skills has 515 files,
@@ -111,8 +110,14 @@ don't claim a skill was invoked:
 >
 > This overlay is the mechanism by design; don't re-add a review skill expecting
 > it to load. (Investigated 2026-07-06: verticopolis ships both the `bmad-*` and
-> `gds-*` families, ~515 files per convention; a bmad-only install lands ~256,
-> under budget.)
+> `gds-*` families, ~515 files; a bmad-only install lands ~256, under budget.)
+>
+> The tree used to be committed twice, as `.claude/skills/` and `.agents/skills/`
+> at 515 files each. That duplicate is gone: `.agents/skills/` holds the only
+> copy and `.claude/skills` is a symlink to it. The file count per convention is
+> unchanged, so this note still applies and the loader still drops the skills.
+> Getting under the budget needs the library itself trimmed, which is tracked
+> separately.
 
 ## Code review
 

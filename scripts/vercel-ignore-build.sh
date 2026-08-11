@@ -40,6 +40,7 @@ if git diff --quiet "$base" HEAD -- . \
   ':(exclude)docs' \
   ':(exclude)_bmad' \
   ':(exclude)_bmad-output' \
+  ':(exclude).agents' \
   ':(exclude).claude' \
   ':(exclude).github' \
   ':(exclude)e2e' \

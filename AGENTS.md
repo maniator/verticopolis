@@ -22,10 +22,19 @@ human, and grammatically correct.
 
 This repo has **BMAD-METHOD** (BMM core + CIS + BMGD) installed. Default to its
 agents and workflows for anything beyond a one-line tweak: planning, design,
-building, and review. The skills are available to **both Claude Code**
-(`.claude/skills/`, invoke as `/bmad-*` / `/gds-*` / `/bmad-cis-*`) **and GitHub
-Copilot** (`.agents/skills/` + custom agents in `.github/agents/*.agent.md`).
-When unsure where to start, run **`bmad-help`** and let it route you.
+building, and review. The skills are available to **both Claude Code** (invoke
+as `/bmad-*` / `/gds-*` / `/bmad-cis-*`) **and GitHub Copilot** (plus the custom
+agents in `.github/agents/*.agent.md`). When unsure where to start, run
+**`bmad-help`** and let it route you.
+
+**One tree, two paths.** The skills live once, in `.agents/skills/`.
+`.claude/skills` is a committed symlink to it, because Claude Code only
+discovers project skills under `.claude/skills/` and Copilot's agent files
+address them as `.agents/skills/`. Edit files under `.agents/skills/`; never
+re-add a second physical copy. On Windows, clone with symlink support enabled
+(`git clone -c core.symlinks=true`, which needs Developer Mode or an elevated
+shell) or Git writes `.claude/skills` as a text file and Claude Code will find
+no project skills.
 
 Follow the lifecycle; each phase feeds the next. Don't jump to code for a
 feature that hasn't been specced; don't spec when a quick fix will do.
