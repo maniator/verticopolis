@@ -1,7 +1,7 @@
 import type { Unit } from "../../engine/types";
 import { visibleOccupants } from "../../engine/Crowd";
 import { PAL, SKIN, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, shade, vacancy, windowView, type RoomCtx } from "./common";
-import { artRow, artUnits, screenLength } from "./artScale";
+import { artRow, authoredWidth, screenLength } from "./artScale";
 import { bevelBox, ceilingCap, curtain, downlights, fill, framedArt, glow, interiorWall, plankFloor } from "./dollhouse";
 import { CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, SUITE_WALLS } from "./residential.looks";
 import { ROACH_AMBER, ROACH_CHESTNUT, drawRoach } from "./residential.roaches";
@@ -103,7 +103,7 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
       // the tile, so sizing the table on screen and counting its chairs in
       // authored units would credit a capped table with 66 authored pixels and
       // seat a sixth worker the room was never drawn to hold.
-      const atw = Math.min(Math.round(artUnits(w) * 0.6), 60);
+      const atw = Math.min(Math.round(authoredWidth(u.width) * 0.6), 60);
       const tw = Math.round(screenLength(atw));
       const tx = x + Math.round((w - tw) / 2);
       fill(ctx, tx, floorY, tw, 1, "#000000", 0.16);
@@ -116,7 +116,7 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
       // chair when the tile narrowed, and the fifth worker present went undrawn
       // with it. A table too short for a chair seats none, which is what the
       // per-chair fit check used to do.
-      const chairs = artRow(atw - 3 - 6, tx + 3, tx + tw - 6, 11);
+      const chairs = artRow(atw - 3 - 6, tx + 3, tx + tw - 6, 11, 1, 6);
       const seated = Math.min(filled, chairs.length);
       chairs.forEach((sx, i) => {
         fill(ctx, sx - 1, floorY - 12, 7, 5, "#3A3F4A"); // high-back chair
@@ -169,7 +169,7 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
       // pitch to compress.
       const start = x + 7;
       const last = x + w - 2 - 18; // the furthest a desk can start and still fit
-      const count = Math.max(1, Math.floor((artUnits(w) - 12) / 22));
+      const count = Math.max(1, Math.floor((authoredWidth(u.width) - 12) / 22));
       const slot = count > 1 ? Math.min(22, (last - start) / (count - 1)) : 22;
       const plantDesk = geoVariant(u, 2, count);
       const seated = Math.min(count, filled);

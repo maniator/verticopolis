@@ -1,6 +1,6 @@
 import type { Unit } from "../../engine/types";
 import { busyStations, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
-import { artRow, artUnits } from "./artScale";
+import { artRow, authoredWidth } from "./artScale";
 
 /**
  * Modern Daycare art: a bright, cheerful playroom with a soft play mat, a toy
@@ -55,7 +55,7 @@ export function daycare(d: RoomCtx, u: Unit, x: number, y: number, w: number, h:
   // its screen size, but its AUTHORED width is what decides how many children it
   // seats, so that is worked out separately and handed to the row.
   const matX0 = x + 3, matX1 = x + Math.round(w * 0.62);
-  const matArtW = Math.round(artUnits(w) * 0.62) - 3;
+  const matArtW = Math.round(authoredWidth(u.width) * 0.62) - 3;
   for (let mx = matX0, k = 0; mx + 4 < matX1; mx += 5, k++) {
     ctx.fillStyle = shade(MAT[(k + seed) % MAT.length], -8);
     ctx.fillRect(mx, floorY - 2, 5, 2);
@@ -85,7 +85,7 @@ export function daycare(d: RoomCtx, u: Unit, x: number, y: number, w: number, h:
   // the tile it was drawn for and stepped at the current one. Read off the mat's
   // pixel width the room lost two places when the tile narrowed, and two
   // children who were in the room went undrawn.
-  const places = artRow(matArtW - 3 - 4, matX0 + 3, matX1 - 4, 6);
+  const places = artRow(matArtW - 3 - 4, matX0 + 3, matX1 - 4, 6, 1, 3);
   // Who is sitting where: the hash scatters them, the occupancy says how many.
   // The old loop counted a hash-skipped place against the occupancy as if a
   // child were there, so a room with five children could show two.

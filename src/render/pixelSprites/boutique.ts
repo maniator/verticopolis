@@ -1,6 +1,6 @@
 import type { Unit } from "../../engine/types";
 import { castShadow, hash, personSeated, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
-import { artRow, artUnits } from "./artScale";
+import { artRow, authoredWidth } from "./artScale";
 
 /**
  * Modern Boutique Bay art: a bay of small independent trades (florist, barber,
@@ -263,7 +263,7 @@ export function boutiqueBay(d: RoomCtx, u: Unit, x: number, y: number, w: number
   // one-customer bay as two figures, a ghost, which is the failure the honest
   // occupancy rule forbids in the other direction.
   const seatedClient = occ > 0 && (look.trade === "barber" || look.trade === "tattoo") ? 1 : 0;
-  const spots = artRow(artUnits(w) - 7 - 3, x + w - 7, x + 3, 7, -1);
+  const spots = artRow(authoredWidth(u.width) - 7 - 3, x + w - 7, x + 3, 7, -1, 6);
   // Floored to match every other row: a forged fractional count must not round
   // a customer into existence.
   const browsing = Math.min(Math.max(0, Math.floor(occ) - seatedClient), spots.length);

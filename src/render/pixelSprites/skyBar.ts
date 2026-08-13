@@ -1,6 +1,6 @@
 import type { Unit } from "../../engine/types";
 import { busyStations, hash, personSeated, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
-import { artRow, artUnits } from "./artScale";
+import { artRow, authoredWidth } from "./artScale";
 
 /**
  * Modern Sky Bar art: a warm rooftop cocktail lounge at dusk, its back wall a big
@@ -78,8 +78,8 @@ export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   // two lengths read as what they are. It restates `barW`'s 3px insets in the
   // authored scale rather than deriving them, so moving `barW` means moving
   // this too.
-  const counterArtW = artUnits(w) - 6;
-  const stools = artRow(counterArtW - 3 - 9, barX + 3, barX + barW - 9, 7);
+  const counterArtW = authoredWidth(u.width) - 6;
+  const stools = artRow(counterArtW - 3 - 9, barX + 3, barX + barW - 9, 7, 1, 6);
   // Which stools are taken: the occupancy says how many, the seed says which.
   // The old loop counted a hash-skipped stool against the occupancy as if
   // someone had sat there, so a bar with five patrons could show two.

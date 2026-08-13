@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 2.27.0
 
-- Busy rooms show everyone in them again, instead of quietly leaving a few people undrawn.
+- Busy rooms fill their seats again. Several had quietly stopped using their last few, and left the people at them undrawn.
 
 ## 2.25.2
 

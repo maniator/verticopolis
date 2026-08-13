@@ -1,6 +1,6 @@
 import type { Unit } from "../../engine/types";
 import { busyStations, castShadow, personSeated, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
-import { artRow, artUnits } from "./artScale";
+import { artRow, authoredWidth } from "./artScale";
 
 /**
  * Modern Fitness Club art: a members' gym in one of five formats (a weight
@@ -77,7 +77,7 @@ function drawWeights(ctx: CanvasRenderingContext2D, x: number, floorY: number, w
   castShadow(ctx, bX, floorY, 14);
 }
 
-function drawYoga(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, look: FitnessLook, occ: number, seed: number): void {
+function drawYoga(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, aw: number, look: FitnessLook, occ: number, seed: number): void {
   // A calm studio: mats laid on the floor, standing figures mid-pose, a plant.
   // Mat anchors: the 12px pitch is authored art, counted at the tile it was
   // drawn for and stepped at the current one. Read off the room's pixel width
@@ -88,7 +88,7 @@ function drawYoga(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   // Floored, so a forged save carrying a fractional count cannot round a member
   // into existence here when the other rows would round one away.
   const members = Math.max(0, Math.floor(occ));
-  artRow(artUnits(w) - 5 - 14, x + 5, x + w - 14, 12).forEach((mx, i) => {
+  artRow(aw - 5 - 14, x + 5, x + w - 14, 12, 1, 9).forEach((mx, i) => {
     ctx.fillStyle = i % 2 === 0 ? look.accent : shade(look.accent, 30); // rolled/laid mats
     ctx.fillRect(mx, floorY - 2, 9, 2);
     if (i < members) personStanding(ctx, mx + 2, floorY - 1, seed + i * 7);
@@ -101,14 +101,14 @@ function drawYoga(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   ctx.fillRect(pX, floorY - 9, 4, 5);
 }
 
-function drawSpin(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, look: FitnessLook, occ: number, seed: number): void {
+function drawSpin(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, aw: number, look: FitnessLook, occ: number, seed: number): void {
   // A dim room of stationary bikes lit by an accent glow, riders on some.
   ctx.fillStyle = shade(look.accent, -30); // floor light wash
   ctx.fillRect(x + 2, floorY - 1, w - 4, 1);
   // Bike anchors: the 8px pitch is authored art, counted at the tile it was
   // drawn for and stepped at the current one, so a narrower tile tightens the
   // row instead of wheeling a bike out of the studio.
-  const bikes = artRow(artUnits(w) - 5 - 9, x + 5, x + w - 9, 8);
+  const bikes = artRow(aw - 5 - 9, x + 5, x + w - 9, 8, 1, 6);
   // Which bikes have riders: the hash scatters them, the occupancy says how
   // many. Rolling the hash per bike left riders who were in the class undrawn,
   // so a full studio could show a handful of people on twenty bikes.
@@ -172,15 +172,18 @@ export function fitnessClub(d: RoomCtx, u: Unit, x: number, y: number, w: number
   const top = mirrorStrip(ctx, x, y, w, look.wall, look.accent, d.lit);
   const occ = roomOccupants(u);
   const seed = figureSeed(u);
+  // The room's authored width comes from its TILES, not its pixels, so a row's
+  // capacity is the same whatever scale the caller draws at.
+  const aw = authoredWidth(u.width);
   switch (look.format) {
     case "weights":
       drawWeights(ctx, x, floorY, w, look, occ, seed);
       break;
     case "yoga":
-      drawYoga(ctx, x, floorY, w, look, occ, seed);
+      drawYoga(ctx, x, floorY, w, aw, look, occ, seed);
       break;
     case "spin":
-      drawSpin(ctx, x, floorY, w, look, occ, seed);
+      drawSpin(ctx, x, floorY, w, aw, look, occ, seed);
       break;
     case "boxing":
       drawBoxing(ctx, x, floorY, w, look, occ, seed);

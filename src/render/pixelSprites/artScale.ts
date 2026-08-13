@@ -28,8 +28,25 @@ import { TILE } from "../scale";
  *  authored units instead of restating 11 of its own. */
 export const ART_TILE = 11;
 
-/** A screen length restated at the authored tile. Pass a room's width to ask how
- *  much room that is in the scale its furniture was drawn for. */
+/**
+ * A room's width in the scale its furniture was drawn for, taken from its width
+ * in TILES.
+ *
+ * Tiles are the scale-free statement of how big a room is, which is why capacity
+ * hangs off them. Restating the room's SCREEN width instead only agrees while
+ * the caller draws at the world tile: `/gallery` and `/preview` render rooms at
+ * tile sizes of their own (up to 18px, and 12px), and a 12-tile boutique handed
+ * over at 144px would read as 158 authored pixels and seat 22 browsers where the
+ * game seats 18, so those pages would advertise a capacity the room does not
+ * have.
+ */
+export function authoredWidth(tiles: number): number {
+  return tiles * ART_TILE;
+}
+
+/** A screen length restated at the authored tile. Valid only for a length in
+ *  WORLD pixels; for a room's own width prefer `authoredWidth`, which does not
+ *  care what scale the caller draws at. */
 export function artUnits(screenLength: number): number {
   return (screenLength * ART_TILE) / TILE;
 }

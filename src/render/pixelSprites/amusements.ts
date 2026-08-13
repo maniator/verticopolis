@@ -1,6 +1,6 @@
 import type { Unit } from "../../engine/types";
 import { busyStations, castShadow, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
-import { artRow, artUnits } from "./artScale";
+import { artRow, authoredWidth } from "./artScale";
 
 /**
  * Modern Amusements art: an arcade / games hall with four attraction types
@@ -73,7 +73,7 @@ function marquee(ctx: CanvasRenderingContext2D, x: number, y: number, w: number,
   return y + band;
 }
 
-function drawArcade(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, top: number, look: AmusementsLook, occ: number, seed: number): void {
+function drawArcade(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, aw: number, top: number, look: AmusementsLook, occ: number, seed: number): void {
   // A row of arcade cabinets along the back wall, each a tall box with a glowing
   // screen and a lit control panel; players stand at a share of them.
   const cabW = 11;
@@ -90,7 +90,7 @@ function drawArcade(ctx: CanvasRenderingContext2D, x: number, floorY: number, w:
   // At the 12-tile hall the catalog ships, the count is the same either way; at
   // a few other widths the wider margin does cost a cabinet, which is the price
   // of keeping every player whole.
-  const spots = artRow(artUnits(w) - 3 - 5 - cabW, x + 3, x + w - 5 - cabW, cabW + gap);
+  const spots = artRow(aw - 3 - 5 - cabW, x + 3, x + w - 5 - cabW, cabW + gap, 1, cabW);
   const busy = busyStations(spots.length, occ, seed * 31);
   spots.forEach((cx, i) => {
     ctx.fillStyle = shade(look.wall, 26); // cabinet body
@@ -131,7 +131,7 @@ function drawVr(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: num
   }
 }
 
-function drawClaw(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, top: number, look: AmusementsLook, occ: number, seed: number): void {
+function drawClaw(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, aw: number, top: number, look: AmusementsLook, occ: number, seed: number): void {
   // A bank of claw machines: glass cases lit from within, packed with colorful
   // plush prizes, a claw rail across the top. Candy-bright, kid crowd.
   const macW = 13;
@@ -141,7 +141,7 @@ function drawClaw(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   // Machine anchors, on the same rule as the arcade row: counted at the
   // authored tile, stepped at the current one, with the far margin widened to
   // hold the player who stands at the last machine's edge.
-  const spots = artRow(artUnits(w) - 3 - 5 - macW, x + 3, x + w - 5 - macW, macW + gap);
+  const spots = artRow(aw - 3 - 5 - macW, x + 3, x + w - 5 - macW, macW + gap, 1, macW);
   const busy = busyStations(spots.length, occ, seed * 23);
   spots.forEach((mx, i) => {
     ctx.fillStyle = shade(look.neon, -30); // machine frame
@@ -167,7 +167,7 @@ function drawClaw(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   });
 }
 
-function drawGolf(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, look: AmusementsLook, occ: number, seed: number): void {
+function drawGolf(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, aw: number, look: AmusementsLook, occ: number, seed: number): void {
   // A mini-golf bay: bright turf, a couple of holes with pin flags, a windmill
   // obstacle, and a putter mid-swing. The one non-dark attraction.
   ctx.fillStyle = look.floor; // extend the turf up a little as a putting green
@@ -216,7 +216,7 @@ function drawGolf(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
     ctx.fillRect(x + 11, floorY - 6, 5, 1);
     ctx.fillRect(x + 15, floorY - 3, 1, 3);
   }
-  const spots = artRow(artUnits(w) - 32 - 7, x + 32, x + w - 7, 12);
+  const spots = artRow(aw - 32 - 7, x + 32, x + w - 7, 12, 1, 6);
   // Floored to match every other row: a forged fractional count must not round
   // a watcher into existence.
   const watchers = Math.min(Math.max(0, Math.floor(occ) - 1), spots.length);
@@ -233,18 +233,21 @@ export function amusements(d: RoomCtx, u: Unit, x: number, y: number, w: number,
   const top = marquee(ctx, x, y, w, look.neon, d.lit);
   const occ = roomOccupants(u);
   const seed = figureSeed(u);
+  // The room's authored width comes from its TILES, not its pixels, so a row's
+  // capacity is the same whatever scale the caller draws at.
+  const aw = authoredWidth(u.width);
   switch (look.attraction) {
     case "arcade":
-      drawArcade(ctx, x, floorY, w, top, look, occ, seed);
+      drawArcade(ctx, x, floorY, w, aw, top, look, occ, seed);
       break;
     case "vr":
       drawVr(ctx, x, floorY, w, top, look, occ, seed);
       break;
     case "claw":
-      drawClaw(ctx, x, floorY, w, top, look, occ, seed);
+      drawClaw(ctx, x, floorY, w, aw, top, look, occ, seed);
       break;
     case "golf":
-      drawGolf(ctx, x, floorY, w, look, occ, seed);
+      drawGolf(ctx, x, floorY, w, aw, look, occ, seed);
       break;
   }
   // A warm marquee glow wash near the top when the hall is lit at night.

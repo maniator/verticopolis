@@ -1,6 +1,6 @@
 import type { Unit } from "../../engine/types";
 import { busyStations, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
-import { artRow, artUnits } from "./artScale";
+import { artRow, authoredWidth } from "./artScale";
 
 /**
  * Modern Nightclub art: a single dark room lit by colored beams, with a DJ booth,
@@ -53,7 +53,7 @@ export function nightclub(d: RoomCtx, u: Unit, x: number, y: number, w: number, 
   // dancers it holds, so that is worked out separately and handed to the row.
   const danceX0 = x + 4;
   const danceX1 = x + Math.round(w * 0.66);
-  const danceArtW = Math.round(artUnits(w) * 0.66) - 4;
+  const danceArtW = Math.round(authoredWidth(u.width) * 0.66) - 4;
   for (let fx = danceX0, k = 0; fx + 3 < danceX1; fx += 4, k++) {
     ctx.fillStyle = (k % 2 === 0) ? shade(BEAMS[(k + seed) % BEAMS.length], -10) : "#14101E";
     ctx.fillRect(fx, floorY - 2, 4, 2);
