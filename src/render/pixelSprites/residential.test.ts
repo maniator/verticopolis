@@ -98,31 +98,33 @@ describe("narrow rooms draw inside their own box", () => {
     // This drives drawRoom, NOT geoVariant directly: calling geoVariant(_, 3, 5) and
     // counting its range proves only that it returns 0-4, which is true whatever the
     // width gate does. The gate lives in condo(), so the only honest probe is to
-    // render and look for the two layouts it can withhold. Both are recognizable by
-    // their ABSOLUTE anchors (the dining table at x+46, the study desk at x+48),
-    // which is exactly why they needed gating in the first place.
-    const anchoredAt = (w: number): Set<number> => {
-      const hits = new Set<number>();
+    // render and look for the two layouts it can withhold. Each is named by a color
+    // only it paints, so the probe identifies the LAYOUT. Recognizing them by the
+    // absolute columns 46 and 48 instead read the tile width as much as the gate:
+    // at the retired 11px tile a narrow box hit neither column, and at 10px two
+    // unrelated rects landed on both.
+    const gatedLayoutsAt = (w: number): Set<string> => {
+      const hits = new Set<string>();
       for (let x0 = 0; x0 < 60; x0++) {
         const s = spyCtx();
         drawRoom(room(s.ctx), unit({ x: x0, kind: "rentalApartment", width: 11, state: "occupied", occupants: 3 }), 0, 0, w, FLOOR);
-        for (const [x] of rectSpans(s.log)) if (x === 46 || x === 48) hits.add(x);
+        if (s.log.includes("fillStyle=#E8C14A")) hits.add("dining"); // the dining candle
+        if (s.log.includes("fillStyle=#4A5464")) hits.add("study"); // the study monitor
       }
       return hits;
     };
+    // The identification is only as good as those two literals being unique to
+    // their layouts, so pin that too: neither may enter a look table, which is
+    // the way a decoration color would start appearing in layouts that do not
+    // own it.
+    for (const table of [CONDO_WALLS, CONDO_PICTURES, STUDIO_WALLS, APARTMENT_WALLS, RENTAL_PICTURES, OFFICE_WALLS, HOTEL_WALLS, SUITE_WALLS]) {
+      for (const c of table) expect(["#E8C14A", "#4A5464"]).not.toContain(c.toUpperCase());
+    }
     const WIDE = 11 * TILE; // the Apartment's real width
-    expect(anchoredAt(WIDE)).toEqual(new Set([46, 48])); // both gated layouts reachable
+    expect(gatedLayoutsAt(WIDE)).toEqual(new Set(["dining", "study"])); // both gated layouts reachable
     // And the same unit rendered narrow loses them, so this pins the gate itself:
     // raise WIDE_LAYOUT_MIN_W above WIDE and the first assertion fails.
-    //
-    // TODO(#813): this probe recognizes the gated layouts by rects landing on
-    // the ABSOLUTE anchors 46 and 48, which is a heuristic, not a contract. At
-    // the retired 11px tile a narrow box hit neither anchor; at 10px two other
-    // rects happen to land there, so the probe now reports 2 where it means
-    // "narrow layout, gate held". Pinned to today's number rather than deleted,
-    // so the gate keeps its coverage while #813 finds an identification that
-    // does not depend on the tile width.
-    expect(anchoredAt(6 * TILE).size).toBe(2);
+    expect(gatedLayoutsAt(6 * TILE).size).toBe(0);
   });
 });
 
@@ -189,18 +191,14 @@ describe("occupancy is honest (maps to visibleOccupants, no ghost people)", () =
   });
 
   it("a staffed office seats exactly min(visibleOccupants, seats), and out-for-meal removes figures", () => {
-    // A 9-tile office with 3 workers present.
-    //
-    // TODO(#813): this SHOULD seat 3 and did at the retired 11px tile. At 10px
-    // the room is 9px narrower and one figure is lost, so three present workers
-    // draw as two. That is the opposite of the failure this suite exists to
-    // catch: not a ghost, but a worker who is there and invisible. Pinned to
-    // today's number so the regression is stated in code and the rest of the
-    // suite keeps running; #813 carries the fix, which is room-layout art and
-    // goes through the design approval gate. Restore this to 3 with it.
+    // A 9-tile office with 3 workers present. This column draws the executive
+    // corner, whose chain of furniture used to overrun the narrower 10px-tile
+    // room and drop the second side cubicle, so the third worker went undrawn
+    // (issue #813). `roomCapacity.test.ts` holds the same contract for every
+    // layout and at full population.
     const three = spyCtx();
     drawRoom(room(three.ctx), unit({ kind: "office", floor: 10, x: 20, occupants: 3 }), 0, 0, 9 * TILE, FLOOR);
-    expect(peopleCount(three.log)).toBe(2);
+    expect(peopleCount(three.log)).toBe(3);
     // Two of the three step out for a meal: only the visible one remains.
     const oneOut = spyCtx();
     drawRoom(room(oneOut.ctx), unit({ kind: "office", floor: 10, x: 20, occupants: 3, outForMeal: 2 }), 0, 0, 9 * TILE, FLOOR);

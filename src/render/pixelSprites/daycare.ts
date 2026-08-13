@@ -1,6 +1,6 @@
-import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { hash, personStanding, shade, shell, type RoomCtx } from "./common";
+import { busyStations, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
+import { artRow, authoredWidth } from "./artScale";
 
 /**
  * Modern Daycare art: a bright, cheerful playroom with a soft play mat, a toy
@@ -43,7 +43,7 @@ export function daycare(d: RoomCtx, u: Unit, x: number, y: number, w: number, h:
   const { ctx } = d;
   const floorY = shell(ctx, x, y, w, h, WALL, FLOOR);
   const seed = figureSeed(u);
-  const occ = visibleOccupants(u);
+  const occ = roomOccupants(u);
 
   // A bright bunting garland along the top wall.
   for (let bx = x + 2, i = 0; bx + 4 < x + w - 2; bx += 6, i++) {
@@ -51,8 +51,11 @@ export function daycare(d: RoomCtx, u: Unit, x: number, y: number, w: number, h:
     ctx.fillRect(bx, y + 3, 4, 3);
   }
 
-  // A checkered soft play mat covering most of the floor.
+  // A checkered soft play mat covering most of the floor. The mat is drawn at
+  // its screen size, but its AUTHORED width is what decides how many children it
+  // seats, so that is worked out separately and handed to the row.
   const matX0 = x + 3, matX1 = x + Math.round(w * 0.62);
+  const matArtW = Math.round(authoredWidth(u.width) * 0.62) - 3;
   for (let mx = matX0, k = 0; mx + 4 < matX1; mx += 5, k++) {
     ctx.fillStyle = shade(MAT[(k + seed) % MAT.length], -8);
     ctx.fillRect(mx, floorY - 2, 5, 2);
@@ -73,13 +76,21 @@ export function daycare(d: RoomCtx, u: Unit, x: number, y: number, w: number, h:
   // A stack of blocks on the mat.
   for (let i = 0; i < 3; i++) { ctx.fillStyle = MAT[(seed + i) % MAT.length]; ctx.fillRect(matX0 + 2, floorY - 4 - i * 2, 3, 2); }
 
-  // The caregiver (a standing adult) is present whenever the room is open.
+  // The caregiver (a standing adult) is present whenever the room is open. She
+  // is staff, not one of the children the room is counted in, so she does not
+  // come off the mat's places.
   if (occ > 0) personStanding(ctx, shX - 6, floorY, seed + 2);
 
-  // Children on the play mat, filling in with occupancy. Bounded by the mat width,
-  // so a forged occupant count can never over-iterate.
-  let drawn = 0;
-  for (let cx = matX0 + 3; cx + 3 < matX1 && drawn < occ; cx += 6, drawn++) {
-    if (hash(seed * 23 + drawn) > 0.12) child(ctx, cx, floorY, seed + drawn * 5);
-  }
+  // Places on the mat: the 6px pitch is authored art, counted against the MAT at
+  // the tile it was drawn for and stepped at the current one. Read off the mat's
+  // pixel width the room lost two places when the tile narrowed, and two
+  // children who were in the room went undrawn.
+  const places = artRow(matArtW - 3 - 4, matX0 + 3, matX1 - 4, 6, 1, 3);
+  // Who is sitting where: the hash scatters them, the occupancy says how many.
+  // The old loop counted a hash-skipped place against the occupancy as if a
+  // child were there, so a room with five children could show two.
+  const sitting = busyStations(places.length, occ, seed * 23);
+  places.forEach((cx, i) => {
+    if (sitting.has(i)) child(ctx, cx, floorY, seed + i * 5);
+  });
 }

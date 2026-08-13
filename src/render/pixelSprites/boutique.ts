@@ -1,6 +1,6 @@
-import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { castShadow, hash, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
+import { castShadow, hash, personSeated, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
+import { artRow, authoredWidth } from "./artScale";
 
 /**
  * Modern Boutique Bay art: a bay of small independent trades (florist, barber,
@@ -223,7 +223,7 @@ export function boutiqueBay(d: RoomCtx, u: Unit, x: number, y: number, w: number
   const look = (u.subtype !== undefined && BOUTIQUE_LOOKS[u.subtype]) || BOUTIQUE_DEFAULT;
   const floorY = shell(ctx, x, y, w, h, look.wall, look.floor);
   const top = fascia(ctx, x, y, w, look.accent, d.lit);
-  const occ = visibleOccupants(u);
+  const occ = roomOccupants(u);
   const seed = figureSeed(u);
   switch (look.trade) {
     case "florist":
@@ -248,11 +248,26 @@ export function boutiqueBay(d: RoomCtx, u: Unit, x: number, y: number, w: number
       drawGallery(ctx, x, floorY, w, top, look.accent, seed);
       break;
   }
-  // A browsing customer near the door when the shop is busy (bounded by width,
-  // inset like the other containers so the figure stays inside the room rect).
-  for (let i = 0; i < occ; i++) {
-    const px = x + w - 6 - i * 7;
-    if (px <= x + 2) break;
-    personStanding(ctx, px, floorY, seed + i * 11);
+  // Browsing customers filling back from the door when the shop is busy,
+  // bounded by width (inset like the other containers so every figure stays
+  // inside the room rect). The 7px shoulder-to-shoulder pitch is authored art,
+  // so the row is counted at the authored tile and stepped at the current one.
+  // Counted off the pixel width, the bay lost two standing spots when the tile
+  // narrowed and two customers who were in the shop went undrawn.
+  // The door-side figure sits a pixel further in than the shopfront chrome does:
+  // a figure is 6px of body between two 1px contact-shadow columns, so at the
+  // chrome's own `w - 6` its shadow fell outside the bay, where both draw paths
+  // clip it away and the figure reads a column short of the others.
+  // The barber's chair and the tattoo bench each seat one of these same people,
+  // so that client comes off the browsing row. Counting them separately drew a
+  // one-customer bay as two figures, a ghost, which is the failure the honest
+  // occupancy rule forbids in the other direction.
+  const seatedClient = occ > 0 && (look.trade === "barber" || look.trade === "tattoo") ? 1 : 0;
+  const spots = artRow(authoredWidth(u.width) - 7 - 3, x + w - 7, x + 3, 7, -1, 6);
+  // Floored to match every other row: a forged fractional count must not round
+  // a customer into existence.
+  const browsing = Math.min(Math.max(0, Math.floor(occ) - seatedClient), spots.length);
+  for (let i = 0; i < browsing; i++) {
+    personStanding(ctx, spots[i], floorY, seed + i * 11);
   }
 }

@@ -1,5 +1,6 @@
 import type { FacilityKind, Unit } from "../../engine/types";
 import { GRID } from "../../engine/facilities";
+import { visibleOccupants } from "../../engine/Crowd";
 
 /**
  * Shared primitives for the dollhouse room art: the signature palette, the
@@ -74,6 +75,53 @@ export function hash(seed: number): number {
   x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d);
   x = Math.imul(x ^ (x >>> 13), 0x297a2d39);
   return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+
+/**
+ * Which of a room's `stations` (stools, dance-floor spots, machines, mats,
+ * bikes, places on a mat) have someone at them: a stable pseudo-random subset of
+ * exactly `min(people, stations)` of them.
+ *
+ * The count is the point. Deciding each station on its own hash roll broke the
+ * honest-occupancy rule in both directions at once: a hall with two visitors
+ * could paint four figures at one column and none at the next, and where the
+ * loop counted a skipped station against the occupancy anyway, people who were
+ * in the room were simply never drawn.
+ *
+ * WHICH stations matters almost as much. Filling from one end would satisfy the
+ * count and turn a quiet room into a solid block of figures against one wall
+ * with an empty half beside it, so the subset is chosen by ranking the stations
+ * on their hash and taking the busiest. That spreads a small crowd over the
+ * whole row and is still a pure function of the room's own seed, which is what
+ * lets these rooms bake to a cached sprite.
+ */
+/**
+ * A room's occupancy as its art has to read it: whole people.
+ *
+ * `visibleOccupants` is the people system's canonical figure and stays
+ * fractional, because the live census sums it. Art cannot draw four fifths of a
+ * person, so every row already floors it, and a room that ALSO draws one gated
+ * figure (a barber's seated client, a spa's tub guest, a golfer, the staff who
+ * appear because the room is open) has to floor it at the same place or the two
+ * halves disagree: at a forged 0.5 the rows correctly draw nobody while the
+ * gate draws a whole person, which is a fraction rounded into a figure through
+ * the door those rows shut.
+ *
+ * Used by the room kinds whose crowds this pass rewired. The others still read
+ * `visibleOccupants` directly, which is the older behavior, not a decision.
+ */
+export function roomOccupants(u: { occupants: number; outForMeal?: number }): number {
+  return Math.floor(visibleOccupants(u));
+}
+
+export function busyStations(stations: number, people: number, seed: number): Set<number> {
+  // Floored so a forged save carrying a fractional count rounds the same way
+  // here as a plain counting loop would.
+  const want = Math.max(0, Math.min(Math.floor(people), stations));
+  if (!(want > 0)) return new Set(); // nobody here, or a nonsense count
+  const ranked = Array.from({ length: stations }, (_, i) => i);
+  ranked.sort((a, b) => hash(seed + b) - hash(seed + a) || a - b); // index breaks a tie
+  return new Set(ranked.slice(0, want));
 }
 
 // ---- Per-unit variety (geo-seeded) ----------------------------------------

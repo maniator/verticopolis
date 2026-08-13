@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  busyStations,
   noticeBadge,
   vacancy,
   closedShutter,
@@ -88,6 +89,63 @@ describe("pixelSprites/common draw helpers", () => {
     const text = wide.log.find((l) => l.startsWith("fillText:"));
     expect(text).toBeDefined();
     expect(text).toContain("CLOSED");
+  });
+});
+
+describe("busyStations fills a room's seats to its occupancy", () => {
+  it("takes exactly min(people, stations), for any count a save can carry", () => {
+    // The contract six room kinds lean on. Each used to roll a hash per seat
+    // and, in four cases, count a skipped seat against the occupancy anyway, so
+    // people who were in the room went undrawn.
+    for (const stations of [0, 1, 3, 8, 21, 64]) {
+      for (const people of [0, 1, 2, 5, 20, 1e9]) {
+        expect(busyStations(stations, people, 12345).size, `${people} of ${stations}`)
+          .toBe(Math.min(people, stations));
+      }
+    }
+  });
+
+  it("holds only real seat indices", () => {
+    for (const s of busyStations(8, 5, 99)) {
+      expect(Number.isInteger(s)).toBe(true);
+      expect(s).toBeGreaterThanOrEqual(0);
+      expect(s).toBeLessThan(8);
+    }
+  });
+
+  it("refuses to invent a seat from a nonsense count", () => {
+    // A forged save can carry anything, and a fractional count has to round the
+    // way a plain counting loop would.
+    expect(busyStations(8, -3, 1).size).toBe(0);
+    expect(busyStations(8, Number.NaN, 1).size).toBe(0);
+    expect(busyStations(8, 2.7, 1).size).toBe(2);
+    expect(busyStations(0, 5, 1).size).toBe(0);
+  });
+
+  it("spreads a small crowd over the whole row instead of banking it at one end", () => {
+    // The half a count-only guarantee misses. An implementation that took the
+    // first seats clearing a threshold would satisfy every assertion above and
+    // still push a quiet room's whole crowd against one wall, which is what the
+    // first cut of this helper did: at a 0.15 threshold the five people in a
+    // 23-spot nightclub all landed inside the first six spots.
+    //
+    // So measure the distribution, not merely that it varies. Over many rooms a
+    // lone visitor should sit at the middle seat ON AVERAGE and should reach
+    // both ends.
+    const stations = 20;
+    const picks: number[] = [];
+    for (let seed = 0; seed < 400; seed++) picks.push([...busyStations(stations, 1, seed * 37)][0]);
+    const mean = picks.reduce((a, b) => a + b, 0) / picks.length;
+    expect(mean, `mean seat ${mean}`).toBeGreaterThan((stations - 1) / 2 - 2);
+    expect(mean, `mean seat ${mean}`).toBeLessThan((stations - 1) / 2 + 2);
+    expect(Math.min(...picks)).toBeLessThanOrEqual(1); // reaches the near end
+    expect(Math.max(...picks)).toBeGreaterThanOrEqual(stations - 2); // and the far one
+  });
+
+  it("gives the same room the same seats every time", () => {
+    // These rooms bake to a cached sprite, so the picture may not move unless
+    // the crowd does.
+    expect([...busyStations(8, 3, 4242)]).toEqual([...busyStations(8, 3, 4242)]);
   });
 });
 

@@ -1,6 +1,6 @@
-import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { hash, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
+import { busyStations, hash, personSeated, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
+import { artRow, authoredWidth } from "./artScale";
 
 /**
  * Modern Sky Bar art: a warm rooftop cocktail lounge at dusk, its back wall a big
@@ -31,7 +31,7 @@ export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   const { ctx } = d;
   const floorY = shell(ctx, x, y, w, h, WALL, WALL);
   const seed = figureSeed(u);
-  const occ = visibleOccupants(u);
+  const occ = roomOccupants(u);
 
   // The skyline window fills the upper back wall: a dark sky pane with a jagged
   // silhouette of buildings and scattered lit windows, the bar's whole reason to
@@ -70,16 +70,38 @@ export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
     ctx.fillRect(lx, floorY - 7, 1, 3); // a bottle glowing on the back shelf
   }
 
+  // Stool anchors: the 7px stool pitch is authored art, counted against the
+  // COUNTER at the tile it was drawn for and stepped at the current one. Read
+  // off the counter's pixel width it lost two stools when the tile narrowed, and
+  // two patrons who were at the bar went undrawn with them. The counter's own
+  // authored width is named rather than folded into the row's margins so the
+  // two lengths read as what they are. It restates `barW`'s 3px insets in the
+  // authored scale rather than deriving them, so moving `barW` means moving
+  // this too.
+  const counterArtW = authoredWidth(u.width) - 6;
+  const stools = artRow(counterArtW - 3 - 9, barX + 3, barX + barW - 9, 7, 1, 6);
+  // Which stools are taken: the occupancy says how many, the seed says which.
+  // The old loop counted a hash-skipped stool against the occupancy as if
+  // someone had sat there, so a bar with five patrons could show two.
+  const taken = busyStations(stools.length, occ, seed * 19);
   // Patrons: a bartender behind the counter when the bar is live, and guests on
-  // stools that fill in with occupancy. Bounded by the counter width, so a forged
-  // occupant count can never over-iterate.
-  if (occ > 0) personStanding(ctx, barX + Math.round(barW / 2) - 3, floorY - 6, seed + 2);
-  let seated = 0;
-  for (let sx = barX + 3; sx + 5 < barX + barW - 3 && seated < occ; sx += 7, seated++) {
-    if (hash(seed * 19 + seated) > 0.2) {
-      personSeated(ctx, sx, floorY - 1, seed + seated * 11);
-      ctx.fillStyle = shade(COUNTER, -18); // the stool
-      ctx.fillRect(sx + 1, floorY - 1, 2, 1);
-    }
+  // stools in front of it. The bartender is staff, not one of the room's
+  // occupants, so he does not come off the stool count. Stools sit closer
+  // together than a figure is wide, so a patron partly overlapping him is
+  // inherent here and always was. Sharing a patron's exact column is not, since
+  // the two then read as one person rather than two, so he takes the next column
+  // along. Only an OCCUPIED stool is dodged (an empty one has nobody to be
+  // confused with), and the walk is bounded by the row it steps through.
+  if (occ > 0) {
+    const heads = new Set(stools.filter((_, i) => taken.has(i)));
+    let bartX = barX + Math.round(barW / 2) - 3;
+    for (let step = 0; step < stools.length && heads.has(bartX); step++) bartX++;
+    personStanding(ctx, bartX, floorY - 6, seed + 2);
   }
+  stools.forEach((sx, i) => {
+    if (!taken.has(i)) return;
+    personSeated(ctx, sx, floorY - 1, seed + i * 11);
+    ctx.fillStyle = shade(COUNTER, -18); // the stool
+    ctx.fillRect(sx + 1, floorY - 1, 2, 1);
+  });
 }
