@@ -13,9 +13,13 @@ import { TILE } from "../scale";
  * capacity to the tile instead of to the room, and several quietly lost a slot:
  * occupants who were present stopped being drawn at all (issue #813). The
  * helpers below count in the authored scale, so capacity follows the room's
- * width in tiles, and step in the current one, so the row still fits inside the
- * room box. The price is that a row packs about 9% tighter than it was drawn:
- * the items keep their authored size and lose some of the air between them.
+ * width in tiles, while the step stays the authored pitch in screen pixels. An
+ * item is fixed-size pixel art that did not shrink with the tile, so the space
+ * between items must not shrink either: scaling the pitch spends the gap the
+ * art was drawn with, and a row authored shoulder to shoulder (the nightclub's
+ * dancers, whose 6px figures sit at a 6px pitch) has no gap to spend and comes
+ * out overlapping. A row still compresses when its run genuinely cannot hold it,
+ * which is the honest last resort rather than the default.
  */
 
 /** The tile the room art was authored against. A literal on purpose: it is
@@ -49,9 +53,10 @@ export function screenLength(authoredLength: number): number {
  * How many fit is decided entirely by that authored run, because an item and the
  * clearance around it are fixed-size pixel art and only the container grew when
  * the tile shrank. That ties capacity to the container's width in tiles, which
- * the scale change did not touch. The step is then the pitch at the current
- * tile, or tighter when the row would otherwise not fit, so an anchor never
- * passes `limit`.
+ * the scale change did not touch. The step is that same pitch in screen pixels,
+ * unscaled for the same reason the item is: a 6px figure needs 6px of pitch at
+ * any tile. It tightens only when the screen run cannot hold the row at full
+ * pitch, so an anchor never passes `limit`.
  *
  * The authored run is passed in rather than worked back out of the screen
  * geometry on purpose. Every caller knows it exactly, while re-deriving it from
@@ -91,7 +96,7 @@ export function artRow(authoredRun: number, from: number, limit: number, pitch: 
   const lo = Math.min(first, edge);
   const hi = Math.max(first, edge);
   const count = Math.max(1, Math.min(wanted, hi - lo + 1, Math.floor(run) + 1));
-  const step = count > 1 ? Math.min(screenLength(pitch), run / (count - 1)) : 0;
+  const step = count > 1 ? Math.min(pitch, run / (count - 1)) : 0;
   return Array.from({ length: count }, (_, i) =>
     Math.min(hi, Math.max(lo, Math.round(from + dir * i * step))));
 }

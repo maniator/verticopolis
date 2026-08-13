@@ -77,10 +77,18 @@ export function nightclub(d: RoomCtx, u: Unit, x: number, y: number, w: number, 
   if (occ > 0) personStanding(ctx, boothX + Math.round(boothW / 2) - 3, floorY - 8, seed + 3);
 
   // Dancer anchors: the 6px pitch is authored art, counted against the DANCE
-  // FLOOR at the tile it was drawn for and stepped at the current one. Read off
-  // the floor's pixel width the club lost two dancing spots when the tile
-  // narrowed, and two people who were in the club went undrawn.
-  const spots = artRow(danceArtW - 3 - 5, danceX0 + 3, danceX1 - 5, 6);
+  // FLOOR at the tile it was drawn for. Read off the floor's pixel width the
+  // club lost two dancing spots when the tile narrowed, and two people who were
+  // in the club went undrawn.
+  //
+  // How many is authored geometry; WHERE they stand is not. A dancer is 6px wide
+  // at a 6px pitch, so this crowd is shoulder to shoulder with nothing to give,
+  // and at the narrower tile the lit strip alone no longer spans its own crowd:
+  // squeezing them onto it is what made adjacent dancers overlap by a pixel. So
+  // the count still comes off the strip's authored width, while the row itself
+  // runs from the strip's left edge to just clear of the booth. That floor was
+  // empty anyway, and a packed club spilling off the lit floor is the right read.
+  const spots = artRow(danceArtW - 3 - 5, danceX0, boothX - 6, 6);
   // Who is dancing: the hash scatters them, the occupancy says how many. The old
   // loop counted a hash-skipped spot against the occupancy as if someone were
   // standing there, so a club with five people could show three.
