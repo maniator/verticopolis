@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.26.0
+
+- The parking spaces, ramp, security office, clinic, housekeeping room, and recycling center are drawn on the current pixel grid, so the rows of things inside them (the camera monitors, the shelves of linen, the bottles, the hazard tape) line up evenly again instead of drifting a pixel here and there.
+
 ## 2.25.2
 
 - Elevator floor numbers now scale with the zoom level instead of looking oversized when zoomed out, and they no longer flicker as elevator cars pass a floor.
