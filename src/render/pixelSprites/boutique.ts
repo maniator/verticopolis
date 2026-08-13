@@ -1,6 +1,5 @@
-import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { castShadow, hash, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
+import { castShadow, hash, personSeated, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { artRow, artUnits } from "./artScale";
 
 /**
@@ -224,7 +223,7 @@ export function boutiqueBay(d: RoomCtx, u: Unit, x: number, y: number, w: number
   const look = (u.subtype !== undefined && BOUTIQUE_LOOKS[u.subtype]) || BOUTIQUE_DEFAULT;
   const floorY = shell(ctx, x, y, w, h, look.wall, look.floor);
   const top = fascia(ctx, x, y, w, look.accent, d.lit);
-  const occ = visibleOccupants(u);
+  const occ = roomOccupants(u);
   const seed = figureSeed(u);
   switch (look.trade) {
     case "florist":

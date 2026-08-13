@@ -13,9 +13,9 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.25.5
+## 2.27.0
 
-- Rooms draw as many people as they have room for again. Offices, amusement halls, boutique bays, sky bars, nightclubs, daycares, and gyms had all been drawing a few figures short, and several of them left out people who were there even when a seat was free. A barber's chair and a spa's hot tub had the opposite habit and counted the same guest twice, so those two show one fewer.
+- Busy rooms show everyone in them again, instead of quietly leaving a few people undrawn.
 
 ## 2.25.2
 

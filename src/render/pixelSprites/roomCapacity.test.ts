@@ -28,7 +28,9 @@ import { BOUTIQUE_LOOKS } from "./boutique";
  *
  * All eight populated kinds that lay furniture out in a row are covered: office,
  * amusements, boutiqueBay, skyBar, nightclub, daycare, fitnessClub, and spa.
- * Every one of them carried the same defect.
+ * Seven of the eight carried the defect; the spa is covered because a capacity
+ * claim is worth pinning either way, not because it lost a slot (it did not,
+ * for the reason given at its own case below).
  *
  * Two things a room draws are NOT its occupants and are counted separately here.
  * Staff (the bar's bartender, the club's DJ, the daycare's caregiver) appear

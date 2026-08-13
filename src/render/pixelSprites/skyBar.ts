@@ -1,6 +1,5 @@
-import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { busyStations, hash, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
+import { busyStations, hash, personSeated, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { artRow, artUnits } from "./artScale";
 
 /**
@@ -32,7 +31,7 @@ export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   const { ctx } = d;
   const floorY = shell(ctx, x, y, w, h, WALL, WALL);
   const seed = figureSeed(u);
-  const occ = visibleOccupants(u);
+  const occ = roomOccupants(u);
 
   // The skyline window fills the upper back wall: a dark sky pane with a jagged
   // silhouette of buildings and scattered lit windows, the bar's whole reason to
@@ -75,8 +74,10 @@ export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   // COUNTER at the tile it was drawn for and stepped at the current one. Read
   // off the counter's pixel width it lost two stools when the tile narrowed, and
   // two patrons who were at the bar went undrawn with them. The counter's own
-  // authored width is named rather than folded into the margins, so the two
-  // 3px insets that define it cannot drift apart from `barW` unnoticed.
+  // authored width is named rather than folded into the row's margins so the
+  // two lengths read as what they are. It restates `barW`'s 3px insets in the
+  // authored scale rather than deriving them, so moving `barW` means moving
+  // this too.
   const counterArtW = artUnits(w) - 6;
   const stools = artRow(counterArtW - 3 - 9, barX + 3, barX + barW - 9, 7);
   // Which stools are taken: the occupancy says how many, the seed says which.
@@ -86,13 +87,15 @@ export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   // Patrons: a bartender behind the counter when the bar is live, and guests on
   // stools in front of it. The bartender is staff, not one of the room's
   // occupants, so he does not come off the stool count. Stools sit closer
-  // together than a figure is wide, so a patron overlapping him is inherent and
-  // always was; landing on his exact column is not, because then the two read as
-  // one person, so he steps aside far enough to stay his own figure.
+  // together than a figure is wide, so a patron partly overlapping him is
+  // inherent here and always was. Sharing a patron's exact column is not, since
+  // the two then read as one person rather than two, so he takes the next column
+  // along. Only an OCCUPIED stool is dodged (an empty one has nobody to be
+  // confused with), and the walk is bounded by the row it steps through.
   if (occ > 0) {
-    const onStool = new Set(stools);
+    const heads = new Set(stools.filter((_, i) => taken.has(i)));
     let bartX = barX + Math.round(barW / 2) - 3;
-    while (onStool.has(bartX)) bartX++;
+    for (let step = 0; step < stools.length && heads.has(bartX); step++) bartX++;
     personStanding(ctx, bartX, floorY - 6, seed + 2);
   }
   stools.forEach((sx, i) => {

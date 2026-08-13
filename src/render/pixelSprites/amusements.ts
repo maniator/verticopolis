@@ -1,6 +1,5 @@
-import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { busyStations, castShadow, personStanding, shade, shell, type RoomCtx } from "./common";
+import { busyStations, castShadow, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { artRow, artUnits } from "./artScale";
 
 /**
@@ -174,9 +173,16 @@ function drawGolf(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   ctx.fillStyle = look.floor; // extend the turf up a little as a putting green
   ctx.fillRect(x, floorY - 3, w, 3);
   ctx.fillStyle = shade(look.floor, 22); // mown highlight stripes
-  // The last stripe is cut to the wall rather than drawn 4 wide past it: at
-  // widths where the 8px stride lands within 4px of the far edge it reached into
-  // the neighboring unit, where both draw paths clip it away unseen.
+  // The last stripe is cut to the wall rather than drawn 4 wide past it. Both
+  // draw paths clip a unit to its own rect, so the overhang was never visible as
+  // a bleed; what it was is a rect outside the box, which the containment guard
+  // reads as a row that does not know where its room ends. The cut keeps the
+  // drawn pixels identical and the claim honest.
+  //
+  // The floor of 0 is not dead code, though it looks it: the loop condition
+  // leaves a positive remainder, but at a fractional width that remainder can be
+  // under a pixel, and flooring it gives 0. An empty stripe is the right answer
+  // there. Widening it to 1 to avoid the no-op draw would put it past the wall.
   for (let sx = x; sx < x + w; sx += 8) ctx.fillRect(sx, floorY - 3, Math.max(0, Math.min(4, Math.floor(x + w - sx))), 1);
   // Holes with pin flags.
   const flags = ["#F0503A", "#F0C43A"];
@@ -225,7 +231,7 @@ export function amusements(d: RoomCtx, u: Unit, x: number, y: number, w: number,
   const look = (u.subtype !== undefined && AMUSEMENTS_LOOKS[u.subtype]) || AMUSEMENTS_DEFAULT;
   const floorY = shell(ctx, x, y, w, h, look.wall, look.floor);
   const top = marquee(ctx, x, y, w, look.neon, d.lit);
-  const occ = visibleOccupants(u);
+  const occ = roomOccupants(u);
   const seed = figureSeed(u);
   switch (look.attraction) {
     case "arcade":

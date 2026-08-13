@@ -1,6 +1,5 @@
-import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { busyStations, personStanding, shade, shell, type RoomCtx } from "./common";
+import { busyStations, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { artRow, artUnits } from "./artScale";
 
 /**
@@ -44,7 +43,7 @@ export function daycare(d: RoomCtx, u: Unit, x: number, y: number, w: number, h:
   const { ctx } = d;
   const floorY = shell(ctx, x, y, w, h, WALL, FLOOR);
   const seed = figureSeed(u);
-  const occ = visibleOccupants(u);
+  const occ = roomOccupants(u);
 
   // A bright bunting garland along the top wall.
   for (let bx = x + 2, i = 0; bx + 4 < x + w - 2; bx += 6, i++) {

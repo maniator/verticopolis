@@ -111,9 +111,13 @@ describe("a full room keeps every figure and fixture inside its own box", () => 
   // counts walks straight past it: the arcade and claw players spilled at 144px
   // (which is what `preview.ts` renders a 12-tile room at) while every whole-tile
   // width was clean.
+  //
+  // The far end is 300px because the widest box the app ever hands a room is
+  // `gallery.ts`'s 276 (`CELL_W` at its 300 maximum, less the cell's padding),
+  // which a 260px sweep did not reach.
   it.each(KINDS)("%s stays in the box at every width, at full population", (label, occupants, over) => {
     const columns = columnsFor(over);
-    for (let W = 6 * TILE; W <= 260; W += 3) {
+    for (let W = 6 * TILE; W <= 300; W += 3) {
       const tiles = Math.round(W / TILE);
       for (const x of columns) {
         const s = spyCtx();
@@ -144,12 +148,20 @@ describe("a full room's figures stand beside each other, never through each othe
   // Figures on DIFFERENT baselines are not compared: they are at different
   // depths in the room (the club's DJ stands behind his booth, above the dance
   // floor's foot line), where overlapping is the depth reading correctly.
+  //
+  // Swept at a half-pixel room origin as well as a whole one. A row rounds its
+  // start and floors its end, so a fractional origin can leave it a whole pixel
+  // less run than a whole origin does, and a row whose count wants all of its
+  // run answers that by stepping tighter than the pitch. Both roundings are
+  // covered: .0 rounds down like .25, .5 rounds up like .75. The game itself
+  // only ever draws a room at a whole pixel (`worldX` is `tile * TILE`), so this
+  // half of the sweep guards the review pages and any future caller.
   it.each(KINDS)("%s never overlaps two figures on one baseline", (label, occupants, over) => {
-    for (let W = 6 * TILE; W <= 260; W += 3) {
+    for (let W = 6 * TILE; W <= 300; W += 3) {
       const tiles = Math.round(W / TILE);
-      for (const x of columnsFor(over)) {
+      for (const x of columnsFor(over)) for (const ox of [0, 0.5]) {
         const s = spyCtx();
-        drawRoom(room(s.ctx, String(over.kind)), unit({ ...over, width: tiles, occupants, x }), 0, 0, W, FLOOR);
+        drawRoom(room(s.ctx, String(over.kind)), unit({ ...over, width: tiles, occupants, x }), ox, 0, W, FLOOR);
         const rows = new Map<number, { x0: number; x1: number }[]>();
         for (const f of figures(s.log)) rows.set(f.foot, [...(rows.get(f.foot) ?? []), f]);
         for (const [foot, row] of rows) {
@@ -158,7 +170,7 @@ describe("a full room's figures stand beside each other, never through each othe
             const prev = sorted[i - 1], cur = sorted[i];
             expect(
               cur.x0,
-              `${label} at ${W}px, column ${x}, baseline ${foot}: a figure at ${cur.x0}-${cur.x1} overlaps the one at ${prev.x0}-${prev.x1}`,
+              `${label} at ${W}px, column ${x}, origin ${ox}, baseline ${foot}: a figure at ${cur.x0}-${cur.x1} overlaps the one at ${prev.x0}-${prev.x1}`,
             ).toBeGreaterThan(prev.x1);
           }
         }

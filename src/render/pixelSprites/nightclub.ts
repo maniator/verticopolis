@@ -1,6 +1,5 @@
-import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { busyStations, personStanding, shade, shell, type RoomCtx } from "./common";
+import { busyStations, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { artRow, artUnits } from "./artScale";
 
 /**
@@ -30,7 +29,7 @@ export function nightclub(d: RoomCtx, u: Unit, x: number, y: number, w: number, 
   const { ctx } = d;
   const floorY = shell(ctx, x, y, w, h, WALL, FLOOR);
   const seed = figureSeed(u);
-  const occ = visibleOccupants(u);
+  const occ = roomOccupants(u);
 
   // Ceiling light rig: a dark bar with colored spot fixtures, each throwing a
   // faint triangular beam down toward the floor.
@@ -88,7 +87,14 @@ export function nightclub(d: RoomCtx, u: Unit, x: number, y: number, w: number, 
   // the count still comes off the strip's authored width, while the row itself
   // runs from the strip's left edge to just clear of the booth. That floor was
   // empty anyway, and a packed club spilling off the lit floor is the right read.
-  const spots = artRow(danceArtW - 3 - 5, danceX0, boothX - 6, 6);
+  //
+  // The row starts a pixel left of the strip rather than on it. This crowd is
+  // the one row in any room whose authored count wants its whole run, so with
+  // the ends flush it sits on a knife edge: lose a single pixel anywhere (a
+  // fractional room origin rounds one away) and the only way to still fit is to
+  // step tighter than the pitch, which is the overlap again. A pixel of slack
+  // costs nothing to look at and takes the row off that edge.
+  const spots = artRow(danceArtW - 3 - 5, danceX0 - 1, boothX - 6, 6, 1, 6);
   // Who is dancing: the hash scatters them, the occupancy says how many. The old
   // loop counted a hash-skipped spot against the occupancy as if someone were
   // standing there, so a club with five people could show three.

@@ -1,6 +1,5 @@
-import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { busyStations, hash, personStanding, shade, shell, type RoomCtx } from "./common";
+import { busyStations, hash, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 
 /**
  * Modern Spa art: a calm, warm wellness room with a steaming hot tub, a row of
@@ -31,7 +30,7 @@ export function spa(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: num
   const { ctx } = d;
   const floorY = shell(ctx, x, y, w, h, WALL, FLOOR);
   const seed = figureSeed(u);
-  const occ = visibleOccupants(u);
+  const occ = roomOccupants(u);
 
   // A warm accent band along the top of the back wall, the spa's calm signature.
   ctx.fillStyle = shade(WALL, 22);

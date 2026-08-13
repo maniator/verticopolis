@@ -1,6 +1,5 @@
-import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { busyStations, castShadow, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
+import { busyStations, castShadow, personSeated, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { artRow, artUnits } from "./artScale";
 
 /**
@@ -171,7 +170,7 @@ export function fitnessClub(d: RoomCtx, u: Unit, x: number, y: number, w: number
   const look = (u.subtype !== undefined && FITNESS_LOOKS[u.subtype]) || FITNESS_DEFAULT;
   const floorY = shell(ctx, x, y, w, h, look.wall, look.floor);
   const top = mirrorStrip(ctx, x, y, w, look.wall, look.accent, d.lit);
-  const occ = visibleOccupants(u);
+  const occ = roomOccupants(u);
   const seed = figureSeed(u);
   switch (look.format) {
     case "weights":

@@ -53,10 +53,28 @@ export function screenLength(authoredLength: number): number {
  * How many fit is decided entirely by that authored run, because an item and the
  * clearance around it are fixed-size pixel art and only the container grew when
  * the tile shrank. That ties capacity to the container's width in tiles, which
- * the scale change did not touch. The step is that same pitch in screen pixels,
- * unscaled for the same reason the item is: a 6px figure needs 6px of pitch at
- * any tile. It tightens only when the screen run cannot hold the row at full
- * pitch, so an anchor never passes `limit`.
+ * the scale change did not touch.
+ *
+ * The step is that same pitch in SCREEN pixels, no longer scaled down with the
+ * tile. Scaling it spent the gap the art was drawn with, since the item did not
+ * shrink and only the space between items can absorb the difference, and a row
+ * authored shoulder to shoulder had no gap to spend. Read the arithmetic
+ * plainly, though: a caller that measures `authoredRun` across the same span it
+ * hands to `from` and `limit` gives the row about 10/11 of the screen its
+ * authored count needs, so `run / (count - 1)` binds and the row still
+ * compresses to roughly the old step. THAT IS THE COMMON CASE and the pitch is
+ * an upper bound, not a promise. What changed is that compression is now
+ * bounded by the room the row actually has, so a caller that can give the row
+ * more screen (the nightclub, whose crowd runs on past the lit dance floor)
+ * reaches the full authored pitch instead of being held under it.
+ *
+ * `minStep` is the item's own width, when the caller knows it. Compression has
+ * to stop somewhere, and the honest floor is the point where items would start
+ * drawing through each other: below it a row is not tighter, it is wrong. Pass
+ * it and the count drops instead, which only bites where the run physically
+ * cannot hold the authored count without stacking. Omit it and the row may
+ * compress without limit, which is safe for a row whose items are narrower than
+ * their pitch by a comfortable margin.
  *
  * The authored run is passed in rather than worked back out of the screen
  * geometry on purpose. Every caller knows it exactly, while re-deriving it from
@@ -76,9 +94,8 @@ export function screenLength(authoredLength: number): number {
  * outside the run, which is the ordinary cost of drawing pixel art at a
  * fractional offset and not a containment failure at any whole-pixel caller.
  */
-export function artRow(authoredRun: number, from: number, limit: number, pitch: number, dir: 1 | -1 = 1): number[] {
-  const run = dir * (limit - from); // screen pixels the row may occupy
-  if (!(pitch > 0) || !(run >= 0) || !(authoredRun >= 0)) return []; // nothing fits (NaN included)
+export function artRow(authoredRun: number, from: number, limit: number, pitch: number, dir: 1 | -1 = 1, minStep = 0): number[] {
+  if (!(pitch > 0) || !(dir * (limit - from) >= 0) || !(authoredRun >= 0)) return []; // nothing fits (NaN included)
   // The epsilon keeps a slot that lands exactly on a boundary. Callers that own
   // a whole room hand in an exact integer, but one measured off a proportion of
   // a fractional width can arrive as 161.99999999999997, and losing a seat to
@@ -86,18 +103,37 @@ export function artRow(authoredRun: number, from: number, limit: number, pitch: 
   const wanted = Math.floor(authoredRun / pitch + 1e-9) + 1;
   // Two anchors cannot share a pixel, so the screen run bounds the count as
   // well: a room whose margins eat all of it seats one item, not the several its
-  // authored width would otherwise allow. Both the integer columns between the
-  // ends AND the run itself are needed. With fractional ends `first` rounds
-  // while `edge` floors, so the column window can come out one wider than the
-  // run really is, and a row that overran it repeated its last anchor: two
-  // people drawn on one pixel, reading as one, which is this bug again.
+  // authored width would otherwise allow.
+  //
+  // Both ends move INWARD to the first whole pixel the row may occupy, and the
+  // run is what lies between them. Every anchor is rounded to a pixel, so those
+  // integers are the row, and measuring the run any other way states room the
+  // row does not have: rounding the near end outward while flooring the far one
+  // inward buys a column the pixels do not contain, and the row answers with a
+  // count it can only fit by stepping tighter than the pitch. At a half-pixel
+  // room origin that put the club's dancers back through each other, which is
+  // the defect this helper exists to prevent. Whole-pixel callers, which is
+  // every one in the game (a room's origin is `tile * TILE`), are unaffected:
+  // rounding an integer inward returns it.
   const edge = dir > 0 ? Math.floor(limit) : Math.ceil(limit);
-  const first = Math.round(from);
-  const lo = Math.min(first, edge);
-  const hi = Math.max(first, edge);
-  const count = Math.max(1, Math.min(wanted, hi - lo + 1, Math.floor(run) + 1));
+  const first = dir > 0 ? Math.ceil(from) : Math.floor(from);
+  // Moving both ends inward can cross them, which means no whole pixel lies in
+  // the run at all (`from` and `limit` inside one pixel of each other). That is
+  // one item at the nearest pixel, never two anchors sharing it.
+  const span = dir * (edge - first);
+  const run = Math.max(0, span);
+  const start = span >= 0 ? first : Math.round(from);
+  // A row may not compress past the width of the thing it repeats. Without this
+  // the count is honored at any cost and the items simply overlap, which is the
+  // defect in a different coat: the nightclub's dancers, whose count comes off
+  // the dance floor while their run is measured to the DJ booth, stack from
+  // about 360px of room upward.
+  const holds = minStep > 0 ? Math.floor(run / minStep) + 1 : Infinity;
+  const count = Math.max(1, Math.min(wanted, run + 1, holds));
   const step = count > 1 ? Math.min(pitch, run / (count - 1)) : 0;
+  const lo = Math.min(start, edge);
+  const hi = Math.max(start, edge);
   return Array.from({ length: count }, (_, i) =>
-    Math.min(hi, Math.max(lo, Math.round(from + dir * i * step))));
+    Math.min(hi, Math.max(lo, Math.round(start + dir * i * step))));
 }
 
