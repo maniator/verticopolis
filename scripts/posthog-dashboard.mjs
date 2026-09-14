@@ -78,23 +78,85 @@ function series(event, name, math = "total", prop) {
   return node;
 }
 
+/** The body of the session_lengths view, kept as an array so the SQL editor
+ *  renders it as readable multi-line SQL rather than one long line. */
+const SESSION_LENGTHS_SQL = [
+  "SELECT",
+  "    -- distinct_id IS the per-tab session id: the ingest relay sets it from the",
+  "    -- session id and sets $process_person_profile false, so no person sits",
+  "    -- behind it. \"Unique users\" in this project means \"unique sessions\".",
+  "    distinct_id AS session_id,",
+  "    -- session_end carries a CUMULATIVE length and re-fires on every tab-hide,",
+  "    -- so the largest value a session reported is its length.",
+  "    max(toFloat(properties.seconds)) AS length_seconds,",
+  "    -- True once the session reported a terminal (pagehide) row. Best-effort:",
+  "    -- a session killed outright never sends one, which is why the length above",
+  "    -- reads max() rather than filtering on this.",
+  "    max(properties.final = true) AS saw_final,",
+  "    count() AS rows_reported,",
+  "    min(timestamp) AS first_reported_at,",
+  "    max(timestamp) AS ended_at,",
+  "    argMax(properties.version, timestamp) AS version,",
+  "    argMax(properties.platform, timestamp) AS platform",
+  "FROM events",
+  "WHERE event = 'session_end'",
+  "  AND properties.environment = 'production'",
+  "  AND toFloat(properties.seconds) IS NOT NULL",
+  "GROUP BY distinct_id",
+].join("\n");
+
+/** A SQL insight source, for the questions the trends builder cannot express.
+ *  `display` picks the visualization; `chartSettings` maps result columns onto the
+ *  axes for a graph (a table or a single number needs neither). */
+function hogql(query, { display = "ActionsTable", chartSettings } = {}) {
+  const node = { kind: "DataVisualizationNode", source: { kind: "HogQLQuery", query }, display };
+  if (chartSettings) node.chartSettings = chartSettings;
+  return node;
+}
+
+/** The saved view the session-length tiles read instead of the raw event.
+ *
+ *  `session_end` re-fires on every tab-hide with a CUMULATIVE `seconds`, because
+ *  the terminal `pagehide` is not reliably delivered and a session that only
+ *  reported at its close would often report nothing at all. So one session writes
+ *  several rows, and a long session writes more of them than a short one.
+ *  Counting rows therefore overcounts sessions (3,343 rows for 919 sessions over
+ *  a recent 30 days), and an event-level percentile over `seconds` is weighted by
+ *  length and reads far too high (a 545s median against a real 90s).
+ *
+ *  Collapsing to `max(seconds)` per `distinct_id` is the fix, and it lives in one
+ *  view rather than in each tile's SQL so the tiles below, and any ad-hoc query,
+ *  cannot drift apart. `distinct_id` IS the per-tab session id: the relay sets it
+ *  from the session id and sets `$process_person_profile` false, so "unique users"
+ *  in this project means "unique sessions". */
+const SESSION_LENGTHS_VIEW = {
+  name: "session_lengths",
+  description:
+    "One row per play session, from the session_end event. session_end re-fires on every tab-hide with a cumulative seconds value (the terminal pagehide is not reliably delivered, so the re-emission is the fallback), which means counting rows overcounts sessions and an event-level percentile over seconds is weighted by session length. This view collapses that to max(seconds) per distinct_id, which is the per-tab session id because the ingest relay sets distinct_id to it and disables person profiles. Production traffic only, matching every tile on this dashboard. Filter on ended_at for a time window.",
+  query: SESSION_LENGTHS_SQL,
+};
+
 /** The dashboard's insight definitions, in display order. Each mirrors what the
  *  live dashboard carries; editing here and re-running is the reproducible path. */
 const INSIGHTS = [
   {
     name: "Boots, sessions & new games over time",
-    description: "Daily boot, session_end, and game_started counts (production).",
-    query: trends([series("boot", "Boots"), series("session_end", "Sessions ended"), series("game_started", "New games")]),
+    description: "Daily boots, distinct sessions that ended, and new towers founded (production). The sessions series counts DISTINCT session ids, not session_end rows, which re-fire once per tab-hide.",
+    // The sessions series is `dau`, i.e. distinct `distinct_id`s, which here means
+    // distinct SESSIONS (the relay's distinct_id is the per-tab session id). A
+    // `total` would count session_end rows, and a session writes one per tab-hide:
+    // 3,343 rows for 919 sessions over a recent 30 days.
+    query: trends([series("boot", "Boots"), series("session_end", "Sessions ended", "dau"), series("new_game_started", "New games")]),
   },
   {
     name: "First-tower funnel (new game → first build → 2★)",
-    description: "Per-session funnel: game_started → first_build → star_reached (star>1), production.",
+    description: "Per-session funnel: new_game_started → first_build → star_reached (star>1), production.",
     query: {
       kind: "InsightVizNode",
       source: {
         kind: "FunnelsQuery",
         series: [
-          { kind: "EventsNode", event: "game_started", name: "New game" },
+          { kind: "EventsNode", event: "new_game_started", name: "New game" },
           { kind: "EventsNode", event: "first_build", name: "First build" },
           {
             kind: "EventsNode",
@@ -141,22 +203,37 @@ const INSIGHTS = [
   },
   {
     name: "Session length percentiles (seconds)",
-    description: "Exact p50 / p90 / p95 of session_end.seconds (production).",
-    query: {
-      kind: "InsightVizNode",
-      source: {
-        kind: "TrendsQuery",
-        series: [
-          series("session_end", "p50", "median", "seconds"),
-          series("session_end", "p90", "p90", "seconds"),
-          series("session_end", "p95", "p95", "seconds"),
-        ],
-        dateRange: LAST_30D,
-        interval: "day",
-        properties: PROD_ONLY,
-        trendsFilter: { display: "ActionsLineGraph", aggregationAxisFormat: "duration" },
+    description: "Daily p50 / p90 / p95 of session length, one value per session (max seconds per session id), production, 30d. An event-level percentile over session_end.seconds reads several times too high.",
+    // Over the session_lengths view, not the raw event: the percentiles have to be
+    // taken over one length PER SESSION. Taken over session_end rows they are
+    // weighted by how many times each session reported, which is itself a function
+    // of length, so long sessions count many times and short ones once.
+    query: hogql(
+      [
+        "SELECT",
+        "    toStartOfDay(ended_at) AS day,",
+        "    round(quantile(0.5)(length_seconds)) AS p50_sec,",
+        "    round(quantile(0.9)(length_seconds)) AS p90_sec,",
+        "    round(quantile(0.95)(length_seconds)) AS p95_sec,",
+        "    count() AS sessions",
+        "FROM session_lengths",
+        "WHERE ended_at >= now() - INTERVAL 30 DAY",
+        "GROUP BY day",
+        "ORDER BY day",
+      ].join("\n"),
+      {
+        display: "ActionsLineGraph",
+        chartSettings: {
+          xAxis: { column: "day" },
+          yAxis: [
+            { column: "p50_sec", settings: { display: { label: "p50" } } },
+            { column: "p90_sec", settings: { display: { label: "p90" } } },
+            { column: "p95_sec", settings: { display: { label: "p95" } } },
+          ],
+          showLegend: true,
+        },
       },
-    },
+    ),
   },
   {
     name: "Session FPS percentiles (median & worst-frame)",
@@ -192,8 +269,16 @@ const INSIGHTS = [
   // Table + KPI tiles for precise at-a-glance numbers.
   { name: "Boots (30d)", description: "Total boot events, production, 30d.", query: trends([series("boot", "Boots")], { display: "BoldNumber" }) },
   { name: "Distinct play sessions (30d)", description: "Unique per-tab session ids, production, 30d.", query: trends([series("boot", "Play sessions", "dau")], { display: "BoldNumber" }) },
-  { name: "New games started (30d)", description: "Total game_started, production, 30d.", query: trends([series("game_started", "New games")], { display: "BoldNumber" }) },
-  { name: "Sessions ended (30d)", description: "Total session_end, production, 30d.", query: trends([series("session_end", "Sessions ended")], { display: "BoldNumber" }) },
+  {
+    name: "New games started (30d)",
+    description: "Total new_game_started (towers FOUNDED, not sessions: a resumed save fires no such event), production, 30d.",
+    query: trends([series("new_game_started", "New games")], { display: "BoldNumber" }),
+  },
+  {
+    name: "Sessions ended (30d)",
+    description: "Distinct sessions that reported an end, production, 30d. Counts sessions, not session_end rows, which re-fire once per tab-hide and overcount by roughly 3.6x.",
+    query: hogql(["SELECT count() AS sessions", "FROM session_lengths", "WHERE ended_at >= now() - INTERVAL 30 DAY"].join("\n"), { display: "BoldNumber" }),
+  },
   { name: "Platform table", description: "Boots by platform as a table, production, 30d.", query: trends([series("boot", "Boots")], { breakdown: "platform", display: "ActionsTable" }) },
   { name: "Tool usage table", description: "tool_used by tool as a table, production, 30d.", query: trends([series("tool_used", "Tool used")], { breakdown: "tool", display: "ActionsTable", breakdownLimit: 25 }) },
   { name: "Boot reason table", description: "Boots by reason as a table, production, 30d.", query: trends([series("boot", "Boots")], { breakdown: "reason", display: "ActionsTable" }) },
@@ -389,6 +474,22 @@ async function findInsight(name) {
   return (data.results || []).find((i) => i.name === name && !i.deleted) || null;
 }
 
+/** Create or update the saved view the SQL tiles read, matched by exact name. A
+ *  view is referenced BY NAME from HogQL, so it has to exist before an insight
+ *  that selects from it runs; provisioning it here keeps the whole dashboard
+ *  reproducible from this one script rather than half of it from the SQL editor. */
+async function ensureView(spec) {
+  const data = await req("GET", `/warehouse_saved_queries/?limit=200`);
+  const existing = (data.results || []).find((v) => v.name === spec.name && !v.deleted) || null;
+  const body = { name: spec.name, description: spec.description, query: { kind: "HogQLQuery", query: spec.query } };
+  if (existing) {
+    await req("PATCH", `/warehouse_saved_queries/${existing.id}/`, body);
+    return "updated";
+  }
+  await req("POST", `/warehouse_saved_queries/`, body);
+  return "created";
+}
+
 async function main() {
   if (!KEY) {
     console.error("POSTHOG_PERSONAL_API_KEY is required (a phx_... personal API key). Aborting.");
@@ -397,10 +498,13 @@ async function main() {
   console.log(`${DRY_RUN ? "[dry-run] " : ""}Provisioning "${DASHBOARD_NAME}" in project ${PROJECT_ID} at ${HOST}`);
 
   if (DRY_RUN) {
-    console.log(`Would ensure the dashboard and ${INSIGHTS.length} insights:`);
+    console.log(`Would ensure the "${SESSION_LENGTHS_VIEW.name}" saved view, the dashboard, and ${INSIGHTS.length} insights:`);
     for (const i of INSIGHTS) console.log(`  - ${i.name}`);
     return;
   }
+
+  // Ahead of the insights: two tiles select from this view by name.
+  console.log(`Saved view "${SESSION_LENGTHS_VIEW.name}": ${await ensureView(SESSION_LENGTHS_VIEW)}`);
 
   let dashboard = await findDashboard();
   if (!dashboard) {

@@ -1,0 +1,91 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sendToRelay } from "./analyticsRelay";
+import { gameplaySession } from "./analytics";
+
+/**
+ * The per-session cap and dedup on the `crash` event.
+ *
+ * `noteCrash` fires every time the crash screen is shown, and a repeating WebGL
+ * context loss re-shows it IN PLACE with no reload: one session emitted 8,269
+ * `crash` events on 2026-09-12. The counts that produces are meaningless, and
+ * worse, the flood spends the ingest route's per-IP minute budget so the SAME
+ * session's `session_builds`, `tool_session_uses`, `session_fps` and
+ * `session_end` are 429'd away, putting the data loss exactly on the sessions
+ * worth studying. These tests pin the guard that stops it (`analyticsThrottle.ts`,
+ * which the `$exception` path shares).
+ *
+ * Its own file so `analytics.test.ts` stays under the line guard.
+ */
+
+vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
+vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
+
+const prod = "https://verticopolis.com/";
+const localhost = "http://localhost:3000/";
+
+/** The tower context every crash in these tests carries, so the assertions are
+ *  about the crash SHAPE the fingerprint reads, not about this payload. */
+const context = { version: "2.25.2", star: 3, population: 800 };
+
+/** Every `crash` event the relay saw, in order, as [name, props] pairs. */
+function crashCalls(): Array<[string, Record<string, unknown>]> {
+  return vi.mocked(sendToRelay).mock.calls.filter(([name]) => name === "crash") as Array<[string, Record<string, unknown>]>;
+}
+
+describe("crash event cap and dedup", () => {
+  beforeEach(() => {
+    window.location.href = prod;
+    gameplaySession.reset();
+    vi.mocked(sendToRelay).mockReset();
+  });
+
+  afterEach(() => {
+    window.location.href = localhost;
+  });
+
+  it("collapses a context-loss loop to the first loss and the first repeat", () => {
+    // The real shape of the 2026-09-12 incident: one loss whose in-place recovery
+    // failed, then the screen re-shown for every further loss, each flagged
+    // `repeat` because the second landed inside 90s.
+    const base = { kind: "webgl-context-lost", recoveryFailed: true, saveFlushed: true, behindSplash: false, ...context };
+    gameplaySession.noteCrash({ ...base, repeat: false });
+    for (let i = 0; i < 40; i++) gameplaySession.noteCrash({ ...base, repeat: true });
+
+    const crashes = crashCalls();
+    expect(crashes.length).toBeLessThanOrEqual(10);
+    expect(crashes).toHaveLength(2); // the two shapes the loop actually has
+    // The first event's payload is untouched by the guard.
+    expect(crashes[0][1]).toEqual({ ...base, repeat: false });
+    // The loop signal survives the dedup, which is why `repeat` is in the
+    // fingerprint: without it the 40 repeats would collapse into the first loss
+    // and nothing would ever report that this session looped.
+    expect(crashes.some(([, props]) => props.repeat === true)).toBe(true);
+  });
+
+  it("reports a repeat-flagged loop even when no earlier crash shape preceded it", () => {
+    // A loop whose first screen is already a repeat (the loss landed within 90s of
+    // one from a previous page), so there is only ever one shape to report.
+    const crash = { kind: "webgl-context-lost", repeat: true, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
+    for (let i = 0; i < 25; i++) gameplaySession.noteCrash(crash);
+    const crashes = crashCalls();
+    expect(crashes).toHaveLength(1);
+    expect(crashes[0][1]).toEqual(crash);
+  });
+
+  it("stops at the per-session cap even for genuinely distinct crash shapes", () => {
+    const base = { kind: "webgl-context-lost", repeat: false, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
+    // 16 distinct fingerprints: the cap has to hold whether or not the dedup
+    // catches them first, since distinct-but-endless is a flood too.
+    for (let i = 0; i < 16; i++) gameplaySession.noteCrash({ ...base, kind: `synthetic-loss-${i}` });
+    expect(crashCalls()).toHaveLength(10);
+  });
+
+  it("re-opens the cap for a fresh measurement window", () => {
+    const crash = { kind: "webgl-context-lost", repeat: false, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
+    gameplaySession.noteCrash(crash);
+    gameplaySession.noteCrash(crash); // deduped
+    gameplaySession.reset(); // a consent epoch (or a test) opens a new window
+    gameplaySession.noteCrash(crash);
+    expect(crashCalls()).toHaveLength(2);
+  });
+});

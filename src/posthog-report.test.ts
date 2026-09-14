@@ -8,6 +8,7 @@ import {
   lit,
   buildTotalsQuery,
   buildDepthQuery,
+  buildSessionDepthQuery,
   buildBreakdownQuery,
   buildFilteredCountQuery,
   rowsToObjects,
@@ -86,6 +87,23 @@ describe("HogQL query builders", () => {
     expect(q).toContain("event = 'session_end'");
     expect(q).toContain("toFloat(properties.seconds) IS NOT NULL");
     expect(q).toContain("INTERVAL 336 HOUR");
+  });
+
+  it("per-session depth query collapses each session to its largest value first", () => {
+    // session_end re-fires per tab-hide with a cumulative value, so its
+    // percentiles have to run over one length per session, not per row.
+    const q = buildSessionDepthQuery("session_end", "seconds", 336);
+    expect(q).toContain("max(toFloat(properties.seconds)) AS v");
+    expect(q).toContain("GROUP BY distinct_id");
+    expect(q).toContain("quantile(0.5)(v)");
+    expect(q).toContain("quantile(0.9)(v)");
+    expect(q).toContain("quantile(0.95)(v)");
+    expect(q).toContain("event = 'session_end'");
+    expect(q).toContain("toFloat(properties.seconds) IS NOT NULL");
+    expect(q).toContain("INTERVAL 336 HOUR");
+    expect(q).toContain("count() AS n"); // sessions, not rows
+    // Reading the raw property in the percentile is the bug this builder fixes.
+    expect(q).not.toContain("quantile(0.5)(toFloat(properties.seconds))");
   });
 
   it("breakdown query groups by the property and counts sessions per group", () => {

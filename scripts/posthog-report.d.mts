@@ -26,6 +26,7 @@ export function parseWindow(v: unknown): { hours: number; label: string };
 export function lit(s: unknown): string;
 export function buildTotalsQuery(events: string[], hours: number): string;
 export function buildDepthQuery(event: string, prop: string, hours: number): string;
+export function buildSessionDepthQuery(event: string, prop: string, hours: number): string;
 export function buildBreakdownQuery(event: string, prop: string, hours: number, limit?: number): string;
 export function buildFilteredCountQuery(event: string, where: string, hours: number): string;
 export function rowsToObjects(json: unknown): Array<Record<string, unknown>>;

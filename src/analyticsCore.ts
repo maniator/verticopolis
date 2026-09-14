@@ -25,13 +25,21 @@ import { holdWhilePending } from "./desktopConsent";
  */
 export interface GameplayEvents {
   /** A fresh tower was founded (the funnel's entry point). `mode` is the
-   *  rule-set: "classic" or "modern". */
-  game_started: { mode: string };
+   *  rule-set: "classic" or "modern".
+   *
+   *  Named for what it counts. It fires ONLY on founding, so a returning player
+   *  who opens a save never emits it: this counts new towers, and reading it as
+   *  a session or games-played denominator understates the real figure (a week
+   *  that read 82 here carried 123 `first_build`s). The resumed half of that
+   *  picture is `boot` with `reason` "continue" or "recovery". It was called
+   *  `game_started` until 2026-09-14, a name that read like a session counter
+   *  and was repeatedly taken for one. */
+  new_game_started: { mode: string };
   /** The first facility placed in the current tower (the funnel's "did they
    *  build anything" step). Fires once per tower: for a founded tower it follows
-   *  that tower's `game_started` (the latch re-opens in `noteNewGame`); for the
-   *  boot tower that a continued save opens on, it fires with no preceding
-   *  `game_started`. `tool` is the facility/transport kind that broke the ice. */
+   *  that tower's `new_game_started` (the latch re-opens in `noteNewGame`); for
+   *  the boot tower that a continued save opens on, it fires with no preceding
+   *  `new_game_started`. `tool` is the facility/transport kind that broke the ice. */
   first_build: { tool: string };
   /** A tool was selected, reported once per distinct tool so the event captures
    *  the session's tool mix without a row per click. */
@@ -39,8 +47,26 @@ export interface GameplayEvents {
   /** The tower crossed into a new star rating (2 through 6): progression depth,
    *  the clearest "how far do players get" signal. */
   star_reached: { star: number };
-  /** The tab was hidden or unloaded: session length in whole seconds. */
-  session_end: { seconds: number };
+  /** The tab was hidden or unloaded: cumulative foreground session length in
+   *  whole seconds, plus whether this was the session's terminal report.
+   *
+   *  It RE-FIRES on every tab-hide with a growing `seconds`, because the terminal
+   *  `pagehide` is not reliably delivered (a hard mobile kill drops it) and a
+   *  session that only ever reported at its close would often report nothing at
+   *  all. So one session contributes several rows, and a long session contributes
+   *  more of them than a short one. Counting rows therefore overcounts sessions,
+   *  and an event-level percentile over `seconds` is weighted by length and reads
+   *  far too high. Read a session's length as `max(seconds)` per `distinct_id`
+   *  (the per-tab session id, see `analyticsIngest.ts`) and count sessions as
+   *  distinct `distinct_id`s, never as a row count. The `session_lengths` saved
+   *  view in PostHog is that collapse, and the dashboard tiles read it.
+   *
+   *  `final` marks the emission made from `pagehide`, so the terminal row is
+   *  identifiable without giving up the re-emission fallback. It is best-effort
+   *  in the same way `pagehide` is: a session killed outright has no row with
+   *  `final: true`, which is why the aggregation above reads `max` rather than
+   *  filtering on this flag. */
+  session_end: { seconds: number; final: boolean };
   /** One snapshot per boot: why the session started (`reason`), the build it
    *  runs (`version`), and the standing state of the tower it opened. Unlike the
    *  delta events, this captures a returning player's established tower even when

@@ -33,10 +33,10 @@ describe("gameplay analytics events", () => {
     setVisibility("visible");
   });
 
-  it("reports game_started, star_reached with their props on a deployed host", () => {
+  it("reports new_game_started, star_reached with their props on a deployed host", () => {
     gameplaySession.noteNewGame("modern");
     gameplaySession.noteStar(3);
-    expect(sendToRelay).toHaveBeenNthCalledWith(1, "game_started", { mode: "modern" });
+    expect(sendToRelay).toHaveBeenNthCalledWith(1, "new_game_started", { mode: "modern" });
     expect(sendToRelay).toHaveBeenNthCalledWith(2, "star_reached", { star: 3 });
   });
 
@@ -111,7 +111,7 @@ describe("gameplay analytics events", () => {
     gameplaySession.noteNewGame("modern"); // founding tower B resets the latch
     gameplaySession.noteBuild("office"); // first build of tower B fires again
     expect(sendToRelay).toHaveBeenNthCalledWith(1, "first_build", { tool: "floor" });
-    expect(sendToRelay).toHaveBeenNthCalledWith(2, "game_started", { mode: "modern" });
+    expect(sendToRelay).toHaveBeenNthCalledWith(2, "new_game_started", { mode: "modern" });
     expect(sendToRelay).toHaveBeenNthCalledWith(3, "first_build", { tool: "office" });
   });
 
@@ -159,7 +159,7 @@ describe("common event enrichment (S4)", () => {
     setCommonProps({ platform: "twa", returning: true, tenure: "d7-29", recency: "7d" });
     gameplaySession.noteNewGame("modern");
     gameplaySession.noteStar(3);
-    expect(sendToRelay).toHaveBeenNthCalledWith(1, "game_started", {
+    expect(sendToRelay).toHaveBeenNthCalledWith(1, "new_game_started", {
       platform: "twa",
       returning: true,
       tenure: "d7-29",
@@ -180,7 +180,7 @@ describe("common event enrichment (S4)", () => {
     // props are spread last.
     setCommonProps({ mode: "should-be-overridden" });
     gameplaySession.noteNewGame("classic");
-    expect(sendToRelay).toHaveBeenCalledWith("game_started", { mode: "classic" });
+    expect(sendToRelay).toHaveBeenCalledWith("new_game_started", { mode: "classic" });
   });
 
   it("clears the common props on reset, so a later event carries none", () => {
@@ -212,7 +212,7 @@ describe("gameplay session length", () => {
     gameplaySession.end();
     gameplaySession.end(); // a second signal must not double-count
     expect(sendToRelay).toHaveBeenCalledTimes(1);
-    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 5 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 5, final: false });
   });
 
   it("does not report a session that never began", () => {
@@ -229,8 +229,8 @@ describe("gameplay session length", () => {
     gameplaySession.begin(); // resumed after 7s hidden (not counted)
     vi.setSystemTime(12000);
     gameplaySession.end(); // hidden again: 3s + 2s foreground
-    expect(sendToRelay).toHaveBeenNthCalledWith(1, "session_end", { seconds: 3 });
-    expect(sendToRelay).toHaveBeenNthCalledWith(2, "session_end", { seconds: 5 });
+    expect(sendToRelay).toHaveBeenNthCalledWith(1, "session_end", { seconds: 3, final: false });
+    expect(sendToRelay).toHaveBeenNthCalledWith(2, "session_end", { seconds: 5, final: false });
   });
 
   it("begin is idempotent so the clock is not reset mid-session", () => {
@@ -240,7 +240,7 @@ describe("gameplay session length", () => {
     gameplaySession.begin(); // ignored: the session already started at 0
     vi.setSystemTime(8000);
     gameplaySession.end();
-    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 8 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 8, final: false });
   });
 
   it("emits build volume, peak floor, and per-tool depth at session end", () => {
@@ -261,7 +261,7 @@ describe("gameplay session length", () => {
     gameplaySession.begin();
     vi.setSystemTime(3000);
     gameplaySession.end();
-    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 3 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 3, final: false });
     expect(sendToRelay).not.toHaveBeenCalledWith("session_builds", expect.anything());
     expect(sendToRelay).not.toHaveBeenCalledWith("tool_session_uses", expect.anything());
   });
@@ -288,6 +288,29 @@ describe("gameplay session length", () => {
     vi.setSystemTime(2000);
     gameplaySession.end();
     expect(sendToRelay).toHaveBeenCalledWith("session_peak_floors", { floors: -5 });
+  });
+
+  it("marks the terminal emission final, and lets it past the whole-second dedup once", () => {
+    vi.setSystemTime(0);
+    gameplaySession.begin();
+    vi.setSystemTime(4000);
+    gameplaySession.end(false); // visibilitychange:hidden
+    gameplaySession.end(true); // pagehide in the same rounded second
+    gameplaySession.end(true); // a second terminal signal must not add a row
+    const ends = vi.mocked(sendToRelay).mock.calls.filter(([name]) => name === "session_end");
+    expect(ends).toHaveLength(2);
+    expect(ends[0][1]).toEqual({ seconds: 4, final: false });
+    expect(ends[1][1]).toEqual({ seconds: 4, final: true });
+  });
+
+  it("stays silent on a terminal end with nothing to report", () => {
+    // A prerender or blink-and-leave visit. The rule above must not start emitting
+    // a zero-length row for every such visit, which would drag the median down.
+    vi.setSystemTime(0);
+    gameplaySession.begin();
+    vi.setSystemTime(300); // 0.3s -> rounds to 0
+    gameplaySession.end(true);
+    expect(sendToRelay).not.toHaveBeenCalledWith("session_end", expect.anything());
   });
 
   it("still records depth when the session ends within the first rounded second", () => {
@@ -335,7 +358,7 @@ describe("startGameplaySession wiring", () => {
     vi.setSystemTime(3000);
     setVisibility("hidden");
     document.dispatchEvent(new Event("visibilitychange"));
-    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 3 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 3, final: false });
   });
 
   it("does not count time before the page first becomes visible", () => {
@@ -349,7 +372,7 @@ describe("startGameplaySession wiring", () => {
     vi.setSystemTime(8000);
     setVisibility("hidden"); // leaves at 8s: only 3s of foreground play
     document.dispatchEvent(new Event("visibilitychange"));
-    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 3 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 3, final: false });
   });
 
   it("ignores a visibilitychange that is not to hidden", () => {
@@ -368,11 +391,11 @@ describe("startGameplaySession wiring", () => {
  * events someone happened to remember.
  */
 const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
-  game_started: { mode: "modern" },
+  new_game_started: { mode: "modern" },
   first_build: { tool: "office" },
   tool_used: { tool: "lobby" },
   star_reached: { star: 3 },
-  session_end: { seconds: 42 },
+  session_end: { seconds: 42, final: true },
   boot: { reason: "continue", version: "1.0.0", mode: "modern", star: 2, floors: 10, population: 90 },
   crash: {
     kind: "webgl-context-lost",

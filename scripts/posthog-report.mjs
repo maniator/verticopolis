@@ -144,6 +144,28 @@ function buildDepthQuery(event, prop, hours) {
   );
 }
 
+/** HogQL for one numeric property's exact percentiles over an event that reports
+ *  MORE THAN ONCE per session with a cumulative value, namely `session_end`. It
+ *  collapses each session to its largest reported value first, then takes the
+ *  percentiles across sessions, so the distribution is one length per session.
+ *
+ *  {@link buildDepthQuery} is wrong for such an event, and badly so: a session
+ *  writes a `session_end` row on every tab-hide, so a long session contributes
+ *  many rows and a short one contributes a single row, and the event-level
+ *  percentile ends up weighted by the very thing it is measuring (a recent 30
+ *  days read a 545s median event-level against a real 90s per session). The
+ *  once-per-session events (`session_builds`, `session_peak_floors`,
+ *  `session_fps`) have exactly one row each and stay on the plain builder. */
+function buildSessionDepthQuery(event, prop, hours) {
+  const val = `toFloat(properties.${prop})`;
+  return (
+    `SELECT count() AS n, quantile(0.5)(v) AS p50, quantile(0.9)(v) AS p90, ` +
+    `quantile(0.95)(v) AS p95, max(v) AS mx FROM ` +
+    `(SELECT distinct_id, max(${val}) AS v FROM events ` +
+    `WHERE ${SCOPE(hours)} AND event = ${lit(event)} AND ${val} IS NOT NULL GROUP BY distinct_id)`
+  );
+}
+
 /** HogQL for one event grouped by a property: events and distinct sessions per
  *  group, most frequent first. The per-session column is the payoff over the
  *  Vercel path, which had no session id to count. */
@@ -450,7 +472,7 @@ function demoModel() {
       ["Towers founded", 1240],
       ["First builds", 1012],
       ["Star promotions", 438],
-      ["Sessions ended", 3120],
+      ["Sessions ended", 2410],
       ["Boots", 5400],
       ["Play sessions", 2600],
       ["Crashes", 37],
@@ -460,13 +482,13 @@ function demoModel() {
       ["Errors", 54],
     ],
     highlights: [
-      ["Founded to first build", "81.6%"],
+      ["First builds vs towers founded", "81.6%"],
       ["Crash to boot ratio", "0.7%"],
       ["Typical session fps (p50)", "58"],
       ["Sessions with a fire", "6.2%"],
     ],
     depth: [
-      { label: "Session length (seconds)", row: depth(3120, 92, 640, 1180, 4200) },
+      { label: "Session length (seconds)", row: depth(2410, 92, 640, 1180, 4200) },
       { label: "Builds per session", row: depth(2600, 6, 31, 58, 210) },
       { label: "Peak floor reached", row: depth(2600, 9, 34, 51, 92) },
       { label: "Session fps (p50)", row: depth(2100, 58, 41, 33, 60) },
@@ -519,7 +541,7 @@ async function main() {
   }
 
   const TOTAL_EVENTS = [
-    "boot", "session_end", "game_started", "first_build", "star_reached", "crash", "update",
+    "boot", "session_end", "new_game_started", "first_build", "star_reached", "crash", "update",
     // App-chrome (#614), error tracking, and the gameplay economy / emergency
     // surfaces (#611). Each only has history from when its build went live.
     "app_action", "economy_action", "emergency_choice", "session_emergencies", "$exception",
@@ -535,8 +557,11 @@ async function main() {
   const totals = totalsByEvent(totalsRes, TOTAL_EVENTS);
 
   // Depth: exact percentiles per session-scoped numeric property.
+  // `perSession` routes an event that reports repeatedly with a cumulative value
+  // through the max-per-session collapse first (see buildSessionDepthQuery). The
+  // rest report once per session, so the plain builder is already per session.
   const depthSpecs = [
-    { label: "Session length (seconds)", event: "session_end", prop: "seconds" },
+    { label: "Session length (seconds)", event: "session_end", prop: "seconds", perSession: true },
     { label: "Builds per session", event: "session_builds", prop: "builds" },
     { label: "Peak floor reached", event: "session_peak_floors", prop: "floors" },
     { label: "Session fps (p50)", event: "session_fps", prop: "p50" },
@@ -544,7 +569,8 @@ async function main() {
   ];
   const depth = [];
   for (const d of depthSpecs) {
-    const r = await q(`depth_${d.event}_${d.prop}`, buildDepthQuery(d.event, d.prop, WINDOW.hours));
+    const build = d.perSession ? buildSessionDepthQuery : buildDepthQuery;
+    const r = await q(`depth_${d.event}_${d.prop}`, build(d.event, d.prop, WINDOW.hours));
     depth.push({ label: d.label, row: depthRow(r) });
   }
 
@@ -579,10 +605,12 @@ async function main() {
     window: { since, until: stamp, label: WINDOW.label },
     generated: new Date().toISOString(),
     kpis: [
-      ["Towers founded", totals.game_started.events],
+      ["Towers founded", totals.new_game_started.events],
       ["First builds", totals.first_build.events],
       ["Star promotions", totals.star_reached.events],
-      ["Sessions ended", totals.session_end.events],
+      // DISTINCT sessions, not session_end rows: the event re-fires on every
+      // tab-hide, so a row count runs several times the real session count.
+      ["Sessions ended", totals.session_end.sessions],
       ["Boots", totals.boot.events],
       ["Play sessions", totals.boot.sessions],
       ["Crashes", totals.crash.events],
@@ -592,7 +620,13 @@ async function main() {
       ["Errors", totals["$exception"].events],
     ],
     highlights: [
-      ["Founded to first build", pct(totals.first_build.events, totals.game_started.events)],
+      // Both are per TOWER, not per session, and the ratio can exceed 100%:
+      // first_build fires once for every tower that gets a facility, a tower
+      // opened from a save included, while new_game_started fires only on
+      // founding. Read it as "first builds against towers founded", not as a
+      // conversion rate; the honest funnel is the dashboard's, which is
+      // per session.
+      ["First builds vs towers founded", pct(totals.first_build.events, totals.new_game_started.events)],
       ["Crash to boot ratio", pct(totals.crash.events, totals.boot.events)],
       ["Typical session fps (p50)", fpsP50 && !fpsP50.skipped && !fpsP50.empty ? fmt(rnd(fpsP50.p50)) : "n/a"],
       // Fire rate: sessions with >=1 fire over all played sessions that reported.
@@ -688,4 +722,4 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
 }
 
 // Exported for unit tests; the script itself uses them directly above.
-export { parseWindow, lit, buildTotalsQuery, buildDepthQuery, buildBreakdownQuery, buildFilteredCountQuery, rowsToObjects, totalsByEvent, depthRow, breakdownRows, countRow };
+export { parseWindow, lit, buildTotalsQuery, buildDepthQuery, buildSessionDepthQuery, buildBreakdownQuery, buildFilteredCountQuery, rowsToObjects, totalsByEvent, depthRow, breakdownRows, countRow };

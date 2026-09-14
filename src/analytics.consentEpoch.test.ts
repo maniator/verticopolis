@@ -97,7 +97,7 @@ describe("a desktop consent change starts a fresh measurement window", () => {
     expect(propsFor("session_builds"), "only the placement after the grant counts").toEqual([{ builds: 1 }]);
     expect(propsFor("session_peak_floors"), "floor 40 was built opted out").toEqual([{ floors: 3 }]);
     expect(propsFor("tool_session_uses")).toEqual([{ tool: "office", uses: 1 }]);
-    expect(propsFor("session_end"), "and the clock covers the consented window only").toEqual([{ seconds: 2 }]);
+    expect(propsFor("session_end"), "and the clock covers the consented window only").toEqual([{ seconds: 2, final: true }]);
     // The catch-all: nothing the player did while opted out may be recognizable in
     // anything that left, whatever event carried it.
     const leaked = sent.filter((e) => JSON.stringify(e.props).includes("hotel"));
@@ -206,7 +206,7 @@ describe("the browser path is untouched", () => {
     expect(propsFor("session_builds"), "still once per session, still the first-background value").toEqual([
       { builds: 2 },
     ]);
-    expect(propsFor("session_end"), "and one growing session, not two").toEqual([{ seconds: 3 }, { seconds: 9 }]);
+    expect(propsFor("session_end"), "and one growing session, not two").toEqual([{ seconds: 3, final: false }, { seconds: 9, final: false }]);
   });
 
   it("sums emergencies across a tower replacement exactly as before", () => {
@@ -226,6 +226,6 @@ describe("the browser path is untouched", () => {
     vi.setSystemTime(5000);
     gameplaySession.end(true);
     expect(propsFor("session_builds")).toEqual([{ builds: 3 }]);
-    expect(propsFor("session_end")).toEqual([{ seconds: 5 }]);
+    expect(propsFor("session_end")).toEqual([{ seconds: 5, final: true }]);
   });
 });
