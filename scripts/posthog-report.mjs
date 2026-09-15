@@ -135,8 +135,10 @@ function buildTotalsQuery(events, hours) {
 /** HogQL for one numeric property's percentiles over a session-scoped event.
  *  `prop` is a hardcoded property name (seconds / builds / floors / p50 / low).
  *  Rows with a null or non-numeric property are excluded by the cast. These are
- *  ClickHouse `quantile()`, which is the approximate (reservoir) implementation,
- *  so read them as close estimates rather than exact order statistics. */
+ *  ClickHouse `quantile()`, which is approximate, so read them as close estimates
+ *  rather than exact order statistics. (Deliberately not naming the sampling
+ *  algorithm: what matters here is that the values are approximate, and pinning a
+ *  specific implementation is a claim this comment would then have to keep true.) */
 function buildDepthQuery(event, prop, hours) {
   const val = `toFloat(properties.${prop})`;
   return (
