@@ -62,16 +62,19 @@ const MAX_MESSAGE_LEN = 500;
 /** Longest raw stack string kept (characters). Fits well inside the relay's 8 KB
  *  body cap alongside the rest of the payload. */
 const MAX_STACK_LEN = 2_000;
-/** Hard cap on `$exception` events one page (session) sends. A crash loop should
- *  report, not flood; distinct errors past this are dropped too, which is the
- *  safe direction (the relay's own per-IP rate limit is the outer backstop). */
-const MAX_ERRORS_PER_SESSION = 10;
+/** Hard cap on `$exception` events one PAGE LIFE sends. Not one session: the
+ *  throttle is module memory and a reload re-opens it, while the session id lives
+ *  in `sessionStorage` and survives, so one `distinct_id` can carry more than this
+ *  across page lives. An error loop should report, not flood; distinct errors past
+ *  this are dropped too, which is the safe direction (the relay's own per-IP rate
+ *  limit is the outer backstop). */
+const MAX_ERRORS_PER_PAGE_LIFE = 10;
 
 /** The cap plus the per-fingerprint dedup, so a repeated error sends once. Its
  *  own instance, deliberately not shared with the gameplay `crash` path's
  *  throttle, so a crash loop cannot spend this budget (see
  *  `analyticsThrottle.ts`, where the guard itself now lives). */
-const throttle = createSessionThrottle(MAX_ERRORS_PER_SESSION);
+const throttle = createSessionThrottle(MAX_ERRORS_PER_PAGE_LIFE);
 /** Re-entrancy latch: a throw while building or sending a report must not
  *  recurse into the `error` handler and spiral. */
 let reporting = false;

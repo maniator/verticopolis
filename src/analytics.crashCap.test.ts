@@ -107,4 +107,26 @@ describe("crash event cap and dedup", () => {
     gameplaySession.noteCrash(crash);
     expect(crashCalls()).toHaveLength(2);
   });
+
+  it("re-opens the cap for a new PAGE LIFE, which the session id outlives", () => {
+    // The throttle is module memory, so a reload gives it a fresh budget, while
+    // `sessionStorage` keeps the session id across that reload on purpose. One
+    // `distinct_id` can therefore carry more than the cap. This pins the seam
+    // rather than leaving it to be rediscovered: `reset()` stands in for the
+    // fresh module a reload produces, and the crash screen's own reload button
+    // is the path that reaches it.
+    //
+    // Deliberate. The flood the cap exists to stop needs no reload (the screen
+    // re-shows in place, which is how one page life reached 8,269 events), and a
+    // crash that survives a reload is a new incident worth reporting: the player
+    // asked for a fresh page and the GPU died again.
+    const crash = { kind: "webgl-context-lost", repeat: true, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
+    for (let i = 0; i < 25; i++) gameplaySession.noteCrash({ ...crash, kind: `loss-${i}` });
+    expect(crashCalls()).toHaveLength(10); // this page life is spent
+
+    gameplaySession.reset(); // the reload
+    for (let i = 0; i < 25; i++) gameplaySession.noteCrash({ ...crash, kind: `loss-${i}` });
+    // A full second budget, under what would be the same session id on the wire.
+    expect(crashCalls()).toHaveLength(20);
+  });
 });

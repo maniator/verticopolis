@@ -92,7 +92,7 @@ describe("cookieless error tracking", () => {
 
   it("caps the number of distinct errors reported per session", () => {
     for (let i = 0; i < 25; i++) fireError({ error: new Error(`distinct ${i}`), message: `distinct ${i}` });
-    expect(sendException).toHaveBeenCalledTimes(10); // MAX_ERRORS_PER_SESSION
+    expect(sendException).toHaveBeenCalledTimes(10); // MAX_ERRORS_PER_PAGE_LIFE
   });
 
   it("reports an unhandled promise rejection carrying an Error", () => {

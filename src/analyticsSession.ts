@@ -31,11 +31,16 @@ const FPS_MIN_SAMPLES = 120;
  *  Pixel 8a recovery is exactly #538's scenario). Such a gap re-anchors and is
  *  dropped instead. Realistic device jank down to 1fps is still captured. */
 const FPS_MAX_FRAME_MS = 1000;
-/** Hard cap on `crash` events one session sends. Deliberately its own literal
- *  rather than a shared constant: this and `analyticsErrors.ts`'s
- *  `MAX_ERRORS_PER_SESSION` happen to agree at 10 today, but they bound two
- *  different streams and either may be retuned without the other. */
-const MAX_CRASHES_PER_SESSION = 10;
+/** Hard cap on `crash` events one PAGE LIFE sends, named for what it bounds: the
+ *  throttle is module memory, so a reload re-opens it, while the session id
+ *  survives in `sessionStorage`, and one `distinct_id` can exceed ten across page
+ *  lives. Intended, not an oversight. The flood this exists to stop needs no
+ *  reload (the screen re-shows in place: 8,269 events in one page life), reloads
+ *  are human-paced so they cannot threaten the per-IP budget, and a crash that
+ *  survives one is a new incident worth seeing. Persisting it anyway is a tracked
+ *  backlog decision. Its own literal, not shared with `analyticsErrors.ts`'s cap:
+ *  they agree at 10 today but bound different streams. */
+const MAX_CRASHES_PER_PAGE_LIFE = 10;
 
 /** The cumulative emergency counters the frame loop samples, in the shape the
  *  session banks and reports them. */
@@ -118,10 +123,11 @@ class GameplaySession {
   private emergReported = false;
   /** Cap and per-fingerprint dedup for `crash`, so a repeating crash-screen show
    *  reports once rather than once per loop iteration (see {@link noteCrash}).
-   *  The cap matches the `$exception` path's, whose identical guard is why the
-   *  same incident produced 11 error reports instead of thousands: 11 across the
-   *  two distinct_ids the incident spanned, since one session cannot exceed 10. */
-  private readonly crashes = createSessionThrottle(MAX_CRASHES_PER_SESSION);
+   *  Module memory, so its budget is per PAGE LIFE: a reload re-opens it, and the
+   *  session id outlives that. The cap matches the `$exception` path's, whose
+   *  identical guard is why the same incident produced 11 error reports rather
+   *  than thousands, across the two distinct_ids that incident spanned. */
+  private readonly crashes = createSessionThrottle(MAX_CRASHES_PER_PAGE_LIFE);
 
   /** Start or resume timing foreground play. Idempotent while already running,
    *  so a redundant `begin` (a defensive double boot, a visible event with no
@@ -194,17 +200,15 @@ class GameplaySession {
    * `tool_session_uses`, `session_fps` and `session_end` come back 429 and are
    * lost, which puts the data loss precisely on the sessions worth studying.
    *
-   * The fingerprint is every FLAG on the crash, and none of the tower context
-   * riding along, so a loop settles onto one fingerprint and reports once. Taking
-   * the whole flag set rather than a chosen subset is the point: each flag marks
-   * a materially different incident (an in-place recovery that failed, a loss
-   * behind the splash, a save that could not be flushed), and dropping one from
-   * the key would silently merge two of them and report only whichever happened
-   * first. `repeat` matters most of the four: it is the signal that a loop
-   * happened at all, it flips from false to true on the second loss inside 90s,
-   * and leaving it out would let the dedup swallow the one event that carries it
-   * wherever nothing else about the shape changed. So a loop emits the first
-   * loss, the first repeat, and nothing more.
+   * The fingerprint is every FLAG on the crash and none of the tower context, so
+   * a loop settles onto one fingerprint and reports once. The whole flag set
+   * rather than a chosen subset is the point: each marks a materially different
+   * incident (a failed in-place recovery, a loss behind the splash, a save that
+   * could not be flushed), and dropping one would silently merge two and report
+   * only whichever came first. `repeat` matters most: it is the signal that a
+   * loop happened at all, it flips on the second loss inside 90s, and without it
+   * the dedup swallows the one event carrying it wherever nothing else changed.
+   * So a loop emits the first loss, the first repeat, and nothing more.
    *
    * The four flags span 16 shapes per `kind`, which is MORE than the cap of 10, so
    * the key does not by itself guarantee every shape reports: past 10 the cap
