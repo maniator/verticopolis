@@ -9,8 +9,14 @@
  * Runs on plain Node (18+, global fetch), no dependencies. Env:
  *   POSTHOG_PERSONAL_API_KEY  (required)  a personal API key with insight:read,
  *                                         insight:write, dashboard:read,
- *                                         dashboard:write (a phx_... key, NOT the
- *                                         phc_... ingest key).
+ *                                         dashboard:write, action:read and
+ *                                         action:write (a phx_... key, NOT the
+ *                                         phc_... ingest key). The action scopes
+ *                                         are not optional: the new-game tiles
+ *                                         read through an action, which is
+ *                                         provisioned before any insight, so a
+ *                                         key without them aborts the run with
+ *                                         nothing written.
  *   POSTHOG_PROJECT_ID        (default 524085)  the verticopolis project.
  *   POSTHOG_HOST              (default https://us.posthog.com)  US Cloud app host.
  *
@@ -746,7 +752,25 @@ async function main() {
   // they save and surface the view's own error when rendered. Both are better
   // than a dead script, and the run still exits non-zero either way. The action
   // is NOT best-effort: tiles reference it by id and there is no id to invent.
-  const action = await ensureAction(NEW_GAME_ACTION);
+  // Before any insight, because two tiles point at the action by id. A key minted
+  // from an older copy of the scope list above has no action:* and fails here, so
+  // the abort names the cause rather than surfacing a bare 403. Failing before
+  // anything is written is the right shape: a half-provisioned dashboard would be
+  // harder to reason about than one that was left alone.
+  let action;
+  try {
+    action = await ensureAction(NEW_GAME_ACTION);
+  } catch (err) {
+    const msg = String(err?.message || err);
+    if (/\b(401|403)\b/.test(msg)) {
+      throw new Error(
+        `${msg}\n\nThe key appears to lack the action:read / action:write scopes. ` +
+          "They are required (see the header): the new-game tiles resolve through an " +
+          "action. Add both to the personal API key and re-run. Nothing was written.",
+      );
+    }
+    throw err;
+  }
   console.log(`Action "${NEW_GAME_ACTION.name}": ${action.outcome} (id ${action.id})`);
   let viewOk = true;
   try {

@@ -1,5 +1,5 @@
 import { telemetryHostAllowed } from "./telemetry";
-import { onDesktopConsentChange } from "./desktopConsent";
+import { desktopConsentState, onDesktopConsentChange } from "./desktopConsent";
 import { gameplaySession } from "./analyticsSession";
 
 /**
@@ -66,7 +66,17 @@ export {
  * `IS_DESKTOP_BUILD`), so this never fires there and the web session behaves
  * exactly as it did before any of this landed.
  */
-onDesktopConsentChange(() => gameplaySession.startEpoch());
+onDesktopConsentChange(() => {
+  gameplaySession.startEpoch();
+  // The crash throttle is a flood guard, not a measurement, so it does not simply
+  // follow the window. Its slots are handed back only when the events that spent
+  // them cannot go out. Watchers run before the held queue settles, so a grant
+  // here means those crashes are about to be sent (keep the slots, or an identical
+  // recurrence sends a duplicate) and any other answer means they are about to be
+  // dropped (release them, or a crash the player has since agreed to share stays
+  // silenced). See `GameplaySession.releaseCrashThrottle`.
+  if (desktopConsentState() !== "granted") gameplaySession.releaseCrashThrottle();
+});
 
 /**
  * Start the gameplay session at boot and keep its foreground clock in step with

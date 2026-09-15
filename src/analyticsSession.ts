@@ -1,7 +1,7 @@
 import { telemetryHostAllowed } from "./telemetry";
 import { trackEvent, setCommonProps, type GameplayEvents } from "./analyticsCore";
 import { clearActionLatches } from "./analyticsActions";
-import { createSessionThrottle } from "./analyticsThrottle";
+import { noteCrash as reportCrash, releaseCrashThrottle as releaseCrashSlots } from "./analyticsCrash";
 
 /**
  * The per-tab {@link GameplaySession} and the one process-wide instance of it,
@@ -31,16 +31,6 @@ const FPS_MIN_SAMPLES = 120;
  *  Pixel 8a recovery is exactly #538's scenario). Such a gap re-anchors and is
  *  dropped instead. Realistic device jank down to 1fps is still captured. */
 const FPS_MAX_FRAME_MS = 1000;
-/** Hard cap on `crash` events one PAGE LIFE sends, named for what it bounds: the
- *  throttle is module memory, so a reload re-opens it, while the session id
- *  survives in `sessionStorage`, and one `distinct_id` can exceed ten across page
- *  lives. Intended, not an oversight. The flood this exists to stop needs no
- *  reload (the screen re-shows in place: 8,269 events in one page life), reloads
- *  are human-paced so they cannot threaten the per-IP budget, and a crash that
- *  survives one is a new incident worth seeing. Persisting it anyway is a tracked
- *  backlog decision. Its own literal, not shared with `analyticsErrors.ts`'s cap:
- *  they agree at 10 today but bound different streams. */
-const MAX_CRASHES_PER_PAGE_LIFE = 10;
 
 /** The cumulative emergency counters the frame loop samples, in the shape the
  *  session banks and reports them. */
@@ -121,13 +111,6 @@ class GameplaySession {
   private emergSampled = false;
   /** `session_emergencies` fires at most once per session (like the depth events). */
   private emergReported = false;
-  /** Cap and per-fingerprint dedup for `crash`, so a repeating crash-screen show
-   *  reports once rather than once per loop iteration (see {@link noteCrash}).
-   *  Module memory, so its budget is per PAGE LIFE: a reload re-opens it, and the
-   *  session id outlives that. The cap matches the `$exception` path's, whose
-   *  identical guard is why the same incident produced 11 error reports rather
-   *  than thousands, across the two distinct_ids that incident spanned. */
-  private readonly crashes = createSessionThrottle(MAX_CRASHES_PER_PAGE_LIFE);
 
   /** Start or resume timing foreground play. Idempotent while already running,
    *  so a redundant `begin` (a defensive double boot, a visible event with no
@@ -188,55 +171,10 @@ class GameplaySession {
     trackEvent("boot", info);
   }
 
-  /**
-   * Report a crash (crash-screen moment) with its flattened description, capped
-   * and deduplicated per session.
-   *
-   * The guard is not a nicety. The crash screen is re-shown IN PLACE on each
-   * loss, with no reload, so a device whose WebGL context keeps dying re-enters
-   * this call for as long as the tab lives: one session sent 8,269 `crash`
-   * events in a day. Past the wrecked crash counts, that flood spends the ingest
-   * route's per-IP minute budget, so the same session's `session_builds`,
-   * `tool_session_uses`, `session_fps` and `session_end` come back 429 and are
-   * lost, which puts the data loss precisely on the sessions worth studying.
-   *
-   * The fingerprint is every FLAG on the crash and none of the tower context, so
-   * a loop settles onto one fingerprint and reports once. The whole flag set
-   * rather than a chosen subset is the point: each marks a materially different
-   * incident (a failed in-place recovery, a loss behind the splash, a save that
-   * could not be flushed), and dropping one would silently merge two and report
-   * only whichever came first. `repeat` matters most: it is the signal that a
-   * loop happened at all, it flips on the second loss inside 90s, and without it
-   * the dedup swallows the one event carrying it wherever nothing else changed.
-   * So a loop emits the first loss, the first repeat, and nothing more.
-   *
-   * The four flags span 16 shapes per `kind`, which is MORE than the cap of 10, so
-   * the key does not by itself guarantee every shape reports: past 10 the cap
-   * merges whatever arrives later. What keeps that off a real device is
-   * REACHABILITY, not the key's width. `recoverFromContextLoss` produces six of
-   * the sixteen, `kind` has one value, and a real loop settles on two, so six sits
-   * inside ten with room. The three constraints that get you from sixteen to six,
-   * because a count you cannot reproduce is no use to the next editor:
-   *   - `behindSplash` leaves `saveFlushed` at its `true` initializer and always
-   *     takes the early return, so it forbids `recoveryFailed`. Two tuples.
-   *   - `recoveryFailed` is only reachable PAST that early return, which needs
-   *     `!repeat && !behindSplash && saveFlushed`. One tuple.
-   *   - and that same early return is why a `!repeat && !behindSplash &&
-   *     saveFlushed` loss never reports `recoveryFailed: false`: it goes to the
-   *     recovery attempt instead, and a successful one shows no screen at all.
-   *     That removes the fourth of the otherwise-four remaining. Three tuples.
-   * Add a fifth flag or a second `kind` and re-derive this before assuming it
-   * still holds.
-   *
-   * What is still lost, deliberately: HOW MANY times each shape recurred. A
-   * two-loss blip and an 8,269-loss catastrophe now look identical, which the
-   * cap's whole purpose makes unavoidable here and which is tracked as its own
-   * backlog item rather than smuggled into this event.
-   */
+  /** Report a crash (crash-screen moment). Capped and deduplicated per page life;
+   *  the signal and its guard live in `analyticsCrash.ts`. */
   noteCrash(info: GameplayEvents["crash"]): void {
-    const fingerprint = `${info.kind}|${info.repeat}|${info.recoveryFailed}|${info.behindSplash}|${info.saveFlushed}`;
-    if (!this.crashes.allow(fingerprint)) return;
-    trackEvent("crash", info);
+    reportCrash(info);
   }
 
   /** Report that the player applied a waiting build, from one version to another. */
@@ -437,17 +375,19 @@ class GameplaySession {
    * - Turning sharing OFF drops the same way, which is what stops the window up
    *   to that moment from being transmitted later.
    *
-   * Two things deliberately survive. `armed` does, because the page-hide listeners
-   * are wired once per tab and a second pair would double-count `session_end`. The
-   * boot-set common props do, because they describe the build and the device
-   * rather than the play.
+   * Three things deliberately survive. `armed` does, because the page-hide
+   * listeners are wired once per tab and a second pair would double-count
+   * `session_end`. The boot-set common props do, because they describe the build
+   * and the device rather than the play. The crash throttle does, because it is a
+   * flood guard rather than a measurement: see {@link releaseCrashThrottle}.
    *
-   * The per-tower `first_build` latch and the per-tool `tool_used` latch re-open
+   * The per-tower `first_build` latch and the per-tool `tool_used` latch DO re-open
    * with everything else, so a window that opens mid-play reports the funnel step
    * and the tool mix it sees rather than staying silenced by an earlier window
    * nothing was sent from. The price is one repeat of each on the one path where
    * the earlier window WAS transmitted (a first run whose held queue flushed on
-   * the grant), the cheaper side of that trade for two deduped, rare events.
+   * the grant), the cheaper side of that trade for two deduped, rare events. That
+   * same path is why the crash throttle, ten slots rather than one shot, is not.
    */
   startEpoch(): void {
     this.activeMs = 0;
@@ -470,7 +410,6 @@ class GameplaySession {
     this.emergBase = null;
     this.emergSampled = false;
     this.emergReported = false;
-    this.crashes.reset();
     clearActionLatches();
     // Re-anchor a running foreground segment on now, so the clock keeps running
     // for the new window while the time already spent in the old one is dropped
@@ -478,11 +417,17 @@ class GameplaySession {
     if (this.resumedAt !== null) this.resumedAt = Date.now();
   }
 
+  /** Hand back the crash throttle's spent slots. See `analyticsCrash.ts`. */
+  releaseCrashThrottle(): void {
+    releaseCrashSlots();
+  }
+
   /** Test hook: forget all session state. A fresh window, plus the few things a
    *  window deliberately outlives (the listener claim and the module-level common
    *  props, both cleared here to keep tests isolated). */
   reset(): void {
     this.startEpoch();
+    this.releaseCrashThrottle();
     this.resumedAt = null;
     this.armed = false;
     // A reset stands in for a brand-new tab, whose towers all start from zero
