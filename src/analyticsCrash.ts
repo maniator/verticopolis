@@ -1,5 +1,5 @@
 import { trackEvent, type GameplayEvents } from "./analyticsCore";
-import { createSessionThrottle } from "./analyticsThrottle";
+import { createEventThrottle } from "./analyticsThrottle";
 
 /**
  * The `crash` signal: the crash-screen report, plus the cap and dedup that keep a
@@ -28,7 +28,7 @@ const MAX_CRASHES_PER_PAGE_LIFE = 10;
  *  matches the `$exception` path's, whose identical guard is why the same incident
  *  produced 11 error reports rather than thousands. Deliberately does NOT follow
  *  the consent measurement window; see {@link releaseCrashThrottle}. */
-const crashes = createSessionThrottle(MAX_CRASHES_PER_PAGE_LIFE);
+const crashes = createEventThrottle(MAX_CRASHES_PER_PAGE_LIFE);
 
 /**
  * Report a crash (crash-screen moment) with its flattened description, capped

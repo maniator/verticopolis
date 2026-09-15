@@ -117,12 +117,17 @@ describe("HogQL query builders", () => {
     // the report quietly computing session length two different ways.
     const dashboardPath = resolve(dirname(fileURLToPath(import.meta.url)), "../scripts/posthog-dashboard.mjs");
     const dashboard = readFileSync(dashboardPath, "utf8");
+    // Whitespace is collapsed on both sides before matching, so re-wrapping or
+    // re-indenting either copy is not drift and does not fail this. What must not
+    // change is the tokens and operators. Without this the guard cries wolf on a
+    // formatting pass, and a guard that cries wolf gets deleted.
+    const collapse = (text: string): string => text.replace(/\s+/g, " ");
     const walk = /arraySum\(arrayMap\(\(x, i\) -> if\(i = length\((\w+)\) OR \1\[i \+ 1\] < x, x, 0\), \1, arrayEnumerate\(\1\)\)\)/;
 
-    const viewWalk = walk.exec(dashboard);
+    const viewWalk = walk.exec(collapse(dashboard));
     expect(viewWalk, "the view's page-life walk should be findable in the dashboard script").not.toBeNull();
 
-    const queryWalk = walk.exec(buildSessionDepthQuery("session_end", "seconds", 720));
+    const queryWalk = walk.exec(collapse(buildSessionDepthQuery("session_end", "seconds", 720)));
     expect(queryWalk, "the builder's page-life walk should have the same shape").not.toBeNull();
 
     // Identical once the array alias is normalized: the view calls it `readings`

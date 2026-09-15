@@ -1,7 +1,7 @@
 import { telemetryHostAllowed } from "./telemetry";
 import { sendException } from "./analyticsRelay";
 import { getCommonProps } from "./analytics";
-import { createSessionThrottle } from "./analyticsThrottle";
+import { createEventThrottle } from "./analyticsThrottle";
 
 /**
  * Cookieless JavaScript error tracking (spec CAP-2 posture, the S5 follow-up
@@ -74,7 +74,7 @@ const MAX_ERRORS_PER_PAGE_LIFE = 10;
  *  own instance, deliberately not shared with the gameplay `crash` path's
  *  throttle, so a crash loop cannot spend this budget (see
  *  `analyticsThrottle.ts`, where the guard itself now lives). */
-const throttle = createSessionThrottle(MAX_ERRORS_PER_PAGE_LIFE);
+const throttle = createEventThrottle(MAX_ERRORS_PER_PAGE_LIFE);
 /** Re-entrancy latch: a throw while building or sending a report must not
  *  recurse into the `error` handler and spiral. */
 let reporting = false;
