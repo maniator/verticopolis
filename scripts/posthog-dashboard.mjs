@@ -642,6 +642,19 @@ async function findInsight(name) {
  *  view is referenced BY NAME from HogQL, so it has to exist before an insight
  *  that selects from it runs; provisioning it here keeps the whole dashboard
  *  reproducible from this one script rather than half of it from the SQL editor. */
+/** Tag a caught failure with which branch of {@link ensureView} it came from, so
+ *  the caller can say what state the view is actually in. Coerced to an Error
+ *  first: an ES module is always strict mode, so assigning onto a primitive or a
+ *  frozen throwable throws a TypeError, and that replacement error would carry no
+ *  tag and mask the real message. Nothing in `req` throws a non-Error today; this
+ *  is here so the diagnostics cannot be defeated by the one thing they exist to
+ *  report on. */
+function taggedViewFailure(err, viewState) {
+  const tagged = err instanceof Error ? err : new Error(String(err));
+  tagged.viewState = viewState;
+  return tagged;
+}
+
 async function ensureView(spec) {
   let existing;
   try {
@@ -651,8 +664,7 @@ async function ensureView(spec) {
     // scope, a plan without saved queries, a host that does not expose them), and
     // from here we do not know whether a view already exists. Saying "absent"
     // would be a guess, and the wrong guess is the dangerous one.
-    err.viewState = "unknown";
-    throw err;
+    throw taggedViewFailure(err, "unknown");
   }
   const body = { name: spec.name, description: spec.description, query: { kind: "HogQLQuery", query: spec.query } };
   // Which branch failed matters to the caller: a failed create leaves no view and
@@ -668,16 +680,14 @@ async function ensureView(spec) {
     try {
       await req("PATCH", `/warehouse_saved_queries/${existing.id}/`, body);
     } catch (err) {
-      err.viewState = "stale";
-      throw err;
+      throw taggedViewFailure(err, "stale");
     }
     return "updated";
   }
   try {
     await req("POST", `/warehouse_saved_queries/`, body);
   } catch (err) {
-    err.viewState = "absent";
-    throw err;
+    throw taggedViewFailure(err, "absent");
   }
   return "created";
 }
