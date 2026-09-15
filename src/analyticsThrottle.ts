@@ -35,8 +35,12 @@ export interface SessionThrottle {
   /** True once the cap is spent, so a caller on a hot failure path can skip the
    *  work of building a fingerprint it already knows will be refused. */
   readonly exhausted: boolean;
-  /** Re-open the cap and drop the fingerprints, for a fresh measurement window
-   *  (a consent epoch) or a test. */
+  /** Re-open the cap and drop the fingerprints. Whether a caller calls this on a
+   *  consent epoch is the CALLER's choice, and the two callers differ today: the
+   *  gameplay `crash` throttle resets in `GameplaySession.startEpoch`, while the
+   *  `$exception` throttle resets only in its test hook, so an error fingerprint
+   *  recorded before a desktop player answered still occupies its budget after a
+   *  grant. That asymmetry is tracked (backlog), not designed. */
   reset(): void;
 }
 

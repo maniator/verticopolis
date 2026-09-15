@@ -84,23 +84,30 @@ const SESSION_LENGTHS_SQL = [
   "SELECT",
   "    session_id,",
   "    -- Foreground play across the page lives this session id covers, as a LOWER",
-  "    -- BOUND. A reading followed by a SMALLER one ends a page life (the clock",
-  "    -- restarted), as does the last reading, so the peaks are per-life lengths",
-  "    -- and their sum is the session. The bound is one-sided because a reset is",
-  "    -- only visible when the next life reads lower: over a recent 30 days, 129",
-  "    -- of 919 sessions reloaded (boot fires once per page life) and this walk",
-  "    -- sees 77 of them. Cross-checked against a boot-partitioned sum, the 52 it",
-  "    -- misses are worth about 2% of total play time, against the 15% that a",
-  "    -- plain max() loses, so the residual did not justify joining boot in here.",
+  "    -- BOUND. A reading followed by a STRICTLY SMALLER one ends a page life (the",
+  "    -- clock restarted), as does the last reading, so the peaks are per-life",
+  "    -- lengths and their sum is the session. Strictly, because the terminal row",
+  "    -- makes a repeated reading routine within ONE life (hide then pagehide in",
+  "    -- the same rounded second), and <= would split that in two and double it.",
+  "    -- The price is that a reload whose next life reaches the previous length OR",
+  "    -- MORE is invisible, equality included, which is the likelier half for short",
+  "    -- repeatable lives such as a crash loop. Over a recent 30 days, 129 of 919",
+  "    -- sessions reloaded (boot fires once per page life) and this walk sees 77;",
+  "    -- that 77 is itself a floor for the same reason. Cross-checked against a",
+  "    -- boot-partitioned sum, the residual is about 2% of total play time against",
+  "    -- the 15% a plain max() loses, so it did not justify joining boot in here.",
   "    arraySum(arrayMap((x, i) -> if(i = length(readings) OR readings[i + 1] < x, x, 0), readings, arrayEnumerate(readings))) AS length_seconds,",
   "    -- What a plain max(seconds) would have reported: the longest single page",
   "    -- life. Kept so the two are comparable rather than silently different, and",
   "    -- so the gap between them is readable per session.",
   "    arrayMax(readings) AS longest_life_seconds,",
-  "    -- Page lives VISIBLE to the walk above, so a lower bound in the same way:",
-  "    -- 1 for a session that never reloaded (86% of them) and for a reload whose",
-  "    -- second life outlived the first. Count boot events per session id for the",
-  "    -- true figure.",
+  "    -- Page lives VISIBLE to the walk above, which is neither a floor nor a",
+  "    -- ceiling. It reads 1 for a session that never reloaded (86% of them) and",
+  "    -- also for a reload whose next life matched or outlived the previous one.",
+  "    -- It can also read HIGH without any reload: a desktop consent flip restarts",
+  "    -- this clock inside one page life (GameplaySession.startEpoch), which looks",
+  "    -- exactly like a reload from here. Counting boot per session id is the true",
+  "    -- page-life figure, so compare the two rather than trusting either alone.",
   "    arrayCount((x, i) -> i = length(readings) OR readings[i + 1] < x, readings, arrayEnumerate(readings)) AS page_lives,",
   "    length(readings) AS rows_reported,",
   "    saw_final,",
@@ -117,10 +124,14 @@ const SESSION_LENGTHS_SQL = [
   "        -- Every reported length, oldest first. Cumulative WITHIN a page life and",
   "        -- back to 0 after a reload, which is what the peak walk above keys on.",
   "        arrayMap(t -> assumeNotNull(t.2), arraySort(t -> t.1, groupArray(tuple(timestamp, toFloat(properties.seconds))))) AS readings,",
-  "        -- Did any page life report a terminal (pagehide) row. Best-effort: a",
-  "        -- session killed outright never sends one, which is why the lengths",
-  "        -- above never filter on it. False for every row written before the flag",
-  "        -- shipped on 2026-09-14.",
+  "        -- Did any page life report a pagehide row. Best-effort and coarse: a",
+  "        -- session killed outright never sends one and a bfcache entry sends one",
+  "        -- early, which is why the lengths above never filter on it. False for",
+  "        -- every row written before the flag shipped on 2026-09-14. The bare",
+  "        -- `= true` is deliberate: the relay sends `final` as a JSON boolean and",
+  "        -- it lands as Nullable(Bool), so this compares cleanly (checked against",
+  "        -- the `returning` prop, which is the same shape); a missing key is NULL",
+  "        -- and max() skips it, hence the coalesce.",
   "        coalesce(max(properties.final = true), false) AS saw_final,",
   "        min(timestamp) AS first_reported_at,",
   "        max(timestamp) AS ended_at,",
@@ -224,6 +235,12 @@ function buildInsights(ids) {
       // The sessions series is `dau`, i.e. distinct `distinct_id`s, which here means
       // distinct SESSIONS (the relay's distinct_id is the per-tab session id). A
       // `total` would count session_end rows, and a session writes one per tab-hide.
+      //
+      // `dau` is distinct per INTERVAL, so this series does not sum to the
+      // "Sessions ended (30d)" tile: a session that straddles midnight, or whose
+      // id survives a reload into the next day, appears on each day it touched.
+      // That is right for a daily series and wrong as a total, which is why the
+      // 30-day figure is its own tile over the view rather than a sum of this one.
       query: trends([series("boot", "Boots"), series("session_end", "Sessions ended", "dau"), actionSeries(ids.newGame, "New games")]),
     },
     {
@@ -446,7 +463,8 @@ function buildInsights(ids) {
     { name: "Errors (30d)", description: "Total $exception events, production, 30d.", query: trends([series("$exception", "Errors")], { display: "BoldNumber" }) },
     {
       name: "WebGL crashes by recovery outcome",
-      description: "The typed crash event split by whether in-place recovery failed (structured crash detail), production.",
+      description:
+        "The typed crash event split by whether in-place recovery failed (structured crash detail), production. Deduped per session on the crash's flag set since 2026-09-14, so counts before and after that date are not comparable.",
       query: trends([series("crash", "Crashes")], { breakdown: "recoveryFailed", display: "ActionsBar" }),
     },
     // App-chrome actions (the app_action event). COOKIELESS: every tile here is
@@ -553,18 +571,33 @@ async function req(method, path, body) {
 
 /** Every page of a listing endpoint, following `next` until it runs out. A
  *  find-by-name that reads only the first page silently stops being idempotent
- *  once the project grows past it, and creates a duplicate instead of updating. */
+ *  once the project grows past it, and creates a duplicate instead of updating.
+ *
+ *  It throws rather than returning a short list on either thing that could
+ *  truncate it (a `next` this helper cannot follow, or the page ceiling), because
+ *  a truncated list is indistinguishable from "the object does not exist" and
+ *  lands right back on the duplicate this exists to prevent. Failing loudly is
+ *  the safe direction: the caller aborts instead of quietly forking the tiles. */
+const MAX_LIST_PAGES = 25;
 async function listAll(path) {
   const out = [];
   let next = `${path}${path.includes("?") ? "&" : "?"}limit=200`;
-  // Bounded so a malformed or cyclic `next` cannot spin forever.
-  for (let page = 0; next && page < 25; page++) {
-    const data = await req("GET", next);
+  for (let page = 0; ; page++) {
+    const data = (await req("GET", next)) || {};
     out.push(...(data.results || []));
-    // The API returns an absolute URL; reduce it to the path this helper takes.
-    next = data.next ? data.next.replace(api(""), "") : null;
+    if (!data.next) return out;
+    if (page + 1 >= MAX_LIST_PAGES) {
+      throw new Error(`listAll(${path}) exceeded ${MAX_LIST_PAGES} pages; refusing to act on a truncated list`);
+    }
+    // The API returns an absolute URL. Reduce it to the path `req` takes, and
+    // insist the reduction actually happened: on a host or prefix mismatch the
+    // replace is a no-op and the next request would be built from a full URL.
+    const prefix = api("");
+    if (!data.next.startsWith(prefix)) {
+      throw new Error(`listAll(${path}) got a next URL outside ${prefix}: ${data.next}`);
+    }
+    next = data.next.slice(prefix.length);
   }
-  return out;
 }
 
 /** Find a dashboard by exact name, or return null. */
@@ -574,8 +607,13 @@ async function findDashboard() {
 
 /** Find a saved insight by exact name, or return null. */
 async function findInsight(name) {
-  const data = await req("GET", `/insights/?limit=1&search=${encodeURIComponent(name)}`);
-  return (data.results || []).find((i) => i.name === name && !i.deleted) || null;
+  // `search` is fuzzy and ranked, so the exact-name match is not guaranteed to be
+  // the FIRST hit. Reading one row and then filtering for the exact name meant a
+  // tile whose name merely shares words with another insight read as absent, and
+  // the run created a second copy of it instead of updating. Insights are the one
+  // object this script makes dozens of, so that is where a duplicate hurts most.
+  const page = await req("GET", `/insights/?limit=100&search=${encodeURIComponent(name)}`);
+  return (page.results || []).find((i) => i.name === name && !i.deleted) || null;
 }
 
 /** Create or update the saved view the SQL tiles read, matched by exact name. A
@@ -585,14 +623,30 @@ async function findInsight(name) {
 async function ensureView(spec) {
   const existing = (await listAll(`/warehouse_saved_queries/`)).find((v) => v.name === spec.name && !v.deleted) || null;
   const body = { name: spec.name, description: spec.description, query: { kind: "HogQLQuery", query: spec.query } };
+  // Which branch failed matters to the caller: a failed create leaves no view and
+  // two visibly broken tiles, while a failed update leaves the PREVIOUS
+  // definition serving numbers that look fine and are stale. The error carries
+  // the branch so the warning can say which happened.
   if (existing) {
-    // A query edit needs the revision it was based on, so a concurrent edit in
-    // the SQL editor is rejected rather than silently overwritten.
+    // A query edit carries the revision it was based on, so a concurrent edit in
+    // the SQL editor is rejected rather than silently overwritten. Only when the
+    // API actually reported one: without it the PATCH goes out unguarded and
+    // DOES overwrite, so the protection is best-effort, not a guarantee.
     if (existing.latest_history_id) body.edited_history_id = existing.latest_history_id;
-    await req("PATCH", `/warehouse_saved_queries/${existing.id}/`, body);
+    try {
+      await req("PATCH", `/warehouse_saved_queries/${existing.id}/`, body);
+    } catch (err) {
+      err.viewState = "stale";
+      throw err;
+    }
     return "updated";
   }
-  await req("POST", `/warehouse_saved_queries/`, body);
+  try {
+    await req("POST", `/warehouse_saved_queries/`, body);
+  } catch (err) {
+    err.viewState = "absent";
+    throw err;
+  }
   return "created";
 }
 
@@ -606,6 +660,12 @@ async function ensureAction(spec) {
     return { id: existing.id, outcome: "updated" };
   }
   const created = await req("POST", `/actions/`, body);
+  // `req` returns null on a 204, and a 2xx body without `id` would yield
+  // undefined, which JSON.stringify drops from the series node entirely: the
+  // tiles would save clean and render nothing. Refuse instead.
+  if (!created || created.id == null) {
+    throw new Error(`POST /actions/ returned no id for "${spec.name}"; cannot point tiles at it`);
+  }
   return { id: created.id, outcome: "created" };
 }
 
@@ -639,11 +699,17 @@ async function main() {
   // three tiles reference it by id and there is no sensible id to invent.
   const action = await ensureAction(NEW_GAME_ACTION);
   console.log(`Action "${NEW_GAME_ACTION.name}": ${action.outcome} (id ${action.id})`);
+  let viewOk = true;
   try {
     console.log(`Saved view "${SESSION_LENGTHS_VIEW.name}": ${await ensureView(SESSION_LENGTHS_VIEW)}`);
   } catch (err) {
+    viewOk = false;
     console.warn(`WARNING: could not provision the "${SESSION_LENGTHS_VIEW.name}" view (${err.message || err}).`);
-    console.warn("The two session-length tiles will not resolve until it exists. Every other tile is unaffected.");
+    console.warn(
+      err.viewState === "stale"
+        ? "The view still EXISTS at its previous definition, so the two session-length tiles will render numbers computed the OLD way rather than failing visibly. Treat them as untrustworthy until this is fixed."
+        : "The view does not exist, so the two session-length tiles will not resolve. Every other tile is unaffected.",
+    );
   }
 
   const INSIGHTS = buildInsights({ newGame: action.id });
@@ -662,29 +728,43 @@ async function main() {
     console.log(`Found dashboard ${dashboard.id}`);
   }
 
+  // Per tile, so one rejected insight does not strand the ~30 behind it. The two
+  // tiles that select from the saved view are the likeliest to be rejected (they
+  // fail validation when the view is missing), and they sit early in the list, so
+  // an all-or-nothing loop would routinely refresh almost nothing. Every failure
+  // is named and the run still exits non-zero, so nothing passes silently.
   let created = 0;
   let updated = 0;
+  const failures = [];
   for (const spec of INSIGHTS) {
-    const existing = await findInsight(spec.name);
-    if (existing) {
-      const dashboards = Array.from(new Set([...(existing.dashboards || []), dashboard.id]));
-      await req("PATCH", `/insights/${existing.id}/`, {
-        query: spec.query,
-        description: spec.description,
-        dashboards,
-      });
-      updated++;
-    } else {
-      await req("POST", `/insights/`, {
-        name: spec.name,
-        description: spec.description,
-        query: spec.query,
-        dashboards: [dashboard.id],
-      });
-      created++;
+    try {
+      const existing = await findInsight(spec.name);
+      if (existing) {
+        const dashboards = Array.from(new Set([...(existing.dashboards || []), dashboard.id]));
+        await req("PATCH", `/insights/${existing.id}/`, {
+          query: spec.query,
+          description: spec.description,
+          dashboards,
+        });
+        updated++;
+      } else {
+        await req("POST", `/insights/`, {
+          name: spec.name,
+          description: spec.description,
+          query: spec.query,
+          dashboards: [dashboard.id],
+        });
+        created++;
+      }
+    } catch (err) {
+      failures.push(`${spec.name}: ${err.message || err}`);
     }
   }
-  console.log(`Insights: ${created} created, ${updated} updated. Dashboard: ${HOST}/project/${PROJECT_ID}/dashboard/${dashboard.id}`);
+  console.log(`Insights: ${created} created, ${updated} updated, ${failures.length} failed. Dashboard: ${HOST}/project/${PROJECT_ID}/dashboard/${dashboard.id}`);
+  for (const f of failures) console.error(`  FAILED ${f}`);
+  if (!viewOk || failures.length) {
+    throw new Error(`${failures.length} insight(s) failed${viewOk ? "" : ", and the saved view did not provision"}`);
+  }
 }
 
 main().catch((err) => {

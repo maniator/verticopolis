@@ -52,14 +52,13 @@ describe("crash event cap and dedup", () => {
     for (let i = 0; i < 40; i++) gameplaySession.noteCrash({ ...base, repeat: true });
 
     const crashes = crashCalls();
-    expect(crashes.length).toBeLessThanOrEqual(10);
     expect(crashes).toHaveLength(2); // the two shapes the loop actually has
     // The first event's payload is untouched by the guard.
     expect(crashes[0][1]).toEqual({ ...base, repeat: false });
     // The loop signal survives the dedup, which is why `repeat` is in the
     // fingerprint: without it the 40 repeats would collapse into the first loss
     // and nothing would ever report that this session looped.
-    expect(crashes.some(([, props]) => props.repeat === true)).toBe(true);
+    expect(crashes[1][1]).toEqual({ ...base, repeat: true });
   });
 
   it("reports a repeat-flagged loop even when no earlier crash shape preceded it", () => {

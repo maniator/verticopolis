@@ -70,19 +70,24 @@ export interface GameplayEvents {
    *     session's length is the SUM of each page life's final reading, worth
    *     about 15% of total play time and landing on the update and
    *     crash-recovery cohort specifically. That sum is a lower bound: a life is
-   *     detected by the reading dropping, so a reload whose second life outruns
-   *     the first is invisible (it recovers 77 of the 129 reloads in a recent
-   *     919 sessions, and a boot-partitioned sum is only 2% higher).
+   *     detected by the reading DROPPING, so a reload whose second life reaches
+   *     the first's length or beyond is invisible (equal counts as invisible too,
+   *     which is the likelier half for short repeatable lives such as a crash
+   *     loop). It recovers 77 of the 129 reloads in a recent 919 sessions, and a
+   *     boot-partitioned sum is only 2% higher.
    *
    *  So: count sessions as distinct `distinct_id`s, never as a row count, and
    *  take a length as the sum of per-page-life peaks rather than a plain `max`.
    *
    *  `final` marks an emission made from `pagehide`. It is best-effort in the
    *  same way `pagehide` is (a session killed outright has no such row), and it
-   *  is NOT unique per `distinct_id`: each page life can contribute one, and a
-   *  bfcache entry fires `pagehide` too. Do not use it to pick a session's length
-   *  or to count sessions; it answers "did this session get to say goodbye",
-   *  which is the measure of how much the re-emission fallback is carrying. */
+   *  is not unique at any level: a `distinct_id` covers several page lives, and a
+   *  single page life can emit it more than once, because a bfcache entry fires
+   *  `pagehide` and a later real close whose `seconds` has grown clears the
+   *  ordinary dedup on its own. So do not use it to pick a session's length, to
+   *  count sessions, or to delimit page lives. It answers the coarse question
+   *  "did any pagehide arrive", which is the measure of how much work the
+   *  re-emission fallback is doing. */
   session_end: { seconds: number; final: boolean };
   /** One snapshot per boot: why the session started (`reason`), the build it
    *  runs (`version`), and the standing state of the tower it opened. Unlike the

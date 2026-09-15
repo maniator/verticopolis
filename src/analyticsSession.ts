@@ -119,7 +119,8 @@ class GameplaySession {
   /** Cap and per-fingerprint dedup for `crash`, so a repeating crash-screen show
    *  reports once rather than once per loop iteration (see {@link noteCrash}).
    *  The cap matches the `$exception` path's, whose identical guard is why the
-   *  same incident produced 11 error reports instead of thousands. */
+   *  same incident produced 11 error reports instead of thousands: 11 across the
+   *  two distinct_ids the incident spanned, since one session cannot exceed 10. */
   private readonly crashes = createSessionThrottle(MAX_CRASHES_PER_SESSION);
 
   /** Start or resume timing foreground play. Idempotent while already running,
@@ -203,8 +204,17 @@ class GameplaySession {
    * happened at all, it flips from false to true on the second loss inside 90s,
    * and leaving it out would let the dedup swallow the one event that carries it
    * wherever nothing else about the shape changed. So a loop emits the first
-   * loss, the first repeat, and nothing more, and five booleans-worth of distinct
-   * shapes still sit well inside the cap.
+   * loss, the first repeat, and nothing more.
+   *
+   * The four flags span 16 shapes per `kind`, which is MORE than the cap of 10, so
+   * the key does not by itself guarantee every shape reports: past 10 the cap
+   * merges whatever arrives later. What keeps that off a real device is
+   * REACHABILITY, not the key's width. `recoverFromContextLoss` can produce six of
+   * the sixteen (`behindSplash` implies `saveFlushed` and forbids `recoveryFailed`,
+   * and `recoveryFailed` is only reachable past the repeat/splash/flush early
+   * return), `kind` has one value, and a real loop settles on two. Six sits inside
+   * ten with room. Add a fifth flag or a second `kind` and re-derive that count
+   * before assuming it still does.
    *
    * What is still lost, deliberately: HOW MANY times each shape recurred. A
    * two-loss blip and an 8,269-loss catastrophe now look identical, which the
@@ -288,10 +298,13 @@ class GameplaySession {
   /** Bank the current foreground segment and report cumulative play seconds.
    *  Called when the tab is hidden or the page unloads. The clock re-arms on the
    *  next `begin` (tab visible again), so tabbing away and back keeps ONE growing
-   *  session rather than latching the length at the first blur: read the largest
-   *  `session_end` per visitor as the length, and count sessions as distinct
-   *  visitors, never as a row count (the `session_end` vocabulary entry in
-   *  `analyticsCore.ts` has the numbers on how wrong an event-level read is).
+   *  session rather than latching the length at the first blur. Count sessions as
+   *  distinct visitors, never as a row count, and take a length as the SUM of
+   *  each page life's final reading rather than the largest reading: the session
+   *  id survives a same-tab reload, so one visitor covers several page lives whose
+   *  clocks each restart here. The `session_end` vocabulary entry in
+   *  `analyticsCore.ts` carries both traps and the numbers behind them; read it
+   *  before writing a query against this event.
    *  Hidden time is excluded, so the number is foreground play, not wall clock.
    *  Deduped on the whole-second value (seeded at 0) so a zero-length end or a
    *  `pagehide` right after a `visibilitychange` doesn't emit a duplicate;
