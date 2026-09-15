@@ -78,22 +78,25 @@ export function noteCrash(info: GameplayEvents["crash"]): void {
   trackEvent("crash", info);
 }
 
-/** Hand back the throttle's spent slots, for a caller that knows the events which
- *  spent them will never be transmitted.
+/** Hand back the throttle's spent slots, for a caller that knows the crashes
+ *  which spent them were never transmitted.
  *
  *  Deliberately not tied to the consent measurement window: a slot should stay
- *  spent if and only if its event went out, and only the consent layer knows
+ *  spent if and only if its crash went out, and only the consent layer knows
  *  which. `setDesktopConsent` notifies watchers BEFORE it settles the held queue,
- *  so at watcher time a grant means the held crashes are about to flush (keep the
- *  slots, or an identical recurrence sends a duplicate) while any other answer
- *  means they are about to be dropped (release them, or a crash the player has
- *  since agreed to share stays silenced). `analytics.ts` makes that call.
+ *  so exactly one transition means "these are about to be sent": a first-run
+ *  grant, `pending` to `granted`. `analytics.ts` keeps the slots on that one and
+ *  releases on every other, where the queue is either discarded or was never
+ *  there. Both directions matter. Releasing on the grant re-sends a crash that
+ *  just flushed; keeping on the rest lets a loop during an opted-out stretch
+ *  spend the entire cap on dropped events and leave the player's next window
+ *  silent.
  *
- *  One case stays imperfect on purpose: a crash raised DURING a declined window
- *  spends a slot that cannot transmit, and a later grant keeps it, because that
- *  same grant is flushing a queue whose slots must survive. It costs at most one
- *  of ten shapes and errs toward reporting less, the safe direction for a guard
- *  whose job is to stop a flood. */
+ *  One bounded gap is left, and it is the held queue's own: `PENDING_CAP` is 32
+ *  events of every kind, oldest evicted first, so a first run noisy enough to
+ *  overflow it before answering can evict a held crash whose slot then stays
+ *  spent. It needs more than 32 events emitted with the notice still open, and it
+ *  errs toward reporting less, which is the safe direction for a flood guard. */
 export function releaseCrashThrottle(): void {
   crashes.reset();
 }

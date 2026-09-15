@@ -64,7 +64,9 @@ export interface EventThrottle {
 
 /**
  * Build a throttle that lets at most `max` distinct fingerprints through per
- * session. Distinct incidents past the cap are dropped too, which is the safe
+ * PAGE LIFE, not per analytics session: the budget belongs to this instance in
+ * module memory, so a reload opens a fresh one while the session id survives.
+ * Distinct incidents past the cap are dropped too, which is the safe
  * direction: the point is a bounded number of requests, and the ingest route's
  * own per-IP rate limit is the outer backstop.
  */

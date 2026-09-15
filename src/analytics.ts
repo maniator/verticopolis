@@ -1,5 +1,5 @@
 import { telemetryHostAllowed } from "./telemetry";
-import { desktopConsentState, onDesktopConsentChange } from "./desktopConsent";
+import { onDesktopConsentChange } from "./desktopConsent";
 import { gameplaySession } from "./analyticsSession";
 
 /**
@@ -66,16 +66,22 @@ export {
  * `IS_DESKTOP_BUILD`), so this never fires there and the web session behaves
  * exactly as it did before any of this landed.
  */
-onDesktopConsentChange(() => {
+onDesktopConsentChange((previous, next) => {
   gameplaySession.startEpoch();
   // The crash throttle is a flood guard, not a measurement, so it does not simply
-  // follow the window. Its slots are handed back only when the events that spent
-  // them cannot go out. Watchers run before the held queue settles, so a grant
-  // here means those crashes are about to be sent (keep the slots, or an identical
-  // recurrence sends a duplicate) and any other answer means they are about to be
-  // dropped (release them, or a crash the player has since agreed to share stays
-  // silenced). See `GameplaySession.releaseCrashThrottle`.
-  if (desktopConsentState() !== "granted") gameplaySession.releaseCrashThrottle();
+  // follow the window. A slot should stay spent only if the crash that spent it
+  // actually went out, and exactly ONE transition can say yes: a first-run grant,
+  // where the watchers run just ahead of the held queue draining. Every other
+  // answer either drops that queue (`pending` to `declined`) or never had one
+  // (`declined` to `granted`, `granted` to `declined`), so the slots those crashes
+  // spent bought nothing and are handed back.
+  //
+  // Getting this wrong is not cosmetic in either direction: releasing on the grant
+  // re-sends a crash that just flushed, and keeping on the others lets a crash loop
+  // during an opted-out stretch spend the whole cap on events that were dropped and
+  // leave the player's next window unable to report anything at all.
+  const heldCrashesAreAboutToFlush = previous === "pending" && next === "granted";
+  if (!heldCrashesAreAboutToFlush) gameplaySession.releaseCrashThrottle();
 });
 
 /**

@@ -275,6 +275,35 @@ describe("the crash throttle spends a slot only on a crash that can be sent", ()
     expect(propsFor("crash"), "so the shape can still report once shared").toEqual([loss]);
   });
 
+  it("does not let an opted-out crash loop silence the window after it", () => {
+    // Copilot review, PR #840. While declined, `noteCrash` still latches before
+    // `trackEvent` drops the event, so a loop can spend the whole cap on crashes
+    // that went nowhere. Keeping those slots left the player's next consented
+    // window unable to report a single crash for the rest of the page life.
+    startGameplaySession();
+    setDesktopConsent("declined");
+    for (let i = 0; i < 10; i++) gameplaySession.noteCrash({ ...loss, kind: `k${i}` });
+    expect(propsFor("crash"), "nothing leaves while opted out").toEqual([]);
+
+    setDesktopConsent("granted"); // no queue to flush here, so the slots are handed back
+    for (let i = 0; i < 10; i++) gameplaySession.noteCrash({ ...loss, kind: `k${i}` });
+    expect(propsFor("crash").length, "and the fresh window reports normally").toBe(10);
+  });
+
+  it("does not let a reported crash silence the window after a toggle either", () => {
+    // The same trap with `granted` as the middle state: those ten DID transmit, but
+    // holding their slots would leave the window after the toggle just as silent.
+    startGameplaySession();
+    setDesktopConsent("granted");
+    for (let i = 0; i < 10; i++) gameplaySession.noteCrash({ ...loss, kind: `k${i}` });
+    expect(propsFor("crash").length).toBe(10);
+
+    setDesktopConsent("declined");
+    setDesktopConsent("granted");
+    for (let i = 0; i < 10; i++) gameplaySession.noteCrash({ ...loss, kind: `k${i}` });
+    expect(propsFor("crash").length, "the new window gets its own budget").toBe(20);
+  });
+
   it("keeps the cap at ten across a grant rather than re-opening it", () => {
     // The whole budget spent while the answer is outstanding, then granted. Without
     // the distinction above this page life could report twenty.
