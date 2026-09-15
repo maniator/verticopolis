@@ -83,16 +83,24 @@ function series(event, name, math = "total", prop) {
 const SESSION_LENGTHS_SQL = [
   "SELECT",
   "    session_id,",
-  "    -- Total foreground play across every page life this session id covers. A",
-  "    -- reading followed by a SMALLER one ends a page life (the clock restarted),",
-  "    -- as does the last reading, so the peaks are the per-life lengths and their",
-  "    -- sum is the session's real length.",
+  "    -- Foreground play across the page lives this session id covers, as a LOWER",
+  "    -- BOUND. A reading followed by a SMALLER one ends a page life (the clock",
+  "    -- restarted), as does the last reading, so the peaks are per-life lengths",
+  "    -- and their sum is the session. The bound is one-sided because a reset is",
+  "    -- only visible when the next life reads lower: over a recent 30 days, 129",
+  "    -- of 919 sessions reloaded (boot fires once per page life) and this walk",
+  "    -- sees 77 of them. Cross-checked against a boot-partitioned sum, the 52 it",
+  "    -- misses are worth about 2% of total play time, against the 15% that a",
+  "    -- plain max() loses, so the residual did not justify joining boot in here.",
   "    arraySum(arrayMap((x, i) -> if(i = length(readings) OR readings[i + 1] < x, x, 0), readings, arrayEnumerate(readings))) AS length_seconds,",
   "    -- What a plain max(seconds) would have reported: the longest single page",
-  "    -- life. Kept so the two are comparable rather than silently different.",
+  "    -- life. Kept so the two are comparable rather than silently different, and",
+  "    -- so the gap between them is readable per session.",
   "    arrayMax(readings) AS longest_life_seconds,",
-  "    -- How many page lives this session id covers. 1 for a session that never",
-  "    -- reloaded, which is about 92% of them.",
+  "    -- Page lives VISIBLE to the walk above, so a lower bound in the same way:",
+  "    -- 1 for a session that never reloaded (86% of them) and for a reload whose",
+  "    -- second life outlived the first. Count boot events per session id for the",
+  "    -- true figure.",
   "    arrayCount((x, i) -> i = length(readings) OR readings[i + 1] < x, readings, arrayEnumerate(readings)) AS page_lives,",
   "    length(readings) AS rows_reported,",
   "    saw_final,",
@@ -155,9 +163,20 @@ function hogql(query, { display = "ActionsTable", chartSettings } = {}) {
  *  "Update now" reload or a WebGL crash-recovery reload keeps one `distinct_id`
  *  while the page's clock restarts at 0. One session id therefore covers several
  *  page lives, and a plain `max(seconds)` would report only the longest of them.
- *  `length_seconds` sums each page life's final reading instead; measured over a
- *  recent 30 days that is about 8% of sessions and 13% of total play time, and it
- *  lands on the update and crash-recovery cohort specifically.
+ *  `length_seconds` sums each page life's final reading instead, which recovers
+ *  about 15% of total play time, concentrated on the update and crash-recovery
+ *  cohort specifically.
+ *
+ *  That sum is a LOWER BOUND, not the exact length, and the difference is worth
+ *  stating because this dashboard exists to stop publishing numbers that are
+ *  quietly wrong. A page life is detected by its reading dropping below the
+ *  previous one, so a reload whose second life runs LONGER than the first is
+ *  invisible and reads as one continuous life. Measured over a recent 30 days:
+ *  129 of 919 sessions reloaded (`boot` fires once per page life, which is the
+ *  independent ground truth), and this heuristic sees 77 of them. A
+ *  boot-partitioned sum, which is exact wherever `boot` was delivered, comes out
+ *  only 2% higher in total and 1 second higher at the median, so the residual did
+ *  not justify joining a second event into the view.
  *
  *  `distinct_id` IS the per-tab session id: the relay sets it from the session id
  *  and sets `$process_person_profile` false, so "unique users" in this project

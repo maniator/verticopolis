@@ -67,9 +67,12 @@ export interface GameplayEvents {
    *     reload or a WebGL crash-recovery reload keeps one `distinct_id` while
    *     this clock restarts at 0. One `distinct_id` therefore covers several page
    *     lives, and `max(seconds)` would report only the longest of them. A
-   *     session's length is the SUM of each page life's final reading: about 8%
-   *     of sessions and 13% of total play time, landing on the update and
-   *     crash-recovery cohort specifically.
+   *     session's length is the SUM of each page life's final reading, worth
+   *     about 15% of total play time and landing on the update and
+   *     crash-recovery cohort specifically. That sum is a lower bound: a life is
+   *     detected by the reading dropping, so a reload whose second life outruns
+   *     the first is invisible (it recovers 77 of the 129 reloads in a recent
+   *     919 sessions, and a boot-partitioned sum is only 2% higher).
    *
    *  So: count sessions as distinct `distinct_id`s, never as a row count, and
    *  take a length as the sum of per-page-life peaks rather than a plain `max`.

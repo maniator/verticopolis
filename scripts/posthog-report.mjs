@@ -163,9 +163,18 @@ function buildDepthQuery(event, prop, hours) {
  *  "Update now" reload, a WebGL crash-recovery reload; see `analyticsRelay.ts`),
  *  so one `distinct_id` covers several page lives whose clocks each restart at
  *  0. A reading followed by a SMALLER one is therefore the end of a page life,
- *  as is the last reading, and their sum is the session's real length. A plain
- *  `max` would keep only the longest life and lose about 13% of total play time,
- *  concentrated on the update and crash-recovery cohort.
+ *  as is the last reading. A plain `max` would keep only the longest life and
+ *  lose about 15% of total play time, concentrated on the update and
+ *  crash-recovery cohort.
+ *
+ *  The sum is a LOWER BOUND: a page life is detected by the reading dropping, so
+ *  a reload whose second life runs LONGER than the first is invisible and reads
+ *  as one continuous life. Over a recent 30 days, 129 of 919 sessions reloaded
+ *  (`boot` fires once per page life) and this walk sees 77 of them; a
+ *  boot-partitioned sum comes out 2% higher in total and 1 second higher at the
+ *  median, which did not justify pulling a second event into this query. Said
+ *  plainly here because the whole point of the builder is to stop publishing a
+ *  number whose error is undocumented.
  *
  *  The once-per-session events (`session_builds`, `session_peak_floors`,
  *  `session_fps`) write one row per page life and stay on the plain builder,
