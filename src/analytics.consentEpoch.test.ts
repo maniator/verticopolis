@@ -97,7 +97,7 @@ describe("a desktop consent change starts a fresh measurement window", () => {
     expect(propsFor("session_builds"), "only the placement after the grant counts").toEqual([{ builds: 1 }]);
     expect(propsFor("session_peak_floors"), "floor 40 was built opted out").toEqual([{ floors: 3 }]);
     expect(propsFor("tool_session_uses")).toEqual([{ tool: "office", uses: 1 }]);
-    expect(propsFor("session_end"), "and the clock covers the consented window only").toEqual([{ seconds: 2 }]);
+    expect(propsFor("session_end"), "and the clock covers the consented window only").toEqual([{ seconds: 2, final: true }]);
     // The catch-all: nothing the player did while opted out may be recognizable in
     // anything that left, whatever event carried it.
     const leaked = sent.filter((e) => JSON.stringify(e.props).includes("hotel"));
@@ -206,7 +206,7 @@ describe("the browser path is untouched", () => {
     expect(propsFor("session_builds"), "still once per session, still the first-background value").toEqual([
       { builds: 2 },
     ]);
-    expect(propsFor("session_end"), "and one growing session, not two").toEqual([{ seconds: 3 }, { seconds: 9 }]);
+    expect(propsFor("session_end"), "and one growing session, not two").toEqual([{ seconds: 3, final: false }, { seconds: 9, final: false }]);
   });
 
   it("sums emergencies across a tower replacement exactly as before", () => {
@@ -226,6 +226,93 @@ describe("the browser path is untouched", () => {
     vi.setSystemTime(5000);
     gameplaySession.end(true);
     expect(propsFor("session_builds")).toEqual([{ builds: 3 }]);
-    expect(propsFor("session_end")).toEqual([{ seconds: 5 }]);
+    expect(propsFor("session_end")).toEqual([{ seconds: 5, final: true }]);
+  });
+});
+
+/**
+ * The crash throttle's slots against the first-run consent answer (Codex review,
+ * PR #840). The guard caps distinct crash SHAPES per page life, and a slot is
+ * spent at `noteCrash` time, before the event's fate is known: on a desktop first
+ * run the send is held while the answer is outstanding. `setDesktopConsent`
+ * notifies watchers BEFORE it settles that queue, so the watcher is the one place
+ * that can tell a slot spent on an event about to FLUSH from one spent on an event
+ * about to be DROPPED. Resetting on both (as the measurement window does) sent the
+ * held crash and then let an identical recurrence send again.
+ */
+describe("the crash throttle spends a slot only on a crash that can be sent", () => {
+  const loss = {
+    kind: "webgl-context-lost",
+    repeat: false,
+    recoveryFailed: false,
+    behindSplash: false,
+    saveFlushed: true,
+    version: "2.26.0",
+    star: 3,
+    population: 800,
+  };
+
+  it("does not re-send a held crash's shape once the grant has flushed it", () => {
+    startGameplaySession();
+    gameplaySession.noteCrash({ ...loss }); // first run: held, and a slot spent
+    expect(propsFor("crash"), "nothing leaves before the player answers").toEqual([]);
+
+    setDesktopConsent("granted"); // the watcher runs, then the queue flushes
+    expect(propsFor("crash"), "the held crash goes out on the grant").toEqual([loss]);
+
+    gameplaySession.noteCrash({ ...loss }); // the context dies again, same shape
+    expect(propsFor("crash"), "and the recurrence is deduped, not re-sent").toEqual([loss]);
+  });
+
+  it("hands the slot back when the answer means the held crash is dropped", () => {
+    startGameplaySession();
+    gameplaySession.noteCrash({ ...loss }); // held, a slot spent
+    setDesktopConsent("declined"); // the queue is dropped: that slot bought nothing
+    expect(propsFor("crash"), "a declined answer sends nothing").toEqual([]);
+
+    setDesktopConsent("granted"); // the player changes their mind
+    gameplaySession.noteCrash({ ...loss });
+    expect(propsFor("crash"), "so the shape can still report once shared").toEqual([loss]);
+  });
+
+  it("does not let an opted-out crash loop silence the window after it", () => {
+    // Copilot review, PR #840. While declined, `noteCrash` still latches before
+    // `trackEvent` drops the event, so a loop can spend the whole cap on crashes
+    // that went nowhere. Keeping those slots left the player's next consented
+    // window unable to report a single crash for the rest of the page life.
+    startGameplaySession();
+    setDesktopConsent("declined");
+    for (let i = 0; i < 10; i++) gameplaySession.noteCrash({ ...loss, kind: `k${i}` });
+    expect(propsFor("crash"), "nothing leaves while opted out").toEqual([]);
+
+    setDesktopConsent("granted"); // no queue to flush here, so the slots are handed back
+    for (let i = 0; i < 10; i++) gameplaySession.noteCrash({ ...loss, kind: `k${i}` });
+    expect(propsFor("crash").length, "and the fresh window reports normally").toBe(10);
+  });
+
+  it("does not let a reported crash silence the window after a toggle either", () => {
+    // The same trap with `granted` as the middle state: those ten DID transmit, but
+    // holding their slots would leave the window after the toggle just as silent.
+    startGameplaySession();
+    setDesktopConsent("granted");
+    for (let i = 0; i < 10; i++) gameplaySession.noteCrash({ ...loss, kind: `k${i}` });
+    expect(propsFor("crash").length).toBe(10);
+
+    setDesktopConsent("declined");
+    setDesktopConsent("granted");
+    for (let i = 0; i < 10; i++) gameplaySession.noteCrash({ ...loss, kind: `k${i}` });
+    expect(propsFor("crash").length, "the new window gets its own budget").toBe(20);
+  });
+
+  it("keeps the cap at ten across a grant rather than re-opening it", () => {
+    // The whole budget spent while the answer is outstanding, then granted. Without
+    // the distinction above this page life could report twenty.
+    startGameplaySession();
+    for (let i = 0; i < 10; i++) gameplaySession.noteCrash({ ...loss, kind: `loss-${i}` });
+    setDesktopConsent("granted");
+    expect(propsFor("crash").length, "the ten held shapes flush").toBe(10);
+
+    for (let i = 0; i < 10; i++) gameplaySession.noteCrash({ ...loss, kind: `loss-${i}` });
+    expect(propsFor("crash").length, "and the spent budget stays spent").toBe(10);
   });
 });

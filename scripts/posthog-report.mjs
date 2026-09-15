@@ -132,15 +132,87 @@ function buildTotalsQuery(events, hours) {
   );
 }
 
-/** HogQL for one numeric property's exact percentiles over a session-scoped
- *  event. `prop` is a hardcoded property name (seconds / builds / floors / p50 /
- *  low). Rows with a null or non-numeric property are excluded by the cast. */
+/** HogQL for one numeric property's percentiles over a session-scoped event.
+ *  `prop` is a hardcoded property name (seconds / builds / floors / p50 / low).
+ *  Rows with a null or non-numeric property are excluded by the cast. These are
+ *  ClickHouse `quantile()`, which is approximate, so read them as close estimates
+ *  rather than exact order statistics. (Deliberately not naming the sampling
+ *  algorithm: what matters here is that the values are approximate, and pinning a
+ *  specific implementation is a claim this comment would then have to keep true.) */
 function buildDepthQuery(event, prop, hours) {
   const val = `toFloat(properties.${prop})`;
   return (
     `SELECT count() AS n, quantile(0.5)(${val}) AS p50, quantile(0.9)(${val}) AS p90, ` +
     `quantile(0.95)(${val}) AS p95, max(${val}) AS mx ` +
     `FROM events WHERE ${SCOPE(hours)} AND event = ${lit(event)} AND ${val} IS NOT NULL`
+  );
+}
+
+/** HogQL for one numeric property's percentiles over an event that reports MORE
+ *  THAN ONCE per session with a cumulative value, namely `session_end`. It
+ *  collapses each session to ONE value first, then takes the percentiles across
+ *  sessions, so the distribution is one length per session and `n` is a count of
+ *  sessions rather than of rows.
+ *
+ *  {@link buildDepthQuery} is wrong for such an event, and badly so: a session
+ *  writes a `session_end` row on every tab-hide, so a long session contributes
+ *  many rows and a short one contributes a single row, and the event-level
+ *  percentile ends up weighted by the very thing it is measuring (a recent 30
+ *  days read a 545s median event-level against a real 91s per session).
+ *
+ *  The collapse is a SUM OF PER-PAGE-LIFE PEAKS, not a plain `max`. The session
+ *  id lives in `sessionStorage` and deliberately survives a same-tab reload (an
+ *  "Update now" reload, a WebGL crash-recovery reload; see `analyticsRelay.ts`),
+ *  so one `distinct_id` covers several page lives whose clocks each restart at
+ *  0. A reading followed by a STRICTLY SMALLER one is therefore the end of a page
+ *  life, as is the last reading. Against the boot-partitioned total, a plain
+ *  `max` loses about 15%; this walk recovers about 13 of those points, on the
+ *  update and crash-recovery cohort specifically.
+ *
+ *  Worked examples, readings oldest first (verified by running the query against
+ *  live data, which a unit test of a SQL string cannot do):
+ *    [10, 20, 5, 15] -> 20 + 15 = 35   two lives, the reset is visible
+ *    [7, 3, 1]       -> 7 + 3 + 1 = 11 three lives, each shorter than the last
+ *    [4, 4]          -> 4              one life reporting twice, which the
+ *                                      terminal row makes routine (hidden then
+ *                                      pagehide in the same rounded second), so
+ *                                      the test is `<` and not `<=`
+ *    [10, 50]        -> 50             TWO lives read as one: see the bound below
+ *    [42]            -> 42             a single reading
+ *
+ *  The sum is a LOWER BOUND: a page life is detected by the reading dropping, so
+ *  a reload whose second life runs LONGER than the first is invisible and reads
+ *  as one continuous life, and equality counts as invisible too, which is the
+ *  likelier half for short repeatable lives. Over a recent 30 days, 129 of 919
+ *  sessions reloaded (`boot` fires once per page life) and this walk sees 77 of
+ *  them, itself a floor; a boot-partitioned sum comes out about 2% higher in
+ *  total and 1 second higher at the median, which did not justify pulling a
+ *  second event into this query. Said
+ *  plainly here because the whole point of the builder is to stop publishing a
+ *  number whose error is undocumented.
+ *
+ *  One more thing this does NOT match: the dashboard's `session_lengths` view
+ *  groups over a fixed 180 days and its tiles then filter on `ended_at`, so a
+ *  session is in when its LAST row is in the window and its length counts every
+ *  reading including earlier ones. This query filters inside the grouping, so a
+ *  session is in when ANY row is in the window and its readings are cut at the
+ *  boundary. For `[50, 10, 60]` with the 50 outside, the dashboard says 110 and
+ *  this says 60. Sessions are short (median 91s), so it bites only at the window
+ *  edge, but the two numbers are not the same measurement and should not be
+ *  quoted against each other.
+ *
+ *  The once-per-session events (`session_builds`, `session_peak_floors`,
+ *  `session_fps`) write one row per page life and stay on the plain builder,
+ *  which is right for them: they are not cumulative, so there is nothing to
+ *  collapse and their `n` is already a count of measurements. */
+function buildSessionDepthQuery(event, prop, hours) {
+  const val = `toFloat(properties.${prop})`;
+  return (
+    `SELECT count() AS n, quantile(0.5)(v) AS p50, quantile(0.9)(v) AS p90, ` +
+    `quantile(0.95)(v) AS p95, max(v) AS mx FROM ` +
+    `(SELECT arraySum(arrayMap((x, i) -> if(i = length(r) OR r[i + 1] < x, x, 0), r, arrayEnumerate(r))) AS v FROM ` +
+    `(SELECT arrayMap(t -> assumeNotNull(t.2), arraySort(t -> t.1, groupArray(tuple(timestamp, ${val})))) AS r ` +
+    `FROM events WHERE ${SCOPE(hours)} AND event = ${lit(event)} AND ${val} IS NOT NULL GROUP BY distinct_id))`
   );
 }
 
@@ -229,8 +301,10 @@ function totalsByEvent(res, events) {
 }
 
 /** Pull the single depth row (n / p50 / p90 / p95 / max) from a depth query, or
- *  null when the query was skipped or the window is empty. Percentiles are exact
- *  (HogQL computed them), so there is no truncation/approximation flag. */
+ *  null when the query was skipped or the window is empty. The percentiles come
+ *  from HogQL `quantile`, ClickHouse's approximate implementation, so they are
+ *  close estimates rather than exact order statistics; there is no per-row flag
+ *  for that because it is true of every row. */
 function depthRow(res) {
   if (!res.ok) return { skipped: true, hint: res.hint };
   const rows = rowsToObjects(res.json);
@@ -313,6 +387,7 @@ td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; }
 .empty { color:var(--muted); background:var(--face); box-shadow:var(--bevel-in); padding:8px 12px; margin:6px 0; }
 td.empty-cell { color:var(--muted); }
 .note { color:var(--muted); font-size:11px; margin:5px 2px; }
+.unit { color:var(--muted); font-size:10px; font-weight:400; }
 footer { color:var(--muted); font-size:11px; text-align:center; margin-top:20px; padding:10px; box-shadow:var(--bevel-in); background:var(--face); }
 `;
 
@@ -340,7 +415,15 @@ function htmlTable(t) {
   return `${cap}<p class="empty">${msg}</p>`;
 }
 
-/** The per-session Depth section (exact p50 / p90 / p95 / max), or nothing. */
+/** The Depth section (p50 / p90 / p95 / max), or nothing. Each row carries its
+ *  own `unit` for the Samples column, because the rows do not all count the same
+ *  thing, and the difference is the same one this report exists to respect: one
+ *  session id is not one page life. The session-length row collapses a repeating
+ *  cumulative event to one value per session, so its Samples are SESSIONS. The
+ *  others fire once per PAGE LIFE, so a session that reloaded contributes several
+ *  partial rows to them and their distributions lean low for that cohort. Fixing
+ *  that means summing or re-deriving each of those per session, which is its own
+ *  change; naming the unit is the honest interim. */
 function htmlDepth(depth) {
   if (!depth || !depth.length) return "";
   const rows = depth
@@ -350,10 +433,11 @@ function htmlDepth(depth) {
         const msg = r.skipped ? `Skipped: ${escapeHtml(r.hint ?? "error")}` : "No data in this window.";
         return `<tr><td>${escapeHtml(d.label)}</td><td class="empty-cell" colspan="5">${msg}</td></tr>`;
       }
-      return `<tr><td>${escapeHtml(d.label)}</td><td class="n">${fmt(r.n)}</td><td class="n">${fmt(rnd(r.p50))}</td><td class="n">${fmt(rnd(r.p90))}</td><td class="n">${fmt(rnd(r.p95))}</td><td class="n">${fmt(rnd(r.max))}</td></tr>`;
+      const unit = d.unit ? ` <span class="unit">${escapeHtml(d.unit)}</span>` : "";
+      return `<tr><td>${escapeHtml(d.label)}</td><td class="n">${fmt(r.n)}${unit}</td><td class="n">${fmt(rnd(r.p50))}</td><td class="n">${fmt(rnd(r.p90))}</td><td class="n">${fmt(rnd(r.p95))}</td><td class="n">${fmt(rnd(r.max))}</td></tr>`;
     })
     .join("");
-  return `<section><h2>Depth (per session)</h2><div class="scroll"><table><thead><tr><th>Metric</th><th class="n">Samples</th><th class="n">p50</th><th class="n">p90</th><th class="n">p95</th><th class="n">Max</th></tr></thead><tbody>${rows}</tbody></table></div><p class="note">Percentiles are exact (HogQL <code>quantile</code>), computed per session from the raw values. No histogram approximation.</p></section>`;
+  return `<section><h2>Depth</h2><div class="scroll"><table><thead><tr><th>Metric</th><th class="n">Samples</th><th class="n">p50</th><th class="n">p90</th><th class="n">p95</th><th class="n">Max</th></tr></thead><tbody>${rows}</tbody></table></div><p class="note">Percentiles come from the raw values with no histogram approximation, using HogQL <code>quantile</code> (ClickHouse's approximate implementation, so read them as close estimates). The Samples column names its own unit: <em>sessions</em> where a repeating cumulative event was collapsed to one value per session, <em>page lives</em> otherwise. Those rows fire once per page life, so a session that reloaded (about 14%) contributes several partial rows and their distributions lean low.</p></section>`;
 }
 
 /** The full self-contained HTML report. */
@@ -383,10 +467,13 @@ ${sections}
 </div></body></html>`;
 }
 
-/** The per-session Depth block for the markdown report / job summary. */
+/** The Depth block for the markdown report / job summary. Kept in step with
+ *  {@link htmlDepth}: the workflow renders this one inline into the run summary,
+ *  so it is the copy most people read, and it carries the same unit column and
+ *  the same caveats rather than a rosier older wording. */
 function markdownDepth(depth) {
   if (!depth || !depth.length) return [];
-  const lines = [`## Depth (per session)`, ``, `| Metric | Samples | p50 | p90 | p95 | Max |`, `| --- | ---: | ---: | ---: | ---: | ---: |`];
+  const lines = [`## Depth`, ``, `| Metric | Samples | p50 | p90 | p95 | Max |`, `| --- | ---: | ---: | ---: | ---: | ---: |`];
   for (const d of depth) {
     const r = d.row;
     if (r.skipped || r.empty) {
@@ -394,9 +481,14 @@ function markdownDepth(depth) {
       lines.push(`| ${mdCell(d.label)} | ${msg} | n/a | n/a | n/a | n/a |`);
       continue;
     }
-    lines.push(`| ${mdCell(d.label)} | ${fmt(r.n)} | ${fmt(rnd(r.p50))} | ${fmt(rnd(r.p90))} | ${fmt(rnd(r.p95))} | ${fmt(rnd(r.max))} |`);
+    const samples = d.unit ? `${fmt(r.n)} ${d.unit}` : fmt(r.n);
+    lines.push(`| ${mdCell(d.label)} | ${samples} | ${fmt(rnd(r.p50))} | ${fmt(rnd(r.p90))} | ${fmt(rnd(r.p95))} | ${fmt(rnd(r.max))} |`);
   }
-  lines.push(``, `_Percentiles are exact (HogQL quantile), computed per session from the raw values. No histogram approximation._`, ``);
+  lines.push(
+    ``,
+    `_Percentiles come from the raw values with no histogram approximation, using HogQL \`quantile\` (ClickHouse's approximate implementation, so read them as close estimates). The Samples column names its own unit: **sessions** where a repeating cumulative event was collapsed to one value per session, **page lives** otherwise. Those rows fire once per page life, so a session that reloaded (about 14%) contributes several partial rows and their distributions lean low._`,
+    ``,
+  );
   return lines;
 }
 
@@ -450,7 +542,7 @@ function demoModel() {
       ["Towers founded", 1240],
       ["First builds", 1012],
       ["Star promotions", 438],
-      ["Sessions ended", 3120],
+      ["Sessions ended", 870],
       ["Boots", 5400],
       ["Play sessions", 2600],
       ["Crashes", 37],
@@ -460,17 +552,18 @@ function demoModel() {
       ["Errors", 54],
     ],
     highlights: [
-      ["Founded to first build", "81.6%"],
-      ["Crash to boot ratio", "0.7%"],
+      ["First builds vs towers founded", "1,012 vs 1,240 (per tower, not a conversion rate)"],
+      ["Sessions with any pagehide row", "74.1%"],
+      ["Crash shapes to boot ratio", "0.7%"],
       ["Typical session fps (p50)", "58"],
       ["Sessions with a fire", "6.2%"],
     ],
     depth: [
-      { label: "Session length (seconds)", row: depth(3120, 92, 640, 1180, 4200) },
-      { label: "Builds per session", row: depth(2600, 6, 31, 58, 210) },
-      { label: "Peak floor reached", row: depth(2600, 9, 34, 51, 92) },
-      { label: "Session fps (p50)", row: depth(2100, 58, 41, 33, 60) },
-      { label: "Session fps (worst-frame low)", row: depth(2100, 42, 22, 15, 60) },
+      { label: "Session length (seconds)", unit: "sessions", row: depth(870, 92, 640, 1180, 4200) },
+      { label: "Builds per page life", unit: "page lives", row: depth(2600, 6, 31, 58, 210) },
+      { label: "Peak floor reached (per page life)", unit: "page lives", row: depth(2600, 9, 34, 51, 92) },
+      { label: "Fps p50 (per page life)", unit: "page lives", row: depth(2100, 58, 41, 33, 60) },
+      { label: "Fps worst-frame low (per page life)", unit: "page lives", row: depth(2100, 42, 22, 15, 60) },
     ],
     sections: [
       { title: "Tool mix", tables: [{ ok: true, header: "Tool", ...rows([["office", 820, 410], ["fast food", 560, 300], ["floor", 540, 295]]) }] },
@@ -519,7 +612,15 @@ async function main() {
   }
 
   const TOTAL_EVENTS = [
-    "boot", "session_end", "game_started", "first_build", "star_reached", "crash", "update",
+    "boot", "session_end", "first_build", "star_reached", "crash", "update",
+    // BOTH new-tower names. `game_started` was renamed to `new_game_started` on
+    // 2026-09-14, so every founding before that date is stored under the old
+    // name, and the game ships as a PWA / TWA / bundled iOS build whose cached
+    // clients keep sending it until they update. Asking for only the new name
+    // would make "Towers founded" read a fraction of reality for a full window
+    // and print it as a confident number. Summed at the KPI below; drop the old
+    // name once no build that emits it is still in the wild.
+    "new_game_started", "game_started",
     // App-chrome (#614), error tracking, and the gameplay economy / emergency
     // surfaces (#611). Each only has history from when its build went live.
     "app_action", "economy_action", "emergency_choice", "session_emergencies", "$exception",
@@ -534,18 +635,23 @@ async function main() {
   const totalsRes = await q("totals", buildTotalsQuery(TOTAL_EVENTS, WINDOW.hours));
   const totals = totalsByEvent(totalsRes, TOTAL_EVENTS);
 
-  // Depth: exact percentiles per session-scoped numeric property.
+  // Depth: percentiles per session-scoped numeric property.
+  // `perSession` routes an event that reports repeatedly with a cumulative value
+  // through the per-page-life collapse first (a SUM of peaks, not a max; see
+  // buildSessionDepthQuery). The rest report one non-cumulative row per page
+  // life, so the plain builder suits them, with the caveat on their labels below.
   const depthSpecs = [
-    { label: "Session length (seconds)", event: "session_end", prop: "seconds" },
-    { label: "Builds per session", event: "session_builds", prop: "builds" },
-    { label: "Peak floor reached", event: "session_peak_floors", prop: "floors" },
-    { label: "Session fps (p50)", event: "session_fps", prop: "p50" },
-    { label: "Session fps (worst-frame low)", event: "session_fps", prop: "low" },
+    { label: "Session length (seconds)", event: "session_end", prop: "seconds", perSession: true },
+    { label: "Builds per page life", event: "session_builds", prop: "builds" },
+    { label: "Peak floor reached (per page life)", event: "session_peak_floors", prop: "floors" },
+    { label: "Fps p50 (per page life)", event: "session_fps", prop: "p50" },
+    { label: "Fps worst-frame low (per page life)", event: "session_fps", prop: "low" },
   ];
   const depth = [];
   for (const d of depthSpecs) {
-    const r = await q(`depth_${d.event}_${d.prop}`, buildDepthQuery(d.event, d.prop, WINDOW.hours));
-    depth.push({ label: d.label, row: depthRow(r) });
+    const build = d.perSession ? buildSessionDepthQuery : buildDepthQuery;
+    const r = await q(`depth_${d.event}_${d.prop}`, build(d.event, d.prop, WINDOW.hours));
+    depth.push({ label: d.label, unit: d.perSession ? "sessions" : "page lives", row: depthRow(r) });
   }
 
   // Breakdowns: each returns events + distinct sessions per group.
@@ -574,17 +680,32 @@ async function main() {
   const firesRes = await q("session_emergencies_with_fire", buildFilteredCountQuery("session_emergencies", "toFloat(properties.fires) > 0", WINDOW.hours));
   const firesWithFire = countRow(firesRes);
 
-  const fpsP50 = depth.find((d) => d.label === "Session fps (p50)")?.row;
+  // Sessions that reported at least one `final: true` row (the terminal
+  // pagehide). `final` shipped on 2026-09-14, so a window reaching back past
+  // that reads low for the days before it.
+  const finalRes = await q("session_end_final", buildFilteredCountQuery("session_end", "properties.final = true", WINDOW.hours));
+  const finalRows = countRow(finalRes);
+  // Both new-tower event names, summed across the 2026-09-14 rename.
+  const founded = totals.new_game_started.events + totals.game_started.events;
+
+  const fpsP50 = depth.find((d) => d.label === "Fps p50 (per page life)")?.row;
   const model = {
     window: { since, until: stamp, label: WINDOW.label },
     generated: new Date().toISOString(),
     kpis: [
-      ["Towers founded", totals.game_started.events],
+      // Both names summed: see TOTAL_EVENTS. Neither alone is the real count
+      // while the rename is still working through cached clients.
+      ["Towers founded", founded],
       ["First builds", totals.first_build.events],
       ["Star promotions", totals.star_reached.events],
-      ["Sessions ended", totals.session_end.events],
+      // DISTINCT sessions, not session_end rows: the event re-fires on every
+      // tab-hide, so a row count runs several times the real session count.
+      ["Sessions ended", totals.session_end.sessions],
       ["Boots", totals.boot.events],
       ["Play sessions", totals.boot.sessions],
+      // Capped and deduped per session since 2026-09-14, so this counts distinct
+      // crash SHAPES per session (at most 10), not occurrences. Not comparable
+      // with counts from before that date.
       ["Crashes", totals.crash.events],
       ["App actions", totals.app_action.events],
       ["Economy actions", totals.economy_action.events],
@@ -592,8 +713,30 @@ async function main() {
       ["Errors", totals["$exception"].events],
     ],
     highlights: [
-      ["Founded to first build", pct(totals.first_build.events, totals.game_started.events)],
-      ["Crash to boot ratio", pct(totals.crash.events, totals.boot.events)],
+      // Deliberately NOT rendered as a bare percentage next to "Crash to boot
+      // ratio": the two would read as the same kind of number and this one is
+      // not a conversion rate. It is per TOWER, not per session, and it can
+      // legitimately exceed 100%, because first_build fires once for every tower
+      // that gets a facility (a tower opened from a save included) while the
+      // new-game event fires only on founding. The honest funnel is the
+      // dashboard's, which is per session; this line is a sanity check on the
+      // two raw counts, so it shows them.
+      ["First builds vs towers founded", `${fmt(totals.first_build.events)} vs ${fmt(founded)} (per tower, not a conversion rate)`],
+      // Sessions where SOME page life reported a `pagehide` row. Deliberately not
+      // called a terminal-pagehide delivery rate: `final` rides EVERY emission
+      // made from `pagehide` that clears the dedup, not just the first, and a
+      // bfcache entry fires `pagehide` too, so one session can carry several and
+      // a hard-killed one carries none. Read it as the coarse measure of how much
+      // work the re-emission fallback is doing, which is why session_end re-fires.
+      [
+        "Sessions with any pagehide row",
+        finalRows.skipped || finalRows.empty ? "n/a" : pct(finalRows.sessions, totals.session_end.sessions),
+      ],
+      // The numerator changed meaning on 2026-09-14: `crash` is capped and deduped
+      // per session, so this is distinct crash SHAPES per session over boots, not
+      // occurrences over boots. It stepped down that day and is not comparable
+      // across it. The denominator is unchanged.
+      ["Crash shapes to boot ratio", pct(totals.crash.events, totals.boot.events)],
       ["Typical session fps (p50)", fpsP50 && !fpsP50.skipped && !fpsP50.empty ? fmt(rnd(fpsP50.p50)) : "n/a"],
       // Fire rate: sessions with >=1 fire over all played sessions that reported.
       // "n/a" (not a false 0.0%) when that one query was skipped while totals succeeded.
@@ -619,7 +762,19 @@ async function main() {
       {
         title: "Reliability and updates",
         tables: [
-          { ...crashByRecovery, caption: "Crashes by failed in-place recovery", header: "Recovery failed" },
+          {
+            ...crashByRecovery,
+            // Deduped per session since 2026-09-14, and this split is the one the
+            // dedup distorts most: recoveryFailed can only be true on a FIRST
+            // mid-game loss whose flush succeeded, so every later loss in a loop
+            // reports false. Before the dedup a long loop pushed the false bucket
+            // up by its occurrence count; now one looping session contributes at
+            // most one row to each bucket, so the ratio is pulled toward 1:1 by
+            // the dedup rather than by device behavior. Not comparable across
+            // that date, and not a recovery success rate in either era.
+            caption: "Crash shapes by failed in-place recovery (per session since 2026-09-14)",
+            header: "Recovery failed",
+          },
           { ...updateByTo, caption: "Updates by target version", header: "To version" },
           { ...exceptionByType, caption: "Errors ($exception) by type", header: "Exception type" },
         ],
@@ -688,4 +843,4 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
 }
 
 // Exported for unit tests; the script itself uses them directly above.
-export { parseWindow, lit, buildTotalsQuery, buildDepthQuery, buildBreakdownQuery, buildFilteredCountQuery, rowsToObjects, totalsByEvent, depthRow, breakdownRows, countRow };
+export { parseWindow, lit, buildTotalsQuery, buildDepthQuery, buildSessionDepthQuery, buildBreakdownQuery, buildFilteredCountQuery, rowsToObjects, totalsByEvent, depthRow, breakdownRows, countRow };

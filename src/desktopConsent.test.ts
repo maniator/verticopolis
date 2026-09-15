@@ -143,20 +143,20 @@ describe("the pending hold (memory only, bounded, ordered)", () => {
 
   it("holds while pending and flushes in emission order on grant", () => {
     const order: string[] = [];
-    for (const name of ["boot", "game_started", "first_build"]) {
+    for (const name of ["boot", "new_game_started", "first_build"]) {
       holdWhilePending(() => order.push(name), "desktop");
     }
     expect(order, "nothing may be sent while the answer is outstanding").toEqual([]);
     expect(heldEventCount()).toBe(3);
     setDesktopConsent("granted");
-    expect(order).toEqual(["boot", "game_started", "first_build"]);
+    expect(order).toEqual(["boot", "new_game_started", "first_build"]);
     expect(heldEventCount()).toBe(0);
   });
 
   it("discards everything held on decline, sending none of it", () => {
     const sent: string[] = [];
     holdWhilePending(() => sent.push("boot"), "desktop");
-    holdWhilePending(() => sent.push("game_started"), "desktop");
+    holdWhilePending(() => sent.push("new_game_started"), "desktop");
     setDesktopConsent("declined");
     expect(sent).toEqual([]);
     expect(heldEventCount()).toBe(0);
@@ -186,7 +186,7 @@ describe("the pending hold (memory only, bounded, ordered)", () => {
       sent.push("boot");
       setDesktopConsent("declined");
     }, "desktop");
-    holdWhilePending(() => sent.push("game_started"), "desktop");
+    holdWhilePending(() => sent.push("new_game_started"), "desktop");
     holdWhilePending(() => sent.push("first_build"), "desktop");
     setDesktopConsent("granted");
     expect(sent, "nothing may go out after the decline was recorded").toEqual(["boot"]);
