@@ -44,21 +44,26 @@ describe("crash event cap and dedup", () => {
   });
 
   it("collapses a context-loss loop to the first loss and the first repeat", () => {
-    // The real shape of the 2026-09-12 incident: one loss whose in-place recovery
-    // failed, then the screen re-shown for every further loss, each flagged
-    // `repeat` because the second landed inside 90s.
-    const base = { kind: "webgl-context-lost", recoveryFailed: true, saveFlushed: true, behindSplash: false, ...context };
-    gameplaySession.noteCrash({ ...base, repeat: false });
-    for (let i = 0; i < 40; i++) gameplaySession.noteCrash({ ...base, repeat: true });
+    // The shape a real loop has, per `recoverFromContextLoss`: the first mid-game
+    // loss flushes and tries an in-place recovery, which fails, so it reports
+    // `recoveryFailed: true` with `repeat: false`. Every later loss inside 90s
+    // takes the repeat early return, so it reports `repeat: true` with
+    // `recoveryFailed: false`. The two never both read true on a device, so the
+    // loop is staged with exactly those two payloads rather than one `base`.
+    const shared = { kind: "webgl-context-lost", saveFlushed: true, behindSplash: false, ...context };
+    const firstLoss = { ...shared, repeat: false, recoveryFailed: true };
+    const looping = { ...shared, repeat: true, recoveryFailed: false };
+    gameplaySession.noteCrash(firstLoss);
+    for (let i = 0; i < 40; i++) gameplaySession.noteCrash(looping);
 
     const crashes = crashCalls();
     expect(crashes).toHaveLength(2); // the two shapes the loop actually has
     // The first event's payload is untouched by the guard.
-    expect(crashes[0][1]).toEqual({ ...base, repeat: false });
+    expect(crashes[0][1]).toEqual(firstLoss);
     // The loop signal survives the dedup, which is why `repeat` is in the
     // fingerprint: without it the 40 repeats would collapse into the first loss
     // and nothing would ever report that this session looped.
-    expect(crashes[1][1]).toEqual({ ...base, repeat: true });
+    expect(crashes[1][1]).toEqual(looping);
   });
 
   it("reports a repeat-flagged loop even when no earlier crash shape preceded it", () => {

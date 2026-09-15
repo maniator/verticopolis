@@ -1,8 +1,9 @@
 name: Analytics Report
 
 # Twice-weekly rollup of the Verticopolis custom events (see src/analytics.ts),
-# rendered by scripts/posthog-report.mjs (PostHog / HogQL: exact percentiles
-# plus per-session and per-tool splits). The report renders inline into the
+# rendered by scripts/posthog-report.mjs (PostHog / HogQL percentiles plus
+# per-session and per-tool splits; the percentiles are ClickHouse `quantile`,
+# which is approximate, so read them as close estimates). The report renders inline into the
 # run's job summary (viewable with no download) and uploads the styled HTML as
 # a downloadable artifact; the raw responses print to the run log. Read-only,
 # writes nothing to the repo.

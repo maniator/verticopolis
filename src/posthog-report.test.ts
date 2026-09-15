@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 // The PostHog report generator is a dependency-free Node script (see
 // scripts/posthog-report.mjs). Its pure helpers (the HogQL query builders and
 // the response normalizers) are exported so they can be pinned here without a
@@ -103,6 +106,30 @@ describe("HogQL query builders", () => {
     expect(q).toContain("count() AS n"); // sessions, not rows
     // Reading the raw property in the percentile is the bug this builder fixes.
     expect(q).not.toContain("quantile(0.5)(toFloat(properties.seconds))");
+  });
+
+  it("keeps the page-life walk identical to the dashboard view's copy of it", () => {
+    // The walk is the one genuinely subtle expression in this change and it lives
+    // in TWO places: the session_lengths view in scripts/posthog-dashboard.mjs and
+    // the builder here. Neither can be executed from a unit test (both are HogQL
+    // that only ClickHouse runs), so what is guarded instead is the thing that
+    // would actually go wrong: the two drifting apart, leaving the dashboard and
+    // the report quietly computing session length two different ways.
+    const dashboardPath = resolve(dirname(fileURLToPath(import.meta.url)), "../scripts/posthog-dashboard.mjs");
+    const dashboard = readFileSync(dashboardPath, "utf8");
+    const walk = /arraySum\(arrayMap\(\(x, i\) -> if\(i = length\((\w+)\) OR \1\[i \+ 1\] < x, x, 0\), \1, arrayEnumerate\(\1\)\)\)/;
+
+    const viewWalk = walk.exec(dashboard);
+    expect(viewWalk, "the view's page-life walk should be findable in the dashboard script").not.toBeNull();
+
+    const queryWalk = walk.exec(buildSessionDepthQuery("session_end", "seconds", 720));
+    expect(queryWalk, "the builder's page-life walk should have the same shape").not.toBeNull();
+
+    // Identical once the array alias is normalized: the view calls it `readings`
+    // and the builder calls it `r`, and nothing else may differ. Word-bounded,
+    // because a one-letter alias otherwise matches inside `array` and friends.
+    const normalize = (m: RegExpExecArray): string => m[0].replace(new RegExp(`\\b${m[1]}\\b`, "g"), "ARR");
+    expect(normalize(queryWalk!)).toBe(normalize(viewWalk!));
   });
 
   it("per-session depth query sums page lives rather than taking a plain max", () => {

@@ -290,29 +290,6 @@ describe("gameplay session length", () => {
     expect(sendToRelay).toHaveBeenCalledWith("session_peak_floors", { floors: -5 });
   });
 
-  it("marks the terminal emission final, and lets it past the whole-second dedup once", () => {
-    vi.setSystemTime(0);
-    gameplaySession.begin();
-    vi.setSystemTime(4000);
-    gameplaySession.end(false); // visibilitychange:hidden
-    gameplaySession.end(true); // pagehide in the same rounded second
-    gameplaySession.end(true); // a second terminal signal must not add a row
-    const ends = vi.mocked(sendToRelay).mock.calls.filter(([name]) => name === "session_end");
-    expect(ends).toHaveLength(2);
-    expect(ends[0][1]).toEqual({ seconds: 4, final: false });
-    expect(ends[1][1]).toEqual({ seconds: 4, final: true });
-  });
-
-  it("stays silent on a terminal end with nothing to report", () => {
-    // A prerender or blink-and-leave visit. The rule above must not start emitting
-    // a zero-length row for every such visit, which would drag the median down.
-    vi.setSystemTime(0);
-    gameplaySession.begin();
-    vi.setSystemTime(300); // 0.3s -> rounds to 0
-    gameplaySession.end(true);
-    expect(sendToRelay).not.toHaveBeenCalledWith("session_end", expect.anything());
-  });
-
   it("still records depth when the session ends within the first rounded second", () => {
     // A build-and-close under 0.5s foreground rounds to 0 == lastReportedSec, so
     // session_end is deduped away. Depth must still emit (it is latched

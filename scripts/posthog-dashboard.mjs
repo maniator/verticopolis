@@ -94,8 +94,9 @@ const SESSION_LENGTHS_SQL = [
   "    -- repeatable lives such as a crash loop. Over a recent 30 days, 129 of 919",
   "    -- sessions reloaded (boot fires once per page life) and this walk sees 77;",
   "    -- that 77 is itself a floor for the same reason. Cross-checked against a",
-  "    -- boot-partitioned sum, the residual is about 2% of total play time against",
-  "    -- the 15% a plain max() loses, so it did not justify joining boot in here.",
+  "    -- boot-partitioned sum: a plain max() loses about 15% of the true total,",
+  "    -- this walk recovers about 13 of those points, and the residual 2% did not",
+  "    -- justify joining boot into this view.",
   "    arraySum(arrayMap((x, i) -> if(i = length(readings) OR readings[i + 1] < x, x, 0), readings, arrayEnumerate(readings))) AS length_seconds,",
   "    -- What a plain max(seconds) would have reported: the longest single page",
   "    -- life. Kept so the two are comparable rather than silently different, and",
@@ -174,9 +175,10 @@ function hogql(query, { display = "ActionsTable", chartSettings } = {}) {
  *  "Update now" reload or a WebGL crash-recovery reload keeps one `distinct_id`
  *  while the page's clock restarts at 0. One session id therefore covers several
  *  page lives, and a plain `max(seconds)` would report only the longest of them.
- *  `length_seconds` sums each page life's final reading instead, which recovers
- *  about 15% of total play time, concentrated on the update and crash-recovery
- *  cohort specifically.
+ *  `length_seconds` sums each page life's final reading instead. Against the
+ *  boot-partitioned total (the closest thing to truth here), a plain `max` loses
+ *  about 15%; this walk recovers about 13 of those points and leaves about 2,
+ *  concentrated on the update and crash-recovery cohort specifically.
  *
  *  That sum is a LOWER BOUND, not the exact length, and the difference is worth
  *  stating because this dashboard exists to stop publishing numbers that are
@@ -186,8 +188,8 @@ function hogql(query, { display = "ActionsTable", chartSettings } = {}) {
  *  129 of 919 sessions reloaded (`boot` fires once per page life, which is the
  *  independent ground truth), and this heuristic sees 77 of them. A
  *  boot-partitioned sum, which is exact wherever `boot` was delivered, comes out
- *  only 2% higher in total and 1 second higher at the median, so the residual did
- *  not justify joining a second event into the view.
+ *  about 2% higher in total and 1 second higher at the median (92s against 91s),
+ *  so the residual did not justify joining a second event into the view.
  *
  *  `distinct_id` IS the per-tab session id: the relay sets it from the session id
  *  and sets `$process_person_profile` false, so "unique users" in this project
@@ -463,8 +465,15 @@ function buildInsights(ids) {
     { name: "Errors (30d)", description: "Total $exception events, production, 30d.", query: trends([series("$exception", "Errors")], { display: "BoldNumber" }) },
     {
       name: "WebGL crashes by recovery outcome",
+      // Not a recovery success rate, in either era. `recoveryFailed` can only be
+      // true on a FIRST mid-game loss whose flush succeeded, so every later loss
+      // in a loop reports false, conflating "recovery succeeded" with "recovery
+      // was never attempted". Before the dedup a long loop pushed the false
+      // bucket up by its occurrence count; now one looping session contributes at
+      // most one row to each bucket, so the split is pulled toward 1:1 by the
+      // dedup rather than by how devices behave.
       description:
-        "The typed crash event split by whether in-place recovery failed (structured crash detail), production. Deduped per session on the crash's flag set since 2026-09-14, so counts before and after that date are not comparable.",
+        "The typed crash event split by whether in-place recovery was tried and failed, production. NOT a recovery success rate: false also covers every loss where recovery was never attempted (a repeat, a loss behind the splash, a failed flush). Deduped per session on the crash's flag set since 2026-09-14, which pulls the split toward 1:1, so counts before and after that date are not comparable.",
       query: trends([series("crash", "Crashes")], { breakdown: "recoveryFailed", display: "ActionsBar" }),
     },
     // App-chrome actions (the app_action event). COOKIELESS: every tile here is
@@ -583,8 +592,14 @@ async function listAll(path) {
   const out = [];
   let next = `${path}${path.includes("?") ? "&" : "?"}limit=200`;
   for (let page = 0; ; page++) {
-    const data = (await req("GET", next)) || {};
-    out.push(...(data.results || []));
+    const data = await req("GET", next);
+    // No envelope means this helper cannot tell an empty listing from a shape it
+    // does not understand, and the caller answers "nothing found" by creating a
+    // duplicate. Refuse, for the same reason the truncation checks below do.
+    if (!data || !Array.isArray(data.results)) {
+      throw new Error(`listAll(${path}) got a response with no results array; refusing to act on it`);
+    }
+    out.push(...data.results);
     if (!data.next) return out;
     if (page + 1 >= MAX_LIST_PAGES) {
       throw new Error(`listAll(${path}) exceeded ${MAX_LIST_PAGES} pages; refusing to act on a truncated list`);
@@ -612,8 +627,15 @@ async function findInsight(name) {
   // tile whose name merely shares words with another insight read as absent, and
   // the run created a second copy of it instead of updating. Insights are the one
   // object this script makes dozens of, so that is where a duplicate hurts most.
-  const page = await req("GET", `/insights/?limit=100&search=${encodeURIComponent(name)}`);
-  return (page.results || []).find((i) => i.name === name && !i.deleted) || null;
+  const page = (await req("GET", `/insights/?limit=100&search=${encodeURIComponent(name)}`)) || {};
+  const hit = (page.results || []).find((i) => i.name === name && !i.deleted) || null;
+  // A truncated page is indistinguishable from "no such insight", and the caller
+  // answers that by CREATING one, which forks the tile. So when the exact name is
+  // not on this page and the API says there are more, refuse rather than guess.
+  if (!hit && page.next) {
+    throw new Error(`findInsight("${name}") did not find it in the first 100 search hits and more remain; refusing to risk a duplicate`);
+  }
+  return hit;
 }
 
 /** Create or update the saved view the SQL tiles read, matched by exact name. A
@@ -621,7 +643,17 @@ async function findInsight(name) {
  *  that selects from it runs; provisioning it here keeps the whole dashboard
  *  reproducible from this one script rather than half of it from the SQL editor. */
 async function ensureView(spec) {
-  const existing = (await listAll(`/warehouse_saved_queries/`)).find((v) => v.name === spec.name && !v.deleted) || null;
+  let existing;
+  try {
+    existing = (await listAll(`/warehouse_saved_queries/`)).find((v) => v.name === spec.name && !v.deleted) || null;
+  } catch (err) {
+    // The listing is where the plausible refusals land (a key without warehouse
+    // scope, a plan without saved queries, a host that does not expose them), and
+    // from here we do not know whether a view already exists. Saying "absent"
+    // would be a guess, and the wrong guess is the dangerous one.
+    err.viewState = "unknown";
+    throw err;
+  }
   const body = { name: spec.name, description: spec.description, query: { kind: "HogQLQuery", query: spec.query } };
   // Which branch failed matters to the caller: a failed create leaves no view and
   // two visibly broken tiles, while a failed update leaves the PREVIOUS
@@ -656,6 +688,7 @@ async function ensureAction(spec) {
   const existing = (await listAll(`/actions/`)).find((a) => a.name === spec.name && !a.deleted) || null;
   const body = { name: spec.name, description: spec.description, steps: spec.steps };
   if (existing) {
+    if (existing.id == null) throw new Error(`the existing action "${spec.name}" has no id; cannot point tiles at it`);
     await req("PATCH", `/actions/${existing.id}/`, body);
     return { id: existing.id, outcome: "updated" };
   }
@@ -670,7 +703,9 @@ async function ensureAction(spec) {
 }
 
 async function main() {
-  if (!KEY) {
+  // The dry run builds its plan offline and issues no request, so it does not
+  // need a credential; demanding one only blocks a reviewer previewing the plan.
+  if (!KEY && !DRY_RUN) {
     console.error("POSTHOG_PERSONAL_API_KEY is required (a phx_... personal API key). Aborting.");
     process.exit(1);
   }
@@ -689,14 +724,18 @@ async function main() {
   // Both run AHEAD of the insights, because tiles reference them: the action by
   // id, the view by name from inside HogQL.
   //
-  // The view is best-effort on purpose. It is one object that two of ~35 tiles
-  // read, and the endpoint can refuse for reasons that have nothing to do with
-  // this dashboard (a key without warehouse scope, a plan without saved
-  // queries, a self-hosted host that does not expose them). Letting that abort
-  // the run would refresh zero tiles over one optional object, so it warns and
-  // carries on; the two SQL tiles then show the view's own error, which names
-  // the cause far better than a dead script does. The action is NOT best-effort:
-  // three tiles reference it by id and there is no sensible id to invent.
+  // The view failing does not STOP the run, which is not the same as being
+  // tolerated: the run still ends non-zero, because two tiles are then wrong or
+  // missing and nobody should read a green exit as "the dashboard is correct".
+  // What carrying on buys is the other forty-one tiles, which have nothing to do
+  // with the view and would otherwise be abandoned over one object the endpoint
+  // can refuse for unrelated reasons (a key without warehouse scope, a plan
+  // without saved queries, a self-hosted host that does not expose them). What happens to those two tiles afterward depends on whether PostHog
+  // validates their HogQL at save time, which is why the loop below handles each
+  // tile separately: either they are rejected there and named as failures, or
+  // they save and surface the view's own error when rendered. Both are better
+  // than a dead script, and the run still exits non-zero either way. The action
+  // is NOT best-effort: tiles reference it by id and there is no id to invent.
   const action = await ensureAction(NEW_GAME_ACTION);
   console.log(`Action "${NEW_GAME_ACTION.name}": ${action.outcome} (id ${action.id})`);
   let viewOk = true;
@@ -705,11 +744,14 @@ async function main() {
   } catch (err) {
     viewOk = false;
     console.warn(`WARNING: could not provision the "${SESSION_LENGTHS_VIEW.name}" view (${err.message || err}).`);
-    console.warn(
-      err.viewState === "stale"
-        ? "The view still EXISTS at its previous definition, so the two session-length tiles will render numbers computed the OLD way rather than failing visibly. Treat them as untrustworthy until this is fixed."
-        : "The view does not exist, so the two session-length tiles will not resolve. Every other tile is unaffected.",
-    );
+    const consequence = {
+      stale:
+        "The view still EXISTS at its previous definition, so the two session-length tiles will render numbers computed the OLD way rather than failing visibly. Treat them as untrustworthy until this is fixed.",
+      absent: "The view does not exist, so the two session-length tiles cannot resolve. Every other tile is unaffected.",
+      unknown:
+        "Could not even list the saved queries, so whether the view exists is unknown: the two session-length tiles are either unresolvable or serving an older definition. Check them before trusting either.",
+    };
+    console.warn(consequence[err.viewState] ?? consequence.unknown);
   }
 
   const INSIGHTS = buildInsights({ newGame: action.id });
@@ -728,11 +770,12 @@ async function main() {
     console.log(`Found dashboard ${dashboard.id}`);
   }
 
-  // Per tile, so one rejected insight does not strand the ~30 behind it. The two
-  // tiles that select from the saved view are the likeliest to be rejected (they
-  // fail validation when the view is missing), and they sit early in the list, so
-  // an all-or-nothing loop would routinely refresh almost nothing. Every failure
-  // is named and the run still exits non-zero, so nothing passes silently.
+  // Per tile, so one rejected insight does not strand the rest. The two tiles
+  // that select from the saved view are the likeliest to be rejected, if PostHog
+  // validates their HogQL at save time, and they sit eighth of forty-three, so an
+  // all-or-nothing loop would have refreshed almost nothing on exactly the run
+  // where the view failed. Every failure is named and the run still exits
+  // non-zero, so nothing passes silently.
   let created = 0;
   let updated = 0;
   const failures = [];
@@ -763,7 +806,10 @@ async function main() {
   console.log(`Insights: ${created} created, ${updated} updated, ${failures.length} failed. Dashboard: ${HOST}/project/${PROJECT_ID}/dashboard/${dashboard.id}`);
   for (const f of failures) console.error(`  FAILED ${f}`);
   if (!viewOk || failures.length) {
-    throw new Error(`${failures.length} insight(s) failed${viewOk ? "" : ", and the saved view did not provision"}`);
+    const parts = [];
+    if (failures.length) parts.push(`${failures.length} insight(s) failed`);
+    if (!viewOk) parts.push("the saved view did not provision");
+    throw new Error(parts.join(", and "));
   }
 }
 

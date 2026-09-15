@@ -209,12 +209,20 @@ class GameplaySession {
    * The four flags span 16 shapes per `kind`, which is MORE than the cap of 10, so
    * the key does not by itself guarantee every shape reports: past 10 the cap
    * merges whatever arrives later. What keeps that off a real device is
-   * REACHABILITY, not the key's width. `recoverFromContextLoss` can produce six of
-   * the sixteen (`behindSplash` implies `saveFlushed` and forbids `recoveryFailed`,
-   * and `recoveryFailed` is only reachable past the repeat/splash/flush early
-   * return), `kind` has one value, and a real loop settles on two. Six sits inside
-   * ten with room. Add a fifth flag or a second `kind` and re-derive that count
-   * before assuming it still does.
+   * REACHABILITY, not the key's width. `recoverFromContextLoss` produces six of
+   * the sixteen, `kind` has one value, and a real loop settles on two, so six sits
+   * inside ten with room. The three constraints that get you from sixteen to six,
+   * because a count you cannot reproduce is no use to the next editor:
+   *   - `behindSplash` leaves `saveFlushed` at its `true` initializer and always
+   *     takes the early return, so it forbids `recoveryFailed`. Two tuples.
+   *   - `recoveryFailed` is only reachable PAST that early return, which needs
+   *     `!repeat && !behindSplash && saveFlushed`. One tuple.
+   *   - and that same early return is why a `!repeat && !behindSplash &&
+   *     saveFlushed` loss never reports `recoveryFailed: false`: it goes to the
+   *     recovery attempt instead, and a successful one shows no screen at all.
+   *     That removes the fourth of the otherwise-four remaining. Three tuples.
+   * Add a fifth flag or a second `kind` and re-derive this before assuming it
+   * still holds.
    *
    * What is still lost, deliberately: HOW MANY times each shape recurred. A
    * two-loss blip and an 8,269-loss catastrophe now look identical, which the
