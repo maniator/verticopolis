@@ -89,11 +89,10 @@ describe("HogQL query builders", () => {
     expect(q).toContain("INTERVAL 336 HOUR");
   });
 
-  it("per-session depth query collapses each session to its largest value first", () => {
+  it("per-session depth query collapses each session to one value before the percentiles", () => {
     // session_end re-fires per tab-hide with a cumulative value, so its
     // percentiles have to run over one length per session, not per row.
     const q = buildSessionDepthQuery("session_end", "seconds", 336);
-    expect(q).toContain("max(toFloat(properties.seconds)) AS v");
     expect(q).toContain("GROUP BY distinct_id");
     expect(q).toContain("quantile(0.5)(v)");
     expect(q).toContain("quantile(0.9)(v)");
@@ -104,6 +103,22 @@ describe("HogQL query builders", () => {
     expect(q).toContain("count() AS n"); // sessions, not rows
     // Reading the raw property in the percentile is the bug this builder fixes.
     expect(q).not.toContain("quantile(0.5)(toFloat(properties.seconds))");
+  });
+
+  it("per-session depth query sums page lives rather than taking a plain max", () => {
+    // The session id survives a same-tab reload on purpose, so one distinct_id
+    // covers several page lives whose clocks each restart at 0. A plain max would
+    // report only the longest life and lose the rest.
+    const q = buildSessionDepthQuery("session_end", "seconds", 720);
+    expect(q).toContain("arraySum(");
+    expect(q).toContain("arrayEnumerate(r)");
+    // The peak walk: a reading followed by a smaller one ends a page life, as
+    // does the last reading.
+    expect(q).toContain("i = length(r) OR r[i + 1] < x");
+    // Readings must be in time order for the walk to mean anything.
+    expect(q).toContain("arraySort(t -> t.1, groupArray(tuple(timestamp,");
+    // A plain max per session is exactly what this builder must NOT do.
+    expect(q).not.toContain("max(toFloat(properties.seconds)) AS v");
   });
 
   it("breakdown query groups by the property and counts sessions per group", () => {

@@ -72,6 +72,21 @@ describe("crash event cap and dedup", () => {
     expect(crashes[0][1]).toEqual(crash);
   });
 
+  it("keeps a save-flush failure distinct from an identical crash that saved", () => {
+    // saveFlushed is the one crash flag that reports actual player harm, and in a
+    // long loop it can flip on its own (the crash flush writes a whole tower every
+    // time, so storage can fill mid-flood) while every other flag holds. Leaving it
+    // out of the fingerprint would drop that crash as a duplicate and the session
+    // would report "saved" for a loss that lost the tower.
+    const base = { kind: "webgl-context-lost", repeat: true, recoveryFailed: false, behindSplash: false, ...context };
+    gameplaySession.noteCrash({ ...base, saveFlushed: true });
+    gameplaySession.noteCrash({ ...base, saveFlushed: true }); // a true duplicate: dropped
+    gameplaySession.noteCrash({ ...base, saveFlushed: false }); // the flush failed: a new shape
+    const crashes = crashCalls();
+    expect(crashes).toHaveLength(2);
+    expect(crashes.map(([, props]) => props.saveFlushed)).toEqual([true, false]);
+  });
+
   it("stops at the per-session cap even for genuinely distinct crash shapes", () => {
     const base = { kind: "webgl-context-lost", repeat: false, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
     // 16 distinct fingerprints: the cap has to hold whether or not the dedup

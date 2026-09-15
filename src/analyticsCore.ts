@@ -48,24 +48,38 @@ export interface GameplayEvents {
    *  the clearest "how far do players get" signal. */
   star_reached: { star: number };
   /** The tab was hidden or unloaded: cumulative foreground session length in
-   *  whole seconds, plus whether this was the session's terminal report.
+   *  whole seconds, plus whether the emission came from `pagehide`.
    *
-   *  It RE-FIRES on every tab-hide with a growing `seconds`, because the terminal
-   *  `pagehide` is not reliably delivered (a hard mobile kill drops it) and a
-   *  session that only ever reported at its close would often report nothing at
-   *  all. So one session contributes several rows, and a long session contributes
-   *  more of them than a short one. Counting rows therefore overcounts sessions,
-   *  and an event-level percentile over `seconds` is weighted by length and reads
-   *  far too high. Read a session's length as `max(seconds)` per `distinct_id`
-   *  (the per-tab session id, see `analyticsIngest.ts`) and count sessions as
-   *  distinct `distinct_id`s, never as a row count. The `session_lengths` saved
-   *  view in PostHog is that collapse, and the dashboard tiles read it.
+   *  READ THIS BEFORE QUERYING IT. Two separate things make the obvious reads
+   *  wrong, and the `session_lengths` saved view in PostHog exists so the
+   *  correction is written once. Use that view; the dashboard tiles do.
    *
-   *  `final` marks the emission made from `pagehide`, so the terminal row is
-   *  identifiable without giving up the re-emission fallback. It is best-effort
-   *  in the same way `pagehide` is: a session killed outright has no row with
-   *  `final: true`, which is why the aggregation above reads `max` rather than
-   *  filtering on this flag. */
+   *  1. It RE-FIRES on every tab-hide with a growing `seconds`, because the
+   *     terminal `pagehide` is not reliably delivered (a hard mobile kill drops
+   *     it) and a session that only ever reported at its close would often report
+   *     nothing at all. So one session contributes several rows, and a long
+   *     session contributes more of them than a short one. Counting rows
+   *     overcounts sessions (measured 3.6x), and an event-level percentile over
+   *     `seconds` is weighted by the very thing it measures (a 545s median
+   *     against a real 91s).
+   *  2. The per-tab session id lives in `sessionStorage` and DELIBERATELY
+   *     survives a same-tab reload (see `analyticsRelay.ts`), so an "Update now"
+   *     reload or a WebGL crash-recovery reload keeps one `distinct_id` while
+   *     this clock restarts at 0. One `distinct_id` therefore covers several page
+   *     lives, and `max(seconds)` would report only the longest of them. A
+   *     session's length is the SUM of each page life's final reading: about 8%
+   *     of sessions and 13% of total play time, landing on the update and
+   *     crash-recovery cohort specifically.
+   *
+   *  So: count sessions as distinct `distinct_id`s, never as a row count, and
+   *  take a length as the sum of per-page-life peaks rather than a plain `max`.
+   *
+   *  `final` marks an emission made from `pagehide`. It is best-effort in the
+   *  same way `pagehide` is (a session killed outright has no such row), and it
+   *  is NOT unique per `distinct_id`: each page life can contribute one, and a
+   *  bfcache entry fires `pagehide` too. Do not use it to pick a session's length
+   *  or to count sessions; it answers "did this session get to say goodbye",
+   *  which is the measure of how much the re-emission fallback is carrying. */
   session_end: { seconds: number; final: boolean };
   /** One snapshot per boot: why the session started (`reason`), the build it
    *  runs (`version`), and the standing state of the tower it opened. Unlike the

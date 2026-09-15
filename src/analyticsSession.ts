@@ -31,9 +31,10 @@ const FPS_MIN_SAMPLES = 120;
  *  Pixel 8a recovery is exactly #538's scenario). Such a gap re-anchors and is
  *  dropped instead. Realistic device jank down to 1fps is still captured. */
 const FPS_MAX_FRAME_MS = 1000;
-/** Hard cap on `crash` events one session sends. Matched to the `$exception`
- *  path's `MAX_ERRORS_PER_SESSION` so the two views of the same incident are
- *  bounded the same way. */
+/** Hard cap on `crash` events one session sends. Deliberately its own literal
+ *  rather than a shared constant: this and `analyticsErrors.ts`'s
+ *  `MAX_ERRORS_PER_SESSION` happen to agree at 10 today, but they bound two
+ *  different streams and either may be retuned without the other. */
 const MAX_CRASHES_PER_SESSION = 10;
 
 /** The cumulative emergency counters the frame loop samples, in the shape the
@@ -192,17 +193,26 @@ class GameplaySession {
    * `tool_session_uses`, `session_fps` and `session_end` come back 429 and are
    * lost, which puts the data loss precisely on the sessions worth studying.
    *
-   * The fingerprint is the SHAPE of the loss (kind, whether it repeated, whether
-   * an in-place recovery was tried and failed, whether it happened behind the
-   * splash), not the tower context riding along, so a loop settles onto one
-   * fingerprint and reports once. `repeat` is part of it deliberately: it is the
-   * signal that a loop happened at all, it flips from false to true on the second
-   * loss inside 90s, and leaving it out would let the dedup swallow the one event
-   * that carries it wherever nothing else about the shape changed. So a loop
-   * emits the first loss, the first repeat, and nothing more.
+   * The fingerprint is every FLAG on the crash, and none of the tower context
+   * riding along, so a loop settles onto one fingerprint and reports once. Taking
+   * the whole flag set rather than a chosen subset is the point: each flag marks
+   * a materially different incident (an in-place recovery that failed, a loss
+   * behind the splash, a save that could not be flushed), and dropping one from
+   * the key would silently merge two of them and report only whichever happened
+   * first. `repeat` matters most of the four: it is the signal that a loop
+   * happened at all, it flips from false to true on the second loss inside 90s,
+   * and leaving it out would let the dedup swallow the one event that carries it
+   * wherever nothing else about the shape changed. So a loop emits the first
+   * loss, the first repeat, and nothing more, and five booleans-worth of distinct
+   * shapes still sit well inside the cap.
+   *
+   * What is still lost, deliberately: HOW MANY times each shape recurred. A
+   * two-loss blip and an 8,269-loss catastrophe now look identical, which the
+   * cap's whole purpose makes unavoidable here and which is tracked as its own
+   * backlog item rather than smuggled into this event.
    */
   noteCrash(info: GameplayEvents["crash"]): void {
-    const fingerprint = `${info.kind}|${info.repeat}|${info.recoveryFailed}|${info.behindSplash}`;
+    const fingerprint = `${info.kind}|${info.repeat}|${info.recoveryFailed}|${info.behindSplash}|${info.saveFlushed}`;
     if (!this.crashes.allow(fingerprint)) return;
     trackEvent("crash", info);
   }
@@ -285,8 +295,11 @@ class GameplaySession {
    *  Hidden time is excluded, so the number is foreground play, not wall clock.
    *  Deduped on the whole-second value (seeded at 0) so a zero-length end or a
    *  `pagehide` right after a `visibilitychange` doesn't emit a duplicate;
-   *  `isFinal` marks the terminal `pagehide` emission and is the one thing let
-   *  past that dedup, once, so the terminal row stays identifiable. */
+   *  `isFinal` marks an emission made from `pagehide` and is the one thing let
+   *  past that dedup, once, so that row stays identifiable. It marks the
+   *  PAGEHIDE, which is not quite the same as the session's last word: a
+   *  bfcache entry fires `pagehide` too, so a restored-and-resumed session can
+   *  spend the allowance early and report its real ending without the flag. */
   end(isFinal = false): void {
     if (this.resumedAt !== null) {
       this.activeMs += Date.now() - this.resumedAt;
