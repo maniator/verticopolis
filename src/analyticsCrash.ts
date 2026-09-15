@@ -12,7 +12,7 @@ import { createEventThrottle } from "./analyticsThrottle";
  * re-exposes both functions so the shell keeps its one analytics handle.
  */
 
-export /** Hard cap on `crash` events one PAGE LIFE sends, named for what it bounds: the
+/** Hard cap on `crash` events one PAGE LIFE sends, named for what it bounds: the
  *  throttle is module memory, so a reload re-opens it, while the session id
  *  survives in `sessionStorage`, and one `distinct_id` can exceed ten across page
  *  lives. Intended, not an oversight. The flood this exists to stop needs no
