@@ -1,5 +1,6 @@
 import type { GameApp } from "../main";
 import { paceFactor } from "../engine/timePacing";
+import { drainFixedSteps, syncStepMode, type StepDebt } from "../engine/sim/fixedStep";
 import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
 import { tickInstallAffordance } from "./installAffordance";
@@ -27,9 +28,16 @@ export const SPEEDS = [0, 10, 30, 120];
  *  time accrues debt every frame; without a cap each frame does more work than
  *  the last until frames run seconds long (see the clamp in runFrame). 30
  *  minutes is 15 ideal frames of fastest-speed debt (2 sim-minutes per 60fps
- *  frame), generous headroom for hitches, while keeping the largest single
- *  frame's sim work bounded near two 20-minute tick chunks. */
-const MAX_CATCHUP_MINUTES = 30;
+ *  frame), generous headroom for hitches. The engine's step budget
+ *  (`MAX_STEPS_PER_FRAME` in engine/sim/fixedStep) bounds the work in one
+ *  frame; this cap bounds the debt carried between frames, so it is where a
+ *  device that cannot keep up drops time and falls behind. */
+export const MAX_CATCHUP_MINUTES = 30;
+
+/** Each app's step debt record, which carries the speed and pacing mode its
+ *  minutes were owed under so the engine can drop them on a change. The
+ *  minutes themselves live in `app.accMinutes` (reset by `adoptSim`). */
+const stepDebts = new WeakMap<GameApp, StepDebt>();
 
 export function runFrame(app: GameApp, dtMs: number): void {
   // Sample the rendered frame-rate for the session_fps signal (#538). noteFrame
@@ -67,7 +75,16 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // player opted out. Presentation-only: the sim still ticks uniform minutes,
   // and paceFactor is normalized so a full day costs the same real time, so
   // the speed buttons keep their meaning.
-  const pace = app.prefs.steadyClock ? 1 : paceFactor(app.sim.clock.minuteOfDay);
+  const steadyClock = app.prefs.steadyClock === true;
+  // Minutes owed under one speed or pacing mode must not replay under another
+  // (the engine sizes its step from both), so the engine drops the carry when
+  // either changes, before this frame's minutes are added.
+  const debt = stepDebts.get(app) ?? { minutes: 0 };
+  stepDebts.set(app, debt);
+  debt.minutes = app.accMinutes;
+  syncStepMode(debt, minutesPerSecond, steadyClock);
+  app.accMinutes = debt.minutes;
+  const pace = steadyClock ? 1 : paceFactor(app.sim.clock.minuteOfDay);
   app.accMinutes += (dtMs / 1000) * minutesPerSecond * pace;
   // A non-finite dtMs (a NaN/Infinity timestamp delta from a hung or restored
   // frame source) would poison accMinutes to NaN, and NaN fails every
@@ -81,16 +98,21 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // WebGL context (the Pixel 8a "random crash"). Dropping the excess trades
   // clock accuracy for survival: the game visibly runs slower than the
   // speed button promises on hardware that can't keep up, and a tab restored
-  // from the background resumes with one bounded step instead of replaying
+  // from the background resumes with a bounded catch-up instead of replaying
   // the whole absence.
   if (app.accMinutes > MAX_CATCHUP_MINUTES) app.accMinutes = MAX_CATCHUP_MINUTES;
-  // Step the simulation in small chunks so hourly/daily boundaries fire.
+  // Hand the owed minutes and the speed's nominal rate to the engine, which
+  // cuts them into quanta sized from its own clock, so the tower comes out the
+  // same at any frame rate. What it leaves owed carries to the next frame; at
+  // speed 0 it is nothing, so a pause never spends carried time. The write-back
+  // sits in `finally` so a step that throws (the frame-error guard catches it)
+  // never re-owes the steps that already ran.
   const minutesBeforeTicks = app.sim.clock.minutes;
-  let guard = 0;
-  while (app.accMinutes >= 1 && guard++ < 2000) {
-    const step = Math.min(20, app.accMinutes);
-    app.sim.tick(step);
-    app.accMinutes -= step;
+  debt.minutes = app.accMinutes;
+  try {
+    drainFixedSteps(app.sim, debt, minutesPerSecond, { steadyClock });
+  } finally {
+    app.accMinutes = debt.minutes;
   }
   emitMealRushes(app, minutesBeforeTicks);
 
