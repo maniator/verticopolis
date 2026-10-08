@@ -1,0 +1,911 @@
+//! Port of `src/engine/facilitiesData.ts`, `residentialRentals.ts`,
+//! `facilityCaps.ts`, `facilityPredicates.ts` and `tower/towerTopology.ts`.
+
+pub const LOT_WIDTH: i64 = 375;
+pub const MAX_FLOOR: i64 = 100;
+pub const MIN_FLOOR: i64 = -9;
+pub const LOBBY_INTERVAL: i64 = 15;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Kind {
+    Lobby,
+    Floor,
+    Office,
+    Condo,
+    HotelSingle,
+    HotelDouble,
+    HotelSuite,
+    FastFood,
+    Restaurant,
+    FoodHall,
+    Shop,
+    Cinema,
+    PartyHall,
+    Amusements,
+    BoutiqueBay,
+    FitnessClub,
+    Clinic,
+    Nightclub,
+    Spa,
+    SkyBar,
+    AquaticCenter,
+    Daycare,
+    Stairs,
+    Escalator,
+    ElevatorStandard,
+    ElevatorService,
+    ElevatorExpress,
+    ParkingRamp,
+    Parking,
+    Security,
+    Medical,
+    Housekeeping,
+    Recycling,
+    Metro,
+    WeddingHall,
+    RentalStudio,
+    RentalApartment,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Category {
+    Structure,
+    Transport,
+    Office,
+    Residential,
+    Hotel,
+    Food,
+    Retail,
+    Entertainment,
+    Service,
+    Special,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Facility {
+    pub kind: Kind,
+    pub key: &'static str,
+    pub category: Category,
+    pub name: &'static str,
+    pub width: i64,
+    pub floors: Option<i64>,
+    pub cost: f64,
+    pub min_star: i64,
+    pub population: i64,
+    pub attendance: Option<i64>,
+    pub modern_only: bool,
+    pub transport: bool,
+    pub staff_only: bool,
+    pub basement: bool,
+}
+
+macro_rules! fac {
+    ($kind:ident, $key:literal, $cat:ident, $name:literal, $w:literal, $floors:expr, $cost:literal, $star:literal, $pop:literal, $att:expr, mo=$mo:literal, t=$t:literal, so=$so:literal, b=$b:literal) => {
+        Facility {
+            kind: Kind::$kind,
+            key: $key,
+            category: Category::$cat,
+            name: $name,
+            width: $w,
+            floors: $floors,
+            cost: $cost as f64,
+            min_star: $star,
+            population: $pop,
+            attendance: $att,
+            modern_only: $mo,
+            transport: $t,
+            staff_only: $so,
+            basement: $b,
+        }
+    };
+}
+
+/// The catalog in `FACILITIES` key order (rentals last).
+pub static FACILITIES: [Facility; 37] = [
+    fac!(
+        Lobby,
+        "lobby",
+        Structure,
+        "Lobby",
+        1,
+        None,
+        5000,
+        1,
+        0,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Floor,
+        "floor",
+        Structure,
+        "Floor",
+        1,
+        None,
+        500,
+        1,
+        0,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Office,
+        "office",
+        Office,
+        "Office",
+        9,
+        None,
+        40000,
+        1,
+        6,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Condo,
+        "condo",
+        Residential,
+        "Condominium",
+        16,
+        None,
+        80000,
+        1,
+        3,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        HotelSingle,
+        "hotelSingle",
+        Hotel,
+        "Single Room",
+        4,
+        None,
+        20000,
+        2,
+        1,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        HotelDouble,
+        "hotelDouble",
+        Hotel,
+        "Double Room",
+        6,
+        None,
+        50000,
+        3,
+        2,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        HotelSuite,
+        "hotelSuite",
+        Hotel,
+        "Suite",
+        10,
+        None,
+        100000,
+        3,
+        3,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        FastFood,
+        "fastFood",
+        Food,
+        "Fast Food",
+        16,
+        None,
+        100000,
+        1,
+        25,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Restaurant,
+        "restaurant",
+        Food,
+        "Restaurant",
+        24,
+        None,
+        200000,
+        3,
+        35,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        FoodHall,
+        "foodHall",
+        Food,
+        "Food Hall",
+        24,
+        None,
+        250000,
+        3,
+        40,
+        None,
+        mo = true,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Shop,
+        "shop",
+        Retail,
+        "Retail Shop",
+        12,
+        None,
+        100000,
+        3,
+        20,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Cinema,
+        "cinema",
+        Entertainment,
+        "Cinema",
+        31,
+        Some(2),
+        500000,
+        3,
+        0,
+        Some(30),
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        PartyHall,
+        "partyHall",
+        Entertainment,
+        "Party Hall",
+        24,
+        Some(2),
+        100000,
+        3,
+        0,
+        Some(20),
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Amusements,
+        "amusements",
+        Entertainment,
+        "Amusements",
+        12,
+        None,
+        180000,
+        3,
+        25,
+        None,
+        mo = true,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        BoutiqueBay,
+        "boutiqueBay",
+        Retail,
+        "Boutique Bay",
+        12,
+        None,
+        150000,
+        3,
+        22,
+        None,
+        mo = true,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        FitnessClub,
+        "fitnessClub",
+        Entertainment,
+        "Fitness Club",
+        16,
+        None,
+        220000,
+        3,
+        20,
+        None,
+        mo = true,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Clinic,
+        "clinic",
+        Retail,
+        "Clinic",
+        8,
+        None,
+        120000,
+        3,
+        12,
+        None,
+        mo = true,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Nightclub,
+        "nightclub",
+        Entertainment,
+        "Nightclub",
+        20,
+        None,
+        350000,
+        3,
+        30,
+        None,
+        mo = true,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Spa,
+        "spa",
+        Entertainment,
+        "Spa",
+        14,
+        None,
+        200000,
+        3,
+        18,
+        None,
+        mo = true,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        SkyBar,
+        "skyBar",
+        Entertainment,
+        "Sky Bar",
+        12,
+        None,
+        260000,
+        3,
+        22,
+        None,
+        mo = true,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        AquaticCenter,
+        "aquaticCenter",
+        Entertainment,
+        "Aquatic Center",
+        28,
+        Some(2),
+        450000,
+        3,
+        0,
+        Some(24),
+        mo = true,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Daycare,
+        "daycare",
+        Retail,
+        "Daycare",
+        12,
+        None,
+        160000,
+        3,
+        14,
+        None,
+        mo = true,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Stairs,
+        "stairs",
+        Transport,
+        "Stairway",
+        8,
+        None,
+        5000,
+        1,
+        0,
+        None,
+        mo = false,
+        t = true,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Escalator,
+        "escalator",
+        Transport,
+        "Escalator",
+        8,
+        None,
+        20000,
+        3,
+        0,
+        None,
+        mo = false,
+        t = true,
+        so = false,
+        b = false
+    ),
+    fac!(
+        ElevatorStandard,
+        "elevatorStandard",
+        Transport,
+        "Standard Elevator",
+        4,
+        None,
+        200000,
+        1,
+        0,
+        None,
+        mo = false,
+        t = true,
+        so = false,
+        b = false
+    ),
+    fac!(
+        ElevatorService,
+        "elevatorService",
+        Transport,
+        "Service Elevator",
+        4,
+        None,
+        100000,
+        2,
+        0,
+        None,
+        mo = false,
+        t = true,
+        so = true,
+        b = false
+    ),
+    fac!(
+        ElevatorExpress,
+        "elevatorExpress",
+        Transport,
+        "Express Elevator",
+        6,
+        None,
+        400000,
+        3,
+        0,
+        None,
+        mo = false,
+        t = true,
+        so = false,
+        b = false
+    ),
+    fac!(
+        ParkingRamp,
+        "parkingRamp",
+        Service,
+        "Parking Ramp",
+        16,
+        None,
+        50000,
+        3,
+        0,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = true
+    ),
+    fac!(
+        Parking,
+        "parking",
+        Service,
+        "Parking Space",
+        4,
+        None,
+        3000,
+        3,
+        0,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = true
+    ),
+    fac!(
+        Security,
+        "security",
+        Service,
+        "Security",
+        8,
+        None,
+        100000,
+        2,
+        0,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Medical,
+        "medical",
+        Service,
+        "Medical Center",
+        16,
+        None,
+        500000,
+        3,
+        0,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Housekeeping,
+        "housekeeping",
+        Service,
+        "Housekeeping",
+        8,
+        None,
+        50000,
+        2,
+        0,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        Recycling,
+        "recycling",
+        Service,
+        "Recycling Center",
+        20,
+        Some(2),
+        500000,
+        3,
+        0,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = true
+    ),
+    fac!(
+        Metro,
+        "metro",
+        Special,
+        "Metro Station",
+        375,
+        Some(3),
+        1000000,
+        4,
+        0,
+        None,
+        mo = false,
+        t = false,
+        so = false,
+        b = true
+    ),
+    fac!(
+        WeddingHall,
+        "weddingHall",
+        Special,
+        "Wedding Hall",
+        16,
+        None,
+        3000000,
+        5,
+        0,
+        Some(12),
+        mo = false,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        RentalStudio,
+        "rentalStudio",
+        Residential,
+        "Studio",
+        6,
+        None,
+        22000,
+        2,
+        1,
+        None,
+        mo = true,
+        t = false,
+        so = false,
+        b = false
+    ),
+    fac!(
+        RentalApartment,
+        "rentalApartment",
+        Residential,
+        "Apartment",
+        11,
+        None,
+        60000,
+        3,
+        2,
+        None,
+        mo = true,
+        t = false,
+        so = false,
+        b = false
+    ),
+];
+
+impl Kind {
+    pub fn facility(self) -> &'static Facility {
+        FACILITIES
+            .iter()
+            .find(|f| f.kind == self)
+            .expect("every kind is in the catalog")
+    }
+
+    pub fn as_str(self) -> &'static str {
+        self.facility().key
+    }
+
+    pub fn parse(s: &str) -> Option<Kind> {
+        FACILITIES.iter().find(|f| f.key == s).map(|f| f.kind)
+    }
+
+    pub fn is_structural(self) -> bool {
+        matches!(self, Kind::Floor | Kind::Lobby)
+    }
+
+    pub fn is_transport(self) -> bool {
+        self.facility().transport
+    }
+
+    pub fn is_elevator(self) -> bool {
+        matches!(
+            self,
+            Kind::ElevatorStandard | Kind::ElevatorService | Kind::ElevatorExpress
+        )
+    }
+
+    pub fn is_hotel(self) -> bool {
+        matches!(
+            self,
+            Kind::HotelSingle | Kind::HotelDouble | Kind::HotelSuite
+        )
+    }
+
+    pub fn is_rental(self) -> bool {
+        matches!(self, Kind::RentalStudio | Kind::RentalApartment)
+    }
+
+    pub fn is_room(self) -> bool {
+        !self.is_structural() && !self.is_transport()
+    }
+
+    /// `facilityFloors`.
+    pub fn floors(self) -> i64 {
+        self.facility().floors.unwrap_or(1)
+    }
+
+    /// `maxSpanFor`.
+    pub fn max_span(self) -> i64 {
+        match self {
+            Kind::Stairs | Kind::Escalator => 1,
+            Kind::ElevatorExpress => MAX_FLOOR - MIN_FLOOR,
+            _ => 30,
+        }
+    }
+
+    pub fn is_fixed_span(self) -> bool {
+        self.is_transport() && self.max_span() == 1
+    }
+
+    pub fn max_cars(self) -> i64 {
+        8
+    }
+
+    /// `buildMinutes`.
+    pub fn build_minutes(self) -> f64 {
+        if self.is_structural() {
+            return 0.0;
+        }
+        let f = self.facility();
+        (8.0_f64 * 60.0).min(crate::jsmath::round(
+            60.0 + f.width as f64 * 8.0 + f.cost / 5000.0,
+        ))
+    }
+
+    /// `resaleRefund`.
+    pub fn resale_refund(self) -> f64 {
+        (self.facility().cost * 0.5).floor()
+    }
+
+    /// `subtypeListFor`.
+    pub fn subtype_list(self) -> Option<&'static [&'static str]> {
+        Some(match self {
+            Kind::Restaurant => &[
+                "English Pub",
+                "French",
+                "Chinese",
+                "Sushi Bar",
+                "Steak House",
+            ],
+            Kind::FastFood => &[
+                "Japanese Soba",
+                "Chinese Cafe",
+                "Hamburger Stand",
+                "Ice Cream",
+                "Coffee Shop",
+            ],
+            Kind::Shop => &[
+                "Men's Clothing",
+                "Pet Store",
+                "Flower Shop",
+                "Book Store",
+                "Drug Store",
+                "Boutique",
+                "Electronics",
+                "Bank",
+                "Hair Salon",
+                "Post Office",
+                "Sports Gear",
+            ],
+            Kind::FoodHall => &[
+                "Ramen Bar",
+                "Taco Stand",
+                "Bubble Tea",
+                "Poke Bowl",
+                "Deli Counter",
+                "Coffee Cart",
+            ],
+            Kind::Amusements => &["Classic Arcade", "VR Lounge", "Claw Parlor", "Mini Golf"],
+            Kind::BoutiqueBay => &[
+                "Florist",
+                "Barber",
+                "Phone Repair",
+                "Vintage",
+                "Tattoo",
+                "Record Store",
+                "Gallery",
+            ],
+            Kind::FitnessClub => &[
+                "Weight Floor",
+                "Yoga Studio",
+                "Spin Studio",
+                "Boxing Gym",
+                "Climbing Wall",
+            ],
+            Kind::Clinic => &["Dental", "Urgent Care", "Optometry", "Pharmacy", "Physio"],
+            _ => return None,
+        })
+    }
+}
+
+/// `BUILD_CAPS`.
+pub fn build_cap(kind: Kind) -> Option<i64> {
+    match kind {
+        Kind::Metro => Some(1),
+        Kind::WeddingHall => Some(1),
+        Kind::Security => Some(10),
+        Kind::Medical => Some(10),
+        Kind::Cinema => Some(16),
+        Kind::PartyHall => Some(16),
+        Kind::AquaticCenter => Some(8),
+        _ => None,
+    }
+}
+
+pub struct Pool {
+    pub kinds: &'static [Kind],
+    pub cap: i64,
+    pub label: &'static str,
+}
+
+/// `POOLED_CAPS`.
+pub static POOLED_CAPS: [Pool; 2] = [
+    Pool {
+        kinds: &[
+            Kind::ElevatorStandard,
+            Kind::ElevatorService,
+            Kind::ElevatorExpress,
+        ],
+        cap: 24,
+        label: "elevator shafts",
+    },
+    Pool {
+        kinds: &[Kind::Stairs, Kind::Escalator],
+        cap: 64,
+        label: "stairs/escalators",
+    },
+];
+
+pub fn is_lobby_floor(floor: i64) -> bool {
+    floor == 1 || (floor > 1 && floor % LOBBY_INTERVAL == 0)
+}
+
+pub fn is_sky_lobby_floor(floor: i64) -> bool {
+    floor >= 2 && floor % LOBBY_INTERVAL == 0
+}
+
+pub fn ground_floor_structure_kind(kind: Kind, floor: i64) -> Kind {
+    if kind == Kind::Floor && floor == 1 {
+        Kind::Lobby
+    } else {
+        kind
+    }
+}
+
+/// `NO_BASEMENT_KINDS`.
+pub fn no_basement(kind: Kind) -> bool {
+    matches!(
+        kind,
+        Kind::Office | Kind::Condo | Kind::HotelSingle | Kind::HotelDouble | Kind::HotelSuite
+    )
+}
+
+pub fn covers_ground_floor(floor: i64, hgt: i64) -> bool {
+    floor <= 1 && floor + hgt - 1 >= 1
+}
+
+pub const NEEDS_FLOORS: &str = "Transport must run through built floors. Lay floors first.";
+pub const SHAFT_OVERLAP: &str = "Transport shafts cannot overlap.";
