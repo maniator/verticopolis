@@ -1,0 +1,48 @@
+{
+  "id": "vip-review-modern",
+  "description": "The Modern tower-one at three stars with its VIP review still pending loses the ramp that chains its parking, so the visiting VIP circles the block and leaves, twice five days apart; the ramp is rebuilt, the next VIP enjoys a suite and leaves a favorable review, and the star evaluation walks the four-star gates with the population still short.",
+  "start": {
+    "fixture": "src/tests/fixtures/towerone-vip-pending.vctower",
+    "mode": "modern"
+  },
+  "commands": [
+    {
+      "op": "sell",
+      "floor": 0,
+      "x": 231
+    },
+    {
+      "op": "checkpoint",
+      "label": "ramp-gone"
+    },
+    {
+      "op": "tick",
+      "dt": 30,
+      "times": 336,
+      "checkpointEvery": 48
+    },
+    {
+      "op": "checkpoint",
+      "label": "circled-twice"
+    },
+    {
+      "op": "build",
+      "kind": "parkingRamp",
+      "floor": 0,
+      "x": 231
+    },
+    {
+      "op": "tick",
+      "dt": 30,
+      "times": 144,
+      "checkpointEvery": 48
+    },
+    {
+      "op": "evaluateStar"
+    },
+    {
+      "op": "checkpoint",
+      "label": "favorable"
+    }
+  ]
+}

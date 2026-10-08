@@ -1,0 +1,22 @@
+{
+  "id": "holidays-classic",
+  "description": "The Classic sixseven tower from the first week of December through the new year at hour ticks with no edits: thieves prowl a three-star tower with Security, the daily headline rolls, Santa crosses the sky once over the holidays, and the star is re-evaluated after the year turns.",
+  "start": {
+    "fixture": "src/tests/fixtures/sixseven-december.vctower"
+  },
+  "commands": [
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 720,
+      "checkpointEvery": 48
+    },
+    {
+      "op": "evaluateStar"
+    },
+    {
+      "op": "checkpoint",
+      "label": "new-year"
+    }
+  ]
+}
