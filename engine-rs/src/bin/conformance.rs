@@ -18,10 +18,15 @@ fn main() {
                 .join("..")
                 .join("conformance")
         });
-    let lock: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(root.join("expected.json")).expect("expected.json"),
-    )
-    .expect("expected.json parses");
+    let lock_path = root.join("expected.json");
+    let lock_text = match std::fs::read_to_string(&lock_path) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("cannot read {}: {e}", lock_path.display());
+            exit(2);
+        }
+    };
+    let lock: serde_json::Value = serde_json::from_str(&lock_text).expect("expected.json parses");
     let want: BTreeMap<String, Vec<Checkpoint>> =
         serde_json::from_value(lock["scenarios"].clone()).expect("lock shape");
     // Every scenario is its own engine, so they replay on separate threads;

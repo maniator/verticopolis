@@ -12,7 +12,7 @@ use crate::facilities::Kind;
 use crate::sim::Simulation;
 
 #[derive(Deserialize, Debug)]
-#[serde(untagged)]
+#[serde(untagged, deny_unknown_fields)]
 pub enum Start {
     NewGame {
         #[serde(rename = "newGame")]
@@ -25,13 +25,14 @@ pub enum Start {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct NewGame {
     pub seed: u32,
     pub mode: String,
 }
 
 #[derive(Deserialize, serde::Serialize, Debug)]
-#[serde(tag = "op")]
+#[serde(tag = "op", deny_unknown_fields)]
 pub enum Command {
     #[serde(rename = "setMoney")]
     SetMoney { amount: f64 },
@@ -87,6 +88,7 @@ pub enum Command {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct Scenario {
     pub id: String,
     pub description: String,
@@ -341,6 +343,9 @@ fn run_scenario_inner(
                     checkpoint_every,
                 } => {
                     let times = times.unwrap_or(1);
+                    if *dt <= 0 || times <= 0 || checkpoint_every.is_some_and(|e| e <= 0) {
+                        return Err(failed("tick needs whole numbers above zero".into()));
+                    }
                     for n in 1..=times {
                         sim.tick(*dt as f64);
                         elapsed += dt;
@@ -355,6 +360,9 @@ fn run_scenario_inner(
                     }
                 }
                 Command::AdjustRent { floor, x, dir } => {
+                    if *dir != 1 && *dir != -1 {
+                        return Err(failed(format!("adjustRent dir {dir} is not 1 or -1")));
+                    }
                     let (id, kind, rent, no_rate) = sim
                         .tower
                         .unit_at(*floor, *x)

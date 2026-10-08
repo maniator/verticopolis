@@ -9,6 +9,10 @@ use verticopolis_engine::scenario::{run_scenario_until, Scenario};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.len() < 3 {
+        eprintln!("usage: dump <scenario-id> <label> [--crowd]");
+        std::process::exit(2);
+    }
     let id = &args[1];
     let label = &args[2];
     let crowd = args.iter().any(|a| a == "--crowd");
