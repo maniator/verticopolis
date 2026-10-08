@@ -43,7 +43,7 @@ export const MAX_QUANTUM_MINUTES = 20;
 
 /** Float dust tolerated when deciding a whole quantum is owed. Far below any
  *  real frame's contribution (a 144 Hz frame at 10 min/s owes about 0.07). */
-const OWED_EPSILON = 1e-6;
+export const OWED_EPSILON = 1e-6;
 
 /** Minutes the host still owes the sim, carried between frames, and the step
  *  mode (speed and pacing) they were owed under. The host keeps one per sim
@@ -100,8 +100,10 @@ export function syncStepMode(debt: StepDebt, minutesPerSecond: number, steadyClo
  * that debt (and so deciding when a slow host falls behind) is the host's
  * catch-up cap, applied to the raw owed minutes before this call. The debt is
  * reduced after every completed step, so if a step throws, the steps that
- * already ran are not owed again. A non-positive or non-finite owed amount or
- * rate steps nothing and owes nothing, which is how a pause clears the carry.
+ * already ran are not owed again. A non-finite or negative owed amount, or a
+ * non-positive or non-finite rate, steps nothing and owes nothing, which is how
+ * a pause clears the carry. The one negative kept is the dust a tolerated step
+ * overdrew (at most {@link OWED_EPSILON}), paid back from the next frame.
  */
 export function drainFixedSteps(
   sim: { tick(dtMinutes: number): void; clock: { minuteOfDay: number } },
@@ -113,7 +115,7 @@ export function drainFixedSteps(
   const requested = options.maxSteps ?? MAX_STEPS_PER_FRAME;
   const maxSteps = Number.isFinite(requested) && requested >= 1 ? Math.floor(requested) : MAX_STEPS_PER_FRAME;
   syncStepMode(debt, minutesPerSecond, steady);
-  const owedOk = debt.minutes > 0 && Number.isFinite(debt.minutes);
+  const owedOk = debt.minutes >= -OWED_EPSILON && Number.isFinite(debt.minutes);
   const rateOk = minutesPerSecond > 0 && Number.isFinite(minutesPerSecond);
   if (!owedOk || !rateOk) {
     debt.minutes = 0;
@@ -122,10 +124,17 @@ export function drainFixedSteps(
   let q = quantumFor(minutesPerSecond, sim.clock.minuteOfDay, steady);
   // Owed minutes are summed from fractional frame times, so a whole quantum can
   // arrive as 1.9999999999. Without the tolerance that step slips a frame on
-  // one machine and not another; with it, the step runs and the dust is cleared.
+  // one machine and not another; with it, the step runs. The shortfall it
+  // forgave stays owed (a debt a hair below 0, floored at the tolerance so float
+  // rounding cannot push it past the line `owedOk` accepts) and the next frame
+  // pays it back. Within one speed and pacing mode, the total stepped then never
+  // runs ahead of the total owed by more than the tolerance however the minutes
+  // were chunked. Clamping it to 0 instead would
+  // let two near-quantum frames step twice where the same minutes owed in one
+  // frame step once.
   for (let steps = 0; debt.minutes >= q - OWED_EPSILON && steps < maxSteps; steps++) {
     sim.tick(q);
-    debt.minutes = Math.max(0, debt.minutes - q);
+    debt.minutes = Math.max(-OWED_EPSILON, debt.minutes - q);
     q = quantumFor(minutesPerSecond, sim.clock.minuteOfDay, steady);
   }
 }

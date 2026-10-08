@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { drainFixedSteps, quantumFor, syncStepMode, MAX_STEPS_PER_FRAME, MAX_QUANTUM_MINUTES } from "./fixedStep";
+import { drainFixedSteps, quantumFor, syncStepMode, MAX_STEPS_PER_FRAME, MAX_QUANTUM_MINUTES, OWED_EPSILON } from "./fixedStep";
 import { paceFactor } from "../timePacing";
 
 /**
@@ -50,6 +50,46 @@ describe("engine fixed time step (unit)", () => {
     }
   });
 
+  it("pays back the dust a tolerated step overdrew, so chunking cannot add a step", () => {
+    // Two frames each owing just under a quantum (inside the tolerance), against
+    // the same minutes owed in one frame: both must run the same steps.
+    const q = quantumFor(120, 0, true);
+    const nearQ = q - 0.75 * OWED_EPSILON;
+    const split = recorder();
+    const a = { minutes: nearQ };
+    drainFixedSteps(split.host, a, 120, { steadyClock: true });
+    expect(a.minutes).toBeLessThan(0); // the forgiven shortfall stays owed
+    expect(a.minutes).toBeGreaterThanOrEqual(-OWED_EPSILON);
+    a.minutes += nearQ;
+    drainFixedSteps(split.host, a, 120, { steadyClock: true });
+    const whole = recorder();
+    const b = { minutes: 2 * nearQ };
+    drainFixedSteps(whole.host, b, 120, { steadyClock: true });
+    expect(split.calls).toEqual([q]);
+    expect(whole.calls).toEqual([q]);
+    // What is left is just under a quantum, outside the tolerance, so it waits.
+    expect(a.minutes).toBeCloseTo(q - 1.5 * OWED_EPSILON, 9);
+    expect(a.minutes).toBeCloseTo(b.minutes, 9);
+  });
+
+  it("keeps the overdraw at the tolerance boundary through an empty frame", () => {
+    // Owing exactly a quantum minus the tolerance steps, and float rounding may
+    // land the remainder a few ulps past -OWED_EPSILON. It must still count as
+    // owed, so a following frame that owes nothing does not zero it.
+    for (const q of [1, 3, 5, 8, 17, 20]) {
+      const rate = q * 60; // steady clock: a 60 Hz frame owes exactly q
+      expect(quantumFor(rate, 0, true)).toBe(q);
+      const { host } = recorder();
+      const debt = { minutes: q - OWED_EPSILON };
+      drainFixedSteps(host, debt, rate, { steadyClock: true });
+      expect(debt.minutes).toBeGreaterThanOrEqual(-OWED_EPSILON);
+      expect(debt.minutes).toBeLessThan(0);
+      const left = debt.minutes;
+      drainFixedSteps(host, debt, rate, { steadyClock: true }); // an empty frame
+      expect(debt.minutes).toBe(left);
+    }
+  });
+
   it("caps one frame's work at the step budget and carries the rest", () => {
     const { calls, host } = recorder();
     const q = quantumFor(120, 0);
@@ -71,6 +111,9 @@ describe("engine fixed time step (unit)", () => {
     expect(run(10, 0)).toBe(0);
     expect(run(10, Number.POSITIVE_INFINITY)).toBe(0);
     expect(run(-3, 120)).toBe(0);
+    // Overdraw dust within the tolerance is kept as owed; anything past it is cleared.
+    expect(run(-0.5 * OWED_EPSILON, 120)).toBe(-0.5 * OWED_EPSILON);
+    expect(run(-2 * OWED_EPSILON, 120)).toBe(0);
     expect(calls).toEqual([]);
     // A nonsense budget falls back to the default instead of stepping nothing
     // or stepping without bound.

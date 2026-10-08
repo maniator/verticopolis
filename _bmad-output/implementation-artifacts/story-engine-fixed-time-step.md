@@ -95,4 +95,8 @@ PR review (Codex) added two fixes: the pure fixed-step guards now also live in
 the unit tier (`src/engine/sim/fixedStep.test.ts`, with a chunking check on a
 fake host), and a speed or steady-clock change now drops the carry where the
 player makes it (`applySpeed`, `toggleSteadyClock`), so a change undone before
-the next frame no longer replays the old carry.
+the next frame no longer replays the old carry. A later Codex pass found that
+the `Math.max(0, ...)` after a step taken within the tolerance threw away the
+forgiven shortfall, so two near-quantum frames could step twice where the same
+minutes in one frame stepped once. The shortfall now stays owed (a debt at most the
+tolerance below 0) and the next frame pays it back, pinned by a unit test.
