@@ -113,8 +113,50 @@ impl Simulation {
         })
     }
 
+    /// The MILESTONES table, in order, with each test's verdict.
+    fn milestone_tests(&self) -> [(&'static str, &'static str, bool); 11] {
+        let pop = self.population();
+        [
+            ("pop-500", "Getting Started", pop >= 500),
+            ("pop-2500", "Rising", pop >= 2500),
+            ("pop-7500", "Metropolis", pop >= 7500),
+            ("pop-12000", "Almost There", pop >= 12000),
+            ("star-4", "Four Stars", self.star >= 4),
+            ("star-5", "Five Stars", self.star >= 5),
+            ("cinema", "Showtime", self.has_operational(Kind::Cinema)),
+            ("metro", "On the Map", self.has_operational(Kind::Metro)),
+            ("skyline", "Touch the Sky", self.highest_floor() >= 100),
+            ("well-served", "Smooth Operator", pop >= 5000 && self.every_occupied_floor_served()),
+            ("full-house", "No Vacancy", pop >= 2000 && self.no_leasable_vacancy()),
+        ]
+    }
+
+    /// Silently adopt every milestone already satisfied (the load path).
+    pub fn adopt_milestones(&mut self) {
+        for (id, _, ok) in self.milestone_tests() {
+            if ok && !self.milestones.iter().any(|m| m == id) {
+                self.milestones.push(id.to_string());
+            }
+        }
+    }
+
     /// `checkMilestones`: the MILESTONES table in order.
     pub fn check_milestones(&mut self) {
+        let tests = self.milestone_tests();
+        for (id, label, ok) in tests {
+            if self.milestones.iter().any(|m| m == id) {
+                continue;
+            }
+            if !ok {
+                continue;
+            }
+            self.milestones.push(id.to_string());
+            self.emit(&format!("🏅 Milestone: {label}"), LogKind::Good);
+        }
+    }
+
+    #[allow(dead_code)]
+    fn check_milestones_old(&mut self) {
         let pop = self.population();
         let tests: [(&str, &str, bool); 11] = [
             ("pop-500", "Getting Started", pop >= 500),

@@ -8,6 +8,7 @@ use serde_json::{json, Map, Value};
 
 use crate::clock::GameMode;
 use crate::facilities::*;
+use crate::schedule::Schedule;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnitState {
@@ -162,8 +163,7 @@ pub struct Transport {
     pub car_load: Option<Vec<f64>>,
     pub load: i64,
     pub skip_floors: Option<Vec<i64>>,
-    /// Schedules are authored by the UI; none of the scenarios set one.
-    pub schedule: Option<Value>,
+    pub schedule: Option<Schedule>,
 }
 
 impl Transport {
@@ -187,7 +187,9 @@ impl Transport {
             m.insert("skipFloors".into(), json!(s));
         }
         if let Some(s) = &self.schedule {
-            m.insert("schedule".into(), s.clone());
+            if !s.is_empty() {
+                m.insert("schedule".into(), s.to_json());
+            }
         }
         Value::Object(m)
     }
@@ -1019,6 +1021,11 @@ impl Tower {
             .collect();
         self.transports[i].skip_floors = Some(skip);
         self.revision += 1;
+        if self.transports[i].schedule.is_some() {
+            let stops = self.stops_of(&self.transports[i]);
+            let t = &mut self.transports[i];
+            t.schedule = Some(t.schedule.as_ref().unwrap().snap_homes_to_stops(&stops));
+        }
     }
 
     pub fn sync_express_stops_for_floor(&mut self, floor: i64) {
@@ -1057,6 +1064,11 @@ impl Tower {
         skip.sort();
         self.transports[i].skip_floors = Some(skip);
         self.revision += 1;
+        if self.transports[i].schedule.is_some() {
+            let stops = self.stops_of(&self.transports[i]);
+            let t = &mut self.transports[i];
+            t.schedule = Some(t.schedule.as_ref().unwrap().snap_homes_to_stops(&stops));
+        }
         true
     }
 
@@ -1096,8 +1108,62 @@ impl Tower {
             );
         }
         t.cars = cars;
+        if t.schedule.is_some() {
+            let raw = t.schedule.as_ref().unwrap().to_json();
+            t.schedule = Schedule::coerce(Some(&raw), t.cars, t.bottom, t.top);
+        }
         self.revision += 1;
         true
+    }
+}
+
+impl Tower {
+    /// `reindex()`: rebuild every per-tile index after a bulk unit assignment.
+    pub fn reindex(&mut self) {
+        self.structure.clear();
+        self.struct_kind.clear();
+        self.rooms.clear();
+        self.by_id.clear();
+        self.lobby_tiles.clear();
+        self.room_tiles.clear();
+        for i in 0..self.units.len() {
+            self.register(i);
+        }
+        *self.memo.borrow_mut() = Default::default();
+        self.revision += 1;
+    }
+
+    /// `coerceExpressStops()`: re-assert the lobby-only express rule on load.
+    pub fn coerce_express_stops(&mut self) {
+        let mut changed = false;
+        for i in 0..self.transports.len() {
+            if self.transports[i].kind != Kind::ElevatorExpress {
+                continue;
+            }
+            let (bottom, top) = (self.transports[i].bottom, self.transports[i].top);
+            let mut skip: Vec<i64> = self.transports[i].skip_floors.clone().unwrap_or_default();
+            for fl in bottom + 1..top {
+                if !self.floor_has_lobby(fl) && !skip.contains(&fl) {
+                    skip.push(fl);
+                }
+            }
+            skip.retain(|&f| f != bottom && f != top);
+            let mut next: Vec<i64> = Vec::new();
+            for f in skip {
+                if !next.contains(&f) {
+                    next.push(f);
+                }
+            }
+            next.sort();
+            let before = self.transports[i].skip_floors.clone().unwrap_or_default();
+            if next != before {
+                self.transports[i].skip_floors = Some(next);
+                changed = true;
+            }
+        }
+        if changed {
+            self.revision += 1;
+        }
     }
 }
 

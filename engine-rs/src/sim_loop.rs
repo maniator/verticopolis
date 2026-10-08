@@ -60,7 +60,8 @@ impl Simulation {
         while left > 0.0 {
             let chunk = left.min(2.5);
             let calls = self.crowd.elevator_calls(&self.tower);
-            self.elevators.move_cars(&mut self.tower, chunk, &calls);
+            let (hour, weekend) = (self.clock.hour(), self.clock.is_weekend());
+            self.elevators.move_cars(&mut self.tower, chunk, &calls, hour, weekend);
             motion::advance(&mut self.crowd, chunk * CROWD_SECONDS_PER_MINUTE, &mut self.tower);
             left -= chunk;
         }

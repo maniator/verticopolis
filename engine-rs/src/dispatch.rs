@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::crowd::ElevatorCalls;
 use crate::jsmath;
+use crate::schedule::Schedule;
 use crate::tower::Tower;
 
 pub const CAR_FLOORS_PER_MINUTE: f64 = 0.8;
@@ -71,8 +72,8 @@ impl ElevatorDispatch {
         }
     }
 
-    /// `moveCars(tower, dt, crowdCalls, clock)` for towers without schedules.
-    pub fn move_cars(&mut self, tower: &mut Tower, dt: f64, calls: &ElevatorCalls) {
+    /// `moveCars(tower, dt, crowdCalls, clock)`.
+    pub fn move_cars(&mut self, tower: &mut Tower, dt: f64, calls: &ElevatorCalls, hour: i64, is_weekend: bool) {
         let lobby_set: HashSet<i64> = tower.lobby_floors().into_iter().collect();
         let n = tower.transports.len();
         for ti in 0..n {
@@ -96,6 +97,11 @@ impl ElevatorDispatch {
                 .find(|s| lobby_set.contains(s))
                 .unwrap_or(stops[0]);
             let t = &mut tower.transports[ti];
+            let sched = t.schedule.clone();
+            let active_count = Schedule::active_car_count(sched.as_ref(), is_weekend, hour, t.cars) as usize;
+            let shaft_dwell = Schedule::dwell_minutes_for(sched.as_ref(), DWELL_MINUTES);
+            let response = Schedule::waiting_response_for(sched.as_ref());
+            let span = (t.top - t.bottom) as f64;
             let cars = t.cars as usize;
             let dwell = self.car_dwell.entry(id).or_default();
             if dwell.len() != cars {
@@ -118,7 +124,24 @@ impl ElevatorDispatch {
             }
             let mut claimed: HashSet<i64> = HashSet::new();
             for i in 0..cars {
-                let car_home = idle_floor.clamp(t.bottom, t.top);
+                let car_home = Schedule::home_floor_for(sched.as_ref(), i, idle_floor).clamp(t.bottom, t.top);
+                if i >= active_count {
+                    car_load[i] = 0.0;
+                    dwell[i] = 0.0;
+                    let cur = t.car_positions[i];
+                    let home = car_home as f64;
+                    if (cur - home).abs() < 0.05 {
+                        t.car_positions[i] = home;
+                        t.car_dir[i] = 0;
+                    } else {
+                        let step = dt * CAR_FLOORS_PER_MINUTE;
+                        let dir = if home > cur { 1 } else { -1 };
+                        let np = if (home - cur).abs() <= step { home } else { cur + dir as f64 * step };
+                        t.car_positions[i] = np.max(t.bottom as f64).min(t.top as f64);
+                        t.car_dir[i] = if np == home { 0 } else { dir };
+                    }
+                    continue;
+                }
                 let mut car_dt = dt;
                 if dwell[i] > 0.0 {
                     let pause = dwell[i].min(car_dt);
@@ -131,12 +154,23 @@ impl ElevatorDispatch {
                 }
                 let v = car_dt * CAR_FLOORS_PER_MINUTE;
                 let mut pos = t.car_positions[i];
+                let was_parked = t.car_dir[i] == 0;
                 let mut dir = if t.car_dir[i] == 0 { 1 } else { t.car_dir[i] };
                 let cab = cabs.and_then(|c| c.get(&(i as i64)));
-                let mut target = next_demand_stop(&stops, pos, dir, &call_set, &claimed, cab);
+                let reach = match response {
+                    Some(r) if was_parked => (span - r).max(0.0),
+                    _ => f64::INFINITY,
+                };
+                let held = |tg: Option<i64>| -> Option<i64> {
+                    match tg {
+                        Some(f) if !cab.is_some_and(|c| c.contains(&f)) && (f as f64 - pos).abs() > reach => None,
+                        other => other,
+                    }
+                };
+                let mut target = held(next_demand_stop(&stops, pos, dir, &call_set, &claimed, cab));
                 if target.is_none() {
                     dir = -dir;
-                    target = next_demand_stop(&stops, pos, dir, &call_set, &claimed, cab);
+                    target = held(next_demand_stop(&stops, pos, dir, &call_set, &claimed, cab));
                 }
                 if let Some(tg) = target {
                     claimed.insert(tg);
@@ -155,7 +189,7 @@ impl ElevatorDispatch {
                 };
                 if (target - pos).abs() <= v {
                     pos = target;
-                    dwell[i] = DWELL_MINUTES;
+                    dwell[i] = shaft_dwell;
                     car_load[i] = (car_load[i] - (car_load[i] * 0.45).ceil()).max(0.0);
                     let tf = target as i64;
                     let w = if staff_only {

@@ -105,6 +105,8 @@ pub struct Simulation {
     pub extermination_room_ids: Option<Vec<i64>>,
     /// `floorReachable` memo keyed by tower revision.
     pub reach_memo: (i64, HashMap<i64, bool>),
+    /// The saved camera view (inert cargo the save carries).
+    pub view: Option<Value>,
 }
 
 impl Simulation {
@@ -172,6 +174,7 @@ impl Simulation {
             metro_platform_nudged: false,
             extermination_room_ids: None,
             reach_memo: (-1, HashMap::new()),
+            view: None,
         }
     }
 
@@ -296,6 +299,9 @@ impl Simulation {
         m.insert("blockbusters".into(), json!(self.blockbusters));
         m.insert("milestones".into(), json!(self.milestones));
         m.insert("ledger".into(), self.ledger.serialize());
+        if let Some(v) = &self.view {
+            m.insert("view".into(), v.clone());
+        }
         if !self.log.is_empty() {
             let start = self.log.len().saturating_sub(LOG_SAVE_CAP);
             let log: Vec<Value> = self.log[start..]

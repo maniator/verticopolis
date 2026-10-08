@@ -137,7 +137,7 @@ fn parse_mode(s: &str) -> Option<GameMode> {
     }
 }
 
-fn start_sim(start: &Start) -> Result<Simulation, RunError> {
+fn start_sim(start: &Start, root: &std::path::Path) -> Result<Simulation, RunError> {
     match start {
         Start::NewGame { new_game } => {
             let mode = parse_mode(&new_game.mode).ok_or_else(|| RunError::Failed {
@@ -146,10 +146,23 @@ fn start_sim(start: &Start) -> Result<Simulation, RunError> {
             })?;
             Ok(Simulation::new_game(new_game.seed, mode))
         }
-        Start::Fixture { fixture, .. } => Err(RunError::Unsupported {
-            index: 0,
-            what: format!("fixture start {fixture}"),
-        }),
+        Start::Fixture { fixture, mode } => {
+            let failed = |what: String| RunError::Failed { index: 0, what };
+            let text = std::fs::read_to_string(root.join(fixture))
+                .map_err(|e| failed(format!("{fixture}: {e}")))?;
+            let mut raw = crate::load::decode_vctower(&text).map_err(|e| failed(format!("{fixture}: {e}")))?;
+            if let Some(m) = mode {
+                raw["mode"] = serde_json::Value::String(m.clone());
+            }
+            let mut sim = crate::load::deserialize(&raw);
+            crate::load::mark_founder_from_loaded_file(&mut sim, &raw);
+            if let Some(m) = mode {
+                if sim.mode.as_str() != m {
+                    return Err(failed(format!("{fixture} loaded as {}, not {m}", sim.mode.as_str())));
+                }
+            }
+            Ok(sim)
+        }
     }
 }
 
@@ -171,18 +184,32 @@ pub struct Run {
 
 /// Run a scenario, collecting checkpoints until it finishes or the port
 /// cannot continue.
-pub fn run_scenario(s: &Scenario) -> Run {
+pub fn run_scenario(s: &Scenario, root: &std::path::Path) -> Run {
+    run_scenario_inner(s, root, None).0
+}
+
+/// Run a scenario up to (and including) the checkpoint `label`, returning
+/// the live engine at that point.
+pub fn run_scenario_until(s: &Scenario, root: &std::path::Path, label: &str) -> Option<Simulation> {
+    run_scenario_inner(s, root, Some(label)).1
+}
+
+fn run_scenario_inner(s: &Scenario, root: &std::path::Path, stop_at: Option<&str>) -> (Run, Option<Simulation>) {
     let mut out = Vec::new();
-    let mut sim = match start_sim(&s.start) {
+    let mut sim = match start_sim(&s.start, root) {
         Ok(sim) => sim,
         Err(e) => {
-            return Run {
+            return (Run {
                 checkpoints: out,
                 error: Some(e),
-            }
+            }, None)
         }
     };
+    let stop = std::cell::Cell::new(false);
     let emit = |sim: &Simulation, label: String, out: &mut Vec<Checkpoint>| {
+        if stop_at == Some(label.as_str()) {
+            stop.set(true);
+        }
         out.push(Checkpoint {
             label,
             state: digest(&state_view(sim)),
@@ -190,8 +217,12 @@ pub fn run_scenario(s: &Scenario) -> Run {
         });
     };
     emit(&sim, "start".into(), &mut out);
+    if stop.get() {
+        return (Run { checkpoints: out, error: None }, Some(sim));
+    }
     let mut elapsed: i64 = 0;
     for (i, c) in s.commands.iter().enumerate() {
+        #[allow(unused_variables)]
         let unsupported = |what: &str| RunError::Unsupported {
             index: i,
             what: what.to_string(),
@@ -299,6 +330,9 @@ pub fn run_scenario(s: &Scenario) -> Run {
                         if let Some(every) = checkpoint_every {
                             if n % every == 0 {
                                 emit(&sim, format!("t+{elapsed}"), &mut out);
+                                if stop.get() {
+                                    break;
+                                }
                             }
                         }
                     }
@@ -334,20 +368,32 @@ pub fn run_scenario(s: &Scenario) -> Run {
                 }
                 Command::BombThreat => sim.bomb_threat(),
                 Command::EvaluateStar => sim.evaluate_star(),
-                Command::Reload => return Err(unsupported("reload")),
+                Command::Reload => {
+                    let before = digest(&state_view(&sim));
+                    let saved: Value = serde_json::from_str(&sim.serialize().to_string()).unwrap();
+                    let loaded = crate::load::deserialize(&saved);
+                    if digest(&state_view(&loaded)) != before {
+                        return Err(failed("reload changed the saved state".into()));
+                    }
+                    sim = loaded;
+                }
             }
             Ok(())
         })();
         if let Err(e) = r {
-            return Run {
+            return (Run {
                 checkpoints: out,
                 error: Some(e),
-            };
+            }, None);
+        }
+        if stop.get() {
+            return (Run { checkpoints: out, error: None }, Some(sim));
         }
     }
     emit(&sim, "final".into(), &mut out);
-    Run {
+    let stopped = if stop.get() { Some(sim) } else { None };
+    (Run {
         checkpoints: out,
         error: None,
-    }
+    }, stopped)
 }

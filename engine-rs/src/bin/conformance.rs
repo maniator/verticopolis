@@ -30,7 +30,8 @@ fn main() {
         let scenario: Scenario =
             serde_json::from_str(&std::fs::read_to_string(&path).expect("scenario file"))
                 .expect("scenario parses");
-        let run = run_scenario(&scenario);
+        let repo_root = root.join("..");
+        let run = run_scenario(&scenario, &repo_root);
         let got = &run.checkpoints;
         let matched = got
             .iter()
