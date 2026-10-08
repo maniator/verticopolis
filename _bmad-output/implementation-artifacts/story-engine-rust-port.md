@@ -73,6 +73,29 @@ run, the switch, threading) are planned in
 - Only what the hashed state reads is ported; the list of what is left out
   is under Out of scope.
 
+## Referee coverage
+
+`cargo llvm-cov run --release --bin conformance` at 372325a: the six scenarios
+execute 78% of the crate's lines (9,283 of which 2,007 are never reached).
+Where the referee cannot see, by module:
+
+| Module | Lines covered | What is dark |
+| --- | --- | --- |
+| services.rs | 50% | VIP visit, exterminator booking and resolution, metro cutoff |
+| events.rs | 51% | every event other than fire and bomb threat |
+| rules.rs, churn.rs | 55%, 58% | Modern rule branches, relocation and eviction paths |
+| star.rs | 65% | evaluation failure branches, later milestones |
+| satisfaction.rs, schedule.rs, tower.rs | 68% to 70% | gripe branches, off-shift schedules, removal paths |
+| housekeeping.rs | 78% | Modern triage order with several dirty wings |
+| load.rs | 82% | migration paths the three fixtures do not take |
+| crowd, dispatch, sim, sim_loop, demand, clock | 84% to 100% | |
+
+This is the scenario list for the follow-up: a hotel weekend with
+housekeeping and an exterminator call, a VIP visit without parking, a star
+evaluation that fails and then passes, a metro platform cut off and
+reconnected, express cars off shift, and the remaining events. Each one
+needs its runner command on both sides and grows the lock.
+
 ## Review findings
 
 `/gds-code-review`, round one (2026-10-08): 0 `decision_needed`, 24 `patch`,
