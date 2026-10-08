@@ -1,0 +1,55 @@
+name: engine-fuzz
+
+# Nightly differential fuzz of the two engines: random scenarios grown on the
+# Rust engine, replayed on the TypeScript engine, hashes compared at every
+# checkpoint. Never a pull-request gate; a divergence is pinned as a named
+# scenario in the fix PR.
+
+on:
+  schedule:
+    - cron: "37 4 * * *"
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: "How many seeds to run"
+        default: "20"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - run: npm ci
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal
+          rustup default 1.97.0
+      - name: Build the fuzzer
+        run: cargo build --locked --release --bin fuzz
+        working-directory: engine-rs
+      - name: Fuzz
+        run: |
+          seeds="${{ github.event.inputs.seeds || '20' }}"
+          base=$(( $(date +%s) / 86400 * 1000 ))
+          status=0
+          for i in $(seq 1 "$seeds"); do
+            seed=$(( base + i ))
+            engine-rs/target/release/fuzz "$seed" fuzz-out 40 || { status=1; continue; }
+            npx tsx scripts/fuzz-compare.ts "fuzz-out/fuzz-$seed.json" || status=1
+          done
+          exit $status
+      - name: Keep the scenarios of this run
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-scenarios
+          path: fuzz-out
+          if-no-files-found: ignore

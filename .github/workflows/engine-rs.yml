@@ -57,7 +57,7 @@ jobs:
         run: cargo run --locked --release --bin conformance
 
       # Coverage of the unit tests plus the referee, with a line floor that
-      # only ratchets up as scenarios land (80.58% at the first measurement).
+      # only ratchets up as scenarios land (80.58% at the first measurement, 85.14% with the scenario library).
       # The referee is replayed in the debug profile here so one report
       # merges both runs; the release replay above is the parity gate.
       - name: Coverage
@@ -66,4 +66,4 @@ jobs:
           cargo install cargo-llvm-cov --locked --version 0.9.1
           cargo llvm-cov --no-report --locked test
           cargo llvm-cov --no-report --locked run --bin conformance
-          cargo llvm-cov report --fail-under-lines 80
+          cargo llvm-cov report --fail-under-lines 85
