@@ -1,10 +1,12 @@
 //! Port of `src/engine/Tower.ts`, `tower/placement.ts`, `tower/transport.ts`
 //! and `tower/expressStops.ts`.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use serde_json::{json, Map, Value};
 
+use crate::clock::GameMode;
 use crate::facilities::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -157,7 +159,7 @@ pub struct Transport {
     pub cars: i64,
     pub car_positions: Vec<f64>,
     pub car_dir: Vec<i64>,
-    pub car_load: Option<Vec<i64>>,
+    pub car_load: Option<Vec<f64>>,
     pub load: i64,
     pub skip_floors: Option<Vec<i64>>,
     /// Schedules are authored by the UI; none of the scenarios set one.
@@ -230,12 +232,19 @@ pub struct Tower {
     pub built_wedding_hall: bool,
     pub revision: i64,
     pub allows_escalator_on_office_floors: bool,
-    structure: HashMap<(i64, i64), i64>,
-    struct_kind: HashMap<(i64, i64), Kind>,
-    rooms: HashMap<(i64, i64), i64>,
-    by_id: HashMap<i64, usize>,
-    lobby_tiles: HashMap<i64, i64>,
-    room_tiles: HashMap<i64, i64>,
+    /// The rule set the tower was founded under (`tower.rules.mode`).
+    pub mode: GameMode,
+    pub(crate) structure: HashMap<(i64, i64), i64>,
+    pub(crate) struct_kind: HashMap<(i64, i64), Kind>,
+    pub(crate) rooms: HashMap<(i64, i64), i64>,
+    pub(crate) by_id: HashMap<i64, usize>,
+    pub(crate) lobby_tiles: HashMap<i64, i64>,
+    pub(crate) room_tiles: HashMap<i64, i64>,
+    /// Revision-keyed memos (`servedSet`, `stopsCache`, segment runs, staff
+    /// components), see `tower_query.rs`.
+    pub(crate) memo: RefCell<crate::tower_query::Memo>,
+    /// `mealOverlayRevision`: bumped on every customersIn/outForMeal change.
+    pub meal_overlay_revision: i64,
 }
 
 impl Tower {
@@ -248,12 +257,15 @@ impl Tower {
             built_wedding_hall: false,
             revision: 0,
             allows_escalator_on_office_floors: false,
+            mode: GameMode::Classic,
             structure: HashMap::new(),
             struct_kind: HashMap::new(),
             rooms: HashMap::new(),
             by_id: HashMap::new(),
             lobby_tiles: HashMap::new(),
             room_tiles: HashMap::new(),
+            memo: RefCell::new(Default::default()),
+            meal_overlay_revision: 0,
         }
     }
 
@@ -1079,7 +1091,7 @@ impl Tower {
         if let Some(load) = &t.car_load {
             t.car_load = Some(
                 (0..cars as usize)
-                    .map(|i| load.get(i).copied().unwrap_or(0))
+                    .map(|i| load.get(i).copied().unwrap_or(0.0))
                     .collect(),
             );
         }

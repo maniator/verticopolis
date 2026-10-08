@@ -1,20 +1,26 @@
-//! The Verticopolis simulation engine in Rust.
-//!
-//! Every module here is a port of a file under `src/engine` in this repository.
-//! The port is checked against `conformance/expected.json` by the `conformance`
-//! binary, which must reproduce every checkpoint hash the TypeScript engine
-//! produces. See `conformance/README.md` for the contract.
-
 pub mod build;
 pub mod canonical;
+pub mod churn;
 pub mod clock;
 pub mod crowd;
+pub mod demand;
+pub mod dispatch;
 pub mod econ;
+pub mod economy;
 pub mod events;
 pub mod facilities;
+pub mod housekeeping;
 pub mod jsmath;
 pub mod ledger;
+pub mod presence;
+pub mod rent;
 pub mod rng;
+pub mod rules;
+pub mod satisfaction;
 pub mod scenario;
+pub mod services;
 pub mod sim;
+pub mod sim_loop;
+pub mod star;
 pub mod tower;
+pub mod tower_query;

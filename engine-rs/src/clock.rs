@@ -122,3 +122,25 @@ impl Clock {
         (self.day() as f64 / self.calendar.year_days as f64).floor() as i64
     }
 }
+
+impl Clock {
+    pub fn is_morning(&self) -> bool {
+        let h = self.hour();
+        (7..10).contains(&h)
+    }
+
+    pub fn is_lunch(&self) -> bool {
+        let h = self.hour();
+        (11..14).contains(&h)
+    }
+
+    pub fn is_evening(&self) -> bool {
+        let h = self.hour();
+        (17..21).contains(&h)
+    }
+
+    pub fn is_night(&self) -> bool {
+        let h = self.hour();
+        h >= 21 || h < 6
+    }
+}

@@ -909,3 +909,138 @@ pub fn covers_ground_floor(floor: i64, hgt: i64) -> bool {
 
 pub const NEEDS_FLOORS: &str = "Transport must run through built floors. Lay floors first.";
 pub const SHAFT_OVERLAP: &str = "Transport shafts cannot overlap.";
+
+// ---- predicates from facilityPredicates.ts / facilityCaps.ts -------------
+
+impl Kind {
+    /// `transportCarCapacity`.
+    pub fn car_capacity(self) -> f64 {
+        match self {
+            Kind::ElevatorStandard => 21.0,
+            Kind::ElevatorService => 10.0,
+            Kind::ElevatorExpress => 42.0,
+            Kind::Escalator => 30.0,
+            Kind::Stairs => 8.0,
+            _ => 0.0,
+        }
+    }
+
+    /// `isStaffOnlyTransport`.
+    pub fn is_staff_only_transport(self) -> bool {
+        self.facility().staff_only
+    }
+
+    /// `isStaffTransportKind`: staff-only elevators plus stairs.
+    pub fn is_staff_transport(self) -> bool {
+        self.is_staff_only_transport() || self == Kind::Stairs
+    }
+
+    pub fn is_walkway(self) -> bool {
+        matches!(self, Kind::Stairs | Kind::Escalator)
+    }
+
+    /// `WALKWAY_WILLINGNESS`.
+    pub fn walkway_willingness(self) -> Option<i64> {
+        match self {
+            Kind::Stairs => Some(4),
+            Kind::Escalator => Some(7),
+            _ => None,
+        }
+    }
+
+    /// `attendanceCap`.
+    pub fn attendance_cap(self) -> Option<i64> {
+        self.facility().attendance
+    }
+
+    /// `isCommercialKind`.
+    pub fn is_commercial(self) -> bool {
+        matches!(
+            self,
+            Kind::FastFood
+                | Kind::Restaurant
+                | Kind::FoodHall
+                | Kind::Amusements
+                | Kind::BoutiqueBay
+                | Kind::Nightclub
+                | Kind::Spa
+                | Kind::SkyBar
+                | Kind::Daycare
+                | Kind::Shop
+                | Kind::Cinema
+        )
+    }
+
+    /// `hasBusinessHours`.
+    pub fn has_business_hours(self) -> bool {
+        self.is_commercial() || matches!(self, Kind::PartyHall | Kind::AquaticCenter)
+    }
+
+    /// `isOpenAt`.
+    pub fn is_open_at(self, hour: i64) -> bool {
+        match self {
+            Kind::FastFood => (7..22).contains(&hour),
+            Kind::Restaurant => (11..14).contains(&hour) || (17..23).contains(&hour),
+            Kind::FoodHall => (10..22).contains(&hour),
+            Kind::Shop => (10..21).contains(&hour),
+            Kind::Amusements => (10..24).contains(&hour),
+            Kind::Nightclub => hour >= 20 || hour < 2,
+            Kind::BoutiqueBay => (10..21).contains(&hour),
+            Kind::Spa => (9..21).contains(&hour),
+            Kind::SkyBar => (16..24).contains(&hour),
+            Kind::Daycare => (7..19).contains(&hour),
+            Kind::Cinema => (12..24).contains(&hour),
+            Kind::PartyHall => (17..24).contains(&hour),
+            Kind::AquaticCenter => (8..22).contains(&hour),
+            _ => true,
+        }
+    }
+
+    /// `openHoursPerDay`.
+    pub fn open_hours_per_day(self) -> i64 {
+        let h = (0..24).filter(|&hr| self.is_open_at(hr)).count() as i64;
+        if h == 0 {
+            1
+        } else {
+            h
+        }
+    }
+
+    /// `isUnmetDemandKind`.
+    pub fn is_unmet_demand_kind(self) -> bool {
+        matches!(self, Kind::Office | Kind::Condo | Kind::RentalApartment) || self.is_hotel()
+    }
+
+    /// `isLeaseAmenityKind`.
+    pub fn is_lease_amenity(self) -> bool {
+        matches!(self, Kind::FitnessClub | Kind::Clinic)
+    }
+
+    /// `hasHousehold`.
+    pub fn has_household(self) -> bool {
+        matches!(self, Kind::Condo | Kind::RentalApartment)
+    }
+
+    pub fn is_staff_kind(self) -> bool {
+        matches!(
+            self,
+            Kind::Security | Kind::Medical | Kind::Housekeeping | Kind::Recycling
+        )
+    }
+
+    /// The one-way ambient venue pool in `spawnFloors`.
+    pub fn is_ambient_venue(self) -> bool {
+        matches!(
+            self,
+            Kind::Shop
+                | Kind::Restaurant
+                | Kind::FastFood
+                | Kind::Amusements
+                | Kind::BoutiqueBay
+                | Kind::Nightclub
+                | Kind::Spa
+                | Kind::SkyBar
+                | Kind::Daycare
+        )
+    }
+}

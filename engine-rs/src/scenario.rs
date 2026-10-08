@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use crate::canonical::digest;
 use crate::clock::GameMode;
+use crate::econ::rent_of;
 use crate::facilities::Kind;
 use crate::sim::Simulation;
 
@@ -189,6 +190,7 @@ pub fn run_scenario(s: &Scenario) -> Run {
         });
     };
     emit(&sim, "start".into(), &mut out);
+    let mut elapsed: i64 = 0;
     for (i, c) in s.commands.iter().enumerate() {
         let unsupported = |what: &str| RunError::Unsupported {
             index: i,
@@ -285,12 +287,53 @@ pub fn run_scenario(s: &Scenario) -> Run {
                     )
                     .map_err(failed)?;
                 }
-                Command::Tick { .. } => return Err(unsupported("tick")),
-                Command::AdjustRent { .. } => return Err(unsupported("adjustRent")),
-                Command::SetNoRate { .. } => return Err(unsupported("setNoRate")),
-                Command::StartFire => return Err(unsupported("startFire")),
-                Command::BombThreat => return Err(unsupported("bombThreat")),
-                Command::EvaluateStar => return Err(unsupported("evaluateStar")),
+                Command::Tick {
+                    dt,
+                    times,
+                    checkpoint_every,
+                } => {
+                    let times = times.unwrap_or(1);
+                    for n in 1..=times {
+                        sim.tick(*dt as f64);
+                        elapsed += dt;
+                        if let Some(every) = checkpoint_every {
+                            if n % every == 0 {
+                                emit(&sim, format!("t+{elapsed}"), &mut out);
+                            }
+                        }
+                    }
+                }
+                Command::AdjustRent { floor, x, dir } => {
+                    let (id, kind, rent, no_rate) = sim
+                        .tower
+                        .unit_at(*floor, *x)
+                        .map(|u| (u.id, u.kind, u.rent, u.no_rate))
+                        .ok_or_else(|| failed(format!("no unit at floor {floor}, x {x}")))?;
+                    let before = rent_of(kind, rent, no_rate);
+                    let moved = sim.adjust_rent(id, *dir).is_some() && {
+                        let u = sim.tower.get_unit(id).unwrap();
+                        rent_of(u.kind, u.rent, u.no_rate) != before
+                    };
+                    expect_ok(moved, false, &format!("adjustRent {dir} @ {floor},{x}"), Some("rent did not move"))
+                        .map_err(failed)?;
+                }
+                Command::SetNoRate { floor, x } => {
+                    let id = sim
+                        .tower
+                        .unit_at(*floor, *x)
+                        .map(|u| u.id)
+                        .ok_or_else(|| failed(format!("no unit at floor {floor}, x {x}")))?;
+                    expect_ok(sim.set_no_rate(id), false, &format!("setNoRate @ {floor},{x}"), None)
+                        .map_err(failed)?;
+                }
+                Command::StartFire => {
+                    let before = sim.events.count();
+                    sim.start_fire();
+                    expect_ok(sim.events.count() > before, false, "startFire", Some("nothing caught fire"))
+                        .map_err(failed)?;
+                }
+                Command::BombThreat => sim.bomb_threat(),
+                Command::EvaluateStar => sim.evaluate_star(),
                 Command::Reload => return Err(unsupported("reload")),
             }
             Ok(())

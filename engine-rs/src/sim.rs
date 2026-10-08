@@ -4,12 +4,28 @@
 use indexmap::IndexSet;
 use serde_json::{json, Map, Value};
 
+use std::collections::HashMap;
+
 use crate::clock::{resolve_calendar, CalendarKind, Clock, GameMode};
 use crate::crowd::Crowd;
+use crate::dispatch::ElevatorDispatch;
 use crate::events::EventSystem;
+use crate::housekeeping::Housekeeping;
 use crate::ledger::Ledger;
 use crate::rng::Rng;
+use crate::sim_loop::{weather_for, Weather};
 use crate::tower::Tower;
+
+/// `moveInsToday`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct MoveIns {
+    pub offices: i64,
+    pub condos: i64,
+    pub rooms: i64,
+    pub fitness: i64,
+    pub clinic: i64,
+    pub rentals: i64,
+}
 
 pub const SAVE_VERSION: i64 = 7;
 /// `ECON.startingMoney`.
@@ -72,6 +88,23 @@ pub struct Simulation {
     pub log_seq: i64,
     /// Unit ids under construction, in insertion order.
     pub constructing: IndexSet<i64>,
+    // ---- transient loop state (never saved) ----
+    pub elevators: ElevatorDispatch,
+    pub housekeeping: Housekeeping,
+    pub weather: Weather,
+    pub last_hour: i64,
+    pub last_day: i64,
+    pub last_month: i64,
+    pub last_quarter: i64,
+    pub on_hour_runs: i64,
+    pub move_ins_today: MoveIns,
+    pub waste_nudged: bool,
+    pub suite_parking_nudged: bool,
+    pub stranded_nudged: bool,
+    pub metro_platform_nudged: bool,
+    pub extermination_room_ids: Option<Vec<i64>>,
+    /// `floorReachable` memo keyed by tower revision.
+    pub reach_memo: (i64, HashMap<i64, bool>),
 }
 
 impl Simulation {
@@ -105,6 +138,7 @@ impl Simulation {
             tower: {
                 let mut t = Tower::new();
                 t.allows_escalator_on_office_floors = mode == GameMode::Modern;
+                t.mode = mode;
                 t
             },
             money: STARTING_MONEY,
@@ -123,7 +157,64 @@ impl Simulation {
             log: Vec::new(),
             log_seq: 0,
             constructing: IndexSet::new(),
+            elevators: ElevatorDispatch::new(),
+            housekeeping: Housekeeping::default(),
+            weather: weather_for(0),
+            last_hour: -1,
+            last_day: 0,
+            last_month: -1,
+            last_quarter: -1,
+            on_hour_runs: 0,
+            move_ins_today: MoveIns::default(),
+            waste_nudged: false,
+            suite_parking_nudged: false,
+            stranded_nudged: false,
+            metro_platform_nudged: false,
+            extermination_room_ids: None,
+            reach_memo: (-1, HashMap::new()),
         }
+    }
+
+    /// `recordMoney(cat, amount)`.
+    pub fn record_money(&mut self, cat: &'static str, amount: f64) {
+        self.ledger.record(cat, amount);
+    }
+
+    /// `population`.
+    pub fn population(&self) -> i64 {
+        self.tower.total_population()
+    }
+
+    /// `floorReachable(floor)`: memoized per tower revision, no rng.
+    pub fn floor_reachable(&mut self, floor: i64) -> bool {
+        if floor == 1 {
+            return true;
+        }
+        if self.reach_memo.0 != self.tower.revision {
+            self.reach_memo = (self.tower.revision, HashMap::new());
+        }
+        if let Some(&hit) = self.reach_memo.1.get(&floor) {
+            return hit;
+        }
+        let hit = self.crowd.floor_reachable(&self.tower, floor);
+        self.reach_memo.1.insert(floor, hit);
+        hit
+    }
+
+    /// `positionReachable(floor, x)`.
+    pub fn position_reachable(&mut self, floor: i64, x: i64) -> bool {
+        if floor == 1 {
+            return true;
+        }
+        if self.tower.segments_of(floor).len() <= 1 {
+            return self.floor_reachable(floor);
+        }
+        self.crowd.position_reachable(&self.tower, floor, x)
+    }
+
+    /// `unitReachable` (sim/demand.ts).
+    pub fn unit_reachable(&mut self, floor: i64, x: i64) -> bool {
+        self.position_reachable(floor, x)
     }
 
     /// `Simulation.newGame(seed, mode)` with the default calendar, bridged.
