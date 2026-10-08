@@ -1,6 +1,7 @@
 import type { Simulation } from "../Simulation";
 import { FACILITIES, isOpenAt, residentCount, syncAttendanceOccupants } from "../facilities";
 import { isDormant } from "../types";
+import { roomUnits } from "../tower/rooms";
 
 /**
  * Per-hour occupancy (`u.occupants`) for every unit, split out of
@@ -12,7 +13,7 @@ import { isDormant } from "../types";
  */
 export function updatePresence(sim: Simulation): void {
   const weekend = sim.clock.isWeekend;
-  for (const u of sim.tower.units) {
+  for (const u of roomUnits(sim.tower)) {
     const f = FACILITIES[u.kind];
     if (isDormant(u)) {
       // The wedding hall is never tenanted, so its lifetime state is "empty"

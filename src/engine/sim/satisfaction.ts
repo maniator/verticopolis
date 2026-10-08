@@ -11,6 +11,7 @@ import { isDormant, isOperational, VACATE_REASON_TEXT } from "../types";
 
 import { VACATE_NOTICE_MINUTES, VACATE_RESCIND, NOISE_CAP, OFFICE_NOISE_TILES, HOTEL_NOISE_TILES } from "./constants";
 import { buildSatisfactionContext, satisfactionStep } from "./satisfactionStep";
+import { roomUnits } from "../tower/rooms";
 
 /** Satisfaction, noise notices, and the amenity halos for the Simulation, as
  * friend functions taking the instance. Extracted from `Simulation.ts`; the
@@ -33,7 +34,7 @@ export function updateSatisfaction(sim: Simulation): void {
   // New notices this tick are batched into one toast (like move-ins) so a
   // tower-wide problem raises a single alarm, not one per unit.
   const notices: { floor: number; kind: FacilityKind; reason: VacateReason }[] = [];
-  for (const u of sim.tower.units) {
+  for (const u of roomUnits(sim.tower)) {
     if (isDormant(u)) continue;
     const { next, served, cong, farWalk, noisy, lobbyFar, unmetDemand, unmetCov } = satisfactionStep(
       sim,

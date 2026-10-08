@@ -7,15 +7,15 @@ import { isStructural } from "./towerTopology";
  * same order as `tower.units`.
  *
  * Structure tiles are most of the unit list on a real tower (about 11,000 of
- * 12,000 on a 78-floor save). The per-step scans that use this list (trip-spawn
- * binning, elevator waiting demand, the population census and its meal
- * overlay) skip them by kind or because a tile holds no population, no
- * occupants (zeroed on load), no customers and no meal-goers. Iterating this
- * list instead gives those loops the same results in the same order.
- *
- * Not a general "structure is inert" rule: some saves carry legacy floor tiles
- * in the `occupied` state, which the hourly satisfaction sweep does process.
- * Check a loop's body against that before switching it to this list.
+ * 12,000 on a 78-floor save). Every one is `empty` (placement creates them so,
+ * and load restores any other saved state to `empty` and their occupants to 0),
+ * so it is dormant, never present or tenanted, and holds nobody. A loop that
+ * skips units by room kind, or skips dormant or non-present units, gets the same
+ * results in the same order from this list. The per-step scans (trip-spawn
+ * binning, elevator demand, the census) and the hourly passes (satisfaction,
+ * demand, move-ins, traffic income, presence, congestion, parking, the star
+ * census) use it. A loop that reads structure geometry (floor extents, the
+ * structure index) must keep walking `tower.units`.
  *
  * Memoized per tower on the unit array, its length, and `tower.revision`
  * (every placement and removal bumps the revision; a unit's kind never changes

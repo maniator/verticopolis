@@ -13,6 +13,8 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.29.0
+
 ## 2.28.0
 
 ## 2.27.0

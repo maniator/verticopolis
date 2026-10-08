@@ -6,6 +6,7 @@ import { FACILITIES, STAR_THRESHOLDS, TOWER_POPULATION, censusCount, isCommercia
 import type { FacilityKind } from "../types";
 
 import { isPresent } from "../types";
+import { roomUnits } from "../tower/rooms";
 
 /** Star rating + population census for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -72,7 +73,7 @@ export function ratingPopulation(sim: Simulation): number {
  * figure each 5★/TOWER rung is tested against in {@link evaluateStar}. */
 export function occupantPopulation(sim: Simulation): number {
   let pop = 0;
-  for (const u of sim.tower.units) {
+  for (const u of roomUnits(sim.tower)) {
     if (isPresent(u) && !isHotelKind(u.kind)) {
       // censusCount: commercial units contribute their live customer tally
       // (cinema excluded via population = 0), everyone else residentCount.

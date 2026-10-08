@@ -20,6 +20,7 @@ import { VACATE_NOTICE_MINUTES } from "./constants";
 import { buildSatisfactionContext, wouldEvictFreshTenant, type SatisfactionContext } from "./satisfactionStep";
 import { foldOriginDemand } from "./demand";
 import { bindingTransportClassAt, type CongestionBindingClass } from "./gripe";
+import { roomUnits } from "../tower/rooms";
 
 /** Vacate, move-in, subtype churn for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -188,7 +189,7 @@ export function attemptMoveIns(sim: Simulation): void {
     sim.moveIn(unit);
     if (satCtx?.demandMap) foldOriginDemand(satCtx.demandMap, sim, unit);
   };
-  for (const u of sim.tower.units) {
+  for (const u of roomUnits(sim.tower)) {
     if (u.state !== "empty") continue;
     // Off-market ("No Rate"): the unit is deliberately not for rent/sale, so it
     // attracts no tenants and never seats one at $0 (which would stamp rent 0,

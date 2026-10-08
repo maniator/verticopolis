@@ -10,6 +10,7 @@ import { ledgerCatFor, type LedgerCat } from "./Ledger";
 import { subtypeListFor } from "./retailSubtypes";
 import { Housekeeping } from "./economy/housekeeping";
 import { computeDemandMap, unitReachable } from "./sim/demand";
+import { roomUnits } from "./tower/rooms";
 
 /** The lease kinds `collectRent` collects quarterly, and the money-log line each
  *  emits (its ledger category comes from `ledgerCatFor`). A kind absent here pays
@@ -161,7 +162,7 @@ export class EconomySystem {
     // venue below. Draws no RNG, so the seeded economy stream is unperturbed.
     const rules = this.sim.rules ?? MODERN_RULES;
     const isWeekend = this.sim.clock.isWeekend;
-    for (const u of this.sim.tower.units) {
+    for (const u of roomUnits(this.sim.tower)) {
       // Mode headline (#572); the demand map reads the same seam, so the income anchor and the pool capacity always match.
       const daily = rules.commercialDailyIncome(u.kind);
       if (daily === undefined) continue;
