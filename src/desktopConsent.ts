@@ -50,6 +50,13 @@
  *  the notice has resolved, and emits nothing. */
 export type DesktopConsentState = "pending" | "granted" | "declined";
 
+/** A consent-change subscriber. It receives BOTH the answer being replaced and
+ *  the new one, because what a watcher should do often depends on the transition
+ *  rather than the destination: only `pending` to `granted` flushes a held queue,
+ *  and a watcher holding its own mirror of the previous answer would go stale
+ *  across `resetDesktopConsentForTests`. */
+export type ConsentWatcher = (previous: DesktopConsentState, next: DesktopConsentState) => void;
+
 /**
  * True only in a `vite build --mode desktop` bundle. Vite statically replaces
  * `import.meta.env.MODE`, so this folds to a literal at build time, the same
@@ -105,7 +112,7 @@ let held: (() => void)[] = [];
  *  never removed, so {@link resetDesktopConsentForTests} deliberately leaves the
  *  list alone (dropping it would unsubscribe the tracker for the rest of the
  *  process). */
-const watchers: (() => void)[] = [];
+const watchers: ConsentWatcher[] = [];
 
 /**
  * Watch for a change of answer.
@@ -122,7 +129,7 @@ const watchers: (() => void)[] = [];
  * Watchers fire on a real change only, so a surface that rewrites the answer it
  * already holds does not tear down a live measurement window for nothing.
  */
-export function onDesktopConsentChange(watcher: () => void): void {
+export function onDesktopConsentChange(watcher: ConsentWatcher): void {
   watchers.push(watcher);
 }
 
@@ -184,7 +191,8 @@ export function desktopAnalyticsAllowed(mode: string): boolean {
  * rather than a property of who happens to be in the queue.
  */
 export function setDesktopConsent(state: DesktopConsentState): void {
-  const changed = desktopConsentState() !== state;
+  const previous = desktopConsentState();
+  const changed = previous !== state;
   consent = state;
   storeConsent(state);
   // Tell the watchers before anything is flushed and after the gate has already
@@ -197,7 +205,7 @@ export function setDesktopConsent(state: DesktopConsentState): void {
   if (changed) {
     for (const watcher of watchers) {
       try {
-        watcher();
+        watcher(previous, state);
       } catch {
         /* best-effort: a watcher must not strand the answer or the flush */
       }

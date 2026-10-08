@@ -59,7 +59,7 @@ describe("sendToRelay", () => {
     const { sendToRelay } = await load();
     const beacon = vi.fn((_path: string, _body?: BodyInit) => true);
     vi.stubGlobal("navigator", { sendBeacon: beacon });
-    sendToRelay("game_started", { mode: "modern" });
+    sendToRelay("new_game_started", { mode: "modern" });
     sendToRelay("first_build", { tool: "office" });
     const first = bodyOf(beacon.mock.calls[0][1]).session;
     const second = bodyOf(beacon.mock.calls[1][1]).session;

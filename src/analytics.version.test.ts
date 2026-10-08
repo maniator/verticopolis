@@ -43,7 +43,7 @@ describe("the build version rides every event, whatever the entry point", () => 
     // merge or the send path would leave the version sitting in module state
     // while events still shipped without it, so this drives the real choke
     // point and reads the version back off the wire.
-    trackEvent("game_started", { mode: "classic" });
+    trackEvent("new_game_started", { mode: "classic" });
     const props = vi.mocked(sendToRelay).mock.calls[0]?.[1] as EventProps | undefined;
     expect(props?.version).toBe(APP_VERSION);
   });
