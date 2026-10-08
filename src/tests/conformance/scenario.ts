@@ -61,7 +61,7 @@ export interface Checkpoint {
  *  4294967295, "count" a whole number above zero, "dir" 1 or -1, "num" a finite
  *  number, "str" a non-empty string, "bool" a boolean, "place" a facility kind
  *  that is not a transport, "shaft" a transport kind, "mode" classic or modern,
- *  "obj" a JSON object.
+ *  "obj" a JSON object, "kind" any facility kind.
  *  A trailing "?" marks the field optional. */
 type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind";
 const AT = { floor: "int", x: "int" } as const;

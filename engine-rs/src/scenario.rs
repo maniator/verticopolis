@@ -126,8 +126,8 @@ impl Scenario {
 /// from 0 to 4294967295, "count" a whole number above zero, "dir" 1 or -1,
 /// "num" a finite number, "str" a non-empty string, "bool" a boolean, "place"
 /// a facility kind that is not a transport, "shaft" a transport kind, "mode"
-/// classic or modern, "obj" a JSON object. A trailing "?" marks the field
-/// optional.
+/// classic or modern, "obj" a JSON object, "kind" any facility kind. A
+/// trailing "?" marks the field optional.
 fn field_fits(ty: &str, v: &Value) -> bool {
     let int = |v: &Value| v.as_i64().is_some();
     match ty {
