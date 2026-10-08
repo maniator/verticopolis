@@ -91,6 +91,24 @@ The table is a gate for phase 3 and a precondition for phase 7.
 Two consumers, one crate: the web PWA through WASM (phases 1 to 3) and the
 Godot client through GDExtension (phase 6). Neither gates the other.
 
+## Order and gates
+
+The stories, in the order they run, each gated on the one before:
+
+| # | Story | Gate to start | Gate to finish |
+| --- | --- | --- | --- |
+| 1 | `story-engine-scenario-library` | #857 merged | Coverage floor raised, no module under 75%, fuzzer nightly, canon tests, #860 closed, CONTRIBUTING rule |
+| 2 | `story-engine-wasm-binding` (phase 1) | 1 | Referee matches through the binding from Node |
+| 3 | `story-engine-dual-run` (phase 2) | 2 | A full day on each fixture with no divergence at game cadence |
+| 4 | `story-engine-wasm-switch` (phase 3) | 3, plus the test-mapping table started | Golden masters, e2e, conformance green; Modern profile no slower |
+| 5 | `story-engine-tdt-port` (phase 7) | 1 (can overlap 2 to 4) | TDT lock matched both ways |
+| 6 | `story-engine-copy-catalog` | any time after 1 | Engines emit ids, one catalog, save version bump |
+| 7 | `story-engine-retire-typescript` (phase 8) | 4, 5, 6, two releases on WASM, table complete | `src/engine/` gone, lock Rust-owned, major bump |
+| 8 | Godot spike (phase 6, private) | 1 | Brief's go/no-go gate |
+
+Saves-keep-unknown-fields (phase 4) and the threading evaluation (phase 5)
+are independent of this order and land where they are needed.
+
 ## Threading
 
 The simulation step is sequential by contract: three random streams are drawn
