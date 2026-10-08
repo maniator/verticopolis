@@ -27,6 +27,29 @@ while that is true:
   why (a UI readout, prose, a transient the hash never sees).
 - The TypeScript engine stays the reference until the web game ships on
   WASM; after that it is frozen and retired on its own story.
+- An engine pull request that adds a branch adds a scenario that reaches
+  it. The referee's coverage map (the Rust job's `cargo llvm-cov` step, with a
+  line floor that only ratchets up) is how review checks it.
+
+## What the TypeScript tests pin, and where it goes
+
+The TypeScript engine carries 360 tests in 32 files. Each one pins a claim
+about the simulation, and every claim has to survive the retirement of
+`src/engine/`. The mechanism is the lock, never a mirrored suite: two
+hand-maintained suites drift apart silently, a hash cannot. Each test maps to
+exactly one home, recorded in a checked-in table that a CI test keeps
+complete:
+
+- A conformance scenario, when the claim shows up in hashed state. This is
+  most of them (housekeeping, churn, milestones, dispatch, economy), and it is
+  the stronger form because it pins the numbers rather than a relation.
+- A Rust unit test, when the claim is about a constant, a cap or a pure
+  function (build caps, the 24-shaft pool, the rent ladder, the JavaScript
+  number helpers).
+- Dropped, with the reason recorded, when the test exercises TypeScript
+  plumbing with no Rust counterpart.
+
+The table is a gate for phase 3 and a precondition for phase 7.
 
 ## Phases ahead, each its own story
 
@@ -50,7 +73,23 @@ while that is true:
 5. **Threading evaluation.** See below. Gate: the referee still matches with
    threads on, on every scenario, across repeated runs.
 6. **Godot spike** on the shared engine, per the brief's go/no-go gate, in its
-   own private repository.
+   own private repository. The Godot client links the crate natively through
+   GDExtension (the `gdext` Rust bindings for Godot 4); no WASM and no browser
+   on Steam, Steam Deck or the desktop builds. Once that client exists, the
+   Electron wrapper planned in the distribution repository has no job left.
+7. **TDT in the crate.** The `.TDT` import and export (24 files under
+   `src/storage/tdt*`, 20 tests) are engine-data work: bytes to the serialized
+   game and back, with hashed seeds and table layouts that must be bit-exact.
+   They move into `engine-rs` so the Godot client reads and writes 1994 towers
+   natively and the web gets them through the same WASM binding. Same referee
+   method: every TDT fixture round-trips to the TypeScript's serialized JSON,
+   hashed into a lock the Rust must match.
+8. **Retire the TypeScript engine**, one or two releases after the switch, once
+   the test-mapping table above is complete and the fallback flag has gone
+   unused. After that the lock is the Rust engine's own regression baseline.
+
+Two consumers, one crate: the web PWA through WASM (phases 1 to 3) and the
+Godot client through GDExtension (phase 6). Neither gates the other.
 
 ## Threading
 

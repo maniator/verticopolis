@@ -201,6 +201,14 @@ and `dump` arguments that are not UTF-8.
 - [x] [Review][Patch] Referee id-check message omitted the path and named "the suite" without the test [engine-rs/src/bin/conformance.rs]
 - [x] [Review][Patch] Comments: the billed-ids note contradicted itself, the fee constants shared one doc line, the removal note claimed "never", the `Unsupported` message shape differed from `Failed` [engine-rs/src/services.rs, tower.rs, scenario.rs]
 
+Round seven (confirming pass, 2026-10-08) on the round-six patches: 0
+`decision_needed`, 1 `patch`, 0 `defer`; the Blind Hunter reported no
+behavioral findings and the Acceptance Auditor no violation. The loop stops
+here: rounds five through seven surfaced no parity defect, only hardening of
+earlier hardening, which is the convergence point CLAUDE.md names.
+
+- [x] [Review][Patch] The release-build fallback on a stale transport index would turn it into a silent no-op in the referee; the check is unconditional now [engine-rs/src/tower.rs]
+
 Codex review of 86f3476 (2026-10-08), both applied:
 
 - [x] [Review][Patch] `callExterminator` (the Modern booking action: fee, billed room ids, next-day deadline) was not ported; only the resolution was [engine-rs/src/services.rs]

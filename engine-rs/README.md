@@ -41,6 +41,8 @@ readouts the hashed state never reads (`scheduleOrigins.ts`,
 cd engine-rs
 cargo test                                  # unit tests (rng, number formatting, hash)
 cargo run --release --bin conformance       # replay every scenario against expected.json
+cargo llvm-cov --no-report test && cargo llvm-cov --no-report run --bin conformance \
+  && cargo llvm-cov report               # what the tests and the referee reach; CI floors lines at 80%
 cargo run --release --bin dump -- starter-classic t+60   # canonical JSON of one checkpoint
 ```
 

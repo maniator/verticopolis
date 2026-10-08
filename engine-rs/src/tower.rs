@@ -894,19 +894,16 @@ impl Tower {
     // ---- transports ------------------------------------------------------
 
     pub fn transport_index(&self, id: i64) -> Option<usize> {
+        debug_assert_eq!(self.transport_by_id.len(), self.transports.len());
         let i = *self.transport_by_id.get(&id)?;
-        // One index and compare keeps a stale map from handing back the wrong
-        // shaft in a release build; a debug build names the bug instead.
-        let found = self.transports.get(i).map(|t| t.id);
-        debug_assert_eq!(
-            found,
+        // One index and compare on every lookup, in release builds too: a
+        // stale map is a programming error, and the referee runs in release,
+        // where a silent miss would surface only as unexplained digest drift.
+        assert_eq!(
+            self.transports.get(i).map(|t| t.id),
             Some(id),
             "transport index points at the wrong shaft; writes to `transports` go through add, remove or reindex"
         );
-        debug_assert_eq!(self.transport_by_id.len(), self.transports.len());
-        if found != Some(id) {
-            return None;
-        }
         Some(i)
     }
 
@@ -1250,7 +1247,6 @@ mod tests {
         let moved = std::mem::take(&mut t.transports);
         let mut fresh = Tower::new();
         fresh.transports = moved;
-        assert_eq!(fresh.transport_index(ids[1]), None);
         fresh.reindex();
         index_matches_positions(&fresh);
         assert_eq!(fresh.get_transport(ids[1]).map(|x| x.x), Some(10));
