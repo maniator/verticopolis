@@ -426,7 +426,7 @@ function buildInsights(ids) {
     {
       name: "Crashes over time (by repeat)",
       description:
-        "Daily crash events split by the repeat-within-90s flag, production. Since 2026-09-14 crash is capped and deduped per session (one event per distinct crash shape, at most 10), so counts before and after that date are not comparable.",
+        "Daily crash events split by the repeat-within-90s flag, production. Since 2026-09-14 crash is capped and deduped per page life (one event per distinct crash shape, at most 10 per page life; a reload starts a fresh budget under the same session id), so counts before and after that date are not comparable.",
       query: trends([series("crash", "Crashes")], { breakdown: "repeat" }),
     },
     {
@@ -437,7 +437,7 @@ function buildInsights(ids) {
       // loop from a one-off. Neither counts occurrences.
       name: "Crashes by build version",
       description:
-        "Typed crash events by build version, production, 30d. Deduped per session on the crash's flag set since 2026-09-14 (finer than the $exception mirror's single fingerprint, but still not an occurrence count), so counts before and after that date are not comparable.",
+        "Typed crash events by build version, production, 30d. Deduped per page life on the crash's flag set since 2026-09-14 (finer than the $exception mirror's single fingerprint, but still not an occurrence count), so counts before and after that date are not comparable.",
       query: trends([series("crash", "Crashes")], { breakdown: "version", display: "ActionsTable", breakdownLimit: 10 }),
     },
     // Reliability / error tracking. $exception is the cookieless error signal
@@ -479,7 +479,7 @@ function buildInsights(ids) {
       // most one row to each bucket, so the split is pulled toward 1:1 by the
       // dedup rather than by how devices behave.
       description:
-        "The typed crash event split by whether in-place recovery was tried and failed, production. NOT a recovery success rate: false also covers every loss where recovery was never attempted (a repeat, a loss behind the splash, a failed flush). Deduped per session on the crash's flag set since 2026-09-14, which pulls the split toward 1:1, so counts before and after that date are not comparable.",
+        "The typed crash event split by whether in-place recovery was tried and failed, production. NOT a recovery success rate: false also covers every loss where recovery was never attempted (a repeat, a loss behind the splash, a failed flush). Deduped per page life on the crash's flag set since 2026-09-14, which pulls the split toward 1:1, so counts before and after that date are not comparable.",
       query: trends([series("crash", "Crashes")], { breakdown: "recoveryFailed", display: "ActionsBar" }),
     },
     // App-chrome actions (the app_action event). COOKIELESS: every tile here is

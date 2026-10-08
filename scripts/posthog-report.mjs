@@ -703,9 +703,10 @@ async function main() {
       ["Sessions ended", totals.session_end.sessions],
       ["Boots", totals.boot.events],
       ["Play sessions", totals.boot.sessions],
-      // Capped and deduped per session since 2026-09-14, so this counts distinct
-      // crash SHAPES per session (at most 10), not occurrences. Not comparable
-      // with counts from before that date.
+      // Capped and deduped per page life since 2026-09-14, so this counts distinct
+      // crash SHAPES per page life (at most 10, and a reload starts a fresh budget
+      // under the same session id), not occurrences. Not comparable with counts
+      // from before that date.
       ["Crashes", totals.crash.events],
       ["App actions", totals.app_action.events],
       ["Economy actions", totals.economy_action.events],
@@ -764,15 +765,15 @@ async function main() {
         tables: [
           {
             ...crashByRecovery,
-            // Deduped per session since 2026-09-14, and this split is the one the
+            // Deduped per page life since 2026-09-14, and this split is the one the
             // dedup distorts most: recoveryFailed can only be true on a FIRST
             // mid-game loss whose flush succeeded, so every later loss in a loop
             // reports false. Before the dedup a long loop pushed the false bucket
-            // up by its occurrence count; now one looping session contributes at
+            // up by its occurrence count; now one looping page life contributes at
             // most one row to each bucket, so the ratio is pulled toward 1:1 by
             // the dedup rather than by device behavior. Not comparable across
             // that date, and not a recovery success rate in either era.
-            caption: "Crash shapes by failed in-place recovery (per session since 2026-09-14)",
+            caption: "Crash shapes by failed in-place recovery (per page life since 2026-09-14)",
             header: "Recovery failed",
           },
           { ...updateByTo, caption: "Updates by target version", header: "To version" },
