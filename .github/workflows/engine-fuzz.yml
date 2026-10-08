@@ -59,6 +59,7 @@ jobs:
           fi
           if [ -n "$one" ]; then
             case "$one" in *[!0-9]*) echo "seed must be a whole number, got '$one'"; exit 2;; esac
+            if [ "${#one}" -gt 10 ] || [ "$one" -gt 4294967295 ]; then echo "seed must be below 4294967296, got '$one'"; exit 2; fi
             list="$one"
           else
             # One block of seeds per day; a day holds up to 100000 seeds.

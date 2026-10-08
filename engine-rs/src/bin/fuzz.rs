@@ -31,7 +31,7 @@ fn main() {
         std::process::exit(2);
     }
     let seed: u32 = args[0].parse().unwrap_or_else(|_| {
-        eprintln!("seed must be a whole number");
+        eprintln!("seed must be a whole number below 4294967296");
         std::process::exit(2);
     });
     let out = PathBuf::from(&args[1]);

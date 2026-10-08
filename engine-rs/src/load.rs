@@ -1876,6 +1876,10 @@ mod loader_cases {
                     misses.push(format!(
                         "{id}: throws, which the recorded divergence ({why}) does not cover"
                     ));
+                } else if expected == "throws" {
+                    misses.push(format!(
+                        "{id}: the TypeScript throws, which the recorded divergence ({why}) does not cover"
+                    ));
                 }
                 continue;
             }
