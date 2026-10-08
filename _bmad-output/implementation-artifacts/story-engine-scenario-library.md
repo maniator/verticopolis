@@ -1,6 +1,6 @@
 ---
 story: engine-scenario-library
-status: review
+status: done
 depends_on: engine-rust-port
 ---
 
@@ -73,15 +73,25 @@ lit.
 
 ## What landed
 
-- Scenarios: `hotel-exterminator-modern` (20 checkpoints), `holidays-classic`
-  (18), `metro-express-modern` (13), `vip-review-modern` (15),
-  `offshift-schedule-modern` (26). The lock holds 434 checkpoints, every one
-  matched by the Rust referee on first replay.
-- Runner commands on both sides: `callExterminator` and `setSchedule`, with
-  `Tower::set_schedule` added to the Rust engine.
+- Scenarios, first slice (#861): `hotel-exterminator-modern` (20
+  checkpoints), `holidays-classic` (18), `metro-express-modern` (13),
+  `vip-review-modern` (15), `offshift-schedule-modern` (26). Second slice:
+  `emergencies-modern` (18: a ransom paid, a threat left to the daily
+  auto-decline and Security's sweep, a detonation with Security sold),
+  `fire-rescue-modern` (20: an undefended tower, a rescue paid, a hand-lit
+  fire left to spread), `amenities-modern` (14: the Modern amenities with a
+  nightclub and daycare two floors under the lowest condos, the express shaft
+  on a schedule whose homes snap to lobbies, a month for halos, noise and
+  relocations), `star-climb-classic` (7: a one-star tower passing to two,
+  then three), `refusals-classic` and `refusals-modern` (6 each: every build
+  and shaft refusal under `expectFail`). The lock holds 505 checkpoints,
+  every one matched by the Rust referee on first replay.
+- Runner commands on both sides: `callExterminator`, `setSchedule` and
+  `resolveChoice`, with `Tower::set_schedule` added to the Rust engine.
 - Derived fixtures: `sixseven-december`, `towerone-star4`,
-  `towerone-vip-pending`, each a few serialized fields away from an existing
-  save, documented in the conformance README.
+  `towerone-vip-pending`, `towerone-star1`, each a few serialized fields
+  away from an existing save, written by `scripts/derive-fixture.ts` and
+  documented in the conformance README.
 - The loader table (`conformance/loader-cases.json`, 47 agreeing cases and
   two carried as recorded #858 divergences) and its Rust replay. Its runs
   caught `skipFloors` entries truncated to whole numbers, a debug-build
@@ -93,22 +103,23 @@ lit.
 - The differential fuzzer (`engine-rs/src/bin/fuzz.rs`,
   `scripts/fuzz-compare.ts`, `engine-fuzz.yml` nightly); 28 seeds run locally
   with no divergence.
-- AC1 as listed is met in part. Landed: the hotel weekend with housekeeping
-  and all three exterminator refusals, the VIP circling twice with no chained
-  parking and then reviewing favorably, the metro cut-off and reconnection
-  with a second express shaft, two failing star evaluations, and condo
-  relocations reached inside the metro and VIP runs. Not landed: a star
-  evaluation that passes (no fixture meets the next gate without a long
-  growth script), express cars on a scheduled shaft (the schedule scenario
-  runs a standard shaft; express stops add a second variable), a dedicated
-  relocation month, and the player-choice events (fire rescue, ransom), which
-  need a `resolveChoice` command. Those go on the next slice with the dark
-  modules below.
-- The coverage floor rises to 83% (84.47% measured with every scenario in
-  this branch). AC3's "no module under 75%" is not met yet: `events.rs` (61%),
-  `rules.rs` (66%), `star.rs` (68%), `satisfaction.rs` (71%) and
-  `schedule.rs` need the player-choice command (`resolveChoice` on a pending
-  fire rescue or ransom) and the five- and six-star climbs, which no fixture
-  can reach without a long growth script. Those go on the next slice.
+- AC1 is met: the hotel weekend with housekeeping and all three exterminator
+  refusals, the VIP circling twice with no chained parking and then reviewing
+  favorably, star evaluations that fail (metro, VIP) and pass (the one-star
+  climb to two and three), the metro cut-off and reconnection with a second
+  express shaft, express cars on a scheduled shaft, a relocation month with
+  the amenity halos, the fire rescue and bomb ransom choices answered each
+  way, and the remaining roster events (thief, headlines, Santa, detonation).
+  Still unreached: the five-star and TOWER rungs (the wedding hall VIP
+  inspection) and the "VIP underwhelmed" line, which need a tower past 10,000
+  residents; those stay dark until a late-game fixture exists (#859 carries
+  the benchmark fixture ask that would also serve here).
+- The coverage floor rises to 87% (88.37% measured). AC3's "no module under
+  75%" holds for every engine module: `events.rs` 93%, `rules.rs` 96%,
+  `schedule.rs` 94%, `satisfaction.rs` 80%, `build.rs` 75%, `star.rs` 74% by
+  scenario plus the four-star gate chain pinned by a unit test (no fixture
+  has the 5,000 residents a four-star rung needs). The binaries (`dump`,
+  `fuzz`) and the referee's error arms are the remaining dark lines and are
+  not engine code.
 - CONTRIBUTING carries the two-engine rules and the branch-adds-a-scenario
   rule; the conformance README covers the new commands, fixtures and table.

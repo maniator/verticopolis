@@ -76,4 +76,4 @@ jobs:
           cargo install cargo-llvm-cov --locked --version 0.9.1
           cargo llvm-cov --no-report --locked test
           cargo llvm-cov --no-report --locked run --bin conformance
-          cargo llvm-cov report --fail-under-lines 83
+          cargo llvm-cov report --fail-under-lines 87
