@@ -24,7 +24,7 @@ import type { FrameErrorEntry } from "./game/crashReport";
 import { wireControllers, runBootFlow } from "./game/appBoot";
 import { wireEngine } from "./game/engineWiring";
 import { bindKeys } from "./game/inputKeys";
-import { SPEEDS } from "./game/frameLoop";
+import { SPEEDS, applySpeed } from "./game/frameLoop";
 import { placeSimpleBuild, updateBuildPreview, isTransportTool, pickedAt, clearBuildRefusal } from "./game/buildPreview";
 import { toggleMute, setVolume, toggleReducedMotion, toggleSteadyClock, isSteadyClock, applyReducedMotion } from "./game/audioPrefs";
 import { showStats, showSaves, saveToSlot, loadFromSlot, deleteSlot } from "./game/appModals";
@@ -335,7 +335,7 @@ class GameApp implements GameAppPorts {
    *  state and the toolbar's active button. The single place the three concerns
    *  are kept in lockstep. */
   setSpeed(s: number): void {
-    this.speed = s;
+    applySpeed(this, s);
     this.engine.paused = SPEEDS[s] === 0;
     document.querySelectorAll("#speed button[data-speed]").forEach((b) =>
       b.classList.toggle("active", Number((b as HTMLElement).dataset.speed) === s),

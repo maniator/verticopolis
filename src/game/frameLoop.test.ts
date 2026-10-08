@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { GameApp } from "../main";
-import { SPEEDS, runFrame, emitMealRushes } from "./frameLoop";
+import { SPEEDS, MAX_CATCHUP_MINUTES, runFrame, emitMealRushes, applySpeed } from "./frameLoop";
+import { MAX_QUANTUM_MINUTES } from "../engine/sim/fixedStep";
 import { decideMealRush } from "./mealRush";
 import { gameplaySession } from "../analytics";
 import * as analytics from "../analytics";
@@ -122,26 +123,133 @@ describe("runFrame freeze path", () => {
 });
 
 describe("runFrame simulation stepping", () => {
-  it("advances the sim in <=20-minute chunks and drains the accumulator", () => {
-    // 0.2s at speed 3 (120 min/s), pace 1 -> 24 owed minutes (under the 30
-    // catch-up cap) -> 20 + 4, fully drained.
+  // makeApp turns the steady clock on, so owed minutes are exact (pace 1) and the
+  // engine sizes its step from a flat pace too: 2 minutes at the fastest speed,
+  // 1 at speed 1.
+  it("steps one fixed 2-minute quantum per 60 fps frame at the fastest speed", () => {
+    // 1/60 s at speed 3 (120 min/s), steady pace -> 2 owed minutes -> one
+    // 2-minute step, fully drained: the same sim work per frame as before.
+    const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
+    runFrame(app, 1000 / 60);
+    const steps = sim.tick.mock.calls.map((c) => c[0] as number);
+    expect(steps).toEqual([2]);
+    expect(raw.accMinutes).toBeCloseTo(0, 9);
+  });
+
+  it("steps 1-minute quanta at the slow speeds and carries the remainder", () => {
+    // 0.25s at speed 1 (10 min/s) -> 2.5 owed minutes -> two 1-minute steps,
+    // 0.5 carried to the next frame.
+    const { app, raw, sim } = makeApp({ speed: 1, accMinutes: 0 });
+    runFrame(app, 250);
+    const steps = sim.tick.mock.calls.map((c) => c[0] as number);
+    expect(steps).toEqual([1, 1]);
+    expect(raw.accMinutes).toBeCloseTo(0.5, 9);
+  });
+
+  it("bounds a slow frame to the step budget and carries the rest as debt", () => {
+    // 0.2s at speed 3 -> 24 owed minutes; four 2-minute steps run (8 minutes)
+    // and the other 16 stay owed for the next frame.
     const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
     runFrame(app, 200);
     const steps = sim.tick.mock.calls.map((c) => c[0] as number);
-    expect(steps).toEqual([20, 4]);
-    expect(steps.every((s) => s <= 20)).toBe(true);
-    expect(raw.accMinutes).toBe(0);
+    expect(steps).toEqual([2, 2, 2, 2]);
+    expect(raw.accMinutes).toBe(16);
   });
 
-  it("clamps catch-up debt to MAX_CATCHUP (30 min) on a huge frame", () => {
-    // A 100s frame at speed 3 would owe 12000 minutes; the cap drops it to 30,
-    // simulated as 20 + 10 (each step still <= 20).
+  it("clamps a huge frame to MAX_CATCHUP (30 min) before the step budget applies", () => {
+    // A 100s frame at speed 3 would owe 12000 minutes. The cap drops it to 30,
+    // four 2-minute steps run, and the other 22 carry: 30 in total, no more.
     const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
     runFrame(app, 100_000);
     const steps = sim.tick.mock.calls.map((c) => c[0] as number);
-    expect(steps).toEqual([20, 10]);
-    expect(steps.reduce((a, b) => a + b, 0)).toBe(30); // total bounded to the cap
-    expect(steps.every((s) => s <= 20)).toBe(true);
+    expect(steps).toEqual([2, 2, 2, 2]);
+    expect(steps.reduce((a, b) => a + b, 0) + raw.accMinutes).toBe(30);
+  });
+
+  it("sizes the step from the steady clock when the player turned it on", () => {
+    // Lunch on the canon curve would take 1-minute steps; with the steady clock
+    // the pace is flat, so a 30 Hz frame at speed 3 (4 owed) runs two 2-minute steps.
+    const sim = makeSim({ clock: { minuteOfDay: 720, minutes: 720, calendar: { weekDays: 7, weekendDays: 2 } } });
+    const { app, raw } = makeApp({ sim, speed: 3, accMinutes: 0 });
+    runFrame(app, 1000 / 30);
+    expect(sim.tick.mock.calls.map((c) => c[0] as number)).toEqual([2, 2]);
+    expect(raw.accMinutes).toBeCloseTo(0, 9);
+  });
+
+  it("sizes the step from the canon curve when the steady clock is off", () => {
+    // Night sprint (minute 180, pace 3.25): a 60 Hz frame at speed 3 owes 6.5
+    // minutes and the engine's step is 6 (rounded down), so every frame steps
+    // once and the half minute carries until it adds up to a second step.
+    const sim = makeSim({ clock: { minuteOfDay: 180, minutes: 180, calendar: { weekDays: 7, weekendDays: 2 } } });
+    const { app, raw } = makeApp({ sim, speed: 3, accMinutes: 0, prefs: { steadyClock: false } });
+    runFrame(app, 1000 / 60);
+    expect(sim.tick.mock.calls.map((c) => c[0] as number)).toEqual([6]);
+    expect(raw.accMinutes).toBeCloseTo(0.5, 9);
+    runFrame(app, 1000 / 60);
+    expect(sim.tick.mock.calls.map((c) => c[0] as number)).toEqual([6, 6]);
+    expect(raw.accMinutes).toBeCloseTo(1, 9);
+  });
+
+  it("keeps the minutes already stepped when a step throws mid-frame", () => {
+    const sim = makeSim();
+    sim.tick.mockImplementationOnce(() => {}).mockImplementationOnce(() => {
+      throw new Error("boom");
+    });
+    const { app, raw } = makeApp({ sim, speed: 3, accMinutes: 0 });
+    expect(() => runFrame(app, 100)).toThrow("boom");
+    // 12 owed, one 2-minute step ran before the throw: 10 stay owed.
+    expect(raw.accMinutes).toBe(10);
+  });
+
+  it("drops minutes carried at one speed when the speed changes", () => {
+    const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
+    runFrame(app, 200); // 24 owed at speed 3: four steps run, 16 carried
+    expect(raw.accMinutes).toBe(16);
+    sim.tick.mockClear();
+    raw.speed = 1;
+    runFrame(app, 100); // the carry is dropped; only 1 minute is owed at speed 1
+    expect(sim.tick.mock.calls.map((c) => c[0] as number)).toEqual([1]);
+    expect(raw.accMinutes).toBeCloseTo(0, 9);
+  });
+
+  it("drops the carry on a speed change undone before the next frame (fastest, pause, fastest)", () => {
+    const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
+    runFrame(app, 200);
+    expect(raw.accMinutes).toBe(16);
+    sim.tick.mockClear();
+    applySpeed(app, 0);
+    applySpeed(app, 3);
+    runFrame(app, 0); // the frame loop sees speed 3 again; the seam already dropped the carry
+    expect(sim.tick).not.toHaveBeenCalled();
+    expect(raw.accMinutes).toBe(0);
+  });
+
+  it("keeps the carry when the speed is set to the one already running", () => {
+    const { app, raw } = makeApp({ speed: 3, accMinutes: 0 });
+    runFrame(app, 200);
+    applySpeed(app, 3);
+    expect(raw.accMinutes).toBe(16);
+  });
+
+  it("drops the carry when the steady clock is toggled", () => {
+    const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
+    runFrame(app, 200);
+    expect(raw.accMinutes).toBe(16);
+    sim.tick.mockClear();
+    raw.prefs.steadyClock = false;
+    runFrame(app, 0);
+    expect(sim.tick).not.toHaveBeenCalled();
+    expect(raw.accMinutes).toBe(0);
+  });
+
+  it("keeps the engine's largest step under the catch-up cap, so a capped debt can always cover one", () => {
+    expect(MAX_QUANTUM_MINUTES).toBeLessThan(MAX_CATCHUP_MINUTES);
+  });
+
+  it("spends no carried time once paused (speed 0)", () => {
+    const { app, raw, sim } = makeApp({ speed: 0, accMinutes: 5.5 });
+    runFrame(app, 1000 / 60);
+    expect(sim.tick).not.toHaveBeenCalled();
     expect(raw.accMinutes).toBe(0);
   });
 

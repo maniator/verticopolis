@@ -241,6 +241,17 @@ describe("steady clock", () => {
     expect(raw.prefs.steadyClock).toBe(false);
   });
 
+  it("toggleSteadyClock drops the step carry, even when toggled back before the next frame", () => {
+    const { app, raw } = makeApp();
+    const carry = raw as { accMinutes?: number };
+    carry.accMinutes = 16;
+    toggleSteadyClock(app);
+    expect(carry.accMinutes).toBe(0);
+    carry.accMinutes = 16;
+    toggleSteadyClock(app); // back to the first pacing: the old carry still never replays
+    expect(carry.accMinutes).toBe(0);
+  });
+
   it("isSteadyClock reports the live pref, treating anything but true as off", () => {
     const { app, raw } = makeApp();
     expect(isSteadyClock(app)).toBe(false); // undefined
