@@ -96,6 +96,60 @@ pub struct Scenario {
     pub commands: Vec<Command>,
 }
 
+impl Scenario {
+    /// Parse and validate a scenario file the way `loadScenario` does: whole
+    /// floats such as `1.0` count as integers (`Number.isInteger`), a `build`
+    /// or `buildRow` names a place and a `buildTransport` a shaft, and a
+    /// `buildRow` runs left to right.
+    pub fn parse(text: &str) -> Result<Scenario, String> {
+        let mut raw: Value =
+            serde_json::from_str(text).map_err(|e| format!("scenario does not parse: {e}"))?;
+        whole_floats_to_ints(&mut raw);
+        let s: Scenario =
+            serde_json::from_value(raw).map_err(|e| format!("scenario does not parse: {e}"))?;
+        for (i, c) in s.commands.iter().enumerate() {
+            let where_ = format!("commands[{i}]");
+            let place = |k: &str| match Kind::parse(k) {
+                Some(kind) if !kind.is_transport() => Ok(()),
+                _ => Err(format!("{where_}: kind must be place")),
+            };
+            let shaft = |k: &str| match Kind::parse(k) {
+                Some(kind) if kind.is_transport() => Ok(()),
+                _ => Err(format!("{where_}: kind must be shaft")),
+            };
+            match c {
+                Command::Build { kind, .. } => place(kind)?,
+                Command::BuildRow { kind, from, to, .. } => {
+                    place(kind)?;
+                    if from > to {
+                        return Err(format!("{where_}: buildRow from must not be past to"));
+                    }
+                }
+                Command::BuildTransport { kind, .. } => shaft(kind)?,
+                _ => {}
+            }
+        }
+        Ok(s)
+    }
+}
+
+/// `Number.isInteger(1.0)` is true, so a scenario may spell a whole number
+/// with a fraction; serde's integer fields would refuse it.
+fn whole_floats_to_ints(v: &mut Value) {
+    match v {
+        Value::Number(n) => {
+            if let Some(f) = n.as_f64() {
+                if n.as_i64().is_none() && f.fract() == 0.0 && f.abs() < 9.0e15 {
+                    *v = Value::from(f as i64);
+                }
+            }
+        }
+        Value::Array(a) => a.iter_mut().for_each(whole_floats_to_ints),
+        Value::Object(o) => o.values_mut().for_each(whole_floats_to_ints),
+        _ => {}
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct Checkpoint {
     pub label: String,
@@ -220,9 +274,14 @@ fn run_scenario_inner(
         }
     };
     let stop = std::cell::Cell::new(false);
+    let labels = std::cell::RefCell::new(std::collections::HashSet::new());
+    let duplicate = std::cell::RefCell::new(None::<String>);
     let emit = |sim: &Simulation, label: String, out: &mut Vec<Checkpoint>| {
         if stop_at == Some(label.as_str()) {
             stop.set(true);
+        }
+        if !labels.borrow_mut().insert(label.clone()) {
+            *duplicate.borrow_mut() = Some(label.clone());
         }
         out.push(Checkpoint {
             label,
@@ -421,6 +480,15 @@ fn run_scenario_inner(
             }
             Ok(())
         })();
+        if let Some(label) = duplicate.borrow_mut().take() {
+            return (
+                Run {
+                    checkpoints: out,
+                    error: Some(failed(format!("checkpoint label {label} is taken twice"))),
+                },
+                None,
+            );
+        }
         if let Err(e) = r {
             return (
                 Run {
@@ -449,4 +517,42 @@ fn run_scenario_inner(
         },
         stopped,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Scenario;
+
+    fn scenario(commands: &str) -> Result<Scenario, String> {
+        Scenario::parse(&format!(
+            r#"{{"id":"t","description":"","start":{{"newGame":{{"seed":1,"mode":"classic"}}}},"commands":[{commands}]}}"#
+        ))
+    }
+
+    #[test]
+    fn whole_floats_count_as_integers() {
+        let s = scenario(r#"{"op":"tick","dt":60.0,"times":2.0}"#).unwrap();
+        assert_eq!(s.commands.len(), 1);
+        assert!(scenario(r#"{"op":"tick","dt":60.5}"#).is_err());
+    }
+
+    #[test]
+    fn load_time_checks_match_the_typescript_runner() {
+        assert!(
+            scenario(r#"{"op":"buildRow","kind":"office","floor":2,"from":5,"to":4}"#)
+                .unwrap_err()
+                .contains("from must not be past to")
+        );
+        assert!(
+            scenario(r#"{"op":"build","kind":"elevator","floor":2,"x":4}"#)
+                .unwrap_err()
+                .contains("kind must be place")
+        );
+        assert!(
+            scenario(r#"{"op":"buildTransport","kind":"office","x":4,"bottom":1,"top":3}"#)
+                .unwrap_err()
+                .contains("kind must be shaft")
+        );
+        assert!(scenario(r#"{"op":"build","kind":"office","floor":2,"x":4}"#).is_ok());
+    }
 }

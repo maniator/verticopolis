@@ -213,7 +213,7 @@ impl Simulation {
                 "A VIP enjoyed their suite. Your tower earned a favorable review (4★ unlocked).",
                 LogKind::Good,
             );
-        } else if self.clock.day() - self.last_vip_nag_day >= 5 {
+        } else if self.clock.day().saturating_sub(self.last_vip_nag_day) >= 5 {
             self.last_vip_nag_day = self.clock.day();
             self.vip_visits += 1;
             let msg = if happy {

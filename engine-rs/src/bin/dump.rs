@@ -17,14 +17,17 @@ fn main() {
     let label = &args[2];
     let crowd = args.iter().any(|a| a == "--crowd");
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-    let scenario: Scenario = serde_json::from_str(
+    let scenario = Scenario::parse(
         &std::fs::read_to_string(
             repo.join("conformance/scenarios")
                 .join(format!("{id}.json")),
         )
         .unwrap(),
     )
-    .unwrap();
+    .unwrap_or_else(|e| {
+        eprintln!("{e}");
+        std::process::exit(2);
+    });
     match run_scenario_until(&scenario, &repo, label) {
         Some(sim) => {
             let v = if crowd {

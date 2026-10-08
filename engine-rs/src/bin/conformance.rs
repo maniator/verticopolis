@@ -43,8 +43,7 @@ fn main() {
                 scope.spawn(move || -> Result<Run, String> {
                     let text = std::fs::read_to_string(&path)
                         .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
-                    let scenario: Scenario = serde_json::from_str(&text)
-                        .map_err(|e| format!("scenario does not parse: {e}"))?;
+                    let scenario = Scenario::parse(&text)?;
                     std::panic::catch_unwind(|| run_scenario(&scenario, repo_root)).map_err(|p| {
                         let msg = p
                             .downcast_ref::<String>()

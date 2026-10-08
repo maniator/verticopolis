@@ -44,9 +44,23 @@ pub fn decode_vctower(text: &str) -> Result<Value, String> {
         .chars()
         .filter(|c| !c.is_whitespace())
         .collect();
-    let packed = base64::engine::general_purpose::STANDARD
-        .decode(b64.as_bytes())
-        .map_err(|e| format!("base64: {e}"))?;
+    // `Buffer.from(b64, "base64")` takes the URL-safe alphabet and unpadded
+    // input alike.
+    let b64: String = b64
+        .chars()
+        .map(|c| match c {
+            '-' => '+',
+            '_' => '/',
+            c => c,
+        })
+        .collect();
+    let packed = base64::engine::GeneralPurpose::new(
+        &base64::alphabet::STANDARD,
+        base64::engine::GeneralPurposeConfig::new()
+            .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent),
+    )
+    .decode(b64.as_bytes())
+    .map_err(|e| format!("base64: {e}"))?;
     use std::io::Read;
     let mut out = Vec::new();
     flate2::read::DeflateDecoder::new(&packed[..])
@@ -59,7 +73,9 @@ pub fn decode_vctower(text: &str) -> Result<Value, String> {
                 .into(),
         );
     }
-    serde_json::from_slice(&out).map_err(|e| format!("json: {e}"))
+    // `TextDecoder` drops a leading byte order mark before `JSON.parse` sees it.
+    let text = out.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&out);
+    serde_json::from_slice(text).map_err(|e| format!("json: {e}"))
 }
 
 // ---- helpers -------------------------------------------------------------------
@@ -95,6 +111,15 @@ fn js_number(v: Option<&Value>) -> f64 {
             }
         }
         Some(Value::String(s)) => js_string_number(s),
+        // `ToPrimitive` joins an array with commas, so only an empty array
+        // (0) or a single scalar element can read as a number; a boolean
+        // element spells "true", which is NaN.
+        Some(Value::Array(a)) => match a.as_slice() {
+            [] => 0.0,
+            [Value::Bool(_)] | [Value::Object(_)] => f64::NAN,
+            [one] => js_number(Some(one)),
+            _ => f64::NAN,
+        },
         _ => f64::NAN,
     }
 }
