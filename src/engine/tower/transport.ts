@@ -283,6 +283,8 @@ export function setCars(tower: Tower, id: number, cars: number): boolean {
   if (!t || !isElevatorKind(t.kind)) return false;
   cars = Math.max(1, Math.min(maxCarsFor(t.kind), cars));
   if (cars === t.cars) return false;
+  // carLoad keeps one entry per car, as load pads it: left short, the next
+  // dispatch pass would zero every car's riders while a saved copy kept them.
   if (cars > t.cars) {
     for (let i = t.cars; i < cars; i++) {
       t.carPositions.push(t.bottom);
@@ -292,6 +294,7 @@ export function setCars(tower: Tower, id: number, cars: number): boolean {
     t.carPositions.length = cars;
     t.carDir.length = cars;
   }
+  if (t.carLoad) t.carLoad = Array.from({ length: cars }, (_, i) => t.carLoad![i] ?? 0);
   t.cars = cars;
   // Re-harden an authored schedule against the new car count (#305): a fleet
   // shrink clamps rows and truncates homes past the last remaining car.

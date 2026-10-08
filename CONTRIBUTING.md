@@ -63,6 +63,12 @@ Verticopolis has **two test tiers**:
     on filename, so a `*.integration.test.ts` anywhere under `src/` runs in this
     tier and never in unit, and the pair covers every test with no gap.
     `npm run test:integration` runs only these.
+    The engine conformance suite runs in this tier: scripted scenarios in
+    `conformance/` whose checkpoint hashes are pinned in
+    `conformance/expected.json` and checked by
+    `conformance.integration.test.ts`. A moved hash is a simulation change:
+    regenerate the lock only on purpose, in the same PR. See
+    [conformance/README.md](./conformance/README.md).
 
   `npm test` (`vitest run`) runs **both** projects and is the CI gate. Coverage
   stays a single root-level measurement across both projects (see Coverage

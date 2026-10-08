@@ -1,0 +1,34 @@
+{
+  "id": "fixture-sixseven",
+  "description": "A large v4 Classic save through migration, one day at the one-minute quantum, then a save round trip, then twelve hours at the 20-minute quantum.",
+  "start": {
+    "fixture": "src/tests/fixtures/sixseven_2.vctower"
+  },
+  "commands": [
+    {
+      "op": "tick",
+      "dt": 1,
+      "times": 1440,
+      "checkpointEvery": 60
+    },
+    {
+      "op": "reload"
+    },
+    {
+      "op": "checkpoint",
+      "label": "reloaded"
+    },
+    {
+      "op": "tick",
+      "dt": 2,
+      "times": 180,
+      "checkpointEvery": 30
+    },
+    {
+      "op": "tick",
+      "dt": 20,
+      "times": 36,
+      "checkpointEvery": 3
+    }
+  ]
+}
