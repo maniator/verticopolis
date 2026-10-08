@@ -90,7 +90,7 @@ describe("cookieless error tracking", () => {
     expect(sendException).toHaveBeenCalledTimes(1);
   });
 
-  it("caps the number of distinct errors reported per session", () => {
+  it("caps the number of distinct errors reported per page life", () => {
     for (let i = 0; i < 25; i++) fireError({ error: new Error(`distinct ${i}`), message: `distinct ${i}` });
     expect(sendException).toHaveBeenCalledTimes(10); // MAX_ERRORS_PER_PAGE_LIFE
   });

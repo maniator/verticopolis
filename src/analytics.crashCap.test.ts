@@ -3,7 +3,7 @@ import { sendToRelay } from "./analyticsRelay";
 import { gameplaySession } from "./analytics";
 
 /**
- * The per-session cap and dedup on the `crash` event.
+ * The per-page-life cap and dedup on the `crash` event.
  *
  * `noteCrash` fires every time the crash screen is shown, and a repeating WebGL
  * context loss re-shows it IN PLACE with no reload: one session emitted 8,269
@@ -91,7 +91,7 @@ describe("crash event cap and dedup", () => {
     expect(crashes.map(([, props]) => props.saveFlushed)).toEqual([true, false]);
   });
 
-  it("stops at the per-session cap even for genuinely distinct crash shapes", () => {
+  it("stops at the per-page-life cap even for genuinely distinct crash shapes", () => {
     const base = { kind: "webgl-context-lost", repeat: false, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
     // 16 distinct fingerprints: the cap has to hold whether or not the dedup
     // catches them first, since distinct-but-endless is a flood too.

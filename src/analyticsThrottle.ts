@@ -20,7 +20,7 @@
  *
  * The guard was first written inline in `analyticsErrors.ts` for the
  * `$exception` path, which is why that path came through the same incident
- * having sent 11 events instead of thousands. It lives here so the crash path
+ * having sent a handful of events instead of thousands. It lives here so the crash path
  * uses the same implementation rather than a second copy of it.
  *
  * Each caller holds its OWN instance, so one path's flood cannot spend another
