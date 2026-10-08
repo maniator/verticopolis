@@ -35,3 +35,6 @@ node_modules
 
 # Nondeterminism evidence from scripts/screenshot-determinism-check.ts
 determinism-diff/
+
+# Rust engine build output
+engine-rs/target/

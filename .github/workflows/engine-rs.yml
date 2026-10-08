@@ -1,0 +1,69 @@
+name: Rust engine
+
+# The Rust port of the engine lives in engine-rs/. Its referee is the same
+# conformance suite the TypeScript engine runs (conformance/): the port must
+# reproduce every pinned checkpoint, so this job runs it on every change to the
+# crate, the scenarios or the lock, and on main. Format and lint run as hard
+# gates, like the TypeScript lane.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "engine-rs/**"
+      - "conformance/**"
+      - "src/tests/fixtures/*.vctower"
+      - ".github/workflows/engine-rs.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "engine-rs/**"
+      - "conformance/**"
+      - "src/tests/fixtures/*.vctower"
+      - ".github/workflows/engine-rs.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  engine-rs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: engine-rs
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # ubuntu-latest ships a stable toolchain through rustup; pin the channel
+      # the crate was written against rather than whatever the image happens
+      # to carry. Every cargo step runs --locked so a stale Cargo.lock fails
+      # the run instead of being rewritten on the runner.
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal --component rustfmt,clippy
+          rustup default 1.97.0
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Lint
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Unit tests
+        run: cargo test --locked
+
+      - name: Conformance
+        run: cargo run --locked --release --bin conformance
+
+      # Coverage of the unit tests plus the referee, with a line floor that
+      # only ratchets up as scenarios land (80.58% at the first measurement).
+      # The referee is replayed in the debug profile here so one report
+      # merges both runs; the release replay above is the parity gate.
+      - name: Coverage
+        run: |
+          rustup component add llvm-tools-preview
+          cargo install cargo-llvm-cov --locked --version 0.9.1
+          cargo llvm-cov --no-report --locked test
+          cargo llvm-cov --no-report --locked run --bin conformance
+          cargo llvm-cov report --fail-under-lines 80

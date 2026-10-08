@@ -49,3 +49,21 @@ jobs:
         run: npm run build
         env:
           VC_TOOLING: "1"
+
+      # The Rust engine (engine-rs/) builds on the same toolchain engine-rs.yml
+      # pins, with the conformance referee compiled in release so an agent can
+      # run `cargo run --release --bin conformance` at once. Each step is
+      # continue-on-error: a toolchain hiccup must not keep the agent from
+      # starting on the TypeScript side.
+      - name: Rust toolchain (pinned to engine-rs.yml)
+        continue-on-error: true
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal --component rustfmt,clippy
+          rustup default 1.97.0
+
+      - name: Build Rust engine and referee
+        continue-on-error: true
+        working-directory: engine-rs
+        run: |
+          cargo build --locked --all-targets
+          cargo build --locked --release --bin conformance --bin dump
