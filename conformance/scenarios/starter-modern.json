@@ -1,0 +1,210 @@
+{
+  "id": "starter-modern",
+  "description": "The same tower in a Modern game.",
+  "start": {
+    "newGame": {
+      "seed": 20260713,
+      "mode": "modern"
+    }
+  },
+  "commands": [
+    {
+      "op": "setMoney",
+      "amount": 500000000
+    },
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 167,
+      "to": 206
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 2,
+      "from": 168,
+      "to": 205
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 3,
+      "from": 168,
+      "to": 205
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 4,
+      "from": 168,
+      "to": 205
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 5,
+      "from": 168,
+      "to": 205
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 6,
+      "from": 168,
+      "to": 205
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 2,
+      "x": 170
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 2,
+      "x": 180
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 3,
+      "x": 170
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 3,
+      "x": 180
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 4,
+      "x": 170
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 4,
+      "x": 180
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 5,
+      "x": 170
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 5,
+      "x": 180
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 6,
+      "x": 170
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 6,
+      "x": 180
+    },
+    {
+      "op": "build",
+      "kind": "fastFood",
+      "floor": 2,
+      "x": 190
+    },
+    {
+      "op": "build",
+      "kind": "fastFood",
+      "floor": 3,
+      "x": 190
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 168,
+      "bottom": 1,
+      "top": 6
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 200,
+      "bottom": 1,
+      "top": 2
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 2,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "built"
+    },
+    {
+      "op": "tick",
+      "dt": 1,
+      "times": 1440,
+      "checkpointEvery": 60
+    },
+    {
+      "op": "adjustRent",
+      "floor": 2,
+      "x": 170,
+      "dir": 1
+    },
+    {
+      "op": "adjustRent",
+      "floor": 3,
+      "x": 180,
+      "dir": -1
+    },
+    {
+      "op": "sell",
+      "floor": 3,
+      "x": 190
+    },
+    {
+      "op": "setCars",
+      "floor": 1,
+      "x": 168,
+      "cars": 2
+    },
+    {
+      "op": "checkpoint",
+      "label": "edited"
+    },
+    {
+      "op": "reload"
+    },
+    {
+      "op": "checkpoint",
+      "label": "reloaded"
+    },
+    {
+      "op": "tick",
+      "dt": 3,
+      "times": 480,
+      "checkpointEvery": 20
+    },
+    {
+      "op": "tick",
+      "dt": 20,
+      "times": 72,
+      "checkpointEvery": 3
+    },
+    {
+      "op": "evaluateStar"
+    }
+  ]
+}
