@@ -36,8 +36,18 @@ export const MAX_CATCHUP_MINUTES = 30;
 
 /** Each app's step debt record, which carries the speed and pacing mode its
  *  minutes were owed under so the engine can drop them on a change. The
- *  minutes themselves live in `app.accMinutes` (reset by `adoptSim`). */
+ *  minutes themselves live in `app.accMinutes` (reset by `adoptSim`, and on a
+ *  speed or steady-clock change by `applySpeed` and `toggleSteadyClock`). */
 const stepDebts = new WeakMap<GameApp, StepDebt>();
+
+/** Apply the player's speed choice. A change drops the step carry here, at the
+ *  seam, so a change undone before the next frame (fastest, pause, fastest)
+ *  still never replays minutes owed under the earlier choice: the frame loop's
+ *  own mode check only sees the speed each frame runs at. */
+export function applySpeed(app: GameApp, s: number): void {
+  if (s !== app.speed) app.accMinutes = 0;
+  app.speed = s;
+}
 
 export function runFrame(app: GameApp, dtMs: number): void {
   // Sample the rendered frame-rate for the session_fps signal (#538). noteFrame

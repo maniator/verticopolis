@@ -46,8 +46,9 @@ game time always produces the same sequence of `tick` calls. This story pins tha
    requested instead of stacking sim work into a frame (the Android WebGL
    reclaim load). The unstepped rest carries as debt, bounded by the existing
    30-minute catch-up cap, which is where a host that cannot keep up drops time.
-   A change of speed or steady clock clears the carry (so banked time never
-   replays under a different step size), and speed 0 spends nothing. The debt
+   A change of speed or steady clock clears the carry where the player makes
+   it, so banked time never replays under a different step size, even when the
+   change is undone before the next frame; speed 0 spends nothing. The debt
    drops step by step, so a step that throws never re-owes the steps that ran.
 5. **AC5 Existing guarantees hold.** Modal freeze, speed 0, and the non-finite
    `dtMs` recovery keep working; Classic golden masters and every existing test
@@ -89,3 +90,9 @@ empty 60 Hz frames (the step now rounds down). Deferred: motion cadence on
 high-refresh displays (backlog `sim-step-high-refresh-cadence`, #845). Also
 filed: the per-step scan cost (`sim-step-unit-scans`, #846). A step is capped
 at 20 minutes so it always fits under the host's 30-minute catch-up cap.
+
+PR review (Codex) added two fixes: the pure fixed-step guards now also live in
+the unit tier (`src/engine/sim/fixedStep.test.ts`, with a chunking check on a
+fake host), and a speed or steady-clock change now drops the carry where the
+player makes it (`applySpeed`, `toggleSteadyClock`), so a change undone before
+the next frame no longer replays the old carry.

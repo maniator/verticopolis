@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { GameApp } from "../main";
-import { SPEEDS, MAX_CATCHUP_MINUTES, runFrame, emitMealRushes } from "./frameLoop";
+import { SPEEDS, MAX_CATCHUP_MINUTES, runFrame, emitMealRushes, applySpeed } from "./frameLoop";
 import { MAX_QUANTUM_MINUTES } from "../engine/sim/fixedStep";
 import { decideMealRush } from "./mealRush";
 import { gameplaySession } from "../analytics";
@@ -210,6 +210,25 @@ describe("runFrame simulation stepping", () => {
     runFrame(app, 100); // the carry is dropped; only 1 minute is owed at speed 1
     expect(sim.tick.mock.calls.map((c) => c[0] as number)).toEqual([1]);
     expect(raw.accMinutes).toBeCloseTo(0, 9);
+  });
+
+  it("drops the carry on a speed change undone before the next frame (fastest, pause, fastest)", () => {
+    const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
+    runFrame(app, 200);
+    expect(raw.accMinutes).toBe(16);
+    sim.tick.mockClear();
+    applySpeed(app, 0);
+    applySpeed(app, 3);
+    runFrame(app, 0); // the frame loop sees speed 3 again; the seam already dropped the carry
+    expect(sim.tick).not.toHaveBeenCalled();
+    expect(raw.accMinutes).toBe(0);
+  });
+
+  it("keeps the carry when the speed is set to the one already running", () => {
+    const { app, raw } = makeApp({ speed: 3, accMinutes: 0 });
+    runFrame(app, 200);
+    applySpeed(app, 3);
+    expect(raw.accMinutes).toBe(16);
   });
 
   it("drops the carry when the steady clock is toggled", () => {

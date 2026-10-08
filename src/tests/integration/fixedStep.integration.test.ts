@@ -3,7 +3,7 @@ import { inflateSync } from "fflate";
 // A real Modern save, inlined as a string (vite ?raw) so the test needs no node fs.
 import towerFile from "../fixtures/split-tower.vctower?raw";
 import { Simulation } from "../../engine/Simulation";
-import { drainFixedSteps, quantumFor, syncStepMode, MAX_STEPS_PER_FRAME, MAX_QUANTUM_MINUTES } from "../../engine/sim/fixedStep";
+import { drainFixedSteps, quantumFor } from "../../engine/sim/fixedStep";
 import { paceFactor } from "../../engine/timePacing";
 import type { SerializedGame } from "../../engine/types";
 
@@ -68,11 +68,6 @@ function jittery(): () => number {
   };
 }
 
-function recorder() {
-  const calls: number[] = [];
-  return { calls, host: { clock: { minuteOfDay: 0 }, tick: (dt: number) => { calls.push(dt); } } };
-}
-
 describe("engine fixed time step: the tower is the same at any frame rate", () => {
   const cases = [
     ["fastest speed (120 min/s)", 120, false],
@@ -130,75 +125,5 @@ describe("engine fixed time step: the tower is the same at any frame rate", () =
       return JSON.stringify(sim.serialize());
     };
     expect(legacy(30)).not.toBe(legacy(144));
-  });
-
-  it("caps one frame's work at the step budget and carries the rest", () => {
-    const { calls, host } = recorder();
-    const q = quantumFor(120, 0);
-    const debt = { minutes: 40 };
-    drainFixedSteps(host, debt, 120);
-    expect(calls).toEqual(Array(MAX_STEPS_PER_FRAME).fill(q));
-    expect(debt.minutes).toBe(40 - MAX_STEPS_PER_FRAME * q);
-  });
-
-  it("never steps a partial quantum, and a bad owed amount, rate, or budget is handled", () => {
-    const { calls, host } = recorder();
-    const run = (minutes: number, rate: number, maxSteps?: number) => {
-      const debt = { minutes };
-      drainFixedSteps(host, debt, rate, { maxSteps });
-      return debt.minutes;
-    };
-    expect(run(1.9, 120)).toBe(1.9);
-    expect(run(Number.NaN, 120)).toBe(0);
-    expect(run(10, 0)).toBe(0);
-    expect(run(10, Number.POSITIVE_INFINITY)).toBe(0);
-    expect(run(-3, 120)).toBe(0);
-    expect(calls).toEqual([]);
-    // A nonsense budget falls back to the default instead of stepping nothing
-    // or stepping without bound.
-    expect(run(40, 120, 0)).toBe(40 - MAX_STEPS_PER_FRAME * 2);
-    expect(run(40, 120, Number.POSITIVE_INFINITY)).toBe(40 - MAX_STEPS_PER_FRAME * 2);
-    expect(calls).toHaveLength(2 * MAX_STEPS_PER_FRAME);
-  });
-
-  it("reduces the debt step by step, so a step that throws never re-owes the ones that ran", () => {
-    let n = 0;
-    const host = {
-      clock: { minuteOfDay: 0 },
-      tick: () => {
-        if (++n === 2) throw new Error("boom");
-      },
-    };
-    const debt = { minutes: 6 };
-    expect(() => drainFixedSteps(host, debt, 120)).toThrow("boom");
-    expect(debt.minutes).toBe(4);
-  });
-
-  it("drops minutes owed under a different speed or pacing mode, but not on the first call", () => {
-    const debt: { minutes: number; mode?: string } = { minutes: 5 };
-    syncStepMode(debt, 120, false);
-    expect(debt.minutes).toBe(5); // no previous mode: nothing to drop
-    syncStepMode(debt, 120, false);
-    expect(debt.minutes).toBe(5);
-    syncStepMode(debt, 30, false);
-    expect(debt.minutes).toBe(0);
-    debt.minutes = 4;
-    syncStepMode(debt, 30, true);
-    expect(debt.minutes).toBe(0);
-  });
-
-  it("sizes the step from the canon pace: at most one 60 Hz frame's worth, never under a minute", () => {
-    expect(quantumFor(120, 0)).toBe(2); // pace ~1.08: 2.2 min per frame
-    expect(quantumFor(120, 180)).toBe(6); // night sprint, pace 3.25: 6.5 rounds down
-    expect(quantumFor(120, 600)).toBe(2); // morning, pace ~1.35: 2.7 rounds down
-    expect(quantumFor(30, 180)).toBe(1); // 1.6 rounds down
-    expect(quantumFor(120, 720)).toBe(1); // lunch crawl, pace ~0.14
-    expect(quantumFor(30, 0)).toBe(1);
-    expect(quantumFor(10, 180)).toBe(1);
-    expect(quantumFor(120, 180, true)).toBe(2); // the steady clock ignores the curve
-    expect(quantumFor(120, 720, true)).toBe(2);
-    // A much faster speed is capped (the frame loop's test pins the cap under
-    // the host's catch-up cap).
-    expect(quantumFor(6000, 180)).toBe(MAX_QUANTUM_MINUTES);
   });
 });
