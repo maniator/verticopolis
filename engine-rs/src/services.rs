@@ -7,13 +7,33 @@ use crate::star::is_tenant_floor_unit;
 use crate::tower::{Unit, UnitState};
 
 pub const PARKING_WORKERS_PER_SPACE: f64 = 24.0;
-/// `ECON.exterminatorCalloutFee` and `ECON.exterminatorPerRoomFee`.
+pub const METRO_PLATFORM_CUTOFF_MSG: &str = "Your metro platform is cut off. Build a passenger elevator, stairs, or an escalator down to the platform so commuters can reach the station.";
+/// `ECON.exterminatorCalloutFee`: the flat fee of one exterminator call.
 pub const EXTERMINATOR_CALLOUT_FEE: f64 = 5000.0;
+/// `ECON.exterminatorPerRoomFee`: added once per infested room billed.
 pub const EXTERMINATOR_PER_ROOM_FEE: f64 = 2000.0;
 
-/// `Number#toLocaleString()` for a whole dollar amount in the en-US locale.
+/// Why `callExterminator` refused, with the quote a host can show when the
+/// funds fall short (`ExterminatorResult` in sim/services.ts).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ExterminatorRefusal {
+    /// Classic has no exterminator.
+    Unavailable,
+    /// A treatment is already booked.
+    Pending,
+    /// No infested room to treat.
+    None,
+    /// The booking would cost more than the tower holds.
+    Funds { cost: f64, rooms: usize },
+}
+
+/// `Number#toLocaleString()` for a whole, finite, non-negative dollar amount
+/// in the en-US locale, which is all the booking message ever formats. The
+/// TypeScript call takes the host locale; log text is outside the hash, and
+/// the referee runs under en-US.
 fn with_thousands(x: f64) -> String {
-    let digits = format!("{}", x.abs() as i64);
+    debug_assert!(x.is_finite() && x >= 0.0 && x.fract() == 0.0, "{x}");
+    let digits = format!("{}", x as i64);
     let mut out = String::new();
     for (i, c) in digits.chars().enumerate() {
         if i > 0 && (digits.len() - i) % 3 == 0 {
@@ -21,13 +41,8 @@ fn with_thousands(x: f64) -> String {
         }
         out.push(c);
     }
-    if x < 0.0 {
-        format!("-{out}")
-    } else {
-        out
-    }
+    out
 }
-pub const METRO_PLATFORM_CUTOFF_MSG: &str = "Your metro platform is cut off. Build a passenger elevator, stairs, or an escalator down to the platform so commuters can reach the station.";
 
 pub struct ParkingDemand {
     pub office_pop: f64,
@@ -173,15 +188,18 @@ impl Simulation {
     }
 
     /// `callExterminator`: book a paid Modern exterminator for every room that
-    /// is infested right now. `Err` carries the TypeScript `reason`
-    /// (`unavailable`, `pending`, `none`, `funds`); `Ok` the cost and count.
-    pub fn call_exterminator(&mut self) -> Result<(f64, usize), &'static str> {
+    /// is infested right now. `Ok` carries the cost and the room count.
+    pub fn call_exterminator(&mut self) -> Result<(f64, usize), ExterminatorRefusal> {
+        // `rules.infestationRecovery()` is null for Classic and the fee pair
+        // for Modern (ruleSets.ts).
         if !self.tower.mode.is_modern() {
-            return Err("unavailable");
+            return Err(ExterminatorRefusal::Unavailable);
         }
         if self.extermination_due_day.is_some() {
-            return Err("pending");
+            return Err(ExterminatorRefusal::Pending);
         }
+        // `isHotelKind(u.kind) && u.state === "infested"`: single, double and
+        // suite rooms alike.
         let ids: Vec<i64> = self
             .tower
             .units
@@ -191,18 +209,21 @@ impl Simulation {
             .collect();
         let rooms = ids.len();
         if rooms == 0 {
-            return Err("none");
+            return Err(ExterminatorRefusal::None);
         }
         let cost = EXTERMINATOR_CALLOUT_FEE + EXTERMINATOR_PER_ROOM_FEE * rooms as f64;
         if self.money < cost {
-            return Err("funds");
+            return Err(ExterminatorRefusal::Funds { cost, rooms });
         }
         self.money -= cost;
         self.record_money("upkeep", -cost);
         self.extermination_due_day = Some((self.clock.day() + 1) as f64);
-        // Transient by design, as in the TypeScript: a save taken mid-booking
-        // loses the billed set and resolution clears every infested room.
+        // `resolve_extermination` clears only the rooms billed here, so a wing
+        // that escalates overnight is not swept for today's price. The list
+        // is transient on both sides: a save taken mid-booking drops it and
+        // the resolution falls back to clearing every infested room.
         self.extermination_room_ids = Some(ids);
+        // Logged as a money line in the TypeScript (`"money"`).
         self.emit(
             &format!(
                 "🧹 Exterminator booked for {rooms} infested room(s): ${} charged. The rooms clear tomorrow.",
@@ -321,7 +342,8 @@ impl Simulation {
 
 #[cfg(test)]
 mod tests {
-    use super::with_thousands;
+    use super::*;
+    use crate::clock::{CalendarKind, GameMode};
 
     #[test]
     fn thousands_match_to_locale_string() {
@@ -330,9 +352,76 @@ mod tests {
             (999.0, "999"),
             (1000.0, "1,000"),
             (7000.0, "7,000"),
+            (25000.0, "25,000"),
+            (100000.0, "100,000"),
+            (999999.0, "999,999"),
+            (1000000.0, "1,000,000"),
             (1234567.0, "1,234,567"),
         ] {
             assert_eq!(with_thousands(x), want);
         }
+    }
+
+    fn modern_with_rooms(infested: usize, clean: usize) -> Simulation {
+        let mut sim = Simulation::new(1, GameMode::Modern, CalendarKind::RealWorld, false);
+        for x in 0..40 {
+            assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+        }
+        for x in 0..40 {
+            assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+        }
+        let width = Kind::HotelSingle.facility().width;
+        let mut x = 0;
+        for i in 0..infested + clean {
+            let r = sim.tower.place(Kind::HotelSingle, 2, x);
+            assert!(r.ok, "{:?}", r.reason);
+            let id = r.unit_id.unwrap();
+            let u = sim.tower.get_unit_mut(id).unwrap();
+            u.state = if i < infested {
+                UnitState::Infested
+            } else {
+                UnitState::Occupied
+            };
+            x += width;
+        }
+        sim
+    }
+
+    #[test]
+    fn booking_mirrors_call_exterminator() {
+        let mut sim = modern_with_rooms(3, 1);
+        sim.money = 100.0;
+        assert_eq!(
+            sim.call_exterminator(),
+            Err(ExterminatorRefusal::Funds {
+                cost: 11000.0,
+                rooms: 3
+            })
+        );
+        sim.money = 20000.0;
+        let day = sim.clock.day();
+        assert_eq!(sim.call_exterminator(), Ok((11000.0, 3)));
+        assert_eq!(sim.money, 9000.0);
+        assert_eq!(sim.ledger.today.get("upkeep"), Some(&-11000.0));
+        assert_eq!(sim.extermination_due_day, Some((day + 1) as f64));
+        assert_eq!(sim.extermination_room_ids.as_ref().map(Vec::len), Some(3));
+        let last = sim.log.last().unwrap();
+        assert_eq!(
+            last.text,
+            "🧹 Exterminator booked for 3 infested room(s): $11,000 charged. The rooms clear tomorrow."
+        );
+        assert_eq!(last.kind, LogKind::Money);
+        assert_eq!(sim.call_exterminator(), Err(ExterminatorRefusal::Pending));
+
+        let mut none = modern_with_rooms(0, 2);
+        none.money = 1e6;
+        assert_eq!(none.call_exterminator(), Err(ExterminatorRefusal::None));
+
+        let mut classic = Simulation::new(1, GameMode::Classic, CalendarKind::RealWorld, false);
+        classic.money = 1e6;
+        assert_eq!(
+            classic.call_exterminator(),
+            Err(ExterminatorRefusal::Unavailable)
+        );
     }
 }

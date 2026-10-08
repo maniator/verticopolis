@@ -78,13 +78,15 @@ fn main() {
                     let text = std::fs::read_to_string(&path)
                         .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
                     let scenario = Scenario::parse(&text)?;
-                    // The suite requires a file's internal id to equal its
-                    // stem, so a copied scenario cannot run under another
-                    // file's lock entry.
+                    // "a unique id per file" in conformance.integration.test.ts:
+                    // the internal id equals the stem, so a copied scenario
+                    // cannot run under another file's lock entry.
                     if scenario.id != *id {
                         return Err(format!(
-                            "scenario id {:?} does not match its file name {id}.json",
-                            scenario.id
+                            "{}: scenario id {:?} does not match the file stem {:?}",
+                            path.display(),
+                            scenario.id,
+                            id
                         ));
                     }
                     std::panic::catch_unwind(|| run_scenario(&scenario, repo_root)).map_err(|p| {

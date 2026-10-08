@@ -187,6 +187,20 @@ and wording the TypeScript shares.
 - [x] [Review][Patch] Comment named "the TypeScript suite" without the test [engine-rs/src/bin/conformance.rs]
 - [x] [Review][Patch] Round-three row said `[-0]` keeps its sign and read as if per-digit rounding were the fix [this file]
 
+Round six (confirming pass, 2026-10-08) on the exterminator port and the
+round-five patches: 0 `decision_needed`, 6 `patch`, 0 `defer`; the
+Acceptance Auditor found no violation. Dismissed: a host-locale
+`toLocaleString` (log text is outside the hash and the referee runs under
+en-US), the rule-set gate (Modern is the only rule set with a recovery fee),
+and `dump` arguments that are not UTF-8.
+
+- [x] [Review][Patch] `call_exterminator` had no test; the `funds` refusal dropped the cost and room count the TypeScript returns [engine-rs/src/services.rs]
+- [x] [Review][Patch] `with_thousands` claimed `toLocaleString` parity it did not have; dead negative branch; no 5, 6 or 7-digit case [engine-rs/src/services.rs]
+- [x] [Review][Patch] A stale transport index returned the wrong shaft in a release build; the test tolerated refused placements and never removed the last shaft or reindexed after a direct assignment [engine-rs/src/tower.rs]
+- [x] [Review][Patch] Repeated-label test did not cover a repeat on a later tick iteration [engine-rs/src/scenario.rs]
+- [x] [Review][Patch] Referee id-check message omitted the path and named "the suite" without the test [engine-rs/src/bin/conformance.rs]
+- [x] [Review][Patch] Comments: the billed-ids note contradicted itself, the fee constants shared one doc line, the removal note claimed "never", the `Unsupported` message shape differed from `Failed` [engine-rs/src/services.rs, tower.rs, scenario.rs]
+
 Codex review of 86f3476 (2026-10-08), both applied:
 
 - [x] [Review][Patch] `callExterminator` (the Modern booking action: fee, billed room ids, next-day deadline) was not ported; only the resolution was [engine-rs/src/services.rs]

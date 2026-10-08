@@ -389,7 +389,7 @@ pub fn run_scenario_until(
             Err(format!("command {index} failed before {label}: {what}"))
         }
         (None, Some(RunError::Unsupported { index, what })) => Err(format!(
-            "command {index} ({what}) is not ported yet, before {label}"
+            "command {index} is not ported yet, before {label}: {what}"
         )),
         (None, None) => Err(format!("label {label} not reached")),
     }
@@ -716,6 +716,22 @@ mod tests {
             run2.error,
             Some(super::RunError::Failed { index: 1, .. })
         ));
+        // A repeat on a later tick iteration stops there too, after that
+        // iteration's step has already advanced the simulation on both engines.
+        let later = scenario(
+            r#"{"op":"checkpoint","label":"t+120"},{"op":"tick","dt":60,"times":3,"checkpointEvery":1}"#,
+        )
+        .unwrap();
+        let run3 = super::run_scenario(&later, std::path::Path::new("."));
+        let labels: Vec<_> = run3.checkpoints.iter().map(|c| c.label.as_str()).collect();
+        assert_eq!(labels, ["start", "t+120", "t+60"]);
+        match run3.error {
+            Some(super::RunError::Failed { index, what }) => {
+                assert_eq!(index, 1);
+                assert_eq!(what, "checkpoint label t+120 is taken twice");
+            }
+            other => panic!("{other:?}"),
+        }
         // The first "a" is a stop in its own right; a stop label past the
         // repeat is never reached and the failure is reported instead.
         assert!(super::run_scenario_until(&s, std::path::Path::new("."), "a").is_ok());

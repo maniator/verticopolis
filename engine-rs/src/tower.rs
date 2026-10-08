@@ -895,16 +895,23 @@ impl Tower {
 
     pub fn transport_index(&self, id: i64) -> Option<usize> {
         let i = *self.transport_by_id.get(&id)?;
+        // One index and compare keeps a stale map from handing back the wrong
+        // shaft in a release build; a debug build names the bug instead.
+        let found = self.transports.get(i).map(|t| t.id);
         debug_assert_eq!(
-            self.transports.get(i).map(|t| t.id),
+            found,
             Some(id),
-            "transport index is stale; every write to `transports` must go through add, remove or reindex"
+            "transport index points at the wrong shaft; writes to `transports` go through add, remove or reindex"
         );
+        debug_assert_eq!(self.transport_by_id.len(), self.transports.len());
+        if found != Some(id) {
+            return None;
+        }
         Some(i)
     }
 
     /// Rebuild `transport_by_id`. `Vec::remove` shifts every later index,
-    /// so a removal (a player edit, never a crowd-hot-path call) rebuilds the
+    /// so a removal (called from player edits and from load today) rebuilds the
     /// map where the TypeScript `Map.delete` is O(1).
     fn reindex_transports(&mut self) {
         self.transport_by_id.clear();
@@ -1213,11 +1220,11 @@ mod tests {
     fn transport_index_survives_add_remove_and_reindex() {
         let mut t = Tower::new();
         for x in 0..30 {
-            assert!(t.place(Kind::Lobby, 1, x).ok || t.room_at(1, x).is_some());
+            assert!(t.place(Kind::Lobby, 1, x).ok);
         }
         for fl in 2..=3 {
             for x in 0..30 {
-                assert!(t.place(Kind::Floor, fl, x).ok || t.has_structure(fl, x));
+                assert!(t.place(Kind::Floor, fl, x).ok);
             }
         }
         let mut ids = Vec::new();
@@ -1231,7 +1238,21 @@ mod tests {
         assert_eq!(t.transport_index(ids[0]), None);
         index_matches_positions(&t);
         t.reindex();
+        assert_eq!(t.transport_index(ids[0]), None);
         index_matches_positions(&t);
         assert_eq!(t.get_transport(ids[2]).map(|x| x.x), Some(18));
+        // Removing the last shaft shifts nothing and must still drop its key.
+        assert!(t.remove_transport(ids[2]).is_some());
+        assert_eq!(t.transport_index(ids[2]), None);
+        index_matches_positions(&t);
+        assert_eq!(t.get_transport(ids[1]).map(|x| x.x), Some(10));
+        // The loader assigns the vector directly and then calls `reindex`.
+        let moved = std::mem::take(&mut t.transports);
+        let mut fresh = Tower::new();
+        fresh.transports = moved;
+        assert_eq!(fresh.transport_index(ids[1]), None);
+        fresh.reindex();
+        index_matches_positions(&fresh);
+        assert_eq!(fresh.get_transport(ids[1]).map(|x| x.x), Some(10));
     }
 }
