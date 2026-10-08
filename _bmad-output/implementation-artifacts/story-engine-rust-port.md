@@ -72,3 +72,34 @@ run, the switch, threading) are planned in
   node. The port keeps that semantics with a sentinel id.
 - Only what the hashed state reads is ported; the list of what is left out
   is under Out of scope.
+
+## Review findings
+
+`/gds-code-review`, round one (2026-10-08): 0 `decision_needed`, 24 `patch`,
+3 `defer`, 7 dismissed as faithful ports of TypeScript behavior or noise.
+
+- [x] [Review][Patch] Referee aborts on a panicking scenario [engine-rs/src/bin/conformance.rs]
+- [x] [Review][Patch] Crowd seed is exact u64 math where JavaScript rounds past 2^53 [engine-rs/src/crowd/spawn.rs]
+- [x] [Review][Patch] Save without `seed` founds a different stream; string seed [engine-rs/src/load.rs]
+- [x] [Review][Patch] Absent `towerName`/`builtWeddingHall`/`evaluatedTower` re-serialize as present [engine-rs/src/load.rs, sim.rs, tower.rs]
+- [x] [Review][Patch] Housekeeping dispatch x integer-divided [engine-rs/src/housekeeping.rs]
+- [x] [Review][Patch] NaN condo rent swallowed by `f64::min`/`max` [engine-rs/src/load.rs]
+- [x] [Review][Patch] v1 reflow reads a null structural width as 0 [engine-rs/src/load.rs]
+- [x] [Review][Patch] `deserialize` panics on the unit cap; inflate has no byte cap [engine-rs/src/load.rs]
+- [x] [Review][Patch] Unknown scenario op or field panics; `checkpointEvery: 0` divides by zero [engine-rs/src/scenario.rs]
+- [x] [Review][Patch] `dump` and `conformance` panic on bad arguments [engine-rs/src/bin/]
+- [x] [Review][Patch] Catalog lookup is a linear scan [engine-rs/src/facilities.rs]
+- [x] [Review][Patch] Landing sort unwraps a partial comparison [engine-rs/src/crowd/landing.rs]
+- [x] [Review][Patch] Duplicated constants, lazy-init housekeeping default, dead code [several]
+- [x] [Review][Patch] CI without `--locked`, a WASM clause the step never runs, no timeout [.github/workflows/engine-rs.yml]
+- [x] [Review][Patch] README mapping incomplete; story under-states what is left out; an "X, not Y" sentence [docs]
+- [x] [Review][Patch] Undocumented draws and nulls that mirror TypeScript (thief floor, `shaftId` null, floor-level probe) [comments]
+- [x] [Review][Defer] JavaScript number semantics on hand-edited saves [engine-rs/src/load.rs] (#858)
+- [x] [Review][Defer] Borrowed views for the memoized tower sets [engine-rs/src/tower_query.rs] (#859)
+- [x] [Review][Defer] Unit tests for migrations, coercion and schedules [engine-rs/] (#860)
+
+Dismissed: build leaves substrate floors on a failed placement (the
+TypeScript does the same), transient crowd readouts kept for hosts, the
+`floorReachable` probe (matches the TypeScript), `segId` collisions off the lot
+(same in TypeScript), `vacateAt`/retail nulls (match), the sold-condo rent path
+on engine-written saves, and the `lingerFor`/`dwelling` interplay.

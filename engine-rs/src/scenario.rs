@@ -157,7 +157,8 @@ fn start_sim(start: &Start, root: &std::path::Path) -> Result<Simulation, RunErr
             if let Some(m) = mode {
                 raw["mode"] = serde_json::Value::String(m.clone());
             }
-            let mut sim = crate::load::deserialize(&raw);
+            let mut sim =
+                crate::load::deserialize(&raw).map_err(|e| failed(format!("{fixture}: {e}")))?;
             crate::load::mark_founder_from_loaded_file(&mut sim, &raw);
             if let Some(m) = mode {
                 if sim.mode.as_str() != m {
@@ -411,7 +412,7 @@ fn run_scenario_inner(
                 Command::Reload => {
                     let before = digest(&state_view(&sim));
                     let saved: Value = serde_json::from_str(&sim.serialize().to_string()).unwrap();
-                    let loaded = crate::load::deserialize(&saved);
+                    let loaded = crate::load::deserialize(&saved).map_err(failed)?;
                     if digest(&state_view(&loaded)) != before {
                         return Err(failed("reload changed the saved state".into()));
                     }

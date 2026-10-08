@@ -279,8 +279,8 @@ impl Simulation {
                     kind.resale_refund()
                 };
                 if kind == Kind::WeddingHall
-                    && !self.tower.built_wedding_hall
-                    && !self.evaluated_tower
+                    && self.tower.built_wedding_hall != Some(true)
+                    && self.evaluated_tower != Some(true)
                 {
                     self.vip_visit_day = -1;
                 }

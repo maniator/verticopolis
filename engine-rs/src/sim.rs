@@ -73,7 +73,8 @@ pub struct Simulation {
     pub money: f64,
     pub star: i64,
     pub last_quarter_money: f64,
-    pub evaluated_tower: bool,
+    /// `evaluatedTower`; `None` when the save carried no key.
+    pub evaluated_tower: Option<bool>,
     pub vip_visit_day: i64,
     pub vip_favorable: bool,
     pub vip_visits: i64,
@@ -146,7 +147,7 @@ impl Simulation {
             money: STARTING_MONEY,
             star: 1,
             last_quarter_money: 0.0,
-            evaluated_tower: false,
+            evaluated_tower: Some(false),
             vip_visit_day: -1,
             vip_favorable: false,
             vip_visits: 0,
@@ -280,12 +281,15 @@ impl Simulation {
             ),
         );
         m.insert("nextId".into(), json!(self.tower.next_id));
-        m.insert("towerName".into(), json!(self.tower.tower_name));
-        m.insert(
-            "builtWeddingHall".into(),
-            json!(self.tower.built_wedding_hall),
-        );
-        m.insert("evaluatedTower".into(), json!(self.evaluated_tower));
+        if let Some(n) = &self.tower.tower_name {
+            m.insert("towerName".into(), json!(n));
+        }
+        if let Some(b) = self.tower.built_wedding_hall {
+            m.insert("builtWeddingHall".into(), json!(b));
+        }
+        if let Some(b) = self.evaluated_tower {
+            m.insert("evaluatedTower".into(), json!(b));
+        }
         m.insert("vipVisitDay".into(), json!(self.vip_visit_day));
         m.insert("vipFavorable".into(), json!(self.vip_favorable));
         m.insert("vipVisits".into(), json!(self.vip_visits));

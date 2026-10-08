@@ -227,10 +227,10 @@ impl Simulation {
 
     /// `checkVip`.
     pub fn check_vip(&mut self) {
-        if self.evaluated_tower || self.vip_visit_day < 0 {
+        if self.evaluated_tower == Some(true) || self.vip_visit_day < 0 {
             return;
         }
-        if !self.tower.built_wedding_hall {
+        if self.tower.built_wedding_hall != Some(true) {
             self.vip_visit_day = -1;
             return;
         }
@@ -246,7 +246,7 @@ impl Simulation {
             && pop >= crate::star::TOWER_POPULATION;
         if ok {
             self.star = 6;
-            self.evaluated_tower = true;
+            self.evaluated_tower = Some(true);
             self.emit(
                 "The VIP was impressed! Your building is now a TOWER. You win!",
                 LogKind::Good,

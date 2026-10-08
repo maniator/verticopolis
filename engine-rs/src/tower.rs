@@ -230,8 +230,10 @@ pub struct Tower {
     pub transports: Vec<Transport>,
     /// One counter shared by units and transports.
     pub next_id: i64,
-    pub tower_name: String,
-    pub built_wedding_hall: bool,
+    /// `towerName`; `None` when the save carried no key (and none is written).
+    pub tower_name: Option<String>,
+    /// `builtWeddingHall`; `None` when the save carried no key.
+    pub built_wedding_hall: Option<bool>,
     pub revision: i64,
     pub allows_escalator_on_office_floors: bool,
     /// The rule set the tower was founded under (`tower.rules.mode`).
@@ -255,8 +257,8 @@ impl Tower {
             units: Vec::new(),
             transports: Vec::new(),
             next_id: 1,
-            tower_name: "Tower One".into(),
-            built_wedding_hall: false,
+            tower_name: Some("Tower One".into()),
+            built_wedding_hall: Some(false),
             revision: 0,
             allows_escalator_on_office_floors: false,
             mode: GameMode::Classic,
@@ -715,7 +717,7 @@ impl Tower {
         let idx = self.units.len() - 1;
         self.register(idx);
         if kind == Kind::WeddingHall {
-            self.built_wedding_hall = true;
+            self.built_wedding_hall = Some(true);
         }
         if kind == Kind::Lobby && self.lobby_tile_count(floor) == f.width {
             self.sync_express_stops_for_floor(floor);
@@ -734,7 +736,7 @@ impl Tower {
         self.unregister(&u);
         self.reindex_ids();
         if u.kind == Kind::WeddingHall {
-            self.built_wedding_hall = self.units.iter().any(|u| u.kind == Kind::WeddingHall);
+            self.built_wedding_hall = Some(self.units.iter().any(|u| u.kind == Kind::WeddingHall));
         }
         if u.kind == Kind::Lobby && !self.floor_has_lobby(u.floor) {
             self.sync_express_stops_for_floor(u.floor);

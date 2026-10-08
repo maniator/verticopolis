@@ -27,6 +27,8 @@ const VIP_VISITS_CAP: f64 = 1_000_000.0;
 const LOG_TEXT_CAP: usize = 400;
 const LEGACY_CONDO_DEFAULT_PRICE: f64 = 120_000.0;
 const OLDEST_SAVE_VERSION: i64 = 1;
+/// `MAX_SAVE_INFLATED_BYTES` (saveCompression.ts).
+const MAX_SAVE_INFLATED_BYTES: u64 = 32 * 1024 * 1024;
 const UNIT_CAP: usize = 2 * (LOT_WIDTH as usize) * ((MAX_FLOOR - MIN_FLOOR + 1) as usize);
 const LOT: i64 = LOT_WIDTH;
 
@@ -48,8 +50,15 @@ pub fn decode_vctower(text: &str) -> Result<Value, String> {
     use std::io::Read;
     let mut out = Vec::new();
     flate2::read::DeflateDecoder::new(&packed[..])
+        .take(MAX_SAVE_INFLATED_BYTES + 1)
         .read_to_end(&mut out)
         .map_err(|e| format!("inflate: {e}"))?;
+    if out.len() as u64 > MAX_SAVE_INFLATED_BYTES {
+        return Err(
+            "this .vctower expands to more data than we will hold; it looks crafted, not saved"
+                .into(),
+        );
+    }
     serde_json::from_slice(&out).map_err(|e| format!("json: {e}"))
 }
 
@@ -84,12 +93,37 @@ fn js_number(v: Option<&Value>) -> f64 {
                 0.0
             }
         }
+        Some(Value::String(s)) => {
+            let t = s.trim();
+            if t.is_empty() {
+                0.0
+            } else {
+                t.parse::<f64>().unwrap_or(f64::NAN)
+            }
+        }
         _ => f64::NAN,
     }
 }
 
 fn kind_of(u: &Value) -> Option<Kind> {
     u.get("kind").and_then(Value::as_str).and_then(Kind::parse)
+}
+
+/// `Math.min` / `Math.max`: a NaN wins, where `f64::min`/`max` would drop it.
+fn js_min(a: f64, b: f64) -> f64 {
+    if a.is_nan() || b.is_nan() {
+        f64::NAN
+    } else {
+        a.min(b)
+    }
+}
+
+fn js_max(a: f64, b: f64) -> f64 {
+    if a.is_nan() || b.is_nan() {
+        f64::NAN
+    } else {
+        a.max(b)
+    }
 }
 
 /// JS `ToUint32`.
@@ -244,10 +278,9 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
         }
         let f = round(js_number(u.get("floor")));
         let x0 = round(js_number(u.get("x")));
-        let w0 = round(if u.get("width").is_some() {
-            js_number(u.get("width"))
-        } else {
-            1.0
+        let w0 = round(match u.get("width") {
+            None | Some(Value::Null) => 1.0,
+            w => js_number(w),
         });
         if !f.is_finite() || !x0.is_finite() || !w0.is_finite() {
             continue;
@@ -1073,7 +1106,7 @@ pub fn mark_founder_from_loaded_file(sim: &mut Simulation, raw: &Value) {
 // ---- serialization.ts: deserialize --------------------------------------------
 
 /// `Simulation.deserialize(raw)`.
-pub fn deserialize(raw: &Value) -> Simulation {
+pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     let data = migrate_save(raw);
     let mode = match data.get("mode").and_then(Value::as_str) {
         Some("modern") => GameMode::Modern,
@@ -1083,7 +1116,12 @@ pub fn deserialize(raw: &Value) -> Simulation {
         Some("canon") => CalendarKind::Canon,
         _ => CalendarKind::RealWorld,
     };
-    let seed = to_uint32(js_number(data.get("seed")));
+    // `new Simulation(data.seed, ...)`: the constructor's default seed applies
+    // when the key is absent; any other value goes through `>>> 0`.
+    let seed = match data.get("seed") {
+        None => 12345,
+        Some(v) => to_uint32(js_number(Some(v))),
+    };
     let mut sim = Simulation::new(seed, mode, calendar, false);
     let modern = mode == GameMode::Modern;
     sim.auto_bridge = if modern {
@@ -1100,8 +1138,7 @@ pub fn deserialize(raw: &Value) -> Simulation {
     sim.clock = Clock::new(num(data.get("minutes"), 0.0).max(0.0), sim.clock.calendar);
     sim.evaluated_tower = data
         .get("evaluatedTower")
-        .and_then(Value::as_bool)
-        .unwrap_or(false);
+        .map(|v| v.as_bool().unwrap_or(false));
     sim.vip_visit_day = match data.get("vipVisitDay") {
         None | Some(Value::Null) => -1,
         Some(v) => v.as_f64().map(|x| x as i64).unwrap_or(-1),
@@ -1114,8 +1151,9 @@ pub fn deserialize(raw: &Value) -> Simulation {
         .floor()
         .min(VIP_VISITS_CAP)
         .max(0.0)) as i64;
-    if data.get("vipVisits").is_none() && (sim.vip_favorable || sim.evaluated_tower) {
-        sim.vip_visits = if sim.evaluated_tower { 2 } else { 1 };
+    let evaluated = sim.evaluated_tower == Some(true);
+    if data.get("vipVisits").is_none() && (sim.vip_favorable || evaluated) {
+        sim.vip_visits = if evaluated { 2 } else { 1 };
     }
     sim.last_vip_nag_day = (match finite_num(data.get("lastVipNagDay")) {
         Some(d) => d.floor() as i64,
@@ -1172,10 +1210,11 @@ pub fn deserialize(raw: &Value) -> Simulation {
                 continue;
             }
             raw_units.push(u);
-            assert!(
-                raw_units.len() <= UNIT_CAP,
-                "This save lists more than {UNIT_CAP} units"
-            );
+            if raw_units.len() > UNIT_CAP {
+                return Err(format!(
+                    "This save lists more than {UNIT_CAP} units, more than the whole lot can hold, so it cannot be a real tower."
+                ));
+            }
         }
     }
     let mut units: Vec<(Unit, Option<i64>)> = Vec::new();
@@ -1222,12 +1261,12 @@ pub fn deserialize(raw: &Value) -> Simulation {
                 };
                 if sold_condo {
                     rent = Some(match ladder {
-                        Some(l) => r.min(l[3]).max(l[0]),
-                        None => r.min(SOLD_CONDO_MAX_PRICE).max(SOLD_CONDO_MIN_PRICE),
+                        Some(l) => js_max(l[0], js_min(l[3], r)),
+                        None => js_max(SOLD_CONDO_MIN_PRICE, js_min(SOLD_CONDO_MAX_PRICE, r)),
                     });
                 } else if ladder.is_none() {
                     let band = rent_config(Kind::Condo).unwrap();
-                    rent = Some(r.min(band.max).max(band.min));
+                    rent = Some(js_max(band.min, js_min(band.max, r)));
                 }
             }
         }
@@ -1452,13 +1491,10 @@ pub fn deserialize(raw: &Value) -> Simulation {
     sim.tower.next_id = next_id;
     sim.tower.tower_name = data
         .get("towerName")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .to_string();
+        .map(|v| v.as_str().unwrap_or("").to_string());
     sim.tower.built_wedding_hall = data
         .get("builtWeddingHall")
-        .and_then(Value::as_bool)
-        .unwrap_or(false);
+        .map(|v| v.as_bool().unwrap_or(false));
     sim.tower.reindex();
     sim.tower.coerce_express_stops();
     if rents_snapped > 0 {
@@ -1518,5 +1554,5 @@ pub fn deserialize(raw: &Value) -> Simulation {
     sim.last_hour = sim.clock.hour();
     sim.adopt_milestones();
     sim.founder = detect_founder(raw);
-    sim
+    Ok(sim)
 }

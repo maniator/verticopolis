@@ -644,27 +644,21 @@ pub fn spawn_staff(
     tower: &Tower,
     from: i64,
     to: i64,
-    dest_x: i64,
+    dest_x: f64,
     clean_unit_id: i64,
     clean_minutes: f64,
-    from_x: Option<i64>,
+    from_x: Option<f64>,
 ) -> StaffSpawn {
     if crowd.staff_count >= max_staff_for(tower) {
         return StaffSpawn::Full;
     }
-    let Some(r) = crowd.staff_route(
-        tower,
-        from,
-        to,
-        from_x.map(|x| x as f64),
-        Some(dest_x as f64),
-    ) else {
+    let Some(r) = crowd.staff_route(tower, from, to, from_x, Some(dest_x)) else {
         return StaffSpawn::NoRoute;
     };
-    let i = make_person(crowd, tower, r, dest_x as f64, None);
+    let i = make_person(crowd, tower, r, dest_x, None);
     let p = &mut crowd.people[i];
     if let Some(fx) = from_x {
-        p.x = fx as f64;
+        p.x = fx;
     }
     p.staff = true;
     p.clean_unit_id = Some(clean_unit_id);

@@ -299,10 +299,10 @@ impl Simulation {
                     transient = true;
                     continue;
                 }
-                // Both x's are `x + width / 2`; widths are even in the catalog,
-                // and the TypeScript passes the float through to the router.
-                let dest_x = rx + rw / 2;
-                let from_x = cx + cw / 2;
+                // `x + width / 2` as a float, as the TypeScript passes it: a
+                // kept-legacy odd width lands on a half tile.
+                let dest_x = rx as f64 + rw as f64 / 2.0;
+                let from_x = cx as f64 + cw as f64 / 2.0;
                 let sent = spawn_staff(
                     &mut self.crowd,
                     &self.tower,
