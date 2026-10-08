@@ -131,7 +131,9 @@ fn js_number(v: Option<&Value>) -> f64 {
 /// `f64::from_str` also takes `inf`, `nan` and `infinity` in any case, so the
 /// decimal path is checked character by character before it is parsed.
 fn js_string_number(s: &str) -> f64 {
-    let is_js_space = |c: char| c.is_whitespace() || c == '\u{feff}';
+    // StrWhiteSpaceChar: Unicode White_Space plus U+FEFF, minus U+0085
+    // (NEL), which Rust counts and JavaScript does not.
+    let is_js_space = |c: char| (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}';
     let t = s.trim_matches(is_js_space);
     if t.is_empty() {
         return 0.0;
@@ -1689,6 +1691,9 @@ mod tests {
             ("+5", 5.0),
             ("1.5e-3", 0.0015),
             (" 3.0e+2 ", 300.0),
+            ("\u{a0}7\u{2028}", 7.0),
+            ("+.5", 0.5),
+            ("1e309", f64::INFINITY),
         ];
         for (s, want) in same {
             assert_eq!(js_string_number(s), want, "{s:?}");
@@ -1696,7 +1701,8 @@ mod tests {
         assert!(js_string_number("-0").is_sign_negative());
         assert_eq!(js_string_number("-0"), 0.0);
         for s in [
-            "0x", "inf", "infinity", "NaN", "1e", "1_000", "12abc", "0x1.5", "-0x10", "e5", ".",
+            "0x", "inf", "infinity", "NaN", "1e", "1e+", "1_000", "12abc", "0x1.5", "-0x10", "e5",
+            ".", "\u{85}7", "\u{661}",
         ] {
             assert!(js_string_number(s).is_nan(), "{s:?}");
         }
