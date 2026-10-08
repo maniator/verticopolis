@@ -1,6 +1,6 @@
 {
   "id": "vip-review-modern",
-  "description": "The Modern tower-one at three stars with its VIP review still pending loses the ramp that chains its parking, so the visiting VIP circles the block and leaves, twice five days apart; the ramp is rebuilt, the next VIP enjoys a suite and leaves a favorable review, and the star evaluation walks the four-star gates with the population still short.",
+  "description": "The Modern tower-one at three stars with its VIP review still pending (the towerone fixture with vipFavorable cleared, vipVisits zeroed and the treasury filled) sells all five parking ramps so no space chains to one, so the visiting VIP circles the block and leaves, twice five days apart; the ramps are rebuilt, the next VIP enjoys a suite and leaves a favorable review, and the star evaluation walks the four-star gates with the population still short.",
   "start": {
     "fixture": "src/tests/fixtures/towerone-vip-pending.vctower",
     "mode": "modern"
@@ -8,12 +8,37 @@
   "commands": [
     {
       "op": "sell",
+      "floor": -1,
+      "x": 231,
+      "kind": "parkingRamp"
+    },
+    {
+      "op": "sell",
+      "floor": -2,
+      "x": 231,
+      "kind": "parkingRamp"
+    },
+    {
+      "op": "sell",
       "floor": 0,
-      "x": 231
+      "x": 231,
+      "kind": "parkingRamp"
+    },
+    {
+      "op": "sell",
+      "floor": -3,
+      "x": 232,
+      "kind": "parkingRamp"
+    },
+    {
+      "op": "sell",
+      "floor": -4,
+      "x": 232,
+      "kind": "parkingRamp"
     },
     {
       "op": "checkpoint",
-      "label": "ramp-gone"
+      "label": "ramps-gone"
     },
     {
       "op": "tick",
@@ -28,8 +53,32 @@
     {
       "op": "build",
       "kind": "parkingRamp",
+      "floor": -1,
+      "x": 231
+    },
+    {
+      "op": "build",
+      "kind": "parkingRamp",
+      "floor": -2,
+      "x": 231
+    },
+    {
+      "op": "build",
+      "kind": "parkingRamp",
       "floor": 0,
       "x": 231
+    },
+    {
+      "op": "build",
+      "kind": "parkingRamp",
+      "floor": -3,
+      "x": 232
+    },
+    {
+      "op": "build",
+      "kind": "parkingRamp",
+      "floor": -4,
+      "x": 232
     },
     {
       "op": "tick",

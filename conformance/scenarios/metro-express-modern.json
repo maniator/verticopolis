@@ -1,6 +1,6 @@
 {
   "id": "metro-express-modern",
-  "description": "The Modern tower-one at four stars digs a metro station whose platform no passenger transport reaches, waits out the cut-off nudge, connects the platform with a standard elevator so commuters arrive, adds a second express shaft the full height of the tower, and asks for a fifth star it cannot yet have.",
+  "description": "The Modern tower-one at four stars (the towerone fixture with star raised to four and the treasury filled) digs a metro station whose platform no passenger transport reaches, waits out the cut-off nudge, connects the platform with a standard elevator so commuters arrive, adds a second express shaft the full height of the tower, and asks for a fifth star it cannot yet have.",
   "start": {
     "fixture": "src/tests/fixtures/towerone-star4.vctower",
     "mode": "modern"

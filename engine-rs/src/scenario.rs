@@ -61,7 +61,11 @@ pub enum Command {
         expect_fail: Option<bool>,
     },
     #[serde(rename = "sell")]
-    Sell { floor: i64, x: i64 },
+    Sell {
+        floor: i64,
+        x: i64,
+        kind: Option<String>,
+    },
     #[serde(rename = "adjustRent")]
     AdjustRent { floor: i64, x: i64, dir: i64 },
     #[serde(rename = "setNoRate")]
@@ -144,6 +148,7 @@ fn field_fits(ty: &str, v: &Value) -> bool {
             .is_some_and(|k| k.is_transport()),
         "mode" => matches!(v.as_str(), Some("classic") | Some("modern")),
         "obj" => v.is_object(),
+        "kind" => v.as_str().and_then(Kind::parse).is_some(),
         _ => unreachable!("field type {ty}"),
     }
 }
@@ -204,7 +209,8 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
             ("top", "int"),
             ("expectFail", "bool?"),
         ],
-        "sell" | "setNoRate" => &AT,
+        "setNoRate" => &AT,
+        "sell" => &[("floor", "int"), ("x", "int"), ("kind", "kind?")],
         "adjustRent" => &[("floor", "int"), ("x", "int"), ("dir", "dir")],
         "setCars" => &[("floor", "int"), ("x", "int"), ("cars", "count")],
         "startFire" | "bombThreat" | "evaluateStar" | "reload" => &[],
@@ -521,7 +527,20 @@ fn run_scenario_inner(
                     )
                     .map_err(failed)?;
                 }
-                Command::Sell { floor, x } => {
+                Command::Sell { floor, x, kind } => {
+                    if let Some(kind) = kind {
+                        let here = sim
+                            .tower
+                            .unit_at(*floor, *x)
+                            .map(|u| u.kind)
+                            .or_else(|| sim.tower.transport_at(*floor, *x).map(|t| t.kind));
+                        if here.map(|k| k.as_str()) != Some(kind.as_str()) {
+                            return Err(failed(format!(
+                                "sell @ {floor},{x}: expected {kind}, found {}",
+                                here.map(|k| k.as_str()).unwrap_or("nothing")
+                            )));
+                        }
+                    }
                     expect_ok(
                         sim.sell_at(*floor, *x),
                         false,

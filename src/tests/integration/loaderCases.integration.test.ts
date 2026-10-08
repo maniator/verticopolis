@@ -18,7 +18,7 @@ const LOCK = resolve(__dirname, "../../../conformance/loader-cases.json");
 const UPDATE = process.env.VC_CONFORMANCE_UPDATE === "1";
 if (UPDATE && process.env.CI) throw new Error("VC_CONFORMANCE_UPDATE is a local regeneration switch and never runs in CI");
 
-type Case = { id: string; input: unknown; expected: string };
+type Case = { id: string; input: unknown; expected: string; knownDivergence?: string };
 type Any = Record<string, unknown>;
 
 function base(mode: "classic" | "modern"): Any {
@@ -86,7 +86,7 @@ function buildCases(): Case[] {
     ["version-absent-v1-reflow", mutate(modern, (s) => { delete s.version; })],
     ["version-3", mutate(modern, (s) => { s.version = 3; })],
     ["vip-evaluated-without-visits", mutate(modern, (s) => { delete s.vipVisits; s.evaluatedTower = true; s.vipFavorable = true; })],
-    ["next-id-zero", mutate(modern, (s) => { if (s.tower && typeof s.tower === "object") (s.tower as Any).nextId = 0; s.nextId = 0; })],
+    ["next-id-zero", mutate(modern, (s) => { s.nextId = 0; })],
     ["units-not-array", mutate(modern, (s) => { s.units = "nope"; })],
     // The migration boundaries and the malformed legacy values the post-merge
     // review of #857 named: loading must end, never panic, and never finish a
@@ -98,17 +98,27 @@ function buildCases(): Case[] {
     ["construction-completeat-negative", mutate(modern, (s) => { const u = units(s).find((x) => x.kind === "office")!; u.state = "construction"; u.completeAt = -1; })],
     ["construction-completeat-huge", mutate(modern, (s) => { const u = units(s).find((x) => x.kind === "office")!; u.state = "construction"; u.completeAt = 1e300; })],
     ["schedule-rows-wrong-length", mutate(modern, (s) => { transports(s)[0].schedule = { activeCars: { weekday: [1, 2, 3], weekend: Array(40).fill(9) }, homeFloors: [-5, 1, 2, 2, 99] }; })],
+    ["unit-width-string", mutate(modern, (s) => { const u = units(s).find((x) => x.kind === "office")!; u.width = "4"; })],
+    ["legacy-v1-width-string", mutate(modern, (s) => { delete s.version; const u = units(s).find((x) => x.kind === "office")!; u.width = "4"; })],
     ["schedule-nonfinite-tunables", mutate(modern, (s) => { transports(s)[0].schedule = { waitingCarResponse: -4, standardFloorDeparture: 1e9, activeCars: { weekday: Array(24).fill(1) } }; })],
   ];
-  return inputs.map(([id, input]) => {
-    let expected: string;
+  // The divergences #858 records, carried with a marker so the Rust test
+  // expects the mismatch and flags the day a case stops diverging.
+  const known: [string, Any, string][] = [
+    ["known-858-fractional-occupants", mutate(modern, (s) => { const u = units(s).find((x) => x.kind === "office")!; u.occupants = 2.5; }), "#858: a fractional occupants count stays a double in TypeScript and narrows to an integer in Rust"],
+    ["known-858-evaluated-tower-number", mutate(modern, (s) => { s.evaluatedTower = 1; }), "#858: a non-boolean evaluatedTower is kept verbatim in TypeScript and narrows to false in Rust"],
+  ];
+  const hashOf = (input: unknown): string => {
     try {
-      expected = digest(stateView(Simulation.deserialize(input as unknown as SerializedGame)));
+      return digest(stateView(Simulation.deserialize(input as unknown as SerializedGame)));
     } catch {
-      expected = "throws";
+      return "throws";
     }
-    return { id, input, expected };
-  });
+  };
+  return [
+    ...inputs.map(([id, input]): Case => ({ id, input, expected: hashOf(input) })),
+    ...known.map(([id, input, knownDivergence]): Case => ({ id, input, expected: hashOf(input), knownDivergence })),
+  ];
 }
 
 describe("loader conformance table", () => {
@@ -121,6 +131,12 @@ describe("loader conformance table", () => {
     expect(existsSync(LOCK)).toBe(true);
     const lock = JSON.parse(readFileSync(LOCK, "utf8")) as { cases: Case[] };
     expect(lock.cases.map((c) => c.id)).toEqual(cases.map((c) => c.id));
-    for (const [i, c] of cases.entries()) expect({ id: c.id, expected: c.expected }).toEqual({ id: lock.cases[i].id, expected: lock.cases[i].expected });
+    // The inputs are compared too, so a change to the base save (a new
+    // serialized field, a different first day) cannot leave the Rust side
+    // replaying a stale input under an unchanged hash.
+    for (const [i, c] of cases.entries()) {
+      expect({ id: c.id, expected: c.expected, input: digest(c.input), knownDivergence: c.knownDivergence })
+        .toEqual({ id: lock.cases[i].id, expected: lock.cases[i].expected, input: digest(lock.cases[i].input), knownDivergence: lock.cases[i].knownDivergence });
+    }
   });
 });

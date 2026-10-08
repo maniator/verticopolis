@@ -1851,13 +1851,34 @@ mod loader_cases {
         for case in cases {
             let id = case["id"].as_str().unwrap();
             let expected = case["expected"].as_str().unwrap();
-            let (got, view) = match super::deserialize(&case["input"]) {
-                Ok(sim) => {
+            let known = case.get("knownDivergence").and_then(Value::as_str);
+            let input = &case["input"];
+            let (got, view) = match std::panic::catch_unwind(|| super::deserialize(input)) {
+                Ok(Ok(sim)) => {
                     let v = state_view(&sim);
                     (digest(&v), Some(v))
                 }
-                Err(_) => ("throws".to_string(), None),
+                Ok(Err(_)) => ("throws".to_string(), None),
+                Err(_) => ("panics".to_string(), None),
             };
+            if let Some(why) = known {
+                // A recorded #858 divergence: the mismatch is expected, and a
+                // match means the case can lose its marker.
+                if got == expected {
+                    misses.push(format!(
+                        "{id}: no longer diverges ({why}); drop its knownDivergence marker"
+                    ));
+                } else if got == "panics" {
+                    misses.push(format!(
+                        "{id}: panics, which a known divergence never excuses"
+                    ));
+                } else if got == "throws" && expected != "throws" {
+                    misses.push(format!(
+                        "{id}: throws, which the recorded divergence ({why}) does not cover"
+                    ));
+                }
+                continue;
+            }
             if got != expected {
                 // Leave the Rust side's canonical JSON beside the target dir so
                 // the miss can be read field by field against

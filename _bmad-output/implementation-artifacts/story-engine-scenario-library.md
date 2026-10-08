@@ -80,17 +80,32 @@ lit.
 - Runner commands on both sides: `callExterminator` and `setSchedule`, with
   `Tower::set_schedule` added to the Rust engine.
 - Derived fixtures: `sixseven-december`, `towerone-star4`,
-  `towerone-vip-pending`, each one edit of a serialized field away from an
-  existing save, documented in the conformance README.
-- The loader table (`conformance/loader-cases.json`, 37 cases) and its Rust
-  replay; its first run caught `skipFloors` entries being truncated to whole
-  numbers where the TypeScript keeps the doubles. Fixed. Closes #860.
+  `towerone-vip-pending`, each a few serialized fields away from an existing
+  save, documented in the conformance README.
+- The loader table (`conformance/loader-cases.json`, 47 agreeing cases and
+  two carried as recorded #858 divergences) and its Rust replay. Its runs
+  caught `skipFloors` entries truncated to whole numbers, a debug-build
+  overflow in the v1 reflow on a saturated coordinate, and a non-numeric
+  `completeAt` completing at once where the TypeScript never completes it.
+  All three fixed. A miss writes the Rust view to `engine-rs/target/` for a
+  field diff against `scripts/loader-case-dump.ts`. Closes #860.
 - Canon-constant tests in `facilities.rs`.
 - The differential fuzzer (`engine-rs/src/bin/fuzz.rs`,
   `scripts/fuzz-compare.ts`, `engine-fuzz.yml` nightly); 28 seeds run locally
   with no divergence.
-- The coverage floor rises to 85% (85.14% measured before the schedule
-  scenario). AC3's "no module under 75%" is not met yet: `events.rs` (61%),
+- AC1 as listed is met in part. Landed: the hotel weekend with housekeeping
+  and all three exterminator refusals, the VIP circling twice with no chained
+  parking and then reviewing favorably, the metro cut-off and reconnection
+  with a second express shaft, two failing star evaluations, and condo
+  relocations reached inside the metro and VIP runs. Not landed: a star
+  evaluation that passes (no fixture meets the next gate without a long
+  growth script), express cars on a scheduled shaft (the schedule scenario
+  runs a standard shaft; express stops add a second variable), a dedicated
+  relocation month, and the player-choice events (fire rescue, ransom), which
+  need a `resolveChoice` command. Those go on the next slice with the dark
+  modules below.
+- The coverage floor rises to 83% (84.47% measured with every scenario in
+  this branch). AC3's "no module under 75%" is not met yet: `events.rs` (61%),
   `rules.rs` (66%), `star.rs` (68%), `satisfaction.rs` (71%) and
   `schedule.rs` need the player-choice command (`resolveChoice` on a pending
   fire rescue or ransom) and the five- and six-star climbs, which no fixture

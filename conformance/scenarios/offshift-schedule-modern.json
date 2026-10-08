@@ -1,6 +1,6 @@
 {
   "id": "offshift-schedule-modern",
-  "description": "A fresh Modern starter tower whose only elevator is put on an authored schedule: no cars through the night, a one-car dawn, two cars by day, homes at the lobby and the fourth floor; two days at ten-minute ticks, then the schedule is cleared and a day runs with every car back.",
+  "description": "A fresh Modern starter tower whose only elevator is put on an authored schedule: no cars through the night, a one-car dawn, two cars by day, homes at the lobby and the fourth floor; two days at ten-minute ticks, a reload, then a garbage schedule (a short row with strings and negatives, out-of-range homes, an oversized response time) that the coercion hardens into a usable one for a day, then the schedule is cleared and a day runs with every car back.",
   "start": {
     "newGame": {
       "seed": 20261008,

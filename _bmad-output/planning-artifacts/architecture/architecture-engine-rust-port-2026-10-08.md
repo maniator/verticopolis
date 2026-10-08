@@ -18,8 +18,9 @@ updates now that the port exists.
 ## Two engines, one simulation
 
 Until the web game runs on the Rust engine, there are two implementations of
-one simulation, and the only thing that keeps them one is the referee. Rules
-while that is true:
+one simulation, and the only thing that keeps them one is the referee. The
+binding rules live in CONTRIBUTING.md ("Two engines, one simulation"); the
+summary here is for the reader of this plan:
 
 - A simulation change lands in both engines in the same pull request, with
   the regenerated lock. CI fails either engine that disagrees with the lock.

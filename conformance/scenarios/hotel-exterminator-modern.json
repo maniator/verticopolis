@@ -9,107 +9,128 @@
     {
       "op": "sell",
       "floor": 12,
-      "x": 158
+      "x": 158,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 16,
-      "x": 188
+      "x": 188,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 18,
-      "x": 150
+      "x": 150,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 21,
-      "x": 204
+      "x": 204,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 28,
-      "x": 208
+      "x": 208,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 28,
-      "x": 174
+      "x": 174,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 29,
-      "x": 150
+      "x": 150,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 12,
-      "x": 215
+      "x": 215,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 21,
-      "x": 216
+      "x": 216,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 21,
-      "x": 224
+      "x": 224,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 2,
-      "x": 142
+      "x": 142,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 16,
-      "x": 142
+      "x": 142,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 14,
-      "x": 129
+      "x": 129,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 2,
-      "x": 240
+      "x": 240,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 3,
-      "x": 240
+      "x": 240,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 4,
-      "x": 240
+      "x": 240,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 31,
-      "x": 232
+      "x": 232,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 32,
-      "x": 232
+      "x": 232,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 46,
-      "x": 273
+      "x": 273,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 31,
-      "x": 110
+      "x": 110,
+      "kind": "housekeeping"
     },
     {
       "op": "sell",
       "floor": 31,
-      "x": 98
+      "x": 98,
+      "kind": "housekeeping"
     },
     {
       "op": "checkpoint",

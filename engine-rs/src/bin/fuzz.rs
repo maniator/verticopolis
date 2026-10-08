@@ -14,6 +14,16 @@ use verticopolis_engine::scenario::{run_scenario, RunError, Scenario};
 const LEFT: i64 = 150;
 const RIGHT: i64 = 230;
 
+/// Write a scenario that broke the engine beside the ordinary output so the
+/// workflow artifact carries it even when the run panics.
+fn write_failed(out: &std::path::Path, id: &str, scenario: &Value) {
+    let _ = std::fs::create_dir_all(out);
+    let _ = std::fs::write(
+        out.join(format!("{id}.failed.json")),
+        serde_json::to_string_pretty(scenario).unwrap(),
+    );
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.len() < 2 {
@@ -25,9 +35,17 @@ fn main() {
         std::process::exit(2);
     });
     let out = PathBuf::from(&args[1]);
-    let budget: usize = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(40);
+    let budget: usize = match args.get(2) {
+        None => 40,
+        Some(s) => s.parse().unwrap_or_else(|_| {
+            eprintln!("commands must be a whole number");
+            std::process::exit(2);
+        }),
+    };
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-    let mut rng = Rng::new(seed);
+    // The generator's stream is separate from the game's own seed, so the
+    // command sequence does not replay the simulation's random draws.
+    let mut rng = Rng::new(seed ^ 0x9e37_79b9);
     let modern = rng.chance(0.5);
     let height = rng.int(3, 9);
     let id = format!("fuzz-{seed}");
@@ -81,8 +99,21 @@ fn main() {
             json!({"op": "sell", "floor": rng.int(1, height), "x": rng.int(LEFT, RIGHT)})
         } else if roll < 60 {
             json!({"op": "adjustRent", "floor": rng.int(2, height), "x": rng.int(LEFT, RIGHT), "dir": if rng.chance(0.5) { 1 } else { -1 }})
-        } else if roll < 64 {
+        } else if roll < 63 {
             json!({"op": "setCars", "floor": 1, "x": rng.int(LEFT, RIGHT), "cars": rng.int(1, 8)})
+        } else if roll < 66 {
+            let row = |rng: &mut Rng| -> Vec<i64> { (0..24).map(|_| rng.int(0, 3)).collect() };
+            let weekday = row(&mut rng);
+            let weekend = row(&mut rng);
+            let homes: Vec<i64> = (0..rng.int(0, 3)).map(|_| rng.int(1, height)).collect();
+            json!({"op": "setSchedule", "floor": 1, "x": rng.int(LEFT, RIGHT), "schedule": {
+                "activeCars": {"weekday": weekday, "weekend": weekend},
+                "waitingCarResponse": rng.int(1, 30),
+                "standardFloorDeparture": rng.int(1, 60),
+                "homeFloors": homes,
+            }})
+        } else if roll < 68 && !modern {
+            json!({"op": "setNoRate", "floor": rng.int(2, height), "x": rng.int(LEFT, RIGHT)})
         } else if roll < 86 {
             let dt = [1, 3, 10, 20, 60][rng.int(0, 4) as usize];
             let times = rng.int(5, 240);
@@ -93,7 +124,7 @@ fn main() {
             json!({"op": "bombThreat"})
         } else if roll < 94 {
             json!({"op": "evaluateStar"})
-        } else if roll < 97 {
+        } else if roll < 97 && modern {
             json!({"op": "callExterminator"})
         } else {
             json!({"op": "reload"})
@@ -107,15 +138,32 @@ fn main() {
                 commands.push(cmd);
                 kept += 1;
             }
-            Some(RunError::Failed { index, .. }) if index == trial.len() - 1 => {
-                if matches!(op.as_str(), "build" | "buildTransport" | "callExterminator") {
-                    cmd["expectFail"] = json!(true);
-                    commands.push(cmd);
-                    kept += 1;
+            Some(RunError::Failed { index, what }) if index == trial.len() - 1 => {
+                match op.as_str() {
+                    // A refusal the runner lets a scenario expect.
+                    "build" | "buildTransport" | "callExterminator" => {
+                        cmd["expectFail"] = json!(true);
+                        commands.push(cmd);
+                        kept += 1;
+                    }
+                    // A refusal with no expectFail form: dropped, the prefix stays
+                    // valid. The drop is logged so an accept-versus-refuse
+                    // divergence on these commands can still be chased by hand.
+                    "sell" | "adjustRent" | "setCars" | "setNoRate" | "setSchedule"
+                    | "startFire" => eprintln!("seed {seed}: dropped {op} ({what}): {cmd}"),
+                    // tick, reload, bombThreat, evaluateStar cannot legitimately refuse:
+                    // a failure here is the engine's own. The failing scenario is
+                    // written before the panic so the artifact carries it.
+                    other => {
+                        write_failed(&out, &id, &scenario_value(&trial));
+                        panic!("seed {seed}: {other} failed on an accepted prefix: {what}")
+                    }
                 }
-                // Any other refused command is dropped; the prefix stays valid.
             }
-            Some(e) => panic!("the accepted prefix failed on replay: {e:?}"),
+            Some(e) => {
+                write_failed(&out, &id, &scenario_value(&trial));
+                panic!("seed {seed}: the accepted prefix failed on replay: {e:?}")
+            }
         }
     }
     commands.push(json!({"op": "checkpoint", "label": "end"}));

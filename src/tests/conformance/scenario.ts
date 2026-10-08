@@ -31,7 +31,7 @@ export type Command =
   | { op: "build"; kind: FacilityKind; floor: number; x: number; expectFail?: boolean }
   | { op: "buildRow"; kind: FacilityKind; floor: number; from: number; to: number }
   | { op: "buildTransport"; kind: FacilityKind; x: number; bottom: number; top: number; expectFail?: boolean }
-  | ({ op: "sell" } & At)
+  | ({ op: "sell"; kind?: FacilityKind } & At)
   | ({ op: "adjustRent"; dir: 1 | -1 } & At)
   | ({ op: "setNoRate" } & At)
   | ({ op: "setCars"; cars: number } & At)
@@ -60,16 +60,17 @@ export interface Checkpoint {
 /** Field types: "int" a whole number, "u32" a whole number from 0 to
  *  4294967295, "count" a whole number above zero, "dir" 1 or -1, "num" a finite
  *  number, "str" a non-empty string, "bool" a boolean, "place" a facility kind
- *  that is not a transport, "shaft" a transport kind, "mode" classic or modern.
+ *  that is not a transport, "shaft" a transport kind, "mode" classic or modern,
+ *  "obj" a JSON object.
  *  A trailing "?" marks the field optional. */
-type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj";
+type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind";
 const AT = { floor: "int", x: "int" } as const;
 const OPS: Record<Command["op"], Spec> = {
   setMoney: { amount: "num" },
   build: { kind: "place", floor: "int", x: "int", expectFail: "bool?" },
   buildRow: { kind: "place", floor: "int", from: "int", to: "int" },
   buildTransport: { kind: "shaft", x: "int", bottom: "int", top: "int", expectFail: "bool?" },
-  sell: AT,
+  sell: { ...AT, kind: "kind?" },
   adjustRent: { ...AT, dir: "dir" },
   setNoRate: AT,
   setCars: { ...AT, cars: "count" },
@@ -96,6 +97,7 @@ function fits(type: FieldType, v: unknown): boolean {
     case "shaft": return typeof v === "string" && own(FACILITIES, v) && !!FACILITIES[v as FacilityKind].transport;
     case "mode": return v === "classic" || v === "modern";
     case "obj": return typeof v === "object" && v !== null && !Array.isArray(v);
+    case "kind": return typeof v === "string" && own(FACILITIES, v);
   }
 }
 
@@ -202,7 +204,16 @@ function apply(sim: Simulation, c: Command, emit: (label: string) => void, clock
       expectOk(r.ok, c.expectFail, `buildTransport ${c.kind} @ x${c.x} ${c.bottom}-${c.top}`, r.reason);
       break;
     }
-    case "sell": expectOk(sim.sellAt(c.floor, c.x), false, `sell @ ${c.floor},${c.x}`); break;
+    case "sell": {
+      // An optional kind pins what the tile holds, so a scenario that says it
+      // sells a housekeeping crew cannot quietly sell whatever sits there.
+      if (c.kind !== undefined) {
+        const here = sim.tower.unitAt(c.floor, c.x)?.kind ?? sim.tower.transportAt(c.floor, c.x)?.kind;
+        if (here !== c.kind) throw new Error(`sell @ ${c.floor},${c.x}: expected ${c.kind}, found ${here ?? "nothing"}`);
+      }
+      expectOk(sim.sellAt(c.floor, c.x), false, `sell @ ${c.floor},${c.x}`);
+      break;
+    }
     case "adjustRent": {
       const u = unitAt(sim, c);
       const before = rentOf(u);

@@ -1107,6 +1107,9 @@ impl Tower {
             skip.push(floor);
         }
         skip.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        // The TypeScript rebuilds the list from a Set, so a loaded duplicate
+        // goes away on the first toggle.
+        skip.dedup();
         self.transports[i].skip_floors = Some(skip);
         self.revision += 1;
         if self.transports[i].schedule.is_some() {
