@@ -259,8 +259,11 @@ export function deserialize(raw: SerializedGame): Simulation {
         // Attendance venues' occupants mirrors the transient customersIn
         // tally (zeroed below), so it restores to 0 no matter what the save
         // carries: a hand-edited or legacy save can't seed a phantom
-        // audience the live crowd would never drain.
-        occupants: FACILITIES[u.kind].attendance !== undefined ? 0 : Math.max(0, num(u.occupants, 0)),
+        // audience the live crowd would never drain. Structure tiles (floor,
+        // lobby) hold nobody either, so a legacy count on one restores to 0:
+        // the per-step scans skip them, and must agree with the hourly ones.
+        occupants:
+          FACILITIES[u.kind].attendance !== undefined || isStructural(u.kind) ? 0 : Math.max(0, num(u.occupants, 0)),
         // Household size, only kept for a CURRENTLY-sold condo, and sanitized by
         // the rule-set (Classic strips it so its condos read the flat 3; Modern
         // clamps into the 2..5 generator band). A not-sold condo (legacy dead

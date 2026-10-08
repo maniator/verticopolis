@@ -2,6 +2,7 @@ import type { Tower } from "../Tower";
 import { FACILITIES, censusCount, isHotelKind, isStaffOnlyTransport, isStaffTransportKind } from "../facilities";
 import { isOperational, isPresent } from "../types";
 import type { Facility, Unit } from "../types";
+import { roomUnits } from "./rooms";
 
 /** Reachability / staff-network / parking routing for the Tower, as friend
  * functions taking the {@link Tower} instance. Extracted from `Tower.ts`. */
@@ -167,7 +168,8 @@ export function facilityOf(_tower: Tower, unit: Unit): Facility {
 
 export function totalPopulation(tower: Tower): number {
   let pop = 0;
-  for (const u of tower.units) {
+  // Structure tiles hold no population; skipping them is the same sum.
+  for (const u of roomUnits(tower)) {
     if (!isPresent(u)) continue;
     // Commercial venues count their live customer tally (meal round-trippers
     // currently eating there); everyone else uses the catalog occupant count.
@@ -196,7 +198,7 @@ export function totalPopulation(tower: Tower): number {
 export function associatedPopulation(tower: Tower, opts?: { excludeHotelOrigin?: boolean }): number {
   const excludeHotel = opts?.excludeHotelOrigin ?? false;
   let pop = 0;
-  for (const u of tower.units) {
+  for (const u of roomUnits(tower)) {
     const out = u.outForMeal ?? 0;
     if (out <= 0 || !isPresent(u)) continue;
     if (excludeHotel && isHotelKind(u.kind)) continue;
