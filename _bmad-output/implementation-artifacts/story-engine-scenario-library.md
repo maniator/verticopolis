@@ -1,6 +1,6 @@
 ---
 story: engine-scenario-library
-status: ready-for-dev
+status: review
 depends_on: engine-rust-port
 ---
 
@@ -70,3 +70,30 @@ lit.
   the engine can refuse gracefully (a build that fails is a fine step); it
   shrinks by truncation, since the scenario format is a list.
 - Review: `/gds-code-review`, since every change here is engine parity.
+
+## What landed
+
+- Scenarios: `hotel-exterminator-modern` (20 checkpoints), `holidays-classic`
+  (18), `metro-express-modern` (13), `vip-review-modern` (15),
+  `offshift-schedule-modern` (26). The lock holds 434 checkpoints, every one
+  matched by the Rust referee on first replay.
+- Runner commands on both sides: `callExterminator` and `setSchedule`, with
+  `Tower::set_schedule` added to the Rust engine.
+- Derived fixtures: `sixseven-december`, `towerone-star4`,
+  `towerone-vip-pending`, each one edit of a serialized field away from an
+  existing save, documented in the conformance README.
+- The loader table (`conformance/loader-cases.json`, 37 cases) and its Rust
+  replay; its first run caught `skipFloors` entries being truncated to whole
+  numbers where the TypeScript keeps the doubles. Fixed. Closes #860.
+- Canon-constant tests in `facilities.rs`.
+- The differential fuzzer (`engine-rs/src/bin/fuzz.rs`,
+  `scripts/fuzz-compare.ts`, `engine-fuzz.yml` nightly); 28 seeds run locally
+  with no divergence.
+- The coverage floor rises to 85% (85.14% measured before the schedule
+  scenario). AC3's "no module under 75%" is not met yet: `events.rs` (61%),
+  `rules.rs` (66%), `star.rs` (68%), `satisfaction.rs` (71%) and
+  `schedule.rs` need the player-choice command (`resolveChoice` on a pending
+  fire rescue or ransom) and the five- and six-star climbs, which no fixture
+  can reach without a long growth script. Those go on the next slice.
+- CONTRIBUTING carries the two-engine rules and the branch-adds-a-scenario
+  rule; the conformance README covers the new commands, fixtures and table.
