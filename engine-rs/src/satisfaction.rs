@@ -314,7 +314,8 @@ impl Simulation {
                 ctx.demand_map = Some(compute_demand_map(self));
             }
             // Floor-level on purpose: the TypeScript probe reads
-            // `sim.floorReachable(u.floor)` here, not the segment probe.
+            // `sim.floorReachable(u.floor)` here, so the segment probe would
+            // be the wrong one.
             let reachable = self.floor_reachable(u.floor);
             let dm = ctx.demand_map.as_mut().unwrap();
             let n = if reachable {

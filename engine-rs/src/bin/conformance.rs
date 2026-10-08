@@ -67,7 +67,7 @@ fn main() {
             Ok(r) => r,
             Err(e) => {
                 all_ok = false;
-                println!("{id}: {e}");
+                println!("{id}: FAILED: {e}");
                 continue;
             }
         };

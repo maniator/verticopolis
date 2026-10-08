@@ -55,7 +55,7 @@ pub fn decode_vctower(text: &str) -> Result<Value, String> {
         .map_err(|e| format!("inflate: {e}"))?;
     if out.len() as u64 > MAX_SAVE_INFLATED_BYTES {
         return Err(
-            "this .vctower expands to more data than we will hold; it looks crafted, not saved"
+            "this .vctower expands to more data than we will hold; it looks crafted rather than saved"
                 .into(),
         );
     }
@@ -81,7 +81,8 @@ fn finite_num(v: Option<&Value>) -> Option<f64> {
 }
 
 /// `Number(v)` for the shapes a save holds: a number is itself, a missing
-/// value is NaN, null is 0, and anything else is NaN.
+/// value is NaN, null is 0, a boolean is 0 or 1, and a string follows the
+/// `StringNumericLiteral` grammar (`js_string_number`); anything else is NaN.
 fn js_number(v: Option<&Value>) -> f64 {
     match v {
         Some(Value::Number(n)) => n.as_f64().unwrap_or(f64::NAN),
@@ -93,15 +94,97 @@ fn js_number(v: Option<&Value>) -> f64 {
                 0.0
             }
         }
-        Some(Value::String(s)) => {
-            let t = s.trim();
-            if t.is_empty() {
-                0.0
-            } else {
-                t.parse::<f64>().unwrap_or(f64::NAN)
+        Some(Value::String(s)) => js_string_number(s),
+        _ => f64::NAN,
+    }
+}
+
+/// `Number(string)`: trim JavaScript whitespace (which includes U+FEFF), an
+/// empty string is 0, `0x`/`0o`/`0b` prefixes are unsigned integer literals,
+/// `Infinity` is spelled exactly so, and the rest is a decimal literal
+/// (`[+-] digits [. digits] [e [+-] digits]`, `.5` and `5.` included). Rust's
+/// `f64::from_str` also takes `inf`, `nan` and `infinity` in any case, so the
+/// decimal path is checked character by character before it is parsed.
+fn js_string_number(s: &str) -> f64 {
+    let is_js_space = |c: char| c.is_whitespace() || c == '\u{feff}';
+    let t = s.trim_matches(is_js_space);
+    if t.is_empty() {
+        return 0.0;
+    }
+    let radix = |rest: &str, radix: u32| -> f64 {
+        if rest.is_empty() {
+            return f64::NAN;
+        }
+        let mut acc = 0.0f64;
+        for c in rest.chars() {
+            match c.to_digit(radix) {
+                Some(d) => acc = acc * radix as f64 + d as f64,
+                None => return f64::NAN,
             }
         }
-        _ => f64::NAN,
+        acc
+    };
+    let lower = t.to_ascii_lowercase();
+    if let Some(rest) = lower.strip_prefix("0x") {
+        return radix(rest, 16);
+    }
+    if let Some(rest) = lower.strip_prefix("0o") {
+        return radix(rest, 8);
+    }
+    if let Some(rest) = lower.strip_prefix("0b") {
+        return radix(rest, 2);
+    }
+    let (neg, body) = match t.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, t.strip_prefix('+').unwrap_or(t)),
+    };
+    if body == "Infinity" {
+        return if neg {
+            f64::NEG_INFINITY
+        } else {
+            f64::INFINITY
+        };
+    }
+    // StrUnsignedDecimalLiteral: digits, an optional fraction, an optional
+    // exponent; at least one digit in the mantissa.
+    let mut chars = body.chars().peekable();
+    let mut mantissa_digits = 0;
+    while chars.peek().is_some_and(|c| c.is_ascii_digit()) {
+        chars.next();
+        mantissa_digits += 1;
+    }
+    if chars.peek() == Some(&'.') {
+        chars.next();
+        while chars.peek().is_some_and(|c| c.is_ascii_digit()) {
+            chars.next();
+            mantissa_digits += 1;
+        }
+    }
+    if mantissa_digits == 0 {
+        return f64::NAN;
+    }
+    if matches!(chars.peek(), Some('e') | Some('E')) {
+        chars.next();
+        if matches!(chars.peek(), Some('+') | Some('-')) {
+            chars.next();
+        }
+        let mut exp_digits = 0;
+        while chars.peek().is_some_and(|c| c.is_ascii_digit()) {
+            chars.next();
+            exp_digits += 1;
+        }
+        if exp_digits == 0 {
+            return f64::NAN;
+        }
+    }
+    if chars.next().is_some() {
+        return f64::NAN;
+    }
+    let v = body.parse::<f64>().unwrap_or(f64::NAN);
+    if neg {
+        -v
+    } else {
+        v
     }
 }
 
@@ -1555,4 +1638,42 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     sim.adopt_milestones();
     sim.founder = detect_founder(raw);
     Ok(sim)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::js_string_number;
+
+    /// Pinned with Node: `Number(s)` for each input.
+    #[test]
+    fn string_number_matches_javascript() {
+        let same = [
+            ("", 0.0),
+            ("  12 ", 12.0),
+            ("\u{feff}7\u{feff}", 7.0),
+            ("0x1A", 26.0),
+            ("0X1a", 26.0),
+            ("0b101", 5.0),
+            ("0o17", 15.0),
+            ("Infinity", f64::INFINITY),
+            ("-Infinity", f64::NEG_INFINITY),
+            ("+Infinity", f64::INFINITY),
+            ("1e5", 100000.0),
+            (".5", 0.5),
+            ("5.", 5.0),
+            ("+5", 5.0),
+            ("1.5e-3", 0.0015),
+            (" 3.0e+2 ", 300.0),
+        ];
+        for (s, want) in same {
+            assert_eq!(js_string_number(s), want, "{s:?}");
+        }
+        assert!(js_string_number("-0").is_sign_negative());
+        assert_eq!(js_string_number("-0"), 0.0);
+        for s in [
+            "0x", "inf", "infinity", "NaN", "1e", "1_000", "12abc", "0x1.5", "-0x10", "e5", ".",
+        ] {
+            assert!(js_string_number(s).is_nan(), "{s:?}");
+        }
+    }
 }

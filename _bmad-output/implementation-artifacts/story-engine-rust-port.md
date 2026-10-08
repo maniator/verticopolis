@@ -76,7 +76,11 @@ run, the switch, threading) are planned in
 ## Review findings
 
 `/gds-code-review`, round one (2026-10-08): 0 `decision_needed`, 24 `patch`,
-3 `defer`, 7 dismissed as faithful ports of TypeScript behavior or noise.
+3 `defer`, 7 dismissed as faithful ports of TypeScript behavior or noise. The
+24 patches are grouped below by file into 16 rows; the fixes landed across
+commits 64f888c, cfe6f5e and 0f8b209. The referee's "EXTRA checkpoint" report
+belongs to the panicking-scenario row, and the dropped `Serialize` derive on
+`Command` to the dead-code row.
 
 - [x] [Review][Patch] Referee aborts on a panicking scenario [engine-rs/src/bin/conformance.rs]
 - [x] [Review][Patch] Crowd seed is exact u64 math where JavaScript rounds past 2^53 [engine-rs/src/crowd/spawn.rs]
@@ -97,6 +101,18 @@ run, the switch, threading) are planned in
 - [x] [Review][Defer] JavaScript number semantics on hand-edited saves [engine-rs/src/load.rs] (#858)
 - [x] [Review][Defer] Borrowed views for the memoized tower sets [engine-rs/src/tower_query.rs] (#859)
 - [x] [Review][Defer] Unit tests for migrations, coercion and schedules [engine-rs/] (#860)
+
+Round two (confirming pass, 2026-10-08) on the round-one fix commits: 0
+`decision_needed`, 5 `patch`, 0 new `defer` (two notes folded into #858),
+and the rest dismissed (compile-checked claims, guards the TypeScript shares,
+or a crowd that is never loaded from a save).
+
+- [x] [Review][Patch] `Number(string)` grammar: Rust `parse` takes `inf`/`nan` and refuses `0x`/`0o`/`0b` [engine-rs/src/load.rs]
+- [x] [Review][Patch] Two new "X, not Y" sentences (inflate error copy, floor-probe comment) [engine-rs/src/load.rs, satisfaction.rs]
+- [x] [Review][Patch] Referee error lines carry no status token [engine-rs/src/bin/conformance.rs]
+- [x] [Review][Patch] Roadmap counts 374 checkpoints; the lock holds 342 [architecture-engine-rust-port-2026-10-08.md]
+- [x] [Review][Patch] Story rows do not say how 24 findings became 16 rows across three commits [this file]
+- [x] [Review][Defer] Present non-boolean `evaluatedTower`/`builtWeddingHall`, non-string `towerName`, and `vipVisitDay` saturation past i64 [engine-rs/src/load.rs] (folded into #858)
 
 Dismissed: build leaves substrate floors on a failed placement (the
 TypeScript does the same), transient crowd readouts kept for hosts, the
