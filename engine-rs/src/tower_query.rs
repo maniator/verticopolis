@@ -166,7 +166,8 @@ impl Tower {
                 if t.kind.is_staff_only_transport() {
                     continue;
                 }
-                let connects = (t.bottom..=t.top).any(|fl| t.stops_at(fl) && reachable.contains(&fl));
+                let connects =
+                    (t.bottom..=t.top).any(|fl| t.stops_at(fl) && reachable.contains(&fl));
                 if connects {
                     for fl in t.bottom..=t.top {
                         if t.stops_at(fl) && !reachable.contains(&fl) {
@@ -250,7 +251,9 @@ impl Tower {
     /// `functionalParkingSet`: parking-space ids chained to a ramp.
     pub fn functional_parking_set(&self) -> HashSet<i64> {
         let usable = |u: Option<&Unit>| {
-            u.is_some_and(|u| matches!(u.kind, Kind::Parking | Kind::ParkingRamp) && u.is_operational())
+            u.is_some_and(|u| {
+                matches!(u.kind, Kind::Parking | Kind::ParkingRamp) && u.is_operational()
+            })
         };
         let mut stack: Vec<(i64, i64)> = Vec::new();
         for u in &self.units {

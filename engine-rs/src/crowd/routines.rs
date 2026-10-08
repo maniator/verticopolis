@@ -18,24 +18,33 @@ fn passes(crowd: &mut Crowd, weight: f64) -> bool {
     weight >= 1.0 || crowd.rng.chance(weight)
 }
 
-pub fn push_routine_options(crowd: &mut Crowd, tower: &Tower, clock: &Clock, floors: &SpawnFloors, options: &mut Options) {
+pub fn push_routine_options(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    clock: &Clock,
+    floors: &SpawnFloors,
+    options: &mut Options,
+) {
     let (school_run, sales_call) = tower.mode.demographic_routines();
     if school_run <= 0.0 && sales_call <= 0.0 {
         return;
     }
     let hour = clock.hour();
     if school_run > 0.0 && !clock.is_weekend() && !floors.household_floors.is_empty() {
-        if hour >= SCHOOL_RUN_DEPART_START && hour < SCHOOL_RUN_DEPART_END && passes(crowd, school_run) {
+        if (SCHOOL_RUN_DEPART_START..SCHOOL_RUN_DEPART_END).contains(&hour)
+            && passes(crowd, school_run)
+        {
             options.push_school_departure();
         }
-        if hour >= SCHOOL_RUN_RETURN_START && hour < SCHOOL_RUN_RETURN_END && passes(crowd, school_run) {
+        if (SCHOOL_RUN_RETURN_START..SCHOOL_RUN_RETURN_END).contains(&hour)
+            && passes(crowd, school_run)
+        {
             options.push_school_return();
         }
     }
     if sales_call > 0.0
         && !floors.staffed_offices.is_empty()
-        && hour >= SALES_CALL_START
-        && hour < SALES_CALL_END
+        && (SALES_CALL_START..SALES_CALL_END).contains(&hour)
         && passes(crowd, sales_call)
     {
         options.push_sales_call();
@@ -58,7 +67,9 @@ pub fn spawn_school_departure(crowd: &mut Crowd, tower: &mut Tower, floors: &Spa
     }
     let origin_id = *crowd.rng.pick(&candidates);
     let ox = tower.get_unit(origin_id).unwrap().x;
-    let Some(i) = add(crowd, tower, floor, GROUND_LOBBY, Some(ox), None) else { return };
+    let Some(i) = add(crowd, tower, floor, GROUND_LOBBY, Some(ox), None) else {
+        return;
+    };
     let p = &mut crowd.people[i];
     p.routine = Some("schoolRun");
     p.origin_unit_id = Some(origin_id);
@@ -91,7 +102,9 @@ pub fn spawn_sales_call(crowd: &mut Crowd, tower: &mut Tower, floors: &SpawnFloo
     }
     let origin_id = *crowd.rng.pick(&candidates);
     let ox = tower.get_unit(origin_id).unwrap().x;
-    let Some(i) = add(crowd, tower, floor, GROUND_LOBBY, Some(ox), None) else { return };
+    let Some(i) = add(crowd, tower, floor, GROUND_LOBBY, Some(ox), None) else {
+        return;
+    };
     let p = &mut crowd.people[i];
     p.routine = Some("salesCall");
     p.origin_unit_id = Some(origin_id);

@@ -6,8 +6,8 @@ pub mod graph;
 pub mod landing;
 pub mod meals;
 pub mod motion;
-pub mod routing;
 pub mod routines;
+pub mod routing;
 pub mod spawn;
 pub mod visits;
 pub mod walk;
@@ -243,8 +243,10 @@ impl Crowd {
             .get(&origin_floor)
             .copied()
             .unwrap_or(wait_seconds);
-        self.commute_wait_by_floor
-            .insert(origin_floor, prev + (wait_seconds - prev) * COMMUTE_STRESS_ALPHA);
+        self.commute_wait_by_floor.insert(
+            origin_floor,
+            prev + (wait_seconds - prev) * COMMUTE_STRESS_ALPHA,
+        );
     }
 
     pub fn begin_step(&mut self) {
@@ -278,7 +280,14 @@ impl Crowd {
         routing::staff_route(self, tower, from, from_x, to, to_x)
     }
 
-    pub fn reachable(&mut self, tower: &Tower, from: i64, to: i64, from_x: Option<f64>, to_x: Option<f64>) -> bool {
+    pub fn reachable(
+        &mut self,
+        tower: &Tower,
+        from: i64,
+        to: i64,
+        from_x: Option<f64>,
+        to_x: Option<f64>,
+    ) -> bool {
         routing::reachable(self, tower, from, from_x, to, to_x)
     }
 

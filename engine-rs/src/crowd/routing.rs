@@ -11,7 +11,11 @@ fn build_adjacency<'a>(tower: &Tower, transports: impl Iterator<Item = &'a Trans
     let mut adj: AdjGraph = HashMap::new();
     for t in transports {
         let stops = tower.stops_of(t);
-        let walk_kind = if t.kind.is_walkway() { Some(t.kind) } else { None };
+        let walk_kind = if t.kind.is_walkway() {
+            Some(t.kind)
+        } else {
+            None
+        };
         let seg_lists: Vec<Vec<i64>> = stops.iter().map(|&fl| tower.landing_segs(t, fl)).collect();
         for ai in 0..stops.len() {
             for &a_seg in &seg_lists[ai] {
@@ -66,7 +70,12 @@ pub fn staff_adjacency<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a AdjGraph 
 }
 
 /// `passengerPath`: the per-mode router on segment ids.
-pub fn passenger_path(crowd: &mut Crowd, tower: &Tower, from_seg: i64, to_seg: i64) -> Option<Route> {
+pub fn passenger_path(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    from_seg: i64,
+    to_seg: i64,
+) -> Option<Route> {
     let walk_budget = tower.mode.walkway_willingness_applies();
     let adj = adjacency(crowd, tower);
     if walk_budget {
@@ -189,7 +198,9 @@ pub fn bfs_route_walk_budget(adj: &AdjGraph, from: i64, to: i64) -> Option<Route
             let Some(edges) = adj.get(&s.0) else { continue };
             for edge in edges {
                 let ns: St = if let Some(wk) = edge.walk_kind {
-                    let Some(w) = wk.walkway_willingness() else { continue };
+                    let Some(w) = wk.walkway_willingness() else {
+                        continue;
+                    };
                     let cap = match s.2 {
                         Some(c) => c.min(w),
                         None => w,
@@ -231,14 +242,21 @@ pub fn bfs_route_walk_budget(adj: &AdjGraph, from: i64, to: i64) -> Option<Route
 pub fn elevator_calls(crowd: &Crowd, tower: &Tower) -> ElevatorCalls {
     let mut calls = ElevatorCalls::default();
     let mut bump = |shaft: i64, floor: i64| {
-        *calls.hall.entry(shaft).or_default().entry(floor).or_insert(0.0) += 1.0;
+        *calls
+            .hall
+            .entry(shaft)
+            .or_default()
+            .entry(floor)
+            .or_insert(0.0) += 1.0;
     };
     for p in &crowd.people {
         let Some(sid) = p.shaft_id else { continue };
         if p.state == PState::Waiting {
             bump(sid, p.floor);
         } else if p.state == PState::Riding && p.car_index.is_some() {
-            let Some(&dest) = p.floors.get(p.leg + 1) else { continue };
+            let Some(&dest) = p.floors.get(p.leg + 1) else {
+                continue;
+            };
             calls
                 .cab
                 .entry(sid)

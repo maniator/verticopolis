@@ -38,7 +38,11 @@ fn origin_weight(kind: Kind) -> Option<f64> {
 
 /// `towerDemandBonus`.
 fn tower_demand_bonus(sim: &Simulation) -> f64 {
-    let metro = if sim.has_operational(Kind::Metro) { 0.25 } else { 0.0 };
+    let metro = if sim.has_operational(Kind::Metro) {
+        0.25
+    } else {
+        0.0
+    };
     let centers = sim.count_operational(Kind::Recycling);
     let mut recycling = 0.0;
     if centers > 0 {
@@ -74,7 +78,9 @@ pub fn compute_demand_map(sim: &mut Simulation) -> DemandMap {
     let mut total_cap = 0.0;
     let mut retail_venue_count = 0;
     for &(id, kind, floor, x, state, _) in &rooms {
-        let Some(cap) = crate::economy::commercial_daily_income(mode, kind) else { continue };
+        let Some(cap) = crate::economy::commercial_daily_income(mode, kind) else {
+            continue;
+        };
         if kind.attendance_cap().is_some() {
             continue;
         }
@@ -92,7 +98,9 @@ pub fn compute_demand_map(sim: &mut Simulation) -> DemandMap {
     let reachable_venue_count = venues.len() as i64;
     let mut pool = 0.0;
     for &(id, kind, floor, x, state, residents) in &rooms {
-        let Some(w) = origin_weight(kind) else { continue };
+        let Some(w) = origin_weight(kind) else {
+            continue;
+        };
         let tenanted = matches!(state, UnitState::Occupied | UnitState::Vacating);
         if !tenanted && state != UnitState::Asleep {
             continue;
@@ -106,7 +114,11 @@ pub fn compute_demand_map(sim: &mut Simulation) -> DemandMap {
     }
     let bonus = tower_demand_bonus(sim);
     pool *= bonus;
-    let share = if total_cap > 0.0 { pool / total_cap } else { 0.0 };
+    let share = if total_cap > 0.0 {
+        pool / total_cap
+    } else {
+        0.0
+    };
     let frac = share.min(1.0).max(floor_frac);
     for (id, cap) in venues {
         fraction_by_unit.insert(id, frac);
@@ -125,7 +137,10 @@ pub fn compute_demand_map(sim: &mut Simulation) -> DemandMap {
 }
 
 fn operational(state: UnitState) -> bool {
-    !matches!(state, UnitState::Construction | UnitState::Fire | UnitState::Gutted)
+    !matches!(
+        state,
+        UnitState::Construction | UnitState::Fire | UnitState::Gutted
+    )
 }
 
 fn resident_count(kind: Kind, residents: Option<i64>) -> i64 {
@@ -139,7 +154,9 @@ fn resident_count(kind: Kind, residents: Option<i64>) -> i64 {
 
 /// `originDemand(sim, u, bonus)`.
 pub fn origin_demand(sim: &Simulation, kind: Kind, residents: Option<i64>, bonus: f64) -> f64 {
-    let Some(w) = origin_weight(kind) else { return 0.0 };
+    let Some(w) = origin_weight(kind) else {
+        return 0.0;
+    };
     resident_count(kind, residents) as f64 * w * sim.mode.demand_model().0 * bonus
 }
 
@@ -157,5 +174,9 @@ pub fn unmet_coverage(dm: &DemandMap, u: &Unit) -> Option<f64> {
     if reachable == 0 {
         return Some(0.0);
     }
-    Some(if dm.share > 0.0 { (1.0 / dm.share).min(1.0) } else { 1.0 })
+    Some(if dm.share > 0.0 {
+        (1.0 / dm.share).min(1.0)
+    } else {
+        1.0
+    })
 }

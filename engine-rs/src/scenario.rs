@@ -150,7 +150,8 @@ fn start_sim(start: &Start, root: &std::path::Path) -> Result<Simulation, RunErr
             let failed = |what: String| RunError::Failed { index: 0, what };
             let text = std::fs::read_to_string(root.join(fixture))
                 .map_err(|e| failed(format!("{fixture}: {e}")))?;
-            let mut raw = crate::load::decode_vctower(&text).map_err(|e| failed(format!("{fixture}: {e}")))?;
+            let mut raw = crate::load::decode_vctower(&text)
+                .map_err(|e| failed(format!("{fixture}: {e}")))?;
             if let Some(m) = mode {
                 raw["mode"] = serde_json::Value::String(m.clone());
             }
@@ -158,7 +159,10 @@ fn start_sim(start: &Start, root: &std::path::Path) -> Result<Simulation, RunErr
             crate::load::mark_founder_from_loaded_file(&mut sim, &raw);
             if let Some(m) = mode {
                 if sim.mode.as_str() != m {
-                    return Err(failed(format!("{fixture} loaded as {}, not {m}", sim.mode.as_str())));
+                    return Err(failed(format!(
+                        "{fixture} loaded as {}, not {m}",
+                        sim.mode.as_str()
+                    )));
                 }
             }
             Ok(sim)
@@ -194,15 +198,22 @@ pub fn run_scenario_until(s: &Scenario, root: &std::path::Path, label: &str) -> 
     run_scenario_inner(s, root, Some(label)).1
 }
 
-fn run_scenario_inner(s: &Scenario, root: &std::path::Path, stop_at: Option<&str>) -> (Run, Option<Simulation>) {
+fn run_scenario_inner(
+    s: &Scenario,
+    root: &std::path::Path,
+    stop_at: Option<&str>,
+) -> (Run, Option<Simulation>) {
     let mut out = Vec::new();
     let mut sim = match start_sim(&s.start, root) {
         Ok(sim) => sim,
         Err(e) => {
-            return (Run {
-                checkpoints: out,
-                error: Some(e),
-            }, None)
+            return (
+                Run {
+                    checkpoints: out,
+                    error: Some(e),
+                },
+                None,
+            )
         }
     };
     let stop = std::cell::Cell::new(false);
@@ -218,7 +229,13 @@ fn run_scenario_inner(s: &Scenario, root: &std::path::Path, stop_at: Option<&str
     };
     emit(&sim, "start".into(), &mut out);
     if stop.get() {
-        return (Run { checkpoints: out, error: None }, Some(sim));
+        return (
+            Run {
+                checkpoints: out,
+                error: None,
+            },
+            Some(sim),
+        );
     }
     let mut elapsed: i64 = 0;
     for (i, c) in s.commands.iter().enumerate() {
@@ -348,8 +365,13 @@ fn run_scenario_inner(s: &Scenario, root: &std::path::Path, stop_at: Option<&str
                         let u = sim.tower.get_unit(id).unwrap();
                         rent_of(u.kind, u.rent, u.no_rate) != before
                     };
-                    expect_ok(moved, false, &format!("adjustRent {dir} @ {floor},{x}"), Some("rent did not move"))
-                        .map_err(failed)?;
+                    expect_ok(
+                        moved,
+                        false,
+                        &format!("adjustRent {dir} @ {floor},{x}"),
+                        Some("rent did not move"),
+                    )
+                    .map_err(failed)?;
                 }
                 Command::SetNoRate { floor, x } => {
                     let id = sim
@@ -357,14 +379,24 @@ fn run_scenario_inner(s: &Scenario, root: &std::path::Path, stop_at: Option<&str
                         .unit_at(*floor, *x)
                         .map(|u| u.id)
                         .ok_or_else(|| failed(format!("no unit at floor {floor}, x {x}")))?;
-                    expect_ok(sim.set_no_rate(id), false, &format!("setNoRate @ {floor},{x}"), None)
-                        .map_err(failed)?;
+                    expect_ok(
+                        sim.set_no_rate(id),
+                        false,
+                        &format!("setNoRate @ {floor},{x}"),
+                        None,
+                    )
+                    .map_err(failed)?;
                 }
                 Command::StartFire => {
                     let before = sim.events.count();
                     sim.start_fire();
-                    expect_ok(sim.events.count() > before, false, "startFire", Some("nothing caught fire"))
-                        .map_err(failed)?;
+                    expect_ok(
+                        sim.events.count() > before,
+                        false,
+                        "startFire",
+                        Some("nothing caught fire"),
+                    )
+                    .map_err(failed)?;
                 }
                 Command::BombThreat => sim.bomb_threat(),
                 Command::EvaluateStar => sim.evaluate_star(),
@@ -381,19 +413,31 @@ fn run_scenario_inner(s: &Scenario, root: &std::path::Path, stop_at: Option<&str
             Ok(())
         })();
         if let Err(e) = r {
-            return (Run {
-                checkpoints: out,
-                error: Some(e),
-            }, None);
+            return (
+                Run {
+                    checkpoints: out,
+                    error: Some(e),
+                },
+                None,
+            );
         }
         if stop.get() {
-            return (Run { checkpoints: out, error: None }, Some(sim));
+            return (
+                Run {
+                    checkpoints: out,
+                    error: None,
+                },
+                Some(sim),
+            );
         }
     }
     emit(&sim, "final".into(), &mut out);
     let stopped = if stop.get() { Some(sim) } else { None };
-    (Run {
-        checkpoints: out,
-        error: None,
-    }, stopped)
+    (
+        Run {
+            checkpoints: out,
+            error: None,
+        },
+        stopped,
+    )
 }

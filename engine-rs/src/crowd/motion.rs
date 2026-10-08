@@ -6,7 +6,10 @@ use super::landing::landing_slots;
 use super::spawn::{inside_x, metro_station_for_platform, pick_x, pick_x_in_segment};
 use super::visits::begin_dwell;
 use super::walk::walk_to;
-use super::{Crowd, PState, Person, StaffResult, CAR_CAPACITY, GIVE_UP, RIDE_SECONDS_PER_FLOOR, STAFF_GIVE_UP, STRESS_WAIT};
+use super::{
+    Crowd, PState, Person, StaffResult, CAR_CAPACITY, GIVE_UP, RIDE_SECONDS_PER_FLOOR,
+    STAFF_GIVE_UP, STRESS_WAIT,
+};
 use crate::jsmath;
 use crate::tower::Tower;
 
@@ -96,7 +99,11 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
             if dir == 0.0 {
                 dir = 1.0;
             }
-            let speed = if shaft.kind == crate::facilities::Kind::Escalator { 1.3 } else { 0.85 };
+            let speed = if shaft.kind == crate::facilities::Kind::Escalator {
+                1.3
+            } else {
+                0.85
+            };
             p.fy += dir * speed * dt;
             p.x = shaft.x as f64 + shaft.width as f64 / 2.0;
             if (dir > 0.0 && p.fy >= dest as f64) || (dir < 0.0 && p.fy <= dest as f64) {
@@ -225,7 +232,13 @@ fn transition_to_return(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
     let venue_floor = crowd.people[i].floor;
     let origin_floor = origin.map(|o| o.0).unwrap_or(crowd.people[i].floors[0]);
     let from_x = crowd.people[i].x;
-    let r = crowd.route(tower, venue_floor, origin_floor, Some(from_x), origin.map(|o| o.1 as f64));
+    let r = crowd.route(
+        tower,
+        venue_floor,
+        origin_floor,
+        Some(from_x),
+        origin.map(|o| o.1 as f64),
+    );
     let Some(r) = r else {
         crowd.people[i].returning = true;
         finish(crowd, i, tower);
@@ -237,7 +250,11 @@ fn transition_to_return(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
     p.leg = 0;
     p.shaft_id = p.shafts.first().copied();
     p.car_index = None;
-    p.state = if p.shafts.is_empty() { PState::ToDest } else { PState::ToShaft };
+    p.state = if p.shafts.is_empty() {
+        PState::ToDest
+    } else {
+        PState::ToShaft
+    };
     p.wait = 0.0;
     p.age = 0.0;
     p.linger = 0.0;
@@ -260,7 +277,9 @@ fn transition_to_return(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
 
 fn release_seat(crowd: &mut Crowd, i: usize) {
     let p = &mut crowd.people[i];
-    let (Some(ci), Some(sid)) = (p.car_index, p.shaft_id) else { return };
+    let (Some(ci), Some(sid)) = (p.car_index, p.shaft_id) else {
+        return;
+    };
     let key = (sid, ci);
     let n = crowd.car_riders.get(&key).copied().unwrap_or(1);
     crowd.car_riders.insert(key, (n - 1).max(0));

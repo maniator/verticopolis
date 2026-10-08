@@ -527,7 +527,7 @@ impl Tower {
     ) -> Option<String> {
         let f = kind.facility();
         let hgt = kind.floors();
-        if floor < MIN_FLOOR || floor > MAX_FLOOR {
+        if !(MIN_FLOOR..=MAX_FLOOR).contains(&floor) {
             return Some("Outside the buildable range.".into());
         }
         if x < 0 || x + f.width > LOT_WIDTH {
@@ -542,7 +542,7 @@ impl Tower {
         if floor + hgt - 1 > MAX_FLOOR {
             return Some("Not enough floors above for this facility.".into());
         }
-        if f.basement && floor + hgt - 1 >= 1 {
+        if f.basement && floor + hgt > 1 {
             return Some(format!("{} can only be built in the basement.", f.name));
         }
         if covers_ground_floor(floor, hgt) {
@@ -574,7 +574,7 @@ impl Tower {
 
     pub fn can_place(&self, kind: Kind, floor: i64, x: i64) -> PlaceResult {
         let f = kind.facility();
-        if floor < MIN_FLOOR || floor > MAX_FLOOR {
+        if !(MIN_FLOOR..=MAX_FLOOR).contains(&floor) {
             return PlaceResult::fail("Outside the buildable range.");
         }
         if x < 0 || x + f.width > LOT_WIDTH {
@@ -643,7 +643,7 @@ impl Tower {
         if !kind.is_structural() {
             return PlaceResult::fail("Not a structural tile.");
         }
-        if floor < MIN_FLOOR || floor > MAX_FLOOR {
+        if !(MIN_FLOOR..=MAX_FLOOR).contains(&floor) {
             return PlaceResult::fail("Outside the buildable range.");
         }
         if x < 0 || x + f.width > LOT_WIDTH {

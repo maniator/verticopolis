@@ -71,7 +71,11 @@ pub fn noise_base_erosion_for(kind: Kind, ever_occupied: bool) -> f64 {
 impl Simulation {
     /// `buildSatisfactionContext`.
     pub fn build_satisfaction_context(&self, neutralize_congestion: bool) -> SatisfactionContext {
-        let cong_map = if neutralize_congestion { None } else { Some(self.spatial_congestion_by_floor()) };
+        let cong_map = if neutralize_congestion {
+            None
+        } else {
+            Some(self.spatial_congestion_by_floor())
+        };
         let mut global_cong = 0.0;
         if let Some(m) = &cong_map {
             for &v in m.values() {
@@ -88,11 +92,15 @@ impl Simulation {
         for c in self.tower.room_units() {
             if c.kind == Kind::FitnessClub && c.is_tenanted() && served_set.contains(&c.floor) {
                 club_floors.push(c.floor);
-            } else if c.kind == Kind::Nightclub && c.is_operational() && served_set.contains(&c.floor) {
+            } else if c.kind == Kind::Nightclub
+                && c.is_operational()
+                && served_set.contains(&c.floor)
+            {
                 nightclub_floors.push(c.floor);
             } else if c.kind == Kind::Spa && c.is_operational() && served_set.contains(&c.floor) {
                 spa_floors.push(c.floor);
-            } else if c.kind == Kind::Daycare && c.is_operational() && served_set.contains(&c.floor) {
+            } else if c.kind == Kind::Daycare && c.is_operational() && served_set.contains(&c.floor)
+            {
                 daycare_floors.push(c.floor);
             }
         }
@@ -120,7 +128,12 @@ impl Simulation {
     }
 
     /// `nearestKindWithin`.
-    fn nearest_kind_within(&self, u: &Unit, is_source: impl Fn(Kind) -> bool, max_tiles: i64) -> bool {
+    fn nearest_kind_within(
+        &self,
+        u: &Unit,
+        is_source: impl Fn(Kind) -> bool,
+        max_tiles: i64,
+    ) -> bool {
         for dir in [-1i64, 1] {
             let start = if dir < 0 { u.x - 1 } else { u.x + u.width };
             for d in 0..=max_tiles {
@@ -147,13 +160,22 @@ impl Simulation {
             return self.nearest_kind_within(u, |k| k.is_commercial(), OFFICE_NOISE_TILES);
         }
         if u.kind.is_hotel() || u.kind == Kind::Condo || u.kind.is_rental() {
-            return self.nearest_kind_within(u, |k| k == Kind::Office || k.is_commercial(), HOTEL_NOISE_TILES);
+            return self.nearest_kind_within(
+                u,
+                |k| k == Kind::Office || k.is_commercial(),
+                HOTEL_NOISE_TILES,
+            );
         }
         false
     }
 
     /// `satisfactionStep`.
-    pub fn satisfaction_step(&mut self, u: &Unit, current: f64, ctx: &mut SatisfactionContext) -> StepResult {
+    pub fn satisfaction_step(
+        &mut self,
+        u: &Unit,
+        current: f64,
+        ctx: &mut SatisfactionContext,
+    ) -> StepResult {
         let served = ctx.served_set.contains(&u.floor) && self.reaches_lobby(u);
         let cong = match &ctx.cong_map {
             Some(m) => m.get(&u.floor).copied().unwrap_or(0.0),
@@ -175,27 +197,37 @@ impl Simulation {
         }
         let residential = u.kind == Kind::Condo || u.kind == Kind::RentalApartment;
         if residential && served && !ctx.club_floors.is_empty() {
-            let bonus = self.mode.fitness_halo_bonus(nearest_floor_dist(&ctx.club_floors, u.floor));
+            let bonus = self
+                .mode
+                .fitness_halo_bonus(nearest_floor_dist(&ctx.club_floors, u.floor));
             if bonus > 0.0 {
                 s = (s + bonus).min(1.0);
             }
         }
-        if (u.kind == Kind::Condo || u.kind.is_hotel() || u.kind == Kind::RentalApartment) && served && !ctx.nightclub_floors.is_empty() {
-            let penalty = self.mode.nightclub_noise_penalty(nearest_floor_dist(&ctx.nightclub_floors, u.floor));
+        if (u.kind == Kind::Condo || u.kind.is_hotel() || u.kind == Kind::RentalApartment)
+            && served
+            && !ctx.nightclub_floors.is_empty()
+        {
+            let penalty = self
+                .mode
+                .nightclub_noise_penalty(nearest_floor_dist(&ctx.nightclub_floors, u.floor));
             if penalty > 0.0 {
                 s = (s - penalty).max(0.0);
             }
         }
         if u.kind.is_hotel() && served && !ctx.spa_floors.is_empty() {
-            let bonus = self.mode.spa_serenity_bonus(nearest_floor_dist(&ctx.spa_floors, u.floor));
+            let bonus = self
+                .mode
+                .spa_serenity_bonus(nearest_floor_dist(&ctx.spa_floors, u.floor));
             if bonus > 0.0 {
                 s = (s + bonus).min(1.0);
             }
         }
         if residential && served && !ctx.daycare_floors.is_empty() {
-            let bonus = self
-                .mode
-                .daycare_family_bonus(nearest_floor_dist(&ctx.daycare_floors, u.floor), u.residents.unwrap_or(0) as f64);
+            let bonus = self.mode.daycare_family_bonus(
+                nearest_floor_dist(&ctx.daycare_floors, u.floor),
+                u.residents.unwrap_or(0) as f64,
+            );
             if bonus > 0.0 {
                 s = (s + bonus).min(1.0);
             }
@@ -203,12 +235,24 @@ impl Simulation {
         let far_walk = (u.kind == Kind::Office || u.kind == Kind::RentalApartment)
             && served
             && u.floor != 1
-            && self.tower.nearest_transport_distance(u).is_none_or(|d| d > TRANSPORT_FAR_TILES);
-        let noisy = (u.kind == Kind::Office || u.kind.is_hotel() || u.kind == Kind::Condo || u.kind.is_rental())
+            && self
+                .tower
+                .nearest_transport_distance(u)
+                .is_none_or(|d| d > TRANSPORT_FAR_TILES);
+        let noisy = (u.kind == Kind::Office
+            || u.kind.is_hotel()
+            || u.kind == Kind::Condo
+            || u.kind.is_rental())
             && served
             && self.noise_afflicted(u);
-        let lobby_drain = if served && (u.kind == Kind::Office || u.kind.is_hotel() || u.kind == Kind::Condo || u.kind == Kind::RentalApartment) {
-            self.mode.lobby_distance_drain(self.tower.nearest_lobby_floor_distance(u.floor))
+        let lobby_drain = if served
+            && (u.kind == Kind::Office
+                || u.kind.is_hotel()
+                || u.kind == Kind::Condo
+                || u.kind == Kind::RentalApartment)
+        {
+            self.mode
+                .lobby_distance_drain(self.tower.nearest_lobby_floor_distance(u.floor))
         } else {
             NO_DRAIN
         };
@@ -228,10 +272,22 @@ impl Simulation {
         let unmet_capped = unmet_drain.cap < 1.0;
         if far_walk || noisy || lobby_capped || unmet_capped {
             let base_erosion = noise_base_erosion_for(u.kind, u.ever_occupied);
-            let scale = if far_walk { 1.0 } else { self.mode.noise_erosion_scale() };
-            let placement_erosion = if far_walk || noisy { base_erosion * scale } else { 0.0 };
-            let erosion = placement_erosion.max(lobby_drain.erosion).max(unmet_drain.erosion);
-            let cap = (if far_walk || noisy { NOISE_CAP } else { 1.0 }).min(lobby_drain.cap).min(unmet_drain.cap);
+            let scale = if far_walk {
+                1.0
+            } else {
+                self.mode.noise_erosion_scale()
+            };
+            let placement_erosion = if far_walk || noisy {
+                base_erosion * scale
+            } else {
+                0.0
+            };
+            let erosion = placement_erosion
+                .max(lobby_drain.erosion)
+                .max(unmet_drain.erosion);
+            let cap = (if far_walk || noisy { NOISE_CAP } else { 1.0 })
+                .min(lobby_drain.cap)
+                .min(unmet_drain.cap);
             s = (s - erosion).min(cap).max(0.0);
         }
         StepResult {
@@ -261,10 +317,18 @@ impl Simulation {
             }
             let reachable = self.floor_reachable(u.floor);
             let dm = ctx.demand_map.as_mut().unwrap();
-            let n = if reachable { dm.fraction_by_unit.len() as i64 } else { 0 };
+            let n = if reachable {
+                dm.fraction_by_unit.len() as i64
+            } else {
+                0
+            };
             dm.reachable_venues_by_origin.insert(u.id, n);
             let od = origin_demand(self, probe.kind, probe.residents, dm.bonus);
-            dm.share = if dm.total_cap > 0.0 { (dm.pool + od) / dm.total_cap } else { 0.0 };
+            dm.share = if dm.total_cap > 0.0 {
+                (dm.pool + od) / dm.total_cap
+            } else {
+                0.0
+            };
         }
         let mut s = 1.0;
         for _ in 0..GATE_HORIZON_HOURS {
@@ -294,7 +358,10 @@ impl Simulation {
     fn nightclub_penalty_at(&self, floor: i64) -> f64 {
         let mut nearest: Option<i64> = None;
         for c in &self.tower.units {
-            if c.kind == Kind::Nightclub && c.is_operational() && self.tower.is_floor_served(c.floor) {
+            if c.kind == Kind::Nightclub
+                && c.is_operational()
+                && self.tower.is_floor_served(c.floor)
+            {
                 let d = (c.floor - floor).abs();
                 if nearest.is_none_or(|n| d < n) {
                     nearest = Some(d);
@@ -310,7 +377,11 @@ impl Simulation {
     /// `dominantGripe` with every flag supplied (the eviction path).
     pub fn dominant_gripe(&self, u: &Unit, r: &StepResult) -> Option<&'static str> {
         if !r.served {
-            return Some(if self.tower.is_floor_served(u.floor) { "noTransport" } else { "access" });
+            return Some(if self.tower.is_floor_served(u.floor) {
+                "noTransport"
+            } else {
+                "access"
+            });
         }
         if u.floor != 1 && r.cong > 1.0 {
             return Some("congestion");
@@ -323,9 +394,16 @@ impl Simulation {
             }
             cov.map(|c| self.mode.unmet_demand_drain(c))
         };
-        let unmet_outranks = |competing: f64| unmet_drain(r.unmet_cov).is_some_and(|d| d.erosion > competing);
-        let unmet_outranks_noise = || unmet_outranks(noise_base_erosion_for(u.kind, u.ever_occupied) * self.mode.noise_erosion_scale());
-        let over_rent = |kind: Kind| rent_config(kind).is_some_and(|cfg| rent_of(kind, u.rent, u.no_rate) > cfg.default);
+        let unmet_outranks =
+            |competing: f64| unmet_drain(r.unmet_cov).is_some_and(|d| d.erosion > competing);
+        let unmet_outranks_noise = || {
+            unmet_outranks(
+                noise_base_erosion_for(u.kind, u.ever_occupied) * self.mode.noise_erosion_scale(),
+            )
+        };
+        let over_rent = |kind: Kind| {
+            rent_config(kind).is_some_and(|cfg| rent_of(kind, u.rent, u.no_rate) > cfg.default)
+        };
         if u.kind == Kind::Office {
             if over_rent(Kind::Office) {
                 return Some("rent");
@@ -363,7 +441,10 @@ impl Simulation {
             if r.noisy && !unmet_outranks_noise() {
                 return Some("noise");
             }
-            if u.kind == Kind::RentalApartment && self.near_nightclub(u.floor) && !unmet_outranks(self.nightclub_penalty_at(u.floor)) {
+            if u.kind == Kind::RentalApartment
+                && self.near_nightclub(u.floor)
+                && !unmet_outranks(self.nightclub_penalty_at(u.floor))
+            {
                 return Some("noise");
             }
             if u.kind.is_unmet_demand_kind() && unmet_active {
@@ -394,7 +475,10 @@ impl Simulation {
     pub fn update_satisfaction(&mut self) {
         let mut ctx = self.build_satisfaction_context(false);
         if ctx.global_cong > 1.4 && self.clock.hour() == 9 && self.rng.chance(0.5) {
-            self.emit("Tenants are complaining of long elevator waits. Add cars or shafts.", LogKind::Bad);
+            self.emit(
+                "Tenants are complaining of long elevator waits. Add cars or shafts.",
+                LogKind::Bad,
+            );
         }
         let mut notices: Vec<(i64, Kind, &'static str)> = Vec::new();
         for i in self.tower.room_indices() {
@@ -405,13 +489,26 @@ impl Simulation {
             let r = self.satisfaction_step(&u, u.satisfaction, &mut ctx);
             self.tower.units[i].satisfaction = r.next;
             let mut u = self.tower.units[i].clone();
-            let lease_tenant = matches!(u.kind, Kind::Office | Kind::Condo | Kind::FitnessClub | Kind::Clinic) || u.kind.is_rental();
+            let lease_tenant = matches!(
+                u.kind,
+                Kind::Office | Kind::Condo | Kind::FitnessClub | Kind::Clinic
+            ) || u.kind.is_rental();
             if lease_tenant && u.state == UnitState::Vacating {
                 let is_relocation = u.vacate_reason == Some("relocation");
-                let noise_cannot_evict = u.vacate_reason == Some("noise") && self.mode.noise_erosion_scale() == 0.0;
-                let price_cfg = if u.kind == Kind::Office || u.kind.is_rental() { rent_config(u.kind) } else { None };
-                let over_market_rent = price_cfg.is_some_and(|c| rent_of(u.kind, u.rent, u.no_rate) > c.default);
-                let non_noise_problem = !r.served || (u.floor != 1 && r.cong > 1.0) || over_market_rent || r.far_walk || r.lobby_far;
+                let noise_cannot_evict =
+                    u.vacate_reason == Some("noise") && self.mode.noise_erosion_scale() == 0.0;
+                let price_cfg = if u.kind == Kind::Office || u.kind.is_rental() {
+                    rent_config(u.kind)
+                } else {
+                    None
+                };
+                let over_market_rent =
+                    price_cfg.is_some_and(|c| rent_of(u.kind, u.rent, u.no_rate) > c.default);
+                let non_noise_problem = !r.served
+                    || (u.floor != 1 && r.cong > 1.0)
+                    || over_market_rent
+                    || r.far_walk
+                    || r.lobby_far;
                 if noise_cannot_evict && non_noise_problem {
                     u.vacate_reason = Some(self.vacate_cause(&u, &r));
                     self.tower.units[i].vacate_reason = u.vacate_reason;
@@ -459,7 +556,10 @@ impl Simulation {
             self.emit(&msg, LogKind::Bad);
             return;
         }
-        let msg = format!("{} tenants gave notice. Fix the flagged units before they leave.", notices.len());
+        let msg = format!(
+            "{} tenants gave notice. Fix the flagged units before they leave.",
+            notices.len()
+        );
         self.emit(&msg, LogKind::Bad);
     }
 }

@@ -66,7 +66,8 @@ impl Schedule {
             }
         }
         if let Some(v) = finite(r.get("waitingCarResponse")) {
-            out.waiting_car_response = Some(crate::jsmath::round(v).clamp(0.0, WAITING_CAR_RESPONSE_MAX));
+            out.waiting_car_response =
+                Some(crate::jsmath::round(v).clamp(0.0, WAITING_CAR_RESPONSE_MAX));
         }
         if let Some(v) = finite(r.get("standardFloorDeparture")) {
             out.standard_floor_departure =
@@ -134,7 +135,9 @@ impl Schedule {
 
     /// `homeFloorFor`.
     pub fn home_floor_for(s: Option<&Schedule>, car_index: usize, fallback: i64) -> i64 {
-        let Some(hf) = s.and_then(|s| s.home_floors.as_ref()) else { return fallback };
+        let Some(hf) = s.and_then(|s| s.home_floors.as_ref()) else {
+            return fallback;
+        };
         hf.get(car_index).copied().unwrap_or(fallback)
     }
 
@@ -154,7 +157,9 @@ impl Schedule {
 
     /// `snapHomesToStops`.
     pub fn snap_homes_to_stops(&self, stops: &[i64]) -> Schedule {
-        let Some(hf) = &self.home_floors else { return self.clone() };
+        let Some(hf) = &self.home_floors else {
+            return self.clone();
+        };
         if hf.is_empty() || stops.is_empty() {
             return self.clone();
         }

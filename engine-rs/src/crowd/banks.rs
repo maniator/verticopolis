@@ -19,7 +19,11 @@ fn shaft_banks<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a Banks {
                     if to == from {
                         continue;
                     }
-                    let key = (t.kind, tower.landing_segs(t, from), tower.landing_segs(t, to));
+                    let key = (
+                        t.kind,
+                        tower.landing_segs(t, from),
+                        tower.landing_segs(t, to),
+                    );
                     banks.entry(key).or_default().push(t.id);
                 }
             }
@@ -36,7 +40,9 @@ fn shaft_banks<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a Banks {
 /// per leg with a real bank).
 pub fn balance_shafts(crowd: &mut Crowd, tower: &Tower, mut r: Route) -> Route {
     for i in 0..r.shafts.len() {
-        let Some(chosen) = tower.get_transport(r.shafts[i]) else { continue };
+        let Some(chosen) = tower.get_transport(r.shafts[i]) else {
+            continue;
+        };
         let from = tower.landing_segs(chosen, r.floors[i]);
         let to = tower.landing_segs(chosen, r.floors[i + 1]);
         let key = (chosen.kind, from, to);

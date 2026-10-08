@@ -28,16 +28,32 @@ impl Simulation {
             }
             match u.kind {
                 Kind::Office => {
-                    u.occupants = if !weekend && (8..18).contains(&hour) { f.population } else { 0 };
+                    u.occupants = if !weekend && (8..18).contains(&hour) {
+                        f.population
+                    } else {
+                        0
+                    };
                 }
                 Kind::Condo | Kind::RentalApartment => {
-                    u.occupants = if night || evening || weekend { u.resident_count() } else { 1 };
+                    u.occupants = if night || evening || weekend {
+                        u.resident_count()
+                    } else {
+                        1
+                    };
                 }
                 Kind::RentalStudio => {
-                    u.occupants = if night || evening || weekend { f.population } else { 0 };
+                    u.occupants = if night || evening || weekend {
+                        f.population
+                    } else {
+                        0
+                    };
                 }
                 Kind::HotelSingle | Kind::HotelDouble | Kind::HotelSuite => {
-                    u.occupants = if u.state == UnitState::Asleep { f.population } else { 0 };
+                    u.occupants = if u.state == UnitState::Asleep {
+                        f.population
+                    } else {
+                        0
+                    };
                 }
                 _ => {
                     if f.attendance.is_some() {
@@ -120,7 +136,9 @@ impl Simulation {
         }
         let mut load_by_shaft: HashMap<i64, f64> = HashMap::new();
         for (f, pop) in &pop_by_floor {
-            let Some(shafts) = shafts_by_floor.get(f) else { continue };
+            let Some(shafts) = shafts_by_floor.get(f) else {
+                continue;
+            };
             if shafts.is_empty() {
                 continue;
             }

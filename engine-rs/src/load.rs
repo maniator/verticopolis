@@ -38,7 +38,10 @@ pub fn decode_vctower(text: &str) -> Result<Value, String> {
     if !trimmed.starts_with("VCTOWER1") {
         return Err("not a VCTOWER1 file".into());
     }
-    let b64: String = trimmed["VCTOWER1".len()..].chars().filter(|c| !c.is_whitespace()).collect();
+    let b64: String = trimmed["VCTOWER1".len()..]
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
     let packed = base64::engine::general_purpose::STANDARD
         .decode(b64.as_bytes())
         .map_err(|e| format!("base64: {e}"))?;
@@ -118,7 +121,10 @@ fn floor_unit(id: i64, floor: i64, x: i64) -> Value {
 }
 
 fn units_of(data: &Value) -> Vec<Value> {
-    data.get("units").and_then(Value::as_array).cloned().unwrap_or_default()
+    data.get("units")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
 }
 
 fn version_of(data: &Value) -> Option<f64> {
@@ -156,7 +162,10 @@ pub fn migration_looks_valid(data: &Value) -> bool {
         let stories = stories_at_version(kind, version) as f64;
         let mut f = floor;
         while f < floor + stories {
-            by_floor.entry(number_to_string(f)).or_default().push((x, width));
+            by_floor
+                .entry(number_to_string(f))
+                .or_default()
+                .push((x, width));
             f += 1.0;
         }
     }
@@ -235,7 +244,11 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
         }
         let f = round(js_number(u.get("floor")));
         let x0 = round(js_number(u.get("x")));
-        let w0 = round(if u.get("width").is_some() { js_number(u.get("width")) } else { 1.0 });
+        let w0 = round(if u.get("width").is_some() {
+            js_number(u.get("width"))
+        } else {
+            1.0
+        });
         if !f.is_finite() || !x0.is_finite() || !w0.is_finite() {
             continue;
         }
@@ -287,11 +300,12 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
     let mut nx: HashMap<usize, i64> = HashMap::new();
     let mut nw: HashMap<usize, i64> = HashMap::new();
     let mut obstacles: HashMap<i64, Vec<(i64, i64)>> = HashMap::new();
-    let add_obstacle = |obstacles: &mut HashMap<i64, Vec<(i64, i64)>>, floor: i64, fl: i64, x: i64, w: i64| {
-        for f in floor..floor + fl {
-            obstacles.entry(f).or_default().push((x, x + w));
-        }
-    };
+    let add_obstacle =
+        |obstacles: &mut HashMap<i64, Vec<(i64, i64)>>, floor: i64, fl: i64, x: i64, w: i64| {
+            for f in floor..floor + fl {
+                obstacles.entry(f).or_default().push((x, x + w));
+            }
+        };
     // Parking runs.
     let mut park_floors: IndexSet<i64> = IndexSet::new();
     for r in &rooms {
@@ -314,7 +328,9 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
         while i < units.len() {
             let mut j = i;
             let mut run = vec![units[i]];
-            while j + 1 < units.len() && rooms[units[j + 1]].x0 == rooms[units[j]].x0 + rooms[units[j]].w0 {
+            while j + 1 < units.len()
+                && rooms[units[j + 1]].x0 == rooms[units[j]].x0 + rooms[units[j]].w0
+            {
                 j += 1;
                 run.push(units[j]);
             }
@@ -324,12 +340,18 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
                 items.push((ri, off));
                 off += rooms[ri].w;
             }
-            let ramp = run.iter().position(|&ri| rooms[ri].kind == Kind::ParkingRamp);
+            let ramp = run
+                .iter()
+                .position(|&ri| rooms[ri].kind == Kind::ParkingRamp);
             let left = match ramp {
                 Some(ri) => rooms[run[ri]].x0 - items[ri].1,
                 None => rooms[run[0]].x0,
             };
-            runs.push(Run { left, width: off, items });
+            runs.push(Run {
+                left,
+                width: off,
+                items,
+            });
             i = j + 1;
         }
         runs.sort_by_key(|r| r.left);
@@ -344,7 +366,13 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
         }
         for run in &runs {
             for &(ri, _) in &run.items {
-                add_obstacle(&mut obstacles, rooms[ri].floor, rooms[ri].fl, nx[&ri], rooms[ri].w);
+                add_obstacle(
+                    &mut obstacles,
+                    rooms[ri].floor,
+                    rooms[ri].fl,
+                    nx[&ri],
+                    rooms[ri].w,
+                );
             }
         }
     }
@@ -403,7 +431,11 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
             }
             Some(placed)
         };
-        let placed = try_canon().unwrap_or_else(|| here.iter().map(|&ri| (ri, rooms[ri].x0, rooms[ri].w0)).collect());
+        let placed = try_canon().unwrap_or_else(|| {
+            here.iter()
+                .map(|&ri| (ri, rooms[ri].x0, rooms[ri].w0))
+                .collect()
+        });
         for (ri, x, w) in placed {
             nx.insert(ri, x);
             nw.insert(ri, w);
@@ -423,10 +455,7 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
             }
         }
     }
-    let mut next_id = match finite_num(data.get("nextId")) {
-        Some(n) => n,
-        None => 1.0,
-    };
+    let mut next_id = finite_num(data.get("nextId")).unwrap_or(1.0);
     for u in &src {
         if let Some(id) = finite_num(u.get("id")) {
             next_id = next_id.max(id.floor() + 1.0);
@@ -448,7 +477,14 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
             }
         }
     }
-    with(data, vec![("version", json!(2)), ("units", Value::Array(out_units)), ("nextId", json!(next_id))])
+    with(
+        data,
+        vec![
+            ("version", json!(2)),
+            ("units", Value::Array(out_units)),
+            ("nextId", json!(next_id)),
+        ],
+    )
 }
 
 pub fn upgrade_v1_to_v2(data: &Value) -> Value {
@@ -488,14 +524,18 @@ pub fn widen_legacy_elevator_shafts(data: &Value) -> Value {
             let kind = kind_of(t)?;
             let catalog_w = kind.facility().width;
             let bottom = (round(num(t.get("bottom"), 1.0)) as i64).clamp(MIN_FLOOR, MAX_FLOOR - 1);
-            let top = (round(num(t.get("top"), (bottom + 1) as f64)) as i64).min(MAX_FLOOR).max(bottom + 1);
+            let top = (round(num(t.get("top"), (bottom + 1) as f64)) as i64)
+                .min(MAX_FLOOR)
+                .max(bottom + 1);
             let w0 = round(num(t.get("width"), catalog_w as f64)) as i64;
             let w = if w0 > 0 { w0.min(catalog_w) } else { catalog_w };
             let x = (round(num(t.get("x"), 0.0)) as i64).clamp(0, LOT - w);
             Some(Fp { x, w, bottom, top })
         })
         .collect();
-    let collides = |a: &Fp, b: &Fp| a.x < b.x + b.w && b.x < a.x + a.w && a.bottom <= b.top && b.bottom <= a.top;
+    let collides = |a: &Fp, b: &Fp| {
+        a.x < b.x + b.w && b.x < a.x + a.w && a.bottom <= b.top && b.bottom <= a.top
+    };
     let mut out: Vec<Value> = Vec::new();
     for i in 0..transports.len() {
         let t = &transports[i];
@@ -515,14 +555,23 @@ pub fn widen_legacy_elevator_shafts(data: &Value) -> Value {
         }
         let mut widened: Option<Value> = None;
         for shift in 0..=canon_w - fp.w {
-            let cand = Fp { x: fp.x - shift, w: canon_w, bottom: fp.bottom, top: fp.top };
+            let cand = Fp {
+                x: fp.x - shift,
+                w: canon_w,
+                bottom: fp.bottom,
+                top: fp.top,
+            };
             if cand.x < 0 || cand.x + cand.w > LOT {
                 continue;
             }
-            let fits = (0..fps.len()).all(|j| j == i || fps[j].is_none_or(|o| !collides(&cand, &o)));
+            let fits =
+                (0..fps.len()).all(|j| j == i || fps[j].is_none_or(|o| !collides(&cand, &o)));
             if fits {
                 fps[i] = Some(cand);
-                widened = Some(with(t, vec![("x", json!(cand.x)), ("width", json!(canon_w))]));
+                widened = Some(with(
+                    t,
+                    vec![("x", json!(cand.x)), ("width", json!(canon_w))],
+                ));
                 break;
             }
         }
@@ -542,9 +591,12 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
     for u in &src {
         let Some(kind) = kind_of(u) else { continue };
         let stories = kind.floors();
-        let f = (round(num(u.get("floor"), 1.0)) as i64).clamp(MIN_FLOOR, MAX_FLOOR - (stories - 1));
+        let f =
+            (round(num(u.get("floor"), 1.0)) as i64).clamp(MIN_FLOOR, MAX_FLOOR - (stories - 1));
         let x0 = (round(num(u.get("x"), 0.0)) as i64).clamp(0, LOT - 1);
-        let w = (round(num(u.get("width"), kind.facility().width as f64)) as i64).min(LOT - x0).max(1);
+        let w = (round(num(u.get("width"), kind.facility().width as f64)) as i64)
+            .min(LOT - x0)
+            .max(1);
         if kind.is_structural() {
             for i in 0..w {
                 struct_cols.entry(f).or_default().insert(x0 + i);
@@ -564,12 +616,20 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
         }
     }
     let mut hall_occ: HashMap<i64, HashSet<i64>> = HashMap::new();
-    let paved = |sc: &HashMap<i64, HashSet<i64>>, f: i64, x: i64| sc.get(&f).is_some_and(|s| s.contains(&x));
-    let halls: Vec<Value> = src.iter().filter(|u| kind_of(u) == Some(Kind::PartyHall)).cloned().collect();
+    let paved = |sc: &HashMap<i64, HashSet<i64>>, f: i64, x: i64| {
+        sc.get(&f).is_some_and(|s| s.contains(&x))
+    };
+    let halls: Vec<Value> = src
+        .iter()
+        .filter(|u| kind_of(u) == Some(Kind::PartyHall))
+        .cloned()
+        .collect();
     let mut kept: Vec<Value> = Vec::new();
     let mut dropped = 0;
     for u in &halls {
-        let w = (round(num(u.get("width"), Kind::PartyHall.facility().width as f64)) as i64).min(LOT).max(1);
+        let w = (round(num(u.get("width"), Kind::PartyHall.facility().width as f64)) as i64)
+            .min(LOT)
+            .max(1);
         let home_floor = (round(num(u.get("floor"), 1.0)) as i64).clamp(MIN_FLOOR, MAX_FLOOR - 1);
         let home_x = (round(num(u.get("x"), 0.0)) as i64).clamp(0, LOT - w);
         let span_clear = |hall_occ: &HashMap<i64, HashSet<i64>>, f_: i64, x: i64, w: i64| -> bool {
@@ -615,7 +675,7 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
         } else {
             let mut candidates: Vec<i64> = Vec::new();
             let mut push = |f: i64| {
-                if f >= MIN_FLOOR && f + 1 <= MAX_FLOOR {
+                if (MIN_FLOOR..MAX_FLOOR).contains(&f) {
                     candidates.push(f);
                 }
             };
@@ -628,7 +688,9 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
                 let mut best: Option<i64> = None;
                 let mut x = 0;
                 while x + w <= LOT {
-                    if fits(&hall_occ, f_, x, w) && best.is_none_or(|b| (x - home_x).abs() < (b - home_x).abs()) {
+                    if fits(&hall_occ, f_, x, w)
+                        && best.is_none_or(|b| (x - home_x).abs() < (b - home_x).abs())
+                    {
                         best = Some(x);
                     }
                     x += 1;
@@ -648,7 +710,10 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
                 hall_occ.entry(f).or_default().insert(px + i);
             }
         }
-        kept.push(with(u, vec![("floor", json!(pf)), ("x", json!(px)), ("width", json!(w))]));
+        kept.push(with(
+            u,
+            vec![("floor", json!(pf)), ("x", json!(px)), ("width", json!(w))],
+        ));
     }
     let mut next_id = match finite_num(data.get("nextId")) {
         Some(n) => n.floor(),
@@ -659,7 +724,11 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
             next_id = next_id.max(id.floor() + 1.0);
         }
     }
-    let others: Vec<Value> = src.iter().filter(|u| !u.is_null() && kind_of(u) != Some(Kind::PartyHall)).cloned().collect();
+    let others: Vec<Value> = src
+        .iter()
+        .filter(|u| !u.is_null() && kind_of(u) != Some(Kind::PartyHall))
+        .cloned()
+        .collect();
     let mut out: Vec<Value> = others.clone();
     out.extend(kept.iter().cloned());
     let mut struct_cols2 = struct_cols.clone();
@@ -699,7 +768,11 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
                 _ => Value::Array(vec![entry]),
             });
         }
-        let mut patches = vec![("version", json!(6)), ("units", Value::Array(units)), ("nextId", json!(next_id))];
+        let mut patches = vec![
+            ("version", json!(6)),
+            ("units", Value::Array(units)),
+            ("nextId", json!(next_id)),
+        ];
         if let Some(l) = log {
             patches.push(("log", l));
         }
@@ -707,7 +780,9 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
     };
     let result = with_log(out, dropped);
     let input_valid = migration_looks_valid(data);
-    if (input_valid && !migration_looks_valid(&result)) || floating_structure_count(&result) > floating_structure_count(data) {
+    if (input_valid && !migration_looks_valid(&result))
+        || floating_structure_count(&result) > floating_structure_count(data)
+    {
         return with_log(others, halls.len());
     }
     result
@@ -722,9 +797,18 @@ fn is_game_mode(v: Option<&Value>) -> bool {
 /// `migrateSave(data)`.
 pub fn migrate_save(data: &Value) -> Value {
     let raw_version = data.get("version").and_then(Value::as_f64);
-    let valid = raw_version.is_some_and(|v| v.is_finite() && v.fract() == 0.0 && v >= OLDEST_SAVE_VERSION as f64);
-    let version = if valid { raw_version.unwrap() } else { OLDEST_SAVE_VERSION as f64 };
-    let mut migrated = if raw_version == Some(version) { data.clone() } else { with(data, vec![("version", json!(version))]) };
+    let valid = raw_version
+        .is_some_and(|v| v.is_finite() && v.fract() == 0.0 && v >= OLDEST_SAVE_VERSION as f64);
+    let version = if valid {
+        raw_version.unwrap()
+    } else {
+        OLDEST_SAVE_VERSION as f64
+    };
+    let mut migrated = if raw_version == Some(version) {
+        data.clone()
+    } else {
+        with(data, vec![("version", json!(version))])
+    };
     if !is_game_mode(migrated.get("mode")) {
         if let Some(units) = migrated.get("units").and_then(Value::as_array) {
             let units: Vec<Value> = units
@@ -812,7 +896,11 @@ fn drop_overlapping_units(units: Vec<(Unit, Option<i64>)>) -> Vec<(Unit, Option<
     let mut claimed_rooms: HashMap<i64, Vec<u8>> = HashMap::new();
     let mut out = Vec::new();
     for (u, id) in units {
-        let layer = if u.kind.is_structural() { &mut claimed_structure } else { &mut claimed_rooms };
+        let layer = if u.kind.is_structural() {
+            &mut claimed_structure
+        } else {
+            &mut claimed_rooms
+        };
         let stories = u.kind.floors();
         let mut free = true;
         'scan: for f in u.floor..u.floor + stories {
@@ -842,14 +930,18 @@ fn drop_overlapping_units(units: Vec<(Unit, Option<i64>)>) -> Vec<(Unit, Option<
 // ---- coerce.ts -----------------------------------------------------------------
 
 fn coerce_log(v: Option<&Value>) -> Vec<LogEntry> {
-    let Some(arr) = v.and_then(Value::as_array) else { return Vec::new() };
+    let Some(arr) = v.and_then(Value::as_array) else {
+        return Vec::new();
+    };
     let mut out: Vec<LogEntry> = Vec::new();
     for e in arr.iter().rev() {
         if out.len() >= LOG_RING_CAP {
             break;
         }
         let Some(o) = e.as_object() else { continue };
-        let Some(text) = o.get("text").and_then(Value::as_str) else { continue };
+        let Some(text) = o.get("text").and_then(Value::as_str) else {
+            continue;
+        };
         let mut t: Vec<u16> = text.encode_utf16().collect();
         if t.len() > LOG_TEXT_CAP {
             t.truncate(LOG_TEXT_CAP);
@@ -883,12 +975,18 @@ fn coerce_view(v: Option<&Value>) -> Option<Value> {
     let floor = finite_num(o.get("floor"))?;
     let mut out = Map::new();
     out.insert("tile".into(), json!(tile.min(LOT as f64).max(0.0)));
-    out.insert("floor".into(), json!(floor.min(MAX_FLOOR as f64).max(MIN_FLOOR as f64)));
+    out.insert(
+        "floor".into(),
+        json!(floor.min(MAX_FLOOR as f64).max(MIN_FLOOR as f64)),
+    );
     match o.get("zoom") {
         None | Some(Value::Null) => {}
         Some(z) => {
             let z = finite_num(Some(z))?;
-            out.insert("zoom".into(), json!(z.min(VIEW_ZOOM_MAX).max(VIEW_ZOOM_MIN)));
+            out.insert(
+                "zoom".into(),
+                json!(z.min(VIEW_ZOOM_MAX).max(VIEW_ZOOM_MIN)),
+            );
         }
     }
     Some(Value::Object(out))
@@ -989,7 +1087,8 @@ pub fn deserialize(raw: &Value) -> Simulation {
     let mut sim = Simulation::new(seed, mode, calendar, false);
     let modern = mode == GameMode::Modern;
     sim.auto_bridge = if modern {
-        data.get("autoBridge") != Some(&Value::Bool(false)) && data.get("manualStructure") != Some(&Value::Bool(true))
+        data.get("autoBridge") != Some(&Value::Bool(false))
+            && data.get("manualStructure") != Some(&Value::Bool(true))
     } else {
         true
     };
@@ -999,7 +1098,10 @@ pub fn deserialize(raw: &Value) -> Simulation {
     sim.money = num(data.get("money"), sim.money);
     sim.star = (num(data.get("star"), 1.0).floor() as i64).clamp(1, 6);
     sim.clock = Clock::new(num(data.get("minutes"), 0.0).max(0.0), sim.clock.calendar);
-    sim.evaluated_tower = data.get("evaluatedTower").and_then(Value::as_bool).unwrap_or(false);
+    sim.evaluated_tower = data
+        .get("evaluatedTower")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     sim.vip_visit_day = match data.get("vipVisitDay") {
         None | Some(Value::Null) => -1,
         Some(v) => v.as_f64().map(|x| x as i64).unwrap_or(-1),
@@ -1008,7 +1110,10 @@ pub fn deserialize(raw: &Value) -> Simulation {
         None | Some(Value::Null) => false,
         Some(v) => v.as_bool().unwrap_or(false),
     };
-    sim.vip_visits = (num(data.get("vipVisits"), 0.0).floor().min(VIP_VISITS_CAP).max(0.0)) as i64;
+    sim.vip_visits = (num(data.get("vipVisits"), 0.0)
+        .floor()
+        .min(VIP_VISITS_CAP)
+        .max(0.0)) as i64;
     if data.get("vipVisits").is_none() && (sim.vip_favorable || sim.evaluated_tower) {
         sim.vip_visits = if sim.evaluated_tower { 2 } else { 1 };
     }
@@ -1067,7 +1172,10 @@ pub fn deserialize(raw: &Value) -> Simulation {
                 continue;
             }
             raw_units.push(u);
-            assert!(raw_units.len() <= UNIT_CAP, "This save lists more than {UNIT_CAP} units");
+            assert!(
+                raw_units.len() <= UNIT_CAP,
+                "This save lists more than {UNIT_CAP} units"
+            );
         }
     }
     let mut units: Vec<(Unit, Option<i64>)> = Vec::new();
@@ -1075,24 +1183,43 @@ pub fn deserialize(raw: &Value) -> Simulation {
         let kind = kind_of(u).unwrap();
         let stories = kind.floors();
         let cat = kind.facility().width;
-        let floor = (round(num(u.get("floor"), 1.0)) as i64).clamp(MIN_FLOOR, MAX_FLOOR - (stories - 1));
+        let floor =
+            (round(num(u.get("floor"), 1.0)) as i64).clamp(MIN_FLOOR, MAX_FLOOR - (stories - 1));
         let x = (round(num(u.get("x"), 0.0)) as i64).clamp(0, LOT - 1);
         let cap = if kind.is_structural() { cat } else { LOT - x };
-        let width = (round(num(u.get("width"), cat as f64)) as i64).min(cap).min(LOT - x).max(1);
-        let state = if kind.is_structural() { UnitState::Empty } else { parse_state(u.get("state")).unwrap_or(UnitState::Empty) };
-        let not_owned = matches!(state, UnitState::Empty | UnitState::Construction | UnitState::Gutted);
-        let ever_occupied = u.get("everOccupied") == Some(&Value::Bool(true)) && !(not_owned && !kind.is_hotel());
+        let width = (round(num(u.get("width"), cat as f64)) as i64)
+            .min(cap)
+            .min(LOT - x)
+            .max(1);
+        let state = if kind.is_structural() {
+            UnitState::Empty
+        } else {
+            parse_state(u.get("state")).unwrap_or(UnitState::Empty)
+        };
+        let not_owned = matches!(
+            state,
+            UnitState::Empty | UnitState::Construction | UnitState::Gutted
+        );
+        let ever_occupied =
+            u.get("everOccupied") == Some(&Value::Bool(true)) && !(not_owned && !kind.is_hotel());
         let sold_condo = kind == Kind::Condo && ever_occupied;
         let keep_household = ever_occupied && kind.has_household();
         let ladder_priced = !modern && classic_ladder(kind).is_some();
         let mut rent: Option<f64> = match u.get("rent") {
             None => None,
             Some(r) if ladder_priced => Some(r.as_f64().unwrap_or(f64::NAN)),
-            Some(r) => Some(num(Some(r), rent_config(kind).map(|c| c.default).unwrap_or(0.0))),
+            Some(r) => Some(num(
+                Some(r),
+                rent_config(kind).map(|c| c.default).unwrap_or(0.0),
+            )),
         };
         if let Some(r) = rent {
             if kind == Kind::Condo {
-                let ladder = if modern { None } else { classic_ladder(Kind::Condo) };
+                let ladder = if modern {
+                    None
+                } else {
+                    classic_ladder(Kind::Condo)
+                };
                 if sold_condo {
                     rent = Some(match ladder {
                         Some(l) => r.min(l[3]).max(l[0]),
@@ -1108,7 +1235,11 @@ pub fn deserialize(raw: &Value) -> Simulation {
             match u.get("residents") {
                 None => None,
                 Some(r) => {
-                    let v = if r.as_f64().is_some_and(|x| x.is_finite()) { r.as_f64().unwrap() } else { 3.0 };
+                    let v = if r.as_f64().is_some_and(|x| x.is_finite()) {
+                        r.as_f64().unwrap()
+                    } else {
+                        3.0
+                    };
                     Some((round(v) as i64).clamp(2, 5))
                 }
             }
@@ -1121,7 +1252,10 @@ pub fn deserialize(raw: &Value) -> Simulation {
             Some("auto") => Some("auto"),
             _ => None,
         };
-        let subtype: Option<&'static str> = match (u.get("subtype").and_then(Value::as_str), kind.subtype_list()) {
+        let subtype: Option<&'static str> = match (
+            u.get("subtype").and_then(Value::as_str),
+            kind.subtype_list(),
+        ) {
             (Some(s), Some(list)) => list.iter().copied().find(|c| *c == s),
             _ => None,
         };
@@ -1133,7 +1267,8 @@ pub fn deserialize(raw: &Value) -> Simulation {
             let v = u.get(key)?;
             Some(num(Some(v), 0.0).max(0.0))
         };
-        let no_rate = rent_config(kind).is_some() && !modern && u.get("noRate") == Some(&Value::Bool(true));
+        let no_rate =
+            rent_config(kind).is_some() && !modern && u.get("noRate") == Some(&Value::Bool(true));
         let unit = Unit {
             id: 0,
             kind,
@@ -1141,8 +1276,16 @@ pub fn deserialize(raw: &Value) -> Simulation {
             x,
             width,
             state,
-            satisfaction: if kind.is_structural() { 1.0 } else { num(u.get("satisfaction"), 1.0).min(1.0).max(0.0) },
-            occupants: if kind.attendance_cap().is_some() || kind.is_structural() { 0 } else { num(u.get("occupants"), 0.0).max(0.0) as i64 },
+            satisfaction: if kind.is_structural() {
+                1.0
+            } else {
+                num(u.get("satisfaction"), 1.0).min(1.0).max(0.0)
+            },
+            occupants: if kind.attendance_cap().is_some() || kind.is_structural() {
+                0
+            } else {
+                num(u.get("occupants"), 0.0).max(0.0) as i64
+            },
             customers_in: None,
             hotel_customers_in: None,
             out_for_meal: None,
@@ -1151,7 +1294,11 @@ pub fn deserialize(raw: &Value) -> Simulation {
             pending_income: num(u.get("pendingIncome"), 0.0),
             rent,
             no_rate,
-            label: u.get("label").and_then(Value::as_str).map(|s| s.to_string()).unwrap_or_else(|| kind.facility().name.to_string()),
+            label: u
+                .get("label")
+                .and_then(Value::as_str)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| kind.facility().name.to_string()),
             vacate_reason: vacate_reason(u.get("vacateReason")),
             vacate_at: u.get("vacateAt").map(|v| num(Some(v), 0.0)),
             film_policy,
@@ -1175,7 +1322,9 @@ pub fn deserialize(raw: &Value) -> Simulation {
             if u.kind == Kind::Condo {
                 has_condo = true;
             }
-            let Some(ladder) = classic_ladder(u.kind) else { continue };
+            let Some(ladder) = classic_ladder(u.kind) else {
+                continue;
+            };
             let cfg = rent_config(u.kind).unwrap();
             let effective = u.rent.unwrap_or(cfg.default);
             let snapped = match u.rent {
@@ -1185,7 +1334,11 @@ pub fn deserialize(raw: &Value) -> Simulation {
             if !u.no_rate && snapped != effective {
                 rents_snapped += 1;
             }
-            u.rent = if snapped == cfg.default { None } else { Some(snapped) };
+            u.rent = if snapped == cfg.default {
+                None
+            } else {
+                Some(snapped)
+            };
         }
     }
     // ---- transports ----
@@ -1199,10 +1352,16 @@ pub fn deserialize(raw: &Value) -> Simulation {
                 continue;
             }
             let Some(kind) = kind_of(t) else { continue };
-            let max_cars = if kind.is_elevator() { kind.max_cars() } else { 0 };
+            let max_cars = if kind.is_elevator() {
+                kind.max_cars()
+            } else {
+                0
+            };
             let cars = (num(t.get("cars"), 0.0).floor() as i64).clamp(0, max_cars);
             let bottom = (round(num(t.get("bottom"), 1.0)) as i64).clamp(MIN_FLOOR, MAX_FLOOR - 1);
-            let top = (round(num(t.get("top"), (bottom + 1) as f64)) as i64).min(MAX_FLOOR).max(bottom + 1);
+            let top = (round(num(t.get("top"), (bottom + 1) as f64)) as i64)
+                .min(MAX_FLOOR)
+                .max(bottom + 1);
             let cat = kind.facility().width;
             let w0 = round(num(t.get("width"), cat as f64)) as i64;
             let width = if w0 > 0 { w0.min(cat) } else { cat };
@@ -1222,7 +1381,11 @@ pub fn deserialize(raw: &Value) -> Simulation {
                 Some(v) => Some(fix_len(Some(v), 0.0)),
             };
             let skip_floors = t.get("skipFloors").and_then(Value::as_array).map(|a| {
-                a.iter().filter_map(Value::as_f64).filter(|n| n.is_finite()).map(|n| n as i64).collect::<Vec<i64>>()
+                a.iter()
+                    .filter_map(Value::as_f64)
+                    .filter(|n| n.is_finite())
+                    .map(|n| n as i64)
+                    .collect::<Vec<i64>>()
             });
             let tr = Transport {
                 id: 0,
@@ -1233,7 +1396,10 @@ pub fn deserialize(raw: &Value) -> Simulation {
                 top,
                 cars,
                 car_positions: fix_len(t.get("carPositions"), bottom as f64),
-                car_dir: fix_len(t.get("carDir"), 0.0).into_iter().map(|d| d as i64).collect(),
+                car_dir: fix_len(t.get("carDir"), 0.0)
+                    .into_iter()
+                    .map(|d| d as i64)
+                    .collect(),
                 car_load,
                 load: t.get("load").and_then(Value::as_f64).unwrap_or(0.0) as i64,
                 skip_floors,
@@ -1269,7 +1435,8 @@ pub fn deserialize(raw: &Value) -> Simulation {
             transports.push((t, id));
         }
     }
-    let (mut transports, mut transport_ids): (Vec<Transport>, Vec<Option<i64>>) = transports.into_iter().unzip();
+    let (mut transports, mut transport_ids): (Vec<Transport>, Vec<Option<i64>>) =
+        transports.into_iter().unzip();
     let mut all_ids: Vec<Option<i64>> = Vec::new();
     all_ids.append(&mut unit_ids);
     all_ids.append(&mut transport_ids);
@@ -1283,14 +1450,25 @@ pub fn deserialize(raw: &Value) -> Simulation {
     sim.tower.units = units;
     sim.tower.transports = transports;
     sim.tower.next_id = next_id;
-    sim.tower.tower_name = data.get("towerName").and_then(Value::as_str).unwrap_or("").to_string();
-    sim.tower.built_wedding_hall = data.get("builtWeddingHall").and_then(Value::as_bool).unwrap_or(false);
+    sim.tower.tower_name = data
+        .get("towerName")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    sim.tower.built_wedding_hall = data
+        .get("builtWeddingHall")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     sim.tower.reindex();
     sim.tower.coerce_express_stops();
     if rents_snapped > 0 {
         let msg = format!(
             "Classic pricing: rents snapped to the four 1994 rate levels.{}",
-            if has_condo { " Condos can now sell for as little as $50,000." } else { "" }
+            if has_condo {
+                " Condos can now sell for as little as $50,000."
+            } else {
+                ""
+            }
         );
         sim.emit(&msg, LogKind::Info);
     }
@@ -1315,20 +1493,28 @@ pub fn deserialize(raw: &Value) -> Simulation {
                 Some("bombThreat") => "bombThreat",
                 _ => return None,
             };
-            let cost = p.get("cost").and_then(Value::as_f64).filter(|c| c.is_finite())?;
+            let cost = p
+                .get("cost")
+                .and_then(Value::as_f64)
+                .filter(|c| c.is_finite())?;
             let message = match p.get("message") {
                 None | Some(Value::Null) => String::new(),
                 Some(Value::String(s)) => s.clone(),
                 Some(v) => v.to_string(),
             };
-            Some(PendingChoice { kind, cost, message })
+            Some(PendingChoice {
+                kind,
+                cost,
+                message,
+            })
         });
     }
     sim.weather = weather_for(sim.clock.day());
     sim.last_day = sim.clock.day();
     sim.last_quarter = sim.clock.quarter();
     sim.last_quarter_money = num(data.get("lastQuarterMoney"), 0.0);
-    sim.last_month = (sim.clock.day() as f64 / sim.clock.calendar.maint_period_days as f64).floor() as i64;
+    sim.last_month =
+        (sim.clock.day() as f64 / sim.clock.calendar.maint_period_days as f64).floor() as i64;
     sim.last_hour = sim.clock.hour();
     sim.adopt_milestones();
     sim.founder = detect_founder(raw);

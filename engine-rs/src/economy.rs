@@ -189,7 +189,9 @@ impl Simulation {
             self.record_money(ledger_cat_for(kind).unwrap_or("upkeep"), amt);
             let msg = match kind {
                 Kind::Office => format!("Quarterly office rent collected: ${amt} ({n} offices)."),
-                Kind::FitnessClub => format!("Fitness Club membership dues collected: ${amt} ({n} clubs)."),
+                Kind::FitnessClub => {
+                    format!("Fitness Club membership dues collected: ${amt} ({n} clubs).")
+                }
                 _ => format!("Clinic lease collected: ${amt} ({n} clinics)."),
             };
             self.emit(&msg, LogKind::Money);
@@ -210,7 +212,9 @@ impl Simulation {
                 let u = &self.tower.units[i];
                 (u.kind, u.floor, u.x, u.id, u.state)
             };
-            let Some(daily) = commercial_daily_income(mode, kind) else { continue };
+            let Some(daily) = commercial_daily_income(mode, kind) else {
+                continue;
+            };
             if !self.tower.units[i].is_operational() {
                 continue;
             }
@@ -252,11 +256,16 @@ impl Simulation {
                 Some(_) => 0.0,
             };
             let rain_mult = if rain && attendance_cap.is_none() {
-                (if rain_metro_relief { 0.7 } else { 0.5 }) * (if kind == Kind::FastFood { 0.6 } else { 1.0 })
+                (if rain_metro_relief { 0.7 } else { 0.5 })
+                    * (if kind == Kind::FastFood { 0.6 } else { 1.0 })
             } else {
                 1.0
             };
-            let film_mult = if kind == Kind::Cinema && self.blockbusters.contains(&id) { 2.2 } else { 1.0 };
+            let film_mult = if kind == Kind::Cinema && self.blockbusters.contains(&id) {
+                2.2
+            } else {
+                1.0
+            };
             let lobby_mult = if kind.is_commercial()
                 && kind != Kind::SkyBar
                 && self.tower.nearest_lobby_floor_distance(floor) > COMMERCIAL_LOBBY_FLOORS
@@ -265,8 +274,16 @@ impl Simulation {
             } else {
                 1.0
             };
-            let weekend_mult = if attendance_cap.is_some() { 1.0 } else { weekend_multiplier(mode, kind, is_weekend) };
-            let view_mult = if kind == Kind::SkyBar { mode.view_premium(floor) } else { 1.0 };
+            let weekend_mult = if attendance_cap.is_some() {
+                1.0
+            } else {
+                weekend_multiplier(mode, kind, is_weekend)
+            };
+            let view_mult = if kind == Kind::SkyBar {
+                mode.view_premium(floor)
+            } else {
+                1.0
+            };
             let traffic_factor = TRAFFIC_FACTOR_MIN + self.rng.next() * TRAFFIC_FACTOR_SPAN;
             let open_h = kind.open_hours_per_day() as f64;
             let hourly = (daily / open_h)
@@ -285,7 +302,12 @@ impl Simulation {
                 let cust_per_hour = daily / (spend.unwrap() * open_h);
                 u.patronage_today = Some(
                     u.patronage_today.unwrap_or(0.0)
-                        + cust_per_hour * frac * rain_mult * lobby_mult * weekend_mult * traffic_factor,
+                        + cust_per_hour
+                            * frac
+                            * rain_mult
+                            * lobby_mult
+                            * weekend_mult
+                            * traffic_factor,
                 );
             }
             if u.pending_income >= 1.0 {
@@ -335,7 +357,10 @@ impl Simulation {
         if revenue > 0.0 {
             self.money += revenue;
             self.record_money("hotels", revenue);
-            self.emit(&format!("Hotel guests checked out: ${revenue} earned overnight."), LogKind::Money);
+            self.emit(
+                &format!("Hotel guests checked out: ${revenue} earned overnight."),
+                LogKind::Money,
+            );
         }
         self.housekeeping.reset_shift();
     }
@@ -356,7 +381,10 @@ impl Simulation {
         if revenue > 0.0 {
             self.money += revenue;
             self.record_money("hotels", revenue);
-            self.emit(&format!("Late hotel checkouts: ${revenue} earned."), LogKind::Money);
+            self.emit(
+                &format!("Late hotel checkouts: ${revenue} earned."),
+                LogKind::Money,
+            );
         }
     }
 
@@ -378,7 +406,11 @@ impl Simulation {
         }
         let modern = self.mode == GameMode::Modern;
         let tax_rate = if modern { CONDO_MONTHLY_TAX_RATE } else { 0.0 };
-        let overhead = if modern { OVERHEAD_PER_LEASABLE_UNIT_MONTHLY } else { 0.0 };
+        let overhead = if modern {
+            OVERHEAD_PER_LEASABLE_UNIT_MONTHLY
+        } else {
+            0.0
+        };
         let mut new_blockbusters: Vec<i64> = Vec::new();
         for i in 0..self.tower.units.len() {
             let u = &self.tower.units[i];
@@ -389,9 +421,16 @@ impl Simulation {
             }
             let operational = u.is_operational();
             if tax_rate > 0.0 && u.kind == Kind::Condo && !u.ever_occupied && operational {
-                charge("condos", (rent_of(u.kind, u.rent, u.no_rate) * tax_rate).ceil());
+                charge(
+                    "condos",
+                    (rent_of(u.kind, u.rent, u.no_rate) * tax_rate).ceil(),
+                );
             }
-            if overhead > 0.0 && operational && is_overhead_kind(u.kind) && !(u.kind == Kind::Condo && u.ever_occupied) {
+            if overhead > 0.0
+                && operational
+                && is_overhead_kind(u.kind)
+                && !(u.kind == Kind::Condo && u.ever_occupied)
+            {
                 charge(ledger_cat_for(u.kind).unwrap_or("upkeep"), overhead);
             }
             if u.kind == Kind::Cinema && operational {
@@ -400,7 +439,11 @@ impl Simulation {
                     Some("feature") => false,
                     _ => self.rng.chance(0.4),
                 };
-                let booking = if blockbuster { CINEMA_BOOKING_BLOCKBUSTER } else { CINEMA_BOOKING_MONTHLY };
+                let booking = if blockbuster {
+                    CINEMA_BOOKING_BLOCKBUSTER
+                } else {
+                    CINEMA_BOOKING_MONTHLY
+                };
                 if blockbuster {
                     new_blockbusters.push(u.id);
                 }
@@ -416,8 +459,16 @@ impl Simulation {
         }
         if cost > 0.0 {
             self.money -= cost;
-            let monthly = self.clock.calendar.maint_period_days as f64 == REAL_WORLD_MAINT_PERIOD_DAYS;
-            let msg = format!("{} paid: ${cost}.", if monthly { "Monthly maintenance" } else { "Maintenance" });
+            let monthly =
+                self.clock.calendar.maint_period_days as f64 == REAL_WORLD_MAINT_PERIOD_DAYS;
+            let msg = format!(
+                "{} paid: ${cost}.",
+                if monthly {
+                    "Monthly maintenance"
+                } else {
+                    "Maintenance"
+                }
+            );
             self.emit(&msg, LogKind::Money);
         }
     }
@@ -450,7 +501,10 @@ impl Simulation {
         for (cat, cat_sum) in by_cat {
             self.record_money(cat, jsmath::round(cat_sum * scale));
         }
-        self.emit(&format!("Monthly rent collected: ${amt} ({n} rentals)."), LogKind::Money);
+        self.emit(
+            &format!("Monthly rent collected: ${amt} ({n} rentals)."),
+            LogKind::Money,
+        );
     }
 
     /// `rollOverRetailDay`.

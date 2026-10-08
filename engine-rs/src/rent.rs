@@ -48,7 +48,9 @@ fn price_neutral(mode: GameMode, kind: Kind) -> Option<f64> {
 impl Simulation {
     /// `demandFactor(u)`.
     pub fn demand_factor(&self, u: &Unit) -> f64 {
-        let Some(neutral) = price_neutral(self.mode, u.kind) else { return 1.0 };
+        let Some(neutral) = price_neutral(self.mode, u.kind) else {
+            return 1.0;
+        };
         if u.no_rate {
             return 0.0;
         }
@@ -72,7 +74,11 @@ impl Simulation {
             Some(l) => snap_to_ladder(&l, target),
             None => target.min(cfg.max).max(cfg.min),
         };
-        u.rent = if applied == cfg.default { None } else { Some(applied) };
+        u.rent = if applied == cfg.default {
+            None
+        } else {
+            Some(applied)
+        };
         u.no_rate = false;
         Some(applied)
     }
@@ -80,7 +86,9 @@ impl Simulation {
     /// `setNoRate(id)`.
     pub fn set_no_rate(&mut self, id: i64) -> bool {
         let mode = self.mode;
-        let Some(u) = self.tower.get_unit_mut(id) else { return false };
+        let Some(u) = self.tower.get_unit_mut(id) else {
+            return false;
+        };
         if !matches!(price_options(mode, u.kind), Some(Some(_))) {
             return false;
         }

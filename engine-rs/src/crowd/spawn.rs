@@ -9,7 +9,10 @@ use super::meals::{
 };
 use super::routines::push_routine_options;
 use super::visits::{push_venue_visit_options, spawn_venue_visit, VisitOrigin};
-use super::{Crowd, PState, Person, Route, CROWD_SECONDS_PER_MINUTE, MAX_PEOPLE, METRO_DWELL_MAX, METRO_DWELL_MIN};
+use super::{
+    Crowd, PState, Person, Route, CROWD_SECONDS_PER_MINUTE, MAX_PEOPLE, METRO_DWELL_MAX,
+    METRO_DWELL_MIN,
+};
 use crate::clock::Clock;
 use crate::facilities::Kind;
 use crate::jsmath;
@@ -24,7 +27,13 @@ fn seed_for(next_id: i64) -> i32 {
     ((next_id as u64).wrapping_mul(2654435761) & 0xffff_ffff) as u32 as i32
 }
 
-pub fn make_person(crowd: &mut Crowd, tower: &Tower, route: Route, dest_x: f64, origin_x: Option<i64>) -> usize {
+pub fn make_person(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    route: Route,
+    dest_x: f64,
+    origin_x: Option<i64>,
+) -> usize {
     let from = route.floors[0];
     let seed = seed_for(crowd.next_id);
     let origin_spawn_x = match origin_x {
@@ -34,7 +43,11 @@ pub fn make_person(crowd: &mut Crowd, tower: &Tower, route: Route, dest_x: f64, 
     let person = Person {
         id: crowd.next_id,
         seed,
-        state: if route.shafts.is_empty() { PState::ToDest } else { PState::ToShaft },
+        state: if route.shafts.is_empty() {
+            PState::ToDest
+        } else {
+            PState::ToShaft
+        },
         floor: from,
         fy: from as f64,
         x: origin_spawn_x as f64,
@@ -66,12 +79,31 @@ pub fn make_person(crowd: &mut Crowd, tower: &Tower, route: Route, dest_x: f64, 
 }
 
 /// `add(crowd, tower, from, to, fromX?, toX?)`: the index of the new person.
-pub fn add(crowd: &mut Crowd, tower: &Tower, from: i64, to: i64, from_x: Option<i64>, to_x: Option<i64>) -> Option<usize> {
+pub fn add(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    from: i64,
+    to: i64,
+    from_x: Option<i64>,
+    to_x: Option<i64>,
+) -> Option<usize> {
     let seed = seed_for(crowd.next_id);
     let route_from_x = from_x.unwrap_or_else(|| pick_x(tower, from, seed));
     let route_to_x = to_x.unwrap_or_else(|| pick_x(tower, to, seed));
-    let r = crowd.route(tower, from, to, Some(route_from_x as f64), Some(route_to_x as f64))?;
-    Some(make_person(crowd, tower, r, route_to_x as f64, Some(route_from_x)))
+    let r = crowd.route(
+        tower,
+        from,
+        to,
+        Some(route_from_x as f64),
+        Some(route_to_x as f64),
+    )?;
+    Some(make_person(
+        crowd,
+        tower,
+        r,
+        route_to_x as f64,
+        Some(route_from_x),
+    ))
 }
 
 fn abs_seed(seed: i32) -> usize {
@@ -154,12 +186,16 @@ pub fn venue_has_room(u: &Unit) -> bool {
 // ---- venueTrips.ts ---------------------------------------------------------
 
 fn metro_arrival(crowd: &mut Crowd, tower: &Tower, station: &Unit, to: i64) {
-    let Some(i) = add(crowd, tower, station.floor + 1, to, None, None) else { return };
+    let Some(i) = add(crowd, tower, station.floor + 1, to, None, None) else {
+        return;
+    };
     crowd.people[i].x = inside_x(crowd, station, 2) as f64;
 }
 
 fn metro_departure(crowd: &mut Crowd, tower: &Tower, station: &Unit, from: i64) {
-    let Some(i) = add(crowd, tower, from, station.floor + 1, None, None) else { return };
+    let Some(i) = add(crowd, tower, from, station.floor + 1, None, None) else {
+        return;
+    };
     crowd.people[i].dest_x = inside_x(crowd, station, 2) as f64;
     crowd.people[i].linger_for = Some(crowd.rng.int(METRO_DWELL_MIN, METRO_DWELL_MAX) as f64);
 }
@@ -184,7 +220,10 @@ pub struct SpawnFloors {
 
 impl SpawnFloors {
     pub fn units_on(&self, floor: i64) -> &[i64] {
-        self.units_by_floor.get(&floor).map(|v| v.as_slice()).unwrap_or(&[])
+        self.units_by_floor
+            .get(&floor)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 }
 
@@ -447,7 +486,15 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
         }
         Opt::MealOutbound(pi) => {
             let pi = *pi;
-            spawn_meal_outbound(crowd, tower, &options.pools[pi], &options.venue_floors, options.venue_kinds, hour, floors);
+            spawn_meal_outbound(
+                crowd,
+                tower,
+                &options.pools[pi],
+                &options.venue_floors,
+                options.venue_kinds,
+                hour,
+                floors,
+            );
         }
         Opt::VenueVisit(kind, venue_floors, origin) => {
             let (kind, venue_floors, origin) = (*kind, venue_floors.clone(), *origin);
@@ -459,8 +506,16 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
     }
 }
 
-fn push_meal_options(crowd: &mut Crowd, tower: &Tower, clock: &Clock, floors: &SpawnFloors, options: &mut Options) {
-    let Some(window) = meal_window_for(clock.hour()) else { return };
+fn push_meal_options(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    clock: &Clock,
+    floors: &SpawnFloors,
+    options: &mut Options,
+) {
+    let Some(window) = meal_window_for(clock.hour()) else {
+        return;
+    };
     let (start, end) = window.bounds();
     let hour_frac = clock.minute_of_day() / 60.0 - start as f64;
     let t = (hour_frac / (end - start) as f64).clamp(0.0, 1.0);
@@ -477,7 +532,10 @@ fn push_meal_options(crowd: &mut Crowd, tower: &Tower, clock: &Clock, floors: &S
     let mut pools: Vec<MealPool> = Vec::new();
     let mut push = |origin_kind: MealOrigin, list: Vec<i64>| {
         if !list.is_empty() && origin_kind.weight() > 0.0 {
-            pools.push(MealPool { origin_kind, floors: list });
+            pools.push(MealPool {
+                origin_kind,
+                floors: list,
+            });
         }
     };
     for &kind in window.origins() {
@@ -546,7 +604,10 @@ fn spawn_meal_outbound(
         .copied()
         .filter(|&id| {
             let u = tower.get_unit(id).unwrap();
-            venue_kinds.contains(&u.kind) && u.is_tenanted() && u.kind.is_open_at(hour) && venue_has_room(u)
+            venue_kinds.contains(&u.kind)
+                && u.is_tenanted()
+                && u.kind.is_open_at(hour)
+                && venue_has_room(u)
         })
         .collect();
     if venue_candidates.is_empty() {
@@ -558,7 +619,9 @@ fn spawn_meal_outbound(
         let v = tower.get_unit(venue_id).unwrap();
         (o.x, v.x, v.width)
     };
-    let Some(i) = add(crowd, tower, origin_floor, venue_floor, Some(ox), Some(vx)) else { return };
+    let Some(i) = add(crowd, tower, origin_floor, venue_floor, Some(ox), Some(vx)) else {
+        return;
+    };
     crowd.people[i].dest_x = crowd.rng.int(vx, vx + vw - 1) as f64;
     crowd.people[i].meal_venue_id = Some(venue_id);
     crowd.people[i].origin_unit_id = Some(origin_id);
@@ -587,7 +650,13 @@ pub fn spawn_staff(
     if crowd.staff_count >= max_staff_for(tower) {
         return StaffSpawn::Full;
     }
-    let Some(r) = crowd.staff_route(tower, from, to, from_x.map(|x| x as f64), Some(dest_x as f64)) else {
+    let Some(r) = crowd.staff_route(
+        tower,
+        from,
+        to,
+        from_x.map(|x| x as f64),
+        Some(dest_x as f64),
+    ) else {
         return StaffSpawn::NoRoute;
     };
     let i = make_person(crowd, tower, r, dest_x as f64, None);
@@ -603,11 +672,22 @@ pub fn spawn_staff(
 }
 
 pub fn max_staff_for(tower: &Tower) -> i64 {
-    tower.units.iter().filter(|u| u.kind == Kind::Housekeeping).count() as i64 * HK_MAIDS_PER_UNIT
+    tower
+        .units
+        .iter()
+        .filter(|u| u.kind == Kind::Housekeeping)
+        .count() as i64
+        * HK_MAIDS_PER_UNIT
 }
 
 /// `spawnStep`.
-pub fn spawn_step(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower, clock: &Clock, weather: Option<Weather>) {
+pub fn spawn_step(
+    crowd: &mut Crowd,
+    dt_sec: f64,
+    tower: &mut Tower,
+    clock: &Clock,
+    weather: Option<Weather>,
+) {
     let mut time_rate = 2.2;
     if clock.is_night() {
         time_rate = 0.3;
@@ -616,7 +696,11 @@ pub fn spawn_step(crowd: &mut Crowd, dt_sec: f64, tower: &mut Tower, clock: &Clo
     }
     let pop_factor = (0.4 + tower.total_population() as f64 / 2000.0).min(3.0);
     let sky = weather.unwrap_or_else(|| weather_for(clock.day()));
-    let weather_factor = if sky == Weather::Rain { tower.mode.rain_crowd_factor() } else { 1.0 };
+    let weather_factor = if sky == Weather::Rain {
+        tower.mode.rain_crowd_factor()
+    } else {
+        1.0
+    };
     crowd.spawn_acc += dt_sec * time_rate * pop_factor * weather_factor;
     if crowd.spawn_acc < 1.0 {
         return;

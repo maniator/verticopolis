@@ -9,7 +9,9 @@ pub const TOWER_POPULATION: i64 = 15000;
 
 /// `isTenantFloorUnit`.
 pub fn is_tenant_floor_unit(u: &Unit) -> bool {
-    u.floor >= 2 && (u.is_tenanted() || u.state == UnitState::Asleep) && u.kind.facility().population > 0
+    u.floor >= 2
+        && (u.is_tenanted() || u.state == UnitState::Asleep)
+        && u.kind.facility().population > 0
 }
 
 impl Simulation {
@@ -20,7 +22,10 @@ impl Simulation {
             if u.is_present() && !u.kind.is_hotel() {
                 pop += u.census_count();
                 if u.kind.is_commercial() && u.kind.facility().population > 0 {
-                    pop -= u.hotel_customers_in.unwrap_or(0).min(u.customers_in.unwrap_or(0));
+                    pop -= u
+                        .hotel_customers_in
+                        .unwrap_or(0)
+                        .min(u.customers_in.unwrap_or(0));
                 }
             }
         }
@@ -70,7 +75,11 @@ impl Simulation {
         let pop_occupants_only = self.occupant_population();
         let mut target = self.star;
         for s in (1..=5).rev() {
-            let pop = if s >= 5 { pop_occupants_only } else { pop_with_hotels };
+            let pop = if s >= 5 {
+                pop_occupants_only
+            } else {
+                pop_with_hotels
+            };
             if pop >= STAR_THRESHOLDS[s as usize] {
                 target = s;
                 break;
@@ -81,7 +90,10 @@ impl Simulation {
         }
         if target > self.star {
             self.star = target;
-            self.emit(&format!("Congratulations! Your tower reached {} stars.", self.star), LogKind::Good);
+            self.emit(
+                &format!("Congratulations! Your tower reached {} stars.", self.star),
+                LogKind::Good,
+            );
         }
     }
 
@@ -109,7 +121,8 @@ impl Simulation {
 
     fn no_leasable_vacancy(&self) -> bool {
         !self.tower.units.iter().any(|u| {
-            u.state == UnitState::Empty && (u.kind == Kind::Office || u.kind == Kind::Condo || u.kind.is_hotel())
+            u.state == UnitState::Empty
+                && (u.kind == Kind::Office || u.kind == Kind::Condo || u.kind.is_hotel())
         })
     }
 
@@ -126,8 +139,16 @@ impl Simulation {
             ("cinema", "Showtime", self.has_operational(Kind::Cinema)),
             ("metro", "On the Map", self.has_operational(Kind::Metro)),
             ("skyline", "Touch the Sky", self.highest_floor() >= 100),
-            ("well-served", "Smooth Operator", pop >= 5000 && self.every_occupied_floor_served()),
-            ("full-house", "No Vacancy", pop >= 2000 && self.no_leasable_vacancy()),
+            (
+                "well-served",
+                "Smooth Operator",
+                pop >= 5000 && self.every_occupied_floor_served(),
+            ),
+            (
+                "full-house",
+                "No Vacancy",
+                pop >= 2000 && self.no_leasable_vacancy(),
+            ),
         ]
     }
 
@@ -143,34 +164,6 @@ impl Simulation {
     /// `checkMilestones`: the MILESTONES table in order.
     pub fn check_milestones(&mut self) {
         let tests = self.milestone_tests();
-        for (id, label, ok) in tests {
-            if self.milestones.iter().any(|m| m == id) {
-                continue;
-            }
-            if !ok {
-                continue;
-            }
-            self.milestones.push(id.to_string());
-            self.emit(&format!("🏅 Milestone: {label}"), LogKind::Good);
-        }
-    }
-
-    #[allow(dead_code)]
-    fn check_milestones_old(&mut self) {
-        let pop = self.population();
-        let tests: [(&str, &str, bool); 11] = [
-            ("pop-500", "Getting Started", pop >= 500),
-            ("pop-2500", "Rising", pop >= 2500),
-            ("pop-7500", "Metropolis", pop >= 7500),
-            ("pop-12000", "Almost There", pop >= 12000),
-            ("star-4", "Four Stars", self.star >= 4),
-            ("star-5", "Five Stars", self.star >= 5),
-            ("cinema", "Showtime", self.has_operational(Kind::Cinema)),
-            ("metro", "On the Map", self.has_operational(Kind::Metro)),
-            ("skyline", "Touch the Sky", self.highest_floor() >= 100),
-            ("well-served", "Smooth Operator", pop >= 5000 && self.every_occupied_floor_served()),
-            ("full-house", "No Vacancy", pop >= 2000 && self.no_leasable_vacancy()),
-        ];
         for (id, label, ok) in tests {
             if self.milestones.iter().any(|m| m == id) {
                 continue;

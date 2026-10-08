@@ -141,6 +141,6 @@ impl Clock {
 
     pub fn is_night(&self) -> bool {
         let h = self.hour();
-        h >= 21 || h < 6
+        !(6..21).contains(&h)
     }
 }

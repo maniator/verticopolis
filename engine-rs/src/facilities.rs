@@ -904,7 +904,7 @@ pub fn no_basement(kind: Kind) -> bool {
 }
 
 pub fn covers_ground_floor(floor: i64, hgt: i64) -> bool {
-    floor <= 1 && floor + hgt - 1 >= 1
+    floor <= 1 && floor + hgt > 1
 }
 
 pub const NEEDS_FLOORS: &str = "Transport must run through built floors. Lay floors first.";
@@ -984,7 +984,7 @@ impl Kind {
             Kind::FoodHall => (10..22).contains(&hour),
             Kind::Shop => (10..21).contains(&hour),
             Kind::Amusements => (10..24).contains(&hour),
-            Kind::Nightclub => hour >= 20 || hour < 2,
+            Kind::Nightclub => !(2..20).contains(&hour),
             Kind::BoutiqueBay => (10..21).contains(&hour),
             Kind::Spa => (9..21).contains(&hour),
             Kind::SkyBar => (16..24).contains(&hour),

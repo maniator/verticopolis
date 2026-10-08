@@ -21,7 +21,12 @@ pub enum VisitOrigin {
 
 fn visit_origins(kind: Kind) -> Option<&'static [VisitOrigin]> {
     Some(match kind {
-        Kind::Cinema => &[VisitOrigin::Outside, VisitOrigin::Condo, VisitOrigin::Office, VisitOrigin::Hotel],
+        Kind::Cinema => &[
+            VisitOrigin::Outside,
+            VisitOrigin::Condo,
+            VisitOrigin::Office,
+            VisitOrigin::Hotel,
+        ],
         Kind::PartyHall => &[VisitOrigin::Outside, VisitOrigin::Condo, VisitOrigin::Hotel],
         Kind::WeddingHall => &[VisitOrigin::Outside],
         Kind::AquaticCenter => &[VisitOrigin::Outside, VisitOrigin::Condo, VisitOrigin::Hotel],
@@ -47,7 +52,13 @@ fn meal_origin_of(origin: VisitOrigin) -> super::meals::MealOrigin {
     }
 }
 
-pub fn push_venue_visit_options(crowd: &mut Crowd, _tower: &Tower, clock: &Clock, floors: &SpawnFloors, options: &mut Options) {
+pub fn push_venue_visit_options(
+    crowd: &mut Crowd,
+    _tower: &Tower,
+    clock: &Clock,
+    floors: &SpawnFloors,
+    options: &mut Options,
+) {
     let hour = clock.hour();
     let mut push_visits = |kind: Kind, venue_floors: &[i64]| {
         for &origin in visit_origins(kind).unwrap() {
@@ -88,13 +99,21 @@ pub fn push_venue_visit_options(crowd: &mut Crowd, _tower: &Tower, clock: &Clock
         }
     }
     if let Some(weddings) = floors.venues_by_kind.get(&Kind::WeddingHall) {
-        if !weddings.is_empty() && clock.is_weekend() && hour >= WEDDING_ARRIVAL_START && hour < WEDDING_ARRIVAL_END {
+        if !weddings.is_empty()
+            && clock.is_weekend()
+            && (WEDDING_ARRIVAL_START..WEDDING_ARRIVAL_END).contains(&hour)
+        {
             push_visits(Kind::WeddingHall, weddings);
         }
     }
 }
 
-fn pick_outside_street_door(crowd: &mut Crowd, tower: &Tower, floors: &SpawnFloors, kind: Kind) -> (i64, Option<i64>) {
+fn pick_outside_street_door(
+    crowd: &mut Crowd,
+    tower: &Tower,
+    floors: &SpawnFloors,
+    kind: Kind,
+) -> (i64, Option<i64>) {
     if kind != Kind::Cinema && kind != Kind::PartyHall {
         return (1, None);
     }
@@ -129,7 +148,9 @@ pub fn spawn_venue_visit(
     if !kind.is_open_at(hour) {
         return;
     }
-    let Some(rows) = visit_origins(kind) else { return };
+    let Some(rows) = visit_origins(kind) else {
+        return;
+    };
     if !rows.contains(&origin) {
         return;
     }
@@ -141,7 +162,11 @@ pub fn spawn_venue_visit(
         .filter(|&id| {
             let u = tower.get_unit(id).unwrap();
             u.kind == kind
-                && (if kind == Kind::WeddingHall { u.is_operational() } else { u.is_tenanted() })
+                && (if kind == Kind::WeddingHall {
+                    u.is_operational()
+                } else {
+                    u.is_tenanted()
+                })
                 && venue_has_room(u)
         })
         .collect();
@@ -151,13 +176,19 @@ pub fn spawn_venue_visit(
     let pool: Vec<i64> = if kind == Kind::Cinema && !crowd.blockbusters.is_empty() {
         candidates
             .iter()
-            .flat_map(|&id| if crowd.blockbusters.contains(&id) { vec![id, id] } else { vec![id] })
+            .flat_map(|&id| {
+                if crowd.blockbusters.contains(&id) {
+                    vec![id, id]
+                } else {
+                    vec![id]
+                }
+            })
             .collect()
     } else {
         candidates
     };
     let venue_id = *crowd.rng.pick(&pool);
-    let mut origin_floor = 1;
+    let origin_floor;
     let mut origin_room: Option<i64> = None;
     let mut origin_station: Option<i64> = None;
     if origin == VisitOrigin::Outside {
@@ -191,7 +222,9 @@ pub fn spawn_venue_visit(
         (v.x, v.width)
     };
     let origin_x = origin_room.map(|id| tower.get_unit(id).unwrap().x);
-    let Some(i) = add(crowd, tower, origin_floor, venue_floor, origin_x, Some(vx)) else { return };
+    let Some(i) = add(crowd, tower, origin_floor, venue_floor, origin_x, Some(vx)) else {
+        return;
+    };
     crowd.people[i].dest_x = crowd.rng.int(vx, vx + vw - 1) as f64;
     crowd.people[i].meal_venue_id = Some(venue_id);
     if let Some(sid) = origin_station {
@@ -224,7 +257,12 @@ pub fn begin_dwell(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
     }
     let (kind, tenanted, operational, customers) = {
         let v = tower.get_unit(vid).unwrap();
-        (v.kind, v.is_tenanted(), v.is_operational(), v.customers_in.unwrap_or(0))
+        (
+            v.kind,
+            v.is_tenanted(),
+            v.is_operational(),
+            v.customers_in.unwrap_or(0),
+        )
     };
     let cap = kind.attendance_cap();
     let pop = kind.facility().population;
@@ -242,7 +280,11 @@ pub fn begin_dwell(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
         }
         tower.bump_meal_overlay_revision();
     } else if let Some(cap) = cap {
-        let gate = if kind == Kind::WeddingHall { operational } else { tenanted };
+        let gate = if kind == Kind::WeddingHall {
+            operational
+        } else {
+            tenanted
+        };
         if gate && customers < cap {
             crowd.people[i].venue_unit_id = Some(vid);
             let v = tower.get_unit_mut(vid).unwrap();

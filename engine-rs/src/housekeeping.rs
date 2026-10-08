@@ -44,7 +44,9 @@ impl Housekeeping {
     }
 
     fn release_assignment(&mut self, room_id: i64) {
-        let Some((crew_id, floor)) = self.assigned_room.remove(&room_id) else { return };
+        let Some((crew_id, floor)) = self.assigned_room.remove(&room_id) else {
+            return;
+        };
         let left = self.maids_out.get(&crew_id).copied().unwrap_or(0) - 1;
         if left > 0 {
             self.maids_out.insert(crew_id, left);
@@ -94,8 +96,15 @@ impl Simulation {
             } else {
                 String::new()
             };
-            let kind = if leftover > 0 { LogKind::Bad } else { LogKind::Info };
-            self.emit(&format!("Housekeeping cleaned {cleaned} hotel room(s).{behind}"), kind);
+            let kind = if leftover > 0 {
+                LogKind::Bad
+            } else {
+                LogKind::Info
+            };
+            self.emit(
+                &format!("Housekeeping cleaned {cleaned} hotel room(s).{behind}"),
+                kind,
+            );
         }
         self.housekeeping.cleaned_today = 0;
         self.escalate_infestations();
@@ -148,7 +157,9 @@ impl Simulation {
         let mut floors: Vec<i64> = Vec::new();
         for (floor, x, width) in sources {
             for nx in [x + width, x - 1] {
-                let Some(nid) = self.tower.room_at(floor, nx).map(|n| n.id) else { continue };
+                let Some(nid) = self.tower.room_at(floor, nx).map(|n| n.id) else {
+                    continue;
+                };
                 let n = self.tower.get_unit_mut(nid).unwrap();
                 if n.kind.is_hotel() && matches!(n.state, UnitState::Asleep | UnitState::Empty) {
                     n.state = UnitState::Dirty;
@@ -196,7 +207,11 @@ impl Simulation {
             .tower
             .units
             .iter()
-            .filter(|u| u.kind.is_hotel() && u.state == UnitState::Dirty && !self.housekeeping.assigned_room.contains_key(&u.id))
+            .filter(|u| {
+                u.kind.is_hotel()
+                    && u.state == UnitState::Dirty
+                    && !self.housekeeping.assigned_room.contains_key(&u.id)
+            })
             .map(|u| (u.id, u.floor, u.x, u.width, u.dirty_days.unwrap_or(0)))
             .collect();
         if modern {
@@ -267,11 +282,17 @@ impl Simulation {
                     continue;
                 }
                 reachable = true;
-                if self.housekeeping.maids_out.get(&cid).copied().unwrap_or(0) >= HK_MAIDS_PER_UNIT {
+                if self.housekeeping.maids_out.get(&cid).copied().unwrap_or(0) >= HK_MAIDS_PER_UNIT
+                {
                     transient = true;
                     continue;
                 }
-                if self.housekeeping.floors_busy.get(&cid).is_some_and(|s| s.contains(&rfloor)) {
+                if self
+                    .housekeeping
+                    .floors_busy
+                    .get(&cid)
+                    .is_some_and(|s| s.contains(&rfloor))
+                {
                     transient = true;
                     continue;
                 }

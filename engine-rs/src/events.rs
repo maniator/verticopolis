@@ -71,7 +71,11 @@ impl Simulation {
             if !self.events.active.is_empty() {
                 let cost = self.fire_rescue_cost();
                 let message = format!("🚒 Fire rescue available for ${cost}. Pay to stop the spread and save the tower now, or decline and fight it the slow way.");
-                self.events.pending = Some(PendingChoice { kind: "fireRescue", cost, message: message.clone() });
+                self.events.pending = Some(PendingChoice {
+                    kind: "fireRescue",
+                    cost,
+                    message: message.clone(),
+                });
                 self.emit(&message, LogKind::Bad);
                 if !self.has_any(Kind::Security) {
                     self.emit("Tip: a Security office fights fires for free. Build one to defend your tower.", LogKind::Bad);
@@ -81,13 +85,20 @@ impl Simulation {
         }
         if self.star >= 4 && roll < fire_chance + 0.05 {
             let message = "💣 A caller demands a $300,000 ransom or a bomb detonates. Pay, or have Security search the tower.".to_string();
-            self.events.pending = Some(PendingChoice { kind: "bombThreat", cost: 300_000.0, message: message.clone() });
+            self.events.pending = Some(PendingChoice {
+                kind: "bombThreat",
+                cost: 300_000.0,
+                message: message.clone(),
+            });
             self.emit(&message, LogKind::Bad);
             return;
         }
         if self.rng.chance(0.15) {
             if self.rng.chance(0.5) {
-                self.emit("A local newspaper praised your tower's design.", LogKind::Good);
+                self.emit(
+                    "A local newspaper praised your tower's design.",
+                    LogKind::Good,
+                );
             } else {
                 self.emit("Tenants are happy with the tower today.", LogKind::Info);
             }
@@ -96,7 +107,9 @@ impl Simulation {
 
     /// `resolveChoice(option)`: `accept` is true.
     pub fn resolve_choice(&mut self, accept: bool) {
-        let Some(p) = self.events.pending.take() else { return };
+        let Some(p) = self.events.pending.take() else {
+            return;
+        };
         if p.kind == "fireRescue" {
             if accept && self.money >= p.cost {
                 self.money -= p.cost;
@@ -107,7 +120,13 @@ impl Simulation {
         }
         if accept && self.money >= p.cost {
             self.money -= p.cost;
-            self.emit(&format!("💣 You paid the ${} ransom; the threat passed quietly.", p.cost), LogKind::Money);
+            self.emit(
+                &format!(
+                    "💣 You paid the ${} ransom; the threat passed quietly.",
+                    p.cost
+                ),
+                LogKind::Money,
+            );
         } else {
             self.bomb_threat();
         }
@@ -181,7 +200,11 @@ impl Simulation {
         u.occupants = 0;
         let (id, name, floor) = (u.id, u.kind.facility().name, u.floor);
         self.events.active.insert(id);
-        let msg = format!("🔥 Fire broke out in {} on {}!", name, self.floor_label(floor));
+        let msg = format!(
+            "🔥 Fire broke out in {} on {}!",
+            name,
+            self.floor_label(floor)
+        );
         self.emit(&msg, LogKind::Bad);
     }
 
@@ -200,7 +223,9 @@ impl Simulation {
 
     fn spread_fire_to(&mut self, target: Option<i64>) {
         let Some(tid) = target else { return };
-        let Some(idx) = self.tower.units.iter().position(|u| u.id == tid) else { return };
+        let Some(idx) = self.tower.units.iter().position(|u| u.id == tid) else {
+            return;
+        };
         if !self.tower.units[idx].is_operational() {
             return;
         }
@@ -222,7 +247,11 @@ impl Simulation {
         u.occupants = 0;
         let (id, name, floor) = (u.id, kind.facility().name, u.floor);
         self.events.active.insert(id);
-        let msg = format!("The fire spread to {} on {}!", name, self.floor_label(floor));
+        let msg = format!(
+            "The fire spread to {} on {}!",
+            name,
+            self.floor_label(floor)
+        );
         self.emit(&msg, LogKind::Bad);
     }
 
@@ -274,7 +303,8 @@ impl Simulation {
         let cal = self.clock.calendar;
         let year = self.clock.year();
         let day_of_year = ((self.clock.day() % cal.year_days) + cal.year_days) % cal.year_days;
-        let holiday_start = cal.year_days - (crate::jsmath::round((cal.year_days as f64 * 20.0) / 360.0) as i64).max(1);
+        let holiday_start = cal.year_days
+            - (crate::jsmath::round((cal.year_days as f64 * 20.0) / 360.0) as i64).max(1);
         if day_of_year < holiday_start || self.star < 3 || year == self.events.last_santa_year {
             return;
         }
@@ -282,7 +312,10 @@ impl Simulation {
             return;
         }
         self.events.last_santa_year = year;
-        self.emit("🎅 Santa was spotted crossing the sky above your tower for the holidays!", LogKind::Good);
+        self.emit(
+            "🎅 Santa was spotted crossing the sky above your tower for the holidays!",
+            LogKind::Good,
+        );
     }
 
     fn maybe_thief(&mut self) {
@@ -294,12 +327,20 @@ impl Simulation {
         }
         let _floor = self.thief_floor();
         if self.has_any(Kind::Security) {
-            self.emit("🕵️ Security caught a thief prowling the tower. Nothing was taken.", LogKind::Good);
+            self.emit(
+                "🕵️ Security caught a thief prowling the tower. Nothing was taken.",
+                LogKind::Good,
+            );
             return;
         }
         let loss = 5_000.0 + self.events.extra.int(0, 20_000) as f64;
         self.money -= loss;
-        self.emit(&format!("🕵️ A thief slipped through the tower and made off with ${loss}. Build Security."), LogKind::Bad);
+        self.emit(
+            &format!(
+                "🕵️ A thief slipped through the tower and made off with ${loss}. Build Security."
+            ),
+            LogKind::Bad,
+        );
     }
 
     fn thief_floor(&mut self) -> i64 {

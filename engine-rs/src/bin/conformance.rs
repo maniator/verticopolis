@@ -24,14 +24,31 @@ fn main() {
     .expect("expected.json parses");
     let want: BTreeMap<String, Vec<Checkpoint>> =
         serde_json::from_value(lock["scenarios"].clone()).expect("lock shape");
+    // Every scenario is its own engine, so they replay on separate threads;
+    // the report still prints in lock order.
+    let repo_root = root.join("..");
+    let runs: Vec<_> = std::thread::scope(|scope| {
+        let handles: Vec<_> = want
+            .keys()
+            .map(|id| {
+                let path = root.join("scenarios").join(format!("{id}.json"));
+                let repo_root = &repo_root;
+                scope.spawn(move || {
+                    let scenario: Scenario = serde_json::from_str(
+                        &std::fs::read_to_string(&path).expect("scenario file"),
+                    )
+                    .expect("scenario parses");
+                    run_scenario(&scenario, repo_root)
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|h| h.join().expect("scenario thread"))
+            .collect()
+    });
     let mut all_ok = true;
-    for (id, want) in &want {
-        let path = root.join("scenarios").join(format!("{id}.json"));
-        let scenario: Scenario =
-            serde_json::from_str(&std::fs::read_to_string(&path).expect("scenario file"))
-                .expect("scenario parses");
-        let repo_root = root.join("..");
-        let run = run_scenario(&scenario, &repo_root);
+    for ((id, want), run) in want.iter().zip(runs.iter()) {
         let got = &run.checkpoints;
         let matched = got
             .iter()

@@ -71,9 +71,20 @@ impl Simulation {
         u.vacate_at = None;
         let name = kind.facility().name;
         let msg = if buyback > 0.0 {
-            format!("The owner left {} on {} ({}). You bought it back for ${}.", name, self.floor_label(floor), reason, buyback)
+            format!(
+                "The owner left {} on {} ({}). You bought it back for ${}.",
+                name,
+                self.floor_label(floor),
+                reason,
+                buyback
+            )
         } else {
-            format!("A tenant left {} on {} ({}).", name, self.floor_label(floor), reason)
+            format!(
+                "A tenant left {} on {} ({}).",
+                name,
+                self.floor_label(floor),
+                reason
+            )
         };
         self.emit(&msg, LogKind::Bad);
     }
@@ -81,7 +92,11 @@ impl Simulation {
     /// `attemptMoveIns`.
     pub fn attempt_move_ins(&mut self) {
         let weekend = self.clock.is_weekend();
-        let parking_penalty = if self.office_parking_short() { 0.5 } else { 1.0 };
+        let parking_penalty = if self.office_parking_short() {
+            0.5
+        } else {
+            1.0
+        };
         let served_set = self.tower.served_floors();
         let mut reach_memo: std::collections::HashMap<i64, bool> = std::collections::HashMap::new();
         let mut sat_ctx: Option<SatisfactionContext> = None;
@@ -110,7 +125,11 @@ impl Simulation {
             if !reachable {
                 continue;
             }
-            if u.kind == Kind::Condo || u.kind == Kind::Office || u.kind.is_lease_amenity() || u.kind.is_rental() {
+            if u.kind == Kind::Condo
+                || u.kind == Kind::Office
+                || u.kind.is_lease_amenity()
+                || u.kind.is_rental()
+            {
                 if sat_ctx.is_none() {
                     sat_ctx = Some(self.build_satisfaction_context(true));
                 }
@@ -144,7 +163,11 @@ impl Simulation {
                     }
                 }
                 Kind::RentalStudio | Kind::RentalApartment => {
-                    let fill_rate = if u.kind == Kind::RentalStudio { 0.22 } else { 0.16 };
+                    let fill_rate = if u.kind == Kind::RentalStudio {
+                        0.22
+                    } else {
+                        0.16
+                    };
                     if self.rng.chance(fill_rate * demand) {
                         filled = true;
                     }
@@ -208,7 +231,11 @@ impl Simulation {
             self.money += price;
             self.record_money("condos", price);
             self.move_ins_today.condos += 1;
-            let msg = format!("Condominium on {} sold for ${}.", self.floor_label(floor), price);
+            let msg = format!(
+                "Condominium on {} sold for ${}.",
+                self.floor_label(floor),
+                price
+            );
             self.emit(&msg, LogKind::Money);
         }
         match kind {
@@ -234,7 +261,11 @@ impl Simulation {
                 self.move_ins_today.clinic += 1;
             }
             Kind::RentalStudio | Kind::RentalApartment => {
-                let residents = if kind == Kind::RentalApartment { Some(roll_household(&mut self.rng)) } else { None };
+                let residents = if kind == Kind::RentalApartment {
+                    Some(roll_household(&mut self.rng))
+                } else {
+                    None
+                };
                 let u = &mut self.tower.units[i];
                 u.ever_occupied = true;
                 if residents.is_some() {
@@ -247,24 +278,72 @@ impl Simulation {
     }
 
     pub fn company_name(&mut self) -> String {
-        const A: [&str; 10] = ["Apex", "Nimbus", "Vertex", "Cobalt", "Atlas", "Orion", "Pioneer", "Summit", "Delta", "Vista"];
-        const B: [&str; 8] = ["Holdings", "Systems", "Partners", "Industries", "Group", "Labs", "Trading", "Capital"];
+        const A: [&str; 10] = [
+            "Apex", "Nimbus", "Vertex", "Cobalt", "Atlas", "Orion", "Pioneer", "Summit", "Delta",
+            "Vista",
+        ];
+        const B: [&str; 8] = [
+            "Holdings",
+            "Systems",
+            "Partners",
+            "Industries",
+            "Group",
+            "Labs",
+            "Trading",
+            "Capital",
+        ];
         let a = *self.rng.pick(&A);
         let b = *self.rng.pick(&B);
         format!("{a} {b}")
     }
 
     pub fn gym_name(&mut self) -> String {
-        const A: [&str; 10] = ["Ironworks", "Summit", "Pulse", "Apex", "Vertex", "Kinetic", "Anvil", "Ascend", "Cobalt", "Momentum"];
-        const B: [&str; 6] = ["Fitness", "Athletic Club", "Gym", "Strength", "Studio", "Wellness"];
+        const A: [&str; 10] = [
+            "Ironworks",
+            "Summit",
+            "Pulse",
+            "Apex",
+            "Vertex",
+            "Kinetic",
+            "Anvil",
+            "Ascend",
+            "Cobalt",
+            "Momentum",
+        ];
+        const B: [&str; 6] = [
+            "Fitness",
+            "Athletic Club",
+            "Gym",
+            "Strength",
+            "Studio",
+            "Wellness",
+        ];
         let a = *self.rng.pick(&A);
         let b = *self.rng.pick(&B);
         format!("{a} {b}")
     }
 
     pub fn clinic_name(&mut self) -> String {
-        const A: [&str; 10] = ["Cedar", "Riverside", "Parkview", "Meridian", "Grove", "Harbor", "Summit", "Bayside", "Elm", "Crestview"];
-        const B: [&str; 6] = ["Clinic", "Health", "Medical", "Care", "Wellness Center", "Practice"];
+        const A: [&str; 10] = [
+            "Cedar",
+            "Riverside",
+            "Parkview",
+            "Meridian",
+            "Grove",
+            "Harbor",
+            "Summit",
+            "Bayside",
+            "Elm",
+            "Crestview",
+        ];
+        const B: [&str; 6] = [
+            "Clinic",
+            "Health",
+            "Medical",
+            "Care",
+            "Wellness Center",
+            "Practice",
+        ];
         let a = *self.rng.pick(&A);
         let b = *self.rng.pick(&B);
         format!("{a} {b}")
@@ -304,25 +383,52 @@ impl Simulation {
         let m = self.move_ins_today;
         let mut parts: Vec<String> = Vec::new();
         if m.offices > 0 {
-            parts.push(format!("{} office{} leased", m.offices, if m.offices > 1 { "s" } else { "" }));
+            parts.push(format!(
+                "{} office{} leased",
+                m.offices,
+                if m.offices > 1 { "s" } else { "" }
+            ));
         }
         if m.condos > 0 {
-            parts.push(format!("{} condo{} sold", m.condos, if m.condos > 1 { "s" } else { "" }));
+            parts.push(format!(
+                "{} condo{} sold",
+                m.condos,
+                if m.condos > 1 { "s" } else { "" }
+            ));
         }
         if m.rooms > 0 {
-            parts.push(format!("{} hotel room{} booked", m.rooms, if m.rooms > 1 { "s" } else { "" }));
+            parts.push(format!(
+                "{} hotel room{} booked",
+                m.rooms,
+                if m.rooms > 1 { "s" } else { "" }
+            ));
         }
         if m.fitness > 0 {
-            parts.push(format!("{} fitness club{} leased", m.fitness, if m.fitness > 1 { "s" } else { "" }));
+            parts.push(format!(
+                "{} fitness club{} leased",
+                m.fitness,
+                if m.fitness > 1 { "s" } else { "" }
+            ));
         }
         if m.clinic > 0 {
-            parts.push(format!("{} clinic{} leased", m.clinic, if m.clinic > 1 { "s" } else { "" }));
+            parts.push(format!(
+                "{} clinic{} leased",
+                m.clinic,
+                if m.clinic > 1 { "s" } else { "" }
+            ));
         }
         if m.rentals > 0 {
-            parts.push(format!("{} rental{} leased", m.rentals, if m.rentals > 1 { "s" } else { "" }));
+            parts.push(format!(
+                "{} rental{} leased",
+                m.rentals,
+                if m.rentals > 1 { "s" } else { "" }
+            ));
         }
         if !parts.is_empty() {
-            self.emit(&format!("New tenants: {}.", parts.join(", ")), LogKind::Good);
+            self.emit(
+                &format!("New tenants: {}.", parts.join(", ")),
+                LogKind::Good,
+            );
         }
         self.move_ins_today = Default::default();
     }

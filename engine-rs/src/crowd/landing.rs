@@ -31,7 +31,9 @@ pub fn landing_slots(crowd: &Crowd, tower: &Tower) -> HashMap<i64, f64> {
             continue;
         }
         let Some(sid) = p.shaft_id else { continue };
-        let Some(shaft) = tower.get_transport(sid) else { continue };
+        let Some(shaft) = tower.get_transport(sid) else {
+            continue;
+        };
         if !shaft.kind.is_elevator() {
             continue;
         }
@@ -64,7 +66,10 @@ pub fn landing_slots(crowd: &Crowd, tower: &Tower) -> HashMap<i64, f64> {
             0.0
         };
         for (rank, &i) in idx.iter().enumerate() {
-            slots.insert(crowd.people[i].id, face + side * (front + rank as f64 * step));
+            slots.insert(
+                crowd.people[i].id,
+                face + side * (front + rank as f64 * step),
+            );
         }
     }
     slots

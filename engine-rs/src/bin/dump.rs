@@ -14,7 +14,11 @@ fn main() {
     let crowd = args.iter().any(|a| a == "--crowd");
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
     let scenario: Scenario = serde_json::from_str(
-        &std::fs::read_to_string(repo.join("conformance/scenarios").join(format!("{id}.json"))).unwrap(),
+        &std::fs::read_to_string(
+            repo.join("conformance/scenarios")
+                .join(format!("{id}.json")),
+        )
+        .unwrap(),
     )
     .unwrap();
     match run_scenario_until(&scenario, &repo, label) {

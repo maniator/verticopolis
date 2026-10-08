@@ -31,7 +31,12 @@ impl Simulation {
 
     pub fn parking_demand(&self) -> ParkingDemand {
         if self.star < Kind::Parking.facility().min_star {
-            return ParkingDemand { office_pop: 0.0, offices: 0.0, suites: 0.0, total: 0.0 };
+            return ParkingDemand {
+                office_pop: 0.0,
+                offices: 0.0,
+                suites: 0.0,
+                total: 0.0,
+            };
         }
         let mut office_pop = 0.0;
         let mut suites = 0.0;
@@ -43,7 +48,12 @@ impl Simulation {
             }
         }
         let offices = (office_pop / PARKING_WORKERS_PER_SPACE).ceil();
-        ParkingDemand { office_pop, offices, suites, total: offices + suites }
+        ParkingDemand {
+            office_pop,
+            offices,
+            suites,
+            total: offices + suites,
+        }
     }
 
     pub fn suite_parking_short(&self) -> bool {
@@ -99,11 +109,9 @@ impl Simulation {
     }
 
     pub fn nudge_metro_platform(&mut self) {
-        let orphaned = self
-            .tower
-            .units
-            .iter()
-            .any(|u| u.kind == Kind::Metro && u.is_operational() && !self.tower.is_metro_platform_served(u));
+        let orphaned = self.tower.units.iter().any(|u| {
+            u.kind == Kind::Metro && u.is_operational() && !self.tower.is_metro_platform_served(u)
+        });
         if orphaned && !self.metro_platform_nudged {
             self.emit(METRO_PLATFORM_CUTOFF_MSG, LogKind::Info);
         }
@@ -117,7 +125,9 @@ impl Simulation {
         if !rentable {
             return false;
         }
-        u.floor >= 2 && u.is_operational() && (u.kind.facility().population > 0 || u.kind.is_hotel())
+        u.floor >= 2
+            && u.is_operational()
+            && (u.kind.facility().population > 0 || u.kind.is_hotel())
     }
 
     /// `strandedFloors(scope)`: sorted ascending.
@@ -144,7 +154,9 @@ impl Simulation {
 
     /// `resolveExtermination`.
     pub fn resolve_extermination(&mut self) {
-        let Some(due) = self.extermination_due_day else { return };
+        let Some(due) = self.extermination_due_day else {
+            return;
+        };
         if (self.clock.day() as f64) < due {
             return;
         }
@@ -183,7 +195,11 @@ impl Simulation {
             .tower
             .units
             .iter()
-            .filter(|u| u.kind == Kind::HotelSuite && u.state == UnitState::Asleep && self.tower.is_floor_served(u.floor))
+            .filter(|u| {
+                u.kind == Kind::HotelSuite
+                    && u.state == UnitState::Asleep
+                    && self.tower.is_floor_served(u.floor)
+            })
             .map(|u| u.satisfaction)
             .collect();
         if suites.is_empty() {
@@ -193,7 +209,10 @@ impl Simulation {
         if happy && !self.suite_parking_short() {
             self.vip_favorable = true;
             self.vip_visits += 1;
-            self.emit("A VIP enjoyed their suite. Your tower earned a favorable review (4★ unlocked).", LogKind::Good);
+            self.emit(
+                "A VIP enjoyed their suite. Your tower earned a favorable review (4★ unlocked).",
+                LogKind::Good,
+            );
         } else if self.clock.day() - self.last_vip_nag_day >= 5 {
             self.last_vip_nag_day = self.clock.day();
             self.vip_visits += 1;
@@ -228,7 +247,10 @@ impl Simulation {
         if ok {
             self.star = 6;
             self.evaluated_tower = true;
-            self.emit("The VIP was impressed! Your building is now a TOWER. You win!", LogKind::Good);
+            self.emit(
+                "The VIP was impressed! Your building is now a TOWER. You win!",
+                LogKind::Good,
+            );
         } else {
             self.emit("The VIP was unimpressed. Grow your population and amenities, then rebuild interest.", LogKind::Bad);
             self.vip_visit_day = self.clock.day() + 5;

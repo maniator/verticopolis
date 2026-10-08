@@ -203,7 +203,7 @@ impl GameMode {
     }
 
     pub fn daycare_family_bonus(self, d: f64, family_size: f64) -> f64 {
-        if self == GameMode::Classic || d < 0.0 || d >= DAYCARE_HALO_FLOORS {
+        if self == GameMode::Classic || !(0.0..DAYCARE_HALO_FLOORS).contains(&d) {
             return 0.0;
         }
         let family_factor = ((family_size - 1.0) / 4.0).clamp(0.0, 1.0);

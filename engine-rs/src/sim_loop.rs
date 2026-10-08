@@ -35,7 +35,11 @@ impl Simulation {
         let mut remaining = dt_minutes;
         while remaining > EPS {
             let to_next_hour = 60.0 - (self.clock.minute_of_day() % 60.0);
-            let cap = if to_next_hour > EPS { to_next_hour.min(30.0) } else { 30.0 };
+            let cap = if to_next_hour > EPS {
+                to_next_hour.min(30.0)
+            } else {
+                30.0
+            };
             let step = remaining.min(cap);
             self.advance_step(step);
             remaining -= step;
@@ -61,8 +65,13 @@ impl Simulation {
             let chunk = left.min(2.5);
             let calls = self.crowd.elevator_calls(&self.tower);
             let (hour, weekend) = (self.clock.hour(), self.clock.is_weekend());
-            self.elevators.move_cars(&mut self.tower, chunk, &calls, hour, weekend);
-            motion::advance(&mut self.crowd, chunk * CROWD_SECONDS_PER_MINUTE, &mut self.tower);
+            self.elevators
+                .move_cars(&mut self.tower, chunk, &calls, hour, weekend);
+            motion::advance(
+                &mut self.crowd,
+                chunk * CROWD_SECONDS_PER_MINUTE,
+                &mut self.tower,
+            );
             left -= chunk;
         }
         let staff_jobs = self.crowd.take_staff_results();
@@ -109,7 +118,8 @@ impl Simulation {
 
     pub fn on_day(&mut self) {
         self.weather = weather_for(self.clock.day());
-        let period = (self.clock.day() as f64 / self.clock.calendar.maint_period_days as f64).floor() as i64;
+        let period =
+            (self.clock.day() as f64 / self.clock.calendar.maint_period_days as f64).floor() as i64;
         if period != self.last_month {
             self.last_month = period;
             self.collect_monthly_rent();
@@ -154,7 +164,11 @@ impl Simulation {
                 u.state = UnitState::Empty;
                 u.complete_at = None;
                 self.constructing.shift_remove(&id);
-                let msg = format!("{} on {} is now open for business.", name, self.floor_label(floor));
+                let msg = format!(
+                    "{} on {} is now open for business.",
+                    name,
+                    self.floor_label(floor)
+                );
                 self.emit(&msg, LogKind::Good);
             }
         }

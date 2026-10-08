@@ -73,7 +73,14 @@ impl ElevatorDispatch {
     }
 
     /// `moveCars(tower, dt, crowdCalls, clock)`.
-    pub fn move_cars(&mut self, tower: &mut Tower, dt: f64, calls: &ElevatorCalls, hour: i64, is_weekend: bool) {
+    pub fn move_cars(
+        &mut self,
+        tower: &mut Tower,
+        dt: f64,
+        calls: &ElevatorCalls,
+        hour: i64,
+        is_weekend: bool,
+    ) {
         let lobby_set: HashSet<i64> = tower.lobby_floors().into_iter().collect();
         let n = tower.transports.len();
         for ti in 0..n {
@@ -98,7 +105,8 @@ impl ElevatorDispatch {
                 .unwrap_or(stops[0]);
             let t = &mut tower.transports[ti];
             let sched = t.schedule.clone();
-            let active_count = Schedule::active_car_count(sched.as_ref(), is_weekend, hour, t.cars) as usize;
+            let active_count =
+                Schedule::active_car_count(sched.as_ref(), is_weekend, hour, t.cars) as usize;
             let shaft_dwell = Schedule::dwell_minutes_for(sched.as_ref(), DWELL_MINUTES);
             let response = Schedule::waiting_response_for(sched.as_ref());
             let span = (t.top - t.bottom) as f64;
@@ -116,15 +124,16 @@ impl ElevatorDispatch {
             let hall_at = |fl: i64| hall.and_then(|h| h.get(&fl)).copied().unwrap_or(0.0);
             let mut call_set: HashSet<i64> = HashSet::new();
             for &fl in &stops {
-                if hall_at(fl) >= 1.0 {
-                    call_set.insert(fl);
-                } else if !staff_only && self.waiting.get(&fl).copied().unwrap_or(0.0) >= 1.0 {
+                if hall_at(fl) >= 1.0
+                    || (!staff_only && self.waiting.get(&fl).copied().unwrap_or(0.0) >= 1.0)
+                {
                     call_set.insert(fl);
                 }
             }
             let mut claimed: HashSet<i64> = HashSet::new();
             for i in 0..cars {
-                let car_home = Schedule::home_floor_for(sched.as_ref(), i, idle_floor).clamp(t.bottom, t.top);
+                let car_home =
+                    Schedule::home_floor_for(sched.as_ref(), i, idle_floor).clamp(t.bottom, t.top);
                 if i >= active_count {
                     car_load[i] = 0.0;
                     dwell[i] = 0.0;
@@ -136,7 +145,11 @@ impl ElevatorDispatch {
                     } else {
                         let step = dt * CAR_FLOORS_PER_MINUTE;
                         let dir = if home > cur { 1 } else { -1 };
-                        let np = if (home - cur).abs() <= step { home } else { cur + dir as f64 * step };
+                        let np = if (home - cur).abs() <= step {
+                            home
+                        } else {
+                            cur + dir as f64 * step
+                        };
                         t.car_positions[i] = np.max(t.bottom as f64).min(t.top as f64);
                         t.car_dir[i] = if np == home { 0 } else { dir };
                     }
@@ -163,7 +176,12 @@ impl ElevatorDispatch {
                 };
                 let held = |tg: Option<i64>| -> Option<i64> {
                     match tg {
-                        Some(f) if !cab.is_some_and(|c| c.contains(&f)) && (f as f64 - pos).abs() > reach => None,
+                        Some(f)
+                            if !cab.is_some_and(|c| c.contains(&f))
+                                && (f as f64 - pos).abs() > reach =>
+                        {
+                            None
+                        }
                         other => other,
                     }
                 };
