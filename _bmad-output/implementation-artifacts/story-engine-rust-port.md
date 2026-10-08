@@ -149,6 +149,11 @@ and two claims the tree already answered).
 - [x] [Review][Patch] `lenient_base64` carried a `Result` with no failing path; `js_trim` comment garbled; whole-float bound undocumented; one unprefixed error [engine-rs/src/load.rs, scenario.rs]
 - [x] [Review][Patch] Story row named "docs" where a path belongs [this file]
 
+Codex review of 86f3476 (2026-10-08), both applied:
+
+- [x] [Review][Patch] `callExterminator` (the Modern booking action: fee, billed room ids, next-day deadline) was not ported; only the resolution was [engine-rs/src/services.rs]
+- [x] [Review][Patch] Referee does not check a scenario's internal `id` against its file stem as the suite does [engine-rs/src/bin/conformance.rs]
+
 Codex review of beaee7c (2026-10-08), both applied:
 
 - [x] [Review][Patch] `getTransport` is a linear scan on the crowd's hot path where the TypeScript keeps `transportsById` [engine-rs/src/tower.rs, tower_query.rs]

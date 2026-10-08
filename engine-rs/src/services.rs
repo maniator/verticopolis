@@ -7,6 +7,26 @@ use crate::star::is_tenant_floor_unit;
 use crate::tower::{Unit, UnitState};
 
 pub const PARKING_WORKERS_PER_SPACE: f64 = 24.0;
+/// `ECON.exterminatorCalloutFee` and `ECON.exterminatorPerRoomFee`.
+pub const EXTERMINATOR_CALLOUT_FEE: f64 = 5000.0;
+pub const EXTERMINATOR_PER_ROOM_FEE: f64 = 2000.0;
+
+/// `Number#toLocaleString()` for a whole dollar amount in the en-US locale.
+fn with_thousands(x: f64) -> String {
+    let digits = format!("{}", x.abs() as i64);
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i) % 3 == 0 {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    if x < 0.0 {
+        format!("-{out}")
+    } else {
+        out
+    }
+}
 pub const METRO_PLATFORM_CUTOFF_MSG: &str = "Your metro platform is cut off. Build a passenger elevator, stairs, or an escalator down to the platform so commuters can reach the station.";
 
 pub struct ParkingDemand {
@@ -152,6 +172,47 @@ impl Simulation {
         out
     }
 
+    /// `callExterminator`: book a paid Modern exterminator for every room that
+    /// is infested right now. `Err` carries the TypeScript `reason`
+    /// (`unavailable`, `pending`, `none`, `funds`); `Ok` the cost and count.
+    pub fn call_exterminator(&mut self) -> Result<(f64, usize), &'static str> {
+        if !self.tower.mode.is_modern() {
+            return Err("unavailable");
+        }
+        if self.extermination_due_day.is_some() {
+            return Err("pending");
+        }
+        let ids: Vec<i64> = self
+            .tower
+            .units
+            .iter()
+            .filter(|u| u.kind.is_hotel() && u.state == UnitState::Infested)
+            .map(|u| u.id)
+            .collect();
+        let rooms = ids.len();
+        if rooms == 0 {
+            return Err("none");
+        }
+        let cost = EXTERMINATOR_CALLOUT_FEE + EXTERMINATOR_PER_ROOM_FEE * rooms as f64;
+        if self.money < cost {
+            return Err("funds");
+        }
+        self.money -= cost;
+        self.record_money("upkeep", -cost);
+        self.extermination_due_day = Some((self.clock.day() + 1) as f64);
+        // Transient by design, as in the TypeScript: a save taken mid-booking
+        // loses the billed set and resolution clears every infested room.
+        self.extermination_room_ids = Some(ids);
+        self.emit(
+            &format!(
+                "🧹 Exterminator booked for {rooms} infested room(s): ${} charged. The rooms clear tomorrow.",
+                with_thousands(cost)
+            ),
+            LogKind::Money,
+        );
+        Ok((cost, rooms))
+    }
+
     /// `resolveExtermination`.
     pub fn resolve_extermination(&mut self) {
         let Some(due) = self.extermination_due_day else {
@@ -254,6 +315,24 @@ impl Simulation {
         } else {
             self.emit("The VIP was unimpressed. Grow your population and amenities, then rebuild interest.", LogKind::Bad);
             self.vip_visit_day = self.clock.day() + 5;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::with_thousands;
+
+    #[test]
+    fn thousands_match_to_locale_string() {
+        for (x, want) in [
+            (0.0, "0"),
+            (999.0, "999"),
+            (1000.0, "1,000"),
+            (7000.0, "7,000"),
+            (1234567.0, "1,234,567"),
+        ] {
+            assert_eq!(with_thousands(x), want);
         }
     }
 }
