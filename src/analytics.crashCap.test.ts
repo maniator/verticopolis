@@ -99,13 +99,24 @@ describe("crash event cap and dedup", () => {
     expect(crashCalls()).toHaveLength(10);
   });
 
-  it("re-opens the cap for a fresh measurement window", () => {
+  it("re-opens the cap when a consent change hands the budget back", () => {
     const crash = { kind: "webgl-context-lost", repeat: false, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
     gameplaySession.noteCrash(crash);
     gameplaySession.noteCrash(crash); // deduped
-    gameplaySession.reset(); // a consent epoch (or a test) opens a new window
+    // The consent watcher's path: a new measurement window, then the crash slots
+    // released (every transition but a first-run grant does this).
+    gameplaySession.startEpoch();
+    gameplaySession.releaseCrashThrottle();
     gameplaySession.noteCrash(crash);
     expect(crashCalls()).toHaveLength(2);
+  });
+
+  it("keeps the crash budget across a new measurement window on its own", () => {
+    const crash = { kind: "webgl-context-lost", repeat: false, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
+    gameplaySession.noteCrash(crash);
+    gameplaySession.startEpoch(); // the window moves; the flood guard does not follow it
+    gameplaySession.noteCrash(crash);
+    expect(crashCalls()).toHaveLength(1);
   });
 
   it("re-opens the cap for a new PAGE LIFE, which the session id outlives", () => {

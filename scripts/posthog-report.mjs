@@ -735,8 +735,8 @@ async function main() {
         finalRows.skipped || finalRows.empty ? "n/a" : pct(finalRows.sessions, totals.session_end.sessions),
       ],
       // The numerator changed meaning on 2026-09-14: `crash` is capped and deduped
-      // per session, so this is distinct crash SHAPES per session over boots, not
-      // occurrences over boots. It stepped down that day and is not comparable
+      // per page life, so this is distinct crash SHAPES per page life over boots,
+      // never occurrences over boots. It stepped down that day and is not comparable
       // across it. The denominator is unchanged.
       ["Crash shapes to boot ratio", pct(totals.crash.events, totals.boot.events)],
       ["Typical session fps (p50)", fpsP50 && !fpsP50.skipped && !fpsP50.empty ? fmt(rnd(fpsP50.p50)) : "n/a"],
