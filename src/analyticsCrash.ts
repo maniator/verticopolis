@@ -12,14 +12,17 @@ import { createEventThrottle } from "./analyticsThrottle";
  * re-exposes both functions so the shell keeps its one analytics handle.
  */
 
-/** Hard cap on `crash` events one PAGE LIFE sends, named for what it bounds: the
+/** Cap on `crash` events one PAGE LIFE sends, named for what it bounds: the
  *  throttle is module memory, so a reload re-opens it, while the session id
  *  survives in `sessionStorage`, and one `distinct_id` can exceed ten across page
  *  lives. Intended, not an oversight. The flood this exists to stop needs no
  *  reload (the screen re-shows in place: 8,269 events in one page life), reloads
  *  are human-paced so they cannot threaten the per-IP budget, and a crash that
  *  survives one is a new incident worth seeing. Persisting it anyway is a tracked
- *  backlog decision. Its own literal, not shared with `analyticsErrors.ts`'s cap:
+ *  backlog decision. A desktop consent change can also hand the budget back
+ *  within one page life (see {@link releaseCrashThrottle}): toggling sharing is
+ *  human-paced too, and a held budget would leave the next consented window
+ *  silent. Its own literal, not shared with `analyticsErrors.ts`'s cap:
  *  they agree at 10 today but bound different streams. */
 const MAX_CRASHES_PER_PAGE_LIFE = 10;
 

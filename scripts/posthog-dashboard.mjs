@@ -9,14 +9,17 @@
  * Runs on plain Node (18+, global fetch), no dependencies. Env:
  *   POSTHOG_PERSONAL_API_KEY  (required)  a personal API key with insight:read,
  *                                         insight:write, dashboard:read,
- *                                         dashboard:write, action:read and
- *                                         action:write (a phx_... key, NOT the
- *                                         phc_... ingest key). The action scopes
- *                                         are not optional: the new-game tiles
- *                                         read through an action, which is
+ *                                         dashboard:write, action:read,
+ *                                         action:write, warehouse_view:read and
+ *                                         warehouse_view:write (a phx_... key,
+ *                                         NOT the phc_... ingest key). The action
+ *                                         scopes are not optional: the new-game
+ *                                         tiles read through an action, which is
  *                                         provisioned before any insight, so a
  *                                         key without them aborts the run with
- *                                         nothing written.
+ *                                         nothing written. The warehouse_view
+ *                                         scopes provision the session_lengths
+ *                                         saved view that the session tiles read.
  *   POSTHOG_PROJECT_ID        (default 524085)  the verticopolis project.
  *   POSTHOG_HOST              (default https://us.posthog.com)  US Cloud app host.
  *
@@ -426,7 +429,7 @@ function buildInsights(ids) {
     {
       name: "Crashes over time (by repeat)",
       description:
-        "Daily crash events split by the repeat-within-90s flag, production. Since 2026-09-14 crash is capped and deduped per page life (one event per distinct crash shape, at most 10 per page life; a reload starts a fresh budget under the same session id), so counts before and after that date are not comparable.",
+        "Daily crash events split by the repeat-within-90s flag, production. Since 2026-09-14 crash is capped and deduped per page life (one event per distinct crash shape, at most 10 per budget; a reload, or a desktop player turning sharing off and on, starts a fresh budget under the same session id), so counts before and after that date are not comparable.",
       query: trends([series("crash", "Crashes")], { breakdown: "repeat" }),
     },
     {

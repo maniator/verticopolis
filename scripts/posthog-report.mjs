@@ -704,8 +704,9 @@ async function main() {
       ["Boots", totals.boot.events],
       ["Play sessions", totals.boot.sessions],
       // Capped and deduped per page life since 2026-09-14, so this counts distinct
-      // crash SHAPES per page life (at most 10, and a reload starts a fresh budget
-      // under the same session id), not occurrences. Not comparable with counts
+      // crash SHAPES per page life (at most 10 per budget; a reload, or a desktop
+      // consent toggle, starts a fresh one under the same session id), not
+      // occurrences. Not comparable with counts
       // from before that date.
       ["Crashes", totals.crash.events],
       ["App actions", totals.app_action.events],
