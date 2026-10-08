@@ -388,9 +388,9 @@ pub fn run_scenario_until(
         (None, Some(RunError::Failed { index, what })) => {
             Err(format!("command {index} failed before {label}: {what}"))
         }
-        (None, Some(RunError::Unsupported { index, what })) => {
-            Err(format!("command {index} ({what}) is not ported yet"))
-        }
+        (None, Some(RunError::Unsupported { index, what })) => Err(format!(
+            "command {index} ({what}) is not ported yet, before {label}"
+        )),
         (None, None) => Err(format!("label {label} not reached")),
     }
 }
@@ -699,10 +699,23 @@ mod tests {
         match run.error {
             Some(super::RunError::Failed { index, what }) => {
                 assert_eq!(index, 1);
-                assert!(what.contains("taken twice"));
+                assert_eq!(what, "checkpoint label a is taken twice");
             }
             other => panic!("{other:?}"),
         }
+        // Inside one command, nothing after the repeated emit runs: a tick
+        // whose first checkpoint repeats a label records no later ones.
+        let ticked = scenario(
+            r#"{"op":"checkpoint","label":"t+60"},{"op":"tick","dt":60,"times":3,"checkpointEvery":1},{"op":"checkpoint","label":"z"}"#,
+        )
+        .unwrap();
+        let run2 = super::run_scenario(&ticked, std::path::Path::new("."));
+        let labels: Vec<_> = run2.checkpoints.iter().map(|c| c.label.as_str()).collect();
+        assert_eq!(labels, ["start", "t+60"]);
+        assert!(matches!(
+            run2.error,
+            Some(super::RunError::Failed { index: 1, .. })
+        ));
         // The first "a" is a stop in its own right; a stop label past the
         // repeat is never reached and the failure is reported instead.
         assert!(super::run_scenario_until(&s, std::path::Path::new("."), "a").is_ok());

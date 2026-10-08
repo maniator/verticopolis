@@ -894,9 +894,18 @@ impl Tower {
     // ---- transports ------------------------------------------------------
 
     pub fn transport_index(&self, id: i64) -> Option<usize> {
-        self.transport_by_id.get(&id).copied()
+        let i = *self.transport_by_id.get(&id)?;
+        debug_assert_eq!(
+            self.transports.get(i).map(|t| t.id),
+            Some(id),
+            "transport index is stale; every write to `transports` must go through add, remove or reindex"
+        );
+        Some(i)
     }
 
+    /// Rebuild `transport_by_id`. `Vec::remove` shifts every later index,
+    /// so a removal (a player edit, never a crowd-hot-path call) rebuilds the
+    /// map where the TypeScript `Map.delete` is O(1).
     fn reindex_transports(&mut self) {
         self.transport_by_id.clear();
         for (i, t) in self.transports.iter().enumerate() {
@@ -1185,5 +1194,44 @@ impl Tower {
 impl Default for Tower {
     fn default() -> Self {
         Tower::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn index_matches_positions(t: &Tower) {
+        assert_eq!(t.transport_by_id.len(), t.transports.len());
+        for (i, tr) in t.transports.iter().enumerate() {
+            assert_eq!(t.transport_index(tr.id), Some(i), "shaft {}", tr.id);
+            assert_eq!(t.get_transport(tr.id).map(|x| x.id), Some(tr.id));
+        }
+    }
+
+    #[test]
+    fn transport_index_survives_add_remove_and_reindex() {
+        let mut t = Tower::new();
+        for x in 0..30 {
+            assert!(t.place(Kind::Lobby, 1, x).ok || t.room_at(1, x).is_some());
+        }
+        for fl in 2..=3 {
+            for x in 0..30 {
+                assert!(t.place(Kind::Floor, fl, x).ok || t.has_structure(fl, x));
+            }
+        }
+        let mut ids = Vec::new();
+        for x in [2, 10, 18] {
+            let r = t.place_transport(Kind::ElevatorStandard, x, 1, 3);
+            assert!(r.ok, "{:?}", r.reason);
+            ids.push(r.unit_id.unwrap());
+        }
+        index_matches_positions(&t);
+        assert!(t.remove_transport(ids[0]).is_some());
+        assert_eq!(t.transport_index(ids[0]), None);
+        index_matches_positions(&t);
+        t.reindex();
+        index_matches_positions(&t);
+        assert_eq!(t.get_transport(ids[2]).map(|x| x.x), Some(18));
     }
 }

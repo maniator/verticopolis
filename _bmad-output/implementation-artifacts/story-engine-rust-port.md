@@ -131,7 +131,7 @@ error text the TypeScript runner shares).
 - [x] [Review][Patch] Duplicate label still pushed and the command keeps running; the closing `final` emit never checked [engine-rs/src/scenario.rs]
 - [x] [Review][Patch] Whole-float cutoff at 9e15 refuses what `Number.isInteger` takes; `elapsed` can overflow [engine-rs/src/scenario.rs]
 - [x] [Review][Patch] `Buffer.from` leniency: trailing bits, a dangling symbol, `=` mid-string, non-alphabet bytes, U+FEFF before the magic, NEL kept [engine-rs/src/load.rs]
-- [x] [Review][Patch] Hex, octal and binary literals rounded per digit; `[-0]` keeps its sign [engine-rs/src/load.rs]
+- [x] [Review][Patch] Hex, octal and binary literals now round once rather than per digit; `Number([-0])` is +0 [engine-rs/src/load.rs]
 - [x] [Review][Patch] U+0085 counted as JavaScript whitespace [engine-rs/src/load.rs]
 - [x] [Review][Patch] `dump` panics on a missing file while a bad one exits cleanly [engine-rs/src/bin/dump.rs]
 - [x] [Review][Patch] Tests for `Number()` of arrays, booleans and null, the container's byte order marks and base64 forms; bookkeeping counts and the `1e400` note on #858 [engine-rs/src/load.rs, this file, backlog.md]
@@ -148,6 +148,21 @@ and two claims the tree already answered).
 - [x] [Review][Patch] Hex rounding test could not tell exact from per-digit; base64 test lacked URL-safe, leading `=` and trailing-bit forms; scenario tests asserted only `is_err` [engine-rs/src/load.rs, scenario.rs]
 - [x] [Review][Patch] `lenient_base64` carried a `Result` with no failing path; `js_trim` comment garbled; whole-float bound undocumented; one unprefixed error [engine-rs/src/load.rs, scenario.rs]
 - [x] [Review][Patch] Story row named "docs" where a path belongs [this file]
+
+Round five (confirming pass, 2026-10-08) on the Codex fix and the round-four
+patches: 0 `decision_needed`, 7 `patch`, 0 `defer`; the Acceptance Auditor
+found no violation. Dismissed: inputs no save or scenario can carry (labels
+starting with `--`, path separators in a dev tool's id, a `.json` directory),
+duplicate shaft ids (the loader repairs them and `Map.set` is last-wins too),
+and wording the TypeScript shares.
+
+- [x] [Review][Patch] Transport index: no test after a removal, no assertion that the map matches the vector, O(n) rebuild on remove unexplained [engine-rs/src/tower.rs]
+- [x] [Review][Patch] Referee folds an unreadable directory entry into "no file" [engine-rs/src/bin/conformance.rs]
+- [x] [Review][Patch] `dump` panics on a non-UTF-8 argument [engine-rs/src/bin/dump.rs]
+- [x] [Review][Patch] Repeated-label test did not prove the command stops at the emit [engine-rs/src/scenario.rs]
+- [x] [Review][Patch] `Number([n])` arm re-implemented the scalar path; `Unsupported` message dropped the label [engine-rs/src/load.rs, scenario.rs]
+- [x] [Review][Patch] Comment named "the TypeScript suite" without the test [engine-rs/src/bin/conformance.rs]
+- [x] [Review][Patch] Round-three row said `[-0]` keeps its sign and read as if per-digit rounding were the fix [this file]
 
 Codex review of 86f3476 (2026-10-08), both applied:
 

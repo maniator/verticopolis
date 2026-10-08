@@ -29,13 +29,17 @@ fn main() {
     let lock: serde_json::Value = serde_json::from_str(&lock_text).expect("expected.json parses");
     let want: BTreeMap<String, Vec<Checkpoint>> =
         serde_json::from_value(lock["scenarios"].clone()).expect("lock shape");
-    // The scenario directory and the lock must name the same set, as the
-    // TypeScript suite checks, so a new scenario cannot slip past the referee
-    // and a stale lock entry cannot pass for a deleted one.
+    // The scenario directory and the lock must name the same set (the
+    // "has a scenario for every lock entry" test in
+    // src/tests/integration/conformance.integration.test.ts), so a new
+    // scenario cannot slip past the referee and a stale lock entry cannot
+    // pass for a deleted one.
     let scenario_dir = root.join("scenarios");
-    let mut on_disk: Vec<String> = match std::fs::read_dir(&scenario_dir) {
+    let mut on_disk: Vec<String> = match std::fs::read_dir(&scenario_dir)
+        .and_then(|entries| entries.collect::<Result<Vec<_>, _>>())
+    {
         Ok(entries) => entries
-            .filter_map(|e| e.ok())
+            .iter()
             .filter_map(|e| {
                 let name = e.file_name().to_string_lossy().into_owned();
                 name.strip_suffix(".json").map(str::to_string)

@@ -8,7 +8,10 @@ use verticopolis_engine::canonical::canonical_json;
 use verticopolis_engine::scenario::{run_scenario_until, Scenario};
 
 fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let args: Vec<String> = std::env::args_os()
+        .skip(1)
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect();
     let crowd = args.iter().any(|a| a == "--crowd");
     let positional: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
     if positional.len() != 2 || args.iter().any(|a| a.starts_with("--") && a != "--crowd") {

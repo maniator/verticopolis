@@ -138,8 +138,8 @@ fn js_number(v: Option<&Value>) -> f64 {
             [Value::Bool(_)] | [Value::Object(_)] => f64::NAN,
             // The element is rendered as text first: a number `-0` prints
             // as "0" and loses its sign, while the string "-0" keeps it.
-            [Value::Number(n)] => {
-                let v = n.as_f64().unwrap_or(f64::NAN);
+            [one @ Value::Number(_)] => {
+                let v = js_number(Some(one));
                 if v == 0.0 {
                     0.0
                 } else {
