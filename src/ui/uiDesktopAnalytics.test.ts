@@ -139,7 +139,7 @@ describe("showDesktopAnalyticsNotice", () => {
     const sent: string[] = [];
     const h = makeHost();
     showDesktopAnalyticsNotice(h.host, "desktop");
-    for (const name of ["boot", "game_started", "first_build"]) {
+    for (const name of ["boot", "new_game_started", "first_build"]) {
       holdWhilePending(() => sent.push(name), "desktop");
     }
     expect(sent, "nothing may leave while the notice is open").toEqual([]);
@@ -147,7 +147,7 @@ describe("showDesktopAnalyticsNotice", () => {
     expect(heldEventCount()).toBe(3);
     h.box.querySelector<HTMLButtonElement>('[data-act="accept"]')!.click();
     expect(desktopConsentState()).toBe("granted");
-    expect(sent).toEqual(["boot", "game_started", "first_build"]);
+    expect(sent).toEqual(["boot", "new_game_started", "first_build"]);
   });
 
   it("discards everything held when the player says No thanks", () => {
@@ -279,7 +279,7 @@ describe("a grant starts the gameplay session boot could not", () => {
     vi.setSystemTime(7000);
     window.dispatchEvent(new Event("pagehide"));
     expect(sent, "the session that follows the yes has to end somewhere").toEqual([
-      { event: "session_end", props: { seconds: 3 } },
+      { event: "session_end", props: { seconds: 3, final: true } },
     ]);
   });
 

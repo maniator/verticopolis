@@ -25,13 +25,21 @@ import { holdWhilePending } from "./desktopConsent";
  */
 export interface GameplayEvents {
   /** A fresh tower was founded (the funnel's entry point). `mode` is the
-   *  rule-set: "classic" or "modern". */
-  game_started: { mode: string };
+   *  rule-set: "classic" or "modern".
+   *
+   *  Named for what it counts. It fires ONLY on founding, so a returning player
+   *  who opens a save never emits it: this counts new towers, and reading it as
+   *  a session or games-played denominator understates the real figure (a week
+   *  that read 82 here carried 123 `first_build`s). The resumed half of that
+   *  picture is `boot` with `reason` "continue" or "recovery". It was called
+   *  `game_started` until 2026-09-14, a name that read like a session counter
+   *  and was repeatedly taken for one. */
+  new_game_started: { mode: string };
   /** The first facility placed in the current tower (the funnel's "did they
    *  build anything" step). Fires once per tower: for a founded tower it follows
-   *  that tower's `game_started` (the latch re-opens in `noteNewGame`); for the
-   *  boot tower that a continued save opens on, it fires with no preceding
-   *  `game_started`. `tool` is the facility/transport kind that broke the ice. */
+   *  that tower's `new_game_started` (the latch re-opens in `noteNewGame`); for
+   *  the boot tower that a continued save opens on, it fires with no preceding
+   *  `new_game_started`. `tool` is the facility/transport kind that broke the ice. */
   first_build: { tool: string };
   /** A tool was selected, reported once per distinct tool so the event captures
    *  the session's tool mix without a row per click. */
@@ -39,8 +47,51 @@ export interface GameplayEvents {
   /** The tower crossed into a new star rating (2 through 6): progression depth,
    *  the clearest "how far do players get" signal. */
   star_reached: { star: number };
-  /** The tab was hidden or unloaded: session length in whole seconds. */
-  session_end: { seconds: number };
+  /** The tab was hidden or unloaded: cumulative foreground session length in
+   *  whole seconds, plus whether the emission came from `pagehide`.
+   *
+   *  READ THIS BEFORE QUERYING IT. Two separate things make the obvious reads
+   *  wrong, and the `session_lengths` saved view in PostHog exists so the
+   *  correction is written once. Use that view; the dashboard tiles do.
+   *
+   *  1. It RE-FIRES on every tab-hide with a growing `seconds`, because the
+   *     terminal `pagehide` is not reliably delivered (a hard mobile kill drops
+   *     it) and a session that only ever reported at its close would often report
+   *     nothing at all. So one session contributes several rows, and a long
+   *     session contributes more of them than a short one. Counting rows
+   *     overcounts sessions (measured 3.6x), and an event-level percentile over
+   *     `seconds` is weighted by the very thing it measures (a 545s median
+   *     against a real 91s).
+   *  2. The per-tab session id lives in `sessionStorage` and DELIBERATELY
+   *     survives a same-tab reload (see `analyticsRelay.ts`), so an "Update now"
+   *     reload or a WebGL crash-recovery reload keeps one `distinct_id` while
+   *     this clock restarts at 0. One `distinct_id` therefore covers several page
+   *     lives, and `max(seconds)` would report only the longest of them. A
+   *     session's length is the SUM of each page life's final reading. The 15%
+   *     figure below is the DIFFERENCE the two readings make, not a share of any
+   *     session: against the boot-partitioned total, a plain `max` loses about
+   *     15%, this sum recovers about 13 of those points, and the loss lands on
+   *     the update and crash-recovery cohort specifically. The sum is itself a
+   *     lower bound: a life is detected by the reading DROPPING, so a reload
+   *     whose second life reaches the first's length or beyond is invisible
+   *     (equal counts as invisible too, which is the likelier half for short
+   *     repeatable lives such as a crash loop). It sees 77 of the 129 reloads in
+   *     a recent 919 sessions, and the boot-partitioned sum that would catch the
+   *     rest is only about 2% higher in total.
+   *
+   *  So: count sessions as distinct `distinct_id`s, never as a row count, and
+   *  take a length as the sum of per-page-life peaks rather than a plain `max`.
+   *
+   *  `final` marks an emission made from `pagehide`. It is best-effort in the
+   *  same way `pagehide` is (a session killed outright has no such row), and it
+   *  is not unique at any level: a `distinct_id` covers several page lives, and a
+   *  single page life can emit it more than once, because a bfcache entry fires
+   *  `pagehide` and a later real close whose `seconds` has grown clears the
+   *  ordinary dedup on its own. So do not use it to pick a session's length, to
+   *  count sessions, or to delimit page lives. It answers the coarse question
+   *  "did any pagehide arrive", which is the measure of how much work the
+   *  re-emission fallback is doing. */
+  session_end: { seconds: number; final: boolean };
   /** One snapshot per boot: why the session started (`reason`), the build it
    *  runs (`version`), and the standing state of the tower it opened. Unlike the
    *  delta events, this captures a returning player's established tower even when
