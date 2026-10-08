@@ -120,6 +120,8 @@ impl Person {
         m.insert("originFloor".into(), json!(self.origin_floor));
         m.insert("shafts".into(), json!(self.shafts));
         m.insert("leg".into(), json!(self.leg));
+        // `shaftId` and `carIndex` are `number | null` in the TypeScript, so
+        // an absent value is a literal null; every other optional is omitted.
         m.insert("shaftId".into(), json!(self.shaft_id));
         m.insert("carIndex".into(), json!(self.car_index));
         m.insert("destX".into(), json!(self.dest_x));

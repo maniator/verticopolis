@@ -28,6 +28,7 @@ permissions:
 jobs:
   engine-rs:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: engine-rs

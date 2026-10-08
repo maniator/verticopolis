@@ -11,26 +11,29 @@ pub const HK_MAIDS_PER_UNIT: i64 = 6;
 pub const HK_CLEAN_MINUTES: f64 = 8.0;
 pub const INFEST_DAYS: i64 = 3;
 
-#[derive(Default)]
 pub struct Housekeeping {
     /// room id -> (crew id, floor)
     assigned_room: HashMap<i64, (i64, i64)>,
     maids_out: HashMap<i64, i64>,
     floors_busy: HashMap<i64, HashSet<i64>>,
     cleaned_today: i64,
+    /// Day the "can't reach" nudge last fired; -1 before the first.
     nudged_day: i64,
-    initialized: bool,
+}
+
+impl Default for Housekeeping {
+    fn default() -> Self {
+        Housekeeping {
+            assigned_room: HashMap::new(),
+            maids_out: HashMap::new(),
+            floors_busy: HashMap::new(),
+            cleaned_today: 0,
+            nudged_day: -1,
+        }
+    }
 }
 
 impl Housekeeping {
-    fn nudged_day(&mut self) -> &mut i64 {
-        if !self.initialized {
-            self.nudged_day = -1;
-            self.initialized = true;
-        }
-        &mut self.nudged_day
-    }
-
     pub fn reset_shift(&mut self) {
         self.assigned_room.clear();
         self.maids_out.clear();
@@ -329,8 +332,8 @@ impl Simulation {
             }
         }
         let day = self.clock.day();
-        if unreachable > 0 && *self.housekeeping.nudged_day() != day {
-            *self.housekeeping.nudged_day() = day;
+        if unreachable > 0 && self.housekeeping.nudged_day != day {
+            self.housekeeping.nudged_day = day;
             self.emit(
                 &format!("🧹 Housekeeping can't reach {unreachable} dirty room(s). Staff travel by service elevator or stairs, not escalators or passenger elevators."),
                 LogKind::Bad,

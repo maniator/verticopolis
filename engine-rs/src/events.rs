@@ -325,6 +325,8 @@ impl Simulation {
         if !self.events.extra.chance(THIEF_DAILY_CHANCE) {
             return;
         }
+        // The floor only places the cosmetic; the draw stays so the event
+        // stream matches the TypeScript.
         let _floor = self.thief_floor();
         if self.has_any(Kind::Security) {
             self.emit(

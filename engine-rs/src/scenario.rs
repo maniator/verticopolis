@@ -31,7 +31,7 @@ pub struct NewGame {
     pub mode: String,
 }
 
-#[derive(Deserialize, serde::Serialize, Debug)]
+#[derive(Deserialize, Debug)]
 #[serde(tag = "op", deny_unknown_fields)]
 pub enum Command {
     #[serde(rename = "setMoney")]

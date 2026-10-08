@@ -28,7 +28,8 @@ impl Rng {
         f64::from(t ^ (t >> 14)) / 4_294_967_296.0
     }
 
-    /// Integer in `[min, max]` inclusive.
+    /// Integer in `[min, max]` inclusive. `max < min` mirrors the
+    /// JavaScript (a value above `max`); callers keep `min <= max`.
     pub fn int(&mut self, min: i64, max: i64) -> i64 {
         min + (self.next() * ((max - min + 1) as f64)).floor() as i64
     }
@@ -38,7 +39,9 @@ impl Rng {
         self.next() < p
     }
 
-    /// One element of `arr`, by `Math.floor(next() * arr.length)`.
+    /// One element of `arr`, by `Math.floor(next() * arr.length)`. Panics on
+    /// an empty slice, where the JavaScript would return undefined; every
+    /// caller checks for emptiness first, as the originals do.
     pub fn pick<'a, T>(&mut self, arr: &'a [T]) -> &'a T {
         &arr[(self.next() * arr.len() as f64).floor() as usize]
     }

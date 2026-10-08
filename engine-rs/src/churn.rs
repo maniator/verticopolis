@@ -9,7 +9,7 @@ use crate::satisfaction::{SatisfactionContext, VACATE_NOTICE_MINUTES};
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
 
-const CLASSIC_HOUSEHOLD: f64 = 3.0;
+use crate::rules::CLASSIC_HOUSEHOLD;
 const HOUSEHOLD_SIZES: [i64; 4] = [2, 3, 4, 5];
 const HOUSEHOLD_WEIGHTS: [i64; 4] = [4, 6, 2, 1];
 

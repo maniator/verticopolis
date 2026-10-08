@@ -2,7 +2,9 @@
 
 use std::collections::HashMap;
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexSet;
+
+use crate::housekeeping::HK_MAIDS_PER_UNIT;
 
 use super::meals::{
     matches_meal_origin_kind, meal_window_for, outbound_weight, staff_on_shift, MealOrigin,
@@ -19,12 +21,13 @@ use crate::jsmath;
 use crate::sim_loop::{weather_for, Weather};
 use crate::tower::{Tower, Unit};
 
-pub const HK_MAIDS_PER_UNIT: i64 = 6;
-
 // ---- trips.ts -------------------------------------------------------------
 
+/// `(crowd.nextId * 2654435761) | 0`: a double product (rounded past 2^53,
+/// which an id above about 3.4 million reaches) then ToInt32.
 fn seed_for(next_id: i64) -> i32 {
-    ((next_id as u64).wrapping_mul(2654435761) & 0xffff_ffff) as u32 as i32
+    let product = next_id as f64 * 2654435761.0;
+    product.rem_euclid(4294967296.0) as u32 as i32
 }
 
 pub fn make_person(
@@ -363,8 +366,7 @@ impl Options {
     }
 }
 
-fn list_of<'a>(floors: &'a SpawnFloors, reachable_metros: &'a [i64], l: List) -> &'a [i64] {
-    let _ = reachable_metros;
+fn list_of(floors: &SpawnFloors, l: List) -> &[i64] {
     match l {
         List::LeasedOffices => &floors.leased_offices,
         List::StaffedOffices => &floors.staffed_offices,
@@ -464,23 +466,23 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
         Opt::Trip(a, b) => {
             let from = match *a {
                 End::Fixed(f) => f,
-                End::Pick(l) => *crowd.rng.pick(list_of(floors, &reachable_metros, l)),
+                End::Pick(l) => *crowd.rng.pick(list_of(floors, l)),
             };
             let to = match *b {
                 End::Fixed(f) => f,
-                End::Pick(l) => *crowd.rng.pick(list_of(floors, &reachable_metros, l)),
+                End::Pick(l) => *crowd.rng.pick(list_of(floors, l)),
             };
             add(crowd, tower, from, to, None, None);
         }
         Opt::MetroArrival(l) => {
             let sid = *crowd.rng.pick(&reachable_metros);
-            let to = *crowd.rng.pick(list_of(floors, &reachable_metros, *l));
+            let to = *crowd.rng.pick(list_of(floors, *l));
             let station = tower.get_unit(sid).unwrap().clone();
             metro_arrival(crowd, tower, &station, to);
         }
         Opt::MetroDeparture(l) => {
             let sid = *crowd.rng.pick(&reachable_metros);
-            let from = *crowd.rng.pick(list_of(floors, &reachable_metros, *l));
+            let from = *crowd.rng.pick(list_of(floors, *l));
             let station = tower.get_unit(sid).unwrap().clone();
             metro_departure(crowd, tower, &station, from);
         }
@@ -714,6 +716,16 @@ pub fn spawn_step(
     }
 }
 
-// `IndexMap` is imported for the per-kind venue bins' insertion order.
-#[allow(dead_code)]
-type KindBins = IndexMap<Kind, Vec<i64>>;
+#[cfg(test)]
+mod tests {
+    use super::seed_for;
+
+    #[test]
+    fn seed_matches_the_javascript_expression() {
+        // Node: (id * 2654435761) | 0 for each id.
+        assert_eq!(seed_for(1), -1640531535);
+        assert_eq!(seed_for(2), 1013904226);
+        assert_eq!(seed_for(3_400_000), -1911161536);
+        assert_eq!(seed_for(10_000_000), -568160640);
+    }
+}

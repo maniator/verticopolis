@@ -697,11 +697,10 @@ pub static FACILITIES: [Facility; 37] = [
 ];
 
 impl Kind {
+    /// The catalog row. `FACILITIES` is laid out in `Kind` order, which the
+    /// `catalog_order` test pins, so the lookup is an index.
     pub fn facility(self) -> &'static Facility {
-        FACILITIES
-            .iter()
-            .find(|f| f.kind == self)
-            .expect("every kind is in the catalog")
+        &FACILITIES[self as usize]
     }
 
     pub fn as_str(self) -> &'static str {
@@ -1042,5 +1041,17 @@ impl Kind {
                 | Kind::SkyBar
                 | Kind::Daycare
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn catalog_order() {
+        for (i, f) in FACILITIES.iter().enumerate() {
+            assert_eq!(f.kind as usize, i, "{} is out of Kind order", f.name);
+        }
     }
 }

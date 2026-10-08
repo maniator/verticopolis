@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use crate::demand::{compute_demand_map, origin_demand, unmet_coverage, DemandMap};
 use crate::econ::{rent_config, rent_of};
 use crate::facilities::Kind;
-use crate::rules::{Drain, NO_DRAIN};
+use crate::rules::{Drain, CLASSIC_HOUSEHOLD, NIGHTCLUB_NOISE_FLOORS, NO_DRAIN};
 use crate::sim::{LogKind, Simulation};
 use crate::tower::{Unit, UnitState};
 
@@ -20,9 +20,7 @@ pub const TRANSPORT_FAR_TILES: i64 = 79;
 pub const SERVED_RECOVERY: f64 = 0.05;
 pub const OFFICE_NOISE_TILES: i64 = 11;
 pub const HOTEL_NOISE_TILES: i64 = 21;
-const NIGHTCLUB_NOISE_FLOORS: i64 = 4;
 const GATE_HORIZON_HOURS: i64 = 48;
-const CLASSIC_HOUSEHOLD: i64 = 3;
 
 pub struct SatisfactionContext {
     pub cong_map: Option<IndexMap<i64, f64>>,
@@ -307,7 +305,7 @@ impl Simulation {
         let mut probe = u.clone();
         probe.ever_occupied = true;
         probe.residents = if u.kind == Kind::Condo || u.kind == Kind::RentalApartment {
-            Some(CLASSIC_HOUSEHOLD)
+            Some(CLASSIC_HOUSEHOLD as i64)
         } else {
             u.residents
         };
@@ -315,6 +313,8 @@ impl Simulation {
             if ctx.demand_map.is_none() {
                 ctx.demand_map = Some(compute_demand_map(self));
             }
+            // Floor-level on purpose: the TypeScript probe reads
+            // `sim.floorReachable(u.floor)` here, not the segment probe.
             let reachable = self.floor_reachable(u.floor);
             let dm = ctx.demand_map.as_mut().unwrap();
             let n = if reachable {
@@ -350,7 +350,7 @@ impl Simulation {
             c.kind == Kind::Nightclub
                 && c.is_operational()
                 && self.tower.is_floor_served(c.floor)
-                && (c.floor - floor).abs() < NIGHTCLUB_NOISE_FLOORS
+                && ((c.floor - floor).abs() as f64) < NIGHTCLUB_NOISE_FLOORS
         })
     }
 

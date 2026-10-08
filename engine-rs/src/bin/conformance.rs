@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::process::exit;
 
-use verticopolis_engine::scenario::{run_scenario, Checkpoint, RunError, Scenario};
+use verticopolis_engine::scenario::{run_scenario, Checkpoint, Run, RunError, Scenario};
 
 fn main() {
     let root = std::env::args()
@@ -30,20 +30,29 @@ fn main() {
     let want: BTreeMap<String, Vec<Checkpoint>> =
         serde_json::from_value(lock["scenarios"].clone()).expect("lock shape");
     // Every scenario is its own engine, so they replay on separate threads;
-    // the report still prints in lock order.
+    // the report prints sorted by id, the order the lock is written in. A
+    // panic inside one scenario (a save the loader refuses) is caught and
+    // reported as that scenario's failure instead of aborting the referee.
     let repo_root = root.join("..");
-    let runs: Vec<_> = std::thread::scope(|scope| {
+    let runs: Vec<Result<Run, String>> = std::thread::scope(|scope| {
         let handles: Vec<_> = want
             .keys()
             .map(|id| {
                 let path = root.join("scenarios").join(format!("{id}.json"));
                 let repo_root = &repo_root;
-                scope.spawn(move || {
-                    let scenario: Scenario = serde_json::from_str(
-                        &std::fs::read_to_string(&path).expect("scenario file"),
-                    )
-                    .expect("scenario parses");
-                    run_scenario(&scenario, repo_root)
+                scope.spawn(move || -> Result<Run, String> {
+                    let text = std::fs::read_to_string(&path)
+                        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+                    let scenario: Scenario = serde_json::from_str(&text)
+                        .map_err(|e| format!("scenario does not parse: {e}"))?;
+                    std::panic::catch_unwind(|| run_scenario(&scenario, repo_root)).map_err(|p| {
+                        let msg = p
+                            .downcast_ref::<String>()
+                            .cloned()
+                            .or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()))
+                            .unwrap_or_else(|| "panic".to_string());
+                        format!("engine panicked: {msg}")
+                    })
                 })
             })
             .collect();
@@ -54,6 +63,14 @@ fn main() {
     });
     let mut all_ok = true;
     for ((id, want), run) in want.iter().zip(runs.iter()) {
+        let run = match run {
+            Ok(r) => r,
+            Err(e) => {
+                all_ok = false;
+                println!("{id}: {e}");
+                continue;
+            }
+        };
         let got = &run.checkpoints;
         let matched = got
             .iter()
@@ -65,6 +82,13 @@ fn main() {
             all_ok = false;
             let g = &got[matched];
             let w = want.get(matched);
+            if w.is_none() {
+                println!(
+                    "{id}: EXTRA checkpoint {matched} ({}) past the lock's {total}",
+                    g.label
+                );
+                continue;
+            }
             println!(
                 "{id}: DIVERGED at checkpoint {matched} ({}): state {} vs {}, crowd {} vs {}",
                 g.label,

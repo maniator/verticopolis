@@ -46,7 +46,7 @@ pub fn landing_slots(crowd: &Crowd, tower: &Tower) -> HashMap<i64, f64> {
             let pb = &crowd.people[b];
             pb.wait
                 .partial_cmp(&pa.wait)
-                .unwrap()
+                .unwrap_or(std::cmp::Ordering::Equal)
                 .then(pa.id.cmp(&pb.id))
         });
         let left_face = shaft.x;
