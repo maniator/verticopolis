@@ -34,15 +34,18 @@ A refactor that claims to change nothing must not touch `expected.json`.
 
 ## Fixtures the scenarios start from
 
-The `fixture` starts use the saves under `src/tests/fixtures/`. Three of them
+The `fixture` starts use the saves under `src/tests/fixtures/`. Four of them
 are derived from the others by editing a few fields of the serialized game
 and nothing else, so a branch no real save reaches can be scripted:
 `sixseven-december` (the sixseven clock moved to early December, for the
 holiday window), `towerone-star4` (tower-one with `star` raised to four and
-`money` filled, for the metro and a second express shaft) and
-`towerone-vip-pending` (tower-one with `vipFavorable` cleared, `vipVisits`
-zeroed and `money` filled). Derive a new one the same way, by a script that
-changes only the fields the scenario needs, and say so in the scenario's
+`money` filled, for the metro, a second express shaft, bomb threats and the
+Modern amenities), `towerone-vip-pending` (tower-one with `vipFavorable`
+cleared, `vipVisits` zeroed and `money` filled) and `towerone-star1`
+(tower-one with `star` set to one, so a star evaluation has a rung to climb).
+Derive a new one the same way, with `scripts/derive-fixture.ts <source>
+<target> '<json patch>'`, which merges the patch over the top level of the
+save and writes nothing else, and say what was edited in the scenario's
 description.
 
 ## The loader table
@@ -94,6 +97,7 @@ Commands run in order. Units and shafts are named by a tile they cover
 | `startFire` | | Start a fire at once: `EventSystem.startFire`, with no hourly roll and no fire-rescue choice. |
 | `bombThreat` | | Run a bomb threat at once: `EventSystem.bombThreat`, which charges the sweep when the tower has Security and detonates when it has none, with no ransom choice. |
 | `evaluateStar` | | Run the star evaluation. |
+| `resolveChoice` | `accept` | Answer the pending player choice (`resolveChoice`): `true` pays the fire rescue or the ransom, `false` declines (the fire burns on, Security searches for the bomb). An error when no choice is pending. |
 | `callExterminator` | `expectFail?` | Book the Modern exterminator (`callExterminator`); a refusal (Classic, a booking pending, no infested room, short of funds) is an error unless `expectFail` is set. |
 | `reload` | | Save the game and load the save (`serialize()`, a JSON round trip, `deserialize`), replacing the running engine. The hashed `state` view must come back unchanged; a difference is an error. Live state that saves do not carry (the crowd, elevator dispatch) restarts as a load restarts it (see Checkpoints). |
 | `tick` | `dt`, `times?`, `checkpointEvery?` | Call `tick(dt)` `times` times (default 1). All three are whole positive numbers. After every `checkpointEvery`th call, take a checkpoint labeled `t+<minutes>`, where minutes counts every tick's `dt` since the start of the scenario. |

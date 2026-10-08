@@ -39,6 +39,7 @@ export type Command =
   | { op: "bombThreat" }
   | { op: "evaluateStar" }
   | { op: "callExterminator"; expectFail?: boolean }
+  | { op: "resolveChoice"; accept: boolean }
   | ({ op: "setSchedule"; schedule: Record<string, unknown> } & At)
   | { op: "reload" }
   | { op: "tick"; dt: number; times?: number; checkpointEvery?: number }
@@ -78,6 +79,7 @@ const OPS: Record<Command["op"], Spec> = {
   bombThreat: {},
   evaluateStar: {},
   callExterminator: { expectFail: "bool?" },
+  resolveChoice: { accept: "bool" },
   setSchedule: { ...AT, schedule: "obj" },
   reload: {},
   tick: { dt: "count", times: "count?", checkpointEvery: "count?" },
@@ -244,6 +246,15 @@ function apply(sim: Simulation, c: Command, emit: (label: string) => void, clock
     case "callExterminator": {
       const r = sim.callExterminator();
       expectOk(r.ok, c.expectFail, "callExterminator", r.ok ? undefined : r.reason);
+      break;
+    }
+    case "resolveChoice": {
+      // The answer must land on a real pending choice (a fire rescue offer or
+      // a bomb ransom), so a scenario cannot claim a decision the engine
+      // never asked for.
+      const p = sim.pendingChoice;
+      if (!p) throw new Error("resolveChoice: no pending choice");
+      sim.resolveChoice(c.accept ? "accept" : "decline");
       break;
     }
     case "reload": {

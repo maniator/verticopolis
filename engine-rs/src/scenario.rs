@@ -85,6 +85,8 @@ pub enum Command {
         #[serde(rename = "expectFail")]
         expect_fail: Option<bool>,
     },
+    #[serde(rename = "resolveChoice")]
+    ResolveChoice { accept: bool },
     #[serde(rename = "reload")]
     Reload,
     #[serde(rename = "tick")]
@@ -215,6 +217,7 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
         "setCars" => &[("floor", "int"), ("x", "int"), ("cars", "count")],
         "startFire" | "bombThreat" | "evaluateStar" | "reload" => &[],
         "callExterminator" => &[("expectFail", "bool?")],
+        "resolveChoice" => &[("accept", "bool")],
         "setSchedule" => &[("floor", "int"), ("x", "int"), ("schedule", "obj")],
         "tick" => &[
             ("dt", "count"),
@@ -658,6 +661,14 @@ fn run_scenario_inner(
                 }
                 Command::BombThreat => sim.bomb_threat(),
                 Command::EvaluateStar => sim.evaluate_star(),
+                Command::ResolveChoice { accept } => {
+                    // The answer must land on a real pending choice, as in
+                    // the TypeScript runner.
+                    if sim.events.pending.is_none() {
+                        return Err(failed("resolveChoice: no pending choice".into()));
+                    }
+                    sim.resolve_choice(*accept);
+                }
                 Command::CallExterminator { expect_fail } => {
                     let r = sim.call_exterminator();
                     expect_ok(
