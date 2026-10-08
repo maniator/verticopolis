@@ -118,7 +118,7 @@ fn finite_num(v: Option<&Value>) -> Option<f64> {
 /// `Number(v)` for the shapes a save holds: a number is itself, a missing
 /// value is NaN, null is 0, a boolean is 0 or 1, and a string follows the
 /// `StringNumericLiteral` grammar (`js_string_number`); anything else is NaN.
-fn js_number(v: Option<&Value>) -> f64 {
+pub(crate) fn js_number(v: Option<&Value>) -> f64 {
     match v {
         Some(Value::Number(n)) => n.as_f64().unwrap_or(f64::NAN),
         Some(Value::Null) => 0.0,
@@ -479,8 +479,11 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
     let mut obstacles: HashMap<i64, Vec<(i64, i64)>> = HashMap::new();
     let add_obstacle =
         |obstacles: &mut HashMap<i64, Vec<(i64, i64)>>, floor: i64, fl: i64, x: i64, w: i64| {
-            for f in floor..floor + fl {
-                obstacles.entry(f).or_default().push((x, x + w));
+            for f in floor..floor.saturating_add(fl) {
+                obstacles
+                    .entry(f)
+                    .or_default()
+                    .push((x, x.saturating_add(w)));
             }
         };
     // Parking runs.
@@ -506,7 +509,7 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
             let mut j = i;
             let mut run = vec![units[i]];
             while j + 1 < units.len()
-                && rooms[units[j + 1]].x0 == rooms[units[j]].x0 + rooms[units[j]].w0
+                && rooms[units[j + 1]].x0 == rooms[units[j]].x0.saturating_add(rooms[units[j]].w0)
             {
                 j += 1;
                 run.push(units[j]);
@@ -521,7 +524,7 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
                 .iter()
                 .position(|&ri| rooms[ri].kind == Kind::ParkingRamp);
             let left = match ramp {
-                Some(ri) => rooms[run[ri]].x0 - items[ri].1,
+                Some(ri) => rooms[run[ri]].x0.saturating_sub(items[ri].1),
                 None => rooms[run[0]].x0,
             };
             runs.push(Run {
@@ -536,10 +539,10 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
         for run in &runs {
             let left = run.left.max(cursor);
             for &(ri, off) in &run.items {
-                nx.insert(ri, left + off);
+                nx.insert(ri, left.saturating_add(off));
                 nw.insert(ri, rooms[ri].w);
             }
-            cursor = left + run.width;
+            cursor = left.saturating_add(run.width);
         }
         for run in &runs {
             for &(ri, _) in &run.items {
@@ -565,15 +568,15 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
     floors.sort();
     let first_fit = |blocked: &[u8], start_x: i64, w: i64| -> Option<i64> {
         let mut x = start_x.max(0);
-        while x + w <= LOT {
+        while x.saturating_add(w) <= LOT {
             let mut k = 0;
-            while k < w && blocked[(x + k) as usize] == 0 {
+            while k < w && blocked[x.saturating_add(k) as usize] == 0 {
                 k += 1;
             }
             if k == w {
                 return Some(x);
             }
-            x += k + 1;
+            x = x.saturating_add(k + 1);
         }
         None
     };
@@ -600,11 +603,11 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
             for &ri in &here {
                 let r = &rooms[ri];
                 let x = first_fit(&blocked, r.x0.max(cursor), r.w)?;
-                for i in x..x + r.w {
+                for i in x..x.saturating_add(r.w) {
                     blocked[i as usize] = 1;
                 }
                 placed.push((ri, x, r.w));
-                cursor = x + r.w;
+                cursor = x.saturating_add(r.w);
             }
             Some(placed)
         };
@@ -643,8 +646,8 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
         let x = nx.get(&ri).copied().unwrap_or(r.x0);
         let w = nw.get(&ri).copied().unwrap_or(r.w0);
         out_units.push(with(&r.u, vec![("x", json!(x)), ("width", json!(w))]));
-        for f in r.floor..r.floor + r.fl {
-            for tx in x..x + w {
+        for f in r.floor..r.floor.saturating_add(r.fl) {
+            for tx in x..x.saturating_add(w) {
                 let key = tile_key(f as f64, tx as f64);
                 if !paved.contains(&key) {
                     paved.insert(key);
@@ -1491,6 +1494,10 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
             profit_today: retail_field("profitToday"),
             profit_yest: retail_field("profitYest"),
             complete_at: u.get("completeAt").and_then(Value::as_f64),
+            complete_at_raw: match u.get("completeAt") {
+                Some(v) if !v.is_number() => Some(v.clone()),
+                _ => None,
+            },
             dirty_days: coerce_dirty_days(state, kind, u.get("dirtyDays")),
         };
         units.push((unit, sane_id(u.get("id"))));
@@ -1844,12 +1851,28 @@ mod loader_cases {
         for case in cases {
             let id = case["id"].as_str().unwrap();
             let expected = case["expected"].as_str().unwrap();
-            let got = match super::deserialize(&case["input"]) {
-                Ok(sim) => digest(&state_view(&sim)),
-                Err(_) => "throws".to_string(),
+            let (got, view) = match super::deserialize(&case["input"]) {
+                Ok(sim) => {
+                    let v = state_view(&sim);
+                    (digest(&v), Some(v))
+                }
+                Err(_) => ("throws".to_string(), None),
             };
             if got != expected {
-                misses.push(format!("{id}: {got} vs {expected}"));
+                // Leave the Rust side's canonical JSON beside the target dir so
+                // the miss can be read field by field against
+                // `npx tsx scripts/loader-case-dump.ts <id>`.
+                if let Some(v) = view {
+                    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/target");
+                    let _ = std::fs::create_dir_all(path);
+                    let _ = std::fs::write(
+                        format!("{path}/loader-case-{id}.rs.json"),
+                        crate::canonical::canonical_json(&v),
+                    );
+                }
+                misses.push(format!(
+                    "{id}: {got} vs {expected} (Rust view written to engine-rs/target/loader-case-{id}.rs.json; TypeScript: npx tsx scripts/loader-case-dump.ts {id})"
+                ));
             }
         }
         assert!(

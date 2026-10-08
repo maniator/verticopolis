@@ -88,6 +88,17 @@ function buildCases(): Case[] {
     ["vip-evaluated-without-visits", mutate(modern, (s) => { delete s.vipVisits; s.evaluatedTower = true; s.vipFavorable = true; })],
     ["next-id-zero", mutate(modern, (s) => { if (s.tower && typeof s.tower === "object") (s.tower as Any).nextId = 0; s.nextId = 0; })],
     ["units-not-array", mutate(modern, (s) => { s.units = "nope"; })],
+    // The migration boundaries and the malformed legacy values the post-merge
+    // review of #857 named: loading must end, never panic, and never finish a
+    // construction early. Each case changes one thing so a divergence names it.
+    ["legacy-v1-width-unbounded", mutate(modern, (s) => { delete s.version; const u = units(s).find((x) => x.kind === "office")!; u.width = 1e6; })],
+    ["legacy-v1-coordinates-saturated", mutate(modern, (s) => { delete s.version; const u = units(s).find((x) => x.kind === "office")!; u.x = 1e300; u.floor = -1e300; })],
+    ["legacy-v1-shaft-widening", mutate(modern, (s) => { delete s.version; transports(s)[0].width = 1; })],
+    ["construction-completeat-string", mutate(modern, (s) => { const u = units(s).find((x) => x.kind === "office")!; u.state = "construction"; u.completeAt = "soon"; })],
+    ["construction-completeat-negative", mutate(modern, (s) => { const u = units(s).find((x) => x.kind === "office")!; u.state = "construction"; u.completeAt = -1; })],
+    ["construction-completeat-huge", mutate(modern, (s) => { const u = units(s).find((x) => x.kind === "office")!; u.state = "construction"; u.completeAt = 1e300; })],
+    ["schedule-rows-wrong-length", mutate(modern, (s) => { transports(s)[0].schedule = { activeCars: { weekday: [1, 2, 3], weekend: Array(40).fill(9) }, homeFloors: [-5, 1, 2, 2, 99] }; })],
+    ["schedule-nonfinite-tunables", mutate(modern, (s) => { transports(s)[0].schedule = { waitingCarResponse: -4, standardFloorDeparture: 1e9, activeCars: { weekday: Array(24).fill(1) } }; })],
   ];
   return inputs.map(([id, input]) => {
     let expected: string;

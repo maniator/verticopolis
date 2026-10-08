@@ -12,6 +12,11 @@ on:
     paths:
       - "engine-rs/**"
       - "conformance/**"
+      - "src/engine/**"
+      - "src/storage/**"
+      - "src/tests/conformance/**"
+      - "src/tests/integration/conformance.integration.test.ts"
+      - "src/tests/integration/loaderCases.integration.test.ts"
       - "src/tests/fixtures/*.vctower"
       - ".github/workflows/engine-rs.yml"
   pull_request:
@@ -19,6 +24,11 @@ on:
     paths:
       - "engine-rs/**"
       - "conformance/**"
+      - "src/engine/**"
+      - "src/storage/**"
+      - "src/tests/conformance/**"
+      - "src/tests/integration/conformance.integration.test.ts"
+      - "src/tests/integration/loaderCases.integration.test.ts"
       - "src/tests/fixtures/*.vctower"
       - ".github/workflows/engine-rs.yml"
 

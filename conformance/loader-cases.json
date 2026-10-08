@@ -18172,6 +18172,4080 @@
     ]
    },
    "expected": "59ac17b82227358d"
+  },
+  {
+   "id": "legacy-v1-width-unbounded",
+   "input": {
+    "seed": 2903413569,
+    "initialSeed": 7,
+    "money": 99673000,
+    "star": 1,
+    "minutes": 1860,
+    "mode": "modern",
+    "modernCalendar": "realWorld",
+    "lastQuarterMoney": 99653000,
+    "units": [
+     {
+      "id": 1,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 170
+     },
+     {
+      "id": 2,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 171
+     },
+     {
+      "id": 3,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 172
+     },
+     {
+      "id": 4,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 173
+     },
+     {
+      "id": 5,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 174
+     },
+     {
+      "id": 6,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 175
+     },
+     {
+      "id": 7,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 176
+     },
+     {
+      "id": 8,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 177
+     },
+     {
+      "id": 9,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 178
+     },
+     {
+      "id": 10,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 179
+     },
+     {
+      "id": 11,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 180
+     },
+     {
+      "id": 12,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 181
+     },
+     {
+      "id": 13,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 182
+     },
+     {
+      "id": 14,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 183
+     },
+     {
+      "id": 15,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 184
+     },
+     {
+      "id": 16,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 185
+     },
+     {
+      "id": 17,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 186
+     },
+     {
+      "id": 18,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 187
+     },
+     {
+      "id": 19,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 188
+     },
+     {
+      "id": 20,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 189
+     },
+     {
+      "id": 21,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 190
+     },
+     {
+      "id": 22,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 191
+     },
+     {
+      "id": 23,
+      "kind": "floor",
+      "floor": 2,
+      "x": 171
+     },
+     {
+      "id": 24,
+      "kind": "floor",
+      "floor": 2,
+      "x": 172
+     },
+     {
+      "id": 25,
+      "kind": "floor",
+      "floor": 2,
+      "x": 173
+     },
+     {
+      "id": 26,
+      "kind": "floor",
+      "floor": 2,
+      "x": 174
+     },
+     {
+      "id": 27,
+      "kind": "floor",
+      "floor": 2,
+      "x": 175
+     },
+     {
+      "id": 28,
+      "kind": "floor",
+      "floor": 2,
+      "x": 176
+     },
+     {
+      "id": 29,
+      "kind": "floor",
+      "floor": 2,
+      "x": 177
+     },
+     {
+      "id": 30,
+      "kind": "floor",
+      "floor": 2,
+      "x": 178
+     },
+     {
+      "id": 31,
+      "kind": "floor",
+      "floor": 2,
+      "x": 179
+     },
+     {
+      "id": 32,
+      "kind": "floor",
+      "floor": 2,
+      "x": 180
+     },
+     {
+      "id": 33,
+      "kind": "floor",
+      "floor": 2,
+      "x": 181
+     },
+     {
+      "id": 34,
+      "kind": "floor",
+      "floor": 2,
+      "x": 182
+     },
+     {
+      "id": 35,
+      "kind": "floor",
+      "floor": 2,
+      "x": 183
+     },
+     {
+      "id": 36,
+      "kind": "floor",
+      "floor": 2,
+      "x": 184
+     },
+     {
+      "id": 37,
+      "kind": "floor",
+      "floor": 2,
+      "x": 185
+     },
+     {
+      "id": 38,
+      "kind": "floor",
+      "floor": 2,
+      "x": 186
+     },
+     {
+      "id": 39,
+      "kind": "floor",
+      "floor": 2,
+      "x": 187
+     },
+     {
+      "id": 40,
+      "kind": "floor",
+      "floor": 2,
+      "x": 188
+     },
+     {
+      "id": 41,
+      "kind": "floor",
+      "floor": 2,
+      "x": 189
+     },
+     {
+      "id": 42,
+      "kind": "floor",
+      "floor": 2,
+      "x": 190
+     },
+     {
+      "id": 43,
+      "kind": "floor",
+      "floor": 3,
+      "x": 171
+     },
+     {
+      "id": 44,
+      "kind": "floor",
+      "floor": 3,
+      "x": 172
+     },
+     {
+      "id": 45,
+      "kind": "floor",
+      "floor": 3,
+      "x": 173
+     },
+     {
+      "id": 46,
+      "kind": "floor",
+      "floor": 3,
+      "x": 174
+     },
+     {
+      "id": 47,
+      "kind": "floor",
+      "floor": 3,
+      "x": 175
+     },
+     {
+      "id": 48,
+      "kind": "floor",
+      "floor": 3,
+      "x": 176
+     },
+     {
+      "id": 49,
+      "kind": "floor",
+      "floor": 3,
+      "x": 177
+     },
+     {
+      "id": 50,
+      "kind": "floor",
+      "floor": 3,
+      "x": 178
+     },
+     {
+      "id": 51,
+      "kind": "floor",
+      "floor": 3,
+      "x": 179
+     },
+     {
+      "id": 52,
+      "kind": "floor",
+      "floor": 3,
+      "x": 180
+     },
+     {
+      "id": 53,
+      "kind": "floor",
+      "floor": 3,
+      "x": 181
+     },
+     {
+      "id": 54,
+      "kind": "floor",
+      "floor": 3,
+      "x": 182
+     },
+     {
+      "id": 55,
+      "kind": "floor",
+      "floor": 3,
+      "x": 183
+     },
+     {
+      "id": 56,
+      "kind": "floor",
+      "floor": 3,
+      "x": 184
+     },
+     {
+      "id": 57,
+      "kind": "floor",
+      "floor": 3,
+      "x": 185
+     },
+     {
+      "id": 58,
+      "kind": "floor",
+      "floor": 3,
+      "x": 186
+     },
+     {
+      "id": 59,
+      "kind": "floor",
+      "floor": 3,
+      "x": 187
+     },
+     {
+      "id": 60,
+      "kind": "floor",
+      "floor": 3,
+      "x": 188
+     },
+     {
+      "id": 61,
+      "kind": "floor",
+      "floor": 3,
+      "x": 189
+     },
+     {
+      "id": 62,
+      "kind": "floor",
+      "floor": 3,
+      "x": 190
+     },
+     {
+      "id": 63,
+      "kind": "office",
+      "floor": 2,
+      "x": 172,
+      "width": 1000000,
+      "state": "occupied",
+      "everOccupied": true,
+      "label": "Apex Capital"
+     },
+     {
+      "id": 64,
+      "kind": "office",
+      "floor": 2,
+      "x": 181,
+      "width": 9,
+      "state": "occupied",
+      "everOccupied": true,
+      "label": "Cobalt Partners"
+     },
+     {
+      "id": 65,
+      "kind": "condo",
+      "floor": 3,
+      "x": 172,
+      "width": 16,
+      "state": "occupied",
+      "occupants": 1,
+      "everOccupied": true,
+      "residents": 3,
+      "rent": 160000
+     }
+    ],
+    "transports": [
+     {
+      "id": 66,
+      "kind": "elevatorStandard",
+      "x": 171,
+      "width": 4,
+      "bottom": 1,
+      "top": 3,
+      "cars": 1,
+      "carPositions": [
+       1
+      ],
+      "carDir": [
+       0
+      ],
+      "load": 0,
+      "carLoad": [
+       0
+      ]
+     },
+     {
+      "id": 67,
+      "kind": "stairs",
+      "x": 189,
+      "width": 8,
+      "bottom": 1,
+      "top": 2,
+      "cars": 0,
+      "carPositions": [],
+      "carDir": [],
+      "load": 0
+     }
+    ],
+    "nextId": 68,
+    "towerName": "Tower One",
+    "builtWeddingHall": false,
+    "evaluatedTower": false,
+    "vipVisitDay": -1,
+    "vipFavorable": false,
+    "vipVisits": 0,
+    "lastVipNagDay": -100,
+    "treasuresFound": 0,
+    "events": {
+     "lastSantaYear": -1,
+     "rngState": 369021,
+     "pending": null
+    },
+    "excavated": [],
+    "blockbusters": [],
+    "milestones": [],
+    "ledger": {
+     "today": {},
+     "history": [
+      {
+       "condos": 160000,
+       "upkeep": -600,
+       "offices": 18600
+      }
+     ]
+    },
+    "log": [
+     {
+      "minute": 1440,
+      "text": "Monthly maintenance paid: $2,000.",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "Quarterly office rent collected: $20,000 (2 offices).",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "New tenants: 2 offices leased, 1 condo sold.",
+      "kind": "good"
+     }
+    ]
+   },
+   "expected": "a252fcd0ad55ade8"
+  },
+  {
+   "id": "legacy-v1-coordinates-saturated",
+   "input": {
+    "seed": 2903413569,
+    "initialSeed": 7,
+    "money": 99673000,
+    "star": 1,
+    "minutes": 1860,
+    "mode": "modern",
+    "modernCalendar": "realWorld",
+    "lastQuarterMoney": 99653000,
+    "units": [
+     {
+      "id": 1,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 170
+     },
+     {
+      "id": 2,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 171
+     },
+     {
+      "id": 3,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 172
+     },
+     {
+      "id": 4,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 173
+     },
+     {
+      "id": 5,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 174
+     },
+     {
+      "id": 6,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 175
+     },
+     {
+      "id": 7,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 176
+     },
+     {
+      "id": 8,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 177
+     },
+     {
+      "id": 9,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 178
+     },
+     {
+      "id": 10,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 179
+     },
+     {
+      "id": 11,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 180
+     },
+     {
+      "id": 12,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 181
+     },
+     {
+      "id": 13,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 182
+     },
+     {
+      "id": 14,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 183
+     },
+     {
+      "id": 15,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 184
+     },
+     {
+      "id": 16,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 185
+     },
+     {
+      "id": 17,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 186
+     },
+     {
+      "id": 18,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 187
+     },
+     {
+      "id": 19,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 188
+     },
+     {
+      "id": 20,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 189
+     },
+     {
+      "id": 21,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 190
+     },
+     {
+      "id": 22,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 191
+     },
+     {
+      "id": 23,
+      "kind": "floor",
+      "floor": 2,
+      "x": 171
+     },
+     {
+      "id": 24,
+      "kind": "floor",
+      "floor": 2,
+      "x": 172
+     },
+     {
+      "id": 25,
+      "kind": "floor",
+      "floor": 2,
+      "x": 173
+     },
+     {
+      "id": 26,
+      "kind": "floor",
+      "floor": 2,
+      "x": 174
+     },
+     {
+      "id": 27,
+      "kind": "floor",
+      "floor": 2,
+      "x": 175
+     },
+     {
+      "id": 28,
+      "kind": "floor",
+      "floor": 2,
+      "x": 176
+     },
+     {
+      "id": 29,
+      "kind": "floor",
+      "floor": 2,
+      "x": 177
+     },
+     {
+      "id": 30,
+      "kind": "floor",
+      "floor": 2,
+      "x": 178
+     },
+     {
+      "id": 31,
+      "kind": "floor",
+      "floor": 2,
+      "x": 179
+     },
+     {
+      "id": 32,
+      "kind": "floor",
+      "floor": 2,
+      "x": 180
+     },
+     {
+      "id": 33,
+      "kind": "floor",
+      "floor": 2,
+      "x": 181
+     },
+     {
+      "id": 34,
+      "kind": "floor",
+      "floor": 2,
+      "x": 182
+     },
+     {
+      "id": 35,
+      "kind": "floor",
+      "floor": 2,
+      "x": 183
+     },
+     {
+      "id": 36,
+      "kind": "floor",
+      "floor": 2,
+      "x": 184
+     },
+     {
+      "id": 37,
+      "kind": "floor",
+      "floor": 2,
+      "x": 185
+     },
+     {
+      "id": 38,
+      "kind": "floor",
+      "floor": 2,
+      "x": 186
+     },
+     {
+      "id": 39,
+      "kind": "floor",
+      "floor": 2,
+      "x": 187
+     },
+     {
+      "id": 40,
+      "kind": "floor",
+      "floor": 2,
+      "x": 188
+     },
+     {
+      "id": 41,
+      "kind": "floor",
+      "floor": 2,
+      "x": 189
+     },
+     {
+      "id": 42,
+      "kind": "floor",
+      "floor": 2,
+      "x": 190
+     },
+     {
+      "id": 43,
+      "kind": "floor",
+      "floor": 3,
+      "x": 171
+     },
+     {
+      "id": 44,
+      "kind": "floor",
+      "floor": 3,
+      "x": 172
+     },
+     {
+      "id": 45,
+      "kind": "floor",
+      "floor": 3,
+      "x": 173
+     },
+     {
+      "id": 46,
+      "kind": "floor",
+      "floor": 3,
+      "x": 174
+     },
+     {
+      "id": 47,
+      "kind": "floor",
+      "floor": 3,
+      "x": 175
+     },
+     {
+      "id": 48,
+      "kind": "floor",
+      "floor": 3,
+      "x": 176
+     },
+     {
+      "id": 49,
+      "kind": "floor",
+      "floor": 3,
+      "x": 177
+     },
+     {
+      "id": 50,
+      "kind": "floor",
+      "floor": 3,
+      "x": 178
+     },
+     {
+      "id": 51,
+      "kind": "floor",
+      "floor": 3,
+      "x": 179
+     },
+     {
+      "id": 52,
+      "kind": "floor",
+      "floor": 3,
+      "x": 180
+     },
+     {
+      "id": 53,
+      "kind": "floor",
+      "floor": 3,
+      "x": 181
+     },
+     {
+      "id": 54,
+      "kind": "floor",
+      "floor": 3,
+      "x": 182
+     },
+     {
+      "id": 55,
+      "kind": "floor",
+      "floor": 3,
+      "x": 183
+     },
+     {
+      "id": 56,
+      "kind": "floor",
+      "floor": 3,
+      "x": 184
+     },
+     {
+      "id": 57,
+      "kind": "floor",
+      "floor": 3,
+      "x": 185
+     },
+     {
+      "id": 58,
+      "kind": "floor",
+      "floor": 3,
+      "x": 186
+     },
+     {
+      "id": 59,
+      "kind": "floor",
+      "floor": 3,
+      "x": 187
+     },
+     {
+      "id": 60,
+      "kind": "floor",
+      "floor": 3,
+      "x": 188
+     },
+     {
+      "id": 61,
+      "kind": "floor",
+      "floor": 3,
+      "x": 189
+     },
+     {
+      "id": 62,
+      "kind": "floor",
+      "floor": 3,
+      "x": 190
+     },
+     {
+      "id": 63,
+      "kind": "office",
+      "floor": -1e+300,
+      "x": 1e+300,
+      "width": 9,
+      "state": "occupied",
+      "everOccupied": true,
+      "label": "Apex Capital"
+     },
+     {
+      "id": 64,
+      "kind": "office",
+      "floor": 2,
+      "x": 181,
+      "width": 9,
+      "state": "occupied",
+      "everOccupied": true,
+      "label": "Cobalt Partners"
+     },
+     {
+      "id": 65,
+      "kind": "condo",
+      "floor": 3,
+      "x": 172,
+      "width": 16,
+      "state": "occupied",
+      "occupants": 1,
+      "everOccupied": true,
+      "residents": 3,
+      "rent": 160000
+     }
+    ],
+    "transports": [
+     {
+      "id": 66,
+      "kind": "elevatorStandard",
+      "x": 171,
+      "width": 4,
+      "bottom": 1,
+      "top": 3,
+      "cars": 1,
+      "carPositions": [
+       1
+      ],
+      "carDir": [
+       0
+      ],
+      "load": 0,
+      "carLoad": [
+       0
+      ]
+     },
+     {
+      "id": 67,
+      "kind": "stairs",
+      "x": 189,
+      "width": 8,
+      "bottom": 1,
+      "top": 2,
+      "cars": 0,
+      "carPositions": [],
+      "carDir": [],
+      "load": 0
+     }
+    ],
+    "nextId": 68,
+    "towerName": "Tower One",
+    "builtWeddingHall": false,
+    "evaluatedTower": false,
+    "vipVisitDay": -1,
+    "vipFavorable": false,
+    "vipVisits": 0,
+    "lastVipNagDay": -100,
+    "treasuresFound": 0,
+    "events": {
+     "lastSantaYear": -1,
+     "rngState": 369021,
+     "pending": null
+    },
+    "excavated": [],
+    "blockbusters": [],
+    "milestones": [],
+    "ledger": {
+     "today": {},
+     "history": [
+      {
+       "condos": 160000,
+       "upkeep": -600,
+       "offices": 18600
+      }
+     ]
+    },
+    "log": [
+     {
+      "minute": 1440,
+      "text": "Monthly maintenance paid: $2,000.",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "Quarterly office rent collected: $20,000 (2 offices).",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "New tenants: 2 offices leased, 1 condo sold.",
+      "kind": "good"
+     }
+    ]
+   },
+   "expected": "096051f72b0f095f"
+  },
+  {
+   "id": "legacy-v1-shaft-widening",
+   "input": {
+    "seed": 2903413569,
+    "initialSeed": 7,
+    "money": 99673000,
+    "star": 1,
+    "minutes": 1860,
+    "mode": "modern",
+    "modernCalendar": "realWorld",
+    "lastQuarterMoney": 99653000,
+    "units": [
+     {
+      "id": 1,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 170
+     },
+     {
+      "id": 2,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 171
+     },
+     {
+      "id": 3,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 172
+     },
+     {
+      "id": 4,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 173
+     },
+     {
+      "id": 5,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 174
+     },
+     {
+      "id": 6,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 175
+     },
+     {
+      "id": 7,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 176
+     },
+     {
+      "id": 8,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 177
+     },
+     {
+      "id": 9,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 178
+     },
+     {
+      "id": 10,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 179
+     },
+     {
+      "id": 11,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 180
+     },
+     {
+      "id": 12,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 181
+     },
+     {
+      "id": 13,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 182
+     },
+     {
+      "id": 14,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 183
+     },
+     {
+      "id": 15,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 184
+     },
+     {
+      "id": 16,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 185
+     },
+     {
+      "id": 17,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 186
+     },
+     {
+      "id": 18,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 187
+     },
+     {
+      "id": 19,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 188
+     },
+     {
+      "id": 20,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 189
+     },
+     {
+      "id": 21,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 190
+     },
+     {
+      "id": 22,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 191
+     },
+     {
+      "id": 23,
+      "kind": "floor",
+      "floor": 2,
+      "x": 171
+     },
+     {
+      "id": 24,
+      "kind": "floor",
+      "floor": 2,
+      "x": 172
+     },
+     {
+      "id": 25,
+      "kind": "floor",
+      "floor": 2,
+      "x": 173
+     },
+     {
+      "id": 26,
+      "kind": "floor",
+      "floor": 2,
+      "x": 174
+     },
+     {
+      "id": 27,
+      "kind": "floor",
+      "floor": 2,
+      "x": 175
+     },
+     {
+      "id": 28,
+      "kind": "floor",
+      "floor": 2,
+      "x": 176
+     },
+     {
+      "id": 29,
+      "kind": "floor",
+      "floor": 2,
+      "x": 177
+     },
+     {
+      "id": 30,
+      "kind": "floor",
+      "floor": 2,
+      "x": 178
+     },
+     {
+      "id": 31,
+      "kind": "floor",
+      "floor": 2,
+      "x": 179
+     },
+     {
+      "id": 32,
+      "kind": "floor",
+      "floor": 2,
+      "x": 180
+     },
+     {
+      "id": 33,
+      "kind": "floor",
+      "floor": 2,
+      "x": 181
+     },
+     {
+      "id": 34,
+      "kind": "floor",
+      "floor": 2,
+      "x": 182
+     },
+     {
+      "id": 35,
+      "kind": "floor",
+      "floor": 2,
+      "x": 183
+     },
+     {
+      "id": 36,
+      "kind": "floor",
+      "floor": 2,
+      "x": 184
+     },
+     {
+      "id": 37,
+      "kind": "floor",
+      "floor": 2,
+      "x": 185
+     },
+     {
+      "id": 38,
+      "kind": "floor",
+      "floor": 2,
+      "x": 186
+     },
+     {
+      "id": 39,
+      "kind": "floor",
+      "floor": 2,
+      "x": 187
+     },
+     {
+      "id": 40,
+      "kind": "floor",
+      "floor": 2,
+      "x": 188
+     },
+     {
+      "id": 41,
+      "kind": "floor",
+      "floor": 2,
+      "x": 189
+     },
+     {
+      "id": 42,
+      "kind": "floor",
+      "floor": 2,
+      "x": 190
+     },
+     {
+      "id": 43,
+      "kind": "floor",
+      "floor": 3,
+      "x": 171
+     },
+     {
+      "id": 44,
+      "kind": "floor",
+      "floor": 3,
+      "x": 172
+     },
+     {
+      "id": 45,
+      "kind": "floor",
+      "floor": 3,
+      "x": 173
+     },
+     {
+      "id": 46,
+      "kind": "floor",
+      "floor": 3,
+      "x": 174
+     },
+     {
+      "id": 47,
+      "kind": "floor",
+      "floor": 3,
+      "x": 175
+     },
+     {
+      "id": 48,
+      "kind": "floor",
+      "floor": 3,
+      "x": 176
+     },
+     {
+      "id": 49,
+      "kind": "floor",
+      "floor": 3,
+      "x": 177
+     },
+     {
+      "id": 50,
+      "kind": "floor",
+      "floor": 3,
+      "x": 178
+     },
+     {
+      "id": 51,
+      "kind": "floor",
+      "floor": 3,
+      "x": 179
+     },
+     {
+      "id": 52,
+      "kind": "floor",
+      "floor": 3,
+      "x": 180
+     },
+     {
+      "id": 53,
+      "kind": "floor",
+      "floor": 3,
+      "x": 181
+     },
+     {
+      "id": 54,
+      "kind": "floor",
+      "floor": 3,
+      "x": 182
+     },
+     {
+      "id": 55,
+      "kind": "floor",
+      "floor": 3,
+      "x": 183
+     },
+     {
+      "id": 56,
+      "kind": "floor",
+      "floor": 3,
+      "x": 184
+     },
+     {
+      "id": 57,
+      "kind": "floor",
+      "floor": 3,
+      "x": 185
+     },
+     {
+      "id": 58,
+      "kind": "floor",
+      "floor": 3,
+      "x": 186
+     },
+     {
+      "id": 59,
+      "kind": "floor",
+      "floor": 3,
+      "x": 187
+     },
+     {
+      "id": 60,
+      "kind": "floor",
+      "floor": 3,
+      "x": 188
+     },
+     {
+      "id": 61,
+      "kind": "floor",
+      "floor": 3,
+      "x": 189
+     },
+     {
+      "id": 62,
+      "kind": "floor",
+      "floor": 3,
+      "x": 190
+     },
+     {
+      "id": 63,
+      "kind": "office",
+      "floor": 2,
+      "x": 172,
+      "width": 9,
+      "state": "occupied",
+      "everOccupied": true,
+      "label": "Apex Capital"
+     },
+     {
+      "id": 64,
+      "kind": "office",
+      "floor": 2,
+      "x": 181,
+      "width": 9,
+      "state": "occupied",
+      "everOccupied": true,
+      "label": "Cobalt Partners"
+     },
+     {
+      "id": 65,
+      "kind": "condo",
+      "floor": 3,
+      "x": 172,
+      "width": 16,
+      "state": "occupied",
+      "occupants": 1,
+      "everOccupied": true,
+      "residents": 3,
+      "rent": 160000
+     }
+    ],
+    "transports": [
+     {
+      "id": 66,
+      "kind": "elevatorStandard",
+      "x": 171,
+      "width": 1,
+      "bottom": 1,
+      "top": 3,
+      "cars": 1,
+      "carPositions": [
+       1
+      ],
+      "carDir": [
+       0
+      ],
+      "load": 0,
+      "carLoad": [
+       0
+      ]
+     },
+     {
+      "id": 67,
+      "kind": "stairs",
+      "x": 189,
+      "width": 8,
+      "bottom": 1,
+      "top": 2,
+      "cars": 0,
+      "carPositions": [],
+      "carDir": [],
+      "load": 0
+     }
+    ],
+    "nextId": 68,
+    "towerName": "Tower One",
+    "builtWeddingHall": false,
+    "evaluatedTower": false,
+    "vipVisitDay": -1,
+    "vipFavorable": false,
+    "vipVisits": 0,
+    "lastVipNagDay": -100,
+    "treasuresFound": 0,
+    "events": {
+     "lastSantaYear": -1,
+     "rngState": 369021,
+     "pending": null
+    },
+    "excavated": [],
+    "blockbusters": [],
+    "milestones": [],
+    "ledger": {
+     "today": {},
+     "history": [
+      {
+       "condos": 160000,
+       "upkeep": -600,
+       "offices": 18600
+      }
+     ]
+    },
+    "log": [
+     {
+      "minute": 1440,
+      "text": "Monthly maintenance paid: $2,000.",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "Quarterly office rent collected: $20,000 (2 offices).",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "New tenants: 2 offices leased, 1 condo sold.",
+      "kind": "good"
+     }
+    ]
+   },
+   "expected": "a252fcd0ad55ade8"
+  },
+  {
+   "id": "construction-completeat-string",
+   "input": {
+    "version": 7,
+    "seed": 2903413569,
+    "initialSeed": 7,
+    "money": 99673000,
+    "star": 1,
+    "minutes": 1860,
+    "mode": "modern",
+    "modernCalendar": "realWorld",
+    "lastQuarterMoney": 99653000,
+    "units": [
+     {
+      "id": 1,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 170
+     },
+     {
+      "id": 2,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 171
+     },
+     {
+      "id": 3,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 172
+     },
+     {
+      "id": 4,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 173
+     },
+     {
+      "id": 5,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 174
+     },
+     {
+      "id": 6,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 175
+     },
+     {
+      "id": 7,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 176
+     },
+     {
+      "id": 8,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 177
+     },
+     {
+      "id": 9,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 178
+     },
+     {
+      "id": 10,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 179
+     },
+     {
+      "id": 11,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 180
+     },
+     {
+      "id": 12,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 181
+     },
+     {
+      "id": 13,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 182
+     },
+     {
+      "id": 14,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 183
+     },
+     {
+      "id": 15,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 184
+     },
+     {
+      "id": 16,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 185
+     },
+     {
+      "id": 17,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 186
+     },
+     {
+      "id": 18,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 187
+     },
+     {
+      "id": 19,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 188
+     },
+     {
+      "id": 20,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 189
+     },
+     {
+      "id": 21,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 190
+     },
+     {
+      "id": 22,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 191
+     },
+     {
+      "id": 23,
+      "kind": "floor",
+      "floor": 2,
+      "x": 171
+     },
+     {
+      "id": 24,
+      "kind": "floor",
+      "floor": 2,
+      "x": 172
+     },
+     {
+      "id": 25,
+      "kind": "floor",
+      "floor": 2,
+      "x": 173
+     },
+     {
+      "id": 26,
+      "kind": "floor",
+      "floor": 2,
+      "x": 174
+     },
+     {
+      "id": 27,
+      "kind": "floor",
+      "floor": 2,
+      "x": 175
+     },
+     {
+      "id": 28,
+      "kind": "floor",
+      "floor": 2,
+      "x": 176
+     },
+     {
+      "id": 29,
+      "kind": "floor",
+      "floor": 2,
+      "x": 177
+     },
+     {
+      "id": 30,
+      "kind": "floor",
+      "floor": 2,
+      "x": 178
+     },
+     {
+      "id": 31,
+      "kind": "floor",
+      "floor": 2,
+      "x": 179
+     },
+     {
+      "id": 32,
+      "kind": "floor",
+      "floor": 2,
+      "x": 180
+     },
+     {
+      "id": 33,
+      "kind": "floor",
+      "floor": 2,
+      "x": 181
+     },
+     {
+      "id": 34,
+      "kind": "floor",
+      "floor": 2,
+      "x": 182
+     },
+     {
+      "id": 35,
+      "kind": "floor",
+      "floor": 2,
+      "x": 183
+     },
+     {
+      "id": 36,
+      "kind": "floor",
+      "floor": 2,
+      "x": 184
+     },
+     {
+      "id": 37,
+      "kind": "floor",
+      "floor": 2,
+      "x": 185
+     },
+     {
+      "id": 38,
+      "kind": "floor",
+      "floor": 2,
+      "x": 186
+     },
+     {
+      "id": 39,
+      "kind": "floor",
+      "floor": 2,
+      "x": 187
+     },
+     {
+      "id": 40,
+      "kind": "floor",
+      "floor": 2,
+      "x": 188
+     },
+     {
+      "id": 41,
+      "kind": "floor",
+      "floor": 2,
+      "x": 189
+     },
+     {
+      "id": 42,
+      "kind": "floor",
+      "floor": 2,
+      "x": 190
+     },
+     {
+      "id": 43,
+      "kind": "floor",
+      "floor": 3,
+      "x": 171
+     },
+     {
+      "id": 44,
+      "kind": "floor",
+      "floor": 3,
+      "x": 172
+     },
+     {
+      "id": 45,
+      "kind": "floor",
+      "floor": 3,
+      "x": 173
+     },
+     {
+      "id": 46,
+      "kind": "floor",
+      "floor": 3,
+      "x": 174
+     },
+     {
+      "id": 47,
+      "kind": "floor",
+      "floor": 3,
+      "x": 175
+     },
+     {
+      "id": 48,
+      "kind": "floor",
+      "floor": 3,
+      "x": 176
+     },
+     {
+      "id": 49,
+      "kind": "floor",
+      "floor": 3,
+      "x": 177
+     },
+     {
+      "id": 50,
+      "kind": "floor",
+      "floor": 3,
+      "x": 178
+     },
+     {
+      "id": 51,
+      "kind": "floor",
+      "floor": 3,
+      "x": 179
+     },
+     {
+      "id": 52,
+      "kind": "floor",
+      "floor": 3,
+      "x": 180
+     },
+     {
+      "id": 53,
+      "kind": "floor",
+      "floor": 3,
+      "x": 181
+     },
+     {
+      "id": 54,
+      "kind": "floor",
+      "floor": 3,
+      "x": 182
+     },
+     {
+      "id": 55,
+      "kind": "floor",
+      "floor": 3,
+      "x": 183
+     },
+     {
+      "id": 56,
+      "kind": "floor",
+      "floor": 3,
+      "x": 184
+     },
+     {
+      "id": 57,
+      "kind": "floor",
+      "floor": 3,
+      "x": 185
+     },
+     {
+      "id": 58,
+      "kind": "floor",
+      "floor": 3,
+      "x": 186
+     },
+     {
+      "id": 59,
+      "kind": "floor",
+      "floor": 3,
+      "x": 187
+     },
+     {
+      "id": 60,
+      "kind": "floor",
+      "floor": 3,
+      "x": 188
+     },
+     {
+      "id": 61,
+      "kind": "floor",
+      "floor": 3,
+      "x": 189
+     },
+     {
+      "id": 62,
+      "kind": "floor",
+      "floor": 3,
+      "x": 190
+     },
+     {
+      "id": 63,
+      "kind": "office",
+      "floor": 2,
+      "x": 172,
+      "width": 9,
+      "state": "construction",
+      "everOccupied": true,
+      "label": "Apex Capital",
+      "completeAt": "soon"
+     },
+     {
+      "id": 64,
+      "kind": "office",
+      "floor": 2,
+      "x": 181,
+      "width": 9,
+      "state": "occupied",
+      "everOccupied": true,
+      "label": "Cobalt Partners"
+     },
+     {
+      "id": 65,
+      "kind": "condo",
+      "floor": 3,
+      "x": 172,
+      "width": 16,
+      "state": "occupied",
+      "occupants": 1,
+      "everOccupied": true,
+      "residents": 3,
+      "rent": 160000
+     }
+    ],
+    "transports": [
+     {
+      "id": 66,
+      "kind": "elevatorStandard",
+      "x": 171,
+      "width": 4,
+      "bottom": 1,
+      "top": 3,
+      "cars": 1,
+      "carPositions": [
+       1
+      ],
+      "carDir": [
+       0
+      ],
+      "load": 0,
+      "carLoad": [
+       0
+      ]
+     },
+     {
+      "id": 67,
+      "kind": "stairs",
+      "x": 189,
+      "width": 8,
+      "bottom": 1,
+      "top": 2,
+      "cars": 0,
+      "carPositions": [],
+      "carDir": [],
+      "load": 0
+     }
+    ],
+    "nextId": 68,
+    "towerName": "Tower One",
+    "builtWeddingHall": false,
+    "evaluatedTower": false,
+    "vipVisitDay": -1,
+    "vipFavorable": false,
+    "vipVisits": 0,
+    "lastVipNagDay": -100,
+    "treasuresFound": 0,
+    "events": {
+     "lastSantaYear": -1,
+     "rngState": 369021,
+     "pending": null
+    },
+    "excavated": [],
+    "blockbusters": [],
+    "milestones": [],
+    "ledger": {
+     "today": {},
+     "history": [
+      {
+       "condos": 160000,
+       "upkeep": -600,
+       "offices": 18600
+      }
+     ]
+    },
+    "log": [
+     {
+      "minute": 1440,
+      "text": "Monthly maintenance paid: $2,000.",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "Quarterly office rent collected: $20,000 (2 offices).",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "New tenants: 2 offices leased, 1 condo sold.",
+      "kind": "good"
+     }
+    ]
+   },
+   "expected": "e274b1f5277361ce"
+  },
+  {
+   "id": "construction-completeat-negative",
+   "input": {
+    "version": 7,
+    "seed": 2903413569,
+    "initialSeed": 7,
+    "money": 99673000,
+    "star": 1,
+    "minutes": 1860,
+    "mode": "modern",
+    "modernCalendar": "realWorld",
+    "lastQuarterMoney": 99653000,
+    "units": [
+     {
+      "id": 1,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 170
+     },
+     {
+      "id": 2,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 171
+     },
+     {
+      "id": 3,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 172
+     },
+     {
+      "id": 4,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 173
+     },
+     {
+      "id": 5,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 174
+     },
+     {
+      "id": 6,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 175
+     },
+     {
+      "id": 7,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 176
+     },
+     {
+      "id": 8,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 177
+     },
+     {
+      "id": 9,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 178
+     },
+     {
+      "id": 10,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 179
+     },
+     {
+      "id": 11,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 180
+     },
+     {
+      "id": 12,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 181
+     },
+     {
+      "id": 13,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 182
+     },
+     {
+      "id": 14,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 183
+     },
+     {
+      "id": 15,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 184
+     },
+     {
+      "id": 16,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 185
+     },
+     {
+      "id": 17,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 186
+     },
+     {
+      "id": 18,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 187
+     },
+     {
+      "id": 19,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 188
+     },
+     {
+      "id": 20,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 189
+     },
+     {
+      "id": 21,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 190
+     },
+     {
+      "id": 22,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 191
+     },
+     {
+      "id": 23,
+      "kind": "floor",
+      "floor": 2,
+      "x": 171
+     },
+     {
+      "id": 24,
+      "kind": "floor",
+      "floor": 2,
+      "x": 172
+     },
+     {
+      "id": 25,
+      "kind": "floor",
+      "floor": 2,
+      "x": 173
+     },
+     {
+      "id": 26,
+      "kind": "floor",
+      "floor": 2,
+      "x": 174
+     },
+     {
+      "id": 27,
+      "kind": "floor",
+      "floor": 2,
+      "x": 175
+     },
+     {
+      "id": 28,
+      "kind": "floor",
+      "floor": 2,
+      "x": 176
+     },
+     {
+      "id": 29,
+      "kind": "floor",
+      "floor": 2,
+      "x": 177
+     },
+     {
+      "id": 30,
+      "kind": "floor",
+      "floor": 2,
+      "x": 178
+     },
+     {
+      "id": 31,
+      "kind": "floor",
+      "floor": 2,
+      "x": 179
+     },
+     {
+      "id": 32,
+      "kind": "floor",
+      "floor": 2,
+      "x": 180
+     },
+     {
+      "id": 33,
+      "kind": "floor",
+      "floor": 2,
+      "x": 181
+     },
+     {
+      "id": 34,
+      "kind": "floor",
+      "floor": 2,
+      "x": 182
+     },
+     {
+      "id": 35,
+      "kind": "floor",
+      "floor": 2,
+      "x": 183
+     },
+     {
+      "id": 36,
+      "kind": "floor",
+      "floor": 2,
+      "x": 184
+     },
+     {
+      "id": 37,
+      "kind": "floor",
+      "floor": 2,
+      "x": 185
+     },
+     {
+      "id": 38,
+      "kind": "floor",
+      "floor": 2,
+      "x": 186
+     },
+     {
+      "id": 39,
+      "kind": "floor",
+      "floor": 2,
+      "x": 187
+     },
+     {
+      "id": 40,
+      "kind": "floor",
+      "floor": 2,
+      "x": 188
+     },
+     {
+      "id": 41,
+      "kind": "floor",
+      "floor": 2,
+      "x": 189
+     },
+     {
+      "id": 42,
+      "kind": "floor",
+      "floor": 2,
+      "x": 190
+     },
+     {
+      "id": 43,
+      "kind": "floor",
+      "floor": 3,
+      "x": 171
+     },
+     {
+      "id": 44,
+      "kind": "floor",
+      "floor": 3,
+      "x": 172
+     },
+     {
+      "id": 45,
+      "kind": "floor",
+      "floor": 3,
+      "x": 173
+     },
+     {
+      "id": 46,
+      "kind": "floor",
+      "floor": 3,
+      "x": 174
+     },
+     {
+      "id": 47,
+      "kind": "floor",
+      "floor": 3,
+      "x": 175
+     },
+     {
+      "id": 48,
+      "kind": "floor",
+      "floor": 3,
+      "x": 176
+     },
+     {
+      "id": 49,
+      "kind": "floor",
+      "floor": 3,
+      "x": 177
+     },
+     {
+      "id": 50,
+      "kind": "floor",
+      "floor": 3,
+      "x": 178
+     },
+     {
+      "id": 51,
+      "kind": "floor",
+      "floor": 3,
+      "x": 179
+     },
+     {
+      "id": 52,
+      "kind": "floor",
+      "floor": 3,
+      "x": 180
+     },
+     {
+      "id": 53,
+      "kind": "floor",
+      "floor": 3,
+      "x": 181
+     },
+     {
+      "id": 54,
+      "kind": "floor",
+      "floor": 3,
+      "x": 182
+     },
+     {
+      "id": 55,
+      "kind": "floor",
+      "floor": 3,
+      "x": 183
+     },
+     {
+      "id": 56,
+      "kind": "floor",
+      "floor": 3,
+      "x": 184
+     },
+     {
+      "id": 57,
+      "kind": "floor",
+      "floor": 3,
+      "x": 185
+     },
+     {
+      "id": 58,
+      "kind": "floor",
+      "floor": 3,
+      "x": 186
+     },
+     {
+      "id": 59,
+      "kind": "floor",
+      "floor": 3,
+      "x": 187
+     },
+     {
+      "id": 60,
+      "kind": "floor",
+      "floor": 3,
+      "x": 188
+     },
+     {
+      "id": 61,
+      "kind": "floor",
+      "floor": 3,
+      "x": 189
+     },
+     {
+      "id": 62,
+      "kind": "floor",
+      "floor": 3,
+      "x": 190
+     },
+     {
+      "id": 63,
+      "kind": "office",
+      "floor": 2,
+      "x": 172,
+      "width": 9,
+      "state": "construction",
+      "everOccupied": true,
+      "label": "Apex Capital",
+      "completeAt": -1
+     },
+     {
+      "id": 64,
+      "kind": "office",
+      "floor": 2,
+      "x": 181,
+      "width": 9,
+      "state": "occupied",
+      "everOccupied": true,
+      "label": "Cobalt Partners"
+     },
+     {
+      "id": 65,
+      "kind": "condo",
+      "floor": 3,
+      "x": 172,
+      "width": 16,
+      "state": "occupied",
+      "occupants": 1,
+      "everOccupied": true,
+      "residents": 3,
+      "rent": 160000
+     }
+    ],
+    "transports": [
+     {
+      "id": 66,
+      "kind": "elevatorStandard",
+      "x": 171,
+      "width": 4,
+      "bottom": 1,
+      "top": 3,
+      "cars": 1,
+      "carPositions": [
+       1
+      ],
+      "carDir": [
+       0
+      ],
+      "load": 0,
+      "carLoad": [
+       0
+      ]
+     },
+     {
+      "id": 67,
+      "kind": "stairs",
+      "x": 189,
+      "width": 8,
+      "bottom": 1,
+      "top": 2,
+      "cars": 0,
+      "carPositions": [],
+      "carDir": [],
+      "load": 0
+     }
+    ],
+    "nextId": 68,
+    "towerName": "Tower One",
+    "builtWeddingHall": false,
+    "evaluatedTower": false,
+    "vipVisitDay": -1,
+    "vipFavorable": false,
+    "vipVisits": 0,
+    "lastVipNagDay": -100,
+    "treasuresFound": 0,
+    "events": {
+     "lastSantaYear": -1,
+     "rngState": 369021,
+     "pending": null
+    },
+    "excavated": [],
+    "blockbusters": [],
+    "milestones": [],
+    "ledger": {
+     "today": {},
+     "history": [
+      {
+       "condos": 160000,
+       "upkeep": -600,
+       "offices": 18600
+      }
+     ]
+    },
+    "log": [
+     {
+      "minute": 1440,
+      "text": "Monthly maintenance paid: $2,000.",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "Quarterly office rent collected: $20,000 (2 offices).",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "New tenants: 2 offices leased, 1 condo sold.",
+      "kind": "good"
+     }
+    ]
+   },
+   "expected": "a1de52f6d178c614"
+  },
+  {
+   "id": "construction-completeat-huge",
+   "input": {
+    "version": 7,
+    "seed": 2903413569,
+    "initialSeed": 7,
+    "money": 99673000,
+    "star": 1,
+    "minutes": 1860,
+    "mode": "modern",
+    "modernCalendar": "realWorld",
+    "lastQuarterMoney": 99653000,
+    "units": [
+     {
+      "id": 1,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 170
+     },
+     {
+      "id": 2,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 171
+     },
+     {
+      "id": 3,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 172
+     },
+     {
+      "id": 4,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 173
+     },
+     {
+      "id": 5,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 174
+     },
+     {
+      "id": 6,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 175
+     },
+     {
+      "id": 7,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 176
+     },
+     {
+      "id": 8,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 177
+     },
+     {
+      "id": 9,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 178
+     },
+     {
+      "id": 10,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 179
+     },
+     {
+      "id": 11,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 180
+     },
+     {
+      "id": 12,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 181
+     },
+     {
+      "id": 13,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 182
+     },
+     {
+      "id": 14,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 183
+     },
+     {
+      "id": 15,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 184
+     },
+     {
+      "id": 16,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 185
+     },
+     {
+      "id": 17,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 186
+     },
+     {
+      "id": 18,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 187
+     },
+     {
+      "id": 19,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 188
+     },
+     {
+      "id": 20,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 189
+     },
+     {
+      "id": 21,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 190
+     },
+     {
+      "id": 22,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 191
+     },
+     {
+      "id": 23,
+      "kind": "floor",
+      "floor": 2,
+      "x": 171
+     },
+     {
+      "id": 24,
+      "kind": "floor",
+      "floor": 2,
+      "x": 172
+     },
+     {
+      "id": 25,
+      "kind": "floor",
+      "floor": 2,
+      "x": 173
+     },
+     {
+      "id": 26,
+      "kind": "floor",
+      "floor": 2,
+      "x": 174
+     },
+     {
+      "id": 27,
+      "kind": "floor",
+      "floor": 2,
+      "x": 175
+     },
+     {
+      "id": 28,
+      "kind": "floor",
+      "floor": 2,
+      "x": 176
+     },
+     {
+      "id": 29,
+      "kind": "floor",
+      "floor": 2,
+      "x": 177
+     },
+     {
+      "id": 30,
+      "kind": "floor",
+      "floor": 2,
+      "x": 178
+     },
+     {
+      "id": 31,
+      "kind": "floor",
+      "floor": 2,
+      "x": 179
+     },
+     {
+      "id": 32,
+      "kind": "floor",
+      "floor": 2,
+      "x": 180
+     },
+     {
+      "id": 33,
+      "kind": "floor",
+      "floor": 2,
+      "x": 181
+     },
+     {
+      "id": 34,
+      "kind": "floor",
+      "floor": 2,
+      "x": 182
+     },
+     {
+      "id": 35,
+      "kind": "floor",
+      "floor": 2,
+      "x": 183
+     },
+     {
+      "id": 36,
+      "kind": "floor",
+      "floor": 2,
+      "x": 184
+     },
+     {
+      "id": 37,
+      "kind": "floor",
+      "floor": 2,
+      "x": 185
+     },
+     {
+      "id": 38,
+      "kind": "floor",
+      "floor": 2,
+      "x": 186
+     },
+     {
+      "id": 39,
+      "kind": "floor",
+      "floor": 2,
+      "x": 187
+     },
+     {
+      "id": 40,
+      "kind": "floor",
+      "floor": 2,
+      "x": 188
+     },
+     {
+      "id": 41,
+      "kind": "floor",
+      "floor": 2,
+      "x": 189
+     },
+     {
+      "id": 42,
+      "kind": "floor",
+      "floor": 2,
+      "x": 190
+     },
+     {
+      "id": 43,
+      "kind": "floor",
+      "floor": 3,
+      "x": 171
+     },
+     {
+      "id": 44,
+      "kind": "floor",
+      "floor": 3,
+      "x": 172
+     },
+     {
+      "id": 45,
+      "kind": "floor",
+      "floor": 3,
+      "x": 173
+     },
+     {
+      "id": 46,
+      "kind": "floor",
+      "floor": 3,
+      "x": 174
+     },
+     {
+      "id": 47,
+      "kind": "floor",
+      "floor": 3,
+      "x": 175
+     },
+     {
+      "id": 48,
+      "kind": "floor",
+      "floor": 3,
+      "x": 176
+     },
+     {
+      "id": 49,
+      "kind": "floor",
+      "floor": 3,
+      "x": 177
+     },
+     {
+      "id": 50,
+      "kind": "floor",
+      "floor": 3,
+      "x": 178
+     },
+     {
+      "id": 51,
+      "kind": "floor",
+      "floor": 3,
+      "x": 179
+     },
+     {
+      "id": 52,
+      "kind": "floor",
+      "floor": 3,
+      "x": 180
+     },
+     {
+      "id": 53,
+      "kind": "floor",
+      "floor": 3,
+      "x": 181
+     },
+     {
+      "id": 54,
+      "kind": "floor",
+      "floor": 3,
+      "x": 182
+     },
+     {
+      "id": 55,
+      "kind": "floor",
+      "floor": 3,
+      "x": 183
+     },
+     {
+      "id": 56,
+      "kind": "floor",
+      "floor": 3,
+      "x": 184
+     },
+     {
+      "id": 57,
+      "kind": "floor",
+      "floor": 3,
+      "x": 185
+     },
+     {
+      "id": 58,
+      "kind": "floor",
+      "floor": 3,
+      "x": 186
+     },
+     {
+      "id": 59,
+      "kind": "floor",
+      "floor": 3,
+      "x": 187
+     },
+     {
+      "id": 60,
+      "kind": "floor",
+      "floor": 3,
+      "x": 188
+     },
+     {
+      "id": 61,
+      "kind": "floor",
+      "floor": 3,
+      "x": 189
+     },
+     {
+      "id": 62,
+      "kind": "floor",
+      "floor": 3,
+      "x": 190
+     },
+     {
+      "id": 63,
+      "kind": "office",
+      "floor": 2,
+      "x": 172,
+      "width": 9,
+      "state": "construction",
+      "everOccupied": true,
+      "label": "Apex Capital",
+      "completeAt": 1e+300
+     },
+     {
+      "id": 64,
+      "kind": "office",
+      "floor": 2,
+      "x": 181,
+      "width": 9,
+      "state": "occupied",
+      "everOccupied": true,
+      "label": "Cobalt Partners"
+     },
+     {
+      "id": 65,
+      "kind": "condo",
+      "floor": 3,
+      "x": 172,
+      "width": 16,
+      "state": "occupied",
+      "occupants": 1,
+      "everOccupied": true,
+      "residents": 3,
+      "rent": 160000
+     }
+    ],
+    "transports": [
+     {
+      "id": 66,
+      "kind": "elevatorStandard",
+      "x": 171,
+      "width": 4,
+      "bottom": 1,
+      "top": 3,
+      "cars": 1,
+      "carPositions": [
+       1
+      ],
+      "carDir": [
+       0
+      ],
+      "load": 0,
+      "carLoad": [
+       0
+      ]
+     },
+     {
+      "id": 67,
+      "kind": "stairs",
+      "x": 189,
+      "width": 8,
+      "bottom": 1,
+      "top": 2,
+      "cars": 0,
+      "carPositions": [],
+      "carDir": [],
+      "load": 0
+     }
+    ],
+    "nextId": 68,
+    "towerName": "Tower One",
+    "builtWeddingHall": false,
+    "evaluatedTower": false,
+    "vipVisitDay": -1,
+    "vipFavorable": false,
+    "vipVisits": 0,
+    "lastVipNagDay": -100,
+    "treasuresFound": 0,
+    "events": {
+     "lastSantaYear": -1,
+     "rngState": 369021,
+     "pending": null
+    },
+    "excavated": [],
+    "blockbusters": [],
+    "milestones": [],
+    "ledger": {
+     "today": {},
+     "history": [
+      {
+       "condos": 160000,
+       "upkeep": -600,
+       "offices": 18600
+      }
+     ]
+    },
+    "log": [
+     {
+      "minute": 1440,
+      "text": "Monthly maintenance paid: $2,000.",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "Quarterly office rent collected: $20,000 (2 offices).",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "New tenants: 2 offices leased, 1 condo sold.",
+      "kind": "good"
+     }
+    ]
+   },
+   "expected": "46f4075e6bcdd1f4"
+  },
+  {
+   "id": "schedule-rows-wrong-length",
+   "input": {
+    "version": 7,
+    "seed": 2903413569,
+    "initialSeed": 7,
+    "money": 99673000,
+    "star": 1,
+    "minutes": 1860,
+    "mode": "modern",
+    "modernCalendar": "realWorld",
+    "lastQuarterMoney": 99653000,
+    "units": [
+     {
+      "id": 1,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 170
+     },
+     {
+      "id": 2,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 171
+     },
+     {
+      "id": 3,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 172
+     },
+     {
+      "id": 4,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 173
+     },
+     {
+      "id": 5,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 174
+     },
+     {
+      "id": 6,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 175
+     },
+     {
+      "id": 7,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 176
+     },
+     {
+      "id": 8,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 177
+     },
+     {
+      "id": 9,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 178
+     },
+     {
+      "id": 10,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 179
+     },
+     {
+      "id": 11,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 180
+     },
+     {
+      "id": 12,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 181
+     },
+     {
+      "id": 13,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 182
+     },
+     {
+      "id": 14,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 183
+     },
+     {
+      "id": 15,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 184
+     },
+     {
+      "id": 16,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 185
+     },
+     {
+      "id": 17,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 186
+     },
+     {
+      "id": 18,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 187
+     },
+     {
+      "id": 19,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 188
+     },
+     {
+      "id": 20,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 189
+     },
+     {
+      "id": 21,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 190
+     },
+     {
+      "id": 22,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 191
+     },
+     {
+      "id": 23,
+      "kind": "floor",
+      "floor": 2,
+      "x": 171
+     },
+     {
+      "id": 24,
+      "kind": "floor",
+      "floor": 2,
+      "x": 172
+     },
+     {
+      "id": 25,
+      "kind": "floor",
+      "floor": 2,
+      "x": 173
+     },
+     {
+      "id": 26,
+      "kind": "floor",
+      "floor": 2,
+      "x": 174
+     },
+     {
+      "id": 27,
+      "kind": "floor",
+      "floor": 2,
+      "x": 175
+     },
+     {
+      "id": 28,
+      "kind": "floor",
+      "floor": 2,
+      "x": 176
+     },
+     {
+      "id": 29,
+      "kind": "floor",
+      "floor": 2,
+      "x": 177
+     },
+     {
+      "id": 30,
+      "kind": "floor",
+      "floor": 2,
+      "x": 178
+     },
+     {
+      "id": 31,
+      "kind": "floor",
+      "floor": 2,
+      "x": 179
+     },
+     {
+      "id": 32,
+      "kind": "floor",
+      "floor": 2,
+      "x": 180
+     },
+     {
+      "id": 33,
+      "kind": "floor",
+      "floor": 2,
+      "x": 181
+     },
+     {
+      "id": 34,
+      "kind": "floor",
+      "floor": 2,
+      "x": 182
+     },
+     {
+      "id": 35,
+      "kind": "floor",
+      "floor": 2,
+      "x": 183
+     },
+     {
+      "id": 36,
+      "kind": "floor",
+      "floor": 2,
+      "x": 184
+     },
+     {
+      "id": 37,
+      "kind": "floor",
+      "floor": 2,
+      "x": 185
+     },
+     {
+      "id": 38,
+      "kind": "floor",
+      "floor": 2,
+      "x": 186
+     },
+     {
+      "id": 39,
+      "kind": "floor",
+      "floor": 2,
+      "x": 187
+     },
+     {
+      "id": 40,
+      "kind": "floor",
+      "floor": 2,
+      "x": 188
+     },
+     {
+      "id": 41,
+      "kind": "floor",
+      "floor": 2,
+      "x": 189
+     },
+     {
+      "id": 42,
+      "kind": "floor",
+      "floor": 2,
+      "x": 190
+     },
+     {
+      "id": 43,
+      "kind": "floor",
+      "floor": 3,
+      "x": 171
+     },
+     {
+      "id": 44,
+      "kind": "floor",
+      "floor": 3,
+      "x": 172
+     },
+     {
+      "id": 45,
+      "kind": "floor",
+      "floor": 3,
+      "x": 173
+     },
+     {
+      "id": 46,
+      "kind": "floor",
+      "floor": 3,
+      "x": 174
+     },
+     {
+      "id": 47,
+      "kind": "floor",
+      "floor": 3,
+      "x": 175
+     },
+     {
+      "id": 48,
+      "kind": "floor",
+      "floor": 3,
+      "x": 176
+     },
+     {
+      "id": 49,
+      "kind": "floor",
+      "floor": 3,
+      "x": 177
+     },
+     {
+      "id": 50,
+      "kind": "floor",
+      "floor": 3,
+      "x": 178
+     },
+     {
+      "id": 51,
+      "kind": "floor",
+      "floor": 3,
+      "x": 179
+     },
+     {
+      "id": 52,
+      "kind": "floor",
+      "floor": 3,
+      "x": 180
+     },
+     {
+      "id": 53,
+      "kind": "floor",
+      "floor": 3,
+      "x": 181
+     },
+     {
+      "id": 54,
+      "kind": "floor",
+      "floor": 3,
+      "x": 182
+     },
+     {
+      "id": 55,
+      "kind": "floor",
+      "floor": 3,
+      "x": 183
+     },
+     {
+      "id": 56,
+      "kind": "floor",
+      "floor": 3,
+      "x": 184
+     },
+     {
+      "id": 57,
+      "kind": "floor",
+      "floor": 3,
+      "x": 185
+     },
+     {
+      "id": 58,
+      "kind": "floor",
+      "floor": 3,
+      "x": 186
+     },
+     {
+      "id": 59,
+      "kind": "floor",
+      "floor": 3,
+      "x": 187
+     },
+     {
+      "id": 60,
+      "kind": "floor",
+      "floor": 3,
+      "x": 188
+     },
+     {
+      "id": 61,
+      "kind": "floor",
+      "floor": 3,
+      "x": 189
+     },
+     {
+      "id": 62,
+      "kind": "floor",
+      "floor": 3,
+      "x": 190
+     },
+     {
+      "id": 63,
+      "kind": "office",
+      "floor": 2,
+      "x": 172,
+      "width": 9,
+      "state": "occupied",
+      "everOccupied": true,
+      "label": "Apex Capital"
+     },
+     {
+      "id": 64,
+      "kind": "office",
+      "floor": 2,
+      "x": 181,
+      "width": 9,
+      "state": "occupied",
+      "everOccupied": true,
+      "label": "Cobalt Partners"
+     },
+     {
+      "id": 65,
+      "kind": "condo",
+      "floor": 3,
+      "x": 172,
+      "width": 16,
+      "state": "occupied",
+      "occupants": 1,
+      "everOccupied": true,
+      "residents": 3,
+      "rent": 160000
+     }
+    ],
+    "transports": [
+     {
+      "id": 66,
+      "kind": "elevatorStandard",
+      "x": 171,
+      "width": 4,
+      "bottom": 1,
+      "top": 3,
+      "cars": 1,
+      "carPositions": [
+       1
+      ],
+      "carDir": [
+       0
+      ],
+      "load": 0,
+      "carLoad": [
+       0
+      ],
+      "schedule": {
+       "activeCars": {
+        "weekday": [
+         1,
+         2,
+         3
+        ],
+        "weekend": [
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9,
+         9
+        ]
+       },
+       "homeFloors": [
+        -5,
+        1,
+        2,
+        2,
+        99
+       ]
+      }
+     },
+     {
+      "id": 67,
+      "kind": "stairs",
+      "x": 189,
+      "width": 8,
+      "bottom": 1,
+      "top": 2,
+      "cars": 0,
+      "carPositions": [],
+      "carDir": [],
+      "load": 0
+     }
+    ],
+    "nextId": 68,
+    "towerName": "Tower One",
+    "builtWeddingHall": false,
+    "evaluatedTower": false,
+    "vipVisitDay": -1,
+    "vipFavorable": false,
+    "vipVisits": 0,
+    "lastVipNagDay": -100,
+    "treasuresFound": 0,
+    "events": {
+     "lastSantaYear": -1,
+     "rngState": 369021,
+     "pending": null
+    },
+    "excavated": [],
+    "blockbusters": [],
+    "milestones": [],
+    "ledger": {
+     "today": {},
+     "history": [
+      {
+       "condos": 160000,
+       "upkeep": -600,
+       "offices": 18600
+      }
+     ]
+    },
+    "log": [
+     {
+      "minute": 1440,
+      "text": "Monthly maintenance paid: $2,000.",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "Quarterly office rent collected: $20,000 (2 offices).",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "New tenants: 2 offices leased, 1 condo sold.",
+      "kind": "good"
+     }
+    ]
+   },
+   "expected": "2da129d7d8db8fa1"
+  },
+  {
+   "id": "schedule-nonfinite-tunables",
+   "input": {
+    "version": 7,
+    "seed": 2903413569,
+    "initialSeed": 7,
+    "money": 99673000,
+    "star": 1,
+    "minutes": 1860,
+    "mode": "modern",
+    "modernCalendar": "realWorld",
+    "lastQuarterMoney": 99653000,
+    "units": [
+     {
+      "id": 1,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 170
+     },
+     {
+      "id": 2,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 171
+     },
+     {
+      "id": 3,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 172
+     },
+     {
+      "id": 4,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 173
+     },
+     {
+      "id": 5,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 174
+     },
+     {
+      "id": 6,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 175
+     },
+     {
+      "id": 7,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 176
+     },
+     {
+      "id": 8,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 177
+     },
+     {
+      "id": 9,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 178
+     },
+     {
+      "id": 10,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 179
+     },
+     {
+      "id": 11,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 180
+     },
+     {
+      "id": 12,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 181
+     },
+     {
+      "id": 13,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 182
+     },
+     {
+      "id": 14,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 183
+     },
+     {
+      "id": 15,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 184
+     },
+     {
+      "id": 16,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 185
+     },
+     {
+      "id": 17,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 186
+     },
+     {
+      "id": 18,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 187
+     },
+     {
+      "id": 19,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 188
+     },
+     {
+      "id": 20,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 189
+     },
+     {
+      "id": 21,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 190
+     },
+     {
+      "id": 22,
+      "kind": "lobby",
+      "floor": 1,
+      "x": 191
+     },
+     {
+      "id": 23,
+      "kind": "floor",
+      "floor": 2,
+      "x": 171
+     },
+     {
+      "id": 24,
+      "kind": "floor",
+      "floor": 2,
+      "x": 172
+     },
+     {
+      "id": 25,
+      "kind": "floor",
+      "floor": 2,
+      "x": 173
+     },
+     {
+      "id": 26,
+      "kind": "floor",
+      "floor": 2,
+      "x": 174
+     },
+     {
+      "id": 27,
+      "kind": "floor",
+      "floor": 2,
+      "x": 175
+     },
+     {
+      "id": 28,
+      "kind": "floor",
+      "floor": 2,
+      "x": 176
+     },
+     {
+      "id": 29,
+      "kind": "floor",
+      "floor": 2,
+      "x": 177
+     },
+     {
+      "id": 30,
+      "kind": "floor",
+      "floor": 2,
+      "x": 178
+     },
+     {
+      "id": 31,
+      "kind": "floor",
+      "floor": 2,
+      "x": 179
+     },
+     {
+      "id": 32,
+      "kind": "floor",
+      "floor": 2,
+      "x": 180
+     },
+     {
+      "id": 33,
+      "kind": "floor",
+      "floor": 2,
+      "x": 181
+     },
+     {
+      "id": 34,
+      "kind": "floor",
+      "floor": 2,
+      "x": 182
+     },
+     {
+      "id": 35,
+      "kind": "floor",
+      "floor": 2,
+      "x": 183
+     },
+     {
+      "id": 36,
+      "kind": "floor",
+      "floor": 2,
+      "x": 184
+     },
+     {
+      "id": 37,
+      "kind": "floor",
+      "floor": 2,
+      "x": 185
+     },
+     {
+      "id": 38,
+      "kind": "floor",
+      "floor": 2,
+      "x": 186
+     },
+     {
+      "id": 39,
+      "kind": "floor",
+      "floor": 2,
+      "x": 187
+     },
+     {
+      "id": 40,
+      "kind": "floor",
+      "floor": 2,
+      "x": 188
+     },
+     {
+      "id": 41,
+      "kind": "floor",
+      "floor": 2,
+      "x": 189
+     },
+     {
+      "id": 42,
+      "kind": "floor",
+      "floor": 2,
+      "x": 190
+     },
+     {
+      "id": 43,
+      "kind": "floor",
+      "floor": 3,
+      "x": 171
+     },
+     {
+      "id": 44,
+      "kind": "floor",
+      "floor": 3,
+      "x": 172
+     },
+     {
+      "id": 45,
+      "kind": "floor",
+      "floor": 3,
+      "x": 173
+     },
+     {
+      "id": 46,
+      "kind": "floor",
+      "floor": 3,
+      "x": 174
+     },
+     {
+      "id": 47,
+      "kind": "floor",
+      "floor": 3,
+      "x": 175
+     },
+     {
+      "id": 48,
+      "kind": "floor",
+      "floor": 3,
+      "x": 176
+     },
+     {
+      "id": 49,
+      "kind": "floor",
+      "floor": 3,
+      "x": 177
+     },
+     {
+      "id": 50,
+      "kind": "floor",
+      "floor": 3,
+      "x": 178
+     },
+     {
+      "id": 51,
+      "kind": "floor",
+      "floor": 3,
+      "x": 179
+     },
+     {
+      "id": 52,
+      "kind": "floor",
+      "floor": 3,
+      "x": 180
+     },
+     {
+      "id": 53,
+      "kind": "floor",
+      "floor": 3,
+      "x": 181
+     },
+     {
+      "id": 54,
+      "kind": "floor",
+      "floor": 3,
+      "x": 182
+     },
+     {
+      "id": 55,
+      "kind": "floor",
+      "floor": 3,
+      "x": 183
+     },
+     {
+      "id": 56,
+      "kind": "floor",
+      "floor": 3,
+      "x": 184
+     },
+     {
+      "id": 57,
+      "kind": "floor",
+      "floor": 3,
+      "x": 185
+     },
+     {
+      "id": 58,
+      "kind": "floor",
+      "floor": 3,
+      "x": 186
+     },
+     {
+      "id": 59,
+      "kind": "floor",
+      "floor": 3,
+      "x": 187
+     },
+     {
+      "id": 60,
+      "kind": "floor",
+      "floor": 3,
+      "x": 188
+     },
+     {
+      "id": 61,
+      "kind": "floor",
+      "floor": 3,
+      "x": 189
+     },
+     {
+      "id": 62,
+      "kind": "floor",
+      "floor": 3,
+      "x": 190
+     },
+     {
+      "id": 63,
+      "kind": "office",
+      "floor": 2,
+      "x": 172,
+      "width": 9,
+      "state": "occupied",
+      "everOccupied": true,
+      "label": "Apex Capital"
+     },
+     {
+      "id": 64,
+      "kind": "office",
+      "floor": 2,
+      "x": 181,
+      "width": 9,
+      "state": "occupied",
+      "everOccupied": true,
+      "label": "Cobalt Partners"
+     },
+     {
+      "id": 65,
+      "kind": "condo",
+      "floor": 3,
+      "x": 172,
+      "width": 16,
+      "state": "occupied",
+      "occupants": 1,
+      "everOccupied": true,
+      "residents": 3,
+      "rent": 160000
+     }
+    ],
+    "transports": [
+     {
+      "id": 66,
+      "kind": "elevatorStandard",
+      "x": 171,
+      "width": 4,
+      "bottom": 1,
+      "top": 3,
+      "cars": 1,
+      "carPositions": [
+       1
+      ],
+      "carDir": [
+       0
+      ],
+      "load": 0,
+      "carLoad": [
+       0
+      ],
+      "schedule": {
+       "waitingCarResponse": -4,
+       "standardFloorDeparture": 1000000000,
+       "activeCars": {
+        "weekday": [
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1,
+         1
+        ]
+       }
+      }
+     },
+     {
+      "id": 67,
+      "kind": "stairs",
+      "x": 189,
+      "width": 8,
+      "bottom": 1,
+      "top": 2,
+      "cars": 0,
+      "carPositions": [],
+      "carDir": [],
+      "load": 0
+     }
+    ],
+    "nextId": 68,
+    "towerName": "Tower One",
+    "builtWeddingHall": false,
+    "evaluatedTower": false,
+    "vipVisitDay": -1,
+    "vipFavorable": false,
+    "vipVisits": 0,
+    "lastVipNagDay": -100,
+    "treasuresFound": 0,
+    "events": {
+     "lastSantaYear": -1,
+     "rngState": 369021,
+     "pending": null
+    },
+    "excavated": [],
+    "blockbusters": [],
+    "milestones": [],
+    "ledger": {
+     "today": {},
+     "history": [
+      {
+       "condos": 160000,
+       "upkeep": -600,
+       "offices": 18600
+      }
+     ]
+    },
+    "log": [
+     {
+      "minute": 1440,
+      "text": "Monthly maintenance paid: $2,000.",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "Quarterly office rent collected: $20,000 (2 offices).",
+      "kind": "money"
+     },
+     {
+      "minute": 1440,
+      "text": "New tenants: 2 offices leased, 1 condo sold.",
+      "kind": "good"
+     }
+    ]
+   },
+   "expected": "dffbc1a14018c632"
   }
  ]
 }

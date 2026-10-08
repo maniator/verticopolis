@@ -69,6 +69,13 @@ pub struct Unit {
     pub profit_today: Option<f64>,
     pub profit_yest: Option<f64>,
     pub complete_at: Option<f64>,
+    /// A `completeAt` the save carried that is not a number (a string, a
+    /// boolean, null). The TypeScript keeps and re-saves it as is, and the
+    /// completion check compares the clock against `Number(value)`, so a
+    /// string that reads as a number completes then and anything else never
+    /// completes. Kept beside `complete_at` so the hash and the behavior both
+    /// match.
+    pub complete_at_raw: Option<Value>,
     pub dirty_days: Option<i64>,
 }
 
@@ -139,7 +146,10 @@ impl Unit {
         }
         if let Some(v) = self.complete_at {
             m.insert("completeAt".into(), json!(v));
+        } else if let Some(raw) = &self.complete_at_raw {
+            m.insert("completeAt".into(), raw.clone());
         }
+
         if let Some(d) = self.dirty_days {
             if d != 0 && self.state == UnitState::Dirty {
                 m.insert("dirtyDays".into(), json!(d));
@@ -720,6 +730,7 @@ impl Tower {
             profit_today: None,
             profit_yest: None,
             complete_at: None,
+            complete_at_raw: None,
             dirty_days: None,
         };
         self.units.push(unit);
