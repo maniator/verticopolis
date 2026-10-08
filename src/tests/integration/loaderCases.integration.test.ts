@@ -24,14 +24,19 @@ type Any = Record<string, unknown>;
 function base(mode: "classic" | "modern"): Any {
   const sim = Simulation.newGame(7, mode);
   sim.money = 1e8;
-  // Small on purpose: the table carries the whole save per case.
-  for (let x = 170; x < 192; x++) sim.build("lobby", 1, x);
-  for (let fl = 2; fl <= 3; fl++) for (let x = 171; x < 191; x++) sim.build("floor", fl, x);
-  sim.build("office", 2, 172);
-  sim.build("office", 2, 181);
-  sim.build("condo", 3, 172);
-  sim.buildTransport("elevatorStandard", 171, 1, 3);
-  sim.buildTransport("stairs", 189, 1, 2);
+  // Small on purpose: the table carries the whole save per case. Every
+  // placement is asserted so the base topology the cases describe cannot
+  // quietly drift and regenerate a lock that passes for the wrong reason.
+  const must = (what: string, r: { ok: boolean; reason?: string }) => {
+    if (!r.ok) throw new Error(`base(${mode}): ${what} failed: ${r.reason ?? "refused"}`);
+  };
+  for (let x = 170; x < 192; x++) must(`lobby @1,${x}`, sim.build("lobby", 1, x));
+  for (let fl = 2; fl <= 3; fl++) for (let x = 171; x < 191; x++) must(`floor @${fl},${x}`, sim.build("floor", fl, x));
+  must("office @2,172", sim.build("office", 2, 172));
+  must("office @2,181", sim.build("office", 2, 181));
+  must("condo @3,172", sim.build("condo", 3, 172));
+  must("elevator @171", sim.buildTransport("elevatorStandard", 171, 1, 3));
+  must("stairs @189", sim.buildTransport("stairs", 189, 1, 2));
   for (let i = 0; i < 72; i++) sim.tick(20);
   const out = JSON.parse(JSON.stringify(sim.serialize())) as Any;
   out.log = (out.log as unknown[]).slice(-3);
