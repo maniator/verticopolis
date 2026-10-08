@@ -38,6 +38,7 @@ export type Command =
   | { op: "startFire" }
   | { op: "bombThreat" }
   | { op: "evaluateStar" }
+  | { op: "callExterminator"; expectFail?: boolean }
   | { op: "reload" }
   | { op: "tick"; dt: number; times?: number; checkpointEvery?: number }
   | { op: "checkpoint"; label: string };
@@ -74,6 +75,7 @@ const OPS: Record<Command["op"], Spec> = {
   startFire: {},
   bombThreat: {},
   evaluateStar: {},
+  callExterminator: { expectFail: "bool?" },
   reload: {},
   tick: { dt: "count", times: "count?", checkpointEvery: "count?" },
   checkpoint: { label: "str" },
@@ -219,6 +221,11 @@ function apply(sim: Simulation, c: Command, emit: (label: string) => void, clock
     }
     case "bombThreat": sim.bombThreat(); break;
     case "evaluateStar": sim.evaluateStar(); break;
+    case "callExterminator": {
+      const r = sim.callExterminator();
+      expectOk(r.ok, c.expectFail, "callExterminator", r.ok ? undefined : r.reason);
+      break;
+    }
     case "reload": {
       // A save round trip must lose nothing the save carries.
       const before = digest(stateView(sim));

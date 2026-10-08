@@ -74,6 +74,11 @@ pub enum Command {
     BombThreat,
     #[serde(rename = "evaluateStar")]
     EvaluateStar,
+    #[serde(rename = "callExterminator")]
+    CallExterminator {
+        #[serde(rename = "expectFail")]
+        expect_fail: Option<bool>,
+    },
     #[serde(rename = "reload")]
     Reload,
     #[serde(rename = "tick")]
@@ -199,6 +204,7 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
         "adjustRent" => &[("floor", "int"), ("x", "int"), ("dir", "dir")],
         "setCars" => &[("floor", "int"), ("x", "int"), ("cars", "count")],
         "startFire" | "bombThreat" | "evaluateStar" | "reload" => &[],
+        "callExterminator" => &[("expectFail", "bool?")],
         "tick" => &[
             ("dt", "count"),
             ("times", "count?"),
@@ -614,6 +620,16 @@ fn run_scenario_inner(
                 }
                 Command::BombThreat => sim.bomb_threat(),
                 Command::EvaluateStar => sim.evaluate_star(),
+                Command::CallExterminator { expect_fail } => {
+                    let r = sim.call_exterminator();
+                    expect_ok(
+                        r.is_ok(),
+                        expect_fail.unwrap_or(false),
+                        "callExterminator",
+                        r.err().map(|e| e.reason()),
+                    )
+                    .map_err(failed)?;
+                }
                 Command::Reload => {
                     let before = digest(&state_view(&sim));
                     let saved: Value = serde_json::from_str(&sim.serialize().to_string()).unwrap();

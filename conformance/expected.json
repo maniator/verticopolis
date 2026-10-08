@@ -196,6 +196,28 @@
       {"label":"t+2520","state":"9293a5fdfcd9f672","crowd":"ee001f4c5259865a"},
       {"label":"final","state":"9293a5fdfcd9f672","crowd":"ee001f4c5259865a"}
     ],
+    "hotel-exterminator-modern": [
+      {"label":"start","state":"4f9cc90eb824f1f1","crowd":"7cb294222cbe0188"},
+      {"label":"no-housekeeping","state":"402783719fdf2cec","crowd":"7cb294222cbe0188"},
+      {"label":"t+1440","state":"07812955b872feaf","crowd":"d9daea5e6a078195"},
+      {"label":"t+2880","state":"d48ad0195b238c85","crowd":"50525fe0a8ff65b0"},
+      {"label":"t+4320","state":"fb3bc3ef5fad6b8a","crowd":"a58c184bbba56f49"},
+      {"label":"t+5760","state":"e82b314ca328e2e3","crowd":"a05a3e9824f2156c"},
+      {"label":"booked","state":"2b0d5f66faefa470","crowd":"a05a3e9824f2156c"},
+      {"label":"t+6120","state":"ef3054eb2debbac9","crowd":"fac8a6cdf214c9dc"},
+      {"label":"t+6480","state":"90221f21d4401edf","crowd":"4a2ba018f7b9807d"},
+      {"label":"t+6840","state":"3231df86c01b2537","crowd":"238e3a74c346e420"},
+      {"label":"t+7200","state":"466047f796f0514e","crowd":"fd212805ce8bd081"},
+      {"label":"cleared","state":"466047f796f0514e","crowd":"fd212805ce8bd081"},
+      {"label":"t+7920","state":"370ab0c139a44be4","crowd":"73b29f490c6ee489"},
+      {"label":"t+8640","state":"0a0c87345a2340f7","crowd":"78d3ff069a796683"},
+      {"label":"t+9360","state":"613f228b3c350513","crowd":"5d716a0d40061d44"},
+      {"label":"t+10080","state":"30b8101d5fb3e784","crowd":"4d3adf549c5b0619"},
+      {"label":"t+10800","state":"f34d35a2a3645444","crowd":"71408fce95e26f04"},
+      {"label":"t+11520","state":"d81beb919b92112b","crowd":"5db17c142ed97636"},
+      {"label":"weekend-end","state":"d81beb919b92112b","crowd":"5db17c142ed97636"},
+      {"label":"final","state":"d81beb919b92112b","crowd":"5db17c142ed97636"}
+    ],
     "starter-classic": [
       {"label":"start","state":"7e9896e57a869117","crowd":"ffab01a633931504"},
       {"label":"built","state":"9829112abd1bac74","crowd":"ffab01a633931504"},

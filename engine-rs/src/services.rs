@@ -27,6 +27,18 @@ pub enum ExterminatorRefusal {
     Funds { cost: f64, rooms: usize },
 }
 
+impl ExterminatorRefusal {
+    /// The TypeScript `reason` string.
+    pub fn reason(&self) -> &'static str {
+        match self {
+            ExterminatorRefusal::Unavailable => "unavailable",
+            ExterminatorRefusal::Pending => "pending",
+            ExterminatorRefusal::None => "none",
+            ExterminatorRefusal::Funds { .. } => "funds",
+        }
+    }
+}
+
 /// `Number#toLocaleString()` for a whole, finite, non-negative dollar amount
 /// in the en-US locale, which is all the booking message ever formats. The
 /// TypeScript call takes the host locale; log text is outside the hash, and
