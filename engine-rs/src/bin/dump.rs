@@ -8,14 +8,15 @@ use verticopolis_engine::canonical::canonical_json;
 use verticopolis_engine::scenario::{run_scenario_until, Scenario};
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() < 3 {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let crowd = args.iter().any(|a| a == "--crowd");
+    let positional: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
+    if positional.len() != 2 || args.iter().any(|a| a.starts_with("--") && a != "--crowd") {
         eprintln!("usage: dump <scenario-id> <label> [--crowd]");
         std::process::exit(2);
     }
-    let id = &args[1];
-    let label = &args[2];
-    let crowd = args.iter().any(|a| a == "--crowd");
+    let id = positional[0];
+    let label = positional[1];
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
     let path = repo
         .join("conformance/scenarios")
@@ -28,7 +29,7 @@ fn main() {
             std::process::exit(2);
         });
     match run_scenario_until(&scenario, &repo, label) {
-        Some(sim) => {
+        Ok(sim) => {
             let v = if crowd {
                 sim.crowd.view()
             } else {
@@ -36,8 +37,8 @@ fn main() {
             };
             println!("{}", canonical_json(&v));
         }
-        None => {
-            eprintln!("label {label} not reached");
+        Err(e) => {
+            eprintln!("{e}");
             std::process::exit(1);
         }
     }

@@ -134,7 +134,20 @@ error text the TypeScript runner shares).
 - [x] [Review][Patch] Hex, octal and binary literals rounded per digit; `[-0]` keeps its sign [engine-rs/src/load.rs]
 - [x] [Review][Patch] U+0085 counted as JavaScript whitespace [engine-rs/src/load.rs]
 - [x] [Review][Patch] `dump` panics on a missing file while a bad one exits cleanly [engine-rs/src/bin/dump.rs]
-- [x] [Review][Patch] Tests for `Number()` of arrays, booleans and null, the container's byte order marks and base64 forms; bookkeeping counts and the `1e400` note on #858 [engine-rs/src/load.rs, docs]
+- [x] [Review][Patch] Tests for `Number()` of arrays, booleans and null, the container's byte order marks and base64 forms; bookkeeping counts and the `1e400` note on #858 [engine-rs/src/load.rs, this file, backlog.md]
+
+Round four (confirming pass, 2026-10-08) on the round-three fix commits: 0
+`decision_needed`, 6 `patch`, 0 `defer`; the Acceptance Auditor found no
+violation, and the rest was dismissed (whole numbers past 2^63, elapsed
+minutes past 2^53, code units above U+00FF in base64, error-text wording,
+and two claims the tree already answered).
+
+- [x] [Review][Patch] `Number(["-0"])` keeps its sign; only a numeric `-0` renders as "0" [engine-rs/src/load.rs]
+- [x] [Review][Patch] A repeated `stop_at` label stopped instead of failing [engine-rs/src/scenario.rs]
+- [x] [Review][Patch] `dump` panics on a missing argument and drops the run error behind "label not reached" [engine-rs/src/bin/dump.rs, scenario.rs]
+- [x] [Review][Patch] Hex rounding test could not tell exact from per-digit; base64 test lacked URL-safe, leading `=` and trailing-bit forms; scenario tests asserted only `is_err` [engine-rs/src/load.rs, scenario.rs]
+- [x] [Review][Patch] `lenient_base64` carried a `Result` with no failing path; `js_trim` comment garbled; whole-float bound undocumented; one unprefixed error [engine-rs/src/load.rs, scenario.rs]
+- [x] [Review][Patch] Story row named "docs" where a path belongs [this file]
 
 Codex review of beaee7c (2026-10-08), both applied:
 

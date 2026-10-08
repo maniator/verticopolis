@@ -40,7 +40,7 @@ pub fn decode_vctower(text: &str) -> Result<Value, String> {
     if !trimmed.starts_with("VCTOWER1") {
         return Err("not a VCTOWER1 file".into());
     }
-    let packed = lenient_base64(&trimmed["VCTOWER1".len()..])?;
+    let packed = lenient_base64(&trimmed["VCTOWER1".len()..]);
     use std::io::Read;
     let mut out = Vec::new();
     flate2::read::DeflateDecoder::new(&packed[..])
@@ -63,7 +63,7 @@ pub fn decode_vctower(text: &str) -> Result<Value, String> {
 /// URL-safe alphabet is taken alongside the standard one, padding is
 /// optional, a dangling single symbol is dropped, and the last symbol's
 /// unused bits are ignored.
-fn lenient_base64(text: &str) -> Result<Vec<u8>, String> {
+fn lenient_base64(text: &str) -> Vec<u8> {
     let body = text.split('=').next().unwrap_or("");
     let mut symbols: String = body
         .chars()
@@ -77,6 +77,9 @@ fn lenient_base64(text: &str) -> Result<Vec<u8>, String> {
     if symbols.len() % 4 == 1 {
         symbols.pop();
     }
+    // With the alphabet filtered, the padding cut, the dangling symbol
+    // dropped and trailing bits allowed, no input is left that the decoder
+    // refuses; like `Buffer.from`, garbage simply inflates to garbage.
     base64::engine::GeneralPurpose::new(
         &base64::alphabet::STANDARD,
         base64::engine::GeneralPurposeConfig::new()
@@ -84,12 +87,12 @@ fn lenient_base64(text: &str) -> Result<Vec<u8>, String> {
             .with_decode_allow_trailing_bits(true),
     )
     .decode(symbols.as_bytes())
-    .map_err(|e| format!("base64: {e}"))
+    .unwrap_or_default()
 }
 
-/// `String.prototype.trim`: strips WhiteSpace and LineTerminator, which is
-/// Unicode White_Space plus U+FEFF and minus U+0085 (NEL), which Rust's
-/// `is_whitespace` counts and JavaScript does not.
+/// `String.prototype.trim`: strips WhiteSpace and LineTerminator. Compared
+/// with Rust's `is_whitespace`, JavaScript also counts U+FEFF and does not
+/// count U+0085 (NEL).
 fn js_trim(s: &str) -> &str {
     s.trim_matches(|c: char| (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}')
 }
@@ -133,15 +136,17 @@ fn js_number(v: Option<&Value>) -> f64 {
         Some(Value::Array(a)) => match a.as_slice() {
             [] => 0.0,
             [Value::Bool(_)] | [Value::Object(_)] => f64::NAN,
-            // The element is rendered as text first, so `[-0]` reads "0".
-            [one] => {
-                let v = js_number(Some(one));
+            // The element is rendered as text first: a number `-0` prints
+            // as "0" and loses its sign, while the string "-0" keeps it.
+            [Value::Number(n)] => {
+                let v = n.as_f64().unwrap_or(f64::NAN);
                 if v == 0.0 {
                     0.0
                 } else {
                     v
                 }
             }
+            [one] => js_number(Some(one)),
             _ => f64::NAN,
         },
         _ => f64::NAN,
@@ -1729,7 +1734,9 @@ mod tests {
             ("Infinity ", f64::INFINITY),
             ("1E5", 100000.0),
             ("00012", 12.0),
-            ("0x1FFFFFFFFFFFFF1", 144115188075855860.0),
+            // 2^57 + 31: exact rounding gives 2^57 + 32, per-digit rounding
+            // (which ties 2^53 + 1 down first) would give 2^57.
+            ("0x20000000000001F", 144115188075855904.0),
             ("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 8.711228593176025e40),
         ];
         for (s, want) in same {
@@ -1757,6 +1764,10 @@ mod tests {
         assert_eq!(js_number(Some(&json!([[7]]))), 7.0);
         assert_eq!(js_number(Some(&json!([null]))), 0.0);
         assert_eq!(js_number(Some(&json!([" 7 "]))), 7.0);
+        assert_eq!(js_number(Some(&json!([""]))), 0.0);
+        assert_eq!(js_number(Some(&json!([[]]))), 0.0);
+        assert_eq!(js_number(Some(&json!(["0x10"]))), 16.0);
+        assert_eq!(js_number(Some(&json!([1e21]))), 1e21);
         for v in [
             json!([true]),
             json!([7, 8]),
@@ -1768,6 +1779,9 @@ mod tests {
         }
         assert!(js_number(None).is_nan());
         assert!(js_number(Some(&json!([-0.0]))).is_sign_positive());
+        assert!(js_number(Some(&json!([[-0.0]]))).is_sign_positive());
+        assert!(js_number(Some(&json!(["-0"]))).is_sign_negative());
+        assert!(js_number(Some(&json!([["-0"]]))).is_sign_negative());
     }
 
     /// Pinned with Node: `Buffer.from(s, "base64").toString("latin1")`.
@@ -1784,9 +1798,15 @@ mod tests {
             ("YW!Jj", "abc"),
             ("YWJjZ", "abc"),
             ("YWJj\u{85}2", "abc"),
+            ("YWJj=", "abc"),
+            ("=YWJj", ""),
+            ("YWK", "ab"),
         ] {
-            assert_eq!(lenient_base64(b64).unwrap(), want.as_bytes(), "{b64:?}");
+            assert_eq!(lenient_base64(b64), want.as_bytes(), "{b64:?}");
         }
+        assert_eq!(lenient_base64("YW-j"), [97, 111, 163]);
+        assert_eq!(lenient_base64("YW_j"), [97, 111, 227]);
+        assert_eq!(lenient_base64("YQ-_"), [97, 15, 191]);
     }
 
     /// `String.prototype.trim` strips a leading U+FEFF before the magic and

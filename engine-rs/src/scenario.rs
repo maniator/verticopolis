@@ -236,7 +236,7 @@ fn check_scenario(s: &Value) -> Result<(), String> {
     let commands = s
         .get("commands")
         .and_then(Value::as_array)
-        .ok_or("commands must be an array")?;
+        .ok_or("scenario: commands must be an array")?;
     for (i, c) in commands.iter().enumerate() {
         let where_ = format!("command {i}");
         if !c.is_object() {
@@ -258,7 +258,9 @@ fn check_scenario(s: &Value) -> Result<(), String> {
 }
 
 /// `Number.isInteger(1.0)` is true, so a scenario may spell a whole number
-/// with a fraction; serde's integer fields would refuse it.
+/// with a fraction; serde's integer fields would refuse it. Whole floats
+/// outside the i64 range stay floats and fail the integer checks, where the
+/// TypeScript would accept them and fail the command instead.
 fn whole_floats_to_ints(v: &mut Value) {
     match v {
         Value::Number(n) => {
@@ -375,8 +377,22 @@ pub fn run_scenario(s: &Scenario, root: &std::path::Path) -> Run {
 
 /// Run a scenario up to (and including) the checkpoint `label`, returning
 /// the live engine at that point.
-pub fn run_scenario_until(s: &Scenario, root: &std::path::Path, label: &str) -> Option<Simulation> {
-    run_scenario_inner(s, root, Some(label)).1
+pub fn run_scenario_until(
+    s: &Scenario,
+    root: &std::path::Path,
+    label: &str,
+) -> Result<Simulation, String> {
+    let (run, sim) = run_scenario_inner(s, root, Some(label));
+    match (sim, run.error) {
+        (Some(sim), _) => Ok(sim),
+        (None, Some(RunError::Failed { index, what })) => {
+            Err(format!("command {index} failed before {label}: {what}"))
+        }
+        (None, Some(RunError::Unsupported { index, what })) => {
+            Err(format!("command {index} ({what}) is not ported yet"))
+        }
+        (None, None) => Err(format!("label {label} not reached")),
+    }
 }
 
 fn run_scenario_inner(
@@ -401,14 +417,15 @@ fn run_scenario_inner(
     let labels = std::cell::RefCell::new(std::collections::HashSet::new());
     let duplicate = std::cell::RefCell::new(None::<String>);
     let emit = |sim: &Simulation, label: String, out: &mut Vec<Checkpoint>| {
-        if stop_at == Some(label.as_str()) {
-            stop.set(true);
-        }
         // `emit` throws on a repeated label in the TypeScript, so nothing
-        // after it in the same command runs or is recorded.
+        // after it in the same command runs or is recorded, and a repeated
+        // `stop_at` label is a failure rather than a stop.
         if !labels.borrow_mut().insert(label.clone()) {
             *duplicate.borrow_mut() = Some(label.clone());
             return;
+        }
+        if stop_at == Some(label.as_str()) {
+            stop.set(true);
         }
         out.push(Checkpoint {
             label,
@@ -671,6 +688,31 @@ mod tests {
     }
 
     #[test]
+    fn a_repeated_label_fails_at_the_emit() {
+        let s = scenario(
+            r#"{"op":"checkpoint","label":"a"},{"op":"checkpoint","label":"a"},{"op":"checkpoint","label":"b"}"#,
+        )
+        .unwrap();
+        let run = super::run_scenario(&s, std::path::Path::new("."));
+        let labels: Vec<_> = run.checkpoints.iter().map(|c| c.label.as_str()).collect();
+        assert_eq!(labels, ["start", "a"]);
+        match run.error {
+            Some(super::RunError::Failed { index, what }) => {
+                assert_eq!(index, 1);
+                assert!(what.contains("taken twice"));
+            }
+            other => panic!("{other:?}"),
+        }
+        // The first "a" is a stop in its own right; a stop label past the
+        // repeat is never reached and the failure is reported instead.
+        assert!(super::run_scenario_until(&s, std::path::Path::new("."), "a").is_ok());
+        match super::run_scenario_until(&s, std::path::Path::new("."), "b") {
+            Err(e) => assert!(e.contains("taken twice")),
+            Ok(_) => panic!("a stop label past a repeated label must fail"),
+        }
+    }
+
+    #[test]
     fn whole_floats_count_as_integers() {
         let s = scenario(r#"{"op":"tick","dt":60.0,"times":2.0}"#).unwrap();
         assert_eq!(s.commands.len(), 1);
@@ -695,18 +737,48 @@ mod tests {
                 .contains("kind must be shaft")
         );
         assert!(scenario(r#"{"op":"build","kind":"office","floor":2,"x":4}"#).is_ok());
-        for bad in [
-            r#"{"op":"checkpoint","label":""}"#,
-            r#"{"op":"tick","dt":0}"#,
-            r#"{"op":"tick","dt":60,"times":null}"#,
-            r#"{"op":"build","kind":"office","floor":2,"x":4,"expectFail":null}"#,
-            r#"{"op":"adjustRent","floor":2,"x":4,"dir":2}"#,
-            r#"{"op":"setCars","floor":2,"x":4,"cars":0}"#,
-            r#"{"op":"sell","floor":2,"x":4,"extra":1}"#,
-            r#"{"op":"nope"}"#,
+        for (bad, why) in [
+            (r#"{"op":"checkpoint","label":""}"#, "label must be str"),
+            (r#"{"op":"tick","dt":0}"#, "dt must be count"),
+            (
+                r#"{"op":"tick","dt":60,"times":null}"#,
+                "times must be count",
+            ),
+            (
+                r#"{"op":"build","kind":"office","floor":2,"x":4,"expectFail":null}"#,
+                "expectFail must be bool",
+            ),
+            (
+                r#"{"op":"adjustRent","floor":2,"x":4,"dir":2}"#,
+                "dir must be dir",
+            ),
+            (
+                r#"{"op":"setCars","floor":2,"x":4,"cars":0}"#,
+                "cars must be count",
+            ),
+            (
+                r#"{"op":"sell","floor":2,"x":4,"extra":1}"#,
+                "unknown field extra",
+            ),
+            (r#"{"op":"nope"}"#, "unknown op"),
+            (
+                r#"{"op":"build","kind":"office","floor":1e300,"x":4}"#,
+                "floor must be int",
+            ),
         ] {
-            assert!(scenario(bad).is_err(), "{bad}");
+            assert!(scenario(bad).unwrap_err().contains(why), "{bad}");
         }
+        assert!(scenario(r#"{"op":"build","kind":"office","floor":2.0,"x":4}"#).is_ok());
+        assert!(Scenario::parse(
+            r#"{"id":"t","description":"t","start":{"newGame":{"seed":1,"mode":"classic"},"fixture":"x"},"commands":[]}"#
+        )
+        .unwrap_err()
+        .contains("unknown field fixture"));
+        assert!(Scenario::parse(
+            r#"{"id":"t","description":"t","extra":1,"start":{"newGame":{"seed":1,"mode":"classic"}},"commands":[]}"#
+        )
+        .unwrap_err()
+        .contains("unknown field extra"));
         let bad_start = Scenario::parse(
             r#"{"id":"t","description":"t","start":{"newGame":{"seed":-1,"mode":"classic"}},"commands":[]}"#,
         );
