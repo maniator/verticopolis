@@ -92,7 +92,7 @@ function buildCases(): Case[] {
   return inputs.map(([id, input]) => {
     let expected: string;
     try {
-      expected = digest(stateView(Simulation.deserialize(input as SerializedGame)));
+      expected = digest(stateView(Simulation.deserialize(input as unknown as SerializedGame)));
     } catch {
       expected = "throws";
     }

@@ -1114,6 +1114,29 @@ impl Tower {
         Some(t)
     }
 
+    /// `setSchedule(id, raw)`: an authored per-shaft schedule, hardened
+    /// through `Schedule::coerce` against the live cars and span, homes
+    /// snapped onto the shaft's stops. False for a non-elevator id.
+    pub fn set_schedule(&mut self, id: i64, raw: &Value) -> bool {
+        let Some(i) = self.transport_index(id) else {
+            return false;
+        };
+        if !self.transports[i].kind.is_elevator() {
+            return false;
+        }
+        self.revision += 1;
+        let (cars, bottom, top) = {
+            let t = &self.transports[i];
+            (t.cars, t.bottom, t.top)
+        };
+        let coerced = Schedule::coerce(Some(raw), cars, bottom, top);
+        self.transports[i].schedule = coerced.map(|sch| {
+            let stops = self.stops_of(&self.transports[i]);
+            sch.snap_homes_to_stops(&stops)
+        });
+        true
+    }
+
     pub fn set_cars(&mut self, id: i64, cars: i64) -> bool {
         let Some(i) = self.transport_index(id) else {
             return false;

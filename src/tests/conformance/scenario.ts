@@ -39,6 +39,7 @@ export type Command =
   | { op: "bombThreat" }
   | { op: "evaluateStar" }
   | { op: "callExterminator"; expectFail?: boolean }
+  | ({ op: "setSchedule"; schedule: Record<string, unknown> } & At)
   | { op: "reload" }
   | { op: "tick"; dt: number; times?: number; checkpointEvery?: number }
   | { op: "checkpoint"; label: string };
@@ -61,7 +62,7 @@ export interface Checkpoint {
  *  number, "str" a non-empty string, "bool" a boolean, "place" a facility kind
  *  that is not a transport, "shaft" a transport kind, "mode" classic or modern.
  *  A trailing "?" marks the field optional. */
-type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode";
+type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj";
 const AT = { floor: "int", x: "int" } as const;
 const OPS: Record<Command["op"], Spec> = {
   setMoney: { amount: "num" },
@@ -76,6 +77,7 @@ const OPS: Record<Command["op"], Spec> = {
   bombThreat: {},
   evaluateStar: {},
   callExterminator: { expectFail: "bool?" },
+  setSchedule: { ...AT, schedule: "obj" },
   reload: {},
   tick: { dt: "count", times: "count?", checkpointEvery: "count?" },
   checkpoint: { label: "str" },
@@ -93,6 +95,7 @@ function fits(type: FieldType, v: unknown): boolean {
     case "place": return typeof v === "string" && own(FACILITIES, v) && !FACILITIES[v as FacilityKind].transport;
     case "shaft": return typeof v === "string" && own(FACILITIES, v) && !!FACILITIES[v as FacilityKind].transport;
     case "mode": return v === "classic" || v === "modern";
+    case "obj": return typeof v === "object" && v !== null && !Array.isArray(v);
   }
 }
 
@@ -221,6 +224,12 @@ function apply(sim: Simulation, c: Command, emit: (label: string) => void, clock
     }
     case "bombThreat": sim.bombThreat(); break;
     case "evaluateStar": sim.evaluateStar(); break;
+    case "setSchedule": {
+      const t = sim.tower.transportAt(c.floor, c.x);
+      if (!t) throw new Error(`no transport at floor ${c.floor}, x ${c.x}`);
+      expectOk(sim.tower.setSchedule(t.id, c.schedule), false, `setSchedule @ ${c.floor},${c.x}`, "not an elevator");
+      break;
+    }
     case "callExterminator": {
       const r = sim.callExterminator();
       expectOk(r.ok, c.expectFail, "callExterminator", r.ok ? undefined : r.reason);

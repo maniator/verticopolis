@@ -44,7 +44,11 @@ fn main() {
         .filter(|f| modern || !f.modern_only)
         .map(|f| f.kind)
         .collect();
-    let shafts: Vec<Kind> = FACILITIES.iter().filter(|f| f.transport).map(|f| f.kind).collect();
+    let shafts: Vec<Kind> = FACILITIES
+        .iter()
+        .filter(|f| f.transport)
+        .map(|f| f.kind)
+        .collect();
     let scenario_value = |commands: &[Value]| {
         json!({
             "id": id,
@@ -67,7 +71,11 @@ fn main() {
         } else if roll < 48 {
             let kind = shafts[rng.int(0, shafts.len() as i64 - 1) as usize];
             let bottom = rng.int(1, height - 1);
-            let top = if kind.max_span() == 1 { bottom + 1 } else { rng.int(bottom + 1, height) };
+            let top = if kind.max_span() == 1 {
+                bottom + 1
+            } else {
+                rng.int(bottom + 1, height)
+            };
             json!({"op": "buildTransport", "kind": kind.as_str(), "x": rng.int(LEFT, RIGHT), "bottom": bottom, "top": top})
         } else if roll < 54 {
             json!({"op": "sell", "floor": rng.int(1, height), "x": rng.int(LEFT, RIGHT)})
@@ -115,12 +123,25 @@ fn main() {
     assert!(final_run.error.is_none(), "{:?}", final_run.error);
     std::fs::create_dir_all(&out).expect("out dir");
     let scenario_path = out.join(format!("{id}.json"));
-    std::fs::write(&scenario_path, serde_json::to_string_pretty(&scenario_value(&commands)).unwrap()).unwrap();
+    std::fs::write(
+        &scenario_path,
+        serde_json::to_string_pretty(&scenario_value(&commands)).unwrap(),
+    )
+    .unwrap();
     let checkpoints: Vec<Value> = final_run
         .checkpoints
         .iter()
         .map(|c| json!({"label": c.label, "state": c.state, "crowd": c.crowd}))
         .collect();
-    std::fs::write(out.join(format!("{id}.rs.json")), serde_json::to_string_pretty(&checkpoints).unwrap()).unwrap();
-    println!("{id}: {} commands, {} checkpoints, written to {}", commands.len(), checkpoints.len(), scenario_path.display());
+    std::fs::write(
+        out.join(format!("{id}.rs.json")),
+        serde_json::to_string_pretty(&checkpoints).unwrap(),
+    )
+    .unwrap();
+    println!(
+        "{id}: {} commands, {} checkpoints, written to {}",
+        commands.len(),
+        checkpoints.len(),
+        scenario_path.display()
+    );
 }

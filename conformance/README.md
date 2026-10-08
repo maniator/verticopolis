@@ -89,6 +89,7 @@ Commands run in order. Units and shafts are named by a tile they cover
 | `adjustRent` | `floor`, `x`, `dir` (`1` or `-1`) | Step a unit's rent. |
 | `setNoRate` | `floor`, `x` | Set a unit to no rate (the Classic price ladder only). |
 | `setCars` | `floor`, `x`, `cars` | Set the car count of the shaft at that tile. |
+| `setSchedule` | `floor`, `x`, `schedule` | Author the elevator schedule of the shaft at that tile (`Tower.setSchedule`), hardened the way a loaded one is; `{}` clears it. An error on a shaft that is not an elevator. |
 | `startFire` | | Start a fire at once: `EventSystem.startFire`, with no hourly roll and no fire-rescue choice. |
 | `bombThreat` | | Run a bomb threat at once: `EventSystem.bombThreat`, which charges the sweep when the tower has Security and detonates when it has none, with no ransom choice. |
 | `evaluateStar` | | Run the star evaluation. |

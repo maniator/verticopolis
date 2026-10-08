@@ -1,0 +1,250 @@
+{
+  "id": "offshift-schedule-modern",
+  "description": "A fresh Modern starter tower whose only elevator is put on an authored schedule: no cars through the night, a one-car dawn, two cars by day, homes at the lobby and the fourth floor; two days at ten-minute ticks, then the schedule is cleared and a day runs with every car back.",
+  "start": {
+    "newGame": {
+      "seed": 20261008,
+      "mode": "modern"
+    }
+  },
+  "commands": [
+    {
+      "op": "setMoney",
+      "amount": 500000000
+    },
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 167,
+      "to": 206
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 2,
+      "from": 168,
+      "to": 205
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 3,
+      "from": 168,
+      "to": 205
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 4,
+      "from": 168,
+      "to": 205
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 5,
+      "from": 168,
+      "to": 205
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 2,
+      "x": 170
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 2,
+      "x": 180
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 3,
+      "x": 170
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 3,
+      "x": 180
+    },
+    {
+      "op": "build",
+      "kind": "condo",
+      "floor": 4,
+      "x": 170
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 5,
+      "x": 170
+    },
+    {
+      "op": "build",
+      "kind": "fastFood",
+      "floor": 2,
+      "x": 190
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 168,
+      "bottom": 1,
+      "top": 5
+    },
+    {
+      "op": "setCars",
+      "floor": 1,
+      "x": 168,
+      "cars": 3
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 200,
+      "bottom": 1,
+      "top": 2
+    },
+    {
+      "op": "checkpoint",
+      "label": "built"
+    },
+    {
+      "op": "tick",
+      "dt": 10,
+      "times": 144,
+      "checkpointEvery": 36
+    },
+    {
+      "op": "setSchedule",
+      "floor": 1,
+      "x": 168,
+      "schedule": {
+        "activeCars": {
+          "weekday": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          "weekend": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "waitingCarResponse": 5,
+        "standardFloorDeparture": 20,
+        "homeFloors": [
+          1,
+          4
+        ]
+      }
+    },
+    {
+      "op": "checkpoint",
+      "label": "scheduled"
+    },
+    {
+      "op": "tick",
+      "dt": 10,
+      "times": 288,
+      "checkpointEvery": 36
+    },
+    {
+      "op": "reload"
+    },
+    {
+      "op": "setSchedule",
+      "floor": 1,
+      "x": 168,
+      "schedule": {
+        "activeCars": {
+          "weekday": [
+            9,
+            9,
+            "x",
+            null,
+            -1
+          ]
+        },
+        "homeFloors": [
+          99,
+          2.5
+        ],
+        "waitingCarResponse": 1000
+      }
+    },
+    {
+      "op": "tick",
+      "dt": 10,
+      "times": 144,
+      "checkpointEvery": 36
+    },
+    {
+      "op": "setSchedule",
+      "floor": 1,
+      "x": 168,
+      "schedule": {}
+    },
+    {
+      "op": "checkpoint",
+      "label": "cleared"
+    },
+    {
+      "op": "tick",
+      "dt": 10,
+      "times": 144,
+      "checkpointEvery": 36
+    },
+    {
+      "op": "checkpoint",
+      "label": "end"
+    }
+  ]
+}
