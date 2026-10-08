@@ -29,6 +29,36 @@ fn main() {
     let lock: serde_json::Value = serde_json::from_str(&lock_text).expect("expected.json parses");
     let want: BTreeMap<String, Vec<Checkpoint>> =
         serde_json::from_value(lock["scenarios"].clone()).expect("lock shape");
+    // The scenario directory and the lock must name the same set, as the
+    // TypeScript suite checks, so a new scenario cannot slip past the referee
+    // and a stale lock entry cannot pass for a deleted one.
+    let scenario_dir = root.join("scenarios");
+    let mut on_disk: Vec<String> = match std::fs::read_dir(&scenario_dir) {
+        Ok(entries) => entries
+            .filter_map(|e| e.ok())
+            .filter_map(|e| {
+                let name = e.file_name().to_string_lossy().into_owned();
+                name.strip_suffix(".json").map(str::to_string)
+            })
+            .collect(),
+        Err(e) => {
+            eprintln!("cannot read {}: {e}", scenario_dir.display());
+            exit(2);
+        }
+    };
+    on_disk.sort();
+    let in_lock: Vec<String> = want.keys().cloned().collect();
+    if on_disk != in_lock {
+        let unlocked: Vec<_> = on_disk
+            .iter()
+            .filter(|id| !want.contains_key(*id))
+            .collect();
+        let orphaned: Vec<_> = in_lock.iter().filter(|id| !on_disk.contains(id)).collect();
+        eprintln!(
+            "scenario set differs from the lock: not in the lock {unlocked:?}, no file {orphaned:?}"
+        );
+        exit(1);
+    }
     // Every scenario is its own engine, so they replay on separate threads;
     // the report prints sorted by id, the order the lock is written in. A
     // panic inside one scenario (a save the loader refuses) is caught and

@@ -136,6 +136,11 @@ error text the TypeScript runner shares).
 - [x] [Review][Patch] `dump` panics on a missing file while a bad one exits cleanly [engine-rs/src/bin/dump.rs]
 - [x] [Review][Patch] Tests for `Number()` of arrays, booleans and null, the container's byte order marks and base64 forms; bookkeeping counts and the `1e400` note on #858 [engine-rs/src/load.rs, docs]
 
+Codex review of beaee7c (2026-10-08), both applied:
+
+- [x] [Review][Patch] `getTransport` is a linear scan on the crowd's hot path where the TypeScript keeps `transportsById` [engine-rs/src/tower.rs, tower_query.rs]
+- [x] [Review][Patch] Referee replays only the lock's ids; the scenario directory and the lock must name the same set [engine-rs/src/bin/conformance.rs]
+
 Dismissed: build leaves substrate floors on a failed placement (the
 TypeScript does the same), transient crowd readouts kept for hosts, the
 `floorReachable` probe (matches the TypeScript), `segId` collisions off the lot

@@ -99,11 +99,11 @@ pub fn floor_of_seg(seg: i64) -> i64 {
 
 impl Tower {
     pub fn get_transport(&self, id: i64) -> Option<&Transport> {
-        self.transports.iter().find(|t| t.id == id)
+        self.transport_index(id).map(|i| &self.transports[i])
     }
 
     pub fn get_transport_mut(&mut self, id: i64) -> Option<&mut Transport> {
-        self.transports.iter_mut().find(|t| t.id == id)
+        self.transport_index(id).map(|i| &mut self.transports[i])
     }
 
     /// `roomAt`: the room covering a tile, structure excluded.

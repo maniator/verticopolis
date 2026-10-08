@@ -242,6 +242,8 @@ pub struct Tower {
     pub(crate) struct_kind: HashMap<(i64, i64), Kind>,
     pub(crate) rooms: HashMap<(i64, i64), i64>,
     pub(crate) by_id: HashMap<i64, usize>,
+    /// `transportsById`: shaft id to its index in `transports`.
+    pub(crate) transport_by_id: HashMap<i64, usize>,
     pub(crate) lobby_tiles: HashMap<i64, i64>,
     pub(crate) room_tiles: HashMap<i64, i64>,
     /// Revision-keyed memos (`servedSet`, `stopsCache`, segment runs, staff
@@ -266,6 +268,7 @@ impl Tower {
             struct_kind: HashMap::new(),
             rooms: HashMap::new(),
             by_id: HashMap::new(),
+            transport_by_id: HashMap::new(),
             lobby_tiles: HashMap::new(),
             room_tiles: HashMap::new(),
             memo: RefCell::new(Default::default()),
@@ -891,7 +894,14 @@ impl Tower {
     // ---- transports ------------------------------------------------------
 
     pub fn transport_index(&self, id: i64) -> Option<usize> {
-        self.transports.iter().position(|t| t.id == id)
+        self.transport_by_id.get(&id).copied()
+    }
+
+    fn reindex_transports(&mut self) {
+        self.transport_by_id.clear();
+        for (i, t) in self.transports.iter().enumerate() {
+            self.transport_by_id.insert(t.id, i);
+        }
     }
 
     pub fn transport_at(&self, floor: i64, x: i64) -> Option<&Transport> {
@@ -999,6 +1009,7 @@ impl Tower {
             skip_floors: None,
             schedule: None,
         };
+        self.transport_by_id.insert(id, self.transports.len());
         self.transports.push(t);
         if kind == Kind::ElevatorExpress {
             self.set_express_stops(id);
@@ -1077,6 +1088,7 @@ impl Tower {
     pub fn remove_transport(&mut self, id: i64) -> Option<Transport> {
         let i = self.transport_index(id)?;
         let t = self.transports.remove(i);
+        self.reindex_transports();
         self.revision += 1;
         Some(t)
     }
@@ -1131,6 +1143,7 @@ impl Tower {
         for i in 0..self.units.len() {
             self.register(i);
         }
+        self.reindex_transports();
         *self.memo.borrow_mut() = Default::default();
         self.revision += 1;
     }
