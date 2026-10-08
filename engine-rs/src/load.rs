@@ -1567,8 +1567,7 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
                 a.iter()
                     .filter_map(Value::as_f64)
                     .filter(|n| n.is_finite())
-                    .map(|n| n as i64)
-                    .collect::<Vec<i64>>()
+                    .collect::<Vec<f64>>()
             });
             let tr = Transport {
                 id: 0,
@@ -1822,5 +1821,41 @@ mod tests {
         let text = format!("\u{feff}VCTOWER1\n{b64}\n");
         assert_eq!(decode_vctower(&text).unwrap(), json!({"version": 7}));
         assert!(decode_vctower(&format!("\u{85}{text}")).is_err());
+    }
+}
+
+#[cfg(test)]
+mod loader_cases {
+    use crate::canonical::digest;
+    use crate::scenario::state_view;
+    use serde_json::Value;
+
+    /// `conformance/loader-cases.json`: forged and hand-edited saves whose
+    /// loaded state the TypeScript `deserialize` hashed. Regenerate it with
+    /// `VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration loaderCases`.
+    const TABLE: &str = include_str!("../../conformance/loader-cases.json");
+
+    #[test]
+    fn forged_saves_load_as_the_typescript_loads_them() {
+        let table: Value = serde_json::from_str(TABLE).expect("loader-cases.json parses");
+        let cases = table["cases"].as_array().expect("cases");
+        assert!(!cases.is_empty());
+        let mut misses = Vec::new();
+        for case in cases {
+            let id = case["id"].as_str().unwrap();
+            let expected = case["expected"].as_str().unwrap();
+            let got = match super::deserialize(&case["input"]) {
+                Ok(sim) => digest(&state_view(&sim)),
+                Err(_) => "throws".to_string(),
+            };
+            if got != expected {
+                misses.push(format!("{id}: {got} vs {expected}"));
+            }
+        }
+        assert!(
+            misses.is_empty(),
+            "loader cases diverge:\n{}",
+            misses.join("\n")
+        );
     }
 }
