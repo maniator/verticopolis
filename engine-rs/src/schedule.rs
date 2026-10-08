@@ -67,11 +67,11 @@ impl Schedule {
         }
         if let Some(v) = finite(r.get("waitingCarResponse")) {
             out.waiting_car_response =
-                Some(crate::jsmath::round(v).clamp(0.0, WAITING_CAR_RESPONSE_MAX));
+                Some(crate::jsmath::round(v).clamp(0.0, WAITING_CAR_RESPONSE_MAX) + 0.0);
         }
         if let Some(v) = finite(r.get("standardFloorDeparture")) {
             out.standard_floor_departure =
-                Some(crate::jsmath::round(v).clamp(0.0, STANDARD_FLOOR_DEPARTURE_MAX));
+                Some(crate::jsmath::round(v).clamp(0.0, STANDARD_FLOOR_DEPARTURE_MAX) + 0.0);
         }
         if let Some(h) = r.get("homeFloors").and_then(Value::as_array) {
             let n = (h.len() as i64).min(cars).max(0) as usize;

@@ -158,11 +158,19 @@ impl Simulation {
                 self.constructing.shift_remove(&id);
                 continue;
             }
-            if self.clock.minutes >= u.complete_at.unwrap_or(0.0) {
+            // `minutes >= (u.completeAt ?? 0)`: a non-numeric value the save
+            // carried goes through `Number()`, so NaN never completes.
+            let threshold = match (u.complete_at, &u.complete_at_raw) {
+                (Some(v), _) => v,
+                (None, Some(raw)) => crate::load::js_number(Some(raw)),
+                (None, None) => 0.0,
+            };
+            if self.clock.minutes >= threshold {
                 let (name, floor) = (u.kind.facility().name, u.floor);
                 let u = self.tower.get_unit_mut(id).unwrap();
                 u.state = UnitState::Empty;
                 u.complete_at = None;
+                u.complete_at_raw = None;
                 self.constructing.shift_remove(&id);
                 let msg = format!(
                     "{} on {} is now open for business.",

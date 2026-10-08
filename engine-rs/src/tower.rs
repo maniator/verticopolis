@@ -69,6 +69,13 @@ pub struct Unit {
     pub profit_today: Option<f64>,
     pub profit_yest: Option<f64>,
     pub complete_at: Option<f64>,
+    /// A `completeAt` the save carried that is not a number (a string, a
+    /// boolean, null). The TypeScript keeps and re-saves it as is, and the
+    /// completion check compares the clock against `Number(value)`, so a
+    /// string that reads as a number completes then and anything else never
+    /// completes. Kept beside `complete_at` so the hash and the behavior both
+    /// match.
+    pub complete_at_raw: Option<Value>,
     pub dirty_days: Option<i64>,
 }
 
@@ -139,7 +146,10 @@ impl Unit {
         }
         if let Some(v) = self.complete_at {
             m.insert("completeAt".into(), json!(v));
+        } else if let Some(raw) = &self.complete_at_raw {
+            m.insert("completeAt".into(), raw.clone());
         }
+
         if let Some(d) = self.dirty_days {
             if d != 0 && self.state == UnitState::Dirty {
                 m.insert("dirtyDays".into(), json!(d));
@@ -162,7 +172,10 @@ pub struct Transport {
     pub car_dir: Vec<i64>,
     pub car_load: Option<Vec<f64>>,
     pub load: i64,
-    pub skip_floors: Option<Vec<i64>>,
+    /// `skipFloors`: kept as the doubles the save carries, as the TypeScript
+    /// does, so a hand-edited fraction re-saves unchanged and never matches a
+    /// floor.
+    pub skip_floors: Option<Vec<f64>>,
     pub schedule: Option<Schedule>,
 }
 
@@ -197,7 +210,10 @@ impl Transport {
     pub fn stops_at(&self, fl: i64) -> bool {
         fl >= self.bottom
             && fl <= self.top
-            && !self.skip_floors.as_ref().is_some_and(|s| s.contains(&fl))
+            && !self
+                .skip_floors
+                .as_ref()
+                .is_some_and(|s| s.contains(&(fl as f64)))
     }
 }
 
@@ -714,6 +730,7 @@ impl Tower {
             profit_today: None,
             profit_yest: None,
             complete_at: None,
+            complete_at_raw: None,
             dirty_days: None,
         };
         self.units.push(unit);
@@ -1042,8 +1059,9 @@ impl Tower {
             return;
         };
         let (bottom, top) = (self.transports[i].bottom, self.transports[i].top);
-        let skip: Vec<i64> = (bottom + 1..top)
+        let skip: Vec<f64> = (bottom + 1..top)
             .filter(|fl| !lobbies.contains(fl))
+            .map(|fl| fl as f64)
             .collect();
         self.transports[i].skip_floors = Some(skip);
         self.revision += 1;
@@ -1081,13 +1099,17 @@ impl Tower {
         if t.kind == Kind::ElevatorExpress && stop && !self.floor_has_lobby(floor) {
             return false;
         }
-        let mut skip: Vec<i64> = self.transports[i].skip_floors.clone().unwrap_or_default();
+        let mut skip: Vec<f64> = self.transports[i].skip_floors.clone().unwrap_or_default();
+        let floor = floor as f64;
         if stop {
             skip.retain(|&f| f != floor);
         } else if !skip.contains(&floor) {
             skip.push(floor);
         }
-        skip.sort();
+        skip.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        // The TypeScript rebuilds the list from a Set, so a loaded duplicate
+        // goes away on the first toggle.
+        skip.dedup();
         self.transports[i].skip_floors = Some(skip);
         self.revision += 1;
         if self.transports[i].schedule.is_some() {
@@ -1104,6 +1126,29 @@ impl Tower {
         self.reindex_transports();
         self.revision += 1;
         Some(t)
+    }
+
+    /// `setSchedule(id, raw)`: an authored per-shaft schedule, hardened
+    /// through `Schedule::coerce` against the live cars and span, homes
+    /// snapped onto the shaft's stops. False for a non-elevator id.
+    pub fn set_schedule(&mut self, id: i64, raw: &Value) -> bool {
+        let Some(i) = self.transport_index(id) else {
+            return false;
+        };
+        if !self.transports[i].kind.is_elevator() {
+            return false;
+        }
+        self.revision += 1;
+        let (cars, bottom, top) = {
+            let t = &self.transports[i];
+            (t.cars, t.bottom, t.top)
+        };
+        let coerced = Schedule::coerce(Some(raw), cars, bottom, top);
+        self.transports[i].schedule = coerced.map(|sch| {
+            let stops = self.stops_of(&self.transports[i]);
+            sch.snap_homes_to_stops(&stops)
+        });
+        true
     }
 
     pub fn set_cars(&mut self, id: i64, cars: i64) -> bool {
@@ -1169,20 +1214,20 @@ impl Tower {
                 continue;
             }
             let (bottom, top) = (self.transports[i].bottom, self.transports[i].top);
-            let mut skip: Vec<i64> = self.transports[i].skip_floors.clone().unwrap_or_default();
+            let mut skip: Vec<f64> = self.transports[i].skip_floors.clone().unwrap_or_default();
             for fl in bottom + 1..top {
-                if !self.floor_has_lobby(fl) && !skip.contains(&fl) {
-                    skip.push(fl);
+                if !self.floor_has_lobby(fl) && !skip.contains(&(fl as f64)) {
+                    skip.push(fl as f64);
                 }
             }
-            skip.retain(|&f| f != bottom && f != top);
-            let mut next: Vec<i64> = Vec::new();
+            skip.retain(|&f| f != bottom as f64 && f != top as f64);
+            let mut next: Vec<f64> = Vec::new();
             for f in skip {
                 if !next.contains(&f) {
                     next.push(f);
                 }
             }
-            next.sort();
+            next.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             let before = self.transports[i].skip_floors.clone().unwrap_or_default();
             if next != before {
                 self.transports[i].skip_floors = Some(next);

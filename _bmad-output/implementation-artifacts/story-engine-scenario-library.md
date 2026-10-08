@@ -1,6 +1,6 @@
 ---
 story: engine-scenario-library
-status: ready-for-dev
+status: review
 depends_on: engine-rust-port
 ---
 
@@ -70,3 +70,45 @@ lit.
   the engine can refuse gracefully (a build that fails is a fine step); it
   shrinks by truncation, since the scenario format is a list.
 - Review: `/gds-code-review`, since every change here is engine parity.
+
+## What landed
+
+- Scenarios: `hotel-exterminator-modern` (20 checkpoints), `holidays-classic`
+  (18), `metro-express-modern` (13), `vip-review-modern` (15),
+  `offshift-schedule-modern` (26). The lock holds 434 checkpoints, every one
+  matched by the Rust referee on first replay.
+- Runner commands on both sides: `callExterminator` and `setSchedule`, with
+  `Tower::set_schedule` added to the Rust engine.
+- Derived fixtures: `sixseven-december`, `towerone-star4`,
+  `towerone-vip-pending`, each a few serialized fields away from an existing
+  save, documented in the conformance README.
+- The loader table (`conformance/loader-cases.json`, 47 agreeing cases and
+  two carried as recorded #858 divergences) and its Rust replay. Its runs
+  caught `skipFloors` entries truncated to whole numbers, a debug-build
+  overflow in the v1 reflow on a saturated coordinate, and a non-numeric
+  `completeAt` completing at once where the TypeScript never completes it.
+  All three fixed. A miss writes the Rust view to `engine-rs/target/` for a
+  field diff against `scripts/loader-case-dump.ts`. Closes #860.
+- Canon-constant tests in `facilities.rs`.
+- The differential fuzzer (`engine-rs/src/bin/fuzz.rs`,
+  `scripts/fuzz-compare.ts`, `engine-fuzz.yml` nightly); 28 seeds run locally
+  with no divergence.
+- AC1 as listed is met in part. Landed: the hotel weekend with housekeeping
+  and all three exterminator refusals, the VIP circling twice with no chained
+  parking and then reviewing favorably, the metro cut-off and reconnection
+  with a second express shaft, two failing star evaluations, and condo
+  relocations reached inside the metro and VIP runs. Not landed: a star
+  evaluation that passes (no fixture meets the next gate without a long
+  growth script), express cars on a scheduled shaft (the schedule scenario
+  runs a standard shaft; express stops add a second variable), a dedicated
+  relocation month, and the player-choice events (fire rescue, ransom), which
+  need a `resolveChoice` command. Those go on the next slice with the dark
+  modules below.
+- The coverage floor rises to 83% (84.47% measured with every scenario in
+  this branch). AC3's "no module under 75%" is not met yet: `events.rs` (61%),
+  `rules.rs` (66%), `star.rs` (68%), `satisfaction.rs` (71%) and
+  `schedule.rs` need the player-choice command (`resolveChoice` on a pending
+  fire rescue or ransom) and the five- and six-star climbs, which no fixture
+  can reach without a long growth script. Those go on the next slice.
+- CONTRIBUTING carries the two-engine rules and the branch-adds-a-scenario
+  rule; the conformance README covers the new commands, fixtures and table.

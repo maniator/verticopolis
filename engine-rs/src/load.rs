@@ -118,7 +118,7 @@ fn finite_num(v: Option<&Value>) -> Option<f64> {
 /// `Number(v)` for the shapes a save holds: a number is itself, a missing
 /// value is NaN, null is 0, a boolean is 0 or 1, and a string follows the
 /// `StringNumericLiteral` grammar (`js_string_number`); anything else is NaN.
-fn js_number(v: Option<&Value>) -> f64 {
+pub(crate) fn js_number(v: Option<&Value>) -> f64 {
     match v {
         Some(Value::Number(n)) => n.as_f64().unwrap_or(f64::NAN),
         Some(Value::Null) => 0.0,
@@ -479,8 +479,11 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
     let mut obstacles: HashMap<i64, Vec<(i64, i64)>> = HashMap::new();
     let add_obstacle =
         |obstacles: &mut HashMap<i64, Vec<(i64, i64)>>, floor: i64, fl: i64, x: i64, w: i64| {
-            for f in floor..floor + fl {
-                obstacles.entry(f).or_default().push((x, x + w));
+            for f in floor..floor.saturating_add(fl) {
+                obstacles
+                    .entry(f)
+                    .or_default()
+                    .push((x, x.saturating_add(w)));
             }
         };
     // Parking runs.
@@ -506,7 +509,7 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
             let mut j = i;
             let mut run = vec![units[i]];
             while j + 1 < units.len()
-                && rooms[units[j + 1]].x0 == rooms[units[j]].x0 + rooms[units[j]].w0
+                && rooms[units[j + 1]].x0 == rooms[units[j]].x0.saturating_add(rooms[units[j]].w0)
             {
                 j += 1;
                 run.push(units[j]);
@@ -521,7 +524,7 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
                 .iter()
                 .position(|&ri| rooms[ri].kind == Kind::ParkingRamp);
             let left = match ramp {
-                Some(ri) => rooms[run[ri]].x0 - items[ri].1,
+                Some(ri) => rooms[run[ri]].x0.saturating_sub(items[ri].1),
                 None => rooms[run[0]].x0,
             };
             runs.push(Run {
@@ -536,10 +539,10 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
         for run in &runs {
             let left = run.left.max(cursor);
             for &(ri, off) in &run.items {
-                nx.insert(ri, left + off);
+                nx.insert(ri, left.saturating_add(off));
                 nw.insert(ri, rooms[ri].w);
             }
-            cursor = left + run.width;
+            cursor = left.saturating_add(run.width);
         }
         for run in &runs {
             for &(ri, _) in &run.items {
@@ -565,15 +568,15 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
     floors.sort();
     let first_fit = |blocked: &[u8], start_x: i64, w: i64| -> Option<i64> {
         let mut x = start_x.max(0);
-        while x + w <= LOT {
+        while x.saturating_add(w) <= LOT {
             let mut k = 0;
-            while k < w && blocked[(x + k) as usize] == 0 {
+            while k < w && blocked[x.saturating_add(k) as usize] == 0 {
                 k += 1;
             }
             if k == w {
                 return Some(x);
             }
-            x += k + 1;
+            x = x.saturating_add(k + 1);
         }
         None
     };
@@ -600,11 +603,11 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
             for &ri in &here {
                 let r = &rooms[ri];
                 let x = first_fit(&blocked, r.x0.max(cursor), r.w)?;
-                for i in x..x + r.w {
+                for i in x..x.saturating_add(r.w) {
                     blocked[i as usize] = 1;
                 }
                 placed.push((ri, x, r.w));
-                cursor = x + r.w;
+                cursor = x.saturating_add(r.w);
             }
             Some(placed)
         };
@@ -643,8 +646,8 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
         let x = nx.get(&ri).copied().unwrap_or(r.x0);
         let w = nw.get(&ri).copied().unwrap_or(r.w0);
         out_units.push(with(&r.u, vec![("x", json!(x)), ("width", json!(w))]));
-        for f in r.floor..r.floor + r.fl {
-            for tx in x..x + w {
+        for f in r.floor..r.floor.saturating_add(r.fl) {
+            for tx in x..x.saturating_add(w) {
                 let key = tile_key(f as f64, tx as f64);
                 if !paved.contains(&key) {
                     paved.insert(key);
@@ -1491,6 +1494,10 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
             profit_today: retail_field("profitToday"),
             profit_yest: retail_field("profitYest"),
             complete_at: u.get("completeAt").and_then(Value::as_f64),
+            complete_at_raw: match u.get("completeAt") {
+                Some(v) if !v.is_number() => Some(v.clone()),
+                _ => None,
+            },
             dirty_days: coerce_dirty_days(state, kind, u.get("dirtyDays")),
         };
         units.push((unit, sane_id(u.get("id"))));
@@ -1567,8 +1574,7 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
                 a.iter()
                     .filter_map(Value::as_f64)
                     .filter(|n| n.is_finite())
-                    .map(|n| n as i64)
-                    .collect::<Vec<i64>>()
+                    .collect::<Vec<f64>>()
             });
             let tr = Transport {
                 id: 0,
@@ -1822,5 +1828,82 @@ mod tests {
         let text = format!("\u{feff}VCTOWER1\n{b64}\n");
         assert_eq!(decode_vctower(&text).unwrap(), json!({"version": 7}));
         assert!(decode_vctower(&format!("\u{85}{text}")).is_err());
+    }
+}
+
+#[cfg(test)]
+mod loader_cases {
+    use crate::canonical::digest;
+    use crate::scenario::state_view;
+    use serde_json::Value;
+
+    /// `conformance/loader-cases.json`: forged and hand-edited saves whose
+    /// loaded state the TypeScript `deserialize` hashed. Regenerate it with
+    /// `VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration loaderCases`.
+    const TABLE: &str = include_str!("../../conformance/loader-cases.json");
+
+    #[test]
+    fn forged_saves_load_as_the_typescript_loads_them() {
+        let table: Value = serde_json::from_str(TABLE).expect("loader-cases.json parses");
+        let cases = table["cases"].as_array().expect("cases");
+        assert!(!cases.is_empty());
+        let mut misses = Vec::new();
+        for case in cases {
+            let id = case["id"].as_str().unwrap();
+            let expected = case["expected"].as_str().unwrap();
+            let known = case.get("knownDivergence").and_then(Value::as_str);
+            let input = &case["input"];
+            let (got, view) = match std::panic::catch_unwind(|| super::deserialize(input)) {
+                Ok(Ok(sim)) => {
+                    let v = state_view(&sim);
+                    (digest(&v), Some(v))
+                }
+                Ok(Err(_)) => ("throws".to_string(), None),
+                Err(_) => ("panics".to_string(), None),
+            };
+            if let Some(why) = known {
+                // A recorded #858 divergence: the mismatch is expected, and a
+                // match means the case can lose its marker.
+                if got == expected {
+                    misses.push(format!(
+                        "{id}: no longer diverges ({why}); drop its knownDivergence marker"
+                    ));
+                } else if got == "panics" {
+                    misses.push(format!(
+                        "{id}: panics, which a known divergence never excuses"
+                    ));
+                } else if got == "throws" && expected != "throws" {
+                    misses.push(format!(
+                        "{id}: throws, which the recorded divergence ({why}) does not cover"
+                    ));
+                } else if expected == "throws" {
+                    misses.push(format!(
+                        "{id}: the TypeScript throws, which the recorded divergence ({why}) does not cover"
+                    ));
+                }
+                continue;
+            }
+            if got != expected {
+                // Leave the Rust side's canonical JSON beside the target dir so
+                // the miss can be read field by field against
+                // `npx tsx scripts/loader-case-dump.ts <id>`.
+                if let Some(v) = view {
+                    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/target");
+                    let _ = std::fs::create_dir_all(path);
+                    let _ = std::fs::write(
+                        format!("{path}/loader-case-{id}.rs.json"),
+                        crate::canonical::canonical_json(&v),
+                    );
+                }
+                misses.push(format!(
+                    "{id}: {got} vs {expected} (Rust view written to engine-rs/target/loader-case-{id}.rs.json; TypeScript: npx tsx scripts/loader-case-dump.ts {id})"
+                ));
+            }
+        }
+        assert!(
+            misses.is_empty(),
+            "loader cases diverge:\n{}",
+            misses.join("\n")
+        );
     }
 }

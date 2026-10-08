@@ -61,7 +61,11 @@ pub enum Command {
         expect_fail: Option<bool>,
     },
     #[serde(rename = "sell")]
-    Sell { floor: i64, x: i64 },
+    Sell {
+        floor: i64,
+        x: i64,
+        kind: Option<String>,
+    },
     #[serde(rename = "adjustRent")]
     AdjustRent { floor: i64, x: i64, dir: i64 },
     #[serde(rename = "setNoRate")]
@@ -74,6 +78,13 @@ pub enum Command {
     BombThreat,
     #[serde(rename = "evaluateStar")]
     EvaluateStar,
+    #[serde(rename = "setSchedule")]
+    SetSchedule { floor: i64, x: i64, schedule: Value },
+    #[serde(rename = "callExterminator")]
+    CallExterminator {
+        #[serde(rename = "expectFail")]
+        expect_fail: Option<bool>,
+    },
     #[serde(rename = "reload")]
     Reload,
     #[serde(rename = "tick")]
@@ -115,7 +126,8 @@ impl Scenario {
 /// from 0 to 4294967295, "count" a whole number above zero, "dir" 1 or -1,
 /// "num" a finite number, "str" a non-empty string, "bool" a boolean, "place"
 /// a facility kind that is not a transport, "shaft" a transport kind, "mode"
-/// classic or modern. A trailing "?" marks the field optional.
+/// classic or modern, "obj" a JSON object, "kind" any facility kind. A
+/// trailing "?" marks the field optional.
 fn field_fits(ty: &str, v: &Value) -> bool {
     let int = |v: &Value| v.as_i64().is_some();
     match ty {
@@ -135,6 +147,8 @@ fn field_fits(ty: &str, v: &Value) -> bool {
             .and_then(Kind::parse)
             .is_some_and(|k| k.is_transport()),
         "mode" => matches!(v.as_str(), Some("classic") | Some("modern")),
+        "obj" => v.is_object(),
+        "kind" => v.as_str().and_then(Kind::parse).is_some(),
         _ => unreachable!("field type {ty}"),
     }
 }
@@ -195,10 +209,13 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
             ("top", "int"),
             ("expectFail", "bool?"),
         ],
-        "sell" | "setNoRate" => &AT,
+        "setNoRate" => &AT,
+        "sell" => &[("floor", "int"), ("x", "int"), ("kind", "kind?")],
         "adjustRent" => &[("floor", "int"), ("x", "int"), ("dir", "dir")],
         "setCars" => &[("floor", "int"), ("x", "int"), ("cars", "count")],
         "startFire" | "bombThreat" | "evaluateStar" | "reload" => &[],
+        "callExterminator" => &[("expectFail", "bool?")],
+        "setSchedule" => &[("floor", "int"), ("x", "int"), ("schedule", "obj")],
         "tick" => &[
             ("dt", "count"),
             ("times", "count?"),
@@ -510,12 +527,39 @@ fn run_scenario_inner(
                     )
                     .map_err(failed)?;
                 }
-                Command::Sell { floor, x } => {
+                Command::Sell { floor, x, kind } => {
+                    if let Some(kind) = kind {
+                        let here = sim
+                            .tower
+                            .unit_at(*floor, *x)
+                            .map(|u| u.kind)
+                            .or_else(|| sim.tower.transport_at(*floor, *x).map(|t| t.kind));
+                        if here.map(|k| k.as_str()) != Some(kind.as_str()) {
+                            return Err(failed(format!(
+                                "sell @ {floor},{x}: expected {kind}, found {}",
+                                here.map(|k| k.as_str()).unwrap_or("nothing")
+                            )));
+                        }
+                    }
                     expect_ok(
                         sim.sell_at(*floor, *x),
                         false,
                         &format!("sell @ {floor},{x}"),
                         None,
+                    )
+                    .map_err(failed)?;
+                }
+                Command::SetSchedule { floor, x, schedule } => {
+                    let id = sim
+                        .tower
+                        .transport_at(*floor, *x)
+                        .map(|t| t.id)
+                        .ok_or_else(|| failed(format!("no transport at floor {floor}, x {x}")))?;
+                    expect_ok(
+                        sim.tower.set_schedule(id, schedule),
+                        false,
+                        &format!("setSchedule @ {floor},{x}"),
+                        Some("not an elevator"),
                     )
                     .map_err(failed)?;
                 }
@@ -614,6 +658,16 @@ fn run_scenario_inner(
                 }
                 Command::BombThreat => sim.bomb_threat(),
                 Command::EvaluateStar => sim.evaluate_star(),
+                Command::CallExterminator { expect_fail } => {
+                    let r = sim.call_exterminator();
+                    expect_ok(
+                        r.is_ok(),
+                        expect_fail.unwrap_or(false),
+                        "callExterminator",
+                        r.err().map(|e| e.reason()),
+                    )
+                    .map_err(failed)?;
+                }
                 Command::Reload => {
                     let before = digest(&state_view(&sim));
                     let saved: Value = serde_json::from_str(&sim.serialize().to_string()).unwrap();

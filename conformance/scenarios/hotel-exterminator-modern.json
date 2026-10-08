@@ -1,0 +1,213 @@
+{
+  "id": "hotel-exterminator-modern",
+  "description": "The Modern tower-one hotel loses every housekeeping crew, its rooms go dirty and then infested, and an exterminator is called short of funds, with funds, and again while pending; the treatment lands the next morning, two crews are rebuilt and cannot keep up, so a second booking follows and lands.",
+  "start": {
+    "fixture": "src/tests/fixtures/towerone_6.vctower",
+    "mode": "modern"
+  },
+  "commands": [
+    {
+      "op": "sell",
+      "floor": 12,
+      "x": 158,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 16,
+      "x": 188,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 18,
+      "x": 150,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 21,
+      "x": 204,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 28,
+      "x": 208,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 28,
+      "x": 174,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 29,
+      "x": 150,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 12,
+      "x": 215,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 21,
+      "x": 216,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 21,
+      "x": 224,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 2,
+      "x": 142,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 16,
+      "x": 142,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 14,
+      "x": 129,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 2,
+      "x": 240,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 3,
+      "x": 240,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 4,
+      "x": 240,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 31,
+      "x": 232,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 32,
+      "x": 232,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 46,
+      "x": 273,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 31,
+      "x": 110,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "sell",
+      "floor": 31,
+      "x": 98,
+      "kind": "housekeeping"
+    },
+    {
+      "op": "checkpoint",
+      "label": "no-housekeeping"
+    },
+    {
+      "op": "tick",
+      "dt": 30,
+      "times": 192,
+      "checkpointEvery": 48
+    },
+    {
+      "op": "setMoney",
+      "amount": 1000
+    },
+    {
+      "op": "callExterminator",
+      "expectFail": true
+    },
+    {
+      "op": "setMoney",
+      "amount": 50000000
+    },
+    {
+      "op": "callExterminator"
+    },
+    {
+      "op": "callExterminator",
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "booked"
+    },
+    {
+      "op": "tick",
+      "dt": 30,
+      "times": 48,
+      "checkpointEvery": 12
+    },
+    {
+      "op": "checkpoint",
+      "label": "cleared"
+    },
+    {
+      "op": "build",
+      "kind": "housekeeping",
+      "floor": 12,
+      "x": 158
+    },
+    {
+      "op": "build",
+      "kind": "housekeeping",
+      "floor": 16,
+      "x": 188
+    },
+    {
+      "op": "tick",
+      "dt": 30,
+      "times": 96,
+      "checkpointEvery": 24
+    },
+    {
+      "op": "callExterminator"
+    },
+    {
+      "op": "tick",
+      "dt": 30,
+      "times": 48,
+      "checkpointEvery": 24
+    },
+    {
+      "op": "evaluateStar"
+    },
+    {
+      "op": "checkpoint",
+      "label": "weekend-end"
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+name: engine-fuzz
+
+# Nightly differential fuzz of the two engines: random scenarios grown on the
+# Rust engine, replayed on the TypeScript engine, hashes compared at every
+# checkpoint. Never a pull-request gate; a divergence is pinned as a named
+# scenario in the fix PR.
+
+on:
+  schedule:
+    - cron: "37 4 * * *"
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: "How many seeds to run (a positive whole number)"
+        default: "20"
+      seed:
+        description: "Replay one explicit seed instead (the number a failing run printed)"
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-fuzz
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - run: npm ci
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal
+          rustup default 1.97.0
+      - name: Build the fuzzer
+        run: cargo build --locked --release --bin fuzz
+        working-directory: engine-rs
+      - name: Fuzz
+        run: |
+          seeds="${{ github.event.inputs.seeds || '20' }}"
+          one="${{ github.event.inputs.seed }}"
+          case "$seeds" in ''|*[!0-9]*|0) echo "seeds must be a positive whole number, got '$seeds'"; exit 2;; esac
+          # A manual run without a seed takes a block the nightly run does not
+          # use, so a dispatch on the same day finds new seeds.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            offset=$(( 10000 + (${{ github.run_number }} % 900) * 100 ))
+          else
+            offset=0
+          fi
+          if [ "${#seeds}" -gt 6 ] || [ "$seeds" -gt $(( 100000 - offset )) ]; then
+            echo "seeds must be at most $(( 100000 - offset )) for this run"; exit 2
+          fi
+          if [ -n "$one" ]; then
+            case "$one" in *[!0-9]*) echo "seed must be a whole number, got '$one'"; exit 2;; esac
+            if [ "${#one}" -gt 10 ] || [ "$one" -gt 4294967295 ]; then echo "seed must be below 4294967296, got '$one'"; exit 2; fi
+            list="$one"
+          else
+            # One block of seeds per day; a day holds up to 100000 seeds.
+            base=$(( $(date +%s) / 86400 * 100000 + offset ))
+            list=$(seq $(( base + 1 )) $(( base + seeds )))
+          fi
+          status=0
+          for seed in $list; do
+            echo "seed $seed"
+            engine-rs/target/release/fuzz "$seed" fuzz-out 40 || { status=1; continue; }
+            npx tsx scripts/fuzz-compare.ts "fuzz-out/fuzz-$seed.json" || status=1
+          done
+          echo "replay one seed with: workflow_dispatch seed=<number>, or locally: cargo run --release --manifest-path engine-rs/Cargo.toml --bin fuzz -- <number> out 40 && npx tsx scripts/fuzz-compare.ts out/fuzz-<number>.json"
+          exit $status
+      - name: Keep the scenarios of this run
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-scenarios
+          path: fuzz-out
+          if-no-files-found: ignore
+          retention-days: 30

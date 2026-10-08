@@ -32,6 +32,30 @@ scenario finishes, and it refuses to run in CI.
 
 A refactor that claims to change nothing must not touch `expected.json`.
 
+## Fixtures the scenarios start from
+
+The `fixture` starts use the saves under `src/tests/fixtures/`. Three of them
+are derived from the others by editing a few fields of the serialized game
+and nothing else, so a branch no real save reaches can be scripted:
+`sixseven-december` (the sixseven clock moved to early December, for the
+holiday window), `towerone-star4` (tower-one with `star` raised to four and
+`money` filled, for the metro and a second express shaft) and
+`towerone-vip-pending` (tower-one with `vipFavorable` cleared, `vipVisits`
+zeroed and `money` filled). Derive a new one the same way, by a script that
+changes only the fields the scenario needs, and say so in the scenario's
+description.
+
+## The loader table
+
+`loader-cases.json` is the referee for `deserialize` on saves no engine writes:
+forged keys, mistyped numbers, overlapping units, inverted shafts, garbage
+schedules. `src/tests/integration/loaderCases.integration.test.ts` builds the
+cases from code, hashes the loaded state of each through the TypeScript
+loader, and writes them with the same regeneration switch as the lock
+(`VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration loaderCases`);
+a Rust unit test replays every case. Add a case for any coercion rule you
+touch.
+
 ## Scenario format
 
 ```json
@@ -62,13 +86,15 @@ Commands run in order. Units and shafts are named by a tile they cover
 | `build` | `kind`, `floor`, `x`, `expectFail?` | Build through the normal money-aware path. |
 | `buildRow` | `kind`, `floor`, `from`, `to` | `build` at every `x` from `from` to `to`, inclusive. |
 | `buildTransport` | `kind`, `x`, `bottom`, `top`, `expectFail?` | Build a shaft. |
-| `sell` | `floor`, `x` | Sell the unit at that tile. |
+| `sell` | `floor`, `x`, `kind?` | Sell the unit at that tile; with `kind`, an error unless that is what the tile holds. |
 | `adjustRent` | `floor`, `x`, `dir` (`1` or `-1`) | Step a unit's rent. |
 | `setNoRate` | `floor`, `x` | Set a unit to no rate (the Classic price ladder only). |
 | `setCars` | `floor`, `x`, `cars` | Set the car count of the shaft at that tile. |
+| `setSchedule` | `floor`, `x`, `schedule` | Author the elevator schedule of the shaft at that tile (`Tower.setSchedule`), hardened the way a loaded one is; `{}` clears it. An error on a shaft that is not an elevator. |
 | `startFire` | | Start a fire at once: `EventSystem.startFire`, with no hourly roll and no fire-rescue choice. |
 | `bombThreat` | | Run a bomb threat at once: `EventSystem.bombThreat`, which charges the sweep when the tower has Security and detonates when it has none, with no ransom choice. |
 | `evaluateStar` | | Run the star evaluation. |
+| `callExterminator` | `expectFail?` | Book the Modern exterminator (`callExterminator`); a refusal (Classic, a booking pending, no infested room, short of funds) is an error unless `expectFail` is set. |
 | `reload` | | Save the game and load the save (`serialize()`, a JSON round trip, `deserialize`), replacing the running engine. The hashed `state` view must come back unchanged; a difference is an error. Live state that saves do not carry (the crowd, elevator dispatch) restarts as a load restarts it (see Checkpoints). |
 | `tick` | `dt`, `times?`, `checkpointEvery?` | Call `tick(dt)` `times` times (default 1). All three are whole positive numbers. After every `checkpointEvery`th call, take a checkpoint labeled `t+<minutes>`, where minutes counts every tick's `dt` since the start of the scenario. |
 | `checkpoint` | `label` | Take a checkpoint. |
