@@ -36,31 +36,11 @@ const LOT: i64 = LOT_WIDTH;
 
 /// `decodeVctower(text)`: the VCTOWER1 container (base64 of raw deflate).
 pub fn decode_vctower(text: &str) -> Result<Value, String> {
-    let trimmed = text.trim();
+    let trimmed = js_trim(text);
     if !trimmed.starts_with("VCTOWER1") {
         return Err("not a VCTOWER1 file".into());
     }
-    let b64: String = trimmed["VCTOWER1".len()..]
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect();
-    // `Buffer.from(b64, "base64")` takes the URL-safe alphabet and unpadded
-    // input alike.
-    let b64: String = b64
-        .chars()
-        .map(|c| match c {
-            '-' => '+',
-            '_' => '/',
-            c => c,
-        })
-        .collect();
-    let packed = base64::engine::GeneralPurpose::new(
-        &base64::alphabet::STANDARD,
-        base64::engine::GeneralPurposeConfig::new()
-            .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent),
-    )
-    .decode(b64.as_bytes())
-    .map_err(|e| format!("base64: {e}"))?;
+    let packed = lenient_base64(&trimmed["VCTOWER1".len()..])?;
     use std::io::Read;
     let mut out = Vec::new();
     flate2::read::DeflateDecoder::new(&packed[..])
@@ -76,6 +56,42 @@ pub fn decode_vctower(text: &str) -> Result<Value, String> {
     // `TextDecoder` drops a leading byte order mark before `JSON.parse` sees it.
     let text = out.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&out);
     serde_json::from_slice(text).map_err(|e| format!("json: {e}"))
+}
+
+/// `Buffer.from(b64, "base64")`: decoding stops at the first `=`, every
+/// character outside the alphabet (whitespace included) is skipped, the
+/// URL-safe alphabet is taken alongside the standard one, padding is
+/// optional, a dangling single symbol is dropped, and the last symbol's
+/// unused bits are ignored.
+fn lenient_base64(text: &str) -> Result<Vec<u8>, String> {
+    let body = text.split('=').next().unwrap_or("");
+    let mut symbols: String = body
+        .chars()
+        .filter_map(|c| match c {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '+' | '/' => Some(c),
+            '-' => Some('+'),
+            '_' => Some('/'),
+            _ => None,
+        })
+        .collect();
+    if symbols.len() % 4 == 1 {
+        symbols.pop();
+    }
+    base64::engine::GeneralPurpose::new(
+        &base64::alphabet::STANDARD,
+        base64::engine::GeneralPurposeConfig::new()
+            .with_decode_padding_mode(base64::engine::DecodePaddingMode::RequireNone)
+            .with_decode_allow_trailing_bits(true),
+    )
+    .decode(symbols.as_bytes())
+    .map_err(|e| format!("base64: {e}"))
+}
+
+/// `String.prototype.trim`: strips WhiteSpace and LineTerminator, which is
+/// Unicode White_Space plus U+FEFF and minus U+0085 (NEL), which Rust's
+/// `is_whitespace` counts and JavaScript does not.
+fn js_trim(s: &str) -> &str {
+    s.trim_matches(|c: char| (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}')
 }
 
 // ---- helpers -------------------------------------------------------------------
@@ -117,7 +133,15 @@ fn js_number(v: Option<&Value>) -> f64 {
         Some(Value::Array(a)) => match a.as_slice() {
             [] => 0.0,
             [Value::Bool(_)] | [Value::Object(_)] => f64::NAN,
-            [one] => js_number(Some(one)),
+            // The element is rendered as text first, so `[-0]` reads "0".
+            [one] => {
+                let v = js_number(Some(one));
+                if v == 0.0 {
+                    0.0
+                } else {
+                    v
+                }
+            }
             _ => f64::NAN,
         },
         _ => f64::NAN,
@@ -131,10 +155,7 @@ fn js_number(v: Option<&Value>) -> f64 {
 /// `f64::from_str` also takes `inf`, `nan` and `infinity` in any case, so the
 /// decimal path is checked character by character before it is parsed.
 fn js_string_number(s: &str) -> f64 {
-    // StrWhiteSpaceChar: Unicode White_Space plus U+FEFF, minus U+0085
-    // (NEL), which Rust counts and JavaScript does not.
-    let is_js_space = |c: char| (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}';
-    let t = s.trim_matches(is_js_space);
+    let t = js_trim(s);
     if t.is_empty() {
         return 0.0;
     }
@@ -142,14 +163,22 @@ fn js_string_number(s: &str) -> f64 {
         if rest.is_empty() {
             return f64::NAN;
         }
+        // The exact value rounded once: u128 covers 32 hex digits, which is
+        // past any save; a longer literal falls back to per-digit rounding.
+        let mut exact: Option<u128> = Some(0);
         let mut acc = 0.0f64;
         for c in rest.chars() {
             match c.to_digit(radix) {
-                Some(d) => acc = acc * radix as f64 + d as f64,
+                Some(d) => {
+                    exact = exact
+                        .and_then(|e| e.checked_mul(radix as u128))
+                        .and_then(|e| e.checked_add(d as u128));
+                    acc = acc * radix as f64 + d as f64;
+                }
                 None => return f64::NAN,
             }
         }
-        acc
+        exact.map(|e| e as f64).unwrap_or(acc)
     };
     let lower = t.to_ascii_lowercase();
     if let Some(rest) = lower.strip_prefix("0x") {
@@ -1669,7 +1698,8 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::js_string_number;
+    use super::{decode_vctower, js_number, js_string_number, lenient_base64};
+    use serde_json::json;
 
     /// Pinned with Node: `Number(s)` for each input.
     #[test]
@@ -1694,6 +1724,13 @@ mod tests {
             ("\u{a0}7\u{2028}", 7.0),
             ("+.5", 0.5),
             ("1e309", f64::INFINITY),
+            ("-.5e1", -5.0),
+            ("  ", 0.0),
+            ("Infinity ", f64::INFINITY),
+            ("1E5", 100000.0),
+            ("00012", 12.0),
+            ("0x1FFFFFFFFFFFFF1", 144115188075855860.0),
+            ("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 8.711228593176025e40),
         ];
         for (s, want) in same {
             assert_eq!(js_string_number(s), want, "{s:?}");
@@ -1702,9 +1739,68 @@ mod tests {
         assert_eq!(js_string_number("-0"), 0.0);
         for s in [
             "0x", "inf", "infinity", "NaN", "1e", "1e+", "1_000", "12abc", "0x1.5", "-0x10", "e5",
-            ".", "\u{85}7", "\u{661}",
+            ".", "\u{85}7", "\u{661}", "+-5",
         ] {
             assert!(js_string_number(s).is_nan(), "{s:?}");
         }
+    }
+
+    /// Pinned with Node: `Number(v)` for non-string shapes.
+    #[test]
+    fn number_of_other_shapes_matches_javascript() {
+        assert_eq!(js_number(Some(&json!(null))), 0.0);
+        assert_eq!(js_number(Some(&json!(true))), 1.0);
+        assert_eq!(js_number(Some(&json!(false))), 0.0);
+        assert_eq!(js_number(Some(&json!(2.5))), 2.5);
+        assert_eq!(js_number(Some(&json!([]))), 0.0);
+        assert_eq!(js_number(Some(&json!([7]))), 7.0);
+        assert_eq!(js_number(Some(&json!([[7]]))), 7.0);
+        assert_eq!(js_number(Some(&json!([null]))), 0.0);
+        assert_eq!(js_number(Some(&json!([" 7 "]))), 7.0);
+        for v in [
+            json!([true]),
+            json!([7, 8]),
+            json!([{}]),
+            json!({}),
+            json!("abc"),
+        ] {
+            assert!(js_number(Some(&v)).is_nan(), "{v}");
+        }
+        assert!(js_number(None).is_nan());
+        assert!(js_number(Some(&json!([-0.0]))).is_sign_positive());
+    }
+
+    /// Pinned with Node: `Buffer.from(s, "base64").toString("latin1")`.
+    #[test]
+    fn base64_is_as_lenient_as_buffer_from() {
+        for (b64, want) in [
+            ("YWJj", "abc"),
+            ("YWJjZA", "abcd"),
+            ("YWJ", "ab"),
+            ("YR==", "a"),
+            ("YQ==Y", "a"),
+            ("YQ==YQ==", "a"),
+            ("YW Jj", "abc"),
+            ("YW!Jj", "abc"),
+            ("YWJjZ", "abc"),
+            ("YWJj\u{85}2", "abc"),
+        ] {
+            assert_eq!(lenient_base64(b64).unwrap(), want.as_bytes(), "{b64:?}");
+        }
+    }
+
+    /// `String.prototype.trim` strips a leading U+FEFF before the magic and
+    /// `TextDecoder` strips one inside the inflated JSON; NEL is neither.
+    #[test]
+    fn container_tolerates_byte_order_marks() {
+        use std::io::Write;
+        let mut enc =
+            flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
+        enc.write_all(b"\xEF\xBB\xBF{\"version\":7}").unwrap();
+        let packed = enc.finish().unwrap();
+        let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &packed);
+        let text = format!("\u{feff}VCTOWER1\n{b64}\n");
+        assert_eq!(decode_vctower(&text).unwrap(), json!({"version": 7}));
+        assert!(decode_vctower(&format!("\u{85}{text}")).is_err());
     }
 }

@@ -17,17 +17,16 @@ fn main() {
     let label = &args[2];
     let crowd = args.iter().any(|a| a == "--crowd");
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-    let scenario = Scenario::parse(
-        &std::fs::read_to_string(
-            repo.join("conformance/scenarios")
-                .join(format!("{id}.json")),
-        )
-        .unwrap(),
-    )
-    .unwrap_or_else(|e| {
-        eprintln!("{e}");
-        std::process::exit(2);
-    });
+    let path = repo
+        .join("conformance/scenarios")
+        .join(format!("{id}.json"));
+    let scenario = std::fs::read_to_string(&path)
+        .map_err(|e| format!("cannot read {}: {e}", path.display()))
+        .and_then(|text| Scenario::parse(&text))
+        .unwrap_or_else(|e| {
+            eprintln!("{e}");
+            std::process::exit(2);
+        });
     match run_scenario_until(&scenario, &repo, label) {
         Some(sim) => {
             let v = if crowd {

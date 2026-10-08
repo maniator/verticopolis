@@ -97,40 +97,164 @@ pub struct Scenario {
 }
 
 impl Scenario {
-    /// Parse and validate a scenario file the way `loadScenario` does: whole
-    /// floats such as `1.0` count as integers (`Number.isInteger`), a `build`
-    /// or `buildRow` names a place and a `buildTransport` a shaft, and a
-    /// `buildRow` runs left to right.
+    /// Parse and validate a scenario file the way `loadScenario` does: the
+    /// same field table (`OPS` in scenario.ts), the same type checks, and the
+    /// same refusal of an unknown op or field, so a typo cannot quietly
+    /// weaken a scenario on one side only. Whole floats such as `1.0` count
+    /// as integers (`Number.isInteger`).
     pub fn parse(text: &str) -> Result<Scenario, String> {
         let mut raw: Value =
             serde_json::from_str(text).map_err(|e| format!("scenario does not parse: {e}"))?;
         whole_floats_to_ints(&mut raw);
-        let s: Scenario =
-            serde_json::from_value(raw).map_err(|e| format!("scenario does not parse: {e}"))?;
-        for (i, c) in s.commands.iter().enumerate() {
-            let where_ = format!("commands[{i}]");
-            let place = |k: &str| match Kind::parse(k) {
-                Some(kind) if !kind.is_transport() => Ok(()),
-                _ => Err(format!("{where_}: kind must be place")),
-            };
-            let shaft = |k: &str| match Kind::parse(k) {
-                Some(kind) if kind.is_transport() => Ok(()),
-                _ => Err(format!("{where_}: kind must be shaft")),
-            };
-            match c {
-                Command::Build { kind, .. } => place(kind)?,
-                Command::BuildRow { kind, from, to, .. } => {
-                    place(kind)?;
-                    if from > to {
-                        return Err(format!("{where_}: buildRow from must not be past to"));
-                    }
-                }
-                Command::BuildTransport { kind, .. } => shaft(kind)?,
-                _ => {}
-            }
-        }
-        Ok(s)
+        check_scenario(&raw)?;
+        serde_json::from_value(raw).map_err(|e| format!("scenario does not parse: {e}"))
     }
+}
+
+/// Field types of `loadScenario`: "int" a whole number, "u32" a whole number
+/// from 0 to 4294967295, "count" a whole number above zero, "dir" 1 or -1,
+/// "num" a finite number, "str" a non-empty string, "bool" a boolean, "place"
+/// a facility kind that is not a transport, "shaft" a transport kind, "mode"
+/// classic or modern. A trailing "?" marks the field optional.
+fn field_fits(ty: &str, v: &Value) -> bool {
+    let int = |v: &Value| v.as_i64().is_some();
+    match ty {
+        "int" => int(v),
+        "u32" => v.as_i64().is_some_and(|n| (0..=0xffff_ffff).contains(&n)),
+        "count" => v.as_i64().is_some_and(|n| n > 0),
+        "dir" => matches!(v.as_i64(), Some(1) | Some(-1)),
+        "num" => v.as_f64().is_some_and(f64::is_finite),
+        "str" => v.as_str().is_some_and(|s| !s.is_empty()),
+        "bool" => v.is_boolean(),
+        "place" => v
+            .as_str()
+            .and_then(Kind::parse)
+            .is_some_and(|k| !k.is_transport()),
+        "shaft" => v
+            .as_str()
+            .and_then(Kind::parse)
+            .is_some_and(|k| k.is_transport()),
+        "mode" => matches!(v.as_str(), Some("classic") | Some("modern")),
+        _ => unreachable!("field type {ty}"),
+    }
+}
+
+/// `check(where, value, spec, skip)`: an object with no field outside the
+/// spec (or `skip`), every required field present and of its type, and
+/// every optional field absent (`undefined`, so a literal null fails) or of
+/// its type.
+fn check_fields(
+    where_: &str,
+    value: &Value,
+    spec: &[(&str, &str)],
+    skip: &[&str],
+) -> Result<(), String> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| format!("{where_}: must be an object"))?;
+    for k in obj.keys() {
+        if !skip.contains(&k.as_str()) && !spec.iter().any(|(name, _)| name == k) {
+            return Err(format!("{where_}: unknown field {k}"));
+        }
+    }
+    for (k, t) in spec {
+        let (ty, optional) = match t.strip_suffix('?') {
+            Some(ty) => (ty, true),
+            None => (*t, false),
+        };
+        match obj.get(*k) {
+            None if optional => {}
+            Some(v) if field_fits(ty, v) => {}
+            _ => return Err(format!("{where_}: {k} must be {ty}")),
+        }
+    }
+    Ok(())
+}
+
+const AT: [(&str, &str); 2] = [("floor", "int"), ("x", "int")];
+
+fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
+    Some(match op {
+        "setMoney" => &[("amount", "num")],
+        "build" => &[
+            ("kind", "place"),
+            ("floor", "int"),
+            ("x", "int"),
+            ("expectFail", "bool?"),
+        ],
+        "buildRow" => &[
+            ("kind", "place"),
+            ("floor", "int"),
+            ("from", "int"),
+            ("to", "int"),
+        ],
+        "buildTransport" => &[
+            ("kind", "shaft"),
+            ("x", "int"),
+            ("bottom", "int"),
+            ("top", "int"),
+            ("expectFail", "bool?"),
+        ],
+        "sell" | "setNoRate" => &AT,
+        "adjustRent" => &[("floor", "int"), ("x", "int"), ("dir", "dir")],
+        "setCars" => &[("floor", "int"), ("x", "int"), ("cars", "count")],
+        "startFire" | "bombThreat" | "evaluateStar" | "reload" => &[],
+        "tick" => &[
+            ("dt", "count"),
+            ("times", "count?"),
+            ("checkpointEvery", "count?"),
+        ],
+        "checkpoint" => &[("label", "str")],
+        _ => return None,
+    })
+}
+
+fn check_scenario(s: &Value) -> Result<(), String> {
+    check_fields(
+        "scenario",
+        s,
+        &[("id", "str"), ("description", "str")],
+        &["start", "commands"],
+    )?;
+    let start = s.get("start").unwrap_or(&Value::Null);
+    if start.get("newGame").is_some() {
+        check_fields("start", start, &[], &["newGame"])?;
+        check_fields(
+            "start.newGame",
+            &start["newGame"],
+            &[("seed", "u32"), ("mode", "mode")],
+            &[],
+        )?;
+    } else {
+        check_fields(
+            "start",
+            start,
+            &[("fixture", "str"), ("mode", "mode?")],
+            &[],
+        )?;
+    }
+    let commands = s
+        .get("commands")
+        .and_then(Value::as_array)
+        .ok_or("commands must be an array")?;
+    for (i, c) in commands.iter().enumerate() {
+        let where_ = format!("command {i}");
+        if !c.is_object() {
+            return Err(format!("{where_}: must be an object"));
+        }
+        let op = c.get("op").and_then(Value::as_str);
+        let spec = op.and_then(op_spec).ok_or_else(|| {
+            format!(
+                "{where_}: unknown op {}",
+                c.get("op").unwrap_or(&Value::Null)
+            )
+        })?;
+        check_fields(&where_, c, spec, &["op"])?;
+        if op == Some("buildRow") && c["from"].as_i64() > c["to"].as_i64() {
+            return Err(format!("{where_}: buildRow from must not be past to"));
+        }
+    }
+    Ok(())
 }
 
 /// `Number.isInteger(1.0)` is true, so a scenario may spell a whole number
@@ -139,7 +263,7 @@ fn whole_floats_to_ints(v: &mut Value) {
     match v {
         Value::Number(n) => {
             if let Some(f) = n.as_f64() {
-                if n.as_i64().is_none() && f.fract() == 0.0 && f.abs() < 9.0e15 {
+                if n.as_i64().is_none() && f.fract() == 0.0 && f.abs() < i64::MAX as f64 {
                     *v = Value::from(f as i64);
                 }
             }
@@ -280,8 +404,11 @@ fn run_scenario_inner(
         if stop_at == Some(label.as_str()) {
             stop.set(true);
         }
+        // `emit` throws on a repeated label in the TypeScript, so nothing
+        // after it in the same command runs or is recorded.
         if !labels.borrow_mut().insert(label.clone()) {
             *duplicate.borrow_mut() = Some(label.clone());
+            return;
         }
         out.push(Checkpoint {
             label,
@@ -408,11 +535,13 @@ fn run_scenario_inner(
                     }
                     for n in 1..=times {
                         sim.tick(*dt as f64);
-                        elapsed += dt;
+                        elapsed = elapsed
+                            .checked_add(*dt)
+                            .ok_or_else(|| failed("elapsed minutes overflow".into()))?;
                         if let Some(every) = checkpoint_every {
                             if n % every == 0 {
                                 emit(&sim, format!("t+{elapsed}"), &mut out);
-                                if stop.get() {
+                                if stop.get() || duplicate.borrow().is_some() {
                                     break;
                                 }
                             }
@@ -509,6 +638,18 @@ fn run_scenario_inner(
         }
     }
     emit(&sim, "final".into(), &mut out);
+    if let Some(label) = duplicate.borrow_mut().take() {
+        return (
+            Run {
+                checkpoints: out,
+                error: Some(RunError::Failed {
+                    index: s.commands.len(),
+                    what: format!("checkpoint label {label} is taken twice"),
+                }),
+            },
+            None,
+        );
+    }
     let stopped = if stop.get() { Some(sim) } else { None };
     (
         Run {
@@ -525,7 +666,7 @@ mod tests {
 
     fn scenario(commands: &str) -> Result<Scenario, String> {
         Scenario::parse(&format!(
-            r#"{{"id":"t","description":"","start":{{"newGame":{{"seed":1,"mode":"classic"}}}},"commands":[{commands}]}}"#
+            r#"{{"id":"t","description":"t","start":{{"newGame":{{"seed":1,"mode":"classic"}}}},"commands":[{commands}]}}"#
         ))
     }
 
@@ -554,5 +695,25 @@ mod tests {
                 .contains("kind must be shaft")
         );
         assert!(scenario(r#"{"op":"build","kind":"office","floor":2,"x":4}"#).is_ok());
+        for bad in [
+            r#"{"op":"checkpoint","label":""}"#,
+            r#"{"op":"tick","dt":0}"#,
+            r#"{"op":"tick","dt":60,"times":null}"#,
+            r#"{"op":"build","kind":"office","floor":2,"x":4,"expectFail":null}"#,
+            r#"{"op":"adjustRent","floor":2,"x":4,"dir":2}"#,
+            r#"{"op":"setCars","floor":2,"x":4,"cars":0}"#,
+            r#"{"op":"sell","floor":2,"x":4,"extra":1}"#,
+            r#"{"op":"nope"}"#,
+        ] {
+            assert!(scenario(bad).is_err(), "{bad}");
+        }
+        let bad_start = Scenario::parse(
+            r#"{"id":"t","description":"t","start":{"newGame":{"seed":-1,"mode":"classic"}},"commands":[]}"#,
+        );
+        assert!(bad_start.unwrap_err().contains("seed must be u32"));
+        let bad_mode = Scenario::parse(
+            r#"{"id":"t","description":"t","start":{"fixture":"x","mode":"foo"},"commands":[]}"#,
+        );
+        assert!(bad_mode.unwrap_err().contains("mode must be mode"));
     }
 }

@@ -103,7 +103,8 @@ belongs to the panicking-scenario row, and the dropped `Serialize` derive on
 - [x] [Review][Defer] Unit tests for migrations, coercion and schedules [engine-rs/] (#860)
 
 Round two (confirming pass, 2026-10-08) on the round-one fix commits: 0
-`decision_needed`, 10 `patch`, 0 new `defer` (six notes folded into #858),
+`decision_needed`, 10 `patch`, 0 new `defer` (the hand-edited-save notes
+folded into #858),
 and the rest dismissed (compile-checked claims, guards the TypeScript shares,
 a crowd that is never loaded from a save, and the 32 MiB cap that mirrors
 the `decodeVctower` path the referee uses).
@@ -113,12 +114,27 @@ the `decodeVctower` path the referee uses).
 - [x] [Review][Patch] Referee error lines carry no status token [engine-rs/src/bin/conformance.rs]
 - [x] [Review][Patch] Roadmap counts 374 checkpoints; the lock holds 342 [architecture-engine-rust-port-2026-10-08.md]
 - [x] [Review][Patch] Story rows do not say how 24 findings became 16 rows across three commits [this file]
-- [x] [Review][Patch] Scenario loader skips the runner's checks: `buildRow` from past to, place vs shaft kinds, whole floats like `1.0`, duplicate labels [engine-rs/src/scenario.rs]
+- [x] [Review][Patch] Scenario loader skips the runner's checks: `buildRow` from past to, place vs shaft kinds, whole floats like `1.0`, duplicate labels [engine-rs/src/scenario.rs, src/bin/conformance.rs, src/bin/dump.rs]
 - [x] [Review][Patch] `.vctower` decoder refuses unpadded or URL-safe base64 and a UTF-8 byte order mark that `Buffer.from` and `TextDecoder` take [engine-rs/src/load.rs]
 - [x] [Review][Patch] `Number([7])` reads as NaN [engine-rs/src/load.rs]
 - [x] [Review][Patch] `day - lastVipNagDay` can overflow on a saturated nag day [engine-rs/src/services.rs]
 - [x] [Review][Patch] `js_number` test coverage [engine-rs/src/load.rs]
-- [x] [Review][Defer] Present non-boolean `evaluatedTower`/`builtWeddingHall`/`vipFavorable`, non-string `towerName`, `vipVisitDay` saturation past i64, `1e400`, stray base64 bytes, string-typed legacy widths [engine-rs/src/load.rs] (folded into #858)
+- [x] [Review][Defer] Present non-boolean `evaluatedTower`/`builtWeddingHall`/`vipFavorable`, non-string `towerName`, `vipVisitDay` saturation past i64, `1e400`, string-typed legacy widths [engine-rs/src/load.rs] (folded into #858)
+
+Round three (confirming pass, 2026-10-08) on the round-two fix commits: 0
+`decision_needed`, 8 `patch`, 0 `defer`, and the rest dismissed (already
+fixed in the tree the reviewers did not see, `-0` on a money field that
+prints and adds the same, line numbers the field table now replaces, and
+error text the TypeScript runner shares).
+
+- [x] [Review][Patch] Scenario loader ports only three of the runner's checks; the whole `OPS` field table now runs before serde (empty strings, null optionals, counts, dir, mode, seed range) [engine-rs/src/scenario.rs]
+- [x] [Review][Patch] Duplicate label still pushed and the command keeps running; the closing `final` emit never checked [engine-rs/src/scenario.rs]
+- [x] [Review][Patch] Whole-float cutoff at 9e15 refuses what `Number.isInteger` takes; `elapsed` can overflow [engine-rs/src/scenario.rs]
+- [x] [Review][Patch] `Buffer.from` leniency: trailing bits, a dangling symbol, `=` mid-string, non-alphabet bytes, U+FEFF before the magic, NEL kept [engine-rs/src/load.rs]
+- [x] [Review][Patch] Hex, octal and binary literals rounded per digit; `[-0]` keeps its sign [engine-rs/src/load.rs]
+- [x] [Review][Patch] U+0085 counted as JavaScript whitespace [engine-rs/src/load.rs]
+- [x] [Review][Patch] `dump` panics on a missing file while a bad one exits cleanly [engine-rs/src/bin/dump.rs]
+- [x] [Review][Patch] Tests for `Number()` of arrays, booleans and null, the container's byte order marks and base64 forms; bookkeeping counts and the `1e400` note on #858 [engine-rs/src/load.rs, docs]
 
 Dismissed: build leaves substrate floors on a failed placement (the
 TypeScript does the same), transient crowd readouts kept for hosts, the
