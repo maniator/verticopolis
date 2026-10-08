@@ -90,6 +90,11 @@ describe("Party Hall v5 to v6 migration", () => {
     // Upper story (floor 3) is now fully paved under the hall.
     for (let x = 10; x < 10 + HALL_W; x++)
       expect(out.units.some((u) => u.kind === "floor" && u.floor === 3 && u.x === x)).toBe(true);
+    // A freshly paved tile is bare `empty` structure like any placed floor. An
+    // `occupied` one would be processed by the hourly satisfaction sweep.
+    const paved = out.units.filter((u) => u.kind === "floor" && u.floor === 3);
+    expect(paved.length).toBe(HALL_W);
+    for (const u of paved) expect(u.state).toBe("empty");
     expect(migrationLooksValid(out)).toBe(true);
     expect(floatingStructureCount(out)).toBeLessThanOrEqual(floatingStructureCount(save));
     expect(out.version).toBe(6);

@@ -10,6 +10,7 @@ import type { FacilityKind, Unit } from "../types";
 
 import { isOperational, isTenanted } from "../types";
 import { HK_MAIDS_PER_UNIT, HK_NOMINAL_ROOMS_PER_MAID } from "../economy/housekeeping";
+import { roomUnits } from "../tower/rooms";
 
 /** Recycling / parking / staff / stranded advisories for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -56,7 +57,7 @@ export function parkingDemand(sim: Simulation): { officePop: number; offices: nu
   }
   let officePop = 0;
   let suites = 0;
-  for (const u of sim.tower.units) {
+  for (const u of roomUnits(sim.tower)) {
     if (u.kind === "office" && isTenanted(u)) officePop += FACILITIES.office.population;
     else if (u.kind === "hotelSuite" && isOperational(u)) suites++;
   }

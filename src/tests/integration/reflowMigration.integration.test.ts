@@ -3,7 +3,7 @@ import { inflateSync } from "fflate";
 // The real v1 save, inlined as a string (vite ?raw) so the test needs no node fs.
 import towerFile from "../fixtures/towerone_6.vctower?raw";
 import { Simulation } from "../../engine/Simulation";
-import { SAVE_VERSION, floatingStructureCount } from "../../engine/saveMigration";
+import { SAVE_VERSION, floatingStructureCount, reflowV1toV2 } from "../../engine/saveMigration";
 import { FACILITIES, facilityFloors } from "../../engine/facilities";
 import type { SerializedGame, Unit } from "../../engine/types";
 
@@ -151,6 +151,24 @@ describe("v1 → v2 reflow migration", () => {
     // Nothing off-lot, no overlap, and no room paved beyond floor 2's x=30 support.
     const rooms = sim.tower.units.filter((u) => u.kind !== "floor" && u.kind !== "lobby");
     for (const r of rooms) expect(r.x + r.width).toBeLessThanOrEqual(30);
+  });
+
+  it("paves the tiles a widened room needs as bare `empty` structure", () => {
+    // Floor 3 is paved to x=25 but rests on a floor 2 paved to x=60, so widening the
+    // restaurant to canon shoves the office past x=25 and the reflow paves the
+    // supported gap. A freshly paved tile is bare structure like any placed floor:
+    // an `occupied` one would be processed by the hourly satisfaction sweep.
+    const save = v1Save([
+      ...pave("floor", 1, 0, 60),
+      ...pave("floor", 2, 0, 60),
+      ...pave("floor", 3, 0, 25),
+      { kind: "restaurant", floor: 3, x: 0, width: 16 },
+      { kind: "office", floor: 3, x: 16, width: 9 },
+    ]);
+    const out = reflowV1toV2(save);
+    const paved = out.units.filter((u) => u.kind === "floor" && u.floor === 3 && u.x! >= 25);
+    expect(paved.length).toBeGreaterThan(0);
+    for (const u of paved) expect(u.state).toBe("empty");
   });
 
   it("resolves two ramps on one floor without overlap (multi-ramp garage)", () => {

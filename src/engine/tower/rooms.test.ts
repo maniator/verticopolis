@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../Simulation";
 import { roomUnits } from "./rooms";
+import type { FacilityKind } from "../types";
 import { isStructural } from "./towerTopology";
 import { ensureStarterLobby, layTile, placeUnit, MID } from "../../tests/fixtures/towerFixtures";
 
@@ -65,6 +66,28 @@ describe("roomUnits", () => {
     expect(loaded.tower.getUnit(office.id)!.occupants).toBe(4);
   });
 
+  it("loads every structure tile `empty` at satisfaction 1, and keeps a room's saved state", () => {
+    const sim = towerWithRooms();
+    const office = placeUnit(sim, "office", 2, MID);
+    const data = sim.serialize();
+    for (const kind of ["floor", "lobby"]) {
+      const tile = data.units.find((u) => u.kind === kind) as { state: string; satisfaction: number } | undefined;
+      expect(tile).toBeDefined();
+      tile!.state = "occupied";
+      tile!.satisfaction = 0.3; // what the old hourly sweep left on a migrated tile
+    }
+    const room = data.units.find((u) => u.id === office.id) as { state: string; satisfaction: number };
+    room.state = "occupied";
+    room.satisfaction = 0.3;
+    const loaded = Simulation.deserialize(data);
+    for (const u of loaded.tower.units.filter((u) => isStructural(u.kind))) {
+      expect(u.state).toBe("empty");
+      expect(u.satisfaction).toBe(1);
+    }
+    expect(loaded.tower.getUnit(office.id)!.state).toBe("occupied");
+    expect(loaded.tower.getUnit(office.id)!.satisfaction).toBe(0.3);
+  });
+
   it("serves a freshly loaded tower its own list", () => {
     const sim = towerWithRooms();
     placeUnit(sim, "office", 2, MID);
@@ -82,9 +105,12 @@ describe("roomUnits on a real tower", () => {
     const { isPresent } = await import("../types");
     const b64 = text.slice(text.indexOf("\n") + 1).trim();
     const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-    const sim = Simulation.deserialize(JSON.parse(new TextDecoder().decode(inflateSync(bytes))));
-    // This save carries legacy floor tiles in the "occupied" state; the skip must still be exact.
-    expect(sim.tower.units.some((u) => u.kind === "floor" && u.state === "occupied")).toBe(true);
+    const raw = JSON.parse(new TextDecoder().decode(inflateSync(bytes)));
+    const rawStructure = raw.units.filter((u: { kind: FacilityKind }) => isStructural(u.kind)).length;
+    const sim = Simulation.deserialize(raw);
+    // Its v5-to-v6 migration paves new floor tiles under party halls; they, like all structure, load `empty`.
+    expect(sim.tower.units.filter((u) => isStructural(u.kind)).length).toBeGreaterThan(rawStructure);
+    expect(sim.tower.units.filter((u) => isStructural(u.kind)).every((u) => u.state === "empty")).toBe(true);
     for (let i = 0; i < 6; i++) {
       for (let m = 0; m < 60; m++) sim.tick(2);
       let full = 0;

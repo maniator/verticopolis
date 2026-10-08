@@ -196,9 +196,9 @@ export function deserialize(raw: SerializedGame): Simulation {
       const x = Math.max(0, Math.min(GRID.width - 1, Math.round(num(u.x, 0))));
       const cap = isStructural(u.kind) ? cat : GRID.width - x;
       const width = Math.max(1, Math.min(GRID.width - x, cap, Math.round(num(u.width, cat))));
-      // Coerce the free-form state first (a forged `state` would flow into UI
-      // innerHTML and state-machine compares); the sold/leased flag below reads it.
-      const state = isUnitState(u.state) ? u.state : "empty";
+      // Coerce the free-form state first (a forged `state` would reach UI innerHTML and state
+      // compares). Structure tiles load `empty` at satisfaction 1: two migrations paved some `occupied`.
+      const state = isStructural(u.kind) || !isUnitState(u.state) ? "empty" : u.state;
       // Harden the "currently sold/leased" flag at the trust boundary: only a
       // literal `true` counts, AND for a LEASE/SALE unit (office, condo) a shell
       // state (empty, construction, gutted) is definitionally NOT owned, so the
@@ -255,7 +255,7 @@ export function deserialize(raw: SerializedGame): Simulation {
         // A non-string `label` would crash the escaping at render.
         state,
         label: typeof u.label === "string" ? u.label : FACILITIES[u.kind].name,
-        satisfaction: Math.max(0, Math.min(1, num(u.satisfaction, 1))),
+        satisfaction: isStructural(u.kind) ? 1 : Math.max(0, Math.min(1, num(u.satisfaction, 1))),
         // Attendance venues' occupants mirrors the transient customersIn
         // tally (zeroed below), so it restores to 0 no matter what the save
         // carries: a hand-edited or legacy save can't seed a phantom

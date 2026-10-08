@@ -225,7 +225,7 @@ export function expandLegacyPartyHalls(data: SerializedGame): SerializedGame {
           floor: f,
           x,
           width: 1,
-          state: "occupied",
+          state: "empty",
           satisfaction: 1,
           occupants: 0,
           everOccupied: false,

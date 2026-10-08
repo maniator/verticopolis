@@ -9,6 +9,7 @@ import { residentCount } from "../census";
 import { segmentStartX } from "../tower/segments";
 import { isOperational, isTenanted } from "../types";
 import type { Unit } from "../types";
+import { roomUnits } from "../tower/rooms";
 
 /**
  * The commercial demand model (gdd/arch-commercial-demand-pools-2026-07-15).
@@ -182,7 +183,7 @@ export function computeDemandMap(sim: SimContext): DemandMap {
   // income anchor are one number in either mode; bare contexts fall back to
   // Modern, the file's standard.
   const rules = sim.rules ?? MODERN_RULES;
-  for (const u of sim.tower.units) {
+  for (const u of roomUnits(sim.tower)) {
     const cap = rules.commercialDailyIncome(u.kind);
     if (cap === undefined) continue; // not a traffic venue
     if (attendanceCap(u.kind) !== undefined) continue; // attendance venue: earns from live fill, not the retail pool (#424)
@@ -198,7 +199,7 @@ export function computeDemandMap(sim: SimContext): DemandMap {
   const { perCapita, floor } = rules.demandModel();
   const reachableVenueCount = venues.length;
   let pool = 0;
-  for (const u of sim.tower.units) {
+  for (const u of roomUnits(sim.tower)) {
     const w = originWeight(u.kind);
     if (w === undefined) continue; // not a demand origin
     // Present and spending: an occupied office/condo (state "occupied"), or a
