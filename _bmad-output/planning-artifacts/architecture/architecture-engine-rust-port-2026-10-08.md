@@ -103,7 +103,7 @@ The stories, in the order they run, each gated on the one before:
 | --- | --- | --- | --- |
 | 1 | `story-engine-scenario-library` | #857 merged | Done: floor at 87%, no engine module under 75%, fuzzer nightly, canon tests, #860 closed, CONTRIBUTING rule |
 | 2 | `story-engine-wasm-binding` (phase 1) | 1 | Done: every scenario matches through the binding from Node, in CI |
-| 3 | `story-engine-dual-run` (phase 2) | 2 | A full day on each fixture with no divergence at game cadence |
+| 3 | `story-engine-dual-run` (phase 2) | 2 | Done: a day on every fixture at each speed with no divergence, in CI; the browser run behind `?dualrun=1` |
 | 4 | `story-engine-wasm-switch` (phase 3) | 3, plus the test-mapping table started | Golden masters, e2e, conformance green; Modern profile no slower |
 | 5 | `story-engine-tdt-port` (phase 7) | 1 (can overlap 2 to 4) | TDT lock matched both ways |
 | 6 | `story-engine-copy-catalog` | any time after 1 | Engines emit ids, one catalog, save version bump |
