@@ -387,8 +387,10 @@ impl Simulation {
             && self.has_operational(Kind::Metro)
             && pop >= crate::star::TOWER_POPULATION;
         if ok {
+            let from = self.star;
             self.star = 6;
             self.evaluated_tower = Some(true);
+            self.note_stars(from);
             self.emit(
                 "The VIP was impressed! Your building is now a TOWER. You win!",
                 LogKind::Good,

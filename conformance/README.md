@@ -11,7 +11,9 @@ Frontends may differ. Simulations may not.
 - `scenarios/*.json`: one scenario per file. The file name is the scenario `id`.
 - `expected.json`: the pinned checkpoints for every scenario, written by the
   TypeScript reference runner, as
-  `{ "scenarios": { "<id>": [ { "label", "state", "crowd" }, ... ] } }`.
+  `{ "scenarios": { "<id>": [ { "label", "state", "crowd", "events" }, ... ] } }`.
+- `events/catalog.json`: the gameplay event catalog, the contract for the
+  events both engines emit (see Checkpoints).
 
 The reference runner is `src/tests/conformance/scenario.ts`, and
 `src/tests/integration/conformance.integration.test.ts` runs it in CI as part
@@ -155,7 +157,7 @@ it is fixed.
 
 The runner takes a checkpoint labeled `start` before the first command and one
 labeled `final` after the last, so nothing a scenario runs goes unchecked.
-Labels are unique within a scenario. Each checkpoint records two hashes:
+Labels are unique within a scenario. Each checkpoint records three hashes:
 
 - `state`: the saved game (what `serialize()` returns) with prose removed: each
   log entry drops `text` and a pending event choice drops `message`, and every
@@ -170,6 +172,17 @@ Labels are unique within a scenario. Each checkpoint records two hashes:
   the same with the save's `seed` field, the main stream's state when it was
   saved, which the engine always writes as a whole number from 0 to
   4294967295.
+- `events`: the gameplay events the engine emitted since the previous
+  checkpoint (since the start for `start`), drained at the checkpoint, as the
+  array `[{ "name", "payload" }, ...]` in emission order. A new game's `start`
+  carries its `tower_founded`; a load emits nothing. A `reload` drains the
+  engine it replaces first, so the next checkpoint still counts those events.
+  `events/catalog.json` defines every event, its payload (closed enums and
+  small integers only, no free text or money) and when it fires;
+  `engine-rs/src/gameplay.rs` holds the Rust type to it and
+  `src/engine/gameplayEvents.d.ts` is generated from it (`npm run
+  gen:events`). The events never enter the save or the other two views, and
+  emitting them draws no randomness, so adding an event moves only this hash.
 
 The shapes are the TypeScript types: `SerializedGame` in
 `src/engine/serializedGame.ts` for the state and `Person` in

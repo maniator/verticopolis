@@ -42,9 +42,17 @@ export function evaluateStar(sim: Simulation): void {
   }
 
   if (target > sim.star) {
+    const from = sim.star;
     sim.star = target;
     sim.emit(`Congratulations! Your tower reached ${sim.star} stars.`, "good");
+    noteStars(sim, from);
   }
+}
+
+/** `star_reached` for every rung between `from` and the current star, so a
+ *  promotion that lifts the tower two rungs still reports both. */
+export function noteStars(sim: Simulation, from: number): void {
+  for (let star = from + 1; star <= sim.star; star++) sim.gameplayEvents.push("star_reached", { star });
 }
 
 /** Population that counts toward the star/TOWER thresholds, from the CURRENT
@@ -207,5 +215,6 @@ export function checkMilestones(sim: Simulation): void {
     if (!m.test(sim)) continue;
     sim.achievedMilestones.add(m.id);
     sim.emit(`🏅 Milestone: ${m.label}`, "good");
+    sim.gameplayEvents.push("milestone_reached", { id: m.id });
   }
 }

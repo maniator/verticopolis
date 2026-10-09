@@ -3,6 +3,7 @@
 use crate::clock::GameMode;
 use crate::econ::{classic_ladder, rent_config, rent_of};
 use crate::facilities::Kind;
+use crate::gameplay::GameplayEvent;
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
@@ -74,7 +75,11 @@ impl Simulation {
         target: BatchTarget,
         only_default_priced: bool,
     ) -> Option<BatchRentResult> {
-        self.compute_batch(kind, target, only_default_priced, true)
+        let r = self.compute_batch(kind, target, only_default_priced, true);
+        if r.as_ref().is_some_and(|r| r.changed > 0) {
+            self.gameplay.push(GameplayEvent::PricingChanged { kind });
+        }
+        r
     }
 
     /// `computeBatch(kind, target, opts, mutate)`: `None` for an unpriced
@@ -187,12 +192,19 @@ impl Simulation {
             Some(l) => snap_to_ladder(&l, target),
             None => target.min(cfg.max).max(cfg.min),
         };
+        let before = (!u.no_rate).then(|| rent_of(u.kind, u.rent, u.no_rate));
         u.rent = if applied == cfg.default {
             None
         } else {
             Some(applied)
         };
         u.no_rate = false;
+        // A write that leaves the price where it was is not a change.
+        let changed = Some(rent_of(u.kind, u.rent, false)) != before;
+        let kind = u.kind;
+        if changed {
+            self.gameplay.push(GameplayEvent::PricingChanged { kind });
+        }
         Some(applied)
     }
 
@@ -208,7 +220,12 @@ impl Simulation {
         if u.kind == Kind::Condo && u.ever_occupied {
             return false;
         }
+        let was_off = u.no_rate;
         u.no_rate = true;
+        let kind = u.kind;
+        if !was_off {
+            self.gameplay.push(GameplayEvent::PricingChanged { kind });
+        }
         true
     }
 

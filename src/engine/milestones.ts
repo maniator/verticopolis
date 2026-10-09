@@ -2,6 +2,7 @@ import type { Simulation } from "./Simulation";
 import type { Unit } from "./types";
 import { isTenanted } from "./types";
 import { FACILITIES, isHotelKind } from "./facilities";
+import type { GameplayMilestoneId } from "./gameplayEvents";
 
 /** An above-ground, currently-occupied, population-bearing tenant unit — the
  *  shared "a real resident/worker/guest lives here" test used by both the
@@ -18,8 +19,10 @@ export function isTenantFloorUnit(u: Unit): boolean {
  * deterministic and headless-testable. Evaluated once per in-game day.
  */
 export interface Milestone {
-  /** Stable key — persisted; never renumber. */
-  id: string;
+  /** Stable key, persisted and never renumbered. The set is closed by the
+   *  gameplay event catalog (`milestone_reached`), so a new milestone is a
+   *  catalog change too. */
+  id: GameplayMilestoneId;
   label: string;
   desc: string;
   test: (sim: Simulation) => boolean;

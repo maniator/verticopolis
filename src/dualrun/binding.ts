@@ -20,7 +20,7 @@ export const INSTANCE_METHODS = [
   "resizeTransport", "removeUnit", "removeTransport", "setLabel", "setTowerName", "setView", "setAutoBridge", "emit",
   "startFire", "fires", "bombThreat", "evaluateStar", "callExterminator", "autoBridge", "toggleAutoBridge", "setFilmPolicy",
   "rerollSubtype", "applyRentBatch", "pendingChoice", "resolveChoice", "tick", "serialize", "stateView", "crowdView",
-  "stateDigest", "crowdDigest", "frameView", "logSince",
+  "stateDigest", "crowdDigest", "frameView", "logSince", "drainGameplayEvents", "gameplayEventsDropped",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 

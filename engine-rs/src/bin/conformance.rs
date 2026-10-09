@@ -134,12 +134,14 @@ fn main() {
                 continue;
             }
             println!(
-                "{id}: DIVERGED at checkpoint {matched} ({}): state {} vs {}, crowd {} vs {}",
+                "{id}: DIVERGED at checkpoint {matched} ({}): state {} vs {}, crowd {} vs {}, events {} vs {}",
                 g.label,
                 g.state,
                 w.map(|w| w.state.as_str()).unwrap_or("none"),
                 g.crowd,
-                w.map(|w| w.crowd.as_str()).unwrap_or("none")
+                w.map(|w| w.crowd.as_str()).unwrap_or("none"),
+                g.events,
+                w.map(|w| w.events.as_str()).unwrap_or("none")
             );
             continue;
         }

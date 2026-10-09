@@ -9,6 +9,7 @@ use crate::canonical::digest;
 use crate::clock::GameMode;
 use crate::econ::rent_of;
 use crate::facilities::Kind;
+use crate::gameplay::batch_json;
 use crate::sim::Simulation;
 
 #[derive(Deserialize, Debug)]
@@ -367,6 +368,9 @@ pub struct Checkpoint {
     pub label: String,
     pub state: String,
     pub crowd: String,
+    /// The hash of the gameplay events drained since the previous
+    /// checkpoint (the first one counts from the start).
+    pub events: String,
 }
 
 #[derive(Debug)]
@@ -458,6 +462,28 @@ fn expect_ok(ok: bool, expect_fail: bool, what: &str, reason: Option<&str>) -> R
     })
 }
 
+/// The buffered events may be hashed: none was pushed out of a full ring
+/// (the scenario must checkpoint more often), and each is one the catalog
+/// describes (`conformance/events/catalog.json`).
+fn events_fit(sim: &Simulation) -> Result<(), String> {
+    use crate::gameplay::{check_catalog, check_event, CATALOG_JSON, GAMEPLAY_RING_CAP};
+    static CATALOG: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
+    if sim.gameplay.dropped > 0 {
+        return Err(format!(
+            "more than {GAMEPLAY_RING_CAP} gameplay events between two checkpoints; checkpoint more often"
+        ));
+    }
+    let catalog = CATALOG.get_or_init(|| {
+        let c: Value = serde_json::from_str(CATALOG_JSON).expect("the catalog parses");
+        check_catalog(&c).expect("the catalog is valid");
+        c
+    });
+    for e in sim.gameplay.iter() {
+        check_event(catalog, &e.to_json())?;
+    }
+    Ok(())
+}
+
 pub struct Run {
     pub checkpoints: Vec<Checkpoint>,
     pub error: Option<RunError>,
@@ -509,25 +535,46 @@ fn run_scenario_inner(
     };
     let stop = std::cell::Cell::new(false);
     let labels = std::cell::RefCell::new(std::collections::HashSet::new());
+    // The first failure an `emit` hit (a repeated label, a dropped event or
+    // one outside the catalog), raised after the command that took it.
     let duplicate = std::cell::RefCell::new(None::<String>);
-    let emit = |sim: &Simulation, label: String, out: &mut Vec<Checkpoint>| {
+    // Events a `reload` carried over from the engine it replaced, ahead of
+    // the new engine's own (a save carries no events).
+    let carried = std::cell::RefCell::new(Vec::new());
+    let emit = |sim: &mut Simulation, label: String, out: &mut Vec<Checkpoint>| {
         // `emit` throws on a repeated label in the TypeScript, so nothing
         // after it in the same command runs or is recorded, and a repeated
         // `stop_at` label is a failure rather than a stop.
         if !labels.borrow_mut().insert(label.clone()) {
-            *duplicate.borrow_mut() = Some(label.clone());
+            *duplicate.borrow_mut() = Some(format!("checkpoint label {label} is taken twice"));
+            return;
+        }
+        if let Err(e) = events_fit(sim) {
+            *duplicate.borrow_mut() = Some(format!("at checkpoint {label}: {e}"));
             return;
         }
         if stop_at == Some(label.as_str()) {
             stop.set(true);
         }
+        let mut events = std::mem::take(&mut *carried.borrow_mut());
+        events.extend(sim.gameplay.drain());
         out.push(Checkpoint {
             label,
             state: digest(&state_view(sim)),
             crowd: digest(&sim.crowd.view()),
+            events: digest(&batch_json(&events)),
         });
     };
-    emit(&sim, "start".into(), &mut out);
+    emit(&mut sim, "start".into(), &mut out);
+    if let Some(what) = duplicate.borrow_mut().take() {
+        return (
+            Run {
+                checkpoints: out,
+                error: Some(RunError::Failed { index: 0, what }),
+            },
+            None,
+        );
+    }
     if stop.get() {
         return (
             Run {
@@ -554,7 +601,7 @@ fn run_scenario_inner(
         let r: Result<(), RunError> = (|| {
             match c {
                 Command::SetMoney { amount } => sim.money = *amount,
-                Command::Checkpoint { label } => emit(&sim, label.clone(), &mut out),
+                Command::Checkpoint { label } => emit(&mut sim, label.clone(), &mut out),
                 Command::Build {
                     kind,
                     floor,
@@ -646,7 +693,7 @@ fn run_scenario_inner(
                         .transport_at(*floor, *x)
                         .map(|t| t.id)
                         .ok_or_else(|| failed(format!("no transport at floor {floor}, x {x}")))?;
-                    let ok = sim.tower.set_cars(id, *cars);
+                    let ok = sim.set_cars(id, *cars);
                     let landed = sim
                         .tower
                         .transports
@@ -678,7 +725,7 @@ fn run_scenario_inner(
                             .ok_or_else(|| failed("elapsed minutes overflow".into()))?;
                         if let Some(every) = checkpoint_every {
                             if n % every == 0 {
-                                emit(&sim, format!("t+{elapsed}"), &mut out);
+                                emit(&mut sim, format!("t+{elapsed}"), &mut out);
                                 if stop.get() || duplicate.borrow().is_some() {
                                     break;
                                 }
@@ -775,7 +822,7 @@ fn run_scenario_inner(
                     expect_fail,
                 } => {
                     let id = transport_id_at(&sim, *floor, *x).map_err(failed)?;
-                    let r = sim.tower.resize_transport(id, *bottom, *top);
+                    let r = sim.resize_transport(id, *bottom, *top);
                     expect_ok(
                         r.ok,
                         expect_fail.unwrap_or(false),
@@ -877,7 +924,10 @@ fn run_scenario_inner(
                     .map_err(failed)?;
                 }
                 Command::Reload => {
+                    // The events go first, as the TypeScript runner takes them.
                     let before = digest(&state_view(&sim));
+                    events_fit(&sim).map_err(failed)?;
+                    carried.borrow_mut().extend(sim.gameplay.drain());
                     let saved: Value = serde_json::from_str(&sim.serialize().to_string()).unwrap();
                     let loaded = crate::load::deserialize(&saved).map_err(failed)?;
                     if digest(&state_view(&loaded)) != before {
@@ -888,11 +938,11 @@ fn run_scenario_inner(
             }
             Ok(())
         })();
-        if let Some(label) = duplicate.borrow_mut().take() {
+        if let Some(what) = duplicate.borrow_mut().take() {
             return (
                 Run {
                     checkpoints: out,
-                    error: Some(failed(format!("checkpoint label {label} is taken twice"))),
+                    error: Some(failed(what)),
                 },
                 None,
             );
@@ -916,14 +966,14 @@ fn run_scenario_inner(
             );
         }
     }
-    emit(&sim, "final".into(), &mut out);
-    if let Some(label) = duplicate.borrow_mut().take() {
+    emit(&mut sim, "final".into(), &mut out);
+    if let Some(what) = duplicate.borrow_mut().take() {
         return (
             Run {
                 checkpoints: out,
                 error: Some(RunError::Failed {
                     index: s.commands.len(),
-                    what: format!("checkpoint label {label} is taken twice"),
+                    what,
                 }),
             },
             None,

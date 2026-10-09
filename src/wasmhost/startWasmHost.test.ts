@@ -23,6 +23,8 @@ class FakeEngine {
   free(): void { this.freed = true; }
   pendingChoice(): string | undefined { return undefined; }
   logSince(): string { return "[]"; }
+  drainGameplayEvents(): string { return "[]"; }
+  gameplayEventsDropped(): number { return 0; }
 }
 
 function fakeModule(): WasmModule & { engines: FakeEngine[] } {

@@ -493,6 +493,7 @@ export function deserialize(raw: SerializedGame): Simulation {
 export function newGame(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", startUnbridged = false): Simulation {
   const sim = new Simulation(seed, mode, modernCalendar, startUnbridged);
   sim.emit("Welcome! Lay a lobby on the ground line to open your tower.", "info");
+  sim.gameplayEvents.push("tower_founded", { mode: sim.mode });
   return sim;
 }
 

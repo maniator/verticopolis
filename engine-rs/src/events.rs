@@ -4,6 +4,7 @@ use indexmap::IndexSet;
 use serde_json::{json, Value};
 
 use crate::facilities::Kind;
+use crate::gameplay::{EmergencyDecision, EmergencyKind, EmergencySource, GameplayEvent};
 use crate::rng::Rng;
 use crate::services::with_thousands;
 use crate::sim::{LogKind, PointFx, Simulation, ThiefFx};
@@ -86,7 +87,7 @@ impl Simulation {
     /// `maybeRandomEvent`: the daily roll.
     pub fn maybe_random_event(&mut self) {
         if self.events.pending.is_some() {
-            self.resolve_choice(false);
+            self.resolve_choice_from(false, EmergencySource::Timeout);
         }
         self.process_fires();
         self.maybe_santa();
@@ -135,20 +136,41 @@ impl Simulation {
         }
     }
 
-    /// `resolveChoice(option)`: `accept` is true.
+    /// `resolveChoice(option)`: `accept` is true. The player's answer.
     pub fn resolve_choice(&mut self, accept: bool) {
+        self.resolve_choice_from(accept, EmergencySource::Player);
+    }
+
+    /// `EventSystem.resolveChoice(option, source)`: the daily roll's
+    /// auto-decline comes through here as a timeout.
+    pub fn resolve_choice_from(&mut self, accept: bool, source: EmergencySource) {
         let Some(p) = self.events.pending.take() else {
             return;
         };
-        if p.kind == "fireRescue" {
-            if accept && self.money >= p.cost {
+        // What takes effect: an accept the tower cannot afford is a decline.
+        // One test drives both the event and the branches below.
+        let paid = accept && self.money >= p.cost;
+        // Anything but a fire rescue is answered as a bomb threat, as the
+        // branches below (and the TypeScript) treat it.
+        let kind = EmergencyKind::parse(p.kind).unwrap_or(EmergencyKind::BombThreat);
+        self.gameplay.push(GameplayEvent::EmergencyResolved {
+            kind,
+            decision: if paid {
+                EmergencyDecision::Accept
+            } else {
+                EmergencyDecision::Decline
+            },
+            source,
+        });
+        if kind == EmergencyKind::FireRescue {
+            if paid {
                 self.money -= p.cost;
                 self.extinguish_all();
                 self.emit(&format!("🚒 Fire-rescue crews saved the tower for ${}. The rooms that were ablaze are gutted. Bulldoze and rebuild them.", with_thousands(p.cost)), LogKind::Money);
             }
             return;
         }
-        if accept && self.money >= p.cost {
+        if paid {
             self.money -= p.cost;
             self.emit(
                 &format!(
@@ -180,15 +202,25 @@ impl Simulation {
 
     fn extinguish_all(&mut self) {
         let ids: Vec<i64> = self.events.active.iter().copied().collect();
+        let mut gutted = 0;
         for id in ids {
             if let Some(idx) = self.tower.units.iter().position(|u| u.id == id) {
                 if self.tower.units[idx].state == UnitState::Fire {
                     self.gut(idx);
                     self.events.fires_gut_rooms += 1;
+                    gutted += 1;
                 }
             }
         }
         self.events.active.clear();
+        self.note_gutted(gutted);
+    }
+
+    /// `fire_gutted` for one step that gutted `rooms` (none for zero).
+    fn note_gutted(&mut self, rooms: i64) {
+        if rooms > 0 {
+            self.gameplay.push(GameplayEvent::FireGutted { rooms });
+        }
     }
 
     pub fn fire_chance(&self) -> f64 {
@@ -232,6 +264,7 @@ impl Simulation {
         let (id, name, floor) = (u.id, u.kind.facility().name, u.floor);
         self.events.active.insert(id);
         self.events.fires_started += 1;
+        self.gameplay.push(GameplayEvent::FireStarted);
         let msg = format!(
             "🔥 Fire broke out in {} on {}!",
             name,
@@ -292,6 +325,7 @@ impl Simulation {
             return;
         }
         let ids: Vec<i64> = self.events.active.iter().copied().collect();
+        let mut gutted = 0;
         for id in ids {
             let Some(idx) = self.tower.units.iter().position(|u| u.id == id) else {
                 self.events.active.shift_remove(&id);
@@ -309,6 +343,7 @@ impl Simulation {
             if self.rng.chance(control) {
                 self.gut(idx);
                 self.events.fires_gut_rooms += 1;
+                gutted += 1;
                 self.events.active.shift_remove(&id);
                 let msg = format!("🔥 The {} on {} burned down. Only a gutted shell remains. Bulldoze the rubble and rebuild.", name, self.floor_label(floor));
                 self.emit(&msg, LogKind::Bad);
@@ -323,6 +358,7 @@ impl Simulation {
                 self.spread_fire_to(above);
             }
         }
+        self.note_gutted(gutted);
         if !self.events.active.is_empty() {
             for u in self.tower.units.iter_mut() {
                 if u.is_tenanted() || u.state == UnitState::Asleep {
@@ -443,6 +479,8 @@ impl Simulation {
                 }
             }
         }
+        self.gameplay
+            .push(GameplayEvent::BombDetonated { rooms: destroyed });
         self.emit(&format!("💣 A bomb detonated with no security to stop it. {destroyed} room(s) across ~5 floors were gutted, plus a ${} fine. Build Security!", with_thousands(fine)), LogKind::Bad);
     }
 }

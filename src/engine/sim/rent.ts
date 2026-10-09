@@ -38,10 +38,14 @@ export function priceUnit(sim: Simulation, u: Unit, target: number): number | nu
   if (!Number.isFinite(target)) return null; // guard NaN/Infinity from any caller
   if (u.kind === "condo" && u.everOccupied) return null; // already sold
   const applied = opts.shape === "ladder" ? snapToLadder(opts.rungs, target) : clampRent(cfg, target);
+  const before = u.noRate ? null : rentOf(u);
   storeRent(u, cfg, applied);
   // Any explicit reprice puts the unit back on the market, so an imported
   // No-Rate unit is never a permanent $0 trap.
   u.noRate = undefined;
+  // A write that leaves the price where it was (a nudge at the end of the
+  // ladder, the same price again) is not a change.
+  if (rentOf(u) !== before) sim.gameplayEvents.push("pricing_changed", { kind: u.kind });
   return applied;
 }
 
@@ -60,7 +64,9 @@ export function setNoRate(sim: Simulation, id: number): boolean {
   const opts = sim.rules.priceOptions(u.kind);
   if (!opts || opts.shape !== "ladder" || !opts.noRate) return false;
   if (u.kind === "condo" && u.everOccupied) return false; // sold: price-locked
+  const wasOff = u.noRate === true;
   u.noRate = true;
+  if (!wasOff) sim.gameplayEvents.push("pricing_changed", { kind: u.kind });
   return true;
 }
 
@@ -96,7 +102,10 @@ export function previewRentBatch(sim: Simulation, kind: FacilityKind, target: Ba
 }
 
 export function applyRentBatch(sim: Simulation, kind: FacilityKind, target: BatchTarget, opts: BatchRentOptions = {}): BatchRentResult | null {
-  return sim.computeBatch(kind, target, opts, true);
+  const r = sim.computeBatch(kind, target, opts, true);
+  // One event for the batch, when it moved at least one unit's price.
+  if (r && r.changed > 0) sim.gameplayEvents.push("pricing_changed", { kind });
+  return r;
 }
 
 export function computeBatch(sim: Simulation,
