@@ -17,6 +17,12 @@ export class ShadowEngine {
     return this.engine !== null;
   }
 
+  /** The loaded engine, for a host that reads it directly (the frame view,
+   *  the save); an error naming the missing `load` otherwise. */
+  handle(): WasmEngine {
+    return this.live();
+  }
+
   /** The loaded engine, or an error naming the missing `load`. */
   private live(): WasmEngine {
     if (!this.engine) throw new Error("shadow: no engine loaded; send a load command first");

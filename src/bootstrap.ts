@@ -7,6 +7,9 @@ import { initPwaInstall } from "./pwaInstall";
 import { IS_WRAPPED_BUILD } from "./platform";
 import { prepareSaveStore } from "./game/desktopSaveStore";
 import { dualRunRequested, startDualRun, type DualRunApp } from "./dualrun/dualRun";
+import { engineRequested } from "./wasmhost/engineChoice";
+import { loadWasmEngine, startWasmHost, type WasmHostApp } from "./wasmhost/startWasmHost";
+import type { WasmModule } from "./dualrun/binding";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -170,8 +173,27 @@ export function bootGame(create: () => BootApp): Promise<void> {
     // line and does not depend on a module three imports away keeping its
     // promise. Boot continues on localStorage either way.
     if (IS_WRAPPED_BUILD) await prepareSaveStore().catch(() => {});
+    // The WASM engine (`?engine=wasm`, or `vc.engine` in storage) is fetched
+    // before the app exists, so the first tower is hosted before its first
+    // tick; a package that fails to load leaves the game on the TypeScript
+    // engine with the reason in the console.
+    let wasmModule: WasmModule | null = null;
+    if (engineRequested() === "wasm") {
+      try {
+        wasmModule = await loadWasmEngine();
+      } catch (e) {
+        console.error("[wasm] the engine package did not load; running on the TypeScript engine:", e);
+      }
+    }
     try {
       const app = create();
+      if (wasmModule) {
+        try {
+          startWasmHost(app as unknown as WasmHostApp, wasmModule);
+        } catch (e) {
+          console.error("[wasm] did not start; running on the TypeScript engine:", e);
+        }
+      }
       // Publish the tooling handle only where tooling runs: dev serves and
       // VC_TOOLING=1 builds (the e2e, screenshot, and perf pipelines; see
       // vite.config.ts `define`). A production build compiles this branch

@@ -2,15 +2,20 @@ import { describe, it, expect, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { dualRunRequested, startDualRun, type DualRunApp } from "./dualRun";
 import type { ShadowCommand } from "./commands";
-import type { WorkerReply } from "./worker";
+import type { WorkerInit, WorkerReply } from "./worker";
 
 /** A worker stand-in: records what it was sent and lets a test answer. */
 class FakeWorker {
   sent: ShadowCommand[] = [];
+  /** The package URL the controller hands over before any command. */
+  init: WorkerInit | null = null;
   onmessage: ((e: MessageEvent<WorkerReply>) => void) | null = null;
   onerror: ((e: ErrorEvent) => void) | null = null;
   terminated = false;
-  postMessage(cmd: ShadowCommand): void { this.sent.push(cmd); }
+  postMessage(msg: ShadowCommand | WorkerInit): void {
+    if ("type" in msg && msg.type === "init") this.init = msg;
+    else this.sent.push(msg as ShadowCommand);
+  }
   terminate(): void { this.terminated = true; }
   reply(r: WorkerReply): void { this.onmessage?.({ data: r } as MessageEvent<WorkerReply>); }
 }
@@ -40,6 +45,7 @@ describe("startDualRun", () => {
     const a = app();
     const w = new FakeWorker();
     const run = startDualRun(a, () => w as unknown as Worker, quiet);
+    expect(w.init).toMatchObject({ type: "init", url: expect.stringMatching(/engine\/verticopolis_engine\.js$/) });
     expect(w.sent[0]).toMatchObject({ op: "load", gen: 1 });
     a.sim.money = 5;
     expect(w.sent[w.sent.length - 1]).toEqual({ op: "setMoney", amount: 5 });
