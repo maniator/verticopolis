@@ -1,0 +1,49 @@
+[package]
+name = "verticopolis-disc"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.97"
+publish = false
+description = "Reads a player's own legacy disc image: an ISO9660 walk and Microsoft KWAJ expansion under hard budgets"
+
+[lib]
+name = "verticopolis_disc"
+path = "src/lib.rs"
+# An rlib for the tests and the tools; scripts/wasm-build.ts asks for the
+# cdylib the WASM binding needs with `cargo rustc --crate-type cdylib`, the
+# same way it builds the engine.
+
+# Seeded hostile-input fuzzer: a smoke run on every change (disc-rs.yml) and
+# a large nightly run (disc-fuzz.yml). Needs the test kit for its encoder and
+# image builder.
+[[bin]]
+name = "disc-fuzz"
+path = "src/bin/fuzz.rs"
+required-features = ["testkit"]
+
+# Rewrites the committed synthetic fixtures; tests/fixtures.rs checks that
+# the committed bytes are exactly what this produces.
+[[bin]]
+name = "disc-fixtures"
+path = "src/bin/fixtures.rs"
+required-features = ["testkit"]
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+# The JavaScript binding, built only for wasm32 with `--features wasm`; the
+# CLI that generates the glue must be the same version (see engine-rs/README).
+wasm-bindgen = { version = "=0.2.129", optional = true }
+
+[features]
+wasm = ["dep:wasm-bindgen"]
+# Our own KWAJ encoder and ISO image builder, for tests, fixtures and the
+# fuzzer. Never part of a shipped build.
+testkit = []
+
+[profile.release]
+debug = 1
+# Arithmetic on attacker-controlled input panics on overflow rather than
+# wrapping, in the shipped worker and in the release-mode fuzz runs alike.
+overflow-checks = true

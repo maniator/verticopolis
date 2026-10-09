@@ -44,3 +44,5 @@ determinism-diff/
 # Rust engine build output
 engine-rs/target/
 engine-rs/pkg/
+disc-rs/target/
+disc-rs/pkg/

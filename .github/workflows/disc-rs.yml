@@ -1,0 +1,164 @@
+name: Disc reader
+
+# The legacy disc reader in disc-rs/ (an ISO9660 walk and Microsoft KWAJ
+# expansion over attacker-controlled bytes). Format, lint and tests are hard
+# gates, like the engine's lane. The KWAJ decoder is held to libmspack, a
+# decoder we did not write, as a test-time oracle (installed from the
+# runner's package archive, compiled into the harness's own kwajd wrapper,
+# never linked into anything shipped). The WASM build must report exactly
+# what the native build reports for the committed synthetic disc.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "disc-rs/**"
+      - "src/tests/disc/**"
+      - "src/tests/integration/discWasm.integration.test.ts"
+      - "tools/simtower/docker/kwajd.c"
+      - "tools/simtower/disc-check.ts"
+      - "src/storage/**"
+      - "scripts/wasm-build.ts"
+      - "vite.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".nvmrc"
+      - ".github/workflows/disc-rs.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "disc-rs/**"
+      - "src/tests/disc/**"
+      - "src/tests/integration/discWasm.integration.test.ts"
+      - "tools/simtower/docker/kwajd.c"
+      - "tools/simtower/disc-check.ts"
+      - "src/storage/**"
+      - "scripts/wasm-build.ts"
+      - "vite.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".nvmrc"
+      - ".github/workflows/disc-rs.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  disc-rs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: disc-rs
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # The same pinned channel as the engine; every cargo step runs --locked.
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal --component rustfmt,clippy
+          rustup default 1.97.0
+          rustup target add wasm32-unknown-unknown
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Lint
+        run: |
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo clippy --locked --all-targets --features testkit -- -D warnings
+          cargo clippy --locked --all-targets --features wasm -- -D warnings
+          cargo clippy --locked --lib --target wasm32-unknown-unknown --features wasm -- -D warnings
+
+      - name: libmspack oracle
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libmspack-dev
+          cc -O2 -o "$RUNNER_TEMP/kwajd" ../tools/simtower/docker/kwajd.c -lmspack
+          echo "VC_KWAJ_ORACLE=$RUNNER_TEMP/kwajd" >> "$GITHUB_ENV"
+
+      # The oracle tests skip without libmspack locally; here a missing
+      # oracle is a failure.
+      - name: Tests
+        env:
+          VC_REQUIRE_KWAJ_ORACLE: "1"
+        run: |
+          cargo test --locked
+          cargo test --locked --features wasm
+          cargo test --locked --release --features testkit
+
+      # The fuzzer's smoke run on every change: a few hundred seeds with the
+      # libmspack differential on. disc-fuzz.yml runs tens of thousands nightly.
+      - name: Fuzz smoke
+        env:
+          VC_REQUIRE_KWAJ_ORACLE: "1"
+        run: |
+          # Each case's seed goes to stderr before it runs; keep it, and show
+          # its tail on failure, so an abort no handler sees still names it.
+          cargo run --locked --release --features testkit --bin disc-fuzz -- --seeds 300 2> "$RUNNER_TEMP/fuzz.err" \
+            || { tail -n 40 "$RUNNER_TEMP/fuzz.err"; exit 1; }
+          # A malformed seed range or option fails instead of running defaults.
+          for bad in "--seeds 0" "--seeds=5" "--offset 18446744073709551000 --seeds 1000"; do
+            if cargo run -q --locked --release --features testkit --bin disc-fuzz -- $bad 2>/dev/null; then
+              echo "disc-fuzz accepted '$bad'"; exit 1
+            fi
+          done
+
+      - name: WASM binding
+        run: |
+          pin="$(grep -m1 -oP '^wasm-bindgen = \{ version = "=\K[0-9.]+' Cargo.toml)"
+          test -n "$pin" || { echo "could not read the wasm-bindgen pin from disc-rs/Cargo.toml (expected: wasm-bindgen = { version = \"=X.Y.Z\", ... })"; exit 1; }
+          cargo install wasm-bindgen-cli --locked --version "$pin"
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - name: The binding reports what the native build reports
+        working-directory: .
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+          # A missing package fails the suite here instead of skipping it.
+          VC_REQUIRE_DISC_WASM: "1"
+        run: |
+          npm ci
+          npm run disc:wasm:build
+          npm run test:disc-wasm
+
+      # The owner's real-disc tool, type-checked and run over the synthetic
+      # disc, so a change to the reader or the importer cannot break it
+      # unseen. It must agree with libmspack on both KWAJ members, and
+      # refuse a non-image with usage text.
+      - name: disc-check
+        working-directory: .
+        run: |
+          npx tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution bundler \
+            --allowImportingTsExtensions --skipLibCheck --types node --noUnusedLocals --noUnusedParameters \
+            tools/simtower/disc-check.ts
+          out="$(npx tsx tools/simtower/disc-check.ts disc-rs/fixtures/synthetic-disc.iso.bin --kwajd "$VC_KWAJ_ORACLE")"
+          echo "$out"
+          test "$(echo "$out" | grep -c 'libmspack: identical')" -eq 2
+          test "$(echo "$out" | grep -c 'ours matches one')" -eq 2
+          status=0
+          npx tsx tools/simtower/disc-check.ts package.json 2> "$RUNNER_TEMP/check.err" || status=$?
+          cat "$RUNNER_TEMP/check.err"
+          test "$status" -eq 2
+          grep -q 'refused the image' "$RUNNER_TEMP/check.err"
+          grep -q '^usage:' "$RUNNER_TEMP/check.err"
+
+      # Line coverage of the shipped code (the parsers, budgets and result
+      # types) by the tests plus a fuzz run, with the floor at the first
+      # measurement (98.18%, rounded down); it only ratchets up. The test kit
+      # and the binaries are left out so tooling cannot pad the number; the
+      # WASM binding (src/wasm.rs, built only with --features wasm) is
+      # exercised from Node by the parity suite above instead.
+      - name: Coverage
+        env:
+          VC_REQUIRE_KWAJ_ORACLE: "1"
+        run: |
+          rustup component add llvm-tools-preview
+          cargo install cargo-llvm-cov --locked --version 0.9.1
+          cargo llvm-cov --no-report --locked --features testkit
+          cargo llvm-cov --no-report --locked --features testkit run --bin disc-fuzz -- --seeds 100 2> "$RUNNER_TEMP/cov-fuzz.err" \
+            || { tail -n 40 "$RUNNER_TEMP/cov-fuzz.err"; exit 1; }
+          cargo llvm-cov report --ignore-filename-regex 'src/(bin|testkit)/' --fail-under-lines 98

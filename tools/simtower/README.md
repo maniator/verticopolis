@@ -132,6 +132,46 @@ Parses a `.TDT` straight from the canon spec, deliberately **not** sharing our
 importer, so it catches bugs both sides of our code would agree on (this is how
 the zeroed-header-count export bug was found).
 
+### Check the disc reader against your own disc
+
+```bash
+npm run disc:wasm:build
+cc -O2 -o /tmp/kwajd tools/simtower/docker/kwajd.c -lmspack   # optional: libmspack-dev
+npx tsx tools/simtower/disc-check.ts /path/to/SimTower.iso --kwajd /tmp/kwajd
+```
+
+Runs the shipping disc reader (`disc-rs/`, through its WASM build) over your
+ISO and prints only names, sizes, hashes and counts: each KWAJ file's
+expanded size against its header and the disc's own setup manifest, whether
+libmspack expands it to the same bytes, and each tower's counts through the
+game's importer. It writes nothing to the repository. Paste the printed
+counts into an issue; the files stay on your machine.
+
+It runs natively on Windows too (PowerShell, no `--kwajd`: libmspack is the
+WSL or Linux half). Under WSL:
+
+- Without root, build `kwajd` against a downloaded libmspack:
+  ```bash
+  mkdir -p ~/mspack-local && cd ~/mspack-local
+  apt-get download libmspack-dev libmspack0
+  dpkg-deb -x libmspack-dev_*_amd64.deb root && dpkg-deb -x libmspack0_*_amd64.deb root
+  cd -   # back to the repository
+  cc -O2 -o ~/kwajd tools/simtower/docker/kwajd.c \
+     -I ~/mspack-local/root/usr/include ~/mspack-local/root/usr/lib/x86_64-linux-gnu/libmspack.a
+  ```
+- Keep the binary under `$HOME`: WSL can clear `/tmp` between sessions.
+- Use a clone inside the WSL home, not one under `/mnt/c` that Windows also
+  uses (`npm ci` from WSL replaces its `node_modules` with Linux builds).
+- Load Node 22 and Rust first if your shell does not (`. ~/.nvm/nvm.sh && nvm
+  use 22`, `export PATH="$HOME/.cargo/bin:$PATH"`). The ISO on the Windows
+  side is under `/mnt/c/...`.
+
+**Shipping product vs this harness.** The harness runs the real 1994 binary
+on a developer's machine. The shipped product never runs it and never ships
+or commits a byte of it: the disc reader only lists and expands files the
+player's own disc holds, inside a confined process, and anything it extracts
+lives only on that player's machine.
+
 ## Notes / gotchas
 
 - **The file Open/Save dialog needs the real `COMMDLG.DLL`.** Wine's builtin
