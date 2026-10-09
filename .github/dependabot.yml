@@ -9,6 +9,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 0
+    # Rebase open Dependabot PRs automatically when they conflict with main.
+    # This is the default, set here so it is not turned off by accident.
+    # Dependabot still stops rebasing a PR once it has been open 30 days.
+    rebase-strategy: auto
     groups:
       npm-security:
         applies-to: security-updates
