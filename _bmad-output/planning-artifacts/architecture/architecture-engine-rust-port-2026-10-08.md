@@ -105,9 +105,10 @@ The stories, in the order they run, each gated on the one before:
 | 2 | `story-engine-wasm-binding` (phase 1) | 1 | Done: every scenario matches through the binding from Node, in CI |
 | 3 | `story-engine-dual-run` (phase 2) | 2 | Done: a day on every fixture at each speed with no divergence, in CI; the browser run behind `?dualrun=1` |
 | 4 | `story-engine-wasm-switch` (phase 3) | 3, plus the test-mapping table started | In progress: the game runs on the engine behind `?engine=wasm` with the read-model gate (every fixture, every hour) in CI; left: golden masters, the e2e suite under the flag, Modern profile no slower, the default flip. The flip is the headline milestone and ships as 3.0.0 (owner decision 2026-10-09); the flag alone bumps nothing |
-| 5 | `story-engine-tdt-port` (phase 7) | 1 (can overlap 2 to 4) | TDT lock matched both ways |
+| 4b | `story-engine-test-parity` (#878) | 4 | The unit and integration suites run on the WASM engine in CI (the e2e suite already does); every test that stays TypeScript-only is named in the test-mapping table. Owner direction 2026-10-09: before 5 merges and before the flip in 7 |
+| 5 | `story-engine-tdt-port` (phase 7) | 1 (can overlap 2 to 4; merges after 4b) | TDT lock matched both ways |
 | 6 | `story-engine-copy-catalog` | any time after 1 | Engines emit ids, one catalog, save version bump |
-| 7 | `story-engine-retire-typescript` (phase 8) | 4, 5, 6, two releases on WASM, table complete | `src/engine/` gone, lock Rust-owned; internal (the major bump lands with the default flip in 4) |
+| 7 | `story-engine-retire-typescript` (phase 8) | 4, 4b, 5, 6, two releases on WASM, table complete | `src/engine/` gone, lock Rust-owned; internal (the major bump lands with the default flip in 4) |
 | 8 | Godot spike (phase 6, private) | 1 | Brief's go/no-go gate |
 
 Saves-keep-unknown-fields (phase 4) and the threading evaluation (phase 5)
