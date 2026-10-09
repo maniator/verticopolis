@@ -53,6 +53,12 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// `bridgingToggleable()`: Modern can switch automatic bridging off;
+    /// Classic always bridges.
+    pub fn bridging_toggleable(self) -> bool {
+        self == GameMode::Modern
+    }
+
     pub fn walkway_willingness_applies(self) -> bool {
         self == GameMode::Classic
     }

@@ -22,7 +22,7 @@ must reproduce every pinned checkpoint hash (`expected.json`) byte for byte.
 | `economy.rs`, `housekeeping.rs`, `ledger.rs`, `events.rs` | `EconomySystem.ts`, `economy/*.ts`, `Ledger.ts`, `EventSystem.ts` |
 | `sim.rs`, `load.rs` | `Simulation.ts`, `sim/stats.ts` (`recordMoney`, `emit`), `sim/serialization.ts`, `sim/coerce.ts`, `sim/deserializeGuards.ts`, `sim/founderStatus.ts`, `saveMigration.ts`, `migrations/*.ts`, `storage/vctowerContainer.ts` |
 | `scenario.rs`, `bin/conformance.rs`, `bin/dump.rs` | `src/tests/conformance/scenario.ts` |
-| `wasm.rs` (feature `wasm`) | the JavaScript binding; `src/tests/conformance/wasmEngine.ts` drives it |
+| `wasm.rs` (feature `wasm`) | the JavaScript binding; `src/tests/conformance/wasmEngine.ts` and `src/dualrun/` drive it |
 
 Functions keep the names and shape of their TypeScript originals so the two
 can be read side by side. Where JavaScript semantics matter for the hash
@@ -64,16 +64,34 @@ Nothing in the binding simulates anything.
 rustup target add wasm32-unknown-unknown
 cargo install wasm-bindgen-cli --locked --version 0.2.129   # the version Cargo.toml pins
 npm run wasm:build          # cargo rustc (cdylib) for wasm32 + wasm-bindgen into engine-rs/pkg/
-npm run test:wasm           # replay every scenario through the binding from Node (fails without the package)
+npm run test:wasm           # every scenario through the binding, and the dual run's day gate (fails without the package)
 ```
 
-`engine-rs/pkg/` is build output and is not checked in. The WASM suite
+`engine-rs/pkg/` is build output and is not checked in, except for the
+declaration wasm-bindgen writes, copied to `src/dualrun/engine.d.ts`:
+`src/dualrun/binding.ts` types the adapters against it, so a method added
+or renamed in `wasm.rs` reaches TypeScript as a type change, and the
+`engine-rs.yml` job fails when the checked-in copy is stale (rebuild and
+commit it with the Rust change). The WASM suite
 (`src/tests/integration/conformanceWasm.integration.test.ts`) skips itself
 when the package is missing, so `npm test` stays green without a Rust
 toolchain; CI builds the package and runs the suite in `engine-rs.yml` with
 `VC_REQUIRE_WASM=1`, under which a missing package fails the run. Rebuild
 the package after any change to the Rust source; the suite replays whatever
 was built last.
+
+## The dual run
+
+The binding's second consumer is the dual run (story-engine-dual-run): the
+web game, behind a developer switch, runs the WASM engine in a worker beside
+the live TypeScript engine, mirrors every command to it and compares the two
+hashed views at every hour. Switch it on under `npm run dev` with
+`?dualrun=1` (or `localStorage.setItem("vc.dualrun", "1")`) after
+`npm run wasm:build`, which also writes the browser package to
+`src/dualrun/pkg-web/`; the first divergence prints in the console with the
+JSON path where the views depart. The same mirror and shadow run in Node as
+the gate, a full day on every fixture at each game speed through the frame
+loop's own step math: `npm run test:wasm` (the `dualRun*` suites).
 
 The referee prints one line per scenario: `ok`, the first divergent
 checkpoint with both hashes, or the first command the port cannot run. It

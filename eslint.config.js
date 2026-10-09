@@ -4,7 +4,7 @@ import prettier from "eslint-config-prettier";
 
 export default [
   {
-    ignores: ["node_modules", "dist", "coverage", "scripts", "**/*.config.js"],
+    ignores: ["node_modules", "dist", "coverage", "scripts", "**/*.config.js", "src/dualrun/pkg-web", "src/dualrun/engine.d.ts"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

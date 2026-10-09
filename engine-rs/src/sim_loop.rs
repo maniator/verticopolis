@@ -51,7 +51,14 @@ impl Simulation {
         let rush = self.rush_factor();
         self.elevators.accumulate(&self.tower, dt_minutes, rush);
         self.crowd.begin_step();
-        self.crowd.blockbusters = self.blockbusters.iter().copied().collect();
+        // A fractional id (a forged save) matches no cinema, so only whole
+        // ids reach the crowd's set.
+        self.crowd.blockbusters = self
+            .blockbusters
+            .iter()
+            .filter(|b| b.fract() == 0.0)
+            .map(|b| *b as i64)
+            .collect();
         spawn::spawn_step(
             &mut self.crowd,
             (dt_minutes * CROWD_SECONDS_PER_MINUTE).min(CROWD_MAX_STEP),

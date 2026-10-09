@@ -73,8 +73,10 @@ Verticopolis has **two test tiers**:
     **Two engines, one simulation.** `engine-rs/` is a Rust port of
     `src/engine/`, held to the same lock by its own referee
     (`cargo run --release --bin conformance`, and again through the WASM
-    binding from Node with `npm run wasm:build && npm run test:wasm`). Until
-    the web game runs on the
+    binding from Node with `npm run wasm:build && npm run test:wasm`, which
+    also runs the dual run's day gate: both engines driven by the frame
+    loop's own step math and compared every hour). Until the web game runs
+    on the
     Rust engine, every simulation change lands in both engines in one PR with
     the regenerated lock, and a PR that changes `src/engine/` without touching
     `engine-rs/` says why (a UI readout, prose, a transient the hash never
@@ -222,6 +224,9 @@ e2e specs (e.g. `e2e/integration.spec.ts` boots it in a real browser):
   `TowerEngine`, so `new GameApp()` can't run under happy-dom. Its testable
   *logic* lives in the measured `src/game/*` controllers.
 - **`src/render/excalibur/**`**: the Excalibur/WebGL engine wrapper.
+- **`src/dualrun/worker.ts`**: the dual run's Web Worker entry, which loads
+  the WASM package by URL; the controller it serves is measured against a
+  worker stand-in.
 
 Also excluded are non-product tooling entry points that are build/dev plumbing,
 not game logic: the gallery/preview pages (`src/gallery.ts`,

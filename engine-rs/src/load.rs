@@ -93,7 +93,7 @@ fn lenient_base64(text: &str) -> Vec<u8> {
 /// `String.prototype.trim`: strips WhiteSpace and LineTerminator. Compared
 /// with Rust's `is_whitespace`, JavaScript also counts U+FEFF and does not
 /// count U+0085 (NEL).
-fn js_trim(s: &str) -> &str {
+pub fn js_trim(s: &str) -> &str {
     s.trim_matches(|c: char| (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}')
 }
 
@@ -1219,7 +1219,8 @@ fn vacate_reason(v: Option<&Value>) -> Option<&'static str> {
 
 /// JS `Number.parseInt(s, 10)` as an option.
 fn parse_int(s: &str) -> Option<f64> {
-    let t = s.trim_start();
+    // `parseInt` skips the JavaScript whitespace set, the byte order mark included.
+    let t = js_trim(s);
     let (neg, rest) = match t.strip_prefix('-') {
         Some(r) => (true, r),
         None => (false, t.strip_prefix('+').unwrap_or(t)),
@@ -1271,7 +1272,7 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     };
     let mut sim = Simulation::new(seed, mode, calendar, false);
     let modern = mode == GameMode::Modern;
-    sim.auto_bridge = if modern {
+    sim.auto_bridge = if mode.bridging_toggleable() {
         data.get("autoBridge") != Some(&Value::Bool(false))
             && data.get("manualStructure") != Some(&Value::Bool(true))
     } else {
@@ -1286,9 +1287,10 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     sim.evaluated_tower = data
         .get("evaluatedTower")
         .map(|v| v.as_bool().unwrap_or(false));
+    // `data.vipVisitDay ?? -1`: a number is kept as it is, fraction included.
     sim.vip_visit_day = match data.get("vipVisitDay") {
-        None | Some(Value::Null) => -1,
-        Some(v) => v.as_f64().map(|x| x as i64).unwrap_or(-1),
+        None | Some(Value::Null) => -1.0,
+        Some(v) => v.as_f64().unwrap_or(-1.0),
     };
     sim.vip_favorable = match data.get("vipFavorable") {
         None | Some(Value::Null) => false,
@@ -1326,15 +1328,17 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
         }
     }
     if let Some(a) = data.get("blockbusters").and_then(Value::as_array) {
-        let mut set: IndexSet<i64> = IndexSet::new();
+        // `new Set(ids.filter(finite))`: a fractional id is kept as it is (it
+        // never matches a unit, but it saves back out unchanged).
+        let mut ids: Vec<f64> = Vec::new();
         for v in a {
             if let Some(n) = v.as_f64() {
-                if n.is_finite() {
-                    set.insert(n as i64);
+                if n.is_finite() && !ids.contains(&n) {
+                    ids.push(n);
                 }
             }
         }
-        sim.blockbusters = set.into_iter().collect();
+        sim.blockbusters = ids;
     }
     if let Some(a) = data.get("milestones").and_then(Value::as_array) {
         for v in a {
@@ -1669,8 +1673,28 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
             sim.events.active.insert(u.id);
         }
     }
-    if let Some(ev) = data.get("events").and_then(Value::as_object) {
-        sim.events.last_santa_year = num(ev.get("lastSantaYear"), -1.0) as i64;
+    // `loadState(state)` runs for any truthy `events`: a number, a string or an
+    // array has no fields, so it resets the Santa year, the extra rng (seed 1)
+    // and the pending choice, the same as an empty object.
+    let truthy = |v: &Value| match v {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(n) => n.as_f64().is_some_and(|x| x != 0.0),
+        Value::String(s) => !s.is_empty(),
+        Value::Array(_) | Value::Object(_) => true,
+    };
+    let empty = Map::new();
+    let events = data.get("events").and_then(|v| {
+        if let Some(o) = v.as_object() {
+            Some(o)
+        } else if truthy(v) {
+            Some(&empty)
+        } else {
+            None
+        }
+    });
+    if let Some(ev) = events {
+        sim.events.last_santa_year = num(ev.get("lastSantaYear"), -1.0);
         let st = to_uint32(num(ev.get("rngState"), 1.0));
         sim.events.extra = Rng::new(if st == 0 { 1 } else { st });
         sim.events.pending = ev.get("pending").and_then(Value::as_object).and_then(|p| {
@@ -1709,8 +1733,21 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_vctower, js_number, js_string_number, lenient_base64};
+    use super::{decode_vctower, detect_founder, js_number, js_string_number, lenient_base64};
     use serde_json::json;
+
+    /// `Number.parseInt` skips the JavaScript whitespace set, the byte order
+    /// mark included, so a stamped version behind one still reads.
+    #[test]
+    fn founder_stamp_reads_through_a_byte_order_mark() {
+        assert!(detect_founder(&json!({ "appVersion": "\u{feff}1.9" })));
+        assert!(detect_founder(&json!({ "appVersion": "  1.9" })));
+        assert!(!detect_founder(&json!({ "appVersion": "2.0" })));
+        assert!(!detect_founder(&json!({ "appVersion": "\u{feff}" })));
+        assert!(detect_founder(
+            &json!({ "founder": true, "appVersion": "9" })
+        ));
+    }
 
     /// Pinned with Node: `Number(s)` for each input.
     #[test]

@@ -1,0 +1,107 @@
+{
+  "id": "player-edits-modern",
+  "description": "The same four-star tower-one save founded as Modern: the bridging toggle flipped off and an office built on the roof unbridged, then flipped back on and a second office built a gap away so the walkway between them fills; band repricing with the clamp counters (offices above the band, hotel doubles below it, condos back to the default) and one office priced by hand; the express shaft told to stop at the sky lobby, grown two floors (the newly served floors skipped), then its stops reset to lobbies only; the upper standard shaft grown to the roof, laying floor behind it; a cinema set to features and a shop rerolled. A day of hours follows.",
+  "start": {
+    "fixture": "src/tests/fixtures/towerone-star4.vctower",
+    "mode": "modern"
+  },
+  "commands": [
+    {
+      "op": "toggleAutoBridge"
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 58,
+      "x": 120
+    },
+    {
+      "op": "toggleAutoBridge"
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 58,
+      "x": 140
+    },
+    {
+      "op": "checkpoint",
+      "label": "built"
+    },
+    {
+      "op": "applyRentBatch",
+      "kind": "office",
+      "target": 900000
+    },
+    {
+      "op": "applyRentBatch",
+      "kind": "hotelDouble",
+      "target": 1
+    },
+    {
+      "op": "applyRentBatch",
+      "kind": "condo",
+      "target": "default"
+    },
+    {
+      "op": "setFilmPolicy",
+      "floor": 10,
+      "x": 240,
+      "policy": "feature"
+    },
+    {
+      "op": "rerollSubtype",
+      "floor": 13,
+      "x": 250
+    },
+    {
+      "op": "priceUnit",
+      "floor": 2,
+      "x": 150,
+      "target": 25000
+    },
+    {
+      "op": "setStop",
+      "floor": 1,
+      "x": 152,
+      "stopFloor": 30,
+      "stop": true
+    },
+    {
+      "op": "setStop",
+      "floor": 1,
+      "x": 152,
+      "stopFloor": 31,
+      "stop": false
+    },
+    {
+      "op": "resizeTransport",
+      "floor": 1,
+      "x": 152,
+      "bottom": 1,
+      "top": 47
+    },
+    {
+      "op": "clearStops",
+      "floor": 1,
+      "x": 152
+    },
+    {
+      "op": "resizeTransport",
+      "floor": 30,
+      "x": 196,
+      "bottom": 30,
+      "top": 58
+    },
+    {
+      "op": "checkpoint",
+      "label": "edited"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 24,
+      "checkpointEvery": 6
+    }
+  ]
+}

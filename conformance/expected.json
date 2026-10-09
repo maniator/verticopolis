@@ -331,6 +331,27 @@
       {"label":"end","state":"1eb9d177206eb660","crowd":"dc4951770f27816b"},
       {"label":"final","state":"1eb9d177206eb660","crowd":"dc4951770f27816b"}
     ],
+    "player-edits-classic": [
+      {"label":"start","state":"9f2e32e4d081cd40","crowd":"7cb294222cbe0188"},
+      {"label":"edited","state":"eaedbc0eecdb3f3e","crowd":"7cb294222cbe0188"},
+      {"label":"offices-off-market","state":"222c75f84f3a92d0","crowd":"7cb294222cbe0188"},
+      {"label":"repriced","state":"17cb25d3f2aa16be","crowd":"7cb294222cbe0188"},
+      {"label":"t+360","state":"b6eb5b648e987e26","crowd":"891008367f0b0e5f"},
+      {"label":"t+720","state":"d52879df857c33dd","crowd":"89be259af4bd4999"},
+      {"label":"t+1080","state":"5909a2777d80ff04","crowd":"620c9d6e9344491b"},
+      {"label":"t+1440","state":"59a4a81427ffe4c4","crowd":"48cff81cab369177"},
+      {"label":"final","state":"59a4a81427ffe4c4","crowd":"48cff81cab369177"}
+    ],
+    "player-edits-modern": [
+      {"label":"start","state":"9fdb3c23417433b1","crowd":"7cb294222cbe0188"},
+      {"label":"built","state":"da14779dae8147b4","crowd":"7cb294222cbe0188"},
+      {"label":"edited","state":"aea2f88ec581d5ae","crowd":"7cb294222cbe0188"},
+      {"label":"t+360","state":"a283447e09fb89ca","crowd":"df9e2b9c8c385313"},
+      {"label":"t+720","state":"f6a660c32ee07ddb","crowd":"3382990f16198e4c"},
+      {"label":"t+1080","state":"4c7fb233d63237c4","crowd":"8098362d61e05280"},
+      {"label":"t+1440","state":"67fc09fd38b30a38","crowd":"d0e37839c45ff22d"},
+      {"label":"final","state":"67fc09fd38b30a38","crowd":"d0e37839c45ff22d"}
+    ],
     "ransom-ignored-modern": [
       {"label":"start","state":"9fdb3c23417433b1","crowd":"7cb294222cbe0188"},
       {"label":"t+3840","state":"5ab4910378f8589c","crowd":"9b23ce324c625820"},

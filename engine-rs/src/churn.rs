@@ -35,6 +35,36 @@ pub fn roll_household(rng: &mut crate::rng::Rng) -> i64 {
 }
 
 impl Simulation {
+    /// `rerollSubtype(id)`: a fresh canon subtype drawn off the current one
+    /// (from the list minus the current entry, so no rejection sampling), or
+    /// from the whole list when the unit has none; `None` for a unit without
+    /// a subtype list of at least two.
+    pub fn reroll_subtype(&mut self, id: i64) -> Option<&'static str> {
+        let (kind, current) = {
+            let u = self.tower.get_unit(id)?;
+            (u.kind, u.subtype)
+        };
+        let list = kind.subtype_list()?;
+        if list.len() < 2 {
+            return None;
+        }
+        let current_idx = current.and_then(|c| list.iter().position(|&s| s == c));
+        let idx = match current_idx {
+            None => self.rng.int(0, list.len() as i64 - 1) as usize,
+            Some(cur) => {
+                let mut i = self.rng.int(0, list.len() as i64 - 2) as usize;
+                if i >= cur {
+                    i += 1;
+                }
+                i
+            }
+        };
+        let next = list[idx];
+        self.tower.get_unit_mut(id)?.subtype = Some(next);
+        self.tower.bump_meal_overlay_revision();
+        Some(next)
+    }
+
     /// `vacate(u, reason)` on the unit at index `i`.
     pub fn vacate(&mut self, i: usize, reason: &'static str) {
         let (kind, floor, ever_occupied, rent, residents) = {

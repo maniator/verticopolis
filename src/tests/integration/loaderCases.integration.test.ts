@@ -88,6 +88,16 @@ function buildCases(): Case[] {
     ["transport-schedule-garbage", mutate(modern, (s) => { transports(s)[0].schedule = { weekday: "x", homeFloors: [1, "2"], waitingCarResponse: 2 }; })],
     ["log-forged", mutate(modern, (s) => { s.log = [{ minute: 1, text: "x".repeat(5000) }, { minute: "2", kind: "money", text: "ok" }, null, 5]; })],
     ["events-forged", mutate(modern, (s) => { s.events = { pending: { kind: "bombThreat", cost: "300000" }, activeFires: "no" }; })],
+    // The port audit's loader edges: `loadState` runs for any truthy `events`
+    // (a number resets the Santa year, the extra rng and the pending choice
+    // like an empty object; `0` and `""` skip it), a fractional Santa year is
+    // kept as it is, and so is a fractional blockbuster id.
+    ["events-number", mutate(modern, (s) => { s.events = 7; })],
+    ["events-zero", mutate(modern, (s) => { s.events = 0; })],
+    ["events-array", mutate(modern, (s) => { s.events = [1]; })],
+    ["events-santa-fractional", mutate(modern, (s) => { s.events = { lastSantaYear: 1.5, rngState: 9 }; })],
+    ["blockbusters-fractional", mutate(modern, (s) => { s.blockbusters = [1.5, 1, 1, "x", 2.25]; })],
+    ["vip-visit-day-fractional", mutate(modern, (s) => { s.vipVisitDay = -0.5; })],
     ["version-absent-v1-reflow", mutate(modern, (s) => { delete s.version; })],
     ["version-3", mutate(modern, (s) => { s.version = 3; })],
     ["vip-evaluated-without-visits", mutate(modern, (s) => { delete s.vipVisits; s.evaluatedTower = true; s.vipFavorable = true; })],

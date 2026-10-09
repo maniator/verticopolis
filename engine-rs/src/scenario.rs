@@ -87,6 +87,40 @@ pub enum Command {
     },
     #[serde(rename = "resolveChoice")]
     ResolveChoice { accept: bool, kind: Option<String> },
+    #[serde(rename = "toggleAutoBridge")]
+    ToggleAutoBridge,
+    #[serde(rename = "setFilmPolicy")]
+    SetFilmPolicy { floor: i64, x: i64, policy: String },
+    #[serde(rename = "rerollSubtype")]
+    RerollSubtype { floor: i64, x: i64 },
+    #[serde(rename = "applyRentBatch")]
+    ApplyRentBatch {
+        kind: String,
+        target: Value,
+        #[serde(rename = "onlyDefaultPriced")]
+        only_default_priced: Option<bool>,
+    },
+    #[serde(rename = "resizeTransport")]
+    ResizeTransport {
+        floor: i64,
+        x: i64,
+        bottom: i64,
+        top: i64,
+        #[serde(rename = "expectFail")]
+        expect_fail: Option<bool>,
+    },
+    #[serde(rename = "clearStops")]
+    ClearStops { floor: i64, x: i64 },
+    #[serde(rename = "setStop")]
+    SetStop {
+        floor: i64,
+        x: i64,
+        #[serde(rename = "stopFloor")]
+        stop_floor: i64,
+        stop: bool,
+    },
+    #[serde(rename = "priceUnit")]
+    PriceUnit { floor: i64, x: i64, target: f64 },
     #[serde(rename = "reload")]
     Reload,
     #[serde(rename = "tick")]
@@ -129,8 +163,9 @@ impl Scenario {
 /// "num" a finite number, "str" a non-empty string, "bool" a boolean, "place"
 /// a facility kind that is not a transport, "shaft" a transport kind, "mode"
 /// classic or modern, "obj" a JSON object, "kind" any facility kind,
-/// "choice" fireRescue or bombThreat. A trailing "?" marks the field
-/// optional.
+/// "choice" fireRescue or bombThreat, "policy" a film policy, "target" a
+/// batch rent target (a finite number, default or noRate). A trailing "?"
+/// marks the field optional.
 fn field_fits(ty: &str, v: &Value) -> bool {
     let int = |v: &Value| v.as_i64().is_some();
     match ty {
@@ -153,6 +188,14 @@ fn field_fits(ty: &str, v: &Value) -> bool {
         "obj" => v.is_object(),
         "kind" => v.as_str().and_then(Kind::parse).is_some(),
         "choice" => matches!(v.as_str(), Some("fireRescue") | Some("bombThreat")),
+        "policy" => matches!(
+            v.as_str(),
+            Some("auto") | Some("feature") | Some("blockbuster")
+        ),
+        "target" => {
+            matches!(v.as_str(), Some("default") | Some("noRate"))
+                || v.as_f64().is_some_and(f64::is_finite)
+        }
         _ => unreachable!("field type {ty}"),
     }
 }
@@ -217,7 +260,28 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
         "sell" => &[("floor", "int"), ("x", "int"), ("kind", "kind?")],
         "adjustRent" => &[("floor", "int"), ("x", "int"), ("dir", "dir")],
         "setCars" => &[("floor", "int"), ("x", "int"), ("cars", "count")],
-        "startFire" | "bombThreat" | "evaluateStar" | "reload" => &[],
+        "startFire" | "bombThreat" | "evaluateStar" | "reload" | "toggleAutoBridge" => &[],
+        "setFilmPolicy" => &[("floor", "int"), ("x", "int"), ("policy", "policy")],
+        "rerollSubtype" | "clearStops" => &AT,
+        "resizeTransport" => &[
+            ("floor", "int"),
+            ("x", "int"),
+            ("bottom", "int"),
+            ("top", "int"),
+            ("expectFail", "bool?"),
+        ],
+        "setStop" => &[
+            ("floor", "int"),
+            ("x", "int"),
+            ("stopFloor", "int"),
+            ("stop", "bool"),
+        ],
+        "priceUnit" => &[("floor", "int"), ("x", "int"), ("target", "num")],
+        "applyRentBatch" => &[
+            ("kind", "place"),
+            ("target", "target"),
+            ("onlyDefaultPriced", "bool?"),
+        ],
         "callExterminator" => &[("expectFail", "bool?")],
         "resolveChoice" => &[("accept", "bool"), ("kind", "choice?")],
         "setSchedule" => &[("floor", "int"), ("x", "int"), ("schedule", "obj")],
@@ -365,6 +429,22 @@ fn start_sim(start: &Start, root: &std::path::Path) -> Result<Simulation, RunErr
             Ok(sim)
         }
     }
+}
+
+/// The id of the shaft covering a tile, or the runner's "no transport" error.
+fn transport_id_at(sim: &Simulation, floor: i64, x: i64) -> Result<i64, String> {
+    sim.tower
+        .transport_at(floor, x)
+        .map(|t| t.id)
+        .ok_or_else(|| format!("no transport at floor {floor}, x {x}"))
+}
+
+/// The id of the unit covering a tile, or the runner's "no unit" error.
+fn unit_id_at(sim: &Simulation, floor: i64, x: i64) -> Result<i64, String> {
+    sim.tower
+        .unit_at(floor, x)
+        .map(|u| u.id)
+        .ok_or_else(|| format!("no unit at floor {floor}, x {x}"))
 }
 
 fn expect_ok(ok: bool, expect_fail: bool, what: &str, reason: Option<&str>) -> Result<(), String> {
@@ -655,6 +735,117 @@ fn run_scenario_inner(
                 }
                 Command::BombThreat => sim.bomb_threat(),
                 Command::EvaluateStar => sim.evaluate_star(),
+                Command::ToggleAutoBridge => {
+                    // The toggle is a Modern control; a Classic scenario that
+                    // asks for it is wrong.
+                    let before = sim.auto_bridge;
+                    expect_ok(
+                        sim.toggle_auto_bridge() != before,
+                        false,
+                        "toggleAutoBridge",
+                        Some("bridging is not toggleable in this mode"),
+                    )
+                    .map_err(failed)?;
+                }
+                Command::SetFilmPolicy { floor, x, policy } => {
+                    let id = unit_id_at(&sim, *floor, *x).map_err(failed)?;
+                    expect_ok(
+                        sim.set_film_policy(id, policy).is_some(),
+                        false,
+                        &format!("setFilmPolicy {policy} @ {floor},{x}"),
+                        Some("not a cinema"),
+                    )
+                    .map_err(failed)?;
+                }
+                Command::RerollSubtype { floor, x } => {
+                    let id = unit_id_at(&sim, *floor, *x).map_err(failed)?;
+                    expect_ok(
+                        sim.reroll_subtype(id).is_some(),
+                        false,
+                        &format!("rerollSubtype @ {floor},{x}"),
+                        Some("no subtype to draw"),
+                    )
+                    .map_err(failed)?;
+                }
+                Command::ResizeTransport {
+                    floor,
+                    x,
+                    bottom,
+                    top,
+                    expect_fail,
+                } => {
+                    let id = transport_id_at(&sim, *floor, *x).map_err(failed)?;
+                    let r = sim.tower.resize_transport(id, *bottom, *top);
+                    expect_ok(
+                        r.ok,
+                        expect_fail.unwrap_or(false),
+                        &format!("resizeTransport @ {floor},{x} to {bottom}-{top}"),
+                        r.reason.as_deref(),
+                    )
+                    .map_err(failed)?;
+                }
+                Command::ClearStops { floor, x } => {
+                    let id = transport_id_at(&sim, *floor, *x).map_err(failed)?;
+                    expect_ok(
+                        sim.tower.clear_stops(id),
+                        false,
+                        &format!("clearStops @ {floor},{x}"),
+                        None,
+                    )
+                    .map_err(failed)?;
+                }
+                Command::SetStop {
+                    floor,
+                    x,
+                    stop_floor,
+                    stop,
+                } => {
+                    let id = transport_id_at(&sim, *floor, *x).map_err(failed)?;
+                    expect_ok(
+                        sim.tower.set_stop(id, *stop_floor, *stop),
+                        false,
+                        &format!("setStop {stop_floor} {stop} @ {floor},{x}"),
+                        Some("outside the span, or an express stop off a lobby"),
+                    )
+                    .map_err(failed)?;
+                }
+                Command::PriceUnit { floor, x, target } => {
+                    let id = unit_id_at(&sim, *floor, *x).map_err(failed)?;
+                    expect_ok(
+                        sim.price_unit(id, *target).is_some(),
+                        false,
+                        &format!("priceUnit {target} @ {floor},{x}"),
+                        Some("not repriceable"),
+                    )
+                    .map_err(failed)?;
+                }
+                Command::ApplyRentBatch {
+                    kind,
+                    target,
+                    only_default_priced,
+                } => {
+                    let kind = Kind::parse(kind).expect("checked at load");
+                    let target = match target {
+                        Value::String(s) if s == "default" => crate::rent::BatchTarget::Default,
+                        Value::String(s) if s == "noRate" => crate::rent::BatchTarget::NoRate,
+                        v => crate::rent::BatchTarget::Price(v.as_f64().expect("checked at load")),
+                    };
+                    let r =
+                        sim.apply_rent_batch(kind, target, only_default_priced.unwrap_or(false));
+                    // A batch that matched nothing changes nothing, so the
+                    // scenario must point at units that exist.
+                    expect_ok(
+                        r.as_ref().is_some_and(|r| r.matched > 0),
+                        false,
+                        &format!("applyRentBatch {}", kind.as_str()),
+                        Some(if r.is_none() {
+                            "not a priced kind or target"
+                        } else {
+                            "no unit of that kind"
+                        }),
+                    )
+                    .map_err(failed)?;
+                }
                 Command::ResolveChoice { accept, kind } => {
                     // The answer must land on a real pending choice of the
                     // kind the scenario names, and an accept must be payable,

@@ -35,6 +35,15 @@ fn substrate_cost(kind: Kind) -> f64 {
 }
 
 impl Simulation {
+    /// `toggleAutoBridge()`: Modern flips the bridging preference, Classic
+    /// always bridges and never flips (`rules.bridgingToggleable()`).
+    pub fn toggle_auto_bridge(&mut self) -> bool {
+        if self.mode.bridging_toggleable() {
+            self.auto_bridge = !self.auto_bridge;
+        }
+        self.auto_bridge
+    }
+
     pub fn is_unlocked(&self, kind: Kind) -> bool {
         let f = kind.facility();
         if f.modern_only && self.mode != GameMode::Modern {
@@ -67,7 +76,9 @@ impl Simulation {
             },
             cost,
         };
-        if kind.is_structural() {
+        // `!isRoomKind(kind)`: floor, lobby and every transport kind take the
+        // structural branch, where `canPlace` refuses a transport by name.
+        if !kind.is_room() {
             if !self.auto_bridge {
                 let c = self.tower.can_place(kind, floor, x);
                 if !c.ok {
@@ -199,7 +210,7 @@ impl Simulation {
                     "Wedding Hall built! A VIP will inspect your tower soon.",
                     LogKind::Good,
                 );
-                self.vip_visit_day = self.clock.day() + 3;
+                self.vip_visit_day = (self.clock.day() + 3) as f64;
             }
             if floor <= 0 && kind.is_room() {
                 let mut fresh = false;
@@ -282,7 +293,7 @@ impl Simulation {
                     && self.tower.built_wedding_hall != Some(true)
                     && self.evaluated_tower != Some(true)
                 {
-                    self.vip_visit_day = -1;
+                    self.vip_visit_day = -1.0;
                 }
                 return true;
             }
@@ -301,5 +312,26 @@ impl Simulation {
             return true;
         }
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::clock::GameMode;
+    use crate::facilities::Kind;
+    use crate::sim::Simulation;
+
+    /// `canBuild` sends every kind that is not a room down the structural
+    /// branch, where a transport is refused by name, as the TypeScript does.
+    #[test]
+    fn can_build_refuses_a_transport_kind_by_name() {
+        let sim = Simulation::new_game(1, GameMode::Classic);
+        let c = sim.can_build(Kind::ElevatorStandard, 1, 180);
+        assert!(!c.ok);
+        assert_eq!(
+            c.reason.as_deref(),
+            Some("Use placeTransport for vertical transport.")
+        );
+        assert_eq!(c.cost, Kind::ElevatorStandard.facility().cost);
     }
 }

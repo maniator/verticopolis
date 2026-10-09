@@ -75,7 +75,9 @@ pub struct Simulation {
     pub last_quarter_money: f64,
     /// `evaluatedTower`; `None` when the save carried no key.
     pub evaluated_tower: Option<bool>,
-    pub vip_visit_day: i64,
+    /// The day the VIP inspection is due, as the save carries it (a forged
+    /// save may hold a fraction, which the day comparisons then honor).
+    pub vip_visit_day: f64,
     pub vip_favorable: bool,
     pub vip_visits: i64,
     pub last_vip_nag_day: i64,
@@ -83,7 +85,9 @@ pub struct Simulation {
     pub extermination_due_day: Option<f64>,
     /// `"floor:x"` keys in insertion order.
     pub excavated: Vec<String>,
-    pub blockbusters: Vec<i64>,
+    /// The cinemas booked for a blockbuster this month, by id, as the save
+    /// carries them (a forged save may hold a fraction).
+    pub blockbusters: Vec<f64>,
     pub milestones: Vec<String>,
     pub log: Vec<LogEntry>,
     pub log_seq: i64,
@@ -148,7 +152,7 @@ impl Simulation {
             star: 1,
             last_quarter_money: 0.0,
             evaluated_tower: Some(false),
-            vip_visit_day: -1,
+            vip_visit_day: -1.0,
             vip_favorable: false,
             vip_visits: 0,
             last_vip_nag_day: -100,
@@ -223,7 +227,17 @@ impl Simulation {
 
     /// `Simulation.newGame(seed, mode)` with the default calendar, bridged.
     pub fn new_game(seed: u32, mode: GameMode) -> Simulation {
-        let mut sim = Simulation::new(seed, mode, CalendarKind::RealWorld, false);
+        Simulation::new_game_with(seed, mode, CalendarKind::RealWorld, false)
+    }
+
+    /// `Simulation.newGame(seed, mode, modernCalendar, startUnbridged)`.
+    pub fn new_game_with(
+        seed: u32,
+        mode: GameMode,
+        modern_calendar: CalendarKind,
+        start_unbridged: bool,
+    ) -> Simulation {
+        let mut sim = Simulation::new(seed, mode, modern_calendar, start_unbridged);
         sim.emit(
             "Welcome! Lay a lobby on the ground line to open your tower.",
             LogKind::Info,

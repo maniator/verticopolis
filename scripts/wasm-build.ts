@@ -1,14 +1,18 @@
 /**
- * Build the Rust engine's WASM binding into engine-rs/pkg/ for Node:
+ * Build the Rust engine's WASM binding into engine-rs/pkg/ for Node and
+ * src/dualrun/pkg-web/ for the browser:
  * `cargo rustc` for wasm32 with the `wasm` feature as a cdylib, `wasm-bindgen`
  * for the JavaScript glue, and a package.json marking the output CommonJS (the
- * repository is ESM, and wasm-bindgen's Node target emits `require`).
+ * repository is ESM, and wasm-bindgen's Node target emits `require`). The
+ * declaration wasm-bindgen writes is copied to src/dualrun/engine.d.ts, the
+ * one checked-in file, so the TypeScript side types against the binding as
+ * the Rust source declares it (CI fails when the copy is stale).
  * Needs the wasm32-unknown-unknown target and a wasm-bindgen CLI of the
  * version Cargo.toml pins (`rustup target add wasm32-unknown-unknown`,
  * `cargo install wasm-bindgen-cli --locked --version <pinned>`).
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,9 +46,18 @@ const run = (cmd: string, args: string[]) => execFileSync(cmd, args, { cwd: crat
 // stale package behind for the suite to replay.
 rmSync(resolve(crate, "pkg"), { recursive: true, force: true });
 run("cargo", ["rustc", "--locked", "--release", "--lib", "--target", "wasm32-unknown-unknown", "--features", "wasm", "--crate-type", "cdylib"]);
-run("wasm-bindgen", ["--target", "nodejs", "--out-dir", "pkg", "target/wasm32-unknown-unknown/release/verticopolis_engine.wasm"]);
+const wasm = "target/wasm32-unknown-unknown/release/verticopolis_engine.wasm";
+run("wasm-bindgen", ["--target", "nodejs", "--out-dir", "pkg", wasm]);
 writeFileSync(resolve(crate, "pkg/package.json"), '{ "type": "commonjs" }\n');
+// The browser build for the dual run (src/dualrun/worker.ts loads it by URL).
+const web = resolve(crate, "../src/dualrun/pkg-web");
+rmSync(web, { recursive: true, force: true });
+run("wasm-bindgen", ["--target", "web", "--out-dir", web, wasm]);
 for (const f of ["verticopolis_engine.js", "verticopolis_engine_bg.wasm"]) {
   if (!existsSync(resolve(crate, "pkg", f))) throw new Error(`wasm-bindgen did not write engine-rs/pkg/${f}`);
+  if (!existsSync(resolve(web, f))) throw new Error(`wasm-bindgen did not write src/dualrun/pkg-web/${f}`);
 }
-console.log("engine-rs/pkg: built");
+// The class declaration is the same for both targets; the Node copy is the
+// committed one (`src/dualrun/binding.ts` types against it).
+copyFileSync(resolve(crate, "pkg/verticopolis_engine.d.ts"), resolve(web, "../engine.d.ts"));
+console.log("engine-rs/pkg and src/dualrun/pkg-web: built; src/dualrun/engine.d.ts refreshed");

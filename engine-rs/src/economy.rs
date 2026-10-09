@@ -261,7 +261,7 @@ impl Simulation {
             } else {
                 1.0
             };
-            let film_mult = if kind == Kind::Cinema && self.blockbusters.contains(&id) {
+            let film_mult = if kind == Kind::Cinema && self.blockbusters.contains(&(id as f64)) {
                 2.2
             } else {
                 1.0
@@ -411,7 +411,7 @@ impl Simulation {
         } else {
             0.0
         };
-        let mut new_blockbusters: Vec<i64> = Vec::new();
+        let mut new_blockbusters: Vec<f64> = Vec::new();
         for i in 0..self.tower.units.len() {
             let u = &self.tower.units[i];
             if let Some(m) = service_maintenance_monthly(u.kind) {
@@ -445,7 +445,7 @@ impl Simulation {
                     CINEMA_BOOKING_MONTHLY
                 };
                 if blockbuster {
-                    new_blockbusters.push(u.id);
+                    new_blockbusters.push(u.id as f64);
                 }
                 charge("entertainment", booking);
             }

@@ -10,6 +10,7 @@ import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
 import { rentOf } from "../../engine/econConfig";
 import { serializeUnit } from "../../engine/sim/coerce";
 import { digest } from "./canonical";
+import { crowdView, stateView } from "../../engine/conformanceView";
 
 /**
  * The TypeScript reference runner for the engine conformance suite. The format
@@ -42,6 +43,14 @@ export type Command =
   | { op: "callExterminator"; expectFail?: boolean }
   | { op: "resolveChoice"; accept: boolean; kind?: "fireRescue" | "bombThreat" }
   | ({ op: "setSchedule"; schedule: Record<string, unknown> } & At)
+  | { op: "toggleAutoBridge" }
+  | ({ op: "setFilmPolicy"; policy: "auto" | "feature" | "blockbuster" } & At)
+  | ({ op: "rerollSubtype" } & At)
+  | { op: "applyRentBatch"; kind: FacilityKind; target: number | "default" | "noRate"; onlyDefaultPriced?: boolean }
+  | ({ op: "resizeTransport"; bottom: number; top: number; expectFail?: boolean } & At)
+  | ({ op: "clearStops" } & At)
+  | ({ op: "setStop"; stopFloor: number; stop: boolean } & At)
+  | ({ op: "priceUnit"; target: number } & At)
   | { op: "reload" }
   | { op: "tick"; dt: number; times?: number; checkpointEvery?: number }
   | { op: "checkpoint"; label: string };
@@ -64,9 +73,10 @@ export interface Checkpoint {
  *  number, "str" a non-empty string, "bool" a boolean, "place" a facility kind
  *  that is not a transport, "shaft" a transport kind, "mode" classic or modern,
  *  "obj" a JSON object, "kind" any facility kind, "choice" fireRescue or
- *  bombThreat.
+ *  bombThreat, "policy" a film policy, "target" a batch rent target (a finite
+ *  number, default or noRate).
  *  A trailing "?" marks the field optional. */
-type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind" | "choice";
+type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind" | "choice" | "policy" | "target";
 const AT = { floor: "int", x: "int" } as const;
 const OPS: Record<Command["op"], Spec> = {
   setMoney: { amount: "num" },
@@ -83,6 +93,14 @@ const OPS: Record<Command["op"], Spec> = {
   callExterminator: { expectFail: "bool?" },
   resolveChoice: { accept: "bool", kind: "choice?" },
   setSchedule: { ...AT, schedule: "obj" },
+  toggleAutoBridge: {},
+  setFilmPolicy: { ...AT, policy: "policy" },
+  rerollSubtype: AT,
+  applyRentBatch: { kind: "place", target: "target", onlyDefaultPriced: "bool?" },
+  resizeTransport: { ...AT, bottom: "int", top: "int", expectFail: "bool?" },
+  clearStops: AT,
+  setStop: { ...AT, stopFloor: "int", stop: "bool" },
+  priceUnit: { ...AT, target: "num" },
   reload: {},
   tick: { dt: "count", times: "count?", checkpointEvery: "count?" },
   checkpoint: { label: "str" },
@@ -103,6 +121,8 @@ function fits(type: FieldType, v: unknown): boolean {
     case "obj": return typeof v === "object" && v !== null && !Array.isArray(v);
     case "kind": return typeof v === "string" && own(FACILITIES, v);
     case "choice": return v === "fireRescue" || v === "bombThreat";
+    case "policy": return v === "auto" || v === "feature" || v === "blockbuster";
+    case "target": return v === "default" || v === "noRate" || (typeof v === "number" && Number.isFinite(v));
   }
 }
 
@@ -173,6 +193,17 @@ export interface ScenarioEngine {
   bombThreat(): void;
   evaluateStar(): void;
   callExterminator(): Outcome;
+  autoBridge(): boolean;
+  /** The bridging preference after the flip (Classic never flips). */
+  toggleAutoBridge(): boolean;
+  resizeTransport(id: number, bottom: number, top: number): Outcome;
+  clearStops(id: number): boolean;
+  setStop(id: number, floor: number, stop: boolean): boolean;
+  priceUnit(id: number, target: number): number | null;
+  setFilmPolicy(id: number, policy: "auto" | "feature" | "blockbuster"): string | null;
+  rerollSubtype(id: number): string | null;
+  /** The batch's `matched` count, or null when the batch does not apply. */
+  applyRentBatch(kind: FacilityKind, target: number | "default" | "noRate", onlyDefaultPriced: boolean): number | null;
   pendingChoice(): { kind: string; cost: number } | null;
   resolveChoice(accept: boolean): void;
   tick(dt: number): void;
@@ -219,6 +250,21 @@ export function tsEngine(sim: Simulation): ScenarioEngine {
       const r = sim.callExterminator();
       return r.ok ? { ok: true } : { ok: false, reason: r.reason };
     },
+    autoBridge: () => sim.autoBridge,
+    toggleAutoBridge: () => sim.toggleAutoBridge(),
+    resizeTransport: (id, bottom, top) => {
+      const r = sim.tower.resizeTransport(id, bottom, top);
+      return r.ok ? { ok: true } : { ok: false, reason: r.reason };
+    },
+    clearStops: (id) => sim.tower.clearStops(id),
+    setStop: (id, floor, stop) => sim.tower.setStop(id, floor, stop),
+    priceUnit: (id, target) => {
+      const u = sim.tower.getUnit(id);
+      return u ? sim.priceUnit(u, target) : null;
+    },
+    setFilmPolicy: (id, policy) => sim.setFilmPolicy(id, policy),
+    rerollSubtype: (id) => sim.rerollSubtype(id) ?? null,
+    applyRentBatch: (kind, target, onlyDefaultPriced) => sim.applyRentBatch(kind, target, { onlyDefaultPriced })?.matched ?? null,
     pendingChoice: () => sim.pendingChoice,
     resolveChoice: (accept) => sim.resolveChoice(accept ? "accept" : "decline"),
     tick: (dt) => sim.tick(dt),
@@ -244,25 +290,7 @@ export const startTsEngine: EngineStart = (start) => {
   return tsEngine(sim);
 };
 
-/** The saved game minus prose: log entry `text` and the pending choice's
- *  `message` are player copy (locale-formatted money), so they stay out of the
- *  hash. Every other field of both stays in. */
-export function stateView(sim: Simulation): unknown {
-  const data = sim.serialize() as SerializedGame & Record<string, unknown>;
-  const view: Record<string, unknown> = { ...data };
-  if (data.log) view.log = data.log.map(({ text: _text, ...rest }) => rest);
-  const events = data.events as { pending?: { message: string } | null } | undefined;
-  if (events?.pending) {
-    const { message: _message, ...pending } = events.pending;
-    view.events = { ...events, pending };
-  }
-  return view;
-}
-
-/** The live crowd, which saves never carry: its people, id source and rng. */
-export function crowdView(sim: Simulation): unknown {
-  return { nextId: sim.crowd.nextId, rng: sim.crowd.rng.seed, people: sim.crowd.people };
-}
+export { crowdView, stateView };
 
 function unitAt(e: ScenarioEngine, at: At) {
   const u = e.unitAt(at.floor, at.x);
@@ -330,6 +358,38 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
     }
     case "bombThreat": e.bombThreat(); break;
     case "evaluateStar": e.evaluateStar(); break;
+    case "toggleAutoBridge": {
+      // The toggle is a Modern control; a Classic scenario that asks for it
+      // is wrong, and the flip must be visible.
+      const before = e.autoBridge();
+      expectOk(e.toggleAutoBridge() !== before, false, "toggleAutoBridge", "bridging is not toggleable in this mode");
+      break;
+    }
+    case "resizeTransport": {
+      const r = e.resizeTransport(transportAt(e, c).id, c.bottom, c.top);
+      expectOk(r.ok, c.expectFail, `resizeTransport @ ${c.floor},${c.x} to ${c.bottom}-${c.top}`, r.reason);
+      break;
+    }
+    case "clearStops": expectOk(e.clearStops(transportAt(e, c).id), false, `clearStops @ ${c.floor},${c.x}`); break;
+    case "setStop":
+      expectOk(e.setStop(transportAt(e, c).id, c.stopFloor, c.stop), false, `setStop ${c.stopFloor} ${c.stop} @ ${c.floor},${c.x}`, "outside the span, or an express stop off a lobby");
+      break;
+    case "priceUnit":
+      expectOk(e.priceUnit(unitAt(e, c).id, c.target) !== null, false, `priceUnit ${c.target} @ ${c.floor},${c.x}`, "not repriceable");
+      break;
+    case "setFilmPolicy":
+      expectOk(e.setFilmPolicy(unitAt(e, c).id, c.policy) !== null, false, `setFilmPolicy ${c.policy} @ ${c.floor},${c.x}`, "not a cinema");
+      break;
+    case "rerollSubtype":
+      expectOk(e.rerollSubtype(unitAt(e, c).id) !== null, false, `rerollSubtype @ ${c.floor},${c.x}`, "no subtype to draw");
+      break;
+    case "applyRentBatch": {
+      // A batch that matched nothing changes nothing, so the scenario must
+      // point at units that exist.
+      const matched = e.applyRentBatch(c.kind, c.target, c.onlyDefaultPriced ?? false);
+      expectOk(matched !== null && matched > 0, false, `applyRentBatch ${c.kind}`, matched === null ? "not a priced kind or target" : "no unit of that kind");
+      break;
+    }
     case "setSchedule":
       expectOk(e.setSchedule(transportAt(e, c).id, c.schedule), false, `setSchedule @ ${c.floor},${c.x}`, "not an elevator");
       break;
