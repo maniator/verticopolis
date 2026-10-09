@@ -17,6 +17,11 @@ on:
       - "src/tests/conformance/**"
       - "src/tests/integration/conformance.integration.test.ts"
       - "src/tests/integration/conformanceWasm.integration.test.ts"
+      - "src/tests/integration/dualRunDay.integration.test.ts"
+      - "src/tests/integration/dualRunEdits.integration.test.ts"
+      - "src/tests/dualrun/**"
+      - "src/dualrun/**"
+      - "src/game/frameLoop.ts"
       - "src/tests/integration/loaderCases.integration.test.ts"
       - "src/tests/fixtures/*.vctower"
       - "scripts/wasm-build.ts"
@@ -35,6 +40,11 @@ on:
       - "src/tests/conformance/**"
       - "src/tests/integration/conformance.integration.test.ts"
       - "src/tests/integration/conformanceWasm.integration.test.ts"
+      - "src/tests/integration/dualRunDay.integration.test.ts"
+      - "src/tests/integration/dualRunEdits.integration.test.ts"
+      - "src/tests/dualrun/**"
+      - "src/dualrun/**"
+      - "src/game/frameLoop.ts"
       - "src/tests/integration/loaderCases.integration.test.ts"
       - "src/tests/fixtures/*.vctower"
       - "scripts/wasm-build.ts"
@@ -86,7 +96,9 @@ jobs:
 
       # The referee again, through the WASM binding from Node: the same
       # TypeScript runner replays every scenario on the module wasm-bindgen
-      # generates (story-engine-wasm-binding). The CLI version must match the
+      # generates (story-engine-wasm-binding), and the dual run's day gate
+      # (story-engine-dual-run) compares both engines every hour for a day on
+      # every fixture at each game speed. The CLI version must match the
       # crate version Cargo.toml pins, so the pin is read from there and
       # scripts/wasm-build.ts checks the match. The CLI is compiled from
       # source here (a few minutes); the job's timeout allows for it.
@@ -109,6 +121,8 @@ jobs:
         run: |
           npm ci
           npm run wasm:build
+          # The checked-in declaration has to be the one this build wrote.
+          test -z "$(git status --porcelain -- src/dualrun/engine.d.ts)" || { echo "src/dualrun/engine.d.ts is stale or untracked: run npm run wasm:build and commit it"; exit 1; }
           npm run test:wasm
 
       # Coverage of the unit tests plus the referee, with a line floor that

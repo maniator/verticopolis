@@ -412,6 +412,13 @@ export default defineConfig({
         "src/render/excalibur/TowerEngine.ts",
         "src/render/excalibur/towerScene.ts",
         "src/render/excalibur/towerReconcile.ts",
+        // The dual run's worker entry: it loads the WASM package by URL in a
+        // Web Worker, neither of which exists under happy-dom; it is
+        // exercised by hand under `npm run dev`. The controller, the mirror,
+        // the shadow engine and the command vocabulary are measured and
+        // tested in Node (the controller against a worker stand-in).
+        "src/dualrun/worker.ts",
+        "src/dualrun/pkg-web/**",
       ],
       // Enforced floors (a ratchet, not a vanity ceiling). Global floor holds the
       // logic layers; per-file globs stop a weak painter/synth file hiding behind

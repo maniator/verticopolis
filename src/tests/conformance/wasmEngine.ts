@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { rentOf } from "../../engine/econConfig";
 import { REPO_ROOT, type EngineStart, type Outcome, type ScenarioEngine } from "./scenario";
+import { checkBinding, type WasmEngine, type WasmModule } from "../../dualrun/binding";
 
 /**
  * The Rust engine behind the scenario surface, through its WASM binding
@@ -25,54 +26,7 @@ export const hasWasmPackage = (): boolean => [WASM_PKG, WASM_BYTES, WASM_MARKER]
 /** CI's switch: the binding must be present, a skip is a failure. */
 export const wasmRequired = (): boolean => process.env.VC_REQUIRE_WASM === "1";
 
-/** The binding's surface, as `engine-rs/src/wasm.rs` declares it. The
- *  generated `.d.ts` is not checked in, so the shape is spelled out here. */
-interface WasmEngine {
-  free(): void;
-  mode(): string;
-  money(): number;
-  setMoney(amount: number): void;
-  build(kind: string, floor: number, x: number): string;
-  buildTransport(kind: string, x: number, bottom: number, top: number): string;
-  sellAt(floor: number, x: number): boolean;
-  unitAt(floor: number, x: number): string | undefined;
-  transportAt(floor: number, x: number): string | undefined;
-  adjustRent(id: number, dir: number): number | undefined;
-  setNoRate(id: number): boolean;
-  setCars(id: number, cars: number): boolean;
-  setSchedule(id: number, schedule: string): boolean;
-  startFire(): void;
-  fires(): number;
-  bombThreat(): void;
-  evaluateStar(): void;
-  callExterminator(): string;
-  pendingChoice(): string | undefined;
-  resolveChoice(accept: boolean): void;
-  tick(dtMinutes: number): void;
-  serialize(): string;
-  stateDigest(): string;
-  crowdDigest(): string;
-}
-
-interface WasmModule {
-  Engine: {
-    newGame(seed: number, mode: string): WasmEngine;
-    fromSave(text: string): WasmEngine;
-    fromVctower(text: string, mode?: string | null): WasmEngine;
-  };
-}
-
 let loaded: WasmModule | undefined;
-
-/** Every method the adapter calls on an instance, checked against the loaded
- *  class once so a binding that renamed or dropped one fails by name rather
- *  than as "not a function" deep inside a scenario. */
-const INSTANCE_METHODS = [
-  "free", "mode", "money", "setMoney", "build", "buildTransport", "sellAt", "unitAt", "transportAt",
-  "adjustRent", "setNoRate", "setCars", "setSchedule", "startFire", "fires", "bombThreat", "evaluateStar",
-  "callExterminator", "pendingChoice", "resolveChoice", "tick", "serialize", "stateDigest", "crowdDigest",
-] as const;
-const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const;
 
 /** Load the package once per process. It is CommonJS (wasm-bindgen's `nodejs`
  *  target) inside an ESM repository, so it comes in through `require`. One
@@ -80,15 +34,7 @@ const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const;
  *  undefined state, so the binding returns errors rather than panicking. */
 export function wasm(): WasmModule {
   if (loaded) return loaded;
-  const mod = createRequire(import.meta.url)(WASM_PKG) as WasmModule;
-  if (typeof mod.Engine !== "function") throw new Error("the WASM binding exports no Engine class; rebuild it");
-  const proto = (mod.Engine as unknown as { prototype: object }).prototype;
-  const missing = [
-    ...INSTANCE_METHODS.filter((m) => typeof (proto as Record<string, unknown>)[m] !== "function").map((m) => `Engine#${m}`),
-    ...STATIC_METHODS.filter((m) => typeof (mod.Engine as unknown as Record<string, unknown>)[m] !== "function").map((m) => `Engine.${m}`),
-  ];
-  if (missing.length) throw new Error(`the WASM binding lacks ${missing.join(", ")}; rebuild it or update the adapter`);
-  loaded = mod;
+  loaded = checkBinding(createRequire(import.meta.url)(WASM_PKG));
   return loaded;
 }
 
@@ -151,6 +97,18 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
     bombThreat: () => live().bombThreat(),
     evaluateStar: () => live().evaluateStar(),
     callExterminator: () => outcome(live().callExterminator()),
+    autoBridge: () => live().autoBridge(),
+    toggleAutoBridge: () => live().toggleAutoBridge(),
+    resizeTransport: (id, bottom, top) => outcome(live().resizeTransport(i32(id, "id"), i32(bottom, "bottom"), i32(top, "top"))),
+    clearStops: (id) => live().clearStops(i32(id, "id")),
+    setStop: (id, floor, stop) => live().setStop(i32(id, "id"), i32(floor, "floor"), stop),
+    priceUnit: (id, target) => live().priceUnit(i32(id, "id"), target) ?? null,
+    setFilmPolicy: (id, policy) => live().setFilmPolicy(i32(id, "id"), policy) ?? null,
+    rerollSubtype: (id) => live().rerollSubtype(i32(id, "id")) ?? null,
+    applyRentBatch: (kind, target, onlyDefaultPriced) => {
+      const text = live().applyRentBatch(kind, JSON.stringify(target), onlyDefaultPriced);
+      return text === undefined ? null : (JSON.parse(text) as { matched: number }).matched;
+    },
     pendingChoice: () => {
       const text = live().pendingChoice();
       return text === undefined ? null : (JSON.parse(text) as { kind: string; cost: number });

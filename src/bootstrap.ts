@@ -6,6 +6,7 @@ import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
 import { IS_WRAPPED_BUILD } from "./platform";
 import { prepareSaveStore } from "./game/desktopSaveStore";
+import { dualRunRequested, startDualRun, type DualRunApp } from "./dualrun/dualRun";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -179,6 +180,16 @@ export function bootGame(create: () => BootApp): Promise<void> {
       // still reach anything client-side; this closes the handed-out path.
       if (import.meta.env.DEV || __TOOLING_BUILD__) {
         (window as unknown as { game: BootApp }).game = app;
+        // The dual run (the WASM engine shadowing the live one, compared
+        // every hour) is a developer switch on the same tooling-only path.
+        // A switch that fails to start is logged and never takes boot down.
+        if (dualRunRequested()) {
+          try {
+            startDualRun(app as unknown as DualRunApp);
+          } catch (e) {
+            console.error("[dualrun] did not start:", e);
+          }
+        }
       }
       // Register the service worker so the game is installable and offline-ready.
       // On a new build: prompt the player (never force a reload), see
