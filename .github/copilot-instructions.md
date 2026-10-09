@@ -93,26 +93,15 @@ don't claim a skill was invoked:
   so it stays reliably searchable as confirmation this overlay was applied, even
   if a template or postamble appends text after it.
 
-> **Maintainer note: why there is no `.github/skills` review skill.** Copilot
-> code review *can* load agent skills from `.github/skills/`, but this repo
-> commits the full BMGD/BMAD skill library under `.claude/skills/` and
-> `.agents/skills/` (~515 files each). Copilot's skill loader has a ~508-file
-> budget those trees blow past, so it drops **all** base-branch skills for safety.
-> A `.github/skills/code-review` skill can't load here. The reviewer's run log
-> states it outright:
->
-> ```
-> [skills] Materialization aborted (convention .claude/skills has 515 files,
->   exceeds remaining MAX_SKILL_FILE_COUNT budget (508)); dropping all
->   base-branch skills for safety.
-> [skills] session=github/copilot-code-review ... configuredDirectories=0
-> [skills] session=github/copilot-code-review SDK reported 0 skills loaded
-> ```
->
-> This overlay is the mechanism by design; don't re-add a review skill expecting
-> it to load. (Investigated 2026-07-06: verticopolis ships both the `bmad-*` and
-> `gds-*` families, ~515 files per convention; a bmad-only install lands ~256,
-> under budget.)
+> **Maintainer note on agent skills.** Copilot code review loads this repo's
+> skills from `.agents/skills/` (the run log for #861 on 2026-10-08 reports
+> `catalogEntries=89`, and the reviewer invoked `gds-code-review` and
+> `bmad-code-review` from there). An earlier note here said the loader's
+> file budget dropped every skill; that was true on 2026-07-06 and is not
+> anymore. `.github/skills/engine-parity-review/SKILL.md` adds the
+> repo-specific checklist for a change on the TypeScript and Rust engine
+> seam (the two-engine rule, the lock, the loader table, the canon caps);
+> the overlay above stays the review method either way.
 
 ## Code review
 
