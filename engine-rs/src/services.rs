@@ -321,17 +321,17 @@ impl Simulation {
 
     /// `checkVip`.
     pub fn check_vip(&mut self) {
-        if self.evaluated_tower == Some(true) || self.vip_visit_day < 0 {
+        if self.evaluated_tower == Some(true) || self.vip_visit_day < 0.0 {
             return;
         }
         if self.tower.built_wedding_hall != Some(true) {
-            self.vip_visit_day = -1;
+            self.vip_visit_day = -1.0;
             return;
         }
-        if self.clock.day() < self.vip_visit_day {
+        if (self.clock.day() as f64) < self.vip_visit_day {
             return;
         }
-        self.vip_visit_day = -1;
+        self.vip_visit_day = -1.0;
         self.vip_visits += 1;
         let pop = self.rating_population();
         let ok = self.has_operational(Kind::WeddingHall)
@@ -347,7 +347,7 @@ impl Simulation {
             );
         } else {
             self.emit("The VIP was unimpressed. Grow your population and amenities, then rebuild interest.", LogKind::Bad);
-            self.vip_visit_day = self.clock.day() + 5;
+            self.vip_visit_day = (self.clock.day() + 5) as f64;
         }
     }
 }

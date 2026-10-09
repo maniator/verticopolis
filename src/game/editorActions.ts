@@ -266,7 +266,7 @@ export class EditorActions {
       }
       if (action === "rename") {
         const input = root.querySelector<HTMLInputElement>("#ed-name");
-        if (input) u.label = input.value.trim() || FACILITIES[u.kind].name;
+        if (input) sim.tower.setLabel(u.id, input.value);
         this.deps.audio.sfx("click");
         this.deps.refreshEditor();
       } else if (action === "rentUp" || action === "rentDown") {

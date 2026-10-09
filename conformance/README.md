@@ -23,7 +23,9 @@ TypeScript engine is the default; the Rust engine answers twice, natively
 through `cargo run --release --bin conformance` and through its WASM binding
 from Node (`npm run wasm:build && npm run test:wasm`, see
 `engine-rs/README.md`), where the same TypeScript runner replays every
-scenario against this lock.
+scenario against this lock. Beyond the scripted scenarios, the dual run
+(`src/dualrun/`, `npm run test:wasm`) compares the two engines every hour
+under the web frame loop's own cadence, for a day on every fixture.
 
 ## When a hash moves
 
@@ -106,6 +108,14 @@ Commands run in order. Units and shafts are named by a tile they cover
 | `evaluateStar` | | Run the star evaluation. |
 | `resolveChoice` | `accept`, `kind?` | Answer the pending player choice (`resolveChoice`): `true` pays the fire rescue or the ransom, `false` declines (the fire burns on; Security searches for the bomb, and with no Security it detonates). An error when no choice is pending, when `kind` (`fireRescue` or `bombThreat`) is not the pending kind, or when `accept` is set and the treasury cannot pay (the engine would treat that as a decline). |
 | `callExterminator` | `expectFail?` | Book the Modern exterminator (`callExterminator`); a refusal (Classic, a booking pending, no infested room, short of funds) is an error unless `expectFail` is set. |
+| `toggleAutoBridge` | | Flip the Modern bridging preference (`toggleAutoBridge`); an error in Classic, where it never flips. |
+| `setFilmPolicy` | `floor`, `x`, `policy` | Set the cinema at that tile to `auto`, `feature` or `blockbuster`; an error on anything but a cinema. |
+| `rerollSubtype` | `floor`, `x` | Draw a fresh retail variety for the unit at that tile off the main rng; an error on a kind with no varieties. |
+| `applyRentBatch` | `kind`, `target`, `onlyDefaultPriced?` | Batch reprice every unit of `kind` to `target` (a number, `default` or `noRate`); an error on an unpriced kind, a `noRate` target off the Classic ladder, or when no unit of that kind exists. |
+| `resizeTransport` | `floor`, `x`, `bottom`, `top`, `expectFail?` | Grow or shrink the shaft at that tile to the span (`Tower.resizeTransport`), laying floor behind newly served floors. |
+| `clearStops` | `floor`, `x` | Every floor stops again on the shaft at that tile (an express keeps its lobby-only rule). |
+| `setStop` | `floor`, `x`, `stopFloor`, `stop` | Serve or skip `stopFloor` on the shaft at that tile; an error outside the span or for an express stop off a lobby. |
+| `priceUnit` | `floor`, `x`, `target` | Set the unit's price to `target` through the one choke point every price write takes; an error when the unit is not repriceable. |
 | `reload` | | Save the game and load the save (`serialize()`, a JSON round trip, `deserialize`), replacing the running engine. The hashed `state` view must come back unchanged; a difference is an error. Live state that saves do not carry (the crowd, elevator dispatch) restarts as a load restarts it (see Checkpoints). |
 | `tick` | `dt`, `times?`, `checkpointEvery?` | Call `tick(dt)` `times` times (default 1). All three are whole positive numbers. After every `checkpointEvery`th call, take a checkpoint labeled `t+<minutes>`, where minutes counts every tick's `dt` since the start of the scenario. |
 | `checkpoint` | `label` | Take a checkpoint. |
@@ -126,6 +136,9 @@ ill-typed:
 - `dt`, `times`, `checkpointEvery` and `cars` are whole numbers above zero.
 - `dir` is 1 or -1, `amount` is a finite number, `expectFail` is a boolean.
 - a `resolveChoice` `kind` is `fireRescue` or `bombThreat`.
+- a `policy` is `auto`, `feature` or `blockbuster`; a batch `target` is a
+  finite number, `default` or `noRate`; `stopFloor` is a whole number,
+  `stop` a boolean, a `priceUnit` `target` a finite number.
 - `kind` is a key of `FACILITIES` in `src/engine/facilitiesData.ts`: one
   without the `transport` flag for `build` and `buildRow`, one with it for
   `buildTransport`.

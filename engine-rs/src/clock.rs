@@ -7,6 +7,15 @@ pub enum CalendarKind {
 }
 
 impl CalendarKind {
+    /// The calendar a save or a host names, by its saved spelling.
+    pub fn parse(s: &str) -> Option<CalendarKind> {
+        match s {
+            "canon" => Some(CalendarKind::Canon),
+            "realWorld" => Some(CalendarKind::RealWorld),
+            _ => None,
+        }
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             CalendarKind::Canon => "canon",

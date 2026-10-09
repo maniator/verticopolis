@@ -20,7 +20,9 @@ pub struct EventSystem {
     pub active: IndexSet<i64>,
     /// The seasonal and visitor stream, separate from the main one.
     pub extra: Rng,
-    pub last_santa_year: i64,
+    /// The year Santa last came, as the save carries it (a forged save may
+    /// hold a fraction, which then never equals a year).
+    pub last_santa_year: f64,
     pub pending: Option<PendingChoice>,
 }
 
@@ -33,7 +35,7 @@ impl EventSystem {
         EventSystem {
             active: IndexSet::new(),
             extra: Rng::new(seed ^ 0x5a17a),
-            last_santa_year: -1,
+            last_santa_year: -1.0,
             pending: None,
         }
     }
@@ -53,6 +55,24 @@ impl EventSystem {
 }
 
 impl Simulation {
+    /// `setFilmPolicy(id, policy)`: the policy as stored, or `None` when the
+    /// unit is not a cinema. A policy outside the three the type allows is
+    /// refused the same way, since the TypeScript cannot be called with one.
+    pub fn set_film_policy(&mut self, id: i64, policy: &str) -> Option<&'static str> {
+        let policy: &'static str = match policy {
+            "auto" => "auto",
+            "feature" => "feature",
+            "blockbuster" => "blockbuster",
+            _ => return None,
+        };
+        let u = self.tower.get_unit_mut(id)?;
+        if u.kind != Kind::Cinema {
+            return None;
+        }
+        u.film_policy = Some(policy);
+        Some(policy)
+    }
+
     /// `maybeRandomEvent`: the daily roll.
     pub fn maybe_random_event(&mut self) {
         if self.events.pending.is_some() {
@@ -305,13 +325,16 @@ impl Simulation {
         let day_of_year = ((self.clock.day() % cal.year_days) + cal.year_days) % cal.year_days;
         let holiday_start = cal.year_days
             - (crate::jsmath::round((cal.year_days as f64 * 20.0) / 360.0) as i64).max(1);
-        if day_of_year < holiday_start || self.star < 3 || year == self.events.last_santa_year {
+        if day_of_year < holiday_start
+            || self.star < 3
+            || year as f64 == self.events.last_santa_year
+        {
             return;
         }
         if !self.events.extra.chance(0.4) {
             return;
         }
-        self.events.last_santa_year = year;
+        self.events.last_santa_year = year as f64;
         self.emit(
             "🎅 Santa was spotted crossing the sky above your tower for the holidays!",
             LogKind::Good,

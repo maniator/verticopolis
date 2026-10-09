@@ -224,6 +224,26 @@ pub struct PlaceResult {
     pub unit_id: Option<i64>,
 }
 
+/// `resizeTransport`'s result: a `PlaceResult` plus what the resize did.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ResizeResult {
+    pub ok: bool,
+    pub reason: Option<String>,
+    pub added: i64,
+    pub floor_tiles_created: i64,
+}
+
+impl ResizeResult {
+    fn fail(reason: impl Into<String>) -> ResizeResult {
+        ResizeResult {
+            ok: false,
+            reason: Some(reason.into()),
+            added: 0,
+            floor_tiles_created: 0,
+        }
+    }
+}
+
 impl PlaceResult {
     fn fail(reason: impl Into<String>) -> PlaceResult {
         PlaceResult {
@@ -1117,6 +1137,164 @@ impl Tower {
             let t = &mut self.transports[i];
             t.schedule = Some(t.schedule.as_ref().unwrap().snap_homes_to_stops(&stops));
         }
+        true
+    }
+
+    /// `transportOverlaps(t, x, width, floor)`.
+    fn transport_overlaps(t: &Transport, x: i64, width: i64, floor: i64) -> bool {
+        if floor < t.bottom || floor > t.top {
+            return false;
+        }
+        x < t.x + t.width && x + width > t.x
+    }
+
+    /// `layShaftFloors(floors, x, width)`: plain floor across the shaft's
+    /// footprint on each floor that lacks it, in support order; `None` (with
+    /// the batch rolled back) when a tile can never be supported.
+    pub fn lay_shaft_floors(&mut self, floors: &[i64], x: i64, width: i64) -> Option<Vec<i64>> {
+        let mut tiles = Vec::new();
+        for &fl in floors {
+            for i in 0..width {
+                if !self.structure.contains_key(&(fl, x + i)) {
+                    tiles.push((fl, x + i));
+                }
+            }
+        }
+        if tiles.is_empty() {
+            return Some(Vec::new());
+        }
+        let (placed, stuck) = self.place_structure_run(&tiles, Kind::Floor);
+        if !stuck.is_empty() {
+            for id in placed {
+                self.remove_unit(id);
+            }
+            return None;
+        }
+        Some(placed)
+    }
+
+    /// `resizeTransport(id, newBottom, newTop)`: grow or shrink a shaft's
+    /// served range, laying plain floor behind newly served floors. Returns
+    /// the floors added (negative for a shrink) and the floor tiles laid.
+    pub fn resize_transport(&mut self, id: i64, new_bottom: i64, new_top: i64) -> ResizeResult {
+        let Some(i) = self.transport_index(id) else {
+            return ResizeResult::fail("No such transport.");
+        };
+        if new_top <= new_bottom {
+            return ResizeResult::fail("Transport needs height.");
+        }
+        if new_bottom < MIN_FLOOR || new_top > MAX_FLOOR {
+            return ResizeResult::fail("Outside the buildable range.");
+        }
+        let (kind, tx, twidth, prev_bottom, prev_top) = {
+            let t = &self.transports[i];
+            (t.kind, t.x, t.width, t.bottom, t.top)
+        };
+        if let Some(reason) = self.span_reason(kind, new_bottom, new_top) {
+            return ResizeResult::fail(reason);
+        }
+        let mut new_floors = Vec::new();
+        for fl in new_bottom..=new_top {
+            if fl >= prev_bottom && fl <= prev_top {
+                continue;
+            }
+            for other in &self.transports {
+                if other.id == id {
+                    continue;
+                }
+                if Self::transport_overlaps(other, tx, twidth, fl) {
+                    return ResizeResult::fail(SHAFT_OVERLAP);
+                }
+            }
+            if is_sky_lobby_floor(fl) && !self.span_has_floor(fl, tx, twidth) {
+                return ResizeResult::fail(format!(
+                    "Build the sky lobby on floor {fl} first, then extend through it."
+                ));
+            }
+            new_floors.push(fl);
+        }
+        let Some(created) = self.lay_shaft_floors(&new_floors, tx, twidth) else {
+            return ResizeResult::fail(NEEDS_FLOORS);
+        };
+        let before = prev_top - prev_bottom + 1;
+        {
+            let t = &mut self.transports[i];
+            t.bottom = new_bottom;
+            t.top = new_top;
+            for p in t.car_positions.iter_mut() {
+                *p = p.min(new_top as f64).max(new_bottom as f64);
+            }
+        }
+        if kind == Kind::ElevatorExpress {
+            // Keep the in-span choices, drop the new endpoints, skip the
+            // newly served non-lobby floors.
+            let mut skip: Vec<f64> = Vec::new();
+            for &f in self.transports[i].skip_floors.as_deref().unwrap_or(&[]) {
+                if f > new_bottom as f64 && f < new_top as f64 && !skip.contains(&f) {
+                    skip.push(f);
+                }
+            }
+            for fl in new_bottom + 1..new_top {
+                if fl >= prev_bottom && fl <= prev_top {
+                    continue;
+                }
+                let f = fl as f64;
+                if !self.floor_has_lobby(fl) && !skip.contains(&f) {
+                    skip.push(f);
+                }
+            }
+            skip.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            self.transports[i].skip_floors = Some(skip);
+        }
+        self.revision += 1;
+        let (cars, bottom, top) = {
+            let t = &self.transports[i];
+            (t.cars, t.bottom, t.top)
+        };
+        if let Some(sch) = self.transports[i].schedule.take() {
+            let raw = sch.to_json();
+            self.transports[i].schedule = Schedule::coerce(Some(&raw), cars, bottom, top);
+        }
+        if self.transports[i].schedule.is_some() {
+            let stops = self.stops_of(&self.transports[i]);
+            let t = &mut self.transports[i];
+            t.schedule = Some(t.schedule.as_ref().unwrap().snap_homes_to_stops(&stops));
+        }
+        ResizeResult {
+            ok: true,
+            reason: None,
+            added: new_top - new_bottom + 1 - before,
+            floor_tiles_created: created.len() as i64,
+        }
+    }
+
+    /// `clearStops(id)`: every floor stops again (an express keeps its
+    /// lobby-only rule).
+    pub fn clear_stops(&mut self, id: i64) -> bool {
+        let Some(i) = self.transport_index(id) else {
+            return false;
+        };
+        if self.transports[i].kind == Kind::ElevatorExpress {
+            self.set_express_stops(id);
+            return true;
+        }
+        self.transports[i].skip_floors = Some(Vec::new());
+        self.revision += 1;
+        true
+    }
+
+    /// `u.label = label`, the editor's rename: trimmed as JavaScript trims,
+    /// an empty name falling back to the catalog name. False for an unknown id.
+    pub fn set_label(&mut self, id: i64, label: &str) -> bool {
+        let Some(u) = self.get_unit_mut(id) else {
+            return false;
+        };
+        let trimmed = crate::load::js_trim(label);
+        u.label = if trimmed.is_empty() {
+            u.kind.facility().name.to_string()
+        } else {
+            trimmed.to_string()
+        };
         true
     }
 

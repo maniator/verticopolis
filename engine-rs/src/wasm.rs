@@ -44,6 +44,54 @@ fn pending_json(kind: &str, cost: f64, message: &str) -> String {
     serde_json::json!({ "kind": kind, "cost": cost, "message": message }).to_string()
 }
 
+/// A batch rent target as its JSON text: `"default"`, `"noRate"` or a number.
+fn parse_batch_target(text: &str) -> Result<crate::rent::BatchTarget, String> {
+    let v: Value = serde_json::from_str(text).map_err(|e| format!("target: {e}"))?;
+    match v {
+        Value::String(s) if s == "default" => Ok(crate::rent::BatchTarget::Default),
+        Value::String(s) if s == "noRate" => Ok(crate::rent::BatchTarget::NoRate),
+        Value::Number(n) => n
+            .as_f64()
+            .map(crate::rent::BatchTarget::Price)
+            .ok_or_else(|| "target must be a finite number".to_string()),
+        other => Err(format!(
+            "target must be default, noRate or a number, got {other}"
+        )),
+    }
+}
+
+/// `BatchRentResult` as the TypeScript spells its keys.
+fn batch_result_json(r: &crate::rent::BatchRentResult) -> String {
+    serde_json::json!({
+        "matched": r.matched,
+        "eligible": r.eligible,
+        "changed": r.changed,
+        "skippedSold": r.skipped_sold,
+        "skippedCustom": r.skipped_custom,
+        "customOverwritten": r.custom_overwritten,
+        "clampedLow": r.clamped_low,
+        "clampedHigh": r.clamped_high,
+    })
+    .to_string()
+}
+
+/// The transient boundary markers a shadow takes over from the live engine.
+fn apply_markers(sim: &mut Simulation, text: &str) -> Result<(), String> {
+    let v: Value = serde_json::from_str(text).map_err(|e| format!("markers: {e}"))?;
+    let field = |name: &str| -> Result<i64, String> {
+        v.get(name)
+            .and_then(Value::as_f64)
+            .filter(|x| x.fract() == 0.0 && x.abs() < 9007199254740992.0)
+            .map(|x| x as i64)
+            .ok_or_else(|| format!("markers: {name} must be a whole number"))
+    };
+    sim.last_hour = field("lastHour")?;
+    sim.last_day = field("lastDay")?;
+    sim.last_quarter = field("lastQuarter")?;
+    sim.last_month = field("lastMonth")?;
+    Ok(())
+}
+
 /// `raw.mode = mode`, the override a scenario start applies before loading.
 /// The TypeScript throws on a non-object; here that is an error rather than
 /// a panic, which under WASM would trap and poison the module.
@@ -66,22 +114,45 @@ pub struct Engine {
 
 #[wasm_bindgen]
 impl Engine {
-    /// `Simulation.newGame(seed, mode)`.
+    /// `Simulation.newGame(seed, mode, modernCalendar, startUnbridged)`; the
+    /// calendar defaults to the real-world one and the tower starts bridged,
+    /// as the TypeScript defaults do.
     #[wasm_bindgen(js_name = newGame)]
-    pub fn new_game(seed: u32, mode: &str) -> Result<Engine, JsError> {
+    pub fn new_game(
+        seed: u32,
+        mode: &str,
+        modern_calendar: Option<String>,
+        start_unbridged: Option<bool>,
+    ) -> Result<Engine, JsError> {
+        let mode = parse_mode(mode).map_err(err)?;
+        let calendar = match modern_calendar.as_deref() {
+            None => crate::clock::CalendarKind::RealWorld,
+            Some(c) => crate::clock::CalendarKind::parse(c).ok_or_else(|| {
+                err(format!(
+                    "modernCalendar must be canon or realWorld, got {c}"
+                ))
+            })?,
+        };
         Ok(Engine {
-            sim: Simulation::new_game(seed, parse_mode(mode).map_err(err)?),
+            sim: Simulation::new_game_with(seed, mode, calendar, start_unbridged.unwrap_or(false)),
         })
     }
 
     /// `Simulation.deserialize(JSON.parse(text))`: a serialized game, migrated
     /// and loaded. Nothing else the import path does (the founder mark) runs.
+    /// `markers`, when given, is JSON `{ lastHour, lastDay, lastQuarter,
+    /// lastMonth }`: the live engine's boundary markers, which a save does
+    /// not carry (a load rebuilds them from the clock, a founded game keeps
+    /// them unset until the first boundary), so a shadow can start exactly
+    /// where the live engine stands.
     #[wasm_bindgen(js_name = fromSave)]
-    pub fn from_save(text: &str) -> Result<Engine, JsError> {
+    pub fn from_save(text: &str, markers: Option<String>) -> Result<Engine, JsError> {
         let raw: Value = serde_json::from_str(text).map_err(err)?;
-        Ok(Engine {
-            sim: crate::load::deserialize(&raw).map_err(err)?,
-        })
+        let mut sim = crate::load::deserialize(&raw).map_err(err)?;
+        if let Some(m) = markers {
+            apply_markers(&mut sim, &m).map_err(err)?;
+        }
+        Ok(Engine { sim })
     }
 
     /// The import path for a `.vctower` file: decode, migrate and load, then
@@ -219,6 +290,144 @@ impl Engine {
         Ok(self.sim.tower.set_schedule(id.into(), &raw))
     }
 
+    /// `toggleAutoBridge()`: the preference after the flip.
+    #[wasm_bindgen(js_name = toggleAutoBridge)]
+    pub fn toggle_auto_bridge(&mut self) -> bool {
+        self.sim.toggle_auto_bridge()
+    }
+
+    /// `setFilmPolicy(id, policy)`: the policy stored, or null.
+    #[wasm_bindgen(js_name = setFilmPolicy)]
+    pub fn set_film_policy(&mut self, id: i32, policy: &str) -> Option<String> {
+        self.sim
+            .set_film_policy(id.into(), policy)
+            .map(str::to_string)
+    }
+
+    /// `rerollSubtype(id)`: the new subtype, or null.
+    #[wasm_bindgen(js_name = rerollSubtype)]
+    pub fn reroll_subtype(&mut self, id: i32) -> Option<String> {
+        self.sim.reroll_subtype(id.into()).map(str::to_string)
+    }
+
+    /// `applyRentBatch(kind, target, onlyDefaultPriced)` with the target as
+    /// JSON text (a number, `"default"` or `"noRate"`): the result counters
+    /// as JSON, or null when the batch does not apply.
+    #[wasm_bindgen(js_name = applyRentBatch)]
+    pub fn apply_rent_batch(
+        &mut self,
+        kind: &str,
+        target: &str,
+        only_default_priced: bool,
+    ) -> Result<Option<String>, JsError> {
+        let kind = parse_kind(kind).map_err(err)?;
+        let target = parse_batch_target(target).map_err(err)?;
+        Ok(self
+            .sim
+            .apply_rent_batch(kind, target, only_default_priced)
+            .map(|r| batch_result_json(&r)))
+    }
+
+    /// `tower.resizeTransport(id, bottom, top)`: JSON
+    /// `{ ok, reason?, added, floorTilesCreated }`.
+    #[wasm_bindgen(js_name = resizeTransport)]
+    pub fn resize_transport(&mut self, id: i32, bottom: i32, top: i32) -> String {
+        let r = self
+            .sim
+            .tower
+            .resize_transport(id.into(), bottom.into(), top.into());
+        let mut v = serde_json::json!({
+            "ok": r.ok,
+            "added": r.added,
+            "floorTilesCreated": r.floor_tiles_created,
+        });
+        if let Some(reason) = r.reason {
+            v["reason"] = Value::String(reason);
+        }
+        v.to_string()
+    }
+
+    /// `tower.removeUnit(id)`: whether a unit went.
+    #[wasm_bindgen(js_name = removeUnit)]
+    pub fn remove_unit(&mut self, id: i32) -> bool {
+        self.sim.tower.remove_unit(id.into()).is_some()
+    }
+
+    /// `tower.removeTransport(id)`: whether a shaft went.
+    #[wasm_bindgen(js_name = removeTransport)]
+    pub fn remove_transport(&mut self, id: i32) -> bool {
+        self.sim.tower.remove_transport(id.into()).is_some()
+    }
+
+    #[wasm_bindgen(js_name = setStop)]
+    pub fn set_stop(&mut self, id: i32, floor: i32, stop: bool) -> bool {
+        self.sim.tower.set_stop(id.into(), floor.into(), stop)
+    }
+
+    #[wasm_bindgen(js_name = setExpressStops)]
+    pub fn set_express_stops(&mut self, id: i32) {
+        self.sim.tower.set_express_stops(id.into());
+    }
+
+    #[wasm_bindgen(js_name = clearStops)]
+    pub fn clear_stops(&mut self, id: i32) -> bool {
+        self.sim.tower.clear_stops(id.into())
+    }
+
+    /// `priceUnit(u, target)`: the new price, or null when not repriceable.
+    #[wasm_bindgen(js_name = priceUnit)]
+    pub fn price_unit(&mut self, id: i32, target: f64) -> Option<f64> {
+        self.sim.price_unit(id.into(), target)
+    }
+
+    /// The editor's rename of a unit.
+    #[wasm_bindgen(js_name = setLabel)]
+    pub fn set_label(&mut self, id: i32, label: &str) -> bool {
+        self.sim.tower.set_label(id.into(), label)
+    }
+
+    /// `tower.towerName = name`; null clears it, as the host's `undefined`
+    /// leaves the key out of the save.
+    #[wasm_bindgen(js_name = setTowerName)]
+    pub fn set_tower_name(&mut self, name: Option<String>) {
+        self.sim.tower.tower_name = name;
+    }
+
+    /// `sim.autoBridge`.
+    #[wasm_bindgen(js_name = autoBridge)]
+    pub fn auto_bridge(&self) -> bool {
+        self.sim.auto_bridge
+    }
+
+    /// `sim.view = view`, the camera a save carries, as JSON text (null clears).
+    #[wasm_bindgen(js_name = setView)]
+    pub fn set_view(&mut self, view: Option<String>) -> Result<(), JsError> {
+        self.sim.view = match view {
+            None => None,
+            Some(text) => Some(serde_json::from_str(&text).map_err(err)?),
+        };
+        Ok(())
+    }
+
+    /// `sim.autoBridge = value`, the direct write an undo restore makes.
+    #[wasm_bindgen(js_name = setAutoBridge)]
+    pub fn set_auto_bridge(&mut self, value: bool) {
+        self.sim.auto_bridge = value;
+    }
+
+    /// `sim.emit(text, kind)`: a log entry at the engine's clock.
+    pub fn emit(&mut self, text: &str, kind: &str) -> Result<(), JsError> {
+        let kind = match kind {
+            "info" => crate::sim::LogKind::Info,
+            "good" => crate::sim::LogKind::Good,
+            "bad" => crate::sim::LogKind::Bad,
+            "money" => crate::sim::LogKind::Money,
+            other => return Err(err(format!("unknown log kind {other}"))),
+        };
+        self.sim.emit(text, kind);
+        Ok(())
+    }
+
     #[wasm_bindgen(js_name = startFire)]
     pub fn start_fire(&mut self) {
         self.sim.start_fire();
@@ -287,6 +496,59 @@ mod tests {
         assert_eq!(v["kind"], "bombThreat");
         assert_eq!(v["cost"], 20000.0);
         assert_eq!(v["message"], "pay");
+    }
+
+    #[test]
+    fn batch_targets_parse_and_results_take_the_typescript_keys() {
+        use crate::rent::{BatchRentResult, BatchTarget};
+        assert_eq!(parse_batch_target("\"default\""), Ok(BatchTarget::Default));
+        assert_eq!(parse_batch_target("\"noRate\""), Ok(BatchTarget::NoRate));
+        assert_eq!(parse_batch_target("1500"), Ok(BatchTarget::Price(1500.0)));
+        assert!(parse_batch_target("\"cheap\"").is_err());
+        assert!(parse_batch_target("[1]").is_err());
+        let r = BatchRentResult {
+            matched: 3,
+            eligible: 2,
+            changed: 1,
+            skipped_sold: 1,
+            ..BatchRentResult::default()
+        };
+        let v: Value = serde_json::from_str(&batch_result_json(&r)).unwrap();
+        assert_eq!(v["matched"], 3);
+        assert_eq!(v["skippedSold"], 1);
+        assert_eq!(v["clampedHigh"], 0);
+        assert_eq!(v.as_object().unwrap().len(), 8);
+    }
+
+    #[test]
+    fn markers_land_on_the_engine_and_refuse_a_bad_shape() {
+        let mut sim = Simulation::new_game(1, GameMode::Classic);
+        apply_markers(
+            &mut sim,
+            r#"{"lastHour":7,"lastDay":0,"lastQuarter":-1,"lastMonth":-1}"#,
+        )
+        .expect("whole numbers land");
+        assert_eq!(
+            (
+                sim.last_hour,
+                sim.last_day,
+                sim.last_quarter,
+                sim.last_month
+            ),
+            (7, 0, -1, -1)
+        );
+        assert!(apply_markers(&mut sim, r#"{"lastHour":7}"#)
+            .unwrap_err()
+            .contains("lastDay"));
+        assert!(apply_markers(
+            &mut sim,
+            r#"{"lastHour":1.5,"lastDay":0,"lastQuarter":0,"lastMonth":0}"#
+        )
+        .unwrap_err()
+        .contains("lastHour"));
+        assert!(apply_markers(&mut sim, "[]")
+            .unwrap_err()
+            .contains("lastHour"));
     }
 
     #[test]

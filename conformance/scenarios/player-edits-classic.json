@@ -1,0 +1,131 @@
+{
+  "id": "player-edits-classic",
+  "description": "The editor's own commands on the four-star tower-one save (star raised to four and money filled by scripts/derive-fixture.ts): a cinema booked for blockbusters, then features, then back to automatic; retail varieties rerolled off the main rng; batch repricing on the Classic ladders (every office off the market, then back to Average, a rung target that snaps, a condo batch that skips every sold unit, a default-only batch that leaves hand-priced offices alone, a default-only No Rate batch); one office priced to a rung by hand; a standard shaft with a floor skipped, its stops cleared, then shrunk by two floors; a stair run refused a span past its fixed length. A day of hours follows so the repriced tower settles.",
+  "start": {
+    "fixture": "src/tests/fixtures/towerone-star4.vctower"
+  },
+  "commands": [
+    {
+      "op": "setFilmPolicy",
+      "floor": 10,
+      "x": 240,
+      "policy": "blockbuster"
+    },
+    {
+      "op": "rerollSubtype",
+      "floor": 13,
+      "x": 238
+    },
+    {
+      "op": "rerollSubtype",
+      "floor": 12,
+      "x": 237
+    },
+    {
+      "op": "rerollSubtype",
+      "floor": 4,
+      "x": 150
+    },
+    {
+      "op": "checkpoint",
+      "label": "edited"
+    },
+    {
+      "op": "applyRentBatch",
+      "kind": "office",
+      "target": "noRate"
+    },
+    {
+      "op": "checkpoint",
+      "label": "offices-off-market"
+    },
+    {
+      "op": "applyRentBatch",
+      "kind": "office",
+      "target": "default"
+    },
+    {
+      "op": "applyRentBatch",
+      "kind": "hotelSingle",
+      "target": 160
+    },
+    {
+      "op": "applyRentBatch",
+      "kind": "condo",
+      "target": 100000
+    },
+    {
+      "op": "applyRentBatch",
+      "kind": "office",
+      "target": 20000,
+      "onlyDefaultPriced": true
+    },
+    {
+      "op": "priceUnit",
+      "floor": 2,
+      "x": 159,
+      "target": 17000
+    },
+    {
+      "op": "applyRentBatch",
+      "kind": "office",
+      "target": "noRate",
+      "onlyDefaultPriced": true
+    },
+    {
+      "op": "setStop",
+      "floor": 30,
+      "x": 196,
+      "stopFloor": 35,
+      "stop": false
+    },
+    {
+      "op": "clearStops",
+      "floor": 30,
+      "x": 196
+    },
+    {
+      "op": "resizeTransport",
+      "floor": 15,
+      "x": 200,
+      "bottom": 15,
+      "top": 27,
+      "expectFail": true
+    },
+    {
+      "op": "resizeTransport",
+      "floor": 30,
+      "x": 196,
+      "bottom": 30,
+      "top": 43
+    },
+    {
+      "op": "setFilmPolicy",
+      "floor": 10,
+      "x": 240,
+      "policy": "auto"
+    },
+    {
+      "op": "checkpoint",
+      "label": "repriced"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 12,
+      "checkpointEvery": 6
+    },
+    {
+      "op": "setFilmPolicy",
+      "floor": 10,
+      "x": 240,
+      "policy": "feature"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 12,
+      "checkpointEvery": 6
+    }
+  ]
+}
