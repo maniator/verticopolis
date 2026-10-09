@@ -43,7 +43,7 @@ impl ExterminatorRefusal {
 /// in the en-US locale, which is all the booking message ever formats. The
 /// TypeScript call takes the host locale; log text is outside the hash, and
 /// the referee runs under en-US.
-fn with_thousands(x: f64) -> String {
+pub(crate) fn with_thousands(x: f64) -> String {
     debug_assert!(x.is_finite() && x >= 0.0 && x.fract() == 0.0, "{x}");
     let digits = format!("{}", x as i64);
     let mut out = String::new();

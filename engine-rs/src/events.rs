@@ -5,6 +5,7 @@ use serde_json::{json, Value};
 
 use crate::facilities::Kind;
 use crate::rng::Rng;
+use crate::services::with_thousands;
 use crate::sim::{LogKind, PointFx, Simulation, ThiefFx};
 use crate::tower::UnitState;
 
@@ -99,7 +100,7 @@ impl Simulation {
             self.start_fire();
             if !self.events.active.is_empty() {
                 let cost = self.fire_rescue_cost();
-                let message = format!("🚒 Fire rescue available for ${cost}. Pay to stop the spread and save the tower now, or decline and fight it the slow way.");
+                let message = format!("🚒 Fire rescue available for ${}. Pay to stop the spread and save the tower now, or decline and fight it the slow way. Either way the rooms already ablaze burn down to gutted shells you'll rebuild; the fee just limits how far the fire spreads.", with_thousands(cost));
                 self.events.pending = Some(PendingChoice {
                     kind: "fireRescue",
                     cost,
@@ -143,7 +144,7 @@ impl Simulation {
             if accept && self.money >= p.cost {
                 self.money -= p.cost;
                 self.extinguish_all();
-                self.emit(&format!("🚒 Fire-rescue crews saved the tower for ${}. The rooms that were ablaze are gutted. Bulldoze and rebuild them.", p.cost), LogKind::Money);
+                self.emit(&format!("🚒 Fire-rescue crews saved the tower for ${}. The rooms that were ablaze are gutted. Bulldoze and rebuild them.", with_thousands(p.cost)), LogKind::Money);
             }
             return;
         }
@@ -152,7 +153,7 @@ impl Simulation {
             self.emit(
                 &format!(
                     "💣 You paid the ${} ransom; the threat passed quietly.",
-                    p.cost
+                    with_thousands(p.cost)
                 ),
                 LogKind::Money,
             );
@@ -385,7 +386,8 @@ impl Simulation {
         self.money -= loss;
         self.emit(
             &format!(
-                "🕵️ A thief slipped through the tower and made off with ${loss}. Build Security."
+                "🕵️ A thief slipped through the tower and made off with ${}. Build Security.",
+                with_thousands(loss)
             ),
             LogKind::Bad,
         );
@@ -410,7 +412,7 @@ impl Simulation {
         if self.has_any(Kind::Security) {
             let cost = 2_000.0 + self.rng.int(0, 3_000) as f64;
             self.money -= cost;
-            self.emit(&format!("💣 A bomb threat was called in. Security swept the tower and found nothing. The evacuation cost ${cost}."), LogKind::Info);
+            self.emit(&format!("💣 A bomb threat was called in. Security swept the tower and found nothing. The evacuation cost ${}.", with_thousands(cost)), LogKind::Info);
             return;
         }
         let fine = 15_000.0 + self.rng.int(0, 15_000) as f64;
@@ -441,6 +443,6 @@ impl Simulation {
                 }
             }
         }
-        self.emit(&format!("💣 A bomb detonated with no security to stop it. {destroyed} room(s) across ~5 floors were gutted, plus a ${fine} fine. Build Security!"), LogKind::Bad);
+        self.emit(&format!("💣 A bomb detonated with no security to stop it. {destroyed} room(s) across ~5 floors were gutted, plus a ${} fine. Build Security!", with_thousands(fine)), LogKind::Bad);
     }
 }

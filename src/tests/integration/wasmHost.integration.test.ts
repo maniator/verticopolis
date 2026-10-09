@@ -92,7 +92,7 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     sim.emit("a note from the host", "info");
     new FrameDriver(sim, 3).run(90);
     // The lines the instance logged for its own commands and the engine's
-    // lines for the same commands are one log, not two.
+    // lines for the same commands make one log rather than two.
     expect(sim.log).toEqual((JSON.parse(host.engine.serialize()) as { log: unknown[] }).log);
     host.syncStructure();
     expect(ownStateView(sim)).toBe(host.engine.stateView());

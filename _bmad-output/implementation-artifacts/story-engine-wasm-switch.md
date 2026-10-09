@@ -84,8 +84,12 @@ the next sync makes the engine's state the instance's. The instance's
   not fill while hosting (#868).
 - The host step driver (#867): the frame loop still owes minutes to the
   instance's `tick`, which the host forwards.
-- The whole e2e suite under the flag, golden masters on the engine and the
-  Modern profile measurement (the roadmap's gate to finish phase 3).
+- Golden masters on the engine and the Modern profile measurement (the
+  roadmap's gate to finish phase 3). The e2e suite runs on both engines
+  (the `chromium-wasm` Playwright project); the specs that script a tower
+  through test helpers on the instance (`buildToStar` and the direct
+  `events.pending` write) exercise the page and not the engine there, and
+  moving them onto relayed commands is part of #878.
 
 ## Dev notes
 

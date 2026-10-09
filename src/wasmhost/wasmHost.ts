@@ -121,6 +121,11 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
     host.frames++;
   };
 
+  // The sink and the tick override are synchronous and let an engine throw
+  // propagate to the caller (backlog #874 records the fallback to build:
+  // catch, record on the status, re-adopt the last merged save). The tick
+  // itself still arrives through the instance's frame-loop step math, which
+  // the host forwards rather than owning (#867).
   let relay: ReturnType<typeof relayCommands>;
   try {
     relay = relayCommands(sim, (cmd) => { shadow.apply(cmd); }, {

@@ -9,6 +9,25 @@ vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 // Mock `virtual:pwa-register` (Vite virtual module via bootstrap.ts/pwa.ts) so the import resolves on Windows too (as pwa.test.ts does).
 vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
+// The WASM engine switch: the request and the package load are stubbed so the
+// fallback (package fails to load, the game boots on the TypeScript engine)
+// can be asserted without a package.
+const wasmStub = vi.hoisted(() => ({ requested: "ts" as "ts" | "wasm", loadError: null as Error | null }));
+vi.mock("./wasmhost/engineChoice", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./wasmhost/engineChoice")>();
+  return { ...real, engineRequested: () => wasmStub.requested };
+});
+vi.mock("./wasmhost/startWasmHost", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./wasmhost/startWasmHost")>();
+  return {
+    ...real,
+    loadWasmEngine: vi.fn(async () => {
+      throw wasmStub.loadError ?? new Error("no package in this test");
+    }),
+    startWasmHost: vi.fn(),
+  };
+});
+import { startWasmHost } from "./wasmhost/startWasmHost";
 
 /** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */
 function stubWebGL(): void {
@@ -244,6 +263,25 @@ describe("bootGame", () => {
     const reload = [...document.querySelectorAll("#boot-fallback-host button")].find((b) => b.textContent === "Reload");
     expect(reload).toBeDefined();
     expect((window as unknown as { game?: unknown }).game).toBeUndefined();
+  });
+
+  it("boots on the TypeScript engine, with the reason logged, when the requested WASM package fails to load", async () => {
+    stubWebGL();
+    wasmStub.requested = "wasm";
+    wasmStub.loadError = new Error("404 engine/verticopolis_engine.js");
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const app = { onUpdateAvailable: vi.fn() };
+    const create = vi.fn(() => app);
+    try {
+      await bootGame(create);
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(startWasmHost).not.toHaveBeenCalled();
+      expect(error).toHaveBeenCalledWith(expect.stringContaining("[wasm]"), wasmStub.loadError);
+      expect(document.getElementById("boot-fallback-host")).toBeNull();
+    } finally {
+      wasmStub.requested = "ts";
+      wasmStub.loadError = null;
+    }
   });
 
   it("shows an error and rethrows when create() throws", async () => {

@@ -15,7 +15,7 @@ browser errors, store behavior) stay on the platform; the engine knows no
 vendor; events never enter the save or the hashed views; events are testable
 on both engines while both run.
 
-## What exists today (read from the code, not from memory)
+## What exists today (read from the code)
 
 | Piece | Where | Note |
 | --- | --- | --- |
@@ -29,7 +29,7 @@ on both engines while both run.
 
 ## Where the current shape conflicts with the model
 
-1. Detection is in the shell, not the engine. `star_reached` is a 160 ms
+1. Detection lives in the shell rather than the engine. `star_reached` is a 160 ms
    poll comparing `sim.star` to `app.lastStar`; two promotions inside one
    poll collapse to one event. `first_build` is a shell latch around the
    build action, so a build that enters through any other host command
@@ -168,6 +168,21 @@ wants never appear below the bridge.
   provider (today it deliberately does not; the room kept today's behavior).
 - Whether to take Cloud's engine-side session summary now or after the
   native client exists.
+
+## Sequencing against 3.0.0 (second session, 2026-10-09)
+
+The owner asked whether this work has to land before the default flip
+(3.0.0). The room said yes, for a measurement reason rather than a code one:
+the flip is the experiment (does the Rust engine change session length, fps,
+crashes, first builds), so the instrument changes first and gets one release
+to settle on the TypeScript default. The TypeScript mirror of the emission
+points is required in every ordering short of retirement, because the
+standing rule lands every simulation change in both engines and the lock's
+events hash needs both sides, so doing the work later saves nothing. The
+pre-flip order is #878 (test parity), then #873 with the events hash, then
+one release, then the flip. The TDT port is off the flip's path: the host
+already hands the exporter the engine's save through the `serialize`
+override, so TDT in the crate is a native-client need and lands after.
 
 ## How the room got there (short form)
 

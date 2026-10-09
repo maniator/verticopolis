@@ -8,7 +8,10 @@ import type { Transport, Unit } from "../engine/types";
  * renderer and panels hold keep their identity, and only their contents
  * change. Everything the save carries is adopted from `fresh`; what the
  * save does not carry (the crowd, the per-frame fields, the dispatch and
- * housekeeping memos) is left to the frame sync or stays as it is.
+ * housekeeping memos) is left to the frame sync or stays as it is. Between
+ * merges the fields the frame does not carry (the memos, `satisfaction`,
+ * the instance's `rng`) keep their last merged value; backlog #868 lists
+ * what the read model still owes.
  */
 
 /** Simulation fields the merge never copies from the fresh instance: the
