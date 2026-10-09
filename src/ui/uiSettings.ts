@@ -1,6 +1,7 @@
 import type { UI } from "./UI";
 import { settingsTemplate } from "./templates/settings";
 import { trackAppAction } from "../analytics";
+import { engineSuffix } from "../wasmhost/engineLabel";
 import { IS_DESKTOP_BUILD } from "../desktopConsent";
 import { wireDesktopAnalyticsToggle } from "./uiDesktopAnalytics";
 
@@ -27,7 +28,7 @@ export function showSettings(ui: UI): void {
   // ordinary parameter, so the row's markup rides inside a shared template a web
   // build still ships and never renders (see `desktopConsent.ts` for what does
   // fold).
-  const box = ui.openModalTemplate(settingsTemplate(version, modern, IS_DESKTOP_BUILD), { displaceable: true });
+  const box = ui.openModalTemplate(settingsTemplate(version, modern, IS_DESKTOP_BUILD, engineSuffix()), { displaceable: true });
   // Volume sliders: initialize from the live levels, apply on every input tick
   // (persistence is debounced by the onSetVolume handler in main.ts), and keep
   // the percent readout in step. Mute is independent; sliders never touch it.

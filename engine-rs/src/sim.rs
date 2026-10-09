@@ -59,6 +59,49 @@ pub struct LogEntry {
     pub kind: LogKind,
 }
 
+/// A cosmetic event the renderer polls: `explosionFx` and `treasureFx`
+/// carry a point, `thiefFx` a floor and whether the thief was caught. The
+/// sequence numbers are what the renderer compares; nothing here is saved
+/// or hashed (`SimContext.trigger*`).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PointFx {
+    pub floor: i64,
+    pub x: f64,
+    pub seq: i64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ThiefFx {
+    pub caught: bool,
+    pub floor: i64,
+    pub seq: i64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FxState {
+    pub santa_seq: i64,
+    pub explosion: PointFx,
+    pub thief: ThiefFx,
+    pub treasure: PointFx,
+    pub vip_seq: i64,
+}
+
+impl Default for FxState {
+    fn default() -> FxState {
+        FxState {
+            santa_seq: 0,
+            explosion: PointFx::default(),
+            thief: ThiefFx {
+                caught: false,
+                floor: 1,
+                seq: 0,
+            },
+            treasure: PointFx::default(),
+            vip_seq: 0,
+        }
+    }
+}
+
 pub struct Simulation {
     pub rng: Rng,
     pub mode: GameMode,
@@ -97,6 +140,8 @@ pub struct Simulation {
     pub elevators: ElevatorDispatch,
     pub housekeeping: Housekeeping,
     pub weather: Weather,
+    /// The cosmetic event counters the renderer polls (never saved).
+    pub fx: FxState,
     pub last_hour: i64,
     pub last_day: i64,
     pub last_month: i64,
@@ -167,6 +212,7 @@ impl Simulation {
             elevators: ElevatorDispatch::new(),
             housekeeping: Housekeeping::default(),
             weather: weather_for(0),
+            fx: FxState::default(),
             last_hour: -1,
             last_day: 0,
             last_month: -1,

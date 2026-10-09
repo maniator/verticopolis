@@ -467,11 +467,244 @@ impl Engine {
     pub fn resolve_choice(&mut self, accept: bool) {
         self.sim.resolve_choice(accept);
     }
+
+    /// The per-frame read model as one flat number array (see
+    /// `frame_view` for the layout): what the host reads every frame while
+    /// the engine runs the simulation.
+    #[wasm_bindgen(js_name = frameView)]
+    pub fn frame_view(&self) -> Vec<f64> {
+        frame_view(&self.sim)
+    }
+
+    /// The log entries emitted after `seq` (the `logSeq` the host last saw),
+    /// oldest first, as JSON `[{ seq, minute, text, kind }]`. The engine keeps
+    /// a ring of the last entries, so a host that falls further behind than
+    /// the ring gets the ring.
+    #[wasm_bindgen(js_name = logSince)]
+    pub fn log_since(&self, seq: i32) -> String {
+        log_since(&self.sim, seq.into()).to_string()
+    }
+}
+
+/// Fixed header slots of the frame view, before the three variable sections.
+pub const FRAME_HEADER: usize = 26;
+
+/// The per-frame read model: every value the web host reads from the
+/// simulation between two structural syncs, flat so it crosses the WASM
+/// boundary as one typed array.
+///
+/// Header (`FRAME_HEADER` slots): 0 minutes, 1 tower revision, 2 meal
+/// overlay revision, 3 logSeq, 4 money, 5 star, 6 weather (0 clear, 1 cloudy,
+/// 2 rain), 7 santaFxSeq, 8..10 explosionFx (seq, floor, x), 11..13 thiefFx
+/// (seq, caught, floor), 14..16 treasureFx (seq, floor, x), 17 vipFxSeq,
+/// 18..20 event counts (fires, firesGutRooms, bombs), 21 a pending choice
+/// (0 or 1), 22 onHourRuns, 23 people count, 24 unit count, 25 transport
+/// count.
+///
+/// Then `people count` records of 8: id, seed, staff (0 or 1), state (the
+/// `PersonState` index), floor, x, fy, wait. Then `unit count` records of 6:
+/// id, state (the `UnitState` index), occupants, customersIn,
+/// hotelCustomersIn, outForMeal (an absent counter is -1). Then
+/// `transport count` records of `2 + 3 * cars`: id, cars, then per car
+/// position, load (-1 when the shaft keeps none), direction.
+pub fn frame_view(sim: &Simulation) -> Vec<f64> {
+    use crate::crowd::PState;
+    use crate::sim_loop::Weather;
+    use crate::tower::UnitState;
+    let people = &sim.crowd.people;
+    let units = &sim.tower.units;
+    let transports = &sim.tower.transports;
+    let mut v = Vec::with_capacity(
+        FRAME_HEADER
+            + people.len() * 8
+            + units.len() * 6
+            + transports
+                .iter()
+                .map(|t| 2 + 3 * t.cars as usize)
+                .sum::<usize>(),
+    );
+    let fx = &sim.fx;
+    v.extend_from_slice(&[
+        sim.clock.minutes,
+        sim.tower.revision as f64,
+        sim.tower.meal_overlay_revision as f64,
+        sim.log_seq as f64,
+        sim.money,
+        sim.star as f64,
+        match sim.weather {
+            Weather::Clear => 0.0,
+            Weather::Cloudy => 1.0,
+            Weather::Rain => 2.0,
+        },
+        fx.santa_seq as f64,
+        fx.explosion.seq as f64,
+        fx.explosion.floor as f64,
+        fx.explosion.x,
+        fx.thief.seq as f64,
+        if fx.thief.caught { 1.0 } else { 0.0 },
+        fx.thief.floor as f64,
+        fx.treasure.seq as f64,
+        fx.treasure.floor as f64,
+        fx.treasure.x,
+        fx.vip_seq as f64,
+        sim.events.fires_started as f64,
+        sim.events.fires_gut_rooms as f64,
+        sim.events.bombs_detonated as f64,
+        if sim.events.pending.is_some() {
+            1.0
+        } else {
+            0.0
+        },
+        sim.on_hour_runs as f64,
+        people.len() as f64,
+        units.len() as f64,
+        transports.len() as f64,
+    ]);
+    debug_assert_eq!(v.len(), FRAME_HEADER);
+    for p in people {
+        let state = match p.state {
+            PState::ToShaft => 0.0,
+            PState::Waiting => 1.0,
+            PState::Riding => 2.0,
+            PState::Climbing => 3.0,
+            PState::ToDest => 4.0,
+            PState::Dwelling => 5.0,
+            PState::Done => 6.0,
+        };
+        v.extend_from_slice(&[
+            p.id as f64,
+            p.seed as f64,
+            if p.staff { 1.0 } else { 0.0 },
+            state,
+            p.floor as f64,
+            p.x,
+            p.fy,
+            p.wait,
+        ]);
+    }
+    let counter = |c: Option<i64>| c.map_or(-1.0, |n| n as f64);
+    for u in units {
+        let state = match u.state {
+            UnitState::Construction => 0.0,
+            UnitState::Empty => 1.0,
+            UnitState::Occupied => 2.0,
+            UnitState::MovingIn => 3.0,
+            UnitState::Vacating => 4.0,
+            UnitState::Asleep => 5.0,
+            UnitState::Dirty => 6.0,
+            UnitState::Infested => 7.0,
+            UnitState::Fire => 8.0,
+            UnitState::Gutted => 9.0,
+        };
+        v.extend_from_slice(&[
+            u.id as f64,
+            state,
+            u.occupants as f64,
+            counter(u.customers_in),
+            counter(u.hotel_customers_in),
+            counter(u.out_for_meal),
+        ]);
+    }
+    for t in transports {
+        v.push(t.id as f64);
+        v.push(t.cars as f64);
+        for i in 0..t.cars as usize {
+            v.push(t.car_positions.get(i).copied().unwrap_or(0.0));
+            v.push(
+                t.car_load
+                    .as_ref()
+                    .and_then(|l| l.get(i).copied())
+                    .unwrap_or(-1.0),
+            );
+            v.push(t.car_dir.get(i).copied().unwrap_or(0) as f64);
+        }
+    }
+    v
+}
+
+/// The log entries numbered after `seq`, oldest first. The ring's entries
+/// are numbered from `log_seq` backwards, so the last entry is `log_seq`.
+pub fn log_since(sim: &Simulation, seq: i64) -> Value {
+    let len = sim.log.len() as i64;
+    let first = sim.log_seq - len + 1;
+    Value::Array(
+        sim.log
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (first + i as i64, e))
+            .filter(|(n, _)| *n > seq)
+            .map(|(n, e)| {
+                serde_json::json!({ "seq": n, "minute": e.minute, "text": e.text, "kind": e.kind.as_str() })
+            })
+            .collect(),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_frame_view_carries_the_header_and_one_record_per_person_unit_and_car() {
+        // A real tower, so the view carries people, every unit kind and cars.
+        let text = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../src/tests/fixtures/towerone-star4.vctower"
+        ))
+        .expect("fixture");
+        let raw = crate::load::decode_vctower(&text).expect("decodes");
+        let mut sim = crate::load::deserialize(&raw).expect("loads");
+        sim.tick(600.0);
+        let v = frame_view(&sim);
+        let people = v[23] as usize;
+        let units = v[24] as usize;
+        let transports = v[25] as usize;
+        assert_eq!(people, sim.crowd.people.len());
+        assert_eq!(units, sim.tower.units.len());
+        assert_eq!(transports, sim.tower.transports.len());
+        assert!(people > 0 && transports > 0);
+        let cars: usize = sim.tower.transports.iter().map(|t| t.cars as usize).sum();
+        assert_eq!(
+            v.len(),
+            FRAME_HEADER + people * 8 + units * 6 + 2 * transports + 3 * cars
+        );
+        assert_eq!(v[0], sim.clock.minutes);
+        assert_eq!(v[4], sim.money);
+        assert_eq!(v[22], sim.on_hour_runs as f64);
+        // The first unit record names the first unit and its occupants.
+        let u0 = FRAME_HEADER + people * 8;
+        assert_eq!(v[u0], sim.tower.units[0].id as f64);
+        assert_eq!(v[u0 + 2], sim.tower.units[0].occupants as f64);
+        // The transport record follows the units.
+        let t0 = u0 + units * 6;
+        assert_eq!(v[t0], sim.tower.transports[0].id as f64);
+        assert_eq!(v[t0 + 1], sim.tower.transports[0].cars as f64);
+        // The first person record names the first person and its position.
+        assert_eq!(v[FRAME_HEADER], sim.crowd.people[0].id as f64);
+        assert_eq!(v[FRAME_HEADER + 5], sim.crowd.people[0].x);
+    }
+
+    #[test]
+    fn log_since_numbers_the_ring_from_the_sequence_counter() {
+        let mut sim = Simulation::new_game(7, GameMode::Classic);
+        let founded = sim.log_seq;
+        sim.emit("one", crate::sim::LogKind::Info);
+        sim.emit("two", crate::sim::LogKind::Good);
+        sim.emit("three", crate::sim::LogKind::Money);
+        let all = log_since(&sim, 0);
+        assert_eq!(all.as_array().map(Vec::len), Some(sim.log.len()));
+        assert_eq!(log_since(&sim, founded).as_array().map(Vec::len), Some(3));
+        let later = log_since(&sim, sim.log_seq - 1);
+        let later = later.as_array().expect("array");
+        assert_eq!(later.len(), 1);
+        assert_eq!(later[0]["text"], "three");
+        assert_eq!(later[0]["kind"], "money");
+        assert_eq!(later[0]["seq"], sim.log_seq);
+        assert_eq!(
+            log_since(&sim, sim.log_seq).as_array().map(Vec::len),
+            Some(0)
+        );
+    }
 
     #[test]
     fn modes_and_kinds_parse_by_their_saved_spelling() {

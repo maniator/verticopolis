@@ -56,6 +56,12 @@ export class Engine {
      */
     fires(): number;
     /**
+     * The per-frame read model as one flat number array (see
+     * `frame_view` for the layout): what the host reads every frame while
+     * the engine runs the simulation.
+     */
+    frameView(): Float64Array;
+    /**
      * `Simulation.deserialize(JSON.parse(text))`: a serialized game, migrated
      * and loaded. Nothing else the import path does (the founder mark) runs.
      * `markers`, when given, is JSON `{ lastHour, lastDay, lastQuarter,
@@ -71,6 +77,13 @@ export class Engine {
      * overwrites the save's mode before loading, as a scenario start does.
      */
     static fromVctower(text: string, mode?: string | null): Engine;
+    /**
+     * The log entries emitted after `seq` (the `logSeq` the host last saw),
+     * oldest first, as JSON `[{ seq, minute, text, kind }]`. The engine keeps
+     * a ring of the last entries, so a host that falls further behind than
+     * the ring gets the ring.
+     */
+    logSince(seq: number): string;
     mode(): string;
     money(): number;
     /**

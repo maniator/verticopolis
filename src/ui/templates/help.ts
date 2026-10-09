@@ -53,7 +53,7 @@ export interface HelpActions {
   onReplay: () => void;
 }
 
-export function helpTemplate(onSplash: boolean, version: string, actions: HelpActions): TemplateResult {
+export function helpTemplate(onSplash: boolean, version: string, actions: HelpActions, engine = ""): TemplateResult {
   return html`
       <h2>How to play</h2>
       ${helpLede()}
@@ -70,7 +70,7 @@ export function helpTemplate(onSplash: boolean, version: string, actions: HelpAc
       ${helpReportBlock()}
       <details class="help-modes">
         <summary><span role="heading" aria-level="3">About</span></summary>
-        ${helpAboutBody(version)}
+        ${helpAboutBody(version, engine)}
       </details>
       <details class="help-modes">
         <summary><span role="heading" aria-level="3">Privacy</span></summary>

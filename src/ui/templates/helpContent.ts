@@ -102,8 +102,8 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
 ];
 
 /** The About section body (attribution + the interpolated app version). */
-export function helpAboutBody(version: string): TemplateResult {
-  return html`<p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br />Verticopolis <span class="app-version">v${version}</span></p>`;
+export function helpAboutBody(version: string, engine = ""): TemplateResult {
+  return html`<p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br />Verticopolis <span class="app-version">v${version}</span>${engine}</p>`;
 }
 
 /** The Privacy section body, shared by the in-game Help modal and the standalone

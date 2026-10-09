@@ -32,7 +32,24 @@ export default defineConfig({
     // the normal case, including CI — Playwright uses its own browser.
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    // The same specs on the WASM engine: the stored engine choice (`vc.engine`,
+    // see src/wasmhost/engineChoice.ts) is seeded into localStorage so every
+    // page the suite opens boots on the Rust engine. Visual baselines are the
+    // TypeScript engine's; the pixel comparison runs only on that project.
+    {
+      name: "chromium-wasm",
+      testIgnore: /visual\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: {
+          cookies: [],
+          origins: [{ origin: "http://127.0.0.1:4173", localStorage: [{ name: "vc.engine", value: "wasm" }] }],
+        },
+      },
+    },
+  ],
   webServer: {
     command: "npm run preview -- --host 127.0.0.1 --strictPort",
     url: "http://127.0.0.1:4173",

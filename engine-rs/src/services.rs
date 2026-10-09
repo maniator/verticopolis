@@ -43,7 +43,7 @@ impl ExterminatorRefusal {
 /// in the en-US locale, which is all the booking message ever formats. The
 /// TypeScript call takes the host locale; log text is outside the hash, and
 /// the referee runs under en-US.
-fn with_thousands(x: f64) -> String {
+pub(crate) fn with_thousands(x: f64) -> String {
     debug_assert!(x.is_finite() && x >= 0.0 && x.fract() == 0.0, "{x}");
     let digits = format!("{}", x as i64);
     let mut out = String::new();
@@ -303,6 +303,7 @@ impl Simulation {
         if happy && !self.suite_parking_short() {
             self.vip_favorable = true;
             self.vip_visits += 1;
+            self.fx.vip_seq += 1;
             self.emit(
                 "A VIP enjoyed their suite. Your tower earned a favorable review (4★ unlocked).",
                 LogKind::Good,
@@ -333,6 +334,8 @@ impl Simulation {
         }
         self.vip_visit_day = -1.0;
         self.vip_visits += 1;
+        // `triggerVip()`: the inspecting VIP's limo, impressed or not.
+        self.fx.vip_seq += 1;
         let pop = self.rating_population();
         let ok = self.has_operational(Kind::WeddingHall)
             && self.star >= 5

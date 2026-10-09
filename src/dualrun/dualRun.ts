@@ -1,7 +1,8 @@
 import type { Simulation } from "../engine/Simulation";
 import type { ShadowCommand } from "./commands";
 import { attachMirror, loadCommand } from "./mirror";
-import type { WorkerReply } from "./worker";
+import type { WorkerInit, WorkerReply } from "./worker";
+import { enginePackageUrl } from "../wasmhost/startWasmHost";
 
 /**
  * The browser side of the dual run (story-engine-dual-run): behind a
@@ -14,8 +15,7 @@ import type { WorkerReply } from "./worker";
  * Switch it on with `?dualrun=1` in the URL or `localStorage.setItem("vc.dualrun", "1")`
  * under `npm run dev`: it only ever starts where the tooling handle does,
  * and the worker loads the browser package by URL from
- * `src/dualrun/pkg-web/` (written by `npm run wasm:build`), which only the
- * dev server serves.
+ * `src/public/engine/` (written by `npm run wasm:build`, served beside the app).
  */
 export interface DualRunStatus {
   /** Hours compared so far on the current tower. */
@@ -61,6 +61,7 @@ export interface DualRunHandle {
 export function startDualRun(app: DualRunApp, makeWorker: () => Worker = defaultWorker, log: Pick<Console, "info" | "error" | "warn"> = console): DualRunHandle {
   const status: DualRunStatus = { hours: 0, starts: 0, divergence: null, errors: [], lastLabel: null };
   const worker = makeWorker();
+  worker.postMessage({ type: "init", url: enginePackageUrl() } satisfies WorkerInit);
   let detach: (() => void) | null = null;
   const send = (cmd: ShadowCommand) => worker.postMessage(cmd);
   // Bounded: a worker in trouble would otherwise report once per command.

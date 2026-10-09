@@ -37,11 +37,37 @@ export function loadCommand(sim: Simulation, gen: number): Extract<ShadowCommand
   };
 }
 
+/** What a relay hands back: `detach` puts the instance back the way it was;
+ *  `suppress` runs a function with reporting off, for a host that writes the
+ *  watched fields itself (a frame sync writing `money`). */
+export interface CommandRelay {
+  detach(): void;
+  suppress<T>(fn: () => T): T;
+}
+
+export interface RelayOptions {
+  /** Stamps the checkpoints the tick wrapper emits (mirror mode). */
+  gen?: number;
+  /** Mirror mode: the live tick runs and every hour crossed emits a
+   *  checkpoint. Host mode (`tick` given): the live tick never runs; this
+   *  runs in its place with the minutes asked for, and no tick or checkpoint
+   *  command reaches the sink. */
+  tick?: (dtMinutes: number) => void;
+}
+
 /** Attach the mirror. `gen` stamps the checkpoints it emits. Throws, leaving
  *  the instance untouched, when a mirror is already attached. */
 export function attachMirror(sim: Simulation, sink: CommandSink, gen = 0): () => void {
+  return relayCommands(sim, sink, { gen }).detach;
+}
+
+/** Wrap the instance so every host mutation reaches `sink` as a command
+ *  (see the module doc). Throws, leaving the instance untouched, when a
+ *  relay is already attached. */
+export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOptions = {}): CommandRelay {
   const moneyDesc = Object.getOwnPropertyDescriptor(sim, "money");
   if (moneyDesc && !("value" in moneyDesc)) throw new Error("mirror: a mirror is already attached to this simulation");
+  const gen = opts.gen ?? 0;
   let depth = 0;
   const restore: (() => void)[] = [];
   const detach = () => {
@@ -50,9 +76,10 @@ export function attachMirror(sim: Simulation, sink: CommandSink, gen = 0): () =>
   };
   let lastHourTicks = sim.hourTicks;
 
-  /** Replace `obj[name]` with a wrapper that runs the original and, for a
-   *  call from outside any other recorded call, reports it. */
-  function wrap<T extends object, K extends keyof T & string>(obj: T, name: K, report: (args: unknown[], result: unknown) => ShadowCommand | null): void {
+  /** Replace `obj[name]` with a wrapper that runs the original (or
+   *  `replace` in its place) and, for a call from outside any other recorded
+   *  call, reports it. */
+  function wrap<T extends object, K extends keyof T & string>(obj: T, name: K, report: (args: unknown[], result: unknown) => ShadowCommand | null, replace?: (args: unknown[]) => unknown): void {
     const original = obj[name] as unknown as AnyFn;
     if (typeof original !== "function") throw new Error(`mirror: ${name} is not a method`);
     const wrapped = function (this: T, ...args: never[]): unknown {
@@ -60,7 +87,7 @@ export function attachMirror(sim: Simulation, sink: CommandSink, gen = 0): () =>
       depth++;
       let result: unknown;
       try {
-        result = original.apply(this, args);
+        result = replace ? replace(args) : original.apply(this, args);
       } finally {
         depth--;
       }
@@ -101,12 +128,17 @@ export function attachMirror(sim: Simulation, sink: CommandSink, gen = 0): () =>
   const s = (v: unknown) => v as string;
 
   try {
-    wrap(sim, "tick", ([dt]) => {
-      sink({ op: "tick", dt: n(dt) });
-      if (sim.hourTicks === lastHourTicks) return null;
-      lastHourTicks = sim.hourTicks;
-      return { op: "checkpoint", gen, label: `day ${sim.clock.day} ${String(sim.clock.hour).padStart(2, "0")}:00`, state: canonicalJson(stateView(sim)), crowd: canonicalJson(crowdView(sim)) };
-    });
+    if (opts.tick) {
+      const run = opts.tick;
+      wrap(sim, "tick", () => null, ([dt]) => { run(n(dt)); });
+    } else {
+      wrap(sim, "tick", ([dt]) => {
+        sink({ op: "tick", dt: n(dt) });
+        if (sim.hourTicks === lastHourTicks) return null;
+        lastHourTicks = sim.hourTicks;
+        return { op: "checkpoint", gen, label: `day ${sim.clock.day} ${String(sim.clock.hour).padStart(2, "0")}:00`, state: canonicalJson(stateView(sim)), crowd: canonicalJson(crowdView(sim)) };
+      });
+    }
     wrap(sim, "build", ([kind, floor, x]) => ({ op: "build", kind, floor: n(floor), x: n(x) }) as ShadowCommand);
     wrap(sim, "buildTransport", ([kind, x, bottom, top]) => ({ op: "buildTransport", kind, x: n(x), bottom: n(bottom), top: n(top) }) as ShadowCommand);
     wrap(sim, "sellAt", ([floor, x]) => ({ op: "sellAt", floor: n(floor), x: n(x) }));
@@ -144,5 +176,15 @@ export function attachMirror(sim: Simulation, sink: CommandSink, gen = 0): () =>
     throw e;
   }
 
-  return detach;
+  return {
+    detach,
+    suppress<T>(fn: () => T): T {
+      depth++;
+      try {
+        return fn();
+      } finally {
+        depth--;
+      }
+    },
+  };
 }

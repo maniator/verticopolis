@@ -13,6 +13,9 @@ coverage/
 !src/dualrun/engine.d.ts
 *.js
 !dist/*.js
+# The served engine package's loader (wasm:build writes it; see
+# src/wasmhost/packageHash.test.ts for the freshness guard).
+!src/public/engine/*.js
 !eslint.config.js
 !vite.config.ts
 !vite-env.d.ts
@@ -41,4 +44,3 @@ determinism-diff/
 # Rust engine build output
 engine-rs/target/
 engine-rs/pkg/
-src/dualrun/pkg-web/

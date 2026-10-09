@@ -4,12 +4,13 @@ import { ShadowEngine } from "./shadow";
 
 /**
  * The dual run's worker: loads the browser build of the binding
- * (`src/dualrun/pkg-web/`, written by `npm run wasm:build`), holds the
+ * (`src/public/engine/`, written by `npm run wasm:build`), holds the
  * shadow engine, applies the commands the main thread posts in order, and
  * answers every checkpoint with the first divergence it found or an ok.
  * Every reply about a tower carries the generation of that tower's load.
- * The package is build output, loaded by URL at runtime, so a bundle never
- * carries it and a checkout without it reports the missing module instead.
+ * The package is served beside the app (`src/public/engine/`), loaded by the URL
+ * the controller sends first, so a bundle never carries it and a checkout
+ * without it reports the missing module instead.
  */
 export type WorkerReply =
   | { type: "ready" }
@@ -33,8 +34,7 @@ let gen: number | undefined;
  *  has failed, since nothing will ever apply them. */
 let queue: ShadowCommand[] | null = [];
 
-async function load(): Promise<void> {
-  const url = new URL("./pkg-web/verticopolis_engine.js", import.meta.url).href;
+async function load(url: string): Promise<void> {
   const mod = (await import(/* @vite-ignore */ url)) as { default: () => Promise<unknown> };
   await mod.default();
   shadow = new ShadowEngine(checkBinding(mod));
@@ -64,8 +64,24 @@ function handle(cmd: ShadowCommand): void {
   }
 }
 
-self.onmessage = (e: MessageEvent<ShadowCommand>) => handle(e.data);
-load().catch((e: unknown) => {
-  queue = null;
-  post({ type: "error", message: `could not load the WASM binding: ${e instanceof Error ? e.message : String(e)}` });
-});
+/** The controller's first message: where the package is served (resolved
+ *  against the page, which a worker cannot do for itself). */
+export interface WorkerInit {
+  type: "init";
+  url: string;
+}
+
+let loading = false;
+self.onmessage = (e: MessageEvent<ShadowCommand | WorkerInit>) => {
+  const data = e.data;
+  if ("type" in data && data.type === "init") {
+    if (loading) return;
+    loading = true;
+    load(data.url).catch((err: unknown) => {
+      queue = null;
+      post({ type: "error", message: `could not load the WASM binding: ${err instanceof Error ? err.message : String(err)}` });
+    });
+    return;
+  }
+  handle(data as ShadowCommand);
+};

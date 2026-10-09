@@ -75,9 +75,13 @@ Verticopolis has **two test tiers**:
     (`cargo run --release --bin conformance`, and again through the WASM
     binding from Node with `npm run wasm:build && npm run test:wasm`, which
     also runs the dual run's day gate: both engines driven by the frame
-    loop's own step math and compared every hour). Until the web game runs
-    on the
-    Rust engine, every simulation change lands in both engines in one PR with
+    loop's own step math and compared every hour). The game runs on the
+    WASM engine behind `?engine=wasm` (the TypeScript engine stays the
+    default); after any change under `engine-rs/`, run `npm run wasm:build`
+    and commit `src/public/engine/` (the served package); otherwise the unit
+    test that checks its source hash fails. Vercel rebuilds the package itself
+    on every deploy through `scripts/vercel-build.sh`. Until the Rust engine is the default,
+    every simulation change lands in both engines in one PR with
     the regenerated lock, and a PR that changes `src/engine/` without touching
     `engine-rs/` says why (a UI readout, prose, a transient the hash never
     sees). An engine PR that adds a branch adds a scenario that reaches it; the

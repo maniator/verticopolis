@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { iconTemplate } from "./icons";
+import { versionLine } from "../wasmhost/engineLabel";
 
 /**
  * The "Metropolis Dusk" splash/title-screen body, split out of the onboarding
@@ -98,7 +99,7 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
       <button class="splash-btn ghost" data-splash="help" @click=${h.onHelp}>${iconTemplate("help", { size: 14 })}How to Play</button>
     </div>
     <p class="splash-attrib">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.</p>
-    <p class="splash-version">v${APP_VERSION}</p>
+    <p class="splash-version">${versionLine(APP_VERSION)}</p>
     <!-- The 2.0 "Ground floor" badge (SPEC/party 2026-07-23, label re-picked
          2026-07-28): a quiet, permanent thank-you shown only when the loaded tower
          predates 2.0 (you got in on the ground floor). A new user never sees it.
