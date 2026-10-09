@@ -38,7 +38,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
  * first-run notice and Help. See the head of `templates/desktopAnalytics.ts` for
  * why an absolute "nothing carries over" would be false.
  */
-export function settingsTemplate(version: string, showBuilding = false, showAnalytics = false): TemplateResult {
+export function settingsTemplate(version: string, showBuilding = false, showAnalytics = false, engine = ""): TemplateResult {
   const analytics = showAnalytics
     ? html`
       <h3>Privacy</h3>
@@ -74,6 +74,6 @@ export function settingsTemplate(version: string, showBuilding = false, showAnal
       ${building}
       ${analytics}
       <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Close</button></div>
-      <p class="set-version">Verticopolis <span class="app-version">v${version}</span></p>
+      <p class="set-version">Verticopolis <span class="app-version">v${version}</span>${engine}</p>
     `;
 }

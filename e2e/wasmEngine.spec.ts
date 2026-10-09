@@ -15,6 +15,9 @@ test("the game runs on the WASM engine behind ?engine=wasm", async ({ page }) =>
     const w = window as unknown as { __vcEngine?: { status: { hosted: boolean } }; game?: { sim: unknown } };
     return !!w.__vcEngine?.status.hosted && !!w.game;
   }, undefined, { timeout: 30_000 });
+  // The title screen names the engine next to the version, so a tester can
+  // tell which engine runs without the console.
+  await expect(page.locator(".splash-version")).toContainText("WASM engine");
   // The sim does not tick behind the title screen; dismiss it the way the
   // other specs do.
   await page.evaluate(() => {

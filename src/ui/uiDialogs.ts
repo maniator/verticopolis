@@ -21,6 +21,7 @@ import { routeExternalInWrapper } from "./externalLink";
 import { isInstalledStandalone } from "./standalone";
 import { getPlatform } from "../platform";
 import { trackAppAction } from "../analytics";
+import { engineSuffix } from "../wasmhost/engineLabel";
 
 /**
  * Dialog and modal controllers for {@link UI}, as friend functions taking the
@@ -283,7 +284,7 @@ export function showHelp(ui: UI): void {
   // Replay binds inline via @click. While the splash is up the button is
   // disabled, so a real browser suppresses the click, and onReplayOnboarding
   // also no-ops behind #splash; both make a splash-time trigger a no-op.
-  const box = ui.openModalTemplate(helpTemplate(onSplash, version, { onReplay: () => ui.cb.onReplayOnboarding() }), { displaceable: true });
+  const box = ui.openModalTemplate(helpTemplate(onSplash, version, { onReplay: () => ui.cb.onReplayOnboarding() }, engineSuffix()), { displaceable: true });
   // Inside a native wrapper the report link routes to the system browser
   // through the platform port (see routeExternalInWrapper).
   routeExternalInWrapper(box.querySelector<HTMLAnchorElement>(".help-report a")!);
