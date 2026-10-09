@@ -1,0 +1,269 @@
+{
+  "id": "refusals-modern",
+  "description": "A fresh Modern starter tower has the build refusals a one-star tower can reach exercised under expectFail, each named by the reason the engine gives: a floor before any lobby, a floor outside the buildable range, a lobby on a tile that already holds one, a room with nothing under it, a room off the lot edge, a room on the ground-floor lobby, a room in the basement, kinds locked behind a higher star (parking, Security, a suite, the wedding hall, the metro, the food hall, an express shaft and an escalator), a lobby on a standard floor, a floor with nothing under it, a stairway that is not two floors, a shaft with no height, off the lot, longer than thirty floors, over another shaft or through unbuilt floors, a room on an occupied tile, and a room and a stairway with no money. The tower then builds two offices and runs two days.",
+  "start": {
+    "newGame": {
+      "seed": 20261008,
+      "mode": "modern"
+    }
+  },
+  "commands": [
+    {
+      "op": "setMoney",
+      "amount": 5000000
+    },
+    {
+      "op": "build",
+      "kind": "floor",
+      "floor": 2,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "floor",
+      "floor": 101,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 160,
+      "to": 215
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 2,
+      "from": 162,
+      "to": 213
+    },
+    {
+      "op": "build",
+      "kind": "lobby",
+      "floor": 1,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 162,
+      "bottom": 1,
+      "top": 2
+    },
+    {
+      "op": "checkpoint",
+      "label": "opened"
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 3,
+      "x": 100,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 2,
+      "x": 370,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 1,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 2,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": -1,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "security",
+      "floor": 2,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "hotelSuite",
+      "floor": 2,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "weddingHall",
+      "floor": 2,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "metro",
+      "floor": -1,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "foodHall",
+      "floor": 2,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "lobby",
+      "floor": 2,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "floor",
+      "floor": 4,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "floor",
+      "floor": 3,
+      "x": 100,
+      "expectFail": true
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 180,
+      "bottom": 1,
+      "top": 3,
+      "expectFail": true
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 190,
+      "bottom": 2,
+      "top": 2,
+      "expectFail": true
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 374,
+      "bottom": 1,
+      "top": 2,
+      "expectFail": true
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 190,
+      "bottom": 1,
+      "top": 40,
+      "expectFail": true
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 162,
+      "bottom": 1,
+      "top": 2,
+      "expectFail": true
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorExpress",
+      "x": 200,
+      "bottom": 1,
+      "top": 2,
+      "expectFail": true
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 190,
+      "bottom": 3,
+      "top": 4,
+      "expectFail": true
+    },
+    {
+      "op": "buildTransport",
+      "kind": "escalator",
+      "x": 200,
+      "bottom": 1,
+      "top": 2,
+      "expectFail": true
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 2,
+      "x": 170
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 2,
+      "x": 172,
+      "expectFail": true
+    },
+    {
+      "op": "setMoney",
+      "amount": 1000
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 2,
+      "x": 190,
+      "expectFail": true
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 200,
+      "bottom": 1,
+      "top": 2,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "refused"
+    },
+    {
+      "op": "setMoney",
+      "amount": 5000000
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 2,
+      "x": 190
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 48,
+      "checkpointEvery": 24
+    }
+  ]
+}

@@ -85,6 +85,8 @@ pub enum Command {
         #[serde(rename = "expectFail")]
         expect_fail: Option<bool>,
     },
+    #[serde(rename = "resolveChoice")]
+    ResolveChoice { accept: bool, kind: Option<String> },
     #[serde(rename = "reload")]
     Reload,
     #[serde(rename = "tick")]
@@ -126,8 +128,9 @@ impl Scenario {
 /// from 0 to 4294967295, "count" a whole number above zero, "dir" 1 or -1,
 /// "num" a finite number, "str" a non-empty string, "bool" a boolean, "place"
 /// a facility kind that is not a transport, "shaft" a transport kind, "mode"
-/// classic or modern, "obj" a JSON object, "kind" any facility kind. A
-/// trailing "?" marks the field optional.
+/// classic or modern, "obj" a JSON object, "kind" any facility kind,
+/// "choice" fireRescue or bombThreat. A trailing "?" marks the field
+/// optional.
 fn field_fits(ty: &str, v: &Value) -> bool {
     let int = |v: &Value| v.as_i64().is_some();
     match ty {
@@ -149,6 +152,7 @@ fn field_fits(ty: &str, v: &Value) -> bool {
         "mode" => matches!(v.as_str(), Some("classic") | Some("modern")),
         "obj" => v.is_object(),
         "kind" => v.as_str().and_then(Kind::parse).is_some(),
+        "choice" => matches!(v.as_str(), Some("fireRescue") | Some("bombThreat")),
         _ => unreachable!("field type {ty}"),
     }
 }
@@ -215,6 +219,7 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
         "setCars" => &[("floor", "int"), ("x", "int"), ("cars", "count")],
         "startFire" | "bombThreat" | "evaluateStar" | "reload" => &[],
         "callExterminator" => &[("expectFail", "bool?")],
+        "resolveChoice" => &[("accept", "bool"), ("kind", "choice?")],
         "setSchedule" => &[("floor", "int"), ("x", "int"), ("schedule", "obj")],
         "tick" => &[
             ("dt", "count"),
@@ -658,6 +663,26 @@ fn run_scenario_inner(
                 }
                 Command::BombThreat => sim.bomb_threat(),
                 Command::EvaluateStar => sim.evaluate_star(),
+                Command::ResolveChoice { accept, kind } => {
+                    // The answer must land on a real pending choice of the
+                    // kind the scenario names, and an accept must be payable,
+                    // as in the TypeScript runner.
+                    let Some(p) = sim.events.pending.as_ref() else {
+                        return Err(failed("resolveChoice: no pending choice".into()));
+                    };
+                    if let Some(k) = kind {
+                        if p.kind != *k {
+                            return Err(failed(format!(
+                                "resolveChoice: expected {k}, found {}",
+                                p.kind
+                            )));
+                        }
+                    }
+                    if *accept && sim.money < p.cost {
+                        return Err(failed(format!("resolveChoice: cannot pay {}", p.cost)));
+                    }
+                    sim.resolve_choice(*accept);
+                }
                 Command::CallExterminator { expect_fail } => {
                     let r = sim.call_exterminator();
                     expect_ok(
@@ -834,6 +859,10 @@ mod tests {
             (
                 r#"{"op":"adjustRent","floor":2,"x":4,"dir":2}"#,
                 "dir must be dir",
+            ),
+            (
+                r#"{"op":"resolveChoice","accept":true,"kind":"fireRescu"}"#,
+                "kind must be choice",
             ),
             (
                 r#"{"op":"setCars","floor":2,"x":4,"cars":0}"#,

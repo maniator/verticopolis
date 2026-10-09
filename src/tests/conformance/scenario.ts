@@ -39,6 +39,7 @@ export type Command =
   | { op: "bombThreat" }
   | { op: "evaluateStar" }
   | { op: "callExterminator"; expectFail?: boolean }
+  | { op: "resolveChoice"; accept: boolean; kind?: "fireRescue" | "bombThreat" }
   | ({ op: "setSchedule"; schedule: Record<string, unknown> } & At)
   | { op: "reload" }
   | { op: "tick"; dt: number; times?: number; checkpointEvery?: number }
@@ -61,9 +62,10 @@ export interface Checkpoint {
  *  4294967295, "count" a whole number above zero, "dir" 1 or -1, "num" a finite
  *  number, "str" a non-empty string, "bool" a boolean, "place" a facility kind
  *  that is not a transport, "shaft" a transport kind, "mode" classic or modern,
- *  "obj" a JSON object, "kind" any facility kind.
+ *  "obj" a JSON object, "kind" any facility kind, "choice" fireRescue or
+ *  bombThreat.
  *  A trailing "?" marks the field optional. */
-type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind";
+type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind" | "choice";
 const AT = { floor: "int", x: "int" } as const;
 const OPS: Record<Command["op"], Spec> = {
   setMoney: { amount: "num" },
@@ -78,6 +80,7 @@ const OPS: Record<Command["op"], Spec> = {
   bombThreat: {},
   evaluateStar: {},
   callExterminator: { expectFail: "bool?" },
+  resolveChoice: { accept: "bool", kind: "choice?" },
   setSchedule: { ...AT, schedule: "obj" },
   reload: {},
   tick: { dt: "count", times: "count?", checkpointEvery: "count?" },
@@ -98,6 +101,7 @@ function fits(type: FieldType, v: unknown): boolean {
     case "mode": return v === "classic" || v === "modern";
     case "obj": return typeof v === "object" && v !== null && !Array.isArray(v);
     case "kind": return typeof v === "string" && own(FACILITIES, v);
+    case "choice": return v === "fireRescue" || v === "bombThreat";
   }
 }
 
@@ -244,6 +248,19 @@ function apply(sim: Simulation, c: Command, emit: (label: string) => void, clock
     case "callExterminator": {
       const r = sim.callExterminator();
       expectOk(r.ok, c.expectFail, "callExterminator", r.ok ? undefined : r.reason);
+      break;
+    }
+    case "resolveChoice": {
+      // The answer must land on a real pending choice (a fire rescue offer or
+      // a bomb ransom), so a scenario cannot claim a decision the engine
+      // never asked for.
+      const p = sim.pendingChoice;
+      if (!p) throw new Error("resolveChoice: no pending choice");
+      if (c.kind !== undefined && p.kind !== c.kind) throw new Error(`resolveChoice: expected ${c.kind}, found ${p.kind}`);
+      // An accept the tower cannot afford is a decline in the engine; the
+      // scenario must mean what it says, so it is an error here.
+      if (c.accept && sim.money < p.cost) throw new Error(`resolveChoice: cannot pay ${p.cost}`);
+      sim.resolveChoice(c.accept ? "accept" : "decline");
       break;
     }
     case "reload": {

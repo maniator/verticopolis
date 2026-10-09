@@ -1,5 +1,21 @@
 {
   "scenarios": {
+    "amenities-modern": [
+      {"label":"start","state":"9fdb3c23417433b1","crowd":"7cb294222cbe0188"},
+      {"label":"built","state":"e8829f33797da060","crowd":"7cb294222cbe0188"},
+      {"label":"scheduled","state":"bc6f19cfcc0dabda","crowd":"7cb294222cbe0188"},
+      {"label":"t+1440","state":"d1e9d49b4785fb15","crowd":"ecff7780f40b0cb4"},
+      {"label":"t+2880","state":"b91b5d3a14e89930","crowd":"1e28a1f0f90df0b3"},
+      {"label":"t+4320","state":"5294f2ab57cca179","crowd":"560f2bf45dbcb020"},
+      {"label":"t+5760","state":"73740d33d0f56a7b","crowd":"3a4385cc7e771342"},
+      {"label":"t+7200","state":"8b1e84321f4f76cb","crowd":"4d405cafe971f388"},
+      {"label":"t+8640","state":"e8b18429d546bb99","crowd":"b6251fd422baec98"},
+      {"label":"t+10080","state":"66f584255e9938cf","crowd":"6be9272f2582edb0"},
+      {"label":"t+11520","state":"ed13281fd6542aa0","crowd":"e66b4faa6a32f6ca"},
+      {"label":"t+12960","state":"d5c9fb2f65d8c2f1","crowd":"0951abd8dfe64e3a"},
+      {"label":"t+14400","state":"9a7f11f7a10bc97e","crowd":"09e28b61500b1bee"},
+      {"label":"final","state":"9a7f11f7a10bc97e","crowd":"09e28b61500b1bee"}
+    ],
     "events-classic": [
       {"label":"start","state":"64377abdeb48d52e","crowd":"14f957522e1cb3fc"},
       {"label":"built","state":"dfc9c1383b28443e","crowd":"14f957522e1cb3fc"},
@@ -54,6 +70,40 @@
       {"label":"t+2820","state":"720409ff2b6fb572","crowd":"cd16013f64032754"},
       {"label":"t+2880","state":"a24ade069306481d","crowd":"cd16013f64032754"},
       {"label":"final","state":"a24ade069306481d","crowd":"cd16013f64032754"}
+    ],
+    "fire-rescue-ignored-modern": [
+      {"label":"start","state":"6dcaf818cadcfe11","crowd":"7cb294222cbe0188"},
+      {"label":"undefended","state":"be68c309bb16b982","crowd":"7cb294222cbe0188"},
+      {"label":"t+3840","state":"a3f1670e0d98ede1","crowd":"9b23ce324c625820"},
+      {"label":"t+7680","state":"60c0cdf055671d2e","crowd":"068351c52b598163"},
+      {"label":"t+11520","state":"0e2f17a1b92726aa","crowd":"37b551beca72f6d2"},
+      {"label":"t+15360","state":"363e95fbc1e61ff3","crowd":"fbfb19622ff3ade4"},
+      {"label":"rescue-offered","state":"363e95fbc1e61ff3","crowd":"fbfb19622ff3ade4"},
+      {"label":"burning","state":"99efd41c0ae47023","crowd":"2db24b6c07b0606a"},
+      {"label":"second-fire","state":"f5afec179a922157","crowd":"2db24b6c07b0606a"},
+      {"label":"t+18240","state":"3ea576534c24fb88","crowd":"faa8fdea468b392b"},
+      {"label":"t+19680","state":"629c2728af8cd9f4","crowd":"85b701191c5cd462"},
+      {"label":"t+21120","state":"96c61938373beaab","crowd":"b348c06d980e7bbd"},
+      {"label":"t+22560","state":"39794b9be459c8f3","crowd":"15347734bac2e53d"},
+      {"label":"t+24000","state":"e74ef49c8bd2f3fb","crowd":"96147e89f673ee83"},
+      {"label":"t+25440","state":"329274069035f734","crowd":"9b81ee140cbae8e3"},
+      {"label":"t+26880","state":"6089d0213f17ec50","crowd":"88d0b6bbf5955543"},
+      {"label":"t+28320","state":"3fe1b9716c9e1b04","crowd":"e2dc6e89eea3b3d0"},
+      {"label":"t+29760","state":"04bb319332101820","crowd":"fb3b3e5889cb7019"},
+      {"label":"final","state":"04bb319332101820","crowd":"fb3b3e5889cb7019"}
+    ],
+    "fire-rescue-paid-modern": [
+      {"label":"start","state":"6dcaf818cadcfe11","crowd":"7cb294222cbe0188"},
+      {"label":"undefended","state":"be68c309bb16b982","crowd":"7cb294222cbe0188"},
+      {"label":"t+3840","state":"a3f1670e0d98ede1","crowd":"9b23ce324c625820"},
+      {"label":"t+7680","state":"60c0cdf055671d2e","crowd":"068351c52b598163"},
+      {"label":"t+11520","state":"0e2f17a1b92726aa","crowd":"37b551beca72f6d2"},
+      {"label":"t+15360","state":"363e95fbc1e61ff3","crowd":"fbfb19622ff3ade4"},
+      {"label":"rescue-offered","state":"363e95fbc1e61ff3","crowd":"fbfb19622ff3ade4"},
+      {"label":"rescued","state":"79580d2da3402d60","crowd":"fbfb19622ff3ade4"},
+      {"label":"t+16800","state":"d6227ea80035c777","crowd":"2db24b6c07b0606a"},
+      {"label":"t+18240","state":"1148ab77576d3490","crowd":"1878332893b1be26"},
+      {"label":"final","state":"1148ab77576d3490","crowd":"1878332893b1be26"}
     ],
     "fixture-sixseven": [
       {"label":"start","state":"ce4e2c5747088912","crowd":"aa873ebd307f66cd"},
@@ -280,6 +330,56 @@
       {"label":"t+7200","state":"1eb9d177206eb660","crowd":"dc4951770f27816b"},
       {"label":"end","state":"1eb9d177206eb660","crowd":"dc4951770f27816b"},
       {"label":"final","state":"1eb9d177206eb660","crowd":"dc4951770f27816b"}
+    ],
+    "ransom-ignored-modern": [
+      {"label":"start","state":"9fdb3c23417433b1","crowd":"7cb294222cbe0188"},
+      {"label":"t+3840","state":"5ab4910378f8589c","crowd":"9b23ce324c625820"},
+      {"label":"t+7680","state":"c381b49af2f4e7d8","crowd":"068351c52b598163"},
+      {"label":"t+11520","state":"d1f0ac93dff736f4","crowd":"37b551beca72f6d2"},
+      {"label":"t+15360","state":"03790c1daa2bf749","crowd":"fbfb19622ff3ade4"},
+      {"label":"ransom-demanded","state":"03790c1daa2bf749","crowd":"fbfb19622ff3ade4"},
+      {"label":"swept","state":"7a7cb331e86aaf3d","crowd":"cc8b09791c204228"},
+      {"label":"detonated","state":"a48a367f16dd8a6d","crowd":"cc8b09791c204228"},
+      {"label":"t+18240","state":"a19281a51efc3891","crowd":"f249ee0062ac8e73"},
+      {"label":"t+19680","state":"0a0e17d26fa5f0a0","crowd":"da5b916867612911"},
+      {"label":"final","state":"0a0e17d26fa5f0a0","crowd":"da5b916867612911"}
+    ],
+    "ransom-paid-modern": [
+      {"label":"start","state":"9fdb3c23417433b1","crowd":"7cb294222cbe0188"},
+      {"label":"t+3840","state":"5ab4910378f8589c","crowd":"9b23ce324c625820"},
+      {"label":"t+7680","state":"c381b49af2f4e7d8","crowd":"068351c52b598163"},
+      {"label":"t+11520","state":"d1f0ac93dff736f4","crowd":"37b551beca72f6d2"},
+      {"label":"t+15360","state":"03790c1daa2bf749","crowd":"fbfb19622ff3ade4"},
+      {"label":"ransom-demanded","state":"03790c1daa2bf749","crowd":"fbfb19622ff3ade4"},
+      {"label":"ransom-paid","state":"247cda6673c95574","crowd":"fbfb19622ff3ade4"},
+      {"label":"t+16800","state":"ac860fc6c62de114","crowd":"cc8b09791c204228"},
+      {"label":"t+18240","state":"d823e18aaa985920","crowd":"00d5ac1f3b0799dc"},
+      {"label":"final","state":"d823e18aaa985920","crowd":"00d5ac1f3b0799dc"}
+    ],
+    "refusals-classic": [
+      {"label":"start","state":"a862fe5195f32a27","crowd":"4a8080683207bc4d"},
+      {"label":"opened","state":"94767b0c4b3c2cdf","crowd":"4a8080683207bc4d"},
+      {"label":"refused","state":"5438bd79897fe25f","crowd":"4a8080683207bc4d"},
+      {"label":"t+1440","state":"cd2db7f2db2b8c05","crowd":"20ae55f561b96d3f"},
+      {"label":"t+2880","state":"4f9e3d90737439fb","crowd":"2f98b38fc463d24c"},
+      {"label":"final","state":"4f9e3d90737439fb","crowd":"2f98b38fc463d24c"}
+    ],
+    "refusals-modern": [
+      {"label":"start","state":"af9358851c9235c8","crowd":"4a8080683207bc4d"},
+      {"label":"opened","state":"cb17ec843f6ea14c","crowd":"4a8080683207bc4d"},
+      {"label":"refused","state":"3ec1c685213743f6","crowd":"4a8080683207bc4d"},
+      {"label":"t+1440","state":"b60d68626ce500c1","crowd":"a5722f2a350b3eb1"},
+      {"label":"t+2880","state":"113454dd564ec6b3","crowd":"9866b65d33c9acde"},
+      {"label":"final","state":"113454dd564ec6b3","crowd":"9866b65d33c9acde"}
+    ],
+    "star-climb-classic": [
+      {"label":"start","state":"95cd144e1fd2ad1c","crowd":"7cb294222cbe0188"},
+      {"label":"two-stars","state":"1f8abe6d66a4d321","crowd":"7cb294222cbe0188"},
+      {"label":"t+1440","state":"3bce6a73312ae46e","crowd":"60e58695bc246214"},
+      {"label":"t+2880","state":"14950fb3a185ebbc","crowd":"079c56f01510b28a"},
+      {"label":"t+4320","state":"5c2e12e7a9bf25de","crowd":"f5e643a375df3746"},
+      {"label":"three-stars","state":"5c2e12e7a9bf25de","crowd":"f5e643a375df3746"},
+      {"label":"final","state":"7e4ba52d2af2b57a","crowd":"fb27a69f1527c013"}
     ],
     "starter-classic": [
       {"label":"start","state":"7e9896e57a869117","crowd":"ffab01a633931504"},

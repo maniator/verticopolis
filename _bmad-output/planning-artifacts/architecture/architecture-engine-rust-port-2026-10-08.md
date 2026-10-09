@@ -9,7 +9,7 @@ updates now that the port exists.
 
 | Item from the engine architecture draft | State |
 | --- | --- |
-| 1. Conformance suite | Done (#854). Six scenarios, 342 checkpoints, pinned in `conformance/expected.json`, run in `npm test`. |
+| 1. Conformance suite | Done (#854, widened by #861 and the scenario library's second slice). Nineteen scenarios, 518 checkpoints, pinned in `conformance/expected.json`, run in `npm test`; a loader table and a nightly differential fuzzer beside it. |
 | 5. Rust core | Ported in full, Classic and Modern together (#857). `engine-rs/` replays every scenario and matches every checkpoint. CI runs the referee on every change to the crate, the scenarios or the fixtures. |
 | 2. Saves keep what they do not understand | Not started. Applies to both engines now (see "Two engines, one simulation"). |
 | 3. Core, Classic, Modern split | Deferred. The owner moved the port ahead of the split; the Rust crate keeps the TypeScript shape (one engine, a rule set chosen by mode). A split can still happen later, in both engines at once, behind the referee. |
@@ -98,7 +98,7 @@ The stories, in the order they run, each gated on the one before:
 
 | # | Story | Gate to start | Gate to finish |
 | --- | --- | --- | --- |
-| 1 | `story-engine-scenario-library` | #857 merged | Coverage floor raised, no module under 75%, fuzzer nightly, canon tests, #860 closed, CONTRIBUTING rule |
+| 1 | `story-engine-scenario-library` | #857 merged | Done: floor at 87%, no engine module under 75%, fuzzer nightly, canon tests, #860 closed, CONTRIBUTING rule |
 | 2 | `story-engine-wasm-binding` (phase 1) | 1 | Referee matches through the binding from Node |
 | 3 | `story-engine-dual-run` (phase 2) | 2 | A full day on each fixture with no divergence at game cadence |
 | 4 | `story-engine-wasm-switch` (phase 3) | 3, plus the test-mapping table started | Golden masters, e2e, conformance green; Modern profile no slower |

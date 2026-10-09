@@ -38,6 +38,7 @@ describe("loadScenario", () => {
     ["an unknown facility kind", { ...base, commands: [{ op: "build", kind: "ofice", floor: 1, x: 1 }] }, /kind must be place/],
     ["a shaft built as a room", { ...base, commands: [{ op: "build", kind: "elevatorStandard", floor: 1, x: 1 }] }, /kind must be place/],
     ["a room built as a shaft", { ...base, commands: [{ op: "buildTransport", kind: "office", x: 1, bottom: 1, top: 2 }] }, /kind must be shaft/],
+    ["a choice that is not fireRescue or bombThreat", { ...base, commands: [{ op: "resolveChoice", accept: true, kind: "fireRescu" }] }, /kind must be choice/],
     ["a bad dir", { ...base, commands: [{ op: "adjustRent", floor: 2, x: 1, dir: 2 }] }, /dir must be dir/],
     ["a non-boolean expectFail", { ...base, commands: [{ op: "build", kind: "office", floor: 2, x: 1, expectFail: "yes" }] }, /expectFail must be bool/],
     ["an empty label", { ...base, commands: [{ op: "checkpoint", label: "" }] }, /label must be str/],

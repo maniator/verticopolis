@@ -1,0 +1,57 @@
+{
+  "id": "fire-rescue-paid-modern",
+  "description": "The Modern tower-one at three stars (the towerone fixture with vipFavorable cleared, vipVisits zeroed and the treasury filled) sells its Security office and both Medical centers so a fire is likelier and nothing fights it, runs at hour ticks until a fire breaks out and the rescue offer is pending, pays the rescue so the blaze is put out at once and the room is left a gutted shell, and runs two more days.",
+  "start": {
+    "fixture": "src/tests/fixtures/towerone-vip-pending.vctower",
+    "mode": "modern"
+  },
+  "commands": [
+    {
+      "op": "sell",
+      "floor": 0,
+      "x": 153,
+      "kind": "security"
+    },
+    {
+      "op": "sell",
+      "floor": 0,
+      "x": 136,
+      "kind": "medical"
+    },
+    {
+      "op": "sell",
+      "floor": 46,
+      "x": 257,
+      "kind": "medical"
+    },
+    {
+      "op": "checkpoint",
+      "label": "undefended"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 256,
+      "checkpointEvery": 64
+    },
+    {
+      "op": "checkpoint",
+      "label": "rescue-offered"
+    },
+    {
+      "op": "resolveChoice",
+      "accept": true,
+      "kind": "fireRescue"
+    },
+    {
+      "op": "checkpoint",
+      "label": "rescued"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 48,
+      "checkpointEvery": 24
+    }
+  ]
+}

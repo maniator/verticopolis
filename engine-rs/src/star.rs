@@ -176,3 +176,71 @@ impl Simulation {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::clock::GameMode;
+
+    /// The four-star gates of `cumulativeStarGates`: Security (the three-star
+    /// gate, carried up), Medical, recycling demand met, two operational
+    /// suites, a favorable VIP review, and Metro for five. No fixture has the
+    /// 5,000 residents a four-star rung needs, so each gate is pinned here on
+    /// a scripted tower: the full set is built and met, then every gate is
+    /// knocked out on its own and must fail by itself.
+    #[test]
+    fn four_star_gates_each_pinned() {
+        let mut sim = Simulation::new_game(7, GameMode::Modern);
+        sim.money = 1.0e9;
+        sim.star = 3;
+        for x in 150..230 {
+            assert!(sim.build(Kind::Lobby, 1, x).ok);
+        }
+        for fl in 2..=3 {
+            for x in 151..229 {
+                assert!(sim.build(Kind::Floor, fl, x).ok, "floor {fl},{x}");
+            }
+        }
+        assert!(sim.build_transport(Kind::ElevatorStandard, 151, 1, 3).ok);
+        let settle = |sim: &mut Simulation| {
+            for _ in 0..(3 * 24) {
+                sim.tick(60.0);
+            }
+        };
+        // Without Security even the three-star rung fails.
+        assert!(!sim.cumulative_gates_met(3));
+        assert!(sim.build(Kind::Security, 2, 160).ok, "security");
+        assert!(sim.build(Kind::Medical, 2, 170).ok, "medical");
+        assert!(sim.build(Kind::HotelSuite, 3, 160).ok, "suite 1");
+        assert!(sim.build(Kind::HotelSuite, 3, 172).ok, "suite 2");
+        sim.vip_favorable = true;
+        settle(&mut sim);
+        assert!(sim.cumulative_gates_met(3));
+        assert_eq!(sim.count_operational(Kind::HotelSuite), 2);
+        // A tiny tower has no recycling demand, so that gate is met already.
+        assert!(sim.recycling_demand_met());
+        assert!(sim.cumulative_gates_met(4), "every four-star gate met");
+        assert!(!sim.cumulative_gates_met(5), "Metro missing");
+
+        // The VIP gate alone.
+        sim.vip_favorable = false;
+        assert!(!sim.cumulative_gates_met(4), "VIP review missing");
+        sim.vip_favorable = true;
+        assert!(sim.cumulative_gates_met(4));
+
+        // One suite alone.
+        assert!(sim.sell_at(3, 172), "sell suite 2");
+        assert!(!sim.cumulative_gates_met(4), "second suite missing");
+        assert!(sim.build(Kind::HotelSuite, 3, 172).ok, "suite 2 again");
+        settle(&mut sim);
+        assert!(sim.cumulative_gates_met(4));
+
+        // Medical alone.
+        assert!(sim.sell_at(2, 170), "sell medical");
+        assert!(!sim.cumulative_gates_met(4), "Medical missing");
+        assert!(
+            sim.cumulative_gates_met(3),
+            "Security still carries the three-star rung"
+        );
+    }
+}
