@@ -56,6 +56,15 @@ impl GameMode {
             GameMode::Modern => "modern",
         }
     }
+
+    /// The mode a scenario or a host names, by its saved spelling.
+    pub fn parse(s: &str) -> Option<GameMode> {
+        match s {
+            "classic" => Some(GameMode::Classic),
+            "modern" => Some(GameMode::Modern),
+            _ => None,
+        }
+    }
 }
 
 /// Classic always runs canon; Modern honors the player's choice.

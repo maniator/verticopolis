@@ -8,6 +8,7 @@ import type { SerializedGame } from "../../engine/serializedGame";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
 import { rentOf } from "../../engine/econConfig";
+import { serializeUnit } from "../../engine/sim/coerce";
 import { digest } from "./canonical";
 
 /**
@@ -143,11 +144,96 @@ export function loadScenario(file: string): Scenario {
   return s;
 }
 
-function startSim(start: Start): Simulation {
+/** The outcome of a command an engine may refuse: `ok`, and the refusal
+ *  reason when it did. */
+export interface Outcome { ok: boolean; reason?: string }
+
+/** What a scenario drives: one engine behind the small command surface the
+ *  ops use. The TypeScript engine implements it directly (`tsEngine`); a port
+ *  implements it through its binding, and the runner cannot tell them apart.
+ *  Ids and tile queries read the engine as it stands, so a method that moves
+ *  something (`adjustRent`, `setCars`) is checked by asking again. */
+export interface ScenarioEngine {
+  mode(): string;
+  money(): number;
+  setMoney(amount: number): void;
+  build(kind: FacilityKind, floor: number, x: number): Outcome;
+  buildTransport(kind: FacilityKind, x: number, bottom: number, top: number): Outcome;
+  sellAt(floor: number, x: number): boolean;
+  /** The unit covering a tile, with the rent it charges right now. */
+  unitAt(floor: number, x: number): { id: number; kind: string; rent: number } | null;
+  /** The shaft covering a tile, with its car count. */
+  transportAt(floor: number, x: number): { id: number; kind: string; cars: number } | null;
+  adjustRent(id: number, dir: 1 | -1): number | null;
+  setNoRate(id: number): boolean;
+  setCars(id: number, cars: number): boolean;
+  setSchedule(id: number, schedule: Record<string, unknown>): boolean;
+  startFire(): void;
+  fires(): number;
+  bombThreat(): void;
+  evaluateStar(): void;
+  callExterminator(): Outcome;
+  pendingChoice(): { kind: string; cost: number } | null;
+  resolveChoice(accept: boolean): void;
+  tick(dt: number): void;
+  /** A save round trip: serialize, then load the result as a fresh engine. */
+  reload(): ScenarioEngine;
+  stateDigest(): string;
+  crowdDigest(): string;
+  /** Release the engine, for a binding that owns memory; the runner calls it
+   *  when the run ends, whether it finished or threw. */
+  free?(): void;
+}
+
+/** How a runner starts an engine from a scenario's `start`. */
+export type EngineStart = (start: Start) => ScenarioEngine;
+
+/** The TypeScript engine behind the scenario surface. */
+export function tsEngine(sim: Simulation): ScenarioEngine {
+  return {
+    mode: () => sim.mode,
+    money: () => sim.money,
+    setMoney: (amount) => { sim.money = amount; },
+    build: (kind, floor, x) => sim.build(kind, floor, x),
+    buildTransport: (kind, x, bottom, top) => sim.buildTransport(kind, x, bottom, top),
+    sellAt: (floor, x) => sim.sellAt(floor, x),
+    unitAt: (floor, x) => {
+      const u = sim.tower.unitAt(floor, x);
+      // The rent is read off the unit as a save carries it, the same shape a
+      // port's binding hands back, so both engines measure one quantity.
+      return u ? { id: u.id, kind: u.kind, rent: rentOf(serializeUnit(u)) } : null;
+    },
+    transportAt: (floor, x) => {
+      const t = sim.tower.transportAt(floor, x);
+      return t ? { id: t.id, kind: t.kind, cars: t.cars } : null;
+    },
+    adjustRent: (id, dir) => sim.adjustRent(id, dir),
+    setNoRate: (id) => sim.setNoRate(id),
+    setCars: (id, cars) => sim.tower.setCars(id, cars),
+    setSchedule: (id, schedule) => sim.tower.setSchedule(id, schedule),
+    startFire: () => sim.startFire(),
+    fires: () => sim.fires,
+    bombThreat: () => sim.bombThreat(),
+    evaluateStar: () => sim.evaluateStar(),
+    callExterminator: () => {
+      const r = sim.callExterminator();
+      return r.ok ? { ok: true } : { ok: false, reason: r.reason };
+    },
+    pendingChoice: () => sim.pendingChoice,
+    resolveChoice: (accept) => sim.resolveChoice(accept ? "accept" : "decline"),
+    tick: (dt) => sim.tick(dt),
+    reload: () => tsEngine(Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame)),
+    stateDigest: () => digest(stateView(sim)),
+    crowdDigest: () => digest(crowdView(sim)),
+  };
+}
+
+/** Start the TypeScript engine from a scenario's `start`. */
+export const startTsEngine: EngineStart = (start) => {
   if ("newGame" in start) {
     const sim = Simulation.newGame(start.newGame.seed, start.newGame.mode);
     if (sim.mode !== start.newGame.mode) throw new Error(`new game founded as ${sim.mode}, not ${start.newGame.mode}`);
-    return sim;
+    return tsEngine(sim);
   }
   const raw = decodeVctower(readFileSync(resolve(REPO_ROOT, start.fixture), "utf8"), start.fixture) as SerializedGame;
   if (start.mode) raw.mode = start.mode;
@@ -155,8 +241,8 @@ function startSim(start: Start): Simulation {
   const sim = Simulation.deserialize(raw);
   markFounderFromLoadedFile(sim, raw);
   if (start.mode && sim.mode !== start.mode) throw new Error(`${start.fixture} loaded as ${sim.mode}, not ${start.mode}`);
-  return sim;
-}
+  return tsEngine(sim);
+};
 
 /** The saved game minus prose: log entry `text` and the pending choice's
  *  `message` are player copy (locale-formatted money), so they stay out of the
@@ -178,10 +264,16 @@ export function crowdView(sim: Simulation): unknown {
   return { nextId: sim.crowd.nextId, rng: sim.crowd.rng.seed, people: sim.crowd.people };
 }
 
-function unitAt(sim: Simulation, at: At) {
-  const u = sim.tower.unitAt(at.floor, at.x);
+function unitAt(e: ScenarioEngine, at: At) {
+  const u = e.unitAt(at.floor, at.x);
   if (!u) throw new Error(`no unit at floor ${at.floor}, x ${at.x}`);
   return u;
+}
+
+function transportAt(e: ScenarioEngine, at: At) {
+  const t = e.transportAt(at.floor, at.x);
+  if (!t) throw new Error(`no transport at floor ${at.floor}, x ${at.x}`);
+  return t;
 }
 
 function expectOk(ok: boolean, expectFail: boolean | undefined, what: string, reason?: string): void {
@@ -189,22 +281,22 @@ function expectOk(ok: boolean, expectFail: boolean | undefined, what: string, re
   throw new Error(`${what} ${ok ? "succeeded but was expected to fail" : `failed: ${reason ?? "no reason"}`}`);
 }
 
-function apply(sim: Simulation, c: Command, emit: (label: string) => void, clock: { minutes: number }): Simulation {
+function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clock: { minutes: number }): ScenarioEngine {
   switch (c.op) {
-    case "setMoney": sim.money = c.amount; break;
+    case "setMoney": e.setMoney(c.amount); break;
     case "build": {
-      const r = sim.build(c.kind, c.floor, c.x);
+      const r = e.build(c.kind, c.floor, c.x);
       expectOk(r.ok, c.expectFail, `build ${c.kind} @ ${c.floor},${c.x}`, r.reason);
       break;
     }
     case "buildRow":
       for (let x = c.from; x <= c.to; x++) {
-        const r = sim.build(c.kind, c.floor, x);
+        const r = e.build(c.kind, c.floor, x);
         expectOk(r.ok, false, `build ${c.kind} @ ${c.floor},${x}`, r.reason);
       }
       break;
     case "buildTransport": {
-      const r = sim.buildTransport(c.kind, c.x, c.bottom, c.top);
+      const r = e.buildTransport(c.kind, c.x, c.bottom, c.top);
       expectOk(r.ok, c.expectFail, `buildTransport ${c.kind} @ x${c.x} ${c.bottom}-${c.top}`, r.reason);
       break;
     }
@@ -212,67 +304,66 @@ function apply(sim: Simulation, c: Command, emit: (label: string) => void, clock
       // An optional kind pins what the tile holds, so a scenario that says it
       // sells a housekeeping crew cannot quietly sell whatever sits there.
       if (c.kind !== undefined) {
-        const here = sim.tower.unitAt(c.floor, c.x)?.kind ?? sim.tower.transportAt(c.floor, c.x)?.kind;
+        const here = e.unitAt(c.floor, c.x)?.kind ?? e.transportAt(c.floor, c.x)?.kind;
         if (here !== c.kind) throw new Error(`sell @ ${c.floor},${c.x}: expected ${c.kind}, found ${here ?? "nothing"}`);
       }
-      expectOk(sim.sellAt(c.floor, c.x), false, `sell @ ${c.floor},${c.x}`);
+      expectOk(e.sellAt(c.floor, c.x), false, `sell @ ${c.floor},${c.x}`);
       break;
     }
     case "adjustRent": {
-      const u = unitAt(sim, c);
-      const before = rentOf(u);
-      expectOk(sim.adjustRent(u.id, c.dir) !== null && rentOf(u) !== before, false, `adjustRent ${c.dir} @ ${c.floor},${c.x}`, "rent did not move");
+      const u = unitAt(e, c);
+      const moved = e.adjustRent(u.id, c.dir) !== null && unitAt(e, c).rent !== u.rent;
+      expectOk(moved, false, `adjustRent ${c.dir} @ ${c.floor},${c.x}`, "rent did not move");
       break;
     }
-    case "setNoRate": expectOk(sim.setNoRate(unitAt(sim, c).id), false, `setNoRate @ ${c.floor},${c.x}`); break;
+    case "setNoRate": expectOk(e.setNoRate(unitAt(e, c).id), false, `setNoRate @ ${c.floor},${c.x}`); break;
     case "setCars": {
-      const t = sim.tower.transportAt(c.floor, c.x);
-      if (!t) throw new Error(`no transport at floor ${c.floor}, x ${c.x}`);
-      expectOk(sim.tower.setCars(t.id, c.cars) && t.cars === c.cars, false, `setCars ${c.cars} @ ${c.floor},${c.x}`);
+      const t = transportAt(e, c);
+      expectOk(e.setCars(t.id, c.cars) && transportAt(e, c).cars === c.cars, false, `setCars ${c.cars} @ ${c.floor},${c.x}`);
       break;
     }
     case "startFire": {
-      const before = sim.fires;
-      sim.startFire();
-      expectOk(sim.fires > before, false, "startFire", "nothing caught fire");
+      const before = e.fires();
+      e.startFire();
+      expectOk(e.fires() > before, false, "startFire", "nothing caught fire");
       break;
     }
-    case "bombThreat": sim.bombThreat(); break;
-    case "evaluateStar": sim.evaluateStar(); break;
-    case "setSchedule": {
-      const t = sim.tower.transportAt(c.floor, c.x);
-      if (!t) throw new Error(`no transport at floor ${c.floor}, x ${c.x}`);
-      expectOk(sim.tower.setSchedule(t.id, c.schedule), false, `setSchedule @ ${c.floor},${c.x}`, "not an elevator");
+    case "bombThreat": e.bombThreat(); break;
+    case "evaluateStar": e.evaluateStar(); break;
+    case "setSchedule":
+      expectOk(e.setSchedule(transportAt(e, c).id, c.schedule), false, `setSchedule @ ${c.floor},${c.x}`, "not an elevator");
       break;
-    }
     case "callExterminator": {
-      const r = sim.callExterminator();
-      expectOk(r.ok, c.expectFail, "callExterminator", r.ok ? undefined : r.reason);
+      const r = e.callExterminator();
+      expectOk(r.ok, c.expectFail, "callExterminator", r.reason);
       break;
     }
     case "resolveChoice": {
       // The answer must land on a real pending choice (a fire rescue offer or
       // a bomb ransom), so a scenario cannot claim a decision the engine
       // never asked for.
-      const p = sim.pendingChoice;
+      const p = e.pendingChoice();
       if (!p) throw new Error("resolveChoice: no pending choice");
       if (c.kind !== undefined && p.kind !== c.kind) throw new Error(`resolveChoice: expected ${c.kind}, found ${p.kind}`);
       // An accept the tower cannot afford is a decline in the engine; the
       // scenario must mean what it says, so it is an error here.
-      if (c.accept && sim.money < p.cost) throw new Error(`resolveChoice: cannot pay ${p.cost}`);
-      sim.resolveChoice(c.accept ? "accept" : "decline");
+      if (c.accept && e.money() < p.cost) throw new Error(`resolveChoice: cannot pay ${p.cost}`);
+      e.resolveChoice(c.accept);
       break;
     }
     case "reload": {
       // A save round trip must lose nothing the save carries.
-      const before = digest(stateView(sim));
-      const loaded = Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame);
-      if (digest(stateView(loaded)) !== before) throw new Error("reload changed the saved state");
+      const before = e.stateDigest();
+      const loaded = e.reload();
+      if (loaded.stateDigest() !== before) {
+        loaded.free?.();
+        throw new Error("reload changed the saved state");
+      }
       return loaded;
     }
     case "tick":
       for (let i = 1; i <= (c.times ?? 1); i++) {
-        sim.tick(c.dt);
+        e.tick(c.dt);
         clock.minutes += c.dt;
         if (c.checkpointEvery && i % c.checkpointEvery === 0) emit(`t+${clock.minutes}`);
       }
@@ -280,24 +371,40 @@ function apply(sim: Simulation, c: Command, emit: (label: string) => void, clock
     case "checkpoint": emit(c.label); break;
     default: throw new Error(`unknown op ${(c as { op: string }).op}`);
   }
-  return sim;
+  return e;
+}
+
+/** The first checkpoint where a run departs from its lock entry (index, both
+ *  sides), or null when they agree to the end. The useful fact for a port. */
+export function firstDivergence(got: Checkpoint[], want: Checkpoint[]): { checkpoint: number; got: Checkpoint | null; want: Checkpoint | null } | null {
+  const same = (a: Checkpoint | undefined, b: Checkpoint | undefined) =>
+    !!a && !!b && a.label === b.label && a.state === b.state && a.crowd === b.crowd;
+  for (let i = 0; i < Math.max(got.length, want.length); i++) {
+    if (!same(got[i], want[i])) return { checkpoint: i, got: got[i] ?? null, want: want[i] ?? null };
+  }
+  return null;
 }
 
 /** Run a scenario from its start, returning every checkpoint in order: `start`
  *  before the first command, the ones the commands take, and `final` after the
- *  last command, so nothing a scenario runs goes unchecked. */
-export function runScenario(s: Scenario): Checkpoint[] {
-  let sim = startSim(s.start);
+ *  last command, so nothing a scenario runs goes unchecked. The engine defaults
+ *  to the TypeScript one; a port passes its own `start`. */
+export function runScenario(s: Scenario, start: EngineStart = startTsEngine): Checkpoint[] {
+  let e = start(s.start);
   const out: Checkpoint[] = [];
   const clock = { minutes: 0 };
   const labels = new Set<string>();
   const emit = (label: string) => {
     if (labels.has(label)) throw new Error(`${s.id}: checkpoint label ${label} is taken twice`);
     labels.add(label);
-    out.push({ label, state: digest(stateView(sim)), crowd: digest(crowdView(sim)) });
+    out.push({ label, state: e.stateDigest(), crowd: e.crowdDigest() });
   };
-  emit("start");
-  for (const c of s.commands) sim = apply(sim, c, emit, clock);
-  emit("final");
+  try {
+    emit("start");
+    for (const c of s.commands) e = apply(e, c, emit, clock);
+    emit("final");
+  } finally {
+    e.free?.();
+  }
   return out;
 }

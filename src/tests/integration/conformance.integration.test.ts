@@ -1,7 +1,7 @@
 import { afterAll, afterEach, describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { CONFORMANCE_DIR, loadScenario, runScenario, type Checkpoint } from "../conformance/scenario";
+import { CONFORMANCE_DIR, firstDivergence, loadScenario, runScenario, type Checkpoint } from "../conformance/scenario";
 
 /**
  * Engine conformance suite (conformance/README.md). Every scenario runs on the
@@ -30,9 +30,6 @@ function writeLock(l: Lock): void {
   });
   writeFileSync(LOCK, `{\n  "scenarios": {\n${body.join(",\n")}\n  }\n}\n`);
 }
-
-const same = (a: Checkpoint | undefined, b: Checkpoint | undefined) =>
-  !!a && !!b && a.label === b.label && a.state === b.state && a.crowd === b.crowd;
 
 describe("engine conformance", () => {
   // An update writes the lock only from a complete run, so a filtered or
@@ -63,16 +60,8 @@ describe("engine conformance", () => {
         fresh.scenarios[scenario.id] = got;
         return;
       }
-      const want = lock.scenarios[scenario.id] ?? [];
       // Report the first divergent checkpoint, the useful fact for a port.
-      let first = -1;
-      for (let i = 0; i < Math.max(got.length, want.length); i++) {
-        if (!same(got[i], want[i])) {
-          first = i;
-          break;
-        }
-      }
-      expect(first === -1 ? null : { checkpoint: first, got: got[first] ?? null, want: want[first] ?? null }).toBeNull();
+      expect(firstDivergence(got, lock.scenarios[scenario.id] ?? [])).toBeNull();
     }, 60_000);
   }
 
