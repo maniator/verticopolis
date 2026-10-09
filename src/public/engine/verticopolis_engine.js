@@ -193,6 +193,24 @@ export class Engine {
         }
     }
     /**
+     * The gameplay events emitted since the last drain, oldest first, as
+     * JSON `[{ name, payload }]` (`conformance/events/catalog.json`); the
+     * buffer is empty afterwards.
+     * @returns {string}
+     */
+    drainGameplayEvents() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.engine_drainGameplayEvents(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
      * The hourly elevator telemetry (`elevatorUtil`, `elevatorHourly`,
      * `elevatorOrigins`) as JSON; see `Simulation::telemetry_json`.
      * @returns {string}
@@ -288,6 +306,15 @@ export class Engine {
             throw takeFromExternrefTable0(ret[1]);
         }
         return Engine.__wrap(ret[0]);
+    }
+    /**
+     * How many gameplay events a full buffer has pushed out since this
+     * engine was made (a host that drains every frame never sees one).
+     * @returns {number}
+     */
+    gameplayEventsDropped() {
+        const ret = wasm.engine_gameplayEventsDropped(this.__wbg_ptr);
+        return ret;
     }
     /**
      * `economy.housekeepingReport()`: yesterday's shift result as JSON

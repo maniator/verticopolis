@@ -1,6 +1,7 @@
 //! Port of `sim/star.ts` and `milestones.ts`.
 
 use crate::facilities::Kind;
+use crate::gameplay::GameplayEvent;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::{Unit, UnitState};
 
@@ -89,11 +90,20 @@ impl Simulation {
             target -= 1;
         }
         if target > self.star {
+            let from = self.star;
             self.star = target;
             self.emit(
                 &format!("Congratulations! Your tower reached {} stars.", self.star),
                 LogKind::Good,
             );
+            self.note_stars(from);
+        }
+    }
+
+    /// `star_reached` for every rung between `from` and the current star.
+    pub fn note_stars(&mut self, from: i64) {
+        for star in from + 1..=self.star {
+            self.gameplay.push(GameplayEvent::StarReached { star });
         }
     }
 
@@ -127,7 +137,7 @@ impl Simulation {
     }
 
     /// The MILESTONES table, in order, with each test's verdict.
-    fn milestone_tests(&self) -> [(&'static str, &'static str, bool); 11] {
+    pub(crate) fn milestone_tests(&self) -> [(&'static str, &'static str, bool); 11] {
         let pop = self.population();
         [
             ("pop-500", "Getting Started", pop >= 500),
@@ -173,6 +183,7 @@ impl Simulation {
             }
             self.milestones.push(id.to_string());
             self.emit(&format!("🏅 Milestone: {label}"), LogKind::Good);
+            self.gameplay.push(GameplayEvent::MilestoneReached { id });
         }
     }
 }

@@ -1,4 +1,5 @@
 import type { Clock } from "./Clock";
+import type { GameplayEventBuffer } from "./gameplayEventBuffer";
 import type { GameRules } from "./gameRules";
 import type { LedgerCat } from "./Ledger";
 import type { RNG } from "./rng";
@@ -33,6 +34,9 @@ export interface SimContext {
   /** Current cosmetic sky weather; rain depresses commercial foot traffic. */
   readonly weather?: WeatherKind;
   emit(text: string, kind?: LogKind): void;
+  /** The gameplay event buffer (`conformance/events/catalog.json`).
+   *  Optional so a hand-rolled test context can omit it. */
+  readonly gameplayEvents?: GameplayEventBuffer;
   /** Tag money to a stats-breakdown category (positive income, negative
    *  expense). Optional so a hand-rolled test context can omit it. */
   recordMoney?(cat: LedgerCat, amount: number): void;

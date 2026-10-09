@@ -33,6 +33,7 @@
     "build:native": "vite build --mode native && npm run verify:dist && node scripts/verify-wrapper-seam.ts native",
     "gen:icons": "node scripts/gen-icon-paths.ts",
     "atlas": "tsx scripts/export-atlas.ts",
+    "gen:events": "node scripts/gen-gameplay-events.ts",
     "wasm:build": "node scripts/wasm-build.ts",
     "test:wasm": "VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm dualRun wasmHost",
     "test:wasm:parity": "VC_REQUIRE_WASM=1 vitest run --project integrationWasm --project unitWasm"

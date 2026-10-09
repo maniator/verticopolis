@@ -193,6 +193,7 @@ export function build(sim: Simulation, kind: FacilityKind, floor: number, x: num
       sim.triggerTreasure(floor, x + Math.floor(f.width / 2)); // sparkle at the dig site (cosmetic)
     }
   }
+  sim.gameplayEvents.push("facility_placed", { kind, floor: floor + hgt - 1, count: 1 });
   return { ok: true };
 }
 
@@ -214,6 +215,7 @@ export function buildTransport(sim: Simulation,
   const res = sim.tower.placeTransport(kind, x, bottom, top);
   if (!res.ok) return { ok: false, reason: res.reason };
   sim.money -= total;
+  sim.gameplayEvents.push("facility_placed", { kind, floor: top, count: 1 });
   return { ok: true };
 }
 
@@ -235,11 +237,13 @@ export function sellAt(sim: Simulation, floor: number, x: number): boolean {
     if (u.kind === "weddingHall" && !sim.tower.builtWeddingHall && !sim.evaluatedTower) {
       sim.vipVisitDay = -1;
     }
+    sim.gameplayEvents.push("facility_removed", { kind: u.kind, method: "sell" });
     return true;
   }
   if (t) {
     sim.tower.removeTransport(t.id);
     sim.money += resaleRefund(t.kind);
+    sim.gameplayEvents.push("facility_removed", { kind: t.kind, method: "sell" });
     return true;
   }
   if (u) {
@@ -248,6 +252,7 @@ export function sellAt(sim: Simulation, floor: number, x: number): boolean {
     if (sim.tower.removalReason(u.id)) return false;
     sim.tower.removeUnit(u.id);
     sim.money += resaleRefund(u.kind);
+    sim.gameplayEvents.push("facility_removed", { kind: u.kind, method: "sell" });
     return true;
   }
   return false;

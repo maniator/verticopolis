@@ -6,6 +6,7 @@ import { ECON } from "./econConfig";
 import { ElevatorDispatch } from "./ElevatorDispatch";
 import { makeRules, type GameRules } from "./gameRules";
 import { EventSystem } from "./EventSystem";
+import { GameplayEventBuffer, type GameplayEvent } from "./gameplayEventBuffer";
 import type { SimContext } from "./SimContext";
 import { Tower } from "./Tower";
 import { Ledger, type LedgerCat } from "./Ledger";
@@ -38,22 +39,8 @@ import * as stats from "./sim/stats";
 
 import type { HeatmapMode, HeatCell, BatchTarget, BatchRentOptions, BatchRentResult } from "./sim/constants";
 export type { LogEntry } from "./types";
-export {
-  VACATE_RESCIND,
-  TRANSPORT_FAR_TILES,
-  GRIPE_WARN,
-  LOG_SAVE_CAP,
-  CONGESTION_CHURN,
-  CONGESTION_GRIDLOCK,
-  congestionSeverity,
-} from "./sim/constants";
-export type {
-  HeatmapMode,
-  HeatCell,
-  BatchTarget,
-  BatchRentOptions,
-  BatchRentResult,
-} from "./sim/constants";
+export { VACATE_RESCIND, TRANSPORT_FAR_TILES, GRIPE_WARN, LOG_SAVE_CAP, CONGESTION_CHURN, CONGESTION_GRIDLOCK, congestionSeverity } from "./sim/constants";
+export type { HeatmapMode, HeatCell, BatchTarget, BatchRentOptions, BatchRentResult } from "./sim/constants";
 export { serializeUnit } from "./sim/coerce";
 
 export class Simulation implements SimContext {
@@ -145,6 +132,10 @@ export class Simulation implements SimContext {
   treasureFx: { floor: number; x: number; seq: number } = { floor: 0, x: 0, seq: 0 };
   vipFxSeq = 0;
 
+  /** Gameplay events since the last drain, never saved or hashed. The engine pushes here; readers use
+   *  {@link drainGameplayEvents}, which the WASM host overrides (this buffer then holds duplicates). */
+  gameplayEvents = new GameplayEventBuffer();
+
   /** Ids of units currently under construction (finalised on the global tick). */
   constructing = new Set<number>();
 
@@ -210,6 +201,7 @@ export class Simulation implements SimContext {
     // Same strategy object to the tower, so mode-dependent placement checks
     // (the Classic-only escalator/office rule) agree with the sim.
     this.tower.rules = this.rules;
+    this.tower.gameplayEvents = this.gameplayEvents; // the tower's capacity edits report here too
     // Classic ALWAYS runs canon, so its modernCalendar is meaningless: clamp to
     // the harmless default so a hand-edited "canon" hint can't survive on disk
     // in a Classic save. Modern honors the player's choice as passed.
@@ -224,6 +216,14 @@ export class Simulation implements SimContext {
   }
 
   static weatherFor(day: number): WeatherKind { return build.weatherFor(day); }
+
+  // ---- Gameplay events ---------------------------------------------------
+
+  /** Every gameplay event since the last drain, oldest first, as `{ name,
+   *  payload }`; the buffer is empty afterwards. The host drains per tick. */
+  drainGameplayEvents(): GameplayEvent[] { return this.gameplayEvents.drain(); }
+  /** Events a full buffer has pushed out since this engine was made. */
+  get gameplayEventsDropped(): number { return this.gameplayEvents.dropped; }
 
   // ---- Logging -----------------------------------------------------------
 

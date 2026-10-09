@@ -25,6 +25,8 @@ class FakeEngine {
   logSince(): string { return "[]"; }
   elevatorTelemetry(): string { return '{"util":[],"hourly":[],"origins":[]}'; }
   housekeepingReport(): string | undefined { return undefined; }
+  drainGameplayEvents(): string { return "[]"; }
+  gameplayEventsDropped(): number { return 0; }
 }
 
 function fakeModule(): WasmModule & { engines: FakeEngine[] } {

@@ -54,6 +54,12 @@ export class Engine {
      */
     crowdView(): string;
     /**
+     * The gameplay events emitted since the last drain, oldest first, as
+     * JSON `[{ name, payload }]` (`conformance/events/catalog.json`); the
+     * buffer is empty afterwards.
+     */
+    drainGameplayEvents(): string;
+    /**
      * The hourly elevator telemetry (`elevatorUtil`, `elevatorHourly`,
      * `elevatorOrigins`) as JSON; see `Simulation::telemetry_json`.
      */
@@ -89,6 +95,11 @@ export class Engine {
      * overwrites the save's mode before loading, as a scenario start does.
      */
     static fromVctower(text: string, mode?: string | null): Engine;
+    /**
+     * How many gameplay events a full buffer has pushed out since this
+     * engine was made (a host that drains every frame never sees one).
+     */
+    gameplayEventsDropped(): number;
     /**
      * `economy.housekeepingReport()`: yesterday's shift result as JSON
      * `{ cleaned, leftover }`, or nothing (`undefined`) before the first
