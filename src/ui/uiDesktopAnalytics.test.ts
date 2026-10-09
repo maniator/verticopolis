@@ -379,7 +379,7 @@ describe("the surfaces are actually reached, checked in the source", () => {
     const source = readFileSync(resolve(HERE, "./uiSettings.ts"), "utf8");
     expect(source, "the source file could not be read, so this test proves nothing").toContain("showSettings");
     expect(source, "the row must be rendered for a desktop build").toContain(
-      "settingsTemplate(version, modern, IS_DESKTOP_BUILD)",
+      "settingsTemplate(version, modern, IS_DESKTOP_BUILD, engineSuffix())",
     );
     expect(source, "and wired with the same flag it was rendered with").toContain(
       "wireDesktopAnalyticsToggle(box, IS_DESKTOP_BUILD)",
