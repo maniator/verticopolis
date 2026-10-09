@@ -72,7 +72,9 @@ Verticopolis has **two test tiers**:
 
     **Two engines, one simulation.** `engine-rs/` is a Rust port of
     `src/engine/`, held to the same lock by its own referee
-    (`cargo run --release --bin conformance`). Until the web game runs on the
+    (`cargo run --release --bin conformance`, and again through the WASM
+    binding from Node with `npm run wasm:build && npm run test:wasm`). Until
+    the web game runs on the
     Rust engine, every simulation change lands in both engines in one PR with
     the regenerated lock, and a PR that changes `src/engine/` without touching
     `engine-rs/` says why (a UI readout, prose, a transient the hash never
