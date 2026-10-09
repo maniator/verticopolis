@@ -81,7 +81,7 @@ lit.
   detonation with Security sold), `fire-rescue-paid-modern` (11: an
   undefended tower, a rescue paid and the room gutted) and
   `fire-rescue-ignored-modern` (19: the offer left to the auto-decline, then
-  a hand-lit fire burning and spreading for nine days), `amenities-modern` (14: the
+  a hand-lit fire left to burn and spread, and nine more days), `amenities-modern` (14: the
   Modern amenities with a nightclub and daycare two floors under the lowest
   condos, the express shaft on a schedule whose homes snap to lobbies, ten
   days across the maintenance roll for halos, noise, relocations and the

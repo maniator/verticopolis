@@ -861,6 +861,10 @@ mod tests {
                 "dir must be dir",
             ),
             (
+                r#"{"op":"resolveChoice","accept":true,"kind":"fireRescu"}"#,
+                "kind must be choice",
+            ),
+            (
                 r#"{"op":"setCars","floor":2,"x":4,"cars":0}"#,
                 "cars must be count",
             ),

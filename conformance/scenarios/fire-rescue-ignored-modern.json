@@ -1,6 +1,6 @@
 {
   "id": "fire-rescue-ignored-modern",
-  "description": "The Modern tower-one at three stars (the towerone fixture with vipFavorable cleared, vipVisits zeroed and the treasury filled) sells its Security office and both Medical centers so a fire is likelier and nothing fights it, runs at hour ticks until a fire breaks out and the rescue offer is pending, and leaves it unanswered: the next day's roll declines it and the parking space burns down. A second fire is then started by hand in the tower proper and burns and spreads for nine days with nobody to fight it.",
+  "description": "The Modern tower-one at three stars (the towerone fixture with vipFavorable cleared, vipVisits zeroed and the treasury filled) sells its Security office and both Medical centers so a fire is likelier and nothing fights it, runs at hour ticks until a fire breaks out and the rescue offer is pending, and leaves it unanswered: the next day's roll declines it and the parking space burns down. A second fire is then started by hand in the tower proper and left to burn and spread with nobody to fight it, and the tower runs nine more days.",
   "start": {
     "fixture": "src/tests/fixtures/towerone-vip-pending.vctower",
     "mode": "modern"
