@@ -9,6 +9,7 @@ import { SPEEDS, advanceOwedMinutes } from "../../game/frameLoop";
 import { attachMirror, loadCommand } from "../../dualrun/mirror";
 import { ShadowEngine } from "../../dualrun/shadow";
 import type { Divergence, ShadowCommand } from "../../dualrun/commands";
+import { canonicalJson } from "../../engine/canonicalJson";
 import { REPO_ROOT } from "../conformance/scenario";
 import { wasm } from "../conformance/wasmEngine";
 
@@ -57,12 +58,16 @@ export interface DualRunReport {
   checkpoints: number;
   divergences: Divergence[];
   commands: number;
+  /** Gameplay events compared (the live engine's count), and every batch
+   *  where the shadow's drained events differ from the live engine's. */
+  events: number;
+  eventDivergences: { label: string; live: string; shadow: string }[];
 }
 
 /** A live simulation paired with its shadow through the mirror. */
 export class DualRun {
   readonly shadow = new ShadowEngine(wasm());
-  readonly report: DualRunReport = { checkpoints: 0, divergences: [], commands: 0 };
+  readonly report: DualRunReport = { checkpoints: 0, divergences: [], commands: 0, events: 0, eventDivergences: [] };
   private detach: (() => void) | null = null;
   sim!: Simulation;
 
@@ -71,10 +76,19 @@ export class DualRun {
   /** Follow a simulation: the shadow loads its save and boundary markers,
    *  then the mirror attaches. */
   follow(sim: Simulation): this {
+    // The load command refuses a tower it cannot shadow (its crowd already
+    // exists); take it first, so that refusal leaves the run following its
+    // old tower. A shadow that then refuses the save itself fails the test.
+    const load = loadCommand(sim, this.gen + 1);
+    if (this.detach) this.compareEvents("before a new tower");
     this.detach?.();
+    this.detach = null;
     this.sim = sim;
     this.gen++;
-    this.shadow.apply(loadCommand(sim, this.gen));
+    this.shadow.apply(load);
+    // What the tower emitted before the shadow existed (its founding, edits
+    // made before it was adopted) has no counterpart there.
+    sim.drainGameplayEvents();
     this.detach = attachMirror(sim, (cmd) => this.sink(cmd), this.gen);
     return this;
   }
@@ -91,7 +105,18 @@ export class DualRun {
     if (cmd.op === "checkpoint") {
       this.report.checkpoints++;
       if (d) this.report.divergences.push(d);
+      this.compareEvents(cmd.label);
     }
+  }
+
+  /** Drain both engines and compare the batches, byte for byte. */
+  private compareEvents(label: string): void {
+    const live = this.sim.drainGameplayEvents();
+    const shadow = JSON.parse(this.shadow.handle().drainGameplayEvents()) as unknown[];
+    this.report.events += live.length;
+    const a = canonicalJson(live);
+    const b = canonicalJson(shadow);
+    if (a !== b) this.report.eventDivergences.push({ label, live: a, shadow: b });
   }
 
   /** The undo path: the app drops the live sim and adopts one rebuilt from
@@ -104,6 +129,7 @@ export class DualRun {
   }
 
   stop(): DualRunReport {
+    if (this.detach) this.compareEvents("stop");
     this.detach?.();
     this.detach = null;
     this.shadow.free();
