@@ -234,6 +234,12 @@ impl Simulation {
                         ),
                         LogKind::Money,
                     );
+                    // `triggerTreasure(floor, x + Math.floor(f.width / 2))`.
+                    self.fx.treasure = crate::sim::PointFx {
+                        floor,
+                        x: (x + f.width.div_euclid(2)) as f64,
+                        seq: self.fx.treasure.seq + 1,
+                    };
                 }
             }
         }

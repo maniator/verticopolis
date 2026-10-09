@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 
 use crate::facilities::Kind;
 use crate::rng::Rng;
-use crate::sim::{LogKind, Simulation};
+use crate::sim::{LogKind, PointFx, Simulation, ThiefFx};
 use crate::tower::UnitState;
 
 #[derive(Clone, Debug)]
@@ -18,6 +18,12 @@ pub struct PendingChoice {
 pub struct EventSystem {
     /// Units currently ablaze, in insertion order.
     pub active: IndexSet<i64>,
+    /// `counts`: emergency tallies for this tower instance (read by the
+    /// shell; never saved). A spreading blaze is the same fire, so only the
+    /// ignition counts; bomb losses are not fire losses.
+    pub fires_started: i64,
+    pub fires_gut_rooms: i64,
+    pub bombs_detonated: i64,
     /// The seasonal and visitor stream, separate from the main one.
     pub extra: Rng,
     /// The year Santa last came, as the save carries it (a forged save may
@@ -34,6 +40,9 @@ impl EventSystem {
     pub fn new(seed: u32) -> EventSystem {
         EventSystem {
             active: IndexSet::new(),
+            fires_started: 0,
+            fires_gut_rooms: 0,
+            bombs_detonated: 0,
             extra: Rng::new(seed ^ 0x5a17a),
             last_santa_year: -1.0,
             pending: None,
@@ -174,6 +183,7 @@ impl Simulation {
             if let Some(idx) = self.tower.units.iter().position(|u| u.id == id) {
                 if self.tower.units[idx].state == UnitState::Fire {
                     self.gut(idx);
+                    self.events.fires_gut_rooms += 1;
                 }
             }
         }
@@ -220,6 +230,7 @@ impl Simulation {
         u.occupants = 0;
         let (id, name, floor) = (u.id, u.kind.facility().name, u.floor);
         self.events.active.insert(id);
+        self.events.fires_started += 1;
         let msg = format!(
             "🔥 Fire broke out in {} on {}!",
             name,
@@ -296,6 +307,7 @@ impl Simulation {
             let control = self.control_chance(floor);
             if self.rng.chance(control) {
                 self.gut(idx);
+                self.events.fires_gut_rooms += 1;
                 self.events.active.shift_remove(&id);
                 let msg = format!("🔥 The {} on {} burned down. Only a gutted shell remains. Bulldoze the rubble and rebuild.", name, self.floor_label(floor));
                 self.emit(&msg, LogKind::Bad);
@@ -339,6 +351,7 @@ impl Simulation {
             "🎅 Santa was spotted crossing the sky above your tower for the holidays!",
             LogKind::Good,
         );
+        self.fx.santa_seq += 1;
     }
 
     fn maybe_thief(&mut self) {
@@ -348,16 +361,26 @@ impl Simulation {
         if !self.events.extra.chance(THIEF_DAILY_CHANCE) {
             return;
         }
-        // The floor only places the cosmetic; the draw stays so the event
-        // stream matches the TypeScript.
-        let _floor = self.thief_floor();
+        // The floor places the cosmetic (`triggerThief`); the draw also keeps
+        // the event stream in step with the TypeScript.
+        let floor = self.thief_floor();
         if self.has_any(Kind::Security) {
             self.emit(
                 "🕵️ Security caught a thief prowling the tower. Nothing was taken.",
                 LogKind::Good,
             );
+            self.fx.thief = ThiefFx {
+                caught: true,
+                floor,
+                seq: self.fx.thief.seq + 1,
+            };
             return;
         }
+        self.fx.thief = ThiefFx {
+            caught: false,
+            floor,
+            seq: self.fx.thief.seq + 1,
+        };
         let loss = 5_000.0 + self.events.extra.int(0, 20_000) as f64;
         self.money -= loss;
         self.emit(
@@ -392,11 +415,18 @@ impl Simulation {
         }
         let fine = 15_000.0 + self.rng.int(0, 15_000) as f64;
         self.money -= fine;
+        self.events.bombs_detonated += 1;
         let targets = self.flammable_units();
         let mut destroyed = 0;
         if !targets.is_empty() {
             let gi = *self.rng.pick(&targets);
-            let epicenter = self.tower.units[gi].floor;
+            let ground = &self.tower.units[gi];
+            let epicenter = ground.floor;
+            self.fx.explosion = PointFx {
+                floor: epicenter,
+                x: ground.x as f64 + ground.width as f64 / 2.0,
+                seq: self.fx.explosion.seq + 1,
+            };
             for i in 0..self.tower.units.len() {
                 let u = &self.tower.units[i];
                 if (u.floor - epicenter).abs() <= 2

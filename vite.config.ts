@@ -214,7 +214,7 @@ export default defineConfig({
         // the game shell: the PWA needs nothing that large, so it stays out
         // of every web player's offline precache (a review catch on the PR
         // that added it).
-        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png"],
+        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png", "**/engine/**"],
         navigateFallback: "index.html",
         // Keep the non-game pages and the real static files out of the app-shell
         // fallback, letting them fall through to the network rather than the game
@@ -418,7 +418,6 @@ export default defineConfig({
         // the shadow engine and the command vocabulary are measured and
         // tested in Node (the controller against a worker stand-in).
         "src/dualrun/worker.ts",
-        "src/dualrun/pkg-web/**",
       ],
       // Enforced floors (a ratchet, not a vanity ceiling). Global floor holds the
       // logic layers; per-file globs stop a weak painter/synth file hiding behind

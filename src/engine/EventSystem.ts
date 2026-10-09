@@ -208,6 +208,14 @@ export class EventSystem {
     return { fires: this.firesStartedCount, firesGutRooms: this.firesGutRoomsCount, bombs: this.bombsDetonatedCount };
   }
 
+  /** Take the tallies from an engine that ran the events elsewhere (the
+   *  WASM host mirroring its engine's counts into this read model). */
+  adoptCounts(c: { fires: number; firesGutRooms: number; bombs: number }): void {
+    this.firesStartedCount = c.fires;
+    this.firesGutRoomsCount = c.firesGutRooms;
+    this.bombsDetonatedCount = c.bombs;
+  }
+
   /**
    * Daily chance a fire breaks out, reduced by the fire-defense you've built.
    * Security (buildable from 2★) is the free front-line defense; a medical
