@@ -80,6 +80,25 @@ toolchain; CI builds the package and runs the suite in `engine-rs.yml` with
 the package after any change to the Rust source; the suite replays whatever
 was built last.
 
+## The switch
+
+Behind `?engine=wasm` (or `localStorage.setItem("vc.engine", "wasm")`,
+`?engine=ts` to override) the web game runs on the WASM engine
+(story-engine-wasm-switch): the engine alone ticks, and the `Simulation`
+instance the app holds becomes a read model of it, refreshed every frame
+from `Engine.frameView()` (one flat number array) and, on every hour pass or
+tower revision, from the engine's save, merged in place so the renderer's
+object references hold. Host commands still run on the instance (the caller
+gets the TypeScript answer) and relay to the engine. `window.__vcEngine`
+says which engine runs. The browser package is served from `src/public/engine/`
+and committed with a `BUILD.json` naming the Rust sources' hash; a unit test
+fails when the sources moved on without `npm run wasm:build`. The Vercel
+build (`scripts/vercel-build.sh`) installs the pinned toolchain and builds
+the package itself on every deploy, so a Rust change reaches the preview and
+production without a committed binary. The gate is
+`src/tests/integration/wasmHost.integration.test.ts`: the instance's own
+state view equals the engine's at every hour of a day on every fixture.
+
 ## The dual run
 
 The binding's second consumer is the dual run (story-engine-dual-run): the
@@ -88,7 +107,7 @@ the live TypeScript engine, mirrors every command to it and compares the two
 hashed views at every hour. Switch it on under `npm run dev` with
 `?dualrun=1` (or `localStorage.setItem("vc.dualrun", "1")`) after
 `npm run wasm:build`, which also writes the browser package to
-`src/dualrun/pkg-web/`; the first divergence prints in the console with the
+`src/public/engine/`; the first divergence prints in the console with the
 JSON path where the views depart. The same mirror and shadow run in Node as
 the gate, a full day on every fixture at each game speed through the frame
 loop's own step math: `npm run test:wasm` (the `dualRun*` suites).
