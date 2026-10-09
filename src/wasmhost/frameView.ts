@@ -1,5 +1,8 @@
-import type { PersonState } from "../engine/crowd/person";
-import type { UnitState, WeatherKind } from "../engine/types";
+import type { Person, PersonState } from "../engine/crowd/person";
+import type { EventSystem } from "../engine/EventSystem";
+import type { Simulation } from "../engine/Simulation";
+import type { Tower } from "../engine/Tower";
+import type { Transport, Unit, UnitState, WeatherKind } from "../engine/types";
 
 /**
  * The engine's per-frame read model, decoded from the flat number array
@@ -13,56 +16,30 @@ export const PERSON_STATES: readonly PersonState[] = ["toShaft", "waiting", "rid
 export const UNIT_STATES: readonly UnitState[] = ["construction", "empty", "occupied", "moving_in", "vacating", "asleep", "dirty", "infested", "fire", "gutted"];
 export const WEATHERS: readonly WeatherKind[] = ["clear", "cloudy", "rain"];
 
-export interface FrameHeader {
-  minutes: number;
-  revision: number;
-  mealOverlayRevision: number;
-  logSeq: number;
-  money: number;
-  star: number;
-  weather: WeatherKind;
-  santaFxSeq: number;
-  explosionFx: { seq: number; floor: number; x: number };
-  thiefFx: { seq: number; caught: boolean; floor: number };
-  treasureFx: { seq: number; floor: number; x: number };
-  vipFxSeq: number;
-  counts: { fires: number; firesGutRooms: number; bombs: number };
-  pending: boolean;
-  onHourRuns: number;
-  people: number;
-  units: number;
-  transports: number;
-}
+/** The header: the Simulation fields the engine sends every frame, named as
+ *  the instance names them so a merge is a plain assignment, plus the tower
+ *  revisions, the log cursor, and the record counts that follow. */
+export type FrameHeader = Pick<Simulation, "money" | "star" | "weather" | "santaFxSeq" | "explosionFx" | "thiefFx" | "treasureFx" | "vipFxSeq" | "onHourRuns" | "logSeq"> &
+  Pick<Tower, "revision" | "mealOverlayRevision"> & {
+    minutes: number;
+    counts: EventSystem["counts"];
+    pending: boolean;
+    people: number;
+    units: number;
+    transports: number;
+  };
 
-export interface PersonRecord {
-  id: number;
-  seed: number;
-  staff: boolean;
-  state: PersonState;
-  floor: number;
-  x: number;
-  fy: number;
-  wait: number;
-}
+/** The per-frame slice of a {@link Person}; `staff` is always present in a
+ *  frame (the engine sends 0 or 1) where the instance keeps it optional. */
+export type PersonRecord = Pick<Person, "id" | "seed" | "state" | "floor" | "x" | "fy" | "wait"> & { staff: boolean };
 
-export interface UnitRecord {
-  id: number;
-  state: UnitState;
-  occupants: number;
-  /** An absent counter (the engine keeps none for this unit) reads undefined. */
-  customersIn: number | undefined;
-  hotelCustomersIn: number | undefined;
-  outForMeal: number | undefined;
-}
+/** The per-frame slice of a {@link Unit}: the counters the engine keeps for
+ *  the unit's kind; an absent one reads undefined, as on the instance. */
+export type UnitRecord = Pick<Unit, "id" | "state" | "occupants" | "customersIn" | "hotelCustomersIn" | "outForMeal">;
 
-export interface TransportRecord {
-  id: number;
-  cars: number;
-  carPositions: number[];
-  /** Undefined when the shaft keeps no load. */
-  carLoad: number[] | undefined;
-  carDir: number[];
-}
+/** The per-frame slice of a {@link Transport}: the car positions, loads, and
+ *  directions the renderer animates. */
+export type TransportRecord = Pick<Transport, "id" | "cars" | "carPositions" | "carLoad" | "carDir">;
 
 export interface FrameView {
   header: FrameHeader;
