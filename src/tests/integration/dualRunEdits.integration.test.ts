@@ -80,7 +80,7 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     // it; the shadow starts from that state with the founding's markers.
     const sim = Simulation.newGame(31, "classic");
     sim.money = 1e9;
-    for (let x = 170; x < 200; x++) sim.build("lobby", 1, x);
+    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
     sim.tower.towerName = "Founded then edited";
     sim.tick(1);
     const run = new DualRun().follow(sim);
@@ -108,7 +108,7 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
   it("a shadow that drifts is caught at the next hour with the path", () => {
     const { sim, run } = DualRun.found(5, "classic");
     sim.money = 1e9;
-    for (let x = 170; x < 200; x++) sim.build("lobby", 1, x);
+    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
     run.shadow.apply({ op: "setMoney", amount: 1 }); // the shadow alone
     new FrameDriver(sim, 3).run(60);
     const report = run.stop();
