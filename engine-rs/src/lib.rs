@@ -38,3 +38,5 @@ pub mod sim_loop;
 pub mod star;
 pub mod tower;
 pub mod tower_query;
+#[cfg(feature = "wasm")]
+pub mod wasm;

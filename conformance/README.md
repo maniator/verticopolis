@@ -18,6 +18,13 @@ The reference runner is `src/tests/conformance/scenario.ts`, and
 of `npm test`. A mismatch fails the build and names the first checkpoint that
 differs.
 
+The runner drives any engine behind its `ScenarioEngine` interface. The
+TypeScript engine is the default; the Rust engine answers twice, natively
+through `cargo run --release --bin conformance` and through its WASM binding
+from Node (`npm run wasm:build && npm run test:wasm`, see
+`engine-rs/README.md`), where the same TypeScript runner replays every
+scenario against this lock.
+
 ## When a hash moves
 
 A moved hash means the simulation changed. If the change is intended, regenerate

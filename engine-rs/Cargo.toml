@@ -9,6 +9,9 @@ description = "The Verticopolis simulation engine, ported from src/engine and ch
 [lib]
 name = "verticopolis_engine"
 path = "src/lib.rs"
+# An rlib for the referee and the tests; scripts/wasm-build.ts asks for the
+# cdylib the WASM binding needs with `cargo rustc --crate-type cdylib`, so the
+# native build links nothing extra.
 
 [[bin]]
 name = "conformance"
@@ -22,6 +25,12 @@ ryu = "1.0.22"
 indexmap = "2.12.0"
 flate2 = "1.1.5"
 base64 = "0.22.1"
+# The JavaScript binding, built only for wasm32 with `--features wasm`; the
+# CLI that generates the glue must be the same version (see engine-rs/README).
+wasm-bindgen = { version = "=0.2.129", optional = true }
+
+[features]
+wasm = ["dep:wasm-bindgen"]
 
 [profile.release]
 debug = 1

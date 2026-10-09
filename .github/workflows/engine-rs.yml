@@ -16,8 +16,14 @@ on:
       - "src/storage/**"
       - "src/tests/conformance/**"
       - "src/tests/integration/conformance.integration.test.ts"
+      - "src/tests/integration/conformanceWasm.integration.test.ts"
       - "src/tests/integration/loaderCases.integration.test.ts"
       - "src/tests/fixtures/*.vctower"
+      - "scripts/wasm-build.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".nvmrc"
+      - "vite.config.ts"
       - ".github/workflows/engine-rs.yml"
   pull_request:
     branches: [main]
@@ -28,8 +34,14 @@ on:
       - "src/storage/**"
       - "src/tests/conformance/**"
       - "src/tests/integration/conformance.integration.test.ts"
+      - "src/tests/integration/conformanceWasm.integration.test.ts"
       - "src/tests/integration/loaderCases.integration.test.ts"
       - "src/tests/fixtures/*.vctower"
+      - "scripts/wasm-build.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".nvmrc"
+      - "vite.config.ts"
       - ".github/workflows/engine-rs.yml"
 
 permissions:
@@ -38,7 +50,7 @@ permissions:
 jobs:
   engine-rs:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: engine-rs
@@ -53,18 +65,51 @@ jobs:
         run: |
           rustup toolchain install 1.97.0 --profile minimal --component rustfmt,clippy
           rustup default 1.97.0
+          rustup target add wasm32-unknown-unknown
 
       - name: Format
         run: cargo fmt --check
 
       - name: Lint
-        run: cargo clippy --locked --all-targets -- -D warnings
+        run: |
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo clippy --locked --all-targets --features wasm -- -D warnings
+          cargo clippy --locked --lib --target wasm32-unknown-unknown --features wasm -- -D warnings
 
       - name: Unit tests
-        run: cargo test --locked
+        run: |
+          cargo test --locked
+          cargo test --locked --features wasm
 
       - name: Conformance
         run: cargo run --locked --release --bin conformance
+
+      # The referee again, through the WASM binding from Node: the same
+      # TypeScript runner replays every scenario on the module wasm-bindgen
+      # generates (story-engine-wasm-binding). The CLI version must match the
+      # crate version Cargo.toml pins, so the pin is read from there and
+      # scripts/wasm-build.ts checks the match. The CLI is compiled from
+      # source here (a few minutes); the job's timeout allows for it.
+      - name: WASM binding
+        run: |
+          pin="$(grep -m1 -oP '^wasm-bindgen = \{ version = "=\K[0-9.]+' Cargo.toml)"
+          test -n "$pin"
+          cargo install wasm-bindgen-cli --locked --version "$pin"
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - name: Conformance through the binding
+        working-directory: .
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+          # A missing package fails the suite here instead of skipping it.
+          VC_REQUIRE_WASM: "1"
+        run: |
+          npm ci
+          npm run wasm:build
+          npm run test:wasm
 
       # Coverage of the unit tests plus the referee, with a line floor that
       # only ratchets up as scenarios land (80.58% at the first measurement,

@@ -81,8 +81,11 @@ The table is a gate for phase 3 and a precondition for phase 7.
 7. **TDT in the crate.** The `.TDT` import and export (24 files under
    `src/storage/tdt*`, 20 tests) are engine-data work: bytes to the serialized
    game and back, with hashed seeds and table layouts that must be bit-exact.
-   They move into `engine-rs` so the Godot client reads and writes 1994 towers
-   natively and the web gets them through the same WASM binding. Same referee
+   They move to a `tdt` crate beside the engine crate in one Cargo workspace
+   (`tdt` depends on the engine crate, and the engine crate has no dependency
+   on `tdt`), so the
+   Godot client reads and writes 1994 towers natively and the web gets them
+   through the same WASM binding. Same referee
    method: every TDT fixture round-trips to the TypeScript's serialized JSON,
    hashed into a lock the Rust must match.
 8. **Retire the TypeScript engine**, one or two releases after the switch, once
@@ -99,7 +102,7 @@ The stories, in the order they run, each gated on the one before:
 | # | Story | Gate to start | Gate to finish |
 | --- | --- | --- | --- |
 | 1 | `story-engine-scenario-library` | #857 merged | Done: floor at 87%, no engine module under 75%, fuzzer nightly, canon tests, #860 closed, CONTRIBUTING rule |
-| 2 | `story-engine-wasm-binding` (phase 1) | 1 | Referee matches through the binding from Node |
+| 2 | `story-engine-wasm-binding` (phase 1) | 1 | Done: every scenario matches through the binding from Node, in CI |
 | 3 | `story-engine-dual-run` (phase 2) | 2 | A full day on each fixture with no divergence at game cadence |
 | 4 | `story-engine-wasm-switch` (phase 3) | 3, plus the test-mapping table started | Golden masters, e2e, conformance green; Modern profile no slower |
 | 5 | `story-engine-tdt-port` (phase 7) | 1 (can overlap 2 to 4) | TDT lock matched both ways |

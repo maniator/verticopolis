@@ -333,18 +333,10 @@ pub fn state_view(sim: &Simulation) -> Value {
     v
 }
 
-fn parse_mode(s: &str) -> Option<GameMode> {
-    match s {
-        "classic" => Some(GameMode::Classic),
-        "modern" => Some(GameMode::Modern),
-        _ => None,
-    }
-}
-
 fn start_sim(start: &Start, root: &std::path::Path) -> Result<Simulation, RunError> {
     match start {
         Start::NewGame { new_game } => {
-            let mode = parse_mode(&new_game.mode).ok_or_else(|| RunError::Failed {
+            let mode = GameMode::parse(&new_game.mode).ok_or_else(|| RunError::Failed {
                 index: 0,
                 what: format!("mode {}", new_game.mode),
             })?;

@@ -22,6 +22,7 @@ must reproduce every pinned checkpoint hash (`expected.json`) byte for byte.
 | `economy.rs`, `housekeeping.rs`, `ledger.rs`, `events.rs` | `EconomySystem.ts`, `economy/*.ts`, `Ledger.ts`, `EventSystem.ts` |
 | `sim.rs`, `load.rs` | `Simulation.ts`, `sim/stats.ts` (`recordMoney`, `emit`), `sim/serialization.ts`, `sim/coerce.ts`, `sim/deserializeGuards.ts`, `sim/founderStatus.ts`, `saveMigration.ts`, `migrations/*.ts`, `storage/vctowerContainer.ts` |
 | `scenario.rs`, `bin/conformance.rs`, `bin/dump.rs` | `src/tests/conformance/scenario.ts` |
+| `wasm.rs` (feature `wasm`) | the JavaScript binding; `src/tests/conformance/wasmEngine.ts` drives it |
 
 Functions keep the names and shape of their TypeScript originals so the two
 can be read side by side. Where JavaScript semantics matter for the hash
@@ -45,6 +46,34 @@ cargo llvm-cov --no-report test && cargo llvm-cov --no-report run --bin conforma
   && cargo llvm-cov report               # what the tests and the referee reach; CI floors lines at 87%
 cargo run --release --bin dump -- starter-classic t+60   # canonical JSON of one checkpoint
 ```
+
+## The WASM binding
+
+The crate also builds as a WebAssembly module for JavaScript hosts. The
+binding (`src/wasm.rs`, behind the `wasm` cargo feature) exports one class,
+`Engine`, with constructors for a new game, a serialized save and a
+`.vctower` text, and methods for ticking, the build and edit commands, the
+events, the tile queries, the readouts a runner checks (`mode`, `money`,
+`setMoney`, `fires`), `serialize` and the two hashed views with their
+digests. Structured values cross as JSON text; integers cross as 32-bit
+values (`i32`, and `u32` for the seed and the fire count), which the
+generated TypeScript sees as `number`.
+Nothing in the binding simulates anything.
+
+```sh
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --locked --version 0.2.129   # the version Cargo.toml pins
+npm run wasm:build          # cargo rustc (cdylib) for wasm32 + wasm-bindgen into engine-rs/pkg/
+npm run test:wasm           # replay every scenario through the binding from Node (fails without the package)
+```
+
+`engine-rs/pkg/` is build output and is not checked in. The WASM suite
+(`src/tests/integration/conformanceWasm.integration.test.ts`) skips itself
+when the package is missing, so `npm test` stays green without a Rust
+toolchain; CI builds the package and runs the suite in `engine-rs.yml` with
+`VC_REQUIRE_WASM=1`, under which a missing package fails the run. Rebuild
+the package after any change to the Rust source; the suite replays whatever
+was built last.
 
 The referee prints one line per scenario: `ok`, the first divergent
 checkpoint with both hashes, or the first command the port cannot run. It
