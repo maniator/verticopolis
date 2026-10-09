@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # Security updates only. A limit of 0 turns off routine version-update PRs
+  # without affecting security updates, which have their own limit. The group
+  # rolls every npm security fix into one PR per run, so fixes land together
+  # instead of as separate lockfile PRs that conflict with each other.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
