@@ -78,6 +78,7 @@ export function startDualRun(app: DualRunApp, makeWorker: () => Worker = default
       case "ready": log.info("[dualrun] shadow engine ready"); break;
       case "ok": status.hours++; status.lastLabel = r.label; break;
       case "divergence":
+        status.hours++;
         status.lastLabel = r.label;
         if (!status.divergence) {
           status.divergence = { label: r.label, view: r.view, path: r.path, live: r.live, shadow: r.shadow };

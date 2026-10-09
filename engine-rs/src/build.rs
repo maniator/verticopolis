@@ -38,7 +38,7 @@ impl Simulation {
     /// `toggleAutoBridge()`: Modern flips the bridging preference, Classic
     /// always bridges and never flips (`rules.bridgingToggleable()`).
     pub fn toggle_auto_bridge(&mut self) -> bool {
-        if self.mode == GameMode::Modern {
+        if self.mode.bridging_toggleable() {
             self.auto_bridge = !self.auto_bridge;
         }
         self.auto_bridge

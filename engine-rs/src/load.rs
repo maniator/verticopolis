@@ -1272,7 +1272,7 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     };
     let mut sim = Simulation::new(seed, mode, calendar, false);
     let modern = mode == GameMode::Modern;
-    sim.auto_bridge = if modern {
+    sim.auto_bridge = if mode.bridging_toggleable() {
         data.get("autoBridge") != Some(&Value::Bool(false))
             && data.get("manualStructure") != Some(&Value::Bool(true))
     } else {

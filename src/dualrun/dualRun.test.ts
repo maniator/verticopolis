@@ -57,6 +57,8 @@ describe("startDualRun", () => {
     w.reply({ type: "divergence", gen: 1, label: "day 0 09:00", view: "state", path: "$.money", live: "1", shadow: "2" });
     w.reply({ type: "divergence", gen: 1, label: "day 0 10:00", view: "crowd", path: "$.people", live: "[]", shadow: "[1]" });
     expect(run.status.divergence).toMatchObject({ label: "day 0 09:00", path: "$.money" });
+    // A divergent hour was still compared, so the count keeps moving.
+    expect(run.status).toMatchObject({ hours: 2, lastLabel: "day 0 10:00" });
     expect(log.error).toHaveBeenCalledTimes(1);
     expect(log.error.mock.calls[0][0]).toContain("$.money");
     run.stop();
