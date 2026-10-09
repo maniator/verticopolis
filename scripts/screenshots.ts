@@ -405,7 +405,21 @@ async function main(): Promise<void> {
   // captures against a stale build).
   let browser: Browser | undefined;
   try {
-    browser = await chromium.launch({ executablePath: EXECUTABLE });
+    // Compositor pipelining is the remaining #762 leak. The evidence from the
+    // two-leg check (PR #871) showed the only differing pixels in
+    // 27c-elevator-schedule-unsaved were the dialog's two sticky layers (the
+    // title bar and the floor-grid head), off by a subpixel text phase while
+    // every scrolled pixel matched: after the programmatic scroll the
+    // compositor moves a sticky layer on its own thread and draws whichever
+    // raster it holds, so a capture under CI load lands before or after that
+    // layer's re-raster. Running every compositor stage to completion before a
+    // draw (the flag Chromium's own pixel tests use) puts the re-raster in the
+    // same frame as the move; the two others keep raster from being skipped
+    // (checker imaging) or animated off the main thread.
+    browser = await chromium.launch({
+      executablePath: EXECUTABLE,
+      args: ["--run-all-compositor-stages-before-draw", "--disable-checker-imaging", "--disable-threaded-animation"],
+    });
     for (const scene of scenes) {
       // A scene's setup (game wait / build / assertReady) can throw; keep it from
       // aborting the whole run. Record every shot in the scene as failed (so its
