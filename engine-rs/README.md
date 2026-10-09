@@ -99,6 +99,13 @@ production without a committed binary. The gate is
 `src/tests/integration/wasmHost.integration.test.ts`: the instance's own
 state view equals the engine's at every hour of a day on every fixture.
 
+Gameplay events (`conformance/events/catalog.json`, `src/gameplay.rs`) come
+from the engine too: `Engine.drainGameplayEvents()` returns and clears the
+batch as JSON. The instance runs every command as well, so its own buffer
+would report each event twice; under the host the instance's
+`drainGameplayEvents` answers with the engine's batch and discards its own,
+and the same test counts that each event arrives once.
+
 ## The dual run
 
 The binding's second consumer is the dual run (story-engine-dual-run): the
