@@ -67,7 +67,9 @@ jobs:
         run: cargo run --locked --release --bin conformance
 
       # Coverage of the unit tests plus the referee, with a line floor that
-      # only ratchets up as scenarios land (80.58% at the first measurement, 84.47% with the scenario library; the floor sits a point under the measurement).
+      # only ratchets up as scenarios land (80.58% at the first measurement,
+      # 84.47% after the first scenario slice, 88.7% with the full library; the
+      # floor sits about a point and a half under the measurement).
       # The referee is replayed in the debug profile here so one report
       # merges both runs; the release replay above is the parity gate.
       - name: Coverage

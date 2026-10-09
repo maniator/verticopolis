@@ -1,6 +1,6 @@
 {
-  "id": "fire-rescue-modern",
-  "description": "The Modern tower-one at three stars (the towerone fixture with vipFavorable cleared, vipVisits zeroed and the treasury filled) sells its Security office and both Medical centers so a fire is likelier and nothing fights it, runs at hour ticks until a fire breaks out and the rescue offer is pending, pays the rescue so the blaze is put out and the room is gutted, then starts a fire by hand and lets it burn and spread for ten days with no choice offered.",
+  "id": "fire-rescue-paid-modern",
+  "description": "The Modern tower-one at three stars (the towerone fixture with vipFavorable cleared, vipVisits zeroed and the treasury filled) sells its Security office and both Medical centers so a fire is likelier and nothing fights it, runs at hour ticks until a fire breaks out and the rescue offer is pending, pays the rescue so the blaze is put out at once and the room is left a gutted shell, and runs two more days.",
   "start": {
     "fixture": "src/tests/fixtures/towerone-vip-pending.vctower",
     "mode": "modern"
@@ -40,7 +40,8 @@
     },
     {
       "op": "resolveChoice",
-      "accept": true
+      "accept": true,
+      "kind": "fireRescue"
     },
     {
       "op": "checkpoint",
@@ -49,19 +50,7 @@
     {
       "op": "tick",
       "dt": 60,
-      "times": 24
-    },
-    {
-      "op": "startFire"
-    },
-    {
-      "op": "checkpoint",
-      "label": "second-fire"
-    },
-    {
-      "op": "tick",
-      "dt": 60,
-      "times": 240,
+      "times": 48,
       "checkpointEvery": 24
     }
   ]

@@ -1,6 +1,6 @@
 {
   "id": "amenities-modern",
-  "description": "The Modern tower-one at four stars (the towerone fixture with star raised to four and the treasury filled) builds the Modern amenities the basement and ground floor have room for (a nightclub and a daycare two floors under the lowest condos, a fitness club, a spa, a clinic, a food hall, an amusement arcade, a boutique bay, a sky bar and two rentals), puts the express shaft on an authored schedule whose home floors are not express stops so they snap to the nearest lobby, and runs a month at hour ticks: amenity halos and nightclub noise reach the satisfaction step, the rentals fill, and the monthly roll can relocate a condo household.",
+  "description": "The Modern tower-one at four stars (the towerone fixture with star raised to four and the treasury filled) builds the Modern amenities the basement and ground floor have room for (a nightclub and a daycare two floors under the lowest condos, a fitness club, a spa, a clinic, a food hall, an amusement arcade, a boutique bay, a sky bar and two rentals), puts the express shaft on an authored schedule whose home floors are not express stops so they snap to the nearest lobby, and runs ten days at hour ticks across the monthly maintenance roll: condo households relocate, nightclub noise and the amenity halos reach the satisfaction step and its vacate reasons, and the rental studio leases (the apartment stays empty across the run).",
   "start": {
     "fixture": "src/tests/fixtures/towerone-star4.vctower",
     "mode": "modern"
@@ -152,8 +152,8 @@
     {
       "op": "tick",
       "dt": 60,
-      "times": 720,
-      "checkpointEvery": 72
+      "times": 240,
+      "checkpointEvery": 24
     }
   ]
 }

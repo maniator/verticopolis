@@ -1,0 +1,64 @@
+{
+  "id": "fire-rescue-ignored-modern",
+  "description": "The Modern tower-one at three stars (the towerone fixture with vipFavorable cleared, vipVisits zeroed and the treasury filled) sells its Security office and both Medical centers so a fire is likelier and nothing fights it, runs at hour ticks until a fire breaks out and the rescue offer is pending, and leaves it unanswered: the next day's roll declines it and the parking space burns down. A second fire is then started by hand in the tower proper and burns and spreads for nine days with nobody to fight it.",
+  "start": {
+    "fixture": "src/tests/fixtures/towerone-vip-pending.vctower",
+    "mode": "modern"
+  },
+  "commands": [
+    {
+      "op": "sell",
+      "floor": 0,
+      "x": 153,
+      "kind": "security"
+    },
+    {
+      "op": "sell",
+      "floor": 0,
+      "x": 136,
+      "kind": "medical"
+    },
+    {
+      "op": "sell",
+      "floor": 46,
+      "x": 257,
+      "kind": "medical"
+    },
+    {
+      "op": "checkpoint",
+      "label": "undefended"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 256,
+      "checkpointEvery": 64
+    },
+    {
+      "op": "checkpoint",
+      "label": "rescue-offered"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 24
+    },
+    {
+      "op": "checkpoint",
+      "label": "burning"
+    },
+    {
+      "op": "startFire"
+    },
+    {
+      "op": "checkpoint",
+      "label": "second-fire"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 216,
+      "checkpointEvery": 24
+    }
+  ]
+}

@@ -91,12 +91,13 @@ Where the referee cannot see, by module:
 | crowd, dispatch, sim, sim_loop, demand, clock | 84% to 100% | |
 
 After the scenario library (`story-engine-scenario-library`, two slices,
-seventeen scenarios and the loader table) the same measurement is 88% of
-lines, with no engine module under 75%: services.rs 85%, events.rs 93%,
-rules.rs 96%, churn.rs 96%, star.rs 74% (plus a unit test on the four-star
-gate chain), satisfaction.rs 80%, schedule.rs 94%, tower.rs 83%,
-housekeeping.rs 98%, load.rs 90%. The dark remainder is the five-star and
-TOWER rungs, which need a late-game fixture.
+nineteen scenarios and the loader table), the CI measurement (unit tests
+plus the referee) is 88.68% of lines, with no engine module under
+75%: services.rs 88%, events.rs 93%, rules.rs 95%,
+churn.rs 96%, star.rs 87%, satisfaction.rs 80%, schedule.rs
+94%, tower.rs 84%, housekeeping.rs 98%, load.rs 90%.
+The dark remainder is the five-star and TOWER rungs, which need a late-game
+fixture (#864).
 
 This is the scenario list for the follow-up: a hotel weekend with
 housekeeping and an exterminator call, a VIP visit without parking, a star

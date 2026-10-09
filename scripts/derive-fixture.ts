@@ -16,11 +16,20 @@ if (!src || !dst || !patchText) {
   process.exit(2);
 }
 const save = decodeVctower(readFileSync(src, "utf8")) as Record<string, unknown>;
-const patch = JSON.parse(patchText) as Record<string, unknown>;
-for (const [k, v] of Object.entries(patch)) {
-  if (v === null) delete save[k];
-  else save[k] = v;
+const patch = JSON.parse(patchText) as unknown;
+if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
+  console.error("the patch must be a JSON object");
+  process.exit(2);
+}
+for (const [k, v] of Object.entries(patch as Record<string, unknown>)) {
+  if (v === null) {
+    if (!(k in save)) {
+      console.error(`${k}: not in the save, nothing to delete`);
+      process.exit(2);
+    }
+    delete save[k];
+  } else save[k] = v;
 }
 const packed = await deflate(new TextEncoder().encode(JSON.stringify(save)));
 writeFileSync(dst, `VCTOWER1\n${Buffer.from(packed).toString("base64")}\n`);
-console.log(`${dst}: ${Object.keys(patch).join(", ")} edited`);
+console.log(`${dst}: ${Object.keys(patch as object).join(", ")} edited`);

@@ -97,7 +97,7 @@ Commands run in order. Units and shafts are named by a tile they cover
 | `startFire` | | Start a fire at once: `EventSystem.startFire`, with no hourly roll and no fire-rescue choice. |
 | `bombThreat` | | Run a bomb threat at once: `EventSystem.bombThreat`, which charges the sweep when the tower has Security and detonates when it has none, with no ransom choice. |
 | `evaluateStar` | | Run the star evaluation. |
-| `resolveChoice` | `accept` | Answer the pending player choice (`resolveChoice`): `true` pays the fire rescue or the ransom, `false` declines (the fire burns on, Security searches for the bomb). An error when no choice is pending. |
+| `resolveChoice` | `accept`, `kind?` | Answer the pending player choice (`resolveChoice`): `true` pays the fire rescue or the ransom, `false` declines (the fire burns on; Security searches for the bomb, and with no Security it detonates). An error when no choice is pending, when `kind` (`fireRescue` or `bombThreat`) is not the pending kind, or when `accept` is set and the treasury cannot pay (the engine would treat that as a decline). |
 | `callExterminator` | `expectFail?` | Book the Modern exterminator (`callExterminator`); a refusal (Classic, a booking pending, no infested room, short of funds) is an error unless `expectFail` is set. |
 | `reload` | | Save the game and load the save (`serialize()`, a JSON round trip, `deserialize`), replacing the running engine. The hashed `state` view must come back unchanged; a difference is an error. Live state that saves do not carry (the crowd, elevator dispatch) restarts as a load restarts it (see Checkpoints). |
 | `tick` | `dt`, `times?`, `checkpointEvery?` | Call `tick(dt)` `times` times (default 1). All three are whole positive numbers. After every `checkpointEvery`th call, take a checkpoint labeled `t+<minutes>`, where minutes counts every tick's `dt` since the start of the scenario. |
@@ -118,6 +118,7 @@ ill-typed:
   `buildRow`'s `from` is not past its `to`.
 - `dt`, `times`, `checkpointEvery` and `cars` are whole numbers above zero.
 - `dir` is 1 or -1, `amount` is a finite number, `expectFail` is a boolean.
+- a `resolveChoice` `kind` is `fireRescue` or `bombThreat`.
 - `kind` is a key of `FACILITIES` in `src/engine/facilitiesData.ts`: one
   without the `transport` flag for `build` and `buildRow`, one with it for
   `buildTransport`.

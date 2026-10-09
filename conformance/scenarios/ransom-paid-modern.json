@@ -1,0 +1,35 @@
+{
+  "id": "ransom-paid-modern",
+  "description": "The Modern tower-one at four stars (the towerone fixture with star raised to four and the treasury filled) runs at hour ticks until a bomb threat is called in, pays the ransom so the threat passes quietly, and runs two more days.",
+  "start": {
+    "fixture": "src/tests/fixtures/towerone-star4.vctower",
+    "mode": "modern"
+  },
+  "commands": [
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 256,
+      "checkpointEvery": 64
+    },
+    {
+      "op": "checkpoint",
+      "label": "ransom-demanded"
+    },
+    {
+      "op": "resolveChoice",
+      "accept": true,
+      "kind": "bombThreat"
+    },
+    {
+      "op": "checkpoint",
+      "label": "ransom-paid"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 48,
+      "checkpointEvery": 24
+    }
+  ]
+}

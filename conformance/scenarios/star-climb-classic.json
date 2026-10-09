@@ -1,6 +1,6 @@
 {
   "id": "star-climb-classic",
-  "description": "The Classic tower-one with its star set to one (the towerone fixture with star edited to 1) sells Security and asks for a rating: the population clears the three-star bar but the Security gate holds it at two stars, a pass of one rung. Security is rebuilt, the tower runs until the office opens, and the next evaluation passes to three stars; a last evaluation with the population short of the four-star bar changes nothing.",
+  "description": "The Classic tower-one with its star set to one (the towerone fixture with star edited to 1) sells Security and asks for a rating: the population clears the three-star bar but the Security gate holds it at two stars, a pass of one rung. Security is rebuilt and the tower runs three days; the hourly evaluation passes to three stars the moment the office opens, and the scripted evaluations after it, with the population short of the four-star bar, change nothing.",
   "start": {
     "fixture": "src/tests/fixtures/towerone-star1.vctower"
   },
