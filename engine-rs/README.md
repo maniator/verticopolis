@@ -62,19 +62,24 @@ itself:
   (the wedding hall), what the tool lays on the ground floor, the commercial
   flag and open hours, build minutes, resale refund, build cap and the pool
   it shares, transport span, fixed-span flag, cars, per-car capacity and
-  per-floor cost, subtypes, the daily take and the ticket per customer, and
+  the price per floor of span (top minus bottom), subtypes, the daily take
+  and the ticket per customer, and
   the rent (cadence, shape, neutral price, the Classic ladder or the Modern
   band, No Rate, the sold-condo lock, the Modern household scaling).
 - `world`: lot width, floor range, ground floor, lobby interval, the lobby
   and sky-lobby floors, and the mode's placement switches (escalators on
   office floors, the bridging toggle, the preview reason).
-- `economy`: the add-car cost and its refund, the per-floor transport cost,
-  and what a gutted unit refunds.
+- `economy`: the add-car cost and its refund, the elevator price per floor
+  of span (top minus bottom), and what a gutted unit refunds.
 
 Every value reads the table the simulation itself reads, so the catalog
 cannot drift from what the engine enforces. Where a price depends on
 placement the catalog carries the inputs and the module the function
-(`transport_build_cost`, `household_price`). Presentation (colors,
+(`transport_build_cost`, `household_price`); `transport_build_cost` returns
+NaN for a span the engine refuses (below 1, above the kind's `max_span`, or
+a walkway at any span but its one flight), so a frontend never quotes a
+placement that cannot be built. Open hours are whole hours by construction:
+the clock hands `is_open_at` an integer hour. Presentation (colors,
 descriptions, icons, sprite sizes) stays with the frontend. The TypeScript
 engine builds the same JSON (`catalogFor` in `src/engine/catalog.ts`),
 `conformance/catalog.json` pins each mode's canonical hash (checked by the
@@ -85,13 +90,13 @@ referee and by a unit test), and the binding serves it as the static
 
 The crate also builds as a WebAssembly module for JavaScript hosts. The
 binding (`src/wasm.rs`, behind the `wasm` cargo feature) exports one class,
-`Engine`, with the static `catalog(mode)` (the catalog JSON), constructors for a new game, a serialized save and a
-`.vctower` text, and methods for ticking, the build and edit commands, the
-events, the tile queries, the readouts a runner checks (`mode`, `money`,
-`setMoney`, `fires`), `serialize` and the two hashed views with their
-digests. Structured values cross as JSON text; integers cross as 32-bit
-values (`i32`, and `u32` for the seed and the fire count), which the
-generated TypeScript sees as `number`.
+`Engine`, with the static `catalog(mode)` (the catalog JSON), constructors
+for a new game, a serialized save and a `.vctower` text, and methods for
+ticking, the build and edit commands, the events, the tile queries, the
+readouts a runner checks (`mode`, `money`, `setMoney`, `fires`), `serialize`
+and the two hashed views with their digests. Structured values cross as JSON
+text; integers cross as 32-bit values (`i32`, and `u32` for the seed and the
+fire count), which the generated TypeScript sees as `number`.
 Nothing in the binding simulates anything.
 
 ```sh
