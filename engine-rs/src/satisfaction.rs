@@ -542,6 +542,9 @@ impl Simulation {
         self.emit_notices(&notices);
     }
 
+    /// `emitNotices`: one toast naming the unit when one tenant gave notice,
+    /// or a per-cause tally (in first-seen order, as the TypeScript `Map`
+    /// keeps it) when several did at once.
     fn emit_notices(&mut self, notices: &[(i64, Kind, &'static str)]) {
         if notices.is_empty() {
             return;
@@ -552,15 +555,92 @@ impl Simulation {
                 "{} on {} gave notice: {}. Fix it before they leave.",
                 kind.facility().name,
                 self.floor_label(floor),
-                reason
+                vacate_reason_text(reason)
             );
             self.emit(&msg, LogKind::Bad);
             return;
         }
+        let mut by_reason: Vec<(&'static str, usize)> = Vec::new();
+        for &(_, _, reason) in notices {
+            match by_reason.iter_mut().find(|(r, _)| *r == reason) {
+                Some(entry) => entry.1 += 1,
+                None => by_reason.push((reason, 1)),
+            }
+        }
+        let parts: Vec<String> = by_reason
+            .iter()
+            .map(|(r, n)| format!("{} \u{d7} {}", n, vacate_reason_text(r)))
+            .collect();
         let msg = format!(
-            "{} tenants gave notice. Fix the flagged units before they leave.",
-            notices.len()
+            "{} tenants gave notice: {}. Fix the flagged units before they leave.",
+            notices.len(),
+            parts.join(", ")
         );
         self.emit(&msg, LogKind::Bad);
+    }
+}
+
+/// `VACATE_REASON_TEXT`: the player-facing phrase for a departure cause, as
+/// the toasts and the inspector word it. The cause keys themselves are what
+/// the save carries (`vacateReason`); the log carries this text. Log text is
+/// outside the conformance hash, so the parity suites (#878) are what pin
+/// it: `simulation.integration.test.ts` reads the eviction line.
+pub fn vacate_reason_text(reason: &'static str) -> &'static str {
+    match reason {
+        "access" => "no route to the lobby",
+        "noTransport" => "no way to transportation from here",
+        "congestion" => "overcrowded vertical transport",
+        "rent" => "rent set too high",
+        "noise" => "a noisy neighbor nearby",
+        "transportFar" => "too far from a stairway, escalator, or passenger elevator",
+        "lobbyFar" => "too far from a lobby or sky lobby",
+        "unmetDemand" => "too few shops or restaurants within reach",
+        "relocation" => "the household is relocating",
+        other => other,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::clock::GameMode;
+
+    #[test]
+    fn vacate_reason_text_matches_the_typescript_table() {
+        for (key, want) in [
+            ("access", "no route to the lobby"),
+            ("noTransport", "no way to transportation from here"),
+            ("congestion", "overcrowded vertical transport"),
+            ("rent", "rent set too high"),
+            ("noise", "a noisy neighbor nearby"),
+            (
+                "transportFar",
+                "too far from a stairway, escalator, or passenger elevator",
+            ),
+            ("lobbyFar", "too far from a lobby or sky lobby"),
+            ("unmetDemand", "too few shops or restaurants within reach"),
+            ("relocation", "the household is relocating"),
+        ] {
+            assert_eq!(vacate_reason_text(key), want, "{key}");
+        }
+    }
+
+    #[test]
+    fn notices_name_one_unit_or_tally_by_cause() {
+        let mut sim = Simulation::new_game(1, GameMode::Classic);
+        sim.emit_notices(&[(5, Kind::Office, "access")]);
+        assert_eq!(
+            sim.log.last().unwrap().text,
+            "Office on floor 5 gave notice: no route to the lobby. Fix it before they leave."
+        );
+        sim.emit_notices(&[
+            (5, Kind::Office, "access"),
+            (6, Kind::Condo, "rent"),
+            (7, Kind::Office, "access"),
+        ]);
+        assert_eq!(
+            sim.log.last().unwrap().text,
+            "3 tenants gave notice: 2 \u{d7} no route to the lobby, 1 \u{d7} rent set too high. Fix the flagged units before they leave."
+        );
     }
 }

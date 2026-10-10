@@ -8,6 +8,15 @@ use crate::facilities::Kind;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 
+/// The per-class congestion maxes a floor's reading was folded from
+/// (`spatialCongestionAttributionByFloor`).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CongestionAttribution {
+    pub elevator: f64,
+    pub stairs: f64,
+    pub escalator: f64,
+}
+
 impl Simulation {
     /// `updatePresence`: the hourly head count per room.
     pub fn update_presence(&mut self) {
@@ -96,9 +105,25 @@ impl Simulation {
 
     /// `spatialCongestionByFloor`: floor -> ratio, in the map's insertion order.
     pub fn spatial_congestion_by_floor(&self) -> IndexMap<i64, f64> {
+        self.build_spatial_congestion().0
+    }
+
+    /// `spatialCongestionAttributionByFloor`: the per-class maxes (elevator,
+    /// stairs, escalator) a floor's reading was folded from, for the
+    /// congestion copy (`bindingTransportClassAt`).
+    pub fn spatial_congestion_attribution_by_floor(&self) -> IndexMap<i64, CongestionAttribution> {
+        self.build_spatial_congestion().1
+    }
+
+    /// `buildSpatialCongestion` (sim/congestion.ts): the ratio map and the
+    /// per-class attribution, from one pass.
+    fn build_spatial_congestion(
+        &self,
+    ) -> (IndexMap<i64, f64>, IndexMap<i64, CongestionAttribution>) {
         const HEADROOM: f64 = 12.0;
         let rush = self.rush_factor();
         let mut result: IndexMap<i64, f64> = IndexMap::new();
+        let mut attribution: IndexMap<i64, CongestionAttribution> = IndexMap::new();
         let mut pop_by_floor: IndexMap<i64, f64> = IndexMap::new();
         let mut metro = 0;
         for u in self.tower.room_units() {
@@ -113,12 +138,12 @@ impl Simulation {
             }
         }
         if pop_by_floor.is_empty() {
-            return result;
+            return (result, attribution);
         }
         let parking = self.tower.functional_parking_spots();
         let relief = (1.0 - metro as f64 * 0.25 - parking as f64 * 0.02).max(0.4);
         let served = self.tower.served_floors();
-        let mut shafts_by_floor: IndexMap<i64, Vec<(i64, f64)>> = IndexMap::new();
+        let mut shafts_by_floor: IndexMap<i64, Vec<(i64, f64, Kind)>> = IndexMap::new();
         for t in &self.tower.transports {
             if t.kind.is_staff_only_transport() {
                 continue;
@@ -130,7 +155,10 @@ impl Simulation {
             let cap = Simulation::transport_capacity(t.kind, t.cars);
             for f in t.bottom..=t.top {
                 if t.stops_at(f) && served.contains(&f) {
-                    shafts_by_floor.entry(f).or_default().push((t.id, cap));
+                    shafts_by_floor
+                        .entry(f)
+                        .or_default()
+                        .push((t.id, cap, t.kind));
                 }
             }
         }
@@ -142,12 +170,12 @@ impl Simulation {
             if shafts.is_empty() {
                 continue;
             }
-            let total_cap: f64 = shafts.iter().fold(0.0, |s, (_, c)| s + c);
+            let total_cap: f64 = shafts.iter().fold(0.0, |s, (_, c, _)| s + c);
             if total_cap <= 0.0 {
                 continue;
             }
             let demand = pop * relief;
-            for (id, cap) in shafts {
+            for (id, cap, _) in shafts {
                 let share = demand * (cap / total_cap);
                 *load_by_shaft.entry(*id).or_insert(0.0) += share;
             }
@@ -157,7 +185,8 @@ impl Simulation {
                 continue;
             }
             let mut c = 0.0;
-            for (id, cap) in shafts {
+            let mut att = CongestionAttribution::default();
+            for (id, cap, kind) in shafts {
                 let cong = if *cap > 0.0 {
                     (load_by_shaft.get(id).copied().unwrap_or(0.0) * rush) / (cap * HEADROOM)
                 } else {
@@ -166,10 +195,24 @@ impl Simulation {
                 if cong > c {
                     c = cong;
                 }
+                // The same reading folded into its class max; the staff
+                // filter above admits only these three classes today.
+                if kind.is_elevator() {
+                    if cong > att.elevator {
+                        att.elevator = cong;
+                    }
+                } else if *kind == Kind::Stairs {
+                    if cong > att.stairs {
+                        att.stairs = cong;
+                    }
+                } else if *kind == Kind::Escalator && cong > att.escalator {
+                    att.escalator = cong;
+                }
             }
             result.insert(*f, c);
+            attribution.insert(*f, att);
         }
-        result
+        (result, attribution)
     }
 
     /// `congestion()`: the mean over populated floors, the lobby excluded.

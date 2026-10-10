@@ -489,6 +489,9 @@ impl Engine {
 /// Fixed header slots of the frame view, before the three variable sections.
 pub const FRAME_HEADER: usize = 26;
 
+/// Fixed slots of a person record, before its route (`floors` then `shafts`).
+pub const PERSON_FIXED: usize = 18;
+
 /// The per-frame read model: every value the web host reads from the
 /// simulation between two structural syncs, flat so it crosses the WASM
 /// boundary as one typed array.
@@ -501,9 +504,16 @@ pub const FRAME_HEADER: usize = 26;
 /// (0 or 1), 22 onHourRuns, 23 people count, 24 unit count, 25 transport
 /// count.
 ///
-/// Then `people count` records of 8: id, seed, staff (0 or 1), state (the
-/// `PersonState` index), floor, x, fy, wait. Then `unit count` records of 6:
-/// id, state (the `UnitState` index), occupants, customersIn,
+/// Then `people count` records of `PERSON_FIXED + floors + shafts`: id, seed,
+/// staff (0 or 1), state (the `PersonState` index), floor, x, fy, wait, then
+/// the routing slice the suites read: originFloor (always present, so -1 is
+/// a real basement floor), originUnitId, venueUnitId, mealVenueId (each -1
+/// when absent), countedHotelGuest (0 or 1), routine
+/// (0 none, 1 schoolRun, 2 salesCall), returning (0 or 1), dwellSecondsLeft
+/// (NaN when absent: a drained timer stays negative on the person through
+/// the return leg, so no number is free), the floors count, the shafts
+/// count, then the route's floors and its shafts. Then `unit count` records
+/// of 6: id, state (the `UnitState` index), occupants, customersIn,
 /// hotelCustomersIn, outForMeal (an absent counter is -1). Then
 /// `transport count` records of `2 + 3 * cars`: id, cars, then per car
 /// position, load (-1 when the shaft keeps none), direction.
@@ -516,7 +526,10 @@ pub fn frame_view(sim: &Simulation) -> Vec<f64> {
     let transports = &sim.tower.transports;
     let mut v = Vec::with_capacity(
         FRAME_HEADER
-            + people.len() * 8
+            + people
+                .iter()
+                .map(|p| PERSON_FIXED + p.floors.len() + p.shafts.len())
+                .sum::<usize>()
             + units.len() * 6
             + transports
                 .iter()
@@ -571,16 +584,42 @@ pub fn frame_view(sim: &Simulation) -> Vec<f64> {
             PState::Dwelling => 5.0,
             PState::Done => 6.0,
         };
+        let id = |v: Option<i64>| v.map_or(-1.0, |n| n as f64);
+        let flag = |b: bool| if b { 1.0 } else { 0.0 };
+        let routine = match p.routine {
+            None => 0.0,
+            Some("schoolRun") => 1.0,
+            Some("salesCall") => 2.0,
+            // The routines are engine-set literals; a new one must be added
+            // here and to `ROUTINES` in frameView.ts, and until then it
+            // crosses as none.
+            Some(other) => {
+                debug_assert!(false, "routine {other} has no frame code");
+                0.0
+            }
+        };
         v.extend_from_slice(&[
             p.id as f64,
             p.seed as f64,
-            if p.staff { 1.0 } else { 0.0 },
+            flag(p.staff),
             state,
             p.floor as f64,
             p.x,
             p.fy,
             p.wait,
+            p.origin_floor as f64,
+            id(p.origin_unit_id),
+            id(p.venue_unit_id),
+            id(p.meal_venue_id),
+            flag(p.counted_hotel_guest),
+            routine,
+            flag(p.returning),
+            p.dwell_seconds_left.unwrap_or(f64::NAN),
+            p.floors.len() as f64,
+            p.shafts.len() as f64,
         ]);
+        v.extend(p.floors.iter().map(|f| *f as f64));
+        v.extend(p.shafts.iter().map(|s| *s as f64));
     }
     let counter = |c: Option<i64>| c.map_or(-1.0, |n| n as f64);
     for u in units {
@@ -664,24 +703,57 @@ mod tests {
         assert_eq!(transports, sim.tower.transports.len());
         assert!(people > 0 && transports > 0);
         let cars: usize = sim.tower.transports.iter().map(|t| t.cars as usize).sum();
+        let person_slots: usize = sim
+            .crowd
+            .people
+            .iter()
+            .map(|p| PERSON_FIXED + p.floors.len() + p.shafts.len())
+            .sum();
         assert_eq!(
             v.len(),
-            FRAME_HEADER + people * 8 + units * 6 + 2 * transports + 3 * cars
+            FRAME_HEADER + person_slots + units * 6 + 2 * transports + 3 * cars
         );
         assert_eq!(v[0], sim.clock.minutes);
         assert_eq!(v[4], sim.money);
         assert_eq!(v[22], sim.on_hour_runs as f64);
         // The first unit record names the first unit and its occupants.
-        let u0 = FRAME_HEADER + people * 8;
+        let u0 = FRAME_HEADER + person_slots;
         assert_eq!(v[u0], sim.tower.units[0].id as f64);
         assert_eq!(v[u0 + 2], sim.tower.units[0].occupants as f64);
         // The transport record follows the units.
         let t0 = u0 + units * 6;
         assert_eq!(v[t0], sim.tower.transports[0].id as f64);
         assert_eq!(v[t0 + 1], sim.tower.transports[0].cars as f64);
-        // The first person record names the first person and its position.
-        assert_eq!(v[FRAME_HEADER], sim.crowd.people[0].id as f64);
-        assert_eq!(v[FRAME_HEADER + 5], sim.crowd.people[0].x);
+        // The first person record names the first person, its position and
+        // its route: the floors and shafts follow the fixed slots.
+        let p0 = &sim.crowd.people[0];
+        assert_eq!(v[FRAME_HEADER], p0.id as f64);
+        assert_eq!(v[FRAME_HEADER + 5], p0.x);
+        assert_eq!(v[FRAME_HEADER + 8], p0.origin_floor as f64);
+        assert_eq!(v[FRAME_HEADER + 16], p0.floors.len() as f64);
+        assert_eq!(v[FRAME_HEADER + 17], p0.shafts.len() as f64);
+        let floors: Vec<i64> = v
+            [FRAME_HEADER + PERSON_FIXED..FRAME_HEADER + PERSON_FIXED + p0.floors.len()]
+            .iter()
+            .map(|f| *f as i64)
+            .collect();
+        assert_eq!(floors, p0.floors);
+        // A round-tripper in the crowd carries its origin unit and venue; the
+        // record agrees with the person's own fields.
+        let (mut at, mut seen) = (FRAME_HEADER, false);
+        for p in &sim.crowd.people {
+            assert_eq!(v[at], p.id as f64);
+            assert_eq!(v[at + 9], p.origin_unit_id.map_or(-1.0, |n| n as f64));
+            assert_eq!(v[at + 11], p.meal_venue_id.map_or(-1.0, |n| n as f64));
+            assert_eq!(v[at + 14], if p.returning { 1.0 } else { 0.0 });
+            match p.dwell_seconds_left {
+                Some(left) => assert_eq!(v[at + 15], left),
+                None => assert!(v[at + 15].is_nan()),
+            }
+            seen |= p.origin_unit_id.is_some();
+            at += PERSON_FIXED + p.floors.len() + p.shafts.len();
+        }
+        assert!(seen, "the fixture's noon crowd has a round-tripper");
     }
 
     #[test]
