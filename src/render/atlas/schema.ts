@@ -7,7 +7,8 @@
  * The full reader's guide lives in `docs/atlas.md`.
  */
 
-/** Manifest schema version. Readers reject a major they do not know. */
+/** Manifest schema version, a single integer. A reader rejects a version it
+ *  does not know. */
 export const ATLAS_SCHEMA_VERSION = 1;
 
 /** Integer upscales shipped next to the canonical 1x bake. */
@@ -69,7 +70,9 @@ export interface FrameRecord {
   /** Frame size in 1x pixels (the full rectangle, trimming undone). */
   w: number;
   h: number;
-  /** The pixel that sits on the frame's grid origin (see docs/atlas.md). */
+  /** The point, in 1x pixels from the frame's top-left corner, that sits on
+   *  the frame's grid origin (see docs/atlas.md). It can lie on the frame's
+   *  far edge: the crane stands on its bottom edge. */
   anchor: { x: number; y: number };
   /** The packed pieces. One piece normally; a frame wider than a page is cut
    *  into column slices laid side by side at their `dx`. Empty when the frame

@@ -118,11 +118,20 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.resolve.outputs.tag }}
         run: |
-          # Attach to the tag's release, draft or published. When the tag has
-          # none yet, open a DRAFT for it: nothing goes public, and nothing
-          # becomes the latest release, until a maintainer publishes it.
-          existing="$(gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.tag_name == env.TAG) | .id' | head -1)"
-          if [ -z "$existing" ]; then
-            gh release create "$TAG" --verify-tag --draft --title "$TAG" --notes "Sprite atlas attached by the atlas release workflow."
+          # Attach to the tag's release, draft or published, replacing any
+          # atlas files a previous run attached (a manual rebuild is how a
+          # maintainer re-bakes a tag on purpose). When the tag has none yet,
+          # open a DRAFT for it: nothing goes public, and nothing becomes the
+          # latest release, until a maintainer publishes it.
+          # The whole list is read before it is inspected, so no early pipe
+          # close can fail the step.
+          has_release() {
+            ids="$(gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.tag_name == env.TAG) | .id')"
+            [ -n "$ids" ]
+          }
+          if ! has_release; then
+            # Another job may open the release between the check and here.
+            gh release create "$TAG" --verify-tag --draft --title "$TAG" --notes "Sprite atlas attached by the atlas release workflow." \
+              || has_release
           fi
           gh release upload "$TAG" dist-atlas/*.zip dist-atlas/*.sha256 --clobber

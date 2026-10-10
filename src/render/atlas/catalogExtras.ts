@@ -1,7 +1,7 @@
 import { FACILITIES, isElevatorKind } from "../../engine/facilities";
 import type { FacilityKind } from "../../engine/types";
 import type { PersonBuild } from "../pixelSprites/common";
-import { SHIRTS, moodTint } from "../pixelSprites/common";
+import { BUILDS as FIGURE_BUILDS, SHIRTS, moodTint } from "../pixelSprites/common";
 import { FLOOR, TILE } from "../scale";
 import {
   AWNING_W,
@@ -87,7 +87,17 @@ export function transportJobs(): Job[] {
       still(`shaft/${kind}/${piece}`, w, FLOOR, { p: "shaft", kind, floors, band: b, skip }, { kind, piece });
     // Bands are numbered from the top floor down; floor 2 of a 3-floor shaft
     // is its middle band.
-    jobs.push(band("top", 3, 0, []), band("stop", 3, 1, []), band("skip", 3, 1, [2]), band("bottom", 3, 2, []), band("single", 1, 0, []));
+    jobs.push(
+      band("top", 3, 0, []),
+      band("stop", 3, 1, []),
+      band("skip", 3, 1, [2]),
+      band("bottom", 3, 2, []),
+      band("single", 1, 0, []),
+      // A skipped end floor (a resized or loaded non-express shaft can keep
+      // one in its skip list): the cap without the stop line.
+      band("top-skip", 3, 0, [3]),
+      band("bottom-skip", 3, 2, [1]),
+    );
     for (const arrow of [null, "up", "down"] as const) {
       for (const full of [false, true]) {
         CAR_SEEDS.forEach((seed, s) => {
@@ -104,14 +114,14 @@ export function transportJobs(): Job[] {
   return jobs;
 }
 
-/** Figure builds and their sizes (pixelSprites/common `BUILDS`). */
-export const BUILDS: Record<PersonBuild, { w: number; h: number }> = {
-  seated: { w: 6, h: 15 },
-  standing: { w: 6, h: 18 },
-  walker: { w: 7, h: 24 },
-  rider: { w: 6, h: 17 },
-  hiVis: { w: 7, h: 22 },
-};
+/** Figure builds and their sizes, from the game's own build table: the build's
+ *  width and its height (head, torso and legs). */
+export const BUILDS = Object.fromEntries(
+  (Object.keys(FIGURE_BUILDS) as PersonBuild[]).map((b) => {
+    const spec = FIGURE_BUILDS[b];
+    return [b, { w: spec.width, h: spec.head + spec.torso + spec.legs }];
+  }),
+) as Record<PersonBuild, { w: number; h: number }>;
 
 /** Every figure build in every fill the game paints it in. */
 export function peopleJobs(): Job[] {

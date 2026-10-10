@@ -43,6 +43,13 @@ describe("lookupRoom", () => {
     expect(look({ kind: "recycling", state: "occupied", occupants: 0, id: 1 }, { ...DAY, recycleFill: 0.49 }, 0)).toMatchObject({ chains: { fill: 4 } });
     expect(look({ kind: "recycling", state: "occupied", occupants: 0, id: 1 }, { ...DAY, recycleFill: 3 }, 0)).toMatchObject({ chains: { fill: 8 } });
   });
+  it("reads corrupt or fractional counts the way the art can draw them", () => {
+    expect(look({ kind: "office", state: "occupied", occupants: 4.7, outForMeal: 1, id: 1 }, DAY, 0)).toMatchObject({ chains: { occupants: 3 } });
+    expect(look({ kind: "office", state: "occupied", occupants: NaN, id: 1 }, DAY, 0)).toMatchObject({ frame: expect.stringMatching(/\/away$/) });
+    expect(look({ kind: "parking", state: "occupied", occupants: 0, id: 12 }, { ...DAY, parkingUse: Infinity }, 0)).toMatchObject({ overlays: [] });
+    expect(look({ kind: "shop", state: "occupied", subtype: "Nope", occupants: 1, id: 1 }, DAY, 0)).toMatchObject({ frame: expect.stringContaining("room/shop/occupied/-/") });
+    expect(look({ kind: "rentalStudio", state: "occupied", occupants: 1, id: 1 }, { ...DAY, hour: 2 }, 0)).toMatchObject({ frame: expect.stringContaining("/always/late/") });
+  });
   it("occupant-free kinds carry no presence", () => {
     expect(look({ kind: "security", state: "occupied", occupants: 5, id: 1 }, DAY, 0)).toEqual({
       frame: "room/security/occupied/-/w8/unlit/always/any/v0",

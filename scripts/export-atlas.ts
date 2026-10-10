@@ -34,6 +34,17 @@ import type { Image } from "../src/render/atlas/pixels";
 
 const root = resolve(import.meta.dirname, "..");
 
+const FLAGS = new Set(["--out", "--filter", "--label"]);
+
+/** Every argument must be one of {@link FLAGS} followed by its value; the
+ *  `--flag=value` form and unknown flags are refused so nothing is silently
+ *  ignored. */
+function checkArgs(argv: readonly string[]): void {
+  for (let i = 0; i < argv.length; i += 2) {
+    if (!FLAGS.has(argv[i])) throw new Error(`unknown argument ${argv[i]} (use ${[...FLAGS].join(", ")}, each followed by its value)`);
+  }
+}
+
 /** A `--name value` argument. A missing, empty or flag-shaped value is an
  *  error rather than a silent default. */
 function arg(name: string): string | undefined {
@@ -80,12 +91,14 @@ function decode(b64: string, w: number, h: number, what: string): Uint8ClampedAr
 }
 
 async function main(): Promise<void> {
+  checkArgs(process.argv.slice(2));
   const outDir = resolve(root, arg("out") ?? "dist-atlas");
   const filter = arg("filter");
   // The release tag names the archive when the workflow builds one; a local
   // run falls back to the package version.
   const label = arg("label")?.replace(/[^A-Za-z0-9._-]+/g, "-");
   if (label !== undefined && !/[A-Za-z0-9]/.test(label)) throw new Error(`--label ${label} names nothing`);
+  if (label !== undefined && filter !== undefined) throw new Error("--label names a release archive; a --filter run is a preview");
   const t0 = Date.now();
   const code = await bundleBake();
   console.log(`bundled the bake (${(code.length / 1024).toFixed(0)} KiB)`);

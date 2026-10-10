@@ -52,7 +52,7 @@ export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number): Lookup {
   if (u.kind === "parking") {
     const overlays: string[] = [];
     if (s.dead) overlays.push("dead");
-    else if (rand((u.id * 31) | 0) < s.parkingUse) overlays.push(`car${u.id % PARKING_CAR_COLORS}`);
+    else if (rand((u.id * 31) | 0) < finite(s.parkingUse)) overlays.push(`car${u.id % PARKING_CAR_COLORS}`);
     return { frame: stem, chains: {}, overlays };
   }
   if (u.kind === "recycling") {
@@ -62,7 +62,8 @@ export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number): Lookup {
   if (OCCUPANT_FREE.has(u.kind)) return { frame: stem, chains: {}, overlays: [] };
   const occupants = finite(u.occupants);
   if (occupants <= 0) return { frame: `${stem}/away`, chains: {}, overlays: [] };
-  const visible = Math.max(0, occupants - finite(u.outForMeal ?? 0));
+  // Whole figures only: a fractional count (a forged save) rounds down.
+  const visible = Math.floor(Math.max(0, occupants - finite(u.outForMeal ?? 0)));
   return { frame: `${stem}/home`, chains: { occupants: visible }, overlays: [] };
 }
 

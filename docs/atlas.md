@@ -36,7 +36,11 @@ screenshot drift) with `npm run atlas -- --out dist-atlas` as the command.
 
 Before it writes anything, the export checks the atlas against the game's own
 paint for the sample signatures in `src/render/atlas/samples.ts` and stops on
-any mismatch.
+any mismatch, then checks that every image comes back out of the packed pages.
+A `--filter` run is a preview: it skips the sample check and is written as
+`verticopolis-atlas-preview.zip`. A release archive takes its name from the
+tag, with any character outside letters, digits, `.`, `_` and `-` turned into
+`-`.
 
 ## How it is made
 
@@ -70,11 +74,13 @@ viewer), encoded as `rgb = n * 0.5 + 0.5`, and share their color page's layout.
 Height comes from luminance times coverage, with each sprite's outline (a
 visible pixel next to a transparent one) sunk to half height so silhouettes
 read as beveled. Each normal map is taken over the whole frame before it is
-trimmed, sliced or split into layers, so none of those cuts bevels, and a
-frame's own border does not either (rooms tile side by side). A layer's normals
-come from the frame it completes. Normal alpha is 255 wherever the color pixel
-shows and 0 elsewhere, so a loader that premultiplies alpha leaves the vectors
-intact.
+trimmed or sliced, so neither cut bevels, and a frame's own border does not
+either (rooms tile side by side). A layer's normals come from the frame it
+completes, masked to the layer's pixels; the base frame's pixels right next to
+a layer keep their own normals, so a composed normal map can differ from a
+fresh one by up to a pixel around each layer. Normal alpha is 255 wherever the
+color pixel shows and 0 elsewhere, so a loader that premultiplies alpha leaves
+the vectors intact.
 
 ## The manifest
 
@@ -126,7 +132,8 @@ Names follow the engine's own strings: the facility keys from
 
 A shaft is drawn floor by floor: `top` for its top floor, `bottom` for its
 bottom floor, `stop` or `skip` for each floor between (an express skip floor
-has no stop line), and `single` for a one-floor shaft.
+has no stop line), and `single` for a one-floor shaft. `top-skip` and
+`bottom-skip` cover a shaft whose skip list holds one of its own end floors.
 
 ## Reading a room
 
@@ -141,10 +148,13 @@ reader is `src/render/atlas/lookup.ts`; in short:
    business hours at the current hour, the late night (23:00 to 06:00) of a
    condo, studio or apartment, and the variant you picked for that room.
 3. For most rooms, append `/home` when `occupants > 0`, else `/away`, and on a
-   home frame draw the `occupants` chain up to `occupants - outForMeal`.
+   home frame draw the `occupants` chain up to `occupants - outForMeal`
+   (rounded down, at least 0, at most the chain's `max`).
 4. A parking space draws the `dead` overlay when it is not chained to a ramp;
    otherwise it draws `car<id % 7>` when it holds a car (the game's presence
-   roll is spelled out in `signature.rules.parkingRoll`). A recycling center
+   roll is spelled out in `signature.rules.parkingRoll`; the game re-paints a
+   space only when the garage's use crosses a sixth, so its cars can trail the
+   live use slightly). A recycling center
    draws its `fill` chain up to `round(fill * 8)`. The game re-bakes the pile on
    the same eighths but paints the exact fill, so between steps a pile can
    differ by a bag or a gauge pixel.
@@ -177,11 +187,13 @@ stretch (`loop: false`); play it forward and back, or hold, as suits you.
 `e2e/atlas.spec.ts` (and the export's own pre-flight) composes atlas frames and
 layers for the sample room signatures with the reference reader, paints the
 same rooms through the game's own paint functions (`src/render/regionPaint.ts`,
-which the region compositor and the burning-room canvas call) at two region
-offsets, and requires an exact pixel match. The bake refuses to write a layer
-that would not compose back to the game's pixels, or a chain that its cap cut
-short. A unit test rebuilds every frame and layer from the packed pages
-through the manifest.
+which the region compositor and the burning-room canvas call), and requires an
+exact pixel match. Settled rooms are painted at two region offsets; burning and
+unbuilt rooms, and the five origin-seeded kinds, at the per-unit origin the
+game and the atlas both use for them. A control case compares two different
+pictures and must report a mismatch. The bake refuses to write a layer that
+would not compose back to the game's pixels. A unit test rebuilds every frame
+and layer from the packed pages through the manifest.
 
 The same check covers the other families (`verifyExtras.ts`): a whole express
 and standard shaft rebuilt from their floor pieces (skip floor included), cabs

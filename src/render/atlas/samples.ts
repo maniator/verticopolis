@@ -82,5 +82,8 @@ export const SAMPLES: Sample[] = [
   s("metro", { kind: "metro" }, DAY),
   s("office gutted", { kind: "office", state: "gutted" }, DAY),
   s("office on fire", { kind: "office", state: "fire" }, DAY, 0, 5),
+  s("office on fire at night", { kind: "office", state: "fire" }, NIGHT, 2, 3),
+  s("parking space on fire", { kind: "parking", state: "fire" }, LATE, 1, 9),
+  s("metro under construction at night", { kind: "metro", state: "construction" }, NIGHT, 0, 4),
   s("cinema under construction", { kind: "cinema", state: "construction" }, DAY, 0, 17),
 ];
