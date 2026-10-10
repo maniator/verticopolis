@@ -8,6 +8,8 @@ import { firstDifference } from "../../dualrun/shadow";
 import { attachWasmHost, type WasmHost } from "../../wasmhost/wasmHost";
 import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { LOG_RING_CAP } from "../../engine/sim/constants";
+import { coerceLog } from "../../engine/sim/coerce";
+import type { LogEntry } from "../../engine/types";
 import { WASM_PARITY_FLAG } from "./typescriptOnly";
 
 /**
@@ -19,59 +21,71 @@ import { WASM_PARITY_FLAG } from "./typescriptOnly";
  * mock of the construction points (`new Simulation`, `newGame`,
  * `deserialize`, the fixture helpers) for two reasons. One hook covers every
  * construction path, the fixtures' `.vctower` loads included. And attaching
- * at the first tick rather than at construction lets a test set its tower
- * up the way the suites do today (`tower.place`, a direct field write) before
- * the engine starts from the instance's own save, so setup that bypasses the
- * command relay still reaches the engine.
+ * at the first tick lets a test set its tower up the way the suites do today
+ * (`tower.place`, a direct field write) before the engine starts from the
+ * instance's own save, so setup that bypasses the command relay still
+ * reaches the engine. `callExterminator` also attaches the host ahead of the
+ * first tick: it keeps its booked room ids in memory only
+ * (`exterminationRoomIds`, which no save carries), so a booking made before
+ * hosting would reach the engine as a due day with no rooms. Hosting first
+ * relays the command, and the engine books the same rooms.
  *
- * Attaching runs one `host.syncStructure()` straight away, so the instance
- * is normalized the way the engine normalized it on load (a Classic tower's
- * rents snap onto the 1994 ladder, a shell with no `completeAt` is opened by
- * `finishConstruction`), and the first compare below agrees instead of
- * re-hosting. The load-time log lines the engine wrote (the rent-snap
- * bulletin) are adopted once, skipping any the instance log already ends
- * with, so a re-host never logs the bulletin twice.
+ * Attaching normalizes the instance. The engine's load can log lines the
+ * instance never had (the Classic rent-snap bulletin); the instance adopts
+ * the ring's tail past its own log, each own line compared in the form the
+ * load keeps it (`coerceLog`: the text cut to LOG_TEXT_CAP, a bad minute or
+ * kind coerced), so a long line is not adopted twice. Then one
+ * `host.syncStructure()` makes the instance the engine's loaded state (a
+ * Classic tower's rents snap onto the 1994 ladder, a shell with no
+ * `completeAt` is opened by `finishConstruction`), and the first compare
+ * agrees.
  *
- * Per tick the wrapper does three things:
- * 1. Before the tick it compares the instance's own state view with the
- *    engine's. In the default tick mode the compare runs on every tick while
- *    the crowd is empty, and once the crowd exists on a tower revision move
- *    or a change in a cheap fingerprint of the fields tests write directly
- *    (the clock, money, a unit's state and counters), taken after each sync;
- *    under `VC_WASM_SYNC=hour` it runs on a revision or fingerprint move
- *    only. A relayed
- *    command (`sim.build`) moved both in step and they agree. A disagreement
- *    is an edit the relay does not carry (`tower.place`, a direct unit
- *    write) or a divergence on a relayed command: while the crowd is still
- *    empty the engine is restarted from the instance's save (a re-host, the
- *    same start a load gets), and once the crowd exists the tick throws a
- *    {@link WasmParityError} naming the first differing path, since a
- *    restart would drop the crowd and hide the difference. A re-host is
- *    refused while an exterminator booking is pending, since the save does
- *    not carry the booked room ids (#902). A per-frame counter stamped on
- *    the instance before the first tick (`customersIn`) is not a
- *    disagreement: the state view leaves it out, and the first frame sync
- *    (the one attaching runs) replaces it with the engine's value.
- * 2. The tick runs on the engine (the host's relay tick: `engine.tick` plus
- *    the frame sync).
- * 3. After the tick, the engine's full save is merged into the instance
- *    (`host.syncStructure`), so an assertion between hours reads the state
- *    the engine holds after that tick. `VC_WASM_SYNC=hour` keeps the host's
- *    own cadence (frame sync per tick, merge on an hour pass or a revision
- *    change) for a cost comparison.
+ * The compare checks the instance's own state view against the engine's. It
+ * runs before every tick while the crowd is empty in the default tick mode,
+ * and otherwise when the tower revision moved or the {@link fingerprint}
+ * changed since the last sync; and it runs around a relayed
+ * `callExterminator`, before the booking and after it. A relayed command
+ * (`sim.build`) moved both engines in step and they agree. A disagreement is
+ * an edit the relay does not carry (`tower.place`, a direct field write) or
+ * a divergence on a relayed command. While the crowd is still empty the
+ * engine is restarted from the instance's save (a re-host, the same start a
+ * load gets); once the crowd exists the tick throws a
+ * {@link WasmParityError} naming the first differing path, since a restart
+ * would drop the crowd and hide the difference.
  *
- * One command attaches the host ahead of the first tick: `callExterminator`
- * keeps its booked room ids in memory only (`exterminationRoomIds`, which no
- * save carries), so a booking made before the first tick would reach the
- * engine as a due day with no rooms. Hosting first relays the command, and
- * the engine books the same rooms. The same compare runs after the relayed
- * command, so a booking the two engines answer differently is caught even
- * when no tick follows.
+ * The fingerprint is a hash of every unit's and every transport's own
+ * fields, the Simulation's own primitive fields, `events.pending` and the
+ * clock, taken after each sync. It leaves out the people (the frame owns
+ * them), the weather (engine owned: no save carries it, and a load
+ * recomputes it from the day) and the engine-owned per-frame counters: a
+ * direct write to any of those is replaced by the next frame sync, and no
+ * error names it. A counter stamped on a unit before the first tick
+ * (`customersIn`) is the same case: the state view leaves it out, and the
+ * first frame sync (the one attaching runs) replaces it.
  *
- * Every host is detached after each test, so the engines are freed and the
- * instances are plain TypeScript simulations again. A test that cannot run
- * on the engine marks itself with `itTypeScriptOnly` (typescriptOnly.ts),
- * which reads the flag raised here.
+ * The refusals, each by name:
+ * - the sampled v1 model (`simModel = "v1"`), at attach and on every hosted
+ *   tick, since the save does not carry it and the engine never ported it;
+ * - an instance that already has a crowd at attach (a Simulation shared
+ *   between tests, ticked on the TypeScript engine after its release);
+ * - an exterminator booking the save cannot carry: booked room ids on the
+ *   instance at attach, and any pending booking at a re-host (#902);
+ * - a re-host after the first tick under `VC_WASM_SYNC=hour`, where the
+ *   instance is behind the engine between merges and its save would rewind
+ *   the engine.
+ *
+ * Each hosted tick runs on the engine (the host's relay tick: `engine.tick`
+ * plus the frame sync), and in tick mode the engine's full save is then
+ * merged into the instance (`host.syncStructure`), so an assertion between
+ * hours reads the state the engine holds after that tick.
+ * `VC_WASM_SYNC=hour` keeps the host's own cadence (frame sync per tick,
+ * merge on an hour pass or a revision change) for a cost comparison.
+ *
+ * Every host is detached after each test (all of them, even when one
+ * release throws), so the engines are freed and the instances are plain
+ * TypeScript simulations again. A test that cannot run on the engine marks
+ * itself with `itTypeScriptOnly` (typescriptOnly.ts), which reads the flag
+ * raised here.
  */
 export class WasmParityError extends Error {
   constructor(message: string) {
@@ -89,17 +103,26 @@ interface Hosting {
   host: WasmHost;
   /** The host's own tick (the relay's: `engine.tick` plus the frame sync). */
   relayTick: (dt: number) => void;
-  /** The wrappers this file put on the instance, so a release can tell them
-   *  from anything else left there. */
-  tickWrapper: (dt: number) => void;
+  /** The `callExterminator` wrapper this file put on the instance, so a
+   *  release can tell it from anything else left there (the tick wrapper is
+   *  {@link hostedTickWrapper}, shared by every host). */
   exterminatorWrapper: () => ReturnType<Simulation["callExterminator"]>;
   /** The instance's tower revision right after the last sync. */
   revision: number;
   /** {@link fingerprint} right after the last sync. */
-  fingerprint: string;
+  fingerprint: number;
+  /** Whether the engine has ticked since this host attached. */
+  ticked: boolean;
 }
 
 const hosted = new Map<Simulation, Hosting>();
+
+const V1_REFUSAL = "wasm parity: the sampled v1 model is TypeScript-only; mark the test with itTypeScriptOnly";
+
+/** The tick this file puts on every hosted instance. */
+const hostedTickWrapper = function (this: Simulation, dt: number): void {
+  hostedTick(this, dt);
+};
 
 /** Counters a test or a report can read: hosts started, re-hosts after an
  *  un-relayed edit, ticks run on the engine. */
@@ -117,17 +140,95 @@ function ownStateView(sim: Simulation): string {
   }
 }
 
-/** The fields a test writes straight onto the instance without moving the
- *  tower revision (the clock, money, weather, star, and a unit's state,
- *  rent, occupancy and satisfaction counters), read cheaply after every
- *  sync. A change before the next tick means a direct write landed, and the
- *  full state-view compare runs even once the crowd exists. */
-function fingerprint(sim: Simulation): string {
-  const parts: (string | number | boolean | undefined)[] = [sim.clock.minutes, sim.money, sim.weather, sim.star];
-  for (const u of sim.tower.units) {
-    parts.push(u.id, u.state, u.rent, u.noRate, u.occupants, u.customersIn, u.hotelCustomersIn, u.outForMeal, u.satisfaction, u.dirtyDays, u.everOccupied, u.residents, u.vacateAt, u.vacateReason, u.completeAt);
+/** Simulation fields the fingerprint leaves out: the per-frame counters the
+ *  engine owns (the frame sync writes them every tick), the weather (engine
+ *  owned too: no save carries it, a load recomputes it from the day), and the
+ *  memo keys a read refreshes. */
+const SIM_UNPRINTED: ReadonlySet<string> = new Set(["weather", "onHourRuns", "santaFxSeq", "vipFxSeq", "logSeq", "noiseMemoRev", "demandMemoKey"]);
+
+// The fingerprint is a 32-bit FNV-1a style hash, folded word by word, so a
+// 13,000-unit fixture costs a few milliseconds where a joined string of
+// every field costs tens.
+const f64 = new Float64Array(1);
+const u32 = new Uint32Array(f64.buffer);
+
+function mixWord(h: number, w: number): number {
+  return Math.imul(h ^ w, 16777619) >>> 0;
+}
+
+function mixString(h: number, s: string): number {
+  h = mixWord(h, s.length);
+  for (let i = 0; i < s.length; i++) h = mixWord(h, s.charCodeAt(i));
+  return h;
+}
+
+function mixValue(h: number, v: unknown, nested: boolean): number {
+  switch (typeof v) {
+    case "number":
+      f64[0] = v;
+      return mixWord(mixWord(h, u32[0]), u32[1]);
+    case "string":
+      return mixWord(mixWord(h, 1), stringHash(v));
+    case "boolean":
+      return mixWord(h, v ? 2 : 3);
+    case "undefined":
+      return mixWord(h, 4);
+    case "object":
+      if (v === null) return mixWord(h, 5);
+      if (nested && (Array.isArray(v) || Object.getPrototypeOf(v) === Object.prototype)) return mixString(mixWord(h, 6), JSON.stringify(v));
+      return h;
+    default:
+      return h;
   }
-  return parts.join(",");
+}
+
+/** Each short string's own hash (a key, a kind, a state, a label), computed
+ *  once; the cache is dropped when it grows past a bound. */
+const stringHashes = new Map<string, number>();
+
+function stringHash(s: string): number {
+  let h = stringHashes.get(s);
+  if (h === undefined) {
+    h = mixString(2166136261, s);
+    if (s.length <= 64) {
+      if (stringHashes.size >= 50_000) stringHashes.clear();
+      stringHashes.set(s, h);
+    }
+  }
+  return h;
+}
+
+/** Fold one record's own enumerable fields: a primitive as itself, and (with
+ *  `nested`) an array or a plain object (a `cars` array, a schedule) as its
+ *  JSON. Each field hashes with its key, and the fields combine by a sum, so
+ *  the key order does not matter (the same as folding them by sorted key). */
+function foldRecord(h: number, record: object, nested: boolean, skip?: ReadonlySet<string>): number {
+  const r = record as Record<string, unknown>;
+  let sum = 0;
+  for (const key of Object.keys(r)) {
+    if (skip?.has(key)) continue;
+    sum = (sum + mixValue(stringHash(key), r[key], nested)) >>> 0;
+  }
+  return mixWord(h, sum);
+}
+
+/** A cheap fingerprint of what a test can write straight onto the instance
+ *  without moving the tower revision, taken after every sync: every unit's
+ *  and every transport's own fields (primitives, and the JSON of their
+ *  arrays and schedules), the Simulation's own primitive fields, the JSON of
+ *  `events.pending`, and the clock. A change before the next tick means a
+ *  direct write landed, and the full state-view compare runs even once the
+ *  crowd exists. The people stay out of it (the frame owns them), as do the
+ *  engine-owned counters and the weather (see {@link SIM_UNPRINTED}): a
+ *  direct write to a person or to one of those is replaced by the next frame
+ *  sync, and no error names it. */
+export function fingerprint(sim: Simulation): number {
+  let h = mixValue(2166136261, sim.clock.minutes, false);
+  h = mixString(h, JSON.stringify(sim.events.pending));
+  h = foldRecord(h, sim, false, SIM_UNPRINTED);
+  for (const u of sim.tower.units) h = foldRecord(h, u, true);
+  for (const t of sim.tower.transports) h = foldRecord(h, t, true);
+  return h;
 }
 
 /** One log line's identity for the tail check below. */
@@ -135,8 +236,15 @@ function sameLine(a: { minute: number; kind?: string; text: string }, b: { minut
   return a.minute === b.minute && a.kind === b.kind && a.text === b.text;
 }
 
+/** One log line as the engine's load keeps it (`coerceLog`: the text cut
+ *  to LOG_TEXT_CAP, a bad minute or kind coerced), or undefined for a line
+ *  the load drops. */
+function asLoaded(e: LogEntry): LogEntry | undefined {
+  return coerceLog([e])[0];
+}
+
 function attach(sim: Simulation): Hosting {
-  if (sim.simModel === "v1") throw new Error("wasm parity: the sampled v1 model is TypeScript-only; mark the test with itTypeScriptOnly");
+  if (sim.simModel === "v1") throw new Error(V1_REFUSAL);
   // A crowd on an instance this file does not host means it was hosted in
   // an earlier test, released by the afterEach below, and ticked on the
   // TypeScript engine since (or it is shared between tests); the engine can
@@ -144,7 +252,26 @@ function attach(sim: Simulation): Hosting {
   if (sim.crowd.people.length > 0) {
     throw new Error("wasm parity: this Simulation already has a crowd, so it was released after a previous test; the parity projects need one Simulation per test");
   }
+  // Booked room ids live on the instance only, and the engine starts from a
+  // save that carries the due day without them (#902). (A due day alone, as
+  // a load leaves it, is in the save, so both engines resolve it alike.)
+  if ((sim.exterminationRoomIds?.length ?? 0) > 0) {
+    throw new Error("wasm parity: this Simulation already holds an exterminator booking the save cannot carry (the booked room ids, #902); the parity projects need one Simulation per test, booked after hosting");
+  }
   const host = attachWasmHost(sim, wasm());
+  try {
+    return finishAttach(sim, host);
+  } catch (e) {
+    // The engine is freed and the instance's relay removed, so a failed
+    // attach leaves a plain TypeScript simulation behind.
+    host.detach();
+    const ownTick = Object.getOwnPropertyDescriptor(sim, "tick");
+    if (ownTick && ownTick.value === hostedTickWrapper) delete (sim as Partial<Simulation>).tick;
+    throw e;
+  }
+}
+
+function finishAttach(sim: Simulation, host: WasmHost): Hosting {
   parityStats.hosts++;
   // The engine starts from the instance's save, and a load can log a line
   // the founded instance never had (the Classic rent snap bulletin), ahead
@@ -153,19 +280,18 @@ function attach(sim: Simulation): Hosting {
   // log on both sides.
   // (A save with no log yet carries no `log` field.)
   const ring = (JSON.parse(host.engine.serialize()) as { log?: Simulation["log"] }).log ?? [];
-  // The ring is the instance's log (capped at LOG_RING_CAP) followed by the
-  // load-time lines: find the longest tail of the instance log that the
-  // ring starts with, so a log already at the cap still lines up.
-  let overlap = Math.min(ring.length, sim.log.length);
+  // The ring is the instance's log (capped at LOG_RING_CAP, each line as the
+  // load coerced it) followed by the load-time lines: find the longest tail
+  // of the instance log that the ring starts with, so a log already at the
+  // cap, or a line the load cut short, still lines up.
+  const loaded = sim.log.map(asLoaded);
+  let overlap = Math.min(ring.length, loaded.length);
   while (overlap > 0) {
-    const tail = sim.log.slice(sim.log.length - overlap);
-    if (tail.every((e, k) => sameLine(e, ring[k]))) break;
+    const tail = loaded.slice(loaded.length - overlap);
+    if (tail.every((e, k) => e !== undefined && sameLine(e, ring[k]))) break;
     overlap--;
   }
-  // A load-time line the instance log already ends with (a re-host loading
-  // the same off-ladder rents again) is not adopted twice.
-  const recent = sim.log.slice(Math.max(0, sim.log.length - (ring.length - overlap)));
-  const extra = ring.slice(overlap).filter((e) => !recent.some((r) => sameLine(r, e)));
+  const extra = ring.slice(overlap);
   if (extra.length > 0) {
     sim.log.push(...extra.map((e) => ({ minute: e.minute, text: e.text, kind: e.kind })));
     while (sim.log.length > LOG_RING_CAP) sim.log.shift();
@@ -181,27 +307,31 @@ function attach(sim: Simulation): Hosting {
   const exterminatorDesc = Object.getOwnPropertyDescriptor(sim, "callExterminator");
   if (!exterminatorDesc || typeof exterminatorDesc.value !== "function") throw new Error("wasm parity: the host left no callExterminator relay on the instance");
   const relayExterminator = exterminatorDesc.value as () => ReturnType<Simulation["callExterminator"]>;
-  const tickWrapper = function (this: Simulation, dt: number) {
-    hostedTick(this, dt);
-  };
   // The booking runs on the instance and is relayed to the engine by the
-  // host's own wrapper; the compare after it catches an answer the two
-  // engines disagree on when no tick follows.
+  // host's own wrapper. The compare before it carries an un-relayed edit
+  // into the engine (a re-host) while no booking is pending yet; the one
+  // after it catches an answer the two engines disagree on when no tick
+  // follows.
   const exterminatorWrapper = function (this: Simulation): ReturnType<Simulation["callExterminator"]> {
-    const result = relayExterminator.call(this);
     const current = hosted.get(this);
-    if (current) compareOrRehost(this, current);
+    if (!current) return relayExterminator.call(this);
+    const before = compareOrRehost(this, current);
+    if (before !== current) return before.exterminatorWrapper.call(this);
+    const result = relayExterminator.call(this);
+    const after = compareOrRehost(this, current);
+    after.revision = this.tower.revision;
+    after.fingerprint = fingerprint(this);
     return result;
   };
   const entry: Hosting = {
     host,
     relayTick: relayDesc.value as (dt: number) => void,
-    tickWrapper,
     exterminatorWrapper,
     revision: sim.tower.revision,
     fingerprint: fingerprint(sim),
+    ticked: false,
   };
-  Object.defineProperty(sim, "tick", { value: tickWrapper, configurable: true, writable: true });
+  Object.defineProperty(sim, "tick", { value: hostedTickWrapper, configurable: true, writable: true });
   Object.defineProperty(sim, "callExterminator", { value: exterminatorWrapper, configurable: true, writable: true });
   hosted.set(sim, entry);
   return entry;
@@ -215,16 +345,19 @@ function release(sim: Simulation): void {
   // are the wrappers above; one left behind would keep the instance hosted.
   entry.host.detach();
   const ownTick = Object.getOwnPropertyDescriptor(sim, "tick");
-  if (ownTick && ownTick.value === entry.tickWrapper) delete (sim as Partial<Simulation>).tick;
+  if (ownTick && ownTick.value === hostedTickWrapper) delete (sim as Partial<Simulation>).tick;
   const ownExterminator = Object.getOwnPropertyDescriptor(sim, "callExterminator");
   if (ownExterminator && ownExterminator.value === entry.exterminatorWrapper) delete (sim as Partial<Simulation>).callExterminator;
   if (sim.tick !== Simulation.prototype.tick) throw new Error("wasm parity: a released instance still has its own tick");
 }
 
 /** Whether the instance holds an exterminator booking the engine would lose
- *  on a re-host (the save carries the due day but not the room ids). */
+ *  on a re-host (the save carries the due day but not the room ids). The
+ *  resolution clears the due day to undefined on both engines (a merge
+ *  copies it so), and a real due day is never 0 (it is the booking day plus
+ *  one), so any falsy due day reads as no booking. */
 function bookingPending(sim: Simulation): boolean {
-  return (sim.exterminationRoomIds?.length ?? 0) > 0 || sim.exterminationDueDay !== undefined;
+  return (sim.exterminationRoomIds?.length ?? 0) > 0 || Boolean(sim.exterminationDueDay);
 }
 
 /** Compare the instance's state view with the engine's (see the module
@@ -232,7 +365,7 @@ function bookingPending(sim: Simulation): boolean {
  *  throw once it exists. Returns the hosting in force afterwards. */
 function compareOrRehost(sim: Simulation, entry: Hosting): Hosting {
   // A tower edit moves the revision; a direct field write (`u.rent = n`,
-  // `sim.weather = "rain"`) does not, so while the crowd is still empty
+  // `sim.money = n`) does not, so while the crowd is still empty
   // (the setup phase of most suites, where the instance is cheap to
   // serialize) the compare runs every tick, and a write that bypassed the
   // relay reaches the engine through the re-host. In hour mode the instance
@@ -280,6 +413,14 @@ function compareOrRehost(sim: Simulation, entry: Hosting): Hosting {
         "make the edit before the callExterminator call, or relay it",
     );
   }
+  if (SYNC_MODE === "hour" && entry.ticked) {
+    // Between merges the instance is behind the engine, so its save is stale
+    // and a restart from it would rewind the engine.
+    throw new WasmParityError(
+      `the instance's state departs from the engine's at ${d?.path ?? "?"} after the first tick under VC_WASM_SYNC=hour, which cannot re-host after a tick (the instance's save is behind the engine between merges): ` +
+        "make the edit before the first tick, or run the test in tick mode",
+    );
+  }
   if (process.env.VC_PARITY_TRACE) {
     console.log(`[parity] re-host at ${sim.clock.minutes}: ${d?.path} instance=${JSON.stringify(d?.live)} engine=${JSON.stringify(d?.shadow)}`);
   }
@@ -292,8 +433,11 @@ function compareOrRehost(sim: Simulation, entry: Hosting): Hosting {
 function hostedTick(sim: Simulation, dt: number): void {
   let entry = hosted.get(sim);
   if (!entry) throw new Error("wasm parity: a hosted tick on an instance that is not hosted");
+  // A test can set v1 after the first tick, past the refusal at attach.
+  if (sim.simModel === "v1") throw new Error(V1_REFUSAL);
   entry = compareOrRehost(sim, entry);
   entry.relayTick(dt);
+  entry.ticked = true;
   parityStats.ticks++;
   if (SYNC_MODE === "tick") {
     entry.host.syncStructure();
@@ -332,5 +476,17 @@ Simulation.prototype.callExterminator = function (this: Simulation): ReturnType<
 };
 
 afterEach(() => {
-  for (const sim of [...hosted.keys()]) release(sim);
+  // Every host is released even when one release throws, so no engine
+  // leaks into the next test.
+  const errors: unknown[] = [];
+  for (const sim of [...hosted.keys()]) {
+    try {
+      release(sim);
+    } catch (e) {
+      errors.push(e);
+    }
+  }
+  // (AggregateError is ES2021, past the project's ES2020 lib; Node has it.)
+  const Aggregate = (globalThis as unknown as { AggregateError: new (errors: unknown[], message: string) => Error }).AggregateError;
+  if (errors.length > 0) throw new Aggregate(errors, `wasm parity: ${errors.length} host release(s) failed`);
 });
