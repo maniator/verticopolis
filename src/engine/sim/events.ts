@@ -49,7 +49,7 @@ export function checkVip(sim: Simulation): void {
   // If the Wedding Hall is gone before the inspection, cancel the pending
   // visit so it can't keep re-failing and spamming the log. The player's
   // removals (`removeFacility`, `sellAt`) already cancel it; this catches a
-  // raw `tower.removeUnit` from a loader or a test.
+  // save loaded with a stale visit day and a raw `tower.removeUnit` in a test.
   if (!sim.tower.builtWeddingHall) {
     sim.vipVisitDay = -1;
     return;

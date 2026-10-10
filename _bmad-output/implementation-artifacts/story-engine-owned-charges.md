@@ -86,3 +86,7 @@ frontend relays engine commands and never copies the money rules.
 - Round 4: all three layers clean on the round-3 fix.
 - Round 5: Blind Hunter and Edge Case Hunter clean (the Blind Hunter's "missing lock" was the review diff leaving out `expected.json` on purpose; the lock holds the new scenario).
 - [x] [Review][Patch] Comments in `checkVip` and a Wedding Hall test still said the editor and bulldozer call `tower.removeUnit` directly [src/engine/sim/events.ts, reviewFixes.integration.test.ts]: reworded to name raw `tower.removeUnit` callers (comment-only; no em-dash added).
+
+### Round 6 (confirming pass)
+
+- All three layers clean on the round-5 fix. The repo sweep for stale claims found two comment-only nits, both fixed: the `resaleRefund` doc said the UI paid the refund, and the VIP guard's comment named "a loader" as a raw `tower.removeUnit` caller (the real case is a save loaded with a stale visit day).

@@ -197,7 +197,7 @@ describe("F31 — selling the Wedding Hall cancels a pending VIP inspection", ()
     const sim = structuredTower(10, GRID.maxFloor, 1_000_000_000, 30);
     sim.star = 5;
     expect(sim.build("weddingHall", GRID.maxFloor, C).ok).toBe(true);
-    // A raw tower.removeUnit (a loader or a test) skips the player's removal
+    // A raw tower.removeUnit (here, the test itself) skips the player's removal
     // command, so the path-independent guard in checkVip must still cancel.
     const hall = sim.tower.units.find((u) => u.kind === "weddingHall")!;
     sim.tower.removeUnit(hall.id);

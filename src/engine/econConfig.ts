@@ -310,9 +310,10 @@ export function rentOf(u: { kind: string; rent?: number; noRate?: boolean }): nu
   return u.rent ?? ECON.rent[u.kind]?.default ?? 0;
 }
 
-/** Partial refund when a facility is sold or bulldozed — half its build cost.
- *  The single source of truth for the resale rule (shown in the editor and paid
- *  out by both the editor Sell button and the bulldoze tool). */
+/** Partial refund when a facility is sold or bulldozed: half its build cost.
+ *  The single source of truth for the resale rule, shown in the editor and paid
+ *  out by the engine's `removeFacility`, which the editor's Sell and the
+ *  bulldozer share. */
 export function resaleRefund(kind: FacilityKind): number {
   return Math.floor(FACILITIES[kind].cost * 0.5);
 }
