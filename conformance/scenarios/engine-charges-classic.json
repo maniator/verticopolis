@@ -1,6 +1,6 @@
 {
   "id": "engine-charges-classic",
-  "description": "The engine-owned charges (#914) on a fresh Classic tower: a standard elevator buys two cars, is refused a third one dollar short, sells two back and is refused its last car, and at eight cars is refused another with no money at all; a stairway is refused cars and an extension. The elevator then extends one floor by button, two floors by a drag that shrinks back and regrows within its high-water mark for free, one floor into open sky (laying the floor behind it), as far as one floor's budget pays and no further, and is refused while short and while in debt, then shrinks for free. A second elevator drags its bottom down two floors, back one for free and down again within its mark, then extends to the lobby on its last floor's worth of money and is refused the next floor. The removal command is refused a lobby tile and a floor holding up the story above, bulldozes a top floor tile and the stairway for half back. A day passes, a fire is started in the office, and the removal command refuses to bulldoze or sell it while it burns; two days later the gutted shell sells for nothing, the elevator is sold, and a last day runs.",
+  "description": "The engine-owned charges (#914) on a fresh Classic tower: a standard elevator buys two cars, is refused a third one dollar short, sells two back and is refused its last car, and at eight cars is refused another with no money at all; a stairway is refused cars and an extension. The elevator then extends one floor by button, two floors by a drag that shrinks back and regrows within its high-water mark for free, one floor into open sky (laying the floor behind it), as far as one floor's budget pays and no further, and is refused while short and while in debt, then shrinks for free. A second elevator drags its bottom down two floors, back one for free and down again within its mark, then extends to the lobby on its last floor's worth of money and is refused the next floor; a drag far below the basement is refused with the tower's own reason and charges nothing. The removal command is refused a lobby tile and a floor holding up the story above, bulldozes a top floor tile and the stairway for half back. A day passes, a fire is started in the office, and the removal command refuses to bulldoze or sell it while it burns; two days later the gutted shell sells for nothing, the elevator is sold, and a last day runs.",
   "start": {
     "newGame": {
       "seed": 20261010,
@@ -300,6 +300,14 @@
     {
       "op": "setMoney",
       "amount": 5000000
+    },
+    {
+      "op": "extendTransport",
+      "floor": 4,
+      "x": 180,
+      "end": "down",
+      "targetFloor": -20,
+      "reason": "Outside the buildable range."
     },
     {
       "op": "checkpoint",

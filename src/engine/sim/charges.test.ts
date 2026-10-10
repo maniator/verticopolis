@@ -114,7 +114,7 @@ describe("extendTransport", () => {
     const money = sim.money;
     const res = sim.extendTransport(lift.id, "up", 3);
     expect(res.ok).toBe(false);
-    expect(res.reason).toBe(sim.tower.validateTransport("elevatorStandard", 10, 1, 3).reason);
+    expect(res.reason).toBe("Transport shafts cannot overlap.");
     expect(res).toMatchObject({ delta: 0, bottom: 1, top: 2, added: 0 });
     expect(sim.money).toBe(money);
   });

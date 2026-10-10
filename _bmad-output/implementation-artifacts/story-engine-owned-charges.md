@@ -75,3 +75,8 @@ frontend relays engine commands and never copies the money rules.
 - [x] [Review][Patch] No Rust test of `sell_at` on a burning room [charges_tests.rs].
 - [x] [Review][Patch] The story did not name the TypeScript `sellAt` conflict with #903; the #346 row named a TS-only method for both engines.
 - Dismissed (8): a double relay through the mirror (the depth guard is verified, and the dual-run edits test runs in CI under `VC_REQUIRE_WASM=1`); `sellAt` now consulting `removalReason` for rooms (it only ever refuses floor and lobby tiles); `setCars` refusing for some other reason (it only refuses a clamp to the same count); the drag mark holding the old sim until the next drag; undo captures left open on early returns (the existing pattern, a no-op later); import order (lint is clean); syncing #346's issue body (informational); the two runners' check order (now the same).
+
+### Round 3 (confirming pass)
+
+- Edge Case Hunter and Acceptance Auditor: no findings.
+- [x] [Review][Patch] Nothing pinned the extend command's tower-refusal copy across engines [charges_tests.rs, engine-charges-classic.json]: both unit tests pin "Transport shafts cannot overlap.", and the scenario adds a drag below the basement refused with "Outside the buildable range." (a refusal moves nothing, so the lock is unchanged).

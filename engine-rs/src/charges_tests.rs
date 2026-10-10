@@ -142,7 +142,10 @@ fn extend_refuses_with_the_towers_reason_and_charges_nothing() {
     let money = sim.money;
     let r = sim.extend_transport(lift, ExtendEnd::Up, 3, None);
     assert!(!r.charge.ok);
-    assert!(r.charge.reason.is_some());
+    assert_eq!(
+        r.charge.reason.as_deref(),
+        Some("Transport shafts cannot overlap.")
+    );
     assert_eq!((r.charge.delta, r.bottom, r.top, r.added), (0.0, 1, 2, 0));
     assert_eq!(sim.money, money);
     assert_eq!(
