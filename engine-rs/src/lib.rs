@@ -12,6 +12,7 @@
 
 pub mod build;
 pub mod canonical;
+pub mod catalog;
 pub mod churn;
 pub mod clock;
 pub mod crowd;

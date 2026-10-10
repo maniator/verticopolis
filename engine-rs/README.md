@@ -23,6 +23,7 @@ must reproduce every pinned checkpoint hash (`expected.json`) byte for byte.
 | `sim.rs`, `load.rs` | `Simulation.ts`, `sim/stats.ts` (`recordMoney`, `emit`), `sim/serialization.ts`, `sim/coerce.ts`, `sim/deserializeGuards.ts`, `sim/founderStatus.ts`, `saveMigration.ts`, `migrations/*.ts`, `storage/vctowerContainer.ts` |
 | `scenario.rs`, `bin/conformance.rs`, `bin/dump.rs` | `src/tests/conformance/scenario.ts` |
 | `tdt/` (`byte_reader.rs`, `byte_writer.rs`, `format.rs`, `types.rs`, `tables.rs`, `parse.rs`, `part_merge.rs`, `transports.rs`, `tail.rs`, `stamp.rs`, `pacing.rs`, `import.rs`, `import_report.rs`, `export_tables.rs`, `export_gather.rs`, `export_parking.rs`, `encoder.rs`, `export.rs`, `export_report.rs`), `tdt/referee.rs`, `bin/tdt.rs` | `src/storage/tdt*.ts` (the 1994 `.TDT` importer and exporter; `timePacing.ts` for the frame clock), `src/tests/integration/tdtCases.integration.test.ts` |
+| `catalog.rs` | `catalog.ts`: the reference data a frontend reads (see The catalog) |
 | `wasm.rs` (feature `wasm`) | the JavaScript binding; `src/tests/conformance/wasmEngine.ts`, `src/dualrun/` and the `.TDT` differential test (`src/tests/conformance/tdtDifferential.ts`, inputs from `src/tests/fixtures/tdtDifferentialInputs.ts`) drive it |
 
 Functions keep the names and shape of their TypeScript originals so the two
@@ -92,7 +93,8 @@ digests, plus two free functions for the 1994 save format, `importTdt(bytes,
 filename)` (JSON text `{ save, warnings }`) and `exportTdt(saveJson)` (the
 file bytes). Structured values cross as JSON text; integers cross as 32-bit
 values (`i32`, and `u32` for the seed and the fire count), which the
-generated TypeScript sees as `number`.
+generated TypeScript sees as `number`. Beside the class, the free function
+`catalog(mode)` returns the catalog (below) as canonical JSON.
 Nothing in the binding simulates anything.
 
 ```sh
@@ -114,6 +116,38 @@ toolchain; CI builds the package and runs the suite in `engine-rs.yml` with
 `VC_REQUIRE_WASM=1`, under which a missing package fails the run. Rebuild
 the package after any change to the Rust source; the suite replays whatever
 was built last.
+
+## The catalog
+
+`catalog::catalog(mode)` is the reference data every frontend draws a build
+menu, a price label or a placement ghost from, read out of the engine's own
+tables and resolved for one mode so a frontend never applies a rule itself:
+the world geometry (lot width, floor range, ground floor, lobby interval),
+the economy constants a UI shows (starting money, the add-car cost and its
+refund, the per-floor transport cost, upkeep and bookings, the exterminator
+fees where the mode has them, whether bridging can be switched off, and the
+calendars the mode runs with the factor each applies to the monthly and
+quarterly figures, since a canon calendar charges a tenth of a monthly
+figure every three days), the
+pooled caps, and per facility kind its key, name, category, size, cost, star
+gate, population, attendance, flags, whether the mode can build it, build
+minutes, resale refund, build cap and pool, transport span, cars and car
+capacity, subtypes, rent configuration (the Classic ladder with No Rate or
+the Modern band, and when it is collected), daily income, spend per customer
+and service upkeep.
+A value a kind does not have is present as `null`, and the shape carries
+a `version` that moves when a field is added, renamed or removed.
+
+The WASM binding returns the same JSON from `catalog(mode)`, typed by
+`Catalog` in `src/engine/catalogTypes.ts` and read through `readCatalog` in
+`src/dualrun/catalog.ts`. The TypeScript engine builds the same catalog from
+its own tables (`catalogFor`), and `conformance/catalog-digests.json` pins
+each mode's canonical hash: the TypeScript run writes it
+(`catalog.integration.test.ts`, regenerated with the conformance switch),
+and a crate test, the referee binary and the WASM suite check against it,
+so the two engines cannot quote a different price or size while both exist (each also has a test that the prices it quotes are the ones its build and sell paths charge).
+Presentation (display copy beyond the name, icons, pixel sizes, colors)
+stays with the frontend.
 
 ## The switch
 

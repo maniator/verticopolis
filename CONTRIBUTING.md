@@ -92,6 +92,12 @@ Verticopolis has **two test tiers**:
     sees). An engine PR that adds a branch adds a scenario that reaches it;
     the Rust job's coverage step (`cargo llvm-cov`, line floor in
     `engine-rs.yml`) is how review checks that, and the floor only moves up.
+    The catalog every frontend reads (prices, sizes and build rules,
+    `src/engine/catalog.ts` and `engine-rs/src/catalog.rs`) is pinned the
+    same way by `conformance/catalog-digests.json`
+    (`catalog.integration.test.ts` writes it with the same regeneration
+    switch; a Rust test, the referee and the WASM suite check it), so a
+    changed price or size moves that digest in the PR that changes it.
     Forged-save handling is pinned the same way by
     `conformance/loader-cases.json` (`loaderCases.integration.test.ts` writes
     it, a Rust test replays it), and the `.TDT` codec by

@@ -181,6 +181,15 @@ export class Engine {
 }
 
 /**
+ * Every price, size and build rule a frontend shows, resolved for `mode`
+ * (`classic` or `modern`), as canonical JSON in the shape of the `Catalog`
+ * type (declared in `src/engine/catalogTypes.ts`, read through `readCatalog`
+ * in `src/dualrun/catalog.ts`; see `verticopolis_engine::catalog`). It needs
+ * no running game.
+ */
+export function catalog(mode: string): string;
+
+/**
  * `exportTdt(saveJson)`: the `.TDT` bytes for a serialized game (what
  * `serialize` returns). A tower the format cannot hold is a JavaScript error
  * with the player-readable message.
