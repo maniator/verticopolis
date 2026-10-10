@@ -3,6 +3,7 @@ import { Simulation } from "../../engine/Simulation";
 import { ECON, rentOf } from "../../engine/econConfig";
 import { FACILITIES, GRID, residentCount } from "../../engine/facilities";
 import type { GameMode, Unit } from "../../engine/types";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
 
 /**
  * Condo rule-sets: the Classic price/buy-back parity fixes (all towers) and the
@@ -17,16 +18,42 @@ function lay(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
   for (let x = 0; x < W; x++) sim.tower.place(kind, floor, x);
 }
 
-/** A single, served, not-yet-sold condo on floor 2 — ready to sell on a tick. */
+/** The Classic ladder's Average rung for a condo, the asking price a built
+ *  condo starts on (`sim.build` stamps it) and the price a loaded tower's
+ *  unpriced condo snaps to; the band default ($160,000) is the price only a
+ *  `tower.place`d condo on a never-loaded tower asks. */
+const CLASSIC_ASKING = 150_000;
+
+/** A single, served condo on floor 2, finished and open for sale.
+ *  Built through the command surface (`sim.build`), so the condo asks the
+ *  ladder's Average rung on every engine; {@link placedCondo} is the
+ *  `tower.place` shape for the unpriced default and the never-ticked
+ *  load-clamp tests. */
 function servedCondo(sim: Simulation): Unit {
   sim.money = 1e9;
   sim.star = 1; // no random fire/bomb events to perturb the run
   lay(sim, "lobby", 1);
   lay(sim, "floor", 2);
   sim.buildTransport("elevatorStandard", C, 1, 2);
+  expect(sim.build("condo", 2, C + 4).ok).toBe(true);
+  const condo = sim.tower.units.find((u) => u.kind === "condo" && u.floor === 2 && u.x === C + 4)!;
+  condo.satisfaction = 1;
+  // Tick past the build's completion time (a buyer may move in that hour).
+  for (let i = 0; i < 24 * 10 && condo.state === "construction"; i++) sim.tick(60);
+  return condo;
+}
+
+/** {@link servedCondo} placed on the tower directly: no asking price is
+ *  stamped, so the sale reads the band default. */
+function placedCondo(sim: Simulation): Unit {
+  sim.money = 1e9;
+  sim.star = 1;
+  lay(sim, "lobby", 1);
+  lay(sim, "floor", 2);
+  sim.buildTransport("elevatorStandard", C, 1, 2);
   const r = sim.tower.place("condo", 2, C + 4);
   const condo = sim.tower.units.find((u) => u.id === r.unitId)!;
-  condo.state = "empty"; // skip the construction phase
+  condo.state = "empty";
   condo.satisfaction = 1;
   return condo;
 }
@@ -60,8 +87,10 @@ describe("Classic mode condos", () => {
     expect(tickUntil(sim, () => condo.everOccupied)).toBe(true);
     expect(condo.residents).toBeUndefined();
     expect(residentCount(condo)).toBe(3);
-    // Sold at the flat asking price — the log names no household.
-    expect(sim.log.some((e) => /sold for \$160,000\.$/.test(e.text))).toBe(true);
+    // Sold at the flat asking price (the rung the build stamped); the log
+    // names no household.
+    expect(condo.rent).toBe(CLASSIC_ASKING);
+    expect(sim.log.some((e) => /sold for \$150,000\.$/.test(e.text))).toBe(true);
     expect(sim.log.some((e) => /household of/.test(e.text))).toBe(false);
   });
 
@@ -78,13 +107,13 @@ describe("No-Rate units stay off-market (no move-in, no sale, $0)", () => {
   it("an empty No-Rate condo never sells and earns nothing over a long run", () => {
     const sim = Simulation.newGame(3, "classic");
     const condo = servedCondo(sim);
-    condo.noRate = true; // off the market (imported class 4)
+    expect(sim.setNoRate(condo.id)).toBe(true); // off the market (imported class 4)
     const before = sim.money;
     // Far past the ~40 in-game hours a normal served condo takes to sell.
     for (let i = 0; i < 24 * 80; i++) sim.tick(60);
     expect(condo.everOccupied).toBe(false); // no buyer seated at $0
     expect(condo.state).toBe("empty");
-    expect(condo.rent).toBeUndefined(); // no $0 sale stamped a magic rent
+    expect(condo.rent).toBe(CLASSIC_ASKING); // the stamped rung held; no $0 sale wrote a magic rent
     expect(rentOf(condo)).toBe(0);
     expect(sim.log.some((e) => /sold/.test(e.text))).toBe(false); // never sold
     expect(sim.money).toBeLessThanOrEqual(before); // gained no income (only overhead)
@@ -167,7 +196,7 @@ describe("Buy-back on an evicted owner (Classic canon, all towers)", () => {
     expect(sim.log.some((e) => /owner left .*bought it back for/.test(e.text))).toBe(true);
   });
 
-  it("re-lists a bought-back condo in the current band, dropping a legacy out-of-band price", () => {
+  itTypeScriptOnly("writes condo.rent = 240_000 after the sale, when the crowd exists: no re-host runs then, so the write never reaches the engine and the next merge (syncStructure) overwrites the rent")("re-lists a bought-back condo in the current band, dropping a legacy out-of-band price", () => {
     const sim = Simulation.newGame(3, "classic");
     const condo = servedCondo(sim);
     tickUntil(sim, () => condo.everOccupied);
@@ -385,9 +414,10 @@ describe("Save hardening at the trust boundary", () => {
     expect(rc.residents).toBeUndefined(); // no stale household leaks into the census/UI
   });
 
-  it("stamps the asking price on sale so buy-back survives a later default change", () => {
+  itTypeScriptOnly("asserts the unpriced band default of a tower.placed condo on a never-loaded tower; the host loads, and the load snaps it to the ladder")("stamps the asking price on sale so buy-back survives a later default change", () => {
     const sim = Simulation.newGame(3, "classic");
-    const condo = servedCondo(sim);
+    const condo = placedCondo(sim);
+    expect(condo.rent).toBeUndefined(); // placed, so unpriced until the sale
     tickUntil(sim, () => condo.everOccupied);
     // The sale records its asking price on the unit, so rentOf no longer depends
     // on the kind default (which a future build could move).
@@ -426,7 +456,7 @@ describe("Save hardening at the trust boundary", () => {
 
   it("snaps a Classic condo's legacy out-of-band price onto the ladder, sold or not", () => {
     const sim = Simulation.newGame(3, "classic");
-    const a = servedCondo(sim);
+    const a = placedCondo(sim);
     const b = sim.tower.place("condo", 2, C + 24);
     const sold = sim.tower.units.find((u) => u.id === b.unitId)!;
     // a: unsold, priced at the OLD max ($240k, above the new $200k ceiling).
@@ -449,7 +479,7 @@ describe("Save hardening at the trust boundary", () => {
 
   it("Modern load clamps an unsold condo into the band and keeps a sold price untouched", () => {
     const sim = Simulation.newGame(3, "modern");
-    const a = servedCondo(sim);
+    const a = placedCondo(sim);
     const b = sim.tower.place("condo", 2, C + 24);
     const sold = sim.tower.units.find((u) => u.id === b.unitId)!;
     // a: unsold, priced at the OLD max ($240k, above the new $200k ceiling).

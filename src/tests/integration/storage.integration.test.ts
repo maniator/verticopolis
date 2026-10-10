@@ -6,6 +6,7 @@ import { SaveGame } from "../../storage/SaveGame";
 import { toBase64, deflate } from "../../storage/saveCompression";
 import { FACILITIES, GRID } from "../../engine/facilities";
 import { UNIT_CAP } from "../../engine/sim/deserializeGuards";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
 
 describe("SaveGame", () => {
   beforeEach(() => localStorage.clear());
@@ -24,7 +25,7 @@ describe("SaveGame", () => {
     return sim;
   }
 
-  it("persists the pending VIP inspection day across save/load", () => {
+  itTypeScriptOnly("writes vipVisitDay on the instance after the ticks and reads serialize(), which is the engine's save while hosted")("persists the pending VIP inspection day across save/load", () => {
     const sim = sampleGame();
     // Simulate a Wedding Hall having scheduled the VIP a few days out.
     (sim as unknown as { vipVisitDay: number }).vipVisitDay = sim.clock.day + 3;
@@ -33,7 +34,7 @@ describe("SaveGame", () => {
     expect((loaded as unknown as { vipVisitDay: number }).vipVisitDay).toBe(expected);
   });
 
-  it("persists the VIP visit counter, hardens forged values, and adopts visits for legacy saves", () => {
+  itTypeScriptOnly("writes vipVisits and vipFavorable on the instance after the ticks and reads serialize(), which is the engine's save while hosted")("persists the VIP visit counter, hardens forged values, and adopts visits for legacy saves", () => {
     const sim = sampleGame();
     sim.vipVisits = 3;
     sim.vipFavorable = true;
@@ -76,7 +77,7 @@ describe("SaveGame", () => {
     expect(Number.isFinite(u.occupants)).toBe(true);
   });
 
-  it("coerces forged top-level scalars (star, money, clock) from a tampered save to sane bounded values", () => {
+  itTypeScriptOnly("writes star on the instance after the ticks and reads serialize(), which is the engine's save while hosted")("coerces forged top-level scalars (star, money, clock) from a tampered save to sane bounded values", () => {
     const sim = sampleGame();
     sim.star = 3;
     sim.money = 1_234_567;
@@ -962,7 +963,7 @@ describe("SaveGame", () => {
     expect(loaded.serialize().version).toBe(SAVE_VERSION);
   });
 
-  it("migrates a v3 save up the ladder (venue-census bump): re-stamps version, tower intact", () => {
+  itTypeScriptOnly("compares the units JSON bytes of the engine's save (the hosted serialize()) with the TypeScript serializer's, which orders a unit's keys differently")("migrates a v3 save up the ladder (venue-census bump): re-stamps version, tower intact", () => {
     // v3 -> v4 is additive/no-op data-wise: the meal-customer census reads a
     // transient overlay that is never serialized, so a v3 save is already valid
     // v4 data. The migration only re-stamps the version; the tower round-trips
@@ -1081,7 +1082,7 @@ describe("SaveGame", () => {
       expect((await importWith(sampleGame(), "2.4.1")).founder).toBe(false);
     });
 
-    it("keeps Founder on an imported 2.0+ save that carries the earned flag", async () => {
+    itTypeScriptOnly("writes founder on the instance after the ticks and reads serialize(), which is the engine's save while hosted")("keeps Founder on an imported 2.0+ save that carries the earned flag", async () => {
       const sim = sampleGame();
       sim.founder = true; // a pre-2.0 tower re-saved in 2.0: stamp is 2.x but the flag persists
       expect((await importWith(sim, "2.4.1")).founder).toBe(true);

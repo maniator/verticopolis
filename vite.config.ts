@@ -128,6 +128,43 @@ function sharedHead(): Plugin {
   };
 }
 
+/** The vitest projects that run the suites on the WASM engine; see the
+ *  `projects` list below. Empty unless `VC_REQUIRE_WASM=1`. */
+function wasmParityProjects() {
+  if (process.env.VC_REQUIRE_WASM !== "1") return [];
+  const typescriptSide = [
+    "**/conformance.integration.test.ts",
+    "**/conformanceWasm.integration.test.ts",
+    "**/dualRunDay.integration.test.ts",
+    "**/dualRunEdits.integration.test.ts",
+    "**/loaderCases.integration.test.ts",
+    "**/wasmHost.integration.test.ts",
+  ];
+  const setupFiles = ["src/tests/parity/wasmHostSetup.ts"];
+  return [
+    {
+      extends: true,
+      test: {
+        name: "unitWasm",
+        include: ["src/**/*.test.ts"],
+        // The mirror's and the dual run's own unit tests attach a relay
+        // themselves.
+        exclude: [...configDefaults.exclude, "**/*.integration.test.ts", "**/dualrun/mirror.test.ts", "**/dualrun/dualRun.test.ts"],
+        setupFiles,
+      },
+    },
+    {
+      extends: true,
+      test: {
+        name: "integrationWasm",
+        include: ["src/**/*.integration.test.ts"],
+        exclude: [...configDefaults.exclude, ...typescriptSide],
+        setupFiles,
+      },
+    },
+  ];
+}
+
 export default defineConfig({
   root: "src",
   base: "./",
@@ -355,6 +392,17 @@ export default defineConfig({
           include: ["src/**/*.integration.test.ts"],
         },
       },
+      // The parity projects (story-engine-test-parity, #878): the same two
+      // tiers, with every `Simulation` a test ticks hosted on the WASM engine
+      // by the setup file. They exist only under `VC_REQUIRE_WASM=1` (the
+      // switch `npm run test:wasm` sets), so `npm test` and the coverage
+      // gate run the TypeScript tiers exactly as before; `npm run
+      // test:wasm:parity` runs them. The suites that attach a mirror or a
+      // host themselves (the dual run, the host fidelity gate) and the
+      // TypeScript side of the referee (the scenario and loader-case lock
+      // writers, whose engine twins are `conformanceWasm` and the Rust
+      // replay) are left out; see the story's test-mapping table.
+      ...wasmParityProjects(),
     ],
     coverage: {
       provider: "v8",

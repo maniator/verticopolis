@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
+import type { Person } from "../../engine/crowd/person";
 import { canonicalJson } from "../../engine/canonicalJson";
 import { stateView } from "../../engine/conformanceView";
 import { attachWasmHost } from "../../wasmhost/wasmHost";
@@ -30,21 +31,40 @@ function ownStateView(sim: Simulation): string {
   }
 }
 
-function peopleOf(sim: Simulation): unknown[] {
-  return sim.crowd.people.map((p) => ({ id: p.id, seed: p.seed, state: p.state, floor: p.floor, x: p.x, fy: p.fy, staff: p.staff ?? false }));
+/** The person fields the frame view carries: position and state, and the
+ *  routing the suites read (#878). Both sides are projected through the
+ *  same shape, with the optional flags read as false when absent. */
+type FramePerson = Pick<Person, "id" | "seed" | "state" | "floor" | "x" | "fy" | "wait" | "originFloor" | "originUnitId" | "venueUnitId" | "mealVenueId" | "routine" | "dwellSecondsLeft" | "floors" | "shafts"> & {
+  staff: boolean;
+  countedHotelGuest: boolean;
+  returning: boolean;
+};
+
+function framePerson(p: Person): FramePerson {
+  return {
+    id: p.id, seed: p.seed, state: p.state, floor: p.floor, x: p.x, fy: p.fy, wait: p.wait, staff: p.staff ?? false,
+    originFloor: p.originFloor, originUnitId: p.originUnitId, venueUnitId: p.venueUnitId, mealVenueId: p.mealVenueId,
+    countedHotelGuest: p.countedHotelGuest ?? false, routine: p.routine, returning: p.returning ?? false, dwellSecondsLeft: p.dwellSecondsLeft,
+    floors: p.floors, shafts: p.shafts,
+  };
 }
 
-function enginePeople(json: string): unknown[] {
-  const view = JSON.parse(json) as { people: { id: number; seed: number; state: string; floor: number; x: number; fy: number; staff?: boolean }[] };
-  return view.people.map((p) => ({ id: p.id, seed: p.seed, state: p.state, floor: p.floor, x: p.x, fy: p.fy, staff: p.staff ?? false }));
+function peopleOf(sim: Simulation): FramePerson[] {
+  return sim.crowd.people.map(framePerson);
 }
 
-function day(sim: Simulation, speed: number): void {
+function enginePeople(json: string): FramePerson[] {
+  const view = JSON.parse(json) as { people: Person[] };
+  return view.people.map(framePerson);
+}
+
+function day(sim: Simulation, speed: number, expectRouted = true): void {
   const host = attachWasmHost(sim, wasm());
   const driver = new FrameDriver(sim, speed);
   let lastHour = -1;
   let lastLogSeq = sim.logSeq;
   let compared = 0;
+  let routed = false;
   const from = sim.clock.minutes;
   while (sim.clock.minutes - from < DAY) {
     driver.frame();
@@ -60,10 +80,14 @@ function day(sim: Simulation, speed: number): void {
       host.syncStructure();
       expect(ownStateView(sim), `hour ${hour}`).toBe(host.engine.stateView());
       expect(peopleOf(sim), `hour ${hour} people`).toEqual(enginePeople(host.engine.crowdView()));
+      if (sim.crowd.people.some((p) => p.originUnitId !== undefined || p.venueUnitId !== undefined)) routed = true;
       compared++;
     }
   }
   expect(compared).toBeGreaterThanOrEqual(24);
+  // The day's crowd held round-trippers, so the routing fields were compared
+  // on people that carry them as well as on commuters that carry none.
+  if (expectRouted) expect(routed, "a round-tripper carrying its origin or venue unit").toBe(true);
   expect(host.frames).toBeGreaterThan(0);
   expect(host.merges).toBeGreaterThanOrEqual(24);
   host.detach();
@@ -74,8 +98,8 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     it(`${fixture} for a day at the fastest speed`, () => day(loadFixture(fixture), 3), 120_000);
   }
   it("a new game of each mode", () => {
-    day(Simulation.newGame(11, "classic"), 3);
-    day(Simulation.newGame(12, "modern"), 3);
+    day(Simulation.newGame(11, "classic"), 3, false); // an empty lot: nobody to route
+    day(Simulation.newGame(12, "modern"), 3, false);
   }, 120_000);
 
   it("relays the host's edits and answers them as the TypeScript engine does", () => {
