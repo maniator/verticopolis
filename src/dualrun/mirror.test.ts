@@ -90,6 +90,35 @@ describe("attachMirror", () => {
     expect(u.label).toBe("Desk");
   });
 
+  it("reports the priced editor commands once each, with no money write after them", () => {
+    const sim = Simulation.newGame(4, "classic");
+    sim.money = 1e9;
+    const { cmds } = record(sim);
+    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    for (let x = 170; x < 200; x++) expect(sim.build("floor", 2, x).ok).toBe(true);
+    expect(sim.build("office", 2, 180).ok).toBe(true);
+    expect(sim.buildTransport("elevatorStandard", 190, 1, 2).ok).toBe(true);
+    const u = sim.tower.unitAt(2, 180)!;
+    const t = sim.tower.transportAt(1, 190)!;
+    cmds.length = 0;
+    const hwm = { bottom: 1, top: 2 };
+    expect(sim.addCar(t.id).ok).toBe(true);
+    expect(sim.removeCar(t.id).ok).toBe(true);
+    expect(sim.extendTransport(t.id, "up", 3, hwm).ok).toBe(true);
+    hwm.top = 3; // the drag moves its mark after the call; the command keeps the old one
+    expect(sim.extendTransport(t.id, "up", 3).ok).toBe(false); // already there: refused, still reported
+    expect(sim.sell(u.id).ok).toBe(true);
+    expect(sim.sell(t.id).ok).toBe(true);
+    expect(cmds).toEqual([
+      { op: "addCar", id: t.id },
+      { op: "removeCar", id: t.id },
+      { op: "extendTransport", id: t.id, end: "up", target: 3, hwm: { bottom: 1, top: 2 } },
+      { op: "extendTransport", id: t.id, end: "up", target: 3, hwm: null },
+      { op: "sell", id: u.id },
+      { op: "sell", id: t.id },
+    ]);
+  });
+
   it("detaches cleanly: the instance is the plain object again and reports nothing", () => {
     const sim = Simulation.newGame(1, "classic");
     const { cmds, detach } = record(sim);

@@ -1,6 +1,5 @@
 import type { Simulation } from "../engine/Simulation";
 import { FACILITIES, facilityFloors } from "../engine/facilities";
-import { resaleRefund } from "../engine/econConfig";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
@@ -198,16 +197,21 @@ export class BuildActions {
   }
 
   /**
-   * Shared player-removal gauntlet: burning and load-bearing units refuse —
+   * Shared player-removal gauntlet: burning and load-bearing units refuse,
    * with an error toast unless `quiet` (drag steps stay silent, like build
-   * drags). Removes with the usual refund and returns true on success.
+   * drags). The engine's `sell` removes the unit and pays the refund (zero
+   * for a gutted shell); returns true on success.
    */
   tryRemoveUnit(u: Unit, verb: "sell" | "bulldoze", quiet = false): boolean {
     const sim = this.deps.getSim();
-    const blocked =
-      u.state === "fire"
-        ? `You can't ${verb} a burning unit. Call fire rescue or let it burn out.`
-        : sim.tower.removalReason(u.id);
+    // The burning refusal is worded here with the player's own verb; the
+    // engine refuses a burning unit too, and a load-bearing one with its reason.
+    let blocked: string | undefined;
+    if (u.state === "fire") blocked = `You can't ${verb} a burning unit. Call fire rescue or let it burn out.`;
+    else {
+      const res = sim.sell(u.id);
+      if (!res.ok) blocked = res.reason ?? "That can't be removed.";
+    }
     if (blocked) {
       if (!quiet) {
         this.deps.audio.sfx("error");
@@ -215,9 +219,6 @@ export class BuildActions {
       }
       return false;
     }
-    sim.tower.removeUnit(u.id);
-    // A gutted shell has no salvage value; everything else refunds half.
-    sim.money += u.state === "gutted" ? 0 : resaleRefund(u.kind);
     // A real player removal (the sole choke point for the bulldoze tool and the
     // editor Sell); `verb` is the sell-vs-bulldoze detail. Per-action: a drag
     // sweep is many genuine removals, each its own demolish.
@@ -229,19 +230,7 @@ export class BuildActions {
    *  editor's Sell and the bulldozer, so the payout can't drift. `verb` is the
    *  sell-vs-bulldoze telemetry detail (the caller's gesture). */
   removeTransportWithRefund(t: Transport, verb: "sell" | "bulldoze"): void {
-    const sim = this.deps.getSim();
-    sim.tower.removeTransport(t.id);
-    sim.money += resaleRefund(t.kind);
-    trackEconomyAction("demolish", verb);
-  }
-
-  /** Charge guard for editor actions: false (with error sfx + toast) if the
-   *  player can't pay. */
-  canAfford(cost: number): boolean {
-    if (this.deps.getSim().money >= cost) return true;
-    this.deps.audio.sfx("error");
-    this.deps.ui.toast("Not enough money.", "bad");
-    return false;
+    if (this.deps.getSim().sell(t.id).ok) trackEconomyAction("demolish", verb);
   }
 
   /** Bulldoze whatever Excalibur reported under the pointer, with a refund.

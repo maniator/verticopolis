@@ -39,6 +39,18 @@ fn build_result(r: crate::build::BuildResult) -> String {
     outcome(r.ok, r.reason.as_deref())
 }
 
+/// A priced command's `{ ok, reason?, delta }`, plus `added` for an extend.
+fn charge_json(r: crate::charges::ChargeResult, extend: bool) -> String {
+    let mut v = serde_json::json!({ "ok": r.ok, "delta": r.delta });
+    if let Some(reason) = r.reason {
+        v["reason"] = Value::String(reason);
+    }
+    if extend {
+        v["added"] = r.added.into();
+    }
+    v.to_string()
+}
+
 /// `{ kind, cost, message }` for the choice the engine is waiting on.
 fn pending_json(kind: &str, cost: f64, message: &str) -> String {
     serde_json::json!({ "kind": kind, "cost": cost, "message": message }).to_string()
@@ -259,6 +271,47 @@ impl Engine {
     #[wasm_bindgen(js_name = sellAt)]
     pub fn sell_at(&mut self, floor: i32, x: i32) -> bool {
         self.sim.sell_at(floor.into(), x.into())
+    }
+
+    /// `sell(id)`: JSON `{ ok, reason?, delta }`.
+    pub fn sell(&mut self, id: i32) -> String {
+        charge_json(self.sim.sell(id.into()), false)
+    }
+
+    /// `addCar(id)`: JSON `{ ok, reason?, delta }`.
+    #[wasm_bindgen(js_name = addCar)]
+    pub fn add_car(&mut self, id: i32) -> String {
+        charge_json(self.sim.add_car(id.into()), false)
+    }
+
+    /// `removeCar(id)`: JSON `{ ok, reason?, delta }`.
+    #[wasm_bindgen(js_name = removeCar)]
+    pub fn remove_car(&mut self, id: i32) -> String {
+        charge_json(self.sim.remove_car(id.into()), false)
+    }
+
+    /// `extendTransport(id, end, target, hwm)` with the mark as two optional
+    /// floors (both or neither): JSON `{ ok, reason?, delta, added }`.
+    #[wasm_bindgen(js_name = extendTransport)]
+    pub fn extend_transport(
+        &mut self,
+        id: i32,
+        end: &str,
+        target: i32,
+        hwm_bottom: Option<i32>,
+        hwm_top: Option<i32>,
+    ) -> Result<String, JsError> {
+        let end = crate::charges::End::parse(end)
+            .ok_or_else(|| err(format!("end must be up or down, got {end}")))?;
+        let hwm = match (hwm_bottom, hwm_top) {
+            (Some(b), Some(t)) => Some((b.into(), t.into())),
+            (None, None) => None,
+            _ => return Err(err("hwm needs both a bottom and a top")),
+        };
+        let r = self
+            .sim
+            .extend_transport(id.into(), end, target.into(), hwm);
+        Ok(charge_json(r, true))
     }
 
     /// The unit covering a tile, serialized as the save would, or null.

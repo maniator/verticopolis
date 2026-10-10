@@ -13,7 +13,7 @@ import {
   residentCount,
 } from "../../engine/facilities";
 import { householdPrice, ladderRungFor } from "../../engine/gameRules";
-import { rentConfig, rentOf, resaleRefund } from "../../engine/econConfig";
+import { rentConfig, rentOf, GUTTED_RESALE_REFUND, resaleRefund } from "../../engine/econConfig";
 import { isRentalKind } from "../../engine/residentialRentals";
 import { facilityDiagnostics, hasAccessDiagnostic, transportDiagnostics } from "../../game/facilityDiagnostics";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
@@ -132,7 +132,7 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
     rows.push(kv("Now showing", sim.isShowingBlockbuster(u.id) ? "Blockbuster" : "Feature", "showing"));
   }
   if (u.state === "gutted") {
-    rows.push(kv("Scrap value", "$0"));
+    rows.push(kv("Scrap value", `$${GUTTED_RESALE_REFUND.toLocaleString()}`));
     rows.push(kv("⚠", "Gutted: bulldoze and rebuild."));
   } else {
     rows.push(kv("Resale value", `$${resaleRefund(f.kind).toLocaleString()}`));

@@ -47,6 +47,10 @@ export class ShadowEngine {
       case "build": this.live().build(cmd.kind, cmd.floor, cmd.x); return null;
       case "buildTransport": this.live().buildTransport(cmd.kind, cmd.x, cmd.bottom, cmd.top); return null;
       case "sellAt": this.live().sellAt(cmd.floor, cmd.x); return null;
+      case "sell": this.live().sell(cmd.id); return null;
+      case "addCar": this.live().addCar(cmd.id); return null;
+      case "removeCar": this.live().removeCar(cmd.id); return null;
+      case "extendTransport": this.live().extendTransport(cmd.id, cmd.end, cmd.target, cmd.hwm?.bottom ?? null, cmd.hwm?.top ?? null); return null;
       case "removeUnit": this.live().removeUnit(cmd.id); return null;
       case "removeTransport": this.live().removeTransport(cmd.id); return null;
       case "resizeTransport": this.live().resizeTransport(cmd.id, cmd.bottom, cmd.top); return null;

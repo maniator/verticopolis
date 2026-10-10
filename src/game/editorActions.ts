@@ -1,6 +1,5 @@
 import type { Simulation } from "../engine/Simulation";
 import { FACILITIES, isElevatorKind, isHotelKind, maxCarsFor } from "../engine/facilities";
-import { ECON, carResaleRefund, extendBill } from "../engine/econConfig";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
@@ -25,7 +24,7 @@ export interface EditorActionsDeps {
   ui: Pick<UI, "toast" | "showBatchPricingDialog" | "showElevatorScheduleDialog">;
   audio: Pick<AudioEngine, "sfx">;
   /** Sell/refund/charge guards shared with the bulldozer. */
-  build: Pick<BuildActions, "tryRemoveUnit" | "removeTransportWithRefund" | "canAfford">;
+  build: Pick<BuildActions, "tryRemoveUnit" | "removeTransportWithRefund">;
   /** Current selection (id-based; the entity may have been removed). */
   selected(): { type: "unit" | "transport"; id: number } | null;
   selectedUnit(): Unit | undefined;
@@ -178,30 +177,22 @@ export class EditorActions {
       this.extendHwm = { id: t.id, top: t.top, bottom: t.bottom };
       this.deps.captureUndo("Extend");
     }
-    // Bill only floors past the gesture's high-water mark, clamped to what the
-    // player can afford — a fast drag grows as far as the budget allows (matching
-    // a slow drag), and a broke drag simply stops growing (no per-frame toast).
-    const { nb, nt, added } = extendBill(
-      { bottom: t.bottom, top: t.top },
-      this.extendHwm,
-      end,
-      targetFloor,
-      sim.money,
-      ECON.transportFloorCost,
-    );
-    if (nb === t.bottom && nt === t.top) return; // nothing changed this step
-
-    const res = sim.tower.resizeTransport(t.id, nb, nt);
-    if (res.ok) {
-      sim.money -= added * ECON.transportFloorCost;
-      if (added > 0) trackEconomyActionOnce("capacity_tune"); // paid shaft extend (latched; no count)
-      this.extendHwm.top = Math.max(this.extendHwm.top, nt);
-      this.extendHwm.bottom = Math.min(this.extendHwm.bottom, nb);
-      this.deps.audio.sfx(added > 0 ? "build" : "click");
-      this.deps.refreshEditor();
+    // The engine bills only floors past the gesture's high-water mark, clamped
+    // to what the player can afford: a fast drag grows as far as the budget
+    // allows (matching a slow drag), and a broke drag simply stops growing.
+    const res = sim.extendTransport(t.id, end, targetFloor, this.extendHwm);
+    // A refused step (nothing to change, out of money, cap reached, no
+    // structure, another shaft in the way) is silent so a drag doesn't spam
+    // toasts; the shaft simply stops growing.
+    if (!res.ok) return;
+    const now = sim.tower.getTransport(t.id);
+    if (now) {
+      this.extendHwm.top = Math.max(this.extendHwm.top, now.top);
+      this.extendHwm.bottom = Math.min(this.extendHwm.bottom, now.bottom);
     }
-    // A blocked step (cap reached, no structure, another shaft in the way) is
-    // silent so a drag doesn't spam toasts; the shaft simply stops growing.
+    if (res.added > 0) trackEconomyActionOnce("capacity_tune"); // paid shaft extend (latched; no count)
+    this.deps.audio.sfx(res.added > 0 ? "build" : "click");
+    this.deps.refreshEditor();
   }
 
   /** Open the batch-pricing dialog pre-scoped to `kind`, wired to the engine's
@@ -337,17 +328,21 @@ export class EditorActions {
         // Cap check first: at max cars the button is disabled anyway, but a
         // money toast here would blame the wrong constraint.
         if (t.cars >= maxCarsFor(t.kind)) return;
-        if (!this.deps.build.canAfford(ECON.addCarCost)) return;
-        if (sim.tower.setCars(t.id, t.cars + 1)) {
-          sim.money -= ECON.addCarCost;
-          trackEconomyActionOnce("capacity_tune"); // adjusted transport capacity (latched; no count)
+        // The engine charges the car and refuses when the player is short.
+        const res = sim.addCar(t.id);
+        if (!res.ok) {
+          if (res.reason) {
+            this.deps.audio.sfx("error");
+            this.deps.ui.toast(res.reason, "bad");
+          }
+          return;
         }
+        trackEconomyActionOnce("capacity_tune"); // adjusted transport capacity (latched; no count)
         this.deps.audio.sfx("build");
         this.deps.refreshEditor();
       } else if (action === "removecar") {
-        // A removed car is a sale, so it pays out like one (half back).
-        if (sim.tower.setCars(t.id, t.cars - 1)) {
-          sim.money += carResaleRefund();
+        // A removed car is a sale, so the engine pays it out like one (half back).
+        if (sim.removeCar(t.id).ok) {
           trackEconomyActionOnce("capacity_tune"); // adjusted transport capacity (latched; no count)
         }
         this.deps.audio.sfx("click");
@@ -357,13 +352,10 @@ export class EditorActions {
         // stops/express/allstops card actions live inside this dialog now.
         this.openSchedule();
       } else if (action === "extendUp" || action === "extendDown") {
-        const nb = action === "extendDown" ? t.bottom - 1 : t.bottom;
-        const nt = action === "extendUp" ? t.top + 1 : t.top;
-        const cost = ECON.transportFloorCost;
-        if (!this.deps.build.canAfford(cost)) return;
-        const res = sim.tower.resizeTransport(t.id, nb, nt);
+        // One floor at the engine's per-floor price; it refuses when short.
+        const res =
+          action === "extendUp" ? sim.extendTransport(t.id, "up", t.top + 1) : sim.extendTransport(t.id, "down", t.bottom - 1);
         if (res.ok) {
-          sim.money -= cost;
           trackEconomyActionOnce("capacity_tune"); // extended a shaft (latched; no count)
           this.deps.audio.sfx("build");
         } else if (res.reason) {

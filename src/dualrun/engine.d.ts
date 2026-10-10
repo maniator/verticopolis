@@ -11,6 +11,10 @@ export class Engine {
     free(): void;
     [Symbol.dispose](): void;
     /**
+     * `addCar(id)`: JSON `{ ok, reason?, delta }`.
+     */
+    addCar(id: number): string;
+    /**
      * `adjustRent(id, dir)`: the new rent, or null when nothing moved.
      */
     adjustRent(id: number, dir: number): number | undefined;
@@ -57,6 +61,11 @@ export class Engine {
      */
     emit(text: string, kind: string): void;
     evaluateStar(): void;
+    /**
+     * `extendTransport(id, end, target, hwm)` with the mark as two optional
+     * floors (both or neither): JSON `{ ok, reason?, delta, added }`.
+     */
+    extendTransport(id: number, end: string, target: number, hwm_bottom?: number | null, hwm_top?: number | null): string;
     /**
      * The number of units on fire.
      */
@@ -107,6 +116,10 @@ export class Engine {
      */
     priceUnit(id: number, target: number): number | undefined;
     /**
+     * `removeCar(id)`: JSON `{ ok, reason?, delta }`.
+     */
+    removeCar(id: number): string;
+    /**
      * `tower.removeTransport(id)`: whether a shaft went.
      */
     removeTransport(id: number): boolean;
@@ -128,6 +141,10 @@ export class Engine {
      */
     resolveChoice(accept: boolean): void;
     sellAt(floor: number, x: number): boolean;
+    /**
+     * `sell(id)`: JSON `{ ok, reason?, delta }`.
+     */
+    sell(id: number): string;
     /**
      * `serialize()` as JSON text.
      */

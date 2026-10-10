@@ -27,6 +27,7 @@ import * as gripe from "./sim/gripe";
 import * as churn from "./sim/churn";
 import * as congestion from "./sim/congestion";
 import * as build from "./sim/build";
+import * as charges from "./sim/charges";
 import * as star from "./sim/star";
 import * as services from "./sim/services";
 import * as events from "./sim/events";
@@ -230,20 +231,19 @@ export class Simulation implements SimContext {
   emit(text: string, kind: LogEntry["kind"] = "info"): void { stats.emit(this, text, kind); }
 
   // ---- Build / sell ------------------------------------------------------
-
   isUnlocked(kind: FacilityKind): boolean { return build.isUnlocked(this, kind); }
-
   isRoomKind(kind: FacilityKind): boolean { return build.isRoomKind(this, kind); }
-
   toggleAutoBridge(): boolean { return build.toggleAutoBridge(this); }
-
   canBuild(kind: FacilityKind, floor: number, x: number): { ok: boolean; reason?: string; cost: number } { return build.canBuild(this, kind, floor, x); }
-
   build(kind: FacilityKind, floor: number, x: number): { ok: boolean; reason?: string } { return build.build(this, kind, floor, x); }
-
   buildTransport( kind: FacilityKind, x: number, bottom: number, top: number, ): { ok: boolean; reason?: string } { return build.buildTransport(this, kind, x, bottom, top); }
-
   sellAt(floor: number, x: number): boolean { return build.sellAt(this, floor, x); }
+
+  // Priced editor commands (#914, sim/charges.ts): sell by id, cars, a billed extend.
+  sell(id: number): charges.ChargeResult { return charges.sell(this, id); }
+  addCar(id: number): charges.ChargeResult { return charges.addCar(this, id); }
+  removeCar(id: number): charges.ChargeResult { return charges.removeCar(this, id); }
+  extendTransport(id: number, end: "up" | "down", targetFloor: number, hwm?: { bottom: number; top: number }): charges.ExtendResult { return charges.extendTransport(this, id, end, targetFloor, hwm); }
 
   // ---- Main tick ---------------------------------------------------------
 

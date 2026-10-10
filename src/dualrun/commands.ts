@@ -19,6 +19,10 @@ export type ShadowCommand =
   | { op: "build"; kind: FacilityKind; floor: number; x: number }
   | { op: "buildTransport"; kind: FacilityKind; x: number; bottom: number; top: number }
   | { op: "sellAt"; floor: number; x: number }
+  | { op: "sell"; id: number }
+  | { op: "addCar"; id: number }
+  | { op: "removeCar"; id: number }
+  | { op: "extendTransport"; id: number; end: "up" | "down"; target: number; hwm: { bottom: number; top: number } | null }
   | { op: "removeUnit"; id: number }
   | { op: "removeTransport"; id: number }
   | { op: "resizeTransport"; id: number; bottom: number; top: number }

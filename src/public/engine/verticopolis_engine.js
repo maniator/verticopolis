@@ -23,6 +23,23 @@ export class Engine {
         wasm.__wbg_engine_free(ptr, 0);
     }
     /**
+     * `addCar(id)`: JSON `{ ok, reason?, delta }`.
+     * @param {number} id
+     * @returns {string}
+     */
+    addCar(id) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.engine_addCar(this.__wbg_ptr, id);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
      * `adjustRent(id, dir)`: the new rent, or null when nothing moved.
      * @param {number} id
      * @param {number} dir
@@ -225,6 +242,36 @@ export class Engine {
         wasm.engine_evaluateStar(this.__wbg_ptr);
     }
     /**
+     * `extendTransport(id, end, target, hwm)` with the mark as two optional
+     * floors (both or neither): JSON `{ ok, reason?, delta, added }`.
+     * @param {number} id
+     * @param {string} end
+     * @param {number} target
+     * @param {number | null} [hwm_bottom]
+     * @param {number | null} [hwm_top]
+     * @returns {string}
+     */
+    extendTransport(id, end, target, hwm_bottom, hwm_top) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(end, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.engine_extendTransport(this.__wbg_ptr, id, ptr0, len0, target, isLikeNone(hwm_bottom) ? Number.MAX_SAFE_INTEGER : (hwm_bottom) >> 0, isLikeNone(hwm_top) ? Number.MAX_SAFE_INTEGER : (hwm_top) >> 0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
      * The number of units on fire.
      * @returns {number}
      */
@@ -373,6 +420,23 @@ export class Engine {
         return ret[0] === 0 ? undefined : ret[1];
     }
     /**
+     * `removeCar(id)`: JSON `{ ok, reason?, delta }`.
+     * @param {number} id
+     * @returns {string}
+     */
+    removeCar(id) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.engine_removeCar(this.__wbg_ptr, id);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
      * `tower.removeTransport(id)`: whether a shaft went.
      * @param {number} id
      * @returns {boolean}
@@ -439,6 +503,23 @@ export class Engine {
     sellAt(floor, x) {
         const ret = wasm.engine_sellAt(this.__wbg_ptr, floor, x);
         return ret !== 0;
+    }
+    /**
+     * `sell(id)`: JSON `{ ok, reason?, delta }`.
+     * @param {number} id
+     * @returns {string}
+     */
+    sell(id) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.engine_sell(this.__wbg_ptr, id);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
     }
     /**
      * `serialize()` as JSON text.

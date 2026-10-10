@@ -1,7 +1,8 @@
 import type { Simulation } from "../Simulation";
 
-import { GUTTED_RESALE_REFUND, rentConfig, resaleRefund, transportBuildCost } from "../econConfig";
+import { rentConfig, resaleRefund, transportBuildCost } from "../econConfig";
 import { storeRent } from "./constants";
+import { sellUnit } from "./charges";
 
 import { FACILITIES, buildMinutes, facilityFloors, isFacilityKind } from "../facilities";
 import { groundFloorStructureKind } from "../tower/towerTopology";
@@ -222,18 +223,9 @@ export function sellAt(sim: Simulation, floor: number, x: number): boolean {
   // Prefer removing a room over the transport/floor beneath it.
   if (u && u.kind !== "floor" && u.kind !== "lobby") {
     // Can't sell a burning unit, the bulldozer is post-fire cleanup, not a
-    // way to end a blaze and skip the rescue fee. Mirrors the UI-side guards
-    // so every removal path upholds the anti-cheat.
-    if (u.state === "fire") return false;
-    sim.tower.removeUnit(u.id);
-    // A gutted shell has no salvage value; everything else refunds half.
-    sim.money += u.state === "gutted" ? GUTTED_RESALE_REFUND : resaleRefund(u.kind);
-    // If the last Wedding Hall is gone before the VIP arrived, cancel the
-    // pending inspection so it can't keep re-failing and spamming the log.
-    if (u.kind === "weddingHall" && !sim.tower.builtWeddingHall && !sim.evaluatedTower) {
-      sim.vipVisitDay = -1;
-    }
-    return true;
+    // way to end a blaze and skip the rescue fee. The by-id `sell` shares
+    // this path, so every removal upholds the anti-cheat and the refund rule.
+    return sellUnit(sim, u).ok;
   }
   if (t) {
     sim.tower.removeTransport(t.id);
