@@ -39,6 +39,46 @@ fn build_result(r: crate::build::BuildResult) -> String {
     outcome(r.ok, r.reason.as_deref())
 }
 
+/// `ChargeResult` as the TypeScript spells it: `{ ok, reason?, delta }`.
+fn charge_json(r: &crate::charges::ChargeResult) -> Value {
+    let mut v = serde_json::json!({ "ok": r.ok, "delta": r.delta });
+    if let Some(reason) = &r.reason {
+        v["reason"] = Value::String(reason.clone());
+    }
+    v
+}
+
+/// `ExtendResult`: the charge plus `bottom`, `top` and `added`.
+fn extend_json(r: &crate::charges::ExtendResult) -> Value {
+    let mut v = charge_json(&r.charge);
+    v["bottom"] = r.bottom.into();
+    v["top"] = r.top.into();
+    v["added"] = r.added.into();
+    v
+}
+
+fn parse_extend_end(s: &str) -> Result<crate::charges::ExtendEnd, String> {
+    crate::charges::ExtendEnd::parse(s).ok_or_else(|| format!("end must be up or down, got {s}"))
+}
+
+fn parse_removal_method(s: &str) -> Result<crate::charges::RemovalMethod, String> {
+    crate::charges::RemovalMethod::parse(s)
+        .ok_or_else(|| format!("method must be sell or bulldoze, got {s}"))
+}
+
+/// A high-water mark as JSON `{ bottom, top }` text, whole floors.
+fn parse_hwm(text: &str) -> Result<(i64, i64), String> {
+    let v: Value = serde_json::from_str(text).map_err(|e| format!("hwm: {e}"))?;
+    let field = |name: &str| -> Result<i64, String> {
+        v.get(name)
+            .and_then(Value::as_f64)
+            .filter(|x| x.fract() == 0.0 && x.abs() < 9007199254740992.0)
+            .map(|x| x as i64)
+            .ok_or_else(|| format!("hwm: {name} must be a whole number"))
+    };
+    Ok((field("bottom")?, field("top")?))
+}
+
 /// `{ kind, cost, message }` for the choice the engine is waiting on.
 fn pending_json(kind: &str, cost: f64, message: &str) -> String {
     serde_json::json!({ "kind": kind, "cost": cost, "message": message }).to_string()
@@ -345,6 +385,46 @@ impl Engine {
             v["reason"] = Value::String(reason);
         }
         v.to_string()
+    }
+
+    /// `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
+    /// limit and the balance and pays for the car itself.
+    #[wasm_bindgen(js_name = addCar)]
+    pub fn add_car(&mut self, id: i32) -> String {
+        charge_json(&self.sim.add_car(id.into())).to_string()
+    }
+
+    /// `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
+    #[wasm_bindgen(js_name = removeCar)]
+    pub fn remove_car(&mut self, id: i32) -> String {
+        charge_json(&self.sim.remove_car(id.into())).to_string()
+    }
+
+    /// `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
+    /// as JSON `{ bottom, top }` text or null: JSON `{ ok, reason?, delta,
+    /// bottom, top, added }`, the floors billed past the mark.
+    #[wasm_bindgen(js_name = extendTransport)]
+    pub fn extend_transport(
+        &mut self,
+        id: i32,
+        end: &str,
+        target_floor: i32,
+        hwm: Option<String>,
+    ) -> Result<String, JsError> {
+        let end = parse_extend_end(end).map_err(err)?;
+        let hwm = hwm.as_deref().map(parse_hwm).transpose().map_err(err)?;
+        let r = self
+            .sim
+            .extend_transport(id.into(), end, target_floor.into(), hwm);
+        Ok(extend_json(&r).to_string())
+    }
+
+    /// `removeFacility(id, method)`: the player's sell or bulldoze of a unit
+    /// or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`.
+    #[wasm_bindgen(js_name = removeFacility)]
+    pub fn remove_facility(&mut self, id: i32, method: &str) -> Result<String, JsError> {
+        let method = parse_removal_method(method).map_err(err)?;
+        Ok(charge_json(&self.sim.remove_facility(id.into(), method)).to_string())
     }
 
     /// `tower.removeUnit(id)`: whether a unit went.
@@ -682,6 +762,48 @@ pub fn log_since(sim: &Simulation, seq: i64) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_charge_commands_cross_as_the_typescript_spells_them() {
+        use crate::charges::{ChargeResult, ExtendEnd, ExtendResult, RemovalMethod};
+        let refused = ChargeResult {
+            ok: false,
+            reason: Some("Not enough money.".into()),
+            delta: 0.0,
+        };
+        let v = charge_json(&refused);
+        assert_eq!(v["ok"], false);
+        assert_eq!(v["reason"], "Not enough money.");
+        assert_eq!(v["delta"].as_f64(), Some(0.0));
+        let paid = ExtendResult {
+            charge: ChargeResult {
+                ok: true,
+                reason: None,
+                delta: -10_000.0,
+            },
+            bottom: 1,
+            top: 4,
+            added: 2,
+        };
+        let v = extend_json(&paid);
+        assert!(v.get("reason").is_none());
+        assert_eq!(v["delta"].as_f64(), Some(-10_000.0));
+        assert_eq!(
+            (v["bottom"].as_i64(), v["top"].as_i64(), v["added"].as_i64()),
+            (Some(1), Some(4), Some(2))
+        );
+        assert_eq!(parse_extend_end("down"), Ok(ExtendEnd::Down));
+        assert!(parse_extend_end("sideways").is_err());
+        assert_eq!(
+            parse_removal_method("bulldoze"),
+            Ok(RemovalMethod::Bulldoze)
+        );
+        assert!(parse_removal_method("burn").is_err());
+        assert_eq!(parse_hwm(r#"{"bottom":-2,"top":30}"#), Ok((-2, 30)));
+        assert!(parse_hwm(r#"{"bottom":1.5,"top":3}"#).is_err());
+        assert!(parse_hwm(r#"{"top":3}"#).is_err());
+        assert!(parse_hwm("not json").is_err());
+    }
 
     #[test]
     fn the_frame_view_carries_the_header_and_one_record_per_person_unit_and_car() {

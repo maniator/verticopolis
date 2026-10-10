@@ -23,6 +23,24 @@ export class Engine {
         wasm.__wbg_engine_free(ptr, 0);
     }
     /**
+     * `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
+     * limit and the balance and pays for the car itself.
+     * @param {number} id
+     * @returns {string}
+     */
+    addCar(id) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.engine_addCar(this.__wbg_ptr, id);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
      * `adjustRent(id, dir)`: the new rent, or null when nothing moved.
      * @param {number} id
      * @param {number} dir
@@ -198,6 +216,38 @@ export class Engine {
         wasm.engine_evaluateStar(this.__wbg_ptr);
     }
     /**
+     * `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
+     * as JSON `{ bottom, top }` text or null: JSON `{ ok, reason?, delta,
+     * bottom, top, added }`, the floors billed past the mark.
+     * @param {number} id
+     * @param {string} end
+     * @param {number} target_floor
+     * @param {string | null} [hwm]
+     * @returns {string}
+     */
+    extendTransport(id, end, target_floor, hwm) {
+        let deferred4_0;
+        let deferred4_1;
+        try {
+            const ptr0 = passStringToWasm0(end, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            var ptr1 = isLikeNone(hwm) ? 0 : passStringToWasm0(hwm, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            var len1 = WASM_VECTOR_LEN;
+            const ret = wasm.engine_extendTransport(this.__wbg_ptr, id, ptr0, len0, target_floor, ptr1, len1);
+            var ptr3 = ret[0];
+            var len3 = ret[1];
+            if (ret[3]) {
+                ptr3 = 0; len3 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred4_0 = ptr3;
+            deferred4_1 = len3;
+            return getStringFromWasm0(ptr3, len3);
+        } finally {
+            wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+        }
+    }
+    /**
      * The number of units on fire.
      * @returns {number}
      */
@@ -344,6 +394,50 @@ export class Engine {
     priceUnit(id, target) {
         const ret = wasm.engine_priceUnit(this.__wbg_ptr, id, target);
         return ret[0] === 0 ? undefined : ret[1];
+    }
+    /**
+     * `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
+     * @param {number} id
+     * @returns {string}
+     */
+    removeCar(id) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.engine_removeCar(this.__wbg_ptr, id);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * `removeFacility(id, method)`: the player's sell or bulldoze of a unit
+     * or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`.
+     * @param {number} id
+     * @param {string} method
+     * @returns {string}
+     */
+    removeFacility(id, method) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(method, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.engine_removeFacility(this.__wbg_ptr, id, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
     }
     /**
      * `tower.removeTransport(id)`: whether a shaft went.

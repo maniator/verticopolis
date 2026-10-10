@@ -37,6 +37,10 @@ export type Command =
   | ({ op: "adjustRent"; dir: 1 | -1 } & At)
   | ({ op: "setNoRate" } & At)
   | ({ op: "setCars"; cars: number } & At)
+  | ({ op: "addCar"; reason?: string } & At)
+  | ({ op: "removeCar"; reason?: string } & At)
+  | ({ op: "extendTransport"; end: "up" | "down"; targetFloor: number; hwmBottom?: number; hwmTop?: number; reason?: string } & At)
+  | ({ op: "removeFacility"; method: "sell" | "bulldoze"; shaft?: boolean; reason?: string } & At)
   | { op: "startFire" }
   | { op: "bombThreat" }
   | { op: "evaluateStar" }
@@ -74,9 +78,9 @@ export interface Checkpoint {
  *  that is not a transport, "shaft" a transport kind, "mode" classic or modern,
  *  "obj" a JSON object, "kind" any facility kind, "choice" fireRescue or
  *  bombThreat, "policy" a film policy, "target" a batch rent target (a finite
- *  number, default or noRate).
+ *  number, default or noRate), "end" up or down, "method" sell or bulldoze.
  *  A trailing "?" marks the field optional. */
-type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind" | "choice" | "policy" | "target";
+type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind" | "choice" | "policy" | "target" | "end" | "method";
 const AT = { floor: "int", x: "int" } as const;
 const OPS: Record<Command["op"], Spec> = {
   setMoney: { amount: "num" },
@@ -87,6 +91,10 @@ const OPS: Record<Command["op"], Spec> = {
   adjustRent: { ...AT, dir: "dir" },
   setNoRate: AT,
   setCars: { ...AT, cars: "count" },
+  addCar: { ...AT, reason: "str?" },
+  removeCar: { ...AT, reason: "str?" },
+  extendTransport: { ...AT, end: "end", targetFloor: "int", hwmBottom: "int?", hwmTop: "int?", reason: "str?" },
+  removeFacility: { ...AT, method: "method", shaft: "bool?", reason: "str?" },
   startFire: {},
   bombThreat: {},
   evaluateStar: {},
@@ -123,6 +131,8 @@ function fits(type: FieldType, v: unknown): boolean {
     case "choice": return v === "fireRescue" || v === "bombThreat";
     case "policy": return v === "auto" || v === "feature" || v === "blockbuster";
     case "target": return v === "default" || v === "noRate" || (typeof v === "number" && Number.isFinite(v));
+    case "end": return v === "up" || v === "down";
+    case "method": return v === "sell" || v === "bulldoze";
   }
 }
 
@@ -160,6 +170,7 @@ export function loadScenario(file: string): Scenario {
     if (typeof op !== "string" || !own(OPS, op)) throw new Error(`${where}: unknown op ${JSON.stringify(op)}`);
     check(where, c, OPS[op as Command["op"]], ["op"]);
     if (c.op === "buildRow" && c.from > c.to) throw new Error(`${where}: buildRow from must not be past to`);
+    if (c.op === "extendTransport" && (c.hwmBottom === undefined) !== (c.hwmTop === undefined)) throw new Error(`${where}: hwmBottom and hwmTop go together`);
   });
   return s;
 }
@@ -187,6 +198,11 @@ export interface ScenarioEngine {
   adjustRent(id: number, dir: 1 | -1): number | null;
   setNoRate(id: number): boolean;
   setCars(id: number, cars: number): boolean;
+  /** The engine-owned charges (#914); each moves the money itself. */
+  addCar(id: number): Outcome;
+  removeCar(id: number): Outcome;
+  extendTransport(id: number, end: "up" | "down", targetFloor: number, hwm: { bottom: number; top: number } | null): Outcome;
+  removeFacility(id: number, method: "sell" | "bulldoze"): Outcome;
   setSchedule(id: number, schedule: Record<string, unknown>): boolean;
   startFire(): void;
   fires(): number;
@@ -219,6 +235,9 @@ export interface ScenarioEngine {
 /** How a runner starts an engine from a scenario's `start`. */
 export type EngineStart = (start: Start) => ScenarioEngine;
 
+/** A command result narrowed to the scenario's `{ ok, reason? }`. */
+const outcomeOf = (r: { ok: boolean; reason?: string }): Outcome => (r.ok ? { ok: true } : { ok: false, reason: r.reason });
+
 /** The TypeScript engine behind the scenario surface. */
 export function tsEngine(sim: Simulation): ScenarioEngine {
   return {
@@ -241,6 +260,10 @@ export function tsEngine(sim: Simulation): ScenarioEngine {
     adjustRent: (id, dir) => sim.adjustRent(id, dir),
     setNoRate: (id) => sim.setNoRate(id),
     setCars: (id, cars) => sim.tower.setCars(id, cars),
+    addCar: (id) => outcomeOf(sim.addCar(id)),
+    removeCar: (id) => outcomeOf(sim.removeCar(id)),
+    extendTransport: (id, end, targetFloor, hwm) => outcomeOf(sim.extendTransport(id, end, targetFloor, hwm ?? undefined)),
+    removeFacility: (id, method) => outcomeOf(sim.removeFacility(id, method)),
     setSchedule: (id, schedule) => sim.tower.setSchedule(id, schedule),
     startFire: () => sim.startFire(),
     fires: () => sim.fires,
@@ -304,6 +327,14 @@ function transportAt(e: ScenarioEngine, at: At) {
   return t;
 }
 
+/** A charge op's outcome: it lands, or, when the scenario names a reason, it
+ *  is refused with exactly that reason, so both engines' copy is pinned. */
+function expectCharge(r: Outcome, reason: string | undefined, what: string): void {
+  if (reason === undefined) return expectOk(r.ok, false, what, r.reason);
+  if (r.ok) throw new Error(`${what} succeeded but was expected to fail with ${reason}`);
+  if (r.reason !== reason) throw new Error(`${what} failed with ${r.reason ?? "no reason"}, expected ${reason}`);
+}
+
 function expectOk(ok: boolean, expectFail: boolean | undefined, what: string, reason?: string): void {
   if (ok === !expectFail) return;
   throw new Error(`${what} ${ok ? "succeeded but was expected to fail" : `failed: ${reason ?? "no reason"}`}`);
@@ -348,6 +379,18 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
     case "setCars": {
       const t = transportAt(e, c);
       expectOk(e.setCars(t.id, c.cars) && transportAt(e, c).cars === c.cars, false, `setCars ${c.cars} @ ${c.floor},${c.x}`);
+      break;
+    }
+    case "addCar": expectCharge(e.addCar(transportAt(e, c).id), c.reason, `addCar @ ${c.floor},${c.x}`); break;
+    case "removeCar": expectCharge(e.removeCar(transportAt(e, c).id), c.reason, `removeCar @ ${c.floor},${c.x}`); break;
+    case "extendTransport": {
+      const hwm = c.hwmBottom !== undefined && c.hwmTop !== undefined ? { bottom: c.hwmBottom, top: c.hwmTop } : null;
+      expectCharge(e.extendTransport(transportAt(e, c).id, c.end, c.targetFloor, hwm), c.reason, `extendTransport ${c.end} to ${c.targetFloor} @ ${c.floor},${c.x}`);
+      break;
+    }
+    case "removeFacility": {
+      const id = c.shaft ? transportAt(e, c).id : unitAt(e, c).id;
+      expectCharge(e.removeFacility(id, c.method), c.reason, `removeFacility ${c.method} @ ${c.floor},${c.x}`);
       break;
     }
     case "startFire": {

@@ -27,6 +27,8 @@ import * as gripe from "./sim/gripe";
 import * as churn from "./sim/churn";
 import * as congestion from "./sim/congestion";
 import * as build from "./sim/build";
+import * as charges from "./sim/charges";
+import type { ChargeResult, ExtendResult, RemovalMethod } from "./sim/charges";
 import * as star from "./sim/star";
 import * as services from "./sim/services";
 import * as events from "./sim/events";
@@ -38,22 +40,8 @@ import * as stats from "./sim/stats";
 
 import type { HeatmapMode, HeatCell, BatchTarget, BatchRentOptions, BatchRentResult } from "./sim/constants";
 export type { LogEntry } from "./types";
-export {
-  VACATE_RESCIND,
-  TRANSPORT_FAR_TILES,
-  GRIPE_WARN,
-  LOG_SAVE_CAP,
-  CONGESTION_CHURN,
-  CONGESTION_GRIDLOCK,
-  congestionSeverity,
-} from "./sim/constants";
-export type {
-  HeatmapMode,
-  HeatCell,
-  BatchTarget,
-  BatchRentOptions,
-  BatchRentResult,
-} from "./sim/constants";
+export { VACATE_RESCIND, TRANSPORT_FAR_TILES, GRIPE_WARN, LOG_SAVE_CAP, CONGESTION_CHURN, CONGESTION_GRIDLOCK, congestionSeverity } from "./sim/constants";
+export type { HeatmapMode, HeatCell, BatchTarget, BatchRentOptions, BatchRentResult } from "./sim/constants";
 export { serializeUnit } from "./sim/coerce";
 
 export class Simulation implements SimContext {
@@ -244,6 +232,16 @@ export class Simulation implements SimContext {
   buildTransport( kind: FacilityKind, x: number, bottom: number, top: number, ): { ok: boolean; reason?: string } { return build.buildTransport(this, kind, x, bottom, top); }
 
   sellAt(floor: number, x: number): boolean { return build.sellAt(this, floor, x); }
+
+  // ---- Engine-owned charges (sim/charges.ts) ----------------------------
+
+  addCar(id: number): ChargeResult { return charges.addCar(this, id); }
+
+  removeCar(id: number): ChargeResult { return charges.removeCar(this, id); }
+
+  extendTransport(id: number, end: "up" | "down", targetFloor: number, hwm?: { bottom: number; top: number }): ExtendResult { return charges.extendTransport(this, id, end, targetFloor, hwm); }
+
+  removeFacility(id: number, method: RemovalMethod): ChargeResult { return charges.removeFacility(this, id, method); }
 
   // ---- Main tick ---------------------------------------------------------
 

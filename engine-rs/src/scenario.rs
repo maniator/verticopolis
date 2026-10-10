@@ -72,6 +72,39 @@ pub enum Command {
     SetNoRate { floor: i64, x: i64 },
     #[serde(rename = "setCars")]
     SetCars { floor: i64, x: i64, cars: i64 },
+    #[serde(rename = "addCar")]
+    AddCar {
+        floor: i64,
+        x: i64,
+        reason: Option<String>,
+    },
+    #[serde(rename = "removeCar")]
+    RemoveCar {
+        floor: i64,
+        x: i64,
+        reason: Option<String>,
+    },
+    #[serde(rename = "extendTransport")]
+    ExtendTransport {
+        floor: i64,
+        x: i64,
+        end: String,
+        #[serde(rename = "targetFloor")]
+        target_floor: i64,
+        #[serde(rename = "hwmBottom")]
+        hwm_bottom: Option<i64>,
+        #[serde(rename = "hwmTop")]
+        hwm_top: Option<i64>,
+        reason: Option<String>,
+    },
+    #[serde(rename = "removeFacility")]
+    RemoveFacility {
+        floor: i64,
+        x: i64,
+        method: String,
+        shaft: Option<bool>,
+        reason: Option<String>,
+    },
     #[serde(rename = "startFire")]
     StartFire,
     #[serde(rename = "bombThreat")]
@@ -196,6 +229,8 @@ fn field_fits(ty: &str, v: &Value) -> bool {
             matches!(v.as_str(), Some("default") | Some("noRate"))
                 || v.as_f64().is_some_and(f64::is_finite)
         }
+        "end" => matches!(v.as_str(), Some("up") | Some("down")),
+        "method" => matches!(v.as_str(), Some("sell") | Some("bulldoze")),
         _ => unreachable!("field type {ty}"),
     }
 }
@@ -260,6 +295,23 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
         "sell" => &[("floor", "int"), ("x", "int"), ("kind", "kind?")],
         "adjustRent" => &[("floor", "int"), ("x", "int"), ("dir", "dir")],
         "setCars" => &[("floor", "int"), ("x", "int"), ("cars", "count")],
+        "addCar" | "removeCar" => &[("floor", "int"), ("x", "int"), ("reason", "str?")],
+        "extendTransport" => &[
+            ("floor", "int"),
+            ("x", "int"),
+            ("end", "end"),
+            ("targetFloor", "int"),
+            ("hwmBottom", "int?"),
+            ("hwmTop", "int?"),
+            ("reason", "str?"),
+        ],
+        "removeFacility" => &[
+            ("floor", "int"),
+            ("x", "int"),
+            ("method", "method"),
+            ("shaft", "bool?"),
+            ("reason", "str?"),
+        ],
         "startFire" | "bombThreat" | "evaluateStar" | "reload" | "toggleAutoBridge" => &[],
         "setFilmPolicy" => &[("floor", "int"), ("x", "int"), ("policy", "policy")],
         "rerollSubtype" | "clearStops" => &AT,
@@ -338,6 +390,11 @@ fn check_scenario(s: &Value) -> Result<(), String> {
         check_fields(&where_, c, spec, &["op"])?;
         if op == Some("buildRow") && c["from"].as_i64() > c["to"].as_i64() {
             return Err(format!("{where_}: buildRow from must not be past to"));
+        }
+        if op == Some("extendTransport")
+            && c.get("hwmBottom").is_some() != c.get("hwmTop").is_some()
+        {
+            return Err(format!("{where_}: hwmBottom and hwmTop go together"));
         }
     }
     Ok(())
@@ -456,6 +513,30 @@ fn expect_ok(ok: bool, expect_fail: bool, what: &str, reason: Option<&str>) -> R
     } else {
         format!("{what} failed: {}", reason.unwrap_or("no reason"))
     })
+}
+
+/// `expectCharge`: a charge op lands, or, when the scenario names a reason,
+/// is refused with exactly that reason, so both engines' copy is pinned.
+fn expect_charge(
+    r: &crate::charges::ChargeResult,
+    reason: &Option<String>,
+    what: &str,
+) -> Result<(), String> {
+    let Some(want) = reason else {
+        return expect_ok(r.ok, false, what, r.reason.as_deref());
+    };
+    if r.ok {
+        return Err(format!(
+            "{what} succeeded but was expected to fail with {want}"
+        ));
+    }
+    if r.reason.as_deref() != Some(want.as_str()) {
+        return Err(format!(
+            "{what} failed with {}, expected {want}",
+            r.reason.as_deref().unwrap_or("no reason")
+        ));
+    }
+    Ok(())
 }
 
 pub struct Run {
@@ -659,6 +740,61 @@ fn run_scenario_inner(
                         false,
                         &format!("setCars {cars} @ {floor},{x}"),
                         None,
+                    )
+                    .map_err(failed)?;
+                }
+                Command::AddCar { floor, x, reason } => {
+                    let id = transport_id_at(&sim, *floor, *x).map_err(failed)?;
+                    let r = sim.add_car(id);
+                    expect_charge(&r, reason, &format!("addCar @ {floor},{x}")).map_err(failed)?;
+                }
+                Command::RemoveCar { floor, x, reason } => {
+                    let id = transport_id_at(&sim, *floor, *x).map_err(failed)?;
+                    let r = sim.remove_car(id);
+                    expect_charge(&r, reason, &format!("removeCar @ {floor},{x}"))
+                        .map_err(failed)?;
+                }
+                Command::ExtendTransport {
+                    floor,
+                    x,
+                    end,
+                    target_floor,
+                    hwm_bottom,
+                    hwm_top,
+                    reason,
+                } => {
+                    let id = transport_id_at(&sim, *floor, *x).map_err(failed)?;
+                    let side = crate::charges::ExtendEnd::parse(end)
+                        .ok_or_else(|| failed(format!("unknown end {end}")))?;
+                    let hwm = hwm_bottom.zip(*hwm_top);
+                    let r = sim.extend_transport(id, side, *target_floor, hwm);
+                    expect_charge(
+                        &r.charge,
+                        reason,
+                        &format!("extendTransport {end} to {target_floor} @ {floor},{x}"),
+                    )
+                    .map_err(failed)?;
+                }
+                Command::RemoveFacility {
+                    floor,
+                    x,
+                    method,
+                    shaft,
+                    reason,
+                } => {
+                    let id = if shaft.unwrap_or(false) {
+                        transport_id_at(&sim, *floor, *x)
+                    } else {
+                        unit_id_at(&sim, *floor, *x)
+                    }
+                    .map_err(failed)?;
+                    let how = crate::charges::RemovalMethod::parse(method)
+                        .ok_or_else(|| failed(format!("unknown method {method}")))?;
+                    let r = sim.remove_facility(id, how);
+                    expect_charge(
+                        &r,
+                        reason,
+                        &format!("removeFacility {method} @ {floor},{x}"),
                     )
                     .map_err(failed)?;
                 }
@@ -1004,6 +1140,33 @@ mod tests {
     }
 
     #[test]
+    fn a_charge_op_pins_its_refusal_reason() {
+        use crate::charges::ChargeResult;
+        let paid = ChargeResult {
+            ok: true,
+            reason: None,
+            delta: -1.0,
+        };
+        let refused = ChargeResult {
+            ok: false,
+            reason: Some("Not enough money.".into()),
+            delta: 0.0,
+        };
+        let want = Some("Not enough money.".to_string());
+        assert!(super::expect_charge(&paid, &None, "a").is_ok());
+        assert!(super::expect_charge(&refused, &want, "a").is_ok());
+        assert!(super::expect_charge(&refused, &None, "a")
+            .unwrap_err()
+            .contains("failed: Not enough money."));
+        assert!(super::expect_charge(&paid, &want, "a")
+            .unwrap_err()
+            .contains("expected to fail with Not enough money."));
+        assert!(super::expect_charge(&refused, &Some("Other.".into()), "a")
+            .unwrap_err()
+            .contains("failed with Not enough money., expected Other."));
+    }
+
+    #[test]
     fn whole_floats_count_as_integers() {
         let s = scenario(r#"{"op":"tick","dt":60.0,"times":2.0}"#).unwrap();
         assert_eq!(s.commands.len(), 1);
@@ -1056,6 +1219,22 @@ mod tests {
                 "unknown field extra",
             ),
             (r#"{"op":"nope"}"#, "unknown op"),
+            (
+                r#"{"op":"extendTransport","floor":1,"x":4,"end":"left","targetFloor":3}"#,
+                "end must be end",
+            ),
+            (
+                r#"{"op":"extendTransport","floor":1,"x":4,"end":"up","targetFloor":3,"hwmTop":3}"#,
+                "hwmBottom and hwmTop go together",
+            ),
+            (
+                r#"{"op":"removeFacility","floor":1,"x":4,"method":"burn"}"#,
+                "method must be method",
+            ),
+            (
+                r#"{"op":"addCar","floor":1,"x":4,"reason":""}"#,
+                "reason must be str",
+            ),
             (
                 r#"{"op":"build","kind":"office","floor":1e300,"x":4}"#,
                 "floor must be int",

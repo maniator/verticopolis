@@ -91,6 +91,11 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
     adjustRent: (id, dir) => live().adjustRent(i32(id, "id"), dir) ?? null,
     setNoRate: (id) => live().setNoRate(i32(id, "id")),
     setCars: (id, cars) => live().setCars(i32(id, "id"), i32(cars, "cars")),
+    addCar: (id) => outcome(live().addCar(i32(id, "id"))),
+    removeCar: (id) => outcome(live().removeCar(i32(id, "id"))),
+    extendTransport: (id, end, targetFloor, hwm) =>
+      outcome(live().extendTransport(i32(id, "id"), end, i32(targetFloor, "targetFloor"), hwm ? JSON.stringify({ bottom: i32(hwm.bottom, "hwm bottom"), top: i32(hwm.top, "hwm top") }) : null)),
+    removeFacility: (id, method) => outcome(live().removeFacility(i32(id, "id"), method)),
     setSchedule: (id, schedule) => live().setSchedule(i32(id, "id"), JSON.stringify(schedule)),
     startFire: () => live().startFire(),
     fires: () => live().fires(),
