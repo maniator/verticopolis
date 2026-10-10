@@ -1,80 +1,71 @@
 import { FACILITIES, facilityFloors } from "../../engine/facilities";
 import type { Unit } from "../../engine/types";
+import { paintAnimatedUnit, paintSettledUnit } from "../regionPaint";
 import { FLOOR, TILE } from "../scale";
-import { drawUnit } from "../sprites";
-import { drawDeadParkingX } from "../sprites/facilities/garage";
-import { bake, type BakeResult, type ImageRef } from "./bake";
-import { ORIGIN_SEEDED, variantPlacements } from "./catalog";
-import { lookupRoom, type LiveScene, type LiveUnit } from "./lookup";
-import { blank, over, type Image } from "./pixels";
-import type { Job } from "./catalog";
-import type { Renderer } from "./bake";
+import { bake, type Renderer } from "./bake";
+import { ORIGIN_SEEDED, variantPlacements, type Job } from "./catalog";
+import { compareImages, composeLookup } from "./compose";
+import { lookupRoom, type LiveScene } from "./lookup";
+import type { Image } from "./pixels";
+import type { Sample } from "./samples";
 
 /**
- * The comparison the e2e spec runs in a real browser: for a live room
- * signature, compose the atlas frame and its layers the way a frontend would
- * (via {@link lookupRoom}), and paint the same room the way the web game's
- * region compositor does (`excalibur/towerRegions.ts`: a shared canvas, the
- * room clipped at its offset, the live `DrawCtx`, the dead-parking mark). The
- * two must match pixel for pixel.
+ * The comparison the e2e spec and the export's pre-flight run in a real
+ * browser. For a live room signature it composes the atlas frame and its
+ * layers the way a frontend would ({@link lookupRoom}, `compose.ts`) and paints
+ * the same room through the game's own paint functions (`regionPaint.ts`, the
+ * ones `towerRegions` and `towerReconcile` call) with the scene the game
+ * threads through its `DrawCtx`. The two must match pixel for pixel.
+ *
+ * Settled rooms are painted at two different offsets inside a larger region
+ * canvas, so any art that depends on where its region starts fails here.
+ * The kinds known to do that ({@link ORIGIN_SEEDED}) are compared at the
+ * per-unit origin, which is the look the atlas carries.
  */
-
-export interface Sample {
-  label: string;
-  unit: LiveUnit;
-  scene: LiveScene;
-  variant: number;
-  /** For fire and construction: which loop frame to compare. */
-  frame?: number;
-}
 
 export interface SampleResult {
   label: string;
   frame: string;
   pixels: number;
   mismatches: number;
-  /** Bounding box of the mismatched pixels, for a readable failure. */
+  /** Where in the region the room was painted for this comparison. */
+  offset: { x: number; y: number };
   box?: { x0: number; y0: number; x1: number; y1: number };
 }
 
-/** Region-canvas offset of the room under test: non-zero so the clip and
- *  translation the web uses are part of what is compared. */
-const REGION_DX = 4 * TILE;
-const REGION_DY = FLOOR;
+/** Region offsets a settled room is checked at: one a multiple of 8 px across
+ *  and one not, so art hashing its draw position cannot pass by luck. */
+const REGION_OFFSETS = [
+  { x: 4 * TILE, y: FLOOR },
+  { x: 7 * TILE, y: 2 * FLOOR },
+];
 
-
-function placeRef(dst: Image, bakeResult: BakeResult, ref: ImageRef | null): void {
-  if (ref) over(dst, bakeResult.images[ref.id], ref.dx, ref.dy);
-}
-
-/** The web's bake of `unit`: a settled room into a region-style canvas at an
- *  offset, clipped (`towerRegions`); a burning or unbuilt room into its own
- *  canvas at the origin (`towerReconcile.addRoom`). */
-function webBake(doc: Document, unit: Unit, s: LiveScene, anim: number): Image {
-  const w = unit.width * TILE;
-  const h = facilityFloors(unit.kind) * FLOOR;
-  const own = unit.state === "fire" || unit.state === "construction" || ORIGIN_SEEDED.has(unit.kind);
-  const DX = own ? 0 : REGION_DX;
-  const DY = own ? 0 : REGION_DY;
+function region(doc: Document, w: number, h: number): CanvasRenderingContext2D {
   const canvas = doc.createElement("canvas");
-  canvas.width = w + 2 * DX;
-  canvas.height = h + 2 * DY;
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("no 2d context");
   ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(DX, DY, w, h);
-  ctx.clip();
-  const dead = unit.kind === "parking" && s.dead;
-  drawUnit({ ctx, lit: s.lit, anim, hour: s.hour, parkingUse: s.parkingUse, recycleFill: s.recycleFill, parkingDead: dead }, unit, DX, DY, w, h);
-  if (dead) drawDeadParkingX(ctx, DX, DY, w, h);
-  ctx.restore();
-  return { w, h, data: ctx.getImageData(DX, DY, w, h).data };
+  return ctx;
 }
 
-export function verifySample(doc: Document, jobs: readonly Job[], renderer: Renderer, sample: Sample): SampleResult {
+/** The game's paint of `unit`: inside a region with the room at `at`, or into
+ *  its own canvas when `at` is null. */
+function webPaint(doc: Document, unit: Unit, s: LiveScene, anim: number, at: { x: number; y: number } | null): Image {
+  const w = unit.width * TILE;
+  const h = facilityFloors(unit.kind) * FLOOR;
+  const ox = at?.x ?? 0;
+  const oy = at?.y ?? 0;
+  const ctx = region(doc, w + 2 * ox, h + 2 * oy);
+  const d = { ctx, lit: s.lit, anim, hour: s.hour, parkingUse: s.parkingUse, recycleFill: s.recycleFill };
+  if (at) paintSettledUnit(d, unit, ox, oy, w, h, unit.kind === "parking" && s.dead);
+  else if (unit.state === "fire" || unit.state === "construction") paintAnimatedUnit(d, unit, w, h);
+  else paintSettledUnit(d, unit, 0, 0, w, h, unit.kind === "parking" && s.dead);
+  return { w, h, data: ctx.getImageData(ox, oy, w, h).data };
+}
+
+export function verifySample(doc: Document, jobs: readonly Job[], renderer: Renderer, sample: Sample): SampleResult[] {
   const pl = variantPlacements(sample.unit.kind)[sample.variant];
   const unit: Unit = {
     ...sample.unit,
@@ -90,48 +81,21 @@ export function verifySample(doc: Document, jobs: readonly Job[], renderer: Rend
     label: "",
   };
   const found = lookupRoom(unit, sample.scene, sample.variant);
-  let name: string;
-  let anim = 0;
-  if ("animation" in found) {
-    const job = jobs.find((j) => j.name === found.animation);
-    if (!job || job.type !== "anim") throw new Error(`no animation ${found.animation}`);
-    const i = sample.frame ?? 0;
-    name = `${found.animation}/${i}`;
-    const spec = job.frames[i];
-    if (!spec || spec.p !== "unit") throw new Error(`no frame ${i} in ${found.animation}`);
-    anim = spec.anim;
-  } else {
-    name = found.frame;
-  }
   const jobName = "animation" in found ? found.animation : found.frame;
-  const r = bake(
-    jobs.filter((j) => j.name === jobName),
-    renderer,
-  );
-  const rec = r.frames.find((f) => f.name === name);
-  if (!rec) throw new Error(`no frame ${name}`);
-  const composed = blank(rec.w, rec.h);
-  placeRef(composed, r, rec.image);
-  if (!("animation" in found)) {
-    for (const [key, n] of Object.entries(found.chains)) {
-      const chain = rec.chains?.[key];
-      if (!chain) throw new Error(`${name} has no chain ${key}`);
-      for (let k = 1; k <= Math.min(n, chain.steps.length - 1); k++) placeRef(composed, r, chain.steps[k]);
-    }
-    for (const o of found.overlays) placeRef(composed, r, rec.overlays?.[o] ?? null);
+  const job = jobs.find((j) => j.name === jobName);
+  if (!job) throw new Error(`no job ${jobName}`);
+  let anim = 0;
+  if (job.type === "anim") {
+    const spec = job.frames[sample.frame ?? 0];
+    if (!spec || spec.p !== "unit") throw new Error(`no frame ${sample.frame} in ${jobName}`);
+    anim = spec.anim;
   }
-  const ref = webBake(doc, unit, sample.scene, anim);
-  let mismatches = 0;
-  let box: SampleResult["box"];
-  for (let i = 0, p = 0; i < ref.data.length; i += 4, p++) {
-    const a = ref.data;
-    const b = composed.data;
-    if (a[i] === b[i] && a[i + 1] === b[i + 1] && a[i + 2] === b[i + 2] && a[i + 3] === b[i + 3]) continue;
-    mismatches++;
-    const x = p % ref.w;
-    const y = (p - x) / ref.w;
-    box ??= { x0: x, y0: y, x1: x, y1: y };
-    box = { x0: Math.min(box.x0, x), y0: Math.min(box.y0, y), x1: Math.max(box.x1, x), y1: Math.max(box.y1, y) };
-  }
-  return { label: sample.label, frame: name, pixels: ref.w * ref.h, mismatches, box };
+  const composed = composeLookup(bake([job], renderer), found, sample.frame ?? 0);
+  const animated = unit.state === "fire" || unit.state === "construction";
+  const offsets = animated || ORIGIN_SEEDED.has(unit.kind) ? [null] : REGION_OFFSETS;
+  return offsets.map((at) => {
+    const ref = webPaint(doc, unit, sample.scene, anim, at);
+    const cmp = compareImages(ref, composed.image);
+    return { label: sample.label, frame: composed.name, pixels: ref.w * ref.h, mismatches: cmp.mismatches, box: cmp.box, offset: at ?? { x: 0, y: 0 } };
+  });
 }

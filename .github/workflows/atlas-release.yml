@@ -58,14 +58,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Bake the atlas in the pinned Chromium
+      # A manual run names an existing tag; fail before the long bake if not.
+      - name: Check the tag
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
-          PW_CHROME="$(ls -d /ms-playwright/chromium-*/chrome-linux*/chrome 2>/dev/null | head -1)"
-          test -x "$PW_CHROME" || { echo "Pinned Chromium was not found."; exit 1; }
-          export PW_CHROME
-          # The archive records the commit it was built from.
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          npm run atlas -- --out dist-atlas
+          git fetch --tags --force origin > /dev/null
+          git rev-parse --verify --quiet "refs/tags/$TAG" > /dev/null || { echo "$TAG is not a tag."; exit 1; }
+
+      # The export launches Playwright's own Chromium from the image (the
+      # binary the e2e comparison uses), checks the atlas against the game's
+      # paint for the sample signatures, then writes the archive. It records
+      # the checked-out commit, so a manual rebuild names the tag's commit.
+      - name: Bake the atlas in the pinned Chromium
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: npm run atlas -- --out dist-atlas --label "$TAG"
 
       - name: Check the checksum file
         working-directory: dist-atlas
@@ -95,6 +104,10 @@ jobs:
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           # A tag push is the release signal: create the release when the tag
-          # has none yet, then replace any atlas files already attached.
-          gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "$TAG" --notes "Sprite atlas attached by the atlas release workflow."
+          # has none yet (a release another job created in the meantime is
+          # fine), then replace any atlas files already attached.
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes "Sprite atlas attached by the atlas release workflow." \
+              || gh release view "$TAG" > /dev/null
+          fi
           gh release upload "$TAG" dist-atlas/*.zip dist-atlas/*.sha256 --clobber

@@ -1,7 +1,6 @@
 import * as ex from "excalibur";
 import { facilityFloors } from "../../engine/facilities";
-import { drawUnit } from "../sprites";
-import { drawDeadParkingX } from "../sprites/facilities/garage";
+import { paintSettledUnit } from "../regionPaint";
 import { FLOOR, TILE } from "../scale";
 import { regionRect, regionsOf } from "../regionGrid";
 import type { Unit } from "../../engine/types";
@@ -65,17 +64,10 @@ function materialize(engine: TowerEngine, key: number): RegionRec {
         const h = hgt * FLOOR;
         const dx = engine.worldX(u.x) - r.x;
         const dy = engine.worldYTop(u.floor, hgt) - r.y;
-        // The clip is mandatory, not defensive: private canvases clipped any
-        // per-unit overdraw implicitly, a shared canvas does not, and one
+        // paintSettledUnit clips to the room's rect: private canvases clipped
+        // any per-unit overdraw implicitly, a shared canvas does not, and one
         // sprite painting a pixel past its rect would bleed onto a neighbor.
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(dx, dy, w, h);
-        ctx.clip();
-        engine.d.parkingDead = engine.deadParking.has(id);
-        drawUnit(engine.d, u, dx, dy, w, h);
-        if (engine.d.parkingDead) drawDeadParkingX(ctx, dx, dy, w, h);
-        ctx.restore();
+        paintSettledUnit(engine.d, u, dx, dy, w, h, engine.deadParking.has(id));
       }
     },
   });

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { pack } from "./pack";
 import { blank, type Image } from "./pixels";
 import { crc32, encodePng } from "./png";
-import { blit, heightField, normalMap, scaleNearest, OUTLINE_SINK } from "./raster";
+import { blit, heightField, maskTo, normalMap, scaleNearest, OUTLINE_SINK } from "./raster";
 
 function solid(w: number, h: number, rgba: number[]): Image {
   const out = blank(w, h);
@@ -82,12 +82,21 @@ describe("normal maps", () => {
     expect(at(3, 4)[1]).toBeLessThan(128);
     expect(at(3, 2)[1]).toBeGreaterThan(128);
   });
-  it("height sinks the outline and scales by coverage", () => {
-    const page = blank(3, 3);
-    blit(page, solid(3, 3, [255, 255, 255, 255]), 0, 0, 3, 3, 0, 0);
-    const hf = heightField(page);
-    expect(hf[4]).toBeCloseTo(1);
-    expect(hf[0]).toBeCloseTo(OUTLINE_SINK);
+  it("height sinks the outline next to transparency but not at the frame edge", () => {
+    const frame = blank(4, 3);
+    blit(frame, solid(3, 3, [255, 255, 255, 255]), 0, 0, 3, 3, 0, 0);
+    const hf = heightField(frame);
+    expect(hf[0]).toBeCloseTo(1); // the frame's own corner: no bevel
+    expect(hf[2]).toBeCloseTo(OUTLINE_SINK); // next to the transparent column
+    // A uniform frame that fills its canvas is flat all the way to the edge.
+    const n = normalMap(solid(3, 3, [90, 90, 90, 128]));
+    expect(Array.from(n.data.subarray(0, 4))).toEqual([128, 128, 255, 255]);
+  });
+  it("maskTo keeps normals only under the mask", () => {
+    const mask = blank(2, 1);
+    mask.data.set([1, 1, 1, 9], 4);
+    const m = maskTo(solid(2, 1, [10, 20, 30, 255]), mask);
+    expect(Array.from(m.data)).toEqual([128, 128, 255, 0, 10, 20, 30, 255]);
   });
 });
 

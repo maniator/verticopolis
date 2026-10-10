@@ -7,8 +7,8 @@ import { allJobs } from "./browserEntry";
 import { UNIT_STATES, hourFor, occupantCap, roomJobs, roomKinds, variantPlacements, type StillJob } from "./catalog";
 import { paint, cloudOrigin, unitOf, type PaintSpec } from "./paint";
 
-/** A 2D context that accepts every call (paint coverage, not pixels: the
- *  e2e comparison spec checks pixels in a real browser). */
+/** A 2D context that accepts every call. This covers the paint dispatch; the
+ *  e2e comparison spec checks the pixels in a real browser. */
 function sinkCtx(): CanvasRenderingContext2D {
   const grad = { addColorStop: () => undefined };
   return new Proxy({} as Record<string, unknown>, {
@@ -70,6 +70,9 @@ describe("room catalog", () => {
     expect(steps[0]).toMatchObject({ occupants: 1, outForMeal: 1 });
     expect(steps[3]).toMatchObject({ occupants: 3, outForMeal: 0 });
     expect(steps.length).toBe(occupantCap("office") + 1);
+    expect(occupantCap("cinema")).toBe(FACILITIES.cinema.attendance);
+    expect(occupantCap("condo")).toBe(5); // the largest Modern household
+    expect(occupantCap("office")).toBe(FACILITIES.office.population);
     const parking = stills.find((j) => j.keys.kind === "parking")!;
     expect(Object.keys(parking.overlays!).sort()).toEqual(["car0", "car1", "car2", "car3", "car4", "car5", "car6", "dead"]);
     const recycling = stills.find((j) => j.keys.kind === "recycling")!;

@@ -5,7 +5,7 @@ import { CAR_SEEDS, SKYLINE_FILLS, STREET_CAR_SEEDS, BUILDS } from "./catalogExt
 import { pack, type PackedSlice } from "./pack";
 import { blank, type Image } from "./pixels";
 import { encodePng } from "./png";
-import { blit, normalMap, scaleNearest } from "./raster";
+import { blit, scaleNearest } from "./raster";
 import {
   ATLAS_PADDING,
   ATLAS_PAGE_BASE,
@@ -50,16 +50,21 @@ export function signature(): AtlasManifest["signature"] {
     sampled: ["variant"],
     rules: {
       hours: "open or closed by the kind's business hours at the current hour; 'always' for kinds without hours",
-      late: "condo only: 'late' from 23:00 to 06:00, else 'notlate'; 'any' for every other kind",
-      presence: "'home' when the unit's occupants is above 0, else 'away'",
-      visibleOccupants: "occupants minus outForMeal, clamped at 0; draw chain steps 1..min(n, max) over the 'home' frame",
-      riders: "the cab's rider count; draw chain steps 1..min(n, max) over the car frame",
-      recyclingFill: `round(fill * ${RECYCLE_STEPS}) for the tower's recycling fill in 0..1; draw chain steps over the frame`,
+      late: "condo, studio and apartment: 'late' from 23:00 to 06:00, else 'notlate'; 'any' for every other kind",
+      presence: "'home' when the unit's occupants is above 0, else 'away'; kinds whose art ignores occupants (the garage, ramp, services, recycling, metro) carry no presence segment",
+      width: "frames exist for each kind's catalog width only; a room imported at another width has no frame",
+      subtype: "a subtype the engine does not list for the kind draws the default look, the '-' frame",
+      visibleOccupants: "occupants minus outForMeal, clamped at 0; draw chain steps 1..min(n, max) over the 'home' frame. Chains cover every count the engine produces (population, venue attendance, the largest household)",
+      riders: "the cab's rider indicator (0..4, the game's load quantized to quarters); draw chain steps 1..min(n, max) over the car frame",
+      recyclingFill: `round(fill * ${RECYCLE_STEPS}) for the tower's recycling fill in 0..1; draw chain steps over the frame. The web re-bakes on the same eighths but paints the exact fill, so a pile between steps can differ by a bag or a gauge pixel`,
       parkingCar: `overlay 'car<i>' with i = unit id % ${PARKING_CAR_COLORS} when the space holds a car; never on a dead space`,
       deadParking: "overlay 'dead' when the space is not chained to a ramp (not on a burning or unbuilt space)",
       fire: "state 'fire' plays the animation fire/<kind>",
       construction: "state 'construction' plays the animation construction/<kind>",
       variant: "the web seeds room variety from the room's floor, column and id; the atlas ships a fixed sample (see 'variants'), pick one per room and keep it",
+      sky: "sky/gradient has one column per quarter hour from 00:00; the web's color is a cosine blend, t = cos((hour - 13) / 24 * 2 * pi) * 0.5 + 0.5, from #1c2246 (t 0) to #82afe0 (t 1) per channel, rounded",
+      parkingRoll: "a space holds a car when hash(id * 31) < parkingUse, where hash(n) is: x = imul32(n, 2654435761); x = imul32(x ^ (x >>> 15), 0x2c1b3c6d); x = imul32(x ^ (x >>> 13), 0x297a2d39); (x ^ (x >>> 16)) as unsigned / 2^32",
+      cinema: "the cinema's marquee and screen read the animation clock; the web keeps whatever phase its last re-bake caught, the atlas bakes phase 0",
       originSeeded: `${[...ORIGIN_SEEDED].join(", ")}: a few details (staff shirts, skyline windows, climbing holds) follow the web's draw origin; the atlas carries the per-unit look at origin 0, 0`,
     },
   };
@@ -78,6 +83,9 @@ function layerOf(ref: ImageRef | null, placements: PackedSlice[][]): LayerRef {
 
 export interface Archive {
   manifest: AtlasManifest;
+  /** The 1x color and normal pages, for checks before encoding. */
+  pages: Image[];
+  normalPages: Image[];
   /** Paths inside the zip (under {@link ARCHIVE_ROOT}) to bytes. */
   files: Record<string, Uint8Array>;
   zip: Uint8Array;
@@ -96,8 +104,12 @@ export function buildArchive(
   );
   onProgress?.(`packed ${bake.images.length} images into ${packed.pages} pages`);
   const pages: Image[] = Array.from({ length: packed.pages }, () => blank(pageSize, pageSize));
+  const normalPages: Image[] = Array.from({ length: packed.pages }, () => flatNormals(pageSize));
   bake.images.forEach((img, id) => {
-    for (const s of packed.placements[id]) blit(pages[s.rect.page], img, s.sx, 0, s.rect.w, s.rect.h, s.rect.x, s.rect.y);
+    for (const s of packed.placements[id]) {
+      blit(pages[s.rect.page], img, s.sx, 0, s.rect.w, s.rect.h, s.rect.x, s.rect.y);
+      blit(normalPages[s.rect.page], bake.normals[id], s.sx, 0, s.rect.w, s.rect.h, s.rect.x, s.rect.y);
+    }
   });
 
   const frames: Record<string, FrameRecord> = {};
@@ -119,7 +131,7 @@ export function buildArchive(
   const files: Record<string, Uint8Array> = {};
   const pageFiles: AtlasManifest["pages"] = [];
   pages.forEach((page, i) => {
-    const normal = normalMap(page);
+    const normal = normalPages[i];
     const entry: AtlasManifest["pages"][number] = { index: i, files: {} };
     for (const s of ATLAS_SCALES) {
       const stem = `${s}x/page-${String(i).padStart(3, "0")}`;
@@ -157,13 +169,20 @@ export function buildArchive(
   };
   files["manifest.json"] = strToU8(JSON.stringify(manifest) + "\n");
   files["ATTRIBUTION.txt"] = strToU8(attributionText(info));
-  files["LICENSE-ASSETS.md"] = strToU8(info.licenseText);
+  files["ASSETS-LICENSE.md"] = strToU8(info.licenseText);
 
   const zippable: Zippable = {};
   for (const path of Object.keys(files).sort()) {
     zippable[`${ARCHIVE_ROOT}/${path}`] = [files[path], { level: path.endsWith(".png") ? 0 : 9, mtime: ZIP_TIME }];
   }
-  return { manifest, files, zip: zipSync(zippable) };
+  return { manifest, pages, normalPages, files, zip: zipSync(zippable) };
+}
+
+/** A transparent page whose pixels still decode as the flat normal. */
+function flatNormals(size: number): Image {
+  const img = blank(size, size);
+  for (let i = 0; i < img.data.length; i += 4) img.data.set([128, 128, 255, 0], i);
+  return img;
 }
 
 export function attributionText(info: ArchiveInfo): string {

@@ -6,7 +6,7 @@ import { FLOOR, TILE } from "../scale";
 import { drawCar, drawTransport, drawUnit, type DrawCtx, type EntranceKind } from "../sprites";
 import { drawAwning, drawCrane, drawEscapeStairs, drawLobbyEntrance } from "../sprites";
 import { drawGarbageTruck, drawMetroTrain, drawStreetCar } from "../sprites";
-import { drawDeadParkingX } from "../sprites/facilities/garage";
+import { paintAnimatedUnit, paintSettledUnit } from "../regionPaint";
 import { cloudFill, drawCloud, drawSunDisc, skyColor } from "../sprites/sky";
 
 /**
@@ -109,9 +109,11 @@ export function unitDrawCtx(ctx: CanvasRenderingContext2D, s: UnitPaint): DrawCt
 export function paint(ctx: CanvasRenderingContext2D, s: PaintSpec, w: number, h: number): void {
   switch (s.p) {
     case "unit": {
-      drawUnit(unitDrawCtx(ctx, s), unitOf(s), 0, 0, w, h);
-      if (s.dead) drawDeadParkingX(ctx, 0, 0, w, h);
-      return;
+      // The game's own paint paths: burning and unbuilt rooms through their
+      // per-unit canvas, settled rooms through the region compositor's.
+      const d = unitDrawCtx(ctx, s);
+      if (s.state === "fire" || s.state === "construction") return paintAnimatedUnit(d, unitOf(s), w, h);
+      return paintSettledUnit(d, unitOf(s), 0, 0, w, h, s.dead === true);
     }
     case "lobby":
       return drawUnit(structCtx(ctx, s.lit), structUnit("lobby", s.ground ? 1 : 2, s.variant), 0, 0, TILE, FLOOR);
@@ -154,9 +156,10 @@ export function paint(ctx: CanvasRenderingContext2D, s: PaintSpec, w: number, h:
 function paintSky(ctx: CanvasRenderingContext2D, s: PaintSpec, w: number, h: number): void {
   switch (s.p) {
     case "skyGradient":
-      for (let hour = 0; hour < 24; hour++) {
-        ctx.fillStyle = skyColor(hour);
-        ctx.fillRect(hour, 0, 1, h);
+      // One column per quarter hour, sampled at the column's start.
+      for (let col = 0; col < w; col++) {
+        ctx.fillStyle = skyColor((col * 24) / w);
+        ctx.fillRect(col, 0, 1, h);
       }
       return;
     case "disc":

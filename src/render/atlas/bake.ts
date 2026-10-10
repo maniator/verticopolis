@@ -1,6 +1,7 @@
 import type { Job } from "./catalog";
 import type { PaintSpec } from "./paint";
-import { LayerError, contentHash, diffLayer, sameImage, trim, type Image } from "./pixels";
+import { LayerError, contentHash, crop, diffLayer, sameImage, trim, type Image, type Piece } from "./pixels";
+import { maskTo, normalMap } from "./raster";
 
 /**
  * Runs the catalog through a renderer: one render per frame, per animation
@@ -41,36 +42,53 @@ export interface BakedAnimation {
 }
 
 export interface BakeResult {
+  /** Unique color images; `normals[i]` is image `i`'s normal map. */
   images: Image[];
+  normals: Image[];
   frames: BakedFrame[];
   animations: BakedAnimation[];
 }
 
-/** Unique images by content. */
+/** Unique color-and-normal pairs by content. A normal map is taken over a
+ *  whole frame before anything is cut from it, so trimming, slicing and
+ *  layering never leave a false bevel at a cut. */
 export class ImageStore {
   readonly images: Image[] = [];
+  readonly normals: Image[] = [];
   private readonly byHash = new Map<string, number[]>();
 
-  add(img: Image): number {
-    const key = contentHash(img);
+  add(img: Image, normal: Image): number {
+    const key = `${contentHash(img)}|${contentHash(normal)}`;
     const ids = this.byHash.get(key) ?? [];
-    for (const id of ids) if (sameImage(this.images[id], img)) return id;
+    for (const id of ids) if (sameImage(this.images[id], img) && sameImage(this.normals[id], normal)) return id;
     const id = this.images.length;
     this.images.push(img);
+    this.normals.push(normal);
     ids.push(id);
     this.byHash.set(key, ids);
     return id;
   }
 
-  /** Trim and store; null for a fully transparent image. */
+  /** Trim a whole frame and store it; null for a fully transparent frame. */
   ref(img: Image): ImageRef | null {
     const t = trim(img);
     if (!t) return null;
-    return { id: this.add({ w: t.w, h: t.h, data: t.data }), dx: t.x, dy: t.y };
+    const normal = crop(normalMap(img), t.x, t.y, t.w, t.h);
+    return { id: this.add({ w: t.w, h: t.h, data: t.data }, normal), dx: t.x, dy: t.y };
+  }
+
+  /** Store a layer cut from the whole frame `next`; its normals come from
+   *  that frame, masked to the layer's own pixels. */
+  layer(piece: Piece | null, next: Image): ImageRef | null {
+    if (!piece) return null;
+    const normal = maskTo(crop(normalMap(next), piece.x, piece.y, piece.w, piece.h), piece);
+    return { id: this.add({ w: piece.w, h: piece.h, data: piece.data }, normal), dx: piece.x, dy: piece.y };
   }
 }
 
-/** Drop trailing empty steps so `max` is the last step that changes pixels. */
+/** Drop trailing empty steps so `max` is the last step that changes pixels.
+ *  The catalog sizes each chain to the largest count the engine produces, so
+ *  steps past `max` look the same as `max`. */
 function trimSteps(steps: (ImageRef | null)[]): (ImageRef | null)[] {
   let n = steps.length;
   while (n > 1 && steps[n - 1] === null) n--;
@@ -108,15 +126,14 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
         let prev = base;
         for (let k = 1; k < chain.steps.length; k++) {
           const cur = r.render(chain.steps[k], job.w, job.h);
-          const layer = diffLayer(prev, cur);
-          steps.push(layer ? { id: store.add(layer), dx: layer.x, dy: layer.y } : null);
+          steps.push(store.layer(diffLayer(prev, cur), cur));
           prev = cur;
         }
         (frame.chains ??= {})[key] = { input: chain.input, steps: trimSteps(steps) };
       }
       for (const [key, spec] of Object.entries(job.overlays ?? {})) {
-        const layer = diffLayer(base, r.render(spec, job.w, job.h));
-        (frame.overlays ??= {})[key] = layer ? { id: store.add(layer), dx: layer.x, dy: layer.y } : null;
+        const next = r.render(spec, job.w, job.h);
+        (frame.overlays ??= {})[key] = store.layer(diffLayer(base, next), next);
       }
     } catch (e) {
       if (e instanceof LayerError) throw new LayerError(`${job.name}: ${e.message}`);
@@ -125,5 +142,5 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
     frames.push(frame);
   });
   onProgress?.(jobs.length, jobs.length);
-  return { images: store.images, frames, animations };
+  return { images: store.images, normals: store.normals, frames, animations };
 }

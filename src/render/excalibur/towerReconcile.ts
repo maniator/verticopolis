@@ -8,11 +8,11 @@ import {
   AWNING_W,
   drawCrane,
   drawTransport,
-  drawUnit,
   ESCAPE_W,
   lobbyVariant,
 } from "../sprites";
 import { facadeGeometry, type FloorEdge } from "../facadeGeometry";
+import { paintAnimatedUnit } from "../regionPaint";
 import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "../scale";
 import { reap } from "./towerCrowd";
 import { dropRegionUnit, markRegionUnit } from "./towerRegions";
@@ -429,8 +429,7 @@ function addRoom(engine: TowerEngine, u: Unit): void {
     cache: false,
     draw: (ctx) => {
       engine.d.ctx = ctx;
-      engine.d.parkingDead = false;
-      drawUnit(engine.d, u, 0, 0, w, h);
+      paintAnimatedUnit(engine.d, u, w, h);
     },
   });
   const a = addBoxActor(engine, ex.vec(engine.worldX(u.x), engine.worldYTop(u.floor, hgt)), w, h, 0.45, cv);

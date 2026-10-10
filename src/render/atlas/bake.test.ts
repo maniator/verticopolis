@@ -4,7 +4,10 @@ import { buildArchive, signature, ARCHIVE_ROOT } from "./archive";
 import { bake, ImageStore, type Renderer } from "./bake";
 import type { Job } from "./catalog";
 import type { PaintSpec } from "./paint";
-import { blank, type Image } from "./pixels";
+import { blank, sameImage, type Image } from "./pixels";
+import { blit } from "./raster";
+import { compareImages, composeFrame, composeLookup } from "./compose";
+import type { Placed } from "./schema";
 import { ATLAS_SCALES, ATLAS_SCHEMA_VERSION } from "./schema";
 
 /** A fake renderer: a person spec paints a w x h opaque block whose color is
@@ -82,7 +85,8 @@ describe("bake", () => {
   });
   it("store returns the same id for equal content", () => {
     const s = new ImageStore();
-    expect(s.add(blank(1, 1))).toBe(s.add(blank(1, 1)));
+    expect(s.add(blank(1, 1), blank(1, 1))).toBe(s.add(blank(1, 1), blank(1, 1)));
+    expect(s.layer(null, blank(1, 1))).toBeNull();
     expect(s.ref(blank(2, 2))).toBeNull();
   });
 
@@ -94,7 +98,7 @@ describe("bake", () => {
     const names = Object.keys(files);
     expect(names).toContain(`${ARCHIVE_ROOT}/manifest.json`);
     expect(strFromU8(files[`${ARCHIVE_ROOT}/ATTRIBUTION.txt`])).toContain("Art by someone, CC BY 4.0.");
-    expect(strFromU8(files[`${ARCHIVE_ROOT}/LICENSE-ASSETS.md`])).toBe("# License\n");
+    expect(strFromU8(files[`${ARCHIVE_ROOT}/ASSETS-LICENSE.md`])).toBe("# License\n");
     for (const s of ATLAS_SCALES) {
       expect(names).toContain(`${ARCHIVE_ROOT}/${s}x/page-000.png`);
       expect(names).toContain(`${ARCHIVE_ROOT}/${s}x/page-000.normal.png`);
@@ -108,6 +112,47 @@ describe("bake", () => {
     expect(m.animations.loop.frames).toEqual(["loop/0", "loop/1"]);
     expect(m.data.skyColors).toHaveLength(24);
     expect(m.pageSize).toBe(32);
+  });
+  it("the packed pages and the manifest give back every frame and layer pixel for pixel", () => {
+    const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+    const wide: Job = { type: "still", name: "wide", w: 70, h: 1, anchor: { x: 0, y: 0 }, keys: {}, paint: solid("7") };
+    const r2 = bake([...jobs, wide], fake);
+    const a = buildArchive(r2, info, undefined, 32);
+    const fromPages = (p: Placed, w: number, h: number): Image => {
+      const out = blank(w, h);
+      blit(out, a.pages[p.rect.page], p.rect.x, p.rect.y, p.rect.w, p.rect.h, p.dx, p.dy);
+      return out;
+    };
+    for (const f of r2.frames) {
+      const rec = a.manifest.frames[f.name];
+      const rebuilt = blank(f.w, f.h);
+      for (const p of rec.parts) blit(rebuilt, a.pages[p.rect.page], p.rect.x, p.rect.y, p.rect.w, p.rect.h, p.dx, p.dy);
+      expect(sameImage(rebuilt, composeFrame(r2, f)), f.name).toBe(true);
+      for (const [k, c] of Object.entries(rec.chains ?? {})) {
+        c.steps.forEach((p, i) => {
+          const ref = f.chains![k].steps[i];
+          if (!p || !ref) return expect(p).toBe(ref);
+          const want = blank(f.w, f.h);
+          blit(want, r2.images[ref.id], 0, 0, r2.images[ref.id].w, r2.images[ref.id].h, ref.dx, ref.dy);
+          expect(sameImage(fromPages(p, f.w, f.h), want)).toBe(true);
+        });
+      }
+    }
+    expect(a.manifest.frames.wide.parts.length).toBe(3); // sliced across a 32 px page
+  });
+  it("composes lookups and reports mismatches", () => {
+    const cab = r.frames.find((f) => f.name === "cab")!;
+    const two = composeFrame(r, cab, { riders: 2 }, ["one"]);
+    expect(two.data[4 + 3]).toBe(255);
+    expect(two.data[8 + 3]).toBe(0);
+    expect(() => composeFrame(r, cab, { nope: 1 })).toThrow(/no chain nope/);
+    expect(() => composeFrame(r, cab, {}, ["nope"])).toThrow(/no overlay nope/);
+    expect(composeLookup(r, { frame: "cab", chains: { riders: 9 }, overlays: [] }).name).toBe("cab");
+    expect(composeLookup(r, { animation: "loop" }, 1).name).toBe("loop/1");
+    expect(() => composeLookup(r, { frame: "nope", chains: {}, overlays: [] })).toThrow(/no frame nope/);
+    expect(compareImages(two, two)).toEqual({ mismatches: 0, box: undefined });
+    expect(compareImages(two, blank(4, 1))).toMatchObject({ mismatches: 2, box: { x0: 0, x1: 1 } });
+    expect(compareImages(two, blank(2, 1)).mismatches).toBe(4);
   });
   it("refuses a layer too wide for one page", () => {
     const wide: Job = { type: "still", name: "w", w: 60, h: 1, anchor: { x: 0, y: 0 }, keys: {}, paint: car(0), overlays: { o: car(60) } };

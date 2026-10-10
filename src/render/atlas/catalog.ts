@@ -1,4 +1,6 @@
 import { FACILITIES, facilityFloors, hasBusinessHours, isOpenAt } from "../../engine/facilities";
+import { HOUSEHOLD_SIZES } from "../../engine/households";
+import { hasHousehold } from "../../engine/residentialRentals";
 import { subtypeListFor } from "../../engine/retailSubtypes";
 import type { FacilityKind, UnitState } from "../../engine/types";
 import { TILE, FLOOR } from "../scale";
@@ -46,7 +48,7 @@ export interface AnimJob {
 export type Job = StillJob | AnimJob;
 
 /** Every state the engine names (engine-rs `UnitState::as_str`). Fire and
- *  construction ship as animations, not stills. */
+ *  construction ship as animations; the rest bake as stills. */
 export const UNIT_STATES: readonly UnitState[] = [
   "construction",
   "empty",
@@ -73,6 +75,15 @@ export const OCCUPANT_FREE = new Set<FacilityKind>(["parking", "parkingRamp", "s
  * so the atlas carries the per-unit bake's look (origin 0, 0). Tracked as a backlog defer (sprite-origin-seeds).
  */
 export const ORIGIN_SEEDED: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["security", "medical", "housekeeping", "skyBar", "fitnessClub"]);
+
+/** Kinds whose art changes after 23:00 and before 06:00: the condo (its
+ *  asleep scrim and its residents) and the two rentals, which share the
+ *  condo's draw (`residentialRentalSprites.ts`) and its hidden-residents rule. */
+export const LATE_NIGHT_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["condo", "rentalStudio", "rentalApartment"]);
+
+export function isLateHour(hour: number): boolean {
+  return hour >= 23 || hour < 6;
+}
 
 /** The web's re-bake bucket for the recycling pile (`r${round(fill * 8)}`). */
 export const RECYCLE_STEPS = 8;
@@ -102,21 +113,25 @@ export function roomKinds(): FacilityKind[] {
 /** An hour that realizes the requested open/closed and late-night bits for
  *  `kind`. `open` is ignored for kinds without business hours. */
 export function hourFor(kind: FacilityKind, open: boolean, late: boolean): number {
-  const lateHour = (h: number) => h >= 23 || h < 6;
   for (let i = 0; i < 24; i++) {
     const h = (12 + i) % 24;
-    if (kind === "condo" && lateHour(h) !== late) continue;
+    if (LATE_NIGHT_KINDS.has(kind) && isLateHour(h) !== late) continue;
     if (hasBusinessHours(kind) && isOpenAt(kind, h) !== open) continue;
     return h;
   }
   throw new Error(`no hour realizes ${kind} open=${open} late=${late}`);
 }
 
-/** The visible-occupant chain cap for a kind: comfortably above any count its
- *  art can show (trailing empty layers are trimmed by the bake). */
+/** The most occupants the engine can put in a room of `kind`, which is the
+ *  occupant chain's length. Leases and stays fill to the catalog population,
+ *  commercial customers stay under it (`crowd/visits.ts`), venues are clamped
+ *  to their attendance (`census.syncAttendanceOccupants`), and a Modern
+ *  household runs up to the largest family size. A frontend clamps a larger
+ *  (forged) count to the chain's `max`. */
 export function occupantCap(kind: FacilityKind): number {
   const f = FACILITIES[kind];
-  return Math.max(f.population, f.attendance ?? 0, 8);
+  const household = hasHousehold(kind) ? Math.max(...HOUSEHOLD_SIZES) : 0;
+  return Math.max(f.population, f.attendance ?? 0, household);
 }
 
 /** Frame name token for a subtype: the engine's name, or `-` for none. */
@@ -136,7 +151,7 @@ export function roomJobs(): Job[] {
     jobs.push(...roomAnimations(kind, w, h));
     const subtypes: (string | undefined)[] = [undefined, ...(subtypeListFor(kind) ?? [])];
     const hoursSet = hasBusinessHours(kind) ? ["open", "closed"] : ["always"];
-    const lateSet = kind === "condo" ? ["late", "notlate"] : ["any"];
+    const lateSet = LATE_NIGHT_KINDS.has(kind) ? ["late", "notlate"] : ["any"];
     const placements = variantPlacements(kind);
     for (const state of UNIT_STATES) {
       if (state === "fire" || state === "construction") continue;

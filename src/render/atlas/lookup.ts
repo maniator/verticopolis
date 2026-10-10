@@ -1,7 +1,8 @@
-import { FACILITIES, hasBusinessHours, isOpenAt } from "../../engine/facilities";
+import { hasBusinessHours, isOpenAt } from "../../engine/facilities";
+import { subtypeListFor } from "../../engine/retailSubtypes";
 import type { FacilityKind, UnitState } from "../../engine/types";
 import { rand } from "../sprites/common";
-import { OCCUPANT_FREE, PARKING_CAR_COLORS, RECYCLE_STEPS } from "./catalog";
+import { LATE_NIGHT_KINDS, OCCUPANT_FREE, PARKING_CAR_COLORS, RECYCLE_STEPS, isLateHour } from "./catalog";
 
 /**
  * The reference reader: how a frontend maps a live unit and scene to atlas
@@ -14,6 +15,9 @@ export interface LiveUnit {
   kind: FacilityKind;
   state: UnitState;
   subtype?: string;
+  /** The room's width in tiles. The atlas bakes catalog widths only; a room
+   *  imported at another width names a frame the atlas does not carry. */
+  width: number;
   occupants: number;
   outForMeal?: number;
   /** Used for the parked-car color and presence roll, like the web. */
@@ -40,8 +44,11 @@ export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number): Lookup {
   let hours = "always";
   if (hasBusinessHours(u.kind)) hours = isOpenAt(u.kind, s.hour) ? "open" : "closed";
   let late = "any";
-  if (u.kind === "condo") late = s.hour >= 23 || s.hour < 6 ? "late" : "notlate";
-  const stem = `room/${u.kind}/${u.state}/${u.subtype ?? "-"}/w${FACILITIES[u.kind].width}/${s.lit ? "lit" : "unlit"}/${hours}/${late}/v${variant}`;
+  if (LATE_NIGHT_KINDS.has(u.kind)) late = isLateHour(s.hour) ? "late" : "notlate";
+  // An unknown or legacy subtype draws the kind's default look, the "-" frame.
+  const known = u.subtype !== undefined && (subtypeListFor(u.kind) ?? []).includes(u.subtype);
+  const subtype = known ? u.subtype : "-";
+  const stem = `room/${u.kind}/${u.state}/${subtype}/w${u.width}/${s.lit ? "lit" : "unlit"}/${hours}/${late}/v${variant}`;
   if (u.kind === "parking") {
     const overlays: string[] = [];
     if (s.dead) overlays.push("dead");
@@ -49,11 +56,17 @@ export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number): Lookup {
     return { frame: stem, chains: {}, overlays };
   }
   if (u.kind === "recycling") {
-    const fill = Math.max(0, Math.min(1, s.recycleFill));
+    const fill = Math.max(0, Math.min(1, finite(s.recycleFill)));
     return { frame: stem, chains: { fill: Math.round(fill * RECYCLE_STEPS) }, overlays: [] };
   }
   if (OCCUPANT_FREE.has(u.kind)) return { frame: stem, chains: {}, overlays: [] };
-  if (u.occupants <= 0) return { frame: `${stem}/away`, chains: {}, overlays: [] };
-  const visible = Math.max(0, u.occupants - (u.outForMeal ?? 0));
+  const occupants = finite(u.occupants);
+  if (occupants <= 0) return { frame: `${stem}/away`, chains: {}, overlays: [] };
+  const visible = Math.max(0, occupants - finite(u.outForMeal ?? 0));
   return { frame: `${stem}/home`, chains: { occupants: visible }, overlays: [] };
+}
+
+/** A count or fraction from the engine, with a corrupt value read as 0. */
+function finite(n: number): number {
+  return Number.isFinite(n) ? n : 0;
 }

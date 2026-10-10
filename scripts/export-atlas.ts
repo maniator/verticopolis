@@ -2,17 +2,21 @@
  * Export the game's procedural sprite art as a scaled texture atlas any
  * frontend on the open engine can load (issue #909). Usage:
  *
- *   npx tsx scripts/export-atlas.ts [--out dist-atlas] [--filter room/office]
+ *   npx tsx scripts/export-atlas.ts [--out dist-atlas] [--filter room/office] [--label <tag>]
  *
  * The art is baked ONCE at the canonical size in a real Chromium, then scaled
  * to 2x and 4x by nearest neighbor (the draw routines are not scale-faithful,
  * #812 and #813, so the art is never redrawn larger). The release copy must be
  * baked in the pinned Playwright image (`mcr.microsoft.com/playwright:v<lockfile
  * playwright version>-jammy`, the one the screenshot workflows use); a host
- * browser is fine for a preview but rasterizes differently. Set PW_CHROME to
- * the browser binary to override Playwright's own.
+ * browser is fine for a preview but rasterizes differently. The bake launches
+ * Playwright's own Chromium, the same binary the e2e comparison uses; set
+ * PW_CHROME only to point a local preview at another browser.
  *
- * Writes `<out>/verticopolis-atlas-<version>.zip` and a `.sha256` beside it.
+ * Before writing, it checks the atlas against the game's own paint for the
+ * sample signatures in `src/render/atlas/samples.ts` and stops on any
+ * mismatch. Writes `<out>/verticopolis-atlas-<label or version>.zip` and a
+ * `.sha256` beside it.
  * Nothing it writes is committed. The archive layout and manifest schema are
  * documented in docs/atlas.md.
  */
@@ -47,18 +51,23 @@ function attributionLine(license: string): string {
   return quote.join(" ").replace(/\s+/g, " ").trim();
 }
 
+/** The commit the working tree is checked out at. Read from git first: on a
+ *  manual workflow run the checkout is the requested tag, while GITHUB_SHA
+ *  names the commit that dispatched the run. */
 function gitCommit(): string {
-  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
   try {
     return execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
   } catch {
-    return "unknown";
+    return process.env.GITHUB_SHA || "unknown";
   }
 }
 
 async function main(): Promise<void> {
   const outDir = resolve(root, arg("out") ?? "dist-atlas");
   const filter = arg("filter");
+  // The release tag names the archive when the workflow builds one; a local
+  // run falls back to the package version.
+  const label = arg("label")?.replace(/[^A-Za-z0-9._-]+/g, "-");
   const t0 = Date.now();
   const code = await bundleBake();
   console.log(`bundled the bake (${(code.length / 1024).toFixed(0)} KiB)`);
@@ -68,19 +77,31 @@ async function main(): Promise<void> {
     const page = await browser.newPage();
     await page.setContent("<!doctype html><html><body></body></html>");
     await page.addScriptTag({ content: code });
+    // Pre-flight: the atlas must reproduce the game's paint for every sample
+    // signature before anything is written.
+    if (!filter) {
+      const checks: { label: string; mismatches: number }[] = await page.evaluate(() => (globalThis as any).__vcAtlas.verify());
+      const bad = checks.filter((c) => c.mismatches > 0);
+      if (bad.length > 0) throw new Error(`atlas does not match the game's paint:\n${JSON.stringify(bad, null, 1)}`);
+      console.log(`pre-flight: ${checks.length} sample paints match the game`);
+    }
     const summary = await page.evaluate((f) => (globalThis as any).__vcAtlas.run(f), filter);
     console.log(`baked ${summary.frames} frames, ${summary.animations} animations, ${summary.images} unique images`);
     const records = await page.evaluate(() => (globalThis as any).__vcAtlas.records());
     const images: Image[] = [];
+    const normals: Image[] = [];
     const CHUNK = 400;
     for (let from = 0; from < summary.images; from += CHUNK) {
-      const got: { w: number; h: number; b64: string }[] = await page.evaluate(
+      const got: { w: number; h: number; b64: string; normal: string }[] = await page.evaluate(
         ([a, b]) => (globalThis as any).__vcAtlas.images(a, b),
         [from, Math.min(summary.images, from + CHUNK)],
       );
-      for (const g of got) images.push({ w: g.w, h: g.h, data: new Uint8ClampedArray(Buffer.from(g.b64, "base64")) });
+      for (const g of got) {
+        images.push({ w: g.w, h: g.h, data: new Uint8ClampedArray(Buffer.from(g.b64, "base64")) });
+        normals.push({ w: g.w, h: g.h, data: new Uint8ClampedArray(Buffer.from(g.normal, "base64")) });
+      }
     }
-    bakeResult = { images, frames: records.frames, animations: records.animations };
+    bakeResult = { images, normals, frames: records.frames, animations: records.animations };
   } finally {
     await browser.close();
   }
@@ -93,7 +114,7 @@ async function main(): Promise<void> {
     (msg) => console.log(msg),
   );
   mkdirSync(outDir, { recursive: true });
-  const name = `verticopolis-atlas-${pkg.version}.zip`;
+  const name = `verticopolis-atlas-${label ?? pkg.version}.zip`;
   writeFileSync(join(outDir, name), archive.zip);
   const sha = createHash("sha256").update(archive.zip).digest("hex");
   writeFileSync(join(outDir, `${name}.sha256`), `${sha}  ${name}\n`);

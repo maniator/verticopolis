@@ -66,8 +66,9 @@ export function structureJobs(): Job[] {
 /** Sampled car seeds (the web seeds a cab by `car index * 7 + shaft id`). */
 export const CAR_SEEDS = [0, 7, 15, 22];
 
-/** Rider chain cap: past the point a cab can show more riders. */
-export const RIDER_CAP = 24;
+/** Rider chain length: a cab shows at most four riders (`carIndicator.ts`
+ *  clamps the load to 0..4). */
+export const RIDER_CAP = 4;
 
 /** Elevator shafts as floor bands, the fixed-span stairs and escalators, and
  *  the cabs with their rider chains. */
@@ -173,9 +174,12 @@ export function vehicleJobs(): Job[] {
 /** Skyline fills (`excalibur/towerScenery.ts`): far, then near. */
 export const SKYLINE_FILLS = ["rgba(70, 86, 120, 0.55)", "rgba(52, 66, 96, 0.75)"];
 
-/** The 24-hour sky strip, the sun and moon, every cloud, and the skyline. */
+/** Columns in the sky strip: one per quarter hour. */
+export const SKY_COLUMNS = 96;
+
+/** The day's sky strip, the sun and moon, every cloud, and the skyline. */
 export function skyJobs(): Job[] {
-  const jobs: Job[] = [still("sky/gradient", 24, 1, { p: "skyGradient" }, { piece: "gradient" })];
+  const jobs: Job[] = [still("sky/gradient", SKY_COLUMNS, 1, { p: "skyGradient" }, { piece: "gradient", columnsPerHour: SKY_COLUMNS / 24 })];
   for (const [name, day, r] of [["sun", true, SUN_R], ["moon", false, MOON_R]] as const) {
     const d = 2 * r + 2;
     jobs.push(still(`sky/${name}`, d, d, { p: "disc", day, r }, { piece: name }, { x: d / 2, y: d / 2 }));

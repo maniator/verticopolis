@@ -3,7 +3,8 @@ import { roomJobs, type Job } from "./catalog";
 import { facadeJobs, peopleJobs, skyJobs, structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
 import { paint, type PaintSpec } from "./paint";
 import type { Image } from "./pixels";
-import { verifySample, type Sample, type SampleResult } from "./verify";
+import { SAMPLES, type Sample } from "./samples";
+import { verifySample, type SampleResult } from "./verify";
 
 /**
  * The atlas bake's browser half, bundled by `scripts/export-atlas.ts` and run
@@ -51,9 +52,9 @@ function toBase64(bytes: Uint8ClampedArray): string {
 
 interface AtlasPage {
   run(filter?: string): { images: number; frames: number; animations: number };
-  records(): Omit<BakeResult, "images">;
-  images(from: number, to: number): { w: number; h: number; b64: string }[];
-  verify(samples: Sample[]): SampleResult[];
+  records(): Omit<BakeResult, "images" | "normals">;
+  images(from: number, to: number): { w: number; h: number; b64: string; normal: string }[];
+  verify(samples?: Sample[]): SampleResult[];
 }
 
 let result: BakeResult | null = null;
@@ -69,12 +70,13 @@ const api: AtlasPage = {
   },
   images(from, to) {
     if (!result) throw new Error("run() first");
-    return result.images.slice(from, to).map((img) => ({ w: img.w, h: img.h, b64: toBase64(img.data) }));
+    const r = result;
+    return r.images.slice(from, to).map((img, i) => ({ w: img.w, h: img.h, b64: toBase64(img.data), normal: toBase64(r.normals[from + i].data) }));
   },
-  verify(samples) {
+  verify(samples = SAMPLES) {
     const jobs = allJobs();
     const renderer = canvasRenderer(document);
-    return samples.map((s) => verifySample(document, jobs, renderer, s));
+    return samples.flatMap((s) => verifySample(document, jobs, renderer, s));
   },
 };
 (globalThis as unknown as { __vcAtlas: AtlasPage }).__vcAtlas = api;

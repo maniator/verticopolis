@@ -39,12 +39,16 @@ export const OUTLINE_SINK = 0.5;
 export const NORMAL_STRENGTH = 2;
 
 /** Height in 0..1 from straight RGBA: luminance times coverage, with the
- *  sprite outline (an opaque pixel touching transparency or the page edge)
- *  sunk by {@link OUTLINE_SINK}. */
+ *  sprite outline (a visible pixel touching a transparent one) sunk by
+ *  {@link OUTLINE_SINK}. The image is a whole frame, so its border is not an
+ *  outline: past the edge the frame reads as continuing (rooms tile side by
+ *  side and must not bevel at their seams). */
 export function heightField(img: Image): Float32Array {
   const { w, h, data } = img;
   const out = new Float32Array(w * h);
-  const alpha = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : data[(y * w + x) * 4 + 3]);
+  const cx = (x: number) => Math.min(w - 1, Math.max(0, x));
+  const cy = (y: number) => Math.min(h - 1, Math.max(0, y));
+  const alpha = (x: number, y: number) => data[(cy(y) * w + cx(x)) * 4 + 3];
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
@@ -59,15 +63,17 @@ export function heightField(img: Image): Float32Array {
 }
 
 /**
- * Tangent-space normal map in the OpenGL convention (+X right, +Y up, +Z out
- * of the page), encoded as `rgb = n * 0.5 + 0.5`. A Sobel gradient over the
- * height field; transparent pixels stay transparent (flat normal, alpha 0),
- * and each opaque pixel keeps its color pixel's alpha.
+ * Tangent-space normal map of a whole frame, in the OpenGL convention (+X
+ * right, +Y up, +Z out of the page), encoded as `rgb = n * 0.5 + 0.5`. A Sobel
+ * gradient over the height field, sampling past the frame edge as the edge
+ * pixel. Coverage is binary: alpha 255 wherever the color pixel shows at all,
+ * 0 (with a flat normal) where it is transparent, so a loader that
+ * premultiplies alpha cannot scale the encoded vector.
  */
 export function normalMap(img: Image): Image {
   const { w, h } = img;
   const hf = heightField(img);
-  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : hf[y * w + x]);
+  const at = (x: number, y: number) => hf[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
   const out = blank(w, h);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -86,8 +92,19 @@ export function normalMap(img: Image): Image {
       out.data[i] = Math.round(((nx / len) * 0.5 + 0.5) * 255);
       out.data[i + 1] = Math.round(((ny / len) * 0.5 + 0.5) * 255);
       out.data[i + 2] = Math.round(((1 / len) * 0.5 + 0.5) * 255);
-      out.data[i + 3] = a;
+      out.data[i + 3] = 255;
     }
+  }
+  return out;
+}
+
+/** Keep `normal`'s pixels only where `mask` shows (alpha above 0); clear the
+ *  rest to transparent. Used to cut a layer's normals out of its frame's. */
+export function maskTo(normal: Image, mask: Image): Image {
+  const out = blank(normal.w, normal.h);
+  for (let i = 0; i < out.data.length; i += 4) {
+    if (mask.data[i + 3] === 0) out.data.set([128, 128, 255, 0], i);
+    else out.data.set(normal.data.subarray(i, i + 4), i);
   }
   return out;
 }

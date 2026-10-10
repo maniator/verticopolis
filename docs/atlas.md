@@ -7,7 +7,7 @@ same art without porting the drawing code.
 
 ## Getting it
 
-Every tag's GitHub release carries `verticopolis-atlas-<version>.zip` and a
+Every tag's GitHub release carries `verticopolis-atlas-<tag>.zip` and a
 `.sha256` file beside it (`.github/workflows/atlas-release.yml`). Fetch the
 release for the commit your frontend pins and check the archive against the
 checksum before you unpack it. Nothing generated is committed to this
@@ -23,9 +23,16 @@ npm run atlas -- --out dist-atlas --filter room/office   # a slice, for a previe
 
 The release copy is baked inside the pinned Playwright image (the same
 `mcr.microsoft.com/playwright:v<lockfile playwright version>-jammy` the
-screenshot workflows use), with `PW_CHROME` pointing at that image's Chromium.
-A host browser works for a preview, but it rasterizes text and curves slightly
-differently, so its pixels and checksum will not match the release.
+screenshot workflows use), with Playwright's own Chromium from that image, the
+browser the e2e comparison runs in. A host browser works for a preview (point
+`PW_CHROME` at it), but it rasterizes text and curves slightly differently, so
+its pixels and checksum will not match the release. To bake in the pinned
+image locally, use the container recipe in CONTRIBUTING.md (Regenerating
+screenshot drift) with `npm run atlas -- --out dist-atlas` as the command.
+
+Before it writes anything, the export checks the atlas against the game's own
+paint for the sample signatures in `src/render/atlas/samples.ts` and stops on
+any mismatch.
 
 ## How it is made
 
@@ -41,7 +48,7 @@ pages. The art is never redrawn larger: the routines use fixed pixel literals
 verticopolis-atlas/
   manifest.json
   ATTRIBUTION.txt          the CC BY 4.0 attribution line
-  LICENSE-ASSETS.md        ASSETS-LICENSE.md, verbatim
+  ASSETS-LICENSE.md        the asset license, verbatim
   1x/page-000.png          512 x 512 color page
   1x/page-000.normal.png   its normal map
   2x/...                   1024 x 1024
@@ -50,13 +57,20 @@ verticopolis-atlas/
 
 Every rectangle in the manifest is in 1x pixels. For a 2x or 4x page, multiply
 `x`, `y`, `w` and `h` (and any `dx`, `dy`, anchor) by the scale; the page index
-stays the same. Sample the pages with nearest filtering: images sit one 1x
-pixel apart, so linear filtering bleeds between neighbors.
+stays the same. Sample the pages with nearest filtering: each image has a
+one-pixel transparent gutter (two pixels between neighbors at 1x), which is not
+enough for linear filtering.
 
 Normal maps are tangent-space, OpenGL convention (+X right, +Y up, +Z toward the
-viewer), encoded as `rgb = n * 0.5 + 0.5`. Height comes from luminance times
-coverage, with each sprite's outline sunk to half height so silhouettes read as
-beveled. Transparent pixels stay transparent.
+viewer), encoded as `rgb = n * 0.5 + 0.5`, and share their color page's layout.
+Height comes from luminance times coverage, with each sprite's outline (a
+visible pixel next to a transparent one) sunk to half height so silhouettes
+read as beveled. Each normal map is taken over the whole frame before it is
+trimmed, sliced or split into layers, so none of those cuts bevels, and a
+frame's own border does not either (rooms tile side by side). A layer's normals
+come from the frame it completes. Normal alpha is 255 wherever the color pixel
+shows and 0 elsewhere, so a loader that premultiplies alpha leaves the vectors
+intact.
 
 ## The manifest
 
@@ -100,11 +114,11 @@ Names follow the engine's own strings: the facility keys from
 | Fire, construction | animation `fire/<kind>`, `construction/<kind>`; frames `.../<i>` |
 | Structure | `structure/floor`, `structure/lobby/<ground or sky>/<lit>/v<0-3>`, animation `structure/entrance/<grand-left, grand-right, grand-solo or service>/<lit>/<staffed or unstaffed>` |
 | Shafts | `shaft/<elevator kind>/<top, stop, skip, bottom or single>`, `transport/stairs`, `transport/escalator` |
-| Cars | `car/<elevator kind>/<idle, up or down>/<full or notfull>/s<seed>` with a `riders` chain |
-| People | `person/<seated, standing, walker, rider or hiVis>/<shirt0-7, staff, impatient or fedUp>` |
+| Cars | `car/<elevator kind>/<idle, up or down>/<full or notfull>/s<0-3>` with a `riders` chain (sampled seeds in `data.carSeeds`) |
+| People | `person/<seated, standing, walker, rider or hiVis>/<shirt<i>, staff, impatient or fedUp>`, one `shirt<i>` per entry of `data.shirts` |
 | Facade | `facade/escape/<left or right>/<0 or 1>`, `facade/awning/<left or right>`, animation `facade/crane/<lit>` |
-| Vehicles | `vehicle/streetcar/s<seed>`, `vehicle/garbagetruck`, `vehicle/metrotrain/<headlight or dark>` |
-| Sky | `sky/gradient` (one column per hour), `sky/sun`, `sky/moon`, `sky/cloud/<overcast or rain>/<0-4>`, `sky/skyline/<far or near>` |
+| Vehicles | `vehicle/streetcar/s<0-3>` (sampled seeds in `data.streetCarSeeds`), `vehicle/garbagetruck`, `vehicle/metrotrain/<headlight or dark>` |
+| Sky | `sky/gradient` (one column per quarter hour), `sky/sun`, `sky/moon`, `sky/cloud/<overcast or rain>/<0-4>`, `sky/skyline/<far or near>` |
 
 A shaft is drawn floor by floor: `top` for its top floor, `bottom` for its
 bottom floor, `stop` or `skip` for each floor between (an express skip floor
@@ -118,14 +132,26 @@ that signature into frame names and leaves the rest as layers. The reference
 reader is `src/render/atlas/lookup.ts`; in short:
 
 1. A burning or unbuilt room plays `fire/<kind>` or `construction/<kind>`.
-2. Otherwise build the frame name from the kind, state, subtype, width, the
-   lighting, the business hours at the current hour, a condo's late night
-   (23:00 to 06:00), and the variant you picked for that room.
+2. Otherwise build the frame name from the kind, state, subtype (a subtype
+   the engine does not list for the kind uses `-`), width, the lighting, the
+   business hours at the current hour, the late night (23:00 to 06:00) of a
+   condo, studio or apartment, and the variant you picked for that room.
 3. For most rooms, append `/home` when `occupants > 0`, else `/away`, and on a
    home frame draw the `occupants` chain up to `occupants - outForMeal`.
 4. A parking space draws the `dead` overlay when it is not chained to a ramp;
-   otherwise it draws `car<id % 7>` when it holds a car. A recycling center
-   draws its `fill` chain up to `round(fill * 8)`.
+   otherwise it draws `car<id % 7>` when it holds a car (the game's presence
+   roll is spelled out in `signature.rules.parkingRoll`). A recycling center
+   draws its `fill` chain up to `round(fill * 8)`. The game re-bakes the pile on
+   the same eighths but paints the exact fill, so between steps a pile can
+   differ by a bag or a gauge pixel.
+
+The chain layers carry the occupants: step `k` holds exactly the pixels that
+change when the visible count goes from `k - 1` to `k`, at their place in the
+room (for most rooms, the figure that sits down in that slot). Draw them in
+order; a single step on its own is not a standalone figure.
+
+Frames exist for each kind's catalog width only. A room imported from an old
+tower at another width has no frame yet.
 
 Room variety in the web comes from each room's floor, column and id, which no
 finite atlas can cover. The atlas bakes four sampled placements per kind (the
@@ -135,16 +161,29 @@ position, and keep it.
 A few details in the security office, medical center, housekeeping, sky bar
 and fitness club follow the draw origin in the web game rather than the room's
 position. The atlas carries the look at the origin; see
-`signature.rules.originSeeded`.
+`signature.rules.originSeeded`. The cinema's marquee and screen read the
+animation clock; the game keeps whatever phase its last re-bake caught, and
+the atlas bakes phase 0.
+
+The crane's motion never repeats in the game. Its animation is a sampled
+stretch (`loop: false`); play it forward and back, or hold, as suits you.
 
 ## How it is checked
 
-`e2e/atlas.spec.ts` composes atlas frames and layers for a sample of live
-signatures with the reference reader, paints the same rooms the way the game's
-region compositor does, and requires an exact pixel match. The bake itself
-refuses to write a layer that would not compose back to the web's pixels.
+`e2e/atlas.spec.ts` (and the export's own pre-flight) composes atlas frames and
+layers for the sample room signatures with the reference reader, paints the
+same rooms through the game's own paint functions (`src/render/regionPaint.ts`,
+which the region compositor and the burning-room canvas call) at two region
+offsets, and requires an exact pixel match. The bake refuses to write a layer
+that would not compose back to the game's pixels, or a chain that its cap cut
+short. A unit test rebuilds every frame and layer from the packed pages
+through the manifest.
+
+The other families (structure, shafts, cars, people, facade, vehicles, sky)
+are direct calls to the same draw functions with the arguments the game
+passes, so they are not compared separately.
 
 ## Not in the atlas yet
 
 Event cameos (Santa, the VIP limo, the thief), the plaza and street scenery,
-the ground strip, and the in-cab mood tints are not exported yet.
+and the ground strip are not exported yet.
