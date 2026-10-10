@@ -189,7 +189,7 @@ impl Simulation {
             ledger: Ledger::new(),
             tower: {
                 let mut t = Tower::new();
-                t.allows_escalator_on_office_floors = mode == GameMode::Modern;
+                t.allows_escalator_on_office_floors = mode.allows_escalator_on_office_floors();
                 t.mode = mode;
                 t
             },

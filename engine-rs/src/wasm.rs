@@ -104,6 +104,11 @@ fn override_mode(raw: &mut Value, mode: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The catalog JSON for a mode name.
+fn catalog_text(mode: &str) -> Result<String, String> {
+    Ok(crate::catalog::catalog_json(parse_mode(mode)?).to_string())
+}
+
 /// One running simulation. Construct with `newGame`, `fromSave` or
 /// `fromVctower`; drive it with the command methods; read it back with
 /// `serialize` and the two hashed views.
@@ -136,6 +141,13 @@ impl Engine {
         Ok(Engine {
             sim: Simulation::new_game_with(seed, mode, calendar, start_unbridged.unwrap_or(false)),
         })
+    }
+
+    /// `catalogFor(mode)`: every price, size and build rule a frontend
+    /// reads, resolved for the mode, as JSON. A static: it reads the
+    /// engine's tables and needs no running game.
+    pub fn catalog(mode: &str) -> Result<String, JsError> {
+        catalog_text(mode).map_err(err)
     }
 
     /// `Simulation.deserialize(JSON.parse(text))`: a serialized game, migrated
@@ -682,6 +694,18 @@ pub fn log_since(sim: &Simulation, seq: i64) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_catalog_crosses_as_json_and_refuses_an_unknown_mode() {
+        for mode in [GameMode::Classic, GameMode::Modern] {
+            let text = catalog_text(mode.as_str()).unwrap();
+            let v: Value = serde_json::from_str(&text).unwrap();
+            assert_eq!(digest(&v), crate::catalog::catalog_digest(mode));
+        }
+        assert!(catalog_text("arcade")
+            .unwrap_err()
+            .contains("classic or modern"));
+    }
 
     #[test]
     fn the_frame_view_carries_the_header_and_one_record_per_person_unit_and_car() {

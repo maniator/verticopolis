@@ -37,7 +37,7 @@ export function isSkyLobbyFloor(floor: number): boolean {
  * primitive stays permissive so save-load and internal callers are untouched.
  */
 export function groundFloorStructureKind(kind: FacilityKind, floor: number): FacilityKind {
-  return kind === "floor" && floor === 1 ? "lobby" : kind;
+  return kind === "floor" && floor === GRID.groundFloor ? "lobby" : kind;
 }
 
 /**

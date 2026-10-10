@@ -5,6 +5,11 @@ pub const LOT_WIDTH: i64 = 375;
 pub const MAX_FLOOR: i64 = 100;
 pub const MIN_FLOOR: i64 = -9;
 pub const LOBBY_INTERVAL: i64 = 15;
+/// `GRID.groundFloor`: the lobby-only concourse every tower starts from.
+pub const GROUND_FLOOR: i64 = 1;
+/// `WEDDING_HALL_FLOOR`: the one floor the wedding hall may sit on. Read by
+/// the placement check and by the catalog's `only_floor`.
+pub const WEDDING_HALL_FLOOR: i64 = MAX_FLOOR;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Kind {
@@ -59,6 +64,24 @@ pub enum Category {
     Entertainment,
     Service,
     Special,
+}
+
+impl Category {
+    /// The TypeScript `FacilityCategory` string.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Category::Structure => "structure",
+            Category::Transport => "transport",
+            Category::Office => "office",
+            Category::Residential => "residential",
+            Category::Hotel => "hotel",
+            Category::Food => "food",
+            Category::Retail => "retail",
+            Category::Entertainment => "entertainment",
+            Category::Service => "service",
+            Category::Special => "special",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -759,8 +782,9 @@ impl Kind {
         self.is_transport() && self.max_span() == 1
     }
 
+    /// `maxCarsFor(kind)`: the `MAX_CARS` entry, with the one fallback.
     pub fn max_cars(self) -> i64 {
-        8
+        max_cars_entry(self).unwrap_or(8)
     }
 
     /// `buildMinutes`.
@@ -840,6 +864,15 @@ impl Kind {
     }
 }
 
+/// `MAX_CARS[kind]`: the most cars one shaft of an elevator kind holds.
+/// Canon: every elevator kind takes 8, service included.
+pub fn max_cars_entry(kind: Kind) -> Option<i64> {
+    match kind {
+        Kind::ElevatorStandard | Kind::ElevatorService | Kind::ElevatorExpress => Some(8),
+        _ => None,
+    }
+}
+
 /// `BUILD_CAPS`.
 pub fn build_cap(kind: Kind) -> Option<i64> {
     match kind {
@@ -887,11 +920,18 @@ pub fn is_sky_lobby_floor(floor: i64) -> bool {
 }
 
 pub fn ground_floor_structure_kind(kind: Kind, floor: i64) -> Kind {
-    if kind == Kind::Floor && floor == 1 {
+    if kind == Kind::Floor && floor == GROUND_FLOOR {
         Kind::Lobby
     } else {
         kind
     }
+}
+
+/// `isAvailableInMode(kind, mode)`: whether the mode offers the kind at all
+/// (a Modern-only kind is never buildable in a Classic tower). The mode half
+/// of `is_unlocked`, and the catalog's `available`.
+pub fn is_available_in_mode(kind: Kind, mode: crate::clock::GameMode) -> bool {
+    !kind.facility().modern_only || mode.is_modern()
 }
 
 /// `NO_BASEMENT_KINDS`.

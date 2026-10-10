@@ -68,6 +68,17 @@ loader, and writes them with the same regeneration switch as the lock
 a Rust unit test replays every case. Add a case for any coercion rule you
 touch.
 
+## The catalog lock
+
+`catalog.json` pins the canonical hash (the definition below) of each mode's
+catalog: every price, size and build rule a frontend reads, as
+`catalogFor(mode)` in `src/engine/catalog.ts` builds it.
+`src/tests/integration/conformanceCatalog.integration.test.ts` hashes it and
+writes the lock with the same switch as the scenario lock; the Rust engine's
+`catalog(mode)` must hash the same (a unit test in `engine-rs/src/catalog.rs`
+and the referee both check it). A moved catalog hash means a price, size or
+rule changed in one engine; change the other in the same pull request.
+
 ## Scenario format
 
 ```json

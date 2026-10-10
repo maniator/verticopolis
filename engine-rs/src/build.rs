@@ -45,18 +45,17 @@ impl Simulation {
     }
 
     pub fn is_unlocked(&self, kind: Kind) -> bool {
-        let f = kind.facility();
-        if f.modern_only && self.mode != GameMode::Modern {
+        if !is_available_in_mode(kind, self.mode) {
             return false;
         }
-        self.star >= f.min_star
+        self.star >= kind.facility().min_star
     }
 
     pub fn can_build(&self, kind: Kind, floor: i64, x: i64) -> CanBuild {
         let kind = ground_floor_structure_kind(kind, floor);
         let f = kind.facility();
         if !self.is_unlocked(kind) {
-            let reason = if f.modern_only && self.mode != GameMode::Modern {
+            let reason = if !is_available_in_mode(kind, self.mode) {
                 format!("{} is a Modern-only facility.", f.name)
             } else {
                 format!("{} unlocks at {}★.", f.name, f.min_star)
@@ -254,13 +253,7 @@ impl Simulation {
         if !self.is_unlocked(kind) {
             return BuildResult::fail(format!("{} unlocks at {}★.", f.name, f.min_star));
         }
-        let span = top - bottom;
-        let extra = if kind.is_elevator() {
-            span as f64 * 5_000.0
-        } else {
-            0.0
-        };
-        let total = f.cost + extra;
+        let total = crate::econ::transport_cost_for_span(kind, top - bottom);
         if self.money < total {
             return BuildResult::fail("Not enough money.");
         }
@@ -291,7 +284,7 @@ impl Simulation {
                 }
                 self.tower.remove_unit(id);
                 self.money += if state == UnitState::Gutted {
-                    0.0
+                    crate::econ::GUTTED_RESALE_REFUND
                 } else {
                     kind.resale_refund()
                 };

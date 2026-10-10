@@ -27,7 +27,7 @@ pub enum CongestionBindingClass {
 /// `BINDING_TIE_EPS`: two ratios within this band count as tied.
 const BINDING_TIE_EPS: f64 = 1e-9;
 
-const HOUSEHOLD_SIZES: [i64; 4] = [2, 3, 4, 5];
+pub const HOUSEHOLD_SIZES: [i64; 4] = [2, 3, 4, 5];
 const HOUSEHOLD_WEIGHTS: [i64; 4] = [4, 6, 2, 1];
 
 /// `householdPrice`.
@@ -377,7 +377,7 @@ impl Simulation {
                 let u = &self.tower.units[i];
                 rent_of(u.kind, u.rent, u.no_rate)
             };
-            let (price, residents) = if self.mode.is_modern() {
+            let (price, residents) = if self.mode.has_variant_households() {
                 let r = roll_household(&mut self.rng);
                 (household_price(asking, Some(r)), Some(r))
             } else {
