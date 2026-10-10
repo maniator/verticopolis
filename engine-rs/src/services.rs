@@ -47,8 +47,16 @@ impl ExterminatorRefusal {
 /// A fractional amount reads as `toLocaleString()` reads it: the shortest
 /// round-trip decimal, rounded half away from zero to at most three
 /// fraction digits, trailing zeros dropped (123456.78 reads "123,456.78").
+/// Negative zero, and a negative amount that rounds to zero, keep the sign
+/// ("-0"), and the non-finite values read "∞", "-∞" and "NaN", in every
+/// build.
 pub(crate) fn with_thousands(x: f64) -> String {
-    debug_assert!(x.is_finite(), "{x}");
+    if x.is_nan() {
+        return "NaN".to_string();
+    }
+    if x.is_infinite() {
+        return if x > 0.0 { "∞" } else { "-∞" }.to_string();
+    }
     // Rust's `Display` for f64 is the shortest round-trip decimal and never
     // uses an exponent, the digits ICU starts from.
     let plain = format!("{}", x.abs());
@@ -85,7 +93,7 @@ pub(crate) fn with_thousands(x: f64) -> String {
         f
     };
     let mut out = String::new();
-    if x < 0.0 {
+    if x.is_sign_negative() {
         out.push('-');
     }
     for (i, &c) in int_digits.iter().enumerate() {
@@ -435,6 +443,24 @@ mod tests {
             (1.0005, "1.001"),
             (106666.66666666667, "106,666.667"),
             (0.1 + 0.2, "0.3"),
+        ] {
+            assert_eq!(with_thousands(x), want, "{x}");
+        }
+    }
+
+    /// The signed and non-finite cases, each the string node's
+    /// `toLocaleString()` prints for the same number.
+    #[test]
+    fn signed_and_non_finite_amounts_match_to_locale_string() {
+        for (x, want) in [
+            (-0.0, "-0"),
+            (-0.0001, "-0"),
+            (-0.0004, "-0"),
+            (-0.0005, "-0.001"),
+            (-1234.5, "-1,234.5"),
+            (f64::INFINITY, "∞"),
+            (f64::NEG_INFINITY, "-∞"),
+            (f64::NAN, "NaN"),
         ] {
             assert_eq!(with_thousands(x), want, "{x}");
         }

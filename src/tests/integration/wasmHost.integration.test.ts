@@ -33,19 +33,21 @@ function ownStateView(sim: Simulation): string {
 
 /** The person fields the frame view carries: position and state, and the
  *  routing the suites read (#878). Both sides are projected through the
- *  same shape, with the optional flags read as false when absent. */
-type FramePerson = Pick<Person, "id" | "seed" | "state" | "floor" | "x" | "fy" | "wait" | "originFloor" | "originUnitId" | "venueUnitId" | "mealVenueId" | "routine" | "dwellSecondsLeft" | "floors" | "shafts"> & {
-  staff: boolean;
-  countedHotelGuest: boolean;
-  returning: boolean;
+ *  same shape, each value as it stands (a flag is true or undefined on both
+ *  sides, so a false one fails the compare), plus whether the flags the
+ *  TypeScript engine never clears (`staff`, `returning`) are present at
+ *  all: the engine's crowd view holds a flag only when it is true. */
+type FramePerson = Pick<Person, "id" | "seed" | "state" | "floor" | "x" | "fy" | "wait" | "originFloor" | "originUnitId" | "venueUnitId" | "mealVenueId" | "routine" | "dwellSecondsLeft" | "floors" | "shafts" | "staff" | "countedHotelGuest" | "returning"> & {
+  has: { staff: boolean; returning: boolean };
 };
 
 function framePerson(p: Person): FramePerson {
   return {
-    id: p.id, seed: p.seed, state: p.state, floor: p.floor, x: p.x, fy: p.fy, wait: p.wait, staff: p.staff ?? false,
+    id: p.id, seed: p.seed, state: p.state, floor: p.floor, x: p.x, fy: p.fy, wait: p.wait, staff: p.staff,
     originFloor: p.originFloor, originUnitId: p.originUnitId, venueUnitId: p.venueUnitId, mealVenueId: p.mealVenueId,
-    countedHotelGuest: p.countedHotelGuest ?? false, routine: p.routine, returning: p.returning ?? false, dwellSecondsLeft: p.dwellSecondsLeft,
+    countedHotelGuest: p.countedHotelGuest, routine: p.routine, returning: p.returning, dwellSecondsLeft: p.dwellSecondsLeft,
     floors: p.floors, shafts: p.shafts,
+    has: { staff: "staff" in p, returning: "returning" in p },
   };
 }
 
@@ -79,7 +81,7 @@ function day(sim: Simulation, speed: number, expectRouted = true): void {
       lastLogSeq = sim.logSeq;
       host.syncStructure();
       expect(ownStateView(sim), `hour ${hour}`).toBe(host.engine.stateView());
-      expect(peopleOf(sim), `hour ${hour} people`).toEqual(enginePeople(host.engine.crowdView()));
+      expect(peopleOf(sim), `hour ${hour} people`).toStrictEqual(enginePeople(host.engine.crowdView()));
       if (sim.crowd.people.some((p) => p.originUnitId !== undefined || p.venueUnitId !== undefined)) routed = true;
       compared++;
     }

@@ -228,7 +228,7 @@ describe("end-to-end lunch trips: Modern lingers, Classic does not (Guardrails 2
     return n;
   }
 
-  itTypeScriptOnly("runs economy.hotelCheckout() on the instance; the checkout pass is the engine's own hourly step, with no relayed command")("Modern: deferred guests are still asleep at lunch and take hotel-origin trips", () => {
+  it("Modern: deferred guests are still asleep at lunch and take hotel-origin trips", () => {
     const sim = hotelTower("modern", 10);
     sim.economy.hotelCheckout(); // defers round(0.2*10)=2 rooms, rest dirty
     expect(asleepHotelCount(sim)).toBeGreaterThan(0);

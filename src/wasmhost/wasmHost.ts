@@ -146,9 +146,26 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
 }
 
 /** The optional person fields the frame carries: set when the record has
- *  them and deleted when it does not, so a held person reads as the
- *  instance's own would (a cleared `venueUnitId` is absent on both). */
+ *  them, and otherwise left in the shape the TypeScript engine leaves them
+ *  in, so a held person reads as the instance's own would. */
 const PERSON_OPTIONALS = ["originUnitId", "venueUnitId", "mealVenueId", "routine", "dwellSecondsLeft"] as const;
+
+/** The optional person fields the TypeScript engine clears by assigning
+ *  undefined (`motion.ts`: the origin unit at the lobby, the venue and the
+ *  hotel-guest flag when a meal ends), so a cleared one keeps its key with
+ *  no value. Every other optional field is absent until set and is never
+ *  cleared, and the three flags are absent or true (no engine path writes
+ *  false). A person first seen in a frame has no key for a field the frame
+ *  sends as absent. */
+const CLEARED_BY_ASSIGNMENT: ReadonlySet<string> = new Set(["originUnitId", "venueUnitId", "countedHotelGuest"]);
+
+/** Clear an optional person field the frame sends as absent, the way the
+ *  TypeScript engine would. */
+function clearOptional(p: Person, key: keyof Person): void {
+  if (!(key in p)) return;
+  if (CLEARED_BY_ASSIGNMENT.has(key)) (p as unknown as Record<string, unknown>)[key] = undefined;
+  else delete (p as unknown as Record<string, unknown>)[key];
+}
 
 function syncPeople(sim: Simulation, frame: FrameView): void {
   const held = new Map<number, Person>();
@@ -164,11 +181,10 @@ function syncPeople(sim: Simulation, frame: FrameView): void {
       p = {
         id: r.id, seed: r.seed, state: r.state, floor: r.floor, fy: r.fy, x: r.x,
         floors: [], originFloor: r.originFloor, shafts: [], leg: 0, shaftId: null, carIndex: null,
-        destX: r.x, wait: r.wait, tripWait: 0, age: 0, linger: 0, staff: r.staff,
+        destX: r.x, wait: r.wait, tripWait: 0, age: 0, linger: 0,
       };
     } else {
       p.seed = r.seed;
-      p.staff = r.staff;
       p.state = r.state;
       p.floor = r.floor;
       p.x = r.x;
@@ -181,14 +197,16 @@ function syncPeople(sim: Simulation, frame: FrameView): void {
     p.shafts.splice(0, p.shafts.length, ...r.shafts);
     for (const key of PERSON_OPTIONALS) {
       const value = r[key];
-      if (value === undefined) delete p[key];
+      if (value === undefined) clearOptional(p, key);
       else (p as Record<typeof key, typeof value>)[key] = value;
     }
-    // The flags are optional on the instance too, and false reads as absent.
+    // The flags: true when set, and a false one cleared as above.
+    if (r.staff) p.staff = true;
+    else clearOptional(p, "staff");
     if (r.countedHotelGuest) p.countedHotelGuest = true;
-    else delete p.countedHotelGuest;
+    else clearOptional(p, "countedHotelGuest");
     if (r.returning) p.returning = true;
-    else delete p.returning;
+    else clearOptional(p, "returning");
     return p;
   });
   sim.crowd.people.splice(0, sim.crowd.people.length, ...next);

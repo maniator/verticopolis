@@ -135,6 +135,7 @@ function wasmParityProjects() {
   const typescriptSide = [
     "**/conformance.integration.test.ts",
     "**/conformanceWasm.integration.test.ts",
+    "**/conformanceWasmTdt.integration.test.ts",
     "**/dualRunDay.integration.test.ts",
     "**/dualRunEdits.integration.test.ts",
     "**/loaderCases.integration.test.ts",
