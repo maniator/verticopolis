@@ -5,6 +5,12 @@
 //! so a frontend relays the command and never writes money for them. The raw
 //! `Tower::set_cars`, `Tower::resize_transport`, `Tower::remove_unit` and
 //! `Tower::remove_transport` stay free of charge for loaders and tests.
+//!
+//! The car and span edits below call the tower directly. Once PR #903's
+//! `Simulation::set_cars` and `Simulation::resize_transport` land, they call
+//! those wrappers instead, so a charged edit reports `capacity_changed` like
+//! the raw one, and `remove_facility` reports `facility_removed` with its
+//! method.
 
 use crate::facilities::Kind;
 use crate::sim::Simulation;
@@ -123,8 +129,8 @@ pub fn extend_bill(
         ExtendEnd::Down => nb = (cur.1 - 1).min(target_floor),
     }
     let budget = (money / per_floor).floor().max(0.0);
-    // The budget is a whole count of floors, and a floor count never reaches
-    // past the grid, so the clamp below stays exact in i64.
+    // The budget is a whole count of floors; a balance too large for i64
+    // saturates, which still pays for any span the tower can hold.
     let budget = if budget > i64::MAX as f64 {
         i64::MAX
     } else {

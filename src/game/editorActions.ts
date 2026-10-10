@@ -39,8 +39,10 @@ export interface EditorActionsDeps {
 
 export class EditorActions {
   /** High-water mark of a shaft's extent during an extend-arrow drag, so a
-   *  back-and-forth wiggle is only charged for floors genuinely added. */
-  private extendHwm: { id: number; top: number; bottom: number } | null = null;
+   *  back-and-forth wiggle is only charged for floors genuinely added. The
+   *  engine bills against this mark as given, so it is bound to the sim it was
+   *  taken on: a tower swapped in mid-drag (a load, an undo) starts a new one. */
+  private extendHwm: { id: number; top: number; bottom: number; sim: Simulation } | null = null;
 
   constructor(private readonly deps: EditorActionsDeps) {}
 
@@ -171,12 +173,12 @@ export class EditorActions {
     const t = this.deps.selectedTransport();
     if (!t || !isElevatorKind(t.kind)) return; // only lifts have extend handles / billing
     const sim = this.deps.getSim();
-    if (!this.extendHwm || this.extendHwm.id !== t.id) {
-      this.extendHwm = { id: t.id, top: t.top, bottom: t.bottom };
+    if (!this.extendHwm || this.extendHwm.id !== t.id || this.extendHwm.sim !== sim) {
+      this.extendHwm = { id: t.id, top: t.top, bottom: t.bottom, sim };
       this.deps.captureUndo("Extend");
     }
     const before = { bottom: t.bottom, top: t.top };
-    const res = sim.extendTransport(t.id, end, targetFloor, this.extendHwm);
+    const res = sim.extendTransport(t.id, end, targetFloor, { bottom: this.extendHwm.bottom, top: this.extendHwm.top });
     // A blocked or broke step (cap reached, no structure, another shaft in the
     // way, no money left) is silent so a drag doesn't spam toasts; the shaft
     // simply stops growing.
@@ -312,7 +314,7 @@ export class EditorActions {
       const t = this.deps.selectedTransport();
       if (!t) return this.deps.clearSelection();
       if (action === "sell") {
-        this.deps.build.removeTransportWithRefund(t, "sell");
+        if (!this.deps.build.removeTransportWithRefund(t, "sell")) return this.deps.clearSelection();
         this.deps.audio.sfx("sell");
         this.deps.commitUndo();
         return this.deps.clearSelection();

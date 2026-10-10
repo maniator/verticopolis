@@ -221,9 +221,12 @@ export class BuildActions {
   /** Tear out a shaft through the engine's `removeFacility`, which pays its
    *  resale: the ONE refund path shared by the editor's Sell and the
    *  bulldozer. `verb` is the sell-vs-bulldoze telemetry detail (the
-   *  caller's gesture). */
-  removeTransportWithRefund(t: Transport, verb: "sell" | "bulldoze"): void {
-    if (this.deps.getSim().removeFacility(t.id, verb).ok) trackEconomyAction("demolish", verb);
+   *  caller's gesture). False when the engine refused (the shaft is already
+   *  gone), so the caller plays no sale. */
+  removeTransportWithRefund(t: Transport, verb: "sell" | "bulldoze"): boolean {
+    if (!this.deps.getSim().removeFacility(t.id, verb).ok) return false;
+    trackEconomyAction("demolish", verb);
+    return true;
   }
 
   /** Bulldoze whatever Excalibur reported under the pointer, with a refund.
@@ -239,7 +242,7 @@ export class BuildActions {
     } else {
       const t = sim.tower.getTransport(p.id);
       if (!t) return;
-      this.removeTransportWithRefund(t, "bulldoze");
+      if (!this.removeTransportWithRefund(t, "bulldoze")) return;
     }
     this.deps.audio.sfx("sell");
     if (this.deps.selectedId() === p.id) this.deps.clearSelection();

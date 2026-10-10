@@ -4,13 +4,17 @@ import type { Command, Outcome, ScenarioEngine } from "./scenario";
  * The scenario ops for the engine-owned charges (#914): `addCar`,
  * `removeCar`, `extendTransport` and `removeFacility`. Each must land, or,
  * when the scenario names a `reason`, be refused with exactly that copy, so
- * both engines' refusal wording is pinned along with their money.
+ * both engines' refusal wording is pinned along with their money. Either
+ * way the balance must move by exactly the `delta` the command reports.
  */
 
 type ChargeCommand = Extract<Command, { op: "addCar" | "removeCar" | "extendTransport" | "removeFacility" }>;
 
-/** A command result narrowed to the scenario's `{ ok, reason? }`. */
-export const outcomeOf = (r: { ok: boolean; reason?: string }): Outcome => (r.ok ? { ok: true } : { ok: false, reason: r.reason });
+/** A charge command's result as the scenario reads it. */
+export interface ChargeOutcome extends Outcome { delta: number }
+
+/** A command result narrowed to `{ ok, reason?, delta }`. */
+export const chargeOf = (r: { ok: boolean; reason?: string; delta: number }): ChargeOutcome => (r.ok ? { ok: true, delta: r.delta } : { ok: false, reason: r.reason, delta: r.delta });
 
 function expectCharge(r: Outcome, reason: string | undefined, what: string): void {
   if (reason === undefined) {
@@ -29,13 +33,21 @@ function idAt(e: ScenarioEngine, c: ChargeCommand, shaft: boolean): number {
 
 export function applyCharge(e: ScenarioEngine, c: ChargeCommand): void {
   const at = `@ ${c.floor},${c.x}`;
+  const before = e.money();
+  const r = run(e, c);
+  expectCharge(r, c.reason, `${c.op} ${at}`);
+  const moved = e.money() - before;
+  if (moved !== r.delta) throw new Error(`${c.op} ${at}: the balance moved ${moved} but the command reported ${r.delta}`);
+}
+
+function run(e: ScenarioEngine, c: ChargeCommand): ChargeOutcome {
   switch (c.op) {
-    case "addCar": return expectCharge(e.addCar(idAt(e, c, true)), c.reason, `addCar ${at}`);
-    case "removeCar": return expectCharge(e.removeCar(idAt(e, c, true)), c.reason, `removeCar ${at}`);
+    case "addCar": return e.addCar(idAt(e, c, true));
+    case "removeCar": return e.removeCar(idAt(e, c, true));
     case "extendTransport": {
       const hwm = c.hwmBottom !== undefined && c.hwmTop !== undefined ? { bottom: c.hwmBottom, top: c.hwmTop } : null;
-      return expectCharge(e.extendTransport(idAt(e, c, true), c.end, c.targetFloor, hwm), c.reason, `extendTransport ${c.end} to ${c.targetFloor} ${at}`);
+      return e.extendTransport(idAt(e, c, true), c.end, c.targetFloor, hwm);
     }
-    case "removeFacility": return expectCharge(e.removeFacility(idAt(e, c, c.shaft ?? false), c.method), c.reason, `removeFacility ${c.method} ${at}`);
+    case "removeFacility": return e.removeFacility(idAt(e, c, c.shaft ?? false), c.method);
   }
 }

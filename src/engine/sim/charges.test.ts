@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../Simulation";
-import { ECON, carResaleRefund, resaleRefund } from "../econConfig";
+import { ECON, carResaleRefund, extendBill, resaleRefund } from "../econConfig";
 import { GRID, maxCarsFor } from "../facilities";
 import type { Transport, Unit } from "../types";
 import { CAR_LIMIT, ELEVATOR_GONE, FACILITY_GONE, LAST_CAR, NOT_ENOUGH_MONEY, ONLY_ELEVATOR_CARS, ONLY_ELEVATOR_EXTEND } from "./charges";
@@ -119,10 +119,48 @@ describe("extendTransport", () => {
     expect(sim.money).toBe(money);
   });
 
+  it("bills the down end the same way: per floor past the mark, budget-clamped, shrinks free", () => {
+    const { sim } = fixture();
+    expect(sim.buildTransport("elevatorStandard", 14, 3, 4).ok).toBe(true);
+    const shaft = sim.tower.transportAt(3, 14)!;
+    const start = sim.money;
+    const hwm = { bottom: 3, top: 4 };
+    expect(sim.extendTransport(shaft.id, "down", 1, hwm)).toEqual({ ok: true, delta: -2 * per, bottom: 1, top: 4, added: 2 });
+    hwm.bottom = 1;
+    expect(sim.extendTransport(shaft.id, "down", 2, hwm)).toEqual({ ok: true, delta: 0, bottom: 2, top: 4, added: 0 });
+    expect(sim.extendTransport(shaft.id, "down", 1, hwm)).toEqual({ ok: true, delta: 0, bottom: 1, top: 4, added: 0 });
+    // A down target above the shaft shrinks it to one floor tall, never past it.
+    expect(sim.extendTransport(shaft.id, "down", 6)).toEqual({ ok: true, delta: 0, bottom: 3, top: 4, added: 0 });
+    expect(sim.money).toBe(start - 2 * per);
+  });
+
+  it("clamps a broke down extension to the budget, then refuses it", () => {
+    const { sim } = fixture();
+    expect(sim.buildTransport("elevatorStandard", 14, 3, 4).ok).toBe(true);
+    const shaft = sim.tower.transportAt(3, 14)!;
+    sim.money = per + per / 2;
+    expect(sim.extendTransport(shaft.id, "down", 1)).toEqual({ ok: true, delta: -per, bottom: 2, top: 4, added: 1 });
+    expect(sim.extendTransport(shaft.id, "down", 1)).toEqual({ ok: false, reason: NOT_ENOUGH_MONEY, delta: 0, bottom: 2, top: 4, added: 0 });
+  });
+
   it("refuses a stairway and a missing shaft", () => {
     const { sim, stairs } = fixture();
     expect(sim.extendTransport(stairs.id, "up", 3)).toEqual({ ok: false, reason: ONLY_ELEVATOR_EXTEND, delta: 0, bottom: 1, top: 2, added: 0 });
     expect(sim.extendTransport(99_999, "down", 0)).toEqual({ ok: false, reason: ELEVATOR_GONE, delta: 0, bottom: 0, top: 0, added: 0 });
+  });
+});
+
+describe("extendBill vectors (engine-rs/src/charges_tests.rs carries the same)", () => {
+  it.each([
+    [{ bottom: 1, top: 2 }, { bottom: 1, top: 2 }, "up", 4, 1e6, { nb: 1, nt: 4, added: 2 }],
+    [{ bottom: 1, top: 2 }, { bottom: 1, top: 2 }, "up", 9, 7_500, { nb: 1, nt: 3, added: 1 }],
+    [{ bottom: 1, top: 3 }, { bottom: 1, top: 5 }, "up", 5, 0, { nb: 1, nt: 5, added: 0 }],
+    [{ bottom: 3, top: 6 }, { bottom: 3, top: 6 }, "up", 1, 0, { nb: 3, nt: 4, added: 0 }],
+    [{ bottom: 3, top: 6 }, { bottom: 3, top: 6 }, "down", 1, -50_000, { nb: 3, nt: 6, added: 0 }],
+    [{ bottom: 4, top: 6 }, { bottom: 3, top: 6 }, "down", 1, 5_000, { nb: 2, nt: 6, added: 1 }],
+    [{ bottom: 1, top: 2 }, { bottom: 1, top: 2 }, "up", 50, 1e300, { nb: 1, nt: 50, added: 48 }],
+  ] as const)("%o mark %o %s to %d with %d", (cur, hwm, end, target, money, want) => {
+    expect(extendBill(cur, hwm, end, target, money, 5_000)).toEqual(want);
   });
 });
 

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { applyCharge, outcomeOf } from "./chargeOps";
+import { applyCharge, chargeOf, type ChargeOutcome } from "./chargeOps";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Simulation } from "../../engine/Simulation";
@@ -200,10 +200,10 @@ export interface ScenarioEngine {
   setNoRate(id: number): boolean;
   setCars(id: number, cars: number): boolean;
   /** The engine-owned charges (#914); each moves the money itself. */
-  addCar(id: number): Outcome;
-  removeCar(id: number): Outcome;
-  extendTransport(id: number, end: "up" | "down", targetFloor: number, hwm: { bottom: number; top: number } | null): Outcome;
-  removeFacility(id: number, method: "sell" | "bulldoze"): Outcome;
+  addCar(id: number): ChargeOutcome;
+  removeCar(id: number): ChargeOutcome;
+  extendTransport(id: number, end: "up" | "down", targetFloor: number, hwm: { bottom: number; top: number } | null): ChargeOutcome;
+  removeFacility(id: number, method: "sell" | "bulldoze"): ChargeOutcome;
   setSchedule(id: number, schedule: Record<string, unknown>): boolean;
   startFire(): void;
   fires(): number;
@@ -258,10 +258,10 @@ export function tsEngine(sim: Simulation): ScenarioEngine {
     adjustRent: (id, dir) => sim.adjustRent(id, dir),
     setNoRate: (id) => sim.setNoRate(id),
     setCars: (id, cars) => sim.tower.setCars(id, cars),
-    addCar: (id) => outcomeOf(sim.addCar(id)),
-    removeCar: (id) => outcomeOf(sim.removeCar(id)),
-    extendTransport: (id, end, targetFloor, hwm) => outcomeOf(sim.extendTransport(id, end, targetFloor, hwm ?? undefined)),
-    removeFacility: (id, method) => outcomeOf(sim.removeFacility(id, method)),
+    addCar: (id) => chargeOf(sim.addCar(id)),
+    removeCar: (id) => chargeOf(sim.removeCar(id)),
+    extendTransport: (id, end, targetFloor, hwm) => chargeOf(sim.extendTransport(id, end, targetFloor, hwm ?? undefined)),
+    removeFacility: (id, method) => chargeOf(sim.removeFacility(id, method)),
     setSchedule: (id, schedule) => sim.tower.setSchedule(id, schedule),
     startFire: () => sim.startFire(),
     fires: () => sim.fires,

@@ -517,11 +517,19 @@ fn expect_ok(ok: bool, expect_fail: bool, what: &str, reason: Option<&str>) -> R
 
 /// `expectCharge`: a charge op lands, or, when the scenario names a reason,
 /// is refused with exactly that reason, so both engines' copy is pinned.
+/// Either way the balance must have moved by exactly the reported delta.
 fn expect_charge(
     r: &crate::charges::ChargeResult,
     reason: &Option<String>,
     what: &str,
+    moved: f64,
 ) -> Result<(), String> {
+    if moved != r.delta {
+        return Err(format!(
+            "{what}: the balance moved {moved} but the command reported {}",
+            r.delta
+        ));
+    }
     let Some(want) = reason else {
         return expect_ok(r.ok, false, what, r.reason.as_deref());
     };
@@ -745,14 +753,27 @@ fn run_scenario_inner(
                 }
                 Command::AddCar { floor, x, reason } => {
                     let id = transport_id_at(&sim, *floor, *x).map_err(failed)?;
+                    let before = sim.money;
                     let r = sim.add_car(id);
-                    expect_charge(&r, reason, &format!("addCar @ {floor},{x}")).map_err(failed)?;
+                    expect_charge(
+                        &r,
+                        reason,
+                        &format!("addCar @ {floor},{x}"),
+                        sim.money - before,
+                    )
+                    .map_err(failed)?;
                 }
                 Command::RemoveCar { floor, x, reason } => {
                     let id = transport_id_at(&sim, *floor, *x).map_err(failed)?;
+                    let before = sim.money;
                     let r = sim.remove_car(id);
-                    expect_charge(&r, reason, &format!("removeCar @ {floor},{x}"))
-                        .map_err(failed)?;
+                    expect_charge(
+                        &r,
+                        reason,
+                        &format!("removeCar @ {floor},{x}"),
+                        sim.money - before,
+                    )
+                    .map_err(failed)?;
                 }
                 Command::ExtendTransport {
                     floor,
@@ -767,11 +788,13 @@ fn run_scenario_inner(
                     let side = crate::charges::ExtendEnd::parse(end)
                         .ok_or_else(|| failed(format!("unknown end {end}")))?;
                     let hwm = hwm_bottom.zip(*hwm_top);
+                    let before = sim.money;
                     let r = sim.extend_transport(id, side, *target_floor, hwm);
                     expect_charge(
                         &r.charge,
                         reason,
                         &format!("extendTransport {end} to {target_floor} @ {floor},{x}"),
+                        sim.money - before,
                     )
                     .map_err(failed)?;
                 }
@@ -790,11 +813,13 @@ fn run_scenario_inner(
                     .map_err(failed)?;
                     let how = crate::charges::RemovalMethod::parse(method)
                         .ok_or_else(|| failed(format!("unknown method {method}")))?;
+                    let before = sim.money;
                     let r = sim.remove_facility(id, how);
                     expect_charge(
                         &r,
                         reason,
                         &format!("removeFacility {method} @ {floor},{x}"),
+                        sim.money - before,
                     )
                     .map_err(failed)?;
                 }
@@ -1153,17 +1178,19 @@ mod tests {
             delta: 0.0,
         };
         let want = Some("Not enough money.".to_string());
-        assert!(super::expect_charge(&paid, &None, "a").is_ok());
-        assert!(super::expect_charge(&refused, &want, "a").is_ok());
-        assert!(super::expect_charge(&refused, &None, "a")
+        assert!(super::expect_charge(&paid, &None, "a", -1.0).is_ok());
+        assert!(super::expect_charge(&refused, &want, "a", 0.0).is_ok());
+        assert!(super::expect_charge(&refused, &None, "a", 0.0)
             .unwrap_err()
             .contains("failed: Not enough money."));
-        assert!(super::expect_charge(&paid, &want, "a")
+        assert!(super::expect_charge(&paid, &want, "a", -1.0)
             .unwrap_err()
             .contains("expected to fail with Not enough money."));
-        assert!(super::expect_charge(&refused, &Some("Other.".into()), "a")
-            .unwrap_err()
-            .contains("failed with Not enough money., expected Other."));
+        assert!(
+            super::expect_charge(&refused, &Some("Other.".into()), "a", 0.0)
+                .unwrap_err()
+                .contains("failed with Not enough money., expected Other.")
+        );
     }
 
     #[test]

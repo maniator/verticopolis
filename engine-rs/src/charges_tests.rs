@@ -260,3 +260,80 @@ fn parsers_round_trip() {
     }
     assert_eq!(RemovalMethod::parse("burn"), None);
 }
+
+#[test]
+fn extend_bills_the_down_end_the_same_way() {
+    let (mut sim, _, _, _) = fixture();
+    let per = TRANSPORT_FLOOR_COST;
+    assert!(sim.build_transport(Kind::ElevatorStandard, 14, 3, 4).ok);
+    let shaft = sim.tower.transport_at(3, 14).unwrap().id;
+    let start = sim.money;
+    assert_eq!(
+        sim.extend_transport(shaft, ExtendEnd::Down, 1, Some((3, 4))),
+        extended(ChargeResult::paid(-2.0 * per), 1, 4, 2)
+    );
+    assert_eq!(
+        sim.extend_transport(shaft, ExtendEnd::Down, 2, Some((1, 4))),
+        extended(ChargeResult::paid(0.0), 2, 4, 0)
+    );
+    assert_eq!(
+        sim.extend_transport(shaft, ExtendEnd::Down, 1, Some((1, 4))),
+        extended(ChargeResult::paid(0.0), 1, 4, 0)
+    );
+    // A down target above the shaft shrinks it to one floor tall.
+    assert_eq!(
+        sim.extend_transport(shaft, ExtendEnd::Down, 6, None),
+        extended(ChargeResult::paid(0.0), 3, 4, 0)
+    );
+    assert_eq!(sim.money, start - 2.0 * per);
+    sim.money = per * 1.5;
+    assert_eq!(
+        sim.extend_transport(shaft, ExtendEnd::Down, 1, None),
+        extended(ChargeResult::paid(-per), 2, 4, 1)
+    );
+    assert_eq!(
+        sim.extend_transport(shaft, ExtendEnd::Down, 1, None),
+        extended(refused(NOT_ENOUGH_MONEY), 2, 4, 0)
+    );
+}
+
+/// `extendBill` vectors, the same answers `econConfig.ts` gives.
+#[test]
+fn extend_bill_matches_the_typescript_vectors() {
+    let per = 5_000.0;
+    // Up two floors past the mark with money for both.
+    assert_eq!(
+        extend_bill((1, 2), (1, 2), ExtendEnd::Up, 4, 1e6, per),
+        (1, 4, 2)
+    );
+    // Up, budget for one: clamped to one past the mark.
+    assert_eq!(
+        extend_bill((1, 2), (1, 2), ExtendEnd::Up, 9, 7_500.0, per),
+        (1, 3, 1)
+    );
+    // Up within the mark: free.
+    assert_eq!(
+        extend_bill((1, 3), (1, 5), ExtendEnd::Up, 5, 0.0, per),
+        (1, 5, 0)
+    );
+    // A shrink target below the bottom stops one floor above it.
+    assert_eq!(
+        extend_bill((3, 6), (3, 6), ExtendEnd::Up, 1, 0.0, per),
+        (3, 4, 0)
+    );
+    // Down, in debt: no new floor, and never a pull past the mark.
+    assert_eq!(
+        extend_bill((3, 6), (3, 6), ExtendEnd::Down, 1, -50_000.0, per),
+        (3, 6, 0)
+    );
+    // Down past a mark that sits below the current bottom.
+    assert_eq!(
+        extend_bill((4, 6), (3, 6), ExtendEnd::Down, 1, 5_000.0, per),
+        (2, 6, 1)
+    );
+    // A vast balance clamps to the request.
+    assert_eq!(
+        extend_bill((1, 2), (1, 2), ExtendEnd::Up, 50, 1e300, per),
+        (1, 50, 48)
+    );
+}

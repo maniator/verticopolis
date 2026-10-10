@@ -106,9 +106,16 @@ describe("BuildActions (the money boundary)", () => {
 
   it("removeTransportWithRefund pays the one shared shaft resale", () => {
     const before = sim.money;
-    build.removeTransportWithRefund(lift, "sell");
+    expect(build.removeTransportWithRefund(lift, "sell")).toBe(true);
     expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
     expect(sim.tower.transports.some((t) => t.id === lift.id)).toBe(false);
+  });
+
+  it("removeTransportWithRefund reports a refusal (the shaft already gone) and pays nothing", () => {
+    expect(sim.tower.removeTransport(lift.id)).toBeDefined();
+    const before = sim.money;
+    expect(build.removeTransportWithRefund(lift, "bulldoze")).toBe(false);
+    expect(sim.money).toBe(before);
   });
 
   it("tryRemoveUnit surfaces the engine's refusal: a burning unit stays, no refund", () => {

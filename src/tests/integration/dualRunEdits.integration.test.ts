@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resaleRefund } from "../../engine/econConfig";
+import { ECON, carResaleRefund, resaleRefund } from "../../engine/econConfig";
 import { hasWasmPackage, wasmRequired } from "../conformance/wasmEngine";
 import { Simulation } from "../../engine/Simulation";
 import { DualRun, FrameDriver, loadFixture } from "../dualrun/dualRunHarness";
@@ -41,8 +41,11 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     // Tower edits from the editor card.
     const shaft = sim.tower.transportAt(30, 196)!;
     // The engine-owned charges (#914): each command moves the money itself.
-    expect(sim.addCar(shaft.id).ok || sim.removeCar(shaft.id).ok).toBe(true);
-    expect(sim.removeCar(shaft.id).ok || sim.addCar(shaft.id).ok).toBe(true);
+    const cars = shaft.cars;
+    expect(sim.tower.setCars(shaft.id, 2)).toBe(cars !== 2); // a known count, so both commands land
+    expect(sim.addCar(shaft.id)).toEqual({ ok: true, delta: -ECON.addCarCost });
+    expect(sim.removeCar(shaft.id)).toEqual({ ok: true, delta: carResaleRefund() });
+    expect(shaft.cars).toBe(2);
     expect(sim.tower.setCars(shaft.id, shaft.cars > 1 ? shaft.cars - 1 : 2)).toBe(true); // the raw edit stays free
     sim.money += 1000;
     expect(sim.tower.setStop(shaft.id, 35, false)).toBe(true);
@@ -61,7 +64,7 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     const money = sim.money;
     sim.money = 0; // a broke press is refused in both engines
     expect(sim.extendTransport(shaft.id, "up", shaft.top + 1).reason).toBe("Not enough money.");
-    expect(sim.addCar(shaft.id).ok).toBe(false);
+    expect(sim.addCar(shaft.id).reason).toBe("Not enough money.");
     sim.money = money;
     expect(sim.tower.setLabel(office.id, "  Corner suite ")).toBe(true);
     sim.tower.towerName = "Dual Run Tower";
