@@ -1,9 +1,9 @@
 import type { Simulation } from "../Simulation";
 
-import { rentConfig, resaleRefund } from "../econConfig";
+import { GUTTED_RESALE_REFUND, rentConfig, resaleRefund, transportBuildCost } from "../econConfig";
 import { storeRent } from "./constants";
 
-import { FACILITIES, buildMinutes, facilityFloors, isElevatorKind, isFacilityKind } from "../facilities";
+import { FACILITIES, buildMinutes, facilityFloors, isFacilityKind } from "../facilities";
 import { groundFloorStructureKind } from "../tower/towerTopology";
 import type { FacilityKind, WeatherKind } from "../types";
 
@@ -207,9 +207,7 @@ export function buildTransport(sim: Simulation,
     return { ok: false, reason: `${f.name} unlocks at ${f.minStar}★.` };
   }
   // Elevators charge per served floor on top of the base price.
-  const span = top - bottom;
-  const extra = isElevatorKind(kind) ? span * 5_000 : 0;
-  const total = f.cost + extra;
+  const total = transportBuildCost(kind, top - bottom);
   if (sim.money < total) return { ok: false, reason: "Not enough money." };
   const res = sim.tower.placeTransport(kind, x, bottom, top);
   if (!res.ok) return { ok: false, reason: res.reason };
@@ -229,7 +227,7 @@ export function sellAt(sim: Simulation, floor: number, x: number): boolean {
     if (u.state === "fire") return false;
     sim.tower.removeUnit(u.id);
     // A gutted shell has no salvage value; everything else refunds half.
-    sim.money += u.state === "gutted" ? 0 : resaleRefund(u.kind);
+    sim.money += u.state === "gutted" ? GUTTED_RESALE_REFUND : resaleRefund(u.kind);
     // If the last Wedding Hall is gone before the VIP arrived, cancel the
     // pending inspection so it can't keep re-failing and spamming the log.
     if (u.kind === "weddingHall" && !sim.tower.builtWeddingHall && !sim.evaluatedTower) {

@@ -1,4 +1,4 @@
-import { FACILITIES } from "./facilities";
+import { FACILITIES, isElevatorKind } from "./facilities";
 import type { FacilityKind } from "./types";
 
 /** Tunable economic constants (dollars), tuned to the 1994 SimTower balance. */
@@ -321,6 +321,18 @@ export function resaleRefund(kind: FacilityKind): number {
  *  half-back rule as {@link resaleRefund}. */
 export function carResaleRefund(): number {
   return Math.floor(ECON.addCarCost * 0.5);
+}
+
+/** What a gutted unit returns when it is sold: nothing (a burned-out shell
+ *  has no salvage value). */
+export const GUTTED_RESALE_REFUND = 0;
+
+/** What `buildTransport` charges for a shaft of `span` floors (top minus
+ *  bottom): the base price plus {@link ECON.transportFloorCost} for every floor
+ *  of span on an elevator. A walkway is a flat price. */
+export function transportBuildCost(kind: FacilityKind, span: number): number {
+  const extra = isElevatorKind(kind) ? span * ECON.transportFloorCost : 0;
+  return FACILITIES[kind].cost + extra;
 }
 
 /** One step of budget-clamped billing for an elevator extend drag. Given the

@@ -2,11 +2,13 @@
 //! compares each checkpoint with `conformance/expected.json`. Exits 1 unless
 //! every scenario matches end to end; the report names, per scenario, the
 //! first divergent checkpoint or the first command the port cannot run yet.
+//! It also checks each mode's catalog against `conformance/catalog.json`.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::process::exit;
 
+use verticopolis_engine::catalog::{catalog_digest, pinned_digests};
 use verticopolis_engine::scenario::{run_scenario, Checkpoint, Run, RunError, Scenario};
 
 fn main() {
@@ -157,6 +159,29 @@ fn main() {
                 all_ok = false;
                 println!("{id}: {matched} of {total} checkpoints match, then command {index} FAILED: {what}");
             }
+        }
+    }
+    // The catalog lock (`catalog.json`): each mode's catalog must hash to
+    // the value the TypeScript engine pinned.
+    let catalog_path = root.join("catalog.json");
+    match std::fs::read_to_string(&catalog_path)
+        .map_err(|e| format!("cannot read {}: {e}", catalog_path.display()))
+        .and_then(|text| pinned_digests(&text))
+    {
+        Ok(pinned) => {
+            for (mode, want) in pinned {
+                let got = catalog_digest(mode);
+                if got == want {
+                    println!("catalog {}: ok", mode.as_str());
+                } else {
+                    all_ok = false;
+                    println!("catalog {}: DIVERGED: {got} vs {want}", mode.as_str());
+                }
+            }
+        }
+        Err(e) => {
+            all_ok = false;
+            println!("catalog: FAILED: {e}");
         }
     }
     if !all_ok {

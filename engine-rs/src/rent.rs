@@ -31,14 +31,14 @@ fn ladder_level(rungs: &[f64; 4], value: f64) -> usize {
 
 /// `priceOptions(kind)`: `Some(Some(ladder))` in Classic for the canon kinds,
 /// `Some(None)` for a Modern band, `None` for an unpriced kind.
-fn price_options(mode: GameMode, kind: Kind) -> Option<Option<[f64; 4]>> {
+pub fn price_options(mode: GameMode, kind: Kind) -> Option<Option<[f64; 4]>> {
     match mode {
         GameMode::Classic => classic_ladder(kind).map(Some),
         GameMode::Modern => rent_config(kind).map(|_| None),
     }
 }
 
-fn price_neutral(mode: GameMode, kind: Kind) -> Option<f64> {
+pub fn price_neutral(mode: GameMode, kind: Kind) -> Option<f64> {
     match price_options(mode, kind)? {
         Some(l) => Some(l[2]),
         None => Some(rent_config(kind)?.default),

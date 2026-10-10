@@ -53,6 +53,18 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// `showsPreviewReason`: Modern names the refusal on an invalid build
+    /// preview; Classic keeps the 1994 click-to-refuse.
+    pub fn shows_preview_reason(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// `allowsEscalatorOnOfficeFloors`: Classic escalators link commercial
+    /// floors only; Modern lifts the rule.
+    pub fn allows_escalator_on_office_floors(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// `bridgingToggleable()`: Modern can switch automatic bridging off;
     /// Classic always bridges.
     pub fn bridging_toggleable(self) -> bool {

@@ -55,3 +55,32 @@ pub fn rent_of(kind: Kind, rent: Option<f64>, no_rate: bool) -> f64 {
     rent.or_else(|| rent_config(kind).map(|c| c.default))
         .unwrap_or(0.0)
 }
+
+/// `ECON.addCarCost`: the price of one more elevator car.
+pub const ADD_CAR_COST: f64 = 40_000.0;
+
+/// `ECON.transportFloorCost`: the price of one served floor on an elevator,
+/// charged per floor of span when the shaft is built and per floor when it
+/// is extended.
+pub const TRANSPORT_FLOOR_COST: f64 = 5_000.0;
+
+/// What a gutted unit returns when it is sold: nothing.
+pub const GUTTED_RESALE_REFUND: f64 = 0.0;
+
+/// `carResaleRefund()`: half the add-car cost, the same half-back rule as
+/// `resaleRefund`.
+pub fn car_resale_refund() -> f64 {
+    (ADD_CAR_COST * 0.5).floor()
+}
+
+/// `transportBuildCost(kind, span)`: what `buildTransport` charges, the base
+/// price plus `TRANSPORT_FLOOR_COST` for every floor of span on an elevator
+/// (a walkway is a flat price).
+pub fn transport_build_cost(kind: Kind, span: i64) -> f64 {
+    let extra = if kind.is_elevator() {
+        span as f64 * TRANSPORT_FLOOR_COST
+    } else {
+        0.0
+    };
+    kind.facility().cost + extra
+}

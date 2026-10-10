@@ -254,13 +254,7 @@ impl Simulation {
         if !self.is_unlocked(kind) {
             return BuildResult::fail(format!("{} unlocks at {}★.", f.name, f.min_star));
         }
-        let span = top - bottom;
-        let extra = if kind.is_elevator() {
-            span as f64 * 5_000.0
-        } else {
-            0.0
-        };
-        let total = f.cost + extra;
+        let total = crate::econ::transport_build_cost(kind, top - bottom);
         if self.money < total {
             return BuildResult::fail("Not enough money.");
         }
@@ -291,7 +285,7 @@ impl Simulation {
                 }
                 self.tower.remove_unit(id);
                 self.money += if state == UnitState::Gutted {
-                    0.0
+                    crate::econ::GUTTED_RESALE_REFUND
                 } else {
                     kind.resale_refund()
                 };

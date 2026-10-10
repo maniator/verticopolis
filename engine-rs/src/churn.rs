@@ -27,7 +27,7 @@ pub enum CongestionBindingClass {
 /// `BINDING_TIE_EPS`: two ratios within this band count as tied.
 const BINDING_TIE_EPS: f64 = 1e-9;
 
-const HOUSEHOLD_SIZES: [i64; 4] = [2, 3, 4, 5];
+pub const HOUSEHOLD_SIZES: [i64; 4] = [2, 3, 4, 5];
 const HOUSEHOLD_WEIGHTS: [i64; 4] = [4, 6, 2, 1];
 
 /// `householdPrice`.

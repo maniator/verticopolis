@@ -574,7 +574,7 @@ impl Tower {
         if x < 0 || x + f.width > LOT_WIDTH {
             return Some("Off the edge of the lot.".into());
         }
-        if kind == Kind::WeddingHall && floor != 100 {
+        if kind == Kind::WeddingHall && floor != MAX_FLOOR {
             return Some("The wedding hall can only crown floor 100.".into());
         }
         if let Some(r) = self.cap_reason(kind) {
