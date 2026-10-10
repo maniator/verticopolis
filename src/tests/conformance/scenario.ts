@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { applyCharge, outcomeOf } from "./chargeOps";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Simulation } from "../../engine/Simulation";
@@ -235,9 +236,6 @@ export interface ScenarioEngine {
 /** How a runner starts an engine from a scenario's `start`. */
 export type EngineStart = (start: Start) => ScenarioEngine;
 
-/** A command result narrowed to the scenario's `{ ok, reason? }`. */
-const outcomeOf = (r: { ok: boolean; reason?: string }): Outcome => (r.ok ? { ok: true } : { ok: false, reason: r.reason });
-
 /** The TypeScript engine behind the scenario surface. */
 export function tsEngine(sim: Simulation): ScenarioEngine {
   return {
@@ -327,14 +325,6 @@ function transportAt(e: ScenarioEngine, at: At) {
   return t;
 }
 
-/** A charge op's outcome: it lands, or, when the scenario names a reason, it
- *  is refused with exactly that reason, so both engines' copy is pinned. */
-function expectCharge(r: Outcome, reason: string | undefined, what: string): void {
-  if (reason === undefined) return expectOk(r.ok, false, what, r.reason);
-  if (r.ok) throw new Error(`${what} succeeded but was expected to fail with ${reason}`);
-  if (r.reason !== reason) throw new Error(`${what} failed with ${r.reason ?? "no reason"}, expected ${reason}`);
-}
-
 function expectOk(ok: boolean, expectFail: boolean | undefined, what: string, reason?: string): void {
   if (ok === !expectFail) return;
   throw new Error(`${what} ${ok ? "succeeded but was expected to fail" : `failed: ${reason ?? "no reason"}`}`);
@@ -381,18 +371,7 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
       expectOk(e.setCars(t.id, c.cars) && transportAt(e, c).cars === c.cars, false, `setCars ${c.cars} @ ${c.floor},${c.x}`);
       break;
     }
-    case "addCar": expectCharge(e.addCar(transportAt(e, c).id), c.reason, `addCar @ ${c.floor},${c.x}`); break;
-    case "removeCar": expectCharge(e.removeCar(transportAt(e, c).id), c.reason, `removeCar @ ${c.floor},${c.x}`); break;
-    case "extendTransport": {
-      const hwm = c.hwmBottom !== undefined && c.hwmTop !== undefined ? { bottom: c.hwmBottom, top: c.hwmTop } : null;
-      expectCharge(e.extendTransport(transportAt(e, c).id, c.end, c.targetFloor, hwm), c.reason, `extendTransport ${c.end} to ${c.targetFloor} @ ${c.floor},${c.x}`);
-      break;
-    }
-    case "removeFacility": {
-      const id = c.shaft ? transportAt(e, c).id : unitAt(e, c).id;
-      expectCharge(e.removeFacility(id, c.method), c.reason, `removeFacility ${c.method} @ ${c.floor},${c.x}`);
-      break;
-    }
+    case "addCar": case "removeCar": case "extendTransport": case "removeFacility": applyCharge(e, c); break;
     case "startFire": {
       const before = e.fires();
       e.startFire();
