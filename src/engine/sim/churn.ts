@@ -140,7 +140,7 @@ export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
   }
   sim.emit(
     buyback > 0
-      ? `The owner left ${FACILITIES[u.kind].name} on ${sim.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}). You bought it back for $${buyback.toLocaleString()}.${buybackNote}`
+      ? `The owner left ${FACILITIES[u.kind].name} on ${sim.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}). You bought it back for $${buyback.toLocaleString("en-US")}.${buybackNote}`
       : `A tenant left ${FACILITIES[u.kind].name} on ${sim.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}).`,
     "bad",
   );
@@ -394,7 +394,7 @@ export function moveIn(sim: Simulation, u: Unit): void {
     sim.recordMoney("condos", price);
     sim.moveInsToday.condos++;
     const who = residents ? ` to a household of ${residents}` : "";
-    sim.emit(`Condominium on ${sim.floorLabel(u.floor)} sold${who} for $${price.toLocaleString()}.`, "money");
+    sim.emit(`Condominium on ${sim.floorLabel(u.floor)} sold${who} for $${price.toLocaleString("en-US")}.`, "money");
   }
   if (u.kind === "office") {
     u.everOccupied = true;

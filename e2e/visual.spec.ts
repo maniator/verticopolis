@@ -51,12 +51,12 @@ test.describe("dialog chrome", () => {
     const star = await page.evaluate(buildToStar, 1);
     expect(star).toBe(1);
     await expectEngineHosted(page);
-    // The clock pin is a presentation input on the paused read model: no
-    // command sets the engine's clock, and at speed 0 no frame ticks, so no
-    // frame syncs the read model from the engine and the pin holds on both
-    // engines until a test merges explicitly. (A running scene is different:
-    // every tick syncs the clock from the engine, which is why the gallery's
-    // pgSetClock pins the engine's own save instead.)
+    // The clock pin is a presentation input on the paused read model: at
+    // speed 0 no frame ticks, so no frame syncs the read model from the
+    // engine and the pin holds on both engines until a test merges
+    // explicitly. (A running scene is different: every tick syncs the clock
+    // from the engine, which is why the gallery's pgSetClock moves the
+    // engine's clock too, with the binding's advanceClock.)
     await page.evaluate(() => {
       ((window as any).game.sim.clock as { minutes: number }).minutes = 7 * 60;
     });

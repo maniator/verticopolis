@@ -8,6 +8,7 @@ use crate::clock::GameMode;
 use crate::econ::{rent_config, rent_of};
 use crate::facilities::Kind;
 use crate::jsmath;
+use crate::services::with_thousands;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
 
@@ -187,13 +188,7 @@ impl Simulation {
             }
             self.money += amt;
             self.record_money(ledger_cat_for(kind).unwrap_or("upkeep"), amt);
-            let msg = match kind {
-                Kind::Office => format!("Quarterly office rent collected: ${amt} ({n} offices)."),
-                Kind::FitnessClub => {
-                    format!("Fitness Club membership dues collected: ${amt} ({n} clubs).")
-                }
-                _ => format!("Clinic lease collected: ${amt} ({n} clinics)."),
-            };
+            let msg = lease_message(kind, amt, n);
             self.emit(&msg, LogKind::Money);
         }
     }
@@ -358,7 +353,10 @@ impl Simulation {
             self.money += revenue;
             self.record_money("hotels", revenue);
             self.emit(
-                &format!("Hotel guests checked out: ${revenue} earned overnight."),
+                &format!(
+                    "Hotel guests checked out: ${} earned overnight.",
+                    with_thousands(revenue)
+                ),
                 LogKind::Money,
             );
         }
@@ -382,7 +380,7 @@ impl Simulation {
             self.money += revenue;
             self.record_money("hotels", revenue);
             self.emit(
-                &format!("Late hotel checkouts: ${revenue} earned."),
+                &format!("Late hotel checkouts: ${} earned.", with_thousands(revenue)),
                 LogKind::Money,
             );
         }
@@ -462,12 +460,13 @@ impl Simulation {
             let monthly =
                 self.clock.calendar.maint_period_days as f64 == REAL_WORLD_MAINT_PERIOD_DAYS;
             let msg = format!(
-                "{} paid: ${cost}.",
+                "{} paid: ${}.",
                 if monthly {
                     "Monthly maintenance"
                 } else {
                     "Maintenance"
-                }
+                },
+                with_thousands(cost)
             );
             self.emit(&msg, LogKind::Money);
         }
@@ -501,10 +500,7 @@ impl Simulation {
         for (cat, cat_sum) in by_cat {
             self.record_money(cat, jsmath::round(cat_sum * scale));
         }
-        self.emit(
-            &format!("Monthly rent collected: ${amt} ({n} rentals)."),
-            LogKind::Money,
-        );
+        self.emit(&rental_message(amt, n), LogKind::Money);
     }
 
     /// `rollOverRetailDay`.
@@ -529,3 +525,77 @@ impl Simulation {
 }
 
 use crate::sim_loop::Weather;
+/// The quarterly lease line (`LEASE_MESSAGE` in `EconomySystem.ts`).
+pub(crate) fn lease_message(kind: Kind, amt: f64, n: i64) -> String {
+    let plural = if n > 1 { "s" } else { "" };
+    match kind {
+        Kind::Office => format!(
+            "Quarterly office rent collected: ${} ({n} offices).",
+            with_thousands(amt)
+        ),
+        Kind::FitnessClub => format!(
+            "Fitness Club membership dues collected: ${} ({n} club{plural}).",
+            with_thousands(amt)
+        ),
+        _ => format!(
+            "Clinic lease collected: ${} ({n} clinic{plural}).",
+            with_thousands(amt)
+        ),
+    }
+}
+
+/// The monthly rental line (`collectRentalIncome` in `rentalIncome.ts`).
+pub(crate) fn rental_message(amt: f64, n: i64) -> String {
+    format!(
+        "Monthly rent collected: ${} ({n} rental{}).",
+        with_thousands(amt),
+        if n > 1 { "s" } else { "" }
+    )
+}
+
+#[cfg(test)]
+mod message_tests {
+    use super::*;
+
+    #[test]
+    fn rent_lines_word_their_counts_as_typescript_does() {
+        // The TypeScript templates (EconomySystem.ts LEASE_MESSAGE, rentalIncome.ts).
+        assert_eq!(
+            lease_message(Kind::Office, 1520000.0, 152),
+            "Quarterly office rent collected: $1,520,000 (152 offices)."
+        );
+        // The TypeScript office line never drops its plural.
+        assert_eq!(
+            lease_message(Kind::Office, 10000.0, 1),
+            "Quarterly office rent collected: $10,000 (1 offices)."
+        );
+        assert_eq!(
+            crate::build::treasure_message(452311.0),
+            "💰 Excavation crews unearthed buried treasure worth $452,311!"
+        );
+        assert_eq!(
+            lease_message(Kind::FitnessClub, 30000.0, 1),
+            "Fitness Club membership dues collected: $30,000 (1 club)."
+        );
+        assert_eq!(
+            lease_message(Kind::FitnessClub, 60000.0, 2),
+            "Fitness Club membership dues collected: $60,000 (2 clubs)."
+        );
+        assert_eq!(
+            lease_message(Kind::Clinic, 1500.0, 1),
+            "Clinic lease collected: $1,500 (1 clinic)."
+        );
+        assert_eq!(
+            lease_message(Kind::Clinic, 3000.0, 2),
+            "Clinic lease collected: $3,000 (2 clinics)."
+        );
+        assert_eq!(
+            rental_message(950.0, 1),
+            "Monthly rent collected: $950 (1 rental)."
+        );
+        assert_eq!(
+            rental_message(12500.0, 3),
+            "Monthly rent collected: $12,500 (3 rentals)."
+        );
+    }
+}

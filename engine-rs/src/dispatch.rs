@@ -3,6 +3,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+use indexmap::IndexMap;
+
 use crate::crowd::ElevatorCalls;
 use crate::jsmath;
 use crate::schedule::Schedule;
@@ -17,11 +19,19 @@ pub struct ElevatorDispatch {
     car_dwell: HashMap<i64, Vec<f64>>,
     /// Waiting passengers per floor.
     waiting: HashMap<i64, f64>,
+    /// The boarding tally since the last drain (#465): shaft id to origin
+    /// floor to boarded count. Counting only, never read back into behavior.
+    board_tally: HashMap<i64, IndexMap<i64, f64>>,
 }
 
 impl ElevatorDispatch {
     pub fn new() -> ElevatorDispatch {
         ElevatorDispatch::default()
+    }
+
+    /// `drainBoardings()`: hand over the tally and clear it.
+    pub fn drain_boardings(&mut self) -> HashMap<i64, IndexMap<i64, f64>> {
+        std::mem::take(&mut self.board_tally)
     }
 
     pub fn waiting_at(&self, floor: i64) -> f64 {
@@ -220,6 +230,16 @@ impl ElevatorDispatch {
                         car_load[i] += board;
                         if !staff_only {
                             self.waiting.insert(tf, (w - board).max(0.0));
+                        }
+                        // Origin tally (#465), only at a stop with a live call.
+                        if call_set.contains(&tf) {
+                            let n = self
+                                .board_tally
+                                .entry(id)
+                                .or_default()
+                                .entry(tf)
+                                .or_insert(0.0);
+                            *n = (*n + board).min(5000.0);
                         }
                     }
                     if pos >= t.top as f64 {
