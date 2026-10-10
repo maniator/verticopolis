@@ -4,6 +4,7 @@ import type { Person } from "../../engine/crowd/person";
 import { canonicalJson } from "../../engine/canonicalJson";
 import { stateView } from "../../engine/conformanceView";
 import { attachWasmHost } from "../../wasmhost/wasmHost";
+import { decodeFrame } from "../../wasmhost/frameView";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import { FIXTURES, FrameDriver, loadFixture } from "../dualrun/dualRunHarness";
 
@@ -99,6 +100,29 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
   for (const fixture of FIXTURES) {
     it(`${fixture} for a day at the fastest speed`, () => day(loadFixture(fixture), 3), 120_000);
   }
+  it("the meal overlay revision moves at the frame the engine's does, between merges too", () => {
+    // The renderer repaints rooms when the counter moves; a read model that
+    // took it only at a merge would show a lunch dip up to an hour late.
+    const sim = loadFixture(FIXTURES[0]);
+    const host = attachWasmHost(sim, wasm());
+    const driver = new FrameDriver(sim, 3);
+    let engineRev = decodeFrame(host.engine.frameView()).header.mealOverlayRevision;
+    let movedBetweenMerges = 0;
+    const from = sim.clock.minutes;
+    for (let frame = 0; sim.clock.minutes - from < DAY; frame++) {
+      if (frame > 200_000) throw new Error(`the clock stalled at minute ${sim.clock.minutes}`);
+      const before = { rev: sim.tower.mealOverlayRevision, merges: host.merges };
+      driver.frame();
+      const now = decodeFrame(host.engine.frameView()).header.mealOverlayRevision;
+      const moved = sim.tower.mealOverlayRevision !== before.rev;
+      expect(moved, `minute ${sim.clock.minutes}`).toBe(now !== engineRev);
+      expect(sim.tower.mealOverlayRevision, "never steps back").toBeGreaterThanOrEqual(before.rev);
+      if (moved && host.merges === before.merges) movedBetweenMerges++;
+      engineRev = now;
+    }
+    expect(movedBetweenMerges, "a meal overlay change between merges").toBeGreaterThan(0);
+    host.detach();
+  }, 120_000);
   it("a new game of each mode", () => {
     day(Simulation.newGame(11, "classic"), 3, false); // an empty lot: nobody to route
     day(Simulation.newGame(12, "modern"), 3, false);

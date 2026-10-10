@@ -325,6 +325,18 @@ export class Engine {
         }
     }
     /**
+     * The loop's pass memos as `[lastHour, lastDay, lastMonth, lastQuarter]`,
+     * the counterpart of `seedLoopMemos`. Tooling only: the gallery's handoff
+     * carries a hosted tower's owed passes across the load that restarts it.
+     * @returns {Float64Array}
+     */
+    loopMemos() {
+        const ret = wasm.engine_loopMemos(this.__wbg_ptr);
+        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v1;
+    }
+    /**
      * @returns {string}
      */
     mode() {
