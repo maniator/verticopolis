@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { rentOf } from "../../engine/econConfig";
 import { REPO_ROOT, type EngineStart, type Outcome, type ScenarioEngine } from "./scenario";
+import type { ChargeOutcome } from "./chargeOps";
 import { checkBinding, type WasmEngine, type WasmModule } from "../../dualrun/binding";
 
 /**
@@ -39,6 +40,7 @@ export function wasm(): WasmModule {
 }
 
 const outcome = (json: string): Outcome => JSON.parse(json) as Outcome;
+const charge = (json: string): ChargeOutcome => JSON.parse(json) as ChargeOutcome;
 
 /** Integers cross the binding as 32-bit values and the glue wraps silently,
  *  so a tile, id or count outside that range is refused here rather than
@@ -91,6 +93,11 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
     adjustRent: (id, dir) => live().adjustRent(i32(id, "id"), dir) ?? null,
     setNoRate: (id) => live().setNoRate(i32(id, "id")),
     setCars: (id, cars) => live().setCars(i32(id, "id"), i32(cars, "cars")),
+    addCar: (id) => charge(live().addCar(i32(id, "id"))),
+    removeCar: (id) => charge(live().removeCar(i32(id, "id"))),
+    extendTransport: (id, end, targetFloor, hwm) =>
+      charge(live().extendTransport(i32(id, "id"), end, i32(targetFloor, "targetFloor"), hwm ? JSON.stringify({ bottom: i32(hwm.bottom, "hwm bottom"), top: i32(hwm.top, "hwm top") }) : null)),
+    removeFacility: (id, method) => charge(live().removeFacility(i32(id, "id"), method)),
     setSchedule: (id, schedule) => live().setSchedule(i32(id, "id"), JSON.stringify(schedule)),
     startFire: () => live().startFire(),
     fires: () => live().fires(),

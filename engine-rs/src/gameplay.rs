@@ -27,6 +27,15 @@ pub enum RemovalMethod {
 }
 
 impl RemovalMethod {
+    /// The method a command names, as the binding and the referee spell it.
+    pub fn parse(s: &str) -> Option<RemovalMethod> {
+        match s {
+            "sell" => Some(RemovalMethod::Sell),
+            "bulldoze" => Some(RemovalMethod::Bulldoze),
+            _ => None,
+        }
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             RemovalMethod::Sell => "sell",

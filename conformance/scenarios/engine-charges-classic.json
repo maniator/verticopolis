@@ -1,0 +1,402 @@
+{
+  "id": "engine-charges-classic",
+  "description": "The engine-owned charges (#914) on a fresh Classic tower: a standard elevator buys two cars, is refused a third one dollar short, sells two back and is refused its last car, and at eight cars is refused another with no money at all; a stairway is refused cars and an extension. The elevator then extends one floor by button, two floors by a drag that shrinks back and regrows within its high-water mark for free, one floor into open sky (laying the floor behind it), as far as one floor's budget pays and no further, and is refused while short and while in debt, then shrinks for free. A second elevator drags its bottom down two floors, back one for free and down again within its mark, then extends to the lobby on its last floor's worth of money and is refused the next floor; a drag far below the basement is refused with the tower's own reason and charges nothing. The removal command is refused a lobby tile and a floor holding up the story above, bulldozes a top floor tile and the stairway for half back. A day passes, a fire is started in the office, and the removal command refuses to bulldoze or sell it while it burns; two days later the gutted shell sells for nothing, the elevator is sold, and a last day runs.",
+  "start": {
+    "newGame": {
+      "seed": 20261010,
+      "mode": "classic"
+    }
+  },
+  "commands": [
+    {
+      "op": "setMoney",
+      "amount": 5000000
+    },
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 160,
+      "to": 215
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 2,
+      "from": 160,
+      "to": 215
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 3,
+      "from": 160,
+      "to": 215
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 4,
+      "from": 160,
+      "to": 215
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 5,
+      "from": 160,
+      "to": 215
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 162,
+      "bottom": 1,
+      "top": 2
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 200,
+      "bottom": 1,
+      "top": 2
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 2,
+      "x": 170
+    },
+    {
+      "op": "checkpoint",
+      "label": "opened"
+    },
+    {
+      "op": "addCar",
+      "floor": 1,
+      "x": 162
+    },
+    {
+      "op": "addCar",
+      "floor": 1,
+      "x": 162
+    },
+    {
+      "op": "setMoney",
+      "amount": 39999
+    },
+    {
+      "op": "addCar",
+      "floor": 1,
+      "x": 162,
+      "reason": "Not enough money."
+    },
+    {
+      "op": "setMoney",
+      "amount": 5000000
+    },
+    {
+      "op": "removeCar",
+      "floor": 1,
+      "x": 162
+    },
+    {
+      "op": "removeCar",
+      "floor": 1,
+      "x": 162
+    },
+    {
+      "op": "removeCar",
+      "floor": 1,
+      "x": 162,
+      "reason": "An elevator needs at least one car."
+    },
+    {
+      "op": "setCars",
+      "floor": 1,
+      "x": 162,
+      "cars": 8
+    },
+    {
+      "op": "setMoney",
+      "amount": 0
+    },
+    {
+      "op": "addCar",
+      "floor": 1,
+      "x": 162,
+      "reason": "This elevator has all the cars it can hold."
+    },
+    {
+      "op": "setMoney",
+      "amount": 5000000
+    },
+    {
+      "op": "setCars",
+      "floor": 1,
+      "x": 162,
+      "cars": 2
+    },
+    {
+      "op": "addCar",
+      "floor": 1,
+      "x": 200,
+      "reason": "Only elevators have cars."
+    },
+    {
+      "op": "removeCar",
+      "floor": 1,
+      "x": 200,
+      "reason": "Only elevators have cars."
+    },
+    {
+      "op": "checkpoint",
+      "label": "cars"
+    },
+    {
+      "op": "extendTransport",
+      "floor": 1,
+      "x": 162,
+      "end": "up",
+      "targetFloor": 3
+    },
+    {
+      "op": "extendTransport",
+      "floor": 1,
+      "x": 162,
+      "end": "up",
+      "targetFloor": 5,
+      "hwmBottom": 1,
+      "hwmTop": 3
+    },
+    {
+      "op": "extendTransport",
+      "floor": 1,
+      "x": 162,
+      "end": "up",
+      "targetFloor": 4,
+      "hwmBottom": 1,
+      "hwmTop": 5
+    },
+    {
+      "op": "extendTransport",
+      "floor": 1,
+      "x": 162,
+      "end": "up",
+      "targetFloor": 5,
+      "hwmBottom": 1,
+      "hwmTop": 5
+    },
+    {
+      "op": "extendTransport",
+      "floor": 1,
+      "x": 162,
+      "end": "up",
+      "targetFloor": 6
+    },
+    {
+      "op": "setMoney",
+      "amount": 7500
+    },
+    {
+      "op": "extendTransport",
+      "floor": 1,
+      "x": 162,
+      "end": "up",
+      "targetFloor": 9
+    },
+    {
+      "op": "extendTransport",
+      "floor": 1,
+      "x": 162,
+      "end": "up",
+      "targetFloor": 9,
+      "reason": "Not enough money."
+    },
+    {
+      "op": "setMoney",
+      "amount": -20000
+    },
+    {
+      "op": "extendTransport",
+      "floor": 1,
+      "x": 162,
+      "end": "up",
+      "targetFloor": 9,
+      "reason": "Not enough money."
+    },
+    {
+      "op": "setMoney",
+      "amount": 5000000
+    },
+    {
+      "op": "extendTransport",
+      "floor": 1,
+      "x": 162,
+      "end": "up",
+      "targetFloor": 4
+    },
+    {
+      "op": "extendTransport",
+      "floor": 1,
+      "x": 200,
+      "end": "up",
+      "targetFloor": 3,
+      "reason": "Only elevators can be extended."
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 180,
+      "bottom": 4,
+      "top": 5
+    },
+    {
+      "op": "extendTransport",
+      "floor": 4,
+      "x": 180,
+      "end": "down",
+      "targetFloor": 2,
+      "hwmBottom": 4,
+      "hwmTop": 5
+    },
+    {
+      "op": "extendTransport",
+      "floor": 4,
+      "x": 180,
+      "end": "down",
+      "targetFloor": 3,
+      "hwmBottom": 2,
+      "hwmTop": 5
+    },
+    {
+      "op": "extendTransport",
+      "floor": 4,
+      "x": 180,
+      "end": "down",
+      "targetFloor": 2,
+      "hwmBottom": 2,
+      "hwmTop": 5
+    },
+    {
+      "op": "setMoney",
+      "amount": 5000
+    },
+    {
+      "op": "extendTransport",
+      "floor": 4,
+      "x": 180,
+      "end": "down",
+      "targetFloor": 1
+    },
+    {
+      "op": "extendTransport",
+      "floor": 4,
+      "x": 180,
+      "end": "down",
+      "targetFloor": 0,
+      "reason": "Not enough money."
+    },
+    {
+      "op": "setMoney",
+      "amount": 5000000
+    },
+    {
+      "op": "extendTransport",
+      "floor": 4,
+      "x": 180,
+      "end": "down",
+      "targetFloor": -20,
+      "reason": "Outside the buildable range."
+    },
+    {
+      "op": "checkpoint",
+      "label": "extended"
+    },
+    {
+      "op": "removeFacility",
+      "floor": 1,
+      "x": 170,
+      "method": "bulldoze",
+      "reason": "Lobby tiles are permanent. The 1994 game does not let you remove them."
+    },
+    {
+      "op": "removeFacility",
+      "floor": 4,
+      "x": 190,
+      "method": "sell",
+      "reason": "Remove the story above first. Floors can't hang in midair."
+    },
+    {
+      "op": "removeFacility",
+      "floor": 5,
+      "x": 215,
+      "method": "bulldoze"
+    },
+    {
+      "op": "removeFacility",
+      "floor": 1,
+      "x": 200,
+      "method": "bulldoze",
+      "shaft": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "removed"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 24
+    },
+    {
+      "op": "startFire"
+    },
+    {
+      "op": "removeFacility",
+      "floor": 2,
+      "x": 170,
+      "method": "bulldoze",
+      "reason": "You can't bulldoze a burning unit. Call fire rescue or let it burn out."
+    },
+    {
+      "op": "removeFacility",
+      "floor": 2,
+      "x": 172,
+      "method": "sell",
+      "reason": "You can't sell a burning unit. Call fire rescue or let it burn out."
+    },
+    {
+      "op": "checkpoint",
+      "label": "burning"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 48,
+      "checkpointEvery": 24
+    },
+    {
+      "op": "removeFacility",
+      "floor": 2,
+      "x": 170,
+      "method": "sell"
+    },
+    {
+      "op": "removeFacility",
+      "floor": 1,
+      "x": 162,
+      "method": "sell",
+      "shaft": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "gutted-sold"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 24
+    }
+  ]
+}
