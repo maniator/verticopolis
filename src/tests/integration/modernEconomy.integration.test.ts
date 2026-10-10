@@ -3,6 +3,10 @@ import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { ECON, rentConfig } from "../../engine/econConfig";
 import type { GameMode } from "../../engine/types";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
+
+/** The parity projects skip these (story-engine-test-parity, #878). */
+const V1_MODEL = "sets simModel = \"v1\", the sampled model the engine never ported and the save does not carry";
 
 /**
  * In-game minutes spanning one 30-day month, matching the sim's own month
@@ -183,13 +187,13 @@ describe("operating overhead + condo hold-tax are Modern-only", () => {
     return before - sim.money;
   }
 
-  it("Classic charges no overhead and no condo hold-tax (only canon maintenance)", () => {
+  itTypeScriptOnly(V1_MODEL)("Classic charges no overhead and no condo hold-tax (only canon maintenance)", () => {
     // Classic still pays canon service maintenance if any, but there are no
     // service rooms here, so a held vacant office + unsold condo cost NOTHING.
     expect(monthlyDrain("classic")).toBe(0);
   });
 
-  it("Modern charges the exact overhead + condo tax (a real carrying cost)", () => {
+  itTypeScriptOnly(V1_MODEL)("Modern charges the exact overhead + condo tax (a real carrying cost)", () => {
     // Two overhead-bearing units (vacant office + unsold condo) + the condo
     // hold-tax on its asking price. Asserting the EXACT figure (not just > 0)
     // catches a sign/tuning error in either sink.

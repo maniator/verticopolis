@@ -40,6 +40,15 @@ function dirtyRoom(sim: Simulation, floor: number, x: number) {
   return room;
 }
 
+/** Tick the 7:00 tower to the noon dispatch (the Classic shift opening): the
+ *  hourly pass that crosses noon sends the maids out, and the ticks run on
+ *  whichever engine hosts the tower (a clock write plus a direct
+ *  `dispatchHousekeepers()` call would reach the TypeScript instance only). */
+function tickToNoonDispatch(sim: Simulation): void {
+  for (let i = 0; i < 5; i++) sim.tick(60);
+  expect(sim.clock.hour).toBe(12);
+}
+
 describe("shift windows via GameRules", () => {
   it("Classic maids start at noon, not at the 8:00 checkout", () => {
     const sim = baseTower(31);
@@ -118,12 +127,11 @@ describe("the maid pool", () => {
     const a = dirtyRoom(sim, 2, X0);
     const b = dirtyRoom(sim, 2, X0 + 4);
     expect(sim.tower.place("housekeeping", 2, X0 + 8).ok).toBe(true);
-    sim.clock.minutes = 13 * 60;
-    sim.economy.dispatchHousekeepers();
+    tickToNoonDispatch(sim);
     expect(sim.crowd.people.filter((p) => p.staff).length).toBe(1); // one maid per floor per unit
     // One hour of simulation: she cleans the first room, is released, and the
     // event-driven re-dispatch sends her straight to the second (no hourly
-    // tick in between: 14:00's dispatch has not run when both turn over).
+    // tick in between: 13:00's dispatch has not run when both turn over).
     sim.tick(60);
     expect(a.state).toBe("empty");
     expect(b.state).toBe("empty");
@@ -185,8 +193,7 @@ describe("the cleaning dwell", () => {
     const sim = baseTower(38);
     const room = dirtyRoom(sim, 2, X0);
     expect(sim.tower.place("housekeeping", 2, X0 + 8).ok).toBe(true);
-    sim.clock.minutes = 13 * 60;
-    sim.economy.dispatchHousekeepers();
+    tickToNoonDispatch(sim);
     expect(sim.crowd.people.some((p) => p.staff)).toBe(true);
     // Three game-minutes (6 crowd-seconds) covers the same-floor walk but is
     // far short of the 16-crowd-second dwell: she is in the room, still

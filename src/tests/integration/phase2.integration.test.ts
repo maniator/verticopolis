@@ -12,7 +12,7 @@ const C = Math.floor(W / 2);
  */
 
 describe("F4 / Step 1 — v2 integrates per hour; v1 keeps the sampled behavior", () => {
-  it("v1 fires onHour at most once for a multi-hour tick (the documented sampling)", () => {
+  itTypeScriptOnly(V1_MODEL)("v1 fires onHour at most once for a multi-hour tick (the documented sampling)", () => {
     const sim = Simulation.newGame(1); // starts Mon 07:00
     sim.simModel = "v1"; // pin the legacy sampled model (v2 is now the default)
     sim.tick(60 * 5); // 07:00 -> 12:00
@@ -35,7 +35,7 @@ describe("F4 / Step 1 — v2 integrates per hour; v1 keeps the sampled behavior"
     expect(sim.clock.day).toBe(day0 + 1);
   });
 
-  it("v2 advances the same total game time as v1 (sub-stepping is exact)", () => {
+  itTypeScriptOnly(V1_MODEL)("v2 advances the same total game time as v1 (sub-stepping is exact)", () => {
     const a = Simulation.newGame(2);
     a.simModel = "v1";
     const b = Simulation.newGame(2);
@@ -130,7 +130,7 @@ describe("F15 / Step 3 — service coverage radius (v2): placement matters", () 
     expect(far).toBeCloseTo(0.5, 5); // base only — neither covers floor 100
   });
 
-  it("v1 keeps tower-wide coverage (one station protects everywhere)", () => {
+  itTypeScriptOnly(V1_MODEL)("v1 keeps tower-wide coverage (one station protects everywhere)", () => {
     const sim = tallTower(2);
     sim.simModel = "v1";
     sim.tower.place("security", 2, C);
@@ -182,6 +182,10 @@ describe("F15 / Step 3 — service coverage radius (v2): placement matters", () 
 });
 
 import { TOWER_POPULATION, FACILITIES } from "../../engine/facilities";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
+
+/** The parity projects skip these (story-engine-test-parity, #878). */
+const V1_MODEL = "sets simModel = \"v1\", the sampled model the engine never ported and the save does not carry";
 
 describe("F2 / Step 5 — honest v2 endgame: a served, well-zoned tower wins under the real hourly clock", () => {
   it("a properly-zoned tower reaches TOWER and does NOT mass-vacate under hourly simulation", () => {

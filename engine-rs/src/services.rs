@@ -39,19 +39,64 @@ impl ExterminatorRefusal {
     }
 }
 
-/// `Number#toLocaleString()` for a whole, finite, non-negative dollar amount
-/// in the en-US locale, which is all the booking message ever formats. The
-/// TypeScript call takes the host locale; log text is outside the hash, and
-/// the referee runs under en-US.
+/// `Number#toLocaleString()` in the en-US locale, for the dollar amounts the
+/// log lines format (the exterminator booking, the condo sale and buy-back).
+/// The TypeScript call takes the host locale; log text is outside the hash,
+/// and the referee runs under en-US.
+///
+/// A fractional amount reads as `toLocaleString()` reads it: the shortest
+/// round-trip decimal, rounded half away from zero to at most three
+/// fraction digits, trailing zeros dropped (123456.78 reads "123,456.78").
 pub(crate) fn with_thousands(x: f64) -> String {
-    debug_assert!(x.is_finite() && x >= 0.0 && x.fract() == 0.0, "{x}");
-    let digits = format!("{}", x as i64);
+    debug_assert!(x.is_finite(), "{x}");
+    // Rust's `Display` for f64 is the shortest round-trip decimal and never
+    // uses an exponent, the digits ICU starts from.
+    let plain = format!("{}", x.abs());
+    let (int_part, frac_part) = plain.split_once('.').unwrap_or((plain.as_str(), ""));
+    let mut digits: Vec<u8> = int_part.bytes().collect();
+    let int_len = digits.len();
+    digits.extend(frac_part.bytes().take(3));
+    while digits.len() < int_len + 3 {
+        digits.push(b'0');
+    }
+    if frac_part.as_bytes().get(3).is_some_and(|&d| d >= b'5') {
+        let mut k = digits.len();
+        loop {
+            if k == 0 {
+                digits.insert(0, b'1');
+                break;
+            }
+            k -= 1;
+            if digits[k] == b'9' {
+                digits[k] = b'0';
+            } else {
+                digits[k] += 1;
+                break;
+            }
+        }
+    }
+    let split = digits.len() - 3;
+    let int_digits = &digits[..split];
+    let frac_digits: Vec<u8> = {
+        let mut f = digits[split..].to_vec();
+        while f.last() == Some(&b'0') {
+            f.pop();
+        }
+        f
+    };
     let mut out = String::new();
-    for (i, c) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i) % 3 == 0 {
+    if x < 0.0 {
+        out.push('-');
+    }
+    for (i, &c) in int_digits.iter().enumerate() {
+        if i > 0 && (int_digits.len() - i).is_multiple_of(3) {
             out.push(',');
         }
-        out.push(c);
+        out.push(c as char);
+    }
+    if !frac_digits.is_empty() {
+        out.push('.');
+        out.extend(frac_digits.iter().map(|&c| c as char));
     }
     out
 }
@@ -374,6 +419,24 @@ mod tests {
             (1234567.0, "1,234,567"),
         ] {
             assert_eq!(with_thousands(x), want);
+        }
+    }
+
+    /// The fractional cases, each the string node's `toLocaleString()`
+    /// prints for the same number.
+    #[test]
+    fn fractional_amounts_match_to_locale_string() {
+        for (x, want) in [
+            (123456.78, "123,456.78"),
+            (150000.0, "150,000"),
+            (1234.5678, "1,234.568"),
+            (0.0005, "0.001"),
+            (999.9996, "1,000"),
+            (1.0005, "1.001"),
+            (106666.66666666667, "106,666.667"),
+            (0.1 + 0.2, "0.3"),
+        ] {
+            assert_eq!(with_thousands(x), want, "{x}");
         }
     }
 

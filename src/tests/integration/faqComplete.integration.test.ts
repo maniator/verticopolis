@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID, FACILITIES } from "../../engine/facilities";
 import type { Unit } from "../../engine/types";
+
+/** The parity projects skip these (story-engine-test-parity, #878). */
+const V1_MODEL = "sets simModel = \"v1\", the sampled model the engine never ported and the save does not carry";
 
 /** FAQ-parity (complete) tests: the canon star ladder, office noise, the
  * hotel-population rule and the VIP-in-suite gate. */
@@ -262,7 +266,7 @@ describe("VIP stay (FAQ): only in a suite, gates the favorable review", () => {
 });
 
 describe("Events & amounts (FAQ Cluster B)", () => {
-  it("rain depresses commercial income vs a clear day", () => {
+  itTypeScriptOnly("sets sim.weather directly; no save carries the weather (a load recomputes it from the day) and the frame sync writes the engine's weather onto the instance on attach and every tick, so the write never reaches the engine")("rain depresses commercial income vs a clear day", () => {
     function dayIncome(weather: "clear" | "rain"): number {
       const sim = newSeededGame(7);
       sim.money = 1e12;
@@ -561,7 +565,7 @@ describe("Fine FAQ mechanics", () => {
     expect(sim.crowd.route(sim.tower, 1, 40)).not.toBeNull();
   });
 
-  it("blockbuster vs average film: two-tier booking cost exists and both occur", () => {
+  itTypeScriptOnly(V1_MODEL)("blockbuster vs average film: two-tier booking cost exists and both occur", () => {
     expect(ECON.cinemaBookingBlockbuster).toBeGreaterThan(ECON.cinemaBookingMonthly);
     // Classic on purpose: this isolates the cinema BOOKING mechanic (which exists
     // in both modes) from the Modern-only operating overhead, so the assertion

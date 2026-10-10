@@ -29,9 +29,26 @@ export type FrameHeader = Pick<Simulation, "money" | "star" | "weather" | "santa
     transports: number;
   };
 
-/** The per-frame slice of a {@link Person}; `staff` is always present in a
- *  frame (the engine sends 0 or 1) where the instance keeps it optional. */
-export type PersonRecord = Pick<Person, "id" | "seed" | "state" | "floor" | "x" | "fy" | "wait"> & { staff: boolean };
+/** The fixed slots of a person record, before its route (`floors`, then
+ *  `shafts`); mirrors `PERSON_FIXED` in `engine-rs/src/wasm.rs`. */
+export const PERSON_FIXED = 18;
+
+/** The routines the engine tags a person with, by the code it sends (0 is
+ *  none). */
+export const ROUTINES: readonly NonNullable<Person["routine"]>[] = ["schoolRun", "salesCall"];
+
+/** The per-frame slice of a {@link Person}: its position and state, and the
+ *  routing the suites and the panels read (the origin and venue units, the
+ *  meal intent, the routine tag, the return leg, the dwell timer, the route).
+ *  `staff` is always present in a frame (the engine sends 0 or 1) where the
+ *  instance keeps it optional; the optional unit ids and the timer are
+ *  undefined when the engine sends -1, as on the instance. */
+export type PersonRecord = Pick<
+  Person,
+  "id" | "seed" | "state" | "floor" | "x" | "fy" | "wait" | "originFloor" | "originUnitId" | "venueUnitId" | "mealVenueId" | "countedHotelGuest" | "routine" | "returning" | "dwellSecondsLeft" | "floors" | "shafts"
+> & { staff: boolean };
+// (An absent dwell timer crosses as NaN rather than a sentinel number: the
+// timer stays negative on a person through the return leg, so -1 is taken.)
 
 /** The per-frame slice of a {@link Unit}: the counters the engine keeps for
  *  the unit's kind; an absent one reads undefined, as on the instance. */
@@ -81,13 +98,34 @@ export function decodeFrame(v: ArrayLike<number>): FrameView {
   const need = (n: number) => {
     if (i + n > v.length) throw new Error(`frame view: ${v.length} numbers, record at ${i} needs ${n}`);
   };
+  const counter = (n: number) => (n < 0 ? undefined : n);
+  // A route length the record reads before it reads the route: a negative
+  // or non-integer one would misalign every record after it.
+  const routeCount = (n: number, what: string) => {
+    if (!Number.isInteger(n) || n < 0) throw new Error(`frame view: person record at ${i} has a bad ${what} count ${n}`);
+    return n;
+  };
   const people: PersonRecord[] = [];
   for (let k = 0; k < header.people; k++) {
-    need(8);
-    people.push({ id: v[i], seed: v[i + 1], staff: v[i + 2] === 1, state: enumAt(PERSON_STATES, v[i + 3], "person state"), floor: v[i + 4], x: v[i + 5], fy: v[i + 6], wait: v[i + 7] });
-    i += 8;
+    need(PERSON_FIXED);
+    const floorCount = routeCount(v[i + 16], "floors");
+    const shaftCount = routeCount(v[i + 17], "shafts");
+    const routineCode = v[i + 13];
+    if (routineCode !== 0 && ROUTINES[routineCode - 1] === undefined) throw new Error(`frame view: unknown routine code ${routineCode}`);
+    const record: PersonRecord = {
+      id: v[i], seed: v[i + 1], staff: v[i + 2] === 1, state: enumAt(PERSON_STATES, v[i + 3], "person state"), floor: v[i + 4], x: v[i + 5], fy: v[i + 6], wait: v[i + 7],
+      originFloor: v[i + 8], originUnitId: counter(v[i + 9]), venueUnitId: counter(v[i + 10]), mealVenueId: counter(v[i + 11]),
+      countedHotelGuest: v[i + 12] === 1, routine: routineCode === 0 ? undefined : ROUTINES[routineCode - 1], returning: v[i + 14] === 1, dwellSecondsLeft: Number.isNaN(v[i + 15]) ? undefined : v[i + 15],
+      floors: [], shafts: [],
+    };
+    i += PERSON_FIXED;
+    need(floorCount + shaftCount);
+    for (let f = 0; f < floorCount; f++) record.floors.push(v[i + f]);
+    i += floorCount;
+    for (let f = 0; f < shaftCount; f++) record.shafts.push(v[i + f]);
+    i += shaftCount;
+    people.push(record);
   }
-  const counter = (n: number) => (n < 0 ? undefined : n);
   const units: UnitRecord[] = [];
   for (let k = 0; k < header.units; k++) {
     need(6);
