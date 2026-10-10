@@ -679,9 +679,95 @@ pub fn log_since(sim: &Simulation, seq: i64) -> Value {
     )
 }
 
+/// `importTdt(bytes, filename)`: a 1994 `.TDT` file as JSON text
+/// `{ "save": <serialized game>, "warnings": [...] }`, where `save` is what
+/// `fromSave` takes. A file that cannot be read is a JavaScript error with
+/// the player-readable message.
+#[wasm_bindgen(js_name = importTdt)]
+pub fn import_tdt(bytes: &[u8], filename: &str) -> Result<String, JsError> {
+    // The same entry point a native host calls, so the two cannot drift.
+    let (save, warnings) = crate::tdt::import_tdt(bytes, filename).map_err(err)?;
+    let warnings = serde_json::to_string(&warnings).map_err(err)?;
+    Ok(format!("{{\"save\":{save},\"warnings\":{warnings}}}"))
+}
+
+/// `exportTdt(saveJson)`: the `.TDT` bytes for a serialized game (what
+/// `serialize` returns). A tower the format cannot hold is a JavaScript error
+/// with the player-readable message.
+#[wasm_bindgen(js_name = exportTdt)]
+pub fn export_tdt(save_json: &str) -> Result<Vec<u8>, JsError> {
+    crate::tdt::export_tdt(save_json).map_err(err)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The two TDT free functions answer every lock case the way the referee
+    /// does: the JSON envelope carries the pinned save and warnings, each
+    /// refusal carries the pinned message, and each embedded export matches
+    /// its pinned bytes or refusal.
+    #[test]
+    fn the_tdt_binding_answers_from_the_lock() {
+        use crate::canonical::digest;
+        use crate::tdt::referee::{inflate, read_lock, sha256_hex};
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let lock = read_lock(&root.join("conformance").join("tdt-cases.json")).expect("lock");
+        let mut parsed = 0;
+        for case in lock.import.iter().filter(|c| c.expected.is_some()) {
+            let Ok(json) = import_tdt(&inflate(&case.bytes).expect("bytes"), &case.filename) else {
+                panic!("the import refused {}, which the lock parses", case.id);
+            };
+            let v: serde_json::Value = serde_json::from_str(&json).expect("json envelope");
+            let expected = case.expected.as_ref().unwrap();
+            assert_eq!(digest(&v["save"]), expected.save, "{}", case.id);
+            let mut warnings: Vec<String> =
+                serde_json::from_value(v["warnings"].clone()).expect("a string array");
+            // The lock stores warnings sorted (as the referee compares them);
+            // their order is pinned by the TypeScript versus WASM
+            // differential test.
+            warnings.sort();
+            assert_eq!(warnings, expected.warnings, "{}", case.id);
+            parsed += 1;
+        }
+        assert!(parsed > 0, "the lock has import cases that parse");
+        // A JavaScript error cannot be built off the wasm target, so each
+        // refusal is asserted on the crate function the binding wraps, with
+        // the lock's exact message.
+        let mut refused = 0;
+        for case in lock.import.iter().filter(|c| c.throws.is_some()) {
+            let got = crate::tdt::import_tdt(&inflate(&case.bytes).expect("bytes"), &case.filename);
+            assert_eq!(got.err().as_ref(), case.throws.as_ref(), "{}", case.id);
+            refused += 1;
+        }
+        assert!(refused > 0, "the lock has import cases that refuse");
+        let mut written = 0;
+        for ex in lock
+            .export
+            .iter()
+            .filter(|c| c.save.is_some() && c.expected.is_some())
+        {
+            let Ok(bytes) = export_tdt(&ex.save.as_ref().unwrap().to_string()) else {
+                panic!("the export refused {}, which the lock writes", ex.id);
+            };
+            assert_eq!(
+                sha256_hex(&bytes),
+                *ex.expected.as_ref().unwrap(),
+                "{}",
+                ex.id
+            );
+            written += 1;
+        }
+        assert!(written > 0, "the lock has embedded export cases");
+        for ex in lock
+            .export
+            .iter()
+            .filter(|c| c.save.is_some() && c.throws.is_some())
+        {
+            let got = crate::tdt::export_tdt(&ex.save.as_ref().unwrap().to_string());
+            assert_eq!(got.err().as_ref(), ex.throws.as_ref(), "{}", ex.id);
+        }
+    }
 
     #[test]
     fn the_frame_view_carries_the_header_and_one_record_per_person_unit_and_car() {

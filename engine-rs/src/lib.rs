@@ -36,6 +36,8 @@ pub mod services;
 pub mod sim;
 pub mod sim_loop;
 pub mod star;
+pub mod tdt;
+pub use tdt::{export_tdt, import_tdt};
 pub mod tower;
 pub mod tower_query;
 #[cfg(feature = "wasm")]
