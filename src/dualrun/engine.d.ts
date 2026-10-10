@@ -37,6 +37,12 @@ export class Engine {
      * `callExterminator()`: JSON `{ ok, reason? }`.
      */
     callExterminator(): string;
+    /**
+     * `catalogFor(mode)`: every price, size and build rule a frontend
+     * reads, resolved for the mode, as JSON. A static: it reads the
+     * engine's tables and needs no running game.
+     */
+    static catalog(mode: string): string;
     clearStops(id: number): boolean;
     /**
      * The crowd view's hash, as the lock records it.

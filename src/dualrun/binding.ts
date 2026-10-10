@@ -1,4 +1,6 @@
 import type { Engine } from "./engine";
+import type { Catalog } from "../engine/catalog";
+import type { GameMode } from "../engine/types";
 
 /**
  * The WASM binding's surface, as wasm-bindgen declares it from
@@ -22,7 +24,7 @@ export const INSTANCE_METHODS = [
   "rerollSubtype", "applyRentBatch", "pendingChoice", "resolveChoice", "tick", "serialize", "stateView", "crowdView",
   "stateDigest", "crowdDigest", "frameView", "logSince",
 ] as const satisfies readonly (keyof WasmEngine)[];
-export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
+export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower", "catalog"] as const satisfies readonly (keyof typeof Engine)[];
 
 // Every method of the declared class (the dispose symbol aside) and every
 // static has to be in the lists above, or the binding gained one the check
@@ -48,4 +50,15 @@ export function checkBinding(mod: unknown): WasmModule {
   ];
   if (missing.length) throw new Error(`the WASM binding lacks ${missing.join(", ")}; rebuild it or update the adapter`);
   return mod as WasmModule;
+}
+
+/** The catalog's type: `Engine.catalog(mode)` returns it as JSON text, and the
+ *  declaration is the TypeScript engine's `Catalog` (`src/engine/catalog.ts`),
+ *  which `conformance/catalog.json` and the WASM catalog test hold to the Rust
+ *  value field for field. */
+export type { Catalog };
+
+/** `Engine.catalog(mode)`, parsed and typed. */
+export function readCatalog(mod: WasmModule, mode: GameMode): Catalog {
+  return JSON.parse(mod.Engine.catalog(mode)) as Catalog;
 }
