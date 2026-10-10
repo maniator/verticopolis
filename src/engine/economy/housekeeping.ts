@@ -98,6 +98,12 @@ export class Housekeeping {
     return this.hkYesterday ? { ...this.hkYesterday } : null;
   }
 
+  /** Set yesterday's shift result from elsewhere: the WASM host's read model
+   *  takes the engine's (the save never carries it). */
+  adoptReport(r: { cleaned: number; leftover: number } | null): void {
+    this.hkYesterday = r ? { cleaned: r.cleaned, leftover: r.leftover } : null;
+  }
+
   /** Emit yesterday's shift report and breed overnight cockroaches, before this
    *  morning's checkouts mark their rooms dirty (so a hotel whose housekeeping
    *  kept up yesterday never seeds an infestation). */

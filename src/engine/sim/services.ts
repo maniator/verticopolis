@@ -164,7 +164,7 @@ export function callExterminator(sim: Simulation): ExterminatorResult {
   // infested rooms (the dueDay itself persists, so the treatment still lands).
   sim.exterminationRoomIds = ids;
   sim.emit(
-    `🧹 Exterminator booked for ${rooms} infested room(s): $${cost.toLocaleString()} charged. The rooms clear tomorrow.`,
+    `🧹 Exterminator booked for ${rooms} infested room(s): $${cost.toLocaleString("en-US")} charged. The rooms clear tomorrow.`,
     "money",
   );
   return { ok: true, cost, rooms };
@@ -248,7 +248,7 @@ export function nudgeServiceShortfalls(sim: Simulation): void {
     const pop = sim.tower.totalPopulation();
     const need = Math.ceil(pop / RECYCLING_POP_PER_CENTER);
     sim.emit(
-      `♻️ Garbage is piling up: ${pop.toLocaleString()} population needs ${need} Recycling Center${need === 1 ? "" : "s"} (you have ${sim.recyclingCenters()}). 4★ requires demand met.`,
+      `♻️ Garbage is piling up: ${pop.toLocaleString("en-US")} population needs ${need} Recycling Center${need === 1 ? "" : "s"} (you have ${sim.recyclingCenters()}). 4★ requires demand met.`,
       "info",
     );
   }

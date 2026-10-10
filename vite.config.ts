@@ -139,6 +139,8 @@ function wasmParityProjects() {
     "**/dualRunEdits.integration.test.ts",
     "**/loaderCases.integration.test.ts",
     "**/wasmHost.integration.test.ts",
+    "**/wasmHostLogText.integration.test.ts",
+    "**/wasmHostTelemetry.integration.test.ts",
   ];
   const setupFiles = ["src/tests/parity/wasmHostSetup.ts"];
   return [

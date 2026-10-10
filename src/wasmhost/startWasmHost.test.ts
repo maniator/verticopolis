@@ -23,6 +23,8 @@ class FakeEngine {
   free(): void { this.freed = true; }
   pendingChoice(): string | undefined { return undefined; }
   logSince(): string { return "[]"; }
+  elevatorTelemetry(): string { return '{"util":[],"hourly":[],"origins":[]}'; }
+  housekeepingReport(): string | undefined { return undefined; }
 }
 
 function fakeModule(): WasmModule & { engines: FakeEngine[] } {

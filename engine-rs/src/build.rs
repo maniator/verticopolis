@@ -34,6 +34,14 @@ fn substrate_cost(kind: Kind) -> f64 {
     }
 }
 
+/// The buried-treasure line (`sim/build.ts`).
+pub(crate) fn treasure_message(gold: f64) -> String {
+    format!(
+        "💰 Excavation crews unearthed buried treasure worth ${}!",
+        crate::services::with_thousands(gold)
+    )
+}
+
 impl Simulation {
     /// `toggleAutoBridge()`: Modern flips the bridging preference, Classic
     /// always bridges and never flips (`rules.bridgingToggleable()`).
@@ -227,13 +235,7 @@ impl Simulation {
                     self.treasures_found += 1.0;
                     let gold = 400_000.0 + self.rng.int(0, 200_000) as f64;
                     self.money += gold;
-                    self.emit(
-                        &format!(
-                            "💰 Excavation crews unearthed buried treasure worth ${}!",
-                            gold
-                        ),
-                        LogKind::Money,
-                    );
+                    self.emit(&treasure_message(gold), LogKind::Money);
                     // `triggerTreasure(floor, x + Math.floor(f.width / 2))`.
                     self.fx.treasure = crate::sim::PointFx {
                         floor,

@@ -14,6 +14,7 @@ use crate::housekeeping::Housekeeping;
 use crate::ledger::Ledger;
 use crate::rng::Rng;
 use crate::sim_loop::{weather_for, Weather};
+use crate::telemetry::ElevatorTelemetry;
 use crate::tower::Tower;
 
 /// `moveInsToday`.
@@ -138,6 +139,8 @@ pub struct Simulation {
     pub constructing: IndexSet<i64>,
     // ---- transient loop state (never saved) ----
     pub elevators: ElevatorDispatch,
+    /// `elevatorUtil` / `elevatorHourly` / `elevatorOrigins` (never saved).
+    pub telemetry: ElevatorTelemetry,
     pub housekeeping: Housekeeping,
     pub weather: Weather,
     /// The cosmetic event counters the renderer polls (never saved).
@@ -210,6 +213,7 @@ impl Simulation {
             log_seq: 0,
             constructing: IndexSet::new(),
             elevators: ElevatorDispatch::new(),
+            telemetry: ElevatorTelemetry::default(),
             housekeeping: Housekeeping::default(),
             weather: weather_for(0),
             fx: FxState::default(),

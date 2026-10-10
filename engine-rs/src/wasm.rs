@@ -468,6 +468,83 @@ impl Engine {
         self.sim.resolve_choice(accept);
     }
 
+    /// The hourly elevator telemetry (`elevatorUtil`, `elevatorHourly`,
+    /// `elevatorOrigins`) as JSON; see `Simulation::telemetry_json`.
+    #[wasm_bindgen(js_name = elevatorTelemetry)]
+    pub fn elevator_telemetry(&self) -> String {
+        self.sim.telemetry_json().to_string()
+    }
+
+    /// `economy.housekeepingReport()`: yesterday's shift result as JSON
+    /// `{ cleaned, leftover }`, or nothing (`undefined`) before the first
+    /// morning checkout.
+    #[wasm_bindgen(js_name = housekeepingReport)]
+    pub fn housekeeping_report(&self) -> Option<String> {
+        self.sim
+            .housekeeping
+            .yesterday
+            .map(|(cleaned, leftover)| format!(r#"{{"cleaned":{cleaned},"leftover":{leftover}}}"#))
+    }
+
+    /// Replace the elevator telemetry with an `elevatorTelemetry` document.
+    /// Tooling only (the gallery's engine leg); no game command reaches it.
+    #[wasm_bindgen(js_name = seedElevatorTelemetry)]
+    pub fn seed_elevator_telemetry(&mut self, json: &str) -> Result<(), JsError> {
+        let doc: Value = serde_json::from_str(json).map_err(err)?;
+        self.sim.seed_telemetry(&doc).map_err(err)
+    }
+
+    /// Move the clock by `minutes` and run nothing: the TypeScript
+    /// `clock.advance(minutes)`. Whatever pass the move skips is owed and runs
+    /// on the next tick, as on the TypeScript engine. Tooling only (the
+    /// gallery's clock pin); no game command reaches it.
+    #[wasm_bindgen(js_name = advanceClock)]
+    pub fn advance_clock(&mut self, minutes: f64) -> Result<(), JsError> {
+        if !minutes.is_finite() || minutes < 0.0 {
+            return Err(err(format!(
+                "advanceClock: {minutes} is not a forward move"
+            )));
+        }
+        self.sim.clock.advance(minutes);
+        Ok(())
+    }
+
+    /// Set the loop's pass memos (`lastHour`, `lastDay`, `lastMonth`,
+    /// `lastQuarter`), which a load derives from the clock. Tooling only: the
+    /// gallery's engine leg hands over a tower built in place, whose memos
+    /// still owe its first passes, and this keeps them owed.
+    #[wasm_bindgen(js_name = seedLoopMemos)]
+    pub fn seed_loop_memos(
+        &mut self,
+        last_hour: f64,
+        last_day: f64,
+        last_month: f64,
+        last_quarter: f64,
+    ) -> Result<(), JsError> {
+        let whole = |v: f64, what: &str| -> Result<i64, JsError> {
+            if v.is_finite() && v.fract() == 0.0 && v.abs() <= 9007199254740991.0 {
+                Ok(v as i64)
+            } else {
+                Err(err(format!(
+                    "seedLoopMemos: {what} {v} is not a whole number"
+                )))
+            }
+        };
+        let memos = (
+            whole(last_hour, "lastHour")?,
+            whole(last_day, "lastDay")?,
+            whole(last_month, "lastMonth")?,
+            whole(last_quarter, "lastQuarter")?,
+        );
+        (
+            self.sim.last_hour,
+            self.sim.last_day,
+            self.sim.last_month,
+            self.sim.last_quarter,
+        ) = memos;
+        Ok(())
+    }
+
     /// The per-frame read model as one flat number array (see
     /// `frame_view` for the layout): what the host reads every frame while
     /// the engine runs the simulation.
