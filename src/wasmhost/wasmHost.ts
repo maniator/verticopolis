@@ -145,12 +145,28 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
   return host;
 }
 
+/** The optional person fields the frame carries: set when the record has
+ *  them and deleted when it does not, so a held person reads as the
+ *  instance's own would (a cleared `venueUnitId` is absent on both). */
+const PERSON_OPTIONALS = ["originUnitId", "venueUnitId", "mealVenueId", "routine", "dwellSecondsLeft"] as const;
+
 function syncPeople(sim: Simulation, frame: FrameView): void {
   const held = new Map<number, Person>();
   for (const p of sim.crowd.people) held.set(p.id, p);
   const next = frame.people.map((r) => {
-    const p = held.get(r.id);
-    if (p) {
+    let p = held.get(r.id);
+    if (!p) {
+      // A person first seen in a frame starts from placeholders for the
+      // fields the frame does not carry (the route's leg, shaftId and
+      // carIndex, destX, tripWait, age, linger), so a reader of those sees
+      // a new walker's values even while the engine has the person riding.
+      // Backlog #868 owns the gap.
+      p = {
+        id: r.id, seed: r.seed, state: r.state, floor: r.floor, fy: r.fy, x: r.x,
+        floors: [], originFloor: r.originFloor, shafts: [], leg: 0, shaftId: null, carIndex: null,
+        destX: r.x, wait: r.wait, tripWait: 0, age: 0, linger: 0, staff: r.staff,
+      };
+    } else {
       p.seed = r.seed;
       p.staff = r.staff;
       p.state = r.state;
@@ -158,14 +174,22 @@ function syncPeople(sim: Simulation, frame: FrameView): void {
       p.x = r.x;
       p.fy = r.fy;
       p.wait = r.wait;
-      return p;
+      p.originFloor = r.originFloor;
     }
-    const fresh: Person = {
-      id: r.id, seed: r.seed, state: r.state, floor: r.floor, fy: r.fy, x: r.x,
-      floors: [], originFloor: r.floor, shafts: [], leg: 0, shaftId: null, carIndex: null,
-      destX: r.x, wait: r.wait, tripWait: 0, age: 0, linger: 0, staff: r.staff,
-    };
-    return fresh;
+    // The route, in place: a holder of the arrays sees the new legs.
+    p.floors.splice(0, p.floors.length, ...r.floors);
+    p.shafts.splice(0, p.shafts.length, ...r.shafts);
+    for (const key of PERSON_OPTIONALS) {
+      const value = r[key];
+      if (value === undefined) delete p[key];
+      else (p as Record<typeof key, typeof value>)[key] = value;
+    }
+    // The flags are optional on the instance too, and false reads as absent.
+    if (r.countedHotelGuest) p.countedHotelGuest = true;
+    else delete p.countedHotelGuest;
+    if (r.returning) p.returning = true;
+    else delete p.returning;
+    return p;
   });
   sim.crowd.people.splice(0, sim.crowd.people.length, ...next);
 }

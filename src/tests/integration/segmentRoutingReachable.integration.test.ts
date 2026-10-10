@@ -8,6 +8,10 @@ import { computeDemandMap } from "../../engine/sim/demand";
 import { FACILITIES } from "../../engine/facilities";
 import type { Unit } from "../../engine/types";
 import type { Person } from "../../engine/Crowd";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
+
+/** The parity projects skip these (story-engine-test-parity, #878). */
+const PINNED_LUNCH = "pins lunch by swapping sim.clock and re-forces the condo and venue occupancy every tick after the crowd exists; no command relays a clock or unit-state write";
 
 /**
  * Segment routing on a REACHABLE split floor (#647 fix round).
@@ -80,7 +84,7 @@ function driveMealRush(sim: Simulation, condo: Unit, venue: Unit, ticks: number,
 }
 
 describe("reachable split floor: meal outbound routes to the venue's own run", () => {
-  it("a meal venue on the NON-representative (right) run draws routed diners, none in the gap", () => {
+  itTypeScriptOnly(PINNED_LUNCH)("a meal venue on the NON-representative (right) run draws routed diners, none in the gap", () => {
     const { sim, condo, venue } = reachableSplitSim("left", "right");
     let sawDinerAtRightVenue = false;
     let sawOutboundStuckOnLeft = false;
@@ -104,7 +108,7 @@ describe("reachable split floor: meal outbound routes to the venue's own run", (
 });
 
 describe("reachable split floor: a diner spawns on its origin run, never boards across the gap", () => {
-  it("a left-run condo's diners (venue also left) never appear on the right run", () => {
+  itTypeScriptOnly(PINNED_LUNCH)("a left-run condo's diners (venue also left) never appear on the right run", () => {
     // Both the condo and its venue sit on the LEFT run, so a left-run diner has no
     // legitimate business on the RIGHT run at any point of the trip. Before the
     // sprite-origin fix, `makePerson` placed the figure at a whole-floor `pickX`
@@ -145,7 +149,7 @@ describe("reachable split floor: a diner spawns on its origin run, never boards 
 });
 
 describe("reachable split floor: return leg lands on the tenant's own run", () => {
-  it("a right-run tenant rides out and returns to the right run without crossing the gap", () => {
+  itTypeScriptOnly(PINNED_LUNCH)("a right-run tenant rides out and returns to the right run without crossing the gap", () => {
     const { sim, condo, venue } = reachableSplitSim("right", "left");
     let sawReturnOnRightRun = false;
     let sawReturnStuckOnLeft = false;

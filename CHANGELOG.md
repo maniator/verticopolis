@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.29.2
+
+- On the opt-in WASM engine, the notices for a condo sale, a condo buy-back and a tenant leaving now read the same as on the default engine.
+
 ## 2.29.1
 
 - The game can run on the new Rust engine: open it with `?engine=wasm` and the version line on the title screen, Settings, and Help reads "WASM engine" while it does. Nothing changes unless you ask for it.

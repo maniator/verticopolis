@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { buildToStar } from "./helpers";
+import { buildToStar, expectEngineHosted } from "./helpers";
+
+// On chromium-wasm every test must end with its tower still on the engine.
+test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
  * Visual regression gate — the CI tripwire for the class of bug unit tests
@@ -21,6 +24,12 @@ import { buildToStar } from "./helpers";
  * pinned, and the tower-scene shots step the sim to a fixed state. (The sprite
  * gallery is no longer shot here: the drift-gate already pins gallery.html as
  * docs/screenshots/06-sprite-gallery.png, so a second baseline was redundant.)
+ *
+ * Two engines, one set of baselines: the baselines are minted on the
+ * TypeScript engine (`chromium`), and the engine leg of
+ * update-visual-baselines.yml runs these same tests on `chromium-wasm` with
+ * `PW_WASM_VISUAL=1`, comparing against the same files. A pixel difference
+ * there is an engine parity finding to report; that leg never mints.
  */
 
 // The sprite gallery (gallery.html) is a pure canvas of every facility, and the
@@ -41,6 +50,13 @@ test.describe("dialog chrome", () => {
     await page.evaluate(() => document.getElementById("splash")?.remove());
     const star = await page.evaluate(buildToStar, 1);
     expect(star).toBe(1);
+    await expectEngineHosted(page);
+    // The clock pin is a presentation input on the paused read model: no
+    // command sets the engine's clock, and at speed 0 no frame ticks, so no
+    // frame syncs the read model from the engine and the pin holds on both
+    // engines until a test merges explicitly. (A running scene is different:
+    // every tick syncs the clock from the engine, which is why the gallery's
+    // pgSetClock pins the engine's own save instead.)
     await page.evaluate(() => {
       ((window as any).game.sim.clock as { minutes: number }).minutes = 7 * 60;
     });
@@ -72,11 +88,22 @@ test.describe("dialog chrome", () => {
     // its per-floor grid, and a 30-floor span is what makes it overflow.
     await page.evaluate(() => {
       const g = (window as any).game;
-      const t = g.sim.tower;
       const W = g.grid.width;
-      for (let f = 4; f <= 30; f++) for (let x = 4; x < W - 4; x++) t.place("floor", f, x);
+      // Relayed builds, so on the WASM engine the floors and the shaft are the
+      // engine's; the merge below reads them back before the dialog opens.
+      for (let f = 4; f <= 30; f++) {
+        for (let x = 4; x < W - 4; x++) {
+          const fl = g.sim.build("floor", f, x);
+          if (!fl.ok) throw new Error(`floor ${f} at x=${x}: ${fl.reason ?? "refused"}`);
+        }
+      }
       const r = g.sim.buildTransport("elevatorStandard", 10, 1, 30);
       if (!r.ok) throw new Error(`could not place the shaft this shot needs: ${JSON.stringify(r)}`);
+      // The merge also copies the engine's clock over the beforeEach pin, so
+      // pin it again (the dialog shot is of a paused game at 07:00).
+      (window as any).__vcEngine?.current()?.syncStructure();
+      g.sim.clock.minutes = 7 * 60;
+      const t = g.sim.tower;
       const shaft = t.transports.find((x: { kind: string }) => x.kind === "elevatorStandard");
       g.selected = { type: "transport", id: shaft.id };
       g.engine.selectedId = shaft.id;
@@ -200,13 +227,17 @@ test.describe("tower scene (region-composition tripwire)", () => {
     await page.evaluate(() => document.getElementById("splash")?.remove());
     const star = await page.evaluate(buildToStar, 4);
     expect(star).toBe(4);
+    await expectEngineHosted(page);
     await page.evaluate(() => {
       const g = (window as any).game;
       // Freeze every nondeterministic pixel input: buildToStar already holds
       // speed 0; reduced motion pins the decorative clock (walkers, clouds,
       // crane), reset to phase zero so the frozen pose is identical across
       // runs, and the cosmetic weather is forced clear so the baseline does
-      // not depend on which day the fixture lands on.
+      // not depend on which day the fixture lands on. The weather (and the
+      // clock settleAt pins below) are presentation inputs on the paused read
+      // model: no command sets either on the engine, and at speed 0 no frame
+      // syncs them back, so the pins hold on both engines.
       g.engine.setReducedMotion(true);
       g.engine.resetDecorativeClock();
       g.sim.weather = "clear";

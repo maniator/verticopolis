@@ -1,7 +1,6 @@
 /**
  * Build a Rust crate's WASM binding. With no argument it builds the engine
- * into engine-rs/pkg/ for Node and src/public/engine/ for the browser; `disc`
- * builds the disc reader into disc-rs/pkg/ for Node. For each:
+ * into engine-rs/pkg/ for Node and src/public/engine/ for the browser:
  * `cargo rustc` for wasm32 with the `wasm` feature as a cdylib, `wasm-bindgen`
  * for the JavaScript glue, and a package.json marking the output CommonJS (the
  * repository is ESM, and wasm-bindgen's Node target emits `require`). For the
@@ -23,7 +22,6 @@ import { engineSourceHash } from "../src/wasmhost/packageHash.ts";
 
 const CRATES: Record<string, { dir: string; lib: string }> = {
   engine: { dir: "engine-rs", lib: "verticopolis_engine" },
-  disc: { dir: "disc-rs", lib: "verticopolis_disc" },
 };
 if (process.argv.length > 3) throw new Error(`expected at most one argument (the crate), got ${process.argv.slice(2).join(" ")}`);
 const which = process.argv[2] ?? "engine";

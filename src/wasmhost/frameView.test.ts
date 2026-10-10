@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { FRAME_HEADER, decodeFrame } from "./frameView";
+import { FRAME_HEADER, PERSON_FIXED, decodeFrame } from "./frameView";
+
+/** A person record in the engine's layout: the fixed slots, then the route. */
+function person(fixed: number[], floors: number[] = [], shafts: number[] = []): number[] {
+  if (fixed.length !== PERSON_FIXED - 2) throw new Error(`a person record has ${PERSON_FIXED - 2} fixed slots before its counts`);
+  return [...fixed, floors.length, shafts.length, ...floors, ...shafts];
+}
 
 /** A frame view with the given records, in the engine's layout. */
 function frame(people: number[][], units: number[][], transports: { id: number; cars: number[][] }[]): number[] {
@@ -29,7 +35,11 @@ function frame(people: number[][], units: number[][], transports: { id: number; 
 describe("decodeFrame", () => {
   it("reads the header, the people, the unit counters and the cars", () => {
     const v = frame(
-      [[1, 42, 1, 2, 3, 150.25, 0.5, 7]],
+      [
+        person([1, 42, 1, 2, 3, 150.25, 0.5, 7, 1, -1, -1, -1, 0, 0, 0, NaN]),
+        person([2, 43, 0, 5, 4, 60, 4, 0, 2, 30, 31, 31, 1, 2, 1, 48.5], [4, 2], [9]),
+        person([3, 44, 0, 0, 2, 10, 2, 0, 2, 30, -1, 31, 0, 0, 1, -1.5], [4, 2], [9]),
+      ],
       [[10, 2, 4, 3, -1, 0]],
       [{ id: 20, cars: [[2.5, 0.5, 1], [4, -1, -1]] }],
     );
@@ -40,7 +50,12 @@ describe("decodeFrame", () => {
       treasureFx: { seq: 1, floor: -1, x: 200 }, vipFxSeq: 5, counts: { fires: 2, firesGutRooms: 1, bombs: 1 },
       pending: true, onHourRuns: 9,
     });
-    expect(f.people).toEqual([{ id: 1, seed: 42, staff: true, state: "riding", floor: 3, x: 150.25, fy: 0.5, wait: 7 }]);
+    expect(f.people).toEqual([
+      { id: 1, seed: 42, staff: true, state: "riding", floor: 3, x: 150.25, fy: 0.5, wait: 7, originFloor: 1, originUnitId: undefined, venueUnitId: undefined, mealVenueId: undefined, countedHotelGuest: false, routine: undefined, returning: false, dwellSecondsLeft: undefined, floors: [], shafts: [] },
+      { id: 2, seed: 43, staff: false, state: "dwelling", floor: 4, x: 60, fy: 4, wait: 0, originFloor: 2, originUnitId: 30, venueUnitId: 31, mealVenueId: 31, countedHotelGuest: true, routine: "salesCall", returning: true, dwellSecondsLeft: 48.5, floors: [4, 2], shafts: [9] },
+      // A drained timer stays negative through the return leg and is kept.
+      { id: 3, seed: 44, staff: false, state: "toShaft", floor: 2, x: 10, fy: 2, wait: 0, originFloor: 2, originUnitId: 30, venueUnitId: undefined, mealVenueId: 31, countedHotelGuest: false, routine: undefined, returning: true, dwellSecondsLeft: -1.5, floors: [4, 2], shafts: [9] },
+    ]);
     expect(f.units).toEqual([{ id: 10, state: "occupied", occupants: 4, customersIn: 3, hotelCustomersIn: undefined, outForMeal: 0 }]);
     expect(f.transports).toEqual([{ id: 20, cars: 2, carPositions: [2.5, 4], carLoad: [0.5, -1], carDir: [1, -1] }]);
   });
@@ -53,10 +68,26 @@ describe("decodeFrame", () => {
   it("names a short array, a trailing surplus and an unknown code", () => {
     expect(() => decodeFrame([1, 2, 3])).toThrow(/header needs/);
     expect(() => decodeFrame([...frame([], [], []), 5])).toThrow(/left after/);
-    const short = frame([[1, 1, 0, 0, 0, 0, 0, 0]], [], []);
+    const blank = [1, 1, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, 0, 0, 0, NaN];
+    const short = frame([person(blank)], [], []);
     short[FRAME_HEADER + 3] = 99;
     expect(() => decodeFrame(short)).toThrow(/person state code 99/);
-    const truncated = frame([[1, 1, 0, 0, 0, 0, 0, 0]], [], []).slice(0, -2);
+    const routine = frame([person(blank)], [], []);
+    routine[FRAME_HEADER + 13] = 3;
+    expect(() => decodeFrame(routine)).toThrow(/routine code 3/);
+    const truncated = frame([person(blank)], [], []).slice(0, -2);
     expect(() => decodeFrame(truncated)).toThrow(/record at/);
+    const route = frame([person(blank, [1, 2], [5])], [], []).slice(0, -1);
+    expect(() => decodeFrame(route)).toThrow(/record at/);
+  });
+
+  it("names a negative or non-integer route count", () => {
+    const blank = [1, 1, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, 0, 0, 0, NaN];
+    const negative = frame([person(blank)], [], []);
+    negative[FRAME_HEADER + 16] = -1;
+    expect(() => decodeFrame(negative)).toThrow(/bad floors count -1/);
+    const nan = frame([person(blank)], [], []);
+    nan[FRAME_HEADER + 17] = NaN;
+    expect(() => decodeFrame(nan)).toThrow(/bad shafts count NaN/);
   });
 });

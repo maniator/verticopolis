@@ -14,6 +14,12 @@ name: Update visual baselines
 # The bot pushes with GITHUB_TOKEN, which never triggers workflows, so the
 # baseline commit itself gets no CI run, push (or rebase) once more after
 # pulling it to get a green check on the final head.
+#
+# After the mint, the `engine-parity` job runs the same visual tests with the
+# WASM engine hosting the tower (the chromium-wasm project with
+# PW_WASM_VISUAL=1) against the baselines the mint left on the branch tip, and
+# fails on any pixel difference, naming each differing shot. It never mints or
+# commits: the baselines stay the TypeScript engine's until the 3.0.0 flip.
 
 on:
   push:
@@ -159,3 +165,74 @@ jobs:
           done
           echo "could not push refreshed baselines after retries" >&2
           exit 1
+
+  # The engine leg. A separate job rather than a matrix entry on `update` so it
+  # holds a read-only token: it only compares, never pushes.
+  engine-parity:
+    needs: [resolve-image, update]
+    # Compare even when the mint failed (against the tip as it stands), so the
+    # engine result is never silently skipped on a mint run.
+    if: ${{ !cancelled() && needs.resolve-image.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: ${{ needs.resolve-image.outputs.image }}
+    steps:
+      # The branch tip after the mint job, so the comparison reads the
+      # baselines that job just pushed (or the unchanged ones).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VC_TOOLING: "1"
+
+      # PW_WASM_VISUAL makes playwright.config.ts compare pixels (on CI or off)
+      # and turns snapshot writing off.
+      - name: Compare the WASM engine's render with the committed baselines
+        run: npx playwright test e2e/visual.spec.ts --project=chromium-wasm
+        env:
+          PW_WASM_VISUAL: "1"
+
+      - name: Name the first differing shot
+        if: failure()
+        env:
+          MINT: ${{ needs.update.result }}
+        run: |
+          if [ "$MINT" != "success" ]; then
+            echo "::error::the mint did not succeed ($MINT), so these differences are against the old baselines and may be the TypeScript render's own change; re-run after a successful mint."
+            exit 0
+          fi
+          # Pixel failures leave a *-diff.png in their result folder, and a spec
+          # with no committed baseline leaves only an *-actual.png; anything else
+          # (a hosting guard, a timeout) failed before it compared.
+          diff="$(find test-results -name '*-diff.png' 2>/dev/null | sort | head -1)"
+          actual="$(find test-results -name '*-actual.png' 2>/dev/null | sort | head -1)"
+          if [ -n "$diff" ]; then
+            echo "::error::engine parity: the first shot that differs on the WASM engine is $(basename "$diff" -diff.png) ($(basename "$(dirname "$diff")")); compared with the baselines this run just minted; report it as a parity finding"
+          elif [ -n "$actual" ]; then
+            echo "::error::no baseline for $(basename "$actual" -actual.png) even after this run's mint; the TypeScript project skipped the spec or its snapshot path differs"
+          else
+            echo "::error::a visual spec failed on the WASM engine without a pixel diff (setup, hosting, or a timeout): $(ls test-results 2>/dev/null | head -1)"
+          fi
+          exit 0
+
+      - name: Upload the engine's visual diffs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-visual-engine-diffs
+          path: test-results/
+          if-no-files-found: ignore

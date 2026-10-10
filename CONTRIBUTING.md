@@ -84,25 +84,19 @@ Verticopolis has **two test tiers**:
     every simulation change lands in both engines in one PR with
     the regenerated lock, and a PR that changes `src/engine/` without touching
     `engine-rs/` says why (a UI readout, prose, a transient the hash never
-    sees). An engine PR that adds a branch adds a scenario that reaches it; the
-    Rust job's coverage step (`cargo llvm-cov`, line floor in
-    `engine-rs.yml`) is how review checks that, and the floor only moves up.
+    sees). The vitest tiers themselves can run on the WASM engine too:
+    `npm run test:wasm:parity` runs the `integrationWasm` and `unitWasm`
+    projects, whose setup file hosts every `Simulation` a test ticks on the
+    engine (story-engine-test-parity, #878); the tests that stay
+    TypeScript-only are named in that story's test-mapping table. An engine
+    PR that adds a branch adds a scenario that reaches it; the Rust job's
+    coverage step (`cargo llvm-cov`, line floor in `engine-rs.yml`) is how
+    review checks that, and the floor only moves up.
     Forged-save handling is pinned the same way by
     `conformance/loader-cases.json` (`loaderCases.integration.test.ts` writes
     it, a Rust test replays it). A nightly differential fuzzer
     (`engine-fuzz.yml`) runs seeded random scenarios through both engines; a
     divergence it finds is pinned as a named scenario in the fix PR.
-
-    **The disc reader.** `disc-rs/` reads a player's own legacy disc image
-    (ISO9660 and Microsoft KWAJ) for the import path; see
-    [disc-rs/README.md](./disc-rs/README.md). Its lane is `disc-rs.yml`:
-    format, clippy, `cargo test` (plus `--features wasm` and `--features
-    testkit`), the libmspack oracle (CI installs `libmspack-dev` and sets
-    `VC_REQUIRE_KWAJ_ORACLE=1`), a fuzz smoke run, the WASM parity suite
-    (`npm run disc:wasm:build && npm run test:disc-wasm`, required in CI with
-    `VC_REQUIRE_DISC_WASM=1`, skipped locally without the package), a run of
-    `tools/simtower/disc-check.ts` over the synthetic disc, and a line floor
-    on the shipped code. `disc-fuzz.yml` runs the fuzzer nightly.
 
   `npm test` (`vitest run`) runs **both** projects and is the CI gate. Coverage
   stays a single root-level measurement across both projects (see Coverage
@@ -212,6 +206,16 @@ a head commit containing `[update-baselines]` for the Playwright baselines.
 A plain host `npm run screenshots` is still preview-only because host Chromium
 and font rasterization may differ from the pinned image. See
 [`docs/screenshots.md`](./docs/screenshots.md) for the workflow details.
+
+Both checks run on two engines. The committed gallery and baselines are the
+TypeScript engine's, and engine legs render the same scenes with the WASM engine
+hosting the tower (`VC_SHOT_ENGINE=wasm` for `scripts/screenshots.ts`,
+`PW_WASM_VISUAL=1 npx playwright test e2e/visual.spec.ts --project=chromium-wasm`
+for the baselines): `pr-drift-check` compares the engine's gallery with the same
+run's TypeScript render (`engine-parity`) and the engine's visual specs with the
+committed baselines (`engine-parity-visual`), and `update-visual-baselines`
+repeats the visual comparison after a mint. Any pixel difference fails the leg
+as an engine parity finding to report; the engine legs never commit or mint.
 
 ### Coverage floors
 

@@ -40,6 +40,16 @@ on:
         description: "Git ref or SHA to render (the caller's branch tip or PR head sha)."
         required: true
         type: string
+      engine:
+        description: >-
+          The engine that hosts the tower: "ts" (the default, the committed
+          gallery's engine) or "wasm" (the engine leg, see
+          scripts/screenshot-engine.ts). A wasm capture uploads its shards as
+          engine-wasm-shots-<shard>, so a caller's shots-* download never
+          picks them up.
+        required: false
+        default: ts
+        type: string
     outputs:
       shards:
         description: "JSON array of shard names (for the caller to loop over the shots-<shard> artifacts)."
@@ -72,15 +82,17 @@ on:
 # without editing this key.
 #
 # INVARIANTS this key relies on (nothing enforces them, so honor them when adding
-# a caller): the group distinguishes runs by event + PR/branch, NOT by caller, so
-# there must be at most ONE caller per (event_name, ref); today that holds (only
-# `pr-drift-check.yml` calls this, on pull_request). A second caller on the same
+# a caller): the group distinguishes runs by engine + event + PR/branch, NOT by
+# caller, so there must be at most ONE caller per (engine, event_name, ref); today
+# that holds (only `pr-drift-check.yml` calls this, on pull_request, once per
+# engine: its TypeScript capture and its WASM engine leg get separate groups, so
+# neither cancels the other). A second caller on the same
 # event and branch would share the group and serialize against an unrelated run.
 # And a new caller on any event where a fresh push SHOULD supersede the capture
 # would get no cancellation here (only `pull_request` cancels); extend the
 # expression if you add one.
 concurrency:
-  group: screenshot-capture-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: screenshot-capture-${{ inputs.engine }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -176,8 +188,10 @@ jobs:
       # this guard exists to catch). This step only supplies the pinned browser and
       # stages the verified run-a set to upload; the script does the rest.
       - name: Render this shard twice in parallel and prove it is deterministic
+        id: render
         env:
           SHARD: ${{ matrix.shard }}
+          VC_SHOT_ENGINE: ${{ inputs.engine }}
         run: |
           # Locate the image's pinned Chromium and fail fast if it is not there:
           # an empty PW_CHROME would let Playwright fall back to some other browser,
@@ -193,7 +207,14 @@ jobs:
           # as an argument (not interpolated into a script body), so a shard name can
           # never break out. The script exits non-zero on any render failure or on
           # nondeterminism, which fails this step.
-          node scripts/screenshot-determinism-check.ts "$SHARD"
+          rc=0
+          node scripts/screenshot-determinism-check.ts "$SHARD" || rc=$?
+          # The TypeScript capture stops here on any failure. The engine leg
+          # (VC_SHOT_ENGINE=wasm) still stages and uploads what rendered, so the
+          # caller's parity comparison can report the other shots too (a scene
+          # that failed on the engine shows up there as a missing image); this
+          # step still fails below with the check's exit code.
+          if [ "$rc" -ne 0 ] && [ "$VC_SHOT_ENGINE" != "wasm" ]; then exit "$rc"; fi
           # Stage the verified run-a set for upload. run-a lives under the same temp
           # base the check uses (os.tmpdir(), overridable via SCREENSHOT_TMP), so read
           # it from there rather than a hardcoded path. The .shard-complete marker is
@@ -204,12 +225,22 @@ jobs:
           stage=/tmp/stage
           rm -rf "$stage"; mkdir -p "$stage/shots"
           touch "$stage/.shard-complete"
+          # An engine-leg shard that failed (a scene error or a nondeterministic
+          # render) is marked, so the parity comparison names it instead of
+          # reading its images as a clean result.
+          [ "$rc" -eq 0 ] || echo "check exit $rc" > "$stage/.render-failed"
           [ -d "$run_a" ] && cp -a "$run_a/." "$stage/shots/"
+          echo "staged=true" >> "$GITHUB_OUTPUT"
+          exit "$rc"
 
-      - name: Upload this shard's verified screenshots
+      - name: Upload this shard's screenshots (verified, or the engine leg's staged render)
+        # The engine leg uploads its staged render even when the step above
+        # failed after staging (see there); the TypeScript capture uploads only
+        # a verified set.
+        if: ${{ success() || (failure() && inputs.engine == 'wasm' && steps.render.outputs.staged == 'true') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: shots-${{ matrix.shard }}
+          name: ${{ inputs.engine == 'wasm' && 'engine-wasm-' || '' }}shots-${{ matrix.shard }}
           path: /tmp/stage
           retention-days: 5
           if-no-files-found: error
@@ -227,7 +258,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: determinism-diff-${{ matrix.shard }}
+          name: ${{ inputs.engine == 'wasm' && 'engine-wasm-' || '' }}determinism-diff-${{ matrix.shard }}
           path: determinism-diff
           # "ignore", not "error": the step runs on EVERY job failure via
           # if: failure(), and evidence only exists when the byte-diff or a

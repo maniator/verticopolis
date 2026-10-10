@@ -1,4 +1,8 @@
 import { test, expect } from "@playwright/test";
+import { expectEngineHosted } from "./helpers";
+
+// On chromium-wasm every test must end with its tower still on the engine.
+test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
  * Tier-2 coverage for the in-place WebGL context-loss recovery, the one piece
