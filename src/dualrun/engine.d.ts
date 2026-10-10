@@ -11,6 +11,11 @@ export class Engine {
     free(): void;
     [Symbol.dispose](): void;
     /**
+     * `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
+     * limit and the balance and pays for the car itself.
+     */
+    addCar(id: number): string;
+    /**
      * `adjustRent(id, dir)`: the new rent, or null when nothing moved.
      */
     adjustRent(id: number, dir: number): number | undefined;
@@ -51,6 +56,12 @@ export class Engine {
      */
     emit(text: string, kind: string): void;
     evaluateStar(): void;
+    /**
+     * `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
+     * as JSON `{ bottom, top }` text or null: JSON `{ ok, reason?, delta,
+     * bottom, top, added }`, the floors billed past the mark.
+     */
+    extendTransport(id: number, end: string, target_floor: number, hwm?: string | null): string;
     /**
      * The number of units on fire.
      */
@@ -100,6 +111,15 @@ export class Engine {
      * `priceUnit(u, target)`: the new price, or null when not repriceable.
      */
     priceUnit(id: number, target: number): number | undefined;
+    /**
+     * `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
+     */
+    removeCar(id: number): string;
+    /**
+     * `removeFacility(id, method)`: the player's sell or bulldoze of a unit
+     * or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`.
+     */
+    removeFacility(id: number, method: string): string;
     /**
      * `tower.removeTransport(id)`: whether a shaft went.
      */

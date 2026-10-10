@@ -1,6 +1,7 @@
 import type { Simulation } from "../Simulation";
 
-import { rentConfig, resaleRefund } from "../econConfig";
+import { rentConfig } from "../econConfig";
+import { removeFacility } from "./charges";
 import { storeRent } from "./constants";
 
 import { FACILITIES, buildMinutes, facilityFloors, isElevatorKind, isFacilityKind } from "../facilities";
@@ -217,39 +218,17 @@ export function buildTransport(sim: Simulation,
   return { ok: true };
 }
 
-/** Bulldoze a unit/transport for a partial refund. */
+/** Sell whatever stands at a tile for a partial refund: a room before
+ *  the shaft or floor beneath it, then the shaft, then the floor tile. The
+ *  refund and the refusals are {@link removeFacility}'s, the one removal path
+ *  the editor and the bulldozer share. */
 export function sellAt(sim: Simulation, floor: number, x: number): boolean {
   const t = sim.tower.transportAt(floor, x);
   const u = sim.tower.unitAt(floor, x);
   // Prefer removing a room over the transport/floor beneath it.
-  if (u && u.kind !== "floor" && u.kind !== "lobby") {
-    // Can't sell a burning unit, the bulldozer is post-fire cleanup, not a
-    // way to end a blaze and skip the rescue fee. Mirrors the UI-side guards
-    // so every removal path upholds the anti-cheat.
-    if (u.state === "fire") return false;
-    sim.tower.removeUnit(u.id);
-    // A gutted shell has no salvage value; everything else refunds half.
-    sim.money += u.state === "gutted" ? 0 : resaleRefund(u.kind);
-    // If the last Wedding Hall is gone before the VIP arrived, cancel the
-    // pending inspection so it can't keep re-failing and spamming the log.
-    if (u.kind === "weddingHall" && !sim.tower.builtWeddingHall && !sim.evaluatedTower) {
-      sim.vipVisitDay = -1;
-    }
-    return true;
-  }
-  if (t) {
-    sim.tower.removeTransport(t.id);
-    sim.money += resaleRefund(t.kind);
-    return true;
-  }
-  if (u) {
-    // A floor/lobby tile that holds up the story above can't be pulled out,
-    // that would leave the structure above hanging in midair.
-    if (sim.tower.removalReason(u.id)) return false;
-    sim.tower.removeUnit(u.id);
-    sim.money += resaleRefund(u.kind);
-    return true;
-  }
+  if (u && u.kind !== "floor" && u.kind !== "lobby") return removeFacility(sim, u.id, "sell").ok;
+  if (t) return removeFacility(sim, t.id, "sell").ok;
+  if (u) return removeFacility(sim, u.id, "sell").ok;
   return false;
 }
 

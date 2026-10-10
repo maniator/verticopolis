@@ -106,19 +106,26 @@ describe("BuildActions (the money boundary)", () => {
 
   it("removeTransportWithRefund pays the one shared shaft resale", () => {
     const before = sim.money;
-    build.removeTransportWithRefund(lift, "sell");
+    expect(build.removeTransportWithRefund(lift, "sell")).toBe(true);
     expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
     expect(sim.tower.transports.some((t) => t.id === lift.id)).toBe(false);
   });
 
-  it("canAfford refuses with an error toast and sfx, passes silently when funded", () => {
-    sim.money = 99;
-    expect(build.canAfford(100)).toBe(false);
-    expect(f.toasts).toEqual([{ text: "Not enough money.", kind: "bad" }]);
+  it("removeTransportWithRefund reports a refusal (the shaft already gone) and pays nothing", () => {
+    expect(sim.tower.removeTransport(lift.id)).toBeDefined();
+    const before = sim.money;
+    expect(build.removeTransportWithRefund(lift, "bulldoze")).toBe(false);
+    expect(sim.money).toBe(before);
+  });
+
+  it("tryRemoveUnit surfaces the engine's refusal: a burning unit stays, no refund", () => {
+    office.state = "fire";
+    const before = sim.money;
+    expect(build.tryRemoveUnit(office, "sell")).toBe(false);
+    expect(sim.money).toBe(before);
+    expect(f.toasts).toEqual([{ text: "You can't sell a burning unit. Call fire rescue or let it burn out.", kind: "bad" }]);
     expect(f.sfx).toEqual(["error"]);
-    sim.money = 100;
-    expect(build.canAfford(100)).toBe(true);
-    expect(f.toasts).toHaveLength(1); // no extra feedback on success
+    expect(sim.tower.getUnit(office.id)).toBe(office);
   });
 
   it("paintBrush reports honestly: already-built strip vs the engine's refusal", () => {

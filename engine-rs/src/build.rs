@@ -1,6 +1,7 @@
 //! Port of `src/engine/sim/build.ts`: the money-aware build, transport build
 //! and sell paths.
 
+use crate::charges::RemovalMethod;
 use crate::clock::GameMode;
 use crate::facilities::*;
 use crate::sim::{LogKind, Simulation};
@@ -278,46 +279,19 @@ impl Simulation {
         }
     }
 
+    /// `sellAt(floor, x)`: sell whatever stands at a tile, a room before
+    /// the shaft or floor beneath it, then the shaft, then the floor tile.
+    /// The refund and the refusals are `remove_facility`'s.
     pub fn sell_at(&mut self, floor: i64, x: i64) -> bool {
-        let t = self.tower.transport_at(floor, x).map(|t| (t.id, t.kind));
-        let u = self
-            .tower
-            .unit_at(floor, x)
-            .map(|u| (u.id, u.kind, u.state));
-        if let Some((id, kind, state)) = u {
-            if !kind.is_structural() {
-                if state == UnitState::Fire {
-                    return false;
-                }
-                self.tower.remove_unit(id);
-                self.money += if state == UnitState::Gutted {
-                    0.0
-                } else {
-                    kind.resale_refund()
-                };
-                if kind == Kind::WeddingHall
-                    && self.tower.built_wedding_hall != Some(true)
-                    && self.evaluated_tower != Some(true)
-                {
-                    self.vip_visit_day = -1.0;
-                }
-                return true;
-            }
-        }
-        if let Some((id, kind)) = t {
-            self.tower.remove_transport(id);
-            self.money += kind.resale_refund();
-            return true;
-        }
-        if let Some((id, kind, _)) = u {
-            if self.tower.removal_reason(id).is_some() {
-                return false;
-            }
-            self.tower.remove_unit(id);
-            self.money += kind.resale_refund();
-            return true;
-        }
-        false
+        let t = self.tower.transport_at(floor, x).map(|t| t.id);
+        let u = self.tower.unit_at(floor, x).map(|u| (u.id, u.kind));
+        let id = match (u, t) {
+            (Some((id, kind)), _) if !kind.is_structural() => id,
+            (_, Some(id)) => id,
+            (Some((id, _)), None) => id,
+            (None, None) => return false,
+        };
+        self.remove_facility(id, RemovalMethod::Sell).ok
     }
 }
 
