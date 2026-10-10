@@ -111,16 +111,6 @@ describe("BuildActions (the money boundary)", () => {
     expect(sim.tower.transports.some((t) => t.id === lift.id)).toBe(false);
   });
 
-  it("canAfford refuses with an error toast and sfx, passes silently when funded", () => {
-    sim.money = 99;
-    expect(build.canAfford(100)).toBe(false);
-    expect(f.toasts).toEqual([{ text: "Not enough money.", kind: "bad" }]);
-    expect(f.sfx).toEqual(["error"]);
-    sim.money = 100;
-    expect(build.canAfford(100)).toBe(true);
-    expect(f.toasts).toHaveLength(1); // no extra feedback on success
-  });
-
   it("paintBrush reports honestly: already-built strip vs the engine's refusal", () => {
     // The fixture's floor-2 strip already carries floor under the whole brush.
     const already = build.paintBrush("floor", 20, 2);

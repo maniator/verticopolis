@@ -142,6 +142,16 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
     wrap(sim, "build", ([kind, floor, x]) => ({ op: "build", kind, floor: n(floor), x: n(x) }) as ShadowCommand);
     wrap(sim, "buildTransport", ([kind, x, bottom, top]) => ({ op: "buildTransport", kind, x: n(x), bottom: n(bottom), top: n(top) }) as ShadowCommand);
     wrap(sim, "sellAt", ([floor, x]) => ({ op: "sellAt", floor: n(floor), x: n(x) }));
+    // The priced editor commands (#914): the engine moves the money, so no
+    // setMoney follows them.
+    wrap(sim, "sell", ([id]) => ({ op: "sell", id: n(id) }));
+    wrap(sim, "addCar", ([id]) => ({ op: "addCar", id: n(id) }));
+    wrap(sim, "removeCar", ([id]) => ({ op: "removeCar", id: n(id) }));
+    // The mark is copied: a drag moves its own after the call returns.
+    wrap(sim, "extendTransport", ([id, end, target, hwm]) => {
+      const mark = hwm as { bottom: number; top: number } | undefined;
+      return { op: "extendTransport", id: n(id), end: end as "up" | "down", target: n(target), hwm: mark ? { bottom: mark.bottom, top: mark.top } : null };
+    });
     wrap(sim, "adjustRent", ([id, dir]) => ({ op: "adjustRent", id: n(id), dir: dir as 1 | -1 }));
     wrap(sim, "setNoRate", ([id]) => ({ op: "setNoRate", id: n(id) }));
     wrap(sim, "priceUnit", ([u, target]) => ({ op: "priceUnit", id: (u as { id: number }).id, target: n(target) }));
