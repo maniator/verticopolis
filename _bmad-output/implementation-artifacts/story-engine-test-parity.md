@@ -69,48 +69,88 @@ mirror or a host themselves (`dualRunDay`, `dualRunEdits`, `wasmHost`,
 on one instance is refused and the referee's TypeScript side has to stay
 TypeScript.
 
+This section describes the mechanism as it stands after review round 2.
+
 The hook is a wrap of `Simulation.prototype.tick`, chosen over a module
 mock of the construction points (`new Simulation`, `Simulation.newGame`,
 `Simulation.deserialize`, the fixture helpers in
 `src/tests/fixtures/towerFixtures.ts`) for two reasons. One hook covers
 every construction path, the `.vctower` fixture loads included, and no test
-file changes. And attaching at the first tick rather than at construction
-lets a test set its tower up the way the suites do today (`tower.place`,
-a direct field write) before the engine starts from the instance's own
-save, so setup that bypasses the command relay still reaches the engine.
+file changes. And attaching at the first tick lets a test set its tower up
+the way the suites do today (`tower.place`, a direct field write) before
+the engine starts from the instance's own save, so setup that bypasses the
+command relay still reaches the engine. `callExterminator` is hooked too:
+it attaches the host ahead of the first tick, because the booked room ids
+live in memory only (`exterminationRoomIds`, which no save carries), and
+hosting first relays the booking so the engine books the same rooms.
 
-Per tick the wrapper does three things:
+**Attach-time normalization.** The engine's load can log lines the
+instance never had (the Classic rent-snap bulletin). The instance adopts
+the tail of the engine's ring past its own log, comparing each of its own
+lines in the form the load keeps it (`coerceLog`: text cut to
+`LOG_TEXT_CAP`, a bad minute or kind coerced), so a long line is not
+adopted twice and a repeated bulletin from a re-host is kept. Then one
+`host.syncStructure()` makes the instance the engine's loaded state (a
+Classic tower's rents snap onto the 1994 ladder, a shell with no
+`completeAt` is opened by `finishConstruction`), so the first compare
+agrees.
 
-1. Before the tick it compares the instance's own state view with the
-   engine's: in the default tick mode on every tick while the crowd is
-   empty, and once the crowd exists on a tower revision move or a change
-   in a cheap fingerprint of the fields tests write directly (the clock,
-   money, weather, star, and each unit's state, rent, occupancy and
-   satisfaction counters), taken after every sync; under
-   `VC_WASM_SYNC=hour` on a revision or fingerprint move only. A relayed command
-   (`sim.build`) moved both in step and they agree. A
-   disagreement is an edit the relay does not carry (`tower.place`, a direct
-   unit write) or a divergence on a relayed command. While the crowd is
-   still empty the engine is restarted from the instance's save (a
-   re-host, the same start a load gets). Once the crowd exists the tick
-   throws a `WasmParityError` naming the first differing path, because a
-   restart would drop the crowd and hide the difference. A counter stamped
-   on the instance before the first tick (`customersIn`) raises no parity
-   error: the state view leaves it out, and the first frame sync replaces
-   it, since the frame carries it as engine-owned.
-2. The tick runs on the engine through the host's relay tick (`engine.tick`
-   plus the frame sync).
-3. After the tick the engine's full save is merged into the instance
-   (`host.syncStructure()`), so an assertion between hours reads the state
-   the engine holds after that tick. `VC_WASM_SYNC=hour` keeps the
-   host's own cadence (frame sync per tick, merge on an hour pass or a
-   revision change) for a cost comparison.
+**When the compare runs.** The compare checks the instance's own state view
+against the engine's:
 
-Every host is detached after each test, so the engines are freed and the
-instances are plain TypeScript simulations again. A test that never ticks
-and never calls `callExterminator` is never hosted (the `callExterminator`
-hook hosts the instance before the first tick, see slice 2); it exercises
-the TypeScript command surface only, and the table counts it as such.
+- before every tick while the crowd is empty, in the default tick mode;
+- before a tick when the tower revision moved since the last sync;
+- before a tick when the fingerprint changed since the last sync;
+- around a relayed `callExterminator`, once before the booking and once
+  after it.
+
+A relayed command (`sim.build`) moved both engines in step and they agree.
+A disagreement is an edit the relay does not carry (`tower.place`, a direct
+field write) or a divergence on a relayed command. While the crowd is still
+empty the engine is restarted from the instance's save (a re-host, the same
+start a load gets). Once the crowd exists the tick throws a
+`WasmParityError` naming the first differing path, because a restart would
+drop the crowd and hide the difference.
+
+**The fingerprint** is a 32-bit hash taken after every sync, of every
+unit's and every transport's own fields (each primitive, and the JSON of an
+array or a schedule), the Simulation's own primitive fields, the JSON of
+`events.pending`, and the clock. It costs about 10 ms on a 13,000-unit
+fixture (`towerone-star4` 10.1 to 10.7 ms, `sixseven_2` 9.0 to 10.7 ms
+across runs; the round 1 hand list cost 7.2 ms on `towerone-star4`). It
+leaves out the people (the frame owns them), the weather (engine owned: no
+save carries it, and a load recomputes it from the day), and the
+engine-owned per-frame counters (`onHourRuns`, the effect sequences,
+`logSeq`) and memo keys. A direct write to any of those is replaced by the
+next frame sync, and no error names it; a counter stamped on a unit before
+the first tick (`customersIn`) is the same case, since the state view
+leaves it out.
+
+**The refusals**, each by name:
+
+- the sampled v1 model (`simModel = "v1"`), at attach and again on every
+  hosted tick, since the save does not carry it and the engine never ported
+  it;
+- an instance that already has a crowd at attach (one Simulation shared
+  between tests and ticked on the TypeScript engine after its release);
+- an exterminator booking the save cannot carry: booked room ids on the
+  instance at attach, and any pending booking at a re-host (#902);
+- a re-host after the first tick under `VC_WASM_SYNC=hour`, where the
+  instance is behind the engine between merges and its save would rewind
+  the engine.
+
+**The tick.** Each hosted tick runs on the engine through the host's relay
+tick (`engine.tick` plus the frame sync). In tick mode the engine's full
+save is then merged into the instance (`host.syncStructure()`), so an
+assertion between hours reads the state the engine holds after that tick.
+`VC_WASM_SYNC=hour` keeps the host's own cadence (frame sync per tick,
+merge on an hour pass or a revision change) for a cost comparison.
+
+Every host is detached after each test, all of them even when one release
+throws, so the engines are freed and the instances are plain TypeScript
+simulations again. A test that never ticks and never calls
+`callExterminator` is never hosted; it exercises the TypeScript command
+surface only, and the table counts it as such.
 
 No CI job runs the parity projects yet. Adding `test:wasm:parity` to
 `test:wasm` (which CI runs) waits until both projects pass.
@@ -136,10 +176,12 @@ below.
 | `integrationWasm` (merge per tick) | 86 | 1596 | 61 | 1 | 296 s | 26 files fail |
 | `integrationWasm` (`VC_WASM_SYNC=hour`) | 86 | 1596 | 61 | 1 | 142 s | the same total: `fixedStep`'s four timeouts pass, and the pre-tick direct writes the hour cadence cannot compare fail instead (`reviewFixes`, `venueOccupancy`, `faqComplete`, two `condoRelocation` cases) |
 | `unitWasm` (merge per tick) | 204 | 2523 | 4 | 0 | 124 s | 3 files fail |
-| `integrationWasm` (merge per tick), after slice 2 | 86 | 1628 | 19 | 11 | 323 s | 10 files fail; the 11 skips are the 10 `itTypeScriptOnly` marks plus the one pre-existing skip |
+| `integrationWasm` (merge per tick), after slice 2 | 86 | 1628 | 19 | 11 | 323 s | 10 files fail; the 11 skips are the 10 `itTypeScriptOnly` marks plus one pre-existing skip (the hour-cost bench; that run's environment had the disc reader's package, so its four tests ran) |
 | `unitWasm` (merge per tick), after slice 2 | 204 | 2525 | 2 | 0 | 143 s | 2 files fail, both the merge-per-tick cost |
 | `integrationWasm` (merge per tick), after review round 1 | 87 | 1610 | 8 | 46 | 374 s | 4 files fail, all named in the table; the 46 skips are the 41 `itTypeScriptOnly` marks plus 5 pre-existing (the opt-in hour-cost bench, the disc reader without its package); the 87th file is the setup's own spec (`src/tests/parity/wasmHostSetup.integration.test.ts`) |
-| `unitWasm` (merge per tick), after review round 1 | 204 | 2537 | 2 | 0 | 136 s | 2 files fail, both the merge-per-tick cost; `dualRun.test.ts` left the project |
+| `unitWasm` (merge per tick), after review round 1 | 205 | 2537 | 2 | 0 | 136 s | 2 files fail, both the merge-per-tick cost; `dualRun.test.ts` left the project (205 files by `vitest list --project unitWasm --filesOnly`; the earlier rows' 204 is as reported then) |
+| `integrationWasm` (merge per tick), after review round 2 | 87 | 1621 | 9 | 43 | 504 s | run alone in this worktree, but other sessions loaded the machine (load average 7 to 13 on four cores); 4 files fail, all named in the table: the four (b) tests and five `fixedStep` timeouts (its fifth, the slow-host test, timed out under the load); the 43 skips are the 38 `itTypeScriptOnly` marks plus 5 pre-existing (the opt-in hour-cost bench, the disc reader's four tests without its package); 1621 + 9 + 43 = 1673 |
+| `unitWasm` (merge per tick), after review round 2 | 205 | 2542 | 4 | 0 | 368 s | run alone in this worktree under the same outside load; 2 files fail, all timeouts: `rooms` and all three of `rentalCrowd`'s day-long runs; 2542 + 4 = 2546 |
 
 The first run, before any fix, failed 90 integration tests in 32 files and
 took 1046 s, of which 936 s was `conformance.integration.test.ts` alone
@@ -181,7 +223,7 @@ twins are `conformanceWasm` and the Rust replay test).
   names them once it exists (`WasmParityError` at the first differing
   path). These are the vitest twins of the e2e specs AC2 names: the next
   slice moves them onto relayed commands or keeps them TypeScript-only
-  with a reason. Four of them are a load artifact rather than a write: the
+  with a reason. Four of them come from the load and involve no write: the
   host always starts from a save, and loading a founded Classic tower
   snaps a `tower.place`d condo's rent onto the 1994 ladder (both engines
   agree on the load; the test's TypeScript instance was never loaded).
@@ -197,7 +239,7 @@ twins are `conformanceWasm` and the Rust replay test).
   structural snapshot in #868 is the fix; until then those five run only
   under the hour cadence.
 
-### Test-mapping table (after review round 1)
+### Test-mapping table (after review round 2)
 
 Buckets: (a) engine divergence, (b) read-model gap, (c) TypeScript-only,
 (d) un-relayed write after the crowd exists, (cost) merge-per-tick
@@ -210,35 +252,35 @@ repeats.
 
 | Test file | Fails | Bucket | Reason |
 | --- | --- | --- | --- |
-| `attendanceTripwire.integration.test.ts` | 0/12 (4 marked) | d | three jump the clock after the crowd exists (one of them also rebuilds the venue through an un-relayed `tower.place` mid-run), one drives the event system directly (`events.restore`, `events.pending`) mid-run; the other five read the routing fields slice 2 added |
+| `attendanceTripwire.integration.test.ts` | 0/12 (4 marked) | d | four marked: three jump the clock after the crowd exists (one of them also rebuilds the venue through an un-relayed `tower.place` mid-run), one drives the event system directly (`events.restore`, `events.pending`) mid-run; the other eight pass on the engine, five of them reading the routing fields slice 2 added |
 | `cockroachInfestation.integration.test.ts` | 0/14 | fixed | the booking is relayed: `callExterminator` hosts the instance ahead of the first tick (see slice 2) |
 | `commuteStress.integration.test.ts` | 2/9 | b | `crowd.commuteStressByFloor`, a live accumulator no save carries (#868) |
-| `condoModes.integration.test.ts` | 0/28 (2 marked) | d | the condo is built through `sim.build` (the Classic ladder's Average rung, $150,000, on every engine), its construction finished by ticking past `completeAt`, and the No Rate flag set through `sim.setNoRate`; the two load-clamp tests forge prices on a placed condo that never ticks; two stay TypeScript-only: the re-list test writes `condo.rent = 240_000` after the sale, when the crowd exists and no re-host runs, so the write never reaches the engine and the next merge overwrites it, and the unpriced band default of a `tower.place`d condo on a never-loaded tower (the load snaps it onto the ladder) |
+| `condoModes.integration.test.ts` | 0/28 (2 marked) | d | the condo is built through `sim.build` (the Classic ladder's Average rung, $150,000, on every engine), its construction finished by ticking past `completeAt`, and the No Rate flag set through `sim.setNoRate`; the two load-clamp tests forge prices on a placed condo that never ticks; two stay TypeScript-only: the re-list test writes `condo.rent = 240_000` after the sale while the crowd is still empty, so the next tick re-hosts (minute 720 under `VC_PARITY_TRACE`) and that load snaps the off-ladder 240,000 onto the Classic ladder, so the buy-back charges the snapped $200,000; and the unpriced band default of a `tower.place`d condo on a never-loaded tower (the load snaps it onto the ladder) |
 | `demographicRoutines.integration.test.ts` | 0/11 | fixed | reads `routine` and `originUnitId`, which the frame carries now |
 | `condoRelocation.integration.test.ts` | 0/8 (6 marked) | c | `simModel = "v1"` in the shared fixture (one monthly roll per tick) |
 | `economyDepth.integration.test.ts` | 0/8 (5 marked) | c | `simModel = "v1"` (the sampled model is not in the save and not ported) |
 | `elevatorStats.integration.test.ts` | 1/3 | b | `elevatorStats()` reads `elevatorUtil`, which the engine does not fill (#868) |
 | `faqComplete.integration.test.ts` | 0/26 (2 marked) | d, c | `sim.weather = "rain"` before the ticks: no save carries the weather (a load recomputes it from the day) and the frame sync writes the engine's weather onto the instance on attach and every tick (the test fails unmarked); the cinema booking test sets `simModel = "v1"` |
-| `fixedStep.integration.test.ts` | 4/6 | cost | frame-sized ticks on a fixture save with a merge per tick (passes under `VC_WASM_SYNC=hour`) |
+| `fixedStep.integration.test.ts` | 4/6 alone, 5/6 under load | cost | frame-sized ticks on a fixture save with a merge per tick (passes under `VC_WASM_SYNC=hour`) |
 | `goldenMaster.integration.test.ts` | 0/7 (2 marked) | c | the pinned TypeScript save hash; the engine's golden master is row 4's gate |
-| `hotelLateCheckout.integration.test.ts` | 0/19 (2 marked) | d | `economy.hotelCheckout()` on the instance mid-run; the checkout pass is the engine's own hourly step; the understaffed test also swaps the clock to each afternoon hour after the crowd exists |
+| `hotelLateCheckout.integration.test.ts` | 0/19 (1 marked) | d | the understaffed test runs `economy.hotelCheckout()` on the instance mid-run (the checkout pass is the engine's own hourly step) and swaps the clock to each afternoon hour after the crowd exists; the Modern deferred-guests test lost its mark in review round 2 (its `hotelCheckout()` runs before the first tick, so the engine starts from that state) |
 | `housekeepingLegibility.integration.test.ts` | 1/6 | b | `economy.housekeepingReport()` (#868) |
 | `housekeepingMaids.integration.test.ts` | 0/10 | fixed | the noon dispatch is reached by ticking to it (`tickToNoonDispatch`) in place of a clock write plus `dispatchHousekeepers()` |
 | `legibility.integration.test.ts` | 0/16 | fixed | the shortcut elevator and the late condo go through `sim.buildTransport` and `sim.build`; the shell test gives its `construction` unit a `completeAt` (see the advisory note in slice 2) |
 | `mealCadence.integration.test.ts` | 0/40 | fixed | reads `floors`, which the frame carries now |
 | `modernEconomy.integration.test.ts` | 0/9 (2 marked) | c | `simModel = "v1"` |
 | `moveInGateLegibility.integration.test.ts` | 0/17 | fixed | the buy-back note is ported (`bindingTransportClassAt`) |
-| `parity.integration.test.ts` | 0/2 (2 marked) | c | `simModel = "v1"` |
+| `parity.integration.test.ts` | 0/2 (1 marked) | c | `simModel = "v1"` on the TOWER-rating run; the star-gate test sets v1 but never ticks, so it passes on both projects (unmarked in review round 2) |
 | `personCensus.integration.test.ts` | 0/24 | fixed | reads `originUnitId`, which the frame carries now |
 | `personRoundTrip.integration.test.ts` | 0/19 (2 marked) | d | two stamp `customersIn` on the instance (one mid-run, which the frame sync restores every tick; one before the first tick, which the save does not carry); the other four read the routing fields |
-| `phase2.integration.test.ts` | 0/14 (3 marked) | c | `simModel = "v1"` |
+| `phase2.integration.test.ts` | 0/14 (2 marked) | c | `simModel = "v1"`; the tower-wide coverage test sets v1 but never ticks (unmarked in review round 2) |
 | `segmentRoutingReachable.integration.test.ts` | 0/11 (3 marked) | d | reads `returning` and the route, which the frame carries now; the three meal-rush tests pin lunch by swapping `sim.clock` and re-force the condo and venue occupancy every tick after the crowd exists, which only the fingerprint check (round 1) sees |
 | `simulation.integration.test.ts` | 0/107 (1 marked) | d | clears the render-only `patronageToday`/`profitToday` accumulators on units every hour mid-run |
 | `storage.integration.test.ts` | 0/66 (5 marked) | c | the TypeScript serializer's own round-trip and hardening tests: four write instance fields after the ticks and read `serialize()`, which is the engine's while hosted, and one compares the engine save's unit JSON bytes with the TypeScript serializer's key order |
 | `venueAttendance.integration.test.ts` | 0/21 | fixed | reads `mealVenueId`, which the frame carries now |
 | `venueOrigins.integration.test.ts` | 0/9 | fixed | reads `mealVenueId` and `originUnitId`, which the frame carries now |
 | `src/engine/aquaticCenter.test.ts` (unit) | 0/6 | fixed | reads `mealVenueId`, which the frame carries now |
-| `src/engine/rentalCrowd.test.ts` (unit) | 1/5 | cost | three day-long minute-tick runs (4,320 merges) on a six-floor tower against the 30 s timeout, 66 s alone (passes under `VC_WASM_SYNC=hour`); the routing fields it reads are carried now |
+| `src/engine/rentalCrowd.test.ts` (unit) | 1/5 alone, 3/5 under load | cost | three day-long minute-tick runs (4,320 merges) on a six-floor tower against the 30 s timeout, 66 s alone (passes under `VC_WASM_SYNC=hour`); the routing fields it reads are carried now |
 | `src/engine/tower/rooms.test.ts` (unit) | 1/8 | cost | 360 ticks on a 12,000-unit fixture with a merge per tick (passes under `VC_WASM_SYNC=hour`) |
 | `conformance.integration.test.ts` (left out) | 23 | c | the TypeScript side of the referee and the scenario lock writer; its engine twin is `conformanceWasm` |
 | `loaderCases.integration.test.ts` (left out) | 1 | c | the loader-case lock writer; the Rust test replays the lock |
@@ -326,7 +368,7 @@ repeats it.
   Two Rust unit tests pin every shape against the TypeScript wording,
   including the cross-loaded stair chain that binds past a healthy elevator
   (#701). `moveInGateLegibility` passes on the engine.
-- **The stranded-floor advisory is a load artifact rather than a divergence.** The
+- **The stranded-floor advisory comes from the load, and the engines agree.** The
   test wrote `state = "construction"` on a shell with no `completeAt` and
   never added it to `constructing`, so the TypeScript instance kept the
   shell forever, while any load (the host's start included) rebuilds
@@ -341,30 +383,29 @@ repeats it.
 
 ### What is left on the parity projects
 
-After review round 1, integration: 8 failures in 4 files, all named.
-Bucket (b) is the #868 list only (`commuteStressByFloor` twice,
-`elevatorUtil`, the housekeeping report); (cost) is `fixedStep`'s four.
-Bucket (d) after the crowd exists is now caught by the fingerprint check
-and marked (five more tests in three files). Bucket (c) is marked: the v1
-sampled model (19 tests), the TypeScript
-golden master (two) and the serializer's own tests (five) skip on the
-parity projects under their reasons. Unit: two failures, both (cost):
-`rooms` on the 12,000-unit fixture and `rentalCrowd`'s three day-long
-minute-tick runs (4,320 merges, 66 s alone). Bucket (a) is empty, and
-every bucket (d) test is relayed or marked. A full run under load (the TypeScript tiers in parallel on four
-cores) times out more tests that pass alone; the parity projects want the
-machine to themselves.
+After review round 2 (landed as a follow-up to #891), integration: 9
+failures in 4 files, all named. Bucket (b) is the #868 list only
+(`commuteStressByFloor` twice, `elevatorUtil`, the housekeeping report);
+(cost) is `fixedStep`, four alone and five under load. The 38 marks: 14 in
+bucket (d), the writes after the crowd exists that the fingerprint check
+names, and 24 in bucket (c): the v1 sampled model (17 tests), the
+TypeScript golden master (two) and the serializer's own tests (five).
+Unit: four failures in two files, all (cost) timeouts: `rooms` on the
+12,000-unit fixture and `rentalCrowd`'s three day-long minute-tick runs
+(one fails alone, all three under load). Bucket (a) is empty, and every
+bucket (d) test is relayed or marked. The parity projects want the machine
+to themselves: a run under load times out tests that pass alone.
 
 ### Next slice
 
-1. The structural snapshot (#868) for the six merge-per-tick timeouts
+1. The structural snapshot (#868) for the merge-per-tick timeouts
    (`fixedStep`, `rooms`, `rentalCrowd`), and the getters the save does not
    carry (`elevatorUtil`, the housekeeping report, `commuteStressByFloor`)
    for the four (b) tests, or a TypeScript-only mark for the ones the
    engine will never expose.
 2. Once both parity projects pass, add `test:wasm:parity` to `test:wasm`
    so CI runs them (no CI job runs them yet). The (c) marks landed in review
-   round 1.
+   round 1, and round 2 took three of them off tests that never tick.
 3. The remaining ACs: AC2 (the helper-scripted e2e specs onto relayed
    commands) and AC3 (the gallery and the baselines on the engine).
 
@@ -376,7 +417,6 @@ Auditor.
 
 - [x] [Review][Patch] attach() normalizes the instance with one syncStructure() and adopts load-time log lines by tail, so a re-host never repeats the rent-snap bulletin; a parity spec pins one host and one bulletin [src/tests/parity/wasmHostSetup.ts]
 - [x] [Review][Patch] The header doc and mechanism bullet 1 say when the compare runs (every tick while the crowd is empty in tick mode, a revision move otherwise) and that a pre-tick customersIn stamp raises no parity error [src/tests/parity/wasmHostSetup.ts]
-- [x] [Review][Patch] Hour mode: merge before the pre-tick compare (on inspection not applied: a merge first replaces the instance's records with the engine's, so it discards the un-relayed edit the compare exists to catch and the re-host never fires) [src/tests/parity/wasmHostSetup.ts]
 - [x] [Review][Patch] A re-host is refused with a WasmParityError while an exterminator booking is pending (#902) [src/tests/parity/wasmHostSetup.ts]
 - [x] [Review][Patch] attach() refuses an instance that already has a crowd, naming the one-Simulation-per-test rule [src/tests/parity/wasmHostSetup.ts]
 - [x] [Review][Patch] VC_PARITY_DUMP creates its directory and a failed dump never replaces the parity error [src/tests/parity/wasmHostSetup.ts]
@@ -385,7 +425,6 @@ Auditor.
 - [x] [Review][Patch] attach() refuses simModel "v1"; every v1 test and the rest of bucket (c) (the golden master hashes, the serializer's round-trip and hardening tests) are marked itTypeScriptOnly; gameEvents' v1 is a SimContext literal no Simulation ticks, so it stays unmarked [src/tests/parity/wasmHostSetup.ts]
 - [x] [Review][Patch] itTypeScriptOnly appends the reason to the skipped test's name on the parity projects [src/tests/parity/typescriptOnly.ts]
 - [x] [Review][Patch] dualRun.test.ts attaches its own relay and leaves unitWasm [vite.config.ts]
-- [x] [Review][Patch] legibility's removeTransport after the ticks (on inspection not applied: the host's relay wraps tower.removeTransport, so the removal reaches the engine, and the test passes on integrationWasm) [src/tests/integration/legibility.integration.test.ts]
 - [x] [Review][Patch] faqComplete's weather test still fails unmarked; its reason names the true mechanism (no save carries the weather and the frame sync writes the engine's) [src/tests/integration/faqComplete.integration.test.ts]
 - [x] [Review][Patch] condoModes finishes its condo's construction by ticking past completeAt, and the re-list reason names the write after the crowd exists [src/tests/integration/condoModes.integration.test.ts]
 - [x] [Review][Patch] attendanceTripwire's bulldozing reason names the un-relayed tower.place [src/tests/integration/attendanceTripwire.integration.test.ts]
@@ -402,18 +441,59 @@ Auditor.
 - [x] [Review][Patch] (Codex) A direct write after the crowd exists that moves no revision is caught by a fingerprint taken after each sync; a parity spec pins it, and the five tests it surfaced are marked [src/tests/parity/wasmHostSetup.ts]
 - [x] [Review][Defer] (Codex) Hoist the buy-back's satisfaction context and congestion attribution map to once per satisfaction pass [engine-rs/src/churn.rs]: deferred to #911, behavior-changing as proposed (on inspection: a condo probe fills the context's demand map from the live tower, and the attribution folds every present unit's census, so each earlier vacate in the pass changes both; a hoist would change the buy-back verdict and note. Both engines build them per vacate today; #911 records the incremental fix that keeps behavior)
 - [x] [Review][Defer] fresh frame people carry a route with placeholder leg, shaftId, carIndex [src/wasmhost/wasmHost.ts]: deferred, read-model gap on #868
+- [x] [Review][Dismissed] Hour mode: merge before the pre-tick compare (checked: a merge first replaces the instance's records with the engine's, so it discards the un-relayed edit the compare exists to catch and the re-host never fires) [src/tests/parity/wasmHostSetup.ts]
+- [x] [Review][Dismissed] legibility's removeTransport after the ticks (checked: the host's relay wraps tower.removeTransport, so the removal reaches the engine, and the test passes on integrationWasm) [src/tests/integration/legibility.integration.test.ts]
+
+Round 2 of `/gds-code-review` (with `/bmad-code-review` for the tooling
+surface), landed as a follow-up to #891 (the owner merged #891 while the
+round 2 patches were in progress).
+
+- [x] [Review][Patch] The fingerprint is generic: every unit's and every transport's own fields (primitives, and the JSON of arrays and schedules), the Simulation's own primitive fields, events.pending and the clock, as a 32-bit hash; people, the weather and the engine-owned counters stay out and the doc says so; specs pin a car-count write and a label write after the crowd exists [src/tests/parity/wasmHostSetup.ts]
+- [x] [Review][Patch] The fingerprint is refreshed after the callExterminator compare [src/tests/parity/wasmHostSetup.ts]
+- [x] [Review][Patch] callExterminator runs the compare before the relayed booking too, so an un-relayed edit re-hosts while no booking is pending; a spec pins both engines clearing the same room [src/tests/parity/wasmHostSetup.ts]
+- [x] [Review][Patch] attach() refuses booked room ids on the instance (a due day alone, as a load leaves it, is in the save and is hosted), and bookingPending reads a falsy due day as no booking (the resolution clears it to undefined on both engines) [src/tests/parity/wasmHostSetup.ts]
+- [x] [Review][Patch] Hour mode refuses a re-host after the first tick with a WasmParityError [src/tests/parity/wasmHostSetup.ts]
+- [x] [Review][Patch] afterEach releases every host and then throws an AggregateError; attach() detaches the host when a later step throws [src/tests/parity/wasmHostSetup.ts]
+- [x] [Review][Patch] Every hosted tick refuses v1 [src/tests/parity/wasmHostSetup.ts]
+- [x] [Review][Patch] Log adoption compares each own line in its coerceLog form and keeps a repeated bulletin; a spec pins one copy of a 500-character line [src/tests/parity/wasmHostSetup.ts]
+- [x] [Review][Patch] Specs for the v1 refusal (at attach and after the first tick), the shared-instance crowd refusal and the re-host refusal while booked [src/tests/parity/wasmHostSetup.integration.test.ts]
+- [x] [Review][Patch] The condoModes re-list reason names the re-host at minute 720 and the ladder snap of 240,000 [src/tests/integration/condoModes.integration.test.ts]
+- [x] [Review][Patch] Three marks removed from tests that pass on the engine (hotelLateCheckout's Modern deferred guests, phase2's and parity's v1 tests that never tick) [src/tests/integration/]
+- [x] [Review][Patch] phase2 imports itTypeScriptOnly and V1_MODEL at the top [src/tests/integration/phase2.integration.test.ts]
+- [x] [Review][Patch] servedCondo asserts the condo left construction, and the No Rate test sets the flag before the condo opens [src/tests/integration/condoModes.integration.test.ts]
+- [x] [Review][Patch] syncPeople leaves the optional person fields in the TypeScript engine's shape (absent until set, cleared by assignment where motion.ts clears them, the flags absent or true); the fidelity test compares the values strictly and the presence of staff and returning [src/wasmhost/wasmHost.ts]
+- [x] [Review][Patch] with_thousands prints -0 and the non-finite values as toLocaleString() does, in release builds too [engine-rs/src/services.rs]
+- [x] [Review][Patch] The sale and buy-back vectors agree: householdPrice rounds before the line on both engines (106,667), and a churn test pins a rounded household buy-back and a fractional stored price through the buy-back line [engine-rs/src/churn.rs]
+- [x] [Review][Patch] frame_view sends an unknown routine as 255, which the decoder rejects [engine-rs/src/wasm.rs]
+- [x] [Review][Patch] decodeFrame checks the header counts and each transport's car count [src/wasmhost/frameView.ts]
+- [x] [Review][Patch] The mechanism section and the setup file's header describe the code as it is [this file, src/tests/parity/wasmHostSetup.ts]
+- [x] [Review][Patch] The runs table is re-run per project, with the file and skip counts reconciled, and the attendanceTripwire row adds up [this file]
+- [x] [Review][Patch] The review tallies agree here and in the backlog [this file, backlog.md]
+- [x] [Review][Patch] The #868 row names the placeholder-route deferral [backlog.md]
+- [x] [Review][Patch] The #878 row states the current state [backlog.md]
+- [x] [Review][Patch] The #911 row opens with its state and follows #902 in date order [backlog.md]
+- [x] [Review][Patch] The "rather than" restatements in new text are rewritten [this file, src/wasmhost/frameView.ts]
+- [x] [Review][Patch] The parity sentence in CONTRIBUTING.md is its own paragraph [CONTRIBUTING.md]
+- [x] [Review][Dismissed] `is_multiple_of` in with_thousands (checked: stable since Rust 1.87, and the crate requires 1.97) [engine-rs/src/services.rs]
 
 ## Review record
 
 - Round 1 (2026-10-09, PR #891): 18 Blind Hunter, 9 Edge Case Hunter and 13
-  Acceptance Auditor raw findings; triage kept 25 patch, 1 defer and 2
-  dismissed. Every patch is listed above (two were checked and left
-  unapplied, with the evidence in their lines). Codex then reviewed the
-  pre-fix head: three findings, one already covered (the log tail), one
-  applied (the fingerprint), one deferred to #911 (the vacancy context).
-  Dismissed after inspection: merging before the hour-mode compare (it
-  would erase the direct edits the compare exists to catch) and relaying
-  the transport removal in legibility (already relayed; 16/16 pass).
+  Acceptance Auditor raw findings (40). After dedupe: 23 patches applied, 2
+  checked and dismissed (merging before the hour-mode compare, which would
+  erase the direct edits the compare exists to catch; relaying the
+  transport removal in legibility, already relayed with 16/16 passing), and
+  1 defer (the placeholder route of a fresh frame person, on #868). Codex
+  then reviewed the pre-fix head: three findings, one already covered (the
+  log tail), one applied (the fingerprint), one deferred to #911 (the
+  vacancy context). In all: 24 patches applied, 2 dismissed, 2 defers
+  (#868, #911).
+- Round 2 (2026-10-10, landed as a follow-up to #891): 15 Blind Hunter, 10
+  Edge Case Hunter and 13 Acceptance Auditor raw findings (38). After
+  dedupe: 26 patches applied, 1 dismissed (`is_multiple_of` is stable since
+  Rust 1.87 and the crate requires 1.97), no defers. The Rust changes keep
+  every conformance digest (21 scenarios ok).
+
 ## Slice: e2e and gallery (AC2, AC3) (2026-10-09)
 
 This slice is a stacked PR on top of slices 1 and 2 and merges after them. Status: in

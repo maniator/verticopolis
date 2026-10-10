@@ -28,8 +28,8 @@ const CLASSIC_ASKING = 150_000;
  *  Built through the command surface (`sim.build`), so the condo asks the
  *  ladder's Average rung on every engine; {@link placedCondo} is the
  *  `tower.place` shape for the unpriced default and the never-ticked
- *  load-clamp tests. */
-function servedCondo(sim: Simulation): Unit {
+ *  load-clamp tests. `beforeOpening` runs while it is under construction. */
+function servedCondo(sim: Simulation, beforeOpening?: (condo: Unit) => void): Unit {
   sim.money = 1e9;
   sim.star = 1; // no random fire/bomb events to perturb the run
   lay(sim, "lobby", 1);
@@ -38,8 +38,9 @@ function servedCondo(sim: Simulation): Unit {
   expect(sim.build("condo", 2, C + 4).ok).toBe(true);
   const condo = sim.tower.units.find((u) => u.kind === "condo" && u.floor === 2 && u.x === C + 4)!;
   condo.satisfaction = 1;
-  // Tick past the build's completion time (a buyer may move in that hour).
-  for (let i = 0; i < 24 * 10 && condo.state === "construction"; i++) sim.tick(60);
+  beforeOpening?.(condo);
+  for (let i = 0; i < 24 * 10 && condo.state === "construction"; i++) sim.tick(60); // a buyer may move in that hour
+  expect(condo.state).not.toBe("construction");
   return condo;
 }
 
@@ -58,8 +59,7 @@ function placedCondo(sim: Simulation): Unit {
   return condo;
 }
 
-/** Tick hours until a predicate holds (or we give up), so RNG-driven move-ins
- *  and evictions can resolve without hard-coding a tick count. */
+/** Tick hours until a predicate holds (or give up): RNG-driven move-ins resolve without a fixed count. */
 function tickUntil(sim: Simulation, pred: () => boolean, maxHours = 24 * 40): boolean {
   for (let i = 0; i < maxHours && !pred(); i++) sim.tick(60);
   return pred();
@@ -106,8 +106,8 @@ describe("Classic mode condos", () => {
 describe("No-Rate units stay off-market (no move-in, no sale, $0)", () => {
   it("an empty No-Rate condo never sells and earns nothing over a long run", () => {
     const sim = Simulation.newGame(3, "classic");
-    const condo = servedCondo(sim);
-    expect(sim.setNoRate(condo.id)).toBe(true); // off the market (imported class 4)
+    const condo = servedCondo(sim, (c) => expect(sim.setNoRate(c.id)).toBe(true)); // off the market (imported class 4) before it opens
+    expect(condo.noRate).toBe(true);
     const before = sim.money;
     // Far past the ~40 in-game hours a normal served condo takes to sell.
     for (let i = 0; i < 24 * 80; i++) sim.tick(60);
@@ -196,7 +196,7 @@ describe("Buy-back on an evicted owner (Classic canon, all towers)", () => {
     expect(sim.log.some((e) => /owner left .*bought it back for/.test(e.text))).toBe(true);
   });
 
-  itTypeScriptOnly("writes condo.rent = 240_000 after the sale, when the crowd exists: no re-host runs then, so the write never reaches the engine and the next merge (syncStructure) overwrites the rent")("re-lists a bought-back condo in the current band, dropping a legacy out-of-band price", () => {
+  itTypeScriptOnly("writes condo.rent = 240_000 after the sale while the crowd is still empty, so the next tick re-hosts (minute 720 under VC_PARITY_TRACE) and that load snaps the off-ladder 240,000 onto the Classic ladder, so the buy-back charges the snapped $200,000")("re-lists a bought-back condo in the current band, dropping a legacy out-of-band price", () => {
     const sim = Simulation.newGame(3, "classic");
     const condo = servedCondo(sim);
     tickUntil(sim, () => condo.everOccupied);

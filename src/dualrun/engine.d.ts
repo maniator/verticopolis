@@ -199,3 +199,18 @@ export class Engine {
      */
     unitAt(floor: number, x: number): string | undefined;
 }
+
+/**
+ * `exportTdt(saveJson)`: the `.TDT` bytes for a serialized game (what
+ * `serialize` returns). A tower the format cannot hold is a JavaScript error
+ * with the player-readable message.
+ */
+export function exportTdt(save_json: string): Uint8Array;
+
+/**
+ * `importTdt(bytes, filename)`: a 1994 `.TDT` file as JSON text
+ * `{ "save": <serialized game>, "warnings": [...] }`, where `save` is what
+ * `fromSave` takes. A file that cannot be read is a JavaScript error with
+ * the player-readable message.
+ */
+export function importTdt(bytes: Uint8Array, filename: string): string;

@@ -716,6 +716,57 @@ export class Engine {
     }
 }
 if (Symbol.dispose) Engine.prototype[Symbol.dispose] = Engine.prototype.free;
+
+/**
+ * `exportTdt(saveJson)`: the `.TDT` bytes for a serialized game (what
+ * `serialize` returns). A tower the format cannot hold is a JavaScript error
+ * with the player-readable message.
+ * @param {string} save_json
+ * @returns {Uint8Array}
+ */
+export function exportTdt(save_json) {
+    const ptr0 = passStringToWasm0(save_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.exportTdt(ptr0, len0);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v2;
+}
+
+/**
+ * `importTdt(bytes, filename)`: a 1994 `.TDT` file as JSON text
+ * `{ "save": <serialized game>, "warnings": [...] }`, where `save` is what
+ * `fromSave` takes. A file that cannot be read is a JavaScript error with
+ * the player-readable message.
+ * @param {Uint8Array} bytes
+ * @param {string} filename
+ * @returns {string}
+ */
+export function importTdt(bytes, filename) {
+    let deferred4_0;
+    let deferred4_1;
+    try {
+        const ptr0 = passArray8ToWasm0(bytes, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(filename, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.importTdt(ptr0, len0, ptr1, len1);
+        var ptr3 = ret[0];
+        var len3 = ret[1];
+        if (ret[3]) {
+            ptr3 = 0; len3 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred4_0 = ptr3;
+        deferred4_1 = len3;
+        return getStringFromWasm0(ptr3, len3);
+    } finally {
+        wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+    }
+}
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
@@ -751,6 +802,11 @@ function getArrayF64FromWasm0(ptr, len) {
     return getFloat64ArrayMemory0().subarray(ptr / 8, ptr / 8 + len);
 }
 
+function getArrayU8FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
+}
+
 let cachedFloat64ArrayMemory0 = null;
 function getFloat64ArrayMemory0() {
     if (cachedFloat64ArrayMemory0 === null || cachedFloat64ArrayMemory0.byteLength === 0) {
@@ -773,6 +829,13 @@ function getUint8ArrayMemory0() {
 
 function isLikeNone(x) {
     return x === undefined || x === null;
+}
+
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
 }
 
 function passStringToWasm0(arg, malloc, realloc) {
