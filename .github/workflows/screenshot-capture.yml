@@ -216,8 +216,11 @@ jobs:
           include-hidden-files: true
 
       - name: Upload the nondeterminism evidence
-        # Only exists when the byte-diff tripped: both legs' copies of every
-        # differing file (see diffRoots in the check script). Diagnosability
+        # Two kinds of evidence land here: both legs' copies of every file the
+        # byte-diff found differing (see diffRoots in the check script), and
+        # under phase-watch/ the capture of any Shot.phaseWatch shot whose
+        # dialog phase check failed (scripts/screenshot-phase-check.ts; that
+        # fails the render itself, before any byte-diff). Diagnosability
         # was the missing half of #762: the first fix was built on inference
         # because the differing pixels were discarded with the leg roots, and
         # the flake outlived the theory.
@@ -227,9 +230,9 @@ jobs:
           name: determinism-diff-${{ matrix.shard }}
           path: determinism-diff
           # "ignore", not "error": the step runs on EVERY job failure via
-          # if: failure(), and evidence only exists when the byte-diff itself
-          # tripped; a build or render failure has none to upload and must not
-          # stack a second red herring on the real one.
+          # if: failure(), and evidence only exists when the byte-diff or a
+          # phase check tripped; any other build or render failure has none to
+          # upload and must not stack a second red herring on the real one.
           if-no-files-found: ignore
           retention-days: 14
           include-hidden-files: true
