@@ -1,7 +1,7 @@
 import { zipSync, strToU8, type Zippable } from "fflate";
 import type { BakeResult, ImageRef } from "./bake";
 import { variantPlacements, roomKinds, ORIGIN_SEEDED, RECYCLE_STEPS, PARKING_CAR_COLORS } from "./catalog";
-import { CAR_SEEDS, SKYLINE_FILLS, STREET_CAR_SEEDS, BUILDS } from "./catalogExtras";
+import { CAR_SEEDS, SKYLINE_FILLS, SKY_COLUMNS, STREET_CAR_SEEDS, BUILDS } from "./catalogExtras";
 import { pack, type PackedSlice } from "./pack";
 import { blank, type Image } from "./pixels";
 import { encodePng } from "./png";
@@ -86,6 +86,8 @@ export interface Archive {
   /** The 1x color and normal pages, for checks before encoding. */
   pages: Image[];
   normalPages: Image[];
+  /** Where each image id was packed. */
+  placements: PackedSlice[][];
   /** Paths inside the zip (under {@link ARCHIVE_ROOT}) to bytes. */
   files: Record<string, Uint8Array>;
   zip: Uint8Array;
@@ -159,7 +161,7 @@ export function buildArchive(
     frames,
     animations: Object.fromEntries(bake.animations.map((a) => [a.name, { frames: a.frames, dt: a.dt, loop: a.loop, keys: a.keys }])),
     data: {
-      skyColors: Array.from({ length: 24 }, (_, h) => skyColor(h)),
+      skyColors: Array.from({ length: SKY_COLUMNS }, (_, c) => skyColor((c * 24) / SKY_COLUMNS)),
       skylineFills: SKYLINE_FILLS,
       shirts: SHIRTS,
       personBuilds: BUILDS,
@@ -175,7 +177,33 @@ export function buildArchive(
   for (const path of Object.keys(files).sort()) {
     zippable[`${ARCHIVE_ROOT}/${path}`] = [files[path], { level: path.endsWith(".png") ? 0 : 9, mtime: ZIP_TIME }];
   }
-  return { manifest, pages, normalPages, files, zip: zipSync(zippable) };
+  return { manifest, pages, normalPages, placements: packed.placements, files, zip: zipSync(zippable) };
+}
+
+/** Ids of images whose color or normal pixels do not come back out of the
+ *  pages at their packed slices; empty when every image does. */
+export function checkPages(bake: Pick<BakeResult, "images" | "normals">, archive: Pick<Archive, "pages" | "normalPages" | "placements">): number[] {
+  const matches = (id: number, s: PackedSlice): boolean => {
+    const img = bake.images[id];
+    const normal = bake.normals[id];
+    const page = archive.pages[s.rect.page];
+    const normalPage = archive.normalPages[s.rect.page];
+    for (let y = 0; y < s.rect.h; y++) {
+      for (let x = 0; x < s.rect.w; x++) {
+        const src = (y * img.w + s.sx + x) * 4;
+        const dst = ((s.rect.y + y) * page.w + s.rect.x + x) * 4;
+        for (let c = 0; c < 4; c++) {
+          if (page.data[dst + c] !== img.data[src + c] || normalPage.data[dst + c] !== normal.data[src + c]) return false;
+        }
+      }
+    }
+    return true;
+  };
+  const bad: number[] = [];
+  archive.placements.forEach((list, id) => {
+    if (list.length === 0 || !list.every((s) => matches(id, s))) bad.push(id);
+  });
+  return bad;
 }
 
 /** A transparent page whose pixels still decode as the flat normal. */

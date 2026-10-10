@@ -242,6 +242,11 @@ e2e specs (e.g. `e2e/integration.spec.ts` boots it in a real browser):
 - **`src/dualrun/worker.ts`**: the dual run's Web Worker entry, which loads
   the WASM package by URL; the controller it serves is measured against a
   worker stand-in.
+- **`src/render/atlas/browserEntry.ts`, `verify.ts`, `verifyExtras.ts`**: the
+  sprite atlas bake's browser half (the page API the export drives and the
+  pixel checks), which reads pixels back from a live canvas. The pipeline they
+  call (bake, compose, lookup, archive) is measured in its own modules, and
+  `e2e/atlas.spec.ts` runs them end to end.
 
 Also excluded are non-product tooling entry points that are build/dev plumbing,
 not game logic: the gallery/preview pages (`src/gallery.ts`,

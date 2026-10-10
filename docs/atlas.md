@@ -13,12 +13,16 @@ release for the commit your frontend pins and check the archive against the
 checksum before you unpack it. Nothing generated is committed to this
 repository.
 
+The workflow attaches to the tag's existing release, draft or published. When
+a tag has no release yet it opens a draft for it, which a maintainer
+publishes; nothing goes public or becomes the latest release on its own.
+
 To build it yourself:
 
 ```bash
 npm ci
 npm run atlas -- --out dist-atlas            # whole catalog
-npm run atlas -- --out dist-atlas --filter room/office   # a slice, for a preview
+npm run atlas -- --out dist-atlas --filter room/office   # a slice, written as verticopolis-atlas-preview.zip
 ```
 
 The release copy is baked inside the pinned Playwright image (the same
@@ -92,8 +96,8 @@ bumps it. New frames or optional fields do not.
 - `signature`: which inputs are baked into frames, which a frontend composes,
   which animate, and the exact rule for each (`signature.rules`).
 - `variants`: the sampled placements behind each room variant.
-- `data`: small tables (the 24 hourly sky colors, the skyline fills, the shirt
-  colors, the person build sizes, the sampled seeds).
+- `data`: small tables (the sky color at each quarter hour, the skyline fills,
+  the shirt colors, the person build sizes, the sampled seeds).
 
 ### Anchors
 

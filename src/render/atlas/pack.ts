@@ -33,9 +33,11 @@ interface Shelf {
 
 export function pack(images: readonly PackInput[], pageSize: number, padding: number): PackResult {
   const maxW = pageSize - 2 * padding;
+  if (!(maxW > 0)) throw new Error(`page ${pageSize} leaves no room inside a ${padding} px gutter`);
   const items: { id: number; sx: number; w: number; h: number }[] = [];
   for (const img of images) {
     if (img.h > maxW) throw new Error(`image ${img.id} is ${img.h} px tall, past the ${maxW} px page`);
+    if (!(img.w > 0 && img.h > 0)) throw new Error(`image ${img.id} is empty (${img.w} x ${img.h})`);
     for (let sx = 0; sx < img.w; sx += maxW) items.push({ id: img.id, sx, w: Math.min(maxW, img.w - sx), h: img.h });
   }
   items.sort((a, b) => b.h - a.h || b.w - a.w || a.id - b.id || a.sx - b.sx);

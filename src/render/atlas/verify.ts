@@ -30,6 +30,9 @@ export interface SampleResult {
   mismatches: number;
   /** Where in the region the room was painted for this comparison. */
   offset: { x: number; y: number };
+  /** A control compares two different pictures on purpose and must report
+   *  a mismatch; one that does not means the comparison itself is broken. */
+  control?: boolean;
   box?: { x0: number; y0: number; x1: number; y1: number };
 }
 

@@ -15,8 +15,10 @@
  *
  * Before writing, it checks the atlas against the game's own paint for the
  * sample signatures in `src/render/atlas/samples.ts` and stops on any
- * mismatch. Writes `<out>/verticopolis-atlas-<label or version>.zip` and a
- * `.sha256` beside it.
+ * mismatch, and after packing it checks that every image comes back out of
+ * the pages. Writes `<out>/verticopolis-atlas-<label or version>.zip` and a
+ * `.sha256` beside it (`verticopolis-atlas-preview.zip` for a `--filter` run,
+ * which skips the sample check).
  * Nothing it writes is committed. The archive layout and manifest schema are
  * documented in docs/atlas.md.
  */
@@ -26,16 +28,25 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
 import { bundleBake } from "./atlas-bundle.ts";
-import { buildArchive } from "../src/render/atlas/archive";
+import { buildArchive, checkPages } from "../src/render/atlas/archive";
 import type { BakeResult } from "../src/render/atlas/bake";
 import type { Image } from "../src/render/atlas/pixels";
 
 const root = resolve(import.meta.dirname, "..");
 
+/** A `--name value` argument. A missing, empty or flag-shaped value is an
+ *  error rather than a silent default. */
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
-  return i >= 0 ? process.argv[i + 1] : undefined;
+  if (i < 0) return undefined;
+  const v = process.argv[i + 1];
+  if (v === undefined || v === "" || v.startsWith("--")) throw new Error(`--${name} needs a value`);
+  return v;
 }
+
+/** Most base64 bytes one page.evaluate hands back (well under the DevTools
+ *  message and string limits). */
+const TRANSFER_BYTES = 32 * 1024 * 1024;
 
 /** The suggested attribution line, read from ASSETS-LICENSE.md. */
 function attributionLine(license: string): string {
@@ -51,15 +62,21 @@ function attributionLine(license: string): string {
   return quote.join(" ").replace(/\s+/g, " ").trim();
 }
 
-/** The commit the working tree is checked out at. Read from git first: on a
- *  manual workflow run the checkout is the requested tag, while GITHUB_SHA
- *  names the commit that dispatched the run. */
+/** The commit the working tree is checked out at, from git. In CI a failure
+ *  is fatal: the archive must never name a commit it was not built from. */
 function gitCommit(): string {
   try {
     return execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-  } catch {
-    return process.env.GITHUB_SHA || "unknown";
+  } catch (e) {
+    if (process.env.CI) throw new Error(`cannot read the commit from git: ${String(e)}`);
+    return "unknown";
   }
+}
+
+function decode(b64: string, w: number, h: number, what: string): Uint8ClampedArray {
+  const data = new Uint8ClampedArray(Buffer.from(b64, "base64"));
+  if (data.length !== w * h * 4) throw new Error(`${what}: got ${data.length} bytes for ${w} x ${h}`);
+  return data;
 }
 
 async function main(): Promise<void> {
@@ -68,6 +85,7 @@ async function main(): Promise<void> {
   // The release tag names the archive when the workflow builds one; a local
   // run falls back to the package version.
   const label = arg("label")?.replace(/[^A-Za-z0-9._-]+/g, "-");
+  if (label !== undefined && !/[A-Za-z0-9]/.test(label)) throw new Error(`--label ${label} names nothing`);
   const t0 = Date.now();
   const code = await bundleBake();
   console.log(`bundled the bake (${(code.length / 1024).toFixed(0)} KiB)`);
@@ -79,26 +97,30 @@ async function main(): Promise<void> {
     await page.addScriptTag({ content: code });
     // Pre-flight: the atlas must reproduce the game's paint for every sample
     // signature before anything is written.
+    // A filtered preview skips it and is named as a preview.
     if (!filter) {
-      const checks: { label: string; mismatches: number }[] = await page.evaluate(() => (globalThis as any).__vcAtlas.verify());
-      const bad = checks.filter((c) => c.mismatches > 0);
+      const checks: { label: string; mismatches: number; control?: boolean }[] = await page.evaluate(() => (globalThis as any).__vcAtlas.verify());
+      // A control case compares two different pictures on purpose; it must
+      // report a mismatch, or the comparison itself is broken.
+      const bad = checks.filter((c) => (c.control ? c.mismatches === 0 : c.mismatches > 0));
       if (bad.length > 0) throw new Error(`atlas does not match the game's paint:\n${JSON.stringify(bad, null, 1)}`);
       console.log(`pre-flight: ${checks.length} sample paints match the game`);
     }
     const summary = await page.evaluate((f) => (globalThis as any).__vcAtlas.run(f), filter);
+    if (summary.frames === 0) throw new Error(`--filter ${filter} matches no frame`);
     console.log(`baked ${summary.frames} frames, ${summary.animations} animations, ${summary.images} unique images`);
     const records = await page.evaluate(() => (globalThis as any).__vcAtlas.records());
     const images: Image[] = [];
     const normals: Image[] = [];
-    const CHUNK = 400;
-    for (let from = 0; from < summary.images; from += CHUNK) {
+    while (images.length < summary.images) {
       const got: { w: number; h: number; b64: string; normal: string }[] = await page.evaluate(
-        ([a, b]) => (globalThis as any).__vcAtlas.images(a, b),
-        [from, Math.min(summary.images, from + CHUNK)],
+        ([from, bytes]) => (globalThis as any).__vcAtlas.images(from, bytes),
+        [images.length, TRANSFER_BYTES],
       );
       for (const g of got) {
-        images.push({ w: g.w, h: g.h, data: new Uint8ClampedArray(Buffer.from(g.b64, "base64")) });
-        normals.push({ w: g.w, h: g.h, data: new Uint8ClampedArray(Buffer.from(g.normal, "base64")) });
+        const id = images.length;
+        images.push({ w: g.w, h: g.h, data: decode(g.b64, g.w, g.h, `image ${id}`) });
+        normals.push({ w: g.w, h: g.h, data: decode(g.normal, g.w, g.h, `normal ${id}`) });
       }
     }
     bakeResult = { images, normals, frames: records.frames, animations: records.animations };
@@ -113,8 +135,11 @@ async function main(): Promise<void> {
     { version: pkg.version, commit: gitCommit(), attribution: attributionLine(licenseText), licenseText },
     (msg) => console.log(msg),
   );
+  // Every image must come back out of the pages it was packed into.
+  const misplaced = checkPages(bakeResult, archive);
+  if (misplaced.length > 0) throw new Error(`images do not round-trip through the pages: ${misplaced.slice(0, 10).join(", ")}`);
   mkdirSync(outDir, { recursive: true });
-  const name = `verticopolis-atlas-${label ?? pkg.version}.zip`;
+  const name = filter ? "verticopolis-atlas-preview.zip" : `verticopolis-atlas-${label ?? pkg.version}.zip`;
   writeFileSync(join(outDir, name), archive.zip);
   const sha = createHash("sha256").update(archive.zip).digest("hex");
   writeFileSync(join(outDir, `${name}.sha256`), `${sha}  ${name}\n`);

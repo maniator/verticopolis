@@ -41,6 +41,8 @@ function struct(kind: "floor" | "lobby", floor: number, x: number): Unit {
 
 interface Case {
   label: string;
+  /** Compares two different pictures on purpose (see SampleResult). */
+  control?: boolean;
   frames: string[];
   /** Compose the atlas side from baked frames. */
   atlas: (get: (name: string, chains?: Record<string, number>) => Image) => Image;
@@ -134,6 +136,19 @@ export function extraCases(): Case[] {
       },
     },
     {
+      // The control: lobby variant 0 from the atlas against the game's
+      // variant 1. These differ, so the comparison must say so.
+      label: "control: lobby variant 0 against variant 1",
+      control: true,
+      frames: ["structure/lobby/sky/lit/v0"],
+      atlas: (get) => get("structure/lobby/sky/lit/v0"),
+      game: (doc) => {
+        const ctx = canvas(doc, TILE, FLOOR);
+        drawUnit({ ctx, lit: true, anim: 0, hour: 20 }, struct("lobby", 2, 1), 0, 0, TILE, FLOOR);
+        return read(ctx, TILE, FLOOR);
+      },
+    },
+    {
       label: "sky strip",
       frames: ["sky/gradient"],
       atlas: (get) => get("sky/gradient"),
@@ -166,6 +181,6 @@ export function verifyExtras(doc: Document, jobs: readonly Job[], renderer: Rend
     const mine = c.atlas(get);
     const theirs = c.game(doc);
     const cmp = compareImages(theirs, mine);
-    return { label: c.label, frame: c.frames.join(", "), pixels: theirs.w * theirs.h, mismatches: cmp.mismatches, box: cmp.box, offset: { x: 0, y: 0 } };
+    return { label: c.label, frame: c.frames.join(", "), pixels: theirs.w * theirs.h, mismatches: cmp.mismatches, box: cmp.box, offset: { x: 0, y: 0 }, control: c.control };
   });
 }

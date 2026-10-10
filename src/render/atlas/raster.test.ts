@@ -42,8 +42,10 @@ describe("pack", () => {
     expect(r.placements[0].reduce((n, s) => n + s.rect.w, 0)).toBe(150);
     expect(r.pages).toBeGreaterThan(1);
   });
-  it("rejects an image taller than a page", () => {
-    expect(() => pack([{ id: 0, w: 4, h: 100 }], 64, 1)).toThrow();
+  it("rejects an image taller than a page, an empty image and a page with no room", () => {
+    expect(() => pack([{ id: 0, w: 4, h: 100 }], 64, 1)).toThrow(/tall/);
+    expect(() => pack([{ id: 0, w: 0, h: 4 }], 64, 1)).toThrow(/empty/);
+    expect(() => pack([{ id: 0, w: 1, h: 1 }], 2, 1)).toThrow(/no room/);
   });
 });
 

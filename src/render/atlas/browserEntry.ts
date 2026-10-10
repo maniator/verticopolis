@@ -54,7 +54,8 @@ function toBase64(bytes: Uint8ClampedArray): string {
 interface AtlasPage {
   run(filter?: string): { images: number; frames: number; animations: number };
   records(): Omit<BakeResult, "images" | "normals">;
-  images(from: number, to: number): { w: number; h: number; b64: string; normal: string }[];
+  /** Images from `from` on, at least one, until about `maxBytes` of base64. */
+  images(from: number, maxBytes: number): { w: number; h: number; b64: string; normal: string }[];
   verify(samples?: Sample[]): SampleResult[];
 }
 
@@ -69,10 +70,16 @@ const api: AtlasPage = {
     if (!result) throw new Error("run() first");
     return { frames: result.frames, animations: result.animations };
   },
-  images(from, to) {
+  images(from, maxBytes) {
     if (!result) throw new Error("run() first");
-    const r = result;
-    return r.images.slice(from, to).map((img, i) => ({ w: img.w, h: img.h, b64: toBase64(img.data), normal: toBase64(r.normals[from + i].data) }));
+    const out: { w: number; h: number; b64: string; normal: string }[] = [];
+    let bytes = 0;
+    for (let i = from; i < result.images.length && (out.length === 0 || bytes < maxBytes); i++) {
+      const img = result.images[i];
+      bytes += Math.ceil((img.data.length * 2 * 4) / 3);
+      out.push({ w: img.w, h: img.h, b64: toBase64(img.data), normal: toBase64(result.normals[i].data) });
+    }
+    return out;
   },
   verify(samples = SAMPLES) {
     const jobs = allJobs();

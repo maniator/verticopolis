@@ -1,6 +1,6 @@
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { buildArchive, signature, ARCHIVE_ROOT } from "./archive";
+import { buildArchive, checkPages, signature, ARCHIVE_ROOT } from "./archive";
 import { bake, ImageStore, type Renderer } from "./bake";
 import type { Job } from "./catalog";
 import type { PaintSpec } from "./paint";
@@ -110,7 +110,7 @@ describe("bake", () => {
     expect(m.frames.cab.chains.riders.max).toBe(4);
     expect(m.frames.empty.parts).toEqual([]);
     expect(m.animations.loop.frames).toEqual(["loop/0", "loop/1"]);
-    expect(m.data.skyColors).toHaveLength(24);
+    expect(m.data.skyColors).toHaveLength(96);
     expect(m.pageSize).toBe(32);
   });
   it("the packed pages and the manifest give back every frame and layer pixel for pixel", () => {
@@ -139,6 +139,11 @@ describe("bake", () => {
       }
     }
     expect(a.manifest.frames.wide.parts.length).toBe(3); // sliced across a 32 px page
+    expect(checkPages(r2, a)).toEqual([]);
+    // A page pixel knocked out of place is caught.
+    const p0 = a.placements[0][0].rect;
+    a.pages[p0.page].data[(p0.y * 32 + p0.x) * 4] ^= 1;
+    expect(checkPages(r2, a)).toEqual([0]);
   });
   it("composes lookups and reports mismatches", () => {
     const cab = r.frames.find((f) => f.name === "cab")!;

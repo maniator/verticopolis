@@ -17,8 +17,12 @@ test.describe("sprite atlas matches the web bake", () => {
     test.setTimeout(180_000);
     await page.setContent("<!doctype html><html><body></body></html>");
     await page.addScriptTag({ content: await bundleBake() });
-    const results: { mismatches: number }[] = await page.evaluate(() => (globalThis as any).__vcAtlas.verify());
-    const bad = results.filter((r) => r.mismatches > 0);
+    const results: { mismatches: number; control?: boolean }[] = await page.evaluate(() => (globalThis as any).__vcAtlas.verify());
+    // A control compares two different pictures and must report a mismatch.
+    const controls = results.filter((r) => r.control);
+    expect(controls.length).toBeGreaterThan(0);
+    expect(controls.every((r) => r.mismatches > 0), "the comparison cannot see a difference").toBe(true);
+    const bad = results.filter((r) => !r.control && r.mismatches > 0);
     expect(bad, JSON.stringify(bad, null, 1)).toEqual([]);
     expect(results.length).toBeGreaterThan(50);
   });
