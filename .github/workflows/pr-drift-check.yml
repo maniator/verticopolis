@@ -97,9 +97,16 @@ jobs:
             case "$f" in src/*) sign=+ ;; esac
             case "$f" in src/tests/*) sign=- ;; esac
             case "$f" in src/tests/fixtures/*) sign=+ ;; esac
+            # Generator logic that lives beside its unit test (the ONLY filter,
+            # the dialog phase watch) runs in every capture. The test files
+            # themselves fall back out on the *.test.ts rule below, which only
+            # works because it comes AFTER this one (last match wins).
+            case "$f" in src/tests/screenshot*.ts) sign=+ ;; esac
             case "$f" in src/*.test.ts) sign=- ;; esac
             case "$f" in scripts/screenshots.ts) sign=+ ;; esac
             case "$f" in scripts/screenshot-*.ts) sign=+ ;; esac
+            # The scene manifest (scripts/screenshot-scenes.ts concatenates these).
+            case "$f" in scripts/scenes/*) sign=+ ;; esac
             case "$f" in .github/workflows/pr-drift-check.yml) sign=+ ;; esac
             case "$f" in .github/workflows/screenshot-capture.yml) sign=+ ;; esac
             # The pinned Playwright/browser + font versions come from the lockfile, and

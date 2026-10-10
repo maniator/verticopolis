@@ -283,3 +283,10 @@ export function pgFrame(arg: { tile: number | null; floor: number; zoom: number 
   const tile = arg.tile ?? Math.floor(g.grid.width / 2);
   g.engine.setCamera(tile, arg.floor, arg.zoom);
 }
+
+// The dialog phase watch (pgWatchModalPhase, pgMarkModalPhaseTarget,
+// pgStopModalPhaseWatch; #762 / #843) lives under src/tests so its contract
+// test can import it, the same arrangement as screenshotOnlyFilter.ts. Each
+// function is self-contained in the same serialized sense as everything in
+// this file.
+export { pgMarkModalPhaseTarget, pgStopModalPhaseWatch, pgWatchModalPhase } from "../src/tests/screenshotPhaseWatch.ts";
