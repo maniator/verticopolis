@@ -191,8 +191,9 @@ layers for the sample room signatures with the reference reader, paints the
 same rooms through the game's own paint functions (`src/render/regionPaint.ts`,
 which the region compositor and the burning-room canvas call), and requires an
 exact pixel match. Settled rooms are painted at two region offsets; burning and
-unbuilt rooms, and the five origin-seeded kinds, at the per-unit origin the
-game and the atlas both use for them. A control case compares two different
+unbuilt rooms at the per-unit origin the game paints them at; and the five
+origin-seeded kinds at the per-unit origin, the look the atlas carries (the
+game's region paint can differ for them, #915). A control case compares two different
 pictures and must report a mismatch. The bake refuses to write a layer that
 would not compose back to the game's pixels. A unit test rebuilds every frame
 and layer from the packed pages through the manifest.
