@@ -50,6 +50,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
 import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
+import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
 import { resolveOnlyFilter } from "../src/tests/screenshotOnlyFilter.ts";
 
@@ -124,7 +125,12 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     // Always drive the overlay dropdown (default "") so a prior shot's overlay
     // never bleeds into the next, so every shot gets a clean map state.
     await page.evaluate(pgSetOverlay, shot.overlay ?? "");
+    const keepDialogs = shot.keepDialogs ?? (!!shot.crop && shot.crop.includes("modal"));
+    // A phaseWatch shot is watched from before setup through the capture
+    // (screenshot-phase-check.ts, #762 / #843).
+    if (shot.phaseWatch) await armPhaseWatch(page, keepDialogs);
     if (shot.setup) await shot.setup(page);
+    if (shot.phaseWatch) await markPhaseTarget(page);
     if (shot.frame) {
       await page.evaluate(pgFrame, { tile: shot.frame.tile ?? null, floor: shot.frame.floor, zoom: shot.frame.zoom });
     }
@@ -133,7 +139,6 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     // stray toasts / event dialogs the running sim may have popped during the
     // settle, unless this shot is deliberately showing a modal.
     await page.evaluate(pgRefreshUi);
-    const keepDialogs = shot.keepDialogs ?? (!!shot.crop && shot.crop.includes("modal"));
     await page.evaluate(pgClearTransients, keepDialogs);
     // Mask the app version to a fixed placeholder so a routine version bump does
     // not churn the splash/help pixels (the shipped app still shows the real one).
@@ -141,12 +146,15 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     await page.waitForTimeout(80);
     // animations: "disabled" freezes CSS animation (the splash star twinkle,
     // the onboarding pulse) at a fixed phase so DOM chrome is byte-stable too.
+    const capturePath = shot.phaseWatch ? phaseCapturePath(path, outDir) : path;
     if (shot.crop) {
-      await page.locator(shot.crop).screenshot({ path, animations: "disabled" });
+      await page.locator(shot.crop).screenshot({ path: capturePath, animations: "disabled" });
     } else {
-      await page.screenshot({ path, fullPage: !!shot.fullPage, animations: "disabled" });
+      await page.screenshot({ path: capturePath, fullPage: !!shot.fullPage, animations: "disabled" });
     }
+    if (shot.phaseWatch) await judgeAndPromote(page, capturePath, path);
   } finally {
+    if (shot.phaseWatch) await stopPhaseWatch(page);
     // Always restore the scene viewport, even if the shot threw, so one failed
     // shot can't cascade a wrong size into the rest of the scene.
     if (shot.viewport) await page.setViewportSize(baseVp);
@@ -405,17 +413,20 @@ async function main(): Promise<void> {
   // captures against a stale build).
   let browser: Browser | undefined;
   try {
-    // Compositor pipelining is the remaining #762 leak. The evidence from the
-    // two-leg check (PR #871) showed the only differing pixels in
-    // 27c-elevator-schedule-unsaved were the dialog's two sticky layers (the
-    // title bar and the floor-grid head), off by a subpixel text phase while
-    // every scrolled pixel matched: after the programmatic scroll the
-    // compositor moves a sticky layer on its own thread and draws whichever
-    // raster it holds, so a capture under CI load lands before or after that
-    // layer's re-raster. Running every compositor stage to completion before a
-    // draw (the flag Chromium's own pixel tests use) puts the re-raster in the
-    // same frame as the move; the two others keep raster from being skipped
-    // (checker imaging) or animated off the main thread.
+    // Compositor flags added for #762 by PR #871. Its evidence held (the only
+    // differing pixels in 27c-elevator-schedule-unsaved were the dialog's two
+    // sticky layers, a subpixel text phase apart) but its cause did not hold.
+    // The race happens before the scroll: a composited layer keeps the
+    // subpixel phase of its first raster, and 27c's dialog moved by a
+    // fraction of a pixel after a first render that CI load decided whether
+    // to make. Measured with these flags on, 8 of 24 renders still took the
+    // raster that differs from the committed PNG. The fix lives in the 27c
+    // scene (scripts/scenes/schedule.ts), and takeShot guards that shot with
+    // the dialog phase watch (Shot.phaseWatch; other dialog shots are #889).
+    // The flags stay because every committed PNG was minted with them on, so
+    // dropping them is a gallery-wide pixel change of its own: running every
+    // compositor stage to completion before a draw (the flag Chromium's own
+    // pixel tests use), no checker imaging, no off-main-thread animation.
     browser = await chromium.launch({
       executablePath: EXECUTABLE,
       args: ["--run-all-compositor-stages-before-draw", "--disable-checker-imaging", "--disable-threaded-animation"],
