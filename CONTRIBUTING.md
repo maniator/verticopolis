@@ -84,9 +84,14 @@ Verticopolis has **two test tiers**:
     every simulation change lands in both engines in one PR with
     the regenerated lock, and a PR that changes `src/engine/` without touching
     `engine-rs/` says why (a UI readout, prose, a transient the hash never
-    sees). An engine PR that adds a branch adds a scenario that reaches it; the
-    Rust job's coverage step (`cargo llvm-cov`, line floor in
-    `engine-rs.yml`) is how review checks that, and the floor only moves up.
+    sees). The vitest tiers themselves can run on the WASM engine too:
+    `npm run test:wasm:parity` runs the `integrationWasm` and `unitWasm`
+    projects, whose setup file hosts every `Simulation` a test ticks on the
+    engine (story-engine-test-parity, #878); the tests that stay
+    TypeScript-only are named in that story's test-mapping table. An engine
+    PR that adds a branch adds a scenario that reaches it; the Rust job's
+    coverage step (`cargo llvm-cov`, line floor in `engine-rs.yml`) is how
+    review checks that, and the floor only moves up.
     Forged-save handling is pinned the same way by
     `conformance/loader-cases.json` (`loaderCases.integration.test.ts` writes
     it, a Rust test replays it). A nightly differential fuzzer
