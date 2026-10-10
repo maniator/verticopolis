@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { buildToStar } from "./helpers";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { buildToStar, expectEngineHosted, syncEngine } from "./helpers";
+
+// On chromium-wasm every test must end with its tower still on the engine.
+test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
  * CAP-1 wiring (mobile render-perf spec): zooming out past the sub-legible
@@ -15,12 +19,22 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     const g = (window as any).game;
     document.getElementById("splash")?.remove();
     // The star-2 fixture carries no transports; add one shaft so the cull has
-    // real elevator-car actors to hide and restore.
-    if (!g.sim.tower.placeTransport("elevatorStandard", 186, 1, 3).ok) throw new Error("shaft placement failed");
+    // real elevator-car actors to hide and restore. A relayed build, so on the
+    // WASM engine the shaft is the engine's.
+    if (!g.sim.buildTransport("elevatorStandard", 186, 1, 3).ok) throw new Error("shaft placement failed");
+  });
+  await expectEngineHosted(page);
+  // Read the tower back from the engine before staging the crowd (a merge
+  // replaces the people list with the engine's, which is empty at speed 0).
+  await page.evaluate(syncEngine);
+  await page.evaluate(() => {
+    const g = (window as any).game;
     // The fixture freezes game speed, so no routed people ever spawn; seed a
     // few directly into sim.crowd.people (the render reads only these fields)
     // so the crowd-actor half of the cull is exercised for real, not over an
-    // empty map. Speed stays 0, so the sim never touches them.
+    // empty map. Speed stays 0, so neither engine nor the host's per-frame
+    // sync touches them: these are render inputs on the read model, and the
+    // render path under test is the same for both engines.
     for (let i = 0; i < 3; i++) {
       g.sim.crowd.people.push({ id: 9000 + i, seed: i, staff: false, state: "walking", x: 180 + i * 4, fy: 2, wait: 0 });
     }
@@ -68,9 +82,9 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     const g = (window as any).game;
     for (const c of g.engine.carActors) c.preRebuild = true;
     // One floor above the star-2 fixture's roof (its structure tops out at
-    // floor 6, so floor 7 is empty and supported); place() bumps
-    // tower.revision itself, which is what trips the structural rebuild.
-    if (!g.sim.tower.place("floor", 7, 190).ok) throw new Error("floor placement failed");
+    // floor 6, so floor 7 is empty and supported); the relayed build bumps
+    // tower.revision, which is what trips the structural rebuild.
+    if (!g.sim.build("floor", 7, 190).ok) throw new Error("floor placement failed");
   });
   await page.waitForTimeout(300);
   const afterRebuild = await page.evaluate(() => {

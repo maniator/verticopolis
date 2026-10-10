@@ -38,7 +38,9 @@
  * Env knobs: RUN_SERVER=1 spawns its own `vite preview`; ONLY=milestones,tablet
  * re-shoots just those scene ids; BASE_URL / PORT / PW_CHROME override targets;
  * SHOTS_DIR relocates the output gallery (used by the determinism guard to render
- * two independent legs into separate roots concurrently).
+ * two independent legs into separate roots concurrently); VC_SHOT_ENGINE=wasm
+ * renders the game scenes with the WASM engine hosting the tower (see
+ * screenshot-engine.ts; the drift check's engine leg, never committed).
  *
  * TypeScript runs natively on Node ≥ 22.18 (type-stripping): no build step, no
  * extra dep. Keep every module here ERASABLE (type annotations / interfaces /
@@ -52,6 +54,7 @@ import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, type OutDir,
 import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
 import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
+import { SHOT_ENGINE, hostOnEngine, seedEngineChoice } from "./screenshot-engine.ts";
 import { resolveOnlyFilter } from "../src/tests/screenshotOnlyFilter.ts";
 
 // ---- Runner -----------------------------------------------------------------
@@ -121,7 +124,10 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     );
   }
   try {
-    if (shot.clock !== undefined) await page.evaluate(pgSetClock, shot.clock);
+    if (shot.clock !== undefined) {
+      await page.evaluate(pgSetClock, shot.clock);
+      await hostOnEngine(page, `after the ${shot.name} clock pin`);
+    }
     // Always drive the overlay dropdown (default "") so a prior shot's overlay
     // never bleeds into the next, so every shot gets a clean map state.
     await page.evaluate(pgSetOverlay, shot.overlay ?? "");
@@ -129,7 +135,10 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     // A phaseWatch shot is watched from before setup through the capture
     // (screenshot-phase-check.ts, #762 / #843).
     if (shot.phaseWatch) await armPhaseWatch(page, keepDialogs);
-    if (shot.setup) await shot.setup(page);
+    if (shot.setup) {
+      await shot.setup(page);
+      await hostOnEngine(page, `after the ${shot.name} setup`);
+    }
     if (shot.phaseWatch) await markPhaseTarget(page);
     if (shot.frame) {
       await page.evaluate(pgFrame, { tile: shot.frame.tile ?? null, floor: shot.frame.floor, zoom: shot.frame.zoom });
@@ -230,6 +239,7 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       });
     }
     if (scene.initScript) await page.addInitScript(scene.initScript);
+    await seedEngineChoice(page);
     await page.goto(scene.route ? `${BASE}/${scene.route}` : BASE, { waitUntil: "networkidle" });
     // Scrollbars are hidden for every capture, because they were the LAST
     // wall-clock leak (#762). The stepped TestClock pins page time, but a
@@ -328,6 +338,7 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       if (!scene.keepSplash) await page.evaluate(pgDismissSplash);
       if (scene.build) await page.evaluate(scene.build);
       if (scene.assertUnits) await assertReady(page, scene.assertUnits);
+      await hostOnEngine(page, "after the scene build");
     }
     for (const shot of scene.shots) {
       try {
@@ -385,6 +396,7 @@ async function main(): Promise<void> {
     console.warn(`ONLY entries matched no scene and are ignored: ${unmatched.join(", ")}`);
   }
   const scenes = SCENES.filter((sc) => selected.includes(sc.id));
+  console.log(`engine: ${SHOT_ENGINE === "wasm" ? "WASM (hosted)" : "TypeScript"}`);
 
   let server: ChildProcess | null = null;
   if (process.env.RUN_SERVER) {

@@ -246,6 +246,8 @@ repeats.
 | `conformanceWasm.integration.test.ts` (left out) | 21 | c | drives the binding directly |
 | `src/dualrun/mirror.test.ts` (left out) | 10 | c | attaches the relay itself |
 | `src/dualrun/dualRun.test.ts` (left out) | 6 | c | attaches the dual run's relay itself |
+| `e2e/regions.spec.ts` (Playwright, `chromium-wasm`) | skipped (1 test) | c | toggles a unit between fire and empty in place; see the e2e slice |
+| `e2e/perf.spec.ts` (Playwright, `chromium-wasm`) | skipped (1 test) | c | the perf baseline is the TypeScript engine's (#900) |
 
 Tests that never tick (the construction and command-surface tests) pass
 on both projects without the engine; a later slice can count them apart.
@@ -412,3 +414,245 @@ Auditor.
   Dismissed after inspection: merging before the hour-mode compare (it
   would erase the direct edits the compare exists to catch) and relaying
   the transport removal in legibility (already relayed; 16/16 pass).
+## Slice: e2e and gallery (AC2, AC3) (2026-10-09)
+
+This slice is a stacked PR on top of slices 1 and 2 and merges after them. Status: in
+review.
+
+### What landed
+
+#### AC2: the helper-scripted e2e specs drive relayed commands
+
+Under the WASM host the TypeScript `Simulation` is a read model: only the
+relayed commands (`sim.build`, `sim.buildTransport`, `sim.evaluateStar`,
+`sim.tick`, `sim.resolveChoice`, a money write) and a load (`adoptSim`, which
+the host follows by starting the engine from the adopted save) reach the
+engine. The specs used to stage towers with `tower.place`, unit field writes,
+`clock.advance`, a direct `checkVip` and a hand-set `events.pending`, which
+changed the read model alone and passed on `chromium-wasm` only because
+speed 0 meant nothing synced the read model back from the engine.
+
+- `e2e/helpers.ts` `buildToStar`, when the tower is hosted, scripts its
+  structure and occupancy on a scratch copy loaded from the engine's own save,
+  and the app adopts that copy, which is the load path a player's save takes.
+  The star is then evaluated by a relayed
+  `evaluateStar`. For TOWER, the Wedding Hall goes in with a relayed
+  `sim.build`, a second save finishes its construction and parks the clock one
+  minute before the inspection day (no command fast-forwards either), and one
+  relayed `sim.tick(1)` runs the engine's own day pass, so `checkVip` runs on
+  the engine. `adoptSim(sim, true)` (the undo-restore flavor) keeps the camera
+  as the in-place build does. On the TypeScript engine (no host) it still
+  scripts the tower in place: the instance is the engine there, and the
+  perf gate's committed baseline measures that in-place tower. The first CI
+  run of this slice, with the load path on both projects, failed the perf gate
+  (`ui.update` median 1.39 ms against a 0.65 ms baseline): `sim.stats()` over
+  a loaded 44,000-unit tower costs about twice what it costs over the same
+  tower built in place (`loaded-tower-stats-cost`, #905). One
+  limit, by design: the fixture's placements and occupancy are authored on
+  the TypeScript side of that load, so the engine never validates them
+  (`buildToStar` is a fixture builder; the specs' own building goes through
+  relayed commands, and the relayed `sim.build` checks are what exercise the
+  engine's placement rules). A guard fails the TOWER rung loudly if the hall
+  scheduled no visit or the inspection day rolled an emergency.
+- `crowdCull.spec.ts` builds the shaft and the extra floor with
+  `sim.buildTransport` and `sim.build`, and reads the tower back from the
+  engine before seeding its render-only crowd.
+- `integration.spec.ts` boots the splash-emergency case from a stored
+  autosave whose tower carries the pending bomb threat (a reload loads it,
+  and on `chromium-wasm` the engine loads the same pending choice; the test
+  checks the engine's save carries it).
+- `auto-floor.spec.ts`, `mobileGestures.spec.ts` and `visual.spec.ts` lay
+  their concourse and floors with `sim.build` and read the tower back from the
+  engine (`syncStructure`) before asserting, so a step the relay does not
+  carry is wiped by the merge and fails the spec.
+- `win.spec.ts` and `milestones.spec.ts` check the engine's own save reached
+  the star (and, at TOWER, `evaluatedTower`).
+- New helpers: `expectEngineHosted` (an `afterEach` in every game spec that
+  runs on `chromium-wasm`; it
+  fails a `chromium-wasm` test unless the host is up, reports the tower
+  hosted with no errors, and the app's live `sim` is the hosted instance),
+  `engineSave`, `syncEngine`, and `tsOnlyOnWasm(reason)`, the one greppable
+  skip.
+
+What stays a direct write, by design: presentation pins on a paused read
+model (the visual spec's clock and weather, `crowdCull`'s seeded people, the
+`perf` spec's UI stubs). At speed 0 no frame syncs the read model from the
+engine, so these hold on both engines until a test merges explicitly (the
+pinned-footer test re-pins the clock after its merge), and the render path
+they feed is the same for both.
+
+`buildToStar` builds in place on the TypeScript project and through a load on
+the WASM project. Before that split both projects took the load path, and on
+the host the 10 visual specs rendered byte-identically to the in-place
+references on both engines, so no load-only effect reaches those scenes and
+the engine visual leg still compares like with like. The TOWER rung does end
+on a different day on each project (the in-place branch advances ten days, the
+hosted one parks a minute before the inspection day and relays that minute, so
+it ends on the inspection day); nothing compares those states across engines
+today, and `milestones.spec.ts` keeps its shots as unasserted artifacts (the
+gallery's milestone ladder comes from `scripts/screenshots.ts` and is in the
+engine leg).
+
+#### AC3: the gallery and the visual baselines render on the WASM engine
+
+- `scripts/screenshot-engine.ts`: `VC_SHOT_ENGINE=wasm` seeds `vc.engine` in
+  every scene's page before boot. After a scene's build, after any shot setup
+  and after a clock pin, the runner hands the live tower to the engine through
+  `adoptSim` when a builder swapped a fresh `Simulation` into `game.sim`
+  (which the host never sees) or edited the hosted instance past the relay (a
+  structural difference between the instance's own save and the engine's),
+  puts back what `adoptSim` resets (the frame-loop latches, the log cursor and
+  panel, the selection), lets a fresh tower's owed hour pass run on the engine
+  when the clock sits on the hour, and fails the scene if the live tower is
+  not hosted. `pgSetClock` pins the hour on the engine's own save; in a running
+  scene the engine is parked one minute short of each boundary the pin crosses
+  (midnight, then the hour) and one relayed minute crosses it, so it runs the
+  day and hour passes the TypeScript leg runs on its next tick. `pgMaskVersion`
+  masks the " · WASM engine" label with the version. Unset, the TypeScript
+  leg is untouched (its render was byte-identical before and after this
+  slice on the host).
+- `playwright.config.ts`: `PW_WASM_VISUAL=1` lets the `chromium-wasm` project
+  run `visual.spec.ts` against the `chromium` baseline files, never writes a
+  snapshot (`updateSnapshots: "none"`), and refuses `--update-snapshots`.
+- `pr-drift-check.yml`: a `capture-wasm` leg runs the reusable capture
+  (`screenshot-capture.yml`, new `engine` input; artifacts, the diff evidence
+  and the concurrency group are keyed by engine, and the engine leg uploads
+  what rendered even when a scene fails, marked `.render-failed`).
+  `engine-parity` compares that render byte for byte with the TypeScript
+  render of the same run (the committed gallery whenever `drift-gate` is
+  green, so a PR that changes rendering is not read as an engine
+  difference), fails on any difference, and prints the first differing shot
+  plus the full list. `engine-parity-visual` runs the visual specs on the
+  engine against the committed baselines on every render-affecting PR.
+- `update-visual-baselines.yml`: an `engine-parity` job runs the visual specs
+  on the engine after the mint, against the baselines it left on the tip.
+- `CONTRIBUTING.md` (Testing & coverage, the screenshot regeneration section)
+  documents the two legs.
+
+No threshold moved, nothing rendered on this machine was committed, and no
+version bump (nothing changes for a player on the default engine).
+
+Departures from the brief, for the owner to accept:
+
+- **Separate jobs instead of matrix legs.** The brief asked for the engine run
+  as a second matrix leg. In `pr-drift-check` a matrix entry on `capture`
+  would make a scene that cannot render on the engine (or a nondeterministic
+  engine render) fail `capture`, and with it the required `drift-gate`, on
+  every render PR until the flip. In `update-visual-baselines` a matrix entry
+  on `update` would share its write token. The engine legs are their own jobs
+  with read-only tokens; they report, and `drift-gate` stays the TypeScript
+  engine's.
+- **The gallery leg compares against the same run's TypeScript render.** The
+  brief said "the same committed gallery". On a same-repo PR the two are
+  identical whenever `drift-gate` is green (a fork PR passes `drift-gate` with
+  drift, so there they can differ); while a render PR waits on
+  `commit-on-approval`, the committed gallery is stale and would flag every
+  changed shot as an engine difference.
+- **Some setup reaches the engine through a load.** The brief allows relayed
+  commands or a TypeScript-only skip. On the WASM project `buildToStar`'s
+  fixture, the staged autosave in `integration.spec.ts` and the gallery's
+  handoffs reach the engine as a save the app adopts (the load path a player's save takes), because no
+  command sets occupancy, a pending choice, or the clock. Presentation pins on
+  a paused read model (the visual spec's clock and weather, `crowdCull`'s
+  seeded people) stay direct writes, since no engine state is involved. These
+  specs run on both projects and are not in the TypeScript-only table.
+- **The gallery engine leg starts red for known harness reasons.** Until the
+  engine takes a clock command (#899), a load drops the crowd and cannot
+  replay every pass the TypeScript leg owes, so shots with people (and a few
+  pinned-clock shots) differ for a reason other than the engines disagreeing,
+  and `27-elevator-schedule` cannot render on the engine (below). The leg is
+  not a required check; its list is the parity report, with those causes to
+  rule out first.
+
+Known harness differences on the engine legs (tracked as
+`engine-gallery-clock-handoff`, #899): a load drops the crowd, so a shot
+taken after a handoff or a clock pin shows the people the engine spawned
+since, while the TypeScript leg keeps its crowd; a load also marks every owed
+pass done, so an off-hour hour pass or a day pass, a fresh builder tower's
+first rent and maintenance, and (for a clock pin across midnight to another
+hour) the hour pass run differently on the two legs. One read-model gap, added to the
+`engine-rs-binding-read-model` row (#868):
+`27-elevator-schedule` cannot render on the engine, since its builder seeds
+`elevatorHourly` (the measured ridership curve), which no save carries and no
+command sets, so the Modern advice line never appears.
+
+The vitest twins of these specs (the slice 1 bucket (d) tests) moved onto
+relayed commands or `itTypeScriptOnly` in slice 2; this slice touches no
+`src/tests/` file.
+
+### TypeScript-only on `chromium-wasm`
+
+Every skip goes through `tsOnlyOnWasm(reason)` (grep `tsOnlyOnWasm(`).
+
+| Spec | Test | Reason |
+| --- | --- | --- |
+| `e2e/regions.spec.ts` | regions compose settled rooms, animate fires privately, and drain on budget | It toggles one office between fire and empty in place to pin the per-sync region move; no relayed command douses a fire, and a load would rebuild every region instead. The renderer mechanism it pins does not depend on the engine. |
+| `e2e/perf.spec.ts` | ui.update cost, end-to-end speed, and node identity clear the committed baseline | `e2e/perf/baseline.json` was measured on the TypeScript engine, so the WASM engine has no baseline to clear yet (`wasm-perf-baseline`, #900). |
+
+### Results
+
+Gates on this machine (2026-10-09, after the rebase onto slice 2):
+`npm run typecheck`, `npm run lint`, `npm test` (292 files, 4,235 passed, 67
+skipped) and `VC_TOOLING=1 npm run build` pass; Playwright
+`--project=chromium` passes 31 of 31, and `--project=chromium-wasm` passes 19
+with 2 skipped (the two TypeScript-only tests above).
+
+Host-browser preview only (not the pinned image, so not a CI result and
+nothing committed):
+
+- The TypeScript leg of the gallery renders byte-identically to the base
+  branch (0 of 91 shots changed), and so do the 10 visual specs.
+- The WASM engine matches all 10 visual baselines on the host.
+- The WASM gallery matches the TypeScript render in 50 of 91 shots. 40 differ
+  and `27-elevator-schedule` does not render (the #868 gap). In the shots
+  inspected, the tower, stats and chrome agree and the differences are the
+  moving layer (people and car positions), which the known crowd and pass
+  gaps (#899) explain; the CI legs give the authoritative list.
+
+CI results, first run on PR #904 (head `fe94c30`, before the perf fix):
+
+- `engine-parity`: 41 shots differ between the engines. 38 differ in pixels
+  (`03-tower-day` through `26-night-rooms`; `features/install-affordance-*`,
+  `lobby-awning-*`, `metro-*`, `overlay-congestion/occupancy/satisfaction`,
+  `stats-dialog-demand`, `stats-income-elevators`, `stats-tenancy-classic`,
+  `tablet-*`; `milestones/tower`), the same list as the host preview, and 3
+  are missing on the engine (`27-elevator-schedule`, `27b`, `27c`).
+- `capture-wasm / shoot (features)` fails on those three scenes. `27` is the
+  #868 gap; without its advice line the dialog is shorter, and in the pinned
+  image's fonts `27b` and `27c` then fall under their below-the-fold guard.
+  The other three shards render.
+- `drift-gate` and `verify-drift`: green (no TypeScript drift).
+- `e2e`: all 49 tests pass, and the perf gate failed (`ui.update` median
+  1.39 ms against 0.65 ms), fixed by keeping `buildToStar`'s in-place build
+  on the TypeScript engine (above); after the fix the local median is
+  0.37 ms, the base's own figure, and both projects pass again (31; 19 with
+  2 skipped), with the TypeScript visual specs unchanged.
+
+CI results, second run on PR #904 (head `3a6c77f`, with the perf fix):
+
+- `e2e`: green, perf gate included.
+- `engine-parity-visual`: green. The 10 visual specs render on the engine
+  against the committed `chromium` baselines with no pixel difference.
+- `engine-parity`: the same 41 shots as the first run (38 pixel diffs, 3
+  missing), and `capture-wasm / shoot (features)` fails on the same three
+  `27*` scenes.
+- `drift-gate`, `verify-drift`, `test`, `engine-rs`, `disc-rs`: green.
+
+### Review record
+
+`/bmad-code-review` (Blind Hunter, Edge Case Hunter, Acceptance Auditor) on the
+full branch diff; no file under `src/engine` or `src/wasmhost` changed, so no
+`/gds-code-review`.
+
+| Round | Patch | Defer | Dismissed | Notes (counts after round 1 are approximate) |
+| --- | --- | --- | --- | --- |
+| 1 | 20 | 2 | 12 | compare the engines on the same run; engine visual leg on PRs; handoff catches in-place edits; owed hour pass; relayed builds checked; TOWER guards. Defers: #899, #900 |
+| 2 | ~21 | 0 | ~13 | fail closed in the parity jobs; wider edit check with post-handoff verification; clock pin paths; departures 3 and 4 recorded; #899 widened |
+| 3 | ~9 | 0 | ~6 | the frame loop's own blocking test; known lag kept out of the edit check; shards compared past a missing one; #868 row noted |
+| 4 | 5 | 0 | 3 | missing shards kept out of the parity list; a missing baseline named; mint-failed message |
+| 5 | 3 | 0 | 2 | optional fields normalized across both saves; no-compare summary wording |
+| 6 | 0 | 0 | 3 | confirming pass on the round-5 delta: clean |
+| 7 | 0 | 0 | 2 | confirming pass on the full diff: clean |
+| 8 | 4 | 0 | ~6 | the CI perf-gate fix (in-place build on the TypeScript engine) and its doc follow-ups; #905 filed |
+
+Copilot review: requested on the PR (Codex is out of quota).

@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { buildToStar, fitCamera } from "./helpers";
+import { buildToStar, engineSave, expectEngineHosted, fitCamera, WASM_PROJECT } from "./helpers";
+
+// On chromium-wasm every test must end with its tower still on the engine.
+test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
  * Integration coverage for the two files kept OUT of the vitest unit set because
@@ -46,6 +49,7 @@ test.describe("app integration — main.ts + TowerEngine boot/render boundary", 
     await page.evaluate(() => document.getElementById("splash")?.remove());
     const reached = await page.evaluate(buildToStar, 3);
     expect(reached).toBe(3);
+    await expectEngineHosted(page);
 
     // Frame the tower so TowerEngine reconciles the built world to the canvas,
     // and let several frames render.
@@ -70,29 +74,52 @@ test.describe("app integration — main.ts + TowerEngine boot/render boundary", 
   // tested (same reason resolveBootScreen was extracted). It fails on the pre-fix
   // code (the modal surfaces over the splash) and passes with the `!splashUp` guard.
   test("does not surface an emergency over the splash (no sim mutation behind the title screen)", async ({ page }) => {
+    // Stage the returning player for real: write an autosave whose tower carries
+    // a pending bomb threat (the shape EventSystem serializes), then reload so
+    // boot loads it behind the title screen. A load is how a save's state reaches
+    // the WASM engine, so on chromium-wasm the engine holds the emergency too.
     await page.goto("/");
-    // The app boots with no save, so the first-run splash IS present on load; wait
-    // for the wired sim AND the splash together.
-    await page.waitForFunction(() => {
-      const g = (window as unknown as { game?: { sim?: unknown } }).game;
-      return Boolean(g?.sim) && Boolean(document.getElementById("splash"));
+    await page.waitForFunction(() => Boolean((window as unknown as { game?: { saveLoad?: unknown } }).game?.saveLoad));
+    await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const g = (window as any).game;
+      const Sim = g.sim.constructor;
+      const s = Sim.deserialize(JSON.parse(JSON.stringify(g.sim.serialize())));
+      s.events.pending = {
+        kind: "bombThreat",
+        cost: 300_000,
+        message: "TEST bomb threat: pay the ransom or have Security search the tower.",
+      };
+      // SaveLoad writes the app's current tower, so lend it the staged one for
+      // the one synchronous write and put the live tower straight back.
+      const live = g.sim;
+      g.sim = s;
+      try {
+        g.saveLoad.save(true);
+      } finally {
+        g.sim = live;
+      }
     });
+    await page.reload();
+    // A returning player's boot shows the title screen over the loaded tower;
+    // wait for the wired sim AND the splash together.
+    await page.waitForFunction(() => {
+      const g = (window as unknown as { game?: { sim?: { pendingChoice?: unknown } } }).game;
+      return Boolean(g?.sim?.pendingChoice) && Boolean(document.getElementById("splash"));
+    });
+    await expectEngineHosted(page);
+    if (test.info().project.name === WASM_PROJECT) {
+      expect((await engineSave(page))?.events?.pending).toMatchObject({ kind: "bombThreat", cost: 300_000 });
+    }
 
     const splash = page.locator("#splash");
     const modal = page.locator("#modal");
     await expect(splash).toBeVisible();
 
-    // Inject a pending emergency straight into the live sim (the shape a loaded
-    // save restores). The app is already paused behind the splash.
-    const moneyBefore = await page.evaluate(() => {
-      const g = (window as unknown as { game: { sim: { money: number; events: { pending: unknown } } } }).game;
-      g.sim.events.pending = {
-        kind: "bombThreat",
-        cost: 300_000,
-        message: "TEST bomb threat: pay the ransom or have Security search the tower.",
-      };
-      return g.sim.money;
-    });
+    // The app is already paused behind the splash.
+    const moneyBefore = await page.evaluate(
+      () => (window as unknown as { game: { sim: { money: number } } }).game.sim.money,
+    );
 
     // Give the ~6Hz surfacing loop several cycles to (wrongly) fire. With the
     // guard, the emergency modal stays closed the whole time the splash is up.

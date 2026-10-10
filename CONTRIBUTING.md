@@ -218,6 +218,16 @@ A plain host `npm run screenshots` is still preview-only because host Chromium
 and font rasterization may differ from the pinned image. See
 [`docs/screenshots.md`](./docs/screenshots.md) for the workflow details.
 
+Both checks run on two engines. The committed gallery and baselines are the
+TypeScript engine's, and engine legs render the same scenes with the WASM engine
+hosting the tower (`VC_SHOT_ENGINE=wasm` for `scripts/screenshots.ts`,
+`PW_WASM_VISUAL=1 npx playwright test e2e/visual.spec.ts --project=chromium-wasm`
+for the baselines): `pr-drift-check` compares the engine's gallery with the same
+run's TypeScript render (`engine-parity`) and the engine's visual specs with the
+committed baselines (`engine-parity-visual`), and `update-visual-baselines`
+repeats the visual comparison after a mint. Any pixel difference fails the leg
+as an engine parity finding to report; the engine legs never commit or mint.
+
 ### Coverage floors
 
 Coverage is enforced as a **ratchet**, not a vanity number. It can't rot below
