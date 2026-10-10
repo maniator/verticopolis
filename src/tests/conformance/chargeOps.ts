@@ -35,9 +35,11 @@ export function applyCharge(e: ScenarioEngine, c: ChargeCommand): void {
   const at = `@ ${c.floor},${c.x}`;
   const before = e.money();
   const r = run(e, c);
-  expectCharge(r, c.reason, `${c.op} ${at}`);
+  // Same order as the Rust runner's `expect_charge`: the money first.
   const moved = e.money() - before;
   if (moved !== r.delta) throw new Error(`${c.op} ${at}: the balance moved ${moved} but the command reported ${r.delta}`);
+  if (!r.ok && r.delta !== 0) throw new Error(`${c.op} ${at}: refused but reported a delta of ${r.delta}`);
+  expectCharge(r, c.reason, `${c.op} ${at}`);
 }
 
 function run(e: ScenarioEngine, c: ChargeCommand): ChargeOutcome {

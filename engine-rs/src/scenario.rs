@@ -530,6 +530,12 @@ fn expect_charge(
             r.delta
         ));
     }
+    if !r.ok && r.delta != 0.0 {
+        return Err(format!(
+            "{what}: refused but reported a delta of {}",
+            r.delta
+        ));
+    }
     let Some(want) = reason else {
         return expect_ok(r.ok, false, what, r.reason.as_deref());
     };
@@ -1191,6 +1197,16 @@ mod tests {
                 .unwrap_err()
                 .contains("failed with Not enough money., expected Other.")
         );
+        assert!(super::expect_charge(&paid, &None, "a", -2.0)
+            .unwrap_err()
+            .contains("the balance moved -2 but the command reported -1"));
+        let refused_but_billed = ChargeResult {
+            delta: -5.0,
+            ..refused.clone()
+        };
+        assert!(super::expect_charge(&refused_but_billed, &want, "a", -5.0)
+            .unwrap_err()
+            .contains("refused but reported a delta of -5"));
     }
 
     #[test]

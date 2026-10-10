@@ -279,7 +279,7 @@ impl Simulation {
         }
     }
 
-    /// `sellAt(floor, x)`: bulldoze whatever stands at a tile, a room before
+    /// `sellAt(floor, x)`: sell whatever stands at a tile, a room before
     /// the shaft or floor beneath it, then the shaft, then the floor tile.
     /// The refund and the refusals are `remove_facility`'s.
     pub fn sell_at(&mut self, floor: i64, x: i64) -> bool {

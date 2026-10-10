@@ -218,7 +218,7 @@ export function buildTransport(sim: Simulation,
   return { ok: true };
 }
 
-/** Bulldoze whatever stands at a tile for a partial refund: a room before
+/** Sell whatever stands at a tile for a partial refund: a room before
  *  the shaft or floor beneath it, then the shaft, then the floor tile. The
  *  refund and the refusals are {@link removeFacility}'s, the one removal path
  *  the editor and the bulldozer share. */

@@ -15,6 +15,9 @@ import type { Transport } from "../types";
  *
  * Refusal reasons are player-facing copy, worded as the web editor shows
  * them. The Rust engine mirrors this file in `engine-rs/src/charges.rs`.
+ * Gameplay events (PR #903) report from the tower edits these commands make;
+ * a removal's `facility_removed` belongs in {@link removeFacility}, with its
+ * method, once that catalog lands.
  */
 
 /** What a charged command did. `delta` is the signed change it made to the
@@ -94,7 +97,9 @@ export function removeCar(sim: Simulation, id: number): ChargeResult {
  * price (see `Tower.resizeTransport`). Refused with "Not enough money." when
  * the request reached past the high-water mark and the balance paid for no
  * floor of it, and with the tower's reason when the new span does not fit.
- * A request that changes nothing succeeds with nothing billed.
+ * A request that changes nothing succeeds with nothing billed. A request the
+ * budget pays only part of succeeds as far as it got: read the ends from the
+ * result, not from the request.
  */
 export function extendTransport(sim: Simulation, id: number, end: "up" | "down", targetFloor: number, hwm?: { bottom: number; top: number }): ExtendResult {
   const t = elevator(sim, id, ONLY_ELEVATOR_EXTEND);

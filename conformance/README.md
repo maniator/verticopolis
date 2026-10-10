@@ -102,6 +102,10 @@ Commands run in order. Units and shafts are named by a tile they cover
 | `adjustRent` | `floor`, `x`, `dir` (`1` or `-1`) | Step a unit's rent. |
 | `setNoRate` | `floor`, `x` | Set a unit to no rate (the Classic price ladder only). |
 | `setCars` | `floor`, `x`, `cars` | Set the car count of the shaft at that tile. |
+| `addCar` | `floor`, `x`, `reason?` | Buy a car for the elevator at that tile through the engine's charge (`addCar`). |
+| `removeCar` | `floor`, `x`, `reason?` | Sell a car back for half the add-car cost (`removeCar`). |
+| `extendTransport` | `floor`, `x`, `end`, `targetFloor`, `hwmBottom?`, `hwmTop?`, `reason?` | Move the `up` or `down` end of the elevator at that tile to `targetFloor`, billed per floor past the high-water mark and clamped to the budget (`extendTransport`). `hwmBottom` and `hwmTop` go together; without them the mark is the shaft's current span. |
+| `removeFacility` | `floor`, `x`, `method`, `shaft?`, `reason?` | `sell` or `bulldoze` the unit at that tile (the shaft with `shaft: true`) through the engine's removal command, which pays the refund (`removeFacility`). |
 | `setSchedule` | `floor`, `x`, `schedule` | Author the elevator schedule of the shaft at that tile (`Tower.setSchedule`), hardened the way a loaded one is; `{}` clears it. An error on a shaft that is not an elevator. |
 | `startFire` | | Start a fire at once: `EventSystem.startFire`, with no hourly roll and no fire-rescue choice. |
 | `bombThreat` | | Run a bomb threat at once: `EventSystem.bombThreat`, which charges the sweep when the tower has Security and detonates when it has none, with no ransom choice. |
@@ -122,7 +126,11 @@ Commands run in order. Units and shafts are named by a tile they cover
 
 A command that fails is an error, and so is a build that succeeds when
 `expectFail` is set, a rent step that leaves the rent where it was, a car
-count the shaft clamps, and a `startFire` that sets nothing alight.
+count the shaft clamps, and a `startFire` that sets nothing alight. The four
+charge ops (`addCar`, `removeCar`, `extendTransport`, `removeFacility`) must
+land, or, when `reason` is given, be refused with exactly that copy; either
+way the balance must move by exactly the `delta` the command reports, and a
+refusal must report a delta of 0.
 
 A scenario is refused before it runs if it is not an object, if `commands` is
 not a list of objects, if it has an unknown op or an unknown field anywhere

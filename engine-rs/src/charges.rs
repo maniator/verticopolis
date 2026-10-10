@@ -268,7 +268,9 @@ impl Simulation {
     /// `removeFacility(id, method)`: the player's removal of a unit or a
     /// shaft, paying half the build cost back (nothing for a gutted unit).
     /// Refused for a burning unit and for structure the tower keeps; the last
-    /// Wedding Hall gone before the VIP's inspection cancels the visit.
+    /// Wedding Hall gone before the VIP's inspection cancels the visit. Units
+    /// and shafts take ids from the tower's one `next_id`, so `id` names
+    /// exactly one of them.
     pub fn remove_facility(&mut self, id: i64, method: RemovalMethod) -> ChargeResult {
         if let Some(u) = self.tower.get_unit(id) {
             let (kind, state) = (u.kind, u.state);

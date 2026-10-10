@@ -15,7 +15,7 @@ must reproduce every pinned checkpoint hash (`expected.json`) byte for byte.
 | `rng.rs`, `jsmath.rs`, `canonical.rs` | `rng.ts`, JavaScript number semantics, the conformance hash |
 | `clock.rs`, `rules.rs`, `facilities.rs`, `econ.rs` | `Clock.ts`, `calendar.ts`, `ruleSets.ts`, `gameRules.ts`, `facilitiesData.ts`, `facilities.ts`, `facilityCaps.ts`, `facilityPredicates.ts`, `residentialRentals.ts`, `retailSubtypes.ts`, `tower/towerTopology.ts`, `econConfig.ts`, `pricing.ts`, `sim/constants.ts` |
 | `tower.rs`, `tower_query.rs`, `schedule.rs` | `Tower.ts`, `tower/*.ts`, `census.ts`, `elevatorSchedule.ts` |
-| `build.rs`, `rent.rs` | `sim/build.ts`, `sim/rent.ts` |
+| `build.rs`, `rent.rs`, `charges.rs` (`charges_tests.rs`) | `sim/build.ts`, `sim/rent.ts`, `sim/charges.ts` (`sim/charges.test.ts`) |
 | `dispatch.rs` | `ElevatorDispatch.ts` |
 | `crowd/` | `Crowd.ts`, `crowd/*.ts` |
 | `sim_loop.rs`, `presence.rs`, `satisfaction.rs`, `demand.rs`, `churn.rs`, `star.rs`, `services.rs` | `sim/loop.ts`, `sim/presence.ts`, `sim/congestion.ts`, `sim/satisfaction*.ts`, `sim/gripe.ts`, `sim/demand.ts`, `sim/churn.ts`, `households.ts`, `sim/star.ts`, `milestones.ts`, `sim/services.ts`, `sim/events.ts` |

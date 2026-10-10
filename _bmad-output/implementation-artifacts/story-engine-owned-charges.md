@@ -48,7 +48,10 @@ frontend relays engine commands and never copies the money rules.
   with no change. In Rust the commands call the tower directly; once #903 lands
   they switch to `Simulation::set_cars` / `resize_transport`, and
   `removeFacility` can emit `facility_removed` with its method (closing #901's
-  gap: the bulldozer's removals now go through an engine command).
+  gap: the bulldozer's removals now go through an engine command). #903 also
+  pushes `facility_removed` from the three branches of the TypeScript `sellAt`,
+  which this change folds into `removeFacility`; whichever lands second moves
+  that push into `removeFacility` (both engines) and resolves the conflict.
 
 ## Review Findings
 
@@ -63,3 +66,12 @@ frontend relays engine commands and never copies the money rules.
 - [x] [Review][Patch] Misleading budget-clamp comment [engine-rs/src/charges.rs]; weak dual-run assertions [dualRunEdits.integration.test.ts]; no note on how the commands meet #903's wrappers [engine-rs/src/charges.rs].
 - [x] [Review][Defer] Charge-command arguments are trusted at the boundary (NaN or fractional floors and marks, unknown enum strings, an inflated caller mark) [charges.ts, wasm.rs]: deferred, the same trust every relayed command has today. Row `charge-command-input-trust` (#923).
 - Dismissed (10): NaN money (not a reachable state); an over-cap shaft selling several cars (load clamps cars in both engines); an empty undo step after a tower-refused extend (unchanged from before); comparing the refusal copy to pick the UI feedback; the `"ok" in t` narrowing; the `sellAt` room rule (`is_structural` is exactly floor or lobby); the extend's free floor (watch row #346); `null` hwm pairing (both loaders reject null first); the version bump (the only changed feedback is behind disabled buttons); `Simulation.ts` re-export collapse (the same change #903 makes).
+
+### Round 2 (confirming pass on the round-1 fixes)
+
+- [x] [Review][Patch] A refused charge op was not held to a zero delta, and the TS runner's delta check had no test; the Rust mismatch case meant for round 1 had not landed [chargeOps.ts, scenario.rs]: both runners check the money first, then a refusal's zero delta, then the copy; `chargeOps.test.ts` and the Rust test drive each branch.
+- [x] [Review][Patch] `conformance/README.md` did not list the four ops or the delta rule; `engine-rs/README.md` did not map `charges.rs`.
+- [x] [Review][Patch] Doc fixes: `sellAt` called itself a bulldoze in both engines; the shared id counter was unstated in Rust; `charges.ts` lacked the #903 event note; `extendTransport` did not say a part-paid request succeeds as far as it got; an unexplained money poke in the dual-run test.
+- [x] [Review][Patch] No Rust test of `sell_at` on a burning room [charges_tests.rs].
+- [x] [Review][Patch] The story did not name the TypeScript `sellAt` conflict with #903; the #346 row named a TS-only method for both engines.
+- Dismissed (8): a double relay through the mirror (the depth guard is verified, and the dual-run edits test runs in CI under `VC_REQUIRE_WASM=1`); `sellAt` now consulting `removalReason` for rooms (it only ever refuses floor and lobby tiles); `setCars` refusing for some other reason (it only refuses a clamp to the same count); the drag mark holding the old sim until the next drag; undo captures left open on early returns (the existing pattern, a no-op later); import order (lint is clean); syncing #346's issue body (informational); the two runners' check order (now the same).

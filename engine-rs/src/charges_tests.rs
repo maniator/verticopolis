@@ -239,6 +239,15 @@ fn remove_facility_cancels_the_vip_with_the_last_wedding_hall() {
 }
 
 #[test]
+fn sell_at_refuses_a_burning_room() {
+    let (mut sim, office, _, _) = fixture();
+    sim.tower.get_unit_mut(office).unwrap().state = UnitState::Fire;
+    assert!(!sim.sell_at(2, 20));
+    assert!(sim.tower.get_unit(office).is_some());
+    assert_eq!(sim.money, 1_000_000.0);
+}
+
+#[test]
 fn sell_at_pays_through_remove_facility() {
     let (mut sim, office, _, stairs) = fixture();
     sim.tower.get_unit_mut(office).unwrap().state = UnitState::Gutted;

@@ -47,7 +47,7 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(sim.removeCar(shaft.id)).toEqual({ ok: true, delta: carResaleRefund() });
     expect(shaft.cars).toBe(2);
     expect(sim.tower.setCars(shaft.id, shaft.cars > 1 ? shaft.cars - 1 : 2)).toBe(true); // the raw edit stays free
-    sim.money += 1000;
+    sim.money += 1000; // a host's direct write is still mirrored as setMoney
     expect(sim.tower.setStop(shaft.id, 35, false)).toBe(true);
     expect(sim.tower.clearStops(shaft.id)).toBe(true);
     expect(sim.tower.setSchedule(shaft.id, { weekday: Array(24).fill(2), weekend: Array(24).fill(1) })).toBe(true);
