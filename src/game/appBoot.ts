@@ -341,6 +341,10 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     // READABILITY, not mere presence, so the splash only promises "Continue"
     // when a real tower sits behind it, never over a fresh boot sim.
     const hasSave = app.hadReadableSave;
+    // With no save the boot tower is only the title screen's backdrop, and the
+    // player's own tower comes from New Tower: the backdrop's events (its
+    // founding first) are left behind when that tower takes over.
+    if (!hasSave) app.sim.gameplayEvents.discardOnHandOff = true;
     app.onboarding.showSplash({
       hasSave,
       // The splash mute is a second view of the ONE persisted master mute

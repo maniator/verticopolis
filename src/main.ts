@@ -448,11 +448,11 @@ class GameApp implements GameAppPorts {
   adoptSim(sim: Simulation, preserveHistory = false): void {
     // Undo/redo restore (the only preserveHistory path) keeps the live bridging toggle: it's a SETTING, not a build step, so undoing a BUILD must not flip it.
     if (preserveHistory) sim.autoBridge = this.sim.autoBridge;
+    sim.gameplayEvents.inherit(this.sim.gameplayEvents); // what the replaced tower still owed, and its drop count
     this.sim = sim;
     this.clearSelection();
-    // Facility ids restart in a fresh tower. A stale ✕-latch (or anchor)
-    // from the old tower would silently mute the inspector on whichever new
-    // facility happens to reuse the id.
+    // Facility ids restart in a fresh tower. A stale ✕-latch (or anchor) from the old tower
+    // would silently mute the inspector on whichever new facility happens to reuse the id.
     this.inspector.clear();
     // A live Getting Started session must follow the swap, or it keeps
     // ticking the abandoned sim and teaches that tower's next step.
