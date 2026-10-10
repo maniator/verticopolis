@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
+import { GRID, TOWER_POPULATION, FACILITIES } from "../../engine/facilities";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
+
+/** The parity projects skip these (story-engine-test-parity, #878). */
+const V1_MODEL = "sets simModel = \"v1\", the sampled model the engine never ported and the save does not carry";
 
 const W = GRID.width;
 const C = Math.floor(W / 2);
@@ -130,7 +134,7 @@ describe("F15 / Step 3 — service coverage radius (v2): placement matters", () 
     expect(far).toBeCloseTo(0.5, 5); // base only — neither covers floor 100
   });
 
-  itTypeScriptOnly(V1_MODEL)("v1 keeps tower-wide coverage (one station protects everywhere)", () => {
+  it("v1 keeps tower-wide coverage (one station protects everywhere)", () => {
     const sim = tallTower(2);
     sim.simModel = "v1";
     sim.tower.place("security", 2, C);
@@ -180,12 +184,6 @@ describe("F15 / Step 3 — service coverage radius (v2): placement matters", () 
     expect(sim.fireIgnitionChance()).toBeLessThan(bare);
   });
 });
-
-import { TOWER_POPULATION, FACILITIES } from "../../engine/facilities";
-import { itTypeScriptOnly } from "../parity/typescriptOnly";
-
-/** The parity projects skip these (story-engine-test-parity, #878). */
-const V1_MODEL = "sets simModel = \"v1\", the sampled model the engine never ported and the save does not carry";
 
 describe("F2 / Step 5 — honest v2 endgame: a served, well-zoned tower wins under the real hourly clock", () => {
   it("a properly-zoned tower reaches TOWER and does NOT mass-vacate under hourly simulation", () => {

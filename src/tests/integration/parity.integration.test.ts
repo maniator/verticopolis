@@ -1,4 +1,4 @@
-import { describe, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES, GRID, TOWER_POPULATION } from "../../engine/facilities";
 import { itTypeScriptOnly } from "../parity/typescriptOnly";
@@ -50,7 +50,7 @@ describe("Gameplay parity: rating progression & the TOWER win", () => {
     return { sim, topFloor: structTop };
   }
 
-  itTypeScriptOnly(V1_MODEL)("gates stars on population AND the required services", () => {
+  it("gates stars on population AND the required services", () => {
     const { sim, topFloor } = buildTower(12, 13); // ~1,450 residents
     expect(sim.population).toBeGreaterThanOrEqual(1000);
 
