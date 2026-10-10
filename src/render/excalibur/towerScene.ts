@@ -12,6 +12,7 @@ import {
   LOBBY_VARIANTS,
 } from "../sprites";
 import { drawSanta } from "../sprites/events";
+import { CLOUD_COUNT, cloudFill, cloudRadius, cloudSeed, drawCloud, drawSunDisc, skyColor } from "../sprites/sky";
 import { disposeRegions } from "./towerRegions";
 import { clearLongPress } from "./longPress";
 import { SHIRTS } from "../pixelSprites";
@@ -282,23 +283,14 @@ function drawClouds(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   const W = engine.viewWidth;
   const H = engine.viewHeight;
   const t = engine.d.anim;
-  ctx.fillStyle = w === "rain" ? "rgba(86,92,108,0.55)" : "rgba(244,247,255,0.72)";
-  for (let i = 0; i < 5; i++) {
-    const seed = i * 97 + 11;
+  ctx.fillStyle = cloudFill(w);
+  for (let i = 0; i < CLOUD_COUNT; i++) {
+    const seed = cloudSeed(i);
     const speed = 6 + (seed % 7);
     const y = H * 0.1 + ((seed % 100) / 100) * H * 0.22;
     const x = (((seed * 53) % (W + 240)) + t * speed) % (W + 240) - 120;
-    drawCloud(ctx, x, y, 56 + (seed % 44));
+    drawCloud(ctx, x, y, cloudRadius(seed));
   }
-}
-
-function drawCloud(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
-  ctx.beginPath();
-  ctx.arc(x, y, r * 0.5, 0, Math.PI * 2);
-  ctx.arc(x + r * 0.5, y + 4, r * 0.4, 0, Math.PI * 2);
-  ctx.arc(x - r * 0.5, y + 4, r * 0.38, 0, Math.PI * 2);
-  ctx.arc(x, y + 9, r * 0.55, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 function drawSun(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
@@ -309,21 +301,10 @@ function drawSun(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   const arc = day ? ((hour - 6) / 12) * Math.PI : (((hour - 18 + 24) % 24) / 12) * Math.PI;
   const cx = (arc / Math.PI) * engine.viewWidth;
   const cy = engine.viewHeight * 0.62 - Math.sin(arc) * engine.viewHeight * 0.5;
-  ctx.fillStyle = day ? "#fff7c0" : "#eef";
-  ctx.beginPath();
-  ctx.arc(cx, cy, day ? 16 : 11, 0, Math.PI * 2);
-  ctx.fill();
+  drawSunDisc(ctx, cx, cy, day);
 }
 
-export function skyColor(hour: number): string {
-  const t = Math.cos(((hour - 13) / 24) * Math.PI * 2) * 0.5 + 0.5; // 1 at midday
-  const mix = (a: number, b: number) => Math.round(a + (b - a) * t);
-  const r = mix(28, 130);
-  const g = mix(34, 175);
-  const b = mix(70, 224);
-  const hex = (n: number) => n.toString(16).padStart(2, "0");
-  return `#${hex(r)}${hex(g)}${hex(b)}`;
-}
+export { skyColor };
 
 // ---- Engine lifecycle ---------------------------------------------------
 

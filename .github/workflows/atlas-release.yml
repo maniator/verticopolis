@@ -1,0 +1,137 @@
+name: Sprite atlas release
+
+# Builds the sprite atlas archive (scripts/export-atlas.ts, issue #909) for a
+# tag and attaches it to that tag's GitHub release with a SHA-256 checksum, so
+# any frontend on the open engine can fetch the art for the exact commit it
+# pins. Nothing generated is committed. The bake runs inside the pinned
+# Playwright image (the same Chromium the screenshot workflows use), so the
+# pixels and the checksum are reproducible.
+on:
+  push:
+    tags: ["**"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)build the atlas for"
+        required: true
+
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  # Resolve the tag to its commit (a manual run checks out refs/tags/<tag>
+  # explicitly, so a branch of the same name can never stand in for it) and
+  # the Playwright image from that commit's lockfile. A name that is not a tag
+  # fails here, before any container pull or install.
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      image: ${{ steps.pin.outputs.image }}
+      sha: ${{ steps.pin.outputs.sha }}
+      tag: ${{ steps.pin.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', github.event.inputs.tag) || github.ref }}
+          persist-credentials: false
+      - id: pin
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          tagged="$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}" || true)"
+          if [ "$sha" != "$tagged" ]; then echo "HEAD $sha is not tag $TAG ($tagged)."; exit 1; fi
+          ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
+          echo "image=mcr.microsoft.com/playwright:v${ver}-jammy" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: resolve
+    runs-on: ubuntu-latest
+    # A full bake takes about seven minutes; anything near this is a hang.
+    timeout-minutes: 45
+    container:
+      image: ${{ needs.resolve.outputs.image }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      # The image ships an older Node; install the repo's pinned one over it.
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+
+      # git refuses a workspace owned by another user inside the container;
+      # the export reads the commit it records from git.
+      - name: Trust the workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The export launches Playwright's own Chromium from the image (the
+      # binary the e2e comparison uses), checks the atlas against the game's
+      # paint for the sample signatures, bakes, checks the packed pages, and
+      # writes the archive named after the tag.
+      - name: Bake the atlas in the pinned Chromium
+        env:
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: npm run atlas -- --out dist-atlas --label "$TAG"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sprite-atlas
+          path: dist-atlas/
+          if-no-files-found: error
+
+  attach:
+    needs: [resolve, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: sprite-atlas
+          path: dist-atlas
+
+      - name: Check the checksum after the transfer
+        working-directory: dist-atlas
+        run: sha256sum --check ./*.sha256
+
+      - name: Attach to the tag's release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          # Attach to the tag's release, draft or published, replacing any
+          # atlas files a previous run attached (a manual rebuild is how a
+          # maintainer re-bakes a tag on purpose). When the tag has none yet,
+          # open a DRAFT for it: nothing goes public, and nothing becomes the
+          # latest release, until a maintainer publishes it.
+          # The whole list is read before it is inspected, so no early pipe
+          # close can fail the step.
+          has_release() {
+            ids="$(gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.tag_name == env.TAG) | .id')"
+            [ -n "$ids" ]
+          }
+          if ! has_release; then
+            # Another job may open the release between the check and here.
+            gh release create "$TAG" --verify-tag --draft --title "$TAG" --notes "Sprite atlas attached by the atlas release workflow." \
+              || has_release
+          fi
+          gh release upload "$TAG" dist-atlas/*.zip dist-atlas/*.sha256 --clobber
