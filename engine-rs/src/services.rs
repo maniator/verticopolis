@@ -109,6 +109,23 @@ pub(crate) fn with_thousands(x: f64) -> String {
     out
 }
 
+/// The garbage advisory (`nudgeServiceShortfalls` in `sim/services.ts`).
+pub(crate) fn waste_nudge_message(pop: f64, need: f64, have: impl std::fmt::Display) -> String {
+    format!(
+        "♻️ Garbage is piling up: {} population needs {need} Recycling Center{} (you have {have}). 4★ requires demand met.",
+        with_thousands(pop),
+        if need == 1.0 { "" } else { "s" }
+    )
+}
+
+/// The suite-parking advisory (`nudgeServiceShortfalls` in `sim/services.ts`).
+pub(crate) fn suite_nudge_message(suites: f64, spots: impl std::fmt::Display) -> String {
+    format!(
+        "🚗 Hotel suites need a working parking space each: {suites} suite{}, {spots} space(s) chained to a ramp.",
+        if suites == 1.0 { "" } else { "s" }
+    )
+}
+
 pub struct ParkingDemand {
     pub office_pop: f64,
     pub offices: f64,
@@ -175,23 +192,14 @@ impl Simulation {
         if waste_short && !self.waste_nudged {
             let pop = self.tower.total_population();
             let need = (pop as f64 / RECYCLING_POP_PER_CENTER).ceil();
-            let msg = format!(
-                "♻️ Garbage is piling up: {} population needs {} Recycling Center(s) (you have {}). 4★ requires demand met.",
-                pop,
-                need,
-                self.recycling_centers()
-            );
+            let msg = waste_nudge_message(pop as f64, need, self.recycling_centers());
             self.emit(&msg, LogKind::Info);
         }
         self.waste_nudged = waste_short;
         let suite_short = self.star >= 3 && self.suite_parking_short();
         if suite_short && !self.suite_parking_nudged {
             let d = self.parking_demand();
-            let msg = format!(
-                "🚗 Hotel suites need a working parking space each: {} suite(s), {} space(s) chained to a ramp.",
-                d.suites,
-                self.tower.functional_parking_spots()
-            );
+            let msg = suite_nudge_message(d.suites, self.tower.functional_parking_spots());
             self.emit(&msg, LogKind::Info);
         }
         self.suite_parking_nudged = suite_short;
@@ -412,6 +420,27 @@ impl Simulation {
 mod tests {
     use super::*;
     use crate::clock::{CalendarKind, GameMode};
+
+    #[test]
+    fn the_advisories_word_their_counts_as_typescript_does() {
+        // The TypeScript templates with these inputs (sim/services.ts).
+        assert_eq!(
+            waste_nudge_message(1234.0, 1.0, 0),
+            "♻️ Garbage is piling up: 1,234 population needs 1 Recycling Center (you have 0). 4★ requires demand met."
+        );
+        assert_eq!(
+            waste_nudge_message(12345.0, 3.0, 1),
+            "♻️ Garbage is piling up: 12,345 population needs 3 Recycling Centers (you have 1). 4★ requires demand met."
+        );
+        assert_eq!(
+            suite_nudge_message(1.0, 0),
+            "🚗 Hotel suites need a working parking space each: 1 suite, 0 space(s) chained to a ramp."
+        );
+        assert_eq!(
+            suite_nudge_message(4.0, 2),
+            "🚗 Hotel suites need a working parking space each: 4 suites, 2 space(s) chained to a ramp."
+        );
+    }
 
     #[test]
     fn thousands_match_to_locale_string() {
