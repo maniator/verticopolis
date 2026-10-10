@@ -377,7 +377,7 @@ impl Simulation {
                 let u = &self.tower.units[i];
                 rent_of(u.kind, u.rent, u.no_rate)
             };
-            let (price, residents) = if self.mode.is_modern() {
+            let (price, residents) = if self.mode.has_variant_households() {
                 let r = roll_household(&mut self.rng);
                 (household_price(asking, Some(r)), Some(r))
             } else {

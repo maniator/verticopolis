@@ -1,5 +1,5 @@
 import { CLASSIC_HOUSEHOLD, HOUSEHOLD_SIZES } from "./households";
-import { ECON, GUTTED_RESALE_REFUND, carResaleRefund, resaleRefund } from "./econConfig";
+import { ECON, GUTTED_RESALE_REFUND, carResaleRefund, resaleRefund, transportFloorCost } from "./econConfig";
 import {
   ALL_KINDS,
   BUILD_CAPS,
@@ -7,11 +7,12 @@ import {
   GRID,
   MAX_CARS,
   POOLED_CAPS,
+  WEDDING_HALL_FLOOR,
   buildMinutes,
   facilityFloors,
   hasBusinessHours,
+  isAvailableInMode,
   isCommercialKind,
-  isElevatorKind,
   isFixedSpanTransport,
   isHotelKind,
   isOpenAt,
@@ -25,7 +26,7 @@ import { NO_BASEMENT_KINDS, groundFloorStructureKind, isLobbyFloor, isSkyLobbyFl
 import type { FacilityKind, GameMode } from "./types";
 
 export { householdPrice } from "./households";
-export { transportBuildCost } from "./econConfig";
+export { transportBuildCost, transportFloorCost } from "./econConfig";
 
 /**
  * The catalog: every price, size and build rule a frontend reads, resolved for
@@ -40,7 +41,14 @@ export { transportBuildCost } from "./econConfig";
  * descriptions, labels, icons) stays with the frontend. Where a price depends on
  * placement (a shaft's span, a sold condo's household) the catalog carries the
  * formula's inputs, and this module re-exports the function
- * (`transportBuildCost`, `householdPrice`).
+ * (`transportBuildCost`, `householdPrice`). `transportBuildCost` returns NaN
+ * for a span the engine refuses, so a frontend never quotes a placement that
+ * cannot be built.
+ *
+ * Open hours are whole hours by construction: the clock hands `isOpenAt` an
+ * integer hour (`Clock.hour` floors the minute of the day), so the 24 hourly
+ * samples are the whole schedule. A test in the catalog suite pins that no
+ * schedule changes inside an hour.
  *
  * Absent values are `null` (never left out), so the JSON has the same keys in
  * every row and the same shape on both engines.
@@ -106,14 +114,17 @@ export interface CatalogFacility {
    *  (the floor tool lays lobby there). */
   groundFloorKind: FacilityKind | null;
   commercial: boolean;
-  /** The hours (0 to 23) a venue with posted hours is open. */
+  /** The hours (0 to 23) a venue with posted hours is open. Whole hours by
+   *  construction (see the module docs). */
   openHours: number[] | null;
   /** In-game minutes from placement to opening. */
   buildMinutes: number;
   /** What selling a working unit returns (a gutted one returns
    *  `economy.guttedResaleRefund`). */
   resaleRefund: number;
-  /** The per-tower cap, or the shared cap of the pool the kind is in. */
+  /** The per-tower cap, or the shared cap of the pool the kind is in. No kind
+   *  is in both `BUILD_CAPS` and a pool (a test pins it); if one ever were, the
+   *  catalog would need both caps as separate fields. */
   buildCap: number | null;
   /** The pool's name when `buildCap` is shared with other kinds. */
   capPool: string | null;
@@ -125,8 +136,9 @@ export interface CatalogFacility {
   maxCars: number | null;
   /** Transports: riders one car (or one flight) carries per trip. */
   carCapacity: number | null;
-  /** Transports: the price of each floor of span on top of `cost`
-   *  (`transportBuildCost`); zero for a walkway. */
+  /** Transports: the price of each floor of span (top minus bottom) on top of
+   *  `cost` (`transportFloorCost`, which `transportBuildCost` reads); zero for
+   *  a walkway. */
   floorCost: number | null;
   subtypes: string[] | null;
   /** The mode's headline daily take for a commercial venue. */
@@ -198,16 +210,10 @@ function rentFor(rules: GameRules, kind: FacilityKind): CatalogRent | null {
   };
 }
 
-/** The per-floor price a transport adds on top of its base cost: elevators
- *  charge for every floor of span, a walkway charges nothing. */
-function floorCost(kind: FacilityKind): number {
-  return isElevatorKind(kind) ? ECON.transportFloorCost : 0;
-}
-
 function facilityFor(rules: GameRules, kind: FacilityKind): CatalogFacility {
   const f = FACILITIES[kind];
   const pool = POOLED_CAPS.find((p) => p.kinds.includes(kind));
-  const ground = groundFloorStructureKind(kind, 1);
+  const ground = groundFloorStructureKind(kind, GRID.groundFloor);
   const transport = f.transport === true;
   const hours: number[] = [];
   for (let h = 0; h < 24; h++) if (isOpenAt(kind, h)) hours.push(h);
@@ -223,12 +229,12 @@ function facilityFor(rules: GameRules, kind: FacilityKind): CatalogFacility {
     population: f.population,
     attendance: f.attendance ?? null,
     modernOnly: f.modernOnly === true,
-    available: f.modernOnly !== true || rules.mode === "modern",
+    available: isAvailableInMode(kind, rules.mode),
     transport,
     staffOnly: f.staffOnly === true,
     basement: f.basement === true,
     noBasement: NO_BASEMENT_KINDS.has(kind),
-    onlyFloor: kind === "weddingHall" ? GRID.maxFloor : null,
+    onlyFloor: kind === "weddingHall" ? WEDDING_HALL_FLOOR : null,
     groundFloorKind: ground !== kind ? ground : null,
     commercial: isCommercialKind(kind),
     openHours: hasBusinessHours(kind) ? hours : null,
@@ -240,7 +246,7 @@ function facilityFor(rules: GameRules, kind: FacilityKind): CatalogFacility {
     fixedSpan: isFixedSpanTransport(kind),
     maxCars: MAX_CARS[kind] ?? null,
     carCapacity: transport ? transportCarCapacity(kind) : null,
-    floorCost: transport ? floorCost(kind) : null,
+    floorCost: transport ? transportFloorCost(kind) : null,
     subtypes: subtypes ? [...subtypes] : null,
     dailyIncome: rules.commercialDailyIncome(kind) ?? null,
     trafficBaseline: ECON.dailyTrafficIncome[kind] ?? null,
@@ -262,7 +268,7 @@ export function catalogFor(mode: GameMode): Catalog {
       lotWidth: GRID.width,
       minFloor: GRID.minFloor,
       maxFloor: GRID.maxFloor,
-      groundFloor: 1,
+      groundFloor: GRID.groundFloor,
       lobbyInterval: GRID.lobbyInterval,
       lobbyFloors: floors.filter(isLobbyFloor),
       skyLobbyFloors: floors.filter(isSkyLobbyFloor),

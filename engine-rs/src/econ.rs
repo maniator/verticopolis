@@ -59,9 +59,11 @@ pub fn rent_of(kind: Kind, rent: Option<f64>, no_rate: bool) -> f64 {
 /// `ECON.addCarCost`: the price of one more elevator car.
 pub const ADD_CAR_COST: f64 = 40_000.0;
 
-/// `ECON.transportFloorCost`: the price of one served floor on an elevator,
-/// charged per floor of span when the shaft is built and per floor when it
-/// is extended.
+/// `ECON.transportFloorCost`: the price of one floor of span (top minus
+/// bottom) on an elevator, charged per floor of span when the shaft is built
+/// (`transport_build_cost`). The web UI also charges it per floor when a
+/// shaft is extended; no engine code does that yet (#914 moves the extend
+/// charge into the engine).
 pub const TRANSPORT_FLOOR_COST: f64 = 5_000.0;
 
 /// What a gutted unit returns when it is sold: nothing.
@@ -73,14 +75,44 @@ pub fn car_resale_refund() -> f64 {
     (ADD_CAR_COST * 0.5).floor()
 }
 
-/// `transportBuildCost(kind, span)`: what `buildTransport` charges, the base
-/// price plus `TRANSPORT_FLOOR_COST` for every floor of span on an elevator
-/// (a walkway is a flat price).
-pub fn transport_build_cost(kind: Kind, span: i64) -> f64 {
-    let extra = if kind.is_elevator() {
-        span as f64 * TRANSPORT_FLOOR_COST
+/// `transportFloorCost(kind)`: the price one floor of span (top minus
+/// bottom) adds to a transport on top of its base cost, `TRANSPORT_FLOOR_COST`
+/// on an elevator and nothing on a walkway. The one home for that rule:
+/// `transport_build_cost` and the catalog's `floor_cost` both read it.
+pub fn transport_floor_cost(kind: Kind) -> f64 {
+    if kind.is_elevator() {
+        TRANSPORT_FLOOR_COST
     } else {
         0.0
+    }
+}
+
+/// `transportCostForSpan(kind, span)`: the formula `build_transport`
+/// charges, with no check on the span. The build path reads this directly so
+/// its affordability check behaves as before for every request (placement
+/// then refuses a span it cannot build); frontends quote through
+/// `transport_build_cost`.
+pub fn transport_cost_for_span(kind: Kind, span: i64) -> f64 {
+    let per_floor = transport_floor_cost(kind);
+    let extra = if per_floor == 0.0 {
+        0.0
+    } else {
+        span as f64 * per_floor
     };
     kind.facility().cost + extra
+}
+
+/// `transportBuildCost(kind, span)`: what `build_transport` charges for a
+/// shaft of `span` floors (top minus bottom), as a quote a frontend can show.
+/// `f64::NAN` for a placement the engine refuses on span alone: a kind that
+/// is not a transport, a span below 1 or above `max_span`, or a fixed-span
+/// walkway at any span but its one flight.
+pub fn transport_build_cost(kind: Kind, span: i64) -> f64 {
+    if !kind.is_transport() || span < 1 || span > kind.max_span() {
+        return f64::NAN;
+    }
+    if kind.is_fixed_span() && span != kind.max_span() {
+        return f64::NAN;
+    }
+    transport_cost_for_span(kind, span)
 }

@@ -10,27 +10,31 @@
 //! enforces. Presentation (colors, descriptions, labels, icons) stays with
 //! the frontend. Where a price depends on placement (a shaft's span, a sold
 //! condo's household) the catalog carries the formula's inputs and this
-//! module the function.
+//! module the function. `transport_build_cost` returns NaN for a span the
+//! engine refuses, so a frontend never quotes a placement that cannot be
+//! built.
+//!
+//! Open hours are whole hours by construction: the clock hands `is_open_at`
+//! an integer hour (`Clock::hour` floors the minute of the day), so the 24
+//! hourly samples are the whole schedule.
 
 use serde::Serialize;
 
 use crate::canonical::digest;
 use crate::churn::HOUSEHOLD_SIZES;
 use crate::clock::GameMode;
-use crate::econ::{
-    car_resale_refund, classic_ladder, rent_config, ADD_CAR_COST, GUTTED_RESALE_REFUND,
-    TRANSPORT_FLOOR_COST,
-};
+use crate::econ::{car_resale_refund, ADD_CAR_COST, GUTTED_RESALE_REFUND, TRANSPORT_FLOOR_COST};
 use crate::economy::{commercial_daily_income, daily_traffic_income, retail_spend_per_customer};
 use crate::facilities::{
-    build_cap, ground_floor_structure_kind, is_lobby_floor, is_sky_lobby_floor, no_basement, Kind,
-    FACILITIES, LOBBY_INTERVAL, LOT_WIDTH, MAX_FLOOR, MIN_FLOOR, POOLED_CAPS,
+    build_cap, ground_floor_structure_kind, is_available_in_mode, is_lobby_floor,
+    is_sky_lobby_floor, max_cars_entry, no_basement, Kind, FACILITIES, GROUND_FLOOR,
+    LOBBY_INTERVAL, LOT_WIDTH, MAX_FLOOR, MIN_FLOOR, POOLED_CAPS, WEDDING_HALL_FLOOR,
 };
-use crate::rent::{price_neutral, price_options};
+use crate::rent::{price_options, PriceOptions};
 use crate::rules::CLASSIC_HOUSEHOLD;
 
 pub use crate::churn::household_price;
-pub use crate::econ::transport_build_cost;
+pub use crate::econ::{transport_build_cost, transport_floor_cost};
 
 /// The rung labels of the Classic ladder, in rung order.
 const RUNG_LABELS: [&str; 4] = ["Very Low", "Low", "Average", "High"];
@@ -75,13 +79,16 @@ pub struct CatalogFacility {
     pub ground_floor_kind: Option<&'static str>,
     pub commercial: bool,
     /// The hours (0 to 23) a venue with posted hours is open, else null.
+    /// Whole hours by construction (see the module docs).
     pub open_hours: Option<Vec<i64>>,
     /// In-game minutes from placement to opening.
     pub build_minutes: f64,
     /// What selling a working unit returns (a gutted one returns
     /// `economy.guttedResaleRefund`).
     pub resale_refund: f64,
-    /// The per-tower cap, or the shared cap of the pool the kind is in.
+    /// The per-tower cap, or the shared cap of the pool the kind is in. No
+    /// kind is in both an individual cap table and a pool (a test pins it);
+    /// if one ever were, the catalog would need both caps as separate fields.
     pub build_cap: Option<i64>,
     /// The pool's name when `build_cap` is shared with other kinds.
     pub cap_pool: Option<&'static str>,
@@ -93,8 +100,9 @@ pub struct CatalogFacility {
     pub max_cars: Option<i64>,
     /// Transports: riders one car (or one flight) carries per trip.
     pub car_capacity: Option<f64>,
-    /// Transports: the price of each floor of span on top of `cost`
-    /// (`transport_build_cost`); zero for a walkway.
+    /// Transports: the price of each floor of span (top minus bottom) on top
+    /// of `cost` (`transport_floor_cost`, which `transport_build_cost` reads);
+    /// zero for a walkway.
     pub floor_cost: Option<f64>,
     pub subtypes: Option<Vec<&'static str>>,
     /// The mode's headline daily take for a commercial venue.
@@ -196,59 +204,51 @@ fn cadence(kind: Kind) -> &'static str {
 
 fn rent(mode: GameMode, kind: Kind) -> Option<CatalogRent> {
     let opts = price_options(mode, kind)?;
-    let default = price_neutral(mode, kind)?;
     let (shape, ladder, band) = match opts {
-        Some(_) => {
-            let values = classic_ladder(kind)?;
-            let rungs = values
-                .iter()
-                .enumerate()
-                .map(|(i, &value)| CatalogRung {
-                    level: i as i64,
-                    label: RUNG_LABELS[i],
+        PriceOptions::Ladder { rungs, .. } => {
+            // A rung's level is its place on the ladder (Very Low is 0).
+            let rungs = (0..)
+                .zip(rungs)
+                .map(|(level, value): (usize, f64)| CatalogRung {
+                    level: level as i64,
+                    label: RUNG_LABELS[level],
                     value,
                 })
                 .collect();
             ("ladder", Some(rungs), None)
         }
-        None => {
-            let c = rent_config(kind)?;
-            (
-                "band",
-                None,
-                Some(CatalogBand {
-                    default: c.default,
-                    min: c.min,
-                    max: c.max,
-                    step: c.step,
-                }),
-            )
-        }
+        PriceOptions::Band(c) => (
+            "band",
+            None,
+            Some(CatalogBand {
+                default: c.default,
+                min: c.min,
+                max: c.max,
+                step: c.step,
+            }),
+        ),
     };
-    let household = (mode.is_modern() && kind == Kind::Condo).then(|| CatalogHousehold {
-        sizes: HOUSEHOLD_SIZES.to_vec(),
-        reference: CLASSIC_HOUSEHOLD,
-    });
+    let household =
+        (mode.has_variant_households() && kind == Kind::Condo).then(|| CatalogHousehold {
+            sizes: HOUSEHOLD_SIZES.to_vec(),
+            reference: CLASSIC_HOUSEHOLD,
+        });
     Some(CatalogRent {
         cadence: cadence(kind),
         shape,
-        default,
-        no_rate: ladder.is_some(),
+        default: opts.neutral(),
         ladder,
         band,
+        no_rate: opts.offers_no_rate(),
         locked_once_sold: kind == Kind::Condo,
         household,
     })
 }
 
-fn available(mode: GameMode, kind: Kind) -> bool {
-    !kind.facility().modern_only || mode.is_modern()
-}
-
 fn facility(mode: GameMode, kind: Kind) -> CatalogFacility {
     let f = kind.facility();
     let pool = POOLED_CAPS.iter().find(|p| p.kinds.contains(&kind));
-    let ground = ground_floor_structure_kind(kind, 1);
+    let ground = ground_floor_structure_kind(kind, GROUND_FLOOR);
     CatalogFacility {
         key: f.key,
         name: f.name,
@@ -260,12 +260,12 @@ fn facility(mode: GameMode, kind: Kind) -> CatalogFacility {
         population: f.population,
         attendance: f.attendance,
         modern_only: f.modern_only,
-        available: available(mode, kind),
+        available: is_available_in_mode(kind, mode),
         transport: f.transport,
         staff_only: f.staff_only,
         basement: f.basement,
         no_basement: no_basement(kind),
-        only_floor: (kind == Kind::WeddingHall).then_some(MAX_FLOOR),
+        only_floor: (kind == Kind::WeddingHall).then_some(WEDDING_HALL_FLOOR),
         ground_floor_kind: (ground != kind).then(|| ground.as_str()),
         commercial: kind.is_commercial(),
         open_hours: kind
@@ -277,15 +277,9 @@ fn facility(mode: GameMode, kind: Kind) -> CatalogFacility {
         cap_pool: pool.map(|p| p.label),
         max_span: f.transport.then(|| kind.max_span()),
         fixed_span: kind.is_fixed_span(),
-        max_cars: kind.is_elevator().then(|| kind.max_cars()),
+        max_cars: max_cars_entry(kind),
         car_capacity: f.transport.then(|| kind.car_capacity()),
-        floor_cost: f.transport.then(|| {
-            if kind.is_elevator() {
-                TRANSPORT_FLOOR_COST
-            } else {
-                0.0
-            }
-        }),
+        floor_cost: f.transport.then(|| transport_floor_cost(kind)),
         subtypes: kind.subtype_list().map(|l| l.to_vec()),
         daily_income: commercial_daily_income(mode, kind),
         traffic_baseline: daily_traffic_income(kind),
@@ -305,7 +299,7 @@ pub fn catalog(mode: GameMode) -> Catalog {
             lot_width: LOT_WIDTH,
             min_floor: MIN_FLOOR,
             max_floor: MAX_FLOOR,
-            ground_floor: 1,
+            ground_floor: GROUND_FLOOR,
             lobby_interval: LOBBY_INTERVAL,
             lobby_floors: floors.clone().filter(|&f| is_lobby_floor(f)).collect(),
             sky_lobby_floors: floors.filter(|&f| is_sky_lobby_floor(f)).collect(),
@@ -369,81 +363,180 @@ mod tests {
         }
     }
 
+    /// Look a row up by its key, the way a frontend reads the catalog.
+    fn row<'a>(c: &'a Catalog, key: &str) -> &'a CatalogFacility {
+        c.facilities
+            .iter()
+            .find(|f| f.key == key)
+            .unwrap_or_else(|| panic!("no catalog row {key}"))
+    }
+
     /// The canon section of CLAUDE.md, as the catalog states it.
     #[test]
     fn catalog_states_the_canon_caps_and_pools() {
         let c = catalog(GameMode::Classic);
-        let row = |k: Kind| &c.facilities[k as usize];
-        for k in [
-            Kind::ElevatorStandard,
-            Kind::ElevatorService,
-            Kind::ElevatorExpress,
-        ] {
-            assert_eq!(row(k).build_cap, Some(24));
-            assert_eq!(row(k).cap_pool, Some("elevator shafts"));
-            assert_eq!(row(k).max_cars, Some(8));
+        for k in ["elevatorStandard", "elevatorService", "elevatorExpress"] {
+            assert_eq!(row(&c, k).build_cap, Some(24));
+            assert_eq!(row(&c, k).cap_pool, Some("elevator shafts"));
+            assert_eq!(row(&c, k).max_cars, Some(8));
         }
-        for k in [Kind::Stairs, Kind::Escalator] {
-            assert_eq!(row(k).build_cap, Some(64));
-            assert!(row(k).fixed_span);
-            assert_eq!(row(k).max_span, Some(1));
-            assert_eq!(row(k).max_cars, None);
+        for k in ["stairs", "escalator"] {
+            assert_eq!(row(&c, k).build_cap, Some(64));
+            assert!(row(&c, k).fixed_span);
+            assert_eq!(row(&c, k).max_span, Some(1));
+            assert_eq!(row(&c, k).max_cars, None);
         }
-        assert_eq!(row(Kind::ElevatorStandard).max_span, Some(30));
-        assert_eq!(row(Kind::ElevatorService).max_span, Some(30));
-        assert_eq!(row(Kind::ElevatorExpress).max_span, Some(109));
-        assert_eq!(row(Kind::Metro).build_cap, Some(1));
-        assert_eq!(row(Kind::Metro).cap_pool, None);
-        assert_eq!(row(Kind::Office).build_cap, None);
+        assert_eq!(row(&c, "elevatorStandard").max_span, Some(30));
+        assert_eq!(row(&c, "elevatorService").max_span, Some(30));
+        assert_eq!(row(&c, "elevatorExpress").max_span, Some(109));
+        assert_eq!(row(&c, "metro").build_cap, Some(1));
+        assert_eq!(row(&c, "metro").cap_pool, None);
+        assert_eq!(row(&c, "office").build_cap, None);
+        assert_eq!(row(&c, "weddingHall").only_floor, Some(WEDDING_HALL_FLOOR));
+        assert_eq!(row(&c, "floor").ground_floor_kind, Some("lobby"));
+    }
+
+    /// The catalog states one cap per kind (`build_cap`, with `cap_pool`
+    /// naming a pool). That holds only while no kind sits in both an
+    /// individual cap table and a pool; if one ever did, the catalog would
+    /// need both caps as separate fields.
+    #[test]
+    fn no_kind_is_in_both_a_cap_table_and_a_pool() {
+        for pool in POOLED_CAPS.iter() {
+            for &k in pool.kinds {
+                assert_eq!(build_cap(k), None, "{k:?}");
+            }
+        }
+    }
+
+    /// Open hours are whole hours by construction: `Clock::hour` is an
+    /// integer, so the 24 hourly samples are the whole schedule.
+    #[test]
+    fn open_hours_cover_every_minute_of_the_day() {
+        let cal = crate::clock::REAL_WORLD;
+        for mode in [GameMode::Classic, GameMode::Modern] {
+            for f in catalog(mode).facilities {
+                let kind = FACILITIES.iter().find(|r| r.key == f.key).unwrap().kind;
+                let Some(listed) = f.open_hours else {
+                    assert!(!kind.has_business_hours(), "{}", f.key);
+                    continue;
+                };
+                let mut open: Vec<i64> = Vec::new();
+                for m in 0..1440 {
+                    let hour = crate::clock::Clock::new(1440.0 + m as f64, cal).hour();
+                    if kind.is_open_at(hour) && !open.contains(&hour) {
+                        open.push(hour);
+                    }
+                }
+                assert_eq!(open, listed, "{}", f.key);
+            }
+        }
     }
 
     #[test]
     fn rent_resolves_per_mode() {
         let classic = catalog(GameMode::Classic);
         let modern = catalog(GameMode::Modern);
-        let condo = classic.facilities[Kind::Condo as usize]
-            .rent
-            .as_ref()
-            .unwrap();
+        let condo = row(&classic, "condo").rent.as_ref().unwrap();
         assert_eq!(condo.shape, "ladder");
         assert_eq!(condo.default, 150_000.0);
         assert!(condo.no_rate && condo.household.is_none());
-        let condo = modern.facilities[Kind::Condo as usize]
-            .rent
+        let labels: Vec<_> = condo
+            .ladder
             .as_ref()
-            .unwrap();
+            .unwrap()
+            .iter()
+            .map(|r| (r.level, r.label))
+            .collect();
+        assert_eq!(
+            labels,
+            vec![(0, "Very Low"), (1, "Low"), (2, "Average"), (3, "High")]
+        );
+        let condo = row(&modern, "condo").rent.as_ref().unwrap();
         assert_eq!(condo.shape, "band");
         assert_eq!(condo.default, 160_000.0);
         assert!(!condo.no_rate);
         assert_eq!(condo.household.as_ref().unwrap().sizes, vec![2, 3, 4, 5]);
         // A Modern-only priced kind has no Classic ladder and is not
         // available there.
-        let fit = &classic.facilities[Kind::FitnessClub as usize];
+        let fit = row(&classic, "fitnessClub");
         assert!(fit.rent.is_none() && !fit.available);
-        assert!(modern.facilities[Kind::FitnessClub as usize].available);
-        assert!(classic.facilities[Kind::Lobby as usize].rent.is_none());
+        assert!(row(&modern, "fitnessClub").available);
+        assert!(row(&classic, "lobby").rent.is_none());
     }
 
-    /// The build path charges what the catalog quotes.
+    const TRANSPORTS: [Kind; 5] = [
+        Kind::ElevatorStandard,
+        Kind::ElevatorService,
+        Kind::ElevatorExpress,
+        Kind::Stairs,
+        Kind::Escalator,
+    ];
+
+    /// The build path charges what the catalog quotes, for every transport
+    /// kind.
     #[test]
     fn transport_cost_matches_the_build_path() {
         let mut sim = crate::sim::Simulation::new_game(7, GameMode::Classic);
         sim.money = 10_000_000.0;
         sim.star = 5;
-        for x in 150..200 {
+        for x in 150..230 {
             for fl in 1..=12 {
-                sim.build(Kind::Floor, fl, x);
+                let r = sim.build(Kind::Floor, fl, x);
+                assert!(r.ok, "floor {fl} @ {x}: {:?}", r.reason);
             }
         }
-        let before = sim.money;
-        let r = sim.build_transport(Kind::ElevatorStandard, 160, 1, 11);
-        assert!(r.ok, "{:?}", r.reason);
-        assert_eq!(
-            before - sim.money,
-            transport_build_cost(Kind::ElevatorStandard, 10)
-        );
+        let shafts = [
+            (Kind::ElevatorStandard, 155, 10),
+            (Kind::ElevatorService, 170, 11),
+            (Kind::ElevatorExpress, 185, 7),
+            (Kind::Stairs, 200, 1),
+            (Kind::Escalator, 215, 1),
+        ];
+        for (kind, x, span) in shafts {
+            let before = sim.money;
+            let r = sim.build_transport(kind, x, 1, 1 + span);
+            assert!(r.ok, "{kind:?}: {:?}", r.reason);
+            assert_eq!(
+                before - sim.money,
+                transport_build_cost(kind, span),
+                "{kind:?}"
+            );
+        }
         assert_eq!(transport_build_cost(Kind::ElevatorStandard, 10), 250_000.0);
         assert_eq!(transport_build_cost(Kind::Stairs, 1), 5_000.0);
         assert_eq!(household_price(160_000.0, Some(5)), 266_667.0);
+    }
+
+    /// Every valid span quotes the formula the build path charges.
+    #[test]
+    fn transport_quote_matches_the_formula_for_every_valid_span() {
+        for kind in TRANSPORTS {
+            for span in 1..=kind.max_span() {
+                assert_eq!(
+                    transport_build_cost(kind, span),
+                    crate::econ::transport_cost_for_span(kind, span),
+                    "{kind:?} {span}"
+                );
+            }
+        }
+    }
+
+    /// A span the engine refuses gets no price.
+    #[test]
+    fn transport_quote_is_nan_for_a_refused_span() {
+        for kind in TRANSPORTS {
+            let max = kind.max_span();
+            for span in [0, -1, max + 1] {
+                assert!(transport_build_cost(kind, span).is_nan(), "{kind:?} {span}");
+            }
+            if kind.is_fixed_span() {
+                assert!(transport_build_cost(kind, 2).is_nan(), "{kind:?}");
+            }
+        }
+        assert!(transport_build_cost(Kind::ElevatorStandard, 31).is_nan());
+        assert!(transport_build_cost(Kind::ElevatorExpress, 110).is_nan());
+        assert!(!transport_build_cost(Kind::ElevatorExpress, 109).is_nan());
+        assert!(transport_build_cost(Kind::Office, 1).is_nan());
     }
 }

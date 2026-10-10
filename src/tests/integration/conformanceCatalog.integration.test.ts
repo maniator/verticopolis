@@ -2,7 +2,18 @@ import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { catalogFor, householdPrice, transportBuildCost } from "../../engine/catalog";
-import { ALL_KINDS, FACILITIES } from "../../engine/facilities";
+import { Clock } from "../../engine/Clock";
+import { transportCostForSpan } from "../../engine/econConfig";
+import {
+  ALL_KINDS,
+  BUILD_CAPS,
+  FACILITIES,
+  POOLED_CAPS,
+  hasBusinessHours,
+  isFixedSpanTransport,
+  isOpenAt,
+  maxSpanFor,
+} from "../../engine/facilities";
 import { Simulation } from "../../engine/Simulation";
 import type { GameMode } from "../../engine/types";
 import { digest } from "../conformance/canonical";
@@ -25,7 +36,11 @@ if (UPDATE && process.env.CI) throw new Error("VC_CONFORMANCE_UPDATE is a local 
 
 const MODES: GameMode[] = ["classic", "modern"];
 type Lock = { catalog: Record<GameMode, string> };
-const lock: Lock | undefined = existsSync(LOCK) ? (JSON.parse(readFileSync(LOCK, "utf8")) as Lock) : undefined;
+// Read the lock only when checking it, so a malformed lock never blocks its
+// own regeneration.
+function readLock(): Lock | undefined {
+  return existsSync(LOCK) ? (JSON.parse(readFileSync(LOCK, "utf8")) as Lock) : undefined;
+}
 const fresh: Partial<Record<GameMode, string>> = {};
 
 describe("catalog conformance", () => {
@@ -48,6 +63,7 @@ describe("catalog conformance", () => {
         fresh[mode] = hash;
         return;
       }
+      const lock = readLock();
       expect(lock, "conformance/catalog.json is missing; regenerate it").toBeDefined();
       expect(Object.keys(lock!.catalog).sort()).toEqual([...MODES].sort());
       expect(hash).toBe(lock!.catalog[mode]);
@@ -80,6 +96,40 @@ describe("catalog conformance", () => {
     expect(row("office").buildCap).toBeNull();
   });
 
+  // The catalog states one cap per kind (`buildCap`, with `capPool` naming a
+  // pool). That holds only while no kind sits in both an individual cap table
+  // and a pool; if one ever did, the catalog would need both caps as separate
+  // fields.
+  it("finds no kind in both BUILD_CAPS and a pool", () => {
+    for (const pool of POOLED_CAPS) {
+      for (const k of pool.kinds) expect(BUILD_CAPS[k], k).toBeUndefined();
+    }
+  });
+
+  // Open hours are whole hours by construction: the clock hands `isOpenAt` a
+  // floored integer hour, so the 24 hourly samples are the whole schedule.
+  it("samples open hours on whole hours, the only hours the clock hands out", () => {
+    for (const minutes of [1, 59.5, 60, 61.25, 719.9, 1439.99, 1440 * 3 + 17.5]) {
+      expect(Number.isInteger(new Clock(minutes).hour)).toBe(true);
+    }
+    for (const mode of MODES) {
+      for (const f of catalogFor(mode).facilities) {
+        if (!hasBusinessHours(f.key)) {
+          expect(f.openHours).toBeNull();
+          continue;
+        }
+        // Walk every minute of a day: the open minutes fall on exactly the
+        // hours the catalog lists.
+        const hours = new Set<number>();
+        for (let m = 0; m < 1440; m++) {
+          const hour = new Clock(1440 + m).hour;
+          if (isOpenAt(f.key, hour)) hours.add(hour);
+        }
+        expect([...hours], f.key).toEqual(f.openHours);
+      }
+    }
+  });
+
   it("resolves rent per mode", () => {
     const classic = catalogFor("classic").facilities.find((f) => f.key === "condo")!.rent!;
     expect(classic).toMatchObject({ shape: "ladder", default: 150_000, noRate: true, band: null, household: null, cadence: "sale" });
@@ -91,15 +141,52 @@ describe("catalog conformance", () => {
     expect(householdPrice(160_000, 5)).toBe(266_667);
   });
 
-  it("quotes what the build path charges for a shaft", () => {
+  it("quotes what the build path charges for every transport kind", () => {
     const sim = Simulation.newGame(7, "classic");
     sim.money = 10_000_000;
     sim.star = 5;
-    for (let x = 150; x < 200; x++) for (let fl = 1; fl <= 12; fl++) sim.build("floor", fl, x);
-    const before = sim.money;
-    expect(sim.buildTransport("elevatorStandard", 160, 1, 11).ok).toBe(true);
-    expect(before - sim.money).toBe(transportBuildCost("elevatorStandard", 10));
+    for (let x = 150; x < 230; x++) {
+      for (let fl = 1; fl <= 12; fl++) {
+        const r = sim.build("floor", fl, x);
+        expect(r.ok, `floor ${fl} @ ${x}: ${r.reason}`).toBe(true);
+      }
+    }
+    const shafts: [string, number, number][] = [
+      ["elevatorStandard", 155, 10],
+      ["elevatorService", 170, 11],
+      ["elevatorExpress", 185, 7],
+      ["stairs", 200, 1],
+      ["escalator", 215, 1],
+    ];
+    for (const [kind, x, span] of shafts) {
+      const before = sim.money;
+      const r = sim.buildTransport(kind as never, x, 1, 1 + span);
+      expect(r.ok, `${kind}: ${r.reason}`).toBe(true);
+      expect(before - sim.money, kind).toBe(transportBuildCost(kind as never, span));
+    }
     expect(transportBuildCost("elevatorStandard", 10)).toBe(250_000);
     expect(transportBuildCost("stairs", 1)).toBe(5_000);
+  });
+
+  it("quotes the build path's formula for every valid span", () => {
+    for (const kind of ALL_KINDS.filter((k) => FACILITIES[k].transport)) {
+      for (let span = 1; span <= maxSpanFor(kind); span++) {
+        expect(transportBuildCost(kind, span), `${kind} ${span}`).toBe(transportCostForSpan(kind, span));
+      }
+    }
+  });
+
+  it("quotes NaN for a span the engine refuses", () => {
+    for (const kind of ALL_KINDS.filter((k) => FACILITIES[k].transport)) {
+      const max = maxSpanFor(kind);
+      for (const span of [0, -1, max + 1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+        expect(transportBuildCost(kind, span), `${kind} ${span}`).toBeNaN();
+      }
+      if (isFixedSpanTransport(kind)) expect(transportBuildCost(kind, 2), kind).toBeNaN();
+    }
+    expect(transportBuildCost("elevatorStandard", 31)).toBeNaN();
+    expect(transportBuildCost("elevatorExpress", 109)).toBe(transportCostForSpan("elevatorExpress", 109));
+    expect(transportBuildCost("elevatorExpress", 110)).toBeNaN();
+    expect(transportBuildCost("office", 1)).toBeNaN();
   });
 });

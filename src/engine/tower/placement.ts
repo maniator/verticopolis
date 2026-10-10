@@ -1,5 +1,5 @@
 import type { Tower } from "../Tower";
-import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isFixedSpanTransport, maxSpanFor } from "../facilities";
+import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, WEDDING_HALL_FLOOR, facilityFloors, isFixedSpanTransport, maxSpanFor } from "../facilities";
 import type { FacilityKind, PlaceResult, Unit } from "../types";
 import { isStructural, isLobbyFloor, isSkyLobbyFloor, coversGroundFloor, NO_BASEMENT_KINDS } from "./towerTopology";
 
@@ -41,8 +41,8 @@ export function roomPlacementReason(tower: Tower,
   const f = FACILITIES[kind];
   if (floor < GRID.minFloor || floor > GRID.maxFloor) return "Outside the buildable range.";
   if (x < 0 || x + f.width > GRID.width) return "Off the edge of the lot.";
-  if (kind === "weddingHall" && floor !== GRID.maxFloor) {
-    return "The wedding hall can only crown floor 100.";
+  if (kind === "weddingHall" && floor !== WEDDING_HALL_FLOOR) {
+    return `The wedding hall can only crown floor ${WEDDING_HALL_FLOOR}.`;
   }
   const cap = tower.capReason(kind);
   if (cap) return cap;

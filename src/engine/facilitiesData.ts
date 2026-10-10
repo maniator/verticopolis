@@ -479,8 +479,14 @@ export const GRID = {
    * floor: floor 1 = ground, floor 0 = B1, -1 = B2 … -9 = B10 (no gap at 0).
    */
   minFloor: -9,
+  /** The ground floor: the lobby-only concourse every tower starts from. */
+  groundFloor: 1,
   /** Total buildable width in tiles, the canon 1994 map is 375 segments wide. */
   width: LOT_WIDTH,
   /** Floors between required (sky) lobbies. */
   lobbyInterval: 15,
 } as const;
+
+/** The one floor the wedding hall may sit on: it crowns the tower. Read by the
+ *  placement check and by the catalog's `onlyFloor`. */
+export const WEDDING_HALL_FLOOR = GRID.maxFloor;

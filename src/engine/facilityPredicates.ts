@@ -1,4 +1,4 @@
-import type { FacilityKind } from "./types";
+import type { FacilityKind, GameMode } from "./types";
 import { FACILITIES } from "./facilitiesData";
 
 export function isHotelKind(kind: FacilityKind): boolean {
@@ -166,4 +166,11 @@ export function isStaffOnlyTransport(kind: FacilityKind): boolean {
  *  working maid and were not part of the original staff network). */
 export function isStaffTransportKind(kind: FacilityKind): boolean {
   return isStaffOnlyTransport(kind) || kind === "stairs";
+}
+
+/** Whether the mode offers the kind at all: a Modern-only kind is never
+ *  buildable in a Classic tower. The mode half of `isUnlocked`, and the
+ *  catalog's `available`. */
+export function isAvailableInMode(kind: FacilityKind, mode: GameMode): boolean {
+  return FACILITIES[kind].modernOnly !== true || mode === "modern";
 }

@@ -53,6 +53,13 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// `hasVariantHouseholds`: Modern condos sell to a rolled household of
+    /// variable size that scales the sale price; Classic sells at the flat
+    /// asking price.
+    pub fn has_variant_households(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// `showsPreviewReason`: Modern names the refusal on an invalid build
     /// preview; Classic keeps the 1994 click-to-refuse.
     pub fn shows_preview_reason(self) -> bool {

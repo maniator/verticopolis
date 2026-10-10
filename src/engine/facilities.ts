@@ -14,7 +14,7 @@
  *   - `census.ts`: residentCount/censusCount + the star/population
  *                  thresholds and service-demand constants.
  */
-export { LOT_WIDTH, FACILITIES, ALL_KINDS, isFacilityKind, GRID } from "./facilitiesData";
+export { LOT_WIDTH, FACILITIES, ALL_KINDS, isFacilityKind, GRID, WEDDING_HALL_FLOOR } from "./facilitiesData";
 export {
   isHotelKind,
   isLeaseAmenityKind,
@@ -29,6 +29,7 @@ export {
   isElevatorKind,
   isStaffOnlyTransport,
   isStaffTransportKind,
+  isAvailableInMode,
 } from "./facilityPredicates";
 export {
   TRANSPORT_CAPACITY,

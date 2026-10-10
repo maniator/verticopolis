@@ -1,4 +1,4 @@
-import { FACILITIES, isElevatorKind } from "./facilities";
+import { FACILITIES, isElevatorKind, isFixedSpanTransport, maxSpanFor } from "./facilities";
 import type { FacilityKind } from "./types";
 
 /** Tunable economic constants (dollars), tuned to the 1994 SimTower balance. */
@@ -211,7 +211,11 @@ export const ECON = {
   skyBarViewBaseFloor: 10,
   skyBarViewPerFloor: 0.02,
   skyBarViewMax: 1.0,
-  /** Cost to extend an elevator shaft by one floor (click or drag handle). */
+  /** The price of one floor of span (top minus bottom) on an elevator:
+   *  charged per floor of span when the shaft is built (`transportBuildCost`).
+   *  The web UI also charges it per floor when a shaft is extended
+   *  (`src/game/editorActions.ts`); no engine code does that yet (#914 moves
+   *  the extend charge into the engine). */
   transportFloorCost: 5_000,
   /** Monthly property tax on an UNSOLD condo, as a fraction of its asking
    *  price. Gives premium pricing a real carrying cost — holding out for a
@@ -327,12 +331,34 @@ export function carResaleRefund(): number {
  *  has no salvage value). */
 export const GUTTED_RESALE_REFUND = 0;
 
+/** The price one floor of span (top minus bottom) adds to a transport on top
+ *  of its base cost: {@link ECON.transportFloorCost} on an elevator, nothing on
+ *  a walkway. The one home for that rule: {@link transportBuildCost} and the
+ *  catalog's `floorCost` both read it. */
+export function transportFloorCost(kind: FacilityKind): number {
+  return isElevatorKind(kind) ? ECON.transportFloorCost : 0;
+}
+
+/** The formula `buildTransport` charges, with no check on the span: the base
+ *  price plus {@link transportFloorCost} for every floor of span. The build
+ *  path reads this directly so its affordability check behaves as before for
+ *  every request (placement then refuses a span it cannot build); frontends
+ *  quote through {@link transportBuildCost}. */
+export function transportCostForSpan(kind: FacilityKind, span: number): number {
+  const perFloor = transportFloorCost(kind);
+  return FACILITIES[kind].cost + (perFloor === 0 ? 0 : span * perFloor);
+}
+
 /** What `buildTransport` charges for a shaft of `span` floors (top minus
- *  bottom): the base price plus {@link ECON.transportFloorCost} for every floor
- *  of span on an elevator. A walkway is a flat price. */
+ *  bottom), as a quote a frontend can show. `NaN` for a placement the engine
+ *  refuses on span alone: a kind that is not a transport, a span that is not a
+ *  whole number, below 1 or above {@link maxSpanFor}, or a fixed-span walkway
+ *  at any span but its one flight. */
 export function transportBuildCost(kind: FacilityKind, span: number): number {
-  const extra = isElevatorKind(kind) ? span * ECON.transportFloorCost : 0;
-  return FACILITIES[kind].cost + extra;
+  if (FACILITIES[kind].transport !== true) return NaN;
+  if (!Number.isInteger(span) || span < 1 || span > maxSpanFor(kind)) return NaN;
+  if (isFixedSpanTransport(kind) && span !== maxSpanFor(kind)) return NaN;
+  return transportCostForSpan(kind, span);
 }
 
 /** One step of budget-clamped billing for an elevator extend drag. Given the

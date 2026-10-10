@@ -1,9 +1,9 @@
 import type { Simulation } from "../Simulation";
 
-import { GUTTED_RESALE_REFUND, rentConfig, resaleRefund, transportBuildCost } from "../econConfig";
+import { GUTTED_RESALE_REFUND, rentConfig, resaleRefund, transportCostForSpan } from "../econConfig";
 import { storeRent } from "./constants";
 
-import { FACILITIES, buildMinutes, facilityFloors, isFacilityKind } from "../facilities";
+import { FACILITIES, buildMinutes, facilityFloors, isAvailableInMode, isFacilityKind } from "../facilities";
 import { groundFloorStructureKind } from "../tower/towerTopology";
 import type { FacilityKind, WeatherKind } from "../types";
 
@@ -24,7 +24,7 @@ export function canBuild(sim: Simulation, kind: FacilityKind, floor: number, x: 
   const f = FACILITIES[kind];
   if (!sim.isUnlocked(kind)) {
     // A Modern-only kind refused in Classic is not a star gate; say why honestly.
-    const reason = f.modernOnly && sim.mode !== "modern" ? `${f.name} is a Modern-only facility.` : `${f.name} unlocks at ${f.minStar}★.`;
+    const reason = !isAvailableInMode(kind, sim.mode) ? `${f.name} is a Modern-only facility.` : `${f.name} unlocks at ${f.minStar}★.`;
     return { ok: false, reason, cost: f.cost };
   }
 
@@ -206,8 +206,10 @@ export function buildTransport(sim: Simulation,
   if (!sim.isUnlocked(kind)) {
     return { ok: false, reason: `${f.name} unlocks at ${f.minStar}★.` };
   }
-  // Elevators charge per served floor on top of the base price.
-  const total = transportBuildCost(kind, top - bottom);
+  // Elevators charge per floor of span (top minus bottom) on top of the base
+  // price. The unchecked formula keeps the affordability check as it was for
+  // every request; placement below refuses a span it cannot build.
+  const total = transportCostForSpan(kind, top - bottom);
   if (sim.money < total) return { ok: false, reason: "Not enough money." };
   const res = sim.tower.placeTransport(kind, x, bottom, top);
   if (!res.ok) return { ok: false, reason: res.reason };
@@ -269,7 +271,7 @@ export function toggleAutoBridge(sim: Simulation): boolean {
 export function isUnlocked(sim: Simulation, kind: FacilityKind): boolean {
   // Modern-only content is never buildable in a Classic tower (parity), on top
   // of the usual star gate.
-  if (FACILITIES[kind].modernOnly && sim.mode !== "modern") return false;
+  if (!isAvailableInMode(kind, sim.mode)) return false;
   return sim.star >= FACILITIES[kind].minStar;
 }
 

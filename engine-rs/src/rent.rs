@@ -1,7 +1,7 @@
 //! Port of `sim/rent.ts` and the ladder helpers of `pricing.ts`.
 
 use crate::clock::GameMode;
-use crate::econ::{classic_ladder, rent_config, rent_of};
+use crate::econ::{classic_ladder, rent_config, rent_of, RentConfig};
 use crate::facilities::Kind;
 use crate::sim::Simulation;
 use crate::tower::Unit;
@@ -29,20 +29,55 @@ fn ladder_level(rungs: &[f64; 4], value: f64) -> usize {
     rungs.iter().position(|&r| r == snapped).unwrap_or(2)
 }
 
-/// `priceOptions(kind)`: `Some(Some(ladder))` in Classic for the canon kinds,
-/// `Some(None)` for a Modern band, `None` for an unpriced kind.
-pub fn price_options(mode: GameMode, kind: Kind) -> Option<Option<[f64; 4]>> {
+/// `PriceOptions`: what a mode offers the player for pricing a rentable
+/// kind. `Ladder` is the Classic four-rung dropdown (Very Low, Low, Average,
+/// High), with `no_rate` saying the mode also offers the off-market state;
+/// `Band` is Modern's continuous range.
+#[derive(Clone, Copy, Debug)]
+pub enum PriceOptions {
+    Ladder { rungs: [f64; 4], no_rate: bool },
+    Band(RentConfig),
+}
+
+impl PriceOptions {
+    /// The rungs of a ladder, `None` on a band.
+    pub fn ladder(&self) -> Option<[f64; 4]> {
+        match *self {
+            PriceOptions::Ladder { rungs, .. } => Some(rungs),
+            PriceOptions::Band(_) => None,
+        }
+    }
+
+    /// `opts.shape === "ladder" && opts.noRate`: whether a unit can be taken
+    /// off the market.
+    pub fn offers_no_rate(&self) -> bool {
+        matches!(self, PriceOptions::Ladder { no_rate: true, .. })
+    }
+
+    /// `priceNeutral(opts)`: the Average rung on a ladder, the band default on
+    /// a band.
+    pub fn neutral(&self) -> f64 {
+        match self {
+            PriceOptions::Ladder { rungs, .. } => rungs[2],
+            PriceOptions::Band(c) => c.default,
+        }
+    }
+}
+
+/// `priceOptions(kind)`: a ladder in Classic for the canon kinds, a band in
+/// Modern, `None` for an unpriced kind.
+pub fn price_options(mode: GameMode, kind: Kind) -> Option<PriceOptions> {
     match mode {
-        GameMode::Classic => classic_ladder(kind).map(Some),
-        GameMode::Modern => rent_config(kind).map(|_| None),
+        GameMode::Classic => classic_ladder(kind).map(|rungs| PriceOptions::Ladder {
+            rungs,
+            no_rate: true,
+        }),
+        GameMode::Modern => rent_config(kind).map(PriceOptions::Band),
     }
 }
 
 pub fn price_neutral(mode: GameMode, kind: Kind) -> Option<f64> {
-    match price_options(mode, kind)? {
-        Some(l) => Some(l[2]),
-        None => Some(rent_config(kind)?.default),
-    }
+    Some(price_options(mode, kind)?.neutral())
 }
 
 /// `BatchTarget`: a price, the mode's neutral anchor, or off the market.
@@ -87,7 +122,7 @@ impl Simulation {
         mutate: bool,
     ) -> Option<BatchRentResult> {
         let cfg = rent_config(kind)?;
-        let ladder = price_options(self.mode, kind)?;
+        let ladder = price_options(self.mode, kind)?.ladder();
         if target == BatchTarget::NoRate && ladder.is_none() {
             return None;
         }
@@ -176,7 +211,7 @@ impl Simulation {
         let mode = self.mode;
         let u = self.tower.get_unit_mut(id)?;
         let cfg = rent_config(u.kind)?;
-        let opts = price_options(mode, u.kind)?;
+        let opts = price_options(mode, u.kind)?.ladder();
         if !target.is_finite() {
             return None;
         }
@@ -202,7 +237,7 @@ impl Simulation {
         let Some(u) = self.tower.get_unit_mut(id) else {
             return false;
         };
-        if !matches!(price_options(mode, u.kind), Some(Some(_))) {
+        if !price_options(mode, u.kind).is_some_and(|o| o.offers_no_rate()) {
             return false;
         }
         if u.kind == Kind::Condo && u.ever_occupied {
@@ -220,7 +255,7 @@ impl Simulation {
             (u.kind, u.rent, u.no_rate)
         };
         let cfg = rent_config(kind)?;
-        let opts = price_options(mode, kind)?;
+        let opts = price_options(mode, kind)?.ladder();
         let current = rent_of(kind, rent, no_rate);
         match opts {
             Some(l) => {
