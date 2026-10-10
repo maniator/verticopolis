@@ -728,6 +728,28 @@ mod tests {
             last_line(&sim),
             "The owner left Condominium on floor 2 (a noisy neighbor nearby). You bought it back for $160,000. It is off the market (No Rate); set a rate to sell it again."
         );
+        // The buy-back amount goes through the same formatter: a household
+        // of 2 at $160,000 is rounded by `household_price` (as
+        // `householdPrice` rounds it) before the line, and a fractional
+        // stored price with no household (a legacy sold record) reads as
+        // `toLocaleString()` reads it.
+        let mut sim = served_tower(27);
+        let i = seat_owner(&mut sim, 2, C, false);
+        sim.tower.units[i].residents = Some(2);
+        sim.vacate(i, "relocation");
+        assert_eq!(
+            last_line(&sim),
+            "The owner left Condominium on floor 2 (the household is relocating). You bought it back for $106,667."
+        );
+        let mut sim = served_tower(28);
+        let i = seat_owner(&mut sim, 2, C, false);
+        sim.tower.units[i].residents = None;
+        sim.tower.units[i].rent = Some(123_456.78);
+        sim.vacate(i, "relocation");
+        assert_eq!(
+            last_line(&sim),
+            "The owner left Condominium on floor 2 (the household is relocating). You bought it back for $123,456.78."
+        );
         // A never-sold condo and any other kind get the plain line.
         let mut sim = served_tower(26);
         let r = sim.tower.place(Kind::Office, 2, C);

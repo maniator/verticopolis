@@ -75,6 +75,9 @@ describe("decodeFrame", () => {
     const routine = frame([person(blank)], [], []);
     routine[FRAME_HEADER + 13] = 3;
     expect(() => decodeFrame(routine)).toThrow(/routine code 3/);
+    // The code the engine sends for a routine it has no code for.
+    routine[FRAME_HEADER + 13] = 255;
+    expect(() => decodeFrame(routine)).toThrow(/routine code 255/);
     const truncated = frame([person(blank)], [], []).slice(0, -2);
     expect(() => decodeFrame(truncated)).toThrow(/record at/);
     const route = frame([person(blank, [1, 2], [5])], [], []).slice(0, -1);
@@ -89,5 +92,23 @@ describe("decodeFrame", () => {
     const nan = frame([person(blank)], [], []);
     nan[FRAME_HEADER + 17] = NaN;
     expect(() => decodeFrame(nan)).toThrow(/bad shafts count NaN/);
+  });
+
+  it("names a negative or non-integer header count and car count", () => {
+    const people = frame([], [], []);
+    people[23] = 0.5;
+    expect(() => decodeFrame(people)).toThrow(/bad people count 0.5/);
+    const units = frame([], [], []);
+    units[24] = -1;
+    expect(() => decodeFrame(units)).toThrow(/bad unit count -1/);
+    const transports = frame([], [], []);
+    transports[25] = 1.5;
+    expect(() => decodeFrame(transports)).toThrow(/bad transport count 1.5/);
+    const negativeCars = frame([], [], [{ id: 7, cars: [] }]);
+    negativeCars[FRAME_HEADER + 1] = -1;
+    expect(() => decodeFrame(negativeCars)).toThrow(/bad transport 7 cars count -1/);
+    const fractionalCars = frame([], [], [{ id: 8, cars: [[1, -1, 0]] }]);
+    fractionalCars[FRAME_HEADER + 1] = 1.5;
+    expect(() => decodeFrame(fractionalCars)).toThrow(/bad transport 8 cars count 1.5/);
   });
 });

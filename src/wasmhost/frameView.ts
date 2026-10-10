@@ -34,7 +34,8 @@ export type FrameHeader = Pick<Simulation, "money" | "star" | "weather" | "santa
 export const PERSON_FIXED = 18;
 
 /** The routines the engine tags a person with, by the code it sends (0 is
- *  none). */
+ *  none; the engine sends 255 for a routine it has no code for, which the
+ *  decoder rejects with every other unknown code). */
 export const ROUTINES: readonly NonNullable<Person["routine"]>[] = ["schoolRun", "salesCall"];
 
 /** The per-frame slice of a {@link Person}: its position and state, and the
@@ -69,6 +70,12 @@ export interface FrameView {
  *  header says, so a binding that changed its layout fails by name. */
 export function decodeFrame(v: ArrayLike<number>): FrameView {
   if (v.length < FRAME_HEADER) throw new Error(`frame view: ${v.length} numbers, header needs ${FRAME_HEADER}`);
+  // A count the decoder reads before the records it counts: a negative or
+  // non-integer one would misalign every record after it.
+  const count = (n: number, what: string) => {
+    if (!Number.isInteger(n) || n < 0) throw new Error(`frame view: bad ${what} count ${n}`);
+    return n;
+  };
   const enumAt = <T>(table: readonly T[], code: number, what: string): T => {
     const t = table[code];
     if (t === undefined) throw new Error(`frame view: unknown ${what} code ${code}`);
@@ -90,9 +97,9 @@ export function decodeFrame(v: ArrayLike<number>): FrameView {
     counts: { fires: v[18], firesGutRooms: v[19], bombs: v[20] },
     pending: v[21] === 1,
     onHourRuns: v[22],
-    people: v[23],
-    units: v[24],
-    transports: v[25],
+    people: count(v[23], "people"),
+    units: count(v[24], "unit"),
+    transports: count(v[25], "transport"),
   };
   let i = FRAME_HEADER;
   const need = (n: number) => {
@@ -136,7 +143,7 @@ export function decodeFrame(v: ArrayLike<number>): FrameView {
   for (let k = 0; k < header.transports; k++) {
     need(2);
     const id = v[i];
-    const cars = v[i + 1];
+    const cars = count(v[i + 1], `transport ${id} cars`);
     i += 2;
     need(3 * cars);
     const carPositions: number[] = [];
