@@ -33,6 +33,19 @@ export class Engine {
         return ret[0] === 0 ? undefined : ret[1];
     }
     /**
+     * Move the clock by `minutes` and run nothing: the TypeScript
+     * `clock.advance(minutes)`. Whatever pass the move skips is owed and runs
+     * on the next tick, as on the TypeScript engine. Tooling only (the
+     * gallery's clock pin); no game command reaches it.
+     * @param {number} minutes
+     */
+    advanceClock(minutes) {
+        const ret = wasm.engine_advanceClock(this.__wbg_ptr, minutes);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
      * `applyRentBatch(kind, target, onlyDefaultPriced)` with the target as
      * JSON text (a number, `"default"` or `"noRate"`): the result counters
      * as JSON, or null when the batch does not apply.
@@ -180,6 +193,23 @@ export class Engine {
         }
     }
     /**
+     * The hourly elevator telemetry (`elevatorUtil`, `elevatorHourly`,
+     * `elevatorOrigins`) as JSON; see `Simulation::telemetry_json`.
+     * @returns {string}
+     */
+    elevatorTelemetry() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.engine_elevatorTelemetry(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
      * `sim.emit(text, kind)`: a log entry at the engine's clock.
      * @param {string} text
      * @param {string} kind
@@ -258,6 +288,21 @@ export class Engine {
             throw takeFromExternrefTable0(ret[1]);
         }
         return Engine.__wrap(ret[0]);
+    }
+    /**
+     * `economy.housekeepingReport()`: yesterday's shift result as JSON
+     * `{ cleaned, leftover }`, or nothing (`undefined`) before the first
+     * morning checkout.
+     * @returns {string | undefined}
+     */
+    housekeepingReport() {
+        const ret = wasm.engine_housekeepingReport(this.__wbg_ptr);
+        let v1;
+        if (ret[0] !== 0) {
+            v1 = getStringFromWasm0(ret[0], ret[1]);
+            wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        }
+        return v1;
     }
     /**
      * The log entries emitted after `seq` (the `logSeq` the host last saw),
@@ -403,6 +448,35 @@ export class Engine {
      */
     resolveChoice(accept) {
         wasm.engine_resolveChoice(this.__wbg_ptr, accept);
+    }
+    /**
+     * Replace the elevator telemetry with an `elevatorTelemetry` document.
+     * Tooling only (the gallery's engine leg); no game command reaches it.
+     * @param {string} json
+     */
+    seedElevatorTelemetry(json) {
+        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.engine_seedElevatorTelemetry(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Set the loop's pass memos (`lastHour`, `lastDay`, `lastMonth`,
+     * `lastQuarter`), which a load derives from the clock. Tooling only: the
+     * gallery's engine leg hands over a tower built in place, whose memos
+     * still owe its first passes, and this keeps them owed.
+     * @param {number} last_hour
+     * @param {number} last_day
+     * @param {number} last_month
+     * @param {number} last_quarter
+     */
+    seedLoopMemos(last_hour, last_day, last_month, last_quarter) {
+        const ret = wasm.engine_seedLoopMemos(this.__wbg_ptr, last_hour, last_day, last_month, last_quarter);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
     }
     /**
      * @param {number} floor

@@ -144,7 +144,7 @@ export function buildStatsTower(): void {
   const g = (window as unknown as { game: any }).game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(42);
-  const s = g.sim;
+  let s = g.sim;
   s.money = 50_000_000;
   s.star = 4;
   const W = g.grid.width;
@@ -187,6 +187,15 @@ export function buildStatsTower(): void {
   }
   // Run a simulated quarter so incomeBreakdown()/elevator loads have data.
   s.evaluateStar();
+  // The gallery's engine leg hands the tower to the WASM engine here, before
+  // the ticks, so the engine runs them and grows its own crowd (a save carries
+  // none). Unset on the TypeScript leg, where nothing changes.
+  const handoff = (window as unknown as { __vcShotHandoff?: () => string }).__vcShotHandoff;
+  if (handoff) {
+    const state = handoff();
+    if (!state.startsWith("hosted")) throw new Error(`WASM leg: the tower is not on the engine before the ticks (${state})`);
+    s = g.sim;
+  }
   for (let i = 0; i < 90; i++) s.tick(60);
   s.money = 9_126_661;
   g.engine.setSim(s);
@@ -252,7 +261,7 @@ export function buildOverlayTower(): void {
   const g = (window as unknown as { game: any }).game;
   const Sim = g.sim.constructor;
   g.sim = Sim.newGame(2024);
-  const s = g.sim;
+  let s = g.sim;
   s.money = 1e12;
   s.star = 5;
   const W = g.grid.width;
@@ -303,6 +312,15 @@ export function buildOverlayTower(): void {
   // every run, then FREEZE so the capture is byte-stable.
   const c = s.clock;
   c.minutes = c.minutes - c.minuteOfDay + 8 * 60;
+  // The gallery's engine leg hands the tower to the WASM engine here, before
+  // the ticks, so the engine runs them and grows its own crowd (a save carries
+  // none). Unset on the TypeScript leg, where nothing changes.
+  const handoff = (window as unknown as { __vcShotHandoff?: () => string }).__vcShotHandoff;
+  if (handoff) {
+    const state = handoff();
+    if (!state.startsWith("hosted")) throw new Error(`WASM leg: the tower is not on the engine before the ticks (${state})`);
+    s = g.sim;
+  }
   for (let i = 0; i < 150; i++) s.tick(1);
   // Stage a satisfaction spread AFTER the ticks (updateSatisfaction would recompute
   // it): the well-served left/lower core stays happy, the far-right (transport-far)

@@ -36,7 +36,8 @@ export function resolveShotEngine(raw: string | undefined): ShotEngine {
 export const SHOT_ENGINE: ShotEngine = resolveShotEngine(process.env.VC_SHOT_ENGINE);
 
 /** Before navigation: seed the stored engine choice so boot hosts the tower on
- *  the WASM engine. Registered after a scene's own init script, so a scene
+ *  the WASM engine, and install the handoff that builders call before they
+ *  tick. Registered after a scene's own init script, so a scene
  *  that resets storage cannot drop it. */
 export async function seedEngineChoice(page: Page): Promise<void> {
   if (SHOT_ENGINE !== "wasm") return;
@@ -47,6 +48,8 @@ export async function seedEngineChoice(page: Page): Promise<void> {
       /* storage blocked: the hosted check after boot fails the scene */
     }
   });
+  // The in-build handoff a builder calls before it ticks (see pgHostOnEngine).
+  await page.addInitScript(`window.__vcShotHandoff = ${pgHostOnEngine.toString()};`);
 }
 
 /** After a scene's build (and after a shot's setup): put the live tower on the
@@ -54,7 +57,7 @@ export async function seedEngineChoice(page: Page): Promise<void> {
 export async function hostOnEngine(page: Page, where: string): Promise<void> {
   if (SHOT_ENGINE !== "wasm") return;
   const state = await page.evaluate(pgHostOnEngine);
-  if (state !== "hosted") throw new Error(`WASM leg: the tower is not on the engine ${where} (${state})`);
+  if (!state.startsWith("hosted")) throw new Error(`WASM leg: the tower is not on the engine ${where} (${state})`);
 }
 
 /**
@@ -66,26 +69,31 @@ export async function hostOnEngine(page: Page, where: string): Promise<void> {
  * the engine's. The handoff loads the instance's own save into the app
  * through `adoptSim`, which the host follows by starting the engine from it.
  *
- * The undo-restore flavor keeps the camera and history. What else `adoptSim`
+ * A load derives the loop's pass memos from the clock and starts the elevator
+ * telemetry empty, where the TypeScript leg keeps the instance's own: a tower
+ * built in place still owes its first hour pass (and a day pass when its
+ * builder moved the clock past midnight), and a builder may author a measured
+ * demand curve. So the handoff seeds the engine with both (`seedLoopMemos`,
+ * `seedElevatorTelemetry`), and the engine runs the same owed passes on its
+ * first tick. An instance already on the engine hands over the engine's own
+ * telemetry; its memos are the ones the load derives, which match the
+ * engine's whenever its passes for the current hour and day have run. The
+ * undo-restore flavor keeps the camera and history, and what else `adoptSim`
  * resets is put back (speed, pause, the star and win latches, the step
  * accumulator, the log cursor and panel, the selection), so the scene runs on
- * as the TypeScript leg does from the same point. A builder's fresh tower still
- * owes its first hour pass, which the TypeScript leg runs on its first tick: on
- * the hour, a running scene parks one minute short and one relayed minute runs
- * it on the engine. Known gaps until the engine takes a clock command (#899): a
- * save carries no crowd, so people a builder spawned do not survive the
- * handoff; a load marks every owed pass done, so an owed pass off the hour, a
- * day pass owed away from midnight, and a fresh tower's first rent and
- * maintenance do not run on the engine. Refuses
- * while the title screen is up, since `adoptSim` would dismiss it. Returns
- * "hosted", or why not.
+ * as the TypeScript leg does from the same point. A save carries no crowd, so
+ * a builder that ticks hands over before its ticks (`__vcShotHandoff`, the
+ * runner installs this function under that name on the WASM leg) and the
+ * engine grows its own crowd. Refuses while the title screen is up, since
+ * `adoptSim` would dismiss it. Returns "hosted" (with a note when it handed
+ * the tower over), or why not.
  */
 export function pgHostOnEngine(): string {
   const w = window as unknown as { game?: any; __vcEngine?: any };
   const g = w.game;
-  const host = w.__vcEngine;
+  const vc = w.__vcEngine;
   if (!g?.sim) return "no game";
-  if (!host) return "no engine host (did the engine package load?)";
+  if (!vc) return "no engine host (did the engine package load?)";
   const sim = g.sim;
   const Sim = sim.constructor;
   const onHost = (x: unknown) => Object.prototype.hasOwnProperty.call(x, "serialize");
@@ -110,7 +118,15 @@ export function pgHostOnEngine(): string {
       (v.units ?? []).map((u: any) => [u.id, u.kind, u.floor, u.x, u.state, u.occupants ?? 0, u.rent ?? null, Boolean(u.noRate), Boolean(u.everOccupied), u.label ?? null]),
       (v.transports ?? []).map((t: any) => [t.id, t.kind, t.x, t.bottom, t.top]),
     ]);
+  // The instance's telemetry in the engine's document shape (see
+  // src/wasmhost/telemetry.ts; restated here, as injected code cannot import).
+  const telemetryOf = (s: any) => ({
+    util: [...s.elevatorUtil],
+    hourly: [...s.elevatorHourly].map(([id, r]: [number, any]) => [id, { weekday: [...r.weekday], weekend: [...r.weekend] }]),
+    origins: [...s.elevatorOrigins].map(([id, r]: [number, any]) => [id, { weekday: r.weekday.map((m: Map<number, number>) => [...m]), weekend: r.weekend.map((m: Map<number, number>) => [...m]) }]),
+  });
   const handoff = !onHost(sim) || shape(own) !== shape(sim.serialize());
+  let telemetry = "";
   if (handoff) {
     // Only a title screen still in the page counts: the runner's splash
     // dismissal removes the node and can leave the controller's reference
@@ -118,6 +134,9 @@ export function pgHostOnEngine(): string {
     // reference changes nothing on screen (its pause is undone below, its
     // toast swept).
     if (document.getElementById("splash")) return "the title screen is up; a handoff would dismiss it";
+    const before = onHost(sim) ? vc.current?.() : null;
+    telemetry = before ? before.engine.elevatorTelemetry() : JSON.stringify(telemetryOf(sim));
+    const memos = onHost(sim) ? null : [sim.lastHour, sim.lastDay, sim.lastMonth, sim.lastQuarter];
     const keep = {
       speed: g.speed,
       paused: g.engine.paused,
@@ -131,22 +150,22 @@ export function pgHostOnEngine(): string {
       selected: g.selected,
       selectedId: g.engine.selectedId,
     };
-    // The frame loop holds the clock only for an emergency choice or the update
-    // prompt (hasBlockingModal); any other dialog lets the scene tick on.
-    const blocked = Boolean(g.shownChoice || g.shownUpdate);
-    const running = keep.speed > 0 && !keep.paused && !blocked;
-    // Only an owed hour pass on the hour can be reproduced by a load and one
-    // minute; an off-hour hour pass or an owed day pass is a known gap (#899).
-    const owesHour = sim.lastHour !== sim.clock.hour;
-    const park = running && owesHour && own.minutes % 60 === 0 && own.minutes > 0;
-    const save = JSON.parse(JSON.stringify(own));
-    if (park) save.minutes -= 1;
-    const fresh = Sim.deserialize(save);
+    const fresh = Sim.deserialize(JSON.parse(JSON.stringify(own)));
     // A load restarts the log cursor; keep the live one, before the host
     // attaches and reads it.
     fresh.logSeq = keep.logSeq;
     g.adoptSim(fresh, true);
-    if (park) g.sim.tick(1);
+    const host = vc.current?.();
+    let refused = "";
+    if (host && vc.status?.hosted) {
+      try {
+        if (memos) host.engine.seedLoopMemos(memos[0], memos[1], memos[2], memos[3]);
+        host.engine.seedElevatorTelemetry(telemetry);
+        host.syncStructure();
+      } catch (e) {
+        refused = `the engine refused the handed-over state: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    }
     g.speed = keep.speed;
     g.engine.paused = keep.paused;
     g.lastStar = keep.lastStar;
@@ -160,9 +179,21 @@ export function pgHostOnEngine(): string {
       g.engine.selectedId = keep.selectedId;
       g.refreshEditor?.();
     }
+    if (refused) return refused;
   }
-  if (!host.status?.hosted) return `host refused the tower: ${((host.status?.errors ?? []) as string[]).join("; ")}`;
+  if (!vc.status?.hosted) return `host refused the tower: ${((vc.status?.errors ?? []) as string[]).join("; ")}`;
   if (!onHost(g.sim)) return "the live sim is not the hosted instance";
-  if (handoff && shape(Sim.prototype.serialize.call(g.sim)) !== shape(g.sim.serialize())) return "the engine's tower differs from the one handed to it";
+  if (handoff) {
+    if (shape(Sim.prototype.serialize.call(g.sim)) !== shape(g.sim.serialize())) return "the engine's tower differs from the one handed to it";
+    // Compared as parsed values with sorted keys: the engine writes a whole
+    // float as 0.0 and its keys in its own order.
+    const canon = (v: unknown) =>
+      JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+    const raw = vc.current?.()?.engine.elevatorTelemetry();
+    const now = raw === undefined ? "" : canon(JSON.parse(raw));
+    if (now !== canon(JSON.parse(telemetry))) return "the engine's elevator telemetry differs from the one handed to it";
+    if (canon(telemetryOf(g.sim)) !== now) return "the read model's elevator telemetry differs from the engine's";
+    return onHost(sim) ? "hosted (handed over again after an edit past the relay)" : "hosted (handed over)";
+  }
   return "hosted";
 }

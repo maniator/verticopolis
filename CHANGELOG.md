@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.29.3
+
+- On the opt-in WASM engine, the elevator Schedule dialog shows its demand curve and advice again, and the Tower Statistics show elevator loads and how many hotel rooms went unserved yesterday.
+- Dollar amounts and counts in the event log now read the same on both engines, with thousands separators and the right plurals ("1 clinic", "3 Recycling Centers"), in every browser language.
+
 ## 2.29.2
 
 - On the opt-in WASM engine, the notices for a condo sale, a condo buy-back and a tenant leaving now read the same as on the default engine.

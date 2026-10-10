@@ -39,66 +39,26 @@ impl ExterminatorRefusal {
     }
 }
 
-/// `Number#toLocaleString()` in the en-US locale, for the dollar amounts the
-/// log lines format (the exterminator booking, the condo sale and buy-back).
-/// The TypeScript call takes the host locale; log text is outside the hash,
-/// and the referee runs under en-US.
-///
-/// A fractional amount reads as `toLocaleString()` reads it: the shortest
-/// round-trip decimal, rounded half away from zero to at most three
-/// fraction digits, trailing zeros dropped (123456.78 reads "123,456.78").
+/// `Number#toLocaleString()` in en-US (see `jsmath::to_locale_string`).
 pub(crate) fn with_thousands(x: f64) -> String {
-    debug_assert!(x.is_finite(), "{x}");
-    // Rust's `Display` for f64 is the shortest round-trip decimal and never
-    // uses an exponent, the digits ICU starts from.
-    let plain = format!("{}", x.abs());
-    let (int_part, frac_part) = plain.split_once('.').unwrap_or((plain.as_str(), ""));
-    let mut digits: Vec<u8> = int_part.bytes().collect();
-    let int_len = digits.len();
-    digits.extend(frac_part.bytes().take(3));
-    while digits.len() < int_len + 3 {
-        digits.push(b'0');
-    }
-    if frac_part.as_bytes().get(3).is_some_and(|&d| d >= b'5') {
-        let mut k = digits.len();
-        loop {
-            if k == 0 {
-                digits.insert(0, b'1');
-                break;
-            }
-            k -= 1;
-            if digits[k] == b'9' {
-                digits[k] = b'0';
-            } else {
-                digits[k] += 1;
-                break;
-            }
-        }
-    }
-    let split = digits.len() - 3;
-    let int_digits = &digits[..split];
-    let frac_digits: Vec<u8> = {
-        let mut f = digits[split..].to_vec();
-        while f.last() == Some(&b'0') {
-            f.pop();
-        }
-        f
-    };
-    let mut out = String::new();
-    if x < 0.0 {
-        out.push('-');
-    }
-    for (i, &c) in int_digits.iter().enumerate() {
-        if i > 0 && (int_digits.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(c as char);
-    }
-    if !frac_digits.is_empty() {
-        out.push('.');
-        out.extend(frac_digits.iter().map(|&c| c as char));
-    }
-    out
+    crate::jsmath::to_locale_string(x)
+}
+
+/// The garbage advisory (`nudgeServiceShortfalls` in `sim/services.ts`).
+pub(crate) fn waste_nudge_message(pop: f64, need: f64, have: impl std::fmt::Display) -> String {
+    format!(
+        "♻️ Garbage is piling up: {} population needs {need} Recycling Center{} (you have {have}). 4★ requires demand met.",
+        with_thousands(pop),
+        if need == 1.0 { "" } else { "s" }
+    )
+}
+
+/// The suite-parking advisory (`nudgeServiceShortfalls` in `sim/services.ts`).
+pub(crate) fn suite_nudge_message(suites: f64, spots: impl std::fmt::Display) -> String {
+    format!(
+        "🚗 Hotel suites need a working parking space each: {suites} suite{}, {spots} space(s) chained to a ramp.",
+        if suites == 1.0 { "" } else { "s" }
+    )
 }
 
 pub struct ParkingDemand {
@@ -167,23 +127,14 @@ impl Simulation {
         if waste_short && !self.waste_nudged {
             let pop = self.tower.total_population();
             let need = (pop as f64 / RECYCLING_POP_PER_CENTER).ceil();
-            let msg = format!(
-                "♻️ Garbage is piling up: {} population needs {} Recycling Center(s) (you have {}). 4★ requires demand met.",
-                pop,
-                need,
-                self.recycling_centers()
-            );
+            let msg = waste_nudge_message(pop as f64, need, self.recycling_centers());
             self.emit(&msg, LogKind::Info);
         }
         self.waste_nudged = waste_short;
         let suite_short = self.star >= 3 && self.suite_parking_short();
         if suite_short && !self.suite_parking_nudged {
             let d = self.parking_demand();
-            let msg = format!(
-                "🚗 Hotel suites need a working parking space each: {} suite(s), {} space(s) chained to a ramp.",
-                d.suites,
-                self.tower.functional_parking_spots()
-            );
+            let msg = suite_nudge_message(d.suites, self.tower.functional_parking_spots());
             self.emit(&msg, LogKind::Info);
         }
         self.suite_parking_nudged = suite_short;
@@ -404,6 +355,27 @@ impl Simulation {
 mod tests {
     use super::*;
     use crate::clock::{CalendarKind, GameMode};
+
+    #[test]
+    fn the_advisories_word_their_counts_as_typescript_does() {
+        // The TypeScript templates with these inputs (sim/services.ts).
+        assert_eq!(
+            waste_nudge_message(1234.0, 1.0, 0),
+            "♻️ Garbage is piling up: 1,234 population needs 1 Recycling Center (you have 0). 4★ requires demand met."
+        );
+        assert_eq!(
+            waste_nudge_message(12345.0, 3.0, 1),
+            "♻️ Garbage is piling up: 12,345 population needs 3 Recycling Centers (you have 1). 4★ requires demand met."
+        );
+        assert_eq!(
+            suite_nudge_message(1.0, 0),
+            "🚗 Hotel suites need a working parking space each: 1 suite, 0 space(s) chained to a ramp."
+        );
+        assert_eq!(
+            suite_nudge_message(4.0, 2),
+            "🚗 Hotel suites need a working parking space each: 4 suites, 2 space(s) chained to a ramp."
+        );
+    }
 
     #[test]
     fn thousands_match_to_locale_string() {

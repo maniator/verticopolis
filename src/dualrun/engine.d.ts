@@ -15,6 +15,13 @@ export class Engine {
      */
     adjustRent(id: number, dir: number): number | undefined;
     /**
+     * Move the clock by `minutes` and run nothing: the TypeScript
+     * `clock.advance(minutes)`. Whatever pass the move skips is owed and runs
+     * on the next tick, as on the TypeScript engine. Tooling only (the
+     * gallery's clock pin); no game command reaches it.
+     */
+    advanceClock(minutes: number): void;
+    /**
      * `applyRentBatch(kind, target, onlyDefaultPriced)` with the target as
      * JSON text (a number, `"default"` or `"noRate"`): the result counters
      * as JSON, or null when the batch does not apply.
@@ -47,6 +54,11 @@ export class Engine {
      */
     crowdView(): string;
     /**
+     * The hourly elevator telemetry (`elevatorUtil`, `elevatorHourly`,
+     * `elevatorOrigins`) as JSON; see `Simulation::telemetry_json`.
+     */
+    elevatorTelemetry(): string;
+    /**
      * `sim.emit(text, kind)`: a log entry at the engine's clock.
      */
     emit(text: string, kind: string): void;
@@ -77,6 +89,12 @@ export class Engine {
      * overwrites the save's mode before loading, as a scenario start does.
      */
     static fromVctower(text: string, mode?: string | null): Engine;
+    /**
+     * `economy.housekeepingReport()`: yesterday's shift result as JSON
+     * `{ cleaned, leftover }`, or nothing (`undefined`) before the first
+     * morning checkout.
+     */
+    housekeepingReport(): string | undefined;
     /**
      * The log entries emitted after `seq` (the `logSeq` the host last saw),
      * oldest first, as JSON `[{ seq, minute, text, kind }]`. The engine keeps
@@ -121,6 +139,18 @@ export class Engine {
      * `resolveChoice(accept ? "accept" : "decline")`.
      */
     resolveChoice(accept: boolean): void;
+    /**
+     * Replace the elevator telemetry with an `elevatorTelemetry` document.
+     * Tooling only (the gallery's engine leg); no game command reaches it.
+     */
+    seedElevatorTelemetry(json: string): void;
+    /**
+     * Set the loop's pass memos (`lastHour`, `lastDay`, `lastMonth`,
+     * `lastQuarter`), which a load derives from the clock. Tooling only: the
+     * gallery's engine leg hands over a tower built in place, whose memos
+     * still owe its first passes, and this keeps them owed.
+     */
+    seedLoopMemos(last_hour: number, last_day: number, last_month: number, last_quarter: number): void;
     sellAt(floor: number, x: number): boolean;
     /**
      * `serialize()` as JSON text.

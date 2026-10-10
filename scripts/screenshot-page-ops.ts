@@ -270,96 +270,32 @@ export function pgFillRow(kind: string, floor: number, x0: number, x1: number, s
 
 /** Set the in-game clock to a whole hour without advancing days.
  *
- *  On the WASM leg (the live sim is the instance the engine host attached to,
- *  which carries the host's own `serialize`) a clock write on the read model of
- *  a running scene would be overwritten from the engine on the next tick, and
- *  no command sets the engine's clock. So the pin is made on the engine's own
- *  save and loaded through `adoptSim`. In a running scene the TypeScript leg's
- *  first tick after `advance` runs the day pass (when the pin crossed midnight)
- *  and the hour pass, so the engine is parked one minute short of each boundary
- *  in turn and one relayed minute crosses it; a paused scene gets the bare pin,
- *  as the TypeScript leg runs no pass until it ticks. What `adoptSim` resets is
- *  put back (the frame-loop latches, the log cursor and panel, the selection).
- *  Known gaps until the engine takes a clock command (#899): a save carries no
- *  crowd, so the people on screen restart from the reload; across midnight the
- *  engine runs the day pass and an extra hour-0 pass at 00:00 and the hour
- *  pass at the pinned hour, where the TypeScript leg runs both at the pinned
- *  hour; and a paused pin
- *  leaves the engine no pass owed for when the scene resumes. */
+ *  The clock moves and nothing runs: whatever pass the move skips is owed and
+ *  runs on the next tick. On the WASM leg (the live sim is the instance the
+ *  engine host attached to, which carries the host's own `serialize`) a write
+ *  on the read model would be overwritten from the engine, so the engine's own
+ *  clock moves the same way (`advanceClock`, the counterpart of
+ *  `clock.advance`) beside the read model's. The crowd, the
+ *  latches and the owed passes stay as they are on both legs. */
 export function pgSetClock(hour: number): void {
   const g = (window as unknown as { game: any }).game;
   const c = g.sim.clock;
   let delta = hour * 60 - c.minuteOfDay;
   if (delta < 0) delta += 1440;
-  const host = (window as unknown as { __vcEngine?: { status?: { hosted?: boolean } } }).__vcEngine;
-  const hosted = Boolean(host?.status?.hosted) && Object.prototype.hasOwnProperty.call(g.sim, "serialize");
+  const vc = (window as unknown as { __vcEngine?: { status?: { hosted?: boolean }; current?: () => any } }).__vcEngine;
+  const hosted = Boolean(vc?.status?.hosted) && Object.prototype.hasOwnProperty.call(g.sim, "serialize");
   if (!hosted) {
     c.advance(delta);
     return;
   }
   if (delta === 0) return;
-  if (document.getElementById("splash")) throw new Error("a clock pin over the title screen would dismiss it on the WASM leg");
-  const keep = {
-    speed: g.speed,
-    paused: g.engine.paused,
-    lastStar: g.lastStar,
-    shownWin: g.shownWin,
-    accMinutes: g.accMinutes,
-    lastMealRushDay: { ...g.lastMealRushDay },
-    logSeq: g.sim.logSeq,
-    uiLogSeq: g.ui.lastLogSeq,
-    logLines: [...g.ui.el.log.childNodes],
-    selected: g.selected,
-    selectedId: g.engine.selectedId,
-  };
-  // The frame loop holds the clock only for an emergency choice or the update
-  // prompt (hasBlockingModal); any other dialog lets the scene tick on.
-  const running = keep.speed > 0 && !keep.paused && !(g.shownChoice || g.shownUpdate);
-  const target = c.minutes + delta;
-  // A ticking scene has run the pass for the hour it is in, so the hour before
-  // the pin is the TypeScript leg's last hour pass.
-  const hourBefore = c.hour;
-  const load = (minutes: number) => {
-    const save = g.sim.serialize();
-    save.minutes = minutes;
-    const fresh = g.sim.constructor.deserialize(save);
-    fresh.logSeq = g.sim.logSeq; // a load restarts the log cursor; keep the live one
-    g.adoptSim(fresh, true);
-  };
-  if (!running) {
-    load(target);
-  } else {
-    // Cross midnight first when the pin does, so the engine runs its day pass.
-    const dayStart = Math.floor(target / 1440) * 1440;
-    if (dayStart > c.minutes && dayStart <= target) {
-      load(dayStart - 1);
-      g.sim.tick(1);
-    }
-    if (g.sim.clock.minutes !== target) {
-      // The TypeScript leg's next tick runs an hour pass only when the pinned
-      // hour differs from the hour it last ran one for (a pin from 08:30 to
-      // 08:00 the next day runs only the day pass there).
-      if (Math.floor((target % 1440) / 60) !== hourBefore) {
-        load(target - 1);
-        g.sim.tick(1);
-      } else {
-        load(target);
-      }
-    }
-  }
-  g.speed = keep.speed;
-  g.engine.paused = keep.paused;
-  g.lastStar = keep.lastStar;
-  g.shownWin = keep.shownWin;
-  g.accMinutes = keep.accMinutes;
-  g.lastMealRushDay = keep.lastMealRushDay;
-  g.ui.lastLogSeq = keep.uiLogSeq;
-  g.ui.el.log.replaceChildren(...keep.logLines);
-  if (keep.selected) {
-    g.selected = keep.selected;
-    g.engine.selectedId = keep.selectedId;
-    g.refreshEditor?.();
-  }
+  const host = vc?.current?.();
+  if (!host) throw new Error("the WASM engine reports a hosted tower but no host holds it");
+  // The same move on both: no merge, so a presentation pin a scene made on
+  // the read model (a staged satisfaction spread) stays as the TypeScript
+  // leg keeps it.
+  host.engine.advanceClock(delta);
+  c.advance(delta);
 }
 
 /** Drive the real Map-overlay dropdown so the shot exercises the shipped path. */

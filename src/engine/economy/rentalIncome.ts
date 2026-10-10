@@ -49,5 +49,5 @@ export function collectMonthlyRent(sim: SimContext): void {
   if (amt <= 0) return;
   sim.money += amt;
   for (const [cat, catSum] of byCat) sim.recordMoney?.(cat, Math.round(catSum * scale));
-  sim.emit(`Monthly rent collected: $${amt.toLocaleString()} (${n} rental${n > 1 ? "s" : ""}).`, "money");
+  sim.emit(`Monthly rent collected: $${amt.toLocaleString("en-US")} (${n} rental${n > 1 ? "s" : ""}).`, "money");
 }

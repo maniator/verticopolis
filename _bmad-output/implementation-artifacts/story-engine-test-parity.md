@@ -243,6 +243,7 @@ repeats.
 | `conformance.integration.test.ts` (left out) | 23 | c | the TypeScript side of the referee and the scenario lock writer; its engine twin is `conformanceWasm` |
 | `loaderCases.integration.test.ts` (left out) | 1 | c | the loader-case lock writer; the Rust test replays the lock |
 | `dualRunDay`, `dualRunEdits`, `wasmHost` (left out) | 18 | c | attach a mirror or a host themselves |
+| `wasmHostTelemetry`, `wasmHostLogText` (left out) | 4 | c | drive the TypeScript engine and their own engine side by side |
 | `conformanceWasm.integration.test.ts` (left out) | 21 | c | drives the binding directly |
 | `src/dualrun/mirror.test.ts` (left out) | 10 | c | attaches the relay itself |
 | `src/dualrun/dualRun.test.ts` (left out) | 6 | c | attaches the dual run's relay itself |
@@ -656,3 +657,85 @@ full branch diff; no file under `src/engine` or `src/wasmhost` changed, so no
 | 8 | 4 | 0 | ~6 | the CI perf-gate fix (in-place build on the TypeScript engine) and its doc follow-ups; #905 filed |
 
 Copilot review: requested on the PR (Codex is out of quota).
+
+## Engine fixes from the gallery's engine leg (2026-10-10)
+
+The engine leg's first runs showed engine gaps under the harness noise. Fixed
+in `engine-rs`, with the host reading the results:
+
+- **Elevator telemetry (#868):** the hour pass now runs `sampleElevatorUtil`
+  (`engine-rs/src/telemetry.rs`), with the dispatcher's boarding tally
+  (`dispatch.rs`), so the
+  schedule dialog's demand curve and advice, the stats screen's elevator loads
+  and the diagnostics' utilization exist on the engine. The host adopts them at
+  every merge (`src/wasmhost/telemetry.ts`).
+- **Housekeeping report:** the morning checkout latches yesterday's shift
+  result, which the stats screen's "unserved yesterday" and the diagnostics
+  read.
+- **Log text:** the rent, maintenance, checkout and treasure lines printed
+  dollar amounts without thousands separators (`$1520000`), the garbage line
+  printed its population count the same way, and five lines flattened a plural
+  (`1 clubs`, `1 clinics`, `1 rentals`, `Recycling Center(s)`, `suite(s)`).
+  `jsmath::to_locale_string` ports `Number#toLocaleString()` (en-US) and now
+  formats every amount and count a TypeScript line formats that way, and the
+  plural lines are pinned word for word by Rust unit tests. The TypeScript
+  engine's log lines used the host's default locale (`1.520.000` in a German
+  browser) where the engine always writes en-US; they now name `en-US` too,
+  held by `src/tests/engineLocale.guard.test.ts`, so both engines write the same
+  text for every player. The conformance
+  view drops log text, so `wasmHostLogText.integration.test.ts` also compares
+  the prose across a day, a quarter boundary and a maintenance boundary on
+  every fixture.
+- **Harness methods:** `advanceClock`, `seedLoopMemos` and
+  `seedElevatorTelemetry` let the gallery pin the clock without a load and
+  hand over a tower built in place with its owed passes and authored curve
+  (#899, partly). They are binding methods the harness calls directly: no game
+  command reaches them and the mirror does not relay them, though the browser
+  package exports them like every other method.
+
+Host preview after the fixes: 69 of 91 shots match (from 50), all three
+`27-elevator-schedule` shots included. What remains is listed on #899.
+
+Review: `/gds-code-review` round 1 (Blind Hunter, Edge Case Hunter,
+Acceptance Auditor). Patched: the treasure line's amount, order-dependent
+aggregate tests (each aggregate comparison is now one self-checking test), weekend coverage
+in the telemetry suite, a quarter jump that could be skipped, the plural lines
+pinned by unit tests, seed validation (non-object documents, ids past
+`MAX_SAFE_INTEGER`), the handoff restoring the page when the engine refuses a
+seed, and this section's wording. Deferred to #899: a handoff in the middle of
+an hour drops the pending boarding tally, a handoff after a morning checkout
+clears the housekeeping report, and a second handoff of a hosted tower
+re-derives its loop memos. Dismissed:
+the stats builder's money write (the relay forwards it as `setMoney`), the
+plural rules (each copies its TypeScript template), and a NaN boarding count
+(the waiting counts are never NaN).
+
+Round 2 (confirming pass, the same three layers). Patched: the TypeScript
+engine's log lines name the `en-US` locale (above), the treasure line and the
+single-office line are pinned by unit tests, the weekend jump skips a weekend
+start less than an hour ahead, a narrower comment on the merged telemetry
+objects, and wording here and on #868 and #899. Dismissed: the overlay
+builder's clock reference (unused after the ticks), the clock pin's delta (the
+read model's clock is synced from the engine every frame and no scene writes it
+directly), `is_multiple_of` (CI pins Rust 1.97), and a deeper memo test (both
+engines derive the memos with the same formulas).
+
+Round 3 (`/gds-code-review` confirming pass, and `/bmad-code-review` on the
+scripts, each with all three layers). Patched: the host's telemetry merge now
+updates each shaft's rings in place, since an open schedule dialog holds them
+and recomputes from them (a merge that swapped in new objects froze the dialog
+on the curve it opened with; a test now holds the rings across hosted hours),
+a stale comment in `e2e/visual.spec.ts` about the clock pin, and wording on
+#899. The scripts review found nothing else.
+
+Round 4 (`/gds-code-review` confirming pass on the round-3 fixes, all three
+layers): clean, with no new patch or defer finding.
+
+Parity projects (`npm run test:wasm:parity`, against #891's head as the
+baseline): this change fixes the two parity failures that read the
+elevator telemetry and the housekeeping report (`elevatorStats`,
+`housekeepingLegibility`) and adds none. The two new suites drive both
+engines themselves, so they join the TypeScript side of the parity config
+with `wasmHost.integration.test.ts`. `rentalCrowd`'s known merge-per-tick
+timeout (#868) fails on both heads; run alone, its file takes about 5% longer
+here (116 s against 110 s), the cost of reading the telemetry at each merge.

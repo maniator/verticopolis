@@ -90,6 +90,115 @@ pub fn number_to_string(x: f64) -> String {
     out
 }
 
+/// `Number.prototype.toLocaleString()` in the en-US locale: the shortest
+/// round-trip digits rounded half away from zero to at most three fraction
+/// digits, the integer part grouped by thousands, trailing fraction zeros
+/// dropped, and a negative sign kept even when the value rounds to zero. The
+/// TypeScript engine's log lines name the same locale
+/// (`toLocaleString("en-US")`, held by `src/tests/engineLocale.guard.test.ts`),
+/// so the two engines agree whatever the player's locale.
+pub fn to_locale_string(x: f64) -> String {
+    if x.is_nan() {
+        return "NaN".to_string();
+    }
+    let neg = x.is_sign_negative();
+    if x.is_infinite() {
+        return if neg { "-∞" } else { "∞" }.to_string();
+    }
+    // Digits and point position of |x| (value = 0.digits * 10^n).
+    let (mut digits, mut n): (Vec<u8>, i32) = if x == 0.0 {
+        (vec![0], 1)
+    } else {
+        let mut buf = ryu::Buffer::new();
+        let s = buf.format_finite(x.abs());
+        let (mantissa, exp) = match s.split_once('e') {
+            Some((m, e)) => (m, e.parse::<i32>().unwrap()),
+            None => (s, 0),
+        };
+        let (int_part, frac_part) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+        let all: Vec<u8> = int_part
+            .bytes()
+            .chain(frac_part.bytes())
+            .map(|b| b - b'0')
+            .collect();
+        let lead = all.iter().take_while(|d| **d == 0).count();
+        let n = int_part.len() as i32 + exp - lead as i32;
+        (all[lead..].to_vec(), n)
+    };
+    // Keep the digits up to three places after the point, rounding half up
+    // on the magnitude (ICU's halfExpand).
+    let keep = n + 3;
+    if keep < 0 {
+        digits = vec![0];
+        n = 1;
+    } else if (keep as usize) < digits.len() {
+        let round_up = digits[keep as usize] >= 5;
+        digits.truncate(keep as usize);
+        if round_up {
+            let mut i = digits.len();
+            loop {
+                if i == 0 {
+                    digits.insert(0, 1);
+                    n += 1;
+                    break;
+                }
+                i -= 1;
+                if digits[i] == 9 {
+                    digits[i] = 0;
+                } else {
+                    digits[i] += 1;
+                    break;
+                }
+            }
+        }
+        if digits.is_empty() {
+            digits = vec![0];
+            n = 1;
+        }
+    }
+    // Split into integer and fraction digits around the point.
+    let int_digits: Vec<u8> = (0..n.max(1))
+        .map(|i| {
+            if n <= 0 {
+                0
+            } else {
+                digits.get(i as usize).copied().unwrap_or(0)
+            }
+        })
+        .collect();
+    let mut frac: Vec<u8> = (0..3)
+        .map(|j| {
+            let idx = n + j;
+            if idx < 0 {
+                0
+            } else {
+                digits.get(idx as usize).copied().unwrap_or(0)
+            }
+        })
+        .collect();
+    while frac.last() == Some(&0) {
+        frac.pop();
+    }
+    let mut out = String::new();
+    if neg {
+        out.push('-');
+    }
+    let len = int_digits.len();
+    for (i, d) in int_digits.iter().enumerate() {
+        if i > 0 && (len - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push((b'0' + d) as char);
+    }
+    if !frac.is_empty() {
+        out.push('.');
+        for d in frac {
+            out.push((b'0' + d) as char);
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -139,5 +248,42 @@ mod tests {
             got.join(" "),
             "0 0 0.1 1e+21 1e-7 123456789.125 5 100000000000000000000 0.000001 1.7976931348623157e+308 5e-324 1.5e-7 1.23e-18 0.30000000000000004 0.3333333333333333 -1e+21 100 1000000 0.000001 0.7999999999999999"
         );
+    }
+
+    #[test]
+    fn to_locale_string_matches_node() {
+        // Expected values from Node's `x.toLocaleString("en-US")`.
+        let cases: [(f64, &str); 27] = [
+            (0.0, "0"),
+            (-0.0, "-0"),
+            (1.0, "1"),
+            (999.0, "999"),
+            (1000.0, "1,000"),
+            (1520000.0, "1,520,000"),
+            (32080.0, "32,080"),
+            (1234.5, "1,234.5"),
+            (1234.5678, "1,234.568"),
+            (1.0005, "1.001"),
+            (2.0005, "2.001"),
+            (0.0004, "0"),
+            (0.0005, "0.001"),
+            (-0.0004, "-0"),
+            (-1234.5, "-1,234.5"),
+            (1e21, "1,000,000,000,000,000,000,000"),
+            (1.5e22, "15,000,000,000,000,000,000,000"),
+            (123456789.123456, "123,456,789.123"),
+            (0.1 + 0.2, "0.3"),
+            (9.9995, "10"),
+            (999.9995, "1,000"),
+            (-999.9995, "-1,000"),
+            (4.35, "4.35"),
+            (1e-7, "0"),
+            (f64::NAN, "NaN"),
+            (f64::INFINITY, "∞"),
+            (f64::NEG_INFINITY, "-∞"),
+        ];
+        for (x, want) in cases {
+            assert_eq!(to_locale_string(x), want, "{x}");
+        }
     }
 }

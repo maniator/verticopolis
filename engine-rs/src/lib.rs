@@ -36,6 +36,7 @@ pub mod services;
 pub mod sim;
 pub mod sim_loop;
 pub mod star;
+pub mod telemetry;
 pub mod tower;
 pub mod tower_query;
 #[cfg(feature = "wasm")]
