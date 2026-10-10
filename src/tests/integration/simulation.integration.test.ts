@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation, ECON, VACATE_RESCIND } from "../../engine/Simulation";
 import { rentOf } from "../../engine/econConfig";
@@ -1706,7 +1707,7 @@ describe("Commercial-venue inspector: patronage/profit accumulation, rollover, s
     expect(shop.patronageToday ?? 0).toBeLessThan(shop.patronageYest ?? 0);
   });
 
-  it("cosmetic invariant: money + pendingIncome unchanged when patronage/profit are read only from render", () => {
+  itTypeScriptOnly("clears the render-only patronage and profit accumulators on the instance every hour mid-run, a write no command relays")("cosmetic invariant: money + pendingIncome unchanged when patronage/profit are read only from render", () => {
     // Two towers, identical seed and script. One runs on the shipped code
     // (accumulators active); the other has its accumulators forcibly cleared
     // every hour. If any economy path READ the accumulators, this would drift.

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
 import { Simulation } from "../../engine/Simulation";
 import { Clock } from "../../engine/Clock";
 import { FACILITIES } from "../../engine/facilities";
@@ -227,7 +228,7 @@ describe("end-to-end lunch trips: Modern lingers, Classic does not (Guardrails 2
     return n;
   }
 
-  it("Modern: deferred guests are still asleep at lunch and take hotel-origin trips", () => {
+  itTypeScriptOnly("runs economy.hotelCheckout() on the instance; the checkout pass is the engine's own hourly step, with no relayed command")("Modern: deferred guests are still asleep at lunch and take hotel-origin trips", () => {
     const sim = hotelTower("modern", 10);
     sim.economy.hotelCheckout(); // defers round(0.2*10)=2 rooms, rest dirty
     expect(asleepHotelCount(sim)).toBeGreaterThan(0);
@@ -308,7 +309,7 @@ describe("midday census lift is bounded and does not flip a star (Guardrail 5 / 
 });
 
 describe("understaffed housekeeping: late-checkout rooms behave like ordinary dirty rooms (AC8)", () => {
-  it("without a maid the afternoon-dirtied rooms stay dirty and are not re-let", () => {
+  itTypeScriptOnly("swaps sim.clock to each afternoon hour and resets lastHour after the crowd exists, and runs economy.hotelCheckout() and hotelLateCheckout() on the instance; no command relays either")("without a maid the afternoon-dirtied rooms stay dirty and are not re-let", () => {
     const sim = hotelTower("modern", 10); // no housekeeping unit placed
     sim.economy.hotelCheckout();
     const deferred = asleepHotelCount(sim);
