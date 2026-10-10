@@ -278,24 +278,11 @@ impl Simulation {
             .tower
             .unit_at(floor, x)
             .map(|u| (u.id, u.kind, u.state));
-        if let Some((id, kind, state)) = u {
+        if let Some((id, kind, _)) = u {
             if !kind.is_structural() {
-                if state == UnitState::Fire {
-                    return false;
-                }
-                self.tower.remove_unit(id);
-                self.money += if state == UnitState::Gutted {
-                    crate::econ::GUTTED_RESALE_REFUND
-                } else {
-                    kind.resale_refund()
-                };
-                if kind == Kind::WeddingHall
-                    && self.tower.built_wedding_hall != Some(true)
-                    && self.evaluated_tower != Some(true)
-                {
-                    self.vip_visit_day = -1.0;
-                }
-                return true;
+                // The by-id `sell` shares this path (`sellUnit`), so every
+                // removal keeps the fire refusal and the refund rule.
+                return self.sell_unit(id).ok;
             }
         }
         if let Some((id, kind)) = t {
