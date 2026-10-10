@@ -233,3 +233,13 @@ messages match the shipped binding verbatim, the TypeScript fixture load
 agrees on all 128 loads, `tenants_by_tdt` is an `IndexMap`); its remaining
 low, test-only items are follow-ups on #885. The loop is closed here.
 
+Go/no-go (2026-10-10, party: game design, architecture, test, implementation,
+the adversary, and a SimTower veteran): GO for phase 1, on three merge
+conditions: Copilot reviews the PR with no blocking finding; required CI is
+green on the head, the only exceptions being `engine-parity` and
+`capture-wasm / shoot (features)` while they show exactly #904's 41 known
+shots; a merge commit. **Phase 3 gate:** the web does not route a player's
+`.TDT` through the Rust codec until the owner's real-save check (#885) and
+the 1994-fidelity verification (#920) have run. The served package's growth
+is #932.
+
