@@ -12,6 +12,7 @@ import {
   buildFireTower,
   buildModernPricingTower,
   pgDismissSplash,
+  pgSetClock,
 } from "../screenshot-builders.ts";
 import { pgShowReturningSplash, pgShowTowerPicker } from "./returningPlayerPage.ts";
 import { DIALOG_PIN_SHOTS } from "./dialogPinShots.ts";
@@ -265,12 +266,10 @@ export const SHOWCASE_SCENES: Scene[] = [
             if (g.engine) g.engine.selectedId = null;
             g.ui?.hideEditor?.();
             g.speed = 0;
-            const c = g.sim.clock;
-            let delta = 8 * 60 + 30 - c.minuteOfDay;
-            if (delta < 0) delta += 1440;
-            c.advance(delta);
             g.engine.setCamera(Math.floor(g.grid.width / 2), 2, 1.7);
           });
+          // 08:30, moved on the engine too on the WASM leg.
+          await page.evaluate(pgSetClock, 8.5);
         },
         wait: 1200,
       },
@@ -336,12 +335,14 @@ export const SHOWCASE_SCENES: Scene[] = [
       },
       {
         name: "13-game-night",
-        setup: async (page) =>
-          void (await page.evaluate(() => {
-            const c = (window as any).game.sim.clock;
-            c.minutes = c.minutes - c.minuteOfDay + 23 * 60;
-            (window as any).game.engine.zoomAt(1 / 1.6, 640, 400);
-          })),
+        setup: async (page) => {
+          // 23:00 the same day: pgSetClock only moves forward, so a clock
+          // already past 23:00 would land a day later. Fail instead.
+          const minute = await page.evaluate(() => (window as any).game.sim.clock.minuteOfDay as number);
+          if (minute > 23 * 60) throw new Error(`the clock is already at minute ${minute} of the day, past 23:00; shorten the waits (or the speed) of the shots before it in this scene so it starts before 23:00`);
+          await page.evaluate(pgSetClock, 23);
+          await page.evaluate(() => (window as any).game.engine.zoomAt(1 / 1.6, 640, 400));
+        },
         wait: 800,
       },
     ],

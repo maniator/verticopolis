@@ -187,13 +187,14 @@ export function buildStatsTower(): void {
   }
   // Run a simulated quarter so incomeBreakdown()/elevator loads have data.
   s.evaluateStar();
-  // The gallery's engine leg hands the tower to the WASM engine here, before
-  // the ticks, so the engine runs them and grows its own crowd (a save carries
-  // none). Unset on the TypeScript leg, where nothing changes.
+  // The gallery settles the tower here on both legs (scripts/screenshot-engine.ts):
+  // a load, so the WASM leg's engine runs the ticks and grows its own crowd (a
+  // save carries none) and the TypeScript leg starts from the same load.
+  // Unset outside the gallery, where nothing changes.
   const handoff = (window as unknown as { __vcShotHandoff?: () => string }).__vcShotHandoff;
   if (handoff) {
     const state = handoff();
-    if (!state.startsWith("hosted")) throw new Error(`WASM leg: the tower is not on the engine before the ticks (${state})`);
+    if (!state.startsWith("settled") && !state.startsWith("skipped")) throw new Error(`could not settle the tower before the ticks (${state})`);
     s = g.sim;
   }
   for (let i = 0; i < 90; i++) s.tick(60);
@@ -312,13 +313,14 @@ export function buildOverlayTower(): void {
   // every run, then FREEZE so the capture is byte-stable.
   const c = s.clock;
   c.minutes = c.minutes - c.minuteOfDay + 8 * 60;
-  // The gallery's engine leg hands the tower to the WASM engine here, before
-  // the ticks, so the engine runs them and grows its own crowd (a save carries
-  // none). Unset on the TypeScript leg, where nothing changes.
+  // The gallery settles the tower here on both legs (scripts/screenshot-engine.ts):
+  // a load, so the WASM leg's engine runs the ticks and grows its own crowd (a
+  // save carries none) and the TypeScript leg starts from the same load.
+  // Unset outside the gallery, where nothing changes.
   const handoff = (window as unknown as { __vcShotHandoff?: () => string }).__vcShotHandoff;
   if (handoff) {
     const state = handoff();
-    if (!state.startsWith("hosted")) throw new Error(`WASM leg: the tower is not on the engine before the ticks (${state})`);
+    if (!state.startsWith("settled") && !state.startsWith("skipped")) throw new Error(`could not settle the tower before the ticks (${state})`);
     s = g.sim;
   }
   for (let i = 0; i < 150; i++) s.tick(1);
