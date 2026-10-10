@@ -2,6 +2,7 @@ import { LOG_RING_CAP } from "../engine/sim/constants";
 import { Simulation } from "../engine/Simulation";
 import type { Person } from "../engine/crowd/person";
 import type { LogEntry } from "../engine/types";
+import type { GameplayEvent } from "../engine/gameplayEvents";
 import type { WasmEngine, WasmModule } from "../dualrun/binding";
 import { loadCommand, relayCommands } from "../dualrun/mirror";
 import { ShadowEngine } from "../dualrun/shadow";
@@ -23,6 +24,14 @@ import { mergeSimulation } from "./merge";
  * The instance's `serialize` answers with the engine's save, so a save, an
  * export or an undo snapshot is the engine's state and never the read
  * model's view of it.
+ *
+ * Gameplay events follow the same rule: the instance runs every command too,
+ * so its own buffer would report each one a second time. Its
+ * `drainGameplayEvents` answers with the engine's batch and throws the
+ * instance's away, so a host that drains `sim` sees each event once whichever
+ * engine runs. Events the instance emitted before the host attached (the
+ * founding) come out at the first drain, and events the engine emitted
+ * after the last drain go back to the instance when the host detaches.
  */
 export interface WasmHost {
   /** The engine behind the instance. */
@@ -55,6 +64,20 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
   let simLogSeqAtSync = sim.logSeq;
   let detached = false;
 
+  // The instance's events up to now are real (it was the authority); the
+  // engine's start from here. The instance keeps its own buffer object for
+  // the whole attach (the merge puts it back), so its marks, its drop count
+  // and the read model's copies since the last drain all stay on it.
+  let carried: GameplayEvent[] = sim.gameplayEvents.drain();
+  // The read model's own ring overflows with duplicates while hosted, so the
+  // drop count is the instance's at attach plus the engine's.
+  const droppedAtAttach = sim.gameplayEvents.dropped;
+  const drainHosted = (): GameplayEvent[] => {
+    sim.gameplayEvents.drain();
+    const out = [...carried, ...(JSON.parse(engine.drainGameplayEvents()) as GameplayEvent[])];
+    carried = [];
+    return out;
+  };
   const host: WasmHost = {
     engine,
     frames: 0,
@@ -65,16 +88,52 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
     detach() {
       if (detached) return;
       detached = true;
-      relay.detach();
-      if (ownSerialize) Object.defineProperty(sim, "serialize", ownSerialize);
-      else delete (sim as Partial<Simulation>).serialize;
-      shadow.free();
+      // The instance is the authority again: it keeps the events the engine
+      // still owes and the engine's drop count. Every step of the teardown
+      // runs even when an earlier one throws (an engine that can no longer
+      // answer, a trap), so the instance is always let go and the engine
+      // always freed. When the engine cannot hand its batch over, the read
+      // model's copies of the commands' events since the last drain count as
+      // dropped. That is an estimate: the engine's own tick events (fires,
+      // stars, milestones) have no copy in the read model; a command the
+      // instance accepted but the engine refused (#874) has no twin there;
+      // a command the engine's full ring already dropped is counted again
+      // from its copy; and the copies stop at the read model's ring cap.
+      const duplicates = sim.gameplayEvents.length;
+      let owed: GameplayEvent[] = carried;
+      let dropped = droppedAtAttach + duplicates;
+      try {
+        dropped += engine.gameplayEventsDropped();
+        owed = drainHosted();
+        dropped -= duplicates;
+      } finally {
+        try {
+          relay.detach();
+        } finally {
+          try {
+            restoreOwn(sim, "serialize", ownSerialize);
+            restoreOwn(sim, "drainGameplayEvents", ownDrain);
+            restoreOwn(sim, "gameplayEventsDropped", ownDropped);
+            sim.gameplayEvents.drain(); // the read model's duplicates
+            sim.gameplayEvents.dropped = dropped;
+            for (const e of owed) sim.gameplayEvents.pushEvent(e);
+          } finally {
+            shadow.free();
+          }
+        }
+      }
     },
   };
 
   const merge = (frame: FrameView) => {
     const fresh = Simulation.deserialize(JSON.parse(engine.serialize()));
-    mergeSimulation(sim, fresh, { revision: frame.header.revision, mealOverlayRevision: frame.header.mealOverlayRevision });
+    const buffer = sim.gameplayEvents;
+    try {
+      mergeSimulation(sim, fresh, { revision: frame.header.revision, mealOverlayRevision: frame.header.mealOverlayRevision });
+    } finally {
+      sim.gameplayEvents = buffer; // the merge copies the fresh, empty one
+      sim.tower.gameplayEvents = buffer;
+    }
     lastRevision = frame.header.revision;
     host.merges++;
   };
@@ -136,13 +195,32 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
     });
   } catch (e) {
     // A relay already on the instance (the dual run's mirror, a second
-    // host): the engine built for it must not leak.
-    shadow.free();
+    // host): the engine built for it must not leak, and the instance keeps
+    // its own events.
+    try {
+      shadow.free();
+    } finally {
+      for (const ev of carried) sim.gameplayEvents.pushEvent(ev);
+    }
     throw e;
   }
   const ownSerialize = Object.getOwnPropertyDescriptor(sim, "serialize");
+  const ownDrain = Object.getOwnPropertyDescriptor(sim, "drainGameplayEvents");
+  const ownDropped = Object.getOwnPropertyDescriptor(sim, "gameplayEventsDropped");
   Object.defineProperty(sim, "serialize", { value: () => JSON.parse(engine.serialize()), configurable: true, writable: true });
+  // A reference to the override kept past detach drains the instance, which
+  // is the authority again, and never reaches the freed engine.
+  const drainOverride = (): GameplayEvent[] => (detached ? sim.gameplayEvents.drain() : drainHosted());
+  Object.defineProperty(sim, "drainGameplayEvents", { value: drainOverride, configurable: true, writable: true });
+  Object.defineProperty(sim, "gameplayEventsDropped", { get: () => droppedAtAttach + engine.gameplayEventsDropped(), configurable: true });
   return host;
+}
+
+/** Put back an own property the host replaced: the one that was there, or
+ *  none (the prototype's member shows through again). */
+function restoreOwn(sim: Simulation, name: string, desc: PropertyDescriptor | undefined): void {
+  if (desc) Object.defineProperty(sim, name, desc);
+  else delete (sim as unknown as Record<string, unknown>)[name];
 }
 
 /** The optional person fields the frame carries: set when the record has

@@ -23,6 +23,7 @@ function day(sim: Simulation, speed: number, steadyClock = false, run = new Dual
   new FrameDriver(sim, speed, steadyClock).run(DAY);
   const report = run.stop();
   expect(report.divergences).toEqual([]);
+  expect(report.eventDivergences).toEqual([]);
   // A frame at the catch-up cap can carry the clock past the day by up to
   // half an hour, so the count follows the hours the run crossed (24 or 25); a
   // founded game's first step also runs its founding hour's pass.

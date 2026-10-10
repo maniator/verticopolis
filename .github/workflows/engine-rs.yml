@@ -129,8 +129,8 @@ jobs:
         run: |
           npm ci
           npm run wasm:build
-          # The checked-in declaration has to be the one this build wrote.
-          test -z "$(git status --porcelain -- src/dualrun/engine.d.ts)" || { echo "src/dualrun/engine.d.ts is stale or untracked: run npm run wasm:build and commit it"; exit 1; }
+          # The checked-in declarations have to be the ones this build wrote.
+          test -z "$(git status --porcelain -- src/dualrun/engine.d.ts src/engine/gameplayEvents.d.ts)" || { echo "src/dualrun/engine.d.ts or src/engine/gameplayEvents.d.ts is stale or untracked: run npm run wasm:build and commit them"; exit 1; }
           npm run test:wasm
 
       # Coverage of the unit tests plus the referee, with a line floor that

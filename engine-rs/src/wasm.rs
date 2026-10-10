@@ -280,7 +280,7 @@ impl Engine {
 
     #[wasm_bindgen(js_name = setCars)]
     pub fn set_cars(&mut self, id: i32, cars: i32) -> bool {
-        self.sim.tower.set_cars(id.into(), cars.into())
+        self.sim.set_cars(id.into(), cars.into())
     }
 
     /// `Tower.setSchedule(id, schedule)` with the schedule as JSON text.
@@ -334,7 +334,6 @@ impl Engine {
     pub fn resize_transport(&mut self, id: i32, bottom: i32, top: i32) -> String {
         let r = self
             .sim
-            .tower
             .resize_transport(id.into(), bottom.into(), top.into());
         let mut v = serde_json::json!({
             "ok": r.ok,
@@ -483,6 +482,21 @@ impl Engine {
     #[wasm_bindgen(js_name = logSince)]
     pub fn log_since(&self, seq: i32) -> String {
         log_since(&self.sim, seq.into()).to_string()
+    }
+
+    /// The gameplay events emitted since the last drain, oldest first, as
+    /// JSON `[{ name, payload }]` (`conformance/events/catalog.json`); the
+    /// buffer is empty afterwards.
+    #[wasm_bindgen(js_name = drainGameplayEvents)]
+    pub fn drain_gameplay_events(&mut self) -> String {
+        crate::gameplay::batch_json(&self.sim.gameplay.drain()).to_string()
+    }
+
+    /// How many gameplay events a full buffer has pushed out since this
+    /// engine was made (a host that drains every frame never sees one).
+    #[wasm_bindgen(js_name = gameplayEventsDropped)]
+    pub fn gameplay_events_dropped(&self) -> f64 {
+        self.sim.gameplay.dropped as f64
     }
 }
 

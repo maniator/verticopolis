@@ -47,6 +47,12 @@ export class Engine {
      */
     crowdView(): string;
     /**
+     * The gameplay events emitted since the last drain, oldest first, as
+     * JSON `[{ name, payload }]` (`conformance/events/catalog.json`); the
+     * buffer is empty afterwards.
+     */
+    drainGameplayEvents(): string;
+    /**
      * `sim.emit(text, kind)`: a log entry at the engine's clock.
      */
     emit(text: string, kind: string): void;
@@ -77,6 +83,11 @@ export class Engine {
      * overwrites the save's mode before loading, as a scenario start does.
      */
     static fromVctower(text: string, mode?: string | null): Engine;
+    /**
+     * How many gameplay events a full buffer has pushed out since this
+     * engine was made (a host that drains every frame never sees one).
+     */
+    gameplayEventsDropped(): number;
     /**
      * The log entries emitted after `seq` (the `logSeq` the host last saw),
      * oldest first, as JSON `[{ seq, minute, text, kind }]`. The engine keeps

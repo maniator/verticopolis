@@ -3,8 +3,9 @@
 
 use crate::clock::GameMode;
 use crate::facilities::*;
+use crate::gameplay::{GameplayEvent, RemovalMethod};
 use crate::sim::{LogKind, Simulation};
-use crate::tower::UnitState;
+use crate::tower::{ResizeResult, UnitState};
 
 pub struct BuildResult {
     pub ok: bool,
@@ -243,6 +244,11 @@ impl Simulation {
                 }
             }
         }
+        self.gameplay.push(GameplayEvent::FacilityPlaced {
+            kind,
+            floor: floor + hgt - 1,
+            count: 1,
+        });
         BuildResult {
             ok: true,
             reason: None,
@@ -272,6 +278,11 @@ impl Simulation {
             };
         }
         self.money -= total;
+        self.gameplay.push(GameplayEvent::FacilityPlaced {
+            kind,
+            floor: top,
+            count: 1,
+        });
         BuildResult {
             ok: true,
             reason: None,
@@ -301,12 +312,14 @@ impl Simulation {
                 {
                     self.vip_visit_day = -1.0;
                 }
+                self.note_removed(kind);
                 return true;
             }
         }
         if let Some((id, kind)) = t {
             self.tower.remove_transport(id);
             self.money += kind.resale_refund();
+            self.note_removed(kind);
             return true;
         }
         if let Some((id, kind, _)) = u {
@@ -315,9 +328,59 @@ impl Simulation {
             }
             self.tower.remove_unit(id);
             self.money += kind.resale_refund();
+            self.note_removed(kind);
             return true;
         }
         false
+    }
+
+    /// `facility_removed` for the engine's sell command.
+    fn note_removed(&mut self, kind: Kind) {
+        self.gameplay.push(GameplayEvent::FacilityRemoved {
+            kind,
+            method: RemovalMethod::Sell,
+        });
+    }
+
+    /// `tower.setCars(id, cars)` with its `capacity_changed`. The TypeScript
+    /// tower emits from its own method; here the binding and the referee call
+    /// this wrapper, since the tower cannot reach the simulation's buffer.
+    pub fn set_cars(&mut self, id: i64, cars: i64) -> bool {
+        let ok = self.tower.set_cars(id, cars);
+        if ok {
+            self.note_capacity(id);
+        }
+        ok
+    }
+
+    /// `tower.resizeTransport(id, bottom, top)` with its `capacity_changed`,
+    /// when the span actually moved.
+    pub fn resize_transport(&mut self, id: i64, bottom: i64, top: i64) -> ResizeResult {
+        let span = |sim: &Simulation| {
+            sim.tower
+                .transports
+                .iter()
+                .find(|t| t.id == id)
+                .map(|t| (t.bottom, t.top))
+        };
+        let before = span(self);
+        let r = self.tower.resize_transport(id, bottom, top);
+        if r.ok && span(self) != before {
+            self.note_capacity(id);
+        }
+        r
+    }
+
+    fn note_capacity(&mut self, id: i64) {
+        if let Some(kind) = self
+            .tower
+            .transports
+            .iter()
+            .find(|t| t.id == id)
+            .map(|t| t.kind)
+        {
+            self.gameplay.push(GameplayEvent::CapacityChanged { kind });
+        }
     }
 }
 

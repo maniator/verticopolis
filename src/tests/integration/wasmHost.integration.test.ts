@@ -3,7 +3,9 @@ import { Simulation } from "../../engine/Simulation";
 import type { Person } from "../../engine/crowd/person";
 import { canonicalJson } from "../../engine/canonicalJson";
 import { stateView } from "../../engine/conformanceView";
+import { startWasmHost } from "../../wasmhost/startWasmHost";
 import { attachWasmHost } from "../../wasmhost/wasmHost";
+import { attachMirror } from "../../dualrun/mirror";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import { FIXTURES, FrameDriver, loadFixture } from "../dualrun/dualRunHarness";
 
@@ -126,6 +128,136 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     // Detached, the instance is a plain TypeScript simulation again.
     expect(Object.getOwnPropertyDescriptor(sim, "serialize")).toBeUndefined();
     expect(Object.getOwnPropertyDescriptor(sim, "money")?.value).toBeDefined();
+  });
+
+  // The instance runs every command the engine runs, so both buffers fill;
+  // the host must hand over the engine's batch and nothing of the instance's.
+  // The same edits on an unhosted TypeScript engine are the count to match.
+  it("drains each gameplay event once, from the engine, across attach and detach", () => {
+    const edits = (sim: Simulation): void => {
+      sim.money = 1e9;
+      for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+      for (let x = 170; x < 200; x++) expect(sim.build("floor", 2, x).ok).toBe(true);
+      expect(sim.build("office", 2, 180).ok).toBe(true);
+      expect(sim.buildTransport("elevatorStandard", 172, 1, 2).ok).toBe(true);
+      const shaft = sim.tower.transportAt(1, 172)!;
+      expect(sim.tower.setCars(shaft.id, 2)).toBe(true);
+      expect(sim.tower.setCars(shaft.id, 2)).toBe(false); // a no-op emits nothing
+      const office = sim.tower.unitAt(2, 180)!;
+      expect(sim.adjustRent(office.id, 1)).not.toBeNull();
+      expect(sim.sellAt(2, 199)).toBe(true);
+      sim.tick(120);
+    };
+    const plain = Simulation.newGame(41, "classic");
+    edits(plain);
+    const want = plain.drainGameplayEvents();
+    const placed = want.filter((e) => e.name === "facility_placed").length;
+    expect(placed).toBe(62);
+    expect(want.filter((e) => e.name === "tower_founded")).toHaveLength(1);
+
+    const sim = Simulation.newGame(41, "classic");
+    const host = attachWasmHost(sim, wasm());
+    edits(sim);
+    // The founding (before the host attached) and the engine's batch, once.
+    expect(sim.drainGameplayEvents()).toEqual(want);
+    expect(sim.drainGameplayEvents()).toEqual([]);
+    expect(sim.gameplayEventsDropped).toBe(0);
+    // Events the engine emitted after the last drain go back to the
+    // instance when the host lets go, still once.
+    expect(sim.build("office", 2, 190).ok).toBe(true);
+    const kept = sim.drainGameplayEvents; // a reference held across the detach
+    host.detach();
+    expect(Object.getOwnPropertyDescriptor(sim, "drainGameplayEvents")).toBeUndefined();
+    expect(kept()).toEqual([{ name: "facility_placed", payload: { kind: "office", floor: 2, count: 1 } }]);
+    expect(sim.drainGameplayEvents()).toEqual([]);
+  });
+
+  it("lets go of the instance when the engine can no longer answer at detach", () => {
+    const sim = Simulation.newGame(42, "modern");
+    const host = attachWasmHost(sim, wasm());
+    sim.money = 1e9;
+    for (let x = 170; x < 180; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    // A trapped engine throws from every call.
+    (host.engine as { drainGameplayEvents: () => string }).drainGameplayEvents = () => { throw new Error("unreachable executed"); };
+    expect(() => host.detach()).toThrow(/unreachable/);
+    expect(Object.getOwnPropertyDescriptor(sim, "drainGameplayEvents")).toBeUndefined();
+    expect(Object.getOwnPropertyDescriptor(sim, "gameplayEventsDropped")).toBeUndefined();
+    expect(Object.getOwnPropertyDescriptor(sim, "serialize")).toBeUndefined();
+    // The founding, emitted before the host attached, is still owed. The
+    // engine's ten placements are lost with it, and the drop count records
+    // them from the read model's ten copies.
+    expect(sim.drainGameplayEvents()).toEqual([{ name: "tower_founded", payload: { mode: "modern" } }]);
+    expect(sim.gameplayEventsDropped).toBe(10);
+    expect(() => host.engine.mode()).toThrow(); // freed
+  });
+
+  // A paused player builds, then undoes before anything drains: the app swaps
+  // in the restored tower and the host follows it. The events the engine
+  // still owed reach the restored tower ahead of its own, once; the
+  // abandoned instance keeps none.
+  it("hands the events still owed to the tower that replaces it", () => {
+    const sim = Simulation.newGame(45, "classic");
+    sim.money = 1e9;
+    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    sim.drainGameplayEvents();
+    const app = {
+      sim,
+      adoptSim(next: Simulation) {
+        next.gameplayEvents.inherit(this.sim.gameplayEvents); // as GameApp.adoptSim does
+        this.sim = next;
+      },
+    };
+    const handle = startWasmHost(app, wasm(), { info: () => {}, error: () => {} });
+    const snapshot = JSON.stringify(sim.serialize());
+    for (let x = 170; x < 180; x++) expect(sim.build("floor", 2, x).ok).toBe(true);
+    const restored = Simulation.deserialize(JSON.parse(snapshot));
+    expect(restored.build("office", 2, 190).ok).toBe(true); // the restored tower's own, after the swap's
+    app.adoptSim(restored);
+    expect(handle.status).toMatchObject({ starts: 2, hosted: true, errors: [] });
+    const events = restored.drainGameplayEvents();
+    expect(events).toHaveLength(11);
+    expect(events.slice(0, 10).every((e) => e.name === "facility_placed" && e.payload.kind === "floor")).toBe(true);
+    expect(events[10]).toEqual({ name: "facility_placed", payload: { kind: "office", floor: 2, count: 1 } });
+    expect(sim.drainGameplayEvents()).toEqual([]);
+    expect(restored.gameplayEventsDropped).toBe(0);
+    handle.stop();
+  });
+
+  // A merge copies the fresh deserialization's empty buffer; the host puts
+  // the instance's own back, so its mark (a title backdrop's) and the read
+  // model's copies since the last drain survive the hour pass.
+  it("keeps the instance's own buffer across a merge", () => {
+    const sim = Simulation.newGame(46, "classic");
+    const buffer = sim.gameplayEvents;
+    buffer.discardOnHandOff = true;
+    const host = attachWasmHost(sim, wasm());
+    sim.money = 1e9;
+    expect(sim.build("lobby", 1, 180).ok).toBe(true);
+    host.syncStructure();
+    expect(host.merges).toBeGreaterThan(0);
+    expect(sim.gameplayEvents).toBe(buffer);
+    expect(sim.tower.gameplayEvents).toBe(buffer);
+    expect(buffer.discardOnHandOff).toBe(true);
+    expect(buffer.length).toBe(1); // the read model's copy of the placement
+    host.detach();
+  });
+
+  it("puts back an own drain the instance had before the host", () => {
+    const sim = Simulation.newGame(44, "classic");
+    const own = () => [];
+    Object.defineProperty(sim, "drainGameplayEvents", { value: own, configurable: true, writable: true });
+    const host = attachWasmHost(sim, wasm());
+    expect(sim.drainGameplayEvents).not.toBe(own);
+    host.detach();
+    expect(sim.drainGameplayEvents).toBe(own);
+  });
+
+  it("leaves the instance's events alone when it refuses to attach", () => {
+    const sim = Simulation.newGame(43, "classic");
+    const detachMirror = attachMirror(sim, () => {});
+    expect(() => attachWasmHost(sim, wasm())).toThrow(/already attached/);
+    detachMirror();
+    expect(sim.drainGameplayEvents()).toEqual([{ name: "tower_founded", payload: { mode: "classic" } }]);
   });
 
   it("refuses a tower whose crowd already exists", () => {

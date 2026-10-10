@@ -1,6 +1,7 @@
 import type { Simulation } from "../Simulation";
 
 import { TOWER_POPULATION } from "../facilities";
+import { noteStars } from "./star";
 
 /** Random events, VIP, fires, choices for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -64,8 +65,10 @@ export function checkVip(sim: Simulation): void {
     sim.hasOperational("metro") && // re-checked: selling the metro after 5★ must not allow the win
     pop >= TOWER_POPULATION;
   if (ok) {
+    const from = sim.star;
     sim.star = 6;
     sim.evaluatedTower = true;
+    noteStars(sim, from);
     sim.emit("The VIP was impressed! Your building is now a TOWER. You win!", "good");
   } else {
     sim.emit("The VIP was unimpressed. Grow your population and amenities, then rebuild interest.", "bad");

@@ -2,6 +2,8 @@ import { facilityFloors } from "./facilities";
 import { CLASSIC_RULES, type GameRules } from "./gameRules";
 import { FACILITIES } from "./facilitiesData";
 import type { Facility, FacilityKind, PlaceResult, Transport, Unit } from "./types";
+import type { GameplayEventBuffer } from "./gameplayEventBuffer";
+import * as capacityEdits from "./tower/capacityEdits";
 import { isStructural } from "./tower/towerTopology";
 import * as placement from "./tower/placement";
 import * as transport from "./tower/transport";
@@ -13,6 +15,8 @@ export class Tower {
    *  mode-dependent placement checks (the Classic-only escalator/office rule)
    *  match the sim. A bare `new Tower()` defaults to canon-faithful Classic. */
   rules: GameRules = CLASSIC_RULES;
+  /** The owning Simulation's gameplay events (see tower/capacityEdits.ts). */
+  gameplayEvents?: GameplayEventBuffer;
   units: Unit[] = [];
   transports: Transport[] = [];
   nextId = 1;
@@ -351,13 +355,9 @@ export class Tower {
     return transport.layShaftFloors(this, floors, x, width);
   }
 
-  resizeTransport(id: number, newBottom: number, newTop: number): PlaceResult & { added?: number; floorTilesCreated?: number } {
-    return transport.resizeTransport(this, id, newBottom, newTop);
-  }
+  resizeTransport(id: number, newBottom: number, newTop: number): PlaceResult & { added?: number; floorTilesCreated?: number } { return capacityEdits.resizeTransport(this, id, newBottom, newTop); }
 
-  setCars(id: number, cars: number): boolean {
-    return transport.setCars(this, id, cars);
-  }
+  setCars(id: number, cars: number): boolean { return capacityEdits.setCars(this, id, cars); }
 
   /** Write an authored per-shaft elevator schedule, hardened against the shaft's
    *  live cars and span (elevator-scheduling #305 Phase 3). Bumps `revision`. */

@@ -7,7 +7,8 @@
  * engine, the declaration wasm-bindgen writes is copied to
  * src/dualrun/engine.d.ts, the one checked-in file, so the TypeScript side
  * types against the binding as the Rust source declares it (CI fails when the
- * copy is stale).
+ * copy is stale). The engine build also refreshes src/engine/gameplayEvents.d.ts
+ * from conformance/events/catalog.json (the same as `npm run gen:events`).
  * The browser target lands in src/public/engine/ with a BUILD.json naming the
  * sources it came from (see src/wasmhost/packageHash.ts).
  * Needs the wasm32-unknown-unknown target and a wasm-bindgen CLI of the
@@ -19,6 +20,7 @@ import { copyFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "n
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { engineSourceHash } from "../src/wasmhost/packageHash.ts";
+import { checkCatalog, renderGameplayEventsDts } from "../src/engine/gameplayCatalog.ts";
 
 const CRATES: Record<string, { dir: string; lib: string }> = {
   engine: { dir: "engine-rs", lib: "verticopolis_engine" },
@@ -83,7 +85,13 @@ if (which === "engine") {
   // The class declaration is the same for both targets; the Node copy is the
   // committed one (`src/dualrun/binding.ts` types against it).
   copyFileSync(resolve(crate, "pkg/verticopolis_engine.d.ts"), resolve(crate, "../src/dualrun/engine.d.ts"));
-  console.log("engine-rs/pkg and src/public/engine: built; src/dualrun/engine.d.ts refreshed");
+  // The gameplay event types come from the catalog both engines are held to,
+  // so they are refreshed with the binding's own declaration.
+  writeFileSync(
+    resolve(crate, "../src/engine/gameplayEvents.d.ts"),
+    renderGameplayEventsDts(checkCatalog(JSON.parse(readFileSync(resolve(crate, "../conformance/events/catalog.json"), "utf8")))),
+  );
+  console.log("engine-rs/pkg and src/public/engine: built; src/dualrun/engine.d.ts and src/engine/gameplayEvents.d.ts refreshed");
 } else {
   console.log(`${target.dir}/pkg: built`);
 }
