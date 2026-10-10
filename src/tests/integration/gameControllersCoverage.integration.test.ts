@@ -759,6 +759,21 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     for (let i = 0; i < 4; i++) expect(sim.tower.structureKindAt(5, 58 + i)).toBe("floor");
   });
 
+  it("a tower swapped in mid-drag starts a fresh high-water mark, so nothing grows unbilled", () => {
+    sel = { type: "transport", id: lift.id };
+    editor.extendSelectedTo("up", 4); // the old tower's drag reaches floor 4
+    expect(lift.top).toBe(4);
+    // A load or an undo adopts a copy of the tower from before the drag; the
+    // shaft keeps its id but stands at 1..2 again.
+    const snapshot = Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())));
+    expect(snapshot.tower.resizeTransport(lift.id, 1, 2).ok).toBe(true);
+    sim = snapshot;
+    const before = sim.money;
+    editor.extendSelectedTo("up", 4); // the stale mark (top 4) must not make this free
+    expect(sim.tower.transportById(lift.id)!.top).toBe(4);
+    expect(before - sim.money).toBe(2 * ECON.transportFloorCost);
+  });
+
   it("extendSelectedTo guards: no selection, a unit, and a stairway (no extend handles) all bail", () => {
     editor.extendSelectedTo("up", 4);
     sel = { type: "unit", id: office.id };
