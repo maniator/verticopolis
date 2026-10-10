@@ -48,7 +48,7 @@ export type PersonRecord = Pick<
   Person,
   "id" | "seed" | "state" | "floor" | "x" | "fy" | "wait" | "originFloor" | "originUnitId" | "venueUnitId" | "mealVenueId" | "countedHotelGuest" | "routine" | "returning" | "dwellSecondsLeft" | "floors" | "shafts"
 > & { staff: boolean };
-// (An absent dwell timer crosses as NaN rather than a sentinel number: the
+// (An absent dwell timer crosses as NaN, since no sentinel number is free: the
 // timer stays negative on a person through the return leg, so -1 is taken.)
 
 /** The per-frame slice of a {@link Unit}: the counters the engine keeps for
