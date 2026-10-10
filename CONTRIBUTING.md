@@ -75,7 +75,12 @@ Verticopolis has **two test tiers**:
     (`cargo run --release --bin conformance`, and again through the WASM
     binding from Node with `npm run wasm:build && npm run test:wasm`, which
     also runs the dual run's day gate: both engines driven by the frame
-    loop's own step math and compared every hour). The game runs on the
+    loop's own step math and compared every hour, and the `.TDT` codec's
+    differential test, `conformanceWasmTdt.integration.test.ts`, which runs
+    both codecs on seeded inputs, with its side runners in
+    `src/tests/conformance/tdtDifferential.ts` and its input builders in
+    `src/tests/fixtures/tdtDifferentialInputs.ts`; its `VC_TDT_DIFF_*`
+    switches are listed in its header). The game runs on the
     WASM engine behind `?engine=wasm` (the TypeScript engine stays the
     default); after any change under `engine-rs/`, run `npm run wasm:build`
     and commit `src/public/engine/` (the served package); otherwise the unit
@@ -94,7 +99,9 @@ Verticopolis has **two test tiers**:
     review checks that, and the floor only moves up.
     Forged-save handling is pinned the same way by
     `conformance/loader-cases.json` (`loaderCases.integration.test.ts` writes
-    it, a Rust test replays it). A nightly differential fuzzer
+    it, a Rust test replays it), and the `.TDT` codec by
+    `conformance/tdt-cases.json` (`tdtCases.integration.test.ts` writes it,
+    `cargo run --release --bin tdt` and a Rust test replay it). A nightly differential fuzzer
     (`engine-fuzz.yml`) runs seeded random scenarios through both engines; a
     divergence it finds is pinned as a named scenario in the fix PR.
 
