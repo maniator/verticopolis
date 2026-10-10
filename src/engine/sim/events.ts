@@ -46,9 +46,10 @@ export function maybeVipStay(sim: Simulation): void {
  *  directly on a deterministic population (without the crowd sim in the loop). */
 export function checkVip(sim: Simulation): void {
   if (sim.evaluatedTower || sim.vipVisitDay < 0) return;
-  // If the Wedding Hall is gone before the inspection (sold via ANY path,
-  // the editor and bulldoze tool call tower.removeUnit directly, not sellAt),
-  // cancel the pending visit so it can't keep re-failing and spamming the log.
+  // If the Wedding Hall is gone before the inspection, cancel the pending
+  // visit so it can't keep re-failing and spamming the log. The player's
+  // removals (`removeFacility`, `sellAt`) already cancel it; this catches a
+  // raw `tower.removeUnit` from a loader or a test.
   if (!sim.tower.builtWeddingHall) {
     sim.vipVisitDay = -1;
     return;
