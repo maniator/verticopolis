@@ -2,6 +2,7 @@
 //! compares each checkpoint with `conformance/expected.json`. Exits 1 unless
 //! every scenario matches end to end; the report names, per scenario, the
 //! first divergent checkpoint or the first command the port cannot run yet.
+//! It also checks each mode's catalog against `conformance/catalog-digests.json`.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -159,7 +160,57 @@ fn main() {
             }
         }
     }
+    match check_catalogs(&root) {
+        Ok(()) => println!("catalogs: ok"),
+        Err(e) => {
+            all_ok = false;
+            println!("catalogs: {e}");
+        }
+    }
     if !all_ok {
         exit(1);
+    }
+}
+
+/// Each mode's catalog digest against `catalog-digests.json`, the lock the
+/// TypeScript engine writes from its own tables.
+fn check_catalogs(root: &std::path::Path) -> Result<(), String> {
+    use verticopolis_engine::catalog::catalog_digest;
+    use verticopolis_engine::clock::GameMode;
+    let path = root.join("catalog-digests.json");
+    let text = std::fs::read_to_string(&path)
+        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let lock: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    let modes = [GameMode::Classic, GameMode::Modern];
+    let mut moved = Vec::new();
+    for mode in modes {
+        match lock["catalogs"][mode.as_str()].as_str() {
+            None => moved.push(format!("{} has no digest in the lock", mode.as_str())),
+            Some(want) => {
+                let got = catalog_digest(mode);
+                if got != want {
+                    moved.push(format!("{} {got} vs {want}", mode.as_str()));
+                }
+            }
+        }
+    }
+    // The TypeScript check compares the whole map, so a stray entry fails
+    // there; refuse it here too.
+    if let Some(entries) = lock["catalogs"].as_object() {
+        for key in entries.keys() {
+            if !modes.iter().any(|m| m.as_str() == key) {
+                moved.push(format!("the lock names an unknown mode {key}"));
+            }
+        }
+    }
+    if moved.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "DIVERGED: {} ({})",
+            moved.join(", "),
+            path.display()
+        ))
     }
 }

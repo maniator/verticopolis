@@ -2,6 +2,19 @@
 
 use crate::facilities::Kind;
 
+/// `ECON.addCarCost`: the price of one more elevator car on a shaft.
+pub const ADD_CAR_COST: f64 = 40_000.0;
+
+/// `ECON.transportFloorCost`: the price of each floor an elevator spans past
+/// its first, on a build and on an extend.
+pub const TRANSPORT_FLOOR_COST: f64 = 5_000.0;
+
+/// `carResaleRefund()`: removing a car refunds half the add-car cost, the
+/// same half-back rule as a facility's resale refund.
+pub fn car_resale_refund() -> f64 {
+    (ADD_CAR_COST * 0.5).floor()
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct RentConfig {
     pub default: f64,

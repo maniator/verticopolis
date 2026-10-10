@@ -22,6 +22,7 @@ must reproduce every pinned checkpoint hash (`expected.json`) byte for byte.
 | `economy.rs`, `housekeeping.rs`, `ledger.rs`, `events.rs` | `EconomySystem.ts`, `economy/*.ts`, `Ledger.ts`, `EventSystem.ts` |
 | `sim.rs`, `load.rs` | `Simulation.ts`, `sim/stats.ts` (`recordMoney`, `emit`), `sim/serialization.ts`, `sim/coerce.ts`, `sim/deserializeGuards.ts`, `sim/founderStatus.ts`, `saveMigration.ts`, `migrations/*.ts`, `storage/vctowerContainer.ts` |
 | `scenario.rs`, `bin/conformance.rs`, `bin/dump.rs` | `src/tests/conformance/scenario.ts` |
+| `catalog.rs` | `catalog.ts`: the reference data a frontend reads (see The catalog) |
 | `wasm.rs` (feature `wasm`) | the JavaScript binding; `src/tests/conformance/wasmEngine.ts` and `src/dualrun/` drive it |
 
 Functions keep the names and shape of their TypeScript originals so the two
@@ -57,7 +58,8 @@ events, the tile queries, the readouts a runner checks (`mode`, `money`,
 `setMoney`, `fires`), `serialize` and the two hashed views with their
 digests. Structured values cross as JSON text; integers cross as 32-bit
 values (`i32`, and `u32` for the seed and the fire count), which the
-generated TypeScript sees as `number`.
+generated TypeScript sees as `number`. Beside the class, the free function
+`catalog(mode)` returns the catalog (below) as canonical JSON.
 Nothing in the binding simulates anything.
 
 ```sh
@@ -79,6 +81,38 @@ toolchain; CI builds the package and runs the suite in `engine-rs.yml` with
 `VC_REQUIRE_WASM=1`, under which a missing package fails the run. Rebuild
 the package after any change to the Rust source; the suite replays whatever
 was built last.
+
+## The catalog
+
+`catalog::catalog(mode)` is the reference data every frontend draws a build
+menu, a price label or a placement ghost from, read out of the engine's own
+tables and resolved for one mode so a frontend never applies a rule itself:
+the world geometry (lot width, floor range, ground floor, lobby interval),
+the economy constants a UI shows (starting money, the add-car cost and its
+refund, the per-floor transport cost, upkeep and bookings, the exterminator
+fees where the mode has them, whether bridging can be switched off, and the
+calendars the mode runs with the factor each applies to the monthly and
+quarterly figures, since a canon calendar charges a tenth of a monthly
+figure every three days), the
+pooled caps, and per facility kind its key, name, category, size, cost, star
+gate, population, attendance, flags, whether the mode can build it, build
+minutes, resale refund, build cap and pool, transport span, cars and car
+capacity, subtypes, rent configuration (the Classic ladder with No Rate or
+the Modern band, and when it is collected), daily income, spend per customer
+and service upkeep.
+A value a kind does not have is present as `null`, and the shape carries
+a `version` that moves when a field is added, renamed or removed.
+
+The WASM binding returns the same JSON from `catalog(mode)`, typed by
+`Catalog` in `src/engine/catalogTypes.ts` and read through `readCatalog` in
+`src/dualrun/catalog.ts`. The TypeScript engine builds the same catalog from
+its own tables (`catalogFor`), and `conformance/catalog-digests.json` pins
+each mode's canonical hash: the TypeScript run writes it
+(`catalog.integration.test.ts`, regenerated with the conformance switch),
+and a crate test, the referee binary and the WASM suite check against it,
+so the two engines cannot quote a different price or size while both exist (each also has a test that the prices it quotes are the ones its build and sell paths charge).
+Presentation (display copy beyond the name, icons, pixel sizes, colors)
+stays with the frontend.
 
 ## The switch
 

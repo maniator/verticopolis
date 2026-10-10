@@ -104,6 +104,21 @@ fn override_mode(raw: &mut Value, mode: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The catalog text for a mode, as [`catalog`] returns it.
+fn catalog_text(mode: &str) -> Result<String, String> {
+    Ok(crate::catalog::catalog_json(parse_mode(mode)?))
+}
+
+/// Every price, size and build rule a frontend shows, resolved for `mode`
+/// (`classic` or `modern`), as canonical JSON in the shape of the `Catalog`
+/// type (declared in `src/engine/catalogTypes.ts`, read through `readCatalog`
+/// in `src/dualrun/catalog.ts`; see `verticopolis_engine::catalog`). It needs
+/// no running game.
+#[wasm_bindgen]
+pub fn catalog(mode: &str) -> Result<String, JsError> {
+    catalog_text(mode).map_err(err)
+}
+
 /// One running simulation. Construct with `newGame`, `fromSave` or
 /// `fromVctower`; drive it with the command methods; read it back with
 /// `serialize` and the two hashed views.
@@ -776,6 +791,17 @@ mod tests {
             log_since(&sim, sim.log_seq).as_array().map(Vec::len),
             Some(0)
         );
+    }
+
+    #[test]
+    fn the_catalog_crosses_as_canonical_json_for_a_named_mode() {
+        let text = catalog_text("modern").unwrap();
+        assert_eq!(text, crate::catalog::catalog_json(GameMode::Modern));
+        let v: Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(v["mode"], "modern");
+        assert!(catalog_text("arcade")
+            .unwrap_err()
+            .contains("classic or modern"));
     }
 
     #[test]

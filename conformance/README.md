@@ -68,6 +68,18 @@ loader, and writes them with the same regeneration switch as the lock
 a Rust unit test replays every case. Add a case for any coercion rule you
 touch.
 
+## The catalog lock
+
+`catalog-digests.json` pins the canonical hash of each mode's catalog: the
+prices, sizes and build rules a frontend reads from the engine
+(`src/engine/catalog.ts`, `engine-rs/src/catalog.rs`). The TypeScript run
+writes it (`src/tests/integration/catalog.integration.test.ts`, regenerated
+with `VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration catalog`);
+a Rust crate test, `cargo run --release --bin conformance` and the WASM suite
+check against it. A moved digest means a price, a size or a build rule some
+frontend shows has changed: regenerate it on purpose only, in the same pull
+request, saying why.
+
 ## Scenario format
 
 ```json

@@ -2,6 +2,10 @@
 //! loop reads, as methods on the mode.
 
 use crate::clock::GameMode;
+use crate::economy::{
+    CONDO_MONTHLY_TAX_RATE, OVERHEAD_PER_LEASABLE_UNIT_MONTHLY, REAL_WORLD_QUARTER_DAYS,
+};
+use crate::services::{EXTERMINATOR_CALLOUT_FEE, EXTERMINATOR_PER_ROOM_FEE};
 
 #[derive(Clone, Copy, Debug)]
 pub struct HousekeepingShift {
@@ -57,6 +61,40 @@ impl GameMode {
     /// Classic always bridges.
     pub fn bridging_toggleable(self) -> bool {
         self == GameMode::Modern
+    }
+
+    /// `operatingOverheadPerUnit()`: Classic charges none.
+    pub fn operating_overhead_per_unit(self) -> f64 {
+        match self {
+            GameMode::Classic => 0.0,
+            GameMode::Modern => OVERHEAD_PER_LEASABLE_UNIT_MONTHLY,
+        }
+    }
+
+    /// `condoHoldTaxRate()`: Classic charges none.
+    pub fn condo_hold_tax_rate(self) -> f64 {
+        match self {
+            GameMode::Classic => 0.0,
+            GameMode::Modern => CONDO_MONTHLY_TAX_RATE,
+        }
+    }
+
+    /// `quarterlyRentScale(quarterDays)`: Classic lands the full canon lump
+    /// every quarter; Modern rescales it to the quarter's length.
+    pub fn quarterly_rent_scale(self, quarter_days: i64) -> f64 {
+        match self {
+            GameMode::Classic => 1.0,
+            GameMode::Modern => quarter_days as f64 / REAL_WORLD_QUARTER_DAYS,
+        }
+    }
+
+    /// `infestationRecovery()`: the paid exterminator's `(calloutFee,
+    /// perRoomFee)`, or `None` where the mode has no exterminator.
+    pub fn infestation_recovery(self) -> Option<(f64, f64)> {
+        match self {
+            GameMode::Classic => None,
+            GameMode::Modern => Some((EXTERMINATOR_CALLOUT_FEE, EXTERMINATOR_PER_ROOM_FEE)),
+        }
     }
 
     pub fn walkway_willingness_applies(self) -> bool {

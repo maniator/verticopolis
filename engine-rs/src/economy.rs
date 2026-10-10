@@ -129,7 +129,7 @@ pub fn weekend_multiplier(mode: GameMode, kind: Kind, is_weekend: bool) -> f64 {
 }
 
 /// `ECON.serviceMaintenanceMonthly`.
-fn service_maintenance_monthly(kind: Kind) -> Option<f64> {
+pub fn service_maintenance_monthly(kind: Kind) -> Option<f64> {
     Some(match kind {
         Kind::Security => 2_000.0,
         Kind::Medical => 5_000.0,
@@ -176,10 +176,9 @@ impl Simulation {
             b.0 += rent_of(u.kind, u.rent, u.no_rate);
             b.1 += 1;
         }
-        let scale = match self.mode {
-            GameMode::Classic => 1.0,
-            GameMode::Modern => self.clock.calendar.quarter_days as f64 / REAL_WORLD_QUARTER_DAYS,
-        };
+        let scale = self
+            .mode
+            .quarterly_rent_scale(self.clock.calendar.quarter_days);
         for (kind, (sum, n)) in sums {
             let amt = jsmath::round(sum * scale);
             if amt <= 0.0 {
@@ -404,13 +403,8 @@ impl Simulation {
                 charge("upkeep", t.cars as f64 * MAINTENANCE_PER_CAR_MONTHLY);
             }
         }
-        let modern = self.mode == GameMode::Modern;
-        let tax_rate = if modern { CONDO_MONTHLY_TAX_RATE } else { 0.0 };
-        let overhead = if modern {
-            OVERHEAD_PER_LEASABLE_UNIT_MONTHLY
-        } else {
-            0.0
-        };
+        let tax_rate = self.mode.condo_hold_tax_rate();
+        let overhead = self.mode.operating_overhead_per_unit();
         let mut new_blockbusters: Vec<f64> = Vec::new();
         for i in 0..self.tower.units.len() {
             let u = &self.tower.units[i];

@@ -249,9 +249,9 @@ impl Simulation {
     pub fn call_exterminator(&mut self) -> Result<(f64, usize), ExterminatorRefusal> {
         // `rules.infestationRecovery()` is null for Classic and the fee pair
         // for Modern (ruleSets.ts).
-        if !self.tower.mode.is_modern() {
+        let Some((callout_fee, per_room_fee)) = self.tower.mode.infestation_recovery() else {
             return Err(ExterminatorRefusal::Unavailable);
-        }
+        };
         if self.extermination_due_day.is_some() {
             return Err(ExterminatorRefusal::Pending);
         }
@@ -268,7 +268,7 @@ impl Simulation {
         if rooms == 0 {
             return Err(ExterminatorRefusal::None);
         }
-        let cost = EXTERMINATOR_CALLOUT_FEE + EXTERMINATOR_PER_ROOM_FEE * rooms as f64;
+        let cost = callout_fee + per_room_fee * rooms as f64;
         if self.money < cost {
             return Err(ExterminatorRefusal::Funds { cost, rooms });
         }
