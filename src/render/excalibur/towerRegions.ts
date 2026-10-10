@@ -1,6 +1,7 @@
 import * as ex from "excalibur";
 import { facilityFloors } from "../../engine/facilities";
 import { drawUnit } from "../sprites";
+import { drawDeadParkingX } from "../sprites/facilities/garage";
 import { FLOOR, TILE } from "../scale";
 import { regionRect, regionsOf } from "../regionGrid";
 import type { Unit } from "../../engine/types";
@@ -40,23 +41,6 @@ export interface RegionRec {
   cv: ex.Canvas;
   /** Settled unit ids whose footprint intersects this region. */
   units: Set<number>;
-}
-
-/** The dead-parking "red X" (canon: an unchained space draws no relief), the
- *  same strokes the per-unit bake drew, at the unit's region-relative rect. */
-function drawDeadParkingX(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
-  // Dark under-stroke so the X reads as a SHAPE independent of hue
-  // (color-blind cue), then the red X on top.
-  for (const [style, wd] of [["#111", 4] as const, ["#C24A3A", 2] as const]) {
-    ctx.strokeStyle = style;
-    ctx.lineWidth = wd;
-    ctx.beginPath();
-    ctx.moveTo(x + 2, y + 2);
-    ctx.lineTo(x + w - 2, y + h - 2);
-    ctx.moveTo(x + w - 2, y + 2);
-    ctx.lineTo(x + 2, y + h - 2);
-    ctx.stroke();
-  }
 }
 
 /** Materialize a region: an anchor actor at the region's world rect and a
