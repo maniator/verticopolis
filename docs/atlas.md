@@ -39,8 +39,8 @@ paint for the sample signatures in `src/render/atlas/samples.ts` and stops on
 any mismatch, then checks that every image comes back out of the packed pages.
 A `--filter` run is a preview: it skips the sample check and is written as
 `verticopolis-atlas-preview.zip`. A release archive takes its name from the
-tag, with any character outside letters, digits, `.`, `_` and `-` turned into
-`-`.
+tag, with each run of characters other than letters, digits, `.`, `_` and `-`
+turned into one `-`.
 
 ## How it is made
 
@@ -123,7 +123,7 @@ Names follow the engine's own strings: the facility keys from
 | Rooms | `room/<kind>/<state>/<subtype or ->/w<tiles>/<lit or unlit>/<open, closed or always>/<late, notlate or any>/v<variant>[/home or /away]` |
 | Fire, construction | animation `fire/<kind>`, `construction/<kind>`; frames `.../<i>` |
 | Structure | `structure/floor`, `structure/lobby/<ground or sky>/<lit>/v<0-3>`, animation `structure/entrance/<grand-left, grand-right, grand-solo or service>/<lit>/<staffed or unstaffed>` |
-| Shafts | `shaft/<elevator kind>/<top, stop, skip, bottom or single>`, `transport/stairs`, `transport/escalator` |
+| Shafts | `shaft/<elevator kind>/<top, stop, skip, bottom, single, top-skip, bottom-skip or single-skip>`, `transport/stairs`, `transport/escalator` |
 | Cars | `car/<elevator kind>/<idle, up or down>/<full or notfull>/s<0-3>` with a `riders` chain (sampled seeds in `data.carSeeds`) |
 | People | `person/<seated, standing, walker, rider or hiVis>/<shirt<i>, staff, impatient or fedUp>`, one `shirt<i>` per entry of `data.shirts` |
 | Facade | `facade/escape/<left or right>/<0 or 1>`, `facade/awning/<left or right>`, animation `facade/crane/<lit>` |
@@ -132,8 +132,10 @@ Names follow the engine's own strings: the facility keys from
 
 A shaft is drawn floor by floor: `top` for its top floor, `bottom` for its
 bottom floor, `stop` or `skip` for each floor between (an express skip floor
-has no stop line), and `single` for a one-floor shaft. `top-skip` and
-`bottom-skip` cover a shaft whose skip list holds one of its own end floors.
+has no stop line), and `single` for a one-floor shaft. `top-skip`,
+`bottom-skip` and `single-skip` cover a shaft whose skip list holds one of its
+own end floors (`top-skip` looks the same as `top`: the motor housing covers
+that stop line).
 
 ## Reading a room
 
@@ -149,7 +151,7 @@ reader is `src/render/atlas/lookup.ts`; in short:
    condo, studio or apartment, and the variant you picked for that room.
 3. For most rooms, append `/home` when `occupants > 0`, else `/away`, and on a
    home frame draw the `occupants` chain up to `occupants - outForMeal`
-   (rounded down, at least 0, at most the chain's `max`).
+   (rounded up, at least 0, at most the chain's `max`).
 4. A parking space draws the `dead` overlay when it is not chained to a ramp;
    otherwise it draws `car<id % 7>` when it holds a car (the game's presence
    roll is spelled out in `signature.rules.parkingRoll`; the game re-paints a

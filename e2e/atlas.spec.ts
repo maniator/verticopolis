@@ -6,9 +6,12 @@ import { bundleBake } from "../scripts/atlas-bundle.ts";
  * web game's own bake. For a sample of live room signatures this composes the
  * atlas frame plus its runtime layers the way a frontend reads the manifest
  * (`src/render/atlas/lookup.ts`), paints the same room through the game's own
- * paint functions at two region offsets, and requires the two to match pixel
- * for pixel (`src/render/atlas/verify.ts`, samples in `samples.ts`). The
- * export runs the same check before it writes an archive.
+ * paint functions, and requires the two to match pixel for pixel
+ * (`src/render/atlas/verify.ts`, samples in `samples.ts`). Settled rooms are
+ * painted at two region offsets; burning, unbuilt and origin-seeded rooms at
+ * the per-unit origin. The non-room families are checked the same way
+ * (`verifyExtras.ts`), and a control case must report a mismatch. The export
+ * runs the same check before it writes an archive.
  */
 
 test.describe("sprite atlas matches the web bake", () => {

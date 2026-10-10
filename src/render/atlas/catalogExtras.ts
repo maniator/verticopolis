@@ -94,9 +94,11 @@ export function transportJobs(): Job[] {
       band("bottom", 3, 2, []),
       band("single", 1, 0, []),
       // A skipped end floor (a resized or loaded non-express shaft can keep
-      // one in its skip list): the cap without the stop line.
+      // one in its skip list). The bottom loses its stop line; the top's is
+      // already under the motor housing, so top-skip matches top.
       band("top-skip", 3, 0, [3]),
       band("bottom-skip", 3, 2, [1]),
+      band("single-skip", 1, 0, [1]),
     );
     for (const arrow of [null, "up", "down"] as const) {
       for (const full of [false, true]) {

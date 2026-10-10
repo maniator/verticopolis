@@ -62,8 +62,9 @@ export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number): Lookup {
   if (OCCUPANT_FREE.has(u.kind)) return { frame: stem, chains: {}, overlays: [] };
   const occupants = finite(u.occupants);
   if (occupants <= 0) return { frame: `${stem}/away`, chains: {}, overlays: [] };
-  // Whole figures only: a fractional count (a forged save) rounds down.
-  const visible = Math.floor(Math.max(0, occupants - finite(u.outForMeal ?? 0)));
+  // Whole figures only. The art's figure loops run `i < n`, so a fractional
+  // count (a forged save) paints like the next whole one: round up.
+  const visible = Math.ceil(Math.max(0, occupants - finite(u.outForMeal ?? 0)));
   return { frame: `${stem}/home`, chains: { occupants: visible }, overlays: [] };
 }
 

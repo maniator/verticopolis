@@ -37,11 +37,14 @@ const root = resolve(import.meta.dirname, "..");
 const FLAGS = new Set(["--out", "--filter", "--label"]);
 
 /** Every argument must be one of {@link FLAGS} followed by its value; the
- *  `--flag=value` form and unknown flags are refused so nothing is silently
- *  ignored. */
+ *  `--flag=value` form, unknown flags and a repeated flag are refused so
+ *  nothing is silently ignored. */
 function checkArgs(argv: readonly string[]): void {
+  const seen = new Set<string>();
   for (let i = 0; i < argv.length; i += 2) {
     if (!FLAGS.has(argv[i])) throw new Error(`unknown argument ${argv[i]} (use ${[...FLAGS].join(", ")}, each followed by its value)`);
+    if (seen.has(argv[i])) throw new Error(`${argv[i]} given twice`);
+    seen.add(argv[i]);
   }
 }
 

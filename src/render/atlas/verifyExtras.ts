@@ -50,14 +50,12 @@ interface Case {
   game: (doc: Document) => Image;
 }
 
-function shaftCase(kind: FacilityKind): Case {
+function shaftCase(kind: FacilityKind, skip: number[], pieces: string[]): Case {
   const w = FACILITIES[kind].width * TILE;
-  const floors = 5;
-  const skip = 3;
-  // Bands from the top: top floor, stop, skip floor, stop, bottom floor.
-  const pieces = ["top", "stop", "skip", "stop", "bottom"];
+  const floors = pieces.length;
+  // Bands run from the top floor down; `pieces` names each band's frame.
   return {
-    label: `${kind} shaft, five floors with floor ${skip} skipped`,
+    label: `${kind} shaft, ${floors} floors skipping ${skip.join(", ") || "none"}`,
     frames: [...new Set(pieces)].map((p) => `shaft/${kind}/${p}`),
     atlas: (get) => {
       const out = blank(w, floors * FLOOR);
@@ -66,7 +64,7 @@ function shaftCase(kind: FacilityKind): Case {
     },
     game: (doc) => {
       const ctx = canvas(doc, w, floors * FLOOR);
-      const t: Transport = { id: 1, kind, x: 0, width: w / TILE, bottom: 1, top: floors, cars: 1, carPositions: [1], carDir: [0], load: 0, skipFloors: [skip] };
+      const t: Transport = { id: 1, kind, x: 0, width: w / TILE, bottom: 1, top: floors, cars: 1, carPositions: [1], carDir: [0], load: 0, skipFloors: skip };
       drawTransport(ctx, t, 0, 0, w, FLOOR);
       return read(ctx, w, floors * FLOOR);
     },
@@ -89,8 +87,11 @@ export function extraCases(): Case[] {
     };
   };
   return [
-    shaftCase("elevatorExpress"),
-    shaftCase("elevatorStandard"),
+    shaftCase("elevatorExpress", [3], ["top", "stop", "skip", "stop", "bottom"]),
+    shaftCase("elevatorStandard", [3], ["top", "stop", "skip", "stop", "bottom"]),
+    shaftCase("elevatorService", [1, 4], ["top-skip", "stop", "stop", "bottom-skip"]),
+    shaftCase("elevatorStandard", [1], ["single-skip"]),
+    shaftCase("elevatorExpress", [], ["single"]),
     cab("elevatorStandard", 1, 3, "up", false),
     cab("elevatorService", 2, 4, null, true),
     cab("elevatorExpress", 3, 1, "down", false),
