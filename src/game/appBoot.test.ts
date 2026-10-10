@@ -297,7 +297,7 @@ describe("runBootFlow", () => {
       ui: { toast: vi.fn(), newTowerModal: vi.fn(), showHelp: vi.fn() },
       // The boot snapshot (gameplaySession.noteBoot) reads these off the live
       // sim; stub the shape so runBootFlow's snapshot call doesn't throw.
-      sim: { emit: vi.fn(), mode: "classic", star: 1, population: 0, tower: { highestFloor: 1 } },
+      sim: { emit: vi.fn(), mode: "classic", star: 1, population: 0, tower: { highestFloor: 1 }, gameplayEvents: {} },
       saveLoad: { autosave: vi.fn(), newGame: vi.fn() },
       hadReadableSave: false,
       saveWasCorrupt: false,

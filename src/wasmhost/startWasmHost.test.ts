@@ -23,8 +23,16 @@ class FakeEngine {
   free(): void { this.freed = true; }
   pendingChoice(): string | undefined { return undefined; }
   logSince(): string { return "[]"; }
-  drainGameplayEvents(): string { return "[]"; }
-  gameplayEventsDropped(): number { return 0; }
+  /** What the engine still owes: handed over once, then empty. */
+  owed: unknown[] = [];
+  drainGameplayEvents(): string {
+    const out = JSON.stringify(this.owed);
+    this.owed = [];
+    return out;
+  }
+  /** The engine's own ring drops. */
+  dropped = 0;
+  gameplayEventsDropped(): number { return this.dropped; }
 }
 
 function fakeModule(): WasmModule & { engines: FakeEngine[] } {
@@ -44,6 +52,7 @@ function app(): WasmHostApp & { adopted: Simulation[] } {
     sim: Simulation.newGame(3, "classic"),
     adopted: [] as Simulation[],
     adoptSim(sim: Simulation) {
+      sim.gameplayEvents.inherit(this.sim.gameplayEvents); // as GameApp.adoptSim does
       this.sim = sim;
       this.adopted.push(sim);
     },
@@ -81,6 +90,134 @@ describe("startWasmHost", () => {
     // The app's own adopt still works and no longer hosts.
     a.adoptSim(Simulation.newGame(5, "classic"));
     expect(mod.engines.length).toBe(2);
+  });
+
+  // The host lets the old tower go before the app swaps, so the app's own
+  // hand-off passes what the old engine still owed to the new tower, once.
+  it("hands the replaced tower's owed events to the tower the app adopts", () => {
+    const mod = fakeModule();
+    const a = app();
+    const handle = startWasmHost(a, mod, quiet());
+    const old = a.sim;
+    old.drainGameplayEvents(); // the founding
+    mod.engines[0].owed = [{ name: "facility_placed", payload: { kind: "office", floor: 2, count: 1 } }];
+    const next = Simulation.newGame(4, "modern");
+    a.adoptSim(next);
+    expect(handle.status.hosted).toBe(true);
+    expect(next.drainGameplayEvents()).toEqual([
+      { name: "facility_placed", payload: { kind: "office", floor: 2, count: 1 } },
+      { name: "tower_founded", payload: { mode: "modern" } },
+    ]);
+    expect(old.drainGameplayEvents()).toEqual([]);
+    handle.stop();
+  });
+
+  // A load or a new game is the way out of a trapped engine: the swap goes
+  // through, the new tower is hosted, and the counted loss moves with it.
+  it("swaps away from a trapped engine and carries the loss to the new tower", () => {
+    const mod = fakeModule();
+    const a = app();
+    const log = quiet();
+    const handle = startWasmHost(a, mod, log);
+    a.sim.drainGameplayEvents(); // the founding
+    const trapped = mod.engines[0];
+    trapped.drainGameplayEvents = () => { throw new Error("unreachable executed"); };
+    // The read model's copy of a command's event the engine still owed.
+    a.sim.gameplayEvents.push("facility_placed", { kind: "office", floor: 2, count: 1 });
+    const next = Simulation.newGame(4, "modern");
+    a.adoptSim(next);
+    expect(a.sim).toBe(next);
+    expect(handle.status).toMatchObject({ starts: 2, hosted: true });
+    expect(handle.status.errors).toEqual(["letting go of the last tower: unreachable executed"]);
+    expect(trapped.freed).toBe(true);
+    expect(next.drainGameplayEvents()).toEqual([{ name: "tower_founded", payload: { mode: "modern" } }]);
+    expect(next.gameplayEventsDropped).toBe(1);
+    handle.stop();
+  });
+
+  // An engine that traps at its first call (the drop count) loses its whole
+  // batch; the read model's copies stand in.
+  it("counts a trap at the drop count from the read model", () => {
+    const mod = fakeModule();
+    const a = app();
+    const handle = startWasmHost(a, mod, quiet());
+    a.sim.drainGameplayEvents(); // the founding
+    mod.engines[0].gameplayEventsDropped = () => { throw new Error("unreachable executed"); };
+    a.sim.gameplayEvents.push("facility_placed", { kind: "office", floor: 2, count: 1 });
+    const next = Simulation.newGame(4, "modern");
+    a.adoptSim(next);
+    expect(handle.status).toMatchObject({ starts: 2, hosted: true });
+    expect(next.drainGameplayEvents()).toEqual([{ name: "tower_founded", payload: { mode: "modern" } }]);
+    expect(next.gameplayEventsDropped).toBe(1);
+    handle.stop();
+  });
+
+  it("stops cleanly on a trapped engine", () => {
+    const mod = fakeModule();
+    const a = app();
+    const handle = startWasmHost(a, mod, quiet());
+    mod.engines[0].drainGameplayEvents = () => { throw new Error("unreachable executed"); };
+    handle.stop();
+    expect(handle.status.errors).toEqual(["letting go of the last tower: unreachable executed"]);
+    expect(mod.engines[0].freed).toBe(true);
+    expect(handle.status.hosted).toBe(false);
+    a.adoptSim(Simulation.newGame(5, "classic"));
+    expect(mod.engines.length).toBe(1); // no longer follows swaps
+    expect((globalThis as { __vcEngine?: unknown }).__vcEngine).toBeUndefined();
+  });
+
+  it("carries the engine's drop count to the tower the app adopts", () => {
+    const mod = fakeModule();
+    const a = app();
+    const handle = startWasmHost(a, mod, quiet());
+    mod.engines[0].dropped = 4;
+    expect(a.sim.gameplayEventsDropped).toBe(4);
+    const next = Simulation.newGame(4, "modern");
+    a.adoptSim(next);
+    expect(next.gameplayEventsDropped).toBe(4);
+    handle.stop();
+  });
+
+  it("keeps the host when the app adopts the tower it already holds", () => {
+    const mod = fakeModule();
+    const a = app();
+    const handle = startWasmHost(a, mod, quiet());
+    a.adoptSim(a.sim);
+    expect(handle.status.starts).toBe(1);
+    expect(mod.engines[0].freed).toBe(false);
+    handle.stop();
+  });
+
+  it("stays stopped when the adopt stops the host", () => {
+    const mod = fakeModule();
+    const a = app();
+    const own = a.adoptSim;
+    let handle: ReturnType<typeof startWasmHost> | null = null;
+    a.adoptSim = function (this: typeof a, sim: Simulation) {
+      own.call(this, sim);
+      handle?.stop();
+    };
+    handle = startWasmHost(a, mod, quiet());
+    a.adoptSim(Simulation.newGame(4, "modern"));
+    expect(mod.engines.length).toBe(1);
+    expect(mod.engines[0].freed).toBe(true);
+    expect(handle.current()).toBeNull();
+  });
+
+  // An adopt that throws before its swap leaves the app on the old tower, and
+  // the host takes that tower up again on a fresh engine (it has no crowd
+  // yet; one with a crowd is refused and reported).
+  it("hosts the tower the app still holds when the adopt throws", () => {
+    const mod = fakeModule();
+    const a = app();
+    a.adoptSim = function () { throw new Error("adopt failed"); };
+    const old = a.sim;
+    const handle = startWasmHost(a, mod, quiet());
+    expect(() => a.adoptSim(Simulation.newGame(4, "modern"))).toThrow(/adopt failed/);
+    expect(a.sim).toBe(old);
+    expect(mod.engines[0].freed).toBe(true);
+    expect(handle.status).toMatchObject({ starts: 2, hosted: true, errors: [] });
+    handle.stop();
   });
 
   it("reports a tower it cannot host and leaves it on the TypeScript engine", () => {

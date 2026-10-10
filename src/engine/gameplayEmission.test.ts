@@ -54,6 +54,50 @@ describe("gameplay event buffer", () => {
     expect(buf.dropped).toBe(5);
   });
 
+  it("inherits a replaced tower's owed events and drop count ahead of its own", () => {
+    const old = tower();
+    expect(old.build("office", 2, 180).ok).toBe(true);
+    old.gameplayEvents.dropped = 3;
+    const next = Simulation.newGame(8, "modern");
+    next.gameplayEvents.inherit(old.gameplayEvents);
+    expect(drain(next)).toEqual([
+      { name: "facility_placed", payload: { kind: "office", floor: 2, count: 1 } },
+      { name: "tower_founded", payload: { mode: "modern" } },
+    ]);
+    expect(next.gameplayEventsDropped).toBe(3);
+    // The replaced buffer is left empty, so nothing is handed over twice.
+    expect(old.gameplayEvents.length).toBe(0);
+    expect(old.gameplayEventsDropped).toBe(0);
+    // Inheriting from itself changes nothing, even on a marked buffer.
+    next.gameplayEvents.push("fire_started", {});
+    next.gameplayEvents.discardOnHandOff = true;
+    next.gameplayEvents.inherit(next.gameplayEvents);
+    next.gameplayEvents.discardOnHandOff = false;
+    expect(drain(next)).toEqual([{ name: "fire_started", payload: {} }]);
+    expect(next.gameplayEventsDropped).toBe(3);
+    // Overflow drops the oldest (the inherited events first) and counts them.
+    const full = new GameplayEventBuffer();
+    for (let i = 0; i < GAMEPLAY_RING_CAP; i++) full.push("fire_started", {});
+    const prev = new GameplayEventBuffer();
+    prev.push("star_reached", { star: 2 });
+    full.inherit(prev);
+    expect(full.length).toBe(GAMEPLAY_RING_CAP);
+    expect(full.dropped).toBe(1);
+    expect(full.drain().some((e) => e.name === "star_reached")).toBe(false);
+  });
+
+  it("leaves a backdrop's events and drops behind", () => {
+    const backdrop = Simulation.newGame(9, "classic");
+    backdrop.gameplayEvents.discardOnHandOff = true;
+    backdrop.gameplayEvents.dropped = 2;
+    backdrop.gameplayEvents.push("fire_started", {});
+    const next = Simulation.newGame(10, "modern");
+    next.gameplayEvents.inherit(backdrop.gameplayEvents);
+    expect(drain(next)).toEqual([{ name: "tower_founded", payload: { mode: "modern" } }]);
+    expect(next.gameplayEventsDropped).toBe(0);
+    expect(backdrop.gameplayEvents.length).toBe(0);
+  });
+
   it("never reaches the save or the hashed views, full or empty", () => {
     const sim = tower("modern");
     sim.tick(180);

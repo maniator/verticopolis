@@ -28,6 +28,8 @@ export interface WasmHostHandle {
   status: WasmHostStatus;
   /** The host of the current tower, or null after a refusal. */
   current(): WasmHost | null;
+  /** Let the current tower go and stop following swaps. A detach that
+   *  throws (a trapped engine) is reported on the status and the log. */
   stop(): void;
 }
 
@@ -53,10 +55,21 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     status.errors.push(message);
     log.error(`[wasm] ${message}`);
   };
-  const follow = (sim: Simulation) => {
-    host?.detach();
+  // Let go of the current tower. A trapped engine still lets go (the detach
+  // finishes its teardown, then rethrows); the error goes to the status and
+  // the log, so a load or a new game stays the way out of a dead engine.
+  const release = () => {
+    const h = host;
     host = null;
     status.hosted = false;
+    try {
+      h?.detach();
+    } catch (e) {
+      noteError(`letting go of the last tower: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+  const follow = (sim: Simulation) => {
+    release();
     try {
       host = attachWasmHost(sim, mod);
       status.starts++;
@@ -70,9 +83,22 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
 
   const adopt = app.adoptSim;
   const ownAdopt = Object.getOwnPropertyDescriptor(app, "adoptSim");
+  let stopped = false;
   const wrappedAdopt = function (this: WasmHostApp, sim: Simulation, preserveHistory?: boolean): void {
-    adopt.call(this, sim, preserveHistory);
-    follow(sim);
+    // Let the old tower go first: the detach hands it back the events its
+    // engine still owes, with the drop count, so the adopt passes them to the
+    // tower that replaces it without asking an engine that may have trapped.
+    // Then host whichever tower the app holds. An adopt that throws before
+    // its swap (GameApp's cannot) leaves the old tower, re-hosted when it has
+    // no crowd yet and otherwise reported and left on the TypeScript engine.
+    // Adopting the tower already held keeps its host.
+    if (sim === app.sim) return adopt.call(this, sim, preserveHistory);
+    release();
+    try {
+      adopt.call(this, sim, preserveHistory);
+    } finally {
+      if (!stopped) follow(app.sim);
+    }
   };
   Object.defineProperty(app, "adoptSim", { value: wrappedAdopt, configurable: true, writable: true });
 
@@ -80,8 +106,8 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     status,
     current: () => host,
     stop() {
-      host?.detach();
-      host = null;
+      stopped = true;
+      release();
       if (ownAdopt) Object.defineProperty(app, "adoptSim", ownAdopt);
       else delete (app as Partial<WasmHostApp>).adoptSim;
       const g = globalThis as unknown as { __vcEngine?: WasmHostHandle };

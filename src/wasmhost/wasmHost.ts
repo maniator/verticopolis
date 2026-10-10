@@ -65,8 +65,9 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
   let detached = false;
 
   // The instance's events up to now are real (it was the authority); the
-  // engine's start from here. A merge may swap the instance's buffer for the
-  // fresh one, so the drain always reads `sim.gameplayEvents` as it stands.
+  // engine's start from here. The instance keeps its own buffer object for
+  // the whole attach (the merge puts it back), so its marks, its drop count
+  // and the read model's copies since the last drain all stay on it.
   let carried: GameplayEvent[] = sim.gameplayEvents.drain();
   // The read model's own ring overflows with duplicates while hosted, so the
   // drop count is the instance's at attach plus the engine's.
@@ -91,12 +92,20 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
       // still owes and the engine's drop count. Every step of the teardown
       // runs even when an earlier one throws (an engine that can no longer
       // answer, a trap), so the instance is always let go and the engine
-      // always freed.
+      // always freed. When the engine cannot hand its batch over, the read
+      // model's copies of the commands' events since the last drain count as
+      // dropped. That is an estimate: the engine's own tick events (fires,
+      // stars, milestones) have no copy in the read model; a command the
+      // instance accepted but the engine refused (#874) has no twin there;
+      // a command the engine's full ring already dropped is counted again
+      // from its copy; and the copies stop at the read model's ring cap.
+      const duplicates = sim.gameplayEvents.length;
       let owed: GameplayEvent[] = carried;
-      let dropped = droppedAtAttach;
+      let dropped = droppedAtAttach + duplicates;
       try {
-        dropped = droppedAtAttach + engine.gameplayEventsDropped();
+        dropped += engine.gameplayEventsDropped();
         owed = drainHosted();
+        dropped -= duplicates;
       } finally {
         try {
           relay.detach();
@@ -118,7 +127,13 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
 
   const merge = (frame: FrameView) => {
     const fresh = Simulation.deserialize(JSON.parse(engine.serialize()));
-    mergeSimulation(sim, fresh, { revision: frame.header.revision, mealOverlayRevision: frame.header.mealOverlayRevision });
+    const buffer = sim.gameplayEvents;
+    try {
+      mergeSimulation(sim, fresh, { revision: frame.header.revision, mealOverlayRevision: frame.header.mealOverlayRevision });
+    } finally {
+      sim.gameplayEvents = buffer; // the merge copies the fresh, empty one
+      sim.tower.gameplayEvents = buffer;
+    }
     lastRevision = frame.header.revision;
     host.merges++;
   };
