@@ -179,9 +179,11 @@ that would not compose back to the game's pixels, or a chain that its cap cut
 short. A unit test rebuilds every frame and layer from the packed pages
 through the manifest.
 
-The other families (structure, shafts, cars, people, facade, vehicles, sky)
-are direct calls to the same draw functions with the arguments the game
-passes, so they are not compared separately.
+The same check covers the other families (`verifyExtras.ts`): a whole express
+and standard shaft rebuilt from their floor pieces (skip floor included), cabs
+with composed riders, a walker, a lobby tile, an entrance pose, a fire escape
+and the sky strip, each against the game's draw call with the game's
+arguments.
 
 ## Not in the atlas yet
 

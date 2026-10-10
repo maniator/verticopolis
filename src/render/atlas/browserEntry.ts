@@ -5,6 +5,7 @@ import { paint, type PaintSpec } from "./paint";
 import type { Image } from "./pixels";
 import { SAMPLES, type Sample } from "./samples";
 import { verifySample, type SampleResult } from "./verify";
+import { verifyExtras } from "./verifyExtras";
 
 /**
  * The atlas bake's browser half, bundled by `scripts/export-atlas.ts` and run
@@ -76,7 +77,7 @@ const api: AtlasPage = {
   verify(samples = SAMPLES) {
     const jobs = allJobs();
     const renderer = canvasRenderer(document);
-    return samples.flatMap((s) => verifySample(document, jobs, renderer, s));
+    return [...samples.flatMap((s) => verifySample(document, jobs, renderer, s)), ...verifyExtras(document, jobs, renderer)];
   },
 };
 (globalThis as unknown as { __vcAtlas: AtlasPage }).__vcAtlas = api;

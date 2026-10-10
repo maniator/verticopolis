@@ -418,12 +418,14 @@ export default defineConfig({
         // the shadow engine and the command vocabulary are measured and
         // tested in Node (the controller against a worker stand-in).
         "src/dualrun/worker.ts",
-        // The atlas bake's browser entry: it registers the page API the
-        // export script drives in a real Chromium (getImageData on a live
-        // canvas). Everything it calls is measured in its own module; the
-        // e2e comparison spec runs it end to end.
+        // The atlas bake's browser half: the page API the export script
+        // drives and the pixel checks, all of which read pixels back from a
+        // live canvas (getImageData). The pipeline they call (bake, compose,
+        // lookup, archive) is measured in its own modules; the e2e
+        // comparison spec runs these end to end.
         "src/render/atlas/browserEntry.ts",
         "src/render/atlas/verify.ts",
+        "src/render/atlas/verifyExtras.ts",
       ],
       // Enforced floors (a ratchet, not a vanity ceiling). Global floor holds the
       // logic layers; per-file globs stop a weak painter/synth file hiding behind
