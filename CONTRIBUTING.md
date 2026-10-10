@@ -93,17 +93,6 @@ Verticopolis has **two test tiers**:
     (`engine-fuzz.yml`) runs seeded random scenarios through both engines; a
     divergence it finds is pinned as a named scenario in the fix PR.
 
-    **The disc reader.** `disc-rs/` reads a player's own legacy disc image
-    (ISO9660 and Microsoft KWAJ) for the import path; see
-    [disc-rs/README.md](./disc-rs/README.md). Its lane is `disc-rs.yml`:
-    format, clippy, `cargo test` (plus `--features wasm` and `--features
-    testkit`), the libmspack oracle (CI installs `libmspack-dev` and sets
-    `VC_REQUIRE_KWAJ_ORACLE=1`), a fuzz smoke run, the WASM parity suite
-    (`npm run disc:wasm:build && npm run test:disc-wasm`, required in CI with
-    `VC_REQUIRE_DISC_WASM=1`, skipped locally without the package), a run of
-    `tools/simtower/disc-check.ts` over the synthetic disc, and a line floor
-    on the shipped code. `disc-fuzz.yml` runs the fuzzer nightly.
-
   `npm test` (`vitest run`) runs **both** projects and is the CI gate. Coverage
   stays a single root-level measurement across both projects (see Coverage
   floors below), so the ratchet still scores the whole app. Colocation is rolling

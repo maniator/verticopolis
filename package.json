@@ -33,9 +33,7 @@
     "build:native": "vite build --mode native && npm run verify:dist && node scripts/verify-wrapper-seam.ts native",
     "gen:icons": "node scripts/gen-icon-paths.ts",
     "wasm:build": "node scripts/wasm-build.ts",
-    "test:wasm": "VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm dualRun wasmHost",
-    "disc:wasm:build": "node scripts/wasm-build.ts disc",
-    "test:disc-wasm": "VC_REQUIRE_DISC_WASM=1 vitest run --project integration discWasm"
+    "test:wasm": "VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm dualRun wasmHost"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
