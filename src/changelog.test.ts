@@ -100,4 +100,21 @@ describe("notesForVersion", () => {
       "Faster reopen loads.",
     ]);
   });
+
+  it("lifts the prompt's caps when the release workflow asks for every bullet whole", () => {
+    const long = "x".repeat(300);
+    const cl = `## 1.0.0\n- One.\n- Two.\n- Three.\n- Four.\n- ${long}\n`;
+    expect(notesForVersion(cl, "1.0.0")).toHaveLength(3);
+    expect(notesForVersion(cl, "1.0.0", { maxNotes: Infinity, maxLen: Infinity })).toEqual([
+      "One.",
+      "Two.",
+      "Three.",
+      "Four.",
+      long,
+    ]);
+  });
+
+  it("turns a hard line break inside a bullet into a space", () => {
+    expect(notesForVersion("## 1.0.0\n- line one  \n  line two\n", "1.0.0")).toEqual(["line one line two"]);
+  });
 });

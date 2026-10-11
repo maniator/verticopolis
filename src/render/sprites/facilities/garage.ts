@@ -53,6 +53,23 @@ export function drawParking(d: DrawCtx, u: Unit, x: number, y: number, w: number
   F(W - 10, 12, 3, 1, "#FFFFFF");
 }
 
+/** The dead-parking "red X" (canon: an unchained space draws no relief), the
+ *  same strokes the per-unit bake drew, at the unit's region-relative rect. */
+export function drawDeadParkingX(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
+  // Dark under-stroke so the X reads as a SHAPE independent of hue
+  // (color-blind cue), then the red X on top.
+  for (const [style, wd] of [["#111", 4] as const, ["#C24A3A", 2] as const]) {
+    ctx.strokeStyle = style;
+    ctx.lineWidth = wd;
+    ctx.beginPath();
+    ctx.moveTo(x + 2, y + 2);
+    ctx.lineTo(x + w - 2, y + h - 2);
+    ctx.moveTo(x + w - 2, y + 2);
+    ctx.lineTo(x + 2, y + h - 2);
+    ctx.stroke();
+  }
+}
+
 // ---- Parking ramp -----------------------------------------------------------
 
 export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: Unit, x: number, y: number, w: number, h: number): void {

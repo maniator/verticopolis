@@ -3,6 +3,7 @@
 node_modules/
 dist/
 dist-single/
+dist-atlas/
 tower-tycoon.html
 *.log
 .DS_Store
