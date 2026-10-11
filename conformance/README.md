@@ -95,6 +95,21 @@ files) and fails on any difference. Its switches (`VC_TDT_DIFF_N`,
 `VC_TDT_DIFF_SEED`, `VC_TDT_DIFF_OUT`, `VC_TDT_DIFF_REPORT`,
 `VC_TDT_DIFF_KNOWN`) are described in the test's header.
 
+## The `.vctower` container
+
+There is no lock table for the `.vctower` container. The engine's writer
+(`encode_vctower` in `engine-rs/src/load.rs`) matches the TypeScript writers'
+framing byte for byte, but its JSON keys are sorted and its deflate bits come
+from a different compressor, so a hash of the file would change with the
+compressor even when the save is the same. Instead, `cargo test`
+round-trips every `.vctower` fixture through the Rust decoder and encoder,
+and
+`conformanceWasmVctower.integration.test.ts`, part of `npm run test:wasm`,
+writes each loaded fixture with the engine and reads it back through the web
+game's readers: the same save, the TypeScript writer's framing, its
+canonical JSON as the payload, the same Founder status and the same loaded
+state hash.
+
 ## Scenario format
 
 ```json

@@ -80,10 +80,13 @@ Verticopolis has **two test tiers**:
     both codecs on seeded inputs, with its side runners in
     `src/tests/conformance/tdtDifferential.ts` and its input builders in
     `src/tests/fixtures/tdtDifferentialInputs.ts`; its `VC_TDT_DIFF_*`
-    switches are listed in its header). The game runs on the
-    WASM engine behind `?engine=wasm` (the TypeScript engine stays the
-    default); after any change under `engine-rs/`, run `npm run wasm:build`
-    and commit `src/public/engine/` (the served package); otherwise the unit
+    switches are listed in its header). The same command runs the `.vctower`
+    writer's test, `conformanceWasmVctower.integration.test.ts`, which writes
+    every fixture with the engine and reads it back through the web game's
+    readers. The game runs on the WASM engine behind `?engine=wasm` (the
+    TypeScript engine stays the default); after any change under
+    `engine-rs/`, run `npm run wasm:build` and commit `src/public/engine/`
+    (the served package); otherwise the unit
     test that checks its source hash fails. Vercel rebuilds the package itself
     on every deploy through `scripts/vercel-build.sh`. Until the Rust engine is the default,
     every simulation change lands in both engines in one PR with

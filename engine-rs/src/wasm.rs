@@ -809,9 +809,46 @@ pub fn export_tdt(save_json: &str) -> Result<Vec<u8>, JsError> {
     crate::tdt::export_tdt(save_json).map_err(err)
 }
 
+/// `encodeVctower(saveJson, appVersion, savedAtMs)`: the `.vctower` file
+/// text for a serialized game (what `serialize` returns), stamped the way
+/// `SaveGame.export` stamps it (`load::stamp_save`). Text that is not JSON,
+/// a save that is not a tower, a time no `Date` holds and a build name that
+/// reads as before 2.0 (which would mark the tower as a founder's) are
+/// JavaScript errors.
+#[wasm_bindgen(js_name = encodeVctower)]
+pub fn encode_vctower(
+    save_json: &str,
+    app_version: &str,
+    saved_at_ms: f64,
+) -> Result<String, JsError> {
+    let mut save: Value = serde_json::from_str(save_json).map_err(|e| err(format!("save: {e}")))?;
+    crate::load::stamp_save(&mut save, app_version, saved_at_ms).map_err(err)?;
+    // The container is ASCII by construction (magic, base64, newlines).
+    String::from_utf8(crate::load::encode_vctower(&save)).map_err(err)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The binding stamps the save and hands back the crate encoder's text.
+    /// (A refusal is a JavaScript error, which cannot be built off the wasm
+    /// target; the crate's `stamp_save` tests and the Node suite cover those.)
+    #[test]
+    fn the_vctower_binding_stamps_and_writes_what_the_crate_writes() {
+        let save =
+            serde_json::json!({"version": 7, "units": [], "minutes": 0, "towerName": "Caf\u{e9}"});
+        let Ok(text) = encode_vctower(&save.to_string(), "3.0.0", 1.5e12) else {
+            panic!("the binding refused a tower save");
+        };
+        let mut stamped = save.clone();
+        crate::load::stamp_save(&mut stamped, "3.0.0", 1.5e12).unwrap();
+        assert_eq!(text.as_bytes(), crate::load::encode_vctower(&stamped));
+        assert_eq!(
+            canonical_json(&crate::load::decode_vctower(&text).unwrap()),
+            canonical_json(&stamped)
+        );
+    }
 
     /// The two TDT free functions answer every lock case the way the referee
     /// does: the JSON envelope carries the pinned save and warnings, each
