@@ -63,6 +63,23 @@ export const MAX_SAVE_INFLATED_BYTES = 32 * 1024 * 1024;
  *  things to tell a player. */
 export class SaveTooLargeError extends Error {}
 
+/**
+ * A save's JSON text as the UTF-8 bytes every writer compresses, refused with
+ * {@link SaveTooLargeError} when it passes {@link MAX_SAVE_INFLATED_BYTES}:
+ * every reader stops there, so a larger save would write and then fail to
+ * open as a file that looks crafted. A real tower is about 2 MB. The Rust
+ * engine's writer (`load::encode_vctower`) refuses at the same bound.
+ */
+export function encodeSaveJson(json: string): Uint8Array {
+  const bytes = new TextEncoder().encode(json);
+  if (bytes.length > MAX_SAVE_INFLATED_BYTES) {
+    throw new SaveTooLargeError(
+      `This tower is ${bytes.length} bytes of save data, more than the ${MAX_SAVE_INFLATED_BYTES} a save can hold.`,
+    );
+  }
+  return bytes;
+}
+
 /** Compressed bytes fed to the inflater per push. The cap can only be enforced
  *  BETWEEN pushes, so this is what actually bounds a decompression bomb: the
  *  overshoot past {@link MAX_SAVE_INFLATED_BYTES} is at most what one push can
@@ -123,13 +140,10 @@ export function compressionDecodeSupported(): boolean {
   }
 }
 
-// Hard ceiling on a decompressed tower. A real maxed-out tower is comfortably
-// under 2MB of JSON; 64MB is generous headroom while still defusing a
-// decompression bomb (a few-KB file that would otherwise inflate to gigabytes
-// and hang the tab before validation ever runs).
-const MAX_INFLATED_BYTES = 64 * 1024 * 1024;
-
-/** Thrown by {@link inflate} when a decompressing stream exceeds MAX_INFLATED_BYTES. */
+/** Thrown by {@link inflate} when a decompressing stream exceeds
+ *  {@link MAX_SAVE_INFLATED_BYTES}, the one cap every save reader holds to (it
+ *  was 64 MB here and 32 MB in {@link inflateCapped}, so a save between the two
+ *  opened through an import and not through the desktop store). */
 export class TowerTooLargeError extends Error {}
 
 // deflate-raw via the native streams API (no zlib/gzip framing, the magic
@@ -141,7 +155,7 @@ export function deflate(bytes: Uint8Array): Promise<Uint8Array> {
 
 export function inflate(bytes: Uint8Array): Promise<Uint8Array> {
   // Decompressing untrusted input, cap the output to bound bombs.
-  return pipe(bytes, new DecompressionStream("deflate-raw"), MAX_INFLATED_BYTES);
+  return pipe(bytes, new DecompressionStream("deflate-raw"), MAX_SAVE_INFLATED_BYTES);
 }
 
 async function pipe(bytes: Uint8Array, transform: GenericTransformStream, maxBytes = Infinity): Promise<Uint8Array> {

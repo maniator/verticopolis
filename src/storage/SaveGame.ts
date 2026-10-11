@@ -13,6 +13,7 @@ import {
   compressionDecodeSupported,
   compressionEncodeSupported,
   deflate,
+  encodeSaveJson,
   fromBase64,
   inflate,
   inflateCapped,
@@ -292,7 +293,7 @@ export const SaveGame = {
    */
   packSync(sim: Simulation): string {
     const data = stamp(sim.serialize());
-    return STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(data)), { level: 1 }));
+    return STORE_MAGIC + toBase64(deflateSync(encodeSaveJson(JSON.stringify(data)), { level: 1 }));
   },
 
   // ---- Shared writer + export/import -----------------------------------
@@ -318,7 +319,7 @@ export const SaveGame = {
     const token = {};
     latestAsyncSave = token;
     const data = stamp(sim.serialize());
-    const packed = await deflate(new TextEncoder().encode(JSON.stringify(data)));
+    const packed = await deflate(encodeSaveJson(JSON.stringify(data)));
     if (latestAsyncSave !== token) return;
     latestAsyncSave = null;
     writeSlot(key, STORE_MAGIC + toBase64(packed));
@@ -333,7 +334,7 @@ export const SaveGame = {
     }
     // Exports carry the same write-time provenance as local saves: a moved
     // file says when and by which build it was written.
-    const packed = await deflate(new TextEncoder().encode(JSON.stringify(stamp(sim.serialize()))));
+    const packed = await deflate(encodeSaveJson(JSON.stringify(stamp(sim.serialize()))));
     return TOWER_FILE_MAGIC + "\n" + toBase64(packed) + "\n";
   },
 

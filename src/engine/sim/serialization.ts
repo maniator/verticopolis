@@ -254,7 +254,7 @@ export function deserialize(raw: SerializedGame): Simulation {
         everOccupied,
         // A non-string `label` would crash the escaping at render.
         state,
-        label: typeof u.label === "string" ? u.label : FACILITIES[u.kind].name,
+        label: typeof u.label === "string" ? wellFormed(u.label) : FACILITIES[u.kind].name,
         satisfaction: isStructural(u.kind) ? 1 : Math.max(0, Math.min(1, num(u.satisfaction, 1))),
         // Attendance venues' occupants mirrors the transient customersIn
         // tally (zeroed below), so it restores to 0 no matter what the save
@@ -451,7 +451,7 @@ export function deserialize(raw: SerializedGame): Simulation {
   // Repair corrupt/duplicate ids and park the id counter above them all
   // (forged-save guard; rationale and the sanity bound live in deserializeGuards).
   sim.tower.setNextId(repairEntityIds([...sim.tower.units, ...sim.tower.transports], data.nextId));
-  sim.tower.towerName = data.towerName;
+  sim.tower.towerName = typeof data.towerName === "string" ? wellFormed(data.towerName) : data.towerName;
   sim.tower.builtWeddingHall = data.builtWeddingHall;
   sim.tower.reindex();
   // Re-assert the express lobby-stop lock at the trust boundary: the import
@@ -497,4 +497,4 @@ export function newGame(seed = 12345, mode: GameMode = "classic", modernCalendar
   return sim;
 }
 
-import { serializeUnit, serializeTransport, coerceLog, coerceView, coerceDirtyDays, coerceExterminationDueDay } from "./coerce";
+import { serializeUnit, serializeTransport, coerceLog, coerceView, coerceDirtyDays, coerceExterminationDueDay, wellFormed } from "./coerce";

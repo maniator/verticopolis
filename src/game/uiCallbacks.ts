@@ -1,4 +1,5 @@
 import { trackAppAction } from "../analytics";
+import { wellFormed } from "../engine/wellFormed";
 import type { UICallbacks, Tool } from "../ui/UI";
 import type { Simulation } from "../engine/Simulation";
 import type { AudioEngine } from "../audio/Audio";
@@ -118,7 +119,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
       trackAppAction("replay_onboarding");
       app.replayOnboarding();
     },
-    onRenameTower: (name) => app.renameTower(name),
+    onRenameTower: (name) => app.renameTower(wellFormed(name)),
     onShowStats: () => {
       trackAppAction("stats_open"); // the user open; the exterminator refresh reopens showStats directly
       app.showStats();

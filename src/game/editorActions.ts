@@ -1,4 +1,5 @@
 import type { Simulation } from "../engine/Simulation";
+import { wellFormed } from "../engine/wellFormed";
 import { FACILITIES, isElevatorKind, isHotelKind, maxCarsFor } from "../engine/facilities";
 import { ECON, carResaleRefund, extendBill } from "../engine/econConfig";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
@@ -266,7 +267,7 @@ export class EditorActions {
       }
       if (action === "rename") {
         const input = root.querySelector<HTMLInputElement>("#ed-name");
-        if (input) sim.tower.setLabel(u.id, input.value);
+        if (input) sim.tower.setLabel(u.id, wellFormed(input.value));
         this.deps.audio.sfx("click");
         this.deps.refreshEditor();
       } else if (action === "rentUp" || action === "rentDown") {

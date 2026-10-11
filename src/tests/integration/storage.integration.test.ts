@@ -864,10 +864,12 @@ describe("SaveGame", () => {
   });
 
   it("rejects a decompression bomb with a 'too large' message, not 'damaged'", async () => {
-    // Build a legitimate deflate-raw stream whose OUTPUT is just past the 64MB
-    // cap, from a tiny compressed input — i.e. a real bomb, not corrupt bytes
-    // (those land on the 'damaged' path instead). 65MB of zeros packs to a few KB.
-    const huge = new Uint8Array(65 * 1024 * 1024); // all zeros → highly compressible
+    // Build a legitimate deflate-raw stream whose OUTPUT is just past the 32MB
+    // cap every save reader shares (MAX_SAVE_INFLATED_BYTES), from a tiny
+    // compressed input: a real bomb, not corrupt bytes (those land on the
+    // 'damaged' path instead). 33MB of zeros packs to a few KB, and sits in the
+    // band the import used to accept at a 64MB cap while the store refused it.
+    const huge = new Uint8Array(33 * 1024 * 1024); // all zeros, highly compressible
     const cs: GenericTransformStream = new CompressionStream("deflate-raw");
     const packed = new Uint8Array(
       await new Response(

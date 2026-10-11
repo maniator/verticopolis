@@ -126,12 +126,13 @@ hold. `load::parse_save_json` reads each such escape as U+FFFD, the
 character `TextEncoder` substitutes for an unpaired surrogate, and every
 engine entry point that takes save JSON goes through it: `decode_vctower`,
 `fromSave`, `encodeVctower` and `exportTdt`. Such a save loads in the
-engine with U+FFFD where the half character was, while the TypeScript
-engine keeps the half character (so the dual run reports that one string
-as a divergence until the web side repairs it the same way, #936). And the
-encoder refuses a save whose JSON is longer than 32 MiB,
-the most the strictest reader (`inflateCapped`, `decode_vctower`) will
-inflate, since that file would only fail to load.
+engine with U+FFFD where the half character was, and the TypeScript
+engine repairs the same strings the same way (`src/engine/wellFormed.ts`,
+on load and on rename), so both engines hold one tower name. And the
+encoder refuses a save whose JSON is longer than 32 MiB, the cap every
+reader holds to (`decode_vctower`, and on the web `inflateCapped` and
+`SaveGame.import`; the web writers check it too, through `encodeSaveJson`),
+since that file would only fail to load.
 
 ## The WASM binding
 

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { deflateSync } from "fflate";
 import {
+  encodeSaveJson,
   INFLATE_CHUNK_BYTES,
   MAX_SAVE_INFLATED_BYTES,
   SaveTooLargeError,
   inflateCapped,
 } from "./saveCompression";
+import { toTowerFile } from "./towerFileCodec";
 
 /**
  * The cap on a decompressed save can only be enforced BETWEEN pushes to the
@@ -58,5 +60,26 @@ describe("inflateCapped", () => {
     // even a maximally compressible slice cannot approach the cap. A 64 KiB
     // chunk would allow ~66 MB, more than the 32 MB cap it is meant to enforce.
     expect(INFLATE_CHUNK_BYTES * MAX_DEFLATE_RATIO).toBeLessThan(MAX_SAVE_INFLATED_BYTES / 2);
+  });
+});
+
+/** One cap for every writer: a save the readers would refuse is never written. */
+describe("encodeSaveJson", () => {
+  it("encodes a save as UTF-8 up to the read cap", () => {
+    expect(encodeSaveJson('{"towerName":"Caf\u00e9"}')).toEqual(new TextEncoder().encode('{"towerName":"Caf\u00e9"}'));
+    expect(encodeSaveJson("x".repeat(MAX_SAVE_INFLATED_BYTES)).length).toBe(MAX_SAVE_INFLATED_BYTES);
+  });
+
+  it("refuses a save one byte past the cap, counting UTF-8 bytes", () => {
+    expect(() => encodeSaveJson("x".repeat(MAX_SAVE_INFLATED_BYTES + 1))).toThrow(SaveTooLargeError);
+    // 2 bytes per character in UTF-8, so half as many characters pass the cap.
+    expect(() => encodeSaveJson("\u00e9".repeat(MAX_SAVE_INFLATED_BYTES / 2 + 1))).toThrow(SaveTooLargeError);
+  });
+
+  it("keeps toTowerFile from writing a .vctower no reader opens, except in preserve mode", () => {
+    const pad = "x".repeat(MAX_SAVE_INFLATED_BYTES);
+    const raw = `{"minutes":0,"units":[],"pad":"${pad}"}`;
+    expect(toTowerFile(raw)).toEqual({ ok: false, reason: "unreadable" });
+    expect(toTowerFile(raw, true).ok).toBe(true);
   });
 });

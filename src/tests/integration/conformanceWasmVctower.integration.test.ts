@@ -149,7 +149,8 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
   // A name cut through an emoji (the rename box counts UTF-16 units) leaves
   // half a surrogate pair, which JSON.stringify writes as an escape a Rust
   // string cannot hold. The web game writes such a tower; the engine has to
-  // open it, with U+FFFD where the half character was (#936).
+  // open it, with U+FFFD where the half character was, and the web game's own
+  // loader agrees (#936).
   it("a tower the web game wrote with a split emoji opens in the engine", async () => {
     const first = fixtures[0];
     expect(first).toBeDefined();
@@ -169,6 +170,17 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
       } finally {
         engine.free();
       }
+    }
+
+    // The web loader repairs the same string the same way, so both engines
+    // hold one tower and the dual run sees no divergence (#936).
+    const webLoaded = await SaveGame.import(webFile);
+    expect(webLoaded.tower.towerName).toBe("Sky \uFFFD");
+    const fromWebFile = rust().Engine.fromVctower(webFile);
+    try {
+      expect(tsEngine(webLoaded).stateDigest()).toBe(fromWebFile.stateDigest());
+    } finally {
+      fromWebFile.free();
     }
 
     const written = rust().encodeVctower(json, VERSION, SAVED_AT);

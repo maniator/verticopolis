@@ -1,4 +1,7 @@
 import type { FacilityKind, LogEntry, SerializedUnit, SerializedView, Transport, Unit, UnitState } from "../types";
+// Save text repair (a lone surrogate reads as U+FFFD, as in the Rust engine),
+// re-exported here so the loader takes it with the rest of its coercions.
+export { wellFormed } from "../wellFormed";
 import { cloneSchedule, scheduleIsEmpty } from "../elevatorSchedule";
 
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../types";
