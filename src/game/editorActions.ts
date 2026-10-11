@@ -5,7 +5,6 @@ import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import type { BuildActions } from "./buildActions";
-import { trackEconomyActionOnce } from "../analytics";
 
 /**
  * The editor-card actions: everything the selected facility's buttons can do
@@ -194,7 +193,6 @@ export class EditorActions {
     const res = sim.tower.resizeTransport(t.id, nb, nt);
     if (res.ok) {
       sim.money -= added * ECON.transportFloorCost;
-      if (added > 0) trackEconomyActionOnce("capacity_tune"); // paid shaft extend (latched; no count)
       this.extendHwm.top = Math.max(this.extendHwm.top, nt);
       this.extendHwm.bottom = Math.min(this.extendHwm.bottom, nb);
       this.deps.audio.sfx(added > 0 ? "build" : "click");
@@ -224,7 +222,6 @@ export class EditorActions {
           return r;
         },
         onApplied: (summary) => {
-          trackEconomyActionOnce("price_tune"); // batch pricing applied (latched; no value)
           this.deps.audio.sfx("build");
           this.deps.ui.toast(summary, "good");
           this.deps.announce(summary);
@@ -271,7 +268,6 @@ export class EditorActions {
         this.deps.refreshEditor();
       } else if (action === "rentUp" || action === "rentDown") {
         if (sim.adjustRent(u.id, action === "rentUp" ? 1 : -1) !== null) {
-          trackEconomyActionOnce("price_tune"); // engaged with pricing (latched; no value)
           this.deps.audio.sfx("click");
           this.deps.refreshEditor();
         }
@@ -285,7 +281,6 @@ export class EditorActions {
         if (sel && shape?.shape === "ladder") {
           if (sel.value === "noRate") {
             if (sim.setNoRate(u.id)) {
-              trackEconomyActionOnce("price_tune"); // engaged with pricing (latched; no value)
               this.deps.audio.sfx("click");
               this.deps.announce("No Rate: off the market. Charges nothing; no one moves in.");
             }
@@ -295,7 +290,6 @@ export class EditorActions {
               let what = "Rent";
               if (u.kind === "condo") what = "Sale price";
               else if (isHotelKind(u.kind)) what = "Room rate";
-              trackEconomyActionOnce("price_tune"); // engaged with pricing (latched; no value)
               this.deps.audio.sfx("click");
               this.deps.announce(`${what} set to ${rung.label} ($${rung.value.toLocaleString()}).`);
             }
@@ -340,7 +334,6 @@ export class EditorActions {
         if (!this.deps.build.canAfford(ECON.addCarCost)) return;
         if (sim.tower.setCars(t.id, t.cars + 1)) {
           sim.money -= ECON.addCarCost;
-          trackEconomyActionOnce("capacity_tune"); // adjusted transport capacity (latched; no count)
         }
         this.deps.audio.sfx("build");
         this.deps.refreshEditor();
@@ -348,7 +341,6 @@ export class EditorActions {
         // A removed car is a sale, so it pays out like one (half back).
         if (sim.tower.setCars(t.id, t.cars - 1)) {
           sim.money += carResaleRefund();
-          trackEconomyActionOnce("capacity_tune"); // adjusted transport capacity (latched; no count)
         }
         this.deps.audio.sfx("click");
         this.deps.refreshEditor();
@@ -364,7 +356,6 @@ export class EditorActions {
         const res = sim.tower.resizeTransport(t.id, nb, nt);
         if (res.ok) {
           sim.money -= cost;
-          trackEconomyActionOnce("capacity_tune"); // extended a shaft (latched; no count)
           this.deps.audio.sfx("build");
         } else if (res.reason) {
           this.deps.audio.sfx("error");

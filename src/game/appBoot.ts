@@ -14,6 +14,7 @@ import { rebuildEngine } from "./engineWiring";
 import { RESUME_AFTER_UPDATE_KEY, RESUME_RELOAD_MAX_AGE_MS } from "./updateFlow";
 import { gameplaySession, setCommonProps } from "../analytics";
 import { reportCrashException } from "../analyticsErrors";
+import { bindEngineBridge } from "../analyticsEngineBridge";
 import { bootCommonProps, distributionChannelLabel, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
 import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
@@ -289,6 +290,10 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   } catch {
     /* best-effort enrichment; a returning/tenure/platform read must never block boot */
   }
+
+  // The analytics bridge folds the live tower's gameplay events once per frame;
+  // binding it lets the session fold the last ones before a page-hide report.
+  bindEngineBridge(() => app.sim);
 
   // One analytics snapshot per boot: the origin (update / recovery / corrupt /
   // continue / fresh) plus the loaded tower's standing state and the build
