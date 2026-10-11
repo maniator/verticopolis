@@ -155,7 +155,7 @@ export function drawAquaticCenter(d: DrawCtx, u: Unit, x: number, y: number, w: 
   for (let sx = 7; sx + 3 < w - 6; sx += 7) swim(sx, poolBot - 1);
   // Deck-chair loungers along the poolside band.
   for (let lx = 5; lx + 5 < w - 4; lx += 11) { f(lx, midY + 3, 7, 2, "#E0A85A"); lounge(lx + 1, midY + 5); }
-  // The water covers the whole pool, so it lands on both depth layers.
+  // The water covers the whole pool, so the depth layers put it on the shell.
   layerEnd(ctx);
   // A translucent water layer over the lower pool: tints the submerged bodies.
   f(3, poolTop + 3, w - 6, poolBot - poolTop - 3, WATER, 0.55);
@@ -356,7 +356,7 @@ export function drawWeddingHall(d: DrawCtx, u: Unit, x: number, y: number, w: nu
   bloom(ctx, acx + 26, fy - 19, "#E88AB0");
 
   // The petal row draws along the top of the wall (y0 + 5), over the sconces,
-  // so it belongs to the shell and lands on both depth layers.
+  // so it belongs to the shell and follows the furniture's end.
   layerEnd(ctx);
   // A row of scattered petals along the top of the wall.
   ctx.fillStyle = "rgba(90,168,90,0.7)";

@@ -58,7 +58,7 @@ export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: num
   F(60, fy - 14, 6, 6, "#D8B05A");
   F(62, fy - 13, 2, 4, "#8A6A2A");
   // A warm ceiling light over the console keys on the lit (evening) state. It
-  // belongs to the shell but draws last, so it lands on both depth layers.
+  // belongs to the shell but draws last, so it follows the furniture's end.
   layerEnd(ctx);
   ceilingFixture(ctx, x, y, w, d.lit);
 }
@@ -448,7 +448,7 @@ export function drawMetro(d: DrawCtx, x: number, y: number, w: number, h: number
     f(tx + 1, deckY - 6, 4, 1, "#2E3A30");
   }
   // The furniture ends here: the exit stairs, the deck and the trough are
-  // structure drawn over it, so they land on both depth layers.
+  // structure drawn over it, so the depth layers put them on the shell.
   layerEnd(ctx);
   // WAY OUT at the right end: green sign over stair steps rising out of frame.
   const ex = W - 46;

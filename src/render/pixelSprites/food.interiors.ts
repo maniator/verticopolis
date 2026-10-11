@@ -367,7 +367,7 @@ export function drawCinema(ctx: CanvasRenderingContext2D, x: number, y: number, 
   const seats = heads.length, filledHeads = Math.min(Math.max(0, n), seats);
   for (let j = 0; j < seats; j++) if ((j + geoAud) % seats < filledHeads) { const [hx, hy] = heads[j]; f(hx, hy, 3, 3, "#3A2E28"); f(hx, hy, 3, 1, "#5A4438"); }
   // The furniture ends here: the aisle lights and EXIT signs belong to the
-  // shell, and they draw over the seats, so they land on both pictures.
+  // shell, and they draw over the seats, so the depth layers put them there.
   layerEnd(ctx);
   // Aisle lights.
   for (let px = 10; px < w; px += 30) f(px, fy - 1, 2, 1, "#E8C14A");

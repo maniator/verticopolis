@@ -405,7 +405,7 @@ export function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
   // the mirror wrapper, so a flipped room reads identically; flips off the unit
   // id give scatter variety without per-frame motion (rooms are cached sprites).
   // The furniture ends here: the grime wash, the roaches and the "z" draw
-  // over the whole room, so the atlas's depth layers carry them on both pictures.
+  // after the furniture ends, so the atlas's depth layers put them on the shell.
   layerEnd(ctx);
   if (infested) {
     const fv = (n: number): number => (geoVariant(u, 30 + n, 2) === 1 ? 1 : -1);
