@@ -73,13 +73,20 @@ export class SaveTooLargeError extends Error {}
  * string collapse to one entry, as the Rust loader dedupes them.
  */
 export function parseSaveJson(text: string): unknown {
+  // Only text holding a surrogate (escaped, or raw in a legacy uncompressed
+  // slot) can need repair; every other save skips the reviver's cost.
+  if (!/\\u[dD][89a-fA-F]|[\uD800-\uDFFF]/.test(text)) return JSON.parse(text);
   return JSON.parse(text, (_key, value: unknown) => {
     if (typeof value === "string") return wellFormed(value);
     if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
     const obj = value as Record<string, unknown>;
     if (Object.keys(obj).every((k) => wellFormed(k) === k)) return obj;
     const fixed: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) fixed[wellFormed(k)] = v;
+    // defineProperty, so a "__proto__" key stays an own key as JSON.parse
+    // made it (assignment would run the prototype setter instead).
+    for (const [k, v] of Object.entries(obj)) {
+      Object.defineProperty(fixed, wellFormed(k), { value: v, enumerable: true, writable: true, configurable: true });
+    }
     return fixed;
   });
 }

@@ -317,8 +317,9 @@ export const SaveGame = {
       this.saveTo(key, sim);
       return;
     }
-    // Encode (and refuse an oversized save) before claiming the token, so a
-    // refused save leaves no token behind.
+    // Encode (and refuse an oversized save) before claiming the token: a
+    // refused save leaves no token behind, so an older save of the same slot
+    // still in flight commits instead of the slot keeping neither.
     const bytes = encodeSaveJson(JSON.stringify(stamp(sim.serialize())));
     const token = {};
     latestAsyncSave = token;

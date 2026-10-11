@@ -108,6 +108,17 @@ describe("parseSaveJson", () => {
     const sim = Simulation.deserialize(parseSaveJson(JSON.stringify(save)) as typeof save);
     expect([...sim.excavated]).toEqual(["\uFFFD"]);
   });
+
+  it("keeps a __proto__ key an own key when the object around it is rebuilt", () => {
+    const v = parseSaveJson(String.raw`{"__proto__":{"units":[]},"k\ud800":1}`) as Record<string, unknown>;
+    expect(Object.getPrototypeOf(v)).toBe(Object.prototype);
+    expect(Object.keys(v)).toEqual(["__proto__", "k\uFFFD"]);
+    expect("units" in v).toBe(false);
+  });
+
+  it("repairs a raw lone surrogate, as a legacy uncompressed slot can hold", () => {
+    expect(parseSaveJson('{"towerName":"Sky ' + String.fromCharCode(0xd83c) + '"}')).toEqual({ towerName: "Sky \uFFFD" });
+  });
 });
 
 /** Every web writer goes through encodeSaveJson, so none writes past the cap. */
