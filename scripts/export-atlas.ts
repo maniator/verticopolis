@@ -17,9 +17,10 @@
  * sample signatures in `src/render/atlas/samples.ts` (flat, and through each
  * room's depth layers) and stops on any mismatch. After packing it checks that
  * every image comes back out of the pages, and that every room's depth layers,
- * read back from the pages, give back its flat frame. Writes `<out>/verticopolis-atlas-<label or version>.zip` and a
- * `.sha256` beside it (`verticopolis-atlas-preview.zip` for a `--filter` run,
- * which skips the sample check).
+ * read back from the pages, give back its flat frame. Writes
+ * `<out>/verticopolis-atlas-<label or version>.zip` and a `.sha256` beside it
+ * (`verticopolis-atlas-preview.zip` for a `--filter` run, which skips the
+ * sample check).
  * Nothing it writes is committed. The archive layout and manifest schema are
  * documented in docs/atlas.md.
  */
@@ -161,8 +162,9 @@ async function main(): Promise<void> {
   const split = checkLayers(archive);
   if (split.length > 0) throw new Error(`depth layers do not compose back to their frames: ${split.slice(0, 10).join(", ")}`);
   // A shell that still shows the furniture also composes back, so every kind
-  // that splits must have furniture somewhere.
-  const unsplit = kindsWithoutFurniture(archive.manifest);
+  // that splits must have furniture somewhere. That holds across the whole
+  // catalog only, so a --filter preview skips it.
+  const unsplit = filter ? [] : kindsWithoutFurniture(archive.manifest);
   if (unsplit.length > 0) throw new Error(`depth layers hold no furniture for ${unsplit.join(", ")}: the shell kept it`);
   const layered = Object.values(archive.manifest.frames).filter((f) => f.layers).length;
   console.log(`depth layers: ${layered} room frames compose back to their flat frames`);

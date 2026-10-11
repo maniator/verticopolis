@@ -132,8 +132,8 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
       ctx.fillStyle = "#3a3f4a";
       ctx.fillRect(x, y, w, h);
   }
-  // The furniture ends here: the night scrim and the notice badge cover the
-  // whole room, so the atlas's depth layers carry them on both pictures.
+  // The furniture ends here: the night scrim and the notice badge draw over
+  // the room after it, so the atlas's depth layers put them on the shell.
   layerEnd(ctx);
   // Lights out at night: an empty home/workplace, or a condo whose residents
   // are asleep in the small hours.

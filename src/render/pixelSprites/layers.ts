@@ -2,9 +2,10 @@
  * Depth-layer marks for the sprite atlas. A room's draw routine calls
  * {@link layerBreak} once, after its shell (ceiling, back wall, windows, wall
  * art, floor band) and before its furniture and seated occupants. The routine
- * that wraps it calls {@link layerEnd} after the furniture and before any
- * mark painted over the whole room (the night scrim, the notice badge, a grime
- * wash).
+ * itself, or the one that wraps it, calls {@link layerEnd} after the furniture
+ * and before anything the game draws over the room after it (the night scrim,
+ * the notice badge, a grime wash, a ceiling light); the first end after the
+ * break counts.
  *
  * In the game both calls do nothing: no hook is installed, so the drawing and
  * its pixels are exactly what they would be without them. The atlas bake
@@ -40,8 +41,8 @@ export function layerEnd(ctx: CanvasRenderingContext2D): void {
   hook?.furnitureEnd(ctx);
 }
 
-/** Run `draw` with `h` receiving the layer marks, then remove it (even when
- *  `draw` throws). Only the atlas bake calls this. */
+/** Run `draw` with `h` receiving the layer marks, then restore the previous
+ *  hook (even when `draw` throws). Only the atlas bake calls this. */
 export function withLayerHook<T>(h: LayerHook, draw: () => T): T {
   const prev = hook;
   hook = h;

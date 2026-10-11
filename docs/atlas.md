@@ -220,10 +220,12 @@ front of the back wall. A room frame that supports this carries an optional
 ```
 
 - `shell` is the room with its furniture and seated people taken out: the
-  ceiling, back wall, windows, wall art and floor band, plus any mark the game
-  paints over the whole room (the night scrim on an empty room, the notice
-  badge, an infested room's grime and roaches, a cinema's EXIT signs, the pool
-  water, the metro's platform and track).
+  ceiling, back wall, windows, wall art and floor band, plus whatever the game
+  draws over the room after its furniture: the night scrim on an empty room,
+  the notice badge, an infested room's grime and roaches, ceiling lights and
+  glow washes drawn last (security, housekeeping, amusements), a cinema's aisle
+  lights and EXIT signs, the wedding hall's petal row, the pool water, and the
+  metro's exit stairs, platform and track.
 - `furniture` holds the pixels that differ between the shell and the flat
   frame, transparent everywhere else.
 
