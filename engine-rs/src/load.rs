@@ -125,9 +125,9 @@ pub fn encode_vctower(save: &Value) -> Vec<u8> {
 /// which carries Founder status as `founder: true`. A save that instead
 /// still holds an older stamp reading as a founder's (a `.vctower` decoded
 /// but never loaded) keeps that status as `founder: true` before the new
-/// stamp replaces the old one. A save with no stamp at all cannot be told apart from a fresh
-/// serialization, so load an unstamped file (`mark_founder_from_loaded_file`)
-/// before writing it again.
+/// stamp replaces the old one. A save with no stamp at all cannot be told
+/// apart from a fresh serialization, so load an unstamped file
+/// (`mark_founder_from_loaded_file`) before writing it again.
 pub fn stamp_save(save: &mut Value, app_version: &str, saved_at_ms: f64) -> Result<(), String> {
     let carries_founder = detect_founder(save);
     let Value::Object(m) = save else {

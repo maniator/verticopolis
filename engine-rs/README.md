@@ -186,7 +186,8 @@ JSON path where the views depart. The same mirror and shadow run in Node as
 the gate, a full day on every fixture at each game speed through the frame
 loop's own step math: `npm run test:wasm` (the `dualRun*` suites; the same
 command runs `conformanceWasmTdt`, the `.TDT` differential test, whose
-`VC_TDT_DIFF_*` switches are described in the `.TDT` section above).
+`VC_TDT_DIFF_*` switches are described in the `.TDT` section above, and
+`conformanceWasmVctower`, the `.vctower` writer test).
 
 The referee prints one line per scenario: `ok`, the first divergent
 checkpoint with both hashes, or the first command the port cannot run. It

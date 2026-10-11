@@ -84,8 +84,9 @@ Verticopolis has **two test tiers**:
     writer's test, `conformanceWasmVctower.integration.test.ts`, which writes
     every fixture with the engine and reads it back through the web game's
     readers. The game runs on the WASM engine behind `?engine=wasm` (the
-    TypeScript engine stays the default); after any change under `engine-rs/`, run `npm run wasm:build`
-    and commit `src/public/engine/` (the served package); otherwise the unit
+    TypeScript engine stays the default); after any change under
+    `engine-rs/`, run `npm run wasm:build` and commit `src/public/engine/`
+    (the served package); otherwise the unit
     test that checks its source hash fails. Vercel rebuilds the package itself
     on every deploy through `scripts/vercel-build.sh`. Until the Rust engine is the default,
     every simulation change lands in both engines in one PR with
