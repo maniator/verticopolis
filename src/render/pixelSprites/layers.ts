@@ -14,7 +14,8 @@
  *
  * A mark reads the canvas as it stands, so it is safe under a transform (the
  * mirrored layouts call it inside `maybeMirrored`): the hook ignores the
- * transform and the clip.
+ * transform. Do not mark inside a clip narrower than the room: the bake puts
+ * the shell back only inside the clip active at the end mark.
  */
 
 export interface LayerHook {

@@ -29,7 +29,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
 import { bundleBake } from "./atlas-bundle.ts";
-import { buildArchive, checkLayers, checkPages } from "../src/render/atlas/archive";
+import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture } from "../src/render/atlas/archive";
 import type { BakeResult } from "../src/render/atlas/bake";
 import type { Image } from "../src/render/atlas/pixels";
 
@@ -160,6 +160,10 @@ async function main(): Promise<void> {
   // Every room's shell plus its furniture must give back its flat frame.
   const split = checkLayers(archive);
   if (split.length > 0) throw new Error(`depth layers do not compose back to their frames: ${split.slice(0, 10).join(", ")}`);
+  // A shell that still shows the furniture also composes back, so every kind
+  // that splits must have furniture somewhere.
+  const unsplit = kindsWithoutFurniture(archive.manifest);
+  if (unsplit.length > 0) throw new Error(`depth layers hold no furniture for ${unsplit.join(", ")}: the shell kept it`);
   const layered = Object.values(archive.manifest.frames).filter((f) => f.layers).length;
   console.log(`depth layers: ${layered} room frames compose back to their flat frames`);
   mkdirSync(outDir, { recursive: true });

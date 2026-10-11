@@ -50,9 +50,9 @@ function marks(s: UnitPaint, w: number, h: number): string[] {
 describe("depth-layer marks across the room catalog", () => {
   const stills = roomJobs().filter((j): j is StillJob => j.type === "still");
 
-  it("asks for a split on every room still frame", () => {
+  it("asks for a split on every room still frame but the flat kinds'", () => {
     expect(stills.length).toBeGreaterThan(0);
-    expect(stills.every((j) => j.layers === true)).toBe(true);
+    for (const j of stills) expect(j.layers, j.name).toBe(!DEPTH_FLAT_KINDS.has((j.paint as UnitPaint).kind));
   });
 
   it("marks exactly one break on every frame that paints a room, and none on vacancy cards, shutters, gutted shells or the flat kinds", () => {

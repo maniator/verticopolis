@@ -249,6 +249,23 @@ export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): strin
   return bad;
 }
 
+/** Room kinds whose frames carry depth layers but never any furniture. Shell
+ *  plus furniture equals the flat frame whatever the shell holds, so a bake
+ *  that failed to take the furniture out (a shell that still shows it) would
+ *  pass {@link checkLayers}; every kind that splits has furniture in some
+ *  frame, so an empty kind means the split did not happen. */
+export function kindsWithoutFurniture(manifest: Pick<AtlasManifest, "frames">): string[] {
+  const split = new Set<string>();
+  const furnished = new Set<string>();
+  for (const rec of Object.values(manifest.frames)) {
+    if (!rec.layers) continue;
+    const kind = String(rec.keys.kind);
+    split.add(kind);
+    if (rec.layers.furniture.length > 0) furnished.add(kind);
+  }
+  return [...split].filter((k) => !furnished.has(k)).sort();
+}
+
 /** A transparent page whose pixels still decode as the flat normal. */
 function flatNormals(size: number): Image {
   const img = blank(size, size);

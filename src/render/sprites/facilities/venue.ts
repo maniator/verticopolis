@@ -353,7 +353,8 @@ export function drawWeddingHall(d: DrawCtx, u: Unit, x: number, y: number, w: nu
   bloom(ctx, acx + 22, fy - 18, "#F0F0F0");
   bloom(ctx, acx + 26, fy - 19, "#E88AB0");
 
-  // The petal garland runs along the top of the wall, so it belongs to the shell.
+  // The petal row below draws along the top of the wall (y0 + 5), over the
+  // sconces, so it belongs to the shell and lands on both depth layers.
   layerEnd(ctx);
   // Scattered petals down the aisle.
   ctx.fillStyle = "rgba(90,168,90,0.7)";

@@ -1,6 +1,6 @@
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { buildArchive, checkLayers, checkPages, signature, ARCHIVE_ROOT } from "./archive";
+import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, signature, ARCHIVE_ROOT } from "./archive";
 import { bake, ImageStore, type Renderer } from "./bake";
 import type { Job } from "./catalog";
 import type { PaintSpec } from "./paint";
@@ -259,6 +259,12 @@ describe("depth layers", () => {
     const p = a.manifest.frames.r1.layers!.furniture[0].rect;
     a.pages[p.page].data[(p.y * 32 + p.x) * 4] ^= 1;
     expect(checkLayers(a)).toEqual(["r1", "r2"]);
+  });
+  it("names a split kind whose frames never hold furniture", () => {
+    const placed = { rect: { page: 0, x: 0, y: 0, w: 1, h: 1 }, dx: 0, dy: 0 };
+    const rec = (kind: string, furniture: (typeof placed)[]) => ({ w: 1, h: 1, anchor: { x: 0, y: 0 }, parts: [placed], keys: { kind }, layers: { shell: [placed], furniture } });
+    const frames = { a: rec("office", []), b: rec("office", [placed]), c: rec("spa", []), d: { ...rec("shop", []), layers: undefined } };
+    expect(kindsWithoutFurniture({ frames })).toEqual(["spa"]);
   });
   it("refuses a frame-image count outside the images", () => {
     expect(() => buildArchive({ ...layered, frameImages: layered.images.length + 1 }, info, undefined, 32)).toThrow(/frameImages/);

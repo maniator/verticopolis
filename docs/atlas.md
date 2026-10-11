@@ -242,6 +242,11 @@ What that means for the pictures:
 - A whole-room mark sits on the shell, so the furniture layer carries the
   furniture as the flat frame shows it (darkened under the night scrim, tinted
   under the pool water).
+- A soft shadow or glow drawn with the furniture is baked into it as opaque
+  pixels (the translucent paint over the wall behind it), so anything a
+  frontend draws between the shell and the furniture is hidden under it.
+- The hotel's roaches and its sleeper's "z" draw after the grime wash, so they
+  sit on the shell with it, even the one on the bed.
 - The shell's normal map is its own (it is a picture without the furniture).
   The furniture's normals come from the flat frame, masked to its pixels, like
   any other layer.
@@ -251,7 +256,9 @@ The game marks the split in each room's draw routine
 where the furniture ends and the whole-room marks begin. In the game both calls
 do nothing. The export paints each room frame a second time with the marks
 live and records the canvas at them; the flat frame comes from the ordinary
-paint, so adding layers never changes a frame's pixels.
+paint, so adding layers never changes a frame's pixels. The export also
+requires every kind that splits to have furniture in some frame, since a shell
+that still showed the furniture would compose back too.
 
 A frame has no `layers`, and a frontend draws it flat, when:
 

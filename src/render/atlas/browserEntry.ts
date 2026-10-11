@@ -2,7 +2,7 @@ import { bake, type BakeResult, type Renderer } from "./bake";
 import { roomJobs, type Job } from "./catalog";
 import { facadeJobs, peopleJobs, skyJobs, structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
 import { paint, type PaintSpec } from "./paint";
-import type { Image } from "./pixels";
+import { LayerError, type Image } from "./pixels";
 import { withLayerHook } from "../pixelSprites/layers";
 import { SAMPLES, type Sample } from "./samples";
 import { verifySample, type SampleResult } from "./verify";
@@ -38,15 +38,22 @@ function prepare(canvas: HTMLCanvasElement, w: number, h: number): CanvasRenderi
   return ctx;
 }
 
-/** Replace every pixel of `dst` with `src`'s, ignoring `dst`'s transform,
- *  clip state aside (the bake's clip is the whole canvas). Canvas to canvas
- *  with "copy" moves the stored pixels unchanged, translucent ones included. */
+/** Replace every pixel of `dst` with `src`'s, whatever transform, alpha,
+ *  shadow or filter the paint has set. Canvas to canvas with "copy" moves the
+ *  stored pixels unchanged, translucent ones included. A clip cannot be lifted
+ *  without the paint's own `restore`, so the copy stays inside any clip: the
+ *  bake's only clip is the room's whole canvas (`paintSettledUnit`). */
 function copyPixels(dst: CanvasRenderingContext2D, src: HTMLCanvasElement): void {
   dst.save();
   dst.setTransform(1, 0, 0, 1, 0, 0);
   dst.globalAlpha = 1;
   dst.globalCompositeOperation = "copy";
   dst.imageSmoothingEnabled = false;
+  dst.shadowColor = "transparent";
+  dst.shadowBlur = 0;
+  dst.shadowOffsetX = 0;
+  dst.shadowOffsetY = 0;
+  dst.filter = "none";
   dst.drawImage(src, 0, 0);
   dst.restore();
 }
@@ -77,12 +84,15 @@ export function canvasRenderer(doc: Document): Renderer {
       withLayerHook(
         {
           shellEnd() {
-            if (broke) throw new Error(`two layer breaks in one paint: ${JSON.stringify(spec)}`);
+            if (broke) throw new LayerError("two layer breaks in one paint");
             broke = true;
             copyPixels(store, canvas);
           },
           furnitureEnd() {
-            if (!broke || ended) return;
+            // A routine's own end and its wrapper's (drawRoom, drawUnit) both
+            // fire; the first one after the break counts.
+            if (ended) return;
+            if (!broke) throw new LayerError("a layer end before the layer break");
             ended = true;
             copyPixels(ctx, saved);
           },

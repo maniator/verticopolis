@@ -118,7 +118,9 @@ interface PendingRef extends ImageRef {
 
 /** The depth layers' images, kept apart from the frame images so a bake with
  *  layers stores every frame image under the same id, in the same order, as a
- *  bake without them. A layer equal to a frame image reuses that image. */
+ *  bake without them. A layer equal to a frame image already stored reuses it
+ *  (one equal to a later frame's image is stored twice, which costs only
+ *  space). */
 class LayerStore {
   readonly own = new ImageStore();
   constructor(private readonly frames: ImageStore) {}
@@ -157,7 +159,7 @@ function trimSteps(steps: (ImageRef | null)[]): (ImageRef | null)[] {
 export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: number, total: number) => void): BakeResult {
   const store = new ImageStore();
   const layerStore = new LayerStore(store);
-  const pending: PendingRef[] = [];
+  const pending: { frame: BakedFrame; shell: PendingRef | null; furniture: PendingRef | null }[] = [];
   const frames: BakedFrame[] = [];
   const animations: BakedAnimation[] = [];
   const names = new Set<string>();
@@ -200,11 +202,7 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
       // shell plus the furniture gives back `base` exactly (diffLayer refuses
       // any pixel source-over could not reproduce).
       const shell = job.layers && r.renderShell ? r.renderShell(job.paint, job.w, job.h) : null;
-      if (shell) {
-        const layers = { shell: layerStore.shell(shell), furniture: layerStore.furniture(diffLayer(shell, base), base) };
-        for (const ref of [layers.shell, layers.furniture]) if (ref) pending.push(ref);
-        frame.layers = layers;
-      }
+      if (shell) pending.push({ frame, shell: layerStore.shell(shell), furniture: layerStore.furniture(diffLayer(shell, base), base) });
     } catch (e) {
       if (e instanceof LayerError) throw new LayerError(`${job.name}: ${e.message}`);
       throw e;
@@ -212,13 +210,10 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
     frames.push(frame);
   });
   onProgress?.(jobs.length, jobs.length);
-  // Move the layer store's own images past the frame images, then drop the
-  // bookkeeping flag so the records hold plain image refs.
+  // The layer store's own images go after the frame images.
   const frameImages = store.images.length;
-  for (const ref of pending) {
-    if (ref.own) ref.id += frameImages;
-    delete (ref as Partial<PendingRef>).own;
-  }
+  const resolve = (ref: PendingRef | null): ImageRef | null => (ref ? { id: ref.own ? ref.id + frameImages : ref.id, dx: ref.dx, dy: ref.dy } : null);
+  for (const p of pending) p.frame.layers = { shell: resolve(p.shell), furniture: resolve(p.furniture) };
   return {
     images: [...store.images, ...layerStore.own.images],
     normals: [...store.normals, ...layerStore.own.normals],

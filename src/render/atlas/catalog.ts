@@ -201,9 +201,10 @@ export function roomJobs(): Job[] {
 }
 
 /** The still frames for one static signature, each tried for a depth split
- *  (the paint decides whether it has one). */
+ *  unless its kind is flat (the paint decides whether it has one). */
 function roomStills(kind: FacilityKind, stem: string, w: number, h: number, base: UnitPaint, keys: Keys): StillJob[] {
-  return roomStillJobs(kind, stem, w, h, base, keys, { x: 0, y: 0 }).map((j) => ({ ...j, layers: true }));
+  const layers = !DEPTH_FLAT_KINDS.has(kind);
+  return roomStillJobs(kind, stem, w, h, base, keys, { x: 0, y: 0 }).map((j) => ({ ...j, layers }));
 }
 
 /** The presence split and the composed layers each kind carries. */
