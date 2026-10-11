@@ -2,7 +2,8 @@ import { bake, type BakeResult, type Renderer } from "./bake";
 import { roomJobs, type Job } from "./catalog";
 import { facadeJobs, peopleJobs, skyJobs, structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
 import { paint, type PaintSpec } from "./paint";
-import { LayerError, type Image } from "./pixels";
+import type { Image } from "./pixels";
+import { shellMarks } from "./shellMarks";
 import { withLayerHook } from "../pixelSprites/layers";
 import { SAMPLES, type Sample } from "./samples";
 import { verifySample, type SampleResult } from "./verify";
@@ -79,30 +80,15 @@ export function canvasRenderer(doc: Document): Renderer {
     renderShell(spec: PaintSpec, w: number, h: number): Image | null {
       const ctx = prepare(canvas, w, h);
       const store = prepare(saved, w, h);
-      let broke = false;
-      let ended = false;
-      withLayerHook(
-        {
-          shellEnd() {
-            if (broke) throw new LayerError("two layer breaks in one paint");
-            broke = true;
-            copyPixels(store, canvas);
-          },
-          furnitureEnd() {
-            // A routine's own end and its wrapper's (drawRoom, drawUnit) both
-            // fire; the first one after the break counts.
-            if (ended) return;
-            if (!broke) throw new LayerError("a layer end before the layer break");
-            ended = true;
-            copyPixels(ctx, saved);
-          },
-        },
-        () => paint(ctx, spec, w, h),
+      const marks = shellMarks(
+        () => copyPixels(store, canvas),
+        () => copyPixels(ctx, saved),
       );
-      if (broke && !ended) copyPixels(ctx, saved);
+      withLayerHook(marks.hook, () => paint(ctx, spec, w, h));
+      const split = marks.finish();
       ctx.restore();
       store.restore();
-      if (!broke) return null;
+      if (!split) return null;
       return { w, h, data: ctx.getImageData(0, 0, w, h).data };
     },
   };
