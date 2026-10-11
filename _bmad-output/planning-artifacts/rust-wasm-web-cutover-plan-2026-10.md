@@ -40,6 +40,8 @@ This document is a **BMAD-style planning input** for product/architecture review
 
 **A2** Audit engine rules in modules rather than comparing filenames: simulation clock, demand, economy, elevators/dispatch, occupancy/crowd, events, milestones, parking, services, RNG, construction, rent, and all game modes. Capture intentional differences as approved product decisions.
 
+**A2a Clock ownership and scheduling:** Document the authoritative Rust `Clock` in `engine-rs/src/clock.rs`, its ownership by `Simulation` in `sim.rs`, and advancement/hour/day hooks in `sim_loop.rs`. The web host schedules elapsed-time tick requests and controls pause/resume/speed; it must not maintain a competing authoritative game clock or apply gameplay time rules. Verify the WASM host's fixed-step accumulator, tick-size caps, speed multipliers, background-tab throttling, pause/resume, save/load time restoration, and deterministic replay at different rendering frame rates. Add tests proving equal game-time advancement and identical hour/day effects for the same command/tick sequence, with no skipped or duplicated boundaries.
+
 **A3** Inventory every web and future clients mutation path; classify commands as player-facing or privileged restore/debug. Guard raw setters and prove that money, removal, car and extension charges cannot be bypassed through UI routes. See #923.
 
 ### Epic B: Automated parity and compatibility (P1; prerequisite)
