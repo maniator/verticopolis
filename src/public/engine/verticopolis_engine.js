@@ -740,9 +740,11 @@ if (Symbol.dispose) Engine.prototype[Symbol.dispose] = Engine.prototype.free;
  * `encodeVctower(saveJson, appVersion, savedAtMs)`: the `.vctower` file
  * text for a serialized game (what `serialize` returns), stamped the way
  * `SaveGame.export` stamps it (`load::stamp_save`). Text that is not JSON,
- * a save that is not a tower, a time no `Date` holds and a build name that
- * reads as before 2.0 (which would mark the tower as a founder's) are
- * JavaScript errors.
+ * a save that is not a tower, a time no `Date` holds, a build name that
+ * reads as before 2.0 (which would mark the tower as a founder's) and a
+ * save whose JSON passes 32 MiB (more than a reader will hold) are
+ * JavaScript errors. A lone surrogate escape reads as U+FFFD
+ * (`load::parse_save_json`).
  * @param {string} save_json
  * @param {string} app_version
  * @param {number} saved_at_ms

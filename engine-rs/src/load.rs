@@ -63,7 +63,8 @@ pub fn decode_vctower(text: &str) -> Result<Value, String> {
 /// string can hold half of a surrogate pair (a name cut at a UTF-16 length,
 /// for one), and `JSON.stringify` writes it as a `\udxxx` escape that
 /// `serde_json` refuses, since a Rust string cannot hold it. Each such escape
-/// becomes U+FFFD, the character `TextEncoder` writes for it, so the save
+/// becomes U+FFFD, the character `TextEncoder` substitutes for an unpaired
+/// surrogate, so the save
 /// loads with a replacement character where the half character was. Paired
 /// escapes, every other escape and every byte outside a string pass through
 /// unchanged; text with no lone surrogate escape is parsed as given.
@@ -2102,7 +2103,7 @@ mod save_json {
         assert_eq!(v, json!({"k\u{FFFD}": [{"label": "x\u{FFFD}"}]}));
     }
 
-    /// An escaped backslash followed by a literal `u` is text, not an escape.
+    /// An escaped backslash followed by a literal `u` stays text.
     #[test]
     fn an_escaped_backslash_is_not_an_escape() {
         assert_eq!(parse(r#"{"a":"\\ud83c"}"#)["a"], json!("\\ud83c"));

@@ -812,9 +812,11 @@ pub fn export_tdt(save_json: &str) -> Result<Vec<u8>, JsError> {
 /// `encodeVctower(saveJson, appVersion, savedAtMs)`: the `.vctower` file
 /// text for a serialized game (what `serialize` returns), stamped the way
 /// `SaveGame.export` stamps it (`load::stamp_save`). Text that is not JSON,
-/// a save that is not a tower, a time no `Date` holds and a build name that
-/// reads as before 2.0 (which would mark the tower as a founder's) are
-/// JavaScript errors.
+/// a save that is not a tower, a time no `Date` holds, a build name that
+/// reads as before 2.0 (which would mark the tower as a founder's) and a
+/// save whose JSON passes 32 MiB (more than a reader will hold) are
+/// JavaScript errors. A lone surrogate escape reads as U+FFFD
+/// (`load::parse_save_json`).
 #[wasm_bindgen(js_name = encodeVctower)]
 pub fn encode_vctower(
     save_json: &str,

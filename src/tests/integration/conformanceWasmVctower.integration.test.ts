@@ -159,6 +159,8 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     const webFile = await SaveGame.export(sim);
     const json = JSON.stringify(sim.serialize());
     expect(json).toContain("\\ud83c");
+    // The file the web writer made carries the escape itself.
+    expect(payloadText(webFile)).toContain("\\ud83c");
 
     const nameIn = (engine: Engine): unknown => (JSON.parse(engine.serialize()) as { towerName?: unknown }).towerName;
     for (const engine of [rust().Engine.fromVctower(webFile), rust().Engine.fromSave(json)]) {
