@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 2.29.5
 
-- On the opt-in WASM engine, a tower or room name cut through an emoji (the name box had room for only part of it) now reads the same as on the default engine.
+- A tower or room name cut through an emoji (the name box had room for only part of it) now loads the same on the default engine as on the opt-in WASM engine, with a placeholder mark where the half character was.
 
 ## 2.29.4
 

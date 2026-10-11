@@ -1,6 +1,7 @@
 import { facilityFloors } from "./facilities";
 import { CLASSIC_RULES, type GameRules } from "./gameRules";
 import { FACILITIES } from "./facilitiesData";
+import { wellFormed } from "./wellFormed";
 import type { Facility, FacilityKind, PlaceResult, Transport, Unit } from "./types";
 import type { GameplayEventBuffer } from "./gameplayEventBuffer";
 import * as capacityEdits from "./tower/capacityEdits";
@@ -341,13 +342,12 @@ export class Tower {
     return transport.removeUnit(this, id);
   }
 
-  /** The editor's rename: a trimmed name, or the catalog name when empty.
-   *  False for an unknown id. The one write path for `label`, so a second
-   *  engine can mirror it. */
+  /** The editor's rename: a trimmed, well-formed name (or the catalog name when empty), false for
+   *  an unknown id. The one write path for `label`, so a second engine can mirror it. */
   setLabel(id: number, label: string): boolean {
     const u = this.getUnit(id);
     if (!u) return false;
-    u.label = label.trim() || FACILITIES[u.kind].name;
+    u.label = wellFormed(label).trim() || FACILITIES[u.kind].name;
     return true;
   }
 

@@ -128,8 +128,8 @@ engine entry point that takes save JSON goes through it: `decode_vctower`,
 `fromSave`, `encodeVctower` and `exportTdt`. Such a save loads in the
 engine with U+FFFD where the half character was, and the web
 game repairs the same way: `parseSaveJson` (`src/storage/saveCompression.ts`)
-on every save text it reads, and `wellFormed` where a name is typed (the
-tower-name box and the label editor), so both engines hold one tower. And the
+on every save text it reads, and `wellFormed` where a name is set (the
+tower-name callback and `Tower.setLabel`), so both engines hold one tower. And the
 encoder refuses a save whose JSON is longer than 32 MiB, the cap every
 reader holds to (`decode_vctower`, and on the web `inflateCapped` and
 `SaveGame.import`; the web writers check it too, through `encodeSaveJson`),

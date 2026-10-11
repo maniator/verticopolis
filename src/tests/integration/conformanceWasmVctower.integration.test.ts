@@ -176,6 +176,8 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     // hold one tower and the dual run sees no divergence (#936).
     const webLoaded = await SaveGame.import(webFile);
     expect(webLoaded.tower.towerName).toBe("Sky \uFFFD");
+    // The Node decoder the dual-run and conformance harnesses load with too.
+    expect((decodeVctower(webFile) as { towerName?: unknown }).towerName).toBe("Sky \uFFFD");
     const fromWebFile = rust().Engine.fromVctower(webFile);
     try {
       expect(tsEngine(webLoaded).stateDigest()).toBe(fromWebFile.stateDigest());
