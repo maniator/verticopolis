@@ -1,0 +1,229 @@
+name: Sprite atlas release
+
+# Builds the sprite atlas archive (scripts/export-atlas.ts, issue #909) for a
+# version tag and publishes it on that tag's GitHub release with a SHA-256
+# checksum, so any frontend on the open engine can fetch the art for the
+# exact commit it pins. Nothing generated is committed. The bake runs inside
+# the pinned Playwright image (the same Chromium the screenshot workflows
+# use), so the pixels and the checksum are reproducible.
+#
+# Release flow: a version tag (v<package.json version>, plain x.y.z, pushed
+# by a maintainer per CONTRIBUTING.md Versioning) is the publish signal.
+# The job opens the tag's release as a draft (or reuses its draft), attaches
+# the zip and checksum while it is still a draft, then publishes it
+# with the version's CHANGELOG notes, so a published release is never edited
+# and works with immutable releases. A published release is never touched:
+# rebuilding a published tag checks the attached zip against its checksum,
+# re-bakes, and fails on any difference.
+on:
+  push:
+    # Plain x.y.z version tags only; resolve re-checks the exact form.
+    tags: ["v*.*.*", "!v*-*", '!v*\+*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing version tag (v<version>) to rebuild or audit"
+        required: true
+
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  # Resolve the tag to its commit (a manual run checks out refs/tags/<tag>
+  # explicitly, so a branch of the same name can never stand in for it),
+  # check that it names the commit's own package.json version, and pick the
+  # Playwright image from that commit's lockfile. A wrong tag fails here,
+  # before any container pull or install.
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      image: ${{ steps.pin.outputs.image }}
+      sha: ${{ steps.pin.outputs.sha }}
+      tag: ${{ steps.pin.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', github.event.inputs.tag) || github.ref }}
+          persist-credentials: false
+      - id: pin
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          tagged="$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}" || true)"
+          if [ "$sha" != "$tagged" ]; then echo "HEAD $sha is not tag $TAG ($tagged)."; exit 1; fi
+          version="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "v$version" ]; then echo "Tag $TAG does not match package.json version $version (expected v$version)."; exit 1; fi
+          # Plain releases only: a pre-release would publish as a full release,
+          # and build metadata (+) would change the archive's name.
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then echo "Tag $TAG is not a plain x.y.z version."; exit 1; fi
+          ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
+          echo "image=mcr.microsoft.com/playwright:v${ver}-jammy" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: resolve
+    runs-on: ubuntu-latest
+    # A full bake takes about eight minutes; anything near this is a hang.
+    timeout-minutes: 45
+    container:
+      image: ${{ needs.resolve.outputs.image }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      # The image ships an older Node; install the repo's pinned one over it.
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+
+      # git refuses a workspace owned by another user inside the container;
+      # the export reads the commit it records from git.
+      - name: Trust the workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The export launches Playwright's own Chromium from the image (the
+      # binary the e2e comparison uses), checks the atlas against the game's
+      # paint for the sample signatures, bakes, checks the packed pages, and
+      # writes the archive named after the tag.
+      - name: Bake the atlas in the pinned Chromium
+        env:
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: npm run atlas -- --out dist-atlas --label "$TAG"
+
+      # The release notes are this version's player notes, picked out of
+      # CHANGELOG.md by the game's own reader (src/changelog.ts), the one the
+      # update prompt uses, without the prompt's three-line and length caps.
+      # A version with no player notes (an internal build) gets a plain line.
+      - name: Write the release notes
+        env:
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          mkdir -p release
+          VERSION="${TAG#v}" npx tsx -e 'import { readFileSync } from "node:fs"; import { notesForVersion } from "./src/changelog.ts"; for (const n of notesForVersion(readFileSync("CHANGELOG.md", "utf8"), process.env.VERSION ?? "", { maxNotes: Infinity, maxLen: Infinity })) console.log(`- ${n.replace(/\s+/g, " ")}`);' > release/notes.md
+          if ! grep -q '[^[:space:]]' release/notes.md; then
+            echo "::notice::CHANGELOG.md has no player notes for ${TAG#v}; the release notes are a plain line."
+            echo "Verticopolis ${TAG}." > release/notes.md
+          fi
+          printf '\nThe sprite atlas (%s) is attached with its SHA-256 checksum; see docs/atlas.md.\n' "verticopolis-atlas-${TAG}.zip" >> release/notes.md
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sprite-atlas
+          path: |
+            dist-atlas/
+            release/
+          if-no-files-found: error
+
+  # No concurrency group across tags on purpose: GitHub keeps one pending
+  # job per group, so a shared group would cancel a waiting publish when a
+  # third tag queued. Two tags published minutes apart can both claim Latest
+  # instead (docs/atlas.md).
+  publish:
+    needs: [resolve, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: sprite-atlas
+          path: artifact
+
+      - name: Check the checksum after the transfer
+        working-directory: artifact/dist-atlas
+        run: sha256sum --check ./*.sha256
+
+      - name: Attach while a draft, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          zip="artifact/dist-atlas/verticopolis-atlas-${TAG}.zip"
+          sum="${zip}.sha256"
+          test -f "$zip" && test -f "$sum"
+          # Every release for the tag, as "id draft" lines. The whole list is
+          # read before it is inspected, and an API error fails the step
+          # rather than reading as "no release".
+          list="$(gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.tag_name == env.TAG) | "\(.id) \(.draft)"')"
+          published="$(printf '%s\n' "$list" | awk '$2 == "false" { print $1 }')"
+          drafts="$(printf '%s\n' "$list" | awk '$2 == "true" { print $1 }')"
+
+          if [ -n "$published" ]; then
+            # Never touch a published release. A rebuild is an audit: the
+            # attached zip must match the attached checksum, and the fresh bake
+            # must reproduce that checksum exactly.
+            if [ "$(printf '%s\n' "$published" | grep -c .)" -gt 1 ]; then
+              echo "::error::Tag $TAG has more than one published release."
+              exit 1
+            fi
+            # The assets of that one release, as "id name" lines, each
+            # downloaded by its id.
+            assets="$(gh api "repos/$GH_REPO/releases/$published" --jq '.assets[] | "\(.id) \(.name)"')"
+            mkdir -p attached
+            for f in "$(basename "$zip")" "$(basename "$sum")"; do
+              aid="$(printf '%s\n' "$assets" | awk -v n="$f" '$2 == n { print $1 }')"
+              if [ -z "$aid" ]; then
+                echo "::error::Release $TAG was published without $f, so this workflow cannot attach it. A maintainer either deletes that release and re-runs this workflow (possible only while releases are not immutable) or ships the atlas with the next version's tag."
+                exit 1
+              fi
+              gh api "repos/$GH_REPO/releases/assets/$aid" -H "Accept: application/octet-stream" > "attached/$f"
+            done
+            if ! (cd attached && sha256sum --check "$(basename "$sum")"); then
+              echo "::error::The zip attached to release $TAG does not match the checksum attached beside it."
+              exit 1
+            fi
+            if cmp -s "attached/$(basename "$sum")" "$sum"; then
+              echo "Release $TAG is published and the rebuild reproduces its atlas: $(cut -d' ' -f1 "$sum")"
+              exit 0
+            fi
+            echo "::error::Rebuilding $TAG gave a different atlas than the one published (a tag moved after publishing is one likely cause). Attached: $(cut -d' ' -f1 "attached/$(basename "$sum")"), rebuilt: $(cut -d' ' -f1 "$sum")."
+            exit 1
+          fi
+
+          if [ "$(printf '%s\n' "$drafts" | grep -c .)" -gt 1 ]; then
+            echo "::error::Tag $TAG has more than one draft release; delete the extras and re-run."
+            exit 1
+          fi
+          id="$drafts"
+          if [ -z "$id" ]; then
+            id="$(gh api "repos/$GH_REPO/releases" -f tag_name="$TAG" -f name="$TAG" -F draft=true -F body=@artifact/release/notes.md --jq .id)"
+          fi
+          # Attach to that draft by id while it is still a draft (nothing
+          # public can change), replacing a same-named asset from an earlier
+          # attempt, then publish as the last step. The release becomes Latest
+          # unless a higher version has already been released (a backport
+          # tagged later).
+          tags="$(gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')"
+          latest_tag="$(printf '%s\n' "$tags" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)"
+          make_latest=true
+          if [ -n "$latest_tag" ] && [ "$(printf '%s\n%s\n' "$latest_tag" "$TAG" | sort -V | tail -n 1)" != "$TAG" ]; then make_latest=false; fi
+          for f in "$zip" "$sum"; do
+            name="$(basename "$f")"
+            old_ids="$(gh api "repos/$GH_REPO/releases/$id/assets" --paginate --jq ".[] | select(.name == \"$name\") | .id")"
+            for old in $old_ids; do
+              gh api -X DELETE "repos/$GH_REPO/releases/assets/$old"
+            done
+            gh api -X POST "https://uploads.github.com/repos/$GH_REPO/releases/$id/assets?name=$name" \
+              -H "Content-Type: application/octet-stream" --input "$f" > /dev/null
+          done
+          gh api -X PATCH "repos/$GH_REPO/releases/$id" -F draft=false -F prerelease=false -f name="$TAG" -f make_latest="$make_latest" -F body=@artifact/release/notes.md > /dev/null
+          echo "Published $TAG with $(basename "$zip") ($(cut -d' ' -f1 "$sum"))."

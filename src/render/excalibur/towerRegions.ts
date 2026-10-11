@@ -1,6 +1,6 @@
 import * as ex from "excalibur";
 import { facilityFloors } from "../../engine/facilities";
-import { drawUnit } from "../sprites";
+import { paintSettledUnit } from "../regionPaint";
 import { FLOOR, TILE } from "../scale";
 import { regionRect, regionsOf } from "../regionGrid";
 import type { Unit } from "../../engine/types";
@@ -42,23 +42,6 @@ export interface RegionRec {
   units: Set<number>;
 }
 
-/** The dead-parking "red X" (canon: an unchained space draws no relief), the
- *  same strokes the per-unit bake drew, at the unit's region-relative rect. */
-function drawDeadParkingX(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
-  // Dark under-stroke so the X reads as a SHAPE independent of hue
-  // (color-blind cue), then the red X on top.
-  for (const [style, wd] of [["#111", 4] as const, ["#C24A3A", 2] as const]) {
-    ctx.strokeStyle = style;
-    ctx.lineWidth = wd;
-    ctx.beginPath();
-    ctx.moveTo(x + 2, y + 2);
-    ctx.lineTo(x + w - 2, y + h - 2);
-    ctx.moveTo(x + w - 2, y + 2);
-    ctx.lineTo(x + 2, y + h - 2);
-    ctx.stroke();
-  }
-}
-
 /** Materialize a region: an anchor actor at the region's world rect and a
  *  cached canvas whose draw walks the member units LIVE (I3). Fresh canvases
  *  raster once on their first draw, which is how initial load fills the
@@ -81,17 +64,10 @@ function materialize(engine: TowerEngine, key: number): RegionRec {
         const h = hgt * FLOOR;
         const dx = engine.worldX(u.x) - r.x;
         const dy = engine.worldYTop(u.floor, hgt) - r.y;
-        // The clip is mandatory, not defensive: private canvases clipped any
-        // per-unit overdraw implicitly, a shared canvas does not, and one
+        // paintSettledUnit clips to the room's rect: private canvases clipped
+        // any per-unit overdraw implicitly, a shared canvas does not, and one
         // sprite painting a pixel past its rect would bleed onto a neighbor.
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(dx, dy, w, h);
-        ctx.clip();
-        engine.d.parkingDead = engine.deadParking.has(id);
-        drawUnit(engine.d, u, dx, dy, w, h);
-        if (engine.d.parkingDead) drawDeadParkingX(ctx, dx, dy, w, h);
-        ctx.restore();
+        paintSettledUnit(engine.d, u, dx, dy, w, h, engine.deadParking.has(id));
       }
     },
   });
