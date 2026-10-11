@@ -9,9 +9,8 @@ import { bundleBake } from "../scripts/atlas-bundle.ts";
  * paint functions, and requires the two to match pixel for pixel
  * (`src/render/atlas/verify.ts`, samples in `samples.ts`). A room with depth
  * layers is also composed through its shell and furniture and held to the same
- * paint. Settled rooms are
- * painted at two region offsets; burning, unbuilt and origin-seeded rooms at
- * the per-unit origin. The non-room families are checked the same way
+ * paint. Settled rooms are painted at two region offsets; burning, unbuilt and
+ * origin-seeded rooms at the per-unit origin. The non-room families are checked the same way
  * (`verifyExtras.ts`), and a control case must report a mismatch. The export
  * runs the same check before it writes an archive.
  */

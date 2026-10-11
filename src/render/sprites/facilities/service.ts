@@ -42,18 +42,21 @@ export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: num
       Fu(mx + 1, my + 1, 6, 1, "#2A4A3A");
     }
   }
-  layerBreak(ctx); // the shell ends; the console, guard and wall kit follow
-  // Console desk with a seated guard behind it.
-  box(F, 58, fy - 8, 26, 8, "#2A3550");
-  F(58, fy - 8, 26, 1, "#3E4A66");
-  personSeated(ctx, sx(66), sy(fy - 8), (Math.round(x) * 3 + 5) | 0);
-  // Brass badge shield, key rack, and the red alarm light.
-  F(60, fy - 14, 6, 6, "#D8B05A");
-  F(62, fy - 13, 2, 4, "#8A6A2A");
+  // The key rack and the red alarm light hang on the wall. They sit clear of
+  // the console, the guard and the badge, so drawing them first changes no
+  // pixel and keeps them on the shell.
   F(78, 8, 8, 5, "#5A4A36");
   for (let k = 0; k < 4; k++) Fu(79 + k * 2, 13, 1, 2, "#D8B05A"); // key rack pins, one object repeated
   F(W - 8, 7, 4, 4, "#E85D5D");
   glow(F, W - 6, 9, "#FF6B6B");
+  layerBreak(ctx); // the shell ends; the console, guard and badge follow
+  // Console desk with a seated guard behind it.
+  box(F, 58, fy - 8, 26, 8, "#2A3550");
+  F(58, fy - 8, 26, 1, "#3E4A66");
+  personSeated(ctx, sx(66), sy(fy - 8), (Math.round(x) * 3 + 5) | 0);
+  // Brass badge shield.
+  F(60, fy - 14, 6, 6, "#D8B05A");
+  F(62, fy - 13, 2, 4, "#8A6A2A");
   // A warm ceiling light over the console keys on the lit (evening) state. It
   // belongs to the shell but draws last, so it lands on both depth layers.
   layerEnd(ctx);

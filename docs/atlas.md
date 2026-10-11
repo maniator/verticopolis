@@ -247,6 +247,11 @@ What that means for the pictures:
   frontend draws between the shell and the furniture is hidden under it.
 - The hotel's roaches and its sleeper's "z" draw after the grime wash, so they
   sit on the shell with it, even the one on the bed.
+- Structure drawn over the furniture sits on the shell and hides the furniture
+  under it in both pictures: the metro's platform deck covers the contact
+  shadow under its benches and bins, and the cinema's EXIT signs cover the
+  seats they overlap. A frontend that offsets the furniture shows those pieces
+  cut off where the structure covered them.
 - The shell's normal map is its own (it is a picture without the furniture).
   The furniture's normals come from the flat frame, masked to its pixels, like
   any other layer.

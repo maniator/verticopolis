@@ -237,10 +237,16 @@ function french(f: Fill, w: number, fy: number, railY: number, lamp: string, sea
 
 function pub(f: Fill, w: number, fy: number, railY: number, lit: boolean, seat: Seat): void {
   const barW = Math.round(w * 0.3);
-  // Hanging pub lamps and a framed print. They sit clear of the bar and the
-  // tables, so drawing them first changes no pixel and keeps them on the shell.
-  [Math.round(w * 0.5), Math.round(w * 0.78)].forEach((fx) => { f(fx - 1, 6, 2, 3, "#2A1E14"); f(fx - 2, 9, 4, 3, lit ? "#F8E2B4" : "#8A7A5C"); glow(f, fx, 10, lit ? "#FFE69A" : "#8A7A5C"); });
-  artF(f, Math.round(w * 0.62), 8, 14, 9, "#2A4A2A");
+  // Hanging pub lamps and a framed print.
+  const decor = (): void => {
+    [Math.round(w * 0.5), Math.round(w * 0.78)].forEach((fx) => { f(fx - 1, 6, 2, 3, "#2A1E14"); f(fx - 2, 9, 4, 3, lit ? "#F8E2B4" : "#8A7A5C"); glow(f, fx, 10, lit ? "#FFE69A" : "#8A7A5C"); });
+    artF(f, Math.round(w * 0.62), 8, 14, 9, "#2A4A2A");
+  };
+  // From 45 px wide the lamps and print sit clear of the bar, the regulars and
+  // the tables, so drawing them first changes no pixel and keeps them on the
+  // shell. A narrower room (only a forged import) keeps the original order.
+  const decorFirst = w >= 45;
+  if (decorFirst) decor();
   layerBreak(f.ctx); // the shell ends; the bars, tables and regulars follow
   // Back bar with a lit bottle wall.
   box(f, 5, 6, barW, railY - 6, "#2A1C10");
@@ -249,6 +255,7 @@ function pub(f: Fill, w: number, fy: number, railY: number, lit: boolean, seat: 
   [9, 14, 19].forEach((fx) => f(fx, fy - 12, 1, 3, "#D8B05A")); // brass taps
   // Seated regulars on bar stools.
   for (let sx = barW + 8; sx < barW + 40; sx += 10) { f(sx, fy - 4, 2, 4, "#3A2A1A"); seat(sx - 2, fy); }
+  if (!decorFirst) decor();
   // Wood tables with pints and seated couples.
   for (let tx = barW + 44; tx + 14 < w - 6; tx += 32) {
     f(tx - 3, fy - 10, 3, 10, "#3A2A1A"); f(tx + 13, fy - 10, 3, 10, "#3A2A1A");
