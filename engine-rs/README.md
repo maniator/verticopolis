@@ -87,7 +87,8 @@ approximated) are not ported yet; the tallies they read from are.
 `load::encode_vctower(&save)` writes one, so a host that is not the web
 game can write saves the web game opens. The encoder takes a serialized
 game as a `serde_json::Value` (what `Simulation::serialize` returns), writes
-it as given and returns the file bytes. A save written as a player's tower
+it as given and returns the file bytes, or refuses a save too large to
+read back (see the limits below). A save written as a player's tower
 needs the stamp `SaveGame.export` adds: `load::stamp_save(&mut save,
 app_version, saved_at_ms)` sets `appVersion` and `savedAt`, and
 `load::encode_simulation_vctower(&sim, app_version, saved_at_ms)` serializes,
@@ -107,15 +108,30 @@ The payload is raw DEFLATE at level 1, the level of `SaveGame.packSync`,
 over the save's canonical JSON (`JSON.stringify` formatting with keys
 sorted). The key order and the compressed bits differ from the TypeScript
 output (fflate and the browser's `CompressionStream` also differ from each
-other there); every reader decodes the file to the same save. The bytes are
-stable within one build of the engine. The Rust
-tests in `load.rs` round-trip every web-written fixture in
+other there); every reader decodes the file to the same save (see the
+limits below). The bytes are stable within one build of the engine. The
+Rust tests in `load.rs` round-trip every web-written fixture in
 `src/tests/fixtures/`, and
 `src/tests/integration/conformanceWasmVctower.integration.test.ts` (part of
 `npm run test:wasm`) loads each fixture in the web game, writes it with the
 engine, reads it back through `decodeVctower`, `fromTowerFile` and
 `SaveGame.import`, and checks the framing against `toTowerFile`'s, the
 payload text, the Founder status and the loaded state's hash.
+
+Two limits apply to every save the engine reads or writes as JSON text.
+A JavaScript string can hold half of a surrogate pair (a tower name cut
+through an emoji, since the rename box counts UTF-16 units), which
+`JSON.stringify` writes as a `\udxxx` escape that a Rust string cannot
+hold. `load::parse_save_json` reads each such escape as U+FFFD, the
+character `TextEncoder` substitutes for an unpaired surrogate, and every
+engine entry point that takes save JSON goes through it: `decode_vctower`,
+`fromSave`, `encodeVctower` and `exportTdt`. Such a save loads in the
+engine with U+FFFD where the half character was, while the TypeScript
+engine keeps the half character (so the dual run reports that one string
+as a divergence until the web side repairs it the same way, #936). And the
+encoder refuses a save whose JSON is longer than 32 MiB,
+the most the strictest reader (`inflateCapped`, `decode_vctower`) will
+inflate, since that file would only fail to load.
 
 ## The WASM binding
 

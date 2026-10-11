@@ -267,7 +267,9 @@ export class Engine {
     }
     /**
      * `Simulation.deserialize(JSON.parse(text))`: a serialized game, migrated
-     * and loaded. Nothing else the import path does (the founder mark) runs.
+     * and loaded, with a lone surrogate escape read as U+FFFD
+     * (`load::parse_save_json`). Nothing else the import path does (the
+     * founder mark) runs.
      * `markers`, when given, is JSON `{ lastHour, lastDay, lastQuarter,
      * lastMonth }`: the live engine's boundary markers, which a save does
      * not carry (a load rebuilds them from the clock, a founded game keeps
@@ -740,9 +742,11 @@ if (Symbol.dispose) Engine.prototype[Symbol.dispose] = Engine.prototype.free;
  * `encodeVctower(saveJson, appVersion, savedAtMs)`: the `.vctower` file
  * text for a serialized game (what `serialize` returns), stamped the way
  * `SaveGame.export` stamps it (`load::stamp_save`). Text that is not JSON,
- * a save that is not a tower, a time no `Date` holds and a build name that
- * reads as before 2.0 (which would mark the tower as a founder's) are
- * JavaScript errors.
+ * a save that is not a tower, a time no `Date` holds, a build name that
+ * reads as before 2.0 (which would mark the tower as a founder's) and a
+ * save whose JSON passes 32 MiB (more than a reader will hold) are
+ * JavaScript errors. A lone surrogate escape reads as U+FFFD
+ * (`load::parse_save_json`).
  * @param {string} save_json
  * @param {string} app_version
  * @param {number} saved_at_ms
