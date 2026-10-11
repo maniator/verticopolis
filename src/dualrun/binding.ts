@@ -22,6 +22,7 @@ export const INSTANCE_METHODS = [
   "rerollSubtype", "applyRentBatch", "pendingChoice", "resolveChoice", "tick", "serialize", "stateView", "crowdView",
   "stateDigest", "crowdDigest", "frameView", "logSince", "elevatorTelemetry", "seedElevatorTelemetry", "advanceClock",
   "seedLoopMemos", "loopMemos", "housekeepingReport", "drainGameplayEvents", "gameplayEventsDropped",
+  "addCar", "removeCar", "extendTransport", "removeFacility",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 

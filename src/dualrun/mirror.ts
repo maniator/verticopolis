@@ -142,6 +142,15 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
     wrap(sim, "build", ([kind, floor, x]) => ({ op: "build", kind, floor: n(floor), x: n(x) }) as ShadowCommand);
     wrap(sim, "buildTransport", ([kind, x, bottom, top]) => ({ op: "buildTransport", kind, x: n(x), bottom: n(bottom), top: n(top) }) as ShadowCommand);
     wrap(sim, "sellAt", ([floor, x]) => ({ op: "sellAt", floor: n(floor), x: n(x) }));
+    // The engine-owned charges (#914): the command carries the money move, so
+    // the shadow charges or refunds for itself and no setMoney follows.
+    wrap(sim, "addCar", ([id]) => ({ op: "addCar", id: n(id) }));
+    wrap(sim, "removeCar", ([id]) => ({ op: "removeCar", id: n(id) }));
+    wrap(sim, "extendTransport", ([id, end, targetFloor, hwm]) => {
+      const mark = hwm as { bottom: number; top: number } | undefined;
+      return { op: "extendTransport", id: n(id), end: end as "up" | "down", targetFloor: n(targetFloor), hwm: mark ? { bottom: mark.bottom, top: mark.top } : null };
+    });
+    wrap(sim, "removeFacility", ([id, method]) => ({ op: "removeFacility", id: n(id), method: method as "sell" | "bulldoze" }));
     wrap(sim, "adjustRent", ([id, dir]) => ({ op: "adjustRent", id: n(id), dir: dir as 1 | -1 }));
     wrap(sim, "setNoRate", ([id]) => ({ op: "setNoRate", id: n(id) }));
     wrap(sim, "priceUnit", ([u, target]) => ({ op: "priceUnit", id: (u as { id: number }).id, target: n(target) }));
