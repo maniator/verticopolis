@@ -26,6 +26,8 @@ them into the same wire events, so the event names and fields are unchanged:
 
 ## Events
 
+> Superseded from 2.29.5 by the engine bridge (see the section above): kept as the #611 record. The hook sites and the `counts` sampler below are no longer how these events are produced.
+
 | Event | Fields (closed enums / integers only) | Cadence | User- or sim-fired | Hook site |
 | :-- | :-- | :-- | :-- | :-- |
 | `economy_action` | `action: "demolish" \| "price_tune" \| "capacity_tune"`; `detail?: "sell" \| "bulldoze"` (demolish only) | `demolish` per-action; `price_tune` / `capacity_tune` session-latched once | user-fired | `demolish`: `src/game/buildActions.ts` `tryRemoveUnit` (+ transport refund path). `price_tune` / `capacity_tune`: `src/game/editorActions.ts` |
@@ -42,6 +44,8 @@ them into the same wire events, so the event names and fields are unchanged:
 
 ## Engine counter surface (CAP-3)
 
+> Superseded from 2.29.5 by the engine bridge (see the section above): kept as the #611 record. The hook sites and the `counts` sampler below are no longer how these events are produced.
+
 `EventSystem.ts` exposes three read-only integers, incremented where the events already occur:
 - fires ignited — at `startFire()`.
 - rooms gutted by fire — at the `gut(u)` / contained-burndown path.
@@ -50,6 +54,8 @@ them into the same wire events, so the event names and fields are unchanged:
 Reset per new game alongside the rest of the emergency state. The frame loop samples the public `counts` getter each throttled tick; `GameplaySession.end()` emits the summary. No new sim->shell push is needed, and no Simulation delegator is added (that file is at its line ceiling), so a plain getter read keeps the engine analytics-free.
 
 ## Acceptance criteria (vitest)
+
+> Superseded from 2.29.5 by the engine bridge (see the section above): kept as the #611 record. The hook sites and the `counts` sampler below are no longer how these events are produced.
 
 1. **Host-gate** — on a non-deployed host, none of the three events fire.
 2. **Per-action** — two demolishes fire two `economy_action { action: "demolish" }` with the right `detail` each.
