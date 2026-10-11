@@ -346,6 +346,18 @@ Bump it with `npm version <patch|minor> --no-git-tag-version`, not by hand-editi
 lockstep (a stale lockfile breaks `npm ci` and misreports the build). A CI guard,
 `src/tests/versionLockSync.test.ts`, fails the moment the two drift.
 
+A version becomes a GitHub release only when a maintainer tags it. After the
+bump merges, tag that merge commit on `main` with `v<version>` and push the tag
+(`git tag v2.30.0 <commit> && git push origin v2.30.0`). The tag runs
+`.github/workflows/atlas-release.yml`, which publishes the release with the
+version's player notes and the sprite atlas (docs/atlas.md). Not every
+bump needs a tag; tag the versions a frontend on the open engine should pin.
+Only commits that contain the atlas exporter can get an atlas. A tag push runs
+the workflow file as it is at the tagged commit. A manual run (Actions, "Sprite
+atlas release", with the tag as input) uses the copy on the branch or tag it
+runs from: it builds and publishes when the tag has no published release, and only
+audits when it does.
+
 **Bump `version` in the same PR as any player-facing change.** The tier is keyed
 to one question: would a player notice anything different?
 
