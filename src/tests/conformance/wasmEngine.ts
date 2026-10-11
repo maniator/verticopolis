@@ -125,6 +125,8 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
     },
     stateDigest: () => live().stateDigest(),
     crowdDigest: () => live().crowdDigest(),
+    drainEvents: () => JSON.parse(live().drainGameplayEvents()) as unknown[],
+    eventsDropped: () => live().gameplayEventsDropped(),
   };
 }
 

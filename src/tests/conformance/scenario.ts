@@ -11,6 +11,7 @@ import { rentOf } from "../../engine/econConfig";
 import { serializeUnit } from "../../engine/sim/coerce";
 import { digest } from "./canonical";
 import { crowdView, stateView } from "../../engine/conformanceView";
+import { drainChecked } from "./gameplayEvents";
 
 /**
  * The TypeScript reference runner for the engine conformance suite. The format
@@ -66,6 +67,9 @@ export interface Checkpoint {
   label: string;
   state: string;
   crowd: string;
+  /** The hash of the gameplay events drained since the previous checkpoint
+   *  (the first one counts from the start). */
+  events: string;
 }
 
 /** Field types: "int" a whole number, "u32" a whole number from 0 to
@@ -211,6 +215,11 @@ export interface ScenarioEngine {
   reload(): ScenarioEngine;
   stateDigest(): string;
   crowdDigest(): string;
+  /** The gameplay events emitted since the last drain, as `{ name, payload }`
+   *  objects; the engine's buffer is empty afterwards. */
+  drainEvents(): unknown[];
+  /** Events a full buffer has pushed out since the engine was made. */
+  eventsDropped(): number;
   /** Release the engine, for a binding that owns memory; the runner calls it
    *  when the run ends, whether it finished or threw. */
   free?(): void;
@@ -271,6 +280,8 @@ export function tsEngine(sim: Simulation): ScenarioEngine {
     reload: () => tsEngine(Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame)),
     stateDigest: () => digest(stateView(sim)),
     crowdDigest: () => digest(crowdView(sim)),
+    drainEvents: () => sim.drainGameplayEvents(),
+    eventsDropped: () => sim.gameplayEventsDropped,
   };
 }
 
@@ -309,7 +320,9 @@ function expectOk(ok: boolean, expectFail: boolean | undefined, what: string, re
   throw new Error(`${what} ${ok ? "succeeded but was expected to fail" : `failed: ${reason ?? "no reason"}`}`);
 }
 
-function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clock: { minutes: number }): ScenarioEngine {
+/** `carry` keeps the events of an engine a `reload` replaces, since a save
+ *  carries none and the next checkpoint must still count them. */
+function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clock: { minutes: number }, carry: (events: unknown[]) => void): ScenarioEngine {
   switch (c.op) {
     case "setMoney": e.setMoney(c.amount); break;
     case "build": {
@@ -412,8 +425,10 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
       break;
     }
     case "reload": {
-      // A save round trip must lose nothing the save carries.
+      // A save round trip must lose nothing the save carries. The events go
+      // first: a binding's reload frees the engine it replaces.
       const before = e.stateDigest();
+      carry(drainChecked(e));
       const loaded = e.reload();
       if (loaded.stateDigest() !== before) {
         loaded.free?.();
@@ -438,7 +453,7 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
  *  sides), or null when they agree to the end. The useful fact for a port. */
 export function firstDivergence(got: Checkpoint[], want: Checkpoint[]): { checkpoint: number; got: Checkpoint | null; want: Checkpoint | null } | null {
   const same = (a: Checkpoint | undefined, b: Checkpoint | undefined) =>
-    !!a && !!b && a.label === b.label && a.state === b.state && a.crowd === b.crowd;
+    !!a && !!b && a.label === b.label && a.state === b.state && a.crowd === b.crowd && a.events === b.events;
   for (let i = 0; i < Math.max(got.length, want.length); i++) {
     if (!same(got[i], want[i])) return { checkpoint: i, got: got[i] ?? null, want: want[i] ?? null };
   }
@@ -454,14 +469,18 @@ export function runScenario(s: Scenario, start: EngineStart = startTsEngine): Ch
   const out: Checkpoint[] = [];
   const clock = { minutes: 0 };
   const labels = new Set<string>();
+  let carried: unknown[] = [];
   const emit = (label: string) => {
     if (labels.has(label)) throw new Error(`${s.id}: checkpoint label ${label} is taken twice`);
     labels.add(label);
-    out.push({ label, state: e.stateDigest(), crowd: e.crowdDigest() });
+    const events = [...carried, ...drainChecked(e)];
+    carried = [];
+    out.push({ label, state: e.stateDigest(), crowd: e.crowdDigest(), events: digest(events) });
   };
+  const carry = (events: unknown[]) => { carried.push(...events); };
   try {
     emit("start");
-    for (const c of s.commands) e = apply(e, c, emit, clock);
+    for (const c of s.commands) e = apply(e, c, emit, clock, carry);
     emit("final");
   } finally {
     e.free?.();
