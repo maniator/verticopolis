@@ -267,7 +267,9 @@ export class Engine {
     }
     /**
      * `Simulation.deserialize(JSON.parse(text))`: a serialized game, migrated
-     * and loaded. Nothing else the import path does (the founder mark) runs.
+     * and loaded, with a lone surrogate escape read as U+FFFD
+     * (`load::parse_save_json`). Nothing else the import path does (the
+     * founder mark) runs.
      * `markers`, when given, is JSON `{ lastHour, lastDay, lastQuarter,
      * lastMonth }`: the live engine's boundary markers, which a save does
      * not carry (a load rebuilds them from the clock, a founded game keeps

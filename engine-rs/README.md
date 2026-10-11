@@ -87,7 +87,8 @@ approximated) are not ported yet; the tallies they read from are.
 `load::encode_vctower(&save)` writes one, so a host that is not the web
 game can write saves the web game opens. The encoder takes a serialized
 game as a `serde_json::Value` (what `Simulation::serialize` returns), writes
-it as given and returns the file bytes. A save written as a player's tower
+it as given and returns the file bytes, or refuses a save too large to
+read back (see the limits below). A save written as a player's tower
 needs the stamp `SaveGame.export` adds: `load::stamp_save(&mut save,
 app_version, saved_at_ms)` sets `appVersion` and `savedAt`, and
 `load::encode_simulation_vctower(&sim, app_version, saved_at_ms)` serializes,

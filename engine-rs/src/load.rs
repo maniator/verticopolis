@@ -2085,9 +2085,11 @@ mod save_json {
         let cases = [
             (r#"{"towerName":"Tower \ud83c"}"#, "Tower \u{FFFD}"),
             (r#"{"towerName":"\udfe2 Tower"}"#, "\u{FFFD} Tower"),
-            (r#"{"towerName":"🏢"}"#, "\u{1F3E2}"),
-            (r#"{"towerName":"\ud83c🏢"}"#, "\u{FFFD}\u{1F3E2}"),
-            (r#"{"towerName":"\ud83cA"}"#, "\u{FFFD}A"),
+            (r#"{"towerName":"\uD83C\uDFE2"}"#, "\u{1F3E2}"),
+            (r#"{"towerName":"\ud83c\ud83c\udfe2"}"#, "\u{FFFD}\u{1F3E2}"),
+            (r#"{"towerName":"\ud83c\u0041"}"#, "\u{FFFD}A"),
+            (r#"{"towerName":"\uD83C"}"#, "\u{FFFD}"),
+            (r#"{"towerName":"\ud83c\n"}"#, "\u{FFFD}\n"),
             (r#"{"towerName":"\udfe2\ud83c"}"#, "\u{FFFD}\u{FFFD}"),
             (r#"{"towerName":"a\"\ud83c\\"}"#, "a\"\u{FFFD}\\"),
         ];
@@ -2114,7 +2116,7 @@ mod save_json {
     /// and broken JSON is still refused.
     #[test]
     fn everything_else_is_left_to_the_parser() {
-        let text = r#"{"money":1.5e3,"n":"é\n\t\"","u":[1,null,true]}"#;
+        let text = r#"{"money":1.5e3,"n":"\u00e9\n\t\"","u":[1,null,true]}"#;
         assert_eq!(parse(text), serde_json::from_str::<Value>(text).unwrap());
         for bad in [
             r#"{"a":"\u12"}"#,
