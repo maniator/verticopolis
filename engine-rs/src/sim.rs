@@ -10,6 +10,7 @@ use crate::clock::{resolve_calendar, CalendarKind, Clock, GameMode};
 use crate::crowd::Crowd;
 use crate::dispatch::ElevatorDispatch;
 use crate::events::EventSystem;
+use crate::gameplay::{GameplayEvent, GameplayEvents};
 use crate::housekeeping::Housekeeping;
 use crate::ledger::Ledger;
 use crate::rng::Rng;
@@ -160,6 +161,9 @@ pub struct Simulation {
     pub reach_memo: (i64, HashMap<i64, bool>),
     /// The saved camera view (inert cargo the save carries).
     pub view: Option<Value>,
+    /// The gameplay events since the host last drained (never saved or
+    /// hashed; see `gameplay.rs`).
+    pub gameplay: GameplayEvents,
 }
 
 impl Simulation {
@@ -230,6 +234,7 @@ impl Simulation {
             extermination_room_ids: None,
             reach_memo: (-1, HashMap::new()),
             view: None,
+            gameplay: GameplayEvents::default(),
         }
     }
 
@@ -292,6 +297,8 @@ impl Simulation {
             "Welcome! Lay a lobby on the ground line to open your tower.",
             LogKind::Info,
         );
+        sim.gameplay
+            .push(GameplayEvent::TowerFounded { mode: sim.mode });
         sim
     }
 

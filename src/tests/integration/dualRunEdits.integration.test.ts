@@ -73,6 +73,11 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(report.divergences).toEqual([]);
     // 90 + 60 + 60 minutes before the restore, then 120 after it.
     expect(report.checkpoints).toBe(5);
+    // The edits' gameplay events agree too: nine placements, three price
+    // changes (the hotel batch moves no price on this tower), the car count
+    // and the resize through the tower.
+    expect(report.eventDivergences).toEqual([]);
+    expect(report.events).toBe(14);
   });
 
   it("a founded game edited before the shadow attaches still starts in step", () => {
@@ -87,6 +92,7 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     new FrameDriver(sim, 3).run(26 * 60); // across the first day boundary
     const report = run.stop();
     expect(report.divergences).toEqual([]);
+    expect(report.eventDivergences).toEqual([]);
     expect(report.checkpoints).toBe(26);
   });
 
@@ -101,6 +107,7 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     new FrameDriver(sim, 3).run(180);
     const report = run.stop();
     expect(report.divergences).toEqual([]);
+    expect(report.eventDivergences).toEqual([]);
     // The founding hour's pass on the first step, then 8:00, 9:00 and 10:00.
     expect(report.checkpoints).toBe(4);
   });

@@ -25,7 +25,7 @@ const fresh: Lock = { scenarios: {} };
 function writeLock(l: Lock): void {
   const ids = Object.keys(l.scenarios).sort();
   const body = ids.map((id) => {
-    const rows = l.scenarios[id].map((c) => `      ${JSON.stringify({ label: c.label, state: c.state, crowd: c.crowd })}`).join(",\n");
+    const rows = l.scenarios[id].map((c) => `      ${JSON.stringify({ label: c.label, state: c.state, crowd: c.crowd, events: c.events })}`).join(",\n");
     return `    ${JSON.stringify(id)}: [\n${rows}\n    ]`;
   });
   writeFileSync(LOCK, `{\n  "scenarios": {\n${body.join(",\n")}\n  }\n}\n`);
