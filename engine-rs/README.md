@@ -126,9 +126,10 @@ hold. `load::parse_save_json` reads each such escape as U+FFFD, the
 character `TextEncoder` substitutes for an unpaired surrogate, and every
 engine entry point that takes save JSON goes through it: `decode_vctower`,
 `fromSave`, `encodeVctower` and `exportTdt`. Such a save loads in the
-engine with U+FFFD where the half character was, and the TypeScript
-engine repairs the same strings the same way (`src/engine/wellFormed.ts`,
-on load and on rename), so both engines hold one tower name. And the
+engine with U+FFFD where the half character was, and the web
+game repairs the same way: `parseSaveJson` (`src/storage/saveCompression.ts`)
+on every save text it reads, and `wellFormed` where a name is typed (the
+tower-name box and the label editor), so both engines hold one tower. And the
 encoder refuses a save whose JSON is longer than 32 MiB, the cap every
 reader holds to (`decode_vctower`, and on the web `inflateCapped` and
 `SaveGame.import`; the web writers check it too, through `encodeSaveJson`),

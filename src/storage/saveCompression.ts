@@ -1,4 +1,5 @@
 import { Inflate } from "fflate";
+import { wellFormed } from "../engine/wellFormed";
 
 /**
  * Compression + base64 codec for the persistence layer. Extracted from
@@ -64,6 +65,26 @@ export const MAX_SAVE_INFLATED_BYTES = 32 * 1024 * 1024;
 export class SaveTooLargeError extends Error {}
 
 /**
+ * `JSON.parse` for a save's text, with every string (and every object key)
+ * repaired by {@link wellFormed}: half of a surrogate pair reads as U+FFFD,
+ * exactly as the Rust engine reads save text (`load::parse_save_json`), so a
+ * save loads into the same tower on both engines. The loader keeps
+ * `excavated` and `milestones` in sets, so two halves that repair to one
+ * string collapse to one entry, as the Rust loader dedupes them.
+ */
+export function parseSaveJson(text: string): unknown {
+  return JSON.parse(text, (_key, value: unknown) => {
+    if (typeof value === "string") return wellFormed(value);
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+    const obj = value as Record<string, unknown>;
+    if (Object.keys(obj).every((k) => wellFormed(k) === k)) return obj;
+    const fixed: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) fixed[wellFormed(k)] = v;
+    return fixed;
+  });
+}
+
+/**
  * A save's JSON text as the UTF-8 bytes every writer compresses, refused with
  * {@link SaveTooLargeError} when it passes {@link MAX_SAVE_INFLATED_BYTES}:
  * every reader stops there, so a larger save would write and then fail to
@@ -73,9 +94,7 @@ export class SaveTooLargeError extends Error {}
 export function encodeSaveJson(json: string): Uint8Array {
   const bytes = new TextEncoder().encode(json);
   if (bytes.length > MAX_SAVE_INFLATED_BYTES) {
-    throw new SaveTooLargeError(
-      `This tower is ${bytes.length} bytes of save data, more than the ${MAX_SAVE_INFLATED_BYTES} a save can hold.`,
-    );
+    throw new SaveTooLargeError("This tower's save data is larger than 32 MB, the most a save can hold.");
   }
   return bytes;
 }
@@ -141,9 +160,8 @@ export function compressionDecodeSupported(): boolean {
 }
 
 /** Thrown by {@link inflate} when a decompressing stream exceeds
- *  {@link MAX_SAVE_INFLATED_BYTES}, the one cap every save reader holds to (it
- *  was 64 MB here and 32 MB in {@link inflateCapped}, so a save between the two
- *  opened through an import and not through the desktop store). */
+ *  {@link MAX_SAVE_INFLATED_BYTES}, the one cap every save reader and writer
+ *  holds to (see {@link encodeSaveJson}). */
 export class TowerTooLargeError extends Error {}
 
 // deflate-raw via the native streams API (no zlib/gzip framing, the magic

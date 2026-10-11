@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 2.29.5
 
-- A tower name that ends in half of an emoji (the name box has room for only part of it) now shows a replacement mark instead of a broken character, the same on both engines.
+- On the opt-in WASM engine, a tower or room name cut through an emoji (the name box had room for only part of it) now reads the same as on the default engine.
 
 ## 2.29.4
 
