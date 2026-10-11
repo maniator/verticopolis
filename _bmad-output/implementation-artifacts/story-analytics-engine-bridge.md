@@ -209,3 +209,13 @@ Auditor had none. One test patch:
 ### Owner review (PR #938, 2026-10-11)
 
 - [x] [Review][Patch] The owner asked for a test of the rate-limit boundary across several founded towers. It found a real hole: a held-back founding left the previous tower's funnel open, so when that tower had not built yet, the new tower's first build was reported as its `first_build`. A held-back founding now closes the funnel (`noteNewGameUnreported`); the new test pins that every `first_build` follows its own tower's `new_game_started` and that the held-back tower's builds still count.
+
+Confirming pass on that fix (three layers): no defect in the fix. Two test
+patches: the comment now names the tower whose funnel was open (the last
+reported, empty one, not A), and the test asserts the budget leaves room for
+that empty tower so it cannot pass vacuously. Dismissed: a founded but unbuilt
+tower followed by a load reports the loaded tower's first placement as
+`first_build`. That predates this change (a load never touched the latch), and
+the wire vocabulary already says `first_build` can follow a continued save
+with no `new_game_started`; the event carries no tower identity.
+

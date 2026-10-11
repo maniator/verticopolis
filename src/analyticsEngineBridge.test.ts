@@ -158,15 +158,18 @@ describe("analytics engine bridge", () => {
   });
 
   it("never attributes a build to the wrong tower across rate-limited foundings", () => {
+    // The case needs an empty tower founded inside the budget after A.
+    expect(BRIDGE_SEND_LIMIT).toBeGreaterThanOrEqual(2);
     const now = 5_000;
     gameplaySession.begin();
     // Tower A is founded and builds: its funnel reports.
     forwardGameplayEvents([founded("classic"), placed("office", 2)], now);
     // Spend the rest of the founding budget on towers that never build.
     for (let i = 1; i < BRIDGE_SEND_LIMIT; i++) forwardGameplayEvents([founded()], now);
+    // The last reported tower never built, so its funnel is still open.
     // Tower B's founding is held back. Its builds must not report a
-    // first_build: the funnel stays closed rather than letting B's first
-    // build pass as A's (or as a founding nobody sent).
+    // first_build: the funnel closes rather than letting B's first build
+    // pass as that empty tower's.
     forwardGameplayEvents([founded("modern"), placed("condo", 3), placed("shop", 4)], now);
     // Tower C, after the window, reports its own founding and first build.
     forwardGameplayEvents([founded("modern"), placed("hotelSingle", 5)], now + 60_000);
