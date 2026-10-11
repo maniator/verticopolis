@@ -7,6 +7,7 @@ import { loadCommand, relayCommands } from "../dualrun/mirror";
 import { ShadowEngine } from "../dualrun/shadow";
 import { decodeFrame, type FrameView } from "./frameView";
 import { mergeSimulation } from "./merge";
+import { adoptTelemetry, type TelemetryDocument } from "./telemetry";
 
 /**
  * Run a live `Simulation` on the WASM engine (story-engine-wasm-switch).
@@ -52,6 +53,11 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
   // (the conformance suite pins the log), so those entries are skipped
   // rather than appended twice.
   let engineLogSeq = engine.frameView()[3];
+  // The engine's meal overlay counter at the last sync. The instance keeps
+  // its own counter and bumps it once in every sync where the engine's moved,
+  // so a bump the instance made itself (a relayed command) and an engine bump
+  // never land on the same number and the counter never steps back.
+  let engineMealRev = decodeFrame(engine.frameView()).header.mealOverlayRevision;
   let simLogSeqAtSync = sim.logSeq;
   let detached = false;
 
@@ -74,7 +80,15 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
 
   const merge = (frame: FrameView) => {
     const fresh = Simulation.deserialize(JSON.parse(engine.serialize()));
-    mergeSimulation(sim, fresh, { revision: frame.header.revision, mealOverlayRevision: frame.header.mealOverlayRevision });
+    mergeSimulation(sim, fresh, { revision: frame.header.revision, mealOverlayRevision: sim.tower.mealOverlayRevision });
+    // The hourly elevator telemetry the save leaves out (the schedule dialog,
+    // the stats screen, the diagnostics): it only moves in the engine's hour
+    // pass, which brings a merge.
+    adoptTelemetry(sim, JSON.parse(engine.elevatorTelemetry()) as TelemetryDocument);
+    // Yesterday's housekeeping result, latched at the morning checkout and
+    // likewise left out of the save (the stats screen and diagnostics read it).
+    const hk = engine.housekeepingReport();
+    sim.economy.adoptHousekeepingReport(hk ? (JSON.parse(hk) as { cleaned: number; leftover: number }) : null);
     lastRevision = frame.header.revision;
     host.merges++;
   };
@@ -89,6 +103,14 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
       if (force || h.onHourRuns !== lastHourRuns || h.revision !== lastRevision) {
         merge(frame);
         lastHourRuns = h.onHourRuns;
+      }
+      // The meal overlay moves mid-hour (a worker leaves for lunch), and the
+      // renderer repaints rooms when the instance's counter moves, so the
+      // counter follows every engine change at the frame it happens, like the
+      // outForMeal counts below.
+      if (h.mealOverlayRevision !== engineMealRev) {
+        engineMealRev = h.mealOverlayRevision;
+        sim.tower.bumpMealOverlayRevision();
       }
       sim.clock.minutes = h.minutes;
       sim.money = h.money;

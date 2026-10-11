@@ -189,7 +189,7 @@ export function build(sim: Simulation, kind: FacilityKind, floor: number, x: num
       sim.treasuresFound++;
       const gold = 400_000 + sim.rng.int(0, 200_000); // ~half a million, per the FAQ
       sim.money += gold;
-      sim.emit(`💰 Excavation crews unearthed buried treasure worth $${gold.toLocaleString()}!`, "money");
+      sim.emit(`💰 Excavation crews unearthed buried treasure worth $${gold.toLocaleString("en-US")}!`, "money");
       sim.triggerTreasure(floor, x + Math.floor(f.width / 2)); // sparkle at the dig site (cosmetic)
     }
   }

@@ -61,6 +61,27 @@ The quality gates and code-review conventions in
 BMAD organizes the work; it doesn't replace `npm test` or self-review before
 pushing.
 
+## Claim an issue before you start it
+
+Several agent sessions often run at once, and two of them can pick up the same
+issue. On 2026-10-10 that happened twice: #925 and #930 both built the catalog
+for #913, and #929 and #928 both built the engine-owned charges for #914. Each
+pair took the same approach, and two of the four PRs were closed. To stop that:
+
+1. **Look before you branch.** Search the open PRs and remote branches for the
+   issue number (and the issue's own comments) before writing any code. If
+   another session already has an open PR or a claim comment on it, stop and
+   ask the user instead of starting a parallel version.
+2. **Claim it.** If nothing is there, comment on the issue right away with the
+   branch name and the session link, then push the branch and open a draft PR
+   as soon as it has its first commit. The draft PR's `Closes #N` line is the
+   claim other sessions will find.
+3. **Fold a duplicate into the survivor.** If you find a duplicate after the
+   fact, keep the PR that is further along, carry anything the other one has
+   that it lacks (a finding, a test, a refactor) to that PR or its follow-up
+   issue, and close the other with a comment that points to where its ideas
+   went.
+
 ## Code review: the agent workflow
 
 Follow [CONTRIBUTING.md](./CONTRIBUTING.md) → **Code review** for the review

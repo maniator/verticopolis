@@ -120,6 +120,7 @@ impl Simulation {
         self.update_satisfaction();
         self.attempt_move_ins();
         self.collect_traffic_income();
+        self.sample_elevator_util();
         self.evaluate_star();
     }
 
