@@ -266,10 +266,10 @@ The game marks the split in each room's draw routine
 (`src/render/pixelSprites/layers.ts`): one call where the shell ends, and one
 where the furniture ends and the marks drawn over it begin. In the game both
 calls do nothing. The export paints each room frame a second time with the
-marks live and records the canvas at them; the flat frame comes from the ordinary
-paint, so adding layers never changes a frame's pixels. The export also
-requires every kind that splits to have furniture in some frame, since a shell
-that still showed the furniture would compose back too.
+marks live and records the canvas at them; the flat frame comes from the
+ordinary paint, so adding layers never changes a frame's pixels. The export
+also requires every kind that splits to have furniture in some frame, since a
+shell that still showed the furniture would compose back too.
 
 A frame has no `layers`, and a frontend draws it flat, when:
 
