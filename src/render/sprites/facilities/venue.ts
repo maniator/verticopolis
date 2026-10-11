@@ -143,10 +143,11 @@ export function drawAquaticCenter(d: DrawCtx, u: Unit, x: number, y: number, w: 
   f(0, midY + 2, w, 5, DECK);
   const poolTop = midY + 7, poolBot = fy - 1;
   f(3, poolTop, w - 6, poolBot - poolTop, WATER); f(3, poolTop, w - 6, 1, WATERLT);
-  // The shell ends; the people and the loungers follow. The diver, the
-  // swimmers and the loungers touch none of the deck or pool fills above, and
-  // the loungers end above the water, ropes and ripples below, so drawing them
-  // here changes no pixel and keeps the fill order.
+  // The shell ends; the people and the loungers follow. Two draws moved to
+  // put them here: the diver now draws after the deck and pool fills, which it
+  // does not touch, and the loungers now draw before the water, ropes and
+  // ripples, which start below them. Neither move changes a pixel, and the
+  // fill order (diver, swimmers, loungers) is the same.
   layerBreak(ctx);
   swim(dvX - 6, midY - 16); // a diver waiting on the board
   // Swimmers standing on the pool floor, drawn BEFORE the water overlay so it

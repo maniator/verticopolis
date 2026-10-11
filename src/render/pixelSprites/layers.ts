@@ -22,8 +22,8 @@
 export interface LayerHook {
   /** The shell is complete; everything drawn from here on is furniture. */
   shellEnd(ctx: CanvasRenderingContext2D): void;
-  /** The furniture is complete; everything drawn from here on covers the
-   *  whole room and belongs to both pictures. */
+  /** The furniture is complete; everything drawn from here on lands on the
+   *  shell (and shows in the flat frame as before). */
   furnitureEnd(ctx: CanvasRenderingContext2D): void;
 }
 

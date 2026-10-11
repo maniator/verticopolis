@@ -221,11 +221,13 @@ front of the back wall. A room frame that supports this carries an optional
 
 - `shell` is the room with its furniture and seated people taken out: the
   ceiling, back wall, windows, wall art and floor band, plus whatever the game
-  draws over the room after its furniture: the night scrim on an empty room,
-  the notice badge, an infested room's grime and roaches, ceiling lights and
-  glow washes drawn last (security, housekeeping, amusements), a cinema's aisle
-  lights and EXIT signs, the wedding hall's petal row, the pool water, and the
-  metro's exit stairs, platform and track.
+  draws over the room after its furniture, such as the night scrim (on an
+  empty home or workplace at night, and on a condo whose residents are
+  asleep), the notice badge, a hotel room's roaches (and an infested room's
+  grime) and a sleeping guest's "z", ceiling lights and glow washes drawn last
+  (security, housekeeping, amusements), a cinema's aisle lights and EXIT signs,
+  the wedding hall's petal row, the pool water, and the metro's exit stairs,
+  platform and track.
 - `furniture` holds the pixels that differ between the shell and the flat
   frame, transparent everywhere else.
 
@@ -247,8 +249,9 @@ What that means for the pictures:
 - A soft shadow or glow drawn with the furniture is baked into it as opaque
   pixels (the translucent paint over the wall behind it), so anything a
   frontend draws between the shell and the furniture is hidden under it.
-- The hotel's roaches and its sleeper's "z" draw after the grime wash, so they
-  sit on the shell with it, even the one on the bed.
+- The hotel's roaches and its sleeping guest's "z" draw after the furniture
+  ends, so they sit on the shell, even the roach on the bed and the "z" over
+  the sleeper.
 - Structure drawn over the furniture sits on the shell and hides the furniture
   under it in both pictures: the metro's platform deck covers the contact
   shadow under its benches and bins, and the cinema's EXIT signs cover the
