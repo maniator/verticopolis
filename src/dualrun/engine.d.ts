@@ -181,6 +181,16 @@ export class Engine {
 }
 
 /**
+ * `encodeVctower(saveJson, appVersion, savedAtMs)`: the `.vctower` file
+ * text for a serialized game (what `serialize` returns), stamped the way
+ * `SaveGame.export` stamps it (`load::stamp_save`). Text that is not JSON,
+ * a save that is not a tower, a time no `Date` holds and a build name that
+ * reads as before 2.0 (which would mark the tower as a founder's) are
+ * JavaScript errors.
+ */
+export function encodeVctower(save_json: string, app_version: string, saved_at_ms: number): string;
+
+/**
  * `exportTdt(saveJson)`: the `.TDT` bytes for a serialized game (what
  * `serialize` returns). A tower the format cannot hold is a JavaScript error
  * with the player-readable message.

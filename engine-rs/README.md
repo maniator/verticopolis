@@ -20,10 +20,10 @@ must reproduce every pinned checkpoint hash (`expected.json`) byte for byte.
 | `crowd/` | `Crowd.ts`, `crowd/*.ts` |
 | `sim_loop.rs`, `presence.rs`, `satisfaction.rs`, `demand.rs`, `churn.rs`, `star.rs`, `services.rs` | `sim/loop.ts`, `sim/presence.ts`, `sim/congestion.ts`, `sim/satisfaction*.ts`, `sim/gripe.ts`, `sim/demand.ts`, `sim/churn.ts`, `households.ts`, `sim/star.ts`, `milestones.ts`, `sim/services.ts`, `sim/events.ts` |
 | `economy.rs`, `housekeeping.rs`, `ledger.rs`, `events.rs` | `EconomySystem.ts`, `economy/*.ts`, `Ledger.ts`, `EventSystem.ts` |
-| `sim.rs`, `load.rs` | `Simulation.ts`, `sim/stats.ts` (`recordMoney`, `emit`), `sim/serialization.ts`, `sim/coerce.ts`, `sim/deserializeGuards.ts`, `sim/founderStatus.ts`, `saveMigration.ts`, `migrations/*.ts`, `storage/vctowerContainer.ts` |
+| `sim.rs`, `load.rs` | `Simulation.ts`, `sim/stats.ts` (`recordMoney`, `emit`), `sim/serialization.ts`, `sim/coerce.ts`, `sim/deserializeGuards.ts`, `sim/founderStatus.ts`, `saveMigration.ts`, `migrations/*.ts`, `storage/vctowerContainer.ts`, the `.vctower` framing and `stamp` of `storage/SaveGame.ts` |
 | `scenario.rs`, `bin/conformance.rs`, `bin/dump.rs` | `src/tests/conformance/scenario.ts` |
 | `tdt/` (`byte_reader.rs`, `byte_writer.rs`, `format.rs`, `types.rs`, `tables.rs`, `parse.rs`, `part_merge.rs`, `transports.rs`, `tail.rs`, `stamp.rs`, `pacing.rs`, `import.rs`, `import_report.rs`, `export_tables.rs`, `export_gather.rs`, `export_parking.rs`, `encoder.rs`, `export.rs`, `export_report.rs`), `tdt/referee.rs`, `bin/tdt.rs` | `src/storage/tdt*.ts` (the 1994 `.TDT` importer and exporter; `timePacing.ts` for the frame clock), `src/tests/integration/tdtCases.integration.test.ts` |
-| `wasm.rs` (feature `wasm`) | the JavaScript binding; `src/tests/conformance/wasmEngine.ts`, `src/dualrun/` and the `.TDT` differential test (`src/tests/conformance/tdtDifferential.ts`, inputs from `src/tests/fixtures/tdtDifferentialInputs.ts`) drive it |
+| `wasm.rs` (feature `wasm`) | the JavaScript binding; `src/tests/conformance/wasmEngine.ts`, `src/dualrun/` and the `.TDT` differential test (`src/tests/conformance/tdtDifferential.ts`, inputs from `src/tests/fixtures/tdtDifferentialInputs.ts`) and the `.vctower` writer test (`src/tests/integration/conformanceWasmVctower.integration.test.ts`) drive it |
 
 Functions keep the names and shape of their TypeScript originals so the two
 can be read side by side. Where JavaScript semantics matter for the hash
@@ -80,6 +80,43 @@ header says what each one covers.
 The import and export fidelity reports (what was mapped, dropped or
 approximated) are not ported yet; the tallies they read from are.
 
+## The `.vctower` container
+
+`load::decode_vctower(text)` reads the web game's save file (the
+`VCTOWER1` magic, then base64 of a raw-deflated JSON save) and
+`load::encode_vctower(&save)` writes one, so a host that is not the web
+game can write saves the web game opens. The encoder takes a serialized
+game as a `serde_json::Value` (what `Simulation::serialize` returns), writes
+it as given and returns the file bytes. A save written as a player's tower
+needs the stamp `SaveGame.export` adds: `load::stamp_save(&mut save,
+app_version, saved_at_ms)` sets `appVersion` and `savedAt`, and
+`load::encode_simulation_vctower(&sim, app_version, saved_at_ms)` serializes,
+stamps and encodes a running game in one call. The engine does no file IO
+and has no clock, so the host passes the build name and the time. The stamp
+refuses a save the web import would refuse (no numeric `minutes` or no
+`units` list), a time no JavaScript `Date` holds, and a build name the web
+game reads as before 2.0, since a save stamped so, or not stamped at all,
+loads as a founder's tower. A save still holding an older stamp that reads
+as a founder's keeps that status as `founder: true`. A save with no stamp
+looks like a fresh serialization, so load an unstamped file before writing
+it again.
+
+The framing and the base64 alphabet match the TypeScript writers byte for
+byte (the magic, a newline, one line of padded standard base64, a newline).
+The payload is raw DEFLATE at level 1, the level of `SaveGame.packSync`,
+over the save's canonical JSON (`JSON.stringify` formatting with keys
+sorted). The key order and the compressed bits differ from the TypeScript
+output (fflate and the browser's `CompressionStream` also differ from each
+other there); every reader decodes the file to the same save. The bytes are
+stable within one build of the engine. The Rust
+tests in `load.rs` round-trip every web-written fixture in
+`src/tests/fixtures/`, and
+`src/tests/integration/conformanceWasmVctower.integration.test.ts` (part of
+`npm run test:wasm`) loads each fixture in the web game, writes it with the
+engine, reads it back through `decodeVctower`, `fromTowerFile` and
+`SaveGame.import`, and checks the framing against `toTowerFile`'s, the
+payload text, the Founder status and the loaded state's hash.
+
 ## The WASM binding
 
 The crate also builds as a WebAssembly module for JavaScript hosts. The
@@ -88,9 +125,11 @@ binding (`src/wasm.rs`, behind the `wasm` cargo feature) exports one class,
 `.vctower` text, and methods for ticking, the build and edit commands, the
 events, the tile queries, the readouts a runner checks (`mode`, `money`,
 `setMoney`, `fires`), `serialize` and the two hashed views with their
-digests, plus two free functions for the 1994 save format, `importTdt(bytes,
-filename)` (JSON text `{ save, warnings }`) and `exportTdt(saveJson)` (the
-file bytes). Structured values cross as JSON text; integers cross as 32-bit
+digests, plus three free functions: two for the 1994 save format,
+`importTdt(bytes, filename)` (JSON text `{ save, warnings }`) and
+`exportTdt(saveJson)` (the file bytes), and `encodeVctower(saveJson,
+appVersion, savedAtMs)`, the stamped `.vctower` text for a serialized game.
+Structured values cross as JSON text; integers cross as 32-bit
 values (`i32`, and `u32` for the seed and the fire count), which the
 generated TypeScript sees as `number`.
 Nothing in the binding simulates anything.
@@ -99,7 +138,7 @@ Nothing in the binding simulates anything.
 rustup target add wasm32-unknown-unknown
 cargo install wasm-bindgen-cli --locked --version 0.2.129   # the version Cargo.toml pins
 npm run wasm:build          # cargo rustc (cdylib) for wasm32 + wasm-bindgen into engine-rs/pkg/
-npm run test:wasm           # every scenario through the binding, the dual run's day gate and the .TDT differential test (fails without the package)
+npm run test:wasm           # every scenario through the binding, the dual run's day gate, the .TDT differential test and the .vctower writer test (fails without the package)
 ```
 
 `engine-rs/pkg/` is build output and is not checked in, except for the
