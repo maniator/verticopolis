@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { FACILITIES, GRID } from "./facilitiesData";
 import { MILESTONES } from "./milestones";
-import { checkCatalog, checkEvent, renderGameplayEventsDts, type GameplayCatalog } from "./gameplayCatalog";
+import { checkCatalog, checkEvent, renderGameplayEventRules, renderGameplayEventsDts, type GameplayCatalog } from "./gameplayCatalog";
+import { GAMEPLAY_EVENT_RULES } from "./gameplayEventRules";
 import type { FacilityKind, GameMode } from "./types";
 import type { GameplayFacilityKind, GameplayMilestoneId, GameplayMode } from "./gameplayEvents";
 
@@ -119,5 +121,23 @@ describe("gameplay event catalog", () => {
   it("generates the committed gameplayEvents.d.ts (run npm run gen:events when this fails)", () => {
     const committed = readFileSync(resolve(root, "src/engine/gameplayEvents.d.ts"), "utf8");
     expect(committed).toBe(renderGameplayEventsDts(catalog));
+  });
+
+  it("generates the committed gameplayEventRules.ts (run npm run gen:events when this fails)", () => {
+    const committed = readFileSync(resolve(root, "src/engine/gameplayEventRules.ts"), "utf8");
+    expect(committed).toBe(renderGameplayEventRules(catalog));
+    // The shipped rules judge every event the same way the full catalog does.
+    expect(() => checkEvent(GAMEPLAY_EVENT_RULES, { name: "star_reached", payload: { star: 3 } })).not.toThrow();
+    expect(() => checkEvent(GAMEPLAY_EVENT_RULES, { name: "star_reached", payload: { star: 7 } })).toThrow(/outside the catalog/);
+  });
+
+  // The catalog is frozen for the release that ships the analytics bridge
+  // (#873 phase 2), so the 3.0.0 engine flip is measured against a fixed
+  // contract. Changing it is a deliberate act: a payload or emission change
+  // bumps the event's version, any change adds a history note, the PR says
+  // which dashboards it moves, and this digest is updated in the same commit.
+  it("is frozen: the parsed catalog matches its pinned digest", () => {
+    const digest = createHash("sha256").update(JSON.stringify(raw())).digest("hex");
+    expect(digest).toBe("e88144ac10c1eb00396992bde5bf80f3f174785812519300dc3edad6dcf88222");
   });
 });

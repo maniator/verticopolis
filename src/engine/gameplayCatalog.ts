@@ -114,10 +114,19 @@ export function checkCatalog(raw: unknown): GameplayCatalog {
   return raw as unknown as GameplayCatalog;
 }
 
+/** The part of the catalog {@link checkEvent} reads: the enums and each
+ *  event's name and payload fields. The shipped game carries this much as
+ *  `GAMEPLAY_EVENT_RULES` (`gameplayEventRules.ts`, generated beside the
+ *  declaration), without the prose. */
+export interface GameplayEventRules {
+  enums: Record<string, string[]>;
+  events: Pick<CatalogEvent, "name" | "payload">[];
+}
+
 /** Throw unless a drained event is one the catalog describes: a known name,
  *  exactly the catalog's fields, each enum value listed and each integer in
  *  range, and nothing beside `name` and `payload`. */
-export function checkEvent(catalog: GameplayCatalog, event: unknown): void {
+export function checkEvent(catalog: GameplayEventRules, event: unknown): void {
   if (!isObject(event) || typeof event.name !== "string") throw new Error("event: name must be a string");
   const name = event.name;
   const entry = catalog.events.find((e) => e.name === name);
@@ -196,4 +205,34 @@ export function renderGameplayEventsDts(catalog: GameplayCatalog): string {
     "",
   );
   return out.join("\n");
+}
+
+/** The text of `src/engine/gameplayEventRules.ts` for a checked catalog: the
+ *  rules {@link checkEvent} needs at runtime, so the shipped bridge checks
+ *  every drained event against the same catalog the engines are held to. */
+export function renderGameplayEventRules(catalog: GameplayCatalog): string {
+  const enums = Object.entries(catalog.enums).map(([set, values]) => `    ${set}: [${values.map((v) => JSON.stringify(v)).join(", ")}],`);
+  const events = catalog.events.map((e) => {
+    const fields = Object.entries(e.payload).map(([field, spec]) =>
+      spec.type === "enum" ? `${field}: { type: "enum", enum: ${JSON.stringify(spec.enum)} }` : `${field}: { type: "integer", min: ${spec.min}, max: ${spec.max} }`,
+    );
+    return `    { name: ${JSON.stringify(e.name)}, payload: {${fields.length ? ` ${fields.join(", ")} ` : ""}} },`;
+  });
+  return [
+    "// Generated from conformance/events/catalog.json by `npm run gen:events`.",
+    "// Do not edit: change the catalog and regenerate (src/engine/gameplayCatalog.test.ts fails while this is stale).",
+    'import type { GameplayEventRules } from "./gameplayCatalog";',
+    "",
+    "/** The catalog's enums and payload fields, without its prose: what the",
+    " *  analytics bridge checks every drained event against. */",
+    "export const GAMEPLAY_EVENT_RULES: GameplayEventRules = {",
+    "  enums: {",
+    ...enums,
+    "  },",
+    "  events: [",
+    ...events,
+    "  ],",
+    "};",
+    "",
+  ].join("\n");
 }
