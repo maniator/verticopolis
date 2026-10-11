@@ -24,7 +24,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { Engine, encodeVctower } from "../../dualrun/engine";
+import type { Engine, encodeVctower, exportTdt } from "../../dualrun/engine";
 import { SaveGame } from "../../storage/SaveGame";
 import { fromBase64, inflateCapped, STORE_MAGIC } from "../../storage/saveCompression";
 import { fromTowerFile, toTowerFile } from "../../storage/towerFileCodec";
@@ -41,7 +41,7 @@ const fixtures = readdirSync(FIXTURES)
 const VERSION = "3.0.0";
 const SAVED_AT = 1_760_000_000_123;
 
-type RustVctower = { encodeVctower: typeof encodeVctower; Engine: typeof Engine };
+type RustVctower = { encodeVctower: typeof encodeVctower; exportTdt: typeof exportTdt; Engine: typeof Engine };
 const rust = (): RustVctower => wasm() as unknown as RustVctower;
 
 /** The JSON text inside a `.vctower`, read the way the desktop store reads
@@ -144,6 +144,34 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     expect(raw.appVersion).toBe("1.100.0");
     const text = rust().encodeVctower(JSON.stringify(raw), VERSION, SAVED_AT);
     expect((await SaveGame.import(text)).founder).toBe(true);
+  });
+
+  // A name cut through an emoji (the rename box counts UTF-16 units) leaves
+  // half a surrogate pair, which JSON.stringify writes as an escape a Rust
+  // string cannot hold. The web game writes such a tower; the engine has to
+  // open it, with U+FFFD where the half character was (#936).
+  it("a tower the web game wrote with a split emoji opens in the engine", async () => {
+    const first = fixtures[0];
+    expect(first).toBeDefined();
+    if (first === undefined) return;
+    const sim = await SaveGame.import(readFileSync(resolve(FIXTURES, first), "utf8"));
+    sim.tower.towerName = "Sky \ud83c";
+    const webFile = await SaveGame.export(sim);
+    const json = JSON.stringify(sim.serialize());
+    expect(json).toContain("\\ud83c");
+
+    const nameIn = (engine: Engine): unknown => (JSON.parse(engine.serialize()) as { towerName?: unknown }).towerName;
+    for (const engine of [rust().Engine.fromVctower(webFile), rust().Engine.fromSave(json)]) {
+      try {
+        expect(nameIn(engine)).toBe("Sky \uFFFD");
+      } finally {
+        engine.free();
+      }
+    }
+
+    const written = rust().encodeVctower(json, VERSION, SAVED_AT);
+    expect((await SaveGame.import(written)).tower.towerName).toBe("Sky \uFFFD");
+    expect(rust().exportTdt(json).length).toBeGreaterThan(0);
   });
 
   it("refuses what the web game would load wrong or refuse", () => {

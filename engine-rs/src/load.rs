@@ -56,7 +56,87 @@ pub fn decode_vctower(text: &str) -> Result<Value, String> {
     }
     // `TextDecoder` drops a leading byte order mark before `JSON.parse` sees it.
     let text = out.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&out);
-    serde_json::from_slice(text).map_err(|e| format!("json: {e}"))
+    parse_save_json(text).map_err(|e| format!("json: {e}"))
+}
+
+/// `JSON.parse` for save text that a JavaScript host wrote. A JavaScript
+/// string can hold half of a surrogate pair (a name cut at a UTF-16 length,
+/// for one), and `JSON.stringify` writes it as a `\udxxx` escape that
+/// `serde_json` refuses, since a Rust string cannot hold it. Each such escape
+/// becomes U+FFFD, the character `TextEncoder` writes for it, so the save
+/// loads with a replacement character where the half character was. Paired
+/// escapes, every other escape and every byte outside a string pass through
+/// unchanged; text with no lone surrogate escape is parsed as given.
+pub fn parse_save_json(text: &[u8]) -> Result<Value, serde_json::Error> {
+    match repair_lone_surrogates(text) {
+        Some(fixed) => serde_json::from_slice(&fixed),
+        None => serde_json::from_slice(text),
+    }
+}
+
+/// The value of the four hex digits at `at`, if they are four hex digits.
+fn hex4(text: &[u8], at: usize) -> Option<u16> {
+    let digits = text.get(at..at + 4)?;
+    let s = std::str::from_utf8(digits).ok()?;
+    if !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    u16::from_str_radix(s, 16).ok()
+}
+
+/// The text with every lone surrogate escape inside a string rewritten to
+/// `\ufffd`, or `None` when there is none (the common case, which then
+/// costs one scan and no copy).
+fn repair_lone_surrogates(text: &[u8]) -> Option<Vec<u8>> {
+    let mut out: Option<Vec<u8>> = None;
+    let mut copied = 0;
+    let mut in_string = false;
+    let mut i = 0;
+    while i < text.len() {
+        let b = text[i];
+        if !in_string {
+            in_string = b == b'"';
+            i += 1;
+            continue;
+        }
+        match b {
+            b'"' => {
+                in_string = false;
+                i += 1;
+            }
+            b'\\' if text.get(i + 1) == Some(&b'u') => {
+                let Some(unit) = hex4(text, i + 2) else {
+                    // A malformed escape: leave it for the parser to refuse.
+                    i += 2;
+                    continue;
+                };
+                let paired_low = || {
+                    text.get(i + 6) == Some(&b'\\')
+                        && text.get(i + 7) == Some(&b'u')
+                        && hex4(text, i + 8).is_some_and(|u| (0xDC00..=0xDFFF).contains(&u))
+                };
+                if (0xD800..=0xDBFF).contains(&unit) && paired_low() {
+                    i += 12;
+                } else if (0xD800..=0xDFFF).contains(&unit) {
+                    let buf = out.get_or_insert_with(|| Vec::with_capacity(text.len()));
+                    buf.extend_from_slice(&text[copied..i]);
+                    buf.extend_from_slice(b"\\ufffd");
+                    i += 6;
+                    copied = i;
+                } else {
+                    i += 6;
+                }
+            }
+            // Any other escape is two bytes; skipping both keeps an escaped
+            // quote or backslash from being read as the end of the string.
+            b'\\' => i += 2,
+            _ => i += 1,
+        }
+    }
+    out.map(|mut buf| {
+        buf.extend_from_slice(&text[copied..]);
+        buf
+    })
 }
 
 /// The `.vctower` magic: the first line of every file, naming the format and
@@ -91,10 +171,21 @@ const VCTOWER_DEFLATE_LEVEL: u32 = 1;
 /// [`encode_simulation_vctower`] and [`stamp_save`] add: one without
 /// `appVersion` loads as a founder's tower.
 ///
+/// A save whose JSON text is longer than the strictest reader holds
+/// (`MAX_SAVE_INFLATED_BYTES`, 32 MiB, the cap of `inflateCapped` and of
+/// [`decode_vctower`]) is refused: written, it would only fail to load as a
+/// file that looks crafted. A real tower is about 2 MB.
+///
 /// [`canonical_json`]: crate::canonical::canonical_json
-pub fn encode_vctower(save: &Value) -> Vec<u8> {
+pub fn encode_vctower(save: &Value) -> Result<Vec<u8>, String> {
     use std::io::Write;
     let json = crate::canonical::canonical_json(save);
+    if json.len() as u64 > MAX_SAVE_INFLATED_BYTES {
+        return Err(format!(
+            "this save is {} bytes of JSON, more than the {MAX_SAVE_INFLATED_BYTES} a .vctower reader will hold",
+            json.len()
+        ));
+    }
     let mut enc = flate2::write::DeflateEncoder::new(
         Vec::new(),
         flate2::Compression::new(VCTOWER_DEFLATE_LEVEL),
@@ -108,7 +199,7 @@ pub fn encode_vctower(save: &Value) -> Vec<u8> {
     out.push(b'\n');
     out.extend_from_slice(b64.as_bytes());
     out.push(b'\n');
-    out
+    Ok(out)
 }
 
 /// `stamp(data)` in SaveGame.ts: set `savedAt` (milliseconds since the
@@ -164,7 +255,7 @@ pub fn encode_simulation_vctower(
 ) -> Result<Vec<u8>, String> {
     let mut save = sim.serialize();
     stamp_save(&mut save, app_version, saved_at_ms)?;
-    Ok(encode_vctower(&save))
+    encode_vctower(&save)
 }
 
 /// `Buffer.from(b64, "base64")`: decoding stops at the first `=`, every
@@ -1978,6 +2069,94 @@ mod tests {
 }
 
 #[cfg(test)]
+mod save_json {
+    use super::{decode_vctower, encode_vctower, parse_save_json};
+    use serde_json::{json, Value};
+
+    fn parse(text: &str) -> Value {
+        parse_save_json(text.as_bytes()).unwrap_or_else(|e| panic!("{text}: {e}"))
+    }
+
+    /// A lone surrogate escape, as `JSON.stringify` writes one, reads as
+    /// U+FFFD in place; a paired one reads as the character it spells.
+    #[test]
+    fn lone_surrogates_become_replacement_characters() {
+        let cases = [
+            (r#"{"towerName":"Tower \ud83c"}"#, "Tower \u{FFFD}"),
+            (r#"{"towerName":"\udfe2 Tower"}"#, "\u{FFFD} Tower"),
+            (r#"{"towerName":"🏢"}"#, "\u{1F3E2}"),
+            (r#"{"towerName":"\ud83c🏢"}"#, "\u{FFFD}\u{1F3E2}"),
+            (r#"{"towerName":"\ud83cA"}"#, "\u{FFFD}A"),
+            (r#"{"towerName":"\udfe2\ud83c"}"#, "\u{FFFD}\u{FFFD}"),
+            (r#"{"towerName":"a\"\ud83c\\"}"#, "a\"\u{FFFD}\\"),
+        ];
+        for (text, want) in cases {
+            assert_eq!(parse(text)["towerName"], json!(want), "{text}");
+        }
+    }
+
+    /// Keys are strings too, and nested values are reached.
+    #[test]
+    fn keys_and_nested_strings_are_repaired() {
+        let v = parse(r#"{"k\ud800":[{"label":"x\udc00"}]}"#);
+        assert_eq!(v, json!({"k\u{FFFD}": [{"label": "x\u{FFFD}"}]}));
+    }
+
+    /// An escaped backslash followed by a literal `u` is text, not an escape.
+    #[test]
+    fn an_escaped_backslash_is_not_an_escape() {
+        assert_eq!(parse(r#"{"a":"\\ud83c"}"#)["a"], json!("\\ud83c"));
+        assert_eq!(parse(r#"{"a":"\\\ud83c"}"#)["a"], json!("\\\u{FFFD}"));
+    }
+
+    /// Text with no lone surrogate parses exactly as serde_json parses it,
+    /// and broken JSON is still refused.
+    #[test]
+    fn everything_else_is_left_to_the_parser() {
+        let text = r#"{"money":1.5e3,"n":"é\n\t\"","u":[1,null,true]}"#;
+        assert_eq!(parse(text), serde_json::from_str::<Value>(text).unwrap());
+        for bad in [
+            r#"{"a":"\u12"}"#,
+            r#"{"a":"\ud83c"#,
+            r#"{"a":"\uzzzz"}"#,
+            "{",
+        ] {
+            assert!(parse_save_json(bad.as_bytes()).is_err(), "{bad}");
+        }
+    }
+
+    /// A `.vctower` whose payload carries a lone surrogate escape (what the
+    /// web writes for a split emoji) opens, and the engine writes it back
+    /// with the replacement character.
+    #[test]
+    fn a_vctower_with_a_lone_surrogate_opens() {
+        use std::io::Write;
+        let json = br#"{"version":7,"units":[],"minutes":0,"towerName":"Sky \ud83c"}"#;
+        let mut enc = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::new(1));
+        enc.write_all(json).unwrap();
+        let b64 = base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            enc.finish().unwrap(),
+        );
+        let save = decode_vctower(&format!("VCTOWER1\n{b64}\n")).unwrap();
+        assert_eq!(save["towerName"], json!("Sky \u{FFFD}"));
+        let again = encode_vctower(&save).unwrap();
+        let back = decode_vctower(std::str::from_utf8(&again).unwrap()).unwrap();
+        assert_eq!(back["towerName"], json!("Sky \u{FFFD}"));
+    }
+
+    /// The encoder refuses a save the readers would refuse as too large.
+    #[test]
+    fn the_encoder_refuses_a_save_over_the_read_cap() {
+        let big = "x".repeat(super::MAX_SAVE_INFLATED_BYTES as usize);
+        let err = encode_vctower(&json!({ "towerName": big })).unwrap_err();
+        assert!(err.contains("more than"), "{err}");
+        let fits = "x".repeat(super::MAX_SAVE_INFLATED_BYTES as usize - 20);
+        assert!(encode_vctower(&json!({ "t": fits })).is_ok());
+    }
+}
+
+#[cfg(test)]
 mod vctower_encode {
     use super::{
         decode_vctower, deserialize, detect_founder, encode_simulation_vctower, encode_vctower,
@@ -2031,7 +2210,7 @@ mod vctower_encode {
     /// padded standard base64, newline, and nothing outside ASCII.
     #[test]
     fn writes_the_typescript_framing() {
-        let bytes = encode_vctower(&json!({"version": 7, "units": []}));
+        let bytes = encode_vctower(&json!({"version": 7, "units": []})).unwrap();
         let s = text(&bytes);
         assert!(s.starts_with("VCTOWER1\n"), "{s:?}");
         assert!(s.ends_with('\n') && !s.ends_with("\n\n"), "{s:?}");
@@ -2057,7 +2236,7 @@ mod vctower_encode {
             "units": [{"x": -0.0, "floor": 1}]
         });
         assert_eq!(
-            inflate_payload(&encode_vctower(&save)),
+            inflate_payload(&encode_vctower(&save).unwrap()),
             "{\"big\":1e+21,\"money\":1500000,\"rate\":0.1,\"towerName\":\"Caf\u{e9} \\\"Tower\\\"\\n\u{1F3E2}\",\"units\":[{\"floor\":1,\"x\":0}]}"
         );
     }
@@ -2073,7 +2252,7 @@ mod vctower_encode {
             json!([1, "two", {"three": 3}]),
             json!("a bare string"),
         ] {
-            let bytes = encode_vctower(&save);
+            let bytes = encode_vctower(&save).unwrap();
             assert_eq!(decode_vctower(text(&bytes)).unwrap(), save, "{save}");
         }
     }
@@ -2082,7 +2261,10 @@ mod vctower_encode {
     #[test]
     fn encoding_is_deterministic() {
         let save = json!({"b": 2, "a": [1, 2, 3], "towerName": "x"});
-        assert_eq!(encode_vctower(&save), encode_vctower(&save));
+        assert_eq!(
+            encode_vctower(&save).unwrap(),
+            encode_vctower(&save).unwrap()
+        );
     }
 
     /// A file the web game wrote decodes, re-encodes and decodes to the same
@@ -2090,14 +2272,14 @@ mod vctower_encode {
     #[test]
     fn web_written_files_survive_a_rewrite() {
         for (name, save) in web_fixtures() {
-            let once = encode_vctower(&save);
+            let once = encode_vctower(&save).unwrap();
             let back = decode_vctower(text(&once)).unwrap_or_else(|e| panic!("{name}: {e}"));
             assert_eq!(
                 back, save,
                 "{name}: the save changed through the engine's writer"
             );
             assert_eq!(
-                encode_vctower(&back),
+                encode_vctower(&back).unwrap(),
                 once,
                 "{name}: re-encoding is not stable"
             );
@@ -2181,7 +2363,7 @@ mod vctower_encode {
             let mut save = json!({"version": 7, "units": [], "minutes": 0, "appVersion": old});
             stamp_save(&mut save, "3.0.0", 0.0).unwrap();
             assert_eq!(save["founder"], json!(true), "{old:?}");
-            let raw = decode_vctower(text(&encode_vctower(&save))).unwrap();
+            let raw = decode_vctower(text(&encode_vctower(&save).unwrap())).unwrap();
             assert!(detect_founder(&raw), "{old:?}");
             let mut sim = deserialize(&raw).unwrap();
             mark_founder_from_loaded_file(&mut sim, &raw);

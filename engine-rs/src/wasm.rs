@@ -147,7 +147,7 @@ impl Engine {
     /// where the live engine stands.
     #[wasm_bindgen(js_name = fromSave)]
     pub fn from_save(text: &str, markers: Option<String>) -> Result<Engine, JsError> {
-        let raw: Value = serde_json::from_str(text).map_err(err)?;
+        let raw = crate::load::parse_save_json(text.as_bytes()).map_err(err)?;
         let mut sim = crate::load::deserialize(&raw).map_err(err)?;
         if let Some(m) = markers {
             apply_markers(&mut sim, &m).map_err(err)?;
@@ -821,10 +821,11 @@ pub fn encode_vctower(
     app_version: &str,
     saved_at_ms: f64,
 ) -> Result<String, JsError> {
-    let mut save: Value = serde_json::from_str(save_json).map_err(|e| err(format!("save: {e}")))?;
+    let mut save = crate::load::parse_save_json(save_json.as_bytes())
+        .map_err(|e| err(format!("save: {e}")))?;
     crate::load::stamp_save(&mut save, app_version, saved_at_ms).map_err(err)?;
     // The container is ASCII by construction (magic, base64, newlines).
-    String::from_utf8(crate::load::encode_vctower(&save)).map_err(err)
+    String::from_utf8(crate::load::encode_vctower(&save).map_err(err)?).map_err(err)
 }
 
 #[cfg(test)]
@@ -843,7 +844,10 @@ mod tests {
         };
         let mut stamped = save.clone();
         crate::load::stamp_save(&mut stamped, "3.0.0", 1.5e12).unwrap();
-        assert_eq!(text.as_bytes(), crate::load::encode_vctower(&stamped));
+        assert_eq!(
+            text.as_bytes(),
+            crate::load::encode_vctower(&stamped).unwrap()
+        );
         assert_eq!(
             canonical_json(&crate::load::decode_vctower(&text).unwrap()),
             canonical_json(&stamped)
