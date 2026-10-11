@@ -3,6 +3,7 @@ import { roomJobs, type Job } from "./catalog";
 import { facadeJobs, peopleJobs, skyJobs, structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
 import { paint, type PaintSpec } from "./paint";
 import type { Image } from "./pixels";
+import { withLayerHook } from "../pixelSprites/layers";
 import { SAMPLES, type Sample } from "./samples";
 import { verifySample, type SampleResult } from "./verify";
 import { verifyExtras } from "./verifyExtras";
@@ -19,27 +20,80 @@ export function allJobs(): Job[] {
   return [...roomJobs(), ...structureJobs(), ...transportJobs(), ...peopleJobs(), ...facadeJobs(), ...vehicleJobs(), ...skyJobs()];
 }
 
-/** A fresh canvas per render, prepared like an Excalibur raster (quality 1,
- *  no padding, smoothing off, 1px butt lines, black fill). */
+/** A 2D context for `canvas` at `w` x `h`, cleared and prepared like an
+ *  Excalibur raster (quality 1, no padding, smoothing off, 1px butt lines,
+ *  black fill), with that state saved. */
+function prepare(canvas: HTMLCanvasElement, w: number, h: number): CanvasRenderingContext2D {
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d context");
+  ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  ctx.lineCap = "butt";
+  ctx.fillStyle = "#000000";
+  return ctx;
+}
+
+/** Replace every pixel of `dst` with `src`'s, ignoring `dst`'s transform,
+ *  clip state aside (the bake's clip is the whole canvas). Canvas to canvas
+ *  with "copy" moves the stored pixels unchanged, translucent ones included. */
+function copyPixels(dst: CanvasRenderingContext2D, src: HTMLCanvasElement): void {
+  dst.save();
+  dst.setTransform(1, 0, 0, 1, 0, 0);
+  dst.globalAlpha = 1;
+  dst.globalCompositeOperation = "copy";
+  dst.imageSmoothingEnabled = false;
+  dst.drawImage(src, 0, 0);
+  dst.restore();
+}
+
+/** A fresh canvas per render, prepared like an Excalibur raster. */
 export function canvasRenderer(doc: Document): Renderer {
   const canvas = doc.createElement("canvas");
+  const saved = doc.createElement("canvas");
   return {
     render(spec: PaintSpec, w: number, h: number): Image {
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("no 2d context");
-      ctx.clearRect(0, 0, w, h);
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([]);
-      ctx.lineCap = "butt";
-      ctx.fillStyle = "#000000";
+      const ctx = prepare(canvas, w, h);
       paint(ctx, spec, w, h);
       ctx.restore();
       const data = ctx.getImageData(0, 0, w, h).data;
       return { w, h, data };
+    },
+    // The same paint, with the layer marks live: at the break the canvas is
+    // copied aside; at the end of the furniture (or of the paint) it is put
+    // back, so the furniture is gone and anything drawn after the end (the
+    // night scrim, the notice badge) lands on the shell. The flat frame comes
+    // from `render`, which runs with no hook, so its pixels never depend on
+    // this pass.
+    renderShell(spec: PaintSpec, w: number, h: number): Image | null {
+      const ctx = prepare(canvas, w, h);
+      const store = prepare(saved, w, h);
+      let broke = false;
+      let ended = false;
+      withLayerHook(
+        {
+          shellEnd() {
+            if (broke) throw new Error(`two layer breaks in one paint: ${JSON.stringify(spec)}`);
+            broke = true;
+            copyPixels(store, canvas);
+          },
+          furnitureEnd() {
+            if (!broke || ended) return;
+            ended = true;
+            copyPixels(ctx, saved);
+          },
+        },
+        () => paint(ctx, spec, w, h),
+      );
+      if (broke && !ended) copyPixels(ctx, saved);
+      ctx.restore();
+      store.restore();
+      if (!broke) return null;
+      return { w, h, data: ctx.getImageData(0, 0, w, h).data };
     },
   };
 }
@@ -68,7 +122,7 @@ const api: AtlasPage = {
   },
   records() {
     if (!result) throw new Error("run() first");
-    return { frames: result.frames, animations: result.animations };
+    return { frameImages: result.frameImages, frames: result.frames, animations: result.animations };
   },
   images(from, maxBytes) {
     if (!result) throw new Error("run() first");

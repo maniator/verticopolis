@@ -3,7 +3,7 @@ import type { BakeResult, ImageRef } from "./bake";
 import { variantPlacements, roomKinds, ORIGIN_SEEDED, RECYCLE_STEPS, PARKING_CAR_COLORS } from "./catalog";
 import { CAR_SEEDS, SKYLINE_FILLS, SKY_COLUMNS, STREET_CAR_SEEDS, BUILDS } from "./catalogExtras";
 import { pack, type PackedSlice } from "./pack";
-import { blank, type Image } from "./pixels";
+import { blank, crop, over, sameImage, type Image } from "./pixels";
 import { encodePng } from "./png";
 import { blit, scaleNearest } from "./raster";
 import {
@@ -66,6 +66,7 @@ export function signature(): AtlasManifest["signature"] {
       parkingRoll: "a space holds a car when hash(int32(id * 31)) < parkingUse, where hash(n) is: x = int32(n * 2654435761) with the product taken as a float64 (IEEE double) multiply; x = imul32(x ^ (x >>> 15), 0x2c1b3c6d); x = imul32(x ^ (x >>> 13), 0x297a2d39); (x ^ (x >>> 16)) as unsigned / 2^32. int32(v) truncates v toward zero and wraps it modulo 2^32 to a signed 32-bit integer (JavaScript's v | 0); imul32 is a 32-bit integer multiply; ^ is a 32-bit xor and >>> a logical (zero-filling) right shift on the 32-bit pattern, so a negative x shifts in zeros. The first step is not imul32: the two can differ once the product's magnitude passes 2^53",
       cinema: "the cinema's marquee and screen read the animation clock; the web keeps whatever phase its last re-bake caught, the atlas bakes phase 0",
       originSeeded: `${[...ORIGIN_SEEDED].join(", ")}: a few details (staff shirts, skyline windows, climbing holds) follow the web's draw origin; the atlas carries the per-unit look at origin 0, 0`,
+      layers: "a room frame may carry 'layers' for drawing with depth: draw the 'shell' parts, then the 'furniture' parts source-over, and the two give back the frame's own parts exactly; draw its chains and overlays on top as usual. A frame without 'layers' (vacancy, closed and gutted rooms, and the kinds whose art marks no split) is drawn flat",
     },
   };
 }
@@ -93,17 +94,33 @@ export interface Archive {
   zip: Uint8Array;
 }
 
+/**
+ * Pack the frame images, then the depth layers' own images on pages of their
+ * own after them. The frame images pack exactly as they would in a bake with
+ * no layers, so adding layers never moves a frame's part or changes a byte of
+ * its pages.
+ */
+function packGroups(bake: BakeResult, pageSize: number): { pages: number; placements: PackedSlice[][] } {
+  const split = bake.frameImages ?? bake.images.length;
+  if (!(Number.isInteger(split) && split >= 0 && split <= bake.images.length)) throw new Error(`frameImages ${split} is outside 0..${bake.images.length}`);
+  const group = (from: number, to: number) => pack(
+    bake.images.slice(from, to).map((img, i) => ({ id: from + i, w: img.w, h: img.h })),
+    pageSize,
+    ATLAS_PADDING,
+  );
+  const framesPacked = group(0, split);
+  const layersPacked = group(split, bake.images.length);
+  const shifted = layersPacked.placements.map((list) => list.map((sl) => ({ ...sl, rect: { ...sl.rect, page: sl.rect.page + framesPacked.pages } })));
+  return { pages: framesPacked.pages + layersPacked.pages, placements: [...framesPacked.placements, ...shifted] };
+}
+
 export function buildArchive(
   bake: BakeResult,
   info: ArchiveInfo,
   onProgress?: (msg: string) => void,
   pageSize: number = ATLAS_PAGE_BASE,
 ): Archive {
-  const packed = pack(
-    bake.images.map((img, id) => ({ id, w: img.w, h: img.h })),
-    pageSize,
-    ATLAS_PADDING,
-  );
+  const packed = packGroups(bake, pageSize);
   onProgress?.(`packed ${bake.images.length} images into ${packed.pages} pages`);
   const pages: Image[] = Array.from({ length: packed.pages }, () => blank(pageSize, pageSize));
   const normalPages: Image[] = Array.from({ length: packed.pages }, () => flatNormals(pageSize));
@@ -126,6 +143,10 @@ export function buildArchive(
     if (f.overlays) {
       rec.overlays = {};
       for (const [k, o] of Object.entries(f.overlays)) rec.overlays[k] = layerOf(o, packed.placements);
+    }
+    if (f.layers) {
+      const parts = (ref: ImageRef | null): Placed[] => (ref ? placedOf(ref, packed.placements[ref.id]) : []);
+      rec.layers = { shell: parts(f.layers.shell), furniture: parts(f.layers.furniture) };
     }
     frames[f.name] = rec;
   }
@@ -203,6 +224,28 @@ export function checkPages(bake: Pick<BakeResult, "images" | "normals">, archive
   archive.placements.forEach((list, id) => {
     if (list.length === 0 || !list.every((s) => matches(id, s))) bad.push(id);
   });
+  return bad;
+}
+
+/** Draw `parts` from the 1x `pages` onto `dst` source-over. */
+function drawParts(dst: Image, pages: readonly Image[], parts: readonly Placed[]): void {
+  for (const p of parts) over(dst, crop(pages[p.rect.page], p.rect.x, p.rect.y, p.rect.w, p.rect.h), p.dx, p.dy);
+}
+
+/** Names of the frames whose depth layers, read back out of the packed pages
+ *  through the manifest the way a frontend reads them, do not give back the
+ *  frame's own pixels; empty when every layered frame does. */
+export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): string[] {
+  const bad: string[] = [];
+  for (const [name, rec] of Object.entries(archive.manifest.frames)) {
+    if (!rec.layers) continue;
+    const flat = blank(rec.w, rec.h);
+    drawParts(flat, archive.pages, rec.parts);
+    const split = blank(rec.w, rec.h);
+    drawParts(split, archive.pages, rec.layers.shell);
+    drawParts(split, archive.pages, rec.layers.furniture);
+    if (!sameImage(flat, split)) bad.push(name);
+  }
   return bad;
 }
 

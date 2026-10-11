@@ -1,5 +1,6 @@
 import { PAL, personSeated, shade } from "./common";
 import type { FastFoodLook, RestaurantLook } from "./food.looks";
+import { layerBreak, layerEnd } from "./layers";
 
 /**
  * Faithful pixel-art interiors for the food and entertainment rooms, ported
@@ -28,16 +29,18 @@ import type { FastFoodLook, RestaurantLook } from "./food.looks";
 // ---- The `F` -> `fillRect` mapping and the ported build-script helpers -----
 
 /** A rectangle fill bound to a room's screen origin: build-local `(bx, by)`
- *  plus the origin, rounded, min 1px, with a transient alpha for the rect. */
-type Fill = (bx: number, by: number, bw: number, bh: number, c: string, o?: number) => void;
+ *  plus the origin, rounded, min 1px, with a transient alpha for the rect.
+ *  `ctx` is the target, for the depth-layer marks (`layers.ts`). */
+type Fill = ((bx: number, by: number, bw: number, bh: number, c: string, o?: number) => void) & { ctx: CanvasRenderingContext2D };
 
 function mkFill(ctx: CanvasRenderingContext2D, ox: number, oy: number): Fill {
-  return (bx, by, bw, bh, c, o = 1) => {
+  const fill = (bx: number, by: number, bw: number, bh: number, c: string, o = 1): void => {
     ctx.fillStyle = c;
     if (o !== 1) ctx.globalAlpha = o;
     ctx.fillRect(Math.round(ox + bx), Math.round(oy + by), Math.max(1, Math.round(bw)), Math.max(1, Math.round(bh)));
     if (o !== 1) ctx.globalAlpha = 1;
   };
+  return Object.assign(fill, { ctx });
 }
 
 /** A soft four-step warm glow around a fixture bulb. */
@@ -206,6 +209,7 @@ function burger(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, s
   f(7, 12, 10, 3, "#E0452C"); f(7, 15, 10, 1, "#E8C14A");
   f(19, 12, 12, 1, "#F8E2B4"); f(19, 15, 10, 1, "#DCE8C0"); f(19, 18, 8, 1, "#F4C0C0");
   glow(f, 20, 16, "#F8E2B4");
+  layerBreak(f.ctx); // the shell ends; the counter, tables and people follow
   // Service counter with grill, soda machine, and the cook (seated occupant).
   const cw = Math.round(w * 0.3);
   box(f, 4, fy - 10, cw, 10, "#C87A2E"); f(4, fy - 10, cw, 1, "#E09A4E"); f(cw - 6, fy - 13, 4, 3, "#2A2E38");
@@ -232,6 +236,7 @@ function soba(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, sea
   // Back shelf with stacked bowls.
   f(6, 15, w * 0.5, 2, "#8A6E48");
   for (let bx = 10; bx < w * 0.5; bx += 8) f(bx, 13, 4, 2, "#F4F0E4");
+  layerBreak(f.ctx); // the shell ends; the pot, counter, stools and people follow
   // Broth pot with steam, and the chef behind it (seated occupant).
   const px = Math.round(w * 0.6);
   f(px, 13, 10, 6, "#8A8A92"); f(px + 2, 10, 2, 3, "#F4F0E4", 0.6); f(px + 6, 9, 2, 4, "#F4F0E4", 0.5);
@@ -256,6 +261,7 @@ function teahouse(f: Fill, w: number, h: number, fy: number, look: FastFoodLook,
   box(f, 24, 9, 34, 12, "#204030");
   for (let r = 0; r < 3; r++) f(27, 11 + r * 3, 20, 1, ["#F4F0E4", "#E8C14A", "#DCE8C0"][r]);
   f(50, 11, 5, 7, "#C8A0D0"); f(51, 10, 3, 1, "#3A2A24"); glow(f, 52, 14, "#E8C0E8");
+  layerBreak(f.ctx); // the shell ends; the counter, stools, plant and people follow
   // Tea and boba counter: stainless tea urn and colored boba dispensers.
   const cw = Math.round(w * 0.36);
   box(f, 4, fy - 11, cw, 11, "#8A6E48"); f(4, fy - 11, cw, 1, "#A8845C");
@@ -281,6 +287,7 @@ function parlor(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, s
   // A wall clock and a scalloped valance.
   f(Math.round(w * 0.5) - 2, 9, 4, 4, "#F4E4B0"); f(Math.round(w * 0.5) - 1, 13, 2, 3, "#E8A050"); glow(f, Math.round(w * 0.5), 11, "#FFF0C0");
   for (let vx = 0; vx < w; vx += 6) f(vx, 7, 3, 3, vx % 12 ? "#E07AA6" : "#FFFFFF");
+  layerBreak(f.ctx); // the shell ends; the freezer, counter, booth and people follow
   // Chrome display freezer with colored tubs and a cone rack.
   box(f, 5, fy - 13, 30, 13, "#F6F4F6"); f(5, fy - 13, 30, 3, "#BCD8E8");
   for (let k = 0; k < 5; k++) f(8 + k * 5, fy - 11, 4, 4, ["#E88AB0", "#F4E4B0", "#8C5A3A", "#A0D8C0", "#F0A0A0"][k]);
@@ -302,6 +309,7 @@ function cafe(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, sea
   for (let r = 0; r < 3; r++) f(Math.round(w * 0.4) + 3, 12 + r * 3, 18, 1, ["#DCE8C0", "#F4F0E4", "#E8C0A0"][r]);
   f(Math.round(w * 0.72), 8, 1, 3, "#3A2E28"); box(f, Math.round(w * 0.72) - 6, 11, 13, 5, "#5A4632"); f(Math.round(w * 0.72) - 4, 12, 9, 3, "#E8DCC8");
   pendant(f, Math.round(w * 0.24), look.band);
+  layerBreak(f.ctx); // the shell ends; the bar, bench, armchair and people follow
   // Espresso bar with machine, grinder, and a pastry case.
   const cw = Math.round(w * 0.34);
   box(f, 4, fy - 9, cw, 9, "#5A4632"); f(4, fy - 9, cw, 1, "#7A6248");
@@ -361,6 +369,7 @@ function french(f: Fill, w: number, fy: number, railY: number, lamp: string, sea
   artF(f, 16, 7, 16, 11, "#3E5A6E"); artF(f, w - 32, 7, 16, 11, "#6E4A3A");
   box(f, Math.round(w * 0.37), 6, 20, 13, "#C9A24B"); f(Math.round(w * 0.37) + 2, 8, 16, 9, "#8FB6C8", 0.7);
   sconce(f, 46, 13, lamp); sconce(f, w - 48, 13, lamp);
+  layerBreak(f.ctx); // the shell ends; the wine rack, tables and diners follow
   // Wine rack.
   box(f, 6, railY + 1, 12, fy - railY - 1, "#3A2418");
   for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) f(8 + k * 3, railY + 3 + r * 4, 2, 3, ["#7A2A2A", "#3A5A3A", "#6A4A2A"][(k + r) % 3]);
@@ -376,6 +385,11 @@ function french(f: Fill, w: number, fy: number, railY: number, lamp: string, sea
 
 function pub(f: Fill, w: number, fy: number, railY: number, lit: boolean, seat: Seat): void {
   const barW = Math.round(w * 0.3);
+  // Hanging pub lamps and a framed print. They sit clear of the bar and the
+  // tables, so drawing them first changes no pixel and keeps them on the shell.
+  [Math.round(w * 0.5), Math.round(w * 0.78)].forEach((fx) => { f(fx - 1, 6, 2, 3, "#2A1E14"); f(fx - 2, 9, 4, 3, lit ? "#F8E2B4" : "#8A7A5C"); glow(f, fx, 10, lit ? "#FFE69A" : "#8A7A5C"); });
+  artF(f, Math.round(w * 0.62), 8, 14, 9, "#2A4A2A");
+  layerBreak(f.ctx); // the shell ends; the bars, tables and regulars follow
   // Back bar with a lit bottle wall.
   box(f, 5, 6, barW, railY - 6, "#2A1C10");
   for (let r = 0; r < 3; r++) for (let bx = 8, c = 0; bx < barW; bx += 4, c++) f(bx, 8 + r * 5, 2, 4, ["#4A7A4A", "#B08A3E", "#8C3A32", "#3A5A7A"][(c + r) % 4]);
@@ -383,10 +397,6 @@ function pub(f: Fill, w: number, fy: number, railY: number, lit: boolean, seat: 
   [9, 14, 19].forEach((fx) => f(fx, fy - 12, 1, 3, "#D8B05A")); // brass taps
   // Seated regulars on bar stools.
   for (let sx = barW + 8; sx < barW + 40; sx += 10) { f(sx, fy - 4, 2, 4, "#3A2A1A"); seat(sx - 2, fy); }
-  // Hanging pub lamps.
-  [Math.round(w * 0.5), Math.round(w * 0.78)].forEach((fx) => { f(fx - 1, 6, 2, 3, "#2A1E14"); f(fx - 2, 9, 4, 3, lit ? "#F8E2B4" : "#8A7A5C"); glow(f, fx, 10, lit ? "#FFE69A" : "#8A7A5C"); });
-  // A framed print.
-  artF(f, Math.round(w * 0.62), 8, 14, 9, "#2A4A2A");
   // Wood tables with pints and seated couples.
   for (let tx = barW + 44; tx + 14 < w - 6; tx += 32) {
     f(tx - 3, fy - 10, 3, 10, "#3A2A1A"); f(tx + 13, fy - 10, 3, 10, "#3A2A1A");
@@ -407,6 +417,7 @@ function banquet(f: Fill, w: number, fy: number, railY: number, lit: boolean, se
   // A carved screen.
   box(f, Math.round(w * 0.44), 7, 26, 12, "#7A2A2A");
   for (let k = 0; k < 6; k++) f(Math.round(w * 0.44) + 3 + k * 4, 9, 2, 8, "#E8C14A");
+  layerBreak(f.ctx); // the shell ends; the tables and diners follow
   // Round banquet tables with a gold lazy-Susan and parties of seated diners.
   for (let tx = 16; tx + 24 < w - 6; tx += 46) {
     f(tx + 10, fy - 1, 3, 1, "#000000", 0.2);
@@ -420,6 +431,7 @@ function sushi(f: Fill, w: number, fy: number, seat: Seat): void {
   // A bottle shelf.
   f(6, 7, w - 12, 3, "#6A4A30");
   for (let k = 0; k < 7; k++) f(10 + k * ((w - 24) / 7), 8, 3, 2, ["#3A5A3A", "#7A2A2A", "#B08A3E"][k % 3]);
+  layerBreak(f.ctx); // the shell ends; the counter, chef and diners follow
   // The long light-wood counter with a glass case and colored nigiri plates.
   box(f, 6, fy - 11, w - 14, 5, "#E8DCC8"); f(6, fy - 13, w - 14, 2, "#BCD8E8");
   for (let px = 12, i = 0; px + 3 < w - 12; px += 12, i++) { f(px, fy - 12, 4, 1, i % 2 ? "#F4F0E4" : "#E88AB0"); f(px, fy - 15, 3, 2, ["#E88AB0", "#3A5A7A", "#C0392B"][i % 3]); }
@@ -436,6 +448,7 @@ function steak(f: Fill, w: number, fy: number, railY: number, lit: boolean, lamp
   box(f, 6, 8, 22, railY - 6, "#1E1614");
   f(8, 15, 18, 3, lit ? "#E8862A" : "#8a4a20"); f(8, 13, 18, 2, "#3A2A1A"); glow(f, 17, 16, lit ? "#E8862A" : "#8a4a20"); f(6, 7, 22, 2, "#2A2018");
   artF(f, Math.round(w * 0.5), 7, 18, 10, "#3A241A");
+  layerBreak(f.ctx); // the shell ends; the booths and diners follow
   // High-back leather booths with candlelit tables and seated diners.
   for (let tx = 36; tx + 20 < w - 6; tx += 34) {
     f(tx - 1, fy - 13, 4, 13, "#4A2E22"); f(tx - 1, fy - 13, 4, 1, "#5E3E2E");
@@ -484,6 +497,7 @@ export function drawCinema(ctx: CanvasRenderingContext2D, x: number, y: number, 
   // Balcony rail.
   f(0, 46, w, 2, "#3A1A2E"); f(0, 46, w, 1, "#5A2A3E");
   for (let px = 6; px < w; px += 10) f(px, 44, 1, 4, "#4A2038");
+  layerBreak(ctx); // the shell ends; the seats and the audience follow
   // Occupancy-driven audience: collect every seat-head slot while drawing the
   // seat boxes, then fill exactly the first min(n, seats) heads in seed order,
   // rotated by geoAud (axis 4) so two cinemas never share a crowd; n === 0 is
@@ -493,6 +507,9 @@ export function drawCinema(ctx: CanvasRenderingContext2D, x: number, y: number, 
   for (let r = 0; r < 3; r++) { const ry = fy - 4 - r * 6; for (let sxn = 5; sxn < w - 4; sxn += 7) { f(sxn, ry, 5, 5, "#22101F"); f(sxn, ry, 5, 1, "#341830"); heads.push([sxn + 1, ry - 3]); } } // raked rows
   const seats = heads.length, filledHeads = Math.min(Math.max(0, n), seats);
   for (let j = 0; j < seats; j++) if ((j + geoAud) % seats < filledHeads) { const [hx, hy] = heads[j]; f(hx, hy, 3, 3, "#3A2E28"); f(hx, hy, 3, 1, "#5A4438"); }
+  // The furniture ends here: the aisle lights and EXIT signs belong to the
+  // shell, and they draw over the seats, so they land on both pictures.
+  layerEnd(ctx);
   // Aisle lights.
   for (let px = 10; px < w; px += 30) f(px, fy - 1, 2, 1, "#E8C14A");
   // Green EXIT signs on BOTH floors (canon), static.

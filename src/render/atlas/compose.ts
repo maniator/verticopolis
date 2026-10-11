@@ -13,15 +13,8 @@ function place(dst: Image, bake: Pick<BakeResult, "images">, ref: ImageRef | nul
   if (ref) over(dst, bake.images[ref.id], ref.dx, ref.dy);
 }
 
-/** Compose `rec` with chain inputs `chains` and overlays `overlays`. */
-export function composeFrame(
-  bake: Pick<BakeResult, "images">,
-  rec: BakedFrame,
-  chains: Record<string, number> = {},
-  overlays: readonly string[] = [],
-): Image {
-  const out = blank(rec.w, rec.h);
-  place(out, bake, rec.image);
+/** Draw `rec`'s chain steps up to `chains` and its named `overlays` onto `out`. */
+function drawRuntime(out: Image, bake: Pick<BakeResult, "images">, rec: BakedFrame, chains: Record<string, number>, overlays: readonly string[]): void {
   for (const [key, n] of Object.entries(chains)) {
     const chain = rec.chains?.[key];
     if (!chain) throw new Error(`${rec.name} has no chain ${key}`);
@@ -31,6 +24,35 @@ export function composeFrame(
     if (!rec.overlays || !(o in rec.overlays)) throw new Error(`${rec.name} has no overlay ${o}`);
     place(out, bake, rec.overlays[o]);
   }
+}
+
+/** Compose `rec` with chain inputs `chains` and overlays `overlays`. */
+export function composeFrame(
+  bake: Pick<BakeResult, "images">,
+  rec: BakedFrame,
+  chains: Record<string, number> = {},
+  overlays: readonly string[] = [],
+): Image {
+  const out = blank(rec.w, rec.h);
+  place(out, bake, rec.image);
+  drawRuntime(out, bake, rec, chains, overlays);
+  return out;
+}
+
+/** Compose `rec` the way a frontend drawing with depth does: the shell, then
+ *  the furniture, then the chain steps and overlays, each source-over. Throws
+ *  for a frame without depth layers. */
+export function composeLayered(
+  bake: Pick<BakeResult, "images">,
+  rec: BakedFrame,
+  chains: Record<string, number> = {},
+  overlays: readonly string[] = [],
+): Image {
+  if (!rec.layers) throw new Error(`${rec.name} has no depth layers`);
+  const out = blank(rec.w, rec.h);
+  place(out, bake, rec.layers.shell);
+  place(out, bake, rec.layers.furniture);
+  drawRuntime(out, bake, rec, chains, overlays);
   return out;
 }
 

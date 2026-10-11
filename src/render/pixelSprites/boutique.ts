@@ -1,6 +1,7 @@
 import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
 import { castShadow, hash, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
+import { layerBreak } from "./layers";
 
 /**
  * Modern Boutique Bay art: a bay of small independent trades (florist, barber,
@@ -223,6 +224,7 @@ export function boutiqueBay(d: RoomCtx, u: Unit, x: number, y: number, w: number
   const look = (u.subtype !== undefined && BOUTIQUE_LOOKS[u.subtype]) || BOUTIQUE_DEFAULT;
   const floorY = shell(ctx, x, y, w, h, look.wall, look.floor);
   const top = fascia(ctx, x, y, w, look.accent, d.lit);
+  layerBreak(ctx); // the shell ends; the trade's fittings and customers follow
   const occ = visibleOccupants(u);
   const seed = figureSeed(u);
   switch (look.trade) {

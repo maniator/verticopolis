@@ -2,6 +2,7 @@ import type { Unit } from "../../engine/types";
 import { visibleOccupants } from "../../engine/Crowd";
 import { PAL, SKIN, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, shade, vacancy, windowView, type RoomCtx } from "./common";
 import { bevelBox, ceilingCap, curtain, downlights, fill, framedArt, glow, interiorWall, plankFloor } from "./dollhouse";
+import { layerBreak, layerEnd } from "./layers";
 import { CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, SUITE_WALLS } from "./residential.looks";
 
 /**
@@ -93,6 +94,7 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
       const spines = ["#8C3A32", "#3E5A8C", "#B08A3E", "#4A7A4A", "#7A5A9E"];
       for (let k = 0; k < 5; k++) fill(ctx, bsX + 2 + k * 3, y + 8, 2, 5, spines[k]);
     }
+    layerBreak(ctx); // the shell ends; furniture and staff follow
     if (layout === 3) {
       // Meeting room: one long table with a laptop and papers, high-back chairs
       // both sides, seated staff up to the chair count, a corner plant.
@@ -202,6 +204,7 @@ export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
     windowView(ctx, winX, winTop, winW, winH, d.lit, geoVariant(u, 5, 997));
     curtain(ctx, winX - 1, winTop, winH, "#9A6E7A");
     curtain(ctx, winX + winW + 2, winTop, winH, "#9A6E7A");
+    layerBreak(ctx); // the shell ends; furniture and residents follow
     if (layout === 3) {
       // Dining: kitchenette on the wall, a set table with a candle, two seated
       // diners when home, a sideboard, the standing lamp.
@@ -437,6 +440,7 @@ export function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
     const winX = x + (w > 80 ? w - 20 : w - 13);
     windowView(ctx, winX, winTop, winW, winH, asleep || d.lit, winSeed);
     curtain(ctx, winX - 2, winTop, winH, asleep ? "#2E2A44" : "#B08A6A");
+    layerBreak(ctx); // the shell ends; the beds and the suite's sitting area follow
     if (grade === 3) {
       bevelBox(ctx, x + 5, floorY - 8, suiteSofaW, 8, "#7C5A6A"); // sitting sofa
       fill(ctx, x + 5, floorY - 11, suiteSofaW, 3, "#8C6A7A");
@@ -474,6 +478,9 @@ export function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
   // out. A DIRTY room gets a single amber warning roach. All draw here, outside
   // the mirror wrapper, so a flipped room reads identically; flips off the unit
   // id give scatter variety without per-frame motion (rooms are cached sprites).
+  // The furniture ends here: the grime wash, the roaches and the "z" draw
+  // over the whole room, so the atlas's depth layers carry them on both pictures.
+  layerEnd(ctx);
   if (infested) {
     const fv = (n: number): number => (geoVariant(u, 30 + n, 2) === 1 ? 1 : -1);
     fill(ctx, x, y, w, h, "#5A6828", 0.2); // grime wash

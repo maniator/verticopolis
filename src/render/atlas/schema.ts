@@ -85,6 +85,13 @@ export interface FrameRecord {
   chains?: Record<string, LayerChain>;
   /** Named single overlays (the dead-parking mark, a parked car color). */
   overlays?: Record<string, LayerRef>;
+  /** A room split for depth: draw the `shell` parts, then the `furniture`
+   *  parts over them source-over, and the result equals the frame's own
+   *  `parts`. Chains and overlays then draw on top as usual. Either list is
+   *  empty when that picture is fully transparent. Absent when the room's art
+   *  marks no split (vacancy, closed and gutted rooms, and the kinds listed in
+   *  docs/atlas.md); a frontend then draws the frame flat. */
+  layers?: { shell: Placed[]; furniture: Placed[] };
 }
 
 export interface AnimationRecord {

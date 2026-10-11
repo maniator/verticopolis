@@ -7,7 +7,9 @@ import { bundleBake } from "../scripts/atlas-bundle.ts";
  * atlas frame plus its runtime layers the way a frontend reads the manifest
  * (`src/render/atlas/lookup.ts`), paints the same room through the game's own
  * paint functions, and requires the two to match pixel for pixel
- * (`src/render/atlas/verify.ts`, samples in `samples.ts`). Settled rooms are
+ * (`src/render/atlas/verify.ts`, samples in `samples.ts`). A room with depth
+ * layers is also composed through its shell and furniture and held to the same
+ * paint. Settled rooms are
  * painted at two region offsets; burning, unbuilt and origin-seeded rooms at
  * the per-unit origin. The non-room families are checked the same way
  * (`verifyExtras.ts`), and a control case must report a mismatch. The export
@@ -20,7 +22,7 @@ test.describe("sprite atlas matches the web bake", () => {
     test.setTimeout(180_000);
     await page.setContent("<!doctype html><html><body></body></html>");
     await page.addScriptTag({ content: await bundleBake() });
-    const results: { mismatches: number; control?: boolean }[] = await page.evaluate(() => (globalThis as any).__vcAtlas.verify());
+    const results: { label: string; mismatches: number; control?: boolean }[] = await page.evaluate(() => (globalThis as any).__vcAtlas.verify());
     // A control compares two different pictures and must report a mismatch.
     const controls = results.filter((r) => r.control);
     expect(controls.length).toBeGreaterThan(0);
@@ -28,5 +30,7 @@ test.describe("sprite atlas matches the web bake", () => {
     const bad = results.filter((r) => !r.control && r.mismatches > 0);
     expect(bad, JSON.stringify(bad, null, 1)).toEqual([]);
     expect(results.length).toBeGreaterThan(50);
+    // The depth-layer path ran for the sampled rooms that split.
+    expect(results.filter((r) => r.label.endsWith("(depth layers)")).length).toBeGreaterThan(40);
   });
 });

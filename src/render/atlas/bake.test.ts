@@ -1,12 +1,12 @@
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { buildArchive, checkPages, signature, ARCHIVE_ROOT } from "./archive";
+import { buildArchive, checkLayers, checkPages, signature, ARCHIVE_ROOT } from "./archive";
 import { bake, ImageStore, type Renderer } from "./bake";
 import type { Job } from "./catalog";
 import type { PaintSpec } from "./paint";
 import { blank, sameImage, type Image } from "./pixels";
 import { blit } from "./raster";
-import { compareImages, composeFrame, composeLookup } from "./compose";
+import { compareImages, composeFrame, composeLayered, composeLookup } from "./compose";
 import type { Placed } from "./schema";
 import { ATLAS_SCALES, ATLAS_SCHEMA_VERSION } from "./schema";
 
@@ -163,5 +163,104 @@ describe("bake", () => {
     const wide: Job = { type: "still", name: "w", w: 60, h: 1, anchor: { x: 0, y: 0 }, keys: {}, paint: car(0), overlays: { o: car(60) } };
     const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
     expect(() => buildArchive(bake([wide], fake), info, undefined, 32)).toThrow(/layers must fit one page/);
+  });
+});
+
+/** A fake room for the depth split: spec `room:<shell>:<furniture>[:haze]`
+ *  paints a w x h block in the shell color, then its last pixel in the
+ *  furniture color (translucent with `haze`); its shell pass is the block. */
+const room = (shell: number, furniture: number, haze = false): PaintSpec => ({ p: "solid", css: `room:${shell}:${furniture}${haze ? ":haze" : ""}` });
+function roomPixels(spec: PaintSpec, w: number, h: number, withFurniture: boolean): Image | null {
+  if (spec.p !== "solid" || !spec.css.startsWith("room:")) return null;
+  const [, a, b, haze] = spec.css.split(":");
+  const img = blank(w, h);
+  for (let i = 0; i < w * h; i++) img.data.set([Number(a), 0, 0, 255], i * 4);
+  if (withFurniture) img.data.set([Number(b), 0, 0, haze ? 40 : 255], (w * h - 1) * 4);
+  return img;
+}
+const layeredFake: Renderer = {
+  render: (spec, w, h) => roomPixels(spec, w, h, true) ?? fake.render(spec, w, h),
+  renderShell: (spec, w, h) => roomPixels(spec, w, h, false),
+};
+const flatFake: Renderer = { render: layeredFake.render };
+
+describe("depth layers", () => {
+  const still = (name: string, paint: PaintSpec, layers = true): Job => ({ type: "still", name, w: 4, h: 2, anchor: { x: 0, y: 0 }, keys: {}, paint, layers });
+  const jobs: Job[] = [
+    still("r1", room(5, 6)),
+    still("plain", solid("3")),
+    still("r2", room(5, 6)),
+    still("same", room(9, 9)),
+    still("unasked", room(7, 8), false),
+    {
+      type: "still",
+      name: "cab",
+      w: 4,
+      h: 1,
+      anchor: { x: 0, y: 0 },
+      keys: {},
+      paint: car(0),
+      chains: { riders: { input: "riders", steps: [car(0), car(1), car(2)] } },
+      layers: true,
+    },
+  ];
+  const layered = bake(jobs, layeredFake);
+  const flat = bake(jobs, flatFake);
+  const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+  const byName = (r: typeof layered, n: string) => r.frames.find((f) => f.name === n)!;
+
+  it("splits only frames that ask for it and whose paint marks a break", () => {
+    expect(layered.frames.filter((f) => f.layers).map((f) => f.name)).toEqual(["r1", "r2", "same"]);
+    expect(flat.frames.some((f) => f.layers)).toBe(false);
+  });
+  it("gives back every layered frame from its shell plus its furniture", () => {
+    for (const f of layered.frames.filter((fr) => fr.layers)) expect(sameImage(composeLayered(layered, f), composeFrame(layered, f)), f.name).toBe(true);
+    expect(() => composeLayered(layered, byName(layered, "plain"))).toThrow(/no depth layers/);
+  });
+  it("stores every frame image exactly as a bake without layers does", () => {
+    expect(layered.frameImages).toBe(flat.images.length);
+    flat.images.forEach((img, i) => expect(sameImage(layered.images[i], img) && sameImage(layered.normals[i], flat.normals[i])).toBe(true));
+    layered.frames.forEach((f, i) => {
+      const { layers: _layers, ...rest } = f;
+      expect(rest).toEqual(flat.frames[i]);
+    });
+  });
+  it("reuses images and keeps its own past the frame images", () => {
+    const r1 = byName(layered, "r1").layers!;
+    expect(byName(layered, "r2").layers).toEqual(r1);
+    expect(r1.shell!.id).toBeGreaterThanOrEqual(layered.frameImages!);
+    expect(r1.furniture).toMatchObject({ dx: 3, dy: 1 });
+    // A room with no furniture: its shell is its own frame image, reused.
+    const same = byName(layered, "same");
+    expect(same.layers).toEqual({ shell: same.image, furniture: null });
+    expect(same.layers!.shell!.id).toBeLessThan(layered.frameImages!);
+  });
+  it("names the frame whose furniture cannot compose", () => {
+    expect(() => bake([still("hazy", room(5, 6, true))], layeredFake)).toThrow(/hazy: diffLayer/);
+  });
+  it("packs the layers on pages after the frames' and leaves every frame page and part as it was", () => {
+    const a = buildArchive(layered, info, undefined, 32);
+    const b = buildArchive(flat, info, undefined, 32);
+    expect(a.pages.length).toBeGreaterThan(b.pages.length);
+    b.pages.forEach((page, i) => expect(sameImage(a.pages[i], page) && sameImage(a.normalPages[i], b.normalPages[i])).toBe(true));
+    for (const [name, rec] of Object.entries(b.manifest.frames)) {
+      const { layers, ...rest } = a.manifest.frames[name];
+      expect(rest).toEqual(rec);
+      for (const p of [...(layers?.shell ?? []), ...(layers?.furniture ?? [])]) {
+        if (p.rect.page < b.pages.length) expect(name).toBe("same"); // reused frame image
+      }
+    }
+    expect(a.manifest.frames.r1.layers!.furniture).toHaveLength(1);
+    expect(a.manifest.frames.same.layers!.furniture).toEqual([]);
+    expect(a.manifest.frames.plain.layers).toBeUndefined();
+    expect(checkPages(layered, a)).toEqual([]);
+    expect(checkLayers(a)).toEqual([]);
+    // A furniture pixel knocked out of place in the pages is caught.
+    const p = a.manifest.frames.r1.layers!.furniture[0].rect;
+    a.pages[p.page].data[(p.y * 32 + p.x) * 4] ^= 1;
+    expect(checkLayers(a)).toEqual(["r1", "r2"]);
+  });
+  it("refuses a frame-image count outside the images", () => {
+    expect(() => buildArchive({ ...layered, frameImages: layered.images.length + 1 }, info, undefined, 32)).toThrow(/frameImages/);
   });
 });

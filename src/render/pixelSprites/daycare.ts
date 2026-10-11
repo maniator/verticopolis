@@ -1,6 +1,7 @@
 import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
 import { hash, personStanding, shade, shell, type RoomCtx } from "./common";
+import { layerBreak } from "./layers";
 
 /**
  * Modern Daycare art: a bright, cheerful playroom with a soft play mat, a toy
@@ -57,6 +58,8 @@ export function daycare(d: RoomCtx, u: Unit, x: number, y: number, w: number, h:
     ctx.fillStyle = shade(MAT[(k + seed) % MAT.length], -8);
     ctx.fillRect(mx, floorY - 2, 5, 2);
   }
+
+  layerBreak(ctx); // the shell ends; the shelf, toys and people follow
 
   // A toy shelf on the right with colorful bins.
   const shX = x + Math.round(w * 0.66);

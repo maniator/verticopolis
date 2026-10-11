@@ -30,6 +30,9 @@ export interface StillJob {
   chains?: Record<string, { input: string; steps: PaintSpec[] }>;
   /** Single overlays: what changes from the frame's paint to this one. */
   overlays?: Record<string, PaintSpec>;
+  /** Try a depth split of the frame's paint (a room): a paint that marks a
+   *  shell break (`pixelSprites/layers.ts`) gets shell and furniture layers. */
+  layers?: boolean;
 }
 
 /** An animation: one frame per paint, `dt` seconds apart. */
@@ -75,6 +78,15 @@ export const OCCUPANT_FREE = new Set<FacilityKind>(["parking", "parkingRamp", "s
  * so the atlas carries the per-unit bake's look (origin 0, 0). Tracked as a backlog defer (sprite-origin-seeds).
  */
 export const ORIGIN_SEEDED: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["security", "medical", "housekeeping", "skyBar", "fitnessClub"]);
+
+/**
+ * Kinds whose art marks no depth split, so their frames carry no `layers`: the
+ * garage space and ramp (bare structure with no furniture of their own; the
+ * parked cars are overlays) and the recycling center (its deck curb draws after
+ * its machinery and its worker after the pile, so a split needs the draw order
+ * reworked). Tracked as a backlog row (atlas-depth-layers-flat-kinds).
+ */
+export const DEPTH_FLAT_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["parking", "parkingRamp", "recycling"]);
 
 /** Kinds whose art changes after 23:00 and before 06:00: the condo (its
  *  asleep scrim and its residents) and the two rentals, which share the
@@ -188,10 +200,14 @@ export function roomJobs(): Job[] {
   return jobs;
 }
 
-/** The still frames for one static signature: the presence split and the
- *  composed layers each kind carries. */
+/** The still frames for one static signature, each tried for a depth split
+ *  (the paint decides whether it has one). */
 function roomStills(kind: FacilityKind, stem: string, w: number, h: number, base: UnitPaint, keys: Keys): StillJob[] {
-  const anchor = { x: 0, y: 0 };
+  return roomStillJobs(kind, stem, w, h, base, keys, { x: 0, y: 0 }).map((j) => ({ ...j, layers: true }));
+}
+
+/** The presence split and the composed layers each kind carries. */
+function roomStillJobs(kind: FacilityKind, stem: string, w: number, h: number, base: UnitPaint, keys: Keys, anchor: { x: number; y: number }): StillJob[] {
   if (kind === "parking") {
     const overlays: Record<string, PaintSpec> = { dead: { ...base, dead: true } };
     for (let c = 0; c < PARKING_CAR_COLORS; c++) overlays[`car${c}`] = { ...base, id: c, parkingUse: 1 };

@@ -13,6 +13,13 @@ import { maskTo, normalMap } from "./raster";
 
 export interface Renderer {
   render(spec: PaintSpec, w: number, h: number): Image;
+  /**
+   * The room's shell picture for a depth-layered frame: the canvas as it stood
+   * at the paint's `layerBreak`, with whatever the paint draws after its
+   * `layerEnd` drawn over it (`pixelSprites/layers.ts`). Null when the paint
+   * marks no break. A renderer without it bakes no depth layers.
+   */
+  renderShell?(spec: PaintSpec, w: number, h: number): Image | null;
 }
 
 /** An image placed inside a frame: the unique image's id and its offset. */
@@ -31,6 +38,10 @@ export interface BakedFrame {
   image: ImageRef | null;
   chains?: Record<string, { input: string; steps: (ImageRef | null)[] }>;
   overlays?: Record<string, ImageRef | null>;
+  /** The frame split for depth: the shell, then the furniture drawn over it
+   *  source-over, give back the frame's image exactly. Null pieces are fully
+   *  transparent. Absent when the paint marks no break. */
+  layers?: { shell: ImageRef | null; furniture: ImageRef | null };
 }
 
 export interface BakedAnimation {
@@ -45,6 +56,11 @@ export interface BakeResult {
   /** Unique color images; `normals[i]` is image `i`'s normal map. */
   images: Image[];
   normals: Image[];
+  /** Images `0..frameImages - 1` are the ones frames, chains and overlays use,
+   *  in the order a bake without depth layers stores them; the depth layers'
+   *  own images come after. The archive packs the two groups apart, so the
+   *  layers never move a frame image (absent: every image is a frame image). */
+  frameImages?: number;
   frames: BakedFrame[];
   animations: BakedAnimation[];
 }
@@ -56,6 +72,14 @@ export class ImageStore {
   readonly images: Image[] = [];
   readonly normals: Image[] = [];
   private readonly byHash = new Map<string, number[]>();
+
+  /** The id of a stored pair equal to this one, or -1. */
+  find(img: Image, normal: Image): number {
+    for (const id of this.byHash.get(`${contentHash(img)}|${contentHash(normal)}`) ?? []) {
+      if (sameImage(this.images[id], img) && sameImage(this.normals[id], normal)) return id;
+    }
+    return -1;
+  }
 
   add(img: Image, normal: Image): number {
     const key = `${contentHash(img)}|${contentHash(normal)}`;
@@ -86,6 +110,41 @@ export class ImageStore {
   }
 }
 
+/** A depth-layer image: a frame image's id, or (`own`) an id in the layer
+ *  store, which the bake moves past the frame images once it is done. */
+interface PendingRef extends ImageRef {
+  own: boolean;
+}
+
+/** The depth layers' images, kept apart from the frame images so a bake with
+ *  layers stores every frame image under the same id, in the same order, as a
+ *  bake without them. A layer equal to a frame image reuses that image. */
+class LayerStore {
+  readonly own = new ImageStore();
+  constructor(private readonly frames: ImageStore) {}
+
+  private put(img: Image, normal: Image, dx: number, dy: number): PendingRef {
+    const hit = this.frames.find(img, normal);
+    return hit >= 0 ? { id: hit, dx, dy, own: false } : { id: this.own.add(img, normal), dx, dy, own: true };
+  }
+
+  /** A whole shell picture, trimmed; its normals are its own (the shell is a
+   *  picture of its own, drawn without the furniture). */
+  shell(img: Image): PendingRef | null {
+    const t = trim(img);
+    if (!t) return null;
+    return this.put({ w: t.w, h: t.h, data: t.data }, crop(normalMap(img), t.x, t.y, t.w, t.h), t.x, t.y);
+  }
+
+  /** The furniture cut from the whole frame `next`; its normals come from
+   *  that frame, masked to its own pixels, like any other layer. */
+  furniture(piece: Piece | null, next: Image): PendingRef | null {
+    if (!piece) return null;
+    const normal = maskTo(crop(normalMap(next), piece.x, piece.y, piece.w, piece.h), piece);
+    return this.put({ w: piece.w, h: piece.h, data: piece.data }, normal, piece.x, piece.y);
+  }
+}
+
 /** Drop trailing empty steps so `max` is the last step that changes pixels.
  *  The catalog sizes each chain to the largest count the engine produces, so
  *  steps past `max` look the same as `max`. */
@@ -97,6 +156,8 @@ function trimSteps(steps: (ImageRef | null)[]): (ImageRef | null)[] {
 
 export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: number, total: number) => void): BakeResult {
   const store = new ImageStore();
+  const layerStore = new LayerStore(store);
+  const pending: PendingRef[] = [];
   const frames: BakedFrame[] = [];
   const animations: BakedAnimation[] = [];
   const names = new Set<string>();
@@ -135,6 +196,15 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
         const next = r.render(spec, job.w, job.h);
         (frame.overlays ??= {})[key] = store.layer(diffLayer(base, next), next);
       }
+      // The depth split: the furniture is what differs from the shell, so the
+      // shell plus the furniture gives back `base` exactly (diffLayer refuses
+      // any pixel source-over could not reproduce).
+      const shell = job.layers && r.renderShell ? r.renderShell(job.paint, job.w, job.h) : null;
+      if (shell) {
+        const layers = { shell: layerStore.shell(shell), furniture: layerStore.furniture(diffLayer(shell, base), base) };
+        for (const ref of [layers.shell, layers.furniture]) if (ref) pending.push(ref);
+        frame.layers = layers;
+      }
     } catch (e) {
       if (e instanceof LayerError) throw new LayerError(`${job.name}: ${e.message}`);
       throw e;
@@ -142,5 +212,18 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
     frames.push(frame);
   });
   onProgress?.(jobs.length, jobs.length);
-  return { images: store.images, normals: store.normals, frames, animations };
+  // Move the layer store's own images past the frame images, then drop the
+  // bookkeeping flag so the records hold plain image refs.
+  const frameImages = store.images.length;
+  for (const ref of pending) {
+    if (ref.own) ref.id += frameImages;
+    delete (ref as Partial<PendingRef>).own;
+  }
+  return {
+    images: [...store.images, ...layerStore.own.images],
+    normals: [...store.normals, ...layerStore.own.normals],
+    frameImages,
+    frames,
+    animations,
+  };
 }

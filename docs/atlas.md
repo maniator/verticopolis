@@ -114,7 +114,9 @@ bumps it. New frames or optional fields do not.
   its `anchor`, structured `keys` (the same values the name spells), and
   `parts`: the packed pieces with their offset inside the frame (transparent
   borders are trimmed; a frame wider than a page, like the metro, is cut into
-  column slices). `parts` is empty for a fully transparent frame.
+  column slices). `parts` is empty for a fully transparent frame. A room frame
+  can also carry `layers`, the same room split for depth (see
+  [Depth layers](#depth-layers)).
 - `chains`: composed layers indexed by an engine number. To show input `n`, draw
   the frame, then steps `1..min(n, max)` in order with ordinary source-over
   blending; a `null` step draws nothing.
@@ -206,6 +208,70 @@ the atlas bakes phase 0.
 The crane's motion never repeats in the game. Its animation is a sampled
 stretch (`loop: false`); play it forward and back, or hold, as suits you.
 
+## Depth layers
+
+A frontend that draws rooms with depth can use a room's shell and its furniture
+separately: for example, a 2.5D cutaway that sets the furniture a little in
+front of the back wall. A room frame that supports this carries an optional
+`layers` field next to its `parts`:
+
+```json
+"layers": { "shell": [ { "rect": {...}, "dx": 0, "dy": 0 } ], "furniture": [ ... ] }
+```
+
+- `shell` is the room with its furniture and seated people taken out: the
+  ceiling, back wall, windows, wall art and floor band, plus any mark the game
+  paints over the whole room (the night scrim on an empty room, the notice
+  badge, an infested room's grime and roaches, a cinema's EXIT signs, the pool
+  water, the metro's platform and track).
+- `furniture` holds the pixels that differ between the shell and the flat
+  frame, transparent everywhere else.
+
+Both are lists of placed parts like `parts` (a picture wider than a page, like
+the metro's, is cut into column slices). Draw the shell parts, then the
+furniture parts over them with ordinary source-over blending, and you get the
+frame's own `parts` exactly. Then draw the frame's chains and overlays on top
+as usual: the occupant steps are the people who sit down, so they ride with the
+furniture. Either list can be empty (a fully transparent picture).
+
+What that means for the pictures:
+
+- The furniture layer holds only the pixels that differ. Where a piece of
+  furniture happens to match the wall behind it, or where a whole-room mark
+  covers it, the furniture layer is transparent and the shell shows that pixel.
+- A whole-room mark sits on the shell, so the furniture layer carries the
+  furniture as the flat frame shows it (darkened under the night scrim, tinted
+  under the pool water).
+- The shell's normal map is its own (it is a picture without the furniture).
+  The furniture's normals come from the flat frame, masked to its pixels, like
+  any other layer.
+
+The game marks the split in each room's draw routine
+(`src/render/pixelSprites/layers.ts`): one call where the shell ends, and one
+where the furniture ends and the whole-room marks begin. In the game both calls
+do nothing. The export paints each room frame a second time with the marks
+live and records the canvas at them; the flat frame comes from the ordinary
+paint, so adding layers never changes a frame's pixels.
+
+A frame has no `layers`, and a frontend draws it flat, when:
+
+- the room is vacant and shows its LEASE or SALE card (office, condo, studio,
+  apartment), is closed and shows its shutter, or is gutted;
+- it is a burning or unbuilt room (those are animations);
+- its kind is one whose art does not mark a split yet: the parking space, the
+  parking ramp and the recycling center (backlog row
+  `atlas-depth-layers-flat-kinds`).
+
+Every other room kind splits: office, condo, studio, apartment, the three
+hotel grades, fast food, restaurant, food hall, cinema, shop, amusements,
+boutique bay, fitness club, clinic, nightclub, spa, sky bar, daycare,
+security, medical center, housekeeping, party hall, wedding hall, aquatic
+center and metro station.
+
+The layers' own images are packed on pages after the frame images', so a
+frontend that ignores `layers` reads the same frames, parts and pages as before
+they existed.
+
 ## How it is checked
 
 `e2e/atlas.spec.ts` (and the export's own pre-flight) composes atlas frames and
@@ -219,6 +285,11 @@ game's region paint can differ for them, #915). A control case compares two diff
 pictures and must report a mismatch. The bake refuses to write a layer that
 would not compose back to the game's pixels. A unit test rebuilds every frame
 and layer from the packed pages through the manifest.
+
+A room frame with depth layers is also composed through its shell and
+furniture (then its chains and overlays) and held to the same paint. After
+packing, the export rebuilds every layered frame from the pages through the
+manifest, shell then furniture, and requires its flat frame's pixels.
 
 The same check covers the other families (`verifyExtras.ts`): a whole express
 and standard shaft rebuilt from their floor pieces (skip floor included), cabs

@@ -1,6 +1,7 @@
 import type { FacilityKind, Unit, UnitState } from "../engine/types";
 import { FACILITIES, hasBusinessHours, isOpenAt } from "../engine/facilities";
 import { POPULATED, closedShutter, noticeBadge, type RoomCtx } from "./pixelSprites/common";
+import { layerEnd } from "./pixelSprites/layers";
 import { condo, hotel, office } from "./pixelSprites/residential";
 import { rentalApartment, rentalStudio } from "./pixelSprites/residentialRentalSprites";
 import { cinema, fastFood, foodHall, restaurant } from "./pixelSprites/food";
@@ -131,6 +132,9 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
       ctx.fillStyle = "#3a3f4a";
       ctx.fillRect(x, y, w, h);
   }
+  // The furniture ends here: the night scrim and the notice badge cover the
+  // whole room, so the atlas's depth layers carry them on both pictures.
+  layerEnd(ctx);
   // Lights out at night: an empty home/workplace, or a condo whose residents
   // are asleep in the small hours.
   const lateNight = d.hour >= 23 || d.hour < 6;
