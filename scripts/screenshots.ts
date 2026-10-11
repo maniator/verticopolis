@@ -54,7 +54,7 @@ import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, type OutDir,
 import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
 import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
-import { SHOT_ENGINE, hostOnEngine, seedEngineChoice } from "./screenshot-engine.ts";
+import { SHOT_ENGINE, SETTLE_AFTER_SETUP, HOSTED_FIX, beginSettleStep, checkHosted, checkSettleList, hostedSnapshot, seedEngineChoice, settleUnlessSettled } from "./screenshot-engine.ts";
 import { resolveOnlyFilter } from "../src/tests/screenshotOnlyFilter.ts";
 
 // ---- Runner -----------------------------------------------------------------
@@ -125,8 +125,9 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
   }
   try {
     if (shot.clock !== undefined) {
+      const before = await hostedSnapshot(page);
       await page.evaluate(pgSetClock, shot.clock);
-      await hostOnEngine(page, `after the ${shot.name} clock pin`);
+      await checkHosted(page, `after the ${shot.name} clock pin`, before, HOSTED_FIX.clock);
     }
     // Always drive the overlay dropdown (default "") so a prior shot's overlay
     // never bleeds into the next, so every shot gets a clean map state.
@@ -136,8 +137,15 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     // (screenshot-phase-check.ts, #762 / #843).
     if (shot.phaseWatch) await armPhaseWatch(page, keepDialogs);
     if (shot.setup) {
+      const settles = SETTLE_AFTER_SETUP.has(`${scene.id}/${shot.name}`);
+      const where = `after the ${shot.name} setup`;
+      if (settles) {
+        await beginSettleStep(page, `before the ${shot.name} setup`);
+      }
+      const before = settles ? null : await hostedSnapshot(page);
       await shot.setup(page);
-      await hostOnEngine(page, `after the ${shot.name} setup`);
+      if (settles) await settleUnlessSettled(page, where, false);
+      else await checkHosted(page, where, before, HOSTED_FIX.setup);
     }
     if (shot.phaseWatch) await markPhaseTarget(page);
     if (shot.frame) {
@@ -336,9 +344,10 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
         throw new Error("test-clock adoption failed on the game page");
       }
       if (!scene.keepSplash) await page.evaluate(pgDismissSplash);
+      await beginSettleStep(page, "before the scene build");
       if (scene.build) await page.evaluate(scene.build);
       if (scene.assertUnits) await assertReady(page, scene.assertUnits);
-      await hostOnEngine(page, "after the scene build");
+      await settleUnlessSettled(page, "after the scene build", true);
     }
     for (const shot of scene.shots) {
       try {
@@ -382,6 +391,7 @@ async function main(): Promise<void> {
   // "render all", the ordinary env-var-off convention; the unit tests pin
   // both readings. Partially-unmatched entries warn but still render the
   // matched remainder.
+  checkSettleList(SCENES);
   const { selected, unmatched } = resolveOnlyFilter(
     SCENES.map((sc) => sc.id),
     process.env.ONLY,

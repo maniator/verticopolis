@@ -576,6 +576,10 @@ engine leg).
 
 #### AC3: the gallery and the visual baselines render on the WASM engine
 
+- (Superseded 2026-10-10: the clock pin now moves the engine's clock
+  ("Engine fixes from the gallery's engine leg", harness methods), and both
+  legs load at the same points ("The symmetric settle" at the end of this
+  story). The bullet below records the slice as it landed.)
 - `scripts/screenshot-engine.ts`: `VC_SHOT_ENGINE=wasm` seeds `vc.engine` in
   every scene's page before boot. After a scene's build, after any shot setup
   and after a clock pin, the runner hands the live tower to the engine through
@@ -644,6 +648,10 @@ Departures from the brief, for the owner to accept:
   and `27-elevator-schedule` cannot render on the engine (below). The leg is
   not a required check; its list is the parity report, with those causes to
   rule out first.
+
+(Superseded 2026-10-10: the TypeScript leg now settles at the same points as
+the WASM leg, so its render changes and the differences below are closed;
+see "The symmetric settle" at the end of this story.)
 
 Known harness differences on the engine legs (tracked as
 `engine-gallery-clock-handoff`, #899): a load drops the crowd, so a shot
@@ -819,3 +827,139 @@ engines themselves, so they join the TypeScript side of the parity config
 with `wasmHost.integration.test.ts`. `rentalCrowd`'s known merge-per-tick
 timeout (#868) fails on both heads; run alone, its file takes about 5% longer
 here (116 s against 110 s), the cost of reading the telemetry at each merge.
+
+## The symmetric settle: no engine differences left in the gallery (#899, 2026-10-10)
+
+The 22 shots left after the engine fixes differed for one harness reason. The
+WASM leg reached the engine through a load, and a load normalizes a tower
+(Classic ladder rent snap, silent milestone adoption, an empty crowd,
+boarding tally and housekeeping report), while the TypeScript leg never
+loaded. The fix loads on both legs at the same points.
+
+### What landed
+
+- `scripts/screenshot-engine.ts` `pgSettle` (both legs): deserializes the
+  live instance's own save into a fresh instance and adopts it through the
+  app's load path (`adoptSim`, undo-restore flavor). It carries what a load
+  would drop and the TypeScript leg would keep: the loop's pass memos (read
+  from the engine with the new `loopMemos()` getter when the tower is already
+  hosted, so a second settle no longer re-derives them) and the elevator
+  telemetry. It restores what `adoptSim` resets in the app (speed, pause,
+  the star and win latches, the step accumulator, the meal-rush day, the log
+  cursor and panel, the selection), skips while the title screen is up, and on the WASM leg
+  seeds the memos and telemetry into the new host and verifies them.
+- Settle points: before a builder's ticks (`__vcShotHandoff`, now installed
+  on both legs), once a game scene is ready (after its build if it has one,
+  unless the builder already settled, since a second load would drop the
+  crowd the ticks grew), and after the
+  setups in `SETTLE_AFTER_SETUP` (the engine demo tower, the six milestone
+  shots, and the staged office vacancies in `stats-tenancy-classic`). Before
+  a scene build or such a setup the WASM leg forces a merge, so the build or
+  setup edits the engine's current tower rather than a read model that lags
+  it until the hour. A listed setup must settle (a title screen still up
+  fails it), and a list entry that names no shot with a setup fails the run.
+  When a build or a listed setup already settled through a builder, the
+  runner does not load again; the WASM leg checks instead that what changed
+  since that settle reached the engine.
+- The settle is told which leg it runs on, and after every settle the WASM
+  leg checks that the live sim is the hosted instance, so a leg whose engine
+  package never loaded cannot pass as a TypeScript render, and that the
+  engine loaded the same tower the page did.
+  Both legs check that the page holds the carried telemetry; the TypeScript
+  leg checks the page's loop memos, and the WASM leg the engine's.
+- One asymmetry is left by design: the merge before a build or a listed
+  setup runs on the WASM leg only, so a presentation pin an earlier shot left
+  on the read model alone (a staged satisfaction spread, say) is merged away
+  there and kept on the TypeScript leg. No current shot does this; one that
+  did would show as a pixel difference between the legs.
+- Everywhere else the WASM leg runs `checkHosted`: it snapshots the page's
+  tower before a clock pin or a setup and fails the scene by name when the
+  step changed the clock, the star, a unit's place, state, occupancy, rent
+  or label, or a transport, and the engine did not follow (also a
+  row the step added or removed that the engine did not follow, or a row only
+  the engine added). Only the fields the step changed are
+  compared, since some fields reach the read model only at a merge (a gutted
+  office's label, for one) and may lag harmlessly. Money stays out, since a
+  relayed build can roll a treasure from the read model's hour-old rng
+  (#868); the relay forwards a money write as `setMoney`. One shape function
+  (`shotShape`), installed in the page, serves every check. An edit outside
+  that shape shows up as a pixel difference instead.
+- Three setups moved the page's clock only (`07-people-rush`,
+  `recycling-filling`, `13-game-night`); they now call `pgSetClock`, which
+  moves the engine's clock too. `13-game-night` used to set 23:00 on the
+  same day even when that meant going back; `pgSetClock` only moves forward,
+  so the setup now fails if the clock is already past 23:00 (it is not).
+
+### An engine-host finding on the way
+
+`18-sun-clip`'s cinema screen froze on a different frame on each leg with
+identical sim state on both (people, clock, money, occupancy). The renderer
+repaints rooms when `tower.mealOverlayRevision` moves, and the host copied
+that counter only at a full merge, so on the WASM engine a lunch dip or a
+venue visit redrew at the next hour pass or structural change. The read
+model now keeps its own counter and bumps it at the frame the engine's
+moves, so a bump the read model makes for a relayed command never collides
+with an engine bump and the counter never steps back. A test in
+`wasmHost.integration.test.ts` checks it frame by frame (it fails without
+the fix). Player-visible on the WASM engine, so 2.29.4.
+
+### Results
+
+In `mcr.microsoft.com/playwright:v1.61.1-jammy` with `npm ci`,
+`VC_TOOLING=1 npm run build` and the full Chrome (`PW_CHROME`), the
+TypeScript and WASM legs render all 91 shots byte for byte the same, with no
+scene failures. The committed gallery is refreshed from that TypeScript leg:
+21 shots change, all of them for the load normalization above (the
+"Milestone:" bulletin lines gone, Classic hotel income and population on
+the Average rung, the crowd started fresh at a settle).
+
+The items #899 deferred from the previous review (a mid-hour handoff drops
+the boarding tally, a handoff after a morning checkout clears the
+housekeeping report) now happen on both legs alike, since both load a fresh
+instance at the same points, so they no longer move a shot. They are what a
+load does on either engine (the TypeScript deserialize drops both too), so no
+follow-up row tracks them.
+
+### Review record
+
+`/gds-code-review` (all three layers each round) ran six rounds on the whole
+change; `/bmad-code-review` then ran three on the scripts.
+
+- gds round 1. Patched: the settle after a scene build now skips when the
+  builder already settled (a second load dropped the crowd the ticks grew,
+  which changed the overlay and stats shots); the WASM leg merges before a
+  listed setup, so the setup edits the engine's current tower; the WASM leg
+  fails when the live sim is not hosted; the read model's meal counter
+  became its own monotonic counter (a copy of the engine's could collide
+  with a local bump or step back); the hosted check compares only the fields
+  the step changed; a stale `SETTLE_AFTER_SETUP` entry fails the run;
+  `13-game-night` refuses to roll into the next day; wording. Deferred:
+  `overlay-heatmap-stale-after-load` (#927), pre-existing.
+- gds round 2. Patched: one shared shape (`shotShape`) installed in the page;
+  `pgSettle` records the settled shape and checks the engine loaded the same
+  tower; a builder that settled gets a content check in place of a second
+  load; the merge before a scene build; engine-only rows; a listed shot must
+  have a setup; the 23:00 boundary; doc and row wording.
+- gds round 3. Patched: the settle is told which leg it runs on (a WASM leg
+  whose engine never loaded settled as the TypeScript leg did), and checks
+  the live sim is hosted before comparing shapes; wording. Dismissed: the
+  relay forwards a money write as `setMoney`; `frameView` drains nothing.
+- gds round 4. Patched: money left the shape again (round 3 had added it; a
+  relayed build can roll a treasure from the read model's hour-old rng,
+  #868), with the reason recorded.
+- gds round 5. Patched: comment and row wording only.
+- gds round 6. Clean: no reachable finding in any layer.
+- bmad round 1. Patched: the merge and the settle flag reset are one step
+  (`beginSettleStep`), with the merge's own error named; a missing shape
+  helper fails by name; `checkHosted` names the fix for its call site;
+  `settleTower` is private; `docs/screenshots.md` describes the settle and
+  `SETTLE_AFTER_SETUP`; the stale AC3 text points here. Deferred:
+  `gallery-chained-shot-cascade` (#931), pre-existing.
+- bmad round 2. Patched: fix hints for a clock move inside a setup, the
+  `13-game-night` message, the leg prefix, two doc lines.
+- bmad round 3. Clean in code; one docs sentence narrowed to what the hosted
+  check covers.
+
+After each code round the pinned image rendered both legs again: 91 of 91
+shots the same on both legs every time, and the same as the committed
+gallery from the round-1 refresh on.

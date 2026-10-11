@@ -509,6 +509,19 @@ impl Engine {
         Ok(())
     }
 
+    /// The loop's pass memos as `[lastHour, lastDay, lastMonth, lastQuarter]`,
+    /// the counterpart of `seedLoopMemos`. Tooling only: the gallery's handoff
+    /// carries a hosted tower's owed passes across the load that restarts it.
+    #[wasm_bindgen(js_name = loopMemos)]
+    pub fn loop_memos(&self) -> Vec<f64> {
+        vec![
+            self.sim.last_hour as f64,
+            self.sim.last_day as f64,
+            self.sim.last_month as f64,
+            self.sim.last_quarter as f64,
+        ]
+    }
+
     /// Set the loop's pass memos (`lastHour`, `lastDay`, `lastMonth`,
     /// `lastQuarter`), which a load derives from the clock. Tooling only: the
     /// gallery's engine leg hands over a tower built in place, whose memos

@@ -268,7 +268,8 @@ export function pgFillRow(kind: string, floor: number, x0: number, x1: number, s
   }
 }
 
-/** Set the in-game clock to a whole hour without advancing days.
+/** Move the in-game clock forward to `hour` (a fraction counts minutes, so 8.5
+ *  is 08:30), into the next day when the clock is already past that time.
  *
  *  The clock moves and nothing runs: whatever pass the move skips is owed and
  *  runs on the next tick. On the WASM leg (the live sim is the instance the

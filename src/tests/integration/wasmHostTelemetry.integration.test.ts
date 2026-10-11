@@ -144,6 +144,7 @@ describe.skipIf(!hasWasmPackage())("elevator telemetry on both engines", () => {
       const e2 = owed.handle();
       try {
         e2.seedLoopMemos(fresh.lastHour, fresh.lastDay, fresh.lastMonth, fresh.lastQuarter);
+        expect([...e2.loopMemos()]).toEqual([fresh.lastHour, fresh.lastDay, fresh.lastMonth, fresh.lastQuarter]);
         expect(() => e2.seedLoopMemos(0.5, 0, 0, 0)).toThrow();
         fresh.tick(1);
         e2.tick(1);

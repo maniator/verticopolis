@@ -102,6 +102,12 @@ export class Engine {
      * the ring gets the ring.
      */
     logSince(seq: number): string;
+    /**
+     * The loop's pass memos as `[lastHour, lastDay, lastMonth, lastQuarter]`,
+     * the counterpart of `seedLoopMemos`. Tooling only: the gallery's handoff
+     * carries a hosted tower's owed passes across the load that restarts it.
+     */
+    loopMemos(): Float64Array;
     mode(): string;
     money(): number;
     /**
