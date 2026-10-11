@@ -4,6 +4,27 @@ Load-bearing companion to `SPEC.md`. The exact event shapes, hook sites, cadence
 and vitest acceptance criteria. Every event is host-gated (fires only on a
 deployed host) and never-throw, matching the existing analytics pipe.
 
+## Since the analytics engine bridge (#873 phase 2)
+
+The hook sites below are how #611 shipped. From the first release after
+2.29.4 the engine reports these facts as gameplay events
+(`conformance/events/catalog.json`) and `src/analyticsEngineBridge.ts` folds
+them into the same wire events, so the event names and fields are unchanged:
+
+- `price_tune` and `capacity_tune` latch on the engine's `pricing_changed` and
+  `capacity_changed`, which fire only on a real change. A rent nudge already at
+  its limit no longer counts; shrinking a shaft now does.
+- `emergency_choice` comes from `emergency_resolved` with `source: player`, and
+  `decision` is what took effect: an accept the tower could not pay for reports
+  `decline`. A timed-out decline (`source: timeout`) still reports nothing.
+- `session_emergencies` sums `fire_started`, the `rooms` of `fire_gutted`, and
+  `bomb_detonated` across every tower the session played. The `counts` sampler
+  is retired; the frame loop's throttled refresh still marks a session as
+  played, so the denominator is unchanged.
+- `demolish` stays on the shell's removal path until the bulldozer and the
+  editor's Sell remove through an engine command (backlog
+  `analytics-removal-command`, #901, carried by #928).
+
 ## Events
 
 | Event | Fields (closed enums / integers only) | Cadence | User- or sim-fired | Hook site |

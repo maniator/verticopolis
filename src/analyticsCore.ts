@@ -39,13 +39,25 @@ export interface GameplayEvents {
    *  build anything" step). Fires once per tower: for a founded tower it follows
    *  that tower's `new_game_started` (the latch re-opens in `noteNewGame`); for
    *  the boot tower that a continued save opens on, it fires with no preceding
-   *  `new_game_started`. `tool` is the facility/transport kind that broke the ice. */
+   *  `new_game_started`. `tool` is the facility/transport kind that broke the ice.
+   *
+   *  Since the release after 2.29.4 the engine's events, through
+   *  `analyticsEngineBridge.ts` (#873 phase 2), drive `new_game_started`,
+   *  `first_build`, the session build and depth summaries, `star_reached`,
+   *  `session_emergencies`, `emergency_choice`, `price_tune` and
+   *  `capacity_tune`; the rest of this vocabulary stays with the shell. `tool` is the
+   *  kind the engine PLACED rather than the tool held: the Floor tool on the
+   *  ground floor lays a lobby and now reports `lobby`, here and in the
+   *  `tool_session_uses` mix. Builds made from any input, the editor included,
+   *  count here and in the session depth events. */
   first_build: { tool: string };
   /** A tool was selected, reported once per distinct tool so the event captures
    *  the session's tool mix without a row per click. */
   tool_used: { tool: string };
   /** The tower crossed into a new star rating (2 through 6): progression depth,
-   *  the clearest "how far do players get" signal. */
+   *  the clearest "how far do players get" signal. One row per rung crossed:
+   *  before the engine bridge (through 2.29.4) a 6 Hz poll sent only the higher
+   *  rung when two promotions landed between polls. */
   star_reached: { star: number };
   /** The tab was hidden or unloaded: cumulative foreground session length in
    *  whole seconds, plus whether the emission came from `pagehide`.
@@ -164,12 +176,20 @@ export interface GameplayEvents {
    *  `tool_used`; this is the removal + tuning side those never saw). `detail`
    *  carries the small extra dimension `demolish` needs (sell vs bulldoze).
    *  Cookieless: closed enums and per-session behavior, never an identity, never
-   *  a currency amount. */
+   *  a currency amount.
+   *
+   *  Since the release after 2.29.4, `price_tune` and `capacity_tune` latch on
+   *  the engine's report of a real change (`pricing_changed`,
+   *  `capacity_changed`): a rent nudge already at its limit no longer counts,
+   *  and shrinking a shaft now does. `demolish` is still reported by the shell. */
   economy_action: { action: EconomyActionName; detail?: string };
   /** The player answered an in-game emergency prompt (pay for rescue, or gamble
    *  the containment / bomb search). Per occurrence, so the accept/decline split
    *  is visible per emergency kind. Only a real click emits: a timed-out
-   *  auto-decline is the absence of a choice, not a decline, and reports nothing. */
+   *  auto-decline is the absence of a choice, not a decline, and reports nothing.
+   *  Since the release after 2.29.4 `decision` is what took effect, from the
+   *  engine's `emergency_resolved`: an accept the tower could not pay for is a
+   *  decline (through 2.29.4 it reported the button pressed). */
   emergency_choice: { kind: EmergencyKind; decision: EmergencyDecision };
   /** Per-session summary of the SIMULATION-fired emergency activity: how many fire
    *  outbreaks ignited, how many rooms they gutted, and how many bombs detonated.
