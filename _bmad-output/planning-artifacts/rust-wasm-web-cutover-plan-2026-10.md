@@ -28,7 +28,7 @@ This document is a **BMAD-style planning input** for product/architecture review
 
 **FR4 Frontend contract:** Web UI can obtain all necessary build previews, catalog/unlock state, income breakdown, stats, logs, analytics events, frame and structural data from a documented, versioned engine read model. No UI-only recreation of engine decisions.
 
-**FR5 Performance and reliability:** Deterministic fixed-step simulation, frame-rate-independent gameplay, bounded memory, worker lifecycle recovery, robust cancellation/attach/detach and observable failure reporting.
+**FR5 Performance and reliability:** Deterministic fixed-step simulation, frame-rate-independent gameplay, bounded memory, existing WASM-host lifecycle recovery, robust cancellation/attach/detach and observable failure reporting. A new dedicated Web Worker and its worker-specific recovery tests are post-cutover follow-up work under D2/#908, not a prerequisite for the web engine switch.
 
 **FR6 Cross-platform parity:** Same public engine crate and compatible saves/commands for WASM/web and future engine consumers. A change to shared rules must pass both host gates.
 
@@ -52,7 +52,7 @@ This document is a **BMAD-style planning input** for product/architecture review
 
 **B3** Cross-format save fixtures: TS -> WASM -> TS, plus legacy migrations, founder state, malformed UTF-8, lone surrogate escapes, duplicate/colliding repaired keys, nonfinite/JS numeric coercions and 32 MiB limit. Coordinate #858, #944 and save durability and recovery.
 
-**B4** Host lifecycle tests: worker attach/detach, in-flight load, stale generation, errors, restart, undo/redo, context loss and exterminator-booking attach (#902). No empty-tower reset or unhandled stale engine handles.
+**B4** Current WASM-host lifecycle tests: engine attach/detach (whether currently on the main thread or existing infrastructure), in-flight load, stale generation, errors, restart, undo/redo, context loss and exterminator-booking attach (#902). No empty-tower reset or unhandled stale engine handles. Dedicated-Web-Worker lifecycle and backpressure tests belong to the post-cutover D2/#908 implementation, not this prerequisite.
 
 ### Epic C: Complete and stabilize frontend APIs (P1; after A)
 
