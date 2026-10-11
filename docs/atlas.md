@@ -241,11 +241,12 @@ furniture. Either list can be empty (a fully transparent picture).
 What that means for the pictures:
 
 - The furniture layer holds only the pixels that differ. Where a piece of
-  furniture happens to match the wall behind it, or where a whole-room mark
-  covers it, the furniture layer is transparent and the shell shows that pixel.
-- A whole-room mark sits on the shell, so the furniture layer carries the
-  furniture as the flat frame shows it (darkened under the night scrim, tinted
-  under the pool water).
+  furniture happens to match the wall behind it, or where a mark drawn after
+  the furniture covers it, the furniture layer is transparent and the shell
+  shows that pixel.
+- A mark drawn after the furniture sits on the shell, so the furniture layer
+  carries the furniture as the flat frame shows it (darkened under the night
+  scrim, tinted under the pool water).
 - A soft shadow or glow drawn with the furniture is baked into it as opaque
   pixels (the translucent paint over the wall behind it), so anything a
   frontend draws between the shell and the furniture is hidden under it.
@@ -263,7 +264,7 @@ What that means for the pictures:
 
 The game marks the split in each room's draw routine
 (`src/render/pixelSprites/layers.ts`): one call where the shell ends, and one
-where the furniture ends and the whole-room marks begin. In the game both calls
+where the furniture ends and the marks drawn over it begin. In the game both calls
 do nothing. The export paints each room frame a second time with the marks
 live and records the canvas at them; the flat frame comes from the ordinary
 paint, so adding layers never changes a frame's pixels. The export also
