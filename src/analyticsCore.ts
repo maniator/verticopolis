@@ -41,7 +41,7 @@ export interface GameplayEvents {
    *  the boot tower that a continued save opens on, it fires with no preceding
    *  `new_game_started`. `tool` is the facility/transport kind that broke the ice.
    *
-   *  Since the release after 2.29.4 the engine's events, through
+   *  Since 2.29.5 the engine's events, through
    *  `analyticsEngineBridge.ts` (#873 phase 2), drive `new_game_started`,
    *  `first_build`, the session build and depth summaries, `star_reached`,
    *  `session_emergencies`, `emergency_choice`, `price_tune` and
@@ -178,7 +178,7 @@ export interface GameplayEvents {
    *  Cookieless: closed enums and per-session behavior, never an identity, never
    *  a currency amount.
    *
-   *  Since the release after 2.29.4, `price_tune` and `capacity_tune` latch on
+   *  Since 2.29.5, `price_tune` and `capacity_tune` latch on
    *  the engine's report of a real change (`pricing_changed`,
    *  `capacity_changed`): a rent nudge already at its limit no longer counts,
    *  and shrinking a shaft now does. `demolish` is still reported by the shell. */
@@ -187,7 +187,7 @@ export interface GameplayEvents {
    *  the containment / bomb search). Per occurrence, so the accept/decline split
    *  is visible per emergency kind. Only a real click emits: a timed-out
    *  auto-decline is the absence of a choice, not a decline, and reports nothing.
-   *  Since the release after 2.29.4 `decision` is what took effect, from the
+   *  Since 2.29.5 `decision` is what took effect, from the
    *  engine's `emergency_resolved`: an accept the tower could not pay for is a
    *  decline (through 2.29.4 it reported the button pressed). */
   emergency_choice: { kind: EmergencyKind; decision: EmergencyDecision };

@@ -6,8 +6,7 @@ deployed host) and never-throw, matching the existing analytics pipe.
 
 ## Since the analytics engine bridge (#873 phase 2)
 
-The hook sites below are how #611 shipped. From the first release after
-2.29.4 the engine reports these facts as gameplay events
+The hook sites below are how #611 shipped. From 2.29.5 the engine reports these facts as gameplay events
 (`conformance/events/catalog.json`) and `src/analyticsEngineBridge.ts` folds
 them into the same wire events, so the event names and fields are unchanged:
 

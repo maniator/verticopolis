@@ -167,7 +167,8 @@ player action, and the limit is a runaway-loop guard); the undo test calling
 `towerSwapHandOff.guard.test.ts`); a first-run grant dropping at most one
 frame of pending play (folding it instead would send it live ahead of the held
 queue, the order inversion round 1 fixed); and the version boundary the docs
-name, which is a release decision raised with the owner on the PR.
+name, raised with the owner, who chose a patch bump to 2.29.5 so the dashboards
+have a clean boundary.
 
 
 ### Round 3 (confirming pass, 2026-10-11)
