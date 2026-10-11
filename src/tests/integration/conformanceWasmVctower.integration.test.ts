@@ -95,6 +95,10 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
       expect(sim.founder).toBe(false);
       expect(payloadText(text)).toBe(canonicalJson({ ...JSON.parse(json), savedAt: SAVED_AT, appVersion: VERSION }));
       expect(tsEngine(sim).stateDigest()).toBe(engine.stateDigest());
+      // The engine's stamp adds exactly the fields SaveGame.export's does.
+      const webKeys = Object.keys(decodeVctower(await SaveGame.export(sim)) as object).sort();
+      const engineKeys = Object.keys(decodeVctower(text) as object).sort();
+      expect(engineKeys).toEqual(webKeys);
     } finally {
       engine.free();
     }
@@ -105,7 +109,8 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
   // web game as no founder's tower and must stay that way through the engine.
   it("a loaded tower that is no founder's stays so through the engine", async () => {
     const first = fixtures[0];
-    if (first === undefined) return; // "has fixtures to check" reports it
+    expect(first).toBeDefined();
+    if (first === undefined) return;
     const raw = decodeVctower(readFileSync(resolve(FIXTURES, first), "utf8")) as Record<string, unknown>;
     delete raw.founder;
     const later = toTowerFile(JSON.stringify({ ...raw, appVersion: "2.5.0" }));
