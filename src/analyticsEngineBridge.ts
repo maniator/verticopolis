@@ -98,9 +98,12 @@ function allowSend(name: string, now: number): boolean {
 function fold(event: GameplayEvent, now: number): void {
   switch (event.name) {
     case "tower_founded":
-      // A founding the rate limit holds back leaves the funnel closed too, so
-      // no first_build is ever sent without its new_game_started ahead of it.
+      // A founding the rate limit holds back closes the funnel, so no
+      // first_build is sent without its own new_game_started ahead of it,
+      // and the new tower's first build is never credited to the tower
+      // before it.
       if (allowSend("new_game_started", now)) gameplaySession.noteNewGame(event.payload.mode);
+      else gameplaySession.noteNewGameUnreported();
       return;
     case "facility_placed":
       gameplaySession.noteBuild(event.payload.kind, event.payload.floor, event.payload.count);

@@ -205,3 +205,7 @@ Auditor had none. One test patch:
 
 - [x] [Review][Patch] The retired shell pin for a deep-basement multi-story room's peak height moved to the engine as an above-ground cinema only; the emission test now also places a two-story Recycling Center on B3 (floor -2) and expects its top story, B2 (-1). A round 6 check of that delta found only the basement labels off by one, fixed.
 
+
+### Owner review (PR #938, 2026-10-11)
+
+- [x] [Review][Patch] The owner asked for a test of the rate-limit boundary across several founded towers. It found a real hole: a held-back founding left the previous tower's funnel open, so when that tower had not built yet, the new tower's first build was reported as its `first_build`. A held-back founding now closes the funnel (`noteNewGameUnreported`); the new test pins that every `first_build` follows its own tower's `new_game_started` and that the held-back tower's builds still count.

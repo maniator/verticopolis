@@ -157,6 +157,35 @@ describe("analytics engine bridge", () => {
     expect(propsFor("new_game_started")).toHaveLength(BRIDGE_SEND_LIMIT + 1);
   });
 
+  it("never attributes a build to the wrong tower across rate-limited foundings", () => {
+    const now = 5_000;
+    gameplaySession.begin();
+    // Tower A is founded and builds: its funnel reports.
+    forwardGameplayEvents([founded("classic"), placed("office", 2)], now);
+    // Spend the rest of the founding budget on towers that never build.
+    for (let i = 1; i < BRIDGE_SEND_LIMIT; i++) forwardGameplayEvents([founded()], now);
+    // Tower B's founding is held back. Its builds must not report a
+    // first_build: the funnel stays closed rather than letting B's first
+    // build pass as A's (or as a founding nobody sent).
+    forwardGameplayEvents([founded("modern"), placed("condo", 3), placed("shop", 4)], now);
+    // Tower C, after the window, reports its own founding and first build.
+    forwardGameplayEvents([founded("modern"), placed("hotelSingle", 5)], now + 60_000);
+    // Every first_build follows its own tower's new_game_started, and none
+    // carries a tool that tower did not place first.
+    const funnel = sent().filter(([n]) => n === "new_game_started" || n === "first_build");
+    expect(funnel.filter(([n]) => n === "first_build")).toEqual([
+      ["first_build", { tool: "office" }],
+      ["first_build", { tool: "hotelSingle" }],
+    ]);
+    funnel.forEach(([n], i) => {
+      if (n === "first_build") expect(funnel[i - 1][0]).toBe("new_game_started");
+    });
+    expect(funnel[funnel.length - 2]).toEqual(["new_game_started", { mode: "modern" }]);
+    // B's builds were still counted for the session.
+    gameplaySession.end(false);
+    expect(propsFor("session_builds")).toEqual([{ builds: 4 }]);
+  });
+
   it("drains and drops the title backdrop's events", () => {
     const queue: unknown[] = [founded(), placed("lobby", 1)];
     drainEngineEvents(source(queue, { backdrop: true }));

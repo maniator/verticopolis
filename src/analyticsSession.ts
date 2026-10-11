@@ -118,10 +118,18 @@ class GameplaySession {
    *  `first_build` latch so the `new_game_started` then `first_build` funnel holds
    *  per tower, not just for the first tower founded in the tab. The analytics
    *  bridge calls it for the engine's `tower_founded`; a founding the rate limit
-   *  holds back skips it, so the funnel stays closed with it. */
+   *  holds back calls {@link noteNewGameUnreported} instead. */
   noteNewGame(mode: string): void {
     this.built = false;
     trackEvent("new_game_started", { mode });
+  }
+
+  /** A tower was founded but its `new_game_started` was not sent (the
+   *  analytics bridge's rate limit held it back). Its funnel is closed, so its
+   *  first build is never reported, and above all never reported as the first
+   *  build of the tower before it, whose funnel may still be open. */
+  noteNewGameUnreported(): void {
+    this.built = true;
   }
 
   /** A facility was placed. Counts toward the session's build volume, per-tool
