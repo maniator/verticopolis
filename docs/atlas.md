@@ -235,11 +235,12 @@ front of the back wall. A room frame that supports this carries an optional
   platform and track.
 - `furniture` holds the pixels that differ between the shell and the flat
   frame, transparent everywhere else.
-- `chains` splits the frame's chain (`occupants` in every layered room) step
-  by step, under the same key: `shell` holds what the step changes on the
-  shell (an office's downlights or a condo's ceiling light, which switch on
-  with the first occupant), `furniture` holds the people who sit down. Each list starts with
-  a null step 0 and is trimmed on its own, like a frame's chain steps.
+- `chains` splits the frame's chain step by step, under the same key
+  (`occupants`; a frame with no chain, such as an `/away` frame, has none):
+  `shell` holds what the step changes on the shell (an office's downlights or
+  a condo's ceiling light, which switch on with the first occupant),
+  `furniture` holds the people who sit down. Each list starts with a null step
+  0 and is trimmed on its own, like a frame's chain steps.
 - `soft` (with its own steps in `chains`) is an optional alternative to
   `furniture`; see below.
 
@@ -267,7 +268,10 @@ What that means for the pictures:
 - The furniture layer holds only the pixels that differ. Where a piece of
   furniture happens to match the wall behind it, or where a mark drawn after
   the furniture covers it, the furniture layer is transparent and the shell
-  shows that pixel.
+  shows that pixel. Once an occupant step puts a pixel in the furniture, the
+  later steps keep it there (each step only adds), so a frontend that offsets
+  the furniture moves that pixel with it even where a later step shows the
+  shell's color.
 - A mark drawn after the furniture sits on the shell, so the furniture layer
   carries the furniture as the flat frame shows it (darkened under the night
   scrim, tinted under the pool water).
@@ -290,8 +294,9 @@ What that means for the pictures:
 The game marks the split in each room's draw routine
 (`src/render/pixelSprites/layers.ts`): one call where the shell ends, and one
 where the furniture ends and the marks drawn over it begin. In the game both
-calls do nothing. The export paints each room frame a second time with the
-marks live and records the canvas at them; the flat frame comes from the
+calls do nothing. The export paints each room frame (and each occupant step)
+again with the marks live and records the canvas at them, once for the exact
+split and once more for the soft furniture; the flat frame comes from the
 ordinary paint, so adding layers never changes a frame's pixels. The export
 also requires every kind that splits to have furniture in some frame, since a
 shell that still showed the furniture would compose back too.
@@ -326,18 +331,19 @@ the wall. Marks the game draws over the furniture (the night scrim, the pool
 tint) land on the soft furniture only where it has pixels; the shell carries
 them everywhere else. An opaque mark drawn over the furniture (a hotel roach
 on the bed, a sleeping guest's "z", a notice badge) is therefore on both the
-shell and the soft furniture: offset the soft furniture and it shows twice.
-In `furniture` the same mark stays on the shell only, leaving a gap in the
-furniture under it. In the current atlas SOFT_PCT of the soft furniture's
+shell and the soft furniture: offset the soft furniture and it shows twice. In
+`furniture` the same mark stays on the shell only, leaving a gap in the
+furniture under it. In the current atlas 8% of the soft furniture's
 pixels differ from the flat frame (each pixel counted once per occupant count
-it shows at), by at most SOFT_MAX of 255 in any channel; the export prints
+it shows at), by at most 2 of 255 in any channel; the export prints
 this measure and refuses an atlas whose soft furniture strays more than 4 of
-255 or misses a pixel of the furniture. Use `furniture` when exact pixels matter, and
-`soft` when the furniture moves away from the wall.
+255 or misses a pixel of the furniture. Use `furniture` when exact pixels
+matter, and `soft` when the furniture moves away from the wall.
 
 A frame has no `soft` when an occupant step would have to change a
 translucent soft pixel, which source-over cannot do (it can only paint over
-one); the export counts them and names the first few. In the current atlas
+one), or when its soft pass fails; the export counts them and names the
+first few. In the current atlas
 that is about one layered frame in eight, where an occupant step changes a
 glow or a soft shadow in the restaurant, food hall, party hall, amusements,
 boutique bay, fitness club, nightclub and aquatic center; those frames offer
@@ -363,8 +369,10 @@ held to the same paint. After
 packing, the export rebuilds every layered frame from the pages through the
 manifest, shell then furniture with their occupant steps at every occupant
 count, and requires its flat frame's pixels. It also measures how far the soft
-furniture drifts from the flat frame and prints the share of pixels and the
-largest channel difference.
+furniture drifts from the flat frame, prints the share of pixels and the
+largest channel difference, and refuses an atlas whose soft furniture strays
+past the limit, misses a pixel of the furniture, or is missing from every
+frame.
 
 The same check covers the other families (`verifyExtras.ts`): a whole express
 and standard shaft rebuilt from their floor pieces (skip floor included), cabs

@@ -311,8 +311,8 @@ export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): strin
   for (const [name, rec] of Object.entries(archive.manifest.frames)) {
     const layers = rec.layers;
     if (!layers) continue;
-    const flat = Object.keys(rec.chains ?? {}).sort().join();
-    const depth = Object.keys(layers.chains ?? {}).sort().join();
+    const flat = JSON.stringify(Object.keys(rec.chains ?? {}).sort());
+    const depth = JSON.stringify(Object.keys(layers.chains ?? {}).sort());
     const soft = layers.soft !== undefined;
     const lists = Object.values(layers.chains ?? {}).flatMap((c) => [c.shell, c.furniture, ...(c.soft ? [c.soft] : [])]);
     const oneChainNoOverlays = Object.keys(rec.chains ?? {}).length <= 1 && Object.keys(rec.overlays ?? {}).length === 0;

@@ -340,10 +340,9 @@ describe("depth layers on occupant steps", () => {
     const drift = softLayerDrift(buildArchive(r, info, undefined, 32));
     expect(drift.frames).toBe(1);
     expect(drift.pictures).toBe(3); // n = 0, 1, 2: the flat chain stops changing at 2
-    expect(drift.differing).toBeGreaterThan(0); // the glow pixel rounds differently over the shell
     // Measured against the soft furniture's own pixels (desk, glow, people).
     expect(drift.pixels).toBe(2 + 3 + 4);
-    expect(drift.differing).toBe(3); // the glow pixel, once per picture
+    expect(drift.differing).toBe(3); // the glow pixel rounds differently over the shell, once per picture
     expect(drift.outside).toBe(0);
   });
   it("drops the soft furniture when a step would change a translucent pixel", () => {

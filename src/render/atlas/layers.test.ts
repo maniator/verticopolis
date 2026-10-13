@@ -81,9 +81,10 @@ describe("the soft furniture pass's assumption", () => {
   it("holds: no paint routine outside the atlas sets a composite mode", () => {
     // The soft pass (`browserEntry.ts`) draws the marks after the furniture
     // with source-atop and puts it back after every restore; a routine with a
-    // composite mode of its own would override that.
+    // composite mode of its own would override that. Only the soft pass
+    // itself may set one.
     const root = join(__dirname, "..");
-    const files = readdirSync(root, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.startsWith("atlas"));
+    const files = readdirSync(root, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && f !== join("atlas", "browserEntry.ts"));
     expect(files.length).toBeGreaterThan(20);
     const offenders = files.filter((f) => readFileSync(join(root, f), "utf8").includes("globalCompositeOperation"));
     expect(offenders).toEqual([]);
