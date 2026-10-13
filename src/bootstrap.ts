@@ -9,6 +9,7 @@ import { prepareSaveStore } from "./game/desktopSaveStore";
 import { dualRunRequested, startDualRun, type DualRunApp } from "./dualrun/dualRun";
 import { engineRequested } from "./wasmhost/engineChoice";
 import { loadWasmEngine, startWasmHost, type WasmHostApp } from "./wasmhost/startWasmHost";
+import { setEngineWriter } from "./storage/vctowerWriter";
 import { refreshSplashVersion } from "./wasmhost/engineLabel";
 import type { WasmModule } from "./dualrun/binding";
 
@@ -191,6 +192,8 @@ export function bootGame(create: () => BootApp): Promise<void> {
       if (wasmModule) {
         try {
           startWasmHost(app as unknown as WasmHostApp, wasmModule);
+          // Saves are written through the engine too (same bytes, #935).
+          if (wasmModule.encodeVctower) setEngineWriter(wasmModule.encodeVctower);
           refreshSplashVersion(); // the title screen mounted before the host started
         } catch (e) {
           console.error("[wasm] did not start; running on the TypeScript engine:", e);
