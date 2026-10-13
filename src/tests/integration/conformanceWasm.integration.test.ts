@@ -2,7 +2,10 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { CONFORMANCE_DIR, firstDivergence, loadScenario, runScenario, type Checkpoint } from "../conformance/scenario";
-import { hasWasmPackage, startWasmEngine, wasmRequired } from "../conformance/wasmEngine";
+import { hasWasmPackage, startWasmEngine, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { CATALOG_VERSION, catalogFor } from "../../engine/catalog";
+import { readCatalog } from "../../dualrun/catalog";
+import { canonicalJson, digest } from "../conformance/canonical";
 
 /**
  * The conformance referee through the WASM binding: every scenario runs on
@@ -28,6 +31,25 @@ describe.skipIf(!hasWasmPackage())("engine conformance through the WASM binding"
       expect(firstDivergence(runScenario(scenario, startWasmEngine), want)).toBeNull();
     }, 60_000);
   }
+
+  // The catalog the binding hands a frontend is the TypeScript engine's, field
+  // for field, and its text is the canonical form the lock hashes.
+  const catalogLock = JSON.parse(readFileSync(resolve(CONFORMANCE_DIR, "catalog-digests.json"), "utf8")) as { catalogs: Record<string, string> };
+  for (const mode of ["classic", "modern"] as const) {
+    it(`catalog(${mode}) matches the TypeScript catalog and the lock`, () => {
+      const { catalog } = wasm();
+      if (typeof catalog !== "function") throw new Error("the WASM package predates catalog(mode); run npm run wasm:build");
+      const text = catalog(mode);
+      expect(readCatalog(wasm(), mode)).toEqual(catalogFor(mode));
+      expect(text).toBe(canonicalJson(catalogFor(mode)));
+      expect(digest(JSON.parse(text))).toBe(catalogLock.catalogs[mode]);
+    });
+  }
+
+  it("refuses a catalog for an unknown mode, or of a shape version it does not read", () => {
+    expect(() => readCatalog(wasm(), "arcade" as "classic")).toThrow(/classic or modern/);
+    expect(() => readCatalog(wasm(), "classic", CATALOG_VERSION + 1)).toThrow(/expected version/);
+  });
 
   // Each refusal must surface as the binding's own error with its message; a
   // Rust panic would trap (a RuntimeError) and poison the one module instance
