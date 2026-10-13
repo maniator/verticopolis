@@ -20,18 +20,16 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve, join, relative } from "node:path";
 import {
   INJECTED_CODE,
-  byCodePoint,
   collectPackageDirs,
   declaredLicense,
-  isLicenseFileName,
-  isLicenseTextFileName,
-  isNoticeFileName,
   noticeProblem,
   packageDirFromSource,
   renderNotices,
   sourceToPath,
   type NoticePackage,
 } from "../src/build/thirdPartyNotices.ts";
+import { readLicenseFiles } from "./license-files.ts";
+import { ENGINE_THIRD_PARTY } from "./engine-third-party.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..").replace(/\\/g, "/");
 const DIST = join(ROOT, "dist").replace(/\\/g, "/");
@@ -57,9 +55,10 @@ const maps = filesUnder(DIST, (n) => /\.([mc]?js|css)\.map$/.test(n));
 if (maps.length === 0) fail("no sourcemaps in dist; they are needed to list the bundled packages");
 
 // Shipped JavaScript with no sourcemap would carry unlisted code. The only one
-// today is the WASM engine's wasm-bindgen glue; its Rust crates are row
-// `wasm-engine-third-party-notices` (#955).
-const MAPLESS_JS_ALLOWED = new Set(["engine/verticopolis_engine.js"]);
+// is the WASM engine's wasm-bindgen glue, which is attributed instead by the
+// record its build writes beside it (read below, #955).
+const ENGINE_GLUE = "engine/verticopolis_engine.js";
+const MAPLESS_JS_ALLOWED = new Set([ENGINE_GLUE]);
 const mapless = filesUnder(DIST, (n) => /\.[mc]?js$/.test(n))
   .filter((f) => !existsSync(`${f}.map`))
   .map((f) => relative(DIST, f).replace(/\\/g, "/"))
@@ -185,39 +184,43 @@ for (const [dir, origin] of dirs) {
     problems.push(`${relative(ROOT, manifestPath)} is not a valid package.json`);
     continue;
   }
-  const files = readdirSync(dir)
-    .filter((n) => isLicenseFileName(n) || isNoticeFileName(n))
-    .filter((n) => {
-      try {
-        return statSync(join(dir, n)).isFile();
-      } catch {
-        problems.push(`${relative(ROOT, join(dir, n))} cannot be read (a broken link?)`);
-        return false;
-      }
-    })
-    .sort(byCodePoint);
-  const texts = new Map<string, string>();
-  for (const n of files) {
-    try {
-      texts.set(n, readFileSync(join(dir, n), "utf8"));
-    } catch {
-      problems.push(`${relative(ROOT, join(dir, n))} cannot be read`);
-    }
+  const read = readLicenseFiles(dir);
+  if (read.problems.length > 0) {
+    problems.push(...read.problems.map((p) => p.replace(`${ROOT}/`, "")));
+    continue;
   }
-  if (texts.size < files.length) continue;
   const pkg = {
     name: typeof manifest.name === "string" ? manifest.name : undefined,
     version: typeof manifest.version === "string" ? manifest.version : undefined,
     license: declaredLicense(manifest),
-    // An empty LICENSE, or a COPYRIGHT line alone, does not count as license text.
-    hasLicenseFile: files.some((n) => isLicenseTextFileName(n) && texts.get(n)!.trim() !== ""),
-    licenseText: files
-      .map((n) => (files.length > 1 ? `--- ${n} ---\n\n` : "") + texts.get(n)!.trimEnd())
-      .join("\n\n"),
+    hasLicenseFile: read.hasLicenseFile,
+    licenseText: read.licenseText,
   };
   const problem = noticeProblem(pkg);
   if (problem) problems.push(problem);
   else packages.push({ name: pkg.name!, version: pkg.version!, license: pkg.license!, licenseText: pkg.licenseText });
+}
+
+// The WASM engine: its crates and the Rust standard library, from the record
+// `npm run wasm:build` writes beside the package. The engine never ships
+// without one.
+if (existsSync(join(DIST, ENGINE_GLUE))) {
+  const recordPath = join(DIST, "engine", ENGINE_THIRD_PARTY);
+  let record: unknown;
+  try {
+    record = JSON.parse(readFileSync(recordPath, "utf8"));
+  } catch {
+    fail(`${relative(ROOT, recordPath)} is missing or not valid JSON; the WASM engine's crates cannot be listed (rebuild it with npm run wasm:build)`);
+  }
+  if (!Array.isArray(record) || record.length === 0) fail(`${relative(ROOT, recordPath)} lists no crates`);
+  for (const entry of record as unknown[]) {
+    const e = (typeof entry === "object" && entry !== null ? entry : {}) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const crate = { name: str(e.name), version: str(e.version), license: str(e.license) ?? null, licenseText: str(e.licenseText) };
+    const problem = noticeProblem({ ...crate, hasLicenseFile: crate.licenseText !== undefined && crate.licenseText.trim() !== "" });
+    if (problem || e.kind !== "crate") problems.push(`${relative(ROOT, recordPath)}: ${problem ?? `${crate.name}@${crate.version} is not marked as a crate`}`);
+    else packages.push({ name: crate.name!, version: crate.version!, license: crate.license!, licenseText: crate.licenseText!, kind: "crate" });
+  }
 }
 
 if (problems.length > 0) fail(problems.join("; "));

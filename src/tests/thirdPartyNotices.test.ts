@@ -14,7 +14,9 @@ import {
   packageDirFromSource,
   packageNameFromDir,
   renderNotices,
+  shippedCrates,
   sourceToPath,
+  type CargoMetadata,
   type NoticePackage,
 } from "../build/thirdPartyNotices";
 import { helpAboutBody } from "../ui/templates/helpContent";
@@ -189,5 +191,40 @@ describe("third-party notices (#951)", () => {
     expect(out.indexOf("tslib@1.14.1")).toBeLessThan(out.indexOf("tslib@2.8.1-beta.1\n"));
     expect(out.indexOf("tslib@2.8.1-beta.1\n")).toBeLessThan(out.indexOf("tslib@2.8.1-beta.2\n"));
     expect(out.indexOf("tslib@2.8.1\n")).toBeLessThan(out.indexOf("tslib@10.0.0"));
+  });
+
+  it("lists the crates a WASM build compiles in, never build-only ones (#955)", () => {
+    const pkg = (name: string, kind = "lib") => ({ id: name, name, version: "1.0.0", license: "MIT", manifest_path: `/r/${name}/Cargo.toml`, targets: [{ kind: [kind] }] });
+    const dep = (name: string, kind: string | null = null) => ({ pkg: name, dep_kinds: [{ kind }] });
+    const meta: CargoMetadata = {
+      packages: [pkg("engine"), pkg("serde"), pkg("serde_derive", "proc-macro"), pkg("syn"), pkg("itoa"), pkg("cc"), pkg("proptest")],
+      resolve: {
+        root: "engine",
+        nodes: [
+          { id: "engine", deps: [dep("serde"), dep("serde_derive"), dep("cc", "build"), dep("proptest", "dev")] },
+          { id: "serde", deps: [dep("itoa"), dep("serde_derive")] },
+          { id: "serde_derive", deps: [dep("syn")] },
+          { id: "syn", deps: [] },
+          { id: "itoa", deps: [] },
+          { id: "cc", deps: [] },
+          { id: "proptest", deps: [] },
+        ],
+      },
+    };
+    // A proc-macro and what only it pulls in, build and dev dependencies and the root itself stay out.
+    expect(shippedCrates(meta).map((p) => p.name)).toEqual(["itoa", "serde"]);
+    expect(() => shippedCrates({ ...meta, resolve: { ...meta.resolve, root: null } })).toThrow(/no root/);
+  });
+
+  it("labels Rust crates and keeps them apart from npm packages of the same name", () => {
+    const out = renderNotices([
+      { name: "base64", version: "0.22.1", license: "MIT OR Apache-2.0", licenseText: "a", kind: "crate" },
+      { name: "base64", version: "0.22.1", license: "MIT", licenseText: "b" },
+    ]);
+    expect(out).toContain("Packages: 2");
+    expect(out).toContain("base64@0.22.1 (Rust, in the WASM engine)");
+    expect(out).toMatch(/^base64@0\.22\.1$/m);
+    // unicode-ident's license, compiled into the engine.
+    expect(isAllowedLicense("(MIT OR Apache-2.0) AND Unicode-3.0")).toBe(true);
   });
 });

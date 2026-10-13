@@ -11,7 +11,9 @@
  * (and the bridge's rules beside it, src/engine/gameplayEventRules.ts)
  * from conformance/events/catalog.json (the same as `npm run gen:events`).
  * The browser target lands in src/public/engine/ with a BUILD.json naming the
- * sources it came from (see src/wasmhost/packageHash.ts).
+ * sources it came from (see src/wasmhost/packageHash.ts) and a
+ * THIRD-PARTY.json listing the crates compiled into it (see
+ * scripts/engine-third-party.ts).
  * Needs the wasm32-unknown-unknown target and a wasm-bindgen CLI of the
  * version Cargo.toml pins (`rustup target add wasm32-unknown-unknown`,
  * `cargo install wasm-bindgen-cli --locked --version <pinned>`).
@@ -21,6 +23,7 @@ import { copyFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "n
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { engineSourceHash } from "../src/wasmhost/packageHash.ts";
+import { ENGINE_THIRD_PARTY, engineThirdParty } from "./engine-third-party.ts";
 import { checkCatalog, renderGameplayEventRules, renderGameplayEventsDts } from "../src/engine/gameplayCatalog.ts";
 
 const CRATES: Record<string, { dir: string; lib: string }> = {
@@ -83,6 +86,10 @@ if (which === "engine") {
   rmSync(resolve(web, "verticopolis_engine.d.ts"), { force: true });
   rmSync(resolve(web, "verticopolis_engine_bg.wasm.d.ts"), { force: true });
   writeFileSync(resolve(web, "BUILD.json"), `${JSON.stringify({ sources: engineSourceHash(crate) }, null, 2)}\n`);
+  // The crates and the standard library compiled into the package, with
+  // their licenses, so the site's notices can list them without a Rust
+  // toolchain (#955). It throws on a crate that cannot be attributed.
+  writeFileSync(resolve(web, ENGINE_THIRD_PARTY), `${JSON.stringify(engineThirdParty(crate, "wasm"), null, 2)}\n`);
   // The class declaration is the same for both targets; the Node copy is the
   // committed one (`src/dualrun/binding.ts` types against it).
   copyFileSync(resolve(crate, "pkg/verticopolis_engine.d.ts"), resolve(crate, "../src/dualrun/engine.d.ts"));

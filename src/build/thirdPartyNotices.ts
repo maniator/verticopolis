@@ -20,6 +20,13 @@ export interface NoticePackage {
   license: string;
   /** Every license and NOTICE file the package ships, in file-name order. */
   licenseText: string;
+  /** Where it comes from: an npm package (the default) or a Rust crate compiled into the WASM engine. */
+  kind?: "npm" | "crate";
+}
+
+/** The label a package carries in the notices, so an npm package and a crate of the same name stay apart. */
+function kindLabel(p: NoticePackage): string {
+  return p.kind === "crate" ? " (Rust, in the WASM engine)" : "";
 }
 
 const NODE_MODULES = "/node_modules/";
@@ -40,6 +47,9 @@ export const ALLOWED_LICENSES: ReadonlySet<string> = new Set([
   "CC0-1.0",
   "Unlicense",
   "BlueOak-1.0.0",
+  // The Unicode data license (unicode-ident, in the WASM engine): permissive,
+  // a copyright and permission notice like MIT's.
+  "Unicode-3.0",
 ]);
 
 /**
@@ -317,14 +327,15 @@ function byParts(pa: string[], pb: string[]): number {
 /**
  * The notices file: a short header, then one block per package. The same
  * package at two versions keeps both blocks; the same name and version from
- * two directories (a nested duplicate) is listed once.
+ * two directories (a nested duplicate) is listed once. A Rust crate is
+ * labeled as one, so it never merges with an npm package of the same name.
  */
 export function renderNotices(packages: readonly NoticePackage[]): string {
   const seen = new Set<string>();
   const unique = [...packages]
-    .sort((a, b) => byCodePoint(a.name, b.name) || byVersion(a.version, b.version))
+    .sort((a, b) => byCodePoint(a.name, b.name) || byVersion(a.version, b.version) || byCodePoint(a.kind ?? "npm", b.kind ?? "npm"))
     .filter((p) => {
-      const key = `${p.name}@${p.version}`;
+      const key = `${p.kind ?? "npm"}:${p.name}@${p.version}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -342,7 +353,48 @@ export function renderNotices(packages: readonly NoticePackage[]): string {
     "",
   ].join("\n");
   const blocks = unique.map((p) =>
-    [rule, `${p.name}@${p.version}`, `License: ${p.license}`, rule, "", p.licenseText.replace(/\r\n?/g, "\n").trimEnd(), ""].join("\n"),
+    [rule, `${p.name}@${p.version}${kindLabel(p)}`, `License: ${p.license}`, rule, "", p.licenseText.replace(/\r\n?/g, "\n").trimEnd(), ""].join("\n"),
   );
   return `${header}\n${blocks.join("\n")}`;
+}
+
+/** The parts of `cargo metadata --format-version 1` the crate walk reads. */
+export interface CargoMetadata {
+  packages: ReadonlyArray<{ id: string; name: string; version: string; license?: string | null; license_file?: string | null; manifest_path: string; targets: ReadonlyArray<{ kind: readonly string[] }> }>;
+  resolve: { root: string | null; nodes: ReadonlyArray<{ id: string; deps: ReadonlyArray<{ pkg: string; dep_kinds: ReadonlyArray<{ kind: string | null }> }> }> };
+}
+
+/**
+ * The crates a build compiles into the root crate's artifact, from `cargo
+ * metadata` resolved for the target and features of that build: the root's
+ * normal dependencies, transitively. Build and dev dependencies run only on
+ * the build machine, and a proc-macro runs inside the compiler, so neither
+ * they nor anything only they pull in ships. The root itself (our own code)
+ * is left out. Sorted by name, then version.
+ */
+export function shippedCrates(meta: CargoMetadata): CargoMetadata["packages"][number][] {
+  const root = meta.resolve.root;
+  if (!root) throw new Error("cargo metadata has no root package; run it inside the crate");
+  const byId = new Map(meta.packages.map((p) => [p.id, p]));
+  const nodes = new Map(meta.resolve.nodes.map((n) => [n.id, n]));
+  const isProcMacro = (id: string) => byId.get(id)?.targets.some((t) => t.kind.includes("proc-macro")) ?? false;
+  const seen = new Set<string>([root]);
+  const queue = [root];
+  while (queue.length > 0) {
+    const node = nodes.get(queue.shift()!);
+    if (!node) throw new Error("cargo metadata's resolve graph names a package it does not describe");
+    for (const dep of node.deps) {
+      if (!dep.dep_kinds.some((k) => k.kind === null) || isProcMacro(dep.pkg) || seen.has(dep.pkg)) continue;
+      seen.add(dep.pkg);
+      queue.push(dep.pkg);
+    }
+  }
+  seen.delete(root);
+  return [...seen]
+    .map((id) => {
+      const p = byId.get(id);
+      if (!p) throw new Error(`cargo metadata's resolve graph names ${id}, which it does not describe`);
+      return p;
+    })
+    .sort((a, b) => byCodePoint(a.name, b.name) || byVersion(a.version, b.version));
 }
