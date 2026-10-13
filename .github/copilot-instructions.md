@@ -141,6 +141,16 @@ agents, convened as a party for larger changes.
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
 - Match the surrounding code's formatting, naming, and comment density.
+- **A published analytics number comes from a governed definition, or from
+  reviewed code that a test binds to one.** What is banned is improvising a
+  measure in a session and publishing it. The governed sources are the
+  "Verticopolis: Gameplay Analytics" dashboard, the `session_lengths` view, its
+  saved insights, and the PostHog data catalog; check the catalog first.
+  `scripts/posthog-report.mjs` is the worked example of the second clause: it
+  writes its own HogQL, and `src/posthog-report.test.ts` pins its page-life walk
+  against the view's copy so the two cannot drift. A published snapshot states
+  its window above the figures, not in a footer. Full rule and the incident
+  behind it: [`CLAUDE.md`](../CLAUDE.md) non-negotiables.
 - Adding a facility/room type? Start in `src/engine/facilities.ts`, then thread it
   through rendering and UI. Don't special-case it in the render layer.
 
