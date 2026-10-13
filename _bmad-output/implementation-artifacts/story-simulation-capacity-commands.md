@@ -66,6 +66,10 @@ not. This is the TypeScript tie-in the owner asked for after #938.
   tower keep both the state and the event streams in step.
 - `towerRelayOps.guard.test.ts`: no source outside the dual-run relay names
   the relay-only ops (owner review on #950).
+- `enginePackageSurface.integration.test.ts`: after merging main with the
+  engine catalog (#930), one built package exports `catalog(mode)`, with
+  digests matching the TypeScript catalog, and the relay-only tower ops, and
+  the shipped glue in src/public/engine names both (owner review on #950).
 - `cargo run --release --bin conformance`: every scenario ok; the TypeScript
   conformance runs match the lock.
 
