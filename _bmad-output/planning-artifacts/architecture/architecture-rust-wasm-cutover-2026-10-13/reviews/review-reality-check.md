@@ -2,7 +2,7 @@
 
 - **Spine:** `ARCHITECTURE-SPINE.md` (Rust/WASM web cutover, 2026-10-13)
 - **Lens:** every committed decision is reality-checked against the repository and the live registries, not asserted from memory.
-- **Baseline:** `origin/main` at `404bb9c` (merge of #948); PR branch `origin/ccr-35e38073-dx4547` (open PR #950); npm registry, crates.io and the Rust stable channel queried 2026-10-13.
+- **Baseline:** `origin/main` at `404bb9c` (merge of #948); PR branch PR #950's branch (open PR #950); npm registry, crates.io and the Rust stable channel queried 2026-10-13.
 
 ## Verdict
 
@@ -12,7 +12,7 @@ Pass with fixes. The spine is grounded far better than average: every file path 
 
 ### F1 (high): tier 3 names two binding ops that exist only on an open PR
 
-AD-3 lists `towerSetCars` and `towerResizeTransport` beside `setMoney`, `setCars` and the others as today's tier 3 relay ops, and the Consistency Conventions table says the `tower*` prefix is reserved for tier 3. On `origin/main`, `engine-rs/src/wasm.rs` exports neither name (0 matches). Both appear only on `origin/ccr-35e38073-dx4547` (commits `e0b044e`, `c6f9e3e`), which backs open PR #950 ("Emit capacity_changed from the simulation layer in TypeScript (#906)"), together with the guard test `towerRelayOps.guard.test.ts` that AD-3's "source guard test" implicitly relies on. That branch shares a name with the merged #938 branch, which makes it easy to assume it landed.
+AD-3 lists `towerSetCars` and `towerResizeTransport` beside `setMoney`, `setCars` and the others as today's tier 3 relay ops, and the Consistency Conventions table says the `tower*` prefix is reserved for tier 3. On `origin/main`, `engine-rs/src/wasm.rs` exports neither name (0 matches). Both appear only on PR #950's branch (commits `e0b044e`, `c6f9e3e`), which backs open PR #950 ("Emit capacity_changed from the simulation layer in TypeScript (#906)"), together with the guard test `towerRelayOps.guard.test.ts` that AD-3's "source guard test" implicitly relies on. That branch shares a name with the merged #938 branch, which makes it easy to assume it landed.
 
 **Fix:** mark both ops and the guard test as "pending #950 / #906", or make AD-3 conditional on #950 merging; cite #906 in Binds.
 

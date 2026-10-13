@@ -5,10 +5,10 @@ purpose: build-substrate
 altitude: epic
 paradigm: 'hexagonal: one engine core behind a command port and a read-model port; hosts are adapters'
 scope: 'The web game from the switch behind ?engine=wasm to the 3.0.0 default flip and TypeScript retirement'
-status: final
+status: final  # owner calls listed under Open Questions
 created: '2026-10-13'
 updated: '2026-10-13'
-binds: [FR1, FR2, FR3, FR4, FR5, FR6, roadmap-row-4, roadmap-row-4b, roadmap-row-7]
+binds: [FR1, FR2, FR3, FR4, FR5, FR6, NFR1, NFR3, NFR4, roadmap-row-4, roadmap-row-4b, roadmap-row-5, roadmap-row-6, roadmap-row-7]
 sources:
   - _bmad-output/planning-artifacts/architecture/architecture-engine-rust-port-2026-10-08.md
   - _bmad-output/planning-artifacts/rust-wasm-web-cutover-plan-2026-10.md
@@ -75,10 +75,11 @@ host; nothing in `src/ui` calls the binding directly.
 - **Rule:** the engine's `Clock` owns game time, and the step driver
   (quantum, day pace curve, steps per frame, debt and its reset) moves into
   the crate behind one call that takes real elapsed time, the speed and the
-  steady-clock choice (#867). All of the step math moves, the pace factor,
-  the catch-up cap and the pause handling included; the owed-time debt lives
-  on the engine handle, outside the save and the hash, and resets on a
-  restore. A host never keeps its own game clock. Until
+  steady-clock choice (#867). All of the step math moves: the pace factor,
+  the catch-up cap, pause, the blocking-modal freeze and the speed-change
+  carry drop. Non-finite or negative elapsed time is ignored. The owed-time
+  debt lives on the engine handle, outside the save and the hash, and resets
+  on a restore and a mode change. A host never keeps its own game clock. Until
   #867 lands, the TypeScript driver is the reference and the dual-run day
   gate judges any other driver.
 
@@ -88,20 +89,28 @@ host; nothing in `src/ui` calls the binding directly.
 - **Prevents:** a UI route that changes money, capacity or the tower without
   the engine's charge and refusal rules.
 - **Rule:** every binding export appears in one checked-in tier table, and a
-  test that parses `engine-rs/src/wasm.rs` fails on an export missing from
-  it. Tier 1, player commands (`build`, `buildTransport`, `sellAt`, `addCar`,
-  `removeCar`, `extendTransport`, `removeFacility`, rent, policy, stop and
-  emergency commands), is the only tier `src/ui` and `src/game` may reach.
-  Tier 2, restores and reads, goes through a full save (`fromSave`,
-  `fromVctower`, undo snapshots) or a getter. Tier 3, relay, test and seed
-  ops (on `main`: `setMoney`, `setCars`, `resizeTransport`, `removeUnit`,
-  `removeTransport`, `advanceClock` and the `seed*` calls; PR #950 adds
-  `towerSetCars` and `towerResizeTransport`), is reachable only from
-  `src/dualrun/` and tests, and leaves the production binding (or moves
-  behind a cargo feature) by retirement. The tiers apply to the instance
-  surface the mirror relays as well: a UI write to `sim.money`, or a call to
+  test that parses `engine-rs/src/wasm.rs` (every `pub fn` in an exported
+  `impl` or free function, with or without a `js_name`) fails on an export
+  missing from it. Tier 1, player commands, is the only tier `src/ui` and
+  `src/game` may reach: `build`, `buildTransport`, `sellAt`, `addCar`,
+  `removeCar`, `extendTransport`, `removeFacility`, the rent and policy
+  commands (`adjustRent`, `setNoRate`, `priceUnit`, `applyRentBatch`,
+  `setFilmPolicy`, `rerollSubtype`), the stop and schedule commands,
+  `callExterminator`, `resolveChoice`, the preferences (`setView`,
+  `setAutoBridge`, `toggleAutoBridge`, `setLabel`, `setTowerName`) and
+  `emit` for UI notices. Tier 2, restores and reads: `newGame`, `fromSave`,
+  `fromVctower`, `importTdt`, `exportTdt`, `encodeVctower`, `serialize`,
+  `catalog` and every getter. Tier 3, relay, test, debug and seed ops: on
+  `main`, `setMoney`, `setCars`, `resizeTransport`, `removeUnit`,
+  `removeTransport`, `advanceClock`, `startFire`, `bombThreat`,
+  `evaluateStar`, `seedElevatorTelemetry` and `seedLoopMemos`; PR #950 adds
+  `towerSetCars` and `towerResizeTransport`. Tier 3 is reachable only from
+  `src/dualrun/`, the host's suppressed frame sync in `src/wasmhost/`, and
+  tests, and leaves the production binding (or moves behind a cargo
+  feature) by retirement. The tiers apply to the instance surface the
+  mirror relays as well: a UI write to `sim.money`, or a call to
   `tower.setCars` or `tower.resizeTransport`, is a tier 3 op and fails the
-  same guard. Arguments are validated at the binding boundary (#923).
+  same guard. Argument validation stays with #923.
 
 ### AD-4: An engine-owned, versioned read model
 
@@ -121,8 +130,8 @@ host; nothing in `src/ui` calls the binding directly.
 - **Prevents:** two writers producing different bytes, and a save the
   rollback engine cannot read.
 - **Rule:** the engine encoder writes `.vctower` (byte-exact since #949) and
-  the engine loader reads it; both sides enforce the 32 MiB cap (#941,
-  #944). A save-format version bump ships only with a recorded rollback rule
+  the engine loader reads it; both sides enforce the 32 MiB cap (#944), and
+  both repair lone surrogates the same way (#941, #944). A save-format version bump ships only with a recorded rollback rule
   and never in the same release as the flip.
 
 ### AD-6: Engine-emitted gameplay events [ADOPTED]
@@ -147,15 +156,17 @@ host; nothing in `src/ui` calls the binding directly.
 - **Prevents:** two save writers on one restore path, where the engine boots
   from a TypeScript re-serialization of a save the engine wrote.
 - **Rule:** a load or an undo boots the engine from the engine-written
-  bytes, and the instance's read model is rebuilt from the engine's save.
+  bytes, and the instance's read model is rebuilt from the engine's save. An
+  undo snapshot taken before an attach was written by TypeScript; it loads
+  through the engine's loader like any save.
 
 ## Consistency Conventions
 
 | Concern | Convention |
 | --- | --- |
 | Command results | JSON `{ ok, reason?, delta? }`, with the refusal text in `reason` from the engine's copy |
-| Binding names | camelCase `js_name` for exports; a new tier 3 op that shadows a tier 1 name takes the `tower*` prefix (as PR #950 does); existing ops keep their names |
-| Errors | Binding argument errors throw `JsError`; refusals are `ok: false`, never throws |
+| Binding names | camelCase `js_name` for exports; a bare-tower relay op takes the `tower*` prefix (PR #950); existing ops keep their names |
+| Errors | Binding argument errors throw `JsError`; a refusal returns `ok: false` |
 | Versions | The frame layout version and the catalog digest move only with a lock change |
 
 ## Stack
@@ -190,10 +201,14 @@ src/dualrun/     # relay, shadow, mirror (tier 3 lives here only)
   read-model ports above are what it serializes.
 - **Structural snapshot shape** (#868): its layout is a read-model change
   under AD-4.
-- **Crate release and semver** (#893): the public crate's compatibility
-  policy for consumers outside this repository.
-- **Toolchain majors:** held for the cutover; upstream releases were not
-  re-checked in this run.
+- **Crate release and semver** (#893): the published crate's compatibility
+  policy for its users.
+- **The merge read model** (`mergeSimulation` and its `KEEP` set) has no
+  version; it is replaced by the structural snapshot (#868), so it stays as
+  it is until then.
+- **Toolchain majors:** held for the cutover. The reality-check lens reported
+  newer upstream majors (TypeScript, Vite, Vitest, Rust stable); moving them
+  is separate work.
 
 ## Open Questions
 
@@ -201,6 +216,10 @@ src/dualrun/     # relay, shadow, mirror (tier 3 lives here only)
   precache; decide its precache and version-skew rule (an old cached shell
   with a newer package), make a failed Rust build fail the deploy, and add a
   fallback-use signal, which the retirement gate needs.
-- **AD-1 timing:** before the flip (recommended) or before retirement.
+- **AD-1 timing:** AD-1 and #945 put it before the flip; the owner confirms
+  or moves it to before retirement.
+- **Reference data's home:** CLAUDE.md names `src/engine/facilities.ts` as
+  the source of truth for caps and tuning; at retirement that line moves to
+  `engine-rs` (owner amendment).
 - **Retirement version:** the parent roadmap calls it internal; the
   retirement story's AC5 says major.

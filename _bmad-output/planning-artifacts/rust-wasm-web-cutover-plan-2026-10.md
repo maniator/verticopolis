@@ -1,6 +1,6 @@
 # BMAD: Rust/WASM web cutover, remaining work and release gate
 
-**Status:** Planning, reviewed 2026-10-13. No implementation or cutover is
+**Status:** Planning, reviewed 2026-10-13 against `main` at `87527a0`. No implementation or cutover is
 authorized by this document.
 **Scope:** The public Rust engine (`engine-rs/`), its WASM binding and the
 web host (`src/wasmhost/`, `src/dualrun/`). Nothing else.
@@ -25,7 +25,7 @@ This plan does not restate the roadmap. It records what is already on
 `main`, what the roadmap's stories still owe, the gaps no story owned, and
 the measurable gate for the default flip.
 
-## 2. Where things stand (`main` at `404bb9c`, 2026-10-13)
+## 2. Where things stand (`main` at `87527a0`, 2026-10-13)
 
 | Area | On `main` | Open PR | Still owed |
 | --- | --- | --- | --- |
@@ -34,9 +34,9 @@ the measurable gate for the default flip.
 | Prices and rules | Engine-owned charges (#928, `a412060`); engine catalog with a digest lock, nested validation and charged-price tests (#930, `562f104`) | none | The web UI still reads TypeScript tables (#921); build quote (#922); catalog second slice (#926) |
 | Mutation surface | Player charge commands; the dual-run relay owns the raw ops | #950 (capacity events from the simulation layer, adds relay-only `towerSetCars` and `towerResizeTransport` with a guard test) | Tier every binding export and confine tier 3 (#946, #923) |
 | Read model | `frameView`, `logSince`, elevator telemetry, housekeeping report, `catalog` | none | Binding getters, result shapes, typed arrays, structural snapshot (#868); inspector read models (#919) |
-| Saves | Unicode repair and 32 MiB caps (#941, #944); byte-exact engine writer (#949); engine encoder (#937) | #953 (the web writes through `encodeVctower` under `?engine=wasm`) | JavaScript number semantics for hand-edited saves (#858); RNG state 0 reload (#856); a rollback rule before any save-format bump (AD-5) |
+| Saves | Lone-surrogate repair in the engine (#941); web Unicode repair and the 32 MiB caps (#944); byte-exact engine writer (#949); engine encoder (#937) | #953 (the web writes through `encodeVctower` under `?engine=wasm`) | JavaScript number semantics for hand-edited saves (#858); RNG state 0 reload (#856); a rollback rule before any save-format bump (AD-5) |
 | Gameplay events | Engine events (#903) and the web bridge (#938) | none | Pin fx sequences and counters across engines (#879); drain glue (#907); close-out of #873 |
-| Tests | Conformance lock (19 scenarios), dual-run day gate, e2e on both engines (`chromium-wasm`), nightly fuzzer | #878 in progress | Vitest suites on WASM and the test-mapping table (#878); refusal reasons pinned (#865) |
+| Tests | Conformance lock (22 scenario files, refusal scenarios included), dual-run day gate, e2e on both engines (`chromium-wasm`), nightly fuzzer | #878 in progress | Vitest suites on WASM and the test-mapping table (#878); refusal reasons pinned (#865) |
 | Host lifecycle | Attach, sync, detach, swap away from a trapped engine on load | none | Fallback on throw or panic, undo after a trap, boot timeout (#874); attach after an exterminator booking (#902) |
 | Performance | TypeScript perf gate | none | WASM baseline (#900); stats cost (#905); hour-boundary cost (#849) |
 | Engine consumers | Public crate and lock | none | Crate release with the lock and a semver policy (#893) |
@@ -108,28 +108,31 @@ the owner changes them.
 
 | # | Story | Issue | Priority | Modules | Acceptance criteria | Tests | Depends on |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| S4 | Fall back to TypeScript on an engine throw, panic or boot stall | #874 | P1 for the flip | `src/wasmhost/`, `src/bootstrap.ts` | A throw or panic in a command, tick, undo or redo detaches and re-adopts the last merged save; the boot import has a timeout; refusals the instance accepted are reported | Fault-injection integration tests per path; e2e with a forced trap | S3 |
-| S5 | Attach after an exterminator booking keeps its rooms | #902 | P2 | `engine-rs/src/load.rs`, `src/wasmhost/` | The booked room ids survive the save, so an attach mid-booking matches the instance | Integration test that attaches mid-booking; conformance | none |
+| S4 | Fall back to TypeScript on an engine throw, panic or boot stall | #874 | P1 for the flip | `src/wasmhost/`, `src/bootstrap.ts` | A throw or panic in a command, tick, undo or redo detaches and re-adopts the last merged save; the boot import has a timeout; refusals the instance accepted are reported | Fault-injection integration tests per path, including a trap during an exterminator booking; e2e with a forced trap | none |
+| S5 | Attach after an exterminator booking keeps its rooms | #902 | P2 | `engine-rs/src/load.rs`, the TypeScript loader and writer, `src/wasmhost/` | The booked room ids survive the save in both engines (a lock change, per AD-5), so an attach or a fallback mid-booking keeps the treatment | Integration test that attaches mid-booking; conformance | none |
 | S6 | Binding read model and result shapes | #868 | P1 for the flip | `engine-rs/src/wasm.rs`, `src/wasmhost/` | `canBuild` with its quote, `isUnlocked`, `previewRentBatch`, full `callExterminator` result, unknown kind as a refusal; getters for stats and income; structural snapshot replaces the per-hour save merge | Unit tests per getter; the six merge-per-tick timeouts pass without `VC_WASM_SYNC=hour` | S3 |
 | S7 | The web UI reads the engine catalog | #921, then #922, #926 | P1 (#921), P2 | `src/ui/`, `src/game/`, `engine-rs/src/catalog.rs` | No price, size or rule constant read from `src/engine/facilities.ts` by UI code; build quote from the engine | A source guard test; UI unit tests on catalog values; catalog lock | S6 |
-| S8 | The step driver in the engine | #867 | P1 for the flip | `engine-rs/src/clock.rs` or a sibling module, `src/game/frameLoop.ts` | One engine call takes real seconds, speed and the steady-clock choice and returns the steps it ran; the pace factor, catch-up cap and pause handling move with it; the debt lives on the engine handle outside the save and hash and resets on restore; the web host uses it under `?engine=wasm` | Dual-run day gate with the Rust driver matching every hour; 30, 60 and 144 Hz cadences give identical tick sequences; pause, resume, speed change and a 30-minute hitch | S3 |
+| S8 | The step driver in the engine | #867 | P1 for the flip | `engine-rs/src/clock.rs` or a sibling module, `src/game/frameLoop.ts` | One engine call takes real seconds, speed and the steady-clock choice and returns the steps it ran; the pace factor, catch-up cap, pause, the blocking-modal freeze and the speed-change carry drop move with it; non-finite or negative elapsed time is ignored; the debt lives on the engine handle outside the save and hash and resets on restore and on a mode change; the web host uses it under `?engine=wasm` | Dual-run day gate with the Rust driver matching every hour; 30, 60 and 144 Hz cadences give identical tick sequences; pause, resume, speed change and a long hitch fed straight to the driver (the renderer clamps frames over 200 ms before the host sees them, so the hitch test calls the driver directly) | S3 |
 
 ### Wave 3: one authority
 
 | # | Story | Issue | Priority | Modules | Acceptance criteria | Tests | Depends on |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| S9 | The engine answers commands; the instance mirrors | #954 | P1 | `src/wasmhost/wasmHost.ts`, `src/dualrun/mirror.ts`, `engine-rs/src/wasm.rs` | Under `?engine=wasm` every player command runs on the engine first and the caller gets the engine's result in one shape (`{ ok, reason?, delta? }` plus named fields); the instance skips a refused command; while hosted only the engine logs and emits events; a load or undo boots the engine from engine-written bytes (AD-8); a disagreement is reported and the engine's state wins | A test per command that the returned result is the engine's; a forced disagreement is reported; e2e on `chromium-wasm` | S4, S6 |
-| S10 | Tier every binding export; confine tier 3 | #946, with #923 | P1 | `engine-rs/src/wasm.rs`, `src/dualrun/`, guard tests | Every export listed in one tier table; a test that parses `wasm.rs` fails on an untiered export; a guard fails on a tier 3 call outside `src/dualrun/` and tests, including UI writes to `sim.money` and calls to `tower.setCars` or `tower.resizeTransport` that the mirror would relay; arguments validated at the boundary | Guard tests; boundary validation tests in both engines | S1, S9 |
+| S9 | The engine answers commands; the instance mirrors | #954 | P1 | `src/wasmhost/wasmHost.ts`, `src/dualrun/mirror.ts`, `engine-rs/src/wasm.rs` | Under `?engine=wasm` every player command runs on the engine first and the caller gets the engine's result in one shape (`{ ok, reason?, delta? }` plus named fields); the instance skips a refused command; while hosted only the engine logs and emits events, refusal text comes from the engine's `reason`, and UI notices still reach the log through `emit`; a load or undo boots the engine from engine-written bytes (AD-8); a disagreement is reported and the engine's state wins | A test per command that the returned result is the engine's; a forced disagreement is reported; e2e on `chromium-wasm` | S4, S6 |
+| S10 | Tier every binding export; confine tier 3 | #946, with #923 | P1 | `engine-rs/src/wasm.rs`, `src/dualrun/`, guard tests | Every export listed in one tier table, methods without a `js_name` included; a test that parses `wasm.rs` fails on an untiered export; a guard fails on a tier 3 call outside `src/dualrun/`, the host's suppressed frame sync in `src/wasmhost/`, and tests, including UI writes to `sim.money` and calls to `tower.setCars` or `tower.resizeTransport` that the mirror would relay. Argument validation stays on #923 | Guard tests; boundary validation tests in both engines | S1, S9 |
 | S11 | Refusal reasons and their order pinned | #865 | P2 | `conformance/`, runners | Scenario steps can pin `reason`; a refusals scenario covers the four-star gates | Conformance in both runners | none |
 | S12 | Save edge cases | #858, #856 | P3 | `engine-rs/src/load.rs`, `src/storage/` | Hand-edited numbers load as the TypeScript loader reads them, or fail with the same message; a save at RNG state 0 reloads at state 0 | Loader table cases; round-trip tests | none |
 
 ### Wave 4: the flip
 
-| # | Story | Issue | Priority | Depends on |
-| --- | --- | --- | --- | --- |
-| S13 | Performance baseline and budgets for the engine | #900 (with #905, #849 as found) | P2 | S6 |
-| S14 | Analytics close-out: fx and counter pins, drain glue, #873 | #879, #907, #873 | P3 | S1 |
-| S15 | The release gate, one release on the TypeScript default with the new instrument, then the flip as 3.0.0 | #945 | P1 | S3 to S14 |
+S12 and S14 are P3: if open at the flip, they go in the exception register.
+
+| # | Story | Issue | Priority | Modules | Acceptance criteria | Tests | Depends on |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| S13 | Performance baseline and budgets for the engine | #900 (with #905, #849 as found) | P2 | `e2e/` perf spec, `scripts/` | `npm run perf` compares each engine with its own baseline in CI; the late-game and 5,000+ population fixtures report tick time, cold load and heap for both engines | The perf spec on both engines | S6 |
+| S14 | Analytics close-out: fx and counter pins, drain glue, #873 | #879, #907, #873 | P3 | `engine-rs/src/gameplay.rs`, `src/analyticsEngineBridge.ts` | A deliberate off-by-one at any fx or counter site fails a test in both engines; one typed drain; #873's remaining phases closed or split | Both engines' unit tests; the bridge's consent, session-swap and exactly-once tests | S1 |
+| S16 | Engine package delivery: a content-hashed package URL or a version check, the precache decision, and a fallback-use signal | #945 | P1 for the flip | `src/wasmhost/startWasmHost.ts`, `vite.config.ts`, `scripts/vercel-build.sh` | An old cached shell never runs a newer package (or refuses it with the fallback); the offline rule is decided; each fallback is counted in the host status and, with consent, in analytics | Unit tests for the version check; an e2e that serves a mismatched package; the existing hash guard stays | S4 |
+| S15 | The release gate, one release on the TypeScript default with the new instrument, then the flip as 3.0.0 | #945 | P1 | `package.json` (3.0.0), `src/wasmhost/engineChoice.ts` | Every row in section 6 passes on one commit, with the exception register attached | The rows themselves | S3, S4, S6 to S11, S13, S16 (S5, S12 and S14 enter the exception register if open) |
 
 ### After the flip (not cutover blockers)
 
@@ -137,13 +140,15 @@ the owner changes them.
   command execution move into one worker; rendering and input stay on the
   main thread. Tests cover worker start and restart, stale messages,
   backpressure, step debt, pause and speed changes, background throttling,
-  save and load, and replay. It improves responsiveness, not throughput.
+  save and load, and replay. It helps responsiveness; simulation throughput
+  stays the same.
 - **Parallel phases** (#908 step 3): only after a measured phase profile,
   behind a cargo feature, with the serial step as the reference and the
   referee run with the feature on and off. Shared memory and cross-origin
   isolation costs are assessed before any WASM threads ship.
-- **TDT in the crate** (roadmap row 5), **copy catalog** (row 6), **crate
-  release** (#893), and **retirement** (row 7,
+- **TDT through the engine on the web** (roadmap row 5: the binding already
+  exports `importTdt` and `exportTdt`; the web wiring and the lock remain),
+  **copy catalog** (row 6), **crate release** (#893), and **retirement** (row 7,
   `story-engine-retire-typescript`) after two releases on WASM.
 
 ## 6. Release gate for the default flip (#945)
@@ -155,14 +160,16 @@ the owner's numbers before the gate is binding.
 | --- | --- |
 | Conformance | Every scenario matches in both runners; refusal reasons pinned (S11) |
 | Dual run | A day on every fixture at every speed with no divergence, with the Rust step driver (S8) |
+| Seeded replay | The nightly fuzzer plus a seeded random-command differential that compares full saves, money, logs and gameplay events at each hour; failing seeds kept and shrunk; no divergence over 14 nights |
+| Analytics | Each gameplay event once per action on the engine; consent off sends nothing; a tower swap and a page hide drain exactly once (the #938 bridge tests on `chromium-wasm`) |
 | Unit and integration | The vitest suites pass on the engine, or each exclusion is named in the mapping table (S3) |
 | End to end | The `chromium-wasm` project is green, including a forced-trap fallback spec (S4) |
 | Authority | No command answer comes from the instance (S9, #954); every export tiered and tier 3 confined (S10); the UI reads no TypeScript price or rule table (S7) |
-| Saves | Every fixture and the loader table round-trip byte for byte through the engine; the 32 MiB cap and Unicode cases fail the same way in both engines |
-| Performance (proposed) | Late-game fixture: Modern tick time no slower than TypeScript (roadmap rule); cold load within +500 ms of the TypeScript build; heap within 1.25x; a 5,000+ population fixture holds the frame budget the perf gate already uses |
-| Reliability (proposed) | One release on the TypeScript default with the engine instrument: engine fallback in under 0.1% of sessions that opt in, and no unexplained divergence report |
+| Saves | Every fixture and the loader table round-trip byte for byte through the engine; the 32 MiB cap and Unicode cases fail the same way in both engines; no session latches off the engine writer (#953) during the TypeScript-default release |
+| Performance (proposed) | Late-game fixture: Modern tick time no slower than TypeScript (roadmap rule); cold load within +500 ms of the TypeScript build; heap within 1.25x; a 5,000+ population fixture within the TypeScript engine's own `npm run perf` baseline (S13) |
+| Reliability (proposed) | One release on the TypeScript default with the engine instrument (S16's signal): engine fallback in under 0.1% of engine sessions whose players consented to analytics, and every divergence report triaged to a cause |
 | Rollback | A rehearsal flips the default back with the flag and loads saves written by the engine build |
-| Deployment | The engine package's precache and versioning rule decided (an offline first load, an old cached shell with a newer package); a failed Rust build fails the deploy |
+| Deployment | S16 done: an old cached shell never runs a newer package, the offline rule is decided, and `scripts/vercel-build.sh` keeps its hash guard (a failed rebuild serves the committed package only when its hash matches the sources) |
 | Coverage | `vite.config.ts` floors and the Rust job's line floor hold |
 | Sign-off | The owner approves with the exception register attached |
 
@@ -180,7 +187,12 @@ the owner's numbers before the gate is binding.
    save (AD-5).
 5. **Retirement version.** The roadmap calls retirement internal while the
    retirement story's AC5 says major; one of them changes.
-6. **Malformed saves.** Match the TypeScript loader's coercions exactly (#858),
+6. **Reference data's home.** CLAUDE.md names `src/engine/facilities.ts` as
+   the single source of truth for build caps and tuning, while #921 moves the
+   UI onto the engine catalog. Until retirement both engines carry the values
+   under the lock; at retirement the CLAUDE.md line needs an amendment that
+   names `engine-rs` as the source.
+7. **Malformed saves.** Match the TypeScript loader's coercions exactly (#858),
    or refuse with a message; the recommendation is to match.
 
 ## 8. Issues
@@ -189,7 +201,7 @@ Reused: #865, #867, #868, #874, #878, #879, #893, #900, #902, #906, #907,
 #908, #919, #921, #922, #923, #926, #935, #945, #946, #856, #858, #873.
 
 New: #954 for S9 (engine-authoritative command answers). #945 (the release
-gate) and #946 (binding export tiers) are extended rather than duplicated.
+gate) and #946 (binding export tiers) are extended.
 All three carry backlog rows (`wasm-host-engine-answers`,
 `wasm-cutover-release-gate`, `wasm-binding-export-tiers`).
 

@@ -11,6 +11,14 @@ documentsIncluded:
 
 # Implementation Readiness Assessment Report
 
+> **Scope of this report.** It assessed the plan as it stood at `58f4bf6`,
+> the PR head before this review, against `main` at `562f104`. The plan was
+> then rewritten on `main` at `87527a0` to resolve these findings: it now
+> follows the roadmap's rows instead of epics A to E, cites the architecture
+> document, names #954 for command authority, carries numeric gate rows and
+> current PR states, and has S4 to S16 with dependencies. The findings below
+> are kept as the record of what the review found.
+
 **Date:** 2026-10-13
 **Project:** Verticopolis (public engine and web host: Rust/WASM web cutover)
 
@@ -33,7 +41,7 @@ architecture document or the existing switch and retirement stories.
 
 FR1 (single engine): All gameplay, prices, unlocking, time progression, RNG,
 event eligibility, building, rent, emergencies and refunds are computed by
-Rust. Web clients only send commands and render authoritative results.
+Rust. The web host sends commands and renders the engine's results.
 
 FR2 (behavioral parity): Existing web player journeys keep their outcomes,
 refusal reasons, logs, state transitions and undo/redo behavior, in Classic
@@ -53,8 +61,8 @@ frame-rate-independent gameplay, bounded memory, WASM-host lifecycle recovery,
 cancellation, attach and detach, and observable failure reporting.
 
 FR6 (engine consumers): One public engine crate with compatible saves and
-commands for the web and any other consumer; a shared-rule change passes the
-public gates.
+commands and a published compatibility policy; a shared-rule change passes
+the public gates.
 
 Total FRs: 6
 
@@ -138,8 +146,8 @@ public issues.
 ### UX Document Status
 
 Not found, and not required: the cutover must change no player-facing
-surface (the major version bump at the flip is a milestone marker, not a UX
-change).
+surface; the major version bump at the flip marks a milestone and changes
+no screen.
 
 ### Alignment Issues
 
@@ -149,7 +157,7 @@ by #865 and #878.
 ### Warnings
 
 The failure fallback (#874) needs a player-visible message rule if the
-engine traps mid-session; that is copy, not a UX document.
+engine traps mid-session; a line of copy covers it.
 
 ## Epic Quality Review
 
@@ -175,7 +183,8 @@ engine traps mid-session; that is copy, not a UX document.
 
 ### Minor Concerns
 
-- "robust" in FR5 (Copilot thread on line 31) breaks the prose rules.
+- FR5 used a word from the prose rules' banned marketing list (the Copilot
+  thread on line 31).
 - "Existing issues should be extended" without naming #945 and #946, which
   were opened for this plan.
 
@@ -203,16 +212,17 @@ need an owner.
 
 ### Recommended Next Steps
 
-1. Land #950 and #953 (open), then #878 and #874, then the command-authority
-   story, then the flip checklist in #945.
+1. Land #950 and #953 (open), then #878, #874 and #868, then the
+   command-authority story (#954), then the flip checklist in #945.
 2. Keep the dedicated Web Worker (#908) after the flip, and parallel phases
    behind a measured profile.
 3. Re-run this assessment when #878 closes.
 
 ### Final Note
 
-This assessment identified 11 issues across 4 categories (coverage, quality,
-staleness, prose). Address the critical issues before implementation stories
+This assessment found three missing owners (command authority, numeric
+gates, raw mutation confinement), one critical structural issue (a second
+plan beside the roadmap), four major issues and two minor ones. Address the critical issues before implementation stories
 start.
 
 Assessor: BMAD implementation-readiness workflow, run 2026-10-13. Steps 3-6

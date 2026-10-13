@@ -139,7 +139,7 @@ cap".
 - Unit B (frame loop) keeps its catch-up cap and its pace factor, since AD-2
   does not list them, and passes paced, capped minutes.
 - Result: pace applied twice and the cap applied to the wrong quantity; two
-  two hosts cut time differently, which AD-2 exists to prevent.
+  hosts cut time differently, which AD-2 exists to prevent.
   Also unstated: whether the debt lives in `Simulation` (and so could enter
   the save or hash) or on the handle, and whether a tier-2 restore resets it.
 
