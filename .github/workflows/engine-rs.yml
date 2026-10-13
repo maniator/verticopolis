@@ -82,8 +82,9 @@ permissions:
 jobs:
   # A host outside the web game: engine-rs/consumer/ depends on the engine by
   # path and drives it through the documented surface (engine-rs/API.md). The
-  # checkout holds only engine-rs/ and conformance/, and the Node.js commands
-  # on PATH are stubs that fail, so the engine library and the consumer are
+  # checkout holds only engine-rs/ and conformance/, the runner's Node.js
+  # installs are deleted and every Node.js command on PATH is a stub that
+  # fails, so the engine library and the consumer are
   # shown to build and run, and to replay every scenario that starts from a
   # new game, without the web game or a Node.js toolchain. (The scenarios
   # that start from a save fixture need src/tests/fixtures/ until stage 3 of
@@ -109,8 +110,14 @@ jobs:
           test -f engine-rs/Cargo.toml
           test -f conformance/expected.json
 
-      - name: Shadow Node.js
+      - name: Remove and shadow Node.js
         run: |
+          # The runner image ships Node.js; delete every copy so a build
+          # script cannot reach one by absolute path, then shadow the names.
+          for n in node nodejs npm npx corepack yarn pnpm bun; do
+            for p in $(type -ap "$n"); do sudo rm -f "$(readlink -f "$p")" "$p"; done
+          done
+          sudo rm -rf /opt/hostedtoolcache/node /usr/local/lib/node_modules
           stub="$RUNNER_TEMP/no-node"
           mkdir -p "$stub"
           for n in node nodejs npm npx corepack yarn pnpm bun; do
@@ -129,6 +136,13 @@ jobs:
           for n in node nodejs npm npx corepack yarn pnpm bun; do
             if "$n" --version; then echo "$n still runs"; exit 1; fi
           done
+          # Only the stubs are left on PATH, and the image's install
+          # locations are gone.
+          for n in node nodejs npm npx; do
+            test "$(type -ap "$n")" = "$RUNNER_TEMP/no-node/$n"
+          done
+          test ! -e /usr/local/bin/node
+          test ! -e /opt/hostedtoolcache/node
 
       - name: The engine library builds alone
         working-directory: engine-rs
@@ -141,8 +155,9 @@ jobs:
           cargo clippy --locked --all-targets -- -D warnings
           # The JavaScript binding is a feature a native host never turns on,
           # and nothing in the tree reaches a browser or the host's entropy.
-          # The tree is captured first so a cargo failure fails the step.
-          tree="$(cargo tree --locked -e normal --prefix none)"
+          # Normal and build dependencies on every target count; the tree is
+          # captured first so a cargo failure fails the step.
+          tree="$(cargo tree --locked -e normal,build --target all --prefix none)"
           test -n "$tree"
           if grep -E '^(wasm-bindgen|js-sys|web-sys|getrandom) ' <<<"$tree"; then
             echo "a browser or host crate reached a native host's tree"; exit 1

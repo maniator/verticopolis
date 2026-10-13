@@ -18,7 +18,9 @@ use verticopolis_engine::charges::ExtendEnd;
 use verticopolis_engine::clock::GameMode;
 use verticopolis_engine::facilities::Kind;
 use verticopolis_engine::gameplay::{check_catalog, check_event, RemovalMethod, CATALOG_JSON};
-use verticopolis_engine::load::{decode_vctower, deserialize, encode_simulation_vctower};
+use verticopolis_engine::load::{
+    decode_vctower, deserialize, encode_simulation_vctower, encode_vctower, stamp_save,
+};
 use verticopolis_engine::rent::BatchTarget;
 use verticopolis_engine::scenario::{run_scenario, state_view, Checkpoint, Scenario, Start};
 use verticopolis_engine::sim::Simulation;
@@ -317,6 +319,12 @@ pub fn advance(sim: &mut Simulation, minutes: u32, events: &Value) -> Result<usi
 /// the same as the one that wrote it.
 pub fn round_trip(sim: &Simulation) -> Result<(Simulation, usize), String> {
     let bytes = encode_simulation_vctower(sim, APP_VERSION, SAVED_AT_MS)?;
+    // The same file in two steps, for a host that holds the save JSON.
+    let mut save = sim.serialize();
+    stamp_save(&mut save, APP_VERSION, SAVED_AT_MS)?;
+    if encode_vctower(&save)? != bytes {
+        return Err("stamp_save and encode_vctower wrote another file".into());
+    }
     let text = std::str::from_utf8(&bytes).map_err(|e| e.to_string())?;
     let raw = decode_vctower(text)?;
     if raw["appVersion"] != APP_VERSION {
@@ -506,14 +514,36 @@ mod tests {
     fn the_new_game_scenarios_are_found() {
         let ids = new_game_scenarios(&conformance_dir()).expect("scenario dir");
         assert!(ids.contains(&"starter-classic".to_string()), "{ids:?}");
+        let files = std::fs::read_dir(conformance_dir().join("scenarios"))
+            .expect("scenario dir")
+            .count();
         assert!(
-            !ids.contains(&"amenities-modern".to_string()),
-            "a fixture start"
+            ids.len() > 1 && ids.len() < files,
+            "some scenarios start from a fixture: {} of {files}",
+            ids.len()
         );
     }
 
     #[test]
-    fn a_missing_scenario_is_an_error() {
-        assert!(replay(&conformance_dir(), "no-such-scenario").is_err());
+    fn a_lock_entry_without_its_scenario_or_checkpoints_is_an_error() {
+        let dir = std::env::temp_dir().join(format!("vc-consumer-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("scenarios")).expect("temp dir");
+        let checkpoint =
+            serde_json::json!({ "label": "start", "state": "0", "crowd": "0", "events": "0" });
+        let lock = serde_json::json!({ "scenarios": { "gone": [checkpoint], "empty": [] } });
+        std::fs::write(dir.join("expected.json"), lock.to_string()).expect("lock");
+        std::fs::copy(
+            conformance_dir().join("scenarios/starter-classic.json"),
+            dir.join("scenarios/empty.json"),
+        )
+        .expect("scenario");
+        let gone = replay(&dir, "gone");
+        let empty = replay(&dir, "empty");
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(
+            gone.unwrap_err().contains("cannot read"),
+            "the scenario file is read"
+        );
+        assert!(empty.unwrap_err().contains("no checkpoint"));
     }
 }

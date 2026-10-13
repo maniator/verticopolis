@@ -11,15 +11,21 @@ proves it runs the real simulation by replaying the conformance suite
 outside the engine that depends on it by path and makes every tier 1 call
 below. The `consumer` job in `.github/workflows/engine-rs.yml` builds and
 runs it from a checkout holding only `engine-rs/` and `conformance/`, with
-Node.js unavailable. The plan this page belongs to is issue #980.
+the runner's Node.js deleted and every Node.js command a failing stub. The plan this page belongs to is issue #980.
 
 ## Depending on the engine
+
+One of these two:
 
 ```toml
 [dependencies]
 # From a checkout of this repository:
 verticopolis-engine = { path = "../verticopolis/engine-rs" }
-# Or pinned to a commit:
+```
+
+```toml
+[dependencies]
+# Pinned to a commit:
 verticopolis-engine = { git = "https://github.com/maniator/verticopolis", rev = "<sha>" }
 ```
 
@@ -27,15 +33,22 @@ Default features only. The `wasm` feature is the JavaScript binding
 (`src/wasm.rs`) and a native host leaves it off. The build needs the Rust
 toolchain in `Cargo.toml` (`rust-version`) and the `engine-rs/` and
 `conformance/` directories (the event catalog is compiled in from there).
-It needs no Node.js, no npm and nothing else from the web game.
+It needs no Node.js, no npm and nothing else from the web game. Because the
+crate reads `../conformance/` at compile time, it builds from a checkout of
+the whole repository (which a path or git dependency gives you) and cannot
+be packaged on its own yet (#893).
 
 A game does no IO. The simulation reads no file, clock, environment,
 console or network, and spawns no thread or process; the host passes in
 bytes, time and its build name. The one exception is the conformance
 harness (`scenario.rs`, `tdt/referee.rs`), which reads the scenario and
 fixture files it is pointed at and is never reached from a running game.
-`tests/independence.rs` fails if any other library code reaches for those
-services.
+`tests/independence.rs` scans the library source for those services (by
+path, grouped import, macro and foreign-function block), refuses a build
+script, a `#[path]` module or an include from outside `engine-rs/` and
+`conformance/`, and fails when `Cargo.lock` names a crate nobody reviewed
+for host access. It reads source text, so it catches the ordinary
+spellings; review still owns the rest.
 
 ## The host API
 
@@ -54,7 +67,7 @@ conformance.
 | Gameplay events | `sim.gameplay.drain()` after each frame; `to_json()` on each event; names and payloads are listed in `conformance/events/catalog.json` (`gameplay::CATALOG_JSON`, checked with `check_event`). The buffer holds `GAMEPLAY_RING_CAP` events and counts any it had to drop in `sim.gameplay.dropped` |
 | Reference data | `catalog::catalog(mode)`: prices, sizes, caps and rules per facility kind, versioned by `CATALOG_VERSION` |
 | Snapshot hash | `canonical::digest(&scenario::state_view(&sim))`: the hashed view the conformance lock pins. `state_view` is tier 1 although it lives in the harness module until stage 2 of #980 moves it |
-| Save | `load::encode_simulation_vctower(&sim, app_version, saved_at_ms)`: the `.vctower` bytes the web game writes; `sim.serialize()` for the JSON |
+| Save | `load::encode_simulation_vctower(&sim, app_version, saved_at_ms)`: the `.vctower` bytes the web game writes. A host that holds the save JSON (`sim.serialize()`) gets the same file from `load::stamp_save(&mut save, app_version, saved_at_ms)` then `load::encode_vctower(&save)` |
 | Load | `load::decode_vctower(text)` then `load::deserialize(&save)` |
 | 1994 saves | `import_tdt(bytes, filename)` and `export_tdt(save_json)` |
 | Conformance (tier 2) | `scenario::Scenario::parse` and `scenario::run_scenario`, compared with `expected.json` (as `consumer/` does for every scenario that starts from a new game), or `cargo run --bin conformance` from this directory for the whole suite |

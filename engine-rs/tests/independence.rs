@@ -19,35 +19,115 @@ use std::path::{Path, PathBuf};
 /// feature is a later stage of the engine-independence plan (#980).
 const MAY_READ_FILES: &[&str] = &["src/scenario.rs", "src/tdt/referee.rs"];
 
-/// Host services the simulation never reaches for, as they read with the
-/// whitespace taken out: the host owns IO, time, threads and the process.
-/// `std::fs` is checked separately against [`MAY_READ_FILES`].
+/// Host services the simulation never reaches for, as they read in
+/// [`squeeze`]d code: the host owns IO, time, threads, the process and
+/// foreign code. A needle that starts with a letter matches only at the start
+/// of a word, so `print!(` does not match `blueprint!(`.
+/// `std::fs` and `std::path` are checked separately against
+/// [`MAY_READ_FILES`].
 const HOST_ONLY: &[&str] = &[
     "std::env",
     "std::net",
     "std::process",
     "std::time",
     "std::thread",
-    "std::io::stdin",
-    "std::io::stdout",
-    "std::io::stderr",
+    "std::os",
+    "io::stdin",
+    "io::stdout",
+    "io::stderr",
+    "stdin(",
+    "stdout(",
+    "stderr(",
+    "extern{",
+    "extern fn",
+    "libc::",
     "SystemTime",
     "Instant::now",
-    "env!(",
-    "option_env!(",
-    "print!(",
-    "println!(",
-    "eprint!(",
-    "eprintln!(",
-    "dbg!(",
+    "env!",
+    "option_env!",
+    "print!",
+    "println!",
+    "eprint!",
+    "eprintln!",
+    "dbg!",
 ];
 
 /// The `std` modules a grouped import (`use std::{...}`) may not name.
 const HOST_MODULES: &[&str] = &["env", "net", "process", "time", "thread"];
 
-/// Crates that reach a browser or the host's entropy. None may be in the
-/// lock, optional or not.
-const BROWSER_OR_HOST_CRATES: &[&str] = &["getrandom", "js-sys", "web-sys"];
+/// Every package `Cargo.lock` may name, optional ones (the binding's)
+/// included. A host service can arrive through a dependency without a
+/// `std::` path in `src/`, so a new crate fails this test until it is
+/// reviewed and listed here. Never list a crate that reaches a browser, the
+/// host's entropy, clock, console, threads or files on its own (`getrandom`,
+/// `js-sys`, `web-sys`, a logger, a thread pool, a time library).
+const ALLOWED_CRATES: &[&str] = &[
+    "adler2",
+    "base64",
+    "block-buffer",
+    "bumpalo",
+    "cfg-if",
+    "const-oid",
+    "cpufeatures",
+    "crc32fast",
+    "crypto-common",
+    "digest",
+    "equivalent",
+    "flate2",
+    "hashbrown",
+    "hybrid-array",
+    "indexmap",
+    "itoa",
+    "libc",
+    "memchr",
+    "miniz_oxide",
+    "once_cell",
+    "proc-macro2",
+    "quote",
+    "rustversion",
+    "ryu",
+    "serde",
+    "serde_core",
+    "serde_derive",
+    "serde_json",
+    "sha2",
+    "simd-adler32",
+    "syn",
+    "typenum",
+    "unicode-ident",
+    "verticopolis-engine",
+    "wasm-bindgen",
+    "wasm-bindgen-macro",
+    "wasm-bindgen-macro-support",
+    "wasm-bindgen-shared",
+    "zlib-rs",
+    "zmij",
+];
+
+/// Marks a test file found by Rust's default module lookup, which starts in
+/// the module's own directory rather than the file's.
+const MODULE_DIR: &str = "<module>/";
+
+/// What may follow `#[cfg(test)]` (after other attributes and a visibility):
+/// the keywords that start an item. Anything else (a field, a variant, a
+/// match arm, a statement) stops the test, since the scan cannot tell where
+/// such a thing ends.
+const ITEM_KEYWORDS: &[&str] = &[
+    "mod",
+    "fn",
+    "impl",
+    "use",
+    "const",
+    "static",
+    "struct",
+    "enum",
+    "trait",
+    "type",
+    "macro_rules",
+    "extern",
+    "unsafe",
+    "async",
+];
 
 fn crate_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -228,6 +308,38 @@ fn strip_tests(name: &str, src: &str) -> (String, Vec<String>) {
         if parts[at] != Part::Code {
             continue;
         }
+        // Past whitespace, further attributes and a visibility, to the word
+        // that says what the attribute is on.
+        let mut k = from;
+        loop {
+            while k < b.len() && b[k].is_ascii_whitespace() {
+                k += 1;
+            }
+            if b.get(k) == Some(&b'#') {
+                let close = src[k..].find(']').expect("an attribute closes");
+                k += close + 1;
+                continue;
+            }
+            break;
+        }
+        let word = |k: usize| {
+            let n = b[k..].iter().take_while(|c| is_ident(**c)).count();
+            &src[k..k + n]
+        };
+        if word(k) == "pub" {
+            k += 3;
+            if b.get(k) == Some(&b'(') {
+                k += src[k..].find(')').expect("a visibility closes") + 1;
+            }
+            while k < b.len() && b[k].is_ascii_whitespace() {
+                k += 1;
+            }
+        }
+        assert!(
+            ITEM_KEYWORDS.contains(&word(k)),
+            "{name}: the #[cfg(test)] at byte {at} is not on an item ({:?})",
+            word(k)
+        );
         let mut depth: i64 = 0;
         let mut end = None;
         for i in from..b.len() {
@@ -255,15 +367,22 @@ fn strip_tests(name: &str, src: &str) -> (String, Vec<String>) {
             }
         }
         let end = end.unwrap_or_else(|| panic!("{name}: the #[cfg(test)] at byte {at} never ends"));
-        let item = &src[at..end];
-        let mut rest = item;
-        while let Some(p) = rest.find("#[path") {
-            rest = &rest[p + 6..];
-            let open = rest.find('"').expect("a #[path] names a file");
-            let close = rest[open + 1..].find('"').expect("the path closes");
-            test_paths.push(rest[open + 1..open + 1 + close].to_string());
-            rest = &rest[open + 1 + close + 1..];
+        let paths = path_attributes(src, &parts, at, end);
+        if paths.is_empty() {
+            // `#[cfg(test)] mod name;` loads `name.rs` or `name/mod.rs` from
+            // the module's directory; record it the way a #[path] is.
+            let item = squeeze(
+                &src[k..end]
+                    .chars()
+                    .filter(|c| !c.is_control() || *c == ' ')
+                    .collect::<String>(),
+            );
+            if let Some(m) = item.strip_prefix("mod ").and_then(|m| m.strip_suffix(';')) {
+                test_paths.push(format!("{MODULE_DIR}{m}.rs"));
+                test_paths.push(format!("{MODULE_DIR}{m}/mod.rs"));
+            }
         }
+        test_paths.extend(paths);
         keep[at..end].iter_mut().for_each(|k| *k = false);
         from = end;
     }
@@ -275,15 +394,42 @@ fn strip_tests(name: &str, src: &str) -> (String, Vec<String>) {
     (kept, test_paths)
 }
 
+/// The files the `#[path = "..."]` attributes in `src[from..to]` name, read
+/// only where the attribute is code (a comment or a string that mentions one
+/// does not count).
+fn path_attributes(src: &str, parts: &[Part], from: usize, to: usize) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut at = from;
+    while let Some(off) = src[at..to].find("#[path") {
+        let p = at + off;
+        at = p + 6;
+        if parts[p] != Part::Code {
+            continue;
+        }
+        let open = p + src[p..to].find('"').expect("a #[path] names a file");
+        let close = open + 1 + src[open + 1..to].find('"').expect("the path closes");
+        out.push(src[open + 1..close].to_string());
+        at = close;
+    }
+    out
+}
+
 fn library(name: &str, src: &str) -> (Library, Vec<String>) {
     let (src, test_paths) = strip_tests(name, src);
     let parts = parts(&src);
+    // Byte for byte, so an offset in `code` is the same offset in `src`.
     let code = src
         .char_indices()
-        .map(|(i, c)| match (parts[i], c) {
-            (Part::Code, c) => c,
-            (_, '\n') => '\n',
-            _ => ' ',
+        .flat_map(|(i, c)| {
+            let blank = match (parts[i], c) {
+                (Part::Code, _) => None,
+                (_, '\n') => Some('\n'),
+                _ => Some(' '),
+            };
+            match blank {
+                None => vec![c],
+                Some(b) => vec![b; c.len_utf8()],
+            }
         })
         .collect();
     (Library { code, src, parts }, test_paths)
@@ -302,8 +448,17 @@ fn library_sources() -> Vec<(String, Library)> {
         }
         let src = std::fs::read_to_string(p).expect("source reads");
         let (lib, paths) = library(&name, &src);
+        let dir = p.parent().expect("dir");
         for t in paths {
-            test_only.push(rel(&p.parent().expect("dir").join(t)));
+            let file = match t.strip_prefix(MODULE_DIR) {
+                // `lib.rs` and `mod.rs` own their directory; `foo.rs` owns `foo/`.
+                Some(t) if matches!(name.rsplit('/').next(), Some("lib.rs" | "mod.rs")) => {
+                    dir.join(t)
+                }
+                Some(t) => dir.join(p.file_stem().expect("stem")).join(t),
+                None => dir.join(t),
+            };
+            test_only.push(rel(&file));
         }
         out.push((name, lib));
     }
@@ -312,23 +467,48 @@ fn library_sources() -> Vec<(String, Library)> {
     out
 }
 
-/// The code with every whitespace character removed, so `std :: env` and a
-/// path wrapped over two lines read as `std::env`.
-fn compact(code: &str) -> String {
-    code.chars().filter(|c| !c.is_whitespace()).collect()
+/// The code with whitespace dropped except one space between two words, so
+/// `std :: env` and a path wrapped over two lines read as `std::env` while
+/// `pub extern "C" fn` reads as `pub extern fn`.
+fn squeeze(code: &str) -> String {
+    let mut out = String::with_capacity(code.len());
+    let mut gap = false;
+    for c in code.chars() {
+        if c.is_whitespace() {
+            gap = true;
+            continue;
+        }
+        let word = |c: char| c.is_ascii() && is_ident(c as u8);
+        if gap && out.chars().last().is_some_and(word) && word(c) {
+            out.push(' ');
+        }
+        gap = false;
+        out.push(c);
+    }
+    out
+}
+
+/// Whether `needle` occurs in `hay`, at the start of a word when the needle
+/// starts with one.
+fn has(hay: &str, needle: &str) -> bool {
+    let wordy = needle.as_bytes()[0].is_ascii_alphabetic();
+    hay.match_indices(needle)
+        .any(|(i, _)| !wordy || i == 0 || !is_ident(hay.as_bytes()[i - 1]))
 }
 
 /// The host services `code` reaches: the [`HOST_ONLY`] paths, the
 /// [`HOST_MODULES`] and `fs` named in a grouped `std` import, and `std::fs`.
 /// Returns (services, reads files).
 fn host_services(code: &str) -> (Vec<String>, bool) {
-    let c = compact(code);
+    let c = squeeze(code);
     let mut found: Vec<String> = HOST_ONLY
         .iter()
-        .filter(|n| c.contains(*n))
+        .filter(|n| has(&c, n))
         .map(|n| n.to_string())
         .collect();
-    let mut reads_files = c.contains("std::fs");
+    // A path is how code reaches the file system without `std::fs`
+    // (`Path::exists`, `read_dir`, `metadata`).
+    let mut reads_files = has(&c, "std::fs") || has(&c, "std::path");
     let mut rest = c.as_str();
     while let Some(at) = rest.find("std::{") {
         let group = &rest[at + 5..];
@@ -371,7 +551,7 @@ fn host_services(code: &str) -> (Vec<String>, bool) {
             }
         }
         for h in heads {
-            if h == "fs" {
+            if h == "fs" || h == "path" {
                 reads_files = true;
             } else if HOST_MODULES.contains(&h.as_str()) {
                 found.push(format!("std::{{{h}}}"));
@@ -395,7 +575,7 @@ fn the_library_uses_no_host_service() {
         let (services, reads_files) = host_services(&lib.code);
         found.extend(services.into_iter().map(|s| format!("{name}: {s}")));
         if reads_files && !MAY_READ_FILES.contains(&name.as_str()) {
-            found.push(format!("{name}: std::fs"));
+            found.push(format!("{name}: file access (std::fs or std::path)"));
         }
     }
     assert!(
@@ -408,18 +588,22 @@ fn the_library_uses_no_host_service() {
 fn the_javascript_binding_stays_in_wasm_rs() {
     let found: Vec<String> = library_sources()
         .into_iter()
-        .filter(|(name, lib)| name != "src/wasm.rs" && compact(&lib.code).contains("wasm_bindgen"))
+        .filter(|(name, lib)| name != "src/wasm.rs" && has(&squeeze(&lib.code), "wasm_bindgen"))
         .map(|(name, _)| name)
         .collect();
     assert!(
         found.is_empty(),
         "wasm_bindgen outside src/wasm.rs: {found:?}"
     );
-    let lib = std::fs::read_to_string(crate_dir().join("src/lib.rs"))
+    let text = std::fs::read_to_string(crate_dir().join("src/lib.rs"))
         .expect("lib.rs")
         .replace("\r\n", "\n");
-    let lines: Vec<&str> = lib.lines().map(str::trim).collect();
-    let at = lines
+    let (lib, _) = library("src/lib.rs", &text);
+    // The comments are blank here, so a commented-out line does not count;
+    // the attribute is matched on the source line it sits on.
+    let code: Vec<&str> = lib.code.lines().map(str::trim).collect();
+    let lines: Vec<&str> = lib.src.lines().map(str::trim).collect();
+    let at = code
         .iter()
         .position(|l| l.ends_with("mod wasm;"))
         .expect("lib.rs declares the wasm module");
@@ -431,8 +615,8 @@ fn the_javascript_binding_stays_in_wasm_rs() {
 }
 
 /// The files a library source compiles in: the path of every `include!`,
-/// `include_str!` and `include_bytes!`, or `Err` for an argument that is not
-/// a plain string literal.
+/// `include_str!` and `include_bytes!` and of every `#[path]` module, or
+/// `Err` for an argument that is not a plain string literal without escapes.
 fn included(lib: &Library) -> Vec<Result<String, String>> {
     let b = lib.src.as_bytes();
     let skip = |mut i: usize| {
@@ -463,10 +647,28 @@ fn included(lib: &Library) -> Vec<Result<String, String>> {
             let end = (arg..b.len())
                 .find(|i| lib.parts[*i] != Part::Literal)
                 .unwrap_or(b.len());
-            let lit = lib.src[arg..end].trim_start_matches(['b', 'r']);
-            out.push(Ok(lit.trim_matches('#').trim_matches('"').to_string()));
+            let lit = &lib.src[arg..end];
+            let raw = lit.starts_with('r') || lit.starts_with("br");
+            let value = lit
+                .trim_start_matches('b')
+                .trim_start_matches('r')
+                .trim_matches('#');
+            let value = value
+                .strip_prefix('"')
+                .and_then(|v| v.strip_suffix('"'))
+                .unwrap_or(value);
+            if !raw && value.contains('\\') {
+                out.push(Err(format!("{mac} at byte {at} escapes its path")));
+            } else {
+                out.push(Ok(value.to_string()));
+            }
         }
     }
+    out.extend(
+        path_attributes(&lib.src, &lib.parts, 0, lib.src.len())
+            .into_iter()
+            .map(Ok),
+    );
     out
 }
 
@@ -494,17 +696,17 @@ fn compiled_in_data_comes_from_the_crate_or_the_conformance_suite() {
     );
 }
 
-/// The `key = value` lines of one `[section]` of a TOML file.
-fn toml_section<'a>(toml: &'a str, section: &str) -> Vec<(&'a str, &'a str)> {
-    let header = format!("[{section}]");
+/// The `key = value` lines of every TOML section whose header `keep`
+/// accepts, with the spaces taken out of the value.
+fn toml_keys(toml: &str, keep: impl Fn(&str) -> bool) -> Vec<(String, String)> {
     let mut inside = false;
     let mut out = Vec::new();
     for line in toml.lines().map(str::trim) {
         if line.starts_with('[') {
-            inside = line == header;
+            inside = keep(line);
         } else if inside {
             if let Some((k, v)) = line.split_once('=') {
-                out.push((k.trim(), v.trim()));
+                out.push((k.trim().to_string(), v.replace(' ', "")));
             }
         }
     }
@@ -514,29 +716,55 @@ fn toml_section<'a>(toml: &'a str, section: &str) -> Vec<(&'a str, &'a str)> {
 #[test]
 fn the_binding_is_an_optional_feature() {
     let toml = std::fs::read_to_string(crate_dir().join("Cargo.toml")).expect("Cargo.toml");
-    let deps = toml_section(&toml, "dependencies");
-    let wasm = deps
-        .iter()
-        .find(|(k, _)| *k == "wasm-bindgen")
-        .expect("wasm-bindgen is declared under [dependencies]");
     assert!(
-        wasm.1.contains("optional = true"),
+        !toml
+            .lines()
+            .any(|l| l.trim().starts_with("[dependencies.") || l.trim().starts_with("[target.")),
+        "declare dependencies inline under [dependencies] so this test can read them"
+    );
+    let wasm: Vec<_> = toml_keys(&toml, |h| h.ends_with("dependencies]"))
+        .into_iter()
+        .filter(|(k, _)| k == "wasm-bindgen")
+        .collect();
+    assert_eq!(wasm.len(), 1, "wasm-bindgen is declared once");
+    assert!(
+        wasm[0].1.contains("optional=true"),
         "wasm-bindgen must stay optional: {}",
-        wasm.1
+        wasm[0].1
     );
     assert!(
-        !toml_section(&toml, "features")
+        toml_keys(&toml, |h| h == "[features]")
             .iter()
-            .any(|(k, _)| *k == "default"),
+            .all(|(k, v)| k != "default" || v == "[]"),
         "the crate has no default features, so a host links no binding by default"
     );
+}
+
+#[test]
+fn no_build_script_runs_on_the_host() {
+    let toml = std::fs::read_to_string(crate_dir().join("Cargo.toml")).expect("Cargo.toml");
+    assert!(
+        !crate_dir().join("build.rs").exists()
+            && toml_keys(&toml, |h| h == "[package]")
+                .iter()
+                .all(|(k, _)| k != "build"),
+        "a build script runs on every consumer's machine and is outside these checks"
+    );
+}
+
+#[test]
+fn every_locked_crate_is_reviewed() {
     let lock = std::fs::read_to_string(crate_dir().join("Cargo.lock")).expect("Cargo.lock");
-    for c in BROWSER_OR_HOST_CRATES {
-        assert!(
-            !lock.lines().any(|l| l == format!("name = \"{c}\"")),
-            "{c} reaches a browser or the host's entropy and is in Cargo.lock"
-        );
-    }
+    let unlisted: Vec<&str> = lock
+        .lines()
+        .filter_map(|l| l.strip_prefix("name = \""))
+        .map(|n| n.trim_end_matches('"'))
+        .filter(|n| !ALLOWED_CRATES.contains(n))
+        .collect();
+    assert!(
+        unlisted.is_empty(),
+        "crates not reviewed for host access (see ALLOWED_CRATES): {unlisted:?}"
+    );
 }
 
 #[test]
@@ -585,21 +813,36 @@ fn the_scanner_finds_every_spelling_of_a_host_service() {
         ),
         ("use std::{time::Instant};", "std::{time}"),
         ("use std::{io::{stdout, Write}};", "std::{io::std*}"),
+        (
+            "use std::io::{stdout, Write}; fn f() { stdout().flush(); }",
+            "stdout(",
+        ),
+        ("use std::io; fn f() { io::stderr(); }", "io::stderr"),
         ("fn f() { std :: thread :: sleep(d); }", "std::thread"),
-        ("fn f() { println!(\"x\"); }", "println!("),
+        ("fn f() { println!(\"x\"); }", "println!"),
+        ("fn f() { println!{\"x\"} }", "println!"),
         ("fn f() { let t = Instant::now(); }", "Instant::now"),
+        ("use std::os::unix::net::UnixStream;", "std::os"),
+        ("extern \"C\" { fn open(p: *const u8) -> i32; }", "extern{"),
+        ("pub extern \"C\" fn hook() {}", "extern fn"),
     ] {
         let (lib, _) = library("sample", src);
         let (services, _) = host_services(&lib.code);
         assert!(services.contains(&want.to_string()), "{src}: {services:?}");
     }
-    for src in ["use std::{io, fs};", "use std::{fs::File, io::Read};"] {
+    for src in [
+        "use std::{io, fs};",
+        "use std::{fs::File, io::Read};",
+        "use std::path::Path; fn f(p: &str) -> bool { Path::new(p).exists() }",
+        "use std::{path::Path};",
+    ] {
         let (lib, _) = library("sample", src);
         assert!(host_services(&lib.code).1, "{src} reads files");
     }
     let (lib, _) = library(
         "sample",
-        "use std::{io::Read, collections::HashMap}; fn refs(a: u8, refs: u8) {}",
+        "use std::{io::Read, collections::HashMap}; fn refs(a: u8, refs: u8) {} \
+         macro_rules! blueprint { () => {} } fn g() { blueprint!(); my_env!(); }",
     );
     assert_eq!(
         host_services(&lib.code),
@@ -611,14 +854,19 @@ fn the_scanner_finds_every_spelling_of_a_host_service() {
 #[test]
 fn the_scanner_reads_every_include_form() {
     let src = r##"
+// floors 30–60 → a comment with multibyte characters before the includes
 const A: &str = include_str!("../../conformance/a.json");
 const B: &str = include_str!(
     "../../src/b.ts"
 );
 const C: &[u8] = include_bytes! (r#"../../src/c.bin"#);
 const D: &str = include_str!(concat!("x", "y"));
-const E: &str = "include_str!(\"in a string";
+const E: &str = "include_str!(\"in a string ×";
+const F: &str = include_str!("..\x2f..\x2fsrc/f.ts");
 include!("../../src/e.rs");
+#[path = "../../src/g.rs"]
+mod g;
+// #[path = "../../src/not_this.rs"]
 "##;
     let (lib, _) = library("sample", src);
     let got = included(&lib);
@@ -627,27 +875,39 @@ include!("../../src/e.rs");
         "../../src/b.ts",
         "../../src/c.bin",
         "../../src/e.rs",
+        "../../src/g.rs",
     ] {
         assert!(got.contains(&Ok(want.into())), "{want}: {got:?}");
     }
-    assert_eq!(got.iter().filter(|r| r.is_err()).count(), 1, "{got:?}");
+    assert_eq!(got.iter().filter(|r| r.is_err()).count(), 2, "{got:?}");
     assert_eq!(
         got.len(),
-        5,
-        "the string literal is not an include: {got:?}"
+        7,
+        "the string and the comment are not includes: {got:?}"
     );
 }
 
 #[test]
-fn a_cfg_test_on_a_field_stops_the_scan() {
-    let r = std::panic::catch_unwind(|| {
-        strip_tests(
-            "sample",
-            "struct S { a: u8, #[cfg(test)] b: u8 }\nfn f() {}",
-        )
-    });
-    assert!(
-        r.is_err(),
-        "a misread attribute must not strip library code"
+fn a_cfg_test_on_anything_but_an_item_stops_the_scan() {
+    for src in [
+        "struct S { a: u8, #[cfg(test)] b: u8 }\nfn f() {}",
+        "fn f(x: u8) { match x { #[cfg(test)] 0 => g(), _ => { h() } } }",
+    ] {
+        let r = std::panic::catch_unwind(|| strip_tests("sample", src));
+        assert!(
+            r.is_err(),
+            "{src}: a misread attribute must not strip library code"
+        );
+    }
+    let (_, paths) = strip_tests(
+        "sample",
+        "#[cfg(test)]\n#[allow(dead_code)]\npub(crate) mod helpers;\n#[cfg(test)]\nmod tests { }",
+    );
+    assert_eq!(
+        paths,
+        vec![
+            format!("{MODULE_DIR}helpers.rs"),
+            format!("{MODULE_DIR}helpers/mod.rs")
+        ]
     );
 }
