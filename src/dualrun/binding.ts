@@ -1,4 +1,4 @@
-import type { Engine } from "./engine";
+import type { Engine, encodeVctower } from "./engine";
 
 /**
  * The WASM binding's surface, as wasm-bindgen declares it from
@@ -11,6 +11,8 @@ export type WasmEngine = Engine;
 
 export interface WasmModule {
   Engine: typeof Engine;
+  /** The engine's `.vctower` writer; absent from a test double. */
+  encodeVctower?: typeof encodeVctower;
 }
 
 /** Every method the adapters call on an instance, and on the class. */
