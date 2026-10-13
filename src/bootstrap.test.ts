@@ -12,7 +12,7 @@ vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // The WASM engine switch: the request and the package load are stubbed so the
 // fallback (package fails to load, the game boots on the TypeScript engine)
 // can be asserted without a package.
-const wasmStub = vi.hoisted(() => ({ requested: "ts" as "ts" | "wasm", loadError: null as Error | null }));
+const wasmStub = vi.hoisted(() => ({ requested: "ts" as "ts" | "wasm", loadError: null as Error | null, module: null as unknown }));
 vi.mock("./wasmhost/engineChoice", async (importOriginal) => {
   const real = await importOriginal<typeof import("./wasmhost/engineChoice")>();
   return { ...real, engineRequested: () => wasmStub.requested };
@@ -22,12 +22,16 @@ vi.mock("./wasmhost/startWasmHost", async (importOriginal) => {
   return {
     ...real,
     loadWasmEngine: vi.fn(async () => {
+      if (wasmStub.module) return wasmStub.module;
       throw wasmStub.loadError ?? new Error("no package in this test");
     }),
     startWasmHost: vi.fn(),
   };
 });
 import { startWasmHost } from "./wasmhost/startWasmHost";
+import { Simulation } from "./engine/Simulation";
+import { SaveGame } from "./storage/SaveGame";
+import { setEngineWriter } from "./storage/vctowerWriter";
 
 /** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */
 function stubWebGL(): void {
@@ -281,6 +285,44 @@ describe("bootGame", () => {
     } finally {
       wasmStub.requested = "ts";
       wasmStub.loadError = null;
+    }
+  });
+
+  it("writes saves through the engine once the WASM engine starts", async () => {
+    stubWebGL();
+    wasmStub.requested = "wasm";
+    const encodeVctower = vi.fn(() => "VCTOWER1\nZW5naW5l\n");
+    wasmStub.module = { Engine: class {}, encodeVctower };
+    try {
+      await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+      expect(startWasmHost).toHaveBeenCalled();
+      expect(await SaveGame.export(new Simulation(1))).toBe("VCTOWER1\nZW5naW5l\n");
+      expect(encodeVctower).toHaveBeenCalledTimes(1);
+    } finally {
+      setEngineWriter(null);
+      wasmStub.requested = "ts";
+      wasmStub.module = null;
+    }
+  });
+
+  it("leaves saves on the TypeScript writer when the WASM host does not start", async () => {
+    stubWebGL();
+    wasmStub.requested = "wasm";
+    const encodeVctower = vi.fn(() => "VCTOWER1\nZW5naW5l\n");
+    wasmStub.module = { Engine: class {}, encodeVctower };
+    vi.mocked(startWasmHost).mockImplementationOnce(() => {
+      throw new Error("no host");
+    });
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+      expect(error).toHaveBeenCalledWith(expect.stringContaining("[wasm]"), expect.any(Error));
+      expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
+      expect(encodeVctower).not.toHaveBeenCalled();
+    } finally {
+      setEngineWriter(null);
+      wasmStub.requested = "ts";
+      wasmStub.module = null;
     }
   });
 

@@ -1,4 +1,3 @@
-import { deflateSync } from "fflate";
 import { Simulation } from "../engine/Simulation";
 import { markFounderFromLoadedFile } from "../engine/sim/founderStatus";
 import type { SerializedGame } from "../engine/types";
@@ -23,6 +22,7 @@ import {
   TOWER_FILE_MAGIC,
   TowerTooLargeError,
 } from "./saveCompression";
+import { packVctower, payloadLine } from "./vctowerWriter";
 
 /**
  * Persistence. Games are stored in localStorage: one auto-save slot plus a
@@ -294,7 +294,8 @@ export const SaveGame = {
    */
   packSync(sim: Simulation): string {
     const data = stamp(sim.serialize());
-    return STORE_MAGIC + toBase64(deflateSync(encodeSaveJson(JSON.stringify(data)), { level: 1 }));
+    const json = JSON.stringify(data);
+    return STORE_MAGIC + payloadLine(packVctower(json, encodeSaveJson(json), data));
   },
 
   // ---- Shared writer + export/import -----------------------------------
@@ -332,12 +333,11 @@ export const SaveGame = {
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
   async export(sim: Simulation): Promise<string> {
     // Exports carry the same write-time provenance as local saves: a moved
-    // file says when and by which build it was written. fflate at level 1,
-    // like packSync, writes the same bits in every browser, and the engine's
-    // writer (`load::encode_vctower`) writes those bits too, so a tower file
-    // is the same bytes whichever wrote it.
-    const json = encodeSaveJson(JSON.stringify(stamp(sim.serialize())));
-    return TOWER_FILE_MAGIC + "\n" + toBase64(deflateSync(json, { level: 1 })) + "\n";
+    // file says when and by which build it was written. packVctower writes the
+    // same bits in every browser, through the engine when it runs.
+    const data = stamp(sim.serialize());
+    const json = JSON.stringify(data);
+    return packVctower(json, encodeSaveJson(json), data);
   },
 
   /** Download name for an export: the tower's name slugged, e.g. "tower-one.vctower". */

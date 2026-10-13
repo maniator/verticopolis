@@ -18,3 +18,21 @@ updates:
         applies-to: security-updates
         patterns:
           - "*"
+
+  # Actions, unlike npm above, DO get routine version-update PRs. The pins in
+  # .github/workflows are SHAs maintained by hand, and nothing else watches
+  # them: they sat three and four majors behind through the whole Node 20
+  # deprecation and the only thing that noticed was a person reading a run
+  # warning. A pin with no staleness signal is a liability with a tidy name.
+  # Monthly and grouped so the signal arrives as one PR a month rather than
+  # five. Dependabot rewrites the SHA and the trailing `# vX.Y.Z` comment
+  # together, so the comment cannot drift from the pin it labels.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    rebase-strategy: auto
+    groups:
+      actions:
+        patterns:
+          - "*"

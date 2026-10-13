@@ -127,6 +127,16 @@ byte for byte, reads it back through `decodeVctower`, `fromTowerFile` and
 hash. The same file runs a randomized differential of the compressor
 against fflate.
 
+When the WASM engine runs (`?engine=wasm`), the web game writes its own
+saves through this writer: `SaveGame.export` and `SaveGame.packSync` hand
+the stamped save JSON to `encodeVctower` (`src/storage/vctowerWriter.ts`),
+and fall back to the TypeScript writer if the engine throws or writes no
+`.vctower` file. A save past 8 MiB skips the engine, which would parse and
+re-print it on the main thread. The timer autosave (`saveToAsync`, which compresses off
+the main thread) and the desktop store's `toTowerFile` re-header keep their
+own writers. The same test file checks that a file written that way is the
+one the web game writes on its own.
+
 Two limits apply to every save the engine reads or writes as JSON text.
 A JavaScript string can hold half of a surrogate pair (a tower name cut
 through an emoji, since the rename box counts UTF-16 units), which
@@ -215,6 +225,25 @@ and a crate test, the referee binary and the WASM suite check against it,
 so the two engines cannot quote a different price or size while both exist (each also has a test that the prices it quotes are the ones its build and sell paths charge, and the TypeScript one charges a maintenance period against the quoted car and service upkeep).
 Presentation (display copy beyond the name, icons, pixel sizes, colors)
 stays with the frontend.
+
+The catalog gives a kind's base price. The price of one placement also
+depends on the tower: the floor tiles laid under a room and, with bridging
+on, the gap tiles bridged to the tower. The binding answers it with
+`canBuild(kind, floor, x)`, the same dry run `build` makes first, as JSON
+`{ ok, reason?, cost }`. When the placement fits, `cost` is its full price,
+and a "Not enough money." refusal carries that same price. Any other refusal
+carries the reason `build` would give and the facility's base price, so
+placement rules the catalog does not list (the Wedding Hall on the top floor,
+the ground-floor concourse, a claimed sky-lobby story, lobby floors) reach a
+frontend through the engine that enforces them.
+`conformanceWasmCanBuild.integration.test.ts` sweeps every kind over a grid
+of floors and positions on new games and saved towers in both modes (two
+raised to the TOWER rating, so the star-gated rules answer), with bridging on
+and off where the mode allows it and money flush, short and exactly at a
+price, and requires the Rust answer to equal the TypeScript one. The build
+paths in both engines charge the same constants the catalog quotes: the
+transport per-floor cost, and the lobby and floor tile prices from the
+facility table.
 
 ## The switch
 
