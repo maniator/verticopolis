@@ -76,17 +76,20 @@ export const INJECTED_CODE: ReadonlyArray<{
 /**
  * A sourcemap `sources` entry as an absolute, `/`-separated path, or null for
  * an id that names no file (`webpack://`, `\0` virtual ids, an http URL).
- * `file:` URLs are decoded; Windows drive paths are kept.
+ * `file:` URLs are decoded; Windows drive and UNC paths are kept.
  */
 export function sourceToPath(source: unknown, mapDir: string, sourceRoot: unknown): string | null {
   if (typeof source !== "string" || source === "" || source.startsWith("\0")) return null;
   const join = (base: string, rel: string): string => {
-    const parts = `${base}/${rel}`.replace(/\\/g, "/").split("/");
+    const full = (base === "" ? rel : `${base}/${rel}`).replace(/\\/g, "/");
+    // A UNC path (//server/share/...) keeps its leading double slash.
+    const unc = /^\/\/[^/]/.test(full);
     const out: string[] = [];
-    for (const p of parts) {
+    for (const p of full.split("/")) {
       if (p === "..") out.pop();
       else if (p !== "." && p !== "") out.push(p);
     }
+    if (unc) return `//${out.join("/")}`;
     const drive = /^[A-Za-z]:$/.test(out[0] ?? "");
     return drive ? out.join("/") : `/${out.join("/")}`;
   };

@@ -8,7 +8,7 @@ context:
   - '{project-root}/CONTRIBUTING.md'
 ---
 
-<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
+<frozen-after-approval reason="human-owned intent: do not modify unless human renegotiates">
 
 ## Intent
 
@@ -78,6 +78,7 @@ context:
 - 2026-10-13, review round 7: a sourcemap id that names no file fails unless `INJECTED_CODE` attributes it; prerelease identifiers compare by SemVer (`beta.2` before `beta.10`); the build plugin (now `no-unlisted-package-files`) also fails on a package stylesheet inlined by a CSS `@import`, on a package asset emitted or inlined from a CSS `url()` (checked through the build's watch list and asset origins), and on every extension Vite treats as CSS. Each case was probed with a throwaway package.
 - 2026-10-13, review round 8: only an `INJECTED_CODE` entry marked `wholeChunk` (Vite's modulepreload polyfill) excuses a sourcemap with no sources, so a chunk that merely contains the preload helper or the service worker template still needs its sources listed. Package content a code generator copies into our own source (pixelarticons' icon paths) is attributed through `INJECTED_CODE`, and a unit test holds every `AUTO-GENERATED ... from <pkg>@` file to an entry.
 - 2026-10-13, review round 9: clean (no patch findings from any layer). Its defer findings are row `third-party-notices-hardening` (#974).
+- 2026-10-13, Codex review on the PR: every sourcemap must have its emitted file beside it (a stale or partial `dist` fails); Windows UNC paths keep their `//server/share` root; the frozen-section tag loses its em dash.
 
 ## Design Notes
 

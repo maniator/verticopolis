@@ -73,6 +73,9 @@ if (mapless.length > 0) fail(`no sourcemap for ${mapless.join(", ")}; its bundle
 const sources: string[] = []; // repo-relative, each starting with "/"
 const rawSources: string[] = [];
 for (const map of maps) {
+  // A map whose emitted file is gone (a stale or partial dist) describes code
+  // that does not ship.
+  if (!existsSync(map.slice(0, -".map".length))) fail(`${relative(ROOT, map)} has no emitted file beside it`);
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(map, "utf8"));
@@ -87,8 +90,7 @@ for (const map of maps) {
   // A map that lists nothing is allowed only for a chunk that is known
   // build-tool code (Vite's modulepreload polyfill).
   if (mapSources.length === 0) {
-    const emitted = map.slice(0, -".map".length);
-    const code = existsSync(emitted) ? readFileSync(emitted, "utf8") : "";
+    const code = readFileSync(map.slice(0, -".map".length), "utf8");
     if (!INJECTED_CODE.some((inj) => inj.wholeChunk && inj.codeMarker && code.includes(inj.codeMarker))) {
       fail(`${relative(ROOT, map)} lists no sources, so its chunk's packages cannot be listed`);
     }
