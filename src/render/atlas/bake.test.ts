@@ -336,7 +336,12 @@ describe("depth layers on occupant steps", () => {
     // The glow pixel stays translucent instead of carrying the wall behind it.
     const glow = (1 - lit0.layers!.soft!.dx + (0 - lit0.layers!.soft!.dy) * soft.w) * 4;
     expect(soft.data[glow + 3]).toBe(40);
-    expect(() => composeLayered(r, lit0, { occupants: 2 }, [], true)).not.toThrow();
+    // Shell plus soft furniture matches the flat frame everywhere but the glow.
+    const viaSoft = composeLayered(r, lit0, { occupants: 2 }, [], true);
+    const flat2 = composeFrame(r, lit0, { occupants: 2 });
+    const off: number[] = [];
+    for (let i = 0; i < 8; i++) if (viaSoft.data.slice(i * 4, i * 4 + 4).some((v, c) => v !== flat2.data[i * 4 + c])) off.push(i);
+    expect(off).toEqual([1]);
     const drift = softLayerDrift(buildArchive(r, info, undefined, 32));
     expect(drift.frames).toBe(1);
     expect(drift.pictures).toBe(3); // n = 0, 1, 2: the flat chain stops changing at 2

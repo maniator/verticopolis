@@ -131,7 +131,7 @@ async function main(): Promise<void> {
     if (summary.frames === 0) throw new Error(`--filter ${filter} matches no frame`);
     console.log(`baked ${summary.frames} frames, ${summary.animations} animations, ${summary.images} unique images`);
     const dropped: string[] = summary.softDropped;
-    console.log(`soft furniture: left out of ${dropped.length} layered frames (an occupant step cannot be drawn over it, or the soft pass failed)${dropped.length > 0 ? ` (${dropped.slice(0, 5).join(", ")}${dropped.length > 5 ? ", ..." : ""})` : ""}`);
+    console.log(`soft furniture: left out of ${dropped.length} layered frames where an occupant step cannot be drawn over it or the soft pass failed${dropped.length > 0 ? `: ${dropped.slice(0, 5).join(", ")}${dropped.length > 5 ? ", ..." : ""}` : ""}`);
     const records = await page.evaluate(() => (globalThis as any).__vcAtlas.records());
     const images: Image[] = [];
     const normals: Image[] = [];

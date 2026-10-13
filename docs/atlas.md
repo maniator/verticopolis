@@ -238,7 +238,7 @@ front of the back wall. A room frame that supports this carries an optional
 - `chains` splits the frame's chain step by step, under the same key
   (`occupants`; a frame with no chain, such as an `/away` frame, has none):
   `shell` holds what the step changes on the shell (an office's downlights or
-  a condo's ceiling light, which switch on with the first occupant),
+  a condo's ceiling light, switched on by the first occupant),
   `furniture` holds the people who sit down. Each list starts with a null step
   0 and is trimmed on its own, like a frame's chain steps.
 - `soft` (with its own steps in `chains`) is an optional alternative to

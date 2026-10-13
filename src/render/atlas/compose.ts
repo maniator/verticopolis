@@ -41,7 +41,7 @@ export function composeFrame(
 
 /** Compose `rec` the way a frontend drawing with depth does: the shell and
  *  its chain's shell steps, then the furniture (or, with `soft`, the soft
- *  furniture) and its chain's furniture steps, each source-over. Named
+ *  furniture) and its chain's furniture (or soft) steps, each source-over. Named
  *  overlays draw last, though a layered frame has none (the bake refuses
  *  them). Throws for a frame without depth layers. */
 export function composeLayered(

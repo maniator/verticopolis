@@ -97,7 +97,7 @@ export interface FrameRecord {
  * then `furniture`, then its chain's `furniture` steps the same way, each
  * source-over: the result equals the frame's `parts` plus its chain steps
  * `1..n` exactly. Draw a frontend's own in-between content (walkers, a depth
- * offset) between the two halves. Either picture list is empty when that
+ * offset) between the two halves. Any picture list is empty when that
  * picture is fully transparent.
  *
  * `soft` is an optional alternative to `furniture` (with its own chain steps
@@ -105,7 +105,7 @@ export interface FrameRecord {
  * glows and soft shadows keep their transparency instead of carrying the wall
  * behind them. Over the shell it looks the same to the eye, but translucent
  * pixels round a step or two differently than in the flat frame; it is absent
- * where it cannot be stepped by source-over.
+ * where it cannot be stepped by source-over or its soft paint failed.
  */
 export interface DepthLayers {
   shell: Placed[];

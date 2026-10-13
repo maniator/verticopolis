@@ -44,7 +44,7 @@ export interface BakedLayerChain {
 
 /** The frame split for depth. Drawing `shell`, the chain's shell steps,
  *  `furniture`, then the chain's furniture steps gives back the frame plus
- *  its chain steps exactly, for every input. `soft` is the furniture with its
+ *  its chain steps exactly, for every input (each list clamped on its own). `soft` is the furniture with its
  *  own transparency; over the shell it rounds a step or two away from
  *  `furniture`. */
 export interface BakedLayers {
@@ -228,7 +228,7 @@ function trimPending(steps: (PendingRef | null)[]): (PendingRef | null)[] {
 export interface BakeStats {
   /** Layered frames left without soft furniture: an occupant step could not
    *  be drawn over it source-over (it would change a translucent pixel), or
-   *  the soft pass gave no picture. */
+   *  the soft pass failed or gave no picture. */
   softDropped: string[];
 }
 

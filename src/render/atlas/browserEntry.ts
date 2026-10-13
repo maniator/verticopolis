@@ -97,8 +97,8 @@ export function canvasRenderer(doc: Document): Renderer {
     // drawn over the room only tint the furniture already there.
     renderSoft(spec: PaintSpec, w: number, h: number): Image | null {
       const ctx = prepare(canvas, w, h);
-      // A blank canvas to copy in at the break: the furniture is painted on
-      // transparency.
+      // A blank canvas to copy in at the break, so the furniture is painted on
+      // transparency (`prepare` clears it; the restore pops its save).
       prepare(saved, w, h).restore();
       // After the end, the marks drawn over the furniture land only on its
       // pixels (source-atop), even past a `restore()` that would bring back
