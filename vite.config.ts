@@ -240,7 +240,26 @@ export default defineConfig({
       workbox: {
         // Precache the game shell only. The dev/tooling entry points and their
         // chunks are excluded so an install ships just the game.
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3}"],
+        //
+        // The shell includes the WASM engine package (`engine/`, its glue and
+        // `.wasm`, built on every deploy by scripts/build-engine-wasm.sh), so
+        // an installed game starts the engine offline (#945). One precache
+        // version holds the shell and the engine together: Workbox installs a
+        // new worker's whole manifest or none of it, activates it through
+        // src/pwa.ts's save-then-reload or on the next cold start, and deletes
+        // the old version's entries, so from 2.29.7 on a page the worker
+        // controls runs the shell and engine its install fetched together.
+        // Not covered here, and owned by the cutover plan's S16 version check
+        // (#945): a page no worker controls yet (a first visit) fetches them
+        // separately; an install that overlaps a deploy can store the engine's
+        // unhashed files from the newer build; and a worker from before 2.29.7
+        // never precached the engine at all. The
+        // cost is about 430 KB compressed per install, paid by every player
+        // (owner decision, 2026-10-13: the engine becomes the default at 3.0).
+        // `engine/BUILD.json` stays out (a `.json`, which the pattern does not
+        // match): the page never reads it. scripts/verify-precache.ts fails
+        // the build when a built engine is missing from the manifest.
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3,wasm}"],
         // og-image.png is the social/crawler share card, not part of the game
         // shell, so keep it out of the offline precache. `help.html` and its own
         // page entry chunk (`help-*.js`) are excluded too (see the note below),
@@ -256,7 +275,7 @@ export default defineConfig({
         // the game shell: the PWA needs nothing that large, so it stays out
         // of every web player's offline precache (a review catch on the PR
         // that added it).
-        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png", "**/engine/**"],
+        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png"],
         navigateFallback: "index.html",
         // Keep the non-game pages and the real static files out of the app-shell
         // fallback, letting them fall through to the network rather than the game
@@ -297,6 +316,9 @@ export default defineConfig({
           /help/,
           /preview/,
           /version\.json$/,
+          // The engine package's own files (its BUILD.json above all) are
+          // documents, never app routes.
+          /\/engine\//,
           /robots\.txt$/,
           /sitemap\.xml$/,
           /og-image\.png$/,

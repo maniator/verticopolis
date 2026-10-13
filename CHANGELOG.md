@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.29.7
+
+- On the opt-in WASM engine, an installed game now starts on that engine with no connection, instead of quietly switching back to the default one.
+
 ## 2.29.6
 
 - An exported tower file is now the same in every browser, and exporting no longer needs the browser's compression support.

@@ -12,11 +12,23 @@
  *
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
-const SW = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist", "sw.js");
+const DIST = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist");
+const SW = resolve(DIST, "sw.js");
+
+/** The WASM engine package, precached with the shell so the engine starts
+ *  offline (#945). Required whenever the build carries an engine: a build
+ *  without one (a checkout with no Rust toolchain, see CONTRIBUTING.md) has
+ *  nothing to precache. */
+const ENGINE_FILES = ["engine/verticopolis_engine.js", "engine/verticopolis_engine_bg.wasm"];
+
+/** What a first install may download, uncompressed. About 2.9 MiB with the
+ *  engine (2026-10-13); the headroom is for ordinary growth. Crossing it should
+ *  be a deliberate call: raise this with the reason. */
+const PRECACHE_BUDGET_BYTES = 4 * 1024 * 1024;
 
 /** Icons that must each appear exactly once (kept in sync with src/public/). */
 const REQUIRED_ICONS = [
@@ -73,4 +85,29 @@ if (dupes.length > 0) fail(`duplicate precache entries (each asset must be liste
 const missing = REQUIRED_ICONS.filter((icon) => !seen.has(icon));
 if (missing.length > 0) fail(`expected icons missing from the precache manifest (a narrowed glob or moved file?): ${missing.join(", ")}`);
 
-console.log(`verify-precache: ${urls.length} unique precache entries; all ${REQUIRED_ICONS.length} required icons present exactly once`);
+const total = urls.reduce((sum, u) => {
+  const file = resolve(DIST, u.split("?")[0]);
+  if (!existsSync(file)) fail(`precache entry ${u} has no file under dist/; cannot size the precache`);
+  return sum + statSync(file).size;
+}, 0);
+if (total > PRECACHE_BUDGET_BYTES) {
+  fail(`the precache is ${(total / 1048576).toFixed(2)} MiB, over its ${PRECACHE_BUDGET_BYTES / 1048576} MiB budget; every install downloads it, so shrink it or raise PRECACHE_BUDGET_BYTES with the reason`);
+}
+
+// Any engine file in the build means the whole package must be there and
+// precached, so a partial build (glue without binary) stops the build before
+// it can reach an offline player. A Vercel deploy always builds the engine
+// (scripts/vercel-build.sh), so there a build without one fails too.
+const builtEngine = ENGINE_FILES.some((f) => existsSync(resolve(DIST, f)));
+if (!builtEngine && process.env.VERCEL === "1") fail("a Vercel deploy has no engine package in dist/; scripts/vercel-build.sh should have built it");
+if (builtEngine) {
+  const notBuilt = ENGINE_FILES.filter((f) => !existsSync(resolve(DIST, f)));
+  if (notBuilt.length > 0) fail(`the engine package in dist/ is incomplete (rebuild it with npm run wasm:build): ${notBuilt.join(", ")}`);
+  const absent = ENGINE_FILES.filter((f) => !seen.has(f));
+  if (absent.length > 0) fail(`the built engine package is missing from the precache manifest, so the WASM engine would not start offline (#945); check the workbox globPatterns and maximumFileSizeToCacheInBytes in vite.config.ts: ${absent.join(", ")}`);
+}
+
+console.log(
+  `verify-precache: ${urls.length} unique precache entries (${(total / 1048576).toFixed(2)} MiB); all ${REQUIRED_ICONS.length} required icons present exactly once; ` +
+    (builtEngine ? "the engine package is precached" : "no engine package in this build"),
+);

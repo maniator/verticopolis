@@ -199,8 +199,13 @@ Decided:
 
 Still open (risks, no decision needed yet):
 
-- **Offline play at the flip.** The engine package is left out of the
-  offline precache today; S16 decides the offline rule before the flip.
+- **Offline play at the flip.** Decided (owner, 2026-10-13): the service
+  worker precaches the engine package with the game shell for every player,
+  so an installed game starts the engine offline (2.29.7, #945). Still open
+  under S16: the version check for a shell cached before 2.29.7 (its worker
+  never precached the engine, so until it updates it pairs its old shell with
+  whatever engine the network serves), an e2e that serves a second deploy to
+  exercise the update path, install interruption, and cache eviction.
 - **Save format bumps.** The copy catalog (row 6) bumps the save version; it
   does not ship in the flip release, so a rollback can still read every save
   (AD-5).
