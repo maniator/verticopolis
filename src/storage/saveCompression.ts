@@ -123,8 +123,8 @@ export function repairSurrogateEscapes(text: string): string {
  * `JSON.parse` for a save's text, read exactly as the Rust engine reads it
  * (`load::parse_save_json`): every lone surrogate escape in the text becomes
  * U+FFFD before parsing ({@link repairSurrogateEscapes}), so a save loads into
- * the same tower on both engines. Repairing the text, not the parsed values,
- * gives both engines one rule for keys too: two keys that repair to the same
+ * the same tower on both engines. Repairing the text before parsing gives both
+ * engines one rule for keys too: two keys that repair to the same
  * name are one key, and the last one written wins, as a repeated key does in
  * any JSON parser. A raw lone surrogate (only a legacy uncompressed slot can
  * hold one) is repaired the same way first, by {@link wellFormed}. The loader

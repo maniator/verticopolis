@@ -62,6 +62,10 @@ afterEach(() => {
 });
 
 describe("a save of exactly 32 MiB", () => {
+  it("is the cap, the same as the engine's (load.rs MAX_SAVE_INFLATED_BYTES)", () => {
+    expect(CAP).toBe(32 * 1024 * 1024);
+  });
+
   it("writes through every writer and opens through every reader", async () => {
     const sim = await towerOf(CAP);
     const name = sim.tower.towerName;
@@ -111,6 +115,7 @@ describe("a save one byte past 32 MiB", () => {
     expect(stored.corrupt).toBe(true);
 
     await expect(SaveGame.import(TOWER_FILE_MAGIC + "\n" + b64 + "\n")).rejects.toThrow(/too large/);
+    // The desktop store's re-header refuses it too.
     expect(toTowerFile(json).ok).toBe(false);
   }, 60_000);
 });
