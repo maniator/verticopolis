@@ -4,7 +4,7 @@ import { paintAnimatedUnit, paintSettledUnit } from "../regionPaint";
 import { FLOOR, TILE } from "../scale";
 import { bake, type Renderer } from "./bake";
 import { ORIGIN_SEEDED, variantPlacements, type Job } from "./catalog";
-import { compareImages, composeLookup } from "./compose";
+import { compareImages, composeLayered, composeLookup } from "./compose";
 import { lookupRoom, type LiveScene } from "./lookup";
 import type { Image } from "./pixels";
 import type { Sample } from "./samples";
@@ -16,6 +16,10 @@ import type { Sample } from "./samples";
  * the same room through the game's own paint functions (`regionPaint.ts`, the
  * ones `towerRegions` and `towerReconcile` call) with the scene the game
  * threads through its `DrawCtx`. The two must match pixel for pixel.
+ *
+ * A room frame with depth layers is also composed through them (the shell
+ * and its occupant steps, then the furniture and its occupant steps) and held
+ * to the same paint.
  *
  * Settled rooms are painted at two different offsets inside a larger region
  * canvas, so any art that depends on where its region starts fails here.
@@ -93,12 +97,19 @@ export function verifySample(doc: Document, jobs: readonly Job[], renderer: Rend
     if (!spec || spec.p !== "unit") throw new Error(`no frame ${sample.frame} in ${jobName}`);
     anim = spec.anim;
   }
-  const composed = composeLookup(bake([job], renderer), found, sample.frame ?? 0);
+  const baked = bake([job], renderer);
+  const composed = composeLookup(baked, found, sample.frame ?? 0);
+  const rec = baked.frames.find((f) => f.name === composed.name);
+  const layered = rec?.layers && !("animation" in found) ? composeLayered(baked, rec, found.chains, found.overlays) : null;
+  const pictures = [{ label: sample.label, image: composed.image }];
+  if (layered) pictures.push({ label: `${sample.label} (depth layers)`, image: layered });
   const animated = unit.state === "fire" || unit.state === "construction";
   const offsets = animated || ORIGIN_SEEDED.has(unit.kind) ? [null] : REGION_OFFSETS;
-  return offsets.map((at) => {
+  return offsets.flatMap((at) => {
     const ref = webPaint(doc, unit, sample.scene, anim, at);
-    const cmp = compareImages(ref, composed.image);
-    return { label: sample.label, frame: composed.name, pixels: ref.w * ref.h, mismatches: cmp.mismatches, box: cmp.box, offset: at ?? { x: 0, y: 0 } };
+    return pictures.map((p) => {
+      const cmp = compareImages(ref, p.image);
+      return { label: p.label, frame: composed.name, pixels: ref.w * ref.h, mismatches: cmp.mismatches, box: cmp.box, offset: at ?? { x: 0, y: 0 } };
+    });
   });
 }

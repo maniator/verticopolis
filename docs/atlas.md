@@ -114,7 +114,9 @@ bumps it. New frames or optional fields do not.
   its `anchor`, structured `keys` (the same values the name spells), and
   `parts`: the packed pieces with their offset inside the frame (transparent
   borders are trimmed; a frame wider than a page, like the metro, is cut into
-  column slices). `parts` is empty for a fully transparent frame.
+  column slices). `parts` is empty for a fully transparent frame. A room frame
+  can also carry `layers`, the same room split for depth (see
+  [Depth layers](#depth-layers)).
 - `chains`: composed layers indexed by an engine number. To show input `n`, draw
   the frame, then steps `1..min(n, max)` in order with ordinary source-over
   blending; a `null` step draws nothing.
@@ -206,6 +208,152 @@ the atlas bakes phase 0.
 The crane's motion never repeats in the game. Its animation is a sampled
 stretch (`loop: false`); play it forward and back, or hold, as suits you.
 
+## Depth layers
+
+A frontend that draws rooms with depth can use a room's shell and its furniture
+separately: for example, a 2.5D cutaway that sets the furniture a little in
+front of the back wall. A room frame that supports this carries an optional
+`layers` field next to its `parts`:
+
+```json
+"layers": {
+  "shell": [ { "rect": {...}, "dx": 0, "dy": 0 } ],
+  "furniture": [ ... ],
+  "soft": [ ... ],
+  "chains": { "occupants": { "shell": [null, ...], "furniture": [null, ...], "soft": [null, ...] } }
+}
+```
+
+- `shell` is the room with its furniture and seated people taken out: the
+  ceiling, back wall, windows, wall art and floor band, plus whatever the game
+  draws over the room after its furniture, such as the night scrim (on an
+  empty home or workplace at night, and on a condo whose residents are
+  asleep), the notice badge, a hotel room's roaches (and an infested room's
+  grime) and a sleeping guest's "z", ceiling lights and glow washes drawn last
+  (security, housekeeping, amusements), a cinema's aisle lights and EXIT signs,
+  the wedding hall's petal row, and the metro's exit stairs, platform and
+  track. The aquatic center keeps its pool whole on the shell: the diver on
+  the board and the swimmers in the pool stay there (they arrive as shell
+  steps), and only the deck-chair loungers come forward as furniture (at the
+  catalog's size every attendee is a diver or a swimmer, so the chairs are
+  empty).
+- `furniture` holds the pixels that differ between the shell and the flat
+  frame, transparent everywhere else.
+- `chains` splits the frame's chain step by step, under the same key
+  (`occupants`; a frame with no chain, such as an `/away` frame, has none):
+  `shell` holds what the step changes on the shell (an office's downlights or
+  a condo's ceiling light, switched on by the first occupant, or the aquatic
+  center's swimmers), `furniture` holds the people who sit down. Each list
+  starts with a null step 0 and is trimmed on its own, like a frame's chain
+  steps.
+- `soft` (with its own steps in `chains`) is an optional alternative to
+  `furniture`; see below.
+
+Each picture is a list of placed parts like `parts` (a picture wider than a
+page, like the metro's, is cut into column slices; an occupant step always
+fits one page, and the export refuses one that does not). To show `n` visible
+occupants, draw with ordinary source-over blending, in this order:
+
+1. the `shell` parts,
+2. the chain's `shell` steps `1..min(n, len - 1)`,
+3. the `furniture` parts,
+4. the chain's `furniture` steps `1..min(n, len - 1)`.
+
+The result is the frame's own `parts` plus its chain steps `1..n`, exactly.
+Pass the visible occupant count itself and clamp it to each list on its own:
+a depth list can run past the chain's `max` when a step changes only pixels
+the flat frame hides (a light behind a desk). A layered frame has at most one
+chain and no overlays, so nothing else of the frame draws over these four.
+Draw anything of your own that belongs between the wall and the furniture
+(walkers, a depth offset) between steps 2 and 3. Any list can be empty (a
+fully transparent picture).
+
+What that means for the pictures:
+
+- The furniture layer holds only the pixels that differ. Where a piece of
+  furniture happens to match the wall behind it, or where a mark drawn after
+  the furniture covers it, the furniture layer is transparent and the shell
+  shows that pixel. Once an occupant step puts a pixel in the furniture, the
+  later steps keep it there (each step only adds), so a frontend that offsets
+  the furniture moves that pixel with it even where a later step shows the
+  shell's color.
+- A mark drawn after the furniture sits on the shell, so the furniture layer
+  carries the furniture as the flat frame shows it (darkened under the night
+  scrim).
+- A soft shadow or glow drawn with the furniture (a restaurant's candles, a
+  hotel or condo lamp) is baked into `furniture` as opaque pixels: the
+  translucent paint over the wall behind it. Offset from the shell, it shows
+  as a box of wall color. Use `soft` for those rooms.
+- The hotel's roaches and its sleeping guest's "z" draw after the furniture
+  ends, so they sit on the shell, even the roach on the bed and the "z" over
+  the sleeper.
+- Structure drawn over the furniture sits on the shell and hides the furniture
+  under it in both pictures: the metro's platform deck covers the contact
+  shadow under its benches and bins, and the cinema's EXIT signs cover the
+  seats they overlap. A frontend that offsets the furniture shows those pieces
+  cut off where the structure covered them.
+- The shell's normal map is its own (it is a picture without the furniture).
+  The furniture's normals, and the soft furniture's, come from the flat frame,
+  masked to their pixels, like any other layer.
+
+The game marks the split in each room's draw routine
+(`src/render/pixelSprites/layers.ts`): one call where the shell ends, and one
+where the furniture ends and the marks drawn over it begin. In the game both
+calls do nothing. The export paints each room frame (and each occupant step)
+again with the marks live and records the canvas at them, once for the exact
+split and once more for the soft furniture; the flat frame comes from the
+ordinary paint, so adding layers never changes a frame's pixels. The export
+also requires every kind that splits to have furniture in some frame, since a
+shell that still showed the furniture would compose back too.
+
+A frame has no `layers`, and a frontend draws it flat, when:
+
+- the room is vacant and shows its LEASE or SALE card (office, condo, studio,
+  apartment), is closed and shows its shutter, or is gutted;
+- it is a burning or unbuilt room (those are animations);
+- its kind is one whose art does not mark a split yet: the parking space, the
+  parking ramp and the recycling center (backlog row
+  `atlas-depth-layers-flat-kinds`).
+
+Every other room kind splits: office, condo, studio, apartment, the three
+hotel grades, fast food, restaurant, food hall, cinema, shop, amusements,
+boutique bay, fitness club, clinic, nightclub, spa, sky bar, daycare,
+security, medical center, housekeeping, party hall, wedding hall, aquatic
+center and metro station.
+
+The layers' own images are packed on pages after the frame images', so a
+frontend that ignores `layers` reads the same frames, parts and pages as before
+they existed.
+
+### Soft furniture
+
+`soft` is the furniture painted on a transparent background instead of over
+the shell, so its glows and soft shadows keep their transparency. Draw it in
+place of `furniture` (and its `chains` steps in place of the `furniture`
+steps); the order is the same. Over the shell it looks the same to the eye,
+but translucent paint rounds a step or two differently on its own than over
+the wall. Marks the game draws over the furniture (the night scrim) land on
+the soft furniture only where it has pixels; the shell carries them everywhere
+else. An opaque mark drawn over the furniture (a hotel roach on the bed, a
+sleeping guest's "z", a notice badge) is therefore on both the shell and the
+soft furniture: offset the soft furniture and it shows twice. In `furniture`
+the same mark stays on the shell only, leaving a gap in the furniture under
+it. In the current atlas 8% of the soft furniture's pixels differ from the
+flat frame (each pixel counted once per occupant count it shows at), by at
+most 2 of 255 in any channel; the export prints this measure and refuses an
+atlas whose soft furniture strays more than 4 of 255 or misses a pixel of the
+furniture. Use `furniture` when exact pixels matter, and `soft` when the
+furniture moves away from the wall.
+
+A frame has no `soft` when an occupant step would have to change a
+translucent soft pixel, which source-over cannot do (it can only paint over
+one), or when its soft pass fails; the export counts them and names the
+first few. In the current atlas
+that is about one layered frame in nine, where an occupant step changes a
+glow or a soft shadow in the restaurant, food hall, party hall, amusements,
+boutique bay, fitness club and nightclub; those frames offer `furniture`
+only.
+
 ## How it is checked
 
 `e2e/atlas.spec.ts` (and the export's own pre-flight) composes atlas frames and
@@ -219,6 +367,17 @@ game's region paint can differ for them, #915). A control case compares two diff
 pictures and must report a mismatch. The bake refuses to write a layer that
 would not compose back to the game's pixels. A unit test rebuilds every frame
 and layer from the packed pages through the manifest.
+
+A room frame with depth layers is also composed through its depth split (the
+shell and its occupant steps, then the furniture and its occupant steps) and
+held to the same paint. After
+packing, the export rebuilds every layered frame from the pages through the
+manifest, shell then furniture with their occupant steps at every occupant
+count, and requires its flat frame's pixels. It also measures how far the soft
+furniture drifts from the flat frame, prints the share of pixels and the
+largest channel difference, and refuses an atlas whose soft furniture strays
+past the limit, misses a pixel of the furniture, or (in a full export) is
+missing from every frame.
 
 The same check covers the other families (`verifyExtras.ts`): a whole express
 and standard shaft rebuilt from their floor pieces (skip floor included), cabs
