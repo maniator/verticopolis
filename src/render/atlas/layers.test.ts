@@ -5,6 +5,7 @@ import { hasBusinessHours, isOpenAt } from "../../engine/facilities";
 import type { FacilityKind } from "../../engine/types";
 import { withLayerHook } from "../pixelSprites/layers";
 import { DEPTH_FLAT_KINDS, roomJobs, roomKinds, type StillJob } from "./catalog";
+import { LOBBY_VARIANTS } from "../sprites";
 import { structureJobs } from "./catalogExtras";
 import { paint, type PaintSpec, type UnitPaint } from "./paint";
 
@@ -84,7 +85,9 @@ describe("depth-layer marks on the lobby", () => {
     const paints: [string, PaintSpec, number, number][] = lobby.flatMap((j) =>
       j.type === "still" ? [[j.name, j.paint, j.w, j.h] as [string, PaintSpec, number, number]] : j.frames.map((f, i) => [`${j.name}/${i}`, f, j.w, j.h] as [string, PaintSpec, number, number]),
     );
-    expect(paints.length).toBe(16 + 32);
+    // Two styles x lit/unlit x each variant, plus four entrances x lit/unlit
+    // x staffed/unstaffed x two poses.
+    expect(paints.length).toBe(2 * 2 * LOBBY_VARIANTS + 4 * 2 * 2 * 2);
     for (const j of lobby) expect(j.layers, j.name).toBe(true);
     const wrong: string[] = [];
     for (const [name, spec, w, h] of paints) {

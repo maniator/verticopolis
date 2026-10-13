@@ -147,6 +147,16 @@ export function extraCases(): Case[] {
       },
     },
     {
+      label: "unlit sky-lobby tile, variant 1 (bench in front of the glass)",
+      frames: ["structure/lobby/sky/unlit/v1"],
+      atlas: (get) => get("structure/lobby/sky/unlit/v1"),
+      game: (doc) => {
+        const ctx = canvas(doc, TILE, FLOOR);
+        drawUnit({ ctx, lit: false, anim: 0, hour: 12 }, struct("lobby", 2, 1), 0, 0, TILE, FLOOR);
+        return read(ctx, TILE, FLOOR);
+      },
+    },
+    {
       label: "grand entrance, left slice, unstaffed",
       frames: ["structure/entrance/grand-left/unlit/unstaffed/0"],
       atlas: (get) => get("structure/entrance/grand-left/unlit/unstaffed/0"),
@@ -235,9 +245,18 @@ export function verifyExtras(doc: Document, jobs: readonly Job[], renderer: Rend
       return { label, frame: c.frames.join(", "), pixels: theirs.w * theirs.h, mismatches: cmp.mismatches, box: cmp.box, offset: { x: 0, y: 0 }, control: c.control };
     };
     const out = [result(c.label, c.atlas((name, chains = {}) => composeFrame(r, recOf(name), chains)))];
-    // Frames split for depth (the lobby tiles and entrances) are composed
-    // through their shell and furniture as well.
-    if (c.frames.every((f) => recOf(f).layers)) out.push(result(`${c.label} (depth layers)`, c.atlas((name, chains = {}) => composeLayered(r, recOf(name), chains))));
+    // The lobby tiles and entrances are split for depth, so (outside the
+    // control) they are composed through their shell and furniture as well,
+    // and a lobby case that came back flat fails.
+    const lobby = c.frames.every((f) => f.startsWith("structure/lobby/") || f.startsWith("structure/entrance/"));
+    if (lobby && !c.control) {
+      const split = c.frames.every((f) => recOf(f).layers);
+      out.push(
+        split
+          ? result(`${c.label} (depth layers)`, c.atlas((name, chains = {}) => composeLayered(r, recOf(name), chains)))
+          : { ...result(`${c.label} (depth layers missing)`, theirs), mismatches: theirs.w * theirs.h },
+      );
+    }
     return out;
   });
 }

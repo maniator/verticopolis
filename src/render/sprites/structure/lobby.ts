@@ -164,16 +164,15 @@ function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, v
 
   // Per-variant centerpiece, centered on the slice and kept inside it (each
   // slice is its own baked 11px canvas, so anything past the edge is clipped
-  // into a visible seam). For depth, the column, console, chandelier and
-  // planter stand in front of the wall, so the shell ends before them; the
-  // sconce and the framed print hang on it, so it ends after them. The
-  // entrance slices mark their own split.
+  // into a visible seam). For depth, the column, console, bench, chandelier
+  // and planter stand in front of the wall, so the shell ends before them; the
+  // sconce, the framed print and the console's recessed wall panel hang on it,
+  // so it ends after them. The entrance slices mark their own split.
   if (variant === 0) {
     layerBreak(ctx);
     fluteColumn(ctx, cx, y0, hh, ground);
   } else if (variant === 1) {
-    layerBreak(ctx);
-    consolePanel(ctx, x0, ww, y0, floorTop, ground, lit);
+    consolePanel(ctx, x0, ww, y0, floorTop, ground, lit); // marks its own split
   } else if (variant === 2) {
     layerBreak(ctx);
     if (ground) chandelier(ctx, cx, y0, lit, ww);
@@ -271,6 +270,8 @@ function consolePanel(ctx: CanvasRenderingContext2D, x0: number, ww: number, y0:
       ctx.fillRect(panelL, panelT, 1, panelB - panelT);
       ctx.fillRect(panelL + panelW - 1, panelT, 1, panelB - panelT);
     }
+    // The panel is wall; the console in front of it is furniture.
+    layerBreak(ctx);
     // Low walnut console with slim legs.
     const cw = Math.min(panelW, 9);
     const cl = cx - Math.floor(cw / 2);
@@ -292,6 +293,7 @@ function consolePanel(ctx: CanvasRenderingContext2D, x0: number, ww: number, y0:
     }
   } else {
     // Sky lobby: a low waiting bench in front of the glass, with a small plant.
+    layerBreak(ctx);
     const bw = Math.min(ww - 2, 9);
     const bl = cx - Math.floor(bw / 2);
     ctx.fillStyle = "#5C4A38"; // bench frame

@@ -1,7 +1,8 @@
 /**
- * Depth-layer marks for the sprite atlas. A room's draw routine calls
- * {@link layerBreak} once, after its shell (ceiling, back wall, windows, wall
- * art, floor band) and before its furniture and seated occupants. The routine
+ * Depth-layer marks for the sprite atlas. A room's draw routine (and each
+ * lobby tile and entrance) calls {@link layerBreak} once, after its shell
+ * (ceiling, back wall, windows, wall art, floor band) and before its
+ * furniture and seated occupants. The routine
  * itself, or the one that wraps it, calls {@link layerEnd} after the furniture
  * and before anything the game draws over the room after it (the night scrim,
  * the notice badge, a grime wash, a ceiling light); the first end after the

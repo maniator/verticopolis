@@ -297,10 +297,11 @@ What that means for the pictures:
   The furniture's normals, and the soft furniture's, come from the flat frame,
   masked to their pixels, like any other layer.
 
-The game marks the split in each room's draw routine
-(`src/render/pixelSprites/layers.ts`): one call where the shell ends, and one
-where the furniture ends and the marks drawn over it begin. In the game both
-calls do nothing. The export paints each room frame (and each occupant step)
+The game marks the split in each room's draw routine, and in the lobby and
+entrance art (`src/render/pixelSprites/layers.ts`): one call where the shell
+ends, and one where the furniture ends and the marks drawn over it begin. In
+the game both calls do nothing. The export paints each split frame (and each
+occupant step)
 again with the marks live and records the canvas at them, once for the exact
 split and once more for the soft furniture; the flat frame comes from the
 ordinary paint, so adding layers never changes a frame's pixels. The export
@@ -311,8 +312,8 @@ A frame has no `layers`, and a frontend draws it flat, when:
 
 - the room is vacant and shows its LEASE or SALE card (office, condo, studio,
   apartment), is closed and shows its shutter, or is gutted;
-- it is a burning or unbuilt room (the entrance doors are the only animation
-  whose frames split);
+- it is a burning or unbuilt room (among the animations, only the entrance
+  frames split);
 - its kind is one whose art does not mark a split yet: the parking space, the
   parking ramp and the recycling center (backlog row
   `atlas-depth-layers-flat-kinds`).
@@ -325,9 +326,10 @@ center and metro station.
 
 The lobby splits too, so a concourse can be drawn with depth like the rooms
 beside it. Every `structure/lobby/...` tile carries `layers`: the column,
-console, chandelier and planter come forward, while the wall, windows,
-cornice, floor, carpet, sconce and framed print stay on the shell (the
-sconce and print tile has an empty furniture list). Each frame of the
+console, sky-lobby bench, chandelier and planter come forward, while the
+wall, windows, cornice, floor, carpet, sconce, framed print and the recessed
+panel above the console stay on the shell (the sconce and print tile has an
+empty furniture list). Each frame of the
 `structure/entrance/...` animations carries its own `layers` too: the facade,
 glass, awning, doors and carpet (or the service door and its plate) are the
 shell, and the palms, the potted plant, the reception desk and its attendant,

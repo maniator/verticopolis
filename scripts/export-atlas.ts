@@ -169,8 +169,15 @@ async function main(): Promise<void> {
   // catalog only, so a --filter preview skips it.
   const unsplit = filter ? [] : kindsWithoutFurniture(archive.manifest);
   if (unsplit.length > 0) throw new Error(`depth layers hold no furniture for ${unsplit.join(", ")}: the shell kept it`);
+  // The lobby shares one kind across its tiles and entrances, so check those
+  // frame by frame: every entrance frame and every tile but the sconce and
+  // print (variant 3, wall pieces only) has furniture in front of its wall.
+  const bareLobby = Object.entries(archive.manifest.frames)
+    .filter(([name, f]) => /^structure\/(entrance\/|lobby\/.*\/v[012]$)/.test(name) && (!f.layers || f.layers.furniture.length === 0))
+    .map(([name]) => name);
+  if (bareLobby.length > 0) throw new Error(`lobby frames without depth furniture: ${bareLobby.slice(0, 10).join(", ")}`);
   const layered = Object.values(archive.manifest.frames).filter((f) => f.layers).length;
-  console.log(`depth layers: ${layered} frames (rooms, lobby tiles and entrances) compose back to their flat frames at every occupant count`);
+  console.log(`depth layers: ${layered} frames (rooms at every occupant count, lobby tiles and entrances) compose back to their flat frames`);
   // The soft furniture is close to the flat frame but rounds differently;
   // report how far it strays, and stop if it strays further than rounding.
   const drift = softLayerDrift(archive);
