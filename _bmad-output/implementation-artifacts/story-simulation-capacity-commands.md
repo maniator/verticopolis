@@ -147,4 +147,19 @@ Round 4, confirming pass on the round-3 fixes:
 - **dismissed** The whole of src/public/ is skipped: it holds only the built
   WASM glue and static assets, none of it hand-written code.
 
-Round 5 confirms these fixes; its result follows in this record.
+Round 5, confirming pass on the round-4 fixes:
+
+- **patch** (Blind Hunter, Edge Case Hunter) The hand-written walk kept
+  turning up file-system corners (a tree reached twice through a link, the
+  glue reached through a file link, `node_modules` under another name, a
+  name starting with `..`, a weak overall floor). The guard now takes its
+  file list from `git ls-files` over the five trees, so it scans exactly the
+  tracked sources with no links to follow, no dependencies and no
+  duplicates. It asserts every tree yields sources, src/ yields more than
+  300, and every allowed file is scanned. A planted offender in tools/ is
+  caught.
+- **patch** (Blind Hunter) The relay-op doc in `wasm.rs` names UI edits
+  again alongside player edits.
+- Acceptance Auditor: no violations.
+
+Round 6 confirms these fixes; its result follows in this record.

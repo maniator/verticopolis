@@ -342,7 +342,7 @@ impl Engine {
 
     /// `tower.setCars(id, cars)`: the bare tower edit, silent in both
     /// engines (#906). Relay-only: the dual-run mirror replays a bare
-    /// TypeScript tower edit with it. Player edits use the charge commands
+    /// TypeScript tower edit with it. Player and UI edits use the charge commands
     /// (`addCar`, `removeCar`, `extendTransport`), and
     /// `towerRelayOps.guard.test.ts` keeps other callers out.
     #[wasm_bindgen(js_name = towerSetCars)]
