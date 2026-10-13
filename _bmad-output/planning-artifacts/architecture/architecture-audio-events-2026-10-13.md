@@ -37,6 +37,9 @@ audio adapter.
    moment, exactly one of them carries the sound.
 9. Every sound is original to Verticopolis, UI effects included. No
    third-party sound pack ships, free or paid (owner, 2026-10-13).
+10. Existing audio fidelity comes first. Newly composed sounds wait until
+    the initial audio gate passes (owner, 2026-10-13; defined under the
+    staged plan).
 
 ## Inventory (facts from the audit)
 
@@ -259,6 +262,7 @@ fails the build until it is mapped to a cue or to none.
 | A separate audio event stream? | **No.** The gameplay catalog plus the read model cover every cue. | A cue that needs a gameplay fact neither carries. |
 | Elevator stops as catalog events? | **No.** A busy tower stops cars hundreds of times a game hour, which would flood the 1,024 ring at top speed. A per-car stop counter in the read model survives any frame rate, and only cars in view chime. | A playtest shows chimes that do not match visible stops. |
 | Third-party sound packs? | **None, UI effects included** (owner, 2026-10-13). Every sound is the project's own: code-generated, rendered from the project's code, or recorded by the owner. | None planned. |
+| Adaptive music? | **A later, optional enhancement** (owner, 2026-10-13): music layered from synchronized per-voice stems with transitions on the bar line. No stage builds it now; stage 4's render manifest records each program's tempo, beats per bar and bar-aligned loop points, and music keeps playing through its one existing seam (`setProgram` and the program's `Part` in `ToneAudioEngine`), so it can be added without rework. | An owner decision to schedule it, after the initial audio gate. |
 | Performance budgets | **Provisional until measured on real hardware** (owner, 2026-10-13). The numbers below are starting targets for the stages' own micro-benchmarks, never CI thresholds without the owner's approval. | The first measurement on real hardware. |
 | Promote the fx sequences to catalog events? | **Not now.** A sequence that jumps by two still tells audio the moment happened; only the earlier position is lost, which is not audible. Dissent recorded: promoting them first would avoid a later lock change. | A playtest shows a missed or wrong cue traced to the latest-value counters. |
 | Where does the win cue live? | **On the win dialog**, as today, so a load or undo of a won tower replays it. | The win dialog's own replay rule changes. |
@@ -280,6 +284,14 @@ fails the build until it is mapped to a cue or to none.
 The master volume slider joins the audio panel row (`audio-button-panel`,
 #483).
 
+**The initial audio gate** passes when stages 1 and 2 have shipped: the hub
+owns the one drain, and today's sounds play from engine events with no
+audible change, with the parity, swap, consent and no-double-play tests
+green on both engines. Stages 3, 4, 7 and 8 add no new composition and can
+land before or after it. The new sounds (stage 5's elevator chime and stage
+6's cues) are new compositions and wait until the gate passes (owner,
+2026-10-13); stage 5's engine field does not wait.
+
 Dependencies and order around open work:
 
 - **1 lands after #950 and #907.** #950 (capacity events from the
@@ -288,8 +300,11 @@ Dependencies and order around open work:
   detach) is the code `ownFrom` has to travel through. Stage 1 builds on
   #907's helpers instead of writing its own, and lands before or with #954
   (the engine answers commands).
-- 2 needs 1. The engine field in 5 needs nothing; its chime needs 2. 6 needs
-  2 and benefits from 4. 3, 4, 7 and 8 need nothing and can go any time.
+- 2 needs 1. The engine field in 5 needs nothing; its chime waits for the
+  initial audio gate. 6 waits for the gate and benefits from 4. 3, 4, 7 and
+  8 need nothing and can go any time.
+- **5 and #958:** if #958 (the engine package is built in CI, no longer
+  committed) lands first, stage 5 commits no rebuilt package.
 - **7 coordinates with #823** (the open sounds contributor doc): if #823
   merges first, stage 7 trues it up with the rest.
 - **Benchmarking (#972) does not wait for audio.** It starts from `main`. No
@@ -298,6 +313,11 @@ Dependencies and order around open work:
   work on both engines; because `perf:compare` records the commit it ran on,
   a run before and after stage 1 shows that cost without either effort
   waiting on the other.
+- **The benchmark harness (#979) times engine exports by name,
+  `drainGameplayEvents` among them.** Stage 1 keeps calling that export,
+  once per drain occasion, under the same name (as does #907's typed
+  wrapper), so the harness's per-export timings stay comparable across the
+  change. A rename updates the harness's list in the same PR.
 
 ## Test strategy
 
