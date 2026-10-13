@@ -1,128 +1,205 @@
 # BMAD: Rust/WASM web cutover, remaining work and release gate
 
-**Status:** Draft planning proposal; no implementation or cutover authorized.  
-**Scope:** Public `verticopolis` Rust engine + TypeScript web host.  
-**Decision:** Do not remove the TypeScript engine or its fallback until the measurable gates below pass.
+**Status:** Planning, reviewed 2026-10-13. No implementation or cutover is
+authorized by this document.
+**Scope:** The public Rust engine (`engine-rs/`), its WASM binding and the
+web host (`src/wasmhost/`, `src/dualrun/`). Nothing else.
+**Decision:** The TypeScript engine and its fallback stay until the release
+gate in section 6 passes and the owner signs.
 
-## 1. Problem and desired outcome
+**Read with:** the roadmap this plan extends,
+`architecture/architecture-engine-rust-port-2026-10-08.md` ("Order and
+gates", rows 4, 4b, 5, 6 and 7); the cutover's invariants,
+`architecture/architecture-rust-wasm-cutover-2026-10-13/ARCHITECTURE-SPINE.md`
+(AD-1 to AD-8); and the readiness report,
+`implementation-readiness-report-2026-10-13-rust-wasm-cutover.md`.
 
-Verticopolis has two implementations of gameplay behavior: the original TypeScript `src/engine` and Rust `engine-rs`. The goal is one authoritative, portable Rust simulation powering WASM/web and other future clients, without gameplay, economic rules or analytics duplicated in the frontends. Presentation and platform delivery remain frontend responsibilities.
+## 1. Outcome
 
-This document is a **BMAD-style planning input** for product/architecture review and story breakdown, not a claim that the full codebase has been audited or tests executed. Verify every gap against current `main` before implementation. Existing issues should be extended instead of duplicated.
+One authoritative Rust simulation runs the web game. The web host sends
+commands, reads engine results and draws them; it computes no price, rule,
+refusal or game time of its own. Players notice nothing except the 3.0.0
+milestone in the update flow.
 
-## 2. Evidence and constraints
+This plan does not restate the roadmap. It records what is already on
+`main`, what the roadmap's stories still owe, the gaps no story owned, and
+the measurable gate for the default flip.
 
-- TypeScript `src/engine/Simulation.ts` exposes gameplay and read APIs including `stats()`, `incomeBreakdown()`, `previewRentBatch()`, `isUnlocked()`, `canBuild()`, and event draining.
-- Rust organizes functionality across `sim.rs`, `sim_loop.rs`, `events.rs`, `gameplay.rs`, `economy.rs`, etc. Missing same-named methods in `sim.rs` alone **do not** prove missing behavior.
-- WASM `engine-rs/src/wasm.rs` exposes commands, snapshots, event draining, telemetry, TDT and save encoding, but does not expose `stats()` and `incomeBreakdown()` under those names. Determine the intended read-model equivalents rather than recreating simulation logic in TS.
-- WASM also exposes low-level mutations (`setMoney`, `setCars`, `resizeTransport`, `removeUnit`, `removeTransport`) alongside engine-owned charge commands. Audit and separate privileged restoration/debug operations from player actions.
-- `src/dualrun/mirror.ts` and `shadow.ts` compare canonical state/crowd views, which are necessary but insufficient for UI-only behavior, error messages, save prose, analytics and host lifecycle.
+## 2. Where things stand (`main` at `404bb9c`, 2026-10-13)
+
+| Area | On `main` | Open PR | Still owed |
+| --- | --- | --- | --- |
+| Engine authority | The engine alone ticks under `?engine=wasm` (switch story AC2) | none | Command answers still come from the TypeScript instance, which runs each command and relays it (switch story, "How it works"). See S9 |
+| Clock | Rust `Clock` (`engine-rs/src/clock.rs`) owns game time while hosted; the frame view writes it back each frame | none | The step driver and day pace live in TypeScript (`src/engine/sim/fixedStep.ts`, `src/engine/timePacing.ts`, `src/game/frameLoop.ts`): #867 |
+| Prices and rules | Engine-owned charges (#928, `a412060`); engine catalog with a digest lock, nested validation and charged-price tests (#930, `562f104`) | none | The web UI still reads TypeScript tables (#921); build quote (#922); catalog second slice (#926) |
+| Mutation surface | Player charge commands; the dual-run relay owns the raw ops | #950 (capacity events from the simulation layer, adds relay-only `towerSetCars` and `towerResizeTransport` with a guard test) | Tier every binding export and confine tier 3 (#946, #923) |
+| Read model | `frameView`, `logSince`, elevator telemetry, housekeeping report, `catalog` | none | Binding getters, result shapes, typed arrays, structural snapshot (#868); inspector read models (#919) |
+| Saves | Unicode repair and 32 MiB caps (#941, #944); byte-exact engine writer (#949); engine encoder (#937) | #953 (the web writes through `encodeVctower` under `?engine=wasm`) | JavaScript number semantics for hand-edited saves (#858); RNG state 0 reload (#856); a rollback rule before any save-format bump (AD-5) |
+| Gameplay events | Engine events (#903) and the web bridge (#938) | none | Pin fx sequences and counters across engines (#879); drain glue (#907); close-out of #873 |
+| Tests | Conformance lock (19 scenarios), dual-run day gate, e2e on both engines (`chromium-wasm`), nightly fuzzer | #878 in progress | Vitest suites on WASM and the test-mapping table (#878); refusal reasons pinned (#865) |
+| Host lifecycle | Attach, sync, detach, swap away from a trapped engine on load | none | Fallback on throw or panic, undo after a trap, boot timeout (#874); attach after an exterminator booking (#902) |
+| Performance | TypeScript perf gate | none | WASM baseline (#900); stats cost (#905); hour-boundary cost (#849) |
+| Engine consumers | Public crate and lock | none | Crate release with the lock and a semver policy (#893) |
 
 ## 3. Requirements
 
-**FR1 Single engine:** All gameplay, prices, unlocking, time progression, RNG, event eligibility, building, rent, emergencies and refunds are computed by Rust. Web clients only send commands and render authoritative results.
+**FR1 One engine.** Rust computes all gameplay: prices, unlocks, game time,
+RNG, event eligibility, building, rent, emergencies, refunds and every
+command's answer. The web host sends commands and renders results (AD-1,
+AD-2, AD-3).
 
-**FR2 Behavioral parity:** Existing web player journeys retain outcomes, refusal reasons, logs, state transitions and undo/redo behavior, including classic/modern modes and migrated towers.
+**FR2 Behavioral parity.** Player journeys keep their outcomes, refusal
+reasons and their order, log text, state transitions and undo/redo, in
+Classic and Modern and for migrated towers.
 
-**FR3 Persistence:** Existing web `.vctower` files and supported legacy saves import and round-trip through WASM; malformed, oversized, corrupted and Unicode edge cases fail safely and consistently. No silent data loss.
+**FR3 Persistence.** Existing `.vctower` files and supported legacy saves
+load and round-trip through the engine. Malformed, oversized, corrupted and
+Unicode edge cases fail the same way every time, with no silent loss (AD-5).
 
-**FR4 Frontend contract:** Web UI can obtain all necessary build previews, catalog/unlock state, income breakdown, stats, logs, analytics events, frame and structural data from a documented, versioned engine read model. No UI-only recreation of engine decisions.
+**FR4 Frontend contract.** The web UI reads build quotes, catalog and unlock
+state, stats, income, logs, events, frame and structure from documented,
+versioned engine read models, and recreates no engine decision (AD-4).
 
-**FR5 Performance and reliability:** Deterministic fixed-step simulation, frame-rate-independent gameplay, bounded memory, existing WASM-host lifecycle recovery, robust cancellation/attach/detach and observable failure reporting. A new dedicated Web Worker and its worker-specific recovery tests are post-cutover follow-up work under D2/#908, not a prerequisite for the web engine switch.
+**FR5 Performance and reliability.** Deterministic fixed steps at any render
+rate, bounded memory, recovery from an engine throw or panic without losing
+the tower, and failures the player and the developer can see.
 
-**FR6 Cross-platform parity:** Same public engine crate and compatible saves/commands for WASM/web and future engine consumers. A change to shared rules must pass both host gates.
+**FR6 Engine consumers.** One public crate with compatible saves, commands
+and a published compatibility policy (#893).
 
-## 4. Epics and stories, in dependency order
+**NFRs** carry numbers in the release gate (section 6): determinism (NFR1),
+performance (NFR2), reliability and rollback (NFR3), analytics consent and
+attribution (NFR4), and the coverage floors (NFR5).
 
-### Epic A: Contract inventory and source-level parity (P1; prerequisite)
+## 4. Architecture decisions
 
-**A1** Inventory all TypeScript `Simulation`/`Tower` public methods, reads and direct writes and map each to a Rust engine implementation and WASM API, recording `implemented`, `equivalent read model`, `host-only`, `missing`, or `intentionally deprecated`. Explicitly inspect `stats()`, `incomeBreakdown()`, `canBuild()`, `isUnlocked()`, rent previews, building refusal details and structural views. Deliver a checked-in matrix with file references, owner and tests.
+The spine fixes eight invariants; each story below cites the ones it must
+honor:
 
-**A2** Audit engine rules in modules rather than comparing filenames: simulation clock, demand, economy, elevators/dispatch, occupancy/crowd, events, milestones, parking, services, RNG, construction, rent, and all game modes. Capture intentional differences as approved product decisions.
+- **AD-1** The engine answers commands; the instance only mirrors.
+- **AD-2** The step driver moves into the engine; no host keeps a game clock.
+- **AD-3** Every binding export has a tier: player commands, restores, or
+  relay and test ops. The UI reaches tier 1 only.
+- **AD-4** Engine-owned, versioned read models; the UI formats only.
+- **AD-5** One save codec; a format bump ships with a rollback rule.
+- **AD-6** Gameplay events come from the engine only.
+- **AD-7** The flip keeps the fallback; the dedicated Web Worker comes after
+  the flip; parallel phases only after a measured profile.
+- **AD-8** Restores boot the engine from engine-written bytes, never from a
+  TypeScript re-serialization.
 
-**A2a Clock ownership and scheduling:** Document the authoritative Rust `Clock` in `engine-rs/src/clock.rs`, its ownership by `Simulation` in `sim.rs`, and advancement/hour/day hooks in `sim_loop.rs`. The web host schedules elapsed-time tick requests and controls pause/resume/speed; it must not maintain a competing authoritative game clock or apply gameplay time rules. Verify the WASM host's fixed-step accumulator, tick-size caps, speed multipliers, background-tab throttling, pause/resume, save/load time restoration, and deterministic replay at different rendering frame rates. Add tests proving equal game-time advancement and identical hour/day effects for the same command/tick sequence, with no skipped or duplicated boundaries.
+## 5. Implementation roadmap
 
-**A3** Inventory every web and future clients mutation path; classify commands as player-facing or privileged restore/debug. Guard raw setters and prove that money, removal, car and extension charges cannot be bypassed through UI routes. See #923.
+Each story is its own branch and PR, reviewed with the skill CLAUDE.md
+names (`/gds-code-review` for engine, host and save fidelity), with the
+four quality gates green and the coverage floors held. Priority is this
+plan's ordering for the flip; issue titles keep their backlog priority until
+the owner changes them.
 
-### Epic B: Automated parity and compatibility (P1; prerequisite)
+### Wave 1: land what is in flight
 
-**B1** Run the original TS unit and integration suites against the WASM-backed implementation; convert uncovered tests and track results under #878. Preserve exact refusal/error shapes, text and ordering where player-observable.
+| # | Story | Issue | Priority | Modules | Acceptance criteria | Tests | Depends on |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| S1 | Capacity events from the simulation layer in both engines | #906 (PR #950) | P2 | `src/engine/sim/capacity.ts`, `engine-rs/src/wasm.rs`, `src/dualrun/` | `capacity_changed` emitted from `Simulation` in both engines; bare tower edits silent; relay-only ops reachable from `src/dualrun/` only | `towerRelayOps.guard.test.ts`, dual-run edits integration, gameplay emission tests, conformance | none |
+| S2 | The web writes saves through the engine encoder | #935 (PR #953) | P2 | `src/storage/vctowerWriter.ts`, `src/bootstrap.ts` | Same bytes as the fflate writer on every fixture; first failure falls back and latches off | Unit, boot, WASM-suite byte comparison | none |
+| S3 | Vitest suites on the WASM engine and the test-mapping table | #878 | P1 | `src/tests/`, `vite.config.ts`, mapping table | Suites green on both engines or each exclusion named with a reason; table complete for `src/engine/` | The suites themselves, the table's completeness test | none |
 
-**B2** Differential long-run seeded tests: execute identical randomized command sequences in TS and Rust; compare full serialized saves, crowd, money, ledger, logs and emitted gameplay events, not only hashed state views. Persist and minimize failing seeds. Include boundary-hour, day/month, classic/modern and rare-event scenarios.
+### Wave 2: host reliability and the read model
 
-**B3** Cross-format save fixtures: TS -> WASM -> TS, plus legacy migrations, founder state, malformed UTF-8, lone surrogate escapes, duplicate/colliding repaired keys, nonfinite/JS numeric coercions and 32 MiB limit. Treat merged PR #944 as a tested baseline, not pending work; extend coverage under #858 and the remaining durability/recovery tasks.
+| # | Story | Issue | Priority | Modules | Acceptance criteria | Tests | Depends on |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| S4 | Fall back to TypeScript on an engine throw, panic or boot stall | #874 | P1 for the flip | `src/wasmhost/`, `src/bootstrap.ts` | A throw or panic in a command, tick, undo or redo detaches and re-adopts the last merged save; the boot import has a timeout; refusals the instance accepted are reported | Fault-injection integration tests per path; e2e with a forced trap | S3 |
+| S5 | Attach after an exterminator booking keeps its rooms | #902 | P2 | `engine-rs/src/load.rs`, `src/wasmhost/` | The booked room ids survive the save, so an attach mid-booking matches the instance | Integration test that attaches mid-booking; conformance | none |
+| S6 | Binding read model and result shapes | #868 | P1 for the flip | `engine-rs/src/wasm.rs`, `src/wasmhost/` | `canBuild` with its quote, `isUnlocked`, `previewRentBatch`, full `callExterminator` result, unknown kind as a refusal; getters for stats and income; structural snapshot replaces the per-hour save merge | Unit tests per getter; the six merge-per-tick timeouts pass without `VC_WASM_SYNC=hour` | S3 |
+| S7 | The web UI reads the engine catalog | #921, then #922, #926 | P1 (#921), P2 | `src/ui/`, `src/game/`, `engine-rs/src/catalog.rs` | No price, size or rule constant read from `src/engine/facilities.ts` by UI code; build quote from the engine | A source guard test; UI unit tests on catalog values; catalog lock | S6 |
+| S8 | The step driver in the engine | #867 | P1 for the flip | `engine-rs/src/clock.rs` or a sibling module, `src/game/frameLoop.ts` | One engine call takes real seconds, speed and the steady-clock choice and returns the steps it ran; the pace factor, catch-up cap and pause handling move with it; the debt lives on the engine handle outside the save and hash and resets on restore; the web host uses it under `?engine=wasm` | Dual-run day gate with the Rust driver matching every hour; 30, 60 and 144 Hz cadences give identical tick sequences; pause, resume, speed change and a 30-minute hitch | S3 |
 
-**B4** Current WASM-host lifecycle tests: engine attach/detach (whether currently on the main thread or existing infrastructure), in-flight load, stale generation, errors, restart, undo/redo, context loss and exterminator-booking attach (#902). No empty-tower reset or unhandled stale engine handles. Dedicated-Web-Worker lifecycle and backpressure tests belong to the post-cutover D2/#908 implementation, not this prerequisite.
+### Wave 3: one authority
 
-### Epic C: Complete and stabilize frontend APIs (P1; after A)
+| # | Story | Issue | Priority | Modules | Acceptance criteria | Tests | Depends on |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| S9 | The engine answers commands; the instance mirrors | #954 | P1 | `src/wasmhost/wasmHost.ts`, `src/dualrun/mirror.ts`, `engine-rs/src/wasm.rs` | Under `?engine=wasm` every player command runs on the engine first and the caller gets the engine's result in one shape (`{ ok, reason?, delta? }` plus named fields); the instance skips a refused command; while hosted only the engine logs and emits events; a load or undo boots the engine from engine-written bytes (AD-8); a disagreement is reported and the engine's state wins | A test per command that the returned result is the engine's; a forced disagreement is reported; e2e on `chromium-wasm` | S4, S6 |
+| S10 | Tier every binding export; confine tier 3 | #946, with #923 | P1 | `engine-rs/src/wasm.rs`, `src/dualrun/`, guard tests | Every export listed in one tier table; a test that parses `wasm.rs` fails on an untiered export; a guard fails on a tier 3 call outside `src/dualrun/` and tests, including UI writes to `sim.money` and calls to `tower.setCars` or `tower.resizeTransport` that the mirror would relay; arguments validated at the boundary | Guard tests; boundary validation tests in both engines | S1, S9 |
+| S11 | Refusal reasons and their order pinned | #865 | P2 | `conformance/`, runners | Scenario steps can pin `reason`; a refusals scenario covers the four-star gates | Conformance in both runners | none |
+| S12 | Save edge cases | #858, #856 | P3 | `engine-rs/src/load.rs`, `src/storage/` | Hand-edited numbers load as the TypeScript loader reads them, or fail with the same message; a save at RNG state 0 reloads at state 0 | Loader table cases; round-trip tests | none |
 
-**C1** Close the read-model and build-quote gaps in #868 with a stable schema: frame, structure, queries, stats, income, build rules, preview/refusal reasons, logs and gameplay events. Avoid repeatedly serializing whole towers to derive simple UI data.
+### Wave 4: the flip
 
-**C2** Reconcile catalog and engine-owned charges with public #930 and merged #928. Enforce shared price/build/unlock policy across both hosts.
+| # | Story | Issue | Priority | Depends on |
+| --- | --- | --- | --- | --- |
+| S13 | Performance baseline and budgets for the engine | #900 (with #905, #849 as found) | P2 | S6 |
+| S14 | Analytics close-out: fx and counter pins, drain glue, #873 | #879, #907, #873 | P3 | S1 |
+| S15 | The release gate, one release on the TypeScript default with the new instrument, then the flip as 3.0.0 | #945 | P1 | S3 to S14 |
 
-**C3** Verify the merged engine-event analytics bridge (#873, merged PR #938): test deduplication, tower resets, event ordering, consent and suppression without attributing a new tower to an old funnel. Engine events remain provider-agnostic; the web forwards them to its analytics provider only.
+### After the flip (not cutover blockers)
 
-**C4** Document API/version compatibility between public engine commit, WASM package and any published engine consumers; add compatibility CI that detects drift.
+- **Dedicated Web Worker** (#908 step 1): the engine instance, the clock and
+  command execution move into one worker; rendering and input stay on the
+  main thread. Tests cover worker start and restart, stale messages,
+  backpressure, step debt, pause and speed changes, background throttling,
+  save and load, and replay. It improves responsiveness, not throughput.
+- **Parallel phases** (#908 step 3): only after a measured phase profile,
+  behind a cargo feature, with the serial step as the reference and the
+  referee run with the feature on and off. Shared memory and cross-origin
+  isolation costs are assessed before any WASM threads ship.
+- **TDT in the crate** (roadmap row 5), **copy catalog** (row 6), **crate
+  release** (#893), and **retirement** (row 7,
+  `story-engine-retire-typescript`) after two releases on WASM.
 
-### Epic D: Performance, accessibility and production operations (P2; before broad rollout)
+## 6. Release gate for the default flip (#945)
 
-**D1** Measure WASM cold load, save/import/export latency, tick throughput, heap/memory, long sessions and 5,000+ population. Compare against TS baselines; track #900 and #908. Set explicit thresholds based on real devices.
+Every row passes on the flip candidate's commit. Rows marked "proposed" need
+the owner's numbers before the gate is binding.
 
-**D2** Worker-ready boundary and post-cutover worker migration (#908): **Cutover prerequisite:** keep the Rust engine accessible through a DOM/React-independent, versioned command/read-model interface, with explicit lifecycle, cancellation, error and snapshot semantics. **First post-cutover follow-up:** move the existing single-threaded WASM engine instance, game clock and command/tick execution into one dedicated Web Worker; keep rendering and input on the main thread. Batch commands and snapshots, measure serialization/copying overhead, and evaluate transferable binary buffers only where profiling justifies them. Test worker startup/restart, stale messages, backpressure, fixed-step debt, pause/resume, speed changes, background-tab throttling, save/load, deterministic replay and UI responsiveness. A worker improves UI responsiveness but does not inherently increase simulation throughput. **Later optional optimization:** profile expensive independent phases before attempting Rust/WASM multithreading; retain a deterministic serial reference and verify RNG, ordering and state parity. Assess shared-memory/cross-origin-isolation requirements, browser support, fallback behavior and deployment costs before enabling threads. Do not make parallel WASM a cutover blocker without measured evidence.
+| Gate | Pass condition |
+| --- | --- |
+| Conformance | Every scenario matches in both runners; refusal reasons pinned (S11) |
+| Dual run | A day on every fixture at every speed with no divergence, with the Rust step driver (S8) |
+| Unit and integration | The vitest suites pass on the engine, or each exclusion is named in the mapping table (S3) |
+| End to end | The `chromium-wasm` project is green, including a forced-trap fallback spec (S4) |
+| Authority | No command answer comes from the instance (S9, #954); every export tiered and tier 3 confined (S10); the UI reads no TypeScript price or rule table (S7) |
+| Saves | Every fixture and the loader table round-trip byte for byte through the engine; the 32 MiB cap and Unicode cases fail the same way in both engines |
+| Performance (proposed) | Late-game fixture: Modern tick time no slower than TypeScript (roadmap rule); cold load within +500 ms of the TypeScript build; heap within 1.25x; a 5,000+ population fixture holds the frame budget the perf gate already uses |
+| Reliability (proposed) | One release on the TypeScript default with the engine instrument: engine fallback in under 0.1% of sessions that opt in, and no unexplained divergence report |
+| Rollback | A rehearsal flips the default back with the flag and loads saves written by the engine build |
+| Deployment | The engine package's precache and versioning rule decided (an offline first load, an old cached shell with a newer package); a failed Rust build fails the deploy |
+| Coverage | `vite.config.ts` floors and the Rust job's line floor hold |
+| Sign-off | The owner approves with the exception register attached |
 
-**D3** Public engine consumer compatibility: verify the versioned engine contract, conformance fixtures and supported import/export behavior without depending on any unreleased client implementation.
+## 7. Risks and decisions for the owner
 
-**D4** Observe failures and implement feature-flagged gradual rollout, telemetry, safe rollback to TS, and explicit migration rollback constraints for saves written by newer Rust builds.
+1. **Command authority before the flip (S9).** Recommended as a flip gate,
+   since 3.0.0 says the game runs on Rust (#954). The alternative is to ship the
+   flip with the instance still answering and fix it before retirement.
+2. **Performance and reliability numbers** in section 6 are proposals.
+3. **Offline play at the flip.** The engine package is left out of the
+   offline precache today; after the flip an offline first load would fall
+   back to TypeScript, and after retirement there is nothing to fall back to.
+4. **Save format bumps.** The copy catalog (row 6) bumps the save version;
+   it should not ship in the flip release, so a rollback can still read every
+   save (AD-5).
+5. **Retirement version.** The roadmap calls retirement internal while the
+   retirement story's AC5 says major; one of them changes.
+6. **Malformed saves.** Match the TypeScript loader's coercions exactly (#858),
+   or refuse with a message; the recommendation is to match.
 
-### Epic E: Cutover and retirement (P1 release decision; after A-D gates)
+## 8. Issues
 
-**E1** Ship internal WASM-only mode with TS comparison in CI, then opt-in canary. Record zero unexplained divergences in agreed deterministic coverage and meet performance/error budgets.
+Reused: #865, #867, #868, #874, #878, #879, #893, #900, #902, #906, #907,
+#908, #919, #921, #922, #923, #926, #935, #945, #946, #856, #858, #873.
 
-**E2** Publish a go/no-go report with links to tests, conformance artifacts, open exceptions, device measurements, save fixtures and rollback rehearsal. Explicit owner sign-off required.
+New: #954 for S9 (engine-authoritative command answers). #945 (the release
+gate) and #946 (binding export tiers) are extended rather than duplicated.
+All three carry backlog rows (`wasm-host-engine-answers`,
+`wasm-cutover-release-gate`, `wasm-binding-export-tiers`).
 
-**E3** Switch the default web engine only after E2; retain a temporary rollback lane. Remove TypeScript simulation implementation only in a later, separate PR after compatibility and telemetry observation.
+## 9. What changed in this review
 
-## 5. Definition of done / release gate
-
-- [ ] A1 parity matrix reviewed, all web API dependencies mapped; no unexplained missing feature.
-- [ ] Original TS suites pass on WASM (#878), plus long-run differential and host lifecycle tests.
-- [ ] Existing real user saves and synthetic edge cases round-trip without silent loss; migrations tested.
-- [ ] No unguarded gameplay path bypasses Rust economic or construction rules.
-- [ ] Web integration and public engine contract gates pass against the selected engine revision.
-- [ ] Performance and memory targets recorded, CI green, test coverage thresholds maintained.
-- [ ] Rollback demonstrated and approved; no untriaged P0/P1 cutover defect.
-- [ ] Product owner approves cutover with a documented exception register.
-
-## 6. Existing tracking / avoid duplicate work
-
-Public: #878 WASM suite parity; #868 frontend read model; #858 save-number fidelity; #886 TDT parity; #900 WASM performance baseline; #902 host attach issue; #908 worker/performance; #923 command argument validation; #873 analytics; open PR #930 catalog and draft PR #950 simulation-layer capacity events; merged PR #938 analytics, merged PR #944 save Unicode/cap. Public PR #928 is closed; verify its merged commit rather than treating it as pending.
-
-
-## 7. Risks, assumptions and open decisions
-
-1. **Save format versioning:** what is the oldest supported save and how will Rust-written saves be rolled back to TS?
-2. **Numeric and Unicode semantics:** does compatibility mean matching JS coercion and malformed inputs exactly, or refusing previously accepted malformed saves with explicit messaging?
-3. **Read API ownership:** what data must Rust calculate versus what the frontend may aggregate purely for display?
-4. **Privileged operations:** how should undo, import, migration, testing and debug paths access raw setters without weakening player-command invariants?
-5. **Analytics privacy and provider boundaries:** confirm event schema, consent handling and attribution lifecycle before making Rust authoritative.
-6. **Release split:** future client release acceptance is independent of the web cutover; the public engine's compatibility guarantees must remain documented.
-
-## 8. BMAD execution handoff
-
-Run BMAD product/architecture review on this proposal, confirm scope and acceptance thresholds, then break epics into appropriately small implementation stories with dependencies and explicit test evidence. Use the repo's `_bmad/bmm/config.yaml` paths: planning artifacts in `_bmad-output/planning-artifacts`, implementation artifacts in `_bmad-output/implementation-artifacts`. This proposal belongs in planning artifacts and must not be mistaken for completed implementation.
-
-For coding agents: before implementation, restate requirements and flag missing/truncated instructions; make small meaningful commits; run relevant tests and CI coverage gates, restore coverage above required thresholds, and report the exact evidence and remaining exceptions. No giant all-in-one migration PR.
-
-## 9. PR reconciliation update (2026-10-13)
-
-This section supersedes older references to pending PRs elsewhere in this planning input. It is **public-engine/web-only** scope; no non-public repository topology or implementation details belong here.
-
-- **Merged #938:** provider-agnostic gameplay analytics forwarding exists. Retain consent, session-swap and event-drain regression coverage; do not file a second bridge implementation.
-- **Merged #944:** web save Unicode repair and 32 MiB reader/writer limits exist. Continue cross-engine pathological save, normalization collision, numeric and migration parity fixtures rather than recreating the codec.
-- **Open #930:** catalog API, nested structural validation, parity digests and charged-price checks were added on its reviewed head `0bf96e43`. Test CI and Rust engine workflows were green on that head. The PR was subsequently rebased to `640219a9`, which GitHub reports mergeable, with fresh workflows still in progress at review time. Wait for those exact-head checks and verify the eventual merged tree before marking C2 delivered; do not treat this API as already on `main`.
-- **Draft #950:** moves TypeScript `capacity_changed` emission to `Simulation` and introduces explicit bare-tower WASM calls for differential replay. Re-review after the final merge/base update. The new `towerSetCars` and `towerResizeTransport` exports must be classified and protected under A3: they bypass the simulation-layer event and player-facing charge paths. No new public mutation escape hatch should become a production UI route.
-- **Open #943/#831/#817/#816:** rendering/atlas work is independent of the Rust simulation cutover except for canonical data contracts and render-performance baselines. Do not hold the engine cutover for unrelated art-review decisions.
-- **Open #947:** this BMAD planning PR. Its current-wasm-host lifecycle/recovery tests are prerequisites; the dedicated Web Worker introduction and worker-specific tests remain post-cutover under D2/#908.
-- **Public #948/#952:** workflow configuration and web notices are not part of engine-cutover implementation. Apply public-content boundary checks to any public automation/planning change; never import details from non-public projects into public PRs, commits, issues or documentation.
-
-**Handoff:** Before implementing any story, refresh the public PR queue and merge SHAs; identify implemented, unmerged and genuinely missing work. Retest dependency interactions in the final merged tree. Every story should have a small diff, targeted tests, passing coverage thresholds and a concrete rollback or recovery path when relevant.
+- #930 is merged (`562f104`); earlier text called it open. #928 merged as
+  `a412060`.
+- #938 and #944 are merged baselines; no second bridge or codec is planned.
+- The dedicated Web Worker moved after the flip; its tests left the cutover
+  gate.
+- Epics A to E were folded into the roadmap's rows and the stories above, so
+  there is one plan for one migration.
+- The command-authority gap (S9) and the deployment rows of the gate are new.

@@ -195,7 +195,7 @@ need an owner.
 
 ### Critical Issues Requiring Immediate Action
 
-1. Open a P1 issue for engine-authoritative command answers and make it a
+1. Open a P1 issue for engine-authoritative command answers (filed as #954) and make it a
    flip gate.
 2. Rewrite the plan as a delta on the architecture roadmap, with the current
    PR states and a dependency-ordered story list mapped to issues.
