@@ -16,8 +16,9 @@ the checkout and builds, tests and runs the copy there, depending on the
 engine by an absolute path. The plan this page belongs to is issue #980.
 
 What that proves today: the engine builds and runs with no web game and no
-Node.js, and a crate in another directory, holding nothing of this
-repository but a dependency line, can drive it and replay the conformance
+Node.js, and a crate in another directory, reaching this repository only
+through its dependency line and the conformance directory it is given, can
+drive it and replay the conformance
 scenarios that start from a new game. What it does not prove yet: a
 registry or packaged release (the crate reads `../conformance/` at compile
 time, so it needs the repository beside it; #893), or the scenarios that
@@ -57,9 +58,10 @@ fixture files it is pointed at and is never reached from a running game.
 `tests/independence.rs` scans the library source for those services (by
 path, grouped import, macro and foreign-function block), refuses a build
 script for the engine itself and a `#[path]` module or an include from
-outside `engine-rs/` and `conformance/`, and fails when the engine's or the consumer's `Cargo.lock` names a
-crate nobody reviewed for host access. It reads source text, so it catches the ordinary
-spellings; review still owns the rest.
+outside `engine-rs/` and `conformance/` (and compiled-in code from outside
+`src/`), and fails when the engine's or the consumer's `Cargo.lock` names
+a crate nobody reviewed for host access. It reads source text, so it
+catches the ordinary spellings; review still owns the rest.
 
 ## The host API
 
