@@ -37,9 +37,9 @@ import {
  * Compressed, each slot lands around 100-120KB. The compression is
  * synchronous (fflate) on purpose: saving happens at boot, on a timer, and —
  * critically — right before a reload in the crash-recovery / update paths,
- * where an async write could be interrupted mid-flush and lose the tower. (The
- * .vctower FILE format keeps using the async native CompressionStream: those
- * exports are user-initiated and never race a reload.)
+ * where an async write could be interrupted mid-flush and lose the tower. The
+ * .vctower FILE export packs with the same fflate level 1, so every writer, and
+ * the engine's, writes the same bits.
  */
 
 const AUTO_KEY = "verticopolis-save";
@@ -331,15 +331,13 @@ export const SaveGame = {
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
   async export(sim: Simulation): Promise<string> {
-    // Export only WRITES compressed data, so it needs just the encoder; a
-    // browser missing only the decoder can still create tower files.
-    if (!compressionEncodeSupported()) {
-      throw new Error("This browser is too old to create tower files. Try a current browser.");
-    }
     // Exports carry the same write-time provenance as local saves: a moved
-    // file says when and by which build it was written.
-    const packed = await deflate(encodeSaveJson(JSON.stringify(stamp(sim.serialize()))));
-    return TOWER_FILE_MAGIC + "\n" + toBase64(packed) + "\n";
+    // file says when and by which build it was written. fflate at level 1,
+    // like packSync, writes the same bits in every browser, and the engine's
+    // writer (`load::encode_vctower`) writes those bits too, so a tower file
+    // is the same bytes whichever wrote it.
+    const json = encodeSaveJson(JSON.stringify(stamp(sim.serialize())));
+    return TOWER_FILE_MAGIC + "\n" + toBase64(deflateSync(json, { level: 1 })) + "\n";
   },
 
   /** Download name for an export: the tower's name slugged, e.g. "tower-one.vctower". */

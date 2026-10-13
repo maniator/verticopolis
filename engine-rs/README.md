@@ -102,21 +102,29 @@ as a founder's keeps that status as `founder: true`. A save with no stamp
 looks like a fresh serialization, so load an unstamped file before writing
 it again.
 
-The framing and the base64 alphabet match the TypeScript writers byte for
-byte (the magic, a newline, one line of padded standard base64, a newline).
-The payload is raw DEFLATE at level 1, the level of `SaveGame.packSync`,
-over the save's canonical JSON (`JSON.stringify` formatting with keys
-sorted). The key order and the compressed bits differ from the TypeScript
-output (fflate and the browser's `CompressionStream` also differ from each
-other there); every reader decodes the file to the same save (see the
-limits below). The bytes are stable within one build of the engine. The
-Rust tests in `load.rs` round-trip every web-written fixture in
-`src/tests/fixtures/`, and
+For the same serialized save, stamp and time, the file is the one the web
+game writes, byte for byte: the magic, a newline, one line of padded
+standard base64, a newline, around raw DEFLATE of the save's JSON. The JSON
+is `JSON.stringify`'s text (`canonical::js_json`: keys in insertion order,
+which serde_json's `preserve_order` keeps, with array-index keys first, as
+in any JavaScript object), so a save parsed from the web game's JSON keeps
+its key order. The compressor is `src/fflate.rs`, a line-for-line port of
+fflate 0.8.3 `deflateSync` at level 1, the compressor every web writer uses
+(`SaveGame.export`, `packSync`, `toTowerFile`). It is pinned by reference
+vectors fflate wrote; change it only together with the fflate version in
+`package-lock.json`. A save built by the engine's own `serialize` has the
+engine's key order, which every reader takes, and a string holding half a
+surrogate pair is written as U+FFFD where `JSON.stringify` writes the escape
+(the web game repairs such strings on load and on input, so its saves hold
+none). The Rust tests in `load.rs`
+round-trip every web-written fixture in `src/tests/fixtures/`, and
 `src/tests/integration/conformanceWasmVctower.integration.test.ts` (part of
 `npm run test:wasm`) loads each fixture in the web game, writes it with the
-engine, reads it back through `decodeVctower`, `fromTowerFile` and
-`SaveGame.import`, and checks the framing against `toTowerFile`'s, the
-payload text, the Founder status and the loaded state's hash.
+engine, checks the file against `SaveGame.export`'s and `toTowerFile`'s
+byte for byte, reads it back through `decodeVctower`, `fromTowerFile` and
+`SaveGame.import`, and checks the Founder status and the loaded state's
+hash. The same file runs a randomized differential of the compressor
+against fflate.
 
 Two limits apply to every save the engine reads or writes as JSON text.
 A JavaScript string can hold half of a surrogate pair (a tower name cut
