@@ -122,6 +122,23 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   forever or merge on your own. Note on the PR that the reviewers were down and
   how many rounds ran. Re-request Copilot/Codex and hold merge as usual the
   moment they are back.
+- **Analytics numbers come from a governed definition, never from SQL written
+  for the occasion.** A readout may narrate, interpret, argue and recommend,
+  all the things a dashboard is bad at, but every figure in anything published
+  comes from an approved catalog metric, a saved view, or a saved insight. The
+  canonical sources are the **Verticopolis: Gameplay Analytics** dashboard, the
+  `session_lengths` view, and the PostHog data catalog. Re-deriving a measure
+  that already has a definition is how a published readout came to report 211
+  sessions at a median of 86s when the real figures were 132 and 42s: it
+  counted `session_end` rows, which re-fire on every tab-hide. Prose in a doc
+  comment did not prevent that, and the view, the dashboard and the saved
+  insights all carried the correction already. Check the catalog first. If no
+  governed definition covers the measure, say so in the readout and propose one
+  rather than quietly inventing a number.
+- **A published snapshot says so, at the top.** Anything dated and not
+  refreshing carries its window and a pointer to the live dashboard above the
+  figures, not in a footer. A date a reader meets after believing the number is
+  too late.
 
 ## Canon reference (don't re-derive from memory)
 
