@@ -46,8 +46,8 @@ fixture files it is pointed at and is never reached from a running game.
 `tests/independence.rs` scans the library source for those services (by
 path, grouped import, macro and foreign-function block), refuses a build
 script for the engine itself and a `#[path]` module or an include from
-outside `engine-rs/` and `conformance/`, and fails when `Cargo.lock` names a crate nobody reviewed
-for host access. It reads source text, so it catches the ordinary
+outside `engine-rs/` and `conformance/`, and fails when the engine's or the consumer's `Cargo.lock` names a
+crate nobody reviewed for host access. It reads source text, so it catches the ordinary
 spellings; review still owns the rest.
 
 ## The host API

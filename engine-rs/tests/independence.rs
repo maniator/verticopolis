@@ -63,7 +63,8 @@ const HOST_MODULES: &[&str] = &["env", "net", "os", "process", "time", "thread"]
 /// `js-sys`, `web-sys`, a logger, a thread pool, a time library). The
 /// exceptions are the optional binding's own crates (`wasm-bindgen*` and
 /// `bumpalo`, compiled only with the `wasm` feature) and `libc`, which the
-/// hashing and compression crates use for CPU feature detection.
+/// hashing and compression crates use for CPU feature detection. A crate
+/// that only a dev-dependency pulls in belongs in [`TEST_ONLY_CRATES`].
 const ALLOWED_CRATES: &[&str] = &[
     "adler2",
     "base64",
@@ -77,6 +78,9 @@ const ALLOWED_CRATES: &[&str] = &[
     "digest",
     "equivalent",
     "flate2",
+    // A hasher serde_json's ordered maps take on newer versions (the
+    // consumer resolves one); pure computation.
+    "foldhash",
     "hashbrown",
     "hybrid-array",
     "indexmap",
@@ -106,6 +110,11 @@ const ALLOWED_CRATES: &[&str] = &[
     "zlib-rs",
     "zmij",
 ];
+
+/// Crates only the engine's own tests pull in. They never reach a host: the
+/// CI `consumer` job checks a host's normal and build dependency tree for
+/// `getrandom` and the browser crates. Empty today.
+const TEST_ONLY_CRATES: &[&str] = &[];
 
 /// Marks a test file found by Rust's default module lookup, which starts in
 /// the module's own directory rather than the file's.
@@ -370,7 +379,27 @@ fn strip_tests(name: &str, src: &str) -> (String, Vec<String>) {
             }
         }
         let end = end.unwrap_or_else(|| panic!("{name}: the #[cfg(test)] at byte {at} never ends"));
-        let paths = path_attributes(src, &parts, at, end);
+        // Attributes written above `#[cfg(test)]` (a `#[path]`, say) belong
+        // to the same item.
+        let mut start = src[..at].rfind('\n').map_or(0, |i| i + 1);
+        while start > 0 {
+            let prev = src[..start - 1].rfind('\n').map_or(0, |i| i + 1);
+            let line = src[prev..start - 1].trim();
+            if line.starts_with("#[")
+                && line.ends_with(']')
+                && parts[prev + src[prev..].find('#').unwrap()] == Part::Code
+            {
+                start = prev;
+            } else {
+                break;
+            }
+        }
+        let start = if src[start..at].trim().is_empty() {
+            at
+        } else {
+            start
+        };
+        let paths = path_attributes(src, &parts, start, end);
         if paths.is_empty() {
             // `#[cfg(test)] mod name;` loads `name.rs` or `name/mod.rs` from
             // the module's directory; record it the way a #[path] is.
@@ -386,7 +415,7 @@ fn strip_tests(name: &str, src: &str) -> (String, Vec<String>) {
             }
         }
         test_paths.extend(paths);
-        keep[at..end].iter_mut().for_each(|k| *k = false);
+        keep[start..end].iter_mut().for_each(|k| *k = false);
         from = end;
     }
     let kept: String = src
@@ -687,6 +716,10 @@ fn compiled_in_data_comes_from_the_crate_or_the_conformance_suite() {
                     let file = normalize(&crate_dir().join(&name).parent().unwrap().join(&path));
                     if !(file.starts_with(&krate) || file.starts_with(&suite)) {
                         found.push(format!("{name}: {path}"));
+                    } else if path.ends_with(".rs") && !file.starts_with(krate.join("src")) {
+                        // Code compiled in from elsewhere would escape the
+                        // host-service scan, which reads src/.
+                        found.push(format!("{name}: {path} is code outside src/"));
                     }
                 }
                 Err(e) => found.push(format!("{name}: {e}")),
@@ -695,7 +728,7 @@ fn compiled_in_data_comes_from_the_crate_or_the_conformance_suite() {
     }
     assert!(
         found.is_empty(),
-        "the library compiles in a file from outside engine-rs/ and conformance/: {found:?}"
+        "the library compiles in code or data from where it may not (data from engine-rs/ or conformance/, code from src/): {found:?}"
     );
 }
 
@@ -757,13 +790,23 @@ fn the_engine_has_no_build_script() {
 
 #[test]
 fn every_locked_crate_is_reviewed() {
-    let lock = std::fs::read_to_string(crate_dir().join("Cargo.lock")).expect("Cargo.lock");
-    let unlisted: Vec<&str> = lock
-        .lines()
-        .filter_map(|l| l.strip_prefix("name = \""))
-        .map(|n| n.trim_end_matches('"'))
-        .filter(|n| !ALLOWED_CRATES.contains(n))
-        .collect();
+    // The engine's lock and the consumer's, which resolves newer patch
+    // versions the way a host outside this repository would.
+    let mut unlisted = Vec::new();
+    for lock in ["Cargo.lock", "consumer/Cargo.lock"] {
+        let text = std::fs::read_to_string(crate_dir().join(lock)).expect("a lock file");
+        unlisted.extend(
+            text.lines()
+                .filter_map(|l| l.strip_prefix("name = \""))
+                .map(|n| n.trim_end_matches('"').to_string())
+                .filter(|n| {
+                    n != "verticopolis-engine-consumer"
+                        && !ALLOWED_CRATES.contains(&n.as_str())
+                        && !(lock == "Cargo.lock" && TEST_ONLY_CRATES.contains(&n.as_str()))
+                })
+                .map(|n| format!("{lock}: {n}")),
+        );
+    }
     assert!(
         unlisted.is_empty(),
         "crates not reviewed for host access (see ALLOWED_CRATES): {unlisted:?}"
@@ -905,13 +948,14 @@ fn a_cfg_test_on_anything_but_an_item_stops_the_scan() {
     }
     let (_, paths) = strip_tests(
         "sample",
-        "#[cfg(test)]\n// helpers for the tests below\n#[allow(dead_code)]\npub(crate) mod helpers;\n#[cfg(test)]\nmod tests { }",
+        "#[cfg(test)]\n// helpers for the tests below\n#[allow(dead_code)]\npub(crate) mod helpers;\n#[cfg(test)]\nmod tests { }\n#[path = \"above_tests.rs\"]\n#[cfg(test)]\nmod above;",
     );
     assert_eq!(
         paths,
         vec![
             format!("{MODULE_DIR}helpers.rs"),
-            format!("{MODULE_DIR}helpers/mod.rs")
+            format!("{MODULE_DIR}helpers/mod.rs"),
+            "above_tests.rs".to_string()
         ]
     );
 }

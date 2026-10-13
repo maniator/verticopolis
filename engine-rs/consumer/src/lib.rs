@@ -571,16 +571,11 @@ mod tests {
     #[test]
     fn a_lock_entry_without_its_scenario_or_checkpoints_is_an_error() {
         let dir = std::env::temp_dir().join(format!("vc-consumer-{}", std::process::id()));
-        std::fs::create_dir_all(dir.join("scenarios")).expect("temp dir");
+        std::fs::create_dir_all(&dir).expect("temp dir");
         let checkpoint =
             serde_json::json!({ "label": "start", "state": "0", "crowd": "0", "events": "0" });
         let lock = serde_json::json!({ "scenarios": { "gone": [checkpoint], "empty": [] } });
         std::fs::write(dir.join("expected.json"), lock.to_string()).expect("lock");
-        std::fs::copy(
-            conformance_dir().join("scenarios/starter-classic.json"),
-            dir.join("scenarios/empty.json"),
-        )
-        .expect("scenario");
         let gone = replay(&dir, "gone");
         let empty = replay(&dir, "empty");
         let _ = std::fs::remove_dir_all(&dir);
