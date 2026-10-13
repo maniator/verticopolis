@@ -79,26 +79,24 @@ fn extend_json(r: &crate::charges::ExtendResult) -> Value {
     v
 }
 
-fn parse_extend_end(s: &str) -> Result<crate::charges::ExtendEnd, String> {
-    crate::charges::ExtendEnd::parse(s).ok_or_else(|| format!("end must be up or down, got {s}"))
-}
-
-fn parse_removal_method(s: &str) -> Result<crate::gameplay::RemovalMethod, String> {
-    crate::gameplay::RemovalMethod::parse(s)
-        .ok_or_else(|| format!("method must be sell or bulldoze, got {s}"))
-}
-
-/// A high-water mark as JSON `{ bottom, top }` text, whole floors.
-fn parse_hwm(text: &str) -> Result<(i64, i64), String> {
-    let v: Value = serde_json::from_str(text).map_err(|e| format!("hwm: {e}"))?;
-    let field = |name: &str| -> Result<i64, String> {
+/// A high-water mark as JSON `{ bottom, top }` text, whole floors; `None`
+/// for anything else, which the command refuses as malformed (#923).
+fn parse_hwm(text: &str) -> Option<(i64, i64)> {
+    let v: Value = serde_json::from_str(text).ok()?;
+    let field = |name: &str| {
         v.get(name)
             .and_then(Value::as_f64)
-            .filter(|x| x.fract() == 0.0 && x.abs() < 9007199254740992.0)
-            .map(|x| x as i64)
-            .ok_or_else(|| format!("hwm: {name} must be a whole number"))
+            .and_then(crate::charges::whole)
     };
-    Ok((field("bottom")?, field("top")?))
+    Some((field("bottom")?, field("top")?))
+}
+
+/// The refusal JSON for a malformed charge command (#923).
+fn invalid_charge() -> String {
+    charge_json(&crate::charges::ChargeResult::refuse(
+        crate::charges::INVALID_REQUEST,
+    ))
+    .to_string()
 }
 
 /// `{ kind, cost, message }` for the choice the engine is waiting on.
@@ -461,41 +459,71 @@ impl Engine {
     /// `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
     /// limit and the balance and pays for the car itself.
     #[wasm_bindgen(js_name = addCar)]
-    pub fn add_car(&mut self, id: i32) -> String {
-        charge_json(&self.sim.add_car(id.into())).to_string()
+    pub fn add_car(&mut self, id: f64) -> String {
+        match crate::charges::whole(id) {
+            Some(id) => charge_json(&self.sim.add_car(id)).to_string(),
+            None => invalid_charge(),
+        }
     }
 
     /// `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
     #[wasm_bindgen(js_name = removeCar)]
-    pub fn remove_car(&mut self, id: i32) -> String {
-        charge_json(&self.sim.remove_car(id.into())).to_string()
+    pub fn remove_car(&mut self, id: f64) -> String {
+        match crate::charges::whole(id) {
+            Some(id) => charge_json(&self.sim.remove_car(id)).to_string(),
+            None => invalid_charge(),
+        }
     }
 
     /// `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
     /// as JSON `{ bottom, top }` text or null: JSON `{ ok, reason?, delta,
-    /// bottom, top, added }`, the floors billed past the mark.
+    /// bottom, top, added }`, the floors billed past the mark. A malformed
+    /// argument (#923) is refused with the shaft's ends as they stand.
     #[wasm_bindgen(js_name = extendTransport)]
     pub fn extend_transport(
         &mut self,
-        id: i32,
+        id: f64,
         end: &str,
-        target_floor: i32,
+        target_floor: f64,
         hwm: Option<String>,
-    ) -> Result<String, JsError> {
-        let end = parse_extend_end(end).map_err(err)?;
-        let hwm = hwm.as_deref().map(parse_hwm).transpose().map_err(err)?;
-        let r = self
-            .sim
-            .extend_transport(id.into(), end, target_floor.into(), hwm);
-        Ok(extend_json(&r).to_string())
+    ) -> String {
+        use crate::charges::{whole, ChargeResult, ExtendEnd, ExtendResult, INVALID_REQUEST};
+        let id_whole = whole(id);
+        let hwm_ok = match hwm.as_deref() {
+            None => Some(None),
+            Some(text) => parse_hwm(text).map(Some),
+        };
+        let parsed = (id_whole, ExtendEnd::parse(end), whole(target_floor), hwm_ok);
+        let r = match parsed {
+            (Some(id), Some(end), Some(target), Some(hwm)) => {
+                self.sim.extend_transport(id, end, target, hwm)
+            }
+            _ => {
+                let (bottom, top) = id_whole
+                    .and_then(|id| self.sim.tower.get_transport(id))
+                    .map_or((0, 0), |t| (t.bottom, t.top));
+                ExtendResult {
+                    charge: ChargeResult::refuse(INVALID_REQUEST),
+                    bottom,
+                    top,
+                    added: 0,
+                }
+            }
+        };
+        extend_json(&r).to_string()
     }
 
     /// `removeFacility(id, method)`: the player's sell or bulldoze of a unit
     /// or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`.
     #[wasm_bindgen(js_name = removeFacility)]
-    pub fn remove_facility(&mut self, id: i32, method: &str) -> Result<String, JsError> {
-        let method = parse_removal_method(method).map_err(err)?;
-        Ok(charge_json(&self.sim.remove_facility(id.into(), method)).to_string())
+    pub fn remove_facility(&mut self, id: f64, method: &str) -> String {
+        let method = crate::gameplay::RemovalMethod::parse(method);
+        match (crate::charges::whole(id), method) {
+            (Some(id), Some(method)) => {
+                charge_json(&self.sim.remove_facility(id, method)).to_string()
+            }
+            _ => invalid_charge(),
+        }
     }
 
     /// `tower.removeUnit(id)`: whether a unit went.
@@ -1104,17 +1132,73 @@ mod tests {
             (v["bottom"].as_i64(), v["top"].as_i64(), v["added"].as_i64()),
             (Some(1), Some(4), Some(2))
         );
-        assert_eq!(parse_extend_end("down"), Ok(ExtendEnd::Down));
-        assert!(parse_extend_end("sideways").is_err());
+        assert_eq!(ExtendEnd::parse("down"), Some(ExtendEnd::Down));
+        assert_eq!(ExtendEnd::parse("sideways"), None);
         assert_eq!(
-            parse_removal_method("bulldoze"),
-            Ok(RemovalMethod::Bulldoze)
+            RemovalMethod::parse("bulldoze"),
+            Some(RemovalMethod::Bulldoze)
         );
-        assert!(parse_removal_method("burn").is_err());
-        assert_eq!(parse_hwm(r#"{"bottom":-2,"top":30}"#), Ok((-2, 30)));
-        assert!(parse_hwm(r#"{"bottom":1.5,"top":3}"#).is_err());
-        assert!(parse_hwm(r#"{"top":3}"#).is_err());
-        assert!(parse_hwm("not json").is_err());
+        assert_eq!(RemovalMethod::parse("burn"), None);
+        assert_eq!(parse_hwm(r#"{"bottom":-2,"top":30}"#), Some((-2, 30)));
+        assert_eq!(parse_hwm(r#"{"bottom":1.5,"top":3}"#), None);
+        assert_eq!(parse_hwm(r#"{"top":3}"#), None);
+        assert_eq!(parse_hwm("not json"), None);
+    }
+
+    /// A malformed charge command (#923) is refused with one reason and moves
+    /// nothing: a fractional or NaN id or floor that the old `i32` arguments
+    /// truncated to a real shaft, an unknown `end` or `method`, a bad mark.
+    #[test]
+    fn a_malformed_charge_command_is_refused_and_moves_nothing() {
+        use crate::charges::INVALID_REQUEST;
+        use crate::facilities::Kind;
+        let mut sim = Simulation::new_game(1, crate::clock::GameMode::Classic);
+        for x in 10..40 {
+            assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+        }
+        for x in 10..40 {
+            assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+        }
+        assert!(sim.build_transport(Kind::ElevatorStandard, 10, 1, 2).ok);
+        let lift = sim.tower.transport_at(1, 10).unwrap().id;
+        sim.money = 1_000_000.0;
+        let mut e = Engine { sim };
+        let before = e.serialize();
+        let refused = |text: String| -> Value {
+            let v: Value = serde_json::from_str(&text).unwrap();
+            assert_eq!(v["ok"], false, "{text}");
+            assert_eq!(v["reason"], INVALID_REQUEST, "{text}");
+            assert_eq!(v["delta"].as_f64(), Some(0.0), "{text}");
+            v
+        };
+        let near = lift as f64 + 0.5;
+        refused(e.add_car(near));
+        refused(e.add_car(f64::NAN));
+        refused(e.remove_car(f64::INFINITY));
+        refused(e.remove_car(f64::NEG_INFINITY));
+        refused(e.add_car(9_007_199_254_740_992.0)); // 2^53: past Number.isSafeInteger
+        refused(e.extend_transport(lift as f64, "UP", 3.0, None)); // exact match, as TypeScript
+        refused(e.remove_facility(lift as f64, "Sell"));
+        let v = refused(e.extend_transport(lift as f64, "sideways", 3.0, None));
+        assert_eq!(
+            (v["bottom"].as_i64(), v["top"].as_i64()),
+            (Some(1), Some(2))
+        );
+        refused(e.extend_transport(lift as f64, "up", 3.5, None));
+        refused(e.extend_transport(lift as f64, "up", f64::NAN, None));
+        refused(e.extend_transport(near, "up", 3.0, None));
+        let bad_mark = Some(r#"{"bottom":1,"top":2.5}"#.to_string());
+        refused(e.extend_transport(lift as f64, "up", 3.0, bad_mark));
+        refused(e.remove_facility(lift as f64, "burn"));
+        refused(e.remove_facility(near, "sell"));
+        assert_eq!(
+            e.serialize(),
+            before,
+            "a refusal moved the tower or the money"
+        );
+        // A well-formed call still lands.
+        let ok: Value = serde_json::from_str(&e.add_car(lift as f64)).unwrap();
+        assert_eq!(ok["ok"], true);
     }
 
     #[test]

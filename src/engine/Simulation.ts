@@ -242,7 +242,7 @@ export class Simulation implements SimContext {
   resizeTransport(id: number, bottom: number, top: number): ReturnType<Tower["resizeTransport"]> { return capacity.resizeTransport(this, id, bottom, top); }
   addCar(id: number): charges.ChargeResult { return charges.addCar(this, id); }
   removeCar(id: number): charges.ChargeResult { return charges.removeCar(this, id); }
-  extendTransport(id: number, end: "up" | "down", targetFloor: number, hwm?: { bottom: number; top: number }): charges.ExtendResult { return charges.extendTransport(this, id, end, targetFloor, hwm); }
+  extendTransport(id: number, end: "up" | "down", targetFloor: number, hwm?: { bottom: number; top: number } | null): charges.ExtendResult { return charges.extendTransport(this, id, end, targetFloor, hwm); }
   removeFacility(id: number, method: charges.RemovalMethod): charges.ChargeResult { return charges.removeFacility(this, id, method); }
 
   // ---- Main tick ---------------------------------------------------------

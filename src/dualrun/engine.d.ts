@@ -88,7 +88,8 @@ export class Engine {
     /**
      * `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
      * as JSON `{ bottom, top }` text or null: JSON `{ ok, reason?, delta,
-     * bottom, top, added }`, the floors billed past the mark.
+     * bottom, top, added }`, the floors billed past the mark. A malformed
+     * argument (#923) is refused with the shaft's ends as they stand.
      */
     extendTransport(id: number, end: string, target_floor: number, hwm?: string | null): string;
     /**

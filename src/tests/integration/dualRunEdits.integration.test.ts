@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ECON, carResaleRefund, resaleRefund } from "../../engine/econConfig";
 import { hasWasmPackage, wasmRequired } from "../conformance/wasmEngine";
 import { Simulation } from "../../engine/Simulation";
+import { INVALID_REQUEST } from "../../engine/sim/charges";
 import { DualRun, FrameDriver, loadFixture } from "../dualrun/dualRunHarness";
 
 /**
@@ -141,6 +142,45 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(report.eventDivergences).toEqual([]);
     // The founding hour's pass on the first step, then 8:00, 9:00 and 10:00.
     expect(report.checkpoints).toBe(4);
+  });
+
+  it("a malformed charge command is refused in both engines and stays in step (#923)", () => {
+    // A second frontend's bad arguments: before #923 the TypeScript engine
+    // acted on some of them while the binding truncated or threw.
+    const { sim, run } = DualRun.found(9, "classic");
+    sim.money = 1e9;
+    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    for (let x = 170; x < 200; x++) expect(sim.build("floor", 2, x).ok).toBe(true);
+    expect(sim.buildTransport("elevatorStandard", 172, 1, 2).ok).toBe(true);
+    const lift = sim.tower.transportAt(1, 172)!;
+    const refused = { ok: false, reason: INVALID_REQUEST, delta: 0 };
+    expect(sim.addCar(lift.id + 0.5)).toEqual(refused);
+    expect(sim.removeCar(Number.NaN)).toEqual(refused);
+    expect(sim.extendTransport(lift.id, "up", 3.5)).toMatchObject(refused);
+    expect(sim.extendTransport(lift.id, "sideways" as "up", 3)).toMatchObject({ ...refused, bottom: 1, top: 2 });
+    expect(sim.extendTransport(lift.id, "up", 3, { bottom: 1, top: 2.5 })).toMatchObject(refused);
+    expect(sim.removeFacility(lift.id, "burn" as "sell")).toEqual(refused);
+    expect(sim.removeFacility(lift.id - 0.5, "sell")).toEqual(refused);
+    // Non-numbers and non-strings: the binding would coerce or throw on
+    // these, so the mirror relays them as NaN and "" for Rust to refuse too.
+    const loose = (v: unknown) => v as number;
+    expect(sim.addCar(loose(String(lift.id)))).toEqual(refused);
+    expect(sim.addCar(loose(null))).toEqual(refused);
+    expect(sim.removeCar(loose(true))).toEqual(refused);
+    expect(sim.extendTransport(lift.id, "up", loose("3"))).toMatchObject(refused);
+    expect(sim.extendTransport(lift.id, loose(null) as unknown as "up", 3)).toMatchObject(refused);
+    expect(sim.extendTransport(lift.id, loose(5) as unknown as "up", 3)).toMatchObject(refused);
+    expect(sim.extendTransport(lift.id, "up", 3, loose(0) as unknown as { bottom: number; top: number })).toMatchObject(refused);
+    expect(sim.extendTransport(lift.id, "up", 3, { bottom: loose("1"), top: 2 })).toMatchObject(refused);
+    expect(sim.removeFacility(lift.id, loose(null) as unknown as "sell")).toEqual(refused);
+    expect(sim.removeFacility(lift.id, loose(7) as unknown as "sell")).toEqual(refused);
+    expect(lift.cars).toBe(1);
+    expect(lift.top).toBe(2);
+    expect(sim.addCar(lift.id).ok).toBe(true); // a well-formed call still lands
+    new FrameDriver(sim, 3).run(60);
+    const report = run.stop();
+    expect(report.divergences).toEqual([]);
+    expect(report.eventDivergences).toEqual([]);
   });
 
   it("a shadow that drifts is caught at the next hour with the path", () => {

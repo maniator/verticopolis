@@ -294,7 +294,8 @@ export class Engine {
     /**
      * `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
      * as JSON `{ bottom, top }` text or null: JSON `{ ok, reason?, delta,
-     * bottom, top, added }`, the floors billed past the mark.
+     * bottom, top, added }`, the floors billed past the mark. A malformed
+     * argument (#923) is refused with the shaft's ends as they stand.
      * @param {number} id
      * @param {string} end
      * @param {number} target_floor
@@ -302,25 +303,19 @@ export class Engine {
      * @returns {string}
      */
     extendTransport(id, end, target_floor, hwm) {
-        let deferred4_0;
-        let deferred4_1;
+        let deferred3_0;
+        let deferred3_1;
         try {
             const ptr0 = passStringToWasm0(end, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             const len0 = WASM_VECTOR_LEN;
             var ptr1 = isLikeNone(hwm) ? 0 : passStringToWasm0(hwm, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             var len1 = WASM_VECTOR_LEN;
             const ret = wasm.engine_extendTransport(this.__wbg_ptr, id, ptr0, len0, target_floor, ptr1, len1);
-            var ptr3 = ret[0];
-            var len3 = ret[1];
-            if (ret[3]) {
-                ptr3 = 0; len3 = 0;
-                throw takeFromExternrefTable0(ret[2]);
-            }
-            deferred4_0 = ptr3;
-            deferred4_1 = len3;
-            return getStringFromWasm0(ptr3, len3);
+            deferred3_0 = ret[0];
+            deferred3_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
         } finally {
-            wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
         }
     }
     /**
@@ -534,23 +529,17 @@ export class Engine {
      * @returns {string}
      */
     removeFacility(id, method) {
-        let deferred3_0;
-        let deferred3_1;
+        let deferred2_0;
+        let deferred2_1;
         try {
             const ptr0 = passStringToWasm0(method, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             const len0 = WASM_VECTOR_LEN;
             const ret = wasm.engine_removeFacility(this.__wbg_ptr, id, ptr0, len0);
-            var ptr2 = ret[0];
-            var len2 = ret[1];
-            if (ret[3]) {
-                ptr2 = 0; len2 = 0;
-                throw takeFromExternrefTable0(ret[2]);
-            }
-            deferred3_0 = ptr2;
-            deferred3_1 = len2;
-            return getStringFromWasm0(ptr2, len2);
+            deferred2_0 = ret[0];
+            deferred2_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
         } finally {
-            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
         }
     }
     /**

@@ -28,6 +28,19 @@ pub const ONLY_ELEVATOR_EXTEND: &str = "Only elevators can be extended.";
 pub const CAR_LIMIT: &str = "This elevator has all the cars it can hold.";
 pub const LAST_CAR: &str = "An elevator needs at least one car.";
 pub const FACILITY_GONE: &str = "That facility is gone.";
+/// `INVALID_REQUEST`: the one refusal for a malformed command (#923), an id,
+/// floor or mark that is not a whole number, or an unknown `end` or `method`.
+/// The typed engine API takes `i64` ids and floors and parsed enums, so it
+/// cannot see a fraction or an unknown string; the WASM binding checks its raw
+/// arguments with [`whole`] and refuses with this before calling the engine.
+/// A native Rust host gets no such check and must pass values in range.
+pub const INVALID_REQUEST: &str = "That request is not valid.";
+
+/// A whole number a command may take, as TypeScript's `Number.isSafeInteger`
+/// reads it: finite, no fraction, within 2^53 - 1. NaN and infinities fail.
+pub fn whole(x: f64) -> Option<i64> {
+    (x.fract() == 0.0 && x.abs() <= 9_007_199_254_740_991.0).then_some(x as i64)
+}
 
 /// `carResaleRefund()`: half the add-car cost.
 pub fn car_resale_refund() -> f64 {
@@ -45,7 +58,7 @@ pub struct ChargeResult {
 }
 
 impl ChargeResult {
-    fn refuse(reason: impl Into<String>) -> ChargeResult {
+    pub(crate) fn refuse(reason: impl Into<String>) -> ChargeResult {
         ChargeResult {
             ok: false,
             reason: Some(reason.into()),
