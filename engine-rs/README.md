@@ -226,6 +226,25 @@ so the two engines cannot quote a different price or size while both exist (each
 Presentation (display copy beyond the name, icons, pixel sizes, colors)
 stays with the frontend.
 
+The catalog gives a kind's base price. The price of one placement also
+depends on the tower: the floor tiles laid under a room and, with bridging
+on, the gap tiles bridged to the tower. The binding answers it with
+`canBuild(kind, floor, x)`, the same dry run `build` makes first, as JSON
+`{ ok, reason?, cost }`. When the placement fits, `cost` is its full price,
+and a "Not enough money." refusal carries that same price. Any other refusal
+carries the reason `build` would give and the facility's base price, so
+placement rules the catalog does not list (the Wedding Hall on the top floor,
+the ground-floor concourse, a claimed sky-lobby story, lobby floors) reach a
+frontend through the engine that enforces them.
+`conformanceWasmCanBuild.integration.test.ts` sweeps every kind over a grid
+of floors and positions on new games and saved towers in both modes (two
+raised to the TOWER rating, so the star-gated rules answer), with bridging on
+and off where the mode allows it and money flush, short and exactly at a
+price, and requires the Rust answer to equal the TypeScript one. The build
+paths in both engines charge the same constants the catalog quotes: the
+transport per-floor cost, and the lobby and floor tile prices from the
+facility table.
+
 ## The switch
 
 Behind `?engine=wasm` (or `localStorage.setItem("vc.engine", "wasm")`,

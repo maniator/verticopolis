@@ -21,7 +21,7 @@ export interface WasmModule {
 
 /** Every method the adapters call on an instance, and on the class. */
 export const INSTANCE_METHODS = [
-  "free", "mode", "money", "setMoney", "build", "buildTransport", "sellAt", "unitAt", "transportAt",
+  "free", "mode", "money", "setMoney", "build", "canBuild", "buildTransport", "sellAt", "unitAt", "transportAt",
   "adjustRent", "setNoRate", "priceUnit", "setCars", "setSchedule", "setStop", "setExpressStops", "clearStops",
   "resizeTransport", "removeUnit", "removeTransport", "setLabel", "setTowerName", "setView", "setAutoBridge", "emit",
   "startFire", "fires", "bombThreat", "evaluateStar", "callExterminator", "autoBridge", "toggleAutoBridge", "setFilmPolicy",

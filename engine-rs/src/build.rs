@@ -27,11 +27,14 @@ pub struct CanBuild {
     pub cost: f64,
 }
 
+/// The price of one bridged or laid substrate tile: a lobby tile when the
+/// placement is a lobby, a floor tile otherwise. Read from the facility table,
+/// the same prices the catalog quotes.
 fn substrate_cost(kind: Kind) -> f64 {
     if kind == Kind::Lobby {
-        5000.0
+        Kind::Lobby.facility().cost
     } else {
-        500.0
+        Kind::Floor.facility().cost
     }
 }
 
@@ -152,7 +155,7 @@ impl Simulation {
         } else {
             0
         };
-        money_check(f.cost + ((missing + bridge) as f64) * 500.0)
+        money_check(f.cost + ((missing + bridge) as f64) * Kind::Floor.facility().cost)
     }
 
     pub fn build(&mut self, kind: Kind, floor: i64, x: i64) -> BuildResult {
@@ -264,7 +267,7 @@ impl Simulation {
         }
         let span = top - bottom;
         let extra = if kind.is_elevator() {
-            span as f64 * 5_000.0
+            span as f64 * crate::charges::TRANSPORT_FLOOR_COST
         } else {
             0.0
         };
