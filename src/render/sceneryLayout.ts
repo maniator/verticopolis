@@ -37,7 +37,7 @@ export const APRON_PAD_TILES = 3;
 /** How far past each lot edge the skyline band runs: one full lot width, the
  *  same reach as the dirt ground, so the city ends exactly where the ground
  *  does even zoomed all the way out at a camera edge. */
-const SKYLINE_OVERSCAN_TILES = GRID.width;
+export const SKYLINE_OVERSCAN_TILES = GRID.width;
 
 /** First sidewalk tile, first road tile (both beyond the lot's last column). */
 export const SIDEWALK_START = GRID.width + FORECOURT_TILES;
@@ -66,6 +66,23 @@ export interface SkylineRect {
   depth: 0 | 1;
 }
 
+/** One skyline band: a building every `step` tiles from `start` tiles past
+ *  the lot's left edge (the overscan), each `base + hash01(seed + t * key) *
+ *  span` wide (tiles) and tall (floors). Published in the atlas data so a
+ *  frontend with the tower seed rebuilds the same city. */
+export interface SkylineBand {
+  depth: 0 | 1;
+  start: number;
+  step: number;
+  w: { base: number; span: number; key: number };
+  hFloors: { base: number; span: number; key: number };
+}
+
+export const SKYLINE_BANDS: readonly SkylineBand[] = [
+  { depth: 0, start: 0, step: 16, w: { base: 9, span: 8, key: 1 }, hFloors: { base: 10, span: 26, key: 3 } },
+  { depth: 1, start: 5, step: 23, w: { base: 12, span: 10, key: 7 }, hFloors: { base: 5, span: 13, key: 13 } },
+];
+
 /** The two-depth skyline band. It runs CONTINUOUSLY across the whole scene,
  *  the tower included: it draws behind everything, so it shows wherever the
  *  built tower does not cover it (owner call: the city is always back there). */
@@ -73,13 +90,11 @@ export function skylineRects(seed: number): SkylineRect[] {
   const rects: SkylineRect[] = [];
   const from = -SKYLINE_OVERSCAN_TILES;
   const to = GRID.width + SKYLINE_OVERSCAN_TILES;
-  for (let t = from; t < to; t += 16) {
-    const w = 9 + hash01(seed + t) * 8;
-    rects.push({ tile: t, w, hFloors: 10 + hash01(seed + t * 3) * 26, depth: 0 });
-  }
-  for (let t = from + 5; t < to; t += 23) {
-    const w = 12 + hash01(seed + t * 7) * 10;
-    rects.push({ tile: t, w, hFloors: 5 + hash01(seed + t * 13) * 13, depth: 1 });
+  for (const b of SKYLINE_BANDS) {
+    for (let t = from + b.start; t < to; t += b.step) {
+      const w = b.w.base + hash01(seed + t * b.w.key) * b.w.span;
+      rects.push({ tile: t, w, hFloors: b.hFloors.base + hash01(seed + t * b.hFloors.key) * b.hFloors.span, depth: b.depth });
+    }
   }
   return rects;
 }
@@ -90,18 +105,34 @@ export interface PlantSpot {
   kind: "tree" | "bush";
 }
 
+/** The plant-spot rule, published in the atlas data. A candidate every
+ *  `step` tiles from `margin` to `GRID.width - margin` (exclusive); with
+ *  `r = hash01(seed * 3 + t)`, the spot is skipped below `skipBelow`, a bush
+ *  below `bushBelow` and a tree otherwise. It sits at `t + floor(hash01(seed +
+ *  t * jitter.key) * jitter.span) + jitter.min` and is scaled `scale.base +
+ *  hash01(seed + t * scale.key) * scale.span`. */
+export const PLANT_RULE = {
+  margin: 6,
+  step: 13,
+  skipBelow: 0.42,
+  bushBelow: 0.72,
+  jitter: { span: 7, min: -3, key: 5 },
+  scale: { base: 0.8, span: 0.4, key: 11 },
+} as const;
+
 /** Tree and bush spots on the open lot, deterministic per tower seed. Spots
  *  keep clear of both lot edges so nothing crowds the plaza sidewalk or the street. */
 export function plantSpots(seed: number): PlantSpot[] {
+  const R = PLANT_RULE;
   const spots: PlantSpot[] = [];
-  for (let t = 6; t < GRID.width - 6; t += 13) {
+  for (let t = R.margin; t < GRID.width - R.margin; t += R.step) {
     const r = hash01(seed * 3 + t);
-    if (r < 0.42) continue; // gaps keep the lot from reading as an orchard
-    const jitter = Math.floor(hash01(seed + t * 5) * 7) - 3;
+    if (r < R.skipBelow) continue; // gaps keep the lot from reading as an orchard
+    const jitter = Math.floor(hash01(seed + t * R.jitter.key) * R.jitter.span) + R.jitter.min;
     spots.push({
       tile: t + jitter,
-      scale: 0.8 + hash01(seed + t * 11) * 0.4,
-      kind: r < 0.72 ? "bush" : "tree",
+      scale: R.scale.base + hash01(seed + t * R.scale.key) * R.scale.span,
+      kind: r < R.bushBelow ? "bush" : "tree",
     });
   }
   return spots;
@@ -125,15 +156,23 @@ export function apronRange(units: readonly Unit[]): { min: number; max: number }
   };
 }
 
+/** Half a plant's footprint in tiles, for {@link plantVisible}. */
+export const PLANT_CLEAR_TILES = 2;
+
 /** Whether a plant is still standing: construction (the apron) displaces it.
  *  A plant needs its whole little footprint outside the paved range. Two tiles
  *  of half-width covers the widest drawn canopy (a max-scale tree spans 3.6
  *  tiles, a max-scale bush 2.4), so no foliage ever overhangs fresh cement. */
 export function plantVisible(spot: PlantSpot, apron: { min: number; max: number } | null): boolean {
   if (!apron) return true;
-  const half = 2;
+  const half = PLANT_CLEAR_TILES;
   return spot.tile + half <= apron.min || spot.tile - half >= apron.max;
 }
+
+/** The dirt under the scene: `lots` lot widths centered on the lot, from the
+ *  ground line down `belowFloors` floors, and the `lineH`-px ground line
+ *  centered on y 0 across the same span. */
+export const GROUND = { lots: 3, belowFloors: 2 - GRID.minFloor + 14, lineH: 6, dirt: "#3a3326", line: "#6f6a60" } as const;
 
 /** Rows of the lot's ground strip above and below the ground line. */
 export const STRIP_ABOVE = 7;
@@ -172,12 +211,16 @@ export const SCENERY = {
   planter: { x: Math.round((GRID.width + FORECOURT_TILES / 2) * TILE - PLANTER_W / 2), y: -PLANTER_H - 6, w: PLANTER_W, h: PLANTER_H },
 } satisfies Record<string, PieceRect | PieceRect[]>;
 
+/** A plant's size before its spot's scale: tiles wide, floors tall. */
+export const PLANT_SIZE = { tree: { tiles: 3, floors: 1.5 }, bush: { tiles: 2, floors: 0.5 } } as const;
+
 /** A lot plant's canvas: a tree is 3 tiles by 1.5 floors and a bush 2 tiles
- *  by half a floor, both scaled by the spot, centered on its tile and standing
- *  on the ground strip. */
+ *  by half a floor, both scaled by the spot, centered on its tile's left edge
+ *  (x may land on a half pixel) and standing on the ground strip: its bottom
+ *  edge two rows under the strip's top, so its last row is one row under it. */
 export function plantRect(spot: PlantSpot): PieceRect {
-  const tree = spot.kind === "tree";
-  const w = Math.round((tree ? 3 : 2) * TILE * spot.scale);
-  const h = Math.round((tree ? FLOOR * 1.5 : FLOOR * 0.5) * spot.scale);
+  const size = PLANT_SIZE[spot.kind];
+  const w = Math.round(size.tiles * TILE * spot.scale);
+  const h = Math.round(FLOOR * size.floors * spot.scale);
   return { x: spot.tile * TILE - w / 2, y: -h - STRIP_ABOVE + 2, w, h };
 }

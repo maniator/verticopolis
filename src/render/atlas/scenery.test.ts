@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { GRID } from "../../engine/facilities";
 import { lampAlpha } from "../excalibur/towerSceneryDraw";
-import { SCENERY } from "../sceneryLayout";
+import { Z } from "../depthPlanes";
+import { TILE } from "../scale";
+import { SCENERY, hash01, plantRect, plantSpots, skylineRects } from "../sceneryLayout";
+import { CLOUD_COUNT, cloudSeed } from "../sprites/sky";
 import {
   FOUNTAIN_FRAMES,
   LAMP_STEPS,
   TREE_VARIANTS,
+  depthData,
   sceneryData,
   sceneryJobs,
+  skyData,
 } from "./scenery";
 
 describe("scenery in the atlas", () => {
@@ -60,8 +65,9 @@ describe("scenery in the atlas", () => {
 
   it("publishes the game's own placement table", () => {
     const data = sceneryData();
-    expect(data.props[0]).toMatchObject({ x: SCENERY.roundabout.x, y: SCENERY.roundabout.y });
-    expect(data.ground.runs[3]).toMatchObject(SCENERY.sidewalk);
+    expect(data.ground.runs[1]).toMatchObject(SCENERY.roundabout);
+    expect(data.props[0]).toMatchObject({ x: SCENERY.fountain.x, y: SCENERY.fountain.y });
+    expect(data.ground.runs[4]).toMatchObject(SCENERY.sidewalk);
   });
 
   it("places only frames it bakes (a lamp by its steps)", () => {
@@ -75,5 +81,52 @@ describe("scenery in the atlas", () => {
           names.has(`${p.frame}/a100`),
         p.frame,
       ).toBe(true);
+  });
+
+  it("publishes skyline and plant rules that rebuild the game's own layout from the seed", () => {
+    const { skyline, plants, lotTiles } = sceneryData();
+    for (const seed of [0, 1, 4400, 987654321]) {
+      const rects = skyline.bands.flatMap((b) => {
+        const out = [];
+        for (let t = -skyline.overscanTiles + b.start; t < lotTiles + skyline.overscanTiles; t += b.step)
+          out.push({
+            tile: t,
+            w: b.w.base + hash01(seed + t * b.w.key) * b.w.span,
+            hFloors: b.hFloors.base + hash01(seed + t * b.hFloors.key) * b.hFloors.span,
+            depth: b.depth,
+          });
+        return out;
+      });
+      expect(rects).toEqual(skylineRects(seed));
+      const R = plants.rule;
+      const spots = [];
+      for (let t = R.margin; t < lotTiles - R.margin; t += R.step) {
+        const r = hash01(seed * 3 + t);
+        if (r < R.skipBelow) continue;
+        spots.push({
+          tile: t + Math.floor(hash01(seed + t * R.jitter.key) * R.jitter.span) + R.jitter.min,
+          scale: R.scale.base + hash01(seed + t * R.scale.key) * R.scale.span,
+          kind: (r < R.bushBelow ? "bush" : "tree") as "bush" | "tree",
+        });
+      }
+      expect(spots).toEqual(plantSpots(seed));
+      for (const spot of spots) {
+        const rect = plantRect(spot);
+        expect(rect.y + rect.h).toBe(plants.bottomY);
+        expect(rect.x + rect.w / 2).toBe(spot.tile * TILE);
+      }
+    }
+  });
+
+  it("names a frame family for every draw plane in z order, and the clouds the sky draws", () => {
+    const planes = depthData();
+    expect(planes.map((p) => p.z)).toEqual(Object.values(Z).sort((a, b) => a - b));
+    for (const p of planes)
+      for (const f of p.frames)
+        if (f.startsWith("scenery/"))
+          expect([...names].some((n) => n === f || n.startsWith(`${f}/`)), f).toBe(true);
+    const sky = skyData();
+    expect(sky.clouds.list).toHaveLength(CLOUD_COUNT);
+    expect(sky.clouds.list[1].offset).toBe(cloudSeed(1) * 53);
   });
 });

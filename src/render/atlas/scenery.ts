@@ -1,6 +1,18 @@
 import { GRID } from "../../engine/facilities";
 import { FLOOR, TILE } from "../scale";
-import { APRON_PAD_TILES, SCENERY, STRIP_ABOVE, STRIP_BELOW, type PieceRect } from "../sceneryLayout";
+import {
+  APRON_PAD_TILES,
+  GROUND,
+  PLANT_CLEAR_TILES,
+  PLANT_RULE,
+  PLANT_SIZE,
+  SCENERY,
+  SKYLINE_BANDS,
+  SKYLINE_OVERSCAN_TILES,
+  STRIP_ABOVE,
+  STRIP_BELOW,
+  type PieceRect,
+} from "../sceneryLayout";
 import {
   PAVE_JOINT_EVERY,
   drawBush,
@@ -17,6 +29,8 @@ import {
   grassLook,
 } from "../excalibur/towerSceneryDraw";
 import type { AnimJob, Job, Keys, StillJob } from "./catalog";
+import { Z } from "../depthPlanes";
+import { CLOUD_COUNT, CLOUD_DRIFT, SUN_ARC, cloudMotion, cloudSeed } from "../sprites/sky";
 
 /**
  * The world outside the tower (`excalibur/towerScenery.ts`): the plaza's
@@ -74,8 +88,8 @@ const SIZE = {
   plazaLamp: size(SCENERY.plazaLamps[0]),
   streetLamp: size(SCENERY.streetLamp),
   planter: size(SCENERY.planter),
-  tree: { w: 3 * TILE, h: Math.round(FLOOR * 1.5) },
-  bush: { w: 2 * TILE, h: Math.round(FLOOR * 0.5) },
+  tree: { w: PLANT_SIZE.tree.tiles * TILE, h: Math.round(FLOOR * PLANT_SIZE.tree.floors) },
+  bush: { w: PLANT_SIZE.bush.tiles * TILE, h: Math.round(FLOOR * PLANT_SIZE.bush.floors) },
   sidewalk: { w: TILE, h: SCENERY.sidewalk.h },
   forecourt: { w: 2 * TILE, h: SCENERY.forecourt.h },
   road: { w: 4 * TILE, h: SCENERY.rightRoad.h },
@@ -155,35 +169,93 @@ export function sceneryData() {
   return {
     lotTiles: GRID.width,
     ground: {
+      // Solid fills: the dirt from the ground line down, and the ground line
+      // centered on y 0, both across `lots` lot widths centered on the lot.
+      dirt: { color: GROUND.dirt, x: -((GROUND.lots - 1) / 2) * GRID.width * TILE, w: GROUND.lots * GRID.width * TILE, y: 0, h: GROUND.belowFloors * FLOOR },
+      line: { color: GROUND.line, y: -GROUND.lineH / 2, h: GROUND.lineH },
       strip: {
         y: -STRIP_ABOVE,
+        tileW: TILE,
         apronPadTiles: APRON_PAD_TILES,
         jointEvery: PAVE_JOINT_EVERY,
         grass: Array.from({ length: GRID.width }, (_, t) => grassName(t)),
       },
       runs: [
         { frame: "scenery/ground/sidewalk", ...SCENERY.plazaSidewalk, tileOriginX: SCENERY.plazaSidewalk.x },
-        { frame: "scenery/ground/road", ...SCENERY.leftRoad, tileOriginX: 0 },
+        // The roundabout shares the ground's plane: one copy, before the road.
+        { frame: "scenery/roundabout", ...SCENERY.roundabout, tileOriginX: SCENERY.roundabout.x },
+        // The game's last road segment runs one column on, over the roundabout's
+        // first column.
+        { frame: "scenery/ground/road", ...SCENERY.leftRoad, w: SCENERY.leftRoad.w + 1, tileOriginX: 0 },
         { frame: "scenery/ground/forecourt", ...SCENERY.forecourt, tileOriginX: SCENERY.forecourt.x },
         { frame: "scenery/ground/sidewalk", ...SCENERY.sidewalk, tileOriginX: SCENERY.sidewalk.x },
         { frame: "scenery/ground/road", ...SCENERY.rightRoad, tileOriginX: SCENERY.rightRoad.x },
       ],
     },
     props: [
-      { frame: "scenery/roundabout", ...at(SCENERY.roundabout) },
       { frame: "scenery/fountain", ...at(SCENERY.fountain) },
       ...SCENERY.plazaLamps.map((r) => ({ frame: "scenery/plaza-lamp", ...at(r) })),
       { frame: "scenery/street-lamp", ...at(SCENERY.streetLamp) },
       { frame: "scenery/planter", ...at(SCENERY.planter) },
     ],
+    // The skyline and the plants are seeded by the tower's founding seed
+    // (`hash01` and the rules below; docs/atlas.md spells them out).
+    skyline: {
+      overscanTiles: SKYLINE_OVERSCAN_TILES,
+      bands: SKYLINE_BANDS.map((b) => ({ ...b, frame: `sky/skyline/${b.depth === 0 ? "far" : "near"}` })),
+    },
     plants: {
-      // Each plant stands centered on its lot tile, its bottom row two rows
-      // under the strip's top, scaled by its spot; the paved apron (with two
-      // tiles of half-width either side) displaces it.
-      scale: [0.8, 1.2],
-      baseY: -STRIP_ABOVE + 2,
-      clearTiles: 2,
+      rule: PLANT_RULE,
+      size: PLANT_SIZE,
+      // A plant's canvas is centered on its tile's left edge, and its bottom
+      // edge (exclusive) sits at bottomY.
+      bottomY: -STRIP_ABOVE + 2,
+      clearTiles: PLANT_CLEAR_TILES,
+      treeVariants: TREE_VARIANTS,
     },
     lamp: { steps: LAMP_STEPS, fadeIn: [18, 20], fadeOut: [5, 7] },
   };
+}
+
+/** The sun's arc and the clouds' drift (`towerScene.ts`), in the game's own
+ *  terms. Both are drawn in screen space, sized to the view. */
+export function skyData() {
+  return {
+    sun: { ...SUN_ARC, day: "sky/sun", night: "sky/moon" },
+    clouds: {
+      ...CLOUD_DRIFT,
+      weathers: ["overcast", "rain"],
+      list: Array.from({ length: CLOUD_COUNT }, (_, i) => ({ frame: i, ...cloudMotion(cloudSeed(i)) })),
+    },
+  };
+}
+
+/** The frame families on each of the game's draw planes ({@link Z}). */
+const PLANE_FRAMES: Record<keyof typeof Z, string[]> = {
+  sky: ["sky/gradient", "sky/sun", "sky/moon", "sky/cloud"],
+  skylineFar: ["sky/skyline/far"],
+  skylineNear: ["sky/skyline/near"],
+  dirt: [],
+  groundLine: [],
+  strip: ["scenery/ground/grass", "scenery/ground/pave"],
+  groundEdge: ["scenery/ground/sidewalk", "scenery/ground/road", "scenery/roundabout", "scenery/ground/forecourt"],
+  plant: ["scenery/fountain", "scenery/plaza-lamp", "scenery/street-lamp", "scenery/planter", "scenery/tree", "scenery/bush"],
+  hang: ["facade/escape", "facade/awning", "facade/crane"],
+  structure: ["structure/floor", "structure/lobby", "structure/entrance"],
+  room: ["room"],
+  walker: ["person"],
+  animatedRoom: ["fire", "construction"],
+  streetCar: ["vehicle/streetcar"],
+  vehicle: ["vehicle/metrotrain", "vehicle/garbagetruck"],
+  transport: ["shaft", "transport/stairs", "transport/escalator"],
+  cab: ["car"],
+  crowd: ["person"],
+  overlay: [],
+};
+
+/** The game's draw planes, back to front, with the families drawn on each. */
+export function depthData() {
+  return (Object.keys(Z) as (keyof typeof Z)[])
+    .map((plane) => ({ plane, z: Z[plane], frames: PLANE_FRAMES[plane] }))
+    .sort((a, b) => a.z - b.z);
 }

@@ -43,6 +43,23 @@ export function cloudRadius(seed: number): number {
   return 56 + (seed % 44);
 }
 
+/** Where the clouds drift: they wrap over the view's width plus `pad`
+ *  (entering `pad / 2` px left of it) and fly in a band from `top` of the
+ *  view's height, `band` of it deep. */
+export const CLOUD_DRIFT = { pad: 240, top: 0.1, band: 0.22 } as const;
+
+/** How cloud `seed` drifts across a view `W` x `H` at `t` seconds: its x is
+ *  `((offset % (W + pad)) + t * speed) % (W + pad) - pad / 2` and its y is
+ *  `H * top + row * H * band` ({@link CLOUD_DRIFT}). */
+export function cloudMotion(seed: number): { speed: number; row: number; offset: number } {
+  return { speed: 6 + (seed % 7), row: (seed % 100) / 100, offset: seed * 53 };
+}
+
+/** The sun's arc from `rise` to `set` (the moon takes the same arc through the
+ *  night): at fraction p of it, the disc's center sits at x `p * viewWidth`
+ *  and y `viewHeight * baseY - sin(p * PI) * viewHeight * lift`. */
+export const SUN_ARC = { rise: 6, set: 18, baseY: 0.62, lift: 0.5 } as const;
+
 /** Cloud fill: a dark gray in the rain, a bright white on an overcast day. */
 export function cloudFill(weather: string): string {
   return weather === "rain" ? "rgba(86,92,108,0.55)" : "rgba(244,247,255,0.72)";

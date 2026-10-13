@@ -1,4 +1,5 @@
 import * as ex from "excalibur";
+import { Z } from "../depthPlanes";
 import { GRID } from "../../engine/facilities";
 import { FLOOR, TILE } from "../scale";
 import {
@@ -73,11 +74,11 @@ interface SceneryRec {
 const recs = new WeakMap<TowerEngine, SceneryRec>();
 
 // Z order, back to front (sky sits at -60, dirt at -50, ground line at -49):
-const Z_SKY_FAR = -56;
-const Z_SKY_NEAR = -55;
-const Z_STRIP = -48;
-const Z_EDGE = -47;
-const Z_PLANT = -46;
+const Z_SKY_FAR = Z.skylineFar;
+const Z_SKY_NEAR = Z.skylineNear;
+const Z_STRIP = Z.strip;
+const Z_EDGE = Z.groundEdge;
+const Z_PLANT = Z.plant;
 
 // Ground strip canvas geometry (world px, STRIP_ABOVE and STRIP_BELOW from
 // towerSceneryDraw). The strip straddles the ground line: blades rise above

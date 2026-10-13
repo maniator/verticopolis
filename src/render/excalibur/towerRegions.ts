@@ -1,4 +1,5 @@
 import * as ex from "excalibur";
+import { Z } from "../depthPlanes";
 import { facilityFloors } from "../../engine/facilities";
 import { paintSettledUnit } from "../regionPaint";
 import { FLOOR, TILE } from "../scale";
@@ -71,7 +72,7 @@ function materialize(engine: TowerEngine, key: number): RegionRec {
       }
     },
   });
-  const actor = new ex.Actor({ pos: ex.vec(r.x, r.y), width: r.w, height: r.h, anchor: ex.vec(0, 0), z: 0 });
+  const actor = new ex.Actor({ pos: ex.vec(r.x, r.y), width: r.w, height: r.h, anchor: ex.vec(0, 0), z: Z.room });
   actor.graphics.use(cv);
   engine.engine.add(actor);
   const rec: RegionRec = { actor, cv, units };

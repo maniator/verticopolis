@@ -1,4 +1,5 @@
 import * as ex from "excalibur";
+import { Z } from "../depthPlanes";
 import { GRID, facilityFloors, hasBusinessHours, isOpenAt } from "../../engine/facilities";
 import { isPresent, type Transport, type Unit } from "../../engine/types";
 import {
@@ -244,7 +245,7 @@ function syncEscapes(engine: TowerEngine, edges: Map<number, FloorEdge>): void {
     }
     const parity = (floor % 2) as 0 | 1;
     const hang = (x: number, side: "left" | "right"): ex.Actor => {
-      const a = new ex.Actor({ pos: ex.vec(x, y), width: segW, height: FLOOR, anchor: ex.vec(0, 0), z: -2 });
+      const a = new ex.Actor({ pos: ex.vec(x, y), width: segW, height: FLOOR, anchor: ex.vec(0, 0), z: Z.hang });
       a.graphics.use(ground ? engine.awningGfx[side] : engine.escGfx[side][parity]);
       engine.engine.add(a);
       return a;
@@ -293,7 +294,7 @@ function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void
       width: CRANE_W,
       height: CRANE_H,
       anchor: ex.vec(0.5, 1),
-      z: -2,
+      z: Z.hang,
     });
     engine.craneActor.graphics.use(engine.craneGfx);
     engine.engine.add(engine.craneActor);
@@ -432,7 +433,7 @@ function addRoom(engine: TowerEngine, u: Unit): void {
       paintAnimatedUnit(engine.d, u, w, h);
     },
   });
-  const a = addBoxActor(engine, ex.vec(engine.worldX(u.x), engine.worldYTop(u.floor, hgt)), w, h, 0.45, cv);
+  const a = addBoxActor(engine, ex.vec(engine.worldX(u.x), engine.worldYTop(u.floor, hgt)), w, h, Z.animatedRoom, cv);
   engine.animatedRooms.set(u.id, a);
 }
 
@@ -441,7 +442,7 @@ function addTransport(engine: TowerEngine, t: Transport): void {
   const totalFloors = t.top - t.bottom + 1;
   const h = totalFloors * FLOOR;
   const gfx = transportGraphic(engine, t, w, totalFloors);
-  engine.transportActors.set(t.id, addBoxActor(engine, ex.vec(engine.worldX(t.x), engine.worldYTop(t.top)), w, h, 1, gfx));
+  engine.transportActors.set(t.id, addBoxActor(engine, ex.vec(engine.worldX(t.x), engine.worldYTop(t.top)), w, h, Z.transport, gfx));
 }
 
 /**

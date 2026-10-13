@@ -1,4 +1,6 @@
 import * as ex from "excalibur";
+import { Z } from "../depthPlanes";
+import { GROUND } from "../sceneryLayout";
 import type { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import type { Unit } from "../../engine/types";
@@ -12,7 +14,7 @@ import {
   LOBBY_VARIANTS,
 } from "../sprites";
 import { drawSanta } from "../sprites/events";
-import { CLOUD_COUNT, cloudFill, cloudRadius, cloudSeed, drawCloud, drawSunDisc, skyColor } from "../sprites/sky";
+import { CLOUD_COUNT, CLOUD_DRIFT, SUN_ARC, cloudFill, cloudMotion, cloudRadius, cloudSeed, drawCloud, drawSunDisc, skyColor } from "../sprites/sky";
 import { disposeRegions } from "./towerRegions";
 import { clearLongPress } from "./longPress";
 import { SHIRTS } from "../pixelSprites";
@@ -35,9 +37,9 @@ import type { TowerEngine } from "./TowerEngine";
 // ---- Static scene elements ----------------------------------------------
 
 export function makeGround(engine: TowerEngine): void {
-  const total = GRID.width * TILE * 3;
+  const total = GRID.width * TILE * GROUND.lots;
   const centerX = (GRID.width / 2) * TILE;
-  const depth = (2 - GRID.minFloor + 14) * FLOOR;
+  const depth = GROUND.belowFloors * FLOOR;
   const leftEdge = centerX - total / 2;
   // One rectangle this wide (~11k px) would rasterize to a bitmap past the GPU
   // texture limit (4096 on mobile) and render as a black band. It needs the
@@ -55,18 +57,18 @@ export function makeGround(engine: TowerEngine): void {
       width: segW + 1, // overlap neighbors by 1px to hide any seam
       height: depth,
       anchor: ex.vec(0.5, 0),
-      z: -50,
-      color: ex.Color.fromHex("#3a3326"),
+      z: Z.dirt,
+      color: ex.Color.fromHex(GROUND.dirt),
     });
     engine.engine.add(dirt);
     engine.engine.add(
       new ex.Actor({
         pos: ex.vec(segCx, 0),
         width: segW + 1,
-        height: 6,
+        height: GROUND.lineH,
         anchor: ex.vec(0.5, 0.5),
-        z: -49,
-        color: ex.Color.fromHex("#6f6a60"),
+        z: Z.groundLine,
+        color: ex.Color.fromHex(GROUND.line),
       }),
     );
   }
@@ -90,7 +92,7 @@ export function makeSky(engine: TowerEngine): void {
     cache: false,
     draw: (ctx) => drawSky(engine, ctx),
   });
-  engine.sky = new ex.ScreenElement({ x: 0, y: 0, z: -60 });
+  engine.sky = new ex.ScreenElement({ x: 0, y: 0, z: Z.sky });
   engine.sky.graphics.use(engine.skyCanvas);
   engine.engine.add(engine.sky);
 }
@@ -110,7 +112,7 @@ export function makeOverlay(engine: TowerEngine): void {
     cache: false,
     draw: (ctx) => overlayFx.drawOverlay(engine, ctx),
   });
-  engine.overlay = new ex.ScreenElement({ x: 0, y: 0, z: 100 });
+  engine.overlay = new ex.ScreenElement({ x: 0, y: 0, z: Z.overlay });
   engine.overlay.graphics.use(engine.overlayCanvas);
   engine.engine.add(engine.overlay);
 }
@@ -127,7 +129,7 @@ export function makeStructTileMap(engine: TowerEngine): void {
     columns: GRID.width,
     rows: GRID.maxFloor - GRID.minFloor + 1,
   });
-  engine.structTileMap.z = -1; // behind rooms (0) and transports (1), like the old actors
+  engine.structTileMap.z = Z.structure; // behind rooms (0) and transports (1), like the old actors
   engine.engine.add(engine.structTileMap);
 }
 
@@ -286,9 +288,10 @@ function drawClouds(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = cloudFill(w);
   for (let i = 0; i < CLOUD_COUNT; i++) {
     const seed = cloudSeed(i);
-    const speed = 6 + (seed % 7);
-    const y = H * 0.1 + ((seed % 100) / 100) * H * 0.22;
-    const x = (((seed * 53) % (W + 240)) + t * speed) % (W + 240) - 120;
+    const { speed, row, offset } = cloudMotion(seed);
+    const { pad, top, band } = CLOUD_DRIFT;
+    const y = H * top + row * H * band;
+    const x = ((offset % (W + pad)) + t * speed) % (W + pad) - pad / 2;
     drawCloud(ctx, x, y, cloudRadius(seed));
   }
 }
@@ -297,10 +300,11 @@ function drawSun(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   const hour = engine.sim.clock.hour + engine.sim.clock.minute / 60;
   // The sun arcs across 06:00→18:00; the moon takes the same arc 18:00→06:00,
   // so both rise in the east, climb, and set in the west.
-  const day = hour >= 6 && hour < 18;
-  const arc = day ? ((hour - 6) / 12) * Math.PI : (((hour - 18 + 24) % 24) / 12) * Math.PI;
+  const { rise, set, baseY, lift } = SUN_ARC;
+  const day = hour >= rise && hour < set;
+  const arc = day ? ((hour - rise) / (set - rise)) * Math.PI : (((hour - set + 24) % 24) / (set - rise)) * Math.PI;
   const cx = (arc / Math.PI) * engine.viewWidth;
-  const cy = engine.viewHeight * 0.62 - Math.sin(arc) * engine.viewHeight * 0.5;
+  const cy = engine.viewHeight * baseY - Math.sin(arc) * engine.viewHeight * lift;
   drawSunDisc(ctx, cx, cy, day);
 }
 
