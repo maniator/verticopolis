@@ -126,3 +126,18 @@ This section supersedes older references to pending PRs elsewhere in this planni
 - **Public #948/#952:** workflow configuration and web notices are not part of engine-cutover implementation. Apply public-content boundary checks to any public automation/planning change; never import details from non-public projects into public PRs, commits, issues or documentation.
 
 **Handoff:** Before implementing any story, refresh the public PR queue and merge SHAs; identify implemented, unmerged and genuinely missing work. Retest dependency interactions in the final merged tree. Every story should have a small diff, targeted tests, passing coverage thresholds and a concrete rollback or recovery path when relevant.
+
+## 10. Mainline reconciliation after the 2026-10-13 merges
+
+**Current public main snapshot:** `87527a06086e72412f01371cafbd304881672aa3`. This section supersedes the status claims in §§6 and 9; it does **not** imply that an open implementation PR or its tests have landed. Refresh the snapshot before any merge or implementation decision.
+
+- **Merged #930, engine catalog:** The public Rust and TypeScript catalogs, versioned WASM catalog export, binding shape validation, charged-price tests and conformance digest lock are now on `main` (merge commit `562f1045`). Mark C2's *catalog implementation* as delivered; retain C2's read-model integration and cross-engine pin/consumer verification gates. Do not open a duplicate catalog issue.
+- **Merged #949, engine byte-identical save encoder:** The engine's `.vctower` writer is byte-aligned with the web writer for the tested serialized/stamped save corpus (merge commit `1c2646b`). Do not confuse this with routing live web saves through WASM: that remains **open #953**.
+- **Open #953, web save writer routing:** Proposed `?engine=wasm` path for `SaveGame.export` and `packSync`, with TypeScript fallback; asynchronous autosaves and existing `toTowerFile` conversion deliberately keep existing paths. Define whether one authoritative writer means full parity or just sync/export routing; run malformed writer output, byte equality, 8/32 MiB boundaries and degraded-host lifecycle tests before treating all web saves as engine-written.
+- **Merged #938/#944:** Gameplay-event analytics and Unicode/save limits remain baseline code. Keep regression tests and avoid duplicate features.
+- **Open #950:** Simulation-layer `capacity_changed` and relay-only raw tower commands are still unmerged; the new source guard is helpful but does not replace an intentional exposed-command API policy or host command parity tests. Audit its final head and checks after rebases.
+- **Open #943/#831/#817/#816:** Rendering and visual scale work continues independently of simulation cutover. Reference the merged frame/atlas contracts and avoid promoting art tasks into simulation blockers.
+- **Merged #948:** The resulting committed party-mode customization is public-only and store-neutral; private-session orchestration is not in the public repository. Keep this boundary in future work.
+- **Merged #952:** Public third-party license notices now have a tracked implementation backlog item (#951), not yet an implemented notice generator.
+
+**Current cutover implications:** Run the A1 source/API matrix and deterministic replay against the merged catalog, save byte-alignment changes and latest public WASM binding, not the baseline reviewed before these merges. The new merged catalog and #953 change the compatibility inventory, but the engine cutover still requires D1 performance evidence, E2 sign-off and rollback rehearsal. The dedicated Worker remains post-cutover.
