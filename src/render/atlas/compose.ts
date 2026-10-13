@@ -13,15 +13,8 @@ function place(dst: Image, bake: Pick<BakeResult, "images">, ref: ImageRef | nul
   if (ref) over(dst, bake.images[ref.id], ref.dx, ref.dy);
 }
 
-/** Compose `rec` with chain inputs `chains` and overlays `overlays`. */
-export function composeFrame(
-  bake: Pick<BakeResult, "images">,
-  rec: BakedFrame,
-  chains: Record<string, number> = {},
-  overlays: readonly string[] = [],
-): Image {
-  const out = blank(rec.w, rec.h);
-  place(out, bake, rec.image);
+/** Draw `rec`'s chain steps up to `chains` and its named `overlays` onto `out`. */
+function drawRuntime(out: Image, bake: Pick<BakeResult, "images">, rec: BakedFrame, chains: Record<string, number>, overlays: readonly string[]): void {
   for (const [key, n] of Object.entries(chains)) {
     const chain = rec.chains?.[key];
     if (!chain) throw new Error(`${rec.name} has no chain ${key}`);
@@ -31,6 +24,46 @@ export function composeFrame(
     if (!rec.overlays || !(o in rec.overlays)) throw new Error(`${rec.name} has no overlay ${o}`);
     place(out, bake, rec.overlays[o]);
   }
+}
+
+/** Compose `rec` with chain inputs `chains` and overlays `overlays`. */
+export function composeFrame(
+  bake: Pick<BakeResult, "images">,
+  rec: BakedFrame,
+  chains: Record<string, number> = {},
+  overlays: readonly string[] = [],
+): Image {
+  const out = blank(rec.w, rec.h);
+  place(out, bake, rec.image);
+  drawRuntime(out, bake, rec, chains, overlays);
+  return out;
+}
+
+/** Compose `rec` the way a frontend drawing with depth does: the shell and
+ *  its chain's shell steps, then the furniture (or, with `soft`, the soft
+ *  furniture) and its chain's furniture (or soft) steps, each source-over. Named
+ *  overlays draw last, though a layered frame has none (the bake refuses
+ *  them). Throws for a frame without depth layers. */
+export function composeLayered(
+  bake: Pick<BakeResult, "images">,
+  rec: BakedFrame,
+  chains: Record<string, number> = {},
+  overlays: readonly string[] = [],
+  soft = false,
+): Image {
+  const layers = rec.layers;
+  if (!layers) throw new Error(`${rec.name} has no depth layers`);
+  if (soft && layers.soft === undefined) throw new Error(`${rec.name} has no soft furniture`);
+  const out = blank(rec.w, rec.h);
+  const stepsOf = (key: string, n: number, list: (ImageRef | null)[] | undefined) => {
+    if (!list) throw new Error(`${rec.name} has no depth steps for chain ${key}`);
+    for (let k = 1; k <= Math.min(n, list.length - 1); k++) place(out, bake, list[k]);
+  };
+  place(out, bake, layers.shell);
+  for (const [key, n] of Object.entries(chains)) stepsOf(key, n, layers.chains?.[key]?.shell);
+  place(out, bake, soft ? (layers.soft ?? null) : layers.furniture);
+  for (const [key, n] of Object.entries(chains)) stepsOf(key, n, soft ? layers.chains?.[key]?.soft : layers.chains?.[key]?.furniture);
+  drawRuntime(out, bake, rec, {}, overlays);
   return out;
 }
 

@@ -2,6 +2,7 @@ import type { Unit } from "../../../engine/types";
 import { visibleOccupants } from "../../../engine/Crowd";
 import { shade, type DrawCtx } from "../common";
 import { personFigure, personSeated, personStanding } from "../../pixelSprites/common";
+import { layerBreak, layerEnd } from "../../pixelSprites/layers";
 
 /**
  * The event venues: the party hall and the wedding hall. Extracted verbatim
@@ -79,6 +80,7 @@ export function drawPartyHall(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   // String-light banner.
   for (let bx = 0; bx < w; bx += 10) f(bx, railY - 3, 5, 3, ["#E07A9A", "#7FB0E8", "#E8C14A", "#8FD0A0"][(bx / 10) % 4 | 0]);
   f(0, railY - 4, w, 1, "#C9A24B");
+  layerBreak(ctx); // the shell ends; the stage, dance floor, table and guests follow
   // Stage with a mirror ball, colored spotlights, and a DJ (seated occupant).
   const stW = Math.round(w * 0.24);
   box(4, fy - 16, stW, 16, "#2A1F3A"); f(4, fy - 16, stW, 1, "#4A3A5A");
@@ -137,11 +139,11 @@ export function drawAquaticCenter(d: DrawCtx, u: Unit, x: number, y: number, w: 
   f(0, midY, w, 2, DECK); f(0, midY, w, 1, "#FFFFFF", 0.5);
   const dvX = w - 9;
   f(dvX, midY - 16, 2, 16, "#9AA6AA"); f(dvX - 9, midY - 16, 11, 2, "#EEF3F5"); // ladder + board
-  swim(dvX - 6, midY - 16); // a diver waiting on the board
   // Poolside deck band, then the lane pool sunk into the lower story.
   f(0, midY + 2, w, 5, DECK);
   const poolTop = midY + 7, poolBot = fy - 1;
   f(3, poolTop, w - 6, poolBot - poolTop, WATER); f(3, poolTop, w - 6, 1, WATERLT);
+  swim(dvX - 6, midY - 16); // a diver waiting on the board
   // Swimmers standing on the pool floor, drawn BEFORE the water overlay so it
   // covers their legs and they read as waist-deep.
   for (let sx = 7; sx + 3 < w - 6; sx += 7) swim(sx, poolBot - 1);
@@ -150,6 +152,12 @@ export function drawAquaticCenter(d: DrawCtx, u: Unit, x: number, y: number, w: 
   // Lane ropes (dashed) and surface ripples on top.
   for (let ly = poolTop + 2; ly < poolBot - 1; ly += 4) for (let lx = 5; lx < w - 6; lx += 4) f(lx, ly, 2, 1, "#EAF6F8", 0.45);
   for (let rx = 6; rx < w - 6; rx += 5) f(rx, poolTop + 1 + ((rx >> 1) & 3), 3, 1, WATERLT, 0.5);
+  // The shell ends: the diver on the board and the swimmers in the pool stay
+  // with it, so only the deck-chair loungers come forward. The water, ropes
+  // and ripples draw before the loungers, which sit on the deck above the
+  // first pool row, so the order changes no pixel; the diver, swimmers and
+  // loungers still fill in that order.
+  layerBreak(ctx);
   // Deck-chair loungers along the poolside band.
   for (let lx = 5; lx + 5 < w - 4; lx += 11) { f(lx, midY + 3, 7, 2, "#E0A85A"); lounge(lx + 1, midY + 5); }
 }
@@ -270,6 +278,7 @@ export function drawWeddingHall(d: DrawCtx, u: Unit, x: number, y: number, w: nu
   ctx.fillStyle = "#C9A24B"; // gold edges
   ctx.fillRect(acx - 12, fy, 2, y0 + hh - fy);
   ctx.fillRect(acx + 10, fy, 2, y0 + hh - fy);
+  layerBreak(ctx); // the shell ends; the arch, altar, chairs, planters and guests follow
 
   // Floral arch over the altar: two white post bases, a top lintel bar, and a
   // garland of blooms across the top and down the sides.
@@ -344,7 +353,10 @@ export function drawWeddingHall(d: DrawCtx, u: Unit, x: number, y: number, w: nu
   bloom(ctx, acx + 22, fy - 18, "#F0F0F0");
   bloom(ctx, acx + 26, fy - 19, "#E88AB0");
 
-  // Scattered petals down the aisle.
+  // The petal row draws along the top of the wall (y0 + 5), over the sconces,
+  // so it belongs to the shell and follows the furniture's end.
+  layerEnd(ctx);
+  // A row of scattered petals along the top of the wall.
   ctx.fillStyle = "rgba(90,168,90,0.7)";
   for (let gx = x0 + 6; gx < x0 + ww - 6; gx += 8) ctx.fillRect(gx, y0 + 5, 4, 1);
 }
