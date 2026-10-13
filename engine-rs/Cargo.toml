@@ -19,7 +19,7 @@ path = "src/bin/conformance.rs"
 
 [dependencies]
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = { version = "1.0.151", features = ["float_roundtrip"] }
+serde_json = { version = "1.0.151", features = ["float_roundtrip", "preserve_order"] }
 sha2 = "0.11.0"
 ryu = "1.0.22"
 indexmap = "2.12.0"

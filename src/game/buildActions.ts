@@ -1,12 +1,12 @@
 import type { Simulation } from "../engine/Simulation";
-import { FACILITIES, facilityFloors } from "../engine/facilities";
+import { FACILITIES } from "../engine/facilities";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
 import { groundFloorStructureKind } from "../engine/tower/towerTopology";
-import { gameplaySession, trackEconomyAction } from "../analytics";
+import { trackEconomyAction } from "../analytics";
 
 /**
  * The money boundary of the game shell: every gesture that buys, paints, or
@@ -47,9 +47,6 @@ export class BuildActions {
   tryBuild(kind: FacilityKind, floor: number, x: number, quiet = false): void {
     const res = this.deps.getSim().build(kind, floor, x);
     if (res.ok) {
-      // Report the TOP occupied story for the session peak: a multi-story room
-      // (cinema, party hall) reaches floor + its height - 1, not just its base.
-      gameplaySession.noteBuild(kind, floor + facilityFloors(kind) - 1); // funnel + depth
       if (!quiet) this.deps.audio.sfx("build");
     } else if (!quiet && res.reason) {
       this.deps.audio.sfx("error");
@@ -68,7 +65,6 @@ export class BuildActions {
     top: number,
   ): { ok: boolean; reason: string } {
     const res = this.deps.getSim().buildTransport(kind, x, bottom, top);
-    if (res.ok) gameplaySession.noteBuild(kind, top); // a shaft counts too; top is its reach
     this.deps.audio.sfx(res.ok ? "build" : "error");
     const reason = res.reason ?? this.transportReason(kind, x, bottom, top);
     if (!res.ok) this.deps.ui.toast(reason, "bad");
@@ -112,7 +108,6 @@ export class BuildActions {
         }
       }
     }
-    if (placed > 0) gameplaySession.noteBuild(kind, floor, placed); // brush lays `placed` tiles
     // Ground floor is lobby-only: the Floor tool on floor 1 auto-converts to a
     // lobby (permanent, and pricier than a floor tile), so confirm what happened
     // once per gesture. The preview already showed a lobby ghost and the lobby

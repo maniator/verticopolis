@@ -840,6 +840,24 @@ impl Kind {
     }
 }
 
+impl Category {
+    /// The category as the TypeScript engine spells it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Category::Structure => "structure",
+            Category::Transport => "transport",
+            Category::Office => "office",
+            Category::Residential => "residential",
+            Category::Hotel => "hotel",
+            Category::Food => "food",
+            Category::Retail => "retail",
+            Category::Entertainment => "entertainment",
+            Category::Service => "service",
+            Category::Special => "special",
+        }
+    }
+}
+
 /// `BUILD_CAPS`.
 pub fn build_cap(kind: Kind) -> Option<i64> {
     match kind {

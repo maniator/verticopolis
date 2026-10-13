@@ -68,6 +68,9 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(sim.addCar(shaft.id).reason).toBe("Not enough money.");
     sim.money = money;
     expect(sim.tower.setLabel(office.id, "  Corner suite ")).toBe(true);
+    // A name cut through an emoji: both engines hold U+FFFD for the half (#936).
+    expect(sim.tower.setLabel(office.id, "Corner " + String.fromCharCode(0xd83c))).toBe(true);
+    expect(sim.tower.getUnit(office.id)?.label).toBe("Corner \uFFFD");
     sim.tower.towerName = "Dual Run Tower";
     sim.view = { tile: 180, floor: 12, zoom: 1.5 };
     drive.run(60);

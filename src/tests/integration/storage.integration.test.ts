@@ -864,10 +864,12 @@ describe("SaveGame", () => {
   });
 
   it("rejects a decompression bomb with a 'too large' message, not 'damaged'", async () => {
-    // Build a legitimate deflate-raw stream whose OUTPUT is just past the 64MB
-    // cap, from a tiny compressed input — i.e. a real bomb, not corrupt bytes
-    // (those land on the 'damaged' path instead). 65MB of zeros packs to a few KB.
-    const huge = new Uint8Array(65 * 1024 * 1024); // all zeros → highly compressible
+    // Build a legitimate deflate-raw stream whose OUTPUT is just past the 32MB
+    // cap every save reader shares (MAX_SAVE_INFLATED_BYTES), from a tiny
+    // compressed input: a real bomb (corrupt bytes land on the 'damaged'
+    // path instead). 33MB of zeros packs to a few KB, and sits in the
+    // band the import used to accept at a 64MB cap while the store refused it.
+    const huge = new Uint8Array(33 * 1024 * 1024); // all zeros, highly compressible
     const cs: GenericTransformStream = new CompressionStream("deflate-raw");
     const packed = new Uint8Array(
       await new Response(
@@ -886,12 +888,11 @@ describe("SaveGame", () => {
   });
 
   describe("when the browser lacks the compression API", () => {
-    // deflate-raw is a 2022+ browser feature; on an older browser the export
-    // and the import of a compressed file must fail with an honest "your
-    // browser is too old" message, not a silent failure and not "this file
-    // is damaged" (which would blame a perfectly good save). Each direction is
-    // probed separately: export needs only the encoder, import only the
-    // decoder, so a browser missing one direction still gets the other.
+    // deflate-raw is a 2022+ browser feature; on an older browser the import
+    // of a compressed file must fail with an honest "your browser is too old"
+    // message, not a silent failure and not "this file is damaged" (which
+    // would blame a perfectly good save). Import needs only the decoder;
+    // export compresses with fflate, so it needs neither direction.
     afterEach(() => vi.unstubAllGlobals());
     const broken = class {
       constructor() {
@@ -901,9 +902,12 @@ describe("SaveGame", () => {
     const breakEncode = () => vi.stubGlobal("CompressionStream", broken);
     const breakDecode = () => vi.stubGlobal("DecompressionStream", broken);
 
-    it("export reports the browser is too old, not a generic failure", async () => {
+    it("export works without the compression API", async () => {
       breakEncode();
-      await expect(SaveGame.export(sampleGame())).rejects.toThrow(/too old to create/);
+      breakDecode();
+      const file = await SaveGame.export(sampleGame());
+      vi.unstubAllGlobals();
+      expect((await SaveGame.import(file)).money).toBe(sampleGame().money);
     });
 
     it("importing a compressed file reports the browser is too old, not 'damaged'", async () => {

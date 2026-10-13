@@ -146,6 +146,22 @@ describe("gameplay event emission", () => {
     expect(events[20]).toEqual({ name: "facility_placed", payload: { kind: "office", floor: 2, count: 1 } });
     expect(events[events.length - 1]).toEqual({ name: "facility_placed", payload: { kind: "stairs", floor: 2, count: 1 } });
     expect(events).toHaveLength(28);
+    // A multi-story room reports the top story it reaches, not its base: the
+    // analytics bridge feeds this floor to the session's peak height.
+    const tall = Simulation.newGame(3, "classic");
+    tall.money = 1e9;
+    tall.star = 5;
+    for (let x = 170; x < 230; x++) tall.build("lobby", 1, x);
+    for (const f of [2, 3]) for (let x = 170; x < 230; x++) tall.build("floor", f, x);
+    drain(tall);
+    expect(tall.build("cinema", 2, 180)).toEqual({ ok: true });
+    expect(drain(tall)).toEqual([{ name: "facility_placed", payload: { kind: "cinema", floor: 3, count: 1 } }]);
+    // Below ground the top story is still base plus height minus one: a
+    // two-story Recycling Center on B3 (floor -2) reaches B2 (-1), not its base.
+    for (const f of [0, -1, -2]) for (let x = 170; x < 230; x++) tall.build("floor", f, x);
+    drain(tall);
+    expect(tall.build("recycling", -2, 180)).toEqual({ ok: true });
+    expect(drain(tall)).toEqual([{ name: "facility_placed", payload: { kind: "recycling", floor: -1, count: 1 } }]);
   });
 
   it("reports the engine's sell command, and nothing for the tower's raw removal", () => {

@@ -48,7 +48,8 @@ export function persistManualSave(sim: Simulation, slot: number | "auto"): "stor
   const id = slot === "auto" ? "auto" : `slot-${slot}`;
   if (!isSaveSlotId(id)) return "fallback";
   const converted = toTowerFile(SaveGame.packSync(sim));
-  // packSync always emits a VCZ1 value, so this cannot fail today; if it ever
+  // packSync either throws (a save past the size cap, which the caller reports)
+  // or emits a VCZ1 value, so this conversion cannot fail today; if it ever
   // does, localStorage still holds the tower and the stamp heals the store.
   if (!converted.ok) return "fallback";
   const result = writeTowerToStoreSync(id, converted.text);

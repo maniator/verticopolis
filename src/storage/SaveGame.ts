@@ -13,9 +13,11 @@ import {
   compressionDecodeSupported,
   compressionEncodeSupported,
   deflate,
+  encodeSaveJson,
   fromBase64,
   inflate,
   inflateCapped,
+  parseSaveJson,
   STORE_MAGIC,
   toBase64,
   TOWER_FILE_MAGIC,
@@ -35,9 +37,9 @@ import {
  * Compressed, each slot lands around 100-120KB. The compression is
  * synchronous (fflate) on purpose: saving happens at boot, on a timer, and —
  * critically — right before a reload in the crash-recovery / update paths,
- * where an async write could be interrupted mid-flush and lose the tower. (The
- * .vctower FILE format keeps using the async native CompressionStream: those
- * exports are user-initiated and never race a reload.)
+ * where an async write could be interrupted mid-flush and lose the tower. The
+ * .vctower FILE export packs with the same fflate level 1, so every writer, and
+ * the engine's, writes the same bits.
  */
 
 const AUTO_KEY = "verticopolis-save";
@@ -83,7 +85,7 @@ function readSlot(key: string): SerializedGame | null {
     const json = raw.startsWith(STORE_MAGIC)
       ? new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(fromBase64(raw.slice(STORE_MAGIC.length))))
       : raw;
-    return JSON.parse(json) as SerializedGame;
+    return parseSaveJson(json) as SerializedGame;
   } catch {
     return null;
   }
@@ -292,7 +294,7 @@ export const SaveGame = {
    */
   packSync(sim: Simulation): string {
     const data = stamp(sim.serialize());
-    return STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(data)), { level: 1 }));
+    return STORE_MAGIC + toBase64(deflateSync(encodeSaveJson(JSON.stringify(data)), { level: 1 }));
   },
 
   // ---- Shared writer + export/import -----------------------------------
@@ -315,10 +317,13 @@ export const SaveGame = {
       this.saveTo(key, sim);
       return;
     }
+    // Encode (and refuse an oversized save) before claiming the token: a
+    // refused save leaves no token behind, so an older save of the same slot
+    // still in flight commits instead of the slot keeping neither.
+    const bytes = encodeSaveJson(JSON.stringify(stamp(sim.serialize())));
     const token = {};
     latestAsyncSave = token;
-    const data = stamp(sim.serialize());
-    const packed = await deflate(new TextEncoder().encode(JSON.stringify(data)));
+    const packed = await deflate(bytes);
     if (latestAsyncSave !== token) return;
     latestAsyncSave = null;
     writeSlot(key, STORE_MAGIC + toBase64(packed));
@@ -326,15 +331,13 @@ export const SaveGame = {
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
   async export(sim: Simulation): Promise<string> {
-    // Export only WRITES compressed data, so it needs just the encoder; a
-    // browser missing only the decoder can still create tower files.
-    if (!compressionEncodeSupported()) {
-      throw new Error("This browser is too old to create tower files. Try a current browser.");
-    }
     // Exports carry the same write-time provenance as local saves: a moved
-    // file says when and by which build it was written.
-    const packed = await deflate(new TextEncoder().encode(JSON.stringify(stamp(sim.serialize()))));
-    return TOWER_FILE_MAGIC + "\n" + toBase64(packed) + "\n";
+    // file says when and by which build it was written. fflate at level 1,
+    // like packSync, writes the same bits in every browser, and the engine's
+    // writer (`load::encode_vctower`) writes those bits too, so a tower file
+    // is the same bytes whichever wrote it.
+    const json = encodeSaveJson(JSON.stringify(stamp(sim.serialize())));
+    return TOWER_FILE_MAGIC + "\n" + toBase64(deflateSync(json, { level: 1 })) + "\n";
   },
 
   /** Download name for an export: the tower's name slugged, e.g. "tower-one.vctower". */
@@ -371,7 +374,7 @@ export const SaveGame = {
       const packed = fromBase64(trimmed.slice(magic[0].length).replace(/\s+/g, ""));
       // fatal decoder: a flipped byte must fail the import loudly, never
       // silently half-load a tower with U+FFFD-mangled strings.
-      data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(await inflate(packed))) as SerializedGame;
+      data = parseSaveJson(new TextDecoder("utf-8", { fatal: true }).decode(await inflate(packed))) as SerializedGame;
     } catch (err) {
       // A crafted tiny file can inflate to gigabytes (a decompression bomb);
       // inflate() caps the output and throws this, distinct from "damaged".

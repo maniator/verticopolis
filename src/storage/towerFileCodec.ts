@@ -1,5 +1,5 @@
 import { deflateSync } from "fflate";
-import { fromBase64, inflateCapped, STORE_MAGIC, toBase64, TOWER_FILE_MAGIC } from "./saveCompression";
+import { encodeSaveJson, fromBase64, inflateCapped, STORE_MAGIC, toBase64, TOWER_FILE_MAGIC } from "./saveCompression";
 
 /**
  * The `.vctower` container codec: localStorage `VCZ1:` values to `.vctower`
@@ -116,7 +116,16 @@ export function toTowerFile(raw: string, preserve = false): ConversionResult {
       return { ok: false, reason: "unreadable" };
     }
   }
-  const packed = deflateSync(new TextEncoder().encode(trimmed), { level: 1 });
+  // A save past the read cap would only become a .vctower no reader opens, so
+  // the loadable-tower mode refuses it here. Preserve mode keeps the bytes
+  // whatever they are, as everywhere else in that mode.
+  let bytes: Uint8Array;
+  try {
+    bytes = preserve ? new TextEncoder().encode(trimmed) : encodeSaveJson(trimmed);
+  } catch {
+    return { ok: false, reason: "unreadable" };
+  }
+  const packed = deflateSync(bytes, { level: 1 });
   return { ok: true, kind: "compressed", text: TOWER_FILE_MAGIC + "\n" + toBase64(packed) + "\n" };
 }
 
