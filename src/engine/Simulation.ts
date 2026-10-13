@@ -14,7 +14,7 @@ import { RNG } from "./rng";
 
 export { ECON } from "./econConfig";
 
-import type { FacilityKind, GameMode, PlaceResult, SerializedGame, SerializedView, Unit, VacateReason, WeatherKind } from "./types";
+import type { FacilityKind, GameMode, SerializedGame, SerializedView, Unit, VacateReason, WeatherKind } from "./types";
 import type { LogEntry } from "./types";
 
 // The save-version constant + migration seam are extracted to ./saveMigration.
@@ -219,7 +219,7 @@ export class Simulation implements SimContext {
 
   // ---- Gameplay events ---------------------------------------------------
 
-  /** Every gameplay event since the last drain, oldest first; empties the buffer. */
+  /** Every gameplay event since the last drain as `{ name, payload }`, oldest first; empties the buffer. The host drains per tick. */
   drainGameplayEvents(): GameplayEvent[] { return this.gameplayEvents.drain(); }
   /** Events a full buffer has pushed out since this engine was made. */
   get gameplayEventsDropped(): number { return this.gameplayEvents.dropped; }
@@ -239,7 +239,7 @@ export class Simulation implements SimContext {
   sellAt(floor: number, x: number): boolean { return build.sellAt(this, floor, x); }
   // capacity_changed edits (sim/capacity.ts); charges move the money (sim/charges.ts).
   setCars(id: number, cars: number): boolean { return capacity.setCars(this, id, cars); }
-  resizeTransport(id: number, bottom: number, top: number): PlaceResult & { added?: number; floorTilesCreated?: number } { return capacity.resizeTransport(this, id, bottom, top); }
+  resizeTransport(id: number, bottom: number, top: number): ReturnType<Tower["resizeTransport"]> { return capacity.resizeTransport(this, id, bottom, top); }
   addCar(id: number): charges.ChargeResult { return charges.addCar(this, id); }
   removeCar(id: number): charges.ChargeResult { return charges.removeCar(this, id); }
   extendTransport(id: number, end: "up" | "down", targetFloor: number, hwm?: { bottom: number; top: number }): charges.ExtendResult { return charges.extendTransport(this, id, end, targetFloor, hwm); }

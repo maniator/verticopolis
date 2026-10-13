@@ -558,7 +558,8 @@ export class Engine {
         return v1;
     }
     /**
-     * `tower.resizeTransport(id, bottom, top)`: JSON
+     * `resizeTransport(id, bottom, top)`, the simulation-layer edit that
+     * reports `capacity_changed`: JSON
      * `{ ok, reason?, added, floorTilesCreated }`.
      * @param {number} id
      * @param {number} bottom
@@ -646,6 +647,8 @@ export class Engine {
         wasm.engine_setAutoBridge(this.__wbg_ptr, value);
     }
     /**
+     * `setCars(id, cars)`: the simulation-layer edit, which reports
+     * `capacity_changed`.
      * @param {number} id
      * @param {number} cars
      * @returns {boolean}
@@ -797,6 +800,37 @@ export class Engine {
      */
     toggleAutoBridge() {
         const ret = wasm.engine_toggleAutoBridge(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * `tower.resizeTransport(id, bottom, top)`, the bare tower edit, silent
+     * in both engines (#906): the same JSON.
+     * @param {number} id
+     * @param {number} bottom
+     * @param {number} top
+     * @returns {string}
+     */
+    towerResizeTransport(id, bottom, top) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.engine_towerResizeTransport(this.__wbg_ptr, id, bottom, top);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * `tower.setCars(id, cars)`: the bare tower edit, silent in both
+     * engines (#906).
+     * @param {number} id
+     * @param {number} cars
+     * @returns {boolean}
+     */
+    towerSetCars(id, cars) {
+        const ret = wasm.engine_towerSetCars(this.__wbg_ptr, id, cars);
         return ret !== 0;
     }
     /**

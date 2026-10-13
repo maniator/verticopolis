@@ -46,6 +46,12 @@ not. This is the TypeScript tie-in the owner asked for after #938.
 - Catalog wording and history note; digest pin moved; the Rust doc comment
   on `Simulation::set_cars` updated (no behavior change; `BUILD.json`'s source
   hash refreshed).
+- The relay keeps the two layers apart: the mirror wraps `Simulation.setCars`
+  and `Simulation.resizeTransport` as the `setCars` and `resizeTransport`
+  commands (the reporting binding ops), and the bare tower edits as
+  `towerSetCars` and `towerResizeTransport`, new silent binding ops that call
+  the Rust tower directly. A bare tower edit is silent in both engines whether
+  or not a host or shadow is attached.
 
 ## Test record
 
@@ -54,9 +60,35 @@ not. This is the TypeScript tie-in the owner asked for after #938.
 - Tests that edited capacity through the raw tower and expected an event
   (`dualRunEdits`, `wasmHost`, `wasmHostAnalyticsBridge` integration) now edit
   through the simulation layer.
+- `mirror.test.ts`: the bare tower edits relay as the tower ops; a
+  simulation-layer edit relays once, as the reporting op.
+- `dualRunEdits` integration: bare tower car and span edits on the hosted
+  tower keep both the state and the event streams in step.
 - `cargo run --release --bin conformance`: every scenario ok; the TypeScript
   conformance runs match the lock.
 
 ## Review record
 
-Filled in by the `/gds-code-review` run.
+`/gds-code-review`, round 1 (Blind Hunter, Edge Case Hunter, Acceptance
+Auditor on commit 4e5e10a):
+
+- **patch** (all three layers) A bare TypeScript tower edit was relayed to
+  the Rust binding's emitting `setCars`/`resizeTransport`, so under the WASM
+  host or the dual-run shadow it reported `capacity_changed` on the Rust side
+  only. Fixed with the silent `towerSetCars`/`towerResizeTransport` binding
+  ops and sim-layer wraps in the mirror (see What landed), with tests.
+- **patch** (Blind Hunter) The resize result type was spelled out in three
+  places; the simulation layer now uses `ReturnType<Tower["resizeTransport"]>`.
+- **patch** (Blind Hunter) The drain doc lost its `{ name, payload }` shape and
+  the per-tick contract when it was condensed; restored on one line.
+- **dismissed** `BUILD.json` missing: it is in the commit (the review diff
+  left it out). No other non-test caller of the bare tower edits exists
+  (`src/`; the screenshot builders in `scripts/` use them and are now silent
+  in both engines alike). The Rust `resize_transport` doc already named the
+  simulation layer.
+- **dismissed** Catalog freeze: the freeze gate on #873 applies to the release
+  that ships the bridge's default flip (3.0.0). This edit changes wording
+  only, so no payload, version, or dashboard moves; the history note records
+  it.
+
+Confirming pass: see below.

@@ -1,5 +1,5 @@
 import type { Simulation } from "../Simulation";
-import type { PlaceResult } from "../types";
+import type { Tower } from "../Tower";
 
 /**
  * A shaft's capacity edits at the simulation layer (#906): the car count and
@@ -18,7 +18,7 @@ export function setCars(sim: Simulation, id: number, cars: number): boolean {
   return ok;
 }
 
-export function resizeTransport(sim: Simulation, id: number, newBottom: number, newTop: number): PlaceResult & { added?: number; floorTilesCreated?: number } {
+export function resizeTransport(sim: Simulation, id: number, newBottom: number, newTop: number): ReturnType<Tower["resizeTransport"]> {
   const span = () => {
     const t = sim.tower.transportById(id);
     return t ? `${t.bottom}:${t.top}` : "";

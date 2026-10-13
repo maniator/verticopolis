@@ -47,6 +47,11 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(sim.removeCar(shaft.id)).toEqual({ ok: true, delta: carResaleRefund() });
     expect(shaft.cars).toBe(2);
     expect(sim.setCars(shaft.id, shaft.cars > 1 ? shaft.cars - 1 : 2)).toBe(true); // the uncharged edit stays free
+    // The bare tower edits are silent in both engines (#906): the shadow
+    // applies them as its silent tower ops, so the event streams still agree.
+    expect(sim.tower.setCars(shaft.id, shaft.cars > 1 ? shaft.cars - 1 : 2)).toBe(true);
+    expect(sim.tower.resizeTransport(shaft.id, shaft.bottom, shaft.top + 1).ok).toBe(true);
+    expect(sim.tower.resizeTransport(shaft.id, shaft.bottom, shaft.top - 1).ok).toBe(true);
     sim.money += 1000; // a host's direct write is still mirrored as setMoney
     expect(sim.tower.setStop(shaft.id, 35, false)).toBe(true);
     expect(sim.tower.clearStops(shaft.id)).toBe(true);

@@ -170,7 +170,8 @@ export class Engine {
      */
     rerollSubtype(id: number): string | undefined;
     /**
-     * `tower.resizeTransport(id, bottom, top)`: JSON
+     * `resizeTransport(id, bottom, top)`, the simulation-layer edit that
+     * reports `capacity_changed`: JSON
      * `{ ok, reason?, added, floorTilesCreated }`.
      */
     resizeTransport(id: number, bottom: number, top: number): string;
@@ -199,6 +200,10 @@ export class Engine {
      * `sim.autoBridge = value`, the direct write an undo restore makes.
      */
     setAutoBridge(value: boolean): void;
+    /**
+     * `setCars(id, cars)`: the simulation-layer edit, which reports
+     * `capacity_changed`.
+     */
     setCars(id: number, cars: number): boolean;
     setExpressStops(id: number): void;
     /**
@@ -239,6 +244,16 @@ export class Engine {
      * `toggleAutoBridge()`: the preference after the flip.
      */
     toggleAutoBridge(): boolean;
+    /**
+     * `tower.resizeTransport(id, bottom, top)`, the bare tower edit, silent
+     * in both engines (#906): the same JSON.
+     */
+    towerResizeTransport(id: number, bottom: number, top: number): string;
+    /**
+     * `tower.setCars(id, cars)`: the bare tower edit, silent in both
+     * engines (#906).
+     */
+    towerSetCars(id: number, cars: number): boolean;
     /**
      * The shaft covering a tile, serialized as the save would, or null.
      */
