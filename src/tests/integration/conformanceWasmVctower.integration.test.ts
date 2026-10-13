@@ -9,27 +9,26 @@
  * loads it, serialized, then stamped and written by the engine, and read back
  * by each web reader: `decodeVctower` (the Node container decoder),
  * `fromTowerFile` (the desktop store's re-header), and `SaveGame.import` (the
- * player's import). `decodeVctower` must give back the stamped save, the
- * payload `fromTowerFile` hands the store must be that save's canonical JSON
- * (`JSON.stringify` formatting, keys in code unit order), the framing must
- * be the one the TypeScript writer puts around the same save, and the tower
- * `SaveGame.import` builds must hash to the same state,
- * with the same Founder status, as the one built from the original file. A
- * loaded tower that is no founder's, and a new game, written by the engine
- * must open as no founder's tower, and the binding must refuse a stamp the
- * web game would read as a founder's, and a save that is no tower.
+ * player's import). The engine's file must be the web game's file of the
+ * same save, stamp and time, byte for byte (#939): the JSON is
+ * `JSON.stringify`'s text in the web's key order, and the compressor is a
+ * port of the web's (fflate at level 1). The tower `SaveGame.import`
+ * builds must hash to the same state, with the same Founder status, as the
+ * one built from the original file. A loaded tower that is no founder's, and
+ * a new game, written by the engine must open as no founder's tower, and the
+ * binding must refuse a stamp the web game would read as a founder's, and a
+ * save that is no tower.
  *
  * Skips without the WASM package, like the rest of `npm run test:wasm`.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Engine, encodeVctower, exportTdt } from "../../dualrun/engine";
 import { SaveGame } from "../../storage/SaveGame";
 import { fromBase64, inflateCapped, parseSaveJson, STORE_MAGIC } from "../../storage/saveCompression";
 import { fromTowerFile, toTowerFile } from "../../storage/towerFileCodec";
 import { decodeVctower } from "../../storage/vctowerContainer";
-import { canonicalJson } from "../conformance/canonical";
 import { tsEngine } from "../conformance/scenario";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 
@@ -69,21 +68,77 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     const stamped = { ...(JSON.parse(json) as Record<string, unknown>), savedAt: SAVED_AT, appVersion: VERSION };
 
     expect(text).toMatch(/^VCTOWER1\n[A-Za-z0-9+/]+={0,2}\n$/);
-    expect((text.length - "VCTOWER1\n".length - 1) % 4).toBe(0);
-    // The TypeScript writer's framing around the same save: only the base64
-    // run between the magic line and the closing newline may differ.
-    const web = toTowerFile(json);
+    // The TypeScript writer's file of the same stamped save, byte for byte.
+    const web = toTowerFile(JSON.stringify(stamped));
     expect(web.ok).toBe(true);
-    if (web.ok) expect(web.text.replace(/\n[^\n]*\n$/, "\n#\n")).toBe(text.replace(/\n[^\n]*\n$/, "\n#\n"));
+    if (web.ok) expect(text).toBe(web.text);
 
     expect(decodeVctower(text, name)).toEqual(stamped);
-    // Every byte of the JSON the engine can match: JSON.stringify's
-    // formatting with keys in code unit order, the canonical text.
-    expect(payloadText(text)).toBe(canonicalJson(stamped));
+    expect(payloadText(text)).toBe(JSON.stringify(stamped));
 
     const fromEngine = await SaveGame.import(text);
     expect(fromEngine.founder).toBe(fromWeb.founder);
     expect(tsEngine(fromEngine).stateDigest()).toBe(tsEngine(fromWeb).stateDigest());
+  });
+
+  // SaveGame.export stamps with the build and the clock; pin both and the
+  // engine, handed the same, writes the same file (#939).
+  it.each(fixtures)("%s: the engine writes the web game's export byte for byte", async (name) => {
+    const original = readFileSync(resolve(FIXTURES, name), "utf8");
+    const sim = await SaveGame.import(original);
+    vi.useFakeTimers({ now: SAVED_AT, toFake: ["Date"] });
+    try {
+      const webFile = await SaveGame.export(sim);
+      expect(rust().encodeVctower(JSON.stringify(sim.serialize()), __APP_VERSION__, SAVED_AT)).toBe(webFile);
+      // packSync, the localStorage writer the desktop store re-headers, packs
+      // the same bits.
+      expect(SaveGame.packSync(sim)).toBe(STORE_MAGIC + (webFile.split("\n")[1] ?? ""));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // A save that already carries a stamp keeps each stamp key where it was,
+  // as the property assignments in SaveGame's stamp() keep it (#939).
+  it("restamps a stamped save in place, as the web writer does", () => {
+    const json = JSON.stringify({ savedAt: 1, version: 7, appVersion: "2.5.0", minutes: 0, units: [], towerName: "Sky" });
+    const web = toTowerFile(JSON.stringify({ ...JSON.parse(json), savedAt: SAVED_AT, appVersion: VERSION }));
+    expect(web.ok).toBe(true);
+    if (web.ok) expect(rust().encodeVctower(json, VERSION, SAVED_AT)).toBe(web.text);
+  });
+
+  // The compressor port against fflate itself on saves the fixtures do not
+  // reach: tower names of many lengths and kinds of text (runs, repeats,
+  // random letters, any character), so every block type, both table sizes
+  // and the code length limit get written (#939).
+  it("writes what the web writer writes for many kinds of save text", () => {
+    let x = 20261013;
+    const next = (): number => {
+      x ^= x << 13;
+      x ^= x >>> 17;
+      x ^= x << 5;
+      return (x >>>= 0);
+    };
+    const pick = (alphabet: string): string => alphabet[next() % alphabet.length] ?? "a";
+    const kinds: Array<() => string> = [
+      () => pick("ab"),
+      () => pick("abcdefghijklmnopqrstuvwxyz "),
+      () => String.fromCharCode(32 + (next() % 95)),
+      () => String.fromCodePoint(0x20 + (next() % 0x2fff)),
+      () => pick("xy").repeat(1 + (next() % 300)),
+      () => "Tower " + (next() % 1000) + ", ",
+    ];
+    for (let n = 0; n < 40; n++) {
+      const make = kinds[n % kinds.length] ?? kinds[0];
+      const length = [0, 1, 2, 3, 100, 3000, 9000, 25000, 70000, 200000][n % 10] ?? 0;
+      let name = "";
+      while (name.length < length && make) name += make();
+      const save = { version: 7, minutes: next() % 100000, units: [], towerName: name };
+      const json = JSON.stringify(save);
+      const web = toTowerFile(JSON.stringify({ ...save, savedAt: SAVED_AT, appVersion: VERSION }));
+      expect(web.ok).toBe(true);
+      if (web.ok) expect(rust().encodeVctower(json, VERSION, SAVED_AT), `save ${n}`).toBe(web.text);
+    }
   });
 
   it.each(["classic", "modern"])("a new %s game written by the engine opens as no founder's tower", async (mode) => {
@@ -93,7 +148,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
       const text = rust().encodeVctower(json, VERSION, SAVED_AT);
       const sim = await SaveGame.import(text);
       expect(sim.founder).toBe(false);
-      expect(payloadText(text)).toBe(canonicalJson({ ...JSON.parse(json), savedAt: SAVED_AT, appVersion: VERSION }));
+      expect(payloadText(text)).toBe(JSON.stringify({ ...JSON.parse(json), savedAt: SAVED_AT, appVersion: VERSION }));
       expect(tsEngine(sim).stateDigest()).toBe(engine.stateDigest());
       // The engine's stamp adds exactly the fields SaveGame.export's does.
       const webKeys = Object.keys(decodeVctower(await SaveGame.export(sim)) as object).sort();
