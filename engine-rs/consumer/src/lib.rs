@@ -480,8 +480,13 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
+    /// `VC_CONFORMANCE`, or the suite beside this crate in the repository.
+    /// CI sets it when it runs a copy of this crate from outside the
+    /// checkout, the way a host in its own repository would.
     fn conformance_dir() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../conformance")
+        std::env::var_os("VC_CONFORMANCE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../conformance"))
     }
 
     #[test]

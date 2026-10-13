@@ -43,8 +43,9 @@ readouts the hashed state never reads (`scheduleOrigins.ts`,
 [`API.md`](API.md) is the page for a host that is not the web game: how to
 depend on the crate, the calls a frontend makes, and what is stable.
 `consumer/` is a small crate that depends on the engine by path and makes
-those calls; CI builds and runs it from a checkout holding only `engine-rs/`
-and `conformance/`, with no Node.js (`engine-rs.yml`, job `consumer`), and
+those calls; CI builds and runs a copy of it outside the checkout, in the
+Rust container image with no Node.js and a checkout holding only
+`engine-rs/` and `conformance/` (`engine-rs.yml`, job `consumer`), and
 `tests/independence.rs` checks that the library source (the conformance
 harness aside) reaches for no file, clock, console, network, thread or
 process access, compiles in nothing from the web game's tree, and pulls in

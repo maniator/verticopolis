@@ -390,7 +390,7 @@ fn strip_tests(name: &str, src: &str) -> (String, Vec<String>) {
         } else {
             at
         };
-        while start > 0 && start == line_start {
+        while start > 0 && b[start - 1] == b'\n' {
             let prev = src[..start - 1].rfind('\n').map_or(0, |i| i + 1);
             let line = src[prev..start - 1].trim();
             if line.starts_with("#[")
@@ -658,6 +658,23 @@ fn the_javascript_binding_stays_in_wasm_rs() {
 /// `include_str!` and `include_bytes!` and of every `#[path]` module, or
 /// `Err` for an argument that is not a plain string literal without escapes.
 fn included(lib: &Library) -> Vec<Result<String, String>> {
+    includes(lib, &["include!", "include_str!", "include_bytes!"], true)
+}
+
+/// The files compiled in as code: `include!` and `#[path]` targets, whatever
+/// their extension.
+fn included_code(lib: &Library) -> Vec<String> {
+    includes(lib, &["include!"], true)
+        .into_iter()
+        .filter_map(Result::ok)
+        .collect()
+}
+
+fn includes(
+    lib: &Library,
+    macros: &[&str],
+    with_path_modules: bool,
+) -> Vec<Result<String, String>> {
     let b = lib.src.as_bytes();
     let skip = |mut i: usize| {
         while i < b.len() && (lib.parts[i] == Part::Comment || b[i].is_ascii_whitespace()) {
@@ -666,7 +683,7 @@ fn included(lib: &Library) -> Vec<Result<String, String>> {
         i
     };
     let mut out = Vec::new();
-    for mac in ["include!", "include_str!", "include_bytes!"] {
+    for &mac in macros {
         let mut from = 0;
         while let Some(off) = lib.code[from..].find(mac) {
             let at = from + off;
@@ -704,11 +721,13 @@ fn included(lib: &Library) -> Vec<Result<String, String>> {
             }
         }
     }
-    out.extend(
-        path_attributes(&lib.src, &lib.parts, 0, lib.src.len())
-            .into_iter()
-            .map(Ok),
-    );
+    if with_path_modules {
+        out.extend(
+            path_attributes(&lib.src, &lib.parts, 0, lib.src.len())
+                .into_iter()
+                .map(Ok),
+        );
+    }
     out
 }
 
@@ -724,17 +743,21 @@ fn compiled_in_data_comes_from_the_crate_or_the_conformance_suite() {
                     let file = normalize(&crate_dir().join(&name).parent().unwrap().join(&path));
                     if !(file.starts_with(&krate) || file.starts_with(&suite)) {
                         found.push(format!("{name}: {path}"));
-                    } else if path.ends_with(".rs")
-                        && (!file.starts_with(krate.join("src"))
-                            || file.starts_with(krate.join("src/bin")))
-                    {
-                        // Code compiled in from elsewhere would escape the
-                        // host-service scan, which reads src/ apart from the
-                        // binaries.
-                        found.push(format!("{name}: {path} is code the scan skips"));
                     }
                 }
                 Err(e) => found.push(format!("{name}: {e}")),
+            }
+        }
+        // Code compiled in from anywhere but a `.rs` file under src/ (the
+        // binaries aside) would escape the host-service scan, which reads
+        // exactly those files.
+        for path in included_code(&lib) {
+            let file = normalize(&crate_dir().join(&name).parent().unwrap().join(&path));
+            if !path.ends_with(".rs")
+                || !file.starts_with(krate.join("src"))
+                || file.starts_with(krate.join("src/bin"))
+            {
+                found.push(format!("{name}: {path} is code the scan skips"));
             }
         }
     }
@@ -912,22 +935,25 @@ fn the_scanner_finds_every_spelling_of_a_host_service() {
 
 #[test]
 fn the_scanner_reads_every_include_form() {
+    // The macro names are spelled at run time (INC is replaced below), so
+    // this file holds no include call a tool reading the source would follow.
     let src = r##"
 // floors 30–60 → a comment with multibyte characters before the includes
-const A: &str = include_str!("../../conformance/a.json");
-const B: &str = include_str!(
+const A: &str = INC_str!("../../conformance/a.json");
+const B: &str = INC_str!(
     "../../src/b.ts"
 );
-const C: &[u8] = include_bytes! (r#"../../src/c.bin"#);
-const D: &str = include_str!(concat!("x", "y"));
-const E: &str = "include_str!(\"in a string ×";
-const F: &str = include_str!("..\x2f..\x2fsrc/f.ts");
-include!("../../src/e.rs");
+const C: &[u8] = INC_bytes! (r#"../../src/c.bin"#);
+const D: &str = INC_str!(concat!("x", "y"));
+const E: &str = "INC_str!(\"in a string ×";
+const F: &str = INC_str!("..\x2f..\x2fsrc/f.ts");
+INC!("../../src/e.rs");
 #[path = "../../src/g.rs"]
 mod g;
 // #[path = "../../src/not_this.rs"]
-"##;
-    let (lib, _) = library("sample", src);
+"##
+    .replace("INC", "include");
+    let (lib, _) = library("sample", &src);
     let got = included(&lib);
     for want in [
         "../../conformance/a.json",
@@ -969,7 +995,7 @@ fn a_cfg_test_on_anything_but_an_item_stops_the_scan() {
     );
     let (_, paths) = strip_tests(
         "sample",
-        "#[cfg(test)]\n// helpers for the tests below\n#[allow(dead_code)]\npub(crate) mod helpers;\n#[cfg(test)]\nmod tests { }\n#[path = \"above_tests.rs\"]\n#[cfg(test)]\nmod above;",
+        "#[cfg(test)]\n// helpers for the tests below\n#[allow(dead_code)]\npub(crate) mod helpers;\n#[cfg(test)]\nmod tests { }\n#[path = \"above_tests.rs\"]\n#[allow(clippy::float_cmp)]\n#[cfg(test)]\nmod above;",
     );
     assert_eq!(
         paths,

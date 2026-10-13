@@ -9,10 +9,20 @@ proves it runs the real simulation by replaying the conformance suite
 
 `consumer/` is a working example and the CI gate for this page: a crate
 outside the engine that depends on it by path and makes every tier 1 call
-below. The `consumer` job in `.github/workflows/engine-rs.yml` builds and
-runs it from a checkout holding only `engine-rs/` and `conformance/`, with
-no Node.js on `PATH` or in the runner image's install locations and every
-Node.js command a failing stub. The plan this page belongs to is issue #980.
+below. The `consumer` job in `.github/workflows/engine-rs.yml` runs in the
+official Rust container image, which has no Node.js, from a checkout
+holding only `engine-rs/` and `conformance/`. It copies `consumer/` out of
+the checkout and builds, tests and runs the copy there, depending on the
+engine by an absolute path. The plan this page belongs to is issue #980.
+
+What that proves today: the engine builds and runs with no web game and no
+Node.js, and a crate in another directory, holding nothing of this
+repository but a dependency line, can drive it and replay the conformance
+scenarios that start from a new game. What it does not prove yet: a
+registry or packaged release (the crate reads `../conformance/` at compile
+time, so it needs the repository beside it; #893), or the scenarios that
+start from a save fixture, which still live in `src/tests/fixtures/`
+(stage 3 of #980).
 
 ## Depending on the engine
 
