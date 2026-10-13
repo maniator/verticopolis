@@ -113,4 +113,22 @@ They are documented as relay-only in `wasm.rs` and `binding.ts`,
 `towerRelayOps.guard.test.ts` keeps every source but the relay off them, and
 the #923 boundary row now covers confining them outright.
 
-Round 3: a confirming pass on these fixes (recorded below once it lands).
+Round 3, confirming pass on the round-2 fixes:
+
+- **patch** (all three layers) The guard covered less than its doc said: it
+  walked only `.ts`/`.tsx` under src/ and scripts/, exempted all of
+  src/tests/, skipped any directory named `public`, and could pass while
+  scanning nothing. It now walks src/, scripts/, api/, tools/ and e2e/ in
+  every JS and TS flavor (symlinked directories too), exempts only
+  `*.test.*` files and the built glue under src/public/, and asserts the
+  walk reaches every allowed file. Its doc names who may call the ops and
+  points player edits at the charged commands.
+- **patch** (Acceptance Auditor) Issue #923 gained the relay-ops scope as a
+  comment, matching the backlog row.
+- **dismissed** Generic forwarding through `INSTANCE_METHODS`: the list is
+  read only by the binding's presence check, which exposes nothing (now
+  stated in the guard's doc). The catalog's "tests, fixtures, tooling" and
+  this record's "no non-test caller in src/" agree: the tooling callers live
+  in scripts/, and tooling builds send no analytics.
+
+Round 4 confirms these fixes; its result is in the PR thread.
