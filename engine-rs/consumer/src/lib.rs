@@ -1,0 +1,480 @@
+//! A host of the Verticopolis engine with no frontend. It depends on the
+//! engine the way a project outside this repository would (one path
+//! dependency, default features, no Node.js) and drives it through the
+//! surface `engine-rs/API.md` documents: start a game, run commands, advance
+//! time, read state and events, save, load, and replay a conformance
+//! scenario. CI builds and runs it from a checkout that holds no web game
+//! (`.github/workflows/engine-rs.yml`, job `consumer`).
+//!
+//! It checks that the integration works, not the rules: the conformance
+//! referee (`cargo run --bin conformance`) owns those.
+
+use std::path::Path;
+
+use serde_json::Value;
+use verticopolis_engine::canonical::digest;
+use verticopolis_engine::catalog::{catalog, CATALOG_VERSION};
+use verticopolis_engine::charges::ExtendEnd;
+use verticopolis_engine::clock::GameMode;
+use verticopolis_engine::facilities::Kind;
+use verticopolis_engine::gameplay::{check_catalog, check_event, RemovalMethod, CATALOG_JSON};
+use verticopolis_engine::load::{decode_vctower, deserialize, encode_simulation_vctower};
+use verticopolis_engine::rent::BatchTarget;
+use verticopolis_engine::scenario::{run_scenario, state_view, Checkpoint, Scenario};
+use verticopolis_engine::sim::Simulation;
+use verticopolis_engine::{export_tdt, import_tdt};
+
+/// The seed every run here starts from. Any seed works; a fixed one makes
+/// two runs comparable.
+pub const SEED: u32 = 20261013;
+
+/// The build name and save time the host stamps a save with. The engine has
+/// no clock and no build identity, so a host always passes both.
+pub const APP_VERSION: &str = "consumer-smoke";
+pub const SAVED_AT_MS: f64 = 1_791_849_600_000.0;
+
+/// What one smoke run saw, for the binary to print and the tests to check.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Report {
+    /// The money the opening build spent, as the engine charged it.
+    pub spent: f64,
+    /// What the catalog quoted for the same placements.
+    pub quoted: f64,
+    /// The game day after the run.
+    pub day: i64,
+    pub population: i64,
+    pub money: f64,
+    /// Gameplay events drained over the run, each checked against the
+    /// event catalog.
+    pub events: usize,
+    /// The hash of the hashed state view at the end of the run.
+    pub state: String,
+    /// The `.vctower` file's size in bytes.
+    pub save_bytes: usize,
+}
+
+/// One placement of the opening build.
+struct Place {
+    kind: Kind,
+    floor: i64,
+    x: i64,
+}
+
+/// The opening build: a lobby row, two floors of offices, floor tiles laid
+/// over the lobby's west end for the shaft, and a standard elevator from
+/// the lobby to the top office floor ([`ELEVATOR_X`]).
+fn opening() -> Vec<Place> {
+    let mut v: Vec<Place> = (100..=123)
+        .map(|x| Place {
+            kind: Kind::Lobby,
+            floor: 1,
+            x,
+        })
+        .collect();
+    for floor in 2..=3 {
+        v.extend((100..=105).map(|x| Place {
+            kind: Kind::Floor,
+            floor,
+            x,
+        }));
+        for x in [106, 115] {
+            v.push(Place {
+                kind: Kind::Office,
+                floor,
+                x,
+            });
+        }
+    }
+    v
+}
+
+/// Where the opening's elevator stands, over the floor tiles at its west
+/// end.
+const ELEVATOR_X: i64 = 100;
+
+/// Start a Classic game and lay the opening build. Every placement is
+/// quoted first (`can_build`, the dry run `build` makes) and must cost what
+/// the quote said, so a host can price a placement ghost without applying a
+/// rule itself.
+pub fn found(seed: u32) -> Result<(Simulation, f64, f64), String> {
+    let cat = catalog(GameMode::Classic);
+    if cat.version != CATALOG_VERSION {
+        return Err(format!(
+            "catalog version {} is not {CATALOG_VERSION}",
+            cat.version
+        ));
+    }
+    let mut sim = Simulation::new_game(seed, GameMode::Classic);
+    if sim.money != cat.economy.starting_money {
+        return Err(format!(
+            "a new game holds {} but the catalog quotes {}",
+            sim.money, cat.economy.starting_money
+        ));
+    }
+    let start = sim.money;
+    let mut quoted = 0.0;
+    for p in opening() {
+        let quote = sim.can_build(p.kind, p.floor, p.x);
+        if !quote.ok {
+            return Err(format!(
+                "{:?} @ {},{} refused: {}",
+                p.kind,
+                p.floor,
+                p.x,
+                quote.reason.unwrap_or_default()
+            ));
+        }
+        let before = sim.money;
+        let r = sim.build(p.kind, p.floor, p.x);
+        if !r.ok {
+            return Err(format!(
+                "{:?} @ {},{} quoted ok but the build failed: {}",
+                p.kind,
+                p.floor,
+                p.x,
+                r.reason.unwrap_or_default()
+            ));
+        }
+        if before - sim.money != quote.cost {
+            return Err(format!(
+                "{:?} @ {},{} quoted {} and charged {}",
+                p.kind,
+                p.floor,
+                p.x,
+                quote.cost,
+                before - sim.money
+            ));
+        }
+        quoted += quote.cost;
+    }
+    let r = sim.build_transport(Kind::ElevatorStandard, ELEVATOR_X, 1, 3);
+    if !r.ok {
+        return Err(format!(
+            "elevator refused: {}",
+            r.reason.unwrap_or_default()
+        ));
+    }
+    let elevator = cat
+        .facilities
+        .iter()
+        .find(|f| f.key == "elevatorStandard")
+        .ok_or("the catalog lists no elevatorStandard")?;
+    // An elevator's price is its base plus the per-floor cost for each floor
+    // past its first (catalog field `transportFloorCost`).
+    quoted += elevator.cost + 2.0 * cat.economy.transport_floor_cost;
+    let spent = start - sim.money;
+    Ok((sim, spent, quoted))
+}
+
+/// Fail with `what` unless `ok`.
+fn check(ok: bool, what: &str) -> Result<(), String> {
+    if ok {
+        Ok(())
+    } else {
+        Err(what.to_string())
+    }
+}
+
+/// The player's edit commands on a founded tower, each checked for the
+/// money it moves against the catalog: cars, an elevator extension, rent,
+/// sales, the choice and bridging calls, and a `.TDT` round trip.
+pub fn edit(sim: &mut Simulation) -> Result<(), String> {
+    let cat = catalog(sim.mode);
+    let elevator = sim
+        .tower
+        .transport_at(1, ELEVATOR_X)
+        .map(|t| t.id)
+        .ok_or("no elevator at the lobby")?;
+    let r = sim.add_car(elevator);
+    check(
+        r.ok && r.delta == -cat.economy.add_car_cost,
+        "add_car charges the quoted price",
+    )?;
+    let r = sim.remove_car(elevator);
+    check(
+        r.ok && r.delta == cat.economy.car_resale_refund,
+        "remove_car refunds the quoted refund",
+    )?;
+    let r = sim.remove_car(elevator);
+    check(!r.ok && r.delta == 0.0, "the last car stays")?;
+
+    for x in ELEVATOR_X..ELEVATOR_X + 6 {
+        check(sim.build(Kind::Floor, 4, x).ok, "floor tiles on floor 4")?;
+    }
+    let r = sim.extend_transport(elevator, ExtendEnd::Up, 4, None);
+    check(
+        r.charge.ok && r.top == 4 && r.added == 1,
+        "the elevator extends one floor",
+    )?;
+    check(
+        r.charge.delta == -cat.economy.transport_floor_cost,
+        "an extension charges the quoted floor cost",
+    )?;
+
+    let office = |sim: &Simulation, x| sim.tower.unit_at(2, x).map(|u| u.id);
+    let a = office(sim, 106).ok_or("no office at 2,106")?;
+    let b = office(sim, 115).ok_or("no office at 2,115")?;
+    check(sim.adjust_rent(a, 1).is_some(), "adjust_rent on an office")?;
+    check(sim.set_no_rate(b), "set_no_rate on an office")?;
+    let price = sim.price_unit(b, 10_000.0);
+    check(price.is_some(), "price_unit on an office")?;
+    let batch = sim
+        .apply_rent_batch(Kind::Office, BatchTarget::Default, false)
+        .ok_or("apply_rent_batch on offices")?;
+    check(batch.matched == 4, "the batch sees the four offices")?;
+
+    let before = sim.money;
+    let sold = sim
+        .tower
+        .unit_at(3, 115)
+        .map(|u| u.id)
+        .ok_or("no office at 3,115")?;
+    let r = sim.remove_facility(sold, RemovalMethod::Sell);
+    check(
+        r.ok && r.delta > 0.0 && sim.money == before + r.delta,
+        "selling refunds",
+    )?;
+    let before = sim.money;
+    check(
+        sim.sell_at(3, 106) && sim.money > before,
+        "sell_at sells the office on the tile",
+    )?;
+    check(
+        sim.tower
+            .unit_at(3, 115)
+            .is_none_or(|u| u.kind.is_structural()),
+        "the sold office is gone",
+    )?;
+
+    // Classic always bridges, and no emergency is pending, so these change
+    // nothing; a host may still call them.
+    check(
+        sim.toggle_auto_bridge() && sim.auto_bridge,
+        "Classic always bridges",
+    )?;
+    let money = sim.money;
+    sim.resolve_choice(false);
+    check(sim.money == money, "resolving no choice changes nothing")?;
+    check(
+        sim.set_film_policy(a, "auto").is_none(),
+        "an office has no film policy",
+    )?;
+
+    let tdt = export_tdt(&sim.serialize().to_string())?;
+    let (save, _warnings) = import_tdt(&tdt, "SMOKE.TDT")?;
+    let save: Value = serde_json::from_str(&save).map_err(|e| e.to_string())?;
+    let from_tdt = deserialize(&save)?;
+    // The 1994 format stores floors its own way and orders units by floor,
+    // so compare the rooms as a set.
+    let rooms = |sim: &Simulation| {
+        let mut v: Vec<_> = sim
+            .tower
+            .units
+            .iter()
+            .filter(|u| !u.kind.is_structural())
+            .map(|u| (u.kind.as_str(), u.floor, u.x))
+            .collect();
+        v.sort();
+        v
+    };
+    check(
+        rooms(&from_tdt) == rooms(sim),
+        "a .TDT round trip keeps every room where it stood",
+    )?;
+    Ok(())
+}
+
+/// The event catalog both engines are held to, checked once.
+fn event_catalog() -> Result<Value, String> {
+    let c: Value = serde_json::from_str(CATALOG_JSON).map_err(|e| e.to_string())?;
+    check_catalog(&c)?;
+    Ok(c)
+}
+
+/// Advance `minutes` of game time in one-minute frames, the way a frame loop
+/// would, draining and checking the gameplay events after every frame.
+/// Returns the number of events drained.
+pub fn advance(sim: &mut Simulation, minutes: u32, events: &Value) -> Result<usize, String> {
+    let mut n = 0;
+    for _ in 0..minutes {
+        sim.tick(1.0);
+        for e in sim.gameplay.drain() {
+            check_event(events, &e.to_json())?;
+            n += 1;
+        }
+    }
+    if sim.gameplay.dropped > 0 {
+        return Err(format!(
+            "{} gameplay events were dropped",
+            sim.gameplay.dropped
+        ));
+    }
+    Ok(n)
+}
+
+/// Save to a `.vctower` file and load it back. The loaded game must hash
+/// the same as the one that wrote it.
+pub fn round_trip(sim: &Simulation) -> Result<(Simulation, usize), String> {
+    let bytes = encode_simulation_vctower(sim, APP_VERSION, SAVED_AT_MS)?;
+    let text = std::str::from_utf8(&bytes).map_err(|e| e.to_string())?;
+    let raw = decode_vctower(text)?;
+    if raw["appVersion"] != APP_VERSION {
+        return Err(format!("the save is stamped {}", raw["appVersion"]));
+    }
+    let loaded = deserialize(&raw)?;
+    let (a, b) = (digest(&state_view(sim)), digest(&state_view(&loaded)));
+    if a != b {
+        return Err(format!("the loaded game hashes {b}, the saved one {a}"));
+    }
+    Ok((loaded, bytes.len()))
+}
+
+/// The whole smoke run: found, play two days, save, load, and play a third
+/// day. A save carries the tower, not the live crowd or the elevator
+/// dispatch (`conformance/README.md`, `reload`), so a loaded game restarts
+/// them and need not track the game that wrote it; two loads of the same
+/// save must track each other exactly.
+pub fn smoke(seed: u32) -> Result<Report, String> {
+    let events = event_catalog()?;
+    let (mut sim, spent, quoted) = found(seed)?;
+    if spent != quoted {
+        return Err(format!(
+            "the opening build cost {spent}, the catalog quoted {quoted}"
+        ));
+    }
+    edit(&mut sim)?;
+    let start_day = sim.clock.day();
+    let mut drained = advance(&mut sim, 2 * 1440, &events)?;
+    if sim.clock.day() != start_day + 2 {
+        return Err(format!(
+            "two days from day {start_day} reached day {}",
+            sim.clock.day()
+        ));
+    }
+    let (mut first, save_bytes) = round_trip(&sim)?;
+    let (mut second, _) = round_trip(&sim)?;
+    drained += advance(&mut first, 1440, &events)?;
+    advance(&mut second, 1440, &events)?;
+    let (a, b) = (digest(&state_view(&first)), digest(&state_view(&second)));
+    if a != b {
+        return Err(format!(
+            "two loads of one save differ a day later: {a} and {b}"
+        ));
+    }
+    Ok(Report {
+        spent,
+        quoted,
+        day: first.clock.day(),
+        population: first.population(),
+        money: first.money,
+        events: drained,
+        state: a,
+        save_bytes,
+    })
+}
+
+/// Replay one scenario of the conformance suite through the engine's own
+/// runner and compare every checkpoint with the lock, as the referee does.
+/// `conformance` is the suite's directory; a scenario that starts from a
+/// fixture also reads the fixture from the directory above it.
+pub fn replay(conformance: &Path, id: &str) -> Result<usize, String> {
+    let read = |p: &Path| {
+        std::fs::read_to_string(p).map_err(|e| format!("cannot read {}: {e}", p.display()))
+    };
+    let lock: Value = serde_json::from_str(&read(&conformance.join("expected.json"))?)
+        .map_err(|e| e.to_string())?;
+    let want: Vec<Checkpoint> = serde_json::from_value(lock["scenarios"][id].clone())
+        .map_err(|e| format!("lock entry {id}: {e}"))?;
+    let scenario = Scenario::parse(&read(
+        &conformance.join("scenarios").join(format!("{id}.json")),
+    )?)?;
+    let run = run_scenario(&scenario, &conformance.join(".."));
+    if let Some(e) = run.error {
+        return Err(format!("{id}: {e:?}"));
+    }
+    if run.checkpoints != want {
+        let at = run
+            .checkpoints
+            .iter()
+            .zip(&want)
+            .position(|(a, b)| a != b)
+            .unwrap_or(want.len().min(run.checkpoints.len()));
+        return Err(format!("{id}: diverges from the lock at checkpoint {at}"));
+    }
+    Ok(want.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn conformance_dir() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../conformance")
+    }
+
+    #[test]
+    fn the_smoke_run_passes() {
+        let r = smoke(SEED).expect("smoke run");
+        assert_eq!(r.spent, r.quoted);
+        assert!(r.spent > 0.0);
+        assert!(r.save_bytes > 0);
+        assert!(
+            r.population > 0,
+            "offices with an elevator fill up in two days"
+        );
+    }
+
+    #[test]
+    fn the_same_seed_and_commands_give_the_same_game() {
+        let a = smoke(SEED).expect("first run");
+        let b = smoke(SEED).expect("second run");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn a_refused_placement_charges_nothing() {
+        let (mut sim, _, _) = found(SEED).expect("found");
+        let before = sim.money;
+        let quote = sim.can_build(Kind::Office, 2, 106);
+        assert!(!quote.ok, "the tile is taken");
+        let r = sim.build(Kind::Office, 2, 106);
+        assert!(!r.ok);
+        assert_eq!(r.reason, quote.reason);
+        assert_eq!(sim.money, before);
+    }
+
+    #[test]
+    fn a_damaged_file_is_refused_not_panicked_on() {
+        assert!(decode_vctower("VCTOWER1\nnot base64 of a deflated save\n").is_err());
+        assert!(decode_vctower("").is_err());
+        // A file that decodes but holds damaged fields is not refused: the
+        // loader coerces them the way the web game's loader does.
+        assert!(deserialize(&serde_json::json!({ "units": "no" })).is_ok());
+    }
+
+    #[test]
+    fn a_modern_game_starts_with_the_host_settings() {
+        use verticopolis_engine::clock::CalendarKind;
+        let mut sim = Simulation::new_game_with(SEED, GameMode::Modern, CalendarKind::Canon, true);
+        assert!(!sim.auto_bridge, "founded unbridged");
+        assert!(
+            sim.toggle_auto_bridge(),
+            "Modern lets the player switch it back on"
+        );
+        let cat = catalog(GameMode::Modern);
+        assert_eq!(sim.money, cat.economy.starting_money);
+        assert!(cat.economy.auto_bridge_toggleable);
+    }
+
+    #[test]
+    fn a_new_game_scenario_matches_the_lock() {
+        let n = replay(&conformance_dir(), "starter-classic").expect("starter-classic");
+        assert!(n > 1);
+    }
+
+    #[test]
+    fn a_missing_scenario_is_an_error() {
+        assert!(replay(&conformance_dir(), "no-such-scenario").is_err());
+    }
+}
