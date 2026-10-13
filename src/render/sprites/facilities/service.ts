@@ -1,5 +1,6 @@
 import type { Unit } from "../../../engine/types";
 import { ceilingFixture, personHiVis, personSeated, personStanding, roomGlow, SKIN } from "../../pixelSprites/common";
+import { layerBreak, layerEnd } from "../../pixelSprites/layers";
 import { rand, serviceLabel, type DrawCtx } from "../common";
 import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./serviceKit";
 
@@ -41,18 +42,24 @@ export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: num
       Fu(mx + 1, my + 1, 6, 1, "#2A4A3A");
     }
   }
-  // Console desk with a seated guard behind it.
-  box(F, 58, fy - 8, 26, 8, "#2A3550");
-  F(58, fy - 8, 26, 1, "#3E4A66");
-  personSeated(ctx, sx(66), sy(fy - 8), (Math.round(x) * 3 + 5) | 0);
-  // Brass badge shield, key rack, and the red alarm light.
-  F(60, fy - 14, 6, 6, "#D8B05A");
-  F(62, fy - 13, 2, 4, "#8A6A2A");
+  // The key rack and the red alarm light hang on the wall. They sit clear of
+  // the console, the guard and the badge, so drawing them first changes no
+  // pixel and keeps them on the shell.
   F(78, 8, 8, 5, "#5A4A36");
   for (let k = 0; k < 4; k++) Fu(79 + k * 2, 13, 1, 2, "#D8B05A"); // key rack pins, one object repeated
   F(W - 8, 7, 4, 4, "#E85D5D");
   glow(F, W - 6, 9, "#FF6B6B");
-  // A warm ceiling light over the console keys on the lit (evening) state.
+  layerBreak(ctx); // the shell ends; the console, guard and badge follow
+  // Console desk with a seated guard behind it.
+  box(F, 58, fy - 8, 26, 8, "#2A3550");
+  F(58, fy - 8, 26, 1, "#3E4A66");
+  personSeated(ctx, sx(66), sy(fy - 8), (Math.round(x) * 3 + 5) | 0);
+  // Brass badge shield.
+  F(60, fy - 14, 6, 6, "#D8B05A");
+  F(62, fy - 13, 2, 4, "#8A6A2A");
+  // A warm ceiling light over the console keys on the lit (evening) state. It
+  // belongs to the shell but draws last, so it follows the furniture's end.
+  layerEnd(ctx);
   ceilingFixture(ctx, x, y, w, d.lit);
 }
 
@@ -76,6 +83,7 @@ export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: numb
   F(6, 8, 14, 14, "#F4F0EC");
   F(10, 10, 6, 10, "#D6342F");
   F(7, 13, 12, 4, "#D6342F");
+  layerBreak(ctx); // the shell ends; the beds, equipment and staff follow
   // First curtained exam bed with a resting patient head, blanket, and rail.
   box(F, 28, fy - 9, 26, 9, "#DCE2E8");
   F(28, fy - 9, 26, 1, "#F0F4F8");
@@ -133,6 +141,7 @@ export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h:
   const fy = RH - 6;
   wallp(F, 0, 0, W, fy, "#D8D0BE", false);
   floorb(F, 0, fy, W, 6, "#B7AE98");
+  layerBreak(ctx); // the shell ends; the shelf, cart, mop and housekeeper follow
   // Linen shelf with folded white and blue linens.
   box(F, 4, 6, 30, fy - 8, "#9A8468");
   const linens = ["#F4F0EC", "#CFE0FF", "#F4F0EC", "#E8D8C0"];
@@ -159,6 +168,7 @@ export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h:
   F(W - 20, fy - 11, 12, 3, "#F4F0EC");
   // Standing housekeeper by the cart (the teal cart carries the uniform read).
   personStanding(ctx, sx(38), sy(fy), (Math.round(x) * 3 + 3) | 0);
+  layerEnd(ctx); // the ceiling light belongs to the shell but draws last
   ceilingFixture(ctx, x, y, w, d.lit);
 }
 
@@ -418,6 +428,7 @@ export function drawMetro(d: DrawCtx, x: number, y: number, w: number, h: number
   f(24, 44, 32, 1, "#E8C14A");
   f(24, 48, 38, 1, "#6bd47a");
   for (let i = 0; i < 6; i++) f(26 + i * 7, 40, 2, 2, "#F4F0E4");
+  layerBreak(ctx); // the shell ends; the benches, vending machines and bins follow
   // Deck furniture on the far platform: wooden benches, a vending machine on
   // a longer cadence, and a bin. The train slides in FRONT of these.
   for (let bx = 110; bx < W - 24; bx += 100) {
@@ -436,6 +447,9 @@ export function drawMetro(d: DrawCtx, x: number, y: number, w: number, h: number
     f(tx, deckY - 6, 6, 6, "#4E5A50");
     f(tx + 1, deckY - 6, 4, 1, "#2E3A30");
   }
+  // The furniture ends here: the exit stairs, the deck and the trough are
+  // structure drawn over it, so the depth layers put them on the shell.
+  layerEnd(ctx);
   // WAY OUT at the right end: green sign over stair steps rising out of frame.
   const ex = W - 46;
   box(f, ex, 30, 26, 10, "#3E7E4E");

@@ -3,7 +3,7 @@ import type { BakeResult, ImageRef } from "./bake";
 import { variantPlacements, roomKinds, ORIGIN_SEEDED, RECYCLE_STEPS, PARKING_CAR_COLORS } from "./catalog";
 import { CAR_SEEDS, SKYLINE_FILLS, SKY_COLUMNS, STREET_CAR_SEEDS, BUILDS } from "./catalogExtras";
 import { pack, type PackedSlice } from "./pack";
-import { blank, type Image } from "./pixels";
+import { blank, crop, over, sameImage, type Image } from "./pixels";
 import { encodePng } from "./png";
 import { blit, scaleNearest } from "./raster";
 import {
@@ -12,6 +12,8 @@ import {
   ATLAS_SCALES,
   ATLAS_SCHEMA_VERSION,
   type AtlasManifest,
+  type DepthLayerChain,
+  type DepthLayers,
   type FrameRecord,
   type LayerRef,
   type Placed,
@@ -66,6 +68,7 @@ export function signature(): AtlasManifest["signature"] {
       parkingRoll: "a space holds a car when hash(int32(id * 31)) < parkingUse, where hash(n) is: x = int32(n * 2654435761) with the product taken as a float64 (IEEE double) multiply; x = imul32(x ^ (x >>> 15), 0x2c1b3c6d); x = imul32(x ^ (x >>> 13), 0x297a2d39); (x ^ (x >>> 16)) as unsigned / 2^32. int32(v) truncates v toward zero and wraps it modulo 2^32 to a signed 32-bit integer (JavaScript's v | 0); imul32 is a 32-bit integer multiply; ^ is a 32-bit xor and >>> a logical (zero-filling) right shift on the 32-bit pattern, so a negative x shifts in zeros. The first step is not imul32: the two can differ once the product's magnitude passes 2^53",
       cinema: "the cinema's marquee and screen read the animation clock; the web keeps whatever phase its last re-bake caught, the atlas bakes phase 0",
       originSeeded: `${[...ORIGIN_SEEDED].join(", ")}: a few details (staff shirts, skyline windows, climbing holds) follow the web's draw origin; the atlas carries the per-unit look at origin 0, 0`,
+      layers: "a room frame may carry 'layers' for drawing with depth: to show n visible occupants draw the 'shell' parts, its 'chains.occupants.shell' steps 1..min(n, len - 1), then the 'furniture' parts and its 'chains.occupants.furniture' steps the same way, each source-over; the result equals the frame's parts plus its occupant steps 1..n exactly. 'soft' (with 'chains.occupants.soft') is an optional furniture picture that keeps glows and soft shadows translucent; over the shell it rounds a step or two away from the frame's parts. A frame without 'layers' (vacancy, closed and gutted rooms, and the kinds whose art marks no split) is drawn flat",
     },
   };
 }
@@ -93,17 +96,33 @@ export interface Archive {
   zip: Uint8Array;
 }
 
+/**
+ * Pack the frame images, then the depth layers' own images on pages of their
+ * own after them. The frame images pack exactly as they would in a bake with
+ * no layers, so adding layers never moves a frame's part or changes a byte of
+ * its pages.
+ */
+function packGroups(bake: BakeResult, pageSize: number): { pages: number; placements: PackedSlice[][] } {
+  const split = bake.frameImages ?? bake.images.length;
+  if (!(Number.isInteger(split) && split >= 0 && split <= bake.images.length)) throw new Error(`frameImages ${split} is outside 0..${bake.images.length}`);
+  const group = (from: number, to: number) => pack(
+    bake.images.slice(from, to).map((img, i) => ({ id: from + i, w: img.w, h: img.h })),
+    pageSize,
+    ATLAS_PADDING,
+  );
+  const framesPacked = group(0, split);
+  const layersPacked = group(split, bake.images.length);
+  const shifted = layersPacked.placements.map((list) => list.map((sl) => ({ ...sl, rect: { ...sl.rect, page: sl.rect.page + framesPacked.pages } })));
+  return { pages: framesPacked.pages + layersPacked.pages, placements: [...framesPacked.placements, ...shifted] };
+}
+
 export function buildArchive(
   bake: BakeResult,
   info: ArchiveInfo,
   onProgress?: (msg: string) => void,
   pageSize: number = ATLAS_PAGE_BASE,
 ): Archive {
-  const packed = pack(
-    bake.images.map((img, id) => ({ id, w: img.w, h: img.h })),
-    pageSize,
-    ATLAS_PADDING,
-  );
+  const packed = packGroups(bake, pageSize);
   onProgress?.(`packed ${bake.images.length} images into ${packed.pages} pages`);
   const pages: Image[] = Array.from({ length: packed.pages }, () => blank(pageSize, pageSize));
   const normalPages: Image[] = Array.from({ length: packed.pages }, () => flatNormals(pageSize));
@@ -126,6 +145,21 @@ export function buildArchive(
     if (f.overlays) {
       rec.overlays = {};
       for (const [k, o] of Object.entries(f.overlays)) rec.overlays[k] = layerOf(o, packed.placements);
+    }
+    if (f.layers) {
+      const parts = (ref: ImageRef | null): Placed[] => (ref ? placedOf(ref, packed.placements[ref.id]) : []);
+      const steps = (list: (ImageRef | null)[]) => list.map((s) => layerOf(s, packed.placements));
+      const layers: DepthLayers = { shell: parts(f.layers.shell), furniture: parts(f.layers.furniture) };
+      if ("soft" in f.layers) layers.soft = parts(f.layers.soft ?? null);
+      if (f.layers.chains) {
+        layers.chains = {};
+        for (const [k, c] of Object.entries(f.layers.chains)) {
+          const chain: DepthLayerChain = { shell: steps(c.shell), furniture: steps(c.furniture) };
+          if (c.soft) chain.soft = steps(c.soft);
+          layers.chains[k] = chain;
+        }
+      }
+      rec.layers = layers;
     }
     frames[f.name] = rec;
   }
@@ -204,6 +238,147 @@ export function checkPages(bake: Pick<BakeResult, "images" | "normals">, archive
     if (list.length === 0 || !list.every((s) => matches(id, s))) bad.push(id);
   });
   return bad;
+}
+
+/** Draw `parts` from the 1x `pages` onto `dst` source-over. */
+function drawParts(dst: Image, pages: readonly Image[], parts: readonly Placed[]): void {
+  for (const p of parts) over(dst, crop(pages[p.rect.page], p.rect.x, p.rect.y, p.rect.w, p.rect.h), p.dx, p.dy);
+}
+
+/** Draw a chain step (or nothing for a null or missing one). */
+function drawStep(dst: Image, pages: readonly Image[], step: LayerRef | undefined): void {
+  if (step) drawParts(dst, pages, [step]);
+}
+
+/** Every picture a layered frame can show, read back out of the pages the
+ *  way a frontend reads them: for each chain input `n` from 0 to the longest
+ *  of its step lists, the flat frame plus steps `1..n`, the exact depth split
+ *  (shell and its steps, then furniture and its steps) and, when the frame
+ *  has one, the soft split. `visit` returns false to stop early. */
+function eachLayeredPicture(
+  archive: Pick<Archive, "manifest" | "pages">,
+  visit: (name: string, n: number, flat: Image, exact: Image, soft: { picture: Image; layer: Image } | null) => boolean,
+): void {
+  const pages = archive.pages;
+  for (const [name, rec] of Object.entries(archive.manifest.frames)) {
+    const layers = rec.layers;
+    if (!layers) continue;
+    // A frame with no chain still has its own picture at n = 0.
+    const keys = Object.keys(rec.chains ?? {});
+    for (const key of keys.length > 0 ? keys : [""]) {
+      const flatSteps = rec.chains?.[key]?.steps ?? [null];
+      const split = layers.chains?.[key] ?? { shell: [null], furniture: [null] };
+      const hasSoft = layers.soft !== undefined && (key === "" || split.soft !== undefined);
+      const top = Math.max(flatSteps.length, split.shell.length, split.furniture.length, split.soft?.length ?? 0) - 1;
+      const flat = blank(rec.w, rec.h);
+      drawParts(flat, pages, rec.parts);
+      const shell = blank(rec.w, rec.h);
+      drawParts(shell, pages, layers.shell);
+      const furniture = blank(rec.w, rec.h);
+      drawParts(furniture, pages, layers.furniture);
+      const soft = blank(rec.w, rec.h);
+      if (hasSoft) drawParts(soft, pages, layers.soft ?? []);
+      for (let n = 0; n <= top; n++) {
+        if (n > 0) {
+          drawStep(flat, pages, flatSteps[n] ?? undefined);
+          drawStep(shell, pages, split.shell[n] ?? undefined);
+          drawStep(furniture, pages, split.furniture[n] ?? undefined);
+          if (hasSoft) drawStep(soft, pages, split.soft?.[n] ?? undefined);
+        }
+        const exact = { w: rec.w, h: rec.h, data: shell.data.slice() };
+        over(exact, furniture, 0, 0);
+        let softPicture: { picture: Image; layer: Image } | null = null;
+        if (hasSoft) {
+          const picture = { w: rec.w, h: rec.h, data: shell.data.slice() };
+          over(picture, soft, 0, 0);
+          softPicture = { picture, layer: soft };
+        }
+        if (!visit(name, n, flat, exact, softPicture)) break;
+      }
+    }
+  }
+}
+
+/** Names of the frames whose depth layers break the manifest's rules (chain
+ *  keys, at most one chain and no overlays, a null step 0, soft steps exactly
+ *  where there is soft furniture) or, read back out of the packed pages
+ *  through the manifest the way a frontend reads them, do not give back the
+ *  frame's own pixels for some occupant count; empty when every layered frame
+ *  passes. */
+export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): string[] {
+  const bad = new Set<string>();
+  // A layered frame has at most one chain and no overlays; its chain has a
+  // depth split (and no split lacks its chain), each list starts with a null
+  // step 0, and soft furniture comes with soft steps for its chain.
+  for (const [name, rec] of Object.entries(archive.manifest.frames)) {
+    const layers = rec.layers;
+    if (!layers) continue;
+    const flat = JSON.stringify(Object.keys(rec.chains ?? {}).sort());
+    const depth = JSON.stringify(Object.keys(layers.chains ?? {}).sort());
+    const soft = layers.soft !== undefined;
+    const lists = Object.values(layers.chains ?? {}).flatMap((c) => [c.shell, c.furniture, ...(c.soft ? [c.soft] : [])]);
+    const oneChainNoOverlays = Object.keys(rec.chains ?? {}).length <= 1 && Object.keys(rec.overlays ?? {}).length === 0;
+    if (flat !== depth || !oneChainNoOverlays || lists.some((l) => l[0] !== null) || Object.values(layers.chains ?? {}).some((c) => (c.soft !== undefined) !== soft)) bad.add(name);
+  }
+  eachLayeredPicture(archive, (name, _n, flat, exact) => {
+    if (sameImage(flat, exact)) return true;
+    bad.add(name);
+    return false;
+  });
+  return [...bad];
+}
+
+/** The largest channel difference (of 255) the soft furniture may show
+ *  against the flat frame before the export refuses the atlas. Translucent
+ *  paint over the shell rounds a step or two away from the same paint baked
+ *  over it; anything far past that means the soft pass drew something else. */
+export const SOFT_DRIFT_LIMIT = 4;
+
+/** How far the soft furniture strays from the flat pictures it stands in
+ *  for: pictures compared (one per frame and occupant count), the soft
+ *  furniture's own pixels in them, how many of those differ from the flat
+ *  picture, how many pixels outside it differ (none, unless the soft pass
+ *  missed part of the furniture), the largest difference in any channel
+ *  (0..255) anywhere, and the frame that shows it (or the first with a
+ *  pixel outside). A pixel counts once per picture it shows in. */
+export function softLayerDrift(archive: Pick<Archive, "manifest" | "pages">): { frames: number; pictures: number; pixels: number; differing: number; outside: number; maxDelta: number; worst: string } {
+  const frames = new Set<string>();
+  const out = { frames: 0, pictures: 0, pixels: 0, differing: 0, outside: 0, maxDelta: 0, worst: "" };
+  eachLayeredPicture(archive, (name, _n, flat, _exact, soft) => {
+    if (!soft) return true;
+    frames.add(name);
+    out.pictures++;
+    for (let i = 0; i < flat.data.length; i += 4) {
+      const covered = soft.layer.data[i + 3] > 0;
+      if (covered) out.pixels++;
+      let d = 0;
+      for (let c = 0; c < 4; c++) d = Math.max(d, Math.abs(flat.data[i + c] - soft.picture.data[i + c]));
+      if (d > 0 && covered) out.differing++;
+      if (d > 0 && !covered && out.outside++ === 0) out.worst = name;
+      if (d > out.maxDelta && out.outside === 0) out.worst = name;
+      if (d > out.maxDelta) out.maxDelta = d;
+    }
+    return true;
+  });
+  out.frames = frames.size;
+  return out;
+}
+
+/** Room kinds whose frames carry depth layers but never any furniture. Shell
+ *  plus furniture equals the flat frame whatever the shell holds, so a bake
+ *  that failed to take the furniture out (a shell that still shows it) would
+ *  pass {@link checkLayers}; every kind that splits has furniture in some
+ *  frame, so an empty kind means the split did not happen. */
+export function kindsWithoutFurniture(manifest: Pick<AtlasManifest, "frames">): string[] {
+  const split = new Set<string>();
+  const furnished = new Set<string>();
+  for (const rec of Object.values(manifest.frames)) {
+    if (!rec.layers) continue;
+    const kind = String(rec.keys.kind);
+    split.add(kind);
+    if (rec.layers.furniture.length > 0) furnished.add(kind);
+  }
+  return [...split].filter((k) => !furnished.has(k)).sort();
 }
 
 /** A transparent page whose pixels still decode as the flat normal. */

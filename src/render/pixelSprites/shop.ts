@@ -2,6 +2,7 @@ import type { Unit } from "../../engine/types";
 import { SHIRTS, closedShutter, person, shell, type RoomCtx } from "./common";
 import { SHOP_LOOKS } from "./shop.looks";
 import { drawShopInterior, drawShopSignage, type ShopGeom } from "./shop.interiors";
+import { layerBreak } from "./layers";
 
 /**
  * Retail shop art plus its canon subtype look table. Every shop keeps the two
@@ -37,6 +38,7 @@ export function shop(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: nu
     ctx.fillRect(sx, y, 5, band);
   }
   if (look === undefined) {
+    layerBreak(ctx); // the shell ends; the shelves and the shopper follow
     // Legacy generic shop: two shelves of colorful goods, kept verbatim.
     const goods = ["#e85d5d", "#5db4e8", "#6bd47a", "#e8c14a", "#b07fe0", "#e88f4a"];
     for (let row = 0; row < 2; row++) {
@@ -77,5 +79,6 @@ export function shop(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: nu
     lit: d.lit,
   };
   drawShopSignage(ctx, geom, accent);
+  layerBreak(ctx); // the shell ends; the trade's fittings and customers follow
   drawShopInterior(ctx, look, geom);
 }
