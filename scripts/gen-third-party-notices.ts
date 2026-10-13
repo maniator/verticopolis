@@ -125,7 +125,15 @@ for (const map of maps) {
       if (inRepo.includes("/node_modules/") && !packageDirFromSource(inRepo)) {
         fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which is under node_modules but names no package`);
       }
-      sources.push(inRepo);
+      // A stale or corrupt map can name a file that is not there; it must not
+      // stand as evidence that a package ships. Two bundlers write sources one
+      // level off, relative to dist/ itself (workbox-build's temporary
+      // directory and Vite's worker bundles), so a path under dist/ that is
+      // missing is read again from the repository root.
+      let onDisk = inRepo;
+      if (!existsSync(ROOT + onDisk) && onDisk.startsWith("/dist/")) onDisk = onDisk.slice("/dist".length);
+      if (!existsSync(ROOT + onDisk)) fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which does not exist`);
+      sources.push(onDisk);
     }
     // An id that names no file (a virtual module, a `\0` helper, a URL) could
     // carry a tool's code; it passes only when `INJECTED_CODE` attributes it.
@@ -135,18 +143,9 @@ for (const map of maps) {
   }
 }
 
-// Package directories from the maps. workbox-build bundles the service worker
-// in a temporary directory one level below the repo, so its relative sources
-// resolve under dist/ instead of the repo root. Only for those, re-anchor the
-// same node_modules chain at the repo root (a nested copy stays nested). Any
-// other missing directory is an error.
+// Package directories from the maps; every source was checked on disk above.
 const dirs = new Map<string, string>(); // dir -> how it was found
-for (const found of collectPackageDirs(sources).map((rel) => ROOT + rel)) {
-  if (existsSync(found)) dirs.set(found, found);
-  else if (found.startsWith(`${DIST}/node_modules/`) && existsSync(join(ROOT, found.slice(DIST.length + 1)))) {
-    dirs.set(join(ROOT, found.slice(DIST.length + 1)).replace(/\\/g, "/"), found);
-  } else fail(`${found}: a sourcemap names this package directory, but it does not exist`);
-}
+for (const found of collectPackageDirs(sources).map((rel) => ROOT + rel)) dirs.set(found, found);
 // Node's lookup: the nearest node_modules/<pkg> from the package that loads it
 // (or the repo root), so a nested copy is the one read.
 function resolvePackage(pkg: string, from?: string): string {
