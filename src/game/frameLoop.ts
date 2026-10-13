@@ -9,7 +9,8 @@ import { hasBlockingModal, isEditorBusy, isSplashUp } from "./interactionState";
 import { IS_WRAPPED_BUILD } from "../platform";
 import { positionPanels } from "./panelAnchoring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
-import { gameplaySession, trackEmergencyChoice } from "../analytics";
+import { gameplaySession } from "../analytics";
+import { drainEngineEvents } from "../analyticsEngineBridge";
 
 /**
  * The per-frame simulation + throttled UI/audio refresh, split out of the
@@ -100,6 +101,11 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // modal freeze returns early on below (fps is a render metric, not a sim-tick
   // one).
   gameplaySession.noteFrame();
+  // Fold the engine's gameplay events into analytics (#873 phase 2): builds,
+  // stars, emergencies and their answers, pricing and capacity. Drained every
+  // frame and ahead of the modal freeze below, so an emergency answered in a
+  // modal reports on the next frame rather than when the freeze lifts.
+  drainEngineEvents(app.sim);
   // While a blocking modal is open, freeze time so nothing changes under it:
   // an emergency choice (canon: the modal pauses the game) must not auto-resolve
   // out from under the player, and the update prompt must not let a distracted
@@ -143,15 +149,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
     app.ui.update(app.sim);
     updateTraffic(app);
     app.onboarding.tick(); // advance the first-run checklist on real progress (no-op when inactive)
-    // Sample the tower's cumulative emergency counters for the session_emergencies
-    // summary (#611). The engine (EventSystem) owns the counts as plain integers
-    // and imports no analytics; the shell reads them off the public getter here
-    // (Simulation stays at its line ceiling, so no delegator is added), and the
-    // session accumulator banks a departing tower's tallies across a new game.
-    // Cheap: three ints on the throttled (~6Hz) path, so a fire's occurrence is
-    // captured without the engine ever reporting it.
-    const ec = app.sim.events.counts;
-    gameplaySession.noteEmergencyCounts(ec.fires, ec.firesGutRooms, ec.bombs);
+    gameplaySession.notePlaying(); // this session played: it reports session_emergencies
     tickInstallAffordance(app); // surface the install chip once the play-gate trips (self-terminating)
     if (IS_WRAPPED_BUILD) tickHostCommands(); // gray out shell menu items the game would refuse
     // Keep the open editor's live stats fresh. Refresh now patches only the
@@ -161,10 +159,10 @@ export function runFrame(app: GameApp, dtMs: number): void {
     if (app.selected && app.ui.isEditorOpen() && !isEditorBusy(app)) {
       app.refreshEditor();
     }
-    // A jingle on every star promotion (2★–5★), not just the TOWER win.
+    // A jingle on every star promotion (2★–5★), not just the TOWER win. The
+    // analytics side is the engine's star_reached, through the bridge.
     if (app.sim.star > app.lastStar) {
       app.lastStar = app.sim.star;
-      gameplaySession.noteStar(app.sim.star); // progression depth signal
       if (app.sim.star < 6) app.audio.sfx("promote");
     }
     // Auto-surfaced modals must never stack over the boot/return splash. A
@@ -183,12 +181,10 @@ export function runFrame(app: GameApp, dtMs: number): void {
       app.shownChoice = true;
       app.audio.sfx("error");
       app.ui.showEventChoice(pc.message, `$${pc.cost.toLocaleString()}`, (opt) => {
-        // The player answered (accept/decline). Only this click path reaches the
-        // telemetry; a timed-out auto-decline resolves in the sim without the
-        // modal callback, so it never emits (the absence of a choice, not a
-        // decline). `pc.kind` is stable while the modal is up (the freeze guard
-        // stops the sim ticking the choice away).
-        trackEmergencyChoice(pc.kind, opt);
+        // The player answered (accept/decline). The engine reports the
+        // resolution (emergency_resolved, source player) and the bridge sends
+        // emergency_choice from it; a timed-out auto-decline carries source
+        // timeout and reports nothing.
         app.sim.resolveChoice(opt);
         app.shownChoice = false;
       });

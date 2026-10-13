@@ -12,7 +12,6 @@ import { IS_WRAPPED_BUILD } from "../platform";
 import { noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
 import { shouldArm } from "../ui/Onboarding";
-import { gameplaySession } from "../analytics";
 import { isCrashed, isSplashUp } from "./interactionState";
 import type { UI } from "../ui/UI";
 
@@ -459,7 +458,6 @@ export class SaveLoad {
     // previous tower's scope and autosave into a namespace it never came from
     // (#736 F5, the account-leak class).
     if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(undefined);
-    gameplaySession.noteNewGame(mode); // funnel entry: a fresh tower was founded
     // Both rule-sets found an empty lot now, so the toast is the actionable
     // first-lobby cue (the engine's welcome log entry is rebased past by the UI
     // cursor, so the toast is the one visible signal). Keyed on tower state,

@@ -33,7 +33,28 @@ fn utf16_cmp(a: &str, b: &str) -> std::cmp::Ordering {
     a.encode_utf16().cmp(b.encode_utf16())
 }
 
-fn write_value(out: &mut String, v: &Value) {
+/// An array index as a JavaScript object key: `"0"` or a decimal without a
+/// leading zero, below 2^32 - 1. A JavaScript object visits such keys first,
+/// in numeric order, then its other keys in insertion order.
+fn array_index(k: &str) -> Option<u32> {
+    if k.is_empty() || (k.len() > 1 && k.starts_with('0')) || !k.bytes().all(|b| b.is_ascii_digit())
+    {
+        return None;
+    }
+    k.parse::<u32>().ok().filter(|&n| n != u32::MAX)
+}
+
+/// How `write_value` orders an object's keys.
+#[derive(Clone, Copy)]
+enum KeyOrder {
+    /// UTF-16 code unit order, the canonical text.
+    Sorted,
+    /// The order `JSON.stringify` visits a JavaScript object built with the
+    /// map's keys in insertion order.
+    Js,
+}
+
+fn write_value(out: &mut String, v: &Value, order: KeyOrder) {
     match v {
         Value::Null => out.push_str("null"),
         Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
@@ -49,13 +70,17 @@ fn write_value(out: &mut String, v: &Value) {
                 if i > 0 {
                     out.push(',');
                 }
-                write_value(out, item);
+                write_value(out, item, order);
             }
             out.push(']');
         }
         Value::Object(map) => {
             let mut keys: Vec<&String> = map.keys().collect();
-            keys.sort_by(|a, b| utf16_cmp(a, b));
+            match order {
+                KeyOrder::Sorted => keys.sort_by(|a, b| utf16_cmp(a, b)),
+                // Stable, so the other keys keep insertion order.
+                KeyOrder::Js => keys.sort_by_key(|k| array_index(k).map_or(1u64 << 32, u64::from)),
+            }
             out.push('{');
             for (i, k) in keys.iter().enumerate() {
                 if i > 0 {
@@ -63,7 +88,7 @@ fn write_value(out: &mut String, v: &Value) {
                 }
                 write_string(out, k);
                 out.push(':');
-                write_value(out, &map[*k]);
+                write_value(out, &map[*k], order);
             }
             out.push('}');
         }
@@ -74,7 +99,18 @@ fn write_value(out: &mut String, v: &Value) {
 /// callers leave absent fields out of the map before calling this.
 pub fn canonical_json(v: &Value) -> String {
     let mut out = String::new();
-    write_value(&mut out, v);
+    write_value(&mut out, v, KeyOrder::Sorted);
+    out
+}
+
+/// `JSON.stringify` of the value as JavaScript would hold it: every map in
+/// insertion order (serde_json's `preserve_order`), except that keys that are
+/// array indices come first in numeric order, as in any JavaScript object.
+/// Numbers and strings are written as in [`canonical_json`]. This is the text
+/// the web game's writers compress, so the engine's `.vctower` matches it.
+pub fn js_json(v: &Value) -> String {
+    let mut out = String::new();
+    write_value(&mut out, v, KeyOrder::Js);
     out
 }
 
@@ -97,6 +133,18 @@ mod tests {
     fn sorts_keys_by_utf16_units_at_every_depth() {
         let v = json!({"b": 1, "a": {"10": 1, "9": 2, "Z": 3}});
         assert_eq!(canonical_json(&v), r#"{"a":{"10":1,"9":2,"Z":3},"b":1}"#);
+    }
+
+    #[test]
+    fn js_order_puts_array_indices_first_then_insertion_order() {
+        let v: Value = serde_json::from_str(
+            r#"{"b":1,"10":2,"a":{"z":1,"y":2},"9":3,"01":4,"-1":5,"4294967295":6,"4294967294":7}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            js_json(&v),
+            r#"{"9":3,"10":2,"4294967294":7,"b":1,"a":{"z":1,"y":2},"01":4,"-1":5,"4294967295":6}"#
+        );
     }
 
     #[test]

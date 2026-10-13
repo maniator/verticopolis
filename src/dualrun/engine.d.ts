@@ -11,6 +11,11 @@ export class Engine {
     free(): void;
     [Symbol.dispose](): void;
     /**
+     * `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
+     * limit and the balance and pays for the car itself.
+     */
+    addCar(id: number): string;
+    /**
      * `adjustRent(id, dir)`: the new rent, or null when nothing moved.
      */
     adjustRent(id: number, dir: number): number | undefined;
@@ -70,6 +75,12 @@ export class Engine {
     emit(text: string, kind: string): void;
     evaluateStar(): void;
     /**
+     * `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
+     * as JSON `{ bottom, top }` text or null: JSON `{ ok, reason?, delta,
+     * bottom, top, added }`, the floors billed past the mark.
+     */
+    extendTransport(id: number, end: string, target_floor: number, hwm?: string | null): string;
+    /**
      * The number of units on fire.
      */
     fires(): number;
@@ -81,7 +92,9 @@ export class Engine {
     frameView(): Float64Array;
     /**
      * `Simulation.deserialize(JSON.parse(text))`: a serialized game, migrated
-     * and loaded. Nothing else the import path does (the founder mark) runs.
+     * and loaded, with a lone surrogate escape read as U+FFFD
+     * (`load::parse_save_json`). Nothing else the import path does (the
+     * founder mark) runs.
      * `markers`, when given, is JSON `{ lastHour, lastDay, lastQuarter,
      * lastMonth }`: the live engine's boundary markers, which a save does
      * not carry (a load rebuilds them from the clock, a founded game keeps
@@ -135,6 +148,15 @@ export class Engine {
      * `priceUnit(u, target)`: the new price, or null when not repriceable.
      */
     priceUnit(id: number, target: number): number | undefined;
+    /**
+     * `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
+     */
+    removeCar(id: number): string;
+    /**
+     * `removeFacility(id, method)`: the player's sell or bulldoze of a unit
+     * or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`.
+     */
+    removeFacility(id: number, method: string): string;
     /**
      * `tower.removeTransport(id)`: whether a shaft went.
      */
@@ -228,12 +250,23 @@ export class Engine {
 }
 
 /**
+ * Every price, size and build rule a frontend shows, resolved for `mode`
+ * (`classic` or `modern`), as canonical JSON in the shape of the `Catalog`
+ * type (declared in `src/engine/catalogTypes.ts`, read through `readCatalog`
+ * in `src/dualrun/catalog.ts`; see `verticopolis_engine::catalog`). It needs
+ * no running game.
+ */
+export function catalog(mode: string): string;
+
+/**
  * `encodeVctower(saveJson, appVersion, savedAtMs)`: the `.vctower` file
  * text for a serialized game (what `serialize` returns), stamped the way
  * `SaveGame.export` stamps it (`load::stamp_save`). Text that is not JSON,
- * a save that is not a tower, a time no `Date` holds and a build name that
- * reads as before 2.0 (which would mark the tower as a founder's) are
- * JavaScript errors.
+ * a save that is not a tower, a time no `Date` holds, a build name that
+ * reads as before 2.0 (which would mark the tower as a founder's) and a
+ * save whose JSON passes 32 MiB (more than a reader will hold) are
+ * JavaScript errors. A lone surrogate escape reads as U+FFFD
+ * (`load::parse_save_json`).
  */
 export function encodeVctower(save_json: string, app_version: string, saved_at_ms: number): string;
 

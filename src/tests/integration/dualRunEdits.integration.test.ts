@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resaleRefund } from "../../engine/econConfig";
+import { ECON, carResaleRefund, resaleRefund } from "../../engine/econConfig";
 import { hasWasmPackage, wasmRequired } from "../conformance/wasmEngine";
 import { Simulation } from "../../engine/Simulation";
 import { DualRun, FrameDriver, loadFixture } from "../dualrun/dualRunHarness";
@@ -40,28 +40,51 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
 
     // Tower edits from the editor card.
     const shaft = sim.tower.transportAt(30, 196)!;
-    expect(sim.tower.setCars(shaft.id, shaft.cars > 1 ? shaft.cars - 1 : 2)).toBe(true);
-    sim.money += 1000; // the UI refunds or charges the car after the engine moves it
+    // The engine-owned charges (#914): each command moves the money itself.
+    const cars = shaft.cars;
+    expect(sim.tower.setCars(shaft.id, 2)).toBe(cars !== 2); // a known count, so both commands land
+    expect(sim.addCar(shaft.id)).toEqual({ ok: true, delta: -ECON.addCarCost });
+    expect(sim.removeCar(shaft.id)).toEqual({ ok: true, delta: carResaleRefund() });
+    expect(shaft.cars).toBe(2);
+    expect(sim.tower.setCars(shaft.id, shaft.cars > 1 ? shaft.cars - 1 : 2)).toBe(true); // the raw edit stays free
+    sim.money += 1000; // a host's direct write is still mirrored as setMoney
     expect(sim.tower.setStop(shaft.id, 35, false)).toBe(true);
     expect(sim.tower.clearStops(shaft.id)).toBe(true);
     expect(sim.tower.setSchedule(shaft.id, { weekday: Array(24).fill(2), weekend: Array(24).fill(1) })).toBe(true);
     const grown = sim.tower.resizeTransport(shaft.id, 30, 47);
     expect(grown.ok).toBe(true);
     sim.money -= 5000;
+    // A billed drag: out two floors, back one (free), out again within the mark.
+    const hwm = { bottom: shaft.bottom, top: shaft.top };
+    const start = shaft.top;
+    const out = sim.extendTransport(shaft.id, "up", start + 2, hwm);
+    expect(out).toMatchObject({ ok: true, top: start + 2, added: 2, delta: -2 * ECON.transportFloorCost });
+    hwm.top = Math.max(hwm.top, out.top);
+    expect(sim.extendTransport(shaft.id, "up", out.top - 1, hwm)).toMatchObject({ ok: true, top: start + 1, delta: 0 });
+    expect(sim.extendTransport(shaft.id, "up", out.top, hwm)).toMatchObject({ ok: true, top: start + 2, added: 0, delta: 0 });
+    const money = sim.money;
+    sim.money = 0; // a broke press is refused in both engines
+    expect(sim.extendTransport(shaft.id, "up", shaft.top + 1).reason).toBe("Not enough money.");
+    expect(sim.addCar(shaft.id).reason).toBe("Not enough money.");
+    sim.money = money;
     expect(sim.tower.setLabel(office.id, "  Corner suite ")).toBe(true);
+    // A name cut through an emoji: both engines hold U+FFFD for the half (#936).
+    expect(sim.tower.setLabel(office.id, "Corner " + String.fromCharCode(0xd83c))).toBe(true);
+    expect(sim.tower.getUnit(office.id)?.label).toBe("Corner \uFFFD");
     sim.tower.towerName = "Dual Run Tower";
     sim.view = { tile: 180, floor: 12, zoom: 1.5 };
     drive.run(60);
     (sim.tower as { towerName?: string }).towerName = undefined; // the name cleared leaves the key out of the save
     expect(sim.tower.setLabel(office.id, "   ")).toBe(true); // back to the catalog name
 
-    // A sale and a bulldoze the way the UI does them: remove, then refund.
+    // A sale and a bulldoze the way the UI does them: the engine's removal
+    // command pays the refund.
     const sold = sim.tower.unitAt(58, 120)!;
-    expect(sim.tower.removeUnit(sold.id)).toBeDefined();
-    sim.money += resaleRefund(sold.kind);
+    expect(sim.removeFacility(sold.id, "sell")).toEqual({ ok: true, delta: resaleRefund(sold.kind) });
     const stairs = sim.tower.transportAt(58, 130)!;
-    expect(sim.tower.removeTransport(stairs.id)).toBeDefined();
-    sim.money += resaleRefund(stairs.kind);
+    expect(sim.removeFacility(stairs.id, "bulldoze")).toEqual({ ok: true, delta: resaleRefund(stairs.kind) });
+    const lobby = sim.tower.unitAt(1, 180)!;
+    expect(sim.removeFacility(lobby.id, "bulldoze").ok).toBe(false); // refused in both engines
     drive.run(60);
 
     // Undo: the app rebuilds the sim from a snapshot and adopts it.
@@ -74,10 +97,13 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     // 90 + 60 + 60 minutes before the restore, then 120 after it.
     expect(report.checkpoints).toBe(5);
     // The edits' gameplay events agree too: nine placements, three price
-    // changes (the hotel batch moves no price on this tower), the car count
-    // and the resize through the tower.
+    // changes (the hotel batch moves no price on this tower), the capacity
+    // changes (the two raw car counts, the first only when it moved the
+    // count, the paid car added and removed, the raw resize, and the drag's
+    // three moves; the refused presses report nothing) and the two removals,
+    // sold and bulldozed.
     expect(report.eventDivergences).toEqual([]);
-    expect(report.events).toBe(14);
+    expect(report.events).toBe(cars !== 2 ? 22 : 21);
   });
 
   it("a founded game edited before the shadow attaches still starts in step", () => {

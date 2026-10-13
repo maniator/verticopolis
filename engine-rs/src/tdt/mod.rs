@@ -60,7 +60,7 @@ pub fn import_tdt(bytes: &[u8], filename: &str) -> Result<(String, Vec<String>),
 /// (which serde_json refuses and `JSON.parse` reads as Infinity) cannot.
 pub fn export_tdt(save_json: &str) -> Result<Vec<u8>, String> {
     let save: serde_json::Value =
-        serde_json::from_str(save_json).map_err(|e| format!("save: {e}"))?;
+        crate::load::parse_save_json(save_json.as_bytes()).map_err(|e| format!("save: {e}"))?;
     export::build_tdt(&save)
         .map(|built| built.bytes)
         .map_err(|e| e.0)

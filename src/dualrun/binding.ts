@@ -1,4 +1,4 @@
-import type { Engine } from "./engine";
+import type { Engine, catalog } from "./engine";
 
 /**
  * The WASM binding's surface, as wasm-bindgen declares it from
@@ -11,6 +11,10 @@ export type WasmEngine = Engine;
 
 export interface WasmModule {
   Engine: typeof Engine;
+  /** The catalog for a mode as canonical JSON (`readCatalog` types it and
+   *  refuses a package without it). Optional here, so a host that never reads
+   *  the catalog still starts on a package built before it. */
+  catalog?: typeof catalog;
 }
 
 /** Every method the adapters call on an instance, and on the class. */
@@ -22,6 +26,7 @@ export const INSTANCE_METHODS = [
   "rerollSubtype", "applyRentBatch", "pendingChoice", "resolveChoice", "tick", "serialize", "stateView", "crowdView",
   "stateDigest", "crowdDigest", "frameView", "logSince", "elevatorTelemetry", "seedElevatorTelemetry", "advanceClock",
   "seedLoopMemos", "loopMemos", "housekeepingReport", "drainGameplayEvents", "gameplayEventsDropped",
+  "addCar", "removeCar", "extendTransport", "removeFacility",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 

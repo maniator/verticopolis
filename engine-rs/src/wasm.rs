@@ -39,6 +39,46 @@ fn build_result(r: crate::build::BuildResult) -> String {
     outcome(r.ok, r.reason.as_deref())
 }
 
+/// `ChargeResult` as the TypeScript spells it: `{ ok, reason?, delta }`.
+fn charge_json(r: &crate::charges::ChargeResult) -> Value {
+    let mut v = serde_json::json!({ "ok": r.ok, "delta": r.delta });
+    if let Some(reason) = &r.reason {
+        v["reason"] = Value::String(reason.clone());
+    }
+    v
+}
+
+/// `ExtendResult`: the charge plus `bottom`, `top` and `added`.
+fn extend_json(r: &crate::charges::ExtendResult) -> Value {
+    let mut v = charge_json(&r.charge);
+    v["bottom"] = r.bottom.into();
+    v["top"] = r.top.into();
+    v["added"] = r.added.into();
+    v
+}
+
+fn parse_extend_end(s: &str) -> Result<crate::charges::ExtendEnd, String> {
+    crate::charges::ExtendEnd::parse(s).ok_or_else(|| format!("end must be up or down, got {s}"))
+}
+
+fn parse_removal_method(s: &str) -> Result<crate::gameplay::RemovalMethod, String> {
+    crate::gameplay::RemovalMethod::parse(s)
+        .ok_or_else(|| format!("method must be sell or bulldoze, got {s}"))
+}
+
+/// A high-water mark as JSON `{ bottom, top }` text, whole floors.
+fn parse_hwm(text: &str) -> Result<(i64, i64), String> {
+    let v: Value = serde_json::from_str(text).map_err(|e| format!("hwm: {e}"))?;
+    let field = |name: &str| -> Result<i64, String> {
+        v.get(name)
+            .and_then(Value::as_f64)
+            .filter(|x| x.fract() == 0.0 && x.abs() < 9007199254740992.0)
+            .map(|x| x as i64)
+            .ok_or_else(|| format!("hwm: {name} must be a whole number"))
+    };
+    Ok((field("bottom")?, field("top")?))
+}
+
 /// `{ kind, cost, message }` for the choice the engine is waiting on.
 fn pending_json(kind: &str, cost: f64, message: &str) -> String {
     serde_json::json!({ "kind": kind, "cost": cost, "message": message }).to_string()
@@ -104,6 +144,21 @@ fn override_mode(raw: &mut Value, mode: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The catalog text for a mode, as [`catalog`] returns it.
+fn catalog_text(mode: &str) -> Result<String, String> {
+    Ok(crate::catalog::catalog_json(parse_mode(mode)?))
+}
+
+/// Every price, size and build rule a frontend shows, resolved for `mode`
+/// (`classic` or `modern`), as canonical JSON in the shape of the `Catalog`
+/// type (declared in `src/engine/catalogTypes.ts`, read through `readCatalog`
+/// in `src/dualrun/catalog.ts`; see `verticopolis_engine::catalog`). It needs
+/// no running game.
+#[wasm_bindgen]
+pub fn catalog(mode: &str) -> Result<String, JsError> {
+    catalog_text(mode).map_err(err)
+}
+
 /// One running simulation. Construct with `newGame`, `fromSave` or
 /// `fromVctower`; drive it with the command methods; read it back with
 /// `serialize` and the two hashed views.
@@ -139,7 +194,9 @@ impl Engine {
     }
 
     /// `Simulation.deserialize(JSON.parse(text))`: a serialized game, migrated
-    /// and loaded. Nothing else the import path does (the founder mark) runs.
+    /// and loaded, with a lone surrogate escape read as U+FFFD
+    /// (`load::parse_save_json`). Nothing else the import path does (the
+    /// founder mark) runs.
     /// `markers`, when given, is JSON `{ lastHour, lastDay, lastQuarter,
     /// lastMonth }`: the live engine's boundary markers, which a save does
     /// not carry (a load rebuilds them from the clock, a founded game keeps
@@ -147,7 +204,7 @@ impl Engine {
     /// where the live engine stands.
     #[wasm_bindgen(js_name = fromSave)]
     pub fn from_save(text: &str, markers: Option<String>) -> Result<Engine, JsError> {
-        let raw: Value = serde_json::from_str(text).map_err(err)?;
+        let raw = crate::load::parse_save_json(text.as_bytes()).map_err(err)?;
         let mut sim = crate::load::deserialize(&raw).map_err(err)?;
         if let Some(m) = markers {
             apply_markers(&mut sim, &m).map_err(err)?;
@@ -344,6 +401,46 @@ impl Engine {
             v["reason"] = Value::String(reason);
         }
         v.to_string()
+    }
+
+    /// `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
+    /// limit and the balance and pays for the car itself.
+    #[wasm_bindgen(js_name = addCar)]
+    pub fn add_car(&mut self, id: i32) -> String {
+        charge_json(&self.sim.add_car(id.into())).to_string()
+    }
+
+    /// `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
+    #[wasm_bindgen(js_name = removeCar)]
+    pub fn remove_car(&mut self, id: i32) -> String {
+        charge_json(&self.sim.remove_car(id.into())).to_string()
+    }
+
+    /// `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
+    /// as JSON `{ bottom, top }` text or null: JSON `{ ok, reason?, delta,
+    /// bottom, top, added }`, the floors billed past the mark.
+    #[wasm_bindgen(js_name = extendTransport)]
+    pub fn extend_transport(
+        &mut self,
+        id: i32,
+        end: &str,
+        target_floor: i32,
+        hwm: Option<String>,
+    ) -> Result<String, JsError> {
+        let end = parse_extend_end(end).map_err(err)?;
+        let hwm = hwm.as_deref().map(parse_hwm).transpose().map_err(err)?;
+        let r = self
+            .sim
+            .extend_transport(id.into(), end, target_floor.into(), hwm);
+        Ok(extend_json(&r).to_string())
+    }
+
+    /// `removeFacility(id, method)`: the player's sell or bulldoze of a unit
+    /// or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`.
+    #[wasm_bindgen(js_name = removeFacility)]
+    pub fn remove_facility(&mut self, id: i32, method: &str) -> Result<String, JsError> {
+        let method = parse_removal_method(method).map_err(err)?;
+        Ok(charge_json(&self.sim.remove_facility(id.into(), method)).to_string())
     }
 
     /// `tower.removeUnit(id)`: whether a unit went.
@@ -812,19 +909,22 @@ pub fn export_tdt(save_json: &str) -> Result<Vec<u8>, JsError> {
 /// `encodeVctower(saveJson, appVersion, savedAtMs)`: the `.vctower` file
 /// text for a serialized game (what `serialize` returns), stamped the way
 /// `SaveGame.export` stamps it (`load::stamp_save`). Text that is not JSON,
-/// a save that is not a tower, a time no `Date` holds and a build name that
-/// reads as before 2.0 (which would mark the tower as a founder's) are
-/// JavaScript errors.
+/// a save that is not a tower, a time no `Date` holds, a build name that
+/// reads as before 2.0 (which would mark the tower as a founder's) and a
+/// save whose JSON passes 32 MiB (more than a reader will hold) are
+/// JavaScript errors. A lone surrogate escape reads as U+FFFD
+/// (`load::parse_save_json`).
 #[wasm_bindgen(js_name = encodeVctower)]
 pub fn encode_vctower(
     save_json: &str,
     app_version: &str,
     saved_at_ms: f64,
 ) -> Result<String, JsError> {
-    let mut save: Value = serde_json::from_str(save_json).map_err(|e| err(format!("save: {e}")))?;
+    let mut save = crate::load::parse_save_json(save_json.as_bytes())
+        .map_err(|e| err(format!("save: {e}")))?;
     crate::load::stamp_save(&mut save, app_version, saved_at_ms).map_err(err)?;
     // The container is ASCII by construction (magic, base64, newlines).
-    String::from_utf8(crate::load::encode_vctower(&save)).map_err(err)
+    String::from_utf8(crate::load::encode_vctower(&save).map_err(err)?).map_err(err)
 }
 
 #[cfg(test)]
@@ -843,7 +943,10 @@ mod tests {
         };
         let mut stamped = save.clone();
         crate::load::stamp_save(&mut stamped, "3.0.0", 1.5e12).unwrap();
-        assert_eq!(text.as_bytes(), crate::load::encode_vctower(&stamped));
+        assert_eq!(
+            text.as_bytes(),
+            crate::load::encode_vctower(&stamped).unwrap()
+        );
         assert_eq!(
             canonical_json(&crate::load::decode_vctower(&text).unwrap()),
             canonical_json(&stamped)
@@ -914,6 +1017,49 @@ mod tests {
             let got = crate::tdt::export_tdt(&ex.save.as_ref().unwrap().to_string());
             assert_eq!(got.err().as_ref(), ex.throws.as_ref(), "{}", ex.id);
         }
+    }
+
+    #[test]
+    fn the_charge_commands_cross_as_the_typescript_spells_them() {
+        use crate::charges::{ChargeResult, ExtendEnd, ExtendResult};
+        use crate::gameplay::RemovalMethod;
+        let refused = ChargeResult {
+            ok: false,
+            reason: Some("Not enough money.".into()),
+            delta: 0.0,
+        };
+        let v = charge_json(&refused);
+        assert_eq!(v["ok"], false);
+        assert_eq!(v["reason"], "Not enough money.");
+        assert_eq!(v["delta"].as_f64(), Some(0.0));
+        let paid = ExtendResult {
+            charge: ChargeResult {
+                ok: true,
+                reason: None,
+                delta: -10_000.0,
+            },
+            bottom: 1,
+            top: 4,
+            added: 2,
+        };
+        let v = extend_json(&paid);
+        assert!(v.get("reason").is_none());
+        assert_eq!(v["delta"].as_f64(), Some(-10_000.0));
+        assert_eq!(
+            (v["bottom"].as_i64(), v["top"].as_i64(), v["added"].as_i64()),
+            (Some(1), Some(4), Some(2))
+        );
+        assert_eq!(parse_extend_end("down"), Ok(ExtendEnd::Down));
+        assert!(parse_extend_end("sideways").is_err());
+        assert_eq!(
+            parse_removal_method("bulldoze"),
+            Ok(RemovalMethod::Bulldoze)
+        );
+        assert!(parse_removal_method("burn").is_err());
+        assert_eq!(parse_hwm(r#"{"bottom":-2,"top":30}"#), Ok((-2, 30)));
+        assert!(parse_hwm(r#"{"bottom":1.5,"top":3}"#).is_err());
+        assert!(parse_hwm(r#"{"top":3}"#).is_err());
+        assert!(parse_hwm("not json").is_err());
     }
 
     #[test]
@@ -1009,6 +1155,17 @@ mod tests {
             log_since(&sim, sim.log_seq).as_array().map(Vec::len),
             Some(0)
         );
+    }
+
+    #[test]
+    fn the_catalog_crosses_as_canonical_json_for_a_named_mode() {
+        let text = catalog_text("modern").unwrap();
+        assert_eq!(text, crate::catalog::catalog_json(GameMode::Modern));
+        let v: Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(v["mode"], "modern");
+        assert!(catalog_text("arcade")
+            .unwrap_err()
+            .contains("classic or modern"));
     }
 
     #[test]

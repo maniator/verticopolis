@@ -1,13 +1,12 @@
 import type { Simulation } from "../engine/Simulation";
-import { FACILITIES, facilityFloors } from "../engine/facilities";
-import { resaleRefund } from "../engine/econConfig";
+import { FACILITIES } from "../engine/facilities";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
 import { groundFloorStructureKind } from "../engine/tower/towerTopology";
-import { gameplaySession, trackEconomyAction } from "../analytics";
+import { trackEconomyAction } from "../analytics";
 
 /**
  * The money boundary of the game shell: every gesture that buys, paints, or
@@ -48,9 +47,6 @@ export class BuildActions {
   tryBuild(kind: FacilityKind, floor: number, x: number, quiet = false): void {
     const res = this.deps.getSim().build(kind, floor, x);
     if (res.ok) {
-      // Report the TOP occupied story for the session peak: a multi-story room
-      // (cinema, party hall) reaches floor + its height - 1, not just its base.
-      gameplaySession.noteBuild(kind, floor + facilityFloors(kind) - 1); // funnel + depth
       if (!quiet) this.deps.audio.sfx("build");
     } else if (!quiet && res.reason) {
       this.deps.audio.sfx("error");
@@ -69,7 +65,6 @@ export class BuildActions {
     top: number,
   ): { ok: boolean; reason: string } {
     const res = this.deps.getSim().buildTransport(kind, x, bottom, top);
-    if (res.ok) gameplaySession.noteBuild(kind, top); // a shaft counts too; top is its reach
     this.deps.audio.sfx(res.ok ? "build" : "error");
     const reason = res.reason ?? this.transportReason(kind, x, bottom, top);
     if (!res.ok) this.deps.ui.toast(reason, "bad");
@@ -113,7 +108,6 @@ export class BuildActions {
         }
       }
     }
-    if (placed > 0) gameplaySession.noteBuild(kind, floor, placed); // brush lays `placed` tiles
     // Ground floor is lobby-only: the Floor tool on floor 1 auto-converts to a
     // lobby (permanent, and pricier than a floor tile), so confirm what happened
     // once per gesture. The preview already showed a lobby ghost and the lobby
@@ -198,26 +192,20 @@ export class BuildActions {
   }
 
   /**
-   * Shared player-removal gauntlet: burning and load-bearing units refuse —
-   * with an error toast unless `quiet` (drag steps stay silent, like build
-   * drags). Removes with the usual refund and returns true on success.
+   * Shared player-removal path: the engine's `removeFacility` refuses a
+   * burning unit or load-bearing structure (with an error toast unless
+   * `quiet`; drag steps stay silent, like build drags) and pays the refund.
+   * Returns true on success.
    */
   tryRemoveUnit(u: Unit, verb: "sell" | "bulldoze", quiet = false): boolean {
-    const sim = this.deps.getSim();
-    const blocked =
-      u.state === "fire"
-        ? `You can't ${verb} a burning unit. Call fire rescue or let it burn out.`
-        : sim.tower.removalReason(u.id);
-    if (blocked) {
-      if (!quiet) {
+    const res = this.deps.getSim().removeFacility(u.id, verb);
+    if (!res.ok) {
+      if (!quiet && res.reason) {
         this.deps.audio.sfx("error");
-        this.deps.ui.toast(blocked, "bad");
+        this.deps.ui.toast(res.reason, "bad");
       }
       return false;
     }
-    sim.tower.removeUnit(u.id);
-    // A gutted shell has no salvage value; everything else refunds half.
-    sim.money += u.state === "gutted" ? 0 : resaleRefund(u.kind);
     // A real player removal (the sole choke point for the bulldoze tool and the
     // editor Sell); `verb` is the sell-vs-bulldoze detail. Per-action: a drag
     // sweep is many genuine removals, each its own demolish.
@@ -225,23 +213,15 @@ export class BuildActions {
     return true;
   }
 
-  /** Tear out a shaft and pay its resale — the ONE refund path shared by the
-   *  editor's Sell and the bulldozer, so the payout can't drift. `verb` is the
-   *  sell-vs-bulldoze telemetry detail (the caller's gesture). */
-  removeTransportWithRefund(t: Transport, verb: "sell" | "bulldoze"): void {
-    const sim = this.deps.getSim();
-    sim.tower.removeTransport(t.id);
-    sim.money += resaleRefund(t.kind);
+  /** Tear out a shaft through the engine's `removeFacility`, which pays its
+   *  resale: the ONE refund path shared by the editor's Sell and the
+   *  bulldozer. `verb` is the sell-vs-bulldoze telemetry detail (the
+   *  caller's gesture). False when the engine refused (the shaft is already
+   *  gone), so the caller plays no sale. */
+  removeTransportWithRefund(t: Transport, verb: "sell" | "bulldoze"): boolean {
+    if (!this.deps.getSim().removeFacility(t.id, verb).ok) return false;
     trackEconomyAction("demolish", verb);
-  }
-
-  /** Charge guard for editor actions: false (with error sfx + toast) if the
-   *  player can't pay. */
-  canAfford(cost: number): boolean {
-    if (this.deps.getSim().money >= cost) return true;
-    this.deps.audio.sfx("error");
-    this.deps.ui.toast("Not enough money.", "bad");
-    return false;
+    return true;
   }
 
   /** Bulldoze whatever Excalibur reported under the pointer, with a refund.
@@ -257,7 +237,7 @@ export class BuildActions {
     } else {
       const t = sim.tower.getTransport(p.id);
       if (!t) return;
-      this.removeTransportWithRefund(t, "bulldoze");
+      if (!this.removeTransportWithRefund(t, "bulldoze")) return;
     }
     this.deps.audio.sfx("sell");
     if (this.deps.selectedId() === p.id) this.deps.clearSelection();

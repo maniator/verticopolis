@@ -4,7 +4,7 @@ import { SPEEDS, MAX_CATCHUP_MINUTES, runFrame, emitMealRushes, applySpeed } fro
 import { MAX_QUANTUM_MINUTES } from "../engine/sim/fixedStep";
 import { decideMealRush } from "./mealRush";
 import { gameplaySession } from "../analytics";
-import * as analytics from "../analytics";
+import * as analyticsActions from "../analyticsActions";
 
 /**
  * These pin the per-frame simulation + throttled UI/audio refresh (`runFrame`)
@@ -34,7 +34,9 @@ interface FakeSim {
   resolveChoice: ReturnType<typeof vi.fn>;
   emit: ReturnType<typeof vi.fn>;
   tower: { totalPopulation: ReturnType<typeof vi.fn> };
-  events: { counts: { fires: number; firesGutRooms: number; bombs: number } };
+  drainGameplayEvents: ReturnType<typeof vi.fn>;
+  gameplayEventsDropped: number;
+  gameplayEvents: { discardOnHandOff: boolean };
 }
 
 function makeSim(over: Partial<FakeSim> = {}): FakeSim {
@@ -47,7 +49,9 @@ function makeSim(over: Partial<FakeSim> = {}): FakeSim {
     resolveChoice: vi.fn(),
     emit: vi.fn(),
     tower: { totalPopulation: vi.fn(() => 0) },
-    events: { counts: { fires: 0, firesGutRooms: 0, bombs: 0 } },
+    drainGameplayEvents: vi.fn(() => []),
+    gameplayEventsDropped: 0,
+    gameplayEvents: { discardOnHandOff: false },
     ...over,
   };
 }
@@ -351,18 +355,24 @@ describe("runFrame auto-surfaced emergency choice", () => {
     expect(raw.shownChoice).toBe(false);
   });
 
-  it("logs emergency_choice only on the player's click, carrying the kind and decision", () => {
-    const spy = vi.spyOn(analytics, "trackEmergencyChoice").mockImplementation(() => {});
+  it("reports emergency_choice from the engine's event on the next frame, even while a modal freezes play", () => {
+    const spy = vi.spyOn(analyticsActions, "trackEmergencyChoice").mockImplementation(() => {});
     const pc = { kind: "fireRescue" as const, message: "Fire on floor 30!", cost: 5000 };
-    const sim = makeSim({ pendingChoice: pc });
+    const queue: unknown[] = [];
+    const sim = makeSim({ pendingChoice: pc, drainGameplayEvents: vi.fn(() => queue.splice(0)) });
+    // The engine reports the resolution itself (emergency_resolved, source player).
+    sim.resolveChoice.mockImplementation((opt: string) => {
+      queue.push({ name: "emergency_resolved", payload: { kind: "fireRescue", decision: opt, source: "player" } });
+    });
     const { app, raw } = makeApp({ speed: 0, sim });
     runFrame(app, 16);
-    // Opening the modal alone must not log: a choice not yet made (and a timed-out
-    // auto-decline, which resolves in the sim without ever reaching this callback)
-    // emits nothing.
+    // Opening the modal alone must not log: a choice not yet made emits nothing.
     expect(spy).not.toHaveBeenCalled();
     const cb = raw.ui.showEventChoice.mock.calls[0][2] as (opt: unknown) => void;
     cb("decline");
+    expect(sim.resolveChoice).toHaveBeenCalledWith("decline");
+    raw.shownChoice = true; // a modal still up: the frame returns at the freeze
+    runFrame(app, 16);
     expect(spy).toHaveBeenCalledExactlyOnceWith("fireRescue", "decline");
     spy.mockRestore();
   });
