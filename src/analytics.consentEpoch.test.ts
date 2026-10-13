@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { gameplaySession, startGameplaySession } from "./analytics";
+import { bindEngineBridge, engineBridgeStats, forwardGameplayEvents, resetEngineBridge } from "./analyticsEngineBridge";
 import { setAnalyticsAdapter, type AnalyticsAdapter, type EventProps } from "./analyticsAdapter";
 import { resetDesktopConsentForTests, setDesktopConsent } from "./desktopConsent";
 
@@ -60,6 +61,7 @@ beforeEach(() => {
   localStorage.clear();
   resetDesktopConsentForTests();
   gameplaySession.reset();
+  resetEngineBridge();
   sent.length = 0;
   restore = setAnalyticsAdapter({
     send: (event, props) => void sent.push({ event, props }),
@@ -158,20 +160,70 @@ describe("a desktop consent change starts a fresh measurement window", () => {
     setDesktopConsent("granted");
     gameplaySession.begin();
     gameplaySession.noteBuild("office", 12, 5);
-    gameplaySession.noteEmergencyCounts(2, 3, 1); // a fire gutted 3 rooms, a bomb went off
+    // Two fires gutted 3 rooms and a bomb went off; the last fire is still in
+    // the engine at the switch, and is dropped with the window that is closing.
+    const pending = [{ name: "fire_started", payload: {} }];
+    bindEngineBridge(() => ({ drainGameplayEvents: () => pending.splice(0) as never, gameplayEventsDropped: 0, gameplayEvents: { discardOnHandOff: false } }));
+    gameplaySession.notePlaying();
+    forwardGameplayEvents([{ name: "fire_started", payload: {} }, { name: "fire_gutted", payload: { rooms: 3 } }, { name: "bomb_detonated", payload: { rooms: 2 } }]);
     vi.setSystemTime(6000);
     const before = sent.length;
     setDesktopConsent("declined");
     expect(sent.slice(before), "opting out is not itself a reason to transmit").toEqual([]);
 
     setDesktopConsent("granted"); // back on, same tower, nothing new has happened
-    gameplaySession.noteEmergencyCounts(2, 3, 1);
+    expect(pending, "the switch took what the engine still held").toEqual([]);
+    gameplaySession.notePlaying();
     vi.setSystemTime(8000);
     gameplaySession.end(true);
     expect(propsFor("session_builds"), "the 5 opted-out placements stay unsent").toEqual([]);
     expect(propsFor("session_emergencies"), "and the tower's earlier outbreaks are not this window's").toEqual([
       { fires: 0, firesGutRooms: 0, bombs: 0 },
     ]);
+  });
+});
+
+describe("the engine's events at a consent change", () => {
+  it("folds a declined stretch's play unsent, then reports the new window's from scratch", () => {
+    // The path that runs: the frame loop drains every frame, so a declined
+    // stretch's events are folded while the gate is shut (spending the
+    // per-tower and per-session latches), and the grant re-opens them.
+    setDesktopConsent("declined");
+    gameplaySession.begin();
+    forwardGameplayEvents([
+      { name: "tower_founded", payload: { mode: "classic" } },
+      { name: "facility_placed", payload: { kind: "lobby", floor: 1, count: 1 } },
+      { name: "star_reached", payload: { star: 2 } },
+      { name: "pricing_changed", payload: { kind: "office" } },
+    ]);
+    expect(sent, "nothing leaves while sharing is off").toEqual([]);
+    setDesktopConsent("granted");
+    expect(sent, "and the grant sends none of it").toEqual([]);
+    forwardGameplayEvents([{ name: "facility_placed", payload: { kind: "office", floor: 2, count: 1 } }, { name: "pricing_changed", payload: { kind: "office" } }]);
+    expect(propsFor("first_build"), "the funnel re-opened with the window").toEqual([{ tool: "office" }]);
+    expect(propsFor("economy_action")).toEqual([{ action: "price_tune" }]);
+  });
+
+  it("drops what the engine still holds at the switch, unsent", () => {
+    setDesktopConsent("declined");
+    gameplaySession.begin();
+    // A new tower, its first build and a promotion, still in the engine when
+    // the player turns sharing on.
+    const pending: unknown[] = [
+      { name: "tower_founded", payload: { mode: "classic" } },
+      { name: "facility_placed", payload: { kind: "lobby", floor: 1, count: 1 } },
+      { name: "star_reached", payload: { star: 2 } },
+      { name: "pricing_changed", payload: { kind: "office" } },
+    ];
+    bindEngineBridge(() => ({ drainGameplayEvents: () => pending.splice(0) as never, gameplayEventsDropped: 0, gameplayEvents: { discardOnHandOff: false } }));
+    setDesktopConsent("granted");
+    expect(pending).toEqual([]);
+    expect(sent, "the declined stretch stays unsent").toEqual([]);
+    expect(engineBridgeStats().discarded).toBe(4);
+    // The new window's own play reports, its latches unspent.
+    forwardGameplayEvents([{ name: "facility_placed", payload: { kind: "office", floor: 2, count: 1 } }, { name: "pricing_changed", payload: { kind: "office" } }]);
+    expect(propsFor("first_build")).toEqual([{ tool: "office" }]);
+    expect(propsFor("economy_action")).toEqual([{ action: "price_tune" }]);
   });
 });
 
@@ -210,9 +262,11 @@ describe("the browser path is untouched", () => {
   });
 
   it("sums emergencies across a tower replacement exactly as before", () => {
-    gameplaySession.noteEmergencyCounts(2, 1, 0); // tower A accrues
-    gameplaySession.noteEmergencyCounts(0, 0, 0); // a fresh tower restarts the counters
-    gameplaySession.noteEmergencyCounts(1, 0, 1); // tower B accrues
+    gameplaySession.notePlaying();
+    const fire = { name: "fire_started", payload: {} };
+    // Tower A accrues, then a new game founds tower B, which accrues too.
+    forwardGameplayEvents([fire, fire, { name: "fire_gutted", payload: { rooms: 1 } }, { name: "tower_founded", payload: { mode: "classic" } }]);
+    forwardGameplayEvents([fire, { name: "bomb_detonated", payload: { rooms: 0 } }]);
     gameplaySession.end(true);
     expect(propsFor("session_emergencies")).toEqual([{ fires: 3, firesGutRooms: 1, bombs: 1 }]);
   });

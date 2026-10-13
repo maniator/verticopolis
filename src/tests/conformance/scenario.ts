@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { CHARGE_OPS, applyCharge, tsCharges, type ChargeCommand, type ChargeEngine } from "./chargeOps";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Simulation } from "../../engine/Simulation";
@@ -27,7 +28,7 @@ export type Start =
   | { fixture: string; mode?: GameMode };
 
 /** A unit or shaft is named by a tile it covers, never by id. */
-interface At { floor: number; x: number }
+export interface At { floor: number; x: number }
 
 export type Command =
   | { op: "setMoney"; amount: number }
@@ -38,6 +39,7 @@ export type Command =
   | ({ op: "adjustRent"; dir: 1 | -1 } & At)
   | ({ op: "setNoRate" } & At)
   | ({ op: "setCars"; cars: number } & At)
+  | ChargeCommand
   | { op: "startFire" }
   | { op: "bombThreat" }
   | { op: "evaluateStar" }
@@ -78,9 +80,9 @@ export interface Checkpoint {
  *  that is not a transport, "shaft" a transport kind, "mode" classic or modern,
  *  "obj" a JSON object, "kind" any facility kind, "choice" fireRescue or
  *  bombThreat, "policy" a film policy, "target" a batch rent target (a finite
- *  number, default or noRate).
+ *  number, default or noRate), "end" up or down, "method" sell or bulldoze.
  *  A trailing "?" marks the field optional. */
-type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind" | "choice" | "policy" | "target";
+type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind" | "choice" | "policy" | "target" | "end" | "method";
 const AT = { floor: "int", x: "int" } as const;
 const OPS: Record<Command["op"], Spec> = {
   setMoney: { amount: "num" },
@@ -91,6 +93,7 @@ const OPS: Record<Command["op"], Spec> = {
   adjustRent: { ...AT, dir: "dir" },
   setNoRate: AT,
   setCars: { ...AT, cars: "count" },
+  ...CHARGE_OPS,
   startFire: {},
   bombThreat: {},
   evaluateStar: {},
@@ -127,12 +130,14 @@ function fits(type: FieldType, v: unknown): boolean {
     case "choice": return v === "fireRescue" || v === "bombThreat";
     case "policy": return v === "auto" || v === "feature" || v === "blockbuster";
     case "target": return v === "default" || v === "noRate" || (typeof v === "number" && Number.isFinite(v));
+    case "end": return v === "up" || v === "down";
+    case "method": return v === "sell" || v === "bulldoze";
   }
 }
 
 const own = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
 
-type Spec = Record<string, `${FieldType}` | `${FieldType}?`>;
+export type Spec = Record<string, `${FieldType}` | `${FieldType}?`>;
 
 function check(where: string, value: unknown, spec: Spec, skip: string[] = []): void {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${where}: must be an object`);
@@ -164,6 +169,7 @@ export function loadScenario(file: string): Scenario {
     if (typeof op !== "string" || !own(OPS, op)) throw new Error(`${where}: unknown op ${JSON.stringify(op)}`);
     check(where, c, OPS[op as Command["op"]], ["op"]);
     if (c.op === "buildRow" && c.from > c.to) throw new Error(`${where}: buildRow from must not be past to`);
+    if (c.op === "extendTransport" && (c.hwmBottom === undefined) !== (c.hwmTop === undefined)) throw new Error(`${where}: hwmBottom and hwmTop go together`);
   });
   return s;
 }
@@ -177,7 +183,7 @@ export interface Outcome { ok: boolean; reason?: string }
  *  implements it through its binding, and the runner cannot tell them apart.
  *  Ids and tile queries read the engine as it stands, so a method that moves
  *  something (`adjustRent`, `setCars`) is checked by asking again. */
-export interface ScenarioEngine {
+export interface ScenarioEngine extends ChargeEngine {
   mode(): string;
   money(): number;
   setMoney(amount: number): void;
@@ -250,6 +256,7 @@ export function tsEngine(sim: Simulation): ScenarioEngine {
     adjustRent: (id, dir) => sim.adjustRent(id, dir),
     setNoRate: (id) => sim.setNoRate(id),
     setCars: (id, cars) => sim.tower.setCars(id, cars),
+    ...tsCharges(sim),
     setSchedule: (id, schedule) => sim.tower.setSchedule(id, schedule),
     startFire: () => sim.startFire(),
     fires: () => sim.fires,
@@ -363,6 +370,7 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
       expectOk(e.setCars(t.id, c.cars) && transportAt(e, c).cars === c.cars, false, `setCars ${c.cars} @ ${c.floor},${c.x}`);
       break;
     }
+    case "addCar": case "removeCar": case "extendTransport": case "removeFacility": applyCharge(e, c); break;
     case "startFire": {
       const before = e.fires();
       e.startFire();

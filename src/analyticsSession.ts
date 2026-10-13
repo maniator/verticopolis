@@ -32,8 +32,7 @@ const FPS_MIN_SAMPLES = 120;
  *  dropped instead. Realistic device jank down to 1fps is still captured. */
 const FPS_MAX_FRAME_MS = 1000;
 
-/** The cumulative emergency counters the frame loop samples, in the shape the
- *  session banks and reports them. */
+/** The session's emergency tallies, in the shape `session_emergencies` reports. */
 interface EmergencyCounts {
   fires: number;
   gutRooms: number;
@@ -89,28 +88,19 @@ class GameplaySession {
    *  null between segments so the first frame after a resume re-anchors instead
    *  of charging the whole background gap as one slow frame. */
   private lastFrameAt: number | null = null;
-  /** Emergency tallies banked from towers this tab already left behind. A new
-   *  game or a loaded save builds a fresh EventSystem whose counters restart at
-   *  zero, so the current tower's live counts alone would undercount (report a
-   *  clean zero for) a session that had a fire in an earlier tower. */
-  private emergBanked: EmergencyCounts = noEmergencies();
-  /** The last sampled CURRENT-tower cumulative emergency counts. A counter going
-   *  backwards between samples means the tower was replaced, so the prior peak is
-   *  banked into {@link emergBanked} before the new tower's counts take over. */
-  private emergLast: EmergencyCounts = noEmergencies();
-  /** What the CURRENT tower's counters already read when this measurement window
-   *  opened, subtracted from the total so the window is charged only for the
-   *  outbreaks it covers. Zero for a tab that has been in one window since boot,
-   *  since every tower it saw started from zero inside that window. `null` means
-   *  the next sample sets it: a consent flip lands mid-tower, and what the live
-   *  counters read right then is only knowable from the sample after it. */
-  private emergBase: EmergencyCounts | null = noEmergencies();
-  /** True once the emergency sampler has run at least once, i.e. the game frame
-   *  loop actually ticked. Gates `session_emergencies` so a no-play prerender/hide
-   *  (frame loop never ran) does not emit a spurious zero into the denominator. */
-  private emergSampled = false;
+  /** Emergencies this window saw, folded from the engine's events
+   *  (`fire_started`, `fire_gutted`, `bomb_detonated`) by the analytics bridge.
+   *  Every tower the tab plays adds to the same tallies, so a swap needs no
+   *  banking, and a window that opens mid-tower starts from zero. */
+  private emerg: EmergencyCounts = noEmergencies();
+  /** True once the frame loop's throttled refresh has run (`notePlaying`, where
+   *  the old counter sampler sat), i.e. the game actually ran. Gates `session_emergencies` so a no-play prerender/hide (the
+   *  frame loop never ran) does not emit a spurious zero into the denominator. */
+  private played = false;
   /** `session_emergencies` fires at most once per session (like the depth events). */
   private emergReported = false;
+  /** See {@link setEngineFlush}. */
+  private engineFlush: ((closing: boolean) => void) | null = null;
 
   /** Start or resume timing foreground play. Idempotent while already running,
    *  so a redundant `begin` (a defensive double boot, a visible event with no
@@ -126,19 +116,30 @@ class GameplaySession {
 
   /** A new tower was founded: the funnel's entry point. Re-opens the
    *  `first_build` latch so the `new_game_started` then `first_build` funnel holds
-   *  per tower, not just for the first tower founded in the tab. */
+   *  per tower, not just for the first tower founded in the tab. The analytics
+   *  bridge calls it for the engine's `tower_founded`; a founding the rate limit
+   *  holds back calls {@link noteNewGameUnreported} instead. */
   noteNewGame(mode: string): void {
     this.built = false;
     trackEvent("new_game_started", { mode });
   }
 
+  /** A tower was founded but its `new_game_started` was not sent (the
+   *  analytics bridge's rate limit held it back). Its funnel is closed, so its
+   *  first build is never reported, and above all never reported as the first
+   *  build of the tower before it, whose funnel may still be open. */
+  noteNewGameUnreported(): void {
+    this.built = true;
+  }
+
   /** A facility was placed. Counts toward the session's build volume, per-tool
    *  usage depth, and peak height (all emitted once at session end), and fires
-   *  `first_build` once per founded tower. The unit is PLACEMENTS, not tiles: a
-   *  wide or multi-story room is one placement (`count` 1); a floor/lobby brush
-   *  lays several 1-wide tiles at once, so it passes `count` = how many it laid,
-   *  each its own placement. `floor` is the TOP occupied story of what was placed
-   *  (callers add the facility height), so the session peak reflects real height.
+   *  `first_build` once per founded tower. Called by the analytics bridge for
+   *  each engine `facility_placed`. The unit is PLACEMENTS: a wide or
+   *  multi-story room is one placement, and a floor/lobby brush's tiles are one
+   *  each (the engine reports every tile it lays), so `count` sums to the tiles
+   *  laid. `floor` is the TOP occupied story of what was placed, as the engine
+   *  reports it, so the session peak reflects real height.
    *  The counting is O(1) (a Map bump and two numeric compares, no sim reads), so
    *  this stays cheap on the per-placement path. */
   noteBuild(tool: string, floor = 0, count = 1): void {
@@ -221,28 +222,27 @@ class GameplaySession {
     if (j < FPS_RESERVOIR) this.fpsSamples[j] = fps;
   }
 
-  /** Sample the live tower's cumulative emergency counters, called from the frame
-   *  loop. The engine (EventSystem) owns the counters as plain integers and never
-   *  imports analytics; the shell reads them here, mirroring how `noteBuild` is
-   *  shell-called after a build, not engine-called. A counter that dropped since
-   *  the last sample means the tower was replaced (a fresh EventSystem restarts at
-   *  zero), so the departing tower's last-seen peak is banked before the new
-   *  tower's counts take over. Pure arithmetic, no allocation: cheap on the
-   *  throttled UI-update path it rides. */
-  noteEmergencyCounts(fires: number, firesGutRooms: number, bombs: number): void {
-    this.emergSampled = true;
-    // A window that opened mid-tower takes this first sample as its baseline, so
-    // what the tower had been through before the window is not charged to it. A
-    // window open since boot already holds a zero baseline and is unaffected.
-    this.emergBase ??= { fires, gutRooms: firesGutRooms, bombs };
-    if (fires < this.emergLast.fires || firesGutRooms < this.emergLast.gutRooms || bombs < this.emergLast.bombs) {
-      this.emergBanked.fires += this.emergLast.fires - this.emergBase.fires;
-      this.emergBanked.gutRooms += this.emergLast.gutRooms - this.emergBase.gutRooms;
-      this.emergBanked.bombs += this.emergLast.bombs - this.emergBase.bombs;
-      // The replacement starts from zero, so the baseline leaves with the old tower.
-      this.emergBase = noEmergencies();
-    }
-    this.emergLast = { fires, gutRooms: firesGutRooms, bombs };
+  /** The game ran a frame (the frame loop's throttled refresh): this session
+   *  played, so it reports `session_emergencies` at its end even when nothing
+   *  caught fire. */
+  notePlaying(): void {
+    this.played = true;
+  }
+
+  /** Fold one engine emergency into the session's tallies: a fire that
+   *  started, rooms a fire gutted, or a bomb that went off. Counts only; the
+   *  summary is sent once, at the session's end. */
+  noteEmergency(kind: keyof EmergencyCounts, n = 1): void {
+    this.emerg[kind] += n;
+  }
+
+  /** Let the analytics bridge take what the engine still holds before the
+   *  session reports (`closing` false: fold it) or a new window opens
+   *  (`closing` true: it belongs to the window being discarded). The bridge
+   *  binds this once; the session itself never imports the bridge or the
+   *  engine. */
+  setEngineFlush(flush: ((closing: boolean) => void) | null): void {
+    this.engineFlush = flush;
   }
 
   /** Bank the current foreground segment and report cumulative play seconds.
@@ -264,6 +264,9 @@ class GameplaySession {
    *  bfcache entry fires `pagehide` too, so a restored-and-resumed session can
    *  spend the allowance early and report its real ending without the flag. */
   end(isFinal = false): void {
+    // Fold the engine's last events first, so a build or a fire in the final
+    // frame before the hide is in the summaries below.
+    this.engineFlush?.(false);
     if (this.resumedAt !== null) {
       this.activeMs += Date.now() - this.resumedAt;
       this.resumedAt = null;
@@ -309,10 +312,10 @@ class GameplaySession {
       trackEvent("session_fps", { p50: Math.round(at(0.5)), low: Math.round(at(0.05)), samples: this.fpsSeen });
     }
     // Per-session emergency summary, emitted once per session that actually
-    // played (the sampler ran). Unlike the depth/fps events it is NOT gated on
-    // any count being nonzero: "fraction of sessions with a fire" needs the
+    // played (the frame loop ran). Unlike the depth/fps events it is NOT gated
+    // on any count being nonzero: "fraction of sessions with a fire" needs the
     // zero-emergency sessions in the denominator. The total sums every tower the
-    // tab played (banked departed towers plus the current one's latest sample).
+    // tab played in this window.
     //
     // Gated on `isFinal` (the terminal `pagehide`), NOT every tab-hide. The depth
     // and fps summaries can latch at the first `visibilitychange:hidden` because
@@ -324,16 +327,9 @@ class GameplaySession {
     // `pagehide` (tab close / navigation / bfcache) captures the whole session. A
     // session whose `pagehide` never fires (a hard mobile kill) simply drops from
     // both the numerator and the denominator, so the RATE stays unbiased.
-    if (isFinal && this.emergSampled && !this.emergReported) {
+    if (isFinal && this.played && !this.emergReported) {
       this.emergReported = true;
-      // Net of the window's opening baseline (zero unless the window opened
-      // mid-tower on a consent change), so the summary covers this window only.
-      const base = this.emergBase ?? noEmergencies();
-      trackEvent("session_emergencies", {
-        fires: this.emergBanked.fires + this.emergLast.fires - base.fires,
-        firesGutRooms: this.emergBanked.gutRooms + this.emergLast.gutRooms - base.gutRooms,
-        bombs: this.emergBanked.bombs + this.emergLast.bombs - base.bombs,
-      });
+      trackEvent("session_emergencies", { fires: this.emerg.fires, firesGutRooms: this.emerg.gutRooms, bombs: this.emerg.bombs });
     }
     const seconds = Math.round(this.activeMs / 1000);
     // The terminal emission is let through the whole-second dedup once, because it
@@ -390,6 +386,9 @@ class GameplaySession {
    * same path is why the crash throttle, ten slots rather than one shot, is not.
    */
   startEpoch(): void {
+    // What the engine emitted before this moment belongs to the window that is
+    // closing, so it is dropped unsent with the rest of that window.
+    this.engineFlush?.(true);
     this.activeMs = 0;
     this.lastReportedSec = 0;
     this.finalReported = false;
@@ -403,12 +402,8 @@ class GameplaySession {
     this.lastFrameAt = null;
     this.toolsSeen.clear();
     this.toolUses.clear();
-    this.emergBanked = noEmergencies();
-    this.emergLast = noEmergencies();
-    // Unknown until the next sample: this window may have opened in the middle of
-    // a tower that already has counts. See `emergBase`.
-    this.emergBase = null;
-    this.emergSampled = false;
+    this.emerg = noEmergencies();
+    this.played = false;
     this.emergReported = false;
     clearActionLatches();
     // Re-anchor a running foreground segment on now, so the clock keeps running
@@ -426,14 +421,11 @@ class GameplaySession {
    *  window deliberately outlives (the listener claim and the module-level common
    *  props, both cleared here to keep tests isolated). */
   reset(): void {
+    this.engineFlush = null;
     this.startEpoch();
     this.releaseCrashThrottle();
     this.resumedAt = null;
     this.armed = false;
-    // A reset stands in for a brand-new tab, whose towers all start from zero
-    // inside the window. Only a mid-flight consent flip needs a baseline read
-    // from the next sample.
-    this.emergBase = noEmergencies();
     setCommonProps({});
   }
 }

@@ -63,8 +63,10 @@ export function trackEconomyActionOnce(action: EconomyActionName, detail?: strin
 }
 
 /** Report the player's answer to an emergency prompt (see `emergency_choice`).
- *  Called only from the choice callback (a real click), so a timed-out
- *  auto-decline never reaches here. Host-gated and never-throw. */
+ *  Called only by the analytics bridge, for the engine's `emergency_resolved`
+ *  with source `player`, carrying the decision that took effect; a timed-out
+ *  auto-decline (source `timeout`) never reaches here. Host-gated and
+ *  never-throw. */
 export function trackEmergencyChoice(kind: EmergencyKind, decision: EmergencyDecision): void {
   trackEvent("emergency_choice", { kind, decision });
 }
