@@ -55,6 +55,7 @@ export function installProbes(): void {
     wa[name] = function (this: unknown, ...a: unknown[]) {
       const t = performance.now();
       const p = orig.apply(this, a) as Promise<unknown>;
+      marks.wasmInstantiateCalls = (marks.wasmInstantiateCalls ?? 0) + 1;
       if (marks.wasmInstantiateStart === undefined) {
         marks.wasmInstantiateStart = t;
         marks.wasmInstantiateVia = name === "instantiateStreaming" ? 1 : 2;
@@ -173,7 +174,7 @@ export async function digestStashed(key: string): Promise<string> {
     const keys = Object.keys(o).filter((k) => o[k] !== undefined).sort();
     return `{${keys.map((k) => `${JSON.stringify(k)}:${stable(o[k])}`).join(",")}}`;
   };
-  const data = { ...(save as Record<string, unknown>) };
+  const data = { ...((typeof save === "string" ? JSON.parse(save) : save) as Record<string, unknown>) };
   if (Array.isArray(data.log)) data.log = (data.log as Record<string, unknown>[]).map(({ text: _t, ...rest }) => rest);
   const ev = data.events as { pending?: Record<string, unknown> | null } | undefined;
   if (ev?.pending) {
@@ -242,8 +243,11 @@ export function adoptScenario(name: string): AdoptResult {
 export async function wasmMemoryBytes(engineUrl: string): Promise<number | null> {
   const w = window as any;
   if (!w.__vcEngine?.status?.hosted) return null;
+  const before = w.__perfMarks?.wasmInstantiateCalls ?? 0;
   const mod = await import(/* @vite-ignore */ engineUrl);
   const exports = await mod.default();
+  // A second instantiate would mean this read a fresh module, not the app's.
+  if ((w.__perfMarks?.wasmInstantiateCalls ?? 0) !== before || before === 0) throw new Error("the WASM memory read did not reach the instance the app booted");
   return (exports.memory as WebAssembly.Memory).buffer.byteLength;
 }
 
@@ -280,4 +284,15 @@ export async function wasmColdLoad(arg: { wasmUrl: string; jsUrl: string; scenar
   glue.Engine.fromSave(save).free();
   const firstEngineMs = performance.now() - t;
   return { fetchMs, bytes: bytes.byteLength, compileMs, instantiateMs, firstEngineMs };
+}
+
+/** A fixed CPU-bound loop, timed: run once unthrottled and once under the
+ *  4x cold start, so the report can show the throttle really applied. */
+export function cpuProbe(): number {
+  const t = performance.now();
+  let x = 0;
+  for (let i = 0; i < 20_000_000; i++) x = (x + i * 7) % 1_000_003;
+  const ms = performance.now() - t;
+  (globalThis as unknown as { __perfSink?: number }).__perfSink = x;
+  return ms;
 }

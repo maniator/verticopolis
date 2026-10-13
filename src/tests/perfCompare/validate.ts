@@ -82,6 +82,7 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
           if (f.hostErrorsAdded.length) errors.push(`${tag}: ${name} ${label} at ${t}x: the host reported ${f.hostErrorsAdded.join("; ")}`);
           if (f.clampedFrames > 0) warnings.push(`${tag}: ${name} ${label} at ${t}x: ${f.clampedFrames} of ${f.frames} frames ran over 200 ms, which the game clamps to 1 ms of elapsed time, so that row understates the simulation work`);
           if (f.frames < 100) warnings.push(`${tag}: ${name} ${label} at ${t}x: only ${f.frames} frames in the window; its p99 and 1% low rest on one or two frames`);
+          if (f.ticks === 0 || !(f.simMinutesPerSecond > 0)) errors.push(`${tag}: ${name} ${label} at ${t}x: the simulation did not advance during the window (${f.ticks} ticks)`);
           if (label === "frames" && f.audioStarted) errors.push(`${tag}: ${name} frames at ${t}x ran with audio started; the audio-off rows are not audio-off`);
           if (label === "frames with audio" && !f.audioStarted) errors.push(`${tag}: ${name} frames with audio at ${t}x ran without audio`);
         }
@@ -93,6 +94,15 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
     const fatal = r.pageErrors.filter((e) => /\[wasm\]|\[tick\]/.test(e));
     if (fatal.length) errors.push(`rep ${r.rep} ${r.engine}: engine or frame errors in the page: ${fatal.slice(0, 3).join(" | ")}`);
     else if (r.pageErrors.length) warnings.push(`rep ${r.rep} ${r.engine}: ${r.pageErrors.length} page error(s), first: ${r.pageErrors[0]}`);
+    if (r.engine === "wasm" && r.cold) {
+      const { engineHostedMs, gameReadyMs } = r.cold;
+      if (engineHostedMs === null || gameReadyMs === null || engineHostedMs > gameReadyMs) errors.push(`rep ${r.rep} wasm: the engine was not hosted by the time the game was ready (hosted ${engineHostedMs ?? "never"}, ready ${gameReadyMs ?? "never"})`);
+    }
+    if (r.audio?.started && !r.audio.contexts.includes("running") && Object.values(r.scenarios).some((sc) => Object.keys(sc.framesAudio ?? {}).length)) errors.push(`rep ${r.rep} ${r.engine}: audio-on frames ran with no running AudioContext (${r.audio.contexts.join(", ") || "none"})`);
+    if (r.cpuProbe && r.cpuProbe.throttledMs < r.cpuProbe.unthrottledMs * r.cpuProbe.rate * 0.5) warnings.push(`rep ${r.rep} ${r.engine}: the CPU probe ran ${r.cpuProbe.throttledMs.toFixed(0)} ms under the ${r.cpuProbe.rate}x throttle against ${r.cpuProbe.unthrottledMs.toFixed(0)} ms without it; the throttled cold start may not have been throttled`);
+    for (const [name, sc] of Object.entries(r.scenarios)) {
+      for (const [t, h] of Object.entries(sc.hosted)) if (r.engine === "wasm" && h.attribution && h.attribution.exportCalls === 0) errors.push(`rep ${r.rep} wasm: ${name} ${t}x: the attribution pass saw no export call, so its host JS share would include engine time`);
+    }
     if (!r.audio?.started) warnings.push(`rep ${r.rep} ${r.engine}: audio did not start, so the audio-on rows have no sample from it`);
     const fv = r.firstVisitWithServiceWorker;
     if (!fv || fv.error || !fv.swActive) warnings.push(`rep ${r.rep} ${r.engine}: the service worker first visit ${fv?.error ? `failed (${fv.error})` : "never activated"}; its transfer and offline rows have no sample from it`);

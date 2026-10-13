@@ -32,7 +32,8 @@ describe("aggregate", () => {
     expect(rows.find((r) => r.metric === "warm game ready" && r.engine === "ts")!.values).toHaveLength(7);
     expect(rows.find((r) => r.metric === "first visit with service worker, bytes served" && r.engine === "wasm")!.values[0]).toBe(2000);
     expect(rows.find((r) => r.metric === "cold before ready: html" && r.engine === "ts")!.values[0]).toBe(0);
-    expect(rows.find((r) => r.metric === "cold game ready" && r.throttle === "4" && r.engine === "ts")!.values[0]).toBe(1200);
+    expect(aggregate(all, ["small"], [1, 4]).find((r) => r.metric === "cold game ready" && r.throttle === "4" && r.engine === "ts")!.values[0]).toBe(1200);
+    expect(rows.find((r) => r.metric === "JS heap + WASM linear memory" && r.engine === "wasm")!.values[0]).toBe(9e6);
     expect(rows.find((r) => r.group === "frames-audio" && r.metric === "mean FPS" && r.engine === "ts")!.values).toHaveLength(8);
   });
 
@@ -45,7 +46,7 @@ describe("aggregate", () => {
 describe("compareEngines", () => {
   it("skips a zero TypeScript median and says so", () => {
     const skipped: string[] = [];
-    const comps = compareEngines(aggregate(runs(), ["small"], [1]), skipped);
+    const comps = compareEngines(aggregate(runs(), ["small"], [1, 4]), skipped);
     expect(comps.find((c) => c.metric === "frames over 200 ms (game time clamped)")).toBeUndefined();
     expect(skipped.some((x) => x.includes("frames over 200 ms"))).toBe(true);
   });

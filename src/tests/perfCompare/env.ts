@@ -9,6 +9,11 @@ export interface Environment {
   commitShort: string;
   dirty: boolean;
   branch: string;
+  /** origin/main at the run (as last fetched), the merge base with it, and
+   *  how many of its commits the measured tree lacks (0: a baseline of it). */
+  mainCommit: string | null;
+  mergeBase: string | null;
+  behindMain: number | null;
   os: string;
   kernel: string;
   arch: string;
@@ -52,7 +57,10 @@ export function engineBuildHash(distDir: string): string | null {
 
 export function collectEnvironment(repo: string, distDir: string, sourceHash: string | null): Environment {
   const commit = run("git", ["rev-parse", "HEAD"], repo) ?? "unknown";
-  const status = run("git", ["status", "--porcelain", "--untracked-files=no"], repo);
+  // Untracked files count too: a new source file changes the build.
+  const status = run("git", ["status", "--porcelain", "--untracked-files=normal"], repo);
+  const mainCommit = run("git", ["rev-parse", "origin/main"], repo);
+  const behind = mainCommit ? run("git", ["rev-list", "--count", `HEAD..${mainCommit}`], repo) : null;
   const pkg = JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { version: string };
   let playwright: string | null = null;
   try {
@@ -65,6 +73,9 @@ export function collectEnvironment(repo: string, distDir: string, sourceHash: st
     commitShort: commit.slice(0, 7),
     dirty: status === null ? false : status.length > 0,
     branch: run("git", ["rev-parse", "--abbrev-ref", "HEAD"], repo) ?? "unknown",
+    mainCommit,
+    mergeBase: mainCommit ? run("git", ["merge-base", "HEAD", mainCommit], repo) : null,
+    behindMain: behind === null ? null : Number(behind),
     os: osName(),
     kernel: release(),
     arch: arch(),

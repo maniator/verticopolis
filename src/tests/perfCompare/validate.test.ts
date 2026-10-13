@@ -172,4 +172,24 @@ describe("validateResults", () => {
     runs[1].cold4x = { ...runs[1].cold4x!, engineActive: "ts" };
     expect(validateResults(config(), runs, [node()]).errors).toContain("rep 0 wasm: 4x cold start: the WASM engine did not initialize; the page fell back to TypeScript");
   });
+
+  it("fails a frame window where the simulation did not advance, and a late WASM host", () => {
+    const runs = good();
+    runs[0].scenarios.small.frames["1"].ticks = 0;
+    runs[1].cold = { ...runs[1].cold!, engineHostedMs: 400 };
+    const v = validateResults(config(), runs, [node()]);
+    expect(v.errors).toEqual(
+      expect.arrayContaining(["rep 0 ts: small frames at 1x: the simulation did not advance during the window (0 ticks)", "rep 0 wasm: the engine was not hosted by the time the game was ready (hosted 400, ready 300)"]),
+    );
+  });
+
+  it("fails audio-on frames without a running context and an attribution pass with no export call, and warns on a weak throttle", () => {
+    const runs = good();
+    runs[1].audio = { started: true, muted: false, contexts: ["suspended"] };
+    runs[2].scenarios.small.hosted["1"].attribution = { engineTickMs: 1, engineExportMs: 0, hostJsMs: 1, wrappedTotalMs: 2, merges: 1, engineTicks: 10, exportCalls: 0, exportsWrapped: 40 };
+    runs[0].cpuProbe = { unthrottledMs: 50, throttledMs: 60, rate: 4 };
+    const v = validateResults(config(), runs, [node()]);
+    expect(v.errors).toEqual(expect.arrayContaining(["rep 0 wasm: audio-on frames ran with no running AudioContext (suspended)", "rep 1 wasm: small 1x: the attribution pass saw no export call, so its host JS share would include engine time"]));
+    expect(v.warnings.some((w) => w.startsWith("rep 0 ts: the CPU probe ran 60 ms under the 4x throttle"))).toBe(true);
+  });
 });

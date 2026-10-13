@@ -78,6 +78,7 @@ export function markdownReport(res: CompareResults): string {
       ["Item", "Value"],
       [
         ["Commit", `${e.commit}${e.dirty ? " (dirty tree)" : ""} on ${e.branch}`],
+        ["Public main", e.mainCommit ? `${e.mainCommit} (merge base ${e.mergeBase ?? "unknown"}; ${e.behindMain === 0 ? "this tree contains it" : `${e.behindMain ?? "?"} commit(s) of it missing here`})` : "unknown"],
         ["App version", e.appVersion],
         ["OS", `${e.os} (kernel ${e.kernel}, ${e.arch})`],
         ["CPU", `${e.cpuModel}, ${e.logicalCpus} logical CPUs`],
@@ -114,7 +115,7 @@ export function markdownReport(res: CompareResults): string {
     const comps = res.comparisons.filter((x) => x.group === g);
     const single = res.metrics.filter((m) => m.group === g && !comps.some((x) => x.scenario === m.scenario && x.throttle === m.throttle && x.metric === m.metric));
     if (comps.length) {
-      out.push(table(["Scenario", "CPU", "Metric", "TypeScript median", "WASM median", "WASM / TS (95% CI)", "Verdict", "n"], comps.map((x) => [x.scenario, `${x.throttle}x`, x.metric, fmt(x.tsMedian, x.unit), fmt(x.wasmMedian, x.unit), ratioText(x), x.verdict, `${x.n.ts}/${x.n.wasm}`])));
+      out.push(table(["Scenario", "CPU", "Metric", "TypeScript median", "WASM median", "WASM / TS, paired (95% CI)", "Verdict", "n (ts/wasm/pairs)"], comps.map((x) => [x.scenario, `${x.throttle}x`, x.metric, fmt(x.tsMedian, x.unit), fmt(x.wasmMedian, x.unit), ratioText(x), x.verdict, `${x.n.ts}/${x.n.wasm}/${x.n.pairs}`])));
     }
     if (single.length) {
       out.push("");

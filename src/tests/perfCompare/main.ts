@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
-import { collectEnvironment, engineBuildHash } from "./env";
+import { collectEnvironment, engineBuildHash, type Environment } from "./env";
 import { aggregate, compareEngines, missingSamples } from "./metrics";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
@@ -34,8 +34,11 @@ export interface Args {
 export function parseArgs(argv: readonly string[]): Args {
   const a: Args = { reps: 10, quick: false, skipBuild: false, out: null, scenarios: null, throttles: null };
   let repsSet = false;
+  const seen = new Set<string>();
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
+    if (seen.has(arg)) throw new Error(`${arg} is given twice`);
+    seen.add(arg);
     const next = (): string => {
       const v = argv[++i];
       if (v === undefined) throw new Error(`${arg} needs a value`);
@@ -50,10 +53,11 @@ export function parseArgs(argv: readonly string[]): Args {
     } else if (arg === "--out") a.out = next();
     else if (arg === "--scenarios") {
       a.scenarios = next().split(",").filter(Boolean);
+      if (a.scenarios.length === 0) throw new Error("--scenarios needs at least one name");
       if (new Set(a.scenarios).size !== a.scenarios.length) throw new Error("--scenarios names a scenario twice");
     } else if (arg === "--throttles") {
       a.throttles = next().split(",").map(Number);
-      if (a.throttles.some((t) => !(t >= 1))) throw new Error("--throttles takes rates of 1 or more, comma separated");
+      if (a.throttles.some((t) => !Number.isFinite(t) || t < 1 || t > 20)) throw new Error("--throttles takes rates from 1 to 20, comma separated");
       if (new Set(a.throttles).size !== a.throttles.length) throw new Error("--throttles names a rate twice");
     } else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --scenarios a,b, --throttles 1,4`);
   }
@@ -85,7 +89,9 @@ const STATIC_LIMITATIONS = [
   "Pages are served cross-origin isolated (COOP/COEP) so performance.now() resolves to about 5 microseconds instead of 100. The production site is not isolated; isolation does not change how either engine executes.",
   "Transfer sizes are what this harness's server sent: Brotli quality 11 or gzip level 9 static compression, Cache-Control per vercel.json. A CDN's compression levels and protocol overhead differ; headers are not counted.",
   "CPU throttling is Chromium's DevTools emulation (the renderer is paused in slices), not a slower CPU: it scales CPU time but not memory bandwidth or cache behavior.",
-  "WASM linear memory only grows. The scenarios run small, medium, large in one page, so each WASM memory figure is the high-water mark up to that scenario. The JS heap is measured after a forced GC through the DevTools protocol; process PSS sums every browser process (Linux only).",
+  "Memory is measured per scenario in its own freshly loaded page, after the save is loaded and two in-game hours run, then a forced GC through the DevTools protocol. WASM linear memory only grows, so each WASM figure is that page's high-water mark, which includes the boot tower the page hosted before the save was loaded. The JS heap leaves linear memory out, so the comparable row is JS heap plus linear memory. Process PSS sums the browser's processes (Linux only).",
+  "Frame-time accounting times sim.tick and ui.update directly; the rest of each frame (the Excalibur canvas render, the compositor, GC and idle time until the next frame) is reported as one remainder. Render cost is therefore not isolated from idle time.",
+  "Ratios are paired by repetition (the two engines' processes ran back to back, order alternating) with a distribution-free 95% interval of the median ratio, and a verdict needs six pairs. Every row is its own 95% interval, so across the report's many rows a few verdicts can be wrong by chance; read single borderline rows with that in mind.",
   "Startup is measured to the moment the app publishes its tooling handle (window.game) and to the first frame after it; it uses a VC_TOOLING=1 build of the same sources, which only adds that handle. The before-ready and after-ready byte split is cut where a 10 ms poll first sees the handle. The 4x cold start runs in a second fresh context of the same browser process (fresh HTTP cache, warm process).",
   "Gameplay frame windows are wall-clock time, so the slower engine simulates fewer in-game minutes in them; the achieved sim speed is reported beside every frame row. A frame over 200 ms is handed 1 ms of elapsed time by Excalibur, so rows with clamped frames (counted in the frames-over-200-ms row) understate the simulation's share.",
   "Audio-off means the game's audio never started (no gesture, so the Tone.js chunk never loads); audio-on starts it the way a first click does, unmuted, with Chromium's autoplay policy relaxed for both engines. Headless Chromium plays to no device, so the audio thread's cost on real output hardware may differ.",
@@ -122,6 +128,8 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const sourceHash = existsSync(join(repo, "engine-rs/src")) ? engineSourceHash(join(repo, "engine-rs")) : null;
   const environment = collectEnvironment(repo, distPerf, sourceHash);
 
+  if (args.out && existsSync(resolve(repo, args.out))) throw new Error(`${resolve(repo, args.out)} already exists; results are never overwritten`);
+  log(`perf:compare: measuring ${environment.commit}${environment.dirty ? " (dirty tree)" : ""}; origin/main is ${environment.mainCommit ?? "unknown"}${environment.behindMain !== null ? `, ${environment.behindMain} commit(s) not in this tree` : ""}`);
   log("perf:compare: Node conformance check of both engines on every scenario");
   const mod = await loadWebPackage(join(distPerf, "engine"));
   const nodeChecks = scenarios.map((sc, i) => checkScenario(mod, sc, config.steps, config.dt, config.warmSteps, i % 2 === 0 ? "ts-first" : "wasm-first"));
@@ -152,7 +160,8 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   if (!environment.engineSourceHash) validation.warnings.push("no engine-rs sources in this checkout, so the package's source hash was not checked");
   if (prodHash !== environment.engineBuildHash) validation.errors.push(`dist/ (sizes) and dist-perf/ (timings) carry different engine packages (${prodHash ?? "none"} vs ${environment.engineBuildHash ?? "none"}); rebuild without --skip-build`);
   if (args.skipBuild) validation.warnings.push("--skip-build: dist/ and dist-perf/ were not rebuilt for this commit");
-  if (environment.dirty) validation.warnings.push("the working tree had uncommitted changes to tracked files");
+  if (environment.dirty) validation.warnings.push("the working tree had uncommitted or untracked changes; the results folder is marked -dirty");
+  if (environment.behindMain) validation.warnings.push(`the measured tree lacks ${environment.behindMain} commit(s) of origin/main (${environment.mainCommit}); it is not a baseline of the latest main`);
   const metrics = aggregate(runs, config.scenarios, config.throttles);
   // Pairs with a zero TypeScript median (WASM-only bytes, no clamped
   // frames) get no ratio; the report lists them per engine instead.
@@ -180,8 +189,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     limitations: [...STATIC_LIMITATIONS, ...(renderer ? [`WebGL renderer in these runs: ${renderer}.`] : [])],
   };
 
-  const day = results.generatedAt.slice(0, 10);
-  const out = resolve(repo, args.out ?? join("docs/performance/results", `${day}-${environment.commitShort}${args.quick ? "-quick" : ""}`));
+  const out = outputDir(repo, args, results.generatedAt.slice(0, 10), environment);
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "results.json"), JSON.stringify(results, null, 1) + "\n");
   writeFileSync(join(out, "metrics.csv"), summaryCsv(metrics));
@@ -196,4 +204,23 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   }
   for (const w of validation.warnings) log(`  warning: ${w}`);
   return 0;
+}
+
+/**
+ * Where the results go. The default is a new folder per run under
+ * docs/performance/results, named by date and commit (with -quick and
+ * -dirty marks), and never an existing one: a second run of the same day
+ * and commit gets -2, -3, and so on, so no result is overwritten. An
+ * explicit --out must not exist yet either.
+ */
+export function outputDir(repo: string, args: Pick<Args, "out" | "quick">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync): string {
+  if (args.out) {
+    const out = resolve(repo, args.out);
+    if (exists(out)) throw new Error(`${out} already exists; results are never overwritten`);
+    return out;
+  }
+  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${env.dirty ? "-dirty" : ""}`);
+  let out = base;
+  for (let n = 2; exists(out); n++) out = `${base}-${n}`;
+  return out;
 }

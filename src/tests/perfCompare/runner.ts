@@ -1,6 +1,6 @@
 import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright";
 import { processTreePss } from "./env";
-import { adoptScenario, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave, wasmColdLoad, wasmMemoryBytes, type PageInfo } from "./page";
+import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave, wasmColdLoad, wasmMemoryBytes, type PageInfo } from "./page";
 import { audioStatus, measureFrames, startAudio, type FrameRun } from "./pageFrames";
 import { simRun, type SimRun } from "./pageSim";
 import type { PerfServer, ServedRequest } from "./server";
@@ -13,13 +13,15 @@ import type { CompareConfig, EngineName, FrameSummary, MemorySummary, ProcessRun
  * 1. cold start and warm start (reload);
  * 2. a memory pass: per scenario, a fresh page (reload), load the save,
  *    two in-game hours, full GC, then JS heap, WASM memory and browser PSS;
- * 3. per scenario and CPU throttle: the simulation-only runs (hosted, plus a
- *    separate attribution pass on WASM, and the bare engine) and the
- *    gameplay frames, all with audio off (never started);
- * 4. audio started, then the gameplay frames again;
- * 5. (TypeScript process) the WASM package's load steps, timed apart;
- * 6. a cold start under the 4x throttle in a second fresh context;
- * 7. a first visit with the service worker allowed, then an offline reload.
+ * 3. per scenario and CPU throttle: the simulation-only runs (hosted, then
+ *    the bare engine, then on WASM a separate attribution pass);
+ * 4. (TypeScript process) the WASM package's load steps, timed apart;
+ * 5. the gameplay frames in two fresh-page blocks, audio off (never
+ *    started) and audio on, their order alternating by repetition;
+ * 6. a cold start under the heaviest throttle in a second fresh context,
+ *    with a CPU probe showing the throttle held;
+ * 7. a first visit with the service worker allowed, then an offline reload
+ *    (a side measurement that cannot fail the repetition).
  * The requested engine is re-checked after every sample.
  */
 
@@ -166,10 +168,13 @@ async function memoryPass(page: Page, cdp: CDPSession, opts: RunnerOptions, engi
     const adopt = await page.evaluate(adoptScenario, sc.name);
     if (adopt.engineActive !== engine) throw new Error(`${sc.name}: after loading the save, ${adopt.engineActive} runs the tower, not ${engine}`);
     await page.evaluate(prepareLiveApp);
-    await page.evaluate((n) => {
-      const g = (window as unknown as { game: { sim: { tick(dt: number): void } } }).game;
-      for (let i = 0; i < n; i++) g.sim.tick(2);
-    }, 60);
+    await within(
+      `${sc.name} memory ticks`,
+      page.evaluate((n) => {
+        const g = (window as unknown as { game: { sim: { tick(dt: number): void } } }).game;
+        for (let i = 0; i < n; i++) g.sim.tick(2);
+      }, 60),
+    );
     await cdp.send("HeapProfiler.collectGarbage");
     const heap = (await cdp.send("Runtime.getHeapUsage")) as { usedSize: number; totalSize: number };
     const wasmBytes = engine === "wasm" ? await page.evaluate(wasmMemoryBytes, engineUrl) : null;
@@ -194,6 +199,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, engine: Engin
     cold: null,
     warm: null,
     cold4x: null,
+    cpuProbe: null,
     scenarios: {},
     wasmCold: null,
     audio: null,
@@ -201,22 +207,28 @@ export async function runProcess(opts: RunnerOptions, rep: number, engine: Engin
   };
   const engineUrl = `${server.url}/engine/verticopolis_engine.js`;
   const url = `${server.url}/?engine=${engine}`;
-  // Errors go to the run, except during the offline reload, where the
-  // engine package failing to load is the behavior being measured; those
-  // land on the first-visit record instead.
-  const sink = { offline: null as string[] | null };
+  // Errors go to the run, except during the first visit (a side
+  // measurement whose offline reload makes the engine package fail to load
+  // on purpose); those land on the first-visit record.
+  const sink = { side: null as string[] | null };
   const listen = (page: Page): void => {
-    const note = (line: string) => (sink.offline ?? run.pageErrors).push(line);
+    const note = (line: string) => (sink.side ?? run.pageErrors).push(line);
     page.on("pageerror", (e) => note(`pageerror: ${e.message}`));
     page.on("console", (m) => {
       if (m.type() === "error") note(`console: ${m.text()}`);
     });
   };
+  // Every page call is bounded, so a hung engine fails the repetition
+  // instead of stalling the benchmark.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ev = <A, R>(page: Page, label: string, fn: (arg: A) => R | Promise<R>, arg: A): Promise<R> => within(label, page.evaluate(fn as any, arg) as Promise<R>);
+  const slowRate = Math.max(...config.throttles);
   let browser: Browser | null = null;
   try {
-    // Autoplay without a gesture, so the audio-on pass can start audio the
-    // way a player's first click would. Audio stays off until that pass.
-    browser = await chromium.launch({ headless: true, args: ["--autoplay-policy=no-user-gesture-required"], ...(opts.executablePath ? { executablePath: opts.executablePath } : {}) });
+    // Autoplay without a gesture, so the audio-on block can start audio the
+    // way a player's first click would; --expose-gc so every timed loop
+    // starts from a full collection. Both engines get the same flags.
+    browser = await chromium.launch({ headless: true, args: ["--autoplay-policy=no-user-gesture-required", "--js-flags=--expose-gc"], ...(opts.executablePath ? { executablePath: opts.executablePath } : {}) });
     run.browserVersion = browser.version();
     const ctx = await newContext(browser, config, "block");
     const page = await ctx.newPage();
@@ -230,111 +242,131 @@ export async function runProcess(opts: RunnerOptions, rep: number, engine: Engin
     const warm = await startup(page, server, () => page.reload({ waitUntil: "commit" }));
     run.warm = warm.sample;
     if (warm.sample.engineActive !== engine) throw new Error(`warm start: requested the ${engine} engine but ${warm.sample.engineActive} is active`);
+    const unthrottledProbe = await ev(page, "cpu probe", cpuProbe, undefined);
     log(`  rep ${rep} ${engine}: cold ready ${cold.sample.gameReadyMs?.toFixed(0)} ms, warm ready ${warm.sample.gameReadyMs?.toFixed(0)} ms`);
 
     const memory = await memoryPass(page, cdp, opts, engine, engineUrl);
     await freshPage(page, engine, "timed passes boot");
 
+    // Timed simulation passes. Per scenario and throttle the order is the
+    // same on both engines (hosted, then raw); the WASM attribution pass
+    // runs after both, so it cannot warm or grow anything they measure.
     for (const sc of scenarios) {
-      await page.evaluate(stashSave, { name: sc.name, save: sc.save });
-      const scenarioRun: ProcessRun["scenarios"][string] = { ...memory[sc.name], hosted: {}, raw: {}, frames: {}, framesAudio: {} };
-      run.scenarios[sc.name] = scenarioRun;
+      await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
+      run.scenarios[sc.name] = { ...memory[sc.name], hosted: {}, raw: {}, frames: {}, framesAudio: {} };
+      const scenarioRun = run.scenarios[sc.name];
       for (const rate of config.throttles) {
         const t = String(rate);
+        const sim = (mode: "hosted" | "raw", attribute: boolean) => ev(page, `${sc.name} ${mode}`, simRun, { name: sc.name, mode, engine, steps: config.steps, warmSteps: config.warmSteps, dt: config.dt, engineUrl, attribute });
+        const digest = (key: string) => ev(page, "digest", digestStashed, key);
         await throttle(cdp, rate);
         try {
-          const sim = (mode: "hosted" | "raw", attribute: boolean) =>
-            within(`${sc.name} ${mode}`, page.evaluate(simRun, { name: sc.name, mode, engine, steps: config.steps, warmSteps: config.warmSteps, dt: config.dt, engineUrl, attribute }));
           const hosted = await sim("hosted", false);
-          const hostedStart = await page.evaluate(digestStashed, hosted.startKey);
-          const hostedEnd = await page.evaluate(digestStashed, hosted.endKey);
-          // The split comes from its own wrapped pass, so the wrappers'
-          // cost never reaches the timings.
+          const hostedStart = await digest(hosted.startKey);
+          const hostedEnd = await digest(hosted.endKey);
+          const raw = await sim("raw", false);
+          scenarioRun.raw[t] = stepSummary(raw, await digest(raw.startKey), await digest(raw.endKey));
           let attribution: SimRun["attribution"] = null;
           if (engine === "wasm") {
+            // The split, from its own wrapped pass, which must have run the
+            // same simulation as the timed one.
             const a = await sim("hosted", true);
-            await page.evaluate(digestStashed, a.startKey);
-            await page.evaluate(digestStashed, a.endKey);
+            const aStart = await digest(a.startKey);
+            const aEnd = await digest(a.endKey);
             attribution = a.attribution;
             if (!attribution || attribution.engineTicks !== config.steps) throw new Error(`${sc.name} ${t}x: the attribution pass saw ${attribution?.engineTicks ?? "no"} engine ticks for ${config.steps} steps`);
+            if (a.engineActive !== "wasm" || a.hostErrorsAdded.length || aStart !== hostedStart || aEnd !== hostedEnd) throw new Error(`${sc.name} ${t}x: the attribution pass did not run the timed pass's simulation (${a.engineActive}, errors ${a.hostErrorsAdded.join("; ") || "none"}, ${aStart}/${aEnd} vs ${hostedStart}/${hostedEnd})`);
           }
           scenarioRun.hosted[t] = stepSummary(hosted, hostedStart, hostedEnd, attribution);
-          const raw = await sim("raw", false);
-          scenarioRun.raw[t] = stepSummary(raw, await page.evaluate(digestStashed, raw.startKey), await page.evaluate(digestStashed, raw.endKey));
-          await page.evaluate(adoptScenario, sc.name);
-          await page.evaluate(prepareLiveApp);
-          scenarioRun.frames[t] = frameSummary(await within(`${sc.name} frames`, page.evaluate(measureFrames, { windowMs: config.frameWindowMs, warmMs: config.frameWarmMs, speed: config.speed })));
         } finally {
           await throttle(cdp, 1);
         }
         await expectEngine(page, engine, `${sc.name} ${t}x`);
-        const h = scenarioRun.hosted[t];
-        const fr = scenarioRun.frames[t];
-        log(`  rep ${rep} ${engine} ${sc.name} ${t}x: hosted ${h.totalMs.toFixed(0)} ms, raw ${scenarioRun.raw[t].totalMs.toFixed(0)} ms, frames median ${fr.medianMs.toFixed(1)} ms (${fr.frames} frames, ${fr.clampedFrames} over ${CLAMP_FRAME_MS} ms)`);
+        log(`  rep ${rep} ${engine} ${sc.name} ${t}x: hosted ${scenarioRun.hosted[t].totalMs.toFixed(0)} ms, raw ${scenarioRun.raw[t].totalMs.toFixed(0)} ms`);
       }
     }
+    // The WASM package's load steps, before any audio runs.
+    if (engine === "ts") run.wasmCold = await ev(page, "wasm cold load", wasmColdLoad, { wasmUrl: `${server.url}/engine/verticopolis_engine_bg.wasm`, jsUrl: engineUrl, scenario: scenarios[0].name });
 
-    // Audio on: start it the way a first gesture would, then the frames again.
-    if ((await page.evaluate(audioStatus)).started) throw new Error("audio started before the audio-on pass; the audio-off frames are not audio-off");
-    run.audio = await page.evaluate(startAudio, 15_000);
-    log(`  rep ${rep} ${engine}: audio ${run.audio.started ? "started" : "DID NOT START"} (contexts: ${run.audio.contexts.join(", ") || "none"})`);
-    if (run.audio.started) {
+    // Gameplay frames: an audio-off block and an audio-on block, each in a
+    // fresh page, their order alternating by repetition so neither always
+    // runs in the older process.
+    const blocks: ("off" | "on")[] = rep % 2 === 0 ? ["off", "on"] : ["on", "off"];
+    for (const block of blocks) {
+      await freshPage(page, engine, `frames (audio ${block}) boot`);
+      for (const sc of scenarios) await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
+      if ((await ev(page, "audio status", audioStatus, undefined)).started) throw new Error("audio was running in a fresh page");
+      if (block === "on") {
+        run.audio = await ev(page, "start audio", startAudio, 15_000);
+        log(`  rep ${rep} ${engine}: audio ${run.audio.started ? "started" : "DID NOT START"} (contexts: ${run.audio.contexts.join(", ") || "none"})`);
+        if (!run.audio.started || !run.audio.contexts.includes("running")) continue;
+      }
       for (const sc of scenarios) {
         for (const rate of config.throttles) {
-          await page.evaluate(adoptScenario, sc.name);
-          await page.evaluate(prepareLiveApp);
+          await ev(page, "adopt", adoptScenario, sc.name);
+          await ev(page, "prepare", prepareLiveApp, undefined);
           await throttle(cdp, rate);
           try {
-            run.scenarios[sc.name].framesAudio[String(rate)] = frameSummary(await within(`${sc.name} frames with audio`, page.evaluate(measureFrames, { windowMs: config.frameWindowMs, warmMs: config.frameWarmMs, speed: config.speed })));
+            const f = frameSummary(await ev(page, `${sc.name} frames (audio ${block})`, measureFrames, { windowMs: config.frameWindowMs, warmMs: config.frameWarmMs, speed: config.speed }));
+            (block === "on" ? run.scenarios[sc.name].framesAudio : run.scenarios[sc.name].frames)[String(rate)] = f;
+            log(`  rep ${rep} ${engine} ${sc.name} ${rate}x audio ${block}: frames median ${f.medianMs.toFixed(1)} ms (${f.frames} frames, ${f.clampedFrames} over ${CLAMP_FRAME_MS} ms, ${f.simMinutesPerSecond.toFixed(1)} sim-min/s)`);
           } finally {
             await throttle(cdp, 1);
           }
         }
       }
-      await expectEngine(page, engine, "audio pass");
-    }
-    if (engine === "ts") {
-      run.wasmCold = await page.evaluate(wasmColdLoad, { wasmUrl: `${server.url}/engine/verticopolis_engine_bg.wasm`, jsUrl: engineUrl, scenario: scenarios[0].name });
+      await expectEngine(page, engine, `frames (audio ${block})`);
     }
     await ctx.close();
 
-    // A cold start under the 4x throttle: a fresh context (fresh HTTP cache),
-    // throttled before navigation.
-    const slow = await newContext(browser, config, "block");
-    const slowPage = await slow.newPage();
-    listen(slowPage);
-    const slowCdp = await slow.newCDPSession(slowPage);
-    await throttle(slowCdp, 4);
-    const c4 = await startup(slowPage, server, () => slowPage.goto(url, { waitUntil: "commit" }));
-    run.cold4x = c4.sample;
-    if (c4.sample.engineActive !== engine) throw new Error(`4x cold start: requested the ${engine} engine but ${c4.sample.engineActive} is active`);
-    await slow.close();
+    // A cold start under the heaviest configured throttle: a fresh context
+    // (fresh HTTP cache), throttled before navigation and again at commit,
+    // with the CPU probe run under it to show the throttle held.
+    if (slowRate > 1) {
+      const slow = await newContext(browser, config, "block");
+      const slowPage = await slow.newPage();
+      listen(slowPage);
+      const slowCdp = await slow.newCDPSession(slowPage);
+      await throttle(slowCdp, slowRate);
+      const c4 = await startup(slowPage, server, async () => {
+        await slowPage.goto(url, { waitUntil: "commit" });
+        await throttle(slowCdp, slowRate);
+      });
+      run.cold4x = c4.sample;
+      if (c4.sample.engineActive !== engine) throw new Error(`${slowRate}x cold start: requested the ${engine} engine but ${c4.sample.engineActive} is active`);
+      run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: await ev(slowPage, "cpu probe", cpuProbe, undefined), rate: slowRate };
+      await slow.close();
+    }
     run.ok = true;
-
-    // Auxiliary: a first visit with the service worker allowed, then an
-    // offline reload. A failure here is recorded on its own record and never
-    // discards the repetition's measurements above.
-    run.firstVisitWithServiceWorker = await firstVisit(browser, config, server, url, listen, sink);
   } catch (e) {
     run.error = e instanceof Error ? e.message : String(e);
-    run.ok = false;
     log(`  rep ${rep} ${engine}: FAILED: ${run.error}`);
-  } finally {
-    await browser?.close();
   }
+  // Auxiliary, after the measurements are final: a first visit with the
+  // service worker allowed, then an offline reload. Nothing in it can mark
+  // the repetition failed.
+  if (run.ok && browser) {
+    const side: string[] = [];
+    sink.side = side;
+    run.firstVisitWithServiceWorker = await firstVisit(browser, config, server, url, listen).catch((e: unknown) => ({ served: [], swActive: false, offlineEngineActive: null, offlinePageErrors: [], error: e instanceof Error ? e.message : String(e) }));
+    run.firstVisitWithServiceWorker.offlinePageErrors = side;
+    sink.side = null;
+  }
+  await browser?.close().catch(() => {});
   return run;
 }
 
-async function firstVisit(browser: Browser, config: CompareConfig, server: PerfServer, url: string, listen: (p: Page) => void, sink: { offline: string[] | null }): Promise<NonNullable<ProcessRun["firstVisitWithServiceWorker"]>> {
-  const sw = await newContext(browser, config, "allow");
+async function firstVisit(browser: Browser, config: CompareConfig, server: PerfServer, url: string, listen: (p: Page) => void): Promise<NonNullable<ProcessRun["firstVisitWithServiceWorker"]>> {
   const result: NonNullable<ProcessRun["firstVisitWithServiceWorker"]> = { served: [], swActive: false, offlineEngineActive: null, offlinePageErrors: [], error: null };
+  let sw: BrowserContext | null = null;
   try {
+    sw = await newContext(browser, config, "allow");
     const page = await sw.newPage();
     listen(page);
     server.take();
     await page.goto(url, { waitUntil: "commit" });
     await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 120_000 });
-    result.swActive = await page.evaluate(() => Promise.race([navigator.serviceWorker.ready.then(() => true), new Promise<boolean>((ok) => setTimeout(() => ok(false), 30_000))]));
+    result.swActive = await within("service worker", page.evaluate(() => Promise.race([navigator.serviceWorker.ready.then(() => true), new Promise<boolean>((ok) => setTimeout(() => ok(false), 30_000))])), 60_000);
     await page.waitForLoadState("networkidle", { timeout: 120_000 });
     await page.waitForTimeout(1000);
     await page.waitForLoadState("networkidle", { timeout: 60_000 });
@@ -343,14 +375,12 @@ async function firstVisit(browser: Browser, config: CompareConfig, server: PerfS
       // Offline: reload with the network cut and see which engine the page
       // comes back on (the precache leaves engine/** out).
       await sw.setOffline(true);
-      sink.offline = result.offlinePageErrors;
       try {
         await page.reload({ waitUntil: "commit" });
         await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 60_000 });
         await page.waitForTimeout(1000);
-        result.offlineEngineActive = (await page.evaluate(pageInfo)).engineActive;
+        result.offlineEngineActive = (await within("offline info", page.evaluate(pageInfo), 60_000)).engineActive;
       } finally {
-        sink.offline = null;
         await sw.setOffline(false);
       }
     }
@@ -358,7 +388,7 @@ async function firstVisit(browser: Browser, config: CompareConfig, server: PerfS
     result.error = e instanceof Error ? e.message : String(e);
   } finally {
     server.take();
-    await sw.close();
+    await sw?.close().catch(() => {});
   }
   return result;
 }

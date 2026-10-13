@@ -35,7 +35,7 @@ export interface StepSummary {
   stepMaxMs: number;
   /** From a separate wrapped pass (hosted WASM only); the timings above
    *  come from an unwrapped pass. */
-  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; merges: number; engineTicks: number } | null;
+  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; wrappedTotalMs: number; merges: number; engineTicks: number; exportCalls: number; exportsWrapped: number } | null;
   engineActive: EngineName;
   hostErrorsAdded: string[];
   startMinutes: number;
@@ -116,9 +116,12 @@ export interface ProcessRun {
   page: { crossOriginIsolated: boolean; timerResolutionMs: number; userAgent: string; viewport: { width: number; height: number; dpr: number }; webgl: { renderer: string; vendor: string } | null } | null;
   cold: StartupSample | null;
   warm: StartupSample | null;
-  /** A cold start under the 4x CPU throttle, in a second fresh context of
-   *  the same browser process (fresh HTTP cache, not a fresh process). */
+  /** A cold start under the heaviest configured CPU throttle (4x by
+   *  default), in a second fresh context of the same browser process
+   *  (fresh HTTP cache, not a fresh process). */
   cold4x: StartupSample | null;
+  /** A fixed CPU loop, unthrottled and under that throttle. */
+  cpuProbe: { unthrottledMs: number; throttledMs: number; rate: number } | null;
   scenarios: Record<string, ScenarioRun>;
   wasmCold: { fetchMs: number; bytes: number; compileMs: number; instantiateMs: number; firstEngineMs: number } | null;
   /** A first visit with the service worker allowed, then an offline
@@ -152,12 +155,13 @@ export interface Comparison {
   better: "lower" | "higher";
   tsMedian: number;
   wasmMedian: number;
-  /** wasm / ts, ratio of medians, with a seeded bootstrap 95% interval. */
+  /** wasm / ts: the median of the per-repetition ratios, with the
+   *  order-statistic 95% interval of that median. */
   ratio: number;
   ciLow: number | null;
   ciHigh: number | null;
-  verdict: "wasm faster" | "wasm slower" | "wasm smaller" | "wasm larger" | "wasm lower" | "wasm higher" | "equivalent" | "inconclusive";
-  n: { ts: number; wasm: number };
+  verdict: "wasm faster" | "wasm slower" | "wasm smaller" | "wasm larger" | "wasm lower" | "wasm higher" | "wasm fewer" | "wasm more" | "equivalent" | "inconclusive";
+  n: { ts: number; wasm: number; pairs: number };
 }
 
 export interface CompareResults {

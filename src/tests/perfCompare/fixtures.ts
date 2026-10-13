@@ -73,6 +73,7 @@ export function processRun(rep: number, engine: EngineName, over: Partial<Proces
     cold: startupSample(engine),
     warm: startupSample(engine),
     cold4x: startupSample(engine, { gameReadyMs: 1200 }),
+    cpuProbe: { unthrottledMs: 50, throttledMs: 200, rate: 4 },
     scenarios: {
       small: {
         adoptMs: 10 * scale,

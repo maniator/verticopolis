@@ -1,4 +1,4 @@
-import { ratioOfMedians, summarize, verdict } from "./stats";
+import { pairedRatio, summarize, verdict } from "./stats";
 import type { Comparison, EngineName, MetricRow, ProcessRun } from "./types";
 import type { ServedRequest } from "./server";
 import { categorize, type Category } from "./bundle";
@@ -39,8 +39,9 @@ export const MIN_VERDICT_N = 6;
 
 function picks(scenarios: readonly string[], throttles: readonly string[]): Pick[] {
   const out: Pick[] = [];
+  const slow = String(Math.max(...throttles.map(Number)));
   const startup = (phase: "cold" | "warm" | "cold4x") => {
-    const throttle = phase === "cold4x" ? "4" : "1";
+    const throttle = phase === "cold4x" ? slow : "1";
     const label = phase === "cold4x" ? "cold" : phase;
     const p = (metric: string, unit: string, value: Pick["value"], engines?: EngineName[]) => out.push({ group: "startup", scenario: "-", throttle, metric: `${label} ${metric}`, unit, better: "lower", value, engines });
     p("game ready", "ms", (r) => r[phase]?.gameReadyMs);
@@ -72,6 +73,9 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
     out.push({ group: "memory", scenario: s, throttle: "1", metric: "JS heap used", unit: "bytes", better: "lower", value: (r) => r.scenarios[s]?.memory.jsHeapUsedBytes });
     out.push({ group: "memory", scenario: s, throttle: "1", metric: "WASM linear memory", unit: "bytes", better: "lower", value: (r) => r.scenarios[s]?.memory.wasmMemoryBytes, engines: ["wasm"] });
     out.push({ group: "memory", scenario: s, throttle: "1", metric: "browser process PSS", unit: "bytes", better: "lower", value: (r) => r.scenarios[s]?.memory.processPssBytes });
+    // The JS heap alone leaves the engine's linear memory out on WASM, so
+    // the comparable figure is the sum.
+    out.push({ group: "memory", scenario: s, throttle: "1", metric: "JS heap + WASM linear memory", unit: "bytes", better: "lower", value: (r) => { const m = r.scenarios[s]?.memory; return m ? m.jsHeapUsedBytes + (m.wasmMemoryBytes ?? 0) : null; } });
     for (const t of throttles) {
       for (const mode of ["hosted", "raw"] as const) {
         const g: Group = mode === "hosted" ? "sim-hosted" : "sim-raw";
@@ -82,9 +86,12 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
         step("step p99", "ms", "lower", (r) => r.scenarios[s]?.[mode][t]?.stepP99Ms);
         if (mode === "raw") step("instance from save", "ms", "lower", (r) => r.scenarios[s]?.raw[t]?.loadMs);
         if (mode === "hosted") {
-          step("engine tick inside host", "ms", "lower", (r) => r.scenarios[s]?.hosted[t]?.attribution?.engineTickMs, ["wasm"]);
-          step("engine exports read by host", "ms", "lower", (r) => r.scenarios[s]?.hosted[t]?.attribution?.engineExportMs, ["wasm"]);
-          step("host JS sync", "ms", "lower", (r) => r.scenarios[s]?.hosted[t]?.attribution?.hostJsMs, ["wasm"]);
+          // Shares of the wrapped attribution pass's own step time (the
+          // wrappers cost time, so its milliseconds are not the timed pass's).
+          const share = (key: "engineTickMs" | "engineExportMs" | "hostJsMs") => (r: ProcessRun) => { const a = r.scenarios[s]?.hosted[t]?.attribution; return a && a.wrappedTotalMs > 0 ? a[key] / a.wrappedTotalMs : null; };
+          step("share in the engine's tick", "ratio", "lower", share("engineTickMs"), ["wasm"]);
+          step("share in exports the host reads", "ratio", "lower", share("engineExportMs"), ["wasm"]);
+          step("share in host JS sync", "ratio", "lower", share("hostJsMs"), ["wasm"]);
         }
       }
       for (const [group, slot] of [["frames", "frames"], ["frames-audio", "framesAudio"]] as const) {
@@ -127,8 +134,9 @@ export function aggregate(runs: readonly ProcessRun[], scenarios: readonly strin
   return rows;
 }
 
-/** One comparison per metric both engines measured, with at least
- *  {@link MIN_VERDICT_N} samples a side before a verdict. `verdict` reads the
+/** One comparison per metric both engines measured: the median of the
+ *  per-repetition WASM / TypeScript ratios with its order-statistic
+ *  interval, and a verdict only from {@link MIN_VERDICT_N} pairs up. `verdict` reads the
  *  ratio's interval against a 5% equivalence band (stats.verdict), in the
  *  metric's own direction: "faster"/"slower" for times and rates, "smaller"/
  *  "larger" for bytes. */
@@ -146,13 +154,26 @@ export function compareEngines(rows: readonly MetricRow[], skipped: string[] = [
       skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: TypeScript median is 0, WASM median ${wasm.summary.median}`);
       continue;
     }
-    const r = ratioOfMedians(wasm.values, ts.values);
-    const v = ts.values.length < MIN_VERDICT_N || wasm.values.length < MIN_VERDICT_N ? "inconclusive" : verdict(r);
+    // Pair the two engines by repetition; a repetition missing on either
+    // side drops out of the pairs (its absence is warned about elsewhere).
+    const tsByRep = new Map(ts.reps.map((rep, i) => [rep, ts.values[i]]));
+    const pairs: [number, number][] = [];
+    wasm.reps.forEach((rep, i) => {
+      const b = tsByRep.get(rep);
+      if (b !== undefined && b !== 0) pairs.push([wasm.values[i], b]);
+    });
+    if (pairs.length === 0) {
+      skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: no repetition has both engines`);
+      continue;
+    }
+    const r = pairedRatio(pairs);
+    const v = r.n < MIN_VERDICT_N ? "inconclusive" : verdict(r);
     let word: Comparison["verdict"] = v === "equivalent" ? "equivalent" : "inconclusive";
     if (v === "higher" || v === "lower") {
       const wasmBetter = (v === "lower") === (ts.better === "lower");
       if (ts.unit === "bytes") word = v === "lower" ? "wasm smaller" : "wasm larger";
       else if (ts.unit === "ratio") word = v === "lower" ? "wasm lower" : "wasm higher";
+      else if (ts.unit === "frames") word = v === "lower" ? "wasm fewer" : "wasm more";
       else word = wasmBetter ? "wasm faster" : "wasm slower";
     }
     out.push({
@@ -168,7 +189,7 @@ export function compareEngines(rows: readonly MetricRow[], skipped: string[] = [
       ciLow: r.ciLow,
       ciHigh: r.ciHigh,
       verdict: word,
-      n: { ts: ts.values.length, wasm: wasm.values.length },
+      n: { ts: ts.values.length, wasm: wasm.values.length, pairs: r.n },
     });
   }
   return out;

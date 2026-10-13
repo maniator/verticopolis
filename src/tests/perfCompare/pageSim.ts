@@ -19,7 +19,7 @@ export interface SimRun {
    *  logSince, telemetry and the rest), and the JavaScript remainder
    *  (decode, merge, read-model sync), plus how many ticks reached the
    *  engine through the wrapper (must equal `steps`). */
-  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; merges: number; engineTicks: number } | null;
+  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; wrappedTotalMs: number; merges: number; engineTicks: number; exportCalls: number; exportsWrapped: number } | null;
   /** New host errors during the run (WASM), and whether the same host
    *  still held the tower at the end. */
   hostErrorsAdded: string[];
@@ -124,18 +124,22 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
   const { d, loadMs, hostedWasm } = make();
   const errorsAtStart = errorsNow().length;
   const tag = `${arg.name}:${arg.mode}:${arg.engine}:${arg.attribute ? "attr" : "time"}:${performance.now()}`;
-  // A deep copy now, so the start digest cannot see the ticks below.
-  w.__perfStash[`${tag}:start`] = JSON.parse(JSON.stringify(d.save()));
+  // The start save as one string (not a live object graph), so the start
+  // digest cannot see the ticks below and the copy costs a collector next
+  // to nothing to keep while the loop runs.
+  w.__perfStash[`${tag}:start`] = JSON.stringify(d.save());
   const startMinutes = d.fields().minutes;
 
   const h = hostOf()?.current?.();
-  const acc = { tick: 0, exp: 0, ticks: 0 };
+  const acc = { tick: 0, exp: 0, ticks: 0, calls: 0 };
   const restore: (() => void)[] = [];
   const mergesBefore = hostedWasm ? (h.merges as number) : 0;
   const attributing = arg.attribute && hostedWasm;
+  let exportsWrapped = 0;
   if (attributing) {
     const e = h.engine;
     const wrap = (name: string, slot: "tick" | "exp") => {
+      if (slot === "exp") exportsWrapped++;
       const own = Object.getOwnPropertyDescriptor(e, name);
       const orig = e[name];
       e[name] = function (this: unknown, ...a: unknown[]) {
@@ -145,6 +149,7 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
         } finally {
           acc[slot] += performance.now() - t;
           if (slot === "tick") acc.ticks++;
+          else acc.calls++;
         }
       };
       restore.push(() => {
@@ -153,8 +158,17 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
       });
     };
     wrap("tick", "tick");
-    for (const name of ["serialize", "frameView", "logSince", "elevatorTelemetry", "housekeepingReport", "pendingChoice", "drainGameplayEvents"]) wrap(name, "exp");
+    // Every other method the binding's class has, so no export the host
+    // calls can land in the "host JS" remainder unseen.
+    for (const name of Object.getOwnPropertyNames(Object.getPrototypeOf(e))) {
+      if (name === "constructor" || name === "tick" || name === "free" || typeof e[name] !== "function") continue;
+      wrap(name, "exp");
+    }
   }
+  // A full collection before the clock starts (Chromium runs with
+  // --expose-gc for both engines), so neither loop pays for the setup's
+  // garbage: the warmup instance, the parse above, a raw engine's fields().
+  (globalThis as any).gc?.();
 
   const stepMs = new Array<number>(arg.steps);
   const t0 = performance.now();
@@ -183,7 +197,9 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
     loadMs,
     totalMs,
     stepMs,
-    attribution: attributing ? { engineTickMs: acc.tick, engineExportMs: acc.exp, hostJsMs: Math.max(0, sum - acc.tick - acc.exp), merges: (h.merges as number) - mergesBefore, engineTicks: acc.ticks } : null,
+    attribution: attributing
+      ? { engineTickMs: acc.tick, engineExportMs: acc.exp, hostJsMs: Math.max(0, sum - acc.tick - acc.exp), wrappedTotalMs: sum, merges: (h.merges as number) - mergesBefore, engineTicks: acc.ticks, exportCalls: acc.calls, exportsWrapped }
+      : null,
     hostErrorsAdded,
     startMinutes,
     startKey: `${tag}:start`,

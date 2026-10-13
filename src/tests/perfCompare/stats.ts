@@ -10,8 +10,8 @@
  * - The median's 95% interval is the distribution-free order-statistic
  *   interval from the binomial distribution, so it needs no normality
  *   assumption and no random resampling.
- * - Ratios between two configurations get a seeded bootstrap interval, so a
- *   rerun over the same samples gives the same interval.
+ * - Engines are compared by paired ratios (one per repetition) with the
+ *   same order-statistic interval on their median ({@link pairedRatio}).
  */
 
 export interface Summary {
@@ -119,48 +119,6 @@ export function summarize(values: readonly number[]): Summary {
   };
 }
 
-/** mulberry32: a small seeded PRNG, so the bootstrap is reproducible. */
-export function seededRandom(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/**
- * The ratio of medians, median(a) / median(b), with a seeded percentile
- * bootstrap interval (each side resampled independently). A ratio above 1
- * means a's median is larger. Null interval when either side has fewer than
- * two samples or b's median is 0.
- */
-export function ratioOfMedians(
-  a: readonly number[],
-  b: readonly number[],
-  opts: { resamples?: number; seed?: number; level?: number } = {},
-): { ratio: number; ciLow: number | null; ciHigh: number | null } {
-  const mb = quantile(b, 0.5);
-  if (mb === 0) throw new Error("ratio against a zero median");
-  const ratio = quantile(a, 0.5) / mb;
-  if (a.length < 2 || b.length < 2) return { ratio, ciLow: null, ciHigh: null };
-  const resamples = opts.resamples ?? 2000;
-  const level = opts.level ?? 0.95;
-  const rand = seededRandom(opts.seed ?? 972);
-  const pick = (xs: readonly number[]): number[] => xs.map(() => xs[Math.floor(rand() * xs.length)]);
-  const ratios: number[] = [];
-  for (let i = 0; i < resamples; i++) {
-    const rb = quantile(pick(b), 0.5);
-    const ra = quantile(pick(a), 0.5);
-    if (rb !== 0) ratios.push(ra / rb);
-  }
-  if (ratios.length === 0) return { ratio, ciLow: null, ciHigh: null };
-  const tail = (1 - level) / 2;
-  return { ratio, ciLow: quantile(ratios, tail), ciHigh: quantile(ratios, 1 - tail) };
-}
-
 export interface FrameStats {
   frames: number;
   medianMs: number;
@@ -196,4 +154,22 @@ export function verdict(r: { ratio: number; ciLow: number | null; ciHigh: number
   if (r.ciHigh < 1 - equivalenceBand) return "lower";
   if (r.ciLow >= 1 - equivalenceBand && r.ciHigh <= 1 + equivalenceBand) return "equivalent";
   return "inconclusive";
+}
+
+/**
+ * The paired comparison the report uses: one ratio per repetition (a / b,
+ * the two engines' processes from the same repetition, which ran back to
+ * back in alternating order), their median, and the distribution-free
+ * order-statistic 95% interval of that median (null below six pairs). No
+ * resampling, so the interval does not depend on a seed and does not
+ * undercover the way a percentile bootstrap does at this sample size.
+ */
+export function pairedRatio(pairs: readonly (readonly [number, number])[]): { ratio: number; ciLow: number | null; ciHigh: number | null; n: number } {
+  const ratios = pairs.map(([a, b]) => {
+    if (b === 0) throw new Error("a paired ratio against zero");
+    return a / b;
+  });
+  if (ratios.length === 0) throw new Error("no pairs");
+  const s = summarize(ratios);
+  return { ratio: s.median, ciLow: s.medianCiLow, ciHigh: s.medianCiHigh, n: ratios.length };
 }

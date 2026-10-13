@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { binomialHalfCdf, frameStats, mean, medianCiRanks, quantile, ratioOfMedians, sampleSd, seededRandom, summarize, verdict } from "./stats";
+import { binomialHalfCdf, pairedRatio, frameStats, mean, medianCiRanks, quantile, sampleSd, summarize, verdict } from "./stats";
 
 describe("quantile", () => {
   it("interpolates linearly between order statistics (type 7)", () => {
@@ -63,33 +63,6 @@ describe("summarize", () => {
   });
 });
 
-describe("ratioOfMedians", () => {
-  it("is reproducible for a seed and brackets the point ratio", () => {
-    const a = [20, 21, 19, 22, 20, 21, 20, 19, 23, 20];
-    const b = [10, 11, 10, 9, 10, 10, 11, 10, 9, 10];
-    const r1 = ratioOfMedians(a, b, { seed: 1 });
-    const r2 = ratioOfMedians(a, b, { seed: 1 });
-    expect(r1).toEqual(r2);
-    expect(r1.ratio).toBe(2);
-    expect(r1.ciLow!).toBeLessThanOrEqual(2);
-    expect(r1.ciHigh!).toBeGreaterThanOrEqual(2);
-    expect(r1.ciLow!).toBeGreaterThan(1.5);
-  });
-  it("has no interval for single samples and refuses a zero median", () => {
-    expect(ratioOfMedians([2], [1])).toEqual({ ratio: 2, ciLow: null, ciHigh: null });
-    expect(() => ratioOfMedians([1], [0])).toThrow(/zero/);
-  });
-});
-
-describe("seededRandom", () => {
-  it("is deterministic and stays in [0, 1)", () => {
-    const r = seededRandom(42);
-    const xs = Array.from({ length: 1000 }, r);
-    expect(xs.every((x) => x >= 0 && x < 1)).toBe(true);
-    expect(Array.from({ length: 3 }, seededRandom(42))).toEqual(xs.slice(0, 3));
-  });
-});
-
 describe("frameStats", () => {
   it("computes the 1% low from the slowest 1% of frames", () => {
     const frames = [...Array.from({ length: 198 }, () => 16), 50, 100];
@@ -114,5 +87,19 @@ describe("verdict", () => {
     expect(verdict({ ratio: 1, ciLow: 0.97, ciHigh: 1.03 })).toBe("equivalent");
     expect(verdict({ ratio: 1, ciLow: 0.9, ciHigh: 1.2 })).toBe("inconclusive");
     expect(verdict({ ratio: 1, ciLow: null, ciHigh: null })).toBe("inconclusive");
+  });
+});
+
+describe("pairedRatio", () => {
+  it("takes the median of the per-pair ratios with its order-statistic interval", () => {
+    const pairs: [number, number][] = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20].map((a, i) => [a, i + 1]);
+    expect(pairedRatio(pairs)).toEqual({ ratio: 2, ciLow: 2, ciHigh: 2, n: 10 });
+    const noisy = pairedRatio([[1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1], [8, 1], [9, 1], [10, 1]]);
+    expect(noisy).toEqual({ ratio: 5.5, ciLow: 2, ciHigh: 9, n: 10 });
+  });
+  it("has no interval below six pairs and refuses a zero denominator or no pairs", () => {
+    expect(pairedRatio([[2, 1], [4, 2]])).toMatchObject({ ratio: 2, ciLow: null, ciHigh: null, n: 2 });
+    expect(() => pairedRatio([[1, 0]])).toThrow(/against zero/);
+    expect(() => pairedRatio([])).toThrow(/no pairs/);
   });
 });

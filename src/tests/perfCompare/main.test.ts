@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { makeConfig, parseArgs } from "./main";
+import { makeConfig, outputDir, parseArgs } from "./main";
 import { engineOrder, frameSummary, stepSummary } from "./runner";
 
 describe("parseArgs", () => {
@@ -18,10 +18,13 @@ describe("parseArgs", () => {
   it("refuses bad values and unknown flags", () => {
     expect(() => parseArgs(["--reps", "0"])).toThrow(/positive integer/);
     expect(() => parseArgs(["--reps"])).toThrow(/needs a value/);
-    expect(() => parseArgs(["--throttles", "0.5"])).toThrow(/rates of 1 or more/);
+    expect(() => parseArgs(["--throttles", "0.5"])).toThrow(/from 1 to 20/);
     expect(() => parseArgs(["--fast"])).toThrow(/unknown argument --fast/);
     expect(() => parseArgs(["--throttles", "1,1"])).toThrow(/a rate twice/);
     expect(() => parseArgs(["--scenarios", "small,small"])).toThrow(/a scenario twice/);
+    expect(() => parseArgs(["--scenarios", ","])).toThrow(/at least one name/);
+    expect(() => parseArgs(["--throttles", "1,Infinity"])).toThrow(/from 1 to 20/);
+    expect(() => parseArgs(["--reps", "3", "--reps", "5"])).toThrow(/--reps is given twice/);
   });
 });
 
@@ -43,5 +46,19 @@ describe("runner summaries", () => {
     expect(f).toMatchObject({ frames: 3, medianMs: 10, simMinutesPerSecond: 50, tickShare: 0.1, uiShare: 0.01, ticks: 9, onePercentLowFps: 50, clampedFrames: 0 });
     expect(f.restShare).toBeCloseTo(0.89, 12);
     expect(frameSummary({ audioStarted: true, intervalsMs: [16, 250, 201, 200], wallMs: 700, simMinutes: 1, tickMs: 0, ticks: 1, uiMs: 0, engineActive: "wasm", hostErrorsAdded: [] }).clampedFrames).toBe(2);
+  });
+});
+
+describe("outputDir", () => {
+  const env = { commitShort: "abc1234", dirty: false };
+  it("names a new folder by date and commit and never reuses one", () => {
+    const taken = new Set(["/r/docs/performance/results/2026-10-13-abc1234", "/r/docs/performance/results/2026-10-13-abc1234-2"]);
+    expect(outputDir("/r", { out: null, quick: false }, "2026-10-14", env, () => false)).toBe("/r/docs/performance/results/2026-10-14-abc1234");
+    expect(outputDir("/r", { out: null, quick: false }, "2026-10-13", env, (p) => taken.has(p))).toBe("/r/docs/performance/results/2026-10-13-abc1234-3");
+  });
+  it("marks quick and dirty runs, and refuses an existing --out", () => {
+    expect(outputDir("/r", { out: null, quick: true }, "2026-10-13", { commitShort: "abc1234", dirty: true }, () => false)).toBe("/r/docs/performance/results/2026-10-13-abc1234-quick-dirty");
+    expect(outputDir("/r", { out: "x", quick: false }, "d", env, () => false)).toBe("/r/x");
+    expect(() => outputDir("/r", { out: "x", quick: false }, "d", env, () => true)).toThrow(/never overwritten/);
   });
 });
