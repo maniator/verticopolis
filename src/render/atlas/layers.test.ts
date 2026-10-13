@@ -78,7 +78,7 @@ describe("depth-layer marks across the room catalog", () => {
 });
 
 describe("the soft furniture pass's assumption", () => {
-  it("holds: no paint routine outside the atlas sets a composite mode", () => {
+  it("holds: no paint routine sets a composite mode", () => {
     // The soft pass (`browserEntry.ts`) draws the marks after the furniture
     // with source-atop and puts it back after every restore; a routine with a
     // composite mode of its own would override that. Only the soft pass

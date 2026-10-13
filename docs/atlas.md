@@ -371,8 +371,8 @@ manifest, shell then furniture with their occupant steps at every occupant
 count, and requires its flat frame's pixels. It also measures how far the soft
 furniture drifts from the flat frame, prints the share of pixels and the
 largest channel difference, and refuses an atlas whose soft furniture strays
-past the limit, misses a pixel of the furniture, or is missing from every
-frame.
+past the limit, misses a pixel of the furniture, or (in a full export) is
+missing from every frame.
 
 The same check covers the other families (`verifyExtras.ts`): a whole express
 and standard shaft rebuilt from their floor pieces (skip floor included), cabs
