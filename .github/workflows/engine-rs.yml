@@ -82,9 +82,9 @@ permissions:
 jobs:
   # A host outside the web game: engine-rs/consumer/ depends on the engine by
   # path and drives it through the documented surface (engine-rs/API.md). The
-  # checkout holds only engine-rs/ and conformance/, the runner's Node.js
+  # checkout holds only engine-rs/ and conformance/, the image's Node.js
   # installs are deleted and every Node.js command on PATH is a stub that
-  # fails, so the engine library and the consumer are
+  # fails (the Actions runner keeps its own private copy for its steps), so the engine library and the consumer are
   # shown to build and run, and to replay every scenario that starts from a
   # new game, without the web game or a Node.js toolchain. (The scenarios
   # that start from a save fixture need src/tests/fixtures/ until stage 3 of
@@ -112,8 +112,9 @@ jobs:
 
       - name: Remove and shadow Node.js
         run: |
-          # The runner image ships Node.js; delete every copy so a build
-          # script cannot reach one by absolute path, then shadow the names.
+          # The runner image ships Node.js; delete the copies on PATH and in
+          # the image's install locations, then shadow the names. (The
+          # Actions runner's private copy stays: its own steps need it.)
           for n in node nodejs npm npx corepack yarn pnpm bun; do
             for p in $(type -ap "$n"); do sudo rm -f "$(readlink -f "$p")" "$p"; done
           done

@@ -11,7 +11,8 @@ proves it runs the real simulation by replaying the conformance suite
 outside the engine that depends on it by path and makes every tier 1 call
 below. The `consumer` job in `.github/workflows/engine-rs.yml` builds and
 runs it from a checkout holding only `engine-rs/` and `conformance/`, with
-the runner's Node.js deleted and every Node.js command a failing stub. The plan this page belongs to is issue #980.
+no Node.js on `PATH` or in the runner image's install locations and every
+Node.js command a failing stub. The plan this page belongs to is issue #980.
 
 ## Depending on the engine
 

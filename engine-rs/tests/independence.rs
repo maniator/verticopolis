@@ -381,8 +381,16 @@ fn strip_tests(name: &str, src: &str) -> (String, Vec<String>) {
         let end = end.unwrap_or_else(|| panic!("{name}: the #[cfg(test)] at byte {at} never ends"));
         // Attributes written above `#[cfg(test)]` (a `#[path]`, say) belong
         // to the same item.
-        let mut start = src[..at].rfind('\n').map_or(0, |i| i + 1);
-        while start > 0 {
+        let line_start = src[..at].rfind('\n').map_or(0, |i| i + 1);
+        let before = src[line_start..at].trim();
+        // Code sharing the line before the attribute is library code: keep
+        // it, and look for attributes above only when the line starts here.
+        let mut start = if before.is_empty() || before.starts_with("#[") {
+            line_start
+        } else {
+            at
+        };
+        while start > 0 && start == line_start {
             let prev = src[..start - 1].rfind('\n').map_or(0, |i| i + 1);
             let line = src[prev..start - 1].trim();
             if line.starts_with("#[")
@@ -716,10 +724,14 @@ fn compiled_in_data_comes_from_the_crate_or_the_conformance_suite() {
                     let file = normalize(&crate_dir().join(&name).parent().unwrap().join(&path));
                     if !(file.starts_with(&krate) || file.starts_with(&suite)) {
                         found.push(format!("{name}: {path}"));
-                    } else if path.ends_with(".rs") && !file.starts_with(krate.join("src")) {
+                    } else if path.ends_with(".rs")
+                        && (!file.starts_with(krate.join("src"))
+                            || file.starts_with(krate.join("src/bin")))
+                    {
                         // Code compiled in from elsewhere would escape the
-                        // host-service scan, which reads src/.
-                        found.push(format!("{name}: {path} is code outside src/"));
+                        // host-service scan, which reads src/ apart from the
+                        // binaries.
+                        found.push(format!("{name}: {path} is code the scan skips"));
                     }
                 }
                 Err(e) => found.push(format!("{name}: {e}")),
@@ -946,6 +958,15 @@ fn a_cfg_test_on_anything_but_an_item_stops_the_scan() {
             "{src}: a misread attribute must not strip library code"
         );
     }
+    let (lib, _) = library(
+        "sample",
+        "fn kept() { std::env::var(\"X\"); } #[cfg(test)] mod t {}",
+    );
+    assert_eq!(
+        host_services(&lib.code).0,
+        vec!["std::env".to_string()],
+        "code before the attribute on its line stays scanned"
+    );
     let (_, paths) = strip_tests(
         "sample",
         "#[cfg(test)]\n// helpers for the tests below\n#[allow(dead_code)]\npub(crate) mod helpers;\n#[cfg(test)]\nmod tests { }\n#[path = \"above_tests.rs\"]\n#[cfg(test)]\nmod above;",
