@@ -19,7 +19,8 @@ use verticopolis_engine::clock::GameMode;
 use verticopolis_engine::facilities::Kind;
 use verticopolis_engine::gameplay::{check_catalog, check_event, RemovalMethod, CATALOG_JSON};
 use verticopolis_engine::load::{
-    decode_vctower, deserialize, encode_simulation_vctower, encode_vctower, stamp_save,
+    decode_vctower, deserialize, encode_simulation_vctower, encode_vctower,
+    mark_founder_from_loaded_file, stamp_save,
 };
 use verticopolis_engine::rent::BatchTarget;
 use verticopolis_engine::scenario::{run_scenario, state_view, Checkpoint, Scenario, Start};
@@ -315,6 +316,16 @@ pub fn advance(sim: &mut Simulation, minutes: u32, events: &Value) -> Result<usi
     Ok(n)
 }
 
+/// Load a `.vctower` file the way the web game does: decode, deserialize,
+/// then mark a file with no build stamp as a founder's tower (an unstamped
+/// save predates the stamp, so it is a founder's).
+pub fn load_file(text: &str) -> Result<Simulation, String> {
+    let raw = decode_vctower(text)?;
+    let mut sim = deserialize(&raw)?;
+    mark_founder_from_loaded_file(&mut sim, &raw);
+    Ok(sim)
+}
+
 /// Save to a `.vctower` file and load it back. The loaded game must hash
 /// the same as the one that wrote it.
 pub fn round_trip(sim: &Simulation) -> Result<(Simulation, usize), String> {
@@ -330,7 +341,10 @@ pub fn round_trip(sim: &Simulation) -> Result<(Simulation, usize), String> {
     if raw["appVersion"] != APP_VERSION {
         return Err(format!("the save is stamped {}", raw["appVersion"]));
     }
-    let loaded = deserialize(&raw)?;
+    let loaded = load_file(text)?;
+    if loaded.founder {
+        return Err("a stamped save loaded as a founder's tower".into());
+    }
     let (a, b) = (digest(&state_view(sim)), digest(&state_view(&loaded)));
     if a != b {
         return Err(format!("the loaded game hashes {b}, the saved one {a}"));
@@ -479,6 +493,16 @@ mod tests {
         assert!(!r.ok);
         assert_eq!(r.reason, quote.reason);
         assert_eq!(sim.money, before);
+    }
+
+    #[test]
+    fn an_unstamped_file_loads_as_a_founders_tower() {
+        let (sim, _, _) = found(SEED).expect("found");
+        let bytes = encode_vctower(&sim.serialize()).expect("encode");
+        let text = std::str::from_utf8(&bytes).expect("utf-8");
+        assert!(load_file(text).expect("load").founder);
+        let (loaded, _) = round_trip(&sim).expect("round trip");
+        assert!(!loaded.founder, "a stamped save keeps its status");
     }
 
     #[test]

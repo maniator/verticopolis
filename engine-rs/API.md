@@ -68,7 +68,7 @@ conformance.
 | Reference data | `catalog::catalog(mode)`: prices, sizes, caps and rules per facility kind, versioned by `CATALOG_VERSION` |
 | Snapshot hash | `canonical::digest(&scenario::state_view(&sim))`: the hashed view the conformance lock pins. `state_view` is tier 1 although it lives in the harness module until stage 2 of #980 moves it |
 | Save | `load::encode_simulation_vctower(&sim, app_version, saved_at_ms)`: the `.vctower` bytes the web game writes. A host that holds the save JSON (`sim.serialize()`) gets the same file from `load::stamp_save(&mut save, app_version, saved_at_ms)` then `load::encode_vctower(&save)` |
-| Load | `load::decode_vctower(text)` then `load::deserialize(&save)` |
+| Load | `load::decode_vctower(text)`, then `load::deserialize(&save)`, then `load::mark_founder_from_loaded_file(&mut sim, &save)`, which marks a file with no build stamp as a founder's tower the way the web game does (skip it and a host drops that status on its next save) |
 | 1994 saves | `import_tdt(bytes, filename)` and `export_tdt(save_json)` |
 | Conformance (tier 2) | `scenario::Scenario::parse` and `scenario::run_scenario`, compared with `expected.json` (as `consumer/` does for every scenario that starts from a new game), or `cargo run --bin conformance` from this directory for the whole suite |
 
