@@ -5,7 +5,7 @@ purpose: build-substrate
 altitude: epic
 paradigm: 'hexagonal: one engine core behind a command port and a read-model port; hosts are adapters'
 scope: 'The web game from the switch behind ?engine=wasm to the 3.0.0 default flip and TypeScript retirement'
-status: final  # owner calls listed under Open Questions
+status: final
 created: '2026-10-13'
 updated: '2026-10-13'
 binds: [FR1, FR2, FR3, FR4, FR5, FR6, NFR1, NFR3, NFR4, roadmap-row-4, roadmap-row-4b, roadmap-row-5, roadmap-row-6, roadmap-row-7]
@@ -218,18 +218,18 @@ src/dualrun/     # relay, shadow, mirror (tier 3 callers, with the AD-3 exemptio
   reported newer upstream releases (TypeScript, Vite, Vitest, Rust stable);
   moving them is separate work.
 
+## Owner Decisions (2026-10-13)
+
+- **AD-1 timing:** before the 3.0.0 flip.
+- **AD-2:** the engine owns the step driver and the day pace curve.
+- **Reference data's home:** CLAUDE.md names `engine-rs` as the source of
+  truth for gameplay rules, caps and tuning, amended in the flip PR.
+- **Versions:** 3.0.0 is the major release, under the crate's compatibility
+  policy (#893); retirement is internal.
+- **Thresholds:** provisional until baselines and measurement methods are
+  approved.
+
 ## Open Questions
 
-- **Deployment at the flip:** the engine package is outside the offline
-  precache; decide its precache and version-skew rule (an old cached shell
-  with a newer package), never serve a package whose hash differs from the
-  sources (today's hash guard in `scripts/vercel-build.sh`; open #958 builds
-  the package on every deploy instead), and add a fallback-use signal, which
-  the retirement gate needs.
-- **AD-1 timing:** AD-1 and #945 put it before the flip; the owner confirms
-  or moves it to before retirement.
-- **Reference data's home:** CLAUDE.md names `src/engine/facilities.ts` as
-  the source of truth for caps and tuning; at retirement that line moves to
-  `engine-rs` (owner amendment).
-- **Retirement version:** the parent roadmap calls it internal; the
-  retirement story's AC5 says major.
+- **Deployment at the flip:** the offline rule and the version-skew rule for
+  the engine package (S16).

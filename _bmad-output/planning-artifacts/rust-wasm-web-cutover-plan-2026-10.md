@@ -76,7 +76,8 @@ attribution (NFR4), and the coverage floors (NFR5).
 The spine fixes eight invariants; each story below cites the ones it must
 honor:
 
-- **AD-1** The engine answers commands; the instance only mirrors.
+- **AD-1** The engine answers commands; the instance only mirrors. Before the
+  flip (owner, 2026-10-13).
 - **AD-2** The step driver moves into the engine; no host keeps a game clock.
 - **AD-3** Every binding export has a tier: player commands, restores, or
   relay and test ops. The UI reaches tier 1 only.
@@ -131,7 +132,7 @@ S12 and S14 are P3: if open at the flip, they go in the exception register.
 | S13 | Performance baseline and budgets for the engine | #900 (with #905, #849 as found) | P2 | `e2e/` perf spec, `scripts/` | `npm run perf` compares each engine with its own baseline in CI; the late-game and 5,000+ population fixtures report tick time, cold load and heap for both engines | The perf spec on both engines | S6 |
 | S14 | Analytics close-out: fx and counter pins, drain glue, #873 | #879, #907, #873 | P3 | `engine-rs/src/gameplay.rs`, `src/analyticsEngineBridge.ts` | A deliberate off-by-one at any fx or counter site fails a test in both engines; one typed drain; #873's remaining phases closed or split | Both engines' unit tests; the bridge's consent, session-swap and exactly-once tests | S1 |
 | S16 | Engine package delivery: a content-hashed package URL or a version check, the precache decision, and a fallback-use signal | #945 | P1 for the flip | `src/wasmhost/startWasmHost.ts`, `vite.config.ts`, `scripts/vercel-build.sh` | An old cached shell never runs a newer package (or refuses it with the fallback); the offline rule is decided; each fallback and each engine-writer latch-off (S2) is counted in the host status and, with consent, in analytics | Unit tests for the version check; an e2e that serves a mismatched package; the existing hash guard stays | S2, S4 |
-| S15 | The release gate, one release on the TypeScript default with the new instrument, then the flip as 3.0.0 | #945 | P1 | `package.json` (3.0.0), `src/wasmhost/engineChoice.ts` | Every row in section 6 passes on one commit, with the exception register attached | The rows themselves | S2 to S11, S13, S16 (S12 and S14 enter the exception register if open) |
+| S15 | The release gate, one release on the TypeScript default with the new instrument, then the flip as 3.0.0 | #945 | P1 | `package.json` (3.0.0), `src/wasmhost/engineChoice.ts`, `CLAUDE.md` | Every row in section 6 passes (on the candidate commit, or over its stated window), with the exception register attached; the CLAUDE.md source-of-truth line names `engine-rs` for gameplay rules, caps and tuning | The rows themselves | S2 to S11, S13, S16 (S12 and S14 enter the exception register if open) |
 
 ### After the flip (not cutover blockers)
 
@@ -155,7 +156,8 @@ S12 and S14 are P3: if open at the flip, they go in the exception register.
 Every row passes on the flip candidate's commit, except the two measured
 over time: Seeded replay covers the 14 nights before the candidate, and
 Reliability covers the release on the TypeScript default that precedes it.
-Rows marked "proposed" need the owner's numbers before the gate is binding.
+Rows marked "proposed" are provisional (owner, 2026-10-13): they bind only
+after their baselines and measurement methods are approved.
 
 | Gate | Pass condition |
 | --- | --- |
@@ -174,27 +176,34 @@ Rows marked "proposed" need the owner's numbers before the gate is binding.
 | Coverage | `vite.config.ts` floors and the Rust job's line floor hold |
 | Sign-off | The owner approves with the exception register attached |
 
-## 7. Risks and decisions for the owner
+## 7. Owner decisions (2026-10-13) and remaining risks
 
-1. **Command authority before the flip (S9).** Recommended as a flip gate,
-   since 3.0.0 says the game runs on Rust (#954). The alternative is to ship the
-   flip with the instance still answering and fix it before retirement.
-2. **Performance and reliability numbers** in section 6 are proposals.
-3. **Offline play at the flip.** The engine package is left out of the
-   offline precache today; after the flip an offline first load would fall
-   back to TypeScript, and after retirement there is nothing to fall back to.
-4. **Save format bumps.** The copy catalog (row 6) bumps the save version;
-   it should not ship in the flip release, so a rollback can still read every
-   save (AD-5).
-5. **Retirement version.** The roadmap calls retirement internal while the
-   retirement story's AC5 says major; one of them changes.
-6. **Reference data's home.** CLAUDE.md names `src/engine/facilities.ts` as
-   the single source of truth for build caps and tuning, while #921 moves the
-   UI onto the engine catalog. Until retirement both engines carry the values
-   under the lock; at retirement the CLAUDE.md line needs an amendment that
-   names `engine-rs` as the source.
-7. **Malformed saves.** Match the TypeScript loader's coercions exactly (#858),
-   or refuse with a message; the recommendation is to match.
+Decided:
+
+1. **Command authority before the flip.** The engine answers every command
+   authoritatively before 3.0.0 (S9, #954); it is a flip gate.
+2. **Thresholds are provisional.** The performance and reliability numbers in
+   section 6 bind only after their baselines and measurement methods are
+   approved (S13, S16).
+3. **The engine owns game time.** The step driver and the day pace curve live
+   in the crate (AD-2, S8, #867).
+4. **3.0.0 is the major release**, subject to the compatibility policy the
+   crate release publishes (#893). Retirement (roadmap row 7) is internal;
+   the retirement story's AC5 ("major") is corrected when that story is next
+   updated.
+5. **CLAUDE.md moves to `engine-rs` during the cutover.** The line naming
+   `src/engine/facilities.ts` as the source of truth for gameplay rules, caps
+   and tuning is amended to name `engine-rs` in the flip PR (S15).
+
+Still open (risks, no decision needed yet):
+
+- **Offline play at the flip.** The engine package is left out of the
+  offline precache today; S16 decides the offline rule before the flip.
+- **Save format bumps.** The copy catalog (row 6) bumps the save version; it
+  does not ship in the flip release, so a rollback can still read every save
+  (AD-5).
+- **Malformed saves.** The recommendation is to match the TypeScript
+  loader's coercions (#858).
 
 ## 8. Issues
 
