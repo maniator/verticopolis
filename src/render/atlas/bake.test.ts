@@ -1,12 +1,12 @@
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { buildArchive, checkPages, signature, ARCHIVE_ROOT } from "./archive";
+import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, signature, softLayerDrift, ARCHIVE_ROOT } from "./archive";
 import { bake, ImageStore, type Renderer } from "./bake";
-import type { Job } from "./catalog";
+import type { Job, StillJob } from "./catalog";
 import type { PaintSpec } from "./paint";
-import { blank, sameImage, type Image } from "./pixels";
+import { LayerError, blank, sameImage, type Image } from "./pixels";
 import { blit } from "./raster";
-import { compareImages, composeFrame, composeLookup } from "./compose";
+import { compareImages, composeFrame, composeLayered, composeLookup } from "./compose";
 import type { Placed } from "./schema";
 import { ATLAS_SCALES, ATLAS_SCHEMA_VERSION } from "./schema";
 
@@ -163,5 +163,245 @@ describe("bake", () => {
     const wide: Job = { type: "still", name: "w", w: 60, h: 1, anchor: { x: 0, y: 0 }, keys: {}, paint: car(0), overlays: { o: car(60) } };
     const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
     expect(() => buildArchive(bake([wide], fake), info, undefined, 32)).toThrow(/layers must fit one page/);
+  });
+});
+
+/** A fake room for the depth split: spec `room:<shell>:<furniture>[:haze]`
+ *  paints a w x h block in the shell color, then its last pixel in the
+ *  furniture color (translucent with `haze`); its shell pass is the block. */
+const room = (shell: number, furniture: number, haze = false): PaintSpec => ({ p: "solid", css: `room:${shell}:${furniture}${haze ? ":haze" : ""}` });
+function roomPixels(spec: PaintSpec, w: number, h: number, withFurniture: boolean): Image | null {
+  if (spec.p !== "solid" || !spec.css.startsWith("room:")) return null;
+  const [, a, b, haze] = spec.css.split(":");
+  const img = blank(w, h);
+  for (let i = 0; i < w * h; i++) img.data.set([Number(a), 0, 0, 255], i * 4);
+  if (withFurniture) img.data.set([Number(b), 0, 0, haze ? 40 : 255], (w * h - 1) * 4);
+  return img;
+}
+const layeredFake: Renderer = {
+  render: (spec, w, h) => roomPixels(spec, w, h, true) ?? fake.render(spec, w, h),
+  renderShell: (spec, w, h) => roomPixels(spec, w, h, false),
+};
+const flatFake: Renderer = { render: layeredFake.render };
+
+describe("depth layers", () => {
+  const still = (name: string, paint: PaintSpec, layers = true): Job => ({ type: "still", name, w: 4, h: 2, anchor: { x: 0, y: 0 }, keys: {}, paint, layers });
+  const jobs: Job[] = [
+    still("r1", room(5, 6)),
+    still("plain", solid("3")),
+    still("r2", room(5, 6)),
+    still("same", room(9, 9)),
+    still("unasked", room(7, 8), false),
+    {
+      type: "still",
+      name: "cab",
+      w: 4,
+      h: 1,
+      anchor: { x: 0, y: 0 },
+      keys: {},
+      paint: car(0),
+      chains: { riders: { input: "riders", steps: [car(0), car(1), car(2)] } },
+      layers: true,
+    },
+  ];
+  const layered = bake(jobs, layeredFake);
+  const flat = bake(jobs, flatFake);
+  const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+  const byName = (r: typeof layered, n: string) => r.frames.find((f) => f.name === n)!;
+
+  it("splits only frames that ask for it and whose paint marks a break", () => {
+    expect(layered.frames.filter((f) => f.layers).map((f) => f.name)).toEqual(["r1", "r2", "same"]);
+    expect(flat.frames.some((f) => f.layers)).toBe(false);
+  });
+  it("gives back every layered frame from its shell plus its furniture", () => {
+    for (const f of layered.frames.filter((fr) => fr.layers)) expect(sameImage(composeLayered(layered, f), composeFrame(layered, f)), f.name).toBe(true);
+    expect(() => composeLayered(layered, byName(layered, "plain"))).toThrow(/no depth layers/);
+  });
+  it("stores every frame image exactly as a bake without layers does", () => {
+    expect(layered.frameImages).toBe(flat.images.length);
+    flat.images.forEach((img, i) => expect(sameImage(layered.images[i], img) && sameImage(layered.normals[i], flat.normals[i])).toBe(true));
+    layered.frames.forEach((f, i) => {
+      const { layers: _layers, ...rest } = f;
+      expect(rest).toEqual(flat.frames[i]);
+    });
+  });
+  it("reuses images and keeps its own past the frame images", () => {
+    const r1 = byName(layered, "r1").layers!;
+    expect(byName(layered, "r2").layers).toEqual(r1);
+    expect(r1.shell!.id).toBeGreaterThanOrEqual(layered.frameImages!);
+    expect(r1.furniture).toMatchObject({ dx: 3, dy: 1 });
+    // A room with no furniture: its shell is its own frame image, reused.
+    const same = byName(layered, "same");
+    expect(same.layers).toEqual({ shell: same.image, furniture: null });
+    expect(same.layers!.shell!.id).toBeLessThan(layered.frameImages!);
+  });
+  it("names the frame whose furniture cannot compose", () => {
+    expect(() => bake([still("hazy", room(5, 6, true))], layeredFake)).toThrow(/hazy: diffLayer/);
+  });
+  it("packs the layers on pages after the frames' and leaves every frame page and part as it was", () => {
+    const a = buildArchive(layered, info, undefined, 32);
+    const b = buildArchive(flat, info, undefined, 32);
+    expect(a.pages.length).toBeGreaterThan(b.pages.length);
+    b.pages.forEach((page, i) => expect(sameImage(a.pages[i], page) && sameImage(a.normalPages[i], b.normalPages[i])).toBe(true));
+    for (const [name, rec] of Object.entries(b.manifest.frames)) {
+      const { layers, ...rest } = a.manifest.frames[name];
+      expect(rest).toEqual(rec);
+      for (const p of [...(layers?.shell ?? []), ...(layers?.furniture ?? [])]) {
+        if (p.rect.page < b.pages.length) expect(name).toBe("same"); // reused frame image
+      }
+    }
+    expect(a.manifest.frames.r1.layers!.furniture).toHaveLength(1);
+    expect(a.manifest.frames.same.layers!.furniture).toEqual([]);
+    expect(a.manifest.frames.plain.layers).toBeUndefined();
+    expect(checkPages(layered, a)).toEqual([]);
+    expect(checkLayers(a)).toEqual([]);
+    // A furniture pixel knocked out of place in the pages is caught.
+    const p = a.manifest.frames.r1.layers!.furniture[0].rect;
+    a.pages[p.page].data[(p.y * 32 + p.x) * 4] ^= 1;
+    expect(checkLayers(a)).toEqual(["r1", "r2"]);
+  });
+  it("names a split kind whose frames never hold furniture", () => {
+    const placed = { rect: { page: 0, x: 0, y: 0, w: 1, h: 1 }, dx: 0, dy: 0 };
+    const rec = (kind: string, furniture: (typeof placed)[]) => ({ w: 1, h: 1, anchor: { x: 0, y: 0 }, parts: [placed], keys: { kind }, layers: { shell: [placed], furniture } });
+    const frames = { a: rec("office", []), b: rec("office", [placed]), c: rec("spa", []), d: { ...rec("shop", []), layers: undefined } };
+    expect(kindsWithoutFurniture({ frames })).toEqual(["spa"]);
+  });
+  it("refuses a frame-image count outside the images", () => {
+    expect(() => buildArchive({ ...layered, frameImages: layered.images.length + 1 }, info, undefined, 32)).toThrow(/frameImages/);
+  });
+});
+
+/** A fake occupied room for the step split: spec `lit:<n>[:fade]` is a 4 x 2
+ *  block in color 5 with a glow pixel at (1, 0) and a desk at (3, 1); from
+ *  n = 1 the ceiling light at (0, 0) is on, and occupant k sits at (k - 1, 1).
+ *  Its shell pass keeps the light; its soft pass paints the desk, the people
+ *  and the glow on transparency (with `fade` the glow's alpha follows n, so
+ *  the soft steps cannot be drawn source-over). */
+const lit = (n: number, fade = false): PaintSpec => ({ p: "solid", css: `lit:${n}${fade ? ":fade" : ""}` });
+function litPixels(spec: PaintSpec, pass: "flat" | "shell" | "soft"): Image | null {
+  if (spec.p !== "solid" || !spec.css.startsWith("lit:")) return null;
+  const [, ns, fade] = spec.css.split(":");
+  const n = Number(ns);
+  const img = blank(4, 2);
+  const at = (x: number, y: number, px: number[]) => img.data.set(px, (y * 4 + x) * 4);
+  if (pass !== "soft") for (let i = 0; i < 8; i++) img.data.set([5, 0, 0, 255], i * 4);
+  if (pass !== "soft" && n > 0) at(0, 0, [9, 0, 0, 255]);
+  if (pass === "shell") return img;
+  at(3, 1, [6, 0, 0, 255]);
+  for (let k = 1; k <= Math.min(n, 3); k++) at(k - 1, 1, [7, 0, 0, 255]);
+  at(1, 0, pass === "soft" ? [200, 0, 0, fade ? 40 + n : 40] : [8, 0, 0, 255]);
+  return img;
+}
+const litFake: Renderer = {
+  render: (spec, w, h) => litPixels(spec, "flat") ?? layeredFake.render(spec, w, h),
+  renderShell: (spec, w, h) => litPixels(spec, "shell") ?? layeredFake.renderShell!(spec, w, h),
+  renderSoft: (spec) => litPixels(spec, "soft"),
+};
+
+describe("depth layers on occupant steps", () => {
+  const room = (name: string, fade = false): StillJob => ({
+    type: "still",
+    name,
+    w: 4,
+    h: 2,
+    anchor: { x: 0, y: 0 },
+    keys: { kind: "office" },
+    paint: lit(0, fade),
+    chains: { occupants: { input: "visibleOccupants", steps: [lit(0, fade), lit(1, fade), lit(2, fade), lit(2, fade)] } },
+    layers: true,
+  });
+  const stats = { softDropped: [] as string[] };
+  const r = bake([room("lit"), room("fading", true)], litFake, undefined, stats);
+  const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+  const lit0 = r.frames.find((f) => f.name === "lit")!;
+
+  it("puts a light that switches on with the first occupant on the shell, and the occupants in front", () => {
+    const c = lit0.layers!.chains!.occupants;
+    expect(c.shell).toHaveLength(2); // only step 1 changes the shell
+    expect(c.shell[1]).toMatchObject({ dx: 0, dy: 0 });
+    expect(c.furniture).toHaveLength(3); // two occupants, the third step changes nothing
+    expect(c.furniture[1]).toMatchObject({ dx: 0, dy: 1 });
+    expect(c.furniture[2]).toMatchObject({ dx: 1, dy: 1 });
+    expect(c.soft).toHaveLength(3);
+  });
+  it("gives back the flat frame plus its steps exactly at every occupant count", () => {
+    for (let n = 0; n <= 4; n++) {
+      expect(sameImage(composeLayered(r, lit0, { occupants: n }), composeFrame(r, lit0, { occupants: n })), `n = ${n}`).toBe(true);
+    }
+    const a = buildArchive(r, info, undefined, 32);
+    expect(checkLayers(a)).toEqual([]);
+  });
+  it("keeps the soft furniture's glow translucent and close to the flat frame", () => {
+    const soft = r.images[lit0.layers!.soft!.id];
+    // The glow pixel stays translucent instead of carrying the wall behind it.
+    const glow = (1 - lit0.layers!.soft!.dx + (0 - lit0.layers!.soft!.dy) * soft.w) * 4;
+    expect(soft.data[glow + 3]).toBe(40);
+    // Shell plus soft furniture matches the flat frame everywhere but the glow.
+    const viaSoft = composeLayered(r, lit0, { occupants: 2 }, [], true);
+    const flat2 = composeFrame(r, lit0, { occupants: 2 });
+    const off: number[] = [];
+    for (let i = 0; i < 8; i++) if (viaSoft.data.slice(i * 4, i * 4 + 4).some((v, c) => v !== flat2.data[i * 4 + c])) off.push(i);
+    expect(off).toEqual([1]);
+    const drift = softLayerDrift(buildArchive(r, info, undefined, 32));
+    expect(drift.frames).toBe(1);
+    expect(drift.pictures).toBe(3); // n = 0, 1, 2: the flat chain stops changing at 2
+    // Measured against the soft furniture's own pixels (desk, glow, people).
+    expect(drift.pixels).toBe(2 + 3 + 4);
+    expect(drift.differing).toBe(3); // the glow pixel rounds differently over the shell, once per picture
+    expect(drift.outside).toBe(0);
+  });
+  it("drops the soft furniture when a step would change a translucent pixel", () => {
+    const fading = r.frames.find((f) => f.name === "fading")!;
+    expect(fading.layers!.soft).toBeUndefined();
+    expect(fading.layers!.chains!.occupants.soft).toBeUndefined();
+    expect(stats.softDropped).toEqual(["fading"]);
+    expect(() => composeLayered(r, fading, {}, [], true)).toThrow(/no soft furniture/);
+  });
+  it("refuses a layered frame with two chains, or a step whose paint marks no break", () => {
+    const steps = room("x").chains!.occupants;
+    expect(() => bake([{ ...room("two"), chains: { a: steps, b: steps } }], litFake)).toThrow(/two: depth layers need at most one chain/);
+    expect(() => bake([{ ...room("over"), overlays: { dead: lit(0) } }], litFake)).toThrow(/over: depth layers need at most one chain and no overlays/);
+    expect(() => bake([{ ...room("none"), overlays: {} }], litFake)).not.toThrow();
+    const noBreak: Renderer = { ...litFake, renderShell: (spec, w, h) => (spec.p === "solid" && spec.css === "lit:1" ? null : litFake.renderShell!(spec, w, h)) };
+    expect(() => bake([room("gap")], noBreak)).toThrow(/gap: chain occupants step 1 marks no layer break/);
+  });
+  it("names a layered frame whose chain has no depth split, or no soft steps", () => {
+    const a = buildArchive(r, info, undefined, 32);
+    delete a.manifest.frames.lit.layers!.chains;
+    expect(checkLayers(a)).toEqual(["lit"]);
+    // Soft furniture without its soft steps is caught too.
+    const b = buildArchive(r, info, undefined, 32);
+    delete b.manifest.frames.lit.layers!.chains!.occupants.soft;
+    expect(checkLayers(b)).toEqual(["lit"]);
+  });
+  it("leaves out the soft furniture, and counts the frame, when the soft pass fails or gives nothing", () => {
+    for (const renderSoft of [() => null, () => { throw new LayerError("soft marks"); }] as Renderer["renderSoft"][]) {
+      const got = { softDropped: [] as string[] };
+      const out = bake([room("bare")], { ...litFake, renderSoft }, undefined, got);
+      expect(out.frames[0].layers!.soft).toBeUndefined();
+      expect(out.frames[0].layers!.chains!.occupants.soft).toBeUndefined();
+      expect(got.softDropped).toEqual(["bare"]);
+    }
+  });
+  it("measures the soft furniture of a layered frame with no chain", () => {
+    const { chains: _, ...still } = room("still");
+    const one = bake([still], litFake);
+    expect(softLayerDrift(buildArchive(one, info, undefined, 32))).toMatchObject({ frames: 1, pictures: 1, pixels: 2, differing: 1, outside: 0, worst: "still" });
+  });
+  it("names a layered frame that breaks the manifest's depth rules", () => {
+    const step0 = buildArchive(r, info, undefined, 32);
+    const c = step0.manifest.frames.lit.layers!.chains!.occupants;
+    c.shell[0] = c.shell[1];
+    expect(checkLayers(step0)).toContain("lit");
+    const overlay = buildArchive(r, info, undefined, 32);
+    overlay.manifest.frames.lit.overlays = { dead: c.shell[1] };
+    expect(checkLayers(overlay)).toContain("lit");
+  });
+  it("catches an occupant step whose depth split is broken", () => {
+    const a = buildArchive(r, info, undefined, 32);
+    // The light's shell step is a layer-only image (no flat frame shares it).
+    const step = a.manifest.frames.lit.layers!.chains!.occupants.shell[1]!.rect;
+    a.pages[step.page].data[(step.y * 32 + step.x) * 4] ^= 1;
+    expect(checkLayers(a)).toContain("lit");
   });
 });
