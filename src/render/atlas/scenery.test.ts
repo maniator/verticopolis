@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GRID } from "../../engine/facilities";
 import { lampAlpha } from "../excalibur/towerSceneryDraw";
 import { Z } from "../depthPlanes";
+import { allJobs } from "./browserEntry";
 import { TILE } from "../scale";
 import { SCENERY, hash01, plantRect, plantSpots, skylineRects } from "../sceneryLayout";
 import { CLOUD_COUNT, cloudSeed } from "../sprites/sky";
@@ -121,10 +122,10 @@ describe("scenery in the atlas", () => {
   it("names a frame family for every draw plane in z order, and the clouds the sky draws", () => {
     const planes = depthData();
     expect(planes.map((p) => p.z)).toEqual(Object.values(Z).sort((a, b) => a - b));
+    const all = allJobs().map((j) => j.name);
     for (const p of planes)
       for (const f of p.frames)
-        if (f.startsWith("scenery/"))
-          expect([...names].some((n) => n === f || n.startsWith(`${f}/`)), f).toBe(true);
+        expect(all.some((n) => n === f || n.startsWith(`${f}/`)), f).toBe(true);
     const sky = skyData();
     expect(sky.clouds.list).toHaveLength(CLOUD_COUNT);
     expect(sky.clouds.list[1].offset).toBe(cloudSeed(1) * 53);

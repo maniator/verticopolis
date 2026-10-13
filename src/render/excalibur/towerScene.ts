@@ -302,7 +302,7 @@ function drawSun(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   // so both rise in the east, climb, and set in the west.
   const { rise, set, baseY, lift } = SUN_ARC;
   const day = hour >= rise && hour < set;
-  const arc = day ? ((hour - rise) / (set - rise)) * Math.PI : (((hour - set + 24) % 24) / (set - rise)) * Math.PI;
+  const arc = day ? ((hour - rise) / (set - rise)) * Math.PI : (((hour - set + 24) % 24) / (24 - (set - rise))) * Math.PI;
   const cx = (arc / Math.PI) * engine.viewWidth;
   const cy = engine.viewHeight * baseY - Math.sin(arc) * engine.viewHeight * lift;
   drawSunDisc(ctx, cx, cy, day);

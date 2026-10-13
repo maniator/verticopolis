@@ -167,6 +167,8 @@ const at = (r: PieceRect) => ({ x: r.x, y: r.y });
  *  the tower"), back to front. */
 export function sceneryData() {
   return {
+    tileW: TILE,
+    floorH: FLOOR,
     lotTiles: GRID.width,
     ground: {
       // Solid fills: the dirt from the ground line down, and the ground line
@@ -243,13 +245,13 @@ const PLANE_FRAMES: Record<keyof typeof Z, string[]> = {
   hang: ["facade/escape", "facade/awning", "facade/crane"],
   structure: ["structure/floor", "structure/lobby", "structure/entrance"],
   room: ["room"],
-  walker: ["person"],
+  walker: ["person/walker"],
   animatedRoom: ["fire", "construction"],
   streetCar: ["vehicle/streetcar"],
   vehicle: ["vehicle/metrotrain", "vehicle/garbagetruck"],
   transport: ["shaft", "transport/stairs", "transport/escalator"],
   cab: ["car"],
-  crowd: ["person"],
+  crowd: ["person/walker"],
   overlay: [],
 };
 

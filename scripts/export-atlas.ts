@@ -41,9 +41,6 @@ const root = resolve(import.meta.dirname, "..");
 
 const FLAGS = new Set(["--out", "--filter", "--label"]);
 
-/** Every argument must be one of {@link FLAGS} followed by its value; the
- *  `--flag=value` form, unknown flags and a repeated flag are refused so
- *  nothing is silently ignored. */
 /** The app icon for other frontends: the mark's SVG (full bleed and inside the
  *  maskable safe zone) and the committed PNGs the web app ships. */
 function appIcons(root: string): Record<string, Uint8Array> {
@@ -57,6 +54,9 @@ function appIcons(root: string): Record<string, Uint8Array> {
   return icons;
 }
 
+/** Every argument must be one of {@link FLAGS} followed by its value; the
+ *  `--flag=value` form, unknown flags and a repeated flag are refused so
+ *  nothing is silently ignored. */
 function checkArgs(argv: readonly string[]): void {
   const seen = new Set<string>();
   for (let i = 0; i < argv.length; i += 2) {

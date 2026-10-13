@@ -392,7 +392,7 @@ export function kindsWithoutFurniture(manifest: Pick<AtlasManifest, "frames">): 
   const furnished = new Set<string>();
   for (const rec of Object.values(manifest.frames)) {
     if (!rec.layers) continue;
-    const kind = String(rec.keys.kind);
+    const kind = String(rec.keys.kind ?? rec.keys.vehicle);
     split.add(kind);
     // A parking space's car comes as a 'car<i>' overlay, which draws in
     // front, and an empty elevator cab's riders as its chain's furniture steps.

@@ -352,15 +352,16 @@ FULL bar and the lantern draw after the furniture ends, so they sit on the
 shell. The train's shell is the whole consist and its furniture the riders in
 the saloon windows; each window's glint draws after them, on the shell, so
 the furniture is transparent under it. The street cars and the garbage truck
-show no one inside and are drawn flat; they have a plane of their own in
-`data.depth`.
+show no one inside and are drawn flat; `data.depth` names the plane each
+draws on.
 
 The layers' own images are packed on pages after the frame images', so a
 frontend that ignores `layers` reads the same frames, parts and pages as before
 they existed. The same goes for the scenery, which joined the atlas later: its
 images pack on pages of their own between the older frames' pages and the
 layers'. The layers' pages come last, so their page numbers can change when a
-family is added; read them from the manifest, never from an older one. An entrance animation can carry `soft` on some of its frames and not
+family is added; read them from the manifest, never from an older one. An
+entrance animation can carry `soft` on some of its frames and not
 others (each frame splits on its own).
 
 ### Soft furniture
@@ -400,7 +401,8 @@ scenery painters (`src/render/excalibur/towerSceneryDraw.ts`), and
 `src/render/sceneryLayout.ts`) and the rules it seeds the rest by. Positions
 are in pixels at 1x: x from the lot's left edge and y from the ground line
 (negative is up), for a frame's top-left corner. `lotTiles` is the lot's width
-in tiles. Draw, back to front (the planes are the ones in
+in tiles, `tileW` a tile's width and `floorH` a floor's height, in pixels.
+Draw, back to front (the planes are the ones in
 [Draw order](#draw-order)):
 
 1. The skyline, seeded by the tower (see below): solid rectangles in the two
@@ -439,7 +441,8 @@ that draws with depth can set each at its own distance.
 
 The skyline and the plants are a pure function of the tower's founding seed
 (the engine's initial RNG seed, fixed for the tower's life), through this
-hash, where `int32`, `imul32`, `^` and `>>>` are as in `signature.rules.parkingRoll`:
+hash, where `int32`, `imul32`, `^` and `>>>` are as in
+`signature.rules.parkingRoll`:
 
 ```text
 hash01(n): h = int32(trunc(n)); h = imul32(h ^ (h >>> 16), 0x45d9f3b);
@@ -451,7 +454,7 @@ The skyline (`skyline`): for each band in `bands`, a building at every tile
 `t` from `start - overscanTiles` while `t < lotTiles + overscanTiles`, stepping
 by `step`. It is `w.base + hash01(seed + t * w.key) * w.span` tiles wide and
 `hFloors.base + hash01(seed + t * hFloors.key) * hFloors.span` floors tall
-(both fractional), with its left edge at x `t * 10` and its bottom on the
+(both fractional), with its left edge at x `t * tileW` and its bottom on the
 ground line, filled with the band's `frame` color.
 
 The plants (`plants.rule`): a candidate at every tile `t` from `margin`
@@ -459,14 +462,14 @@ while `t < lotTiles - margin`, stepping by `step`. With `r = hash01(seed * 3 +
 t)`, skip it when `r < skipBelow`; it is a bush when `r < bushBelow` and a
 tree otherwise. It stands on tile `t + floor(hash01(seed + t * jitter.key) *
 jitter.span) + jitter.min`, scaled `scale.base + hash01(seed + t * scale.key) *
-scale.span`. Its canvas is `round(size.tiles * 10 * scale)` wide and
-`round(size.floors * 45 * scale)` tall (`plants.size`, by kind), centered on
-the tile's left edge (x `tile * 10 - w / 2`, which can land on a half pixel),
+scale.span`. Its canvas is `round(size.tiles * tileW * scale)` wide and
+`round(size.floors * floorH * scale)` tall (`plants.size`, by kind), centered on
+the tile's left edge (x `tile * tileW - w / 2`, which can land on a half pixel),
 with its bottom edge at `bottomY` (its last row one above). The game paints a
 plant at that size; the atlas carries the tree in `treeVariants` variants and
 the bush at their base size, so a frontend scales the frame and picks the tree
-variant `(seed + tile) mod treeVariants`, which is close to, not exactly, the
-game's tree. A plant is hidden while the paved span reaches within
+variant `(seed + tile) mod treeVariants`, which comes close to the game's
+tree. A plant is hidden while the paved span reaches within
 `clearTiles` tiles of it: it shows only when `tile + clearTiles` is at most
 the span's first tile or `tile - clearTiles` is at least the tile after its
 last.
@@ -478,7 +481,7 @@ screen space, sized to the view (`viewW` by `viewH` pixels), behind the world.
 
 - The sun (`sky/sun`) shows from `sun.rise` to `sun.set` hours and the moon
   (`sky/moon`) for the rest of the day, along the same arc. At fraction `p`
-  of its stretch, the disc's center is at x `p * viewW` and y `viewH *
+  of its stretch (the day from rise to set, or the night from set to rise), the disc's center is at x `p * viewW` and y `viewH *
   baseY - sin(p * PI) * viewH * lift`.
 - The clouds show only on overcast and rainy days, as the
   `sky/cloud/<weather>/<i>` frames, one per entry in `clouds.list`. At `t`

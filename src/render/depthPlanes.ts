@@ -22,7 +22,7 @@ export const Z = {
   hang: -2,
   /** Floor and lobby tiles (the entrances are lobby tiles). */
   structure: -1,
-  /** Rooms (settled, burning and unbuilt). */
+  /** Settled rooms (the region canvases). */
   room: 0,
   /** Ambient walkers on the floors and in the lobby. */
   walker: 0.4,

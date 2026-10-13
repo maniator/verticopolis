@@ -18,12 +18,11 @@ import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { iconSvg } from "./app-icon-svg.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = resolve(__dirname, "../src/public");
 const EXECUTABLE = process.env.PW_CHROME || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
-
-import { iconSvg } from "./app-icon-svg.mjs";
 
 const TARGETS = [
   { name: "pwa-192x192.png", size: 192, maskable: false },
