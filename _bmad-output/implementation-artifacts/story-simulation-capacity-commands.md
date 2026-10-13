@@ -62,8 +62,10 @@ not. This is the TypeScript tie-in the owner asked for after #938.
   through the simulation layer.
 - `mirror.test.ts`: the bare tower edits relay as the tower ops; a
   simulation-layer edit relays once, as the reporting op.
-- `dualRunEdits` integration: bare tower car and span edits on the hosted
+- `dualRunEdits` integration: bare tower car and span edits on the shadowed
   tower keep both the state and the event streams in step.
+- `towerRelayOps.guard.test.ts`: no source outside the dual-run relay names
+  the relay-only ops (owner review on #950).
 - `cargo run --release --bin conformance`: every scenario ok; the TypeScript
   conformance runs match the lock.
 
@@ -91,4 +93,24 @@ Auditor on commit 4e5e10a):
   only, so no payload, version, or dashboard moves; the history note records
   it.
 
-Confirming pass: see below.
+Round 2, confirming pass on the full PR diff after the round-1 fixes and the
+merge of main:
+
+- Edge Case Hunter: no unhandled paths (mirror nesting, the shadow's
+  exhaustive switch, the WASM host relay, undo and detach, Rust parity).
+- **patch** (Blind Hunter) The catalog history note said every host command
+  reports as before; it now also says a bare tower edit, which reported
+  before, is silent in both engines. Digest pin moved.
+- **patch** (Blind Hunter, Acceptance Auditor) This record's dangling
+  "see below" and the test record's "hosted tower" (the test runs under the
+  dual-run shadow; the WASM host shares the same relay) fixed.
+- **dismissed** Rust `Simulation::set_cars`/`resize_transport` do nothing
+  beyond the tower call and the event, so the silent ops change the same
+  state; no non-test caller of the bare tower edits exists in `src/`.
+
+Owner review on #950 (P2): the relay-only ops sit on the production binding.
+They are documented as relay-only in `wasm.rs` and `binding.ts`,
+`towerRelayOps.guard.test.ts` keeps every source but the relay off them, and
+the #923 boundary row now covers confining them outright.
+
+Round 3: a confirming pass on these fixes (recorded below once it lands).
