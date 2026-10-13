@@ -13,13 +13,13 @@ import { RNG } from "./rng";
 export class EventSystem {
   /** Ids of units currently ablaze (a fire emergency in progress). */
   private active = new Set<number>();
-  /** Cumulative emergency tallies for this tower instance, for the shell's
-   *  session analytics ONLY: fire outbreaks ignited, rooms gutted BY FIRE
-   *  (not by a bomb), and bomb detonations. Plain integers the shell reads;
-   *  the engine never reports them itself (it imports no analytics). Not part
-   *  of save state, so a loaded tower restarts them at zero (the shell's
-   *  session accumulator banks a departing tower's tallies, so a session that
-   *  changes towers still sums every tower it played). */
+  /** Cumulative emergency tallies for this tower instance: fire outbreaks
+   *  ignited, rooms gutted BY FIRE (not by a bomb), and bomb detonations. Not
+   *  part of save state, so a loaded tower restarts them at zero. Session
+   *  analytics no longer read them: since #873 phase 2 the analytics bridge
+   *  folds the gameplay events (`fire_started`, `fire_gutted`,
+   *  `bomb_detonated`) instead, and the tallies wait to be retired in both
+   *  engines (backlog `retire-emergency-counters`). */
   private firesStartedCount = 0;
   private firesGutRoomsCount = 0;
   private bombsDetonatedCount = 0;
@@ -215,8 +215,8 @@ export class EventSystem {
     if (rooms > 0) this.sim.gameplayEvents?.push("fire_gutted", { rooms });
   }
 
-  /** Cumulative emergency tallies for this tower instance (analytics only, read
-   *  by the shell; see the counter fields). */
+  /** Cumulative emergency tallies for this tower instance (see the counter
+   *  fields). */
   get counts(): { fires: number; firesGutRooms: number; bombs: number } {
     return { fires: this.firesStartedCount, firesGutRooms: this.firesGutRoomsCount, bombs: this.bombsDetonatedCount };
   }

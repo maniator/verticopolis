@@ -89,10 +89,17 @@ export type GameplayMilestoneId =
 export interface GameplayEventPayloads {
   /**
    * A new tower was founded. Emitted once by the new-game constructor, before
-   * any command runs. Loading a save never emits it. Version 1, once per tower.
-   * Takes over from the shell's new_game_started call in saveLoad.ts in phase
-   * 2. That wire name was game_started until 2026-09-14, renamed because it
-   * read like a session counter; the wire keeps new_game_started.
+   * any command runs. Loading a save never emits it. A tower a host founds only
+   * as a backdrop the player never plays (the web title screen with no save
+   * behind it) is not a founding the player made: the host leaves that
+   * tower_founded, and every other event the backdrop emits, out of analytics,
+   * and the tower the player then founds reports its own. Version 1, once per
+   * tower. Takes over from the shell's new_game_started call in saveLoad.ts in
+   * phase 2. That wire name was game_started until 2026-09-14, renamed because
+   * it read like a session counter; the wire keeps new_game_started. The
+   * backdrop rule was written into the semantics on 2026-10-11 (phase 2); it
+   * states what the web host already did, so the payload, the emission and the
+   * version are unchanged.
    */
   tower_founded: {
     mode: GameplayMode;

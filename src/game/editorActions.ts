@@ -5,7 +5,6 @@ import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import type { BuildActions } from "./buildActions";
 import { NOT_ENOUGH_MONEY } from "../engine/sim/charges";
-import { trackEconomyActionOnce } from "../analytics";
 
 /**
  * The editor-card actions: everything the selected facility's buttons can do
@@ -183,7 +182,6 @@ export class EditorActions {
     // way, no money left) is silent so a drag doesn't spam toasts; the shaft
     // simply stops growing.
     if (!res.ok || (res.bottom === before.bottom && res.top === before.top)) return;
-    if (res.added > 0) trackEconomyActionOnce("capacity_tune"); // paid shaft extend (latched; no count)
     this.extendHwm.top = Math.max(this.extendHwm.top, res.top);
     this.extendHwm.bottom = Math.min(this.extendHwm.bottom, res.bottom);
     this.deps.audio.sfx(res.added > 0 ? "build" : "click");
@@ -210,7 +208,6 @@ export class EditorActions {
           return r;
         },
         onApplied: (summary) => {
-          trackEconomyActionOnce("price_tune"); // batch pricing applied (latched; no value)
           this.deps.audio.sfx("build");
           this.deps.ui.toast(summary, "good");
           this.deps.announce(summary);
@@ -257,7 +254,6 @@ export class EditorActions {
         this.deps.refreshEditor();
       } else if (action === "rentUp" || action === "rentDown") {
         if (sim.adjustRent(u.id, action === "rentUp" ? 1 : -1) !== null) {
-          trackEconomyActionOnce("price_tune"); // engaged with pricing (latched; no value)
           this.deps.audio.sfx("click");
           this.deps.refreshEditor();
         }
@@ -271,7 +267,6 @@ export class EditorActions {
         if (sel && shape?.shape === "ladder") {
           if (sel.value === "noRate") {
             if (sim.setNoRate(u.id)) {
-              trackEconomyActionOnce("price_tune"); // engaged with pricing (latched; no value)
               this.deps.audio.sfx("click");
               this.deps.announce("No Rate: off the market. Charges nothing; no one moves in.");
             }
@@ -281,7 +276,6 @@ export class EditorActions {
               let what = "Rent";
               if (u.kind === "condo") what = "Sale price";
               else if (isHotelKind(u.kind)) what = "Room rate";
-              trackEconomyActionOnce("price_tune"); // engaged with pricing (latched; no value)
               this.deps.audio.sfx("click");
               this.deps.announce(`${what} set to ${rung.label} ($${rung.value.toLocaleString()}).`);
             }
@@ -326,7 +320,6 @@ export class EditorActions {
         // disabled anyway, and a toast would blame the wrong constraint.
         const res = action === "addcar" ? sim.addCar(t.id) : sim.removeCar(t.id);
         if (!res.ok) return res.reason === NOT_ENOUGH_MONEY ? this.refuse(res.reason) : undefined;
-        trackEconomyActionOnce("capacity_tune"); // adjusted transport capacity (latched; no count)
         this.deps.audio.sfx(action === "addcar" ? "build" : "click");
         this.deps.refreshEditor();
       } else if (action === "schedule") {
@@ -342,7 +335,6 @@ export class EditorActions {
           this.deps.audio.sfx("error");
           if (res.reason) this.deps.ui.toast(res.reason, "bad");
         } else {
-          trackEconomyActionOnce("capacity_tune"); // extended a shaft (latched; no count)
           this.deps.audio.sfx("build");
         }
         this.deps.refreshEditor();
