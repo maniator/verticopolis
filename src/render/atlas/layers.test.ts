@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { hasBusinessHours, isOpenAt } from "../../engine/facilities";
 import type { FacilityKind } from "../../engine/types";
 import { withLayerHook } from "../pixelSprites/layers";
-import { DEPTH_FLAT_KINDS, roomJobs, roomKinds, type StillJob } from "./catalog";
+import { roomJobs, roomKinds, type StillJob } from "./catalog";
 import { LOBBY_VARIANTS } from "../sprites";
 import { structureJobs } from "./catalogExtras";
 import { paint, type PaintSpec, type UnitPaint } from "./paint";
@@ -38,7 +38,7 @@ const INTERIOR_KINDS = new Set<FacilityKind>(["partyHall", "aquaticCenter", "wed
 /** Whether the game paints `s` as a full room (so it should split), rather
  *  than a vacancy card, a closed shutter or a gutted shell. */
 function paintsRoom(s: UnitPaint): boolean {
-  if (DEPTH_FLAT_KINDS.has(s.kind) || s.state === "gutted") return false;
+  if (s.state === "gutted") return false;
   if (s.state === "empty" && VACANCY_KINDS.has(s.kind)) return false;
   if (!INTERIOR_KINDS.has(s.kind) && s.state !== "empty" && hasBusinessHours(s.kind) && !isOpenAt(s.kind, s.hour)) return false;
   return true;
@@ -54,12 +54,12 @@ function marks(s: UnitPaint, w: number, h: number): string[] {
 describe("depth-layer marks across the room catalog", () => {
   const stills = roomJobs().filter((j): j is StillJob => j.type === "still");
 
-  it("asks for a split on every room still frame but the flat kinds'", () => {
+  it("asks for a split on every room still frame", () => {
     expect(stills.length).toBeGreaterThan(0);
-    for (const j of stills) expect(j.layers, j.name).toBe(!DEPTH_FLAT_KINDS.has((j.paint as UnitPaint).kind));
+    for (const j of stills) expect(j.layers, j.name).toBe(true);
   });
 
-  it("marks exactly one break on every frame that paints a room, and none on vacancy cards, shutters, gutted shells or the flat kinds", () => {
+  it("marks exactly one break on every frame that paints a room, and none on vacancy cards, shutters or gutted shells", () => {
     const wrong: string[] = [];
     const split = new Set<FacilityKind>();
     for (const j of stills) {
@@ -74,7 +74,7 @@ describe("depth-layer marks across the room catalog", () => {
     }
     expect(wrong.slice(0, 10)).toEqual([]);
     // Every room kind outside the flat list splits somewhere in the catalog.
-    const expected = roomKinds().filter((k) => !DEPTH_FLAT_KINDS.has(k));
+    const expected = roomKinds();
     expect([...split].sort()).toEqual(expected.sort());
   });
 });

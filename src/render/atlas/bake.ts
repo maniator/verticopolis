@@ -316,9 +316,9 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
       // any pixel source-over could not reproduce).
       const shell = job.layers && r.renderShell ? r.renderShell(job.paint, job.w, job.h) : null;
       if (shell) {
-        // One chain and no overlays: the draw order the manifest documents
-        // (and the checks that prove it) covers exactly that.
-        if (Object.keys(job.chains ?? {}).length > 1 || Object.keys(job.overlays ?? {}).length > 0) throw new LayerError("depth layers need at most one chain and no overlays");
+        // At most one chain: the draw order the manifest documents (and the
+        // checks that prove it) covers one; overlays draw last, in front.
+        if (Object.keys(job.chains ?? {}).length > 1) throw new LayerError("depth layers need at most one chain");
         const { layers, softBase } = splitBase(job.paint, job.w, job.h, base, shell);
         const soft0 = softBase?.image ?? null;
         let softOk = softBase !== null;

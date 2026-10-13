@@ -212,6 +212,35 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   // Overhead sorting sign.
   box(F, 92, 5, 70, 10, "#2A6E3A");
   for (let i = 0; i < 11; i++) Fu(96 + i * 6, 8, 3, 4, "#DCE8C0"); // sign letters
+  // The deck curb, the wall gauge and its FULL cue are the hall's own, so they
+  // draw before the machines (none of them overlaps one) and the depth split
+  // (`pixelSprites/layers.ts`) keeps them on the shell; the machines, the
+  // day's pile and the plant hand are the furniture.
+  const drawCurb = (): void => {
+    F(0, deck, W, 7, "#4A4A44");
+    F(0, deck, W, 1, "#5E5E56");
+    for (let i = 0; i < W; i += 6) {
+      Fu(i, deck + 1, 3, 2, "#D8B23A");
+      Fu(i + 3, deck + 1, 3, 2, "#2A2418");
+    }
+    F(20, deck + 3, W - 40, 1, "#000000", 0.2);
+  };
+  drawCurb();
+  // The day's waste fill, a prepared input (no scan runs here).
+  const rawFill = d.recycleFill ?? 0;
+  const fill = Number.isFinite(rawFill) ? Math.max(0, Math.min(1, rawFill)) : 0;
+  // Live wall gauge: green, then amber past 0.7, then red with the FULL cue at
+  // capacity. The FULL red is a deliberate state cue, not decoration.
+  const gY = 14;
+  const gH = deck - 18;
+  F(W - 6, gY, 4, gH, "#1B2A14");
+  let gauge = "#6bd47a";
+  if (fill >= 1) gauge = "#d6342f";
+  else if (fill > 0.7) gauge = "#e0a94e";
+  const gaugeH = Math.round(gH * fill);
+  F(W - 5, gY + gH - gaugeH, 2, gaugeH, gauge);
+  if (fill >= 1) serviceLabel(ctx, "FULL", sx(W - 34), y, "#ffd2c8", 44, w);
+  layerBreak(ctx);
   // Conveyor belt carrying baled recyclables (no reserved red bale).
   const by = deck - 24;
   F(26, by, 120, 6, "#3A3E44");
@@ -271,19 +300,11 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
     Fu(gx2, deck - 5, 6, 5, i % 2 ? "#3A4232" : "#2F3628");
     Fu(gx2 + 2, deck - 6, 2, 2, "#FFFFFF", 0.28);
   }
-  // Painted deck curb with hazard stripes.
-  F(0, deck, W, 7, "#4A4A44");
-  F(0, deck, W, 1, "#5E5E56");
-  for (let i = 0; i < W; i += 6) {
-    Fu(i, deck + 1, 3, 2, "#D8B23A");
-    Fu(i + 3, deck + 1, 3, 2, "#2A2418");
-  }
-  F(20, deck + 3, W - 40, 1, "#000000", 0.2);
+  // The curb again, over the machines' contact shadows on its top row, so the
+  // frame reads exactly as it did when the curb was drawn only here.
+  drawCurb();
   // Live behavior: the day's waste piles up until the morning truck. The pile
-  // grows rightward and stacks a second row past half full. `d.recycleFill` is
-  // a prepared input, so no scan runs here.
-  const rawFill = d.recycleFill ?? 0;
-  const fill = Number.isFinite(rawFill) ? Math.max(0, Math.min(1, rawFill)) : 0;
+  // grows rightward and stacks a second row past half full.
   const pileX0 = 28;
   const pileMax = W - 70;
   const slots = Math.floor((pileMax - pileX0) / 7);
@@ -295,17 +316,6 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
     Fu(bx + 2, deck - 7 - jit, 2, 2, "#FFFFFF", 0.35);
     if (fill > 0.5 && i % 2 === 0 && i < bags - 1) F(bx + 3, deck - 11 - jit, 6, 5, "#2f3628");
   }
-  // Live wall gauge: green, then amber past 0.7, then red with the FULL cue at
-  // capacity. The FULL red is a deliberate state cue, not decoration.
-  const gY = 14;
-  const gH = deck - 18;
-  F(W - 6, gY, 4, gH, "#1B2A14");
-  let gauge = "#6bd47a";
-  if (fill >= 1) gauge = "#d6342f";
-  else if (fill > 0.7) gauge = "#e0a94e";
-  const gaugeH = Math.round(gH * fill);
-  F(W - 5, gY + gH - gaugeH, 2, gaugeH, gauge);
-  if (fill >= 1) serviceLabel(ctx, "FULL", sx(W - 34), y, "#ffd2c8", 44, w);
   // The vested plant hand (shared hi-vis build with a hardhat), drawn last so
   // the worker stands in front of the pile.
   personHiVis(ctx, sx(84), sy(deck), (u.id * 7 + 3) | 0);

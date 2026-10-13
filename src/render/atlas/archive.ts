@@ -302,14 +302,14 @@ function eachLayeredPicture(
 }
 
 /** Names of the frames whose depth layers break the manifest's rules (chain
- *  keys, at most one chain and no overlays, a null step 0, soft steps exactly
+ *  keys, at most one chain, a null step 0, soft steps exactly
  *  where there is soft furniture) or, read back out of the packed pages
  *  through the manifest the way a frontend reads them, do not give back the
  *  frame's own pixels for some occupant count; empty when every layered frame
  *  passes. */
 export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): string[] {
   const bad = new Set<string>();
-  // A layered frame has at most one chain and no overlays; its chain has a
+  // A layered frame has at most one chain (its overlays draw last); its chain has a
   // depth split (and no split lacks its chain), each list starts with a null
   // step 0, and soft furniture comes with soft steps for its chain.
   for (const [name, rec] of Object.entries(archive.manifest.frames)) {
@@ -319,8 +319,8 @@ export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): strin
     const depth = JSON.stringify(Object.keys(layers.chains ?? {}).sort());
     const soft = layers.soft !== undefined;
     const lists = Object.values(layers.chains ?? {}).flatMap((c) => [c.shell, c.furniture, ...(c.soft ? [c.soft] : [])]);
-    const oneChainNoOverlays = Object.keys(rec.chains ?? {}).length <= 1 && Object.keys(rec.overlays ?? {}).length === 0;
-    if (flat !== depth || !oneChainNoOverlays || lists.some((l) => l[0] !== null) || Object.values(layers.chains ?? {}).some((c) => (c.soft !== undefined) !== soft)) bad.add(name);
+    const oneChain = Object.keys(rec.chains ?? {}).length <= 1;
+    if (flat !== depth || !oneChain || lists.some((l) => l[0] !== null) || Object.values(layers.chains ?? {}).some((c) => (c.soft !== undefined) !== soft)) bad.add(name);
   }
   eachLayeredPicture(archive, (name, _n, flat, exact) => {
     if (sameImage(flat, exact)) return true;
@@ -378,7 +378,8 @@ export function kindsWithoutFurniture(manifest: Pick<AtlasManifest, "frames">): 
     if (!rec.layers) continue;
     const kind = String(rec.keys.kind);
     split.add(kind);
-    if (rec.layers.furniture.length > 0) furnished.add(kind);
+    // A parking space's car comes as an overlay, which draws in front.
+    if (rec.layers.furniture.length > 0 || Object.keys(rec.overlays ?? {}).length > 0) furnished.add(kind);
   }
   return [...split].filter((k) => !furnished.has(k)).sort();
 }

@@ -265,7 +265,8 @@ The result is the frame's own `parts` plus its chain steps `1..n`, exactly.
 Pass the visible occupant count itself and clamp it to each list on its own:
 a depth list can run past the chain's `max` when a step changes only pixels
 the flat frame hides (a light behind a desk). A layered frame has at most one
-chain and no overlays, so nothing else of the frame draws over these four.
+chain, and its overlays (only the parking space has any) draw after these
+four, in front.
 Draw anything of your own that belongs between the wall and the furniture
 (walkers, a depth offset) between steps 2 and 3. Any list can be empty (a
 fully transparent picture).
@@ -313,17 +314,18 @@ A frame has no `layers`, and a frontend draws it flat, when:
 
 - the room is vacant and shows its LEASE or SALE card (office, condo, studio,
   apartment), is closed and shows its shutter, or is gutted;
-- it is a burning or unbuilt room (among the animations, only the entrance
-  frames split);
-- its kind is one whose art does not mark a split yet: the parking space, the
-  parking ramp and the recycling center (backlog row
-  `atlas-depth-layers-flat-kinds`).
+- it is a burning or unbuilt room (those are animations).
 
-Every other room kind splits: office, condo, studio, apartment, the three
+Every room kind splits otherwise: office, condo, studio, apartment, the three
 hotel grades, fast food, restaurant, food hall, cinema, shop, amusements,
 boutique bay, fitness club, clinic, nightclub, spa, sky bar, daycare,
 security, medical center, housekeeping, party hall, wedding hall, aquatic
-center and metro station.
+center, metro station, recycling center, parking ramp and parking space. The
+recycling center's chain is its `fill`: the wall gauge (and its FULL cue)
+changes on the shell, the day's pile in front. The parking ramp's furniture is
+the car parked at its foot. A parking space's shell is the whole bay and its
+furniture list is empty: its car comes as a `car<i>` overlay (and a dead
+space's red X as `dead`), which draws in front of everything.
 
 The lobby splits too, so a concourse can be drawn with depth like the rooms
 beside it. Every `structure/lobby/...` tile carries `layers`: the column,

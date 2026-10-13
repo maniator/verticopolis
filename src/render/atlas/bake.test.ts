@@ -370,11 +370,14 @@ describe("depth layers on occupant steps", () => {
     expect(stats.softDropped).toEqual(["fading"]);
     expect(() => composeLayered(r, fading, {}, [], true)).toThrow(/no soft furniture/);
   });
-  it("refuses a layered frame with two chains, or a step whose paint marks no break", () => {
+  it("refuses a layered frame with two chains, or a step whose paint marks no break, and keeps its overlays", () => {
     const steps = room("x").chains!.occupants;
     expect(() => bake([{ ...room("two"), chains: { a: steps, b: steps } }], litFake)).toThrow(/two: depth layers need at most one chain/);
-    expect(() => bake([{ ...room("over"), overlays: { dead: lit(0) } }], litFake)).toThrow(/over: depth layers need at most one chain and no overlays/);
-    expect(() => bake([{ ...room("none"), overlays: {} }], litFake)).not.toThrow();
+    // Overlays are fine: they draw last, over the furniture, as over the flat frame.
+    const over = bake([{ ...room("over"), overlays: { lamp: lit(1) } }], litFake);
+    const f = over.frames[0];
+    expect(f.layers).toBeDefined();
+    expect(sameImage(composeLayered(over, f, { occupants: 2 }, ["lamp"]), composeFrame(over, f, { occupants: 2 }, ["lamp"]))).toBe(true);
     const noBreak: Renderer = { ...litFake, renderShell: (spec, w, h) => (spec.p === "solid" && spec.css === "lit:1" ? null : litFake.renderShell!(spec, w, h)) };
     expect(() => bake([room("gap")], noBreak)).toThrow(/gap: chain occupants step 1 marks no layer break/);
   });
@@ -406,9 +409,10 @@ describe("depth layers on occupant steps", () => {
     const c = step0.manifest.frames.lit.layers!.chains!.occupants;
     c.shell[0] = c.shell[1];
     expect(checkLayers(step0)).toContain("lit");
-    const overlay = buildArchive(r, info, undefined, 32);
-    overlay.manifest.frames.lit.overlays = { dead: c.shell[1] };
-    expect(checkLayers(overlay)).toContain("lit");
+    const two = buildArchive(r, info, undefined, 32);
+    two.manifest.frames.lit.chains!.extra = two.manifest.frames.lit.chains!.occupants;
+    two.manifest.frames.lit.layers!.chains!.extra = two.manifest.frames.lit.layers!.chains!.occupants;
+    expect(checkLayers(two)).toContain("lit");
   });
   it("catches an occupant step whose depth split is broken", () => {
     const a = buildArchive(r, info, undefined, 32);
