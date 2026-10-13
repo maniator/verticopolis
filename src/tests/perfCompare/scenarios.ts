@@ -27,22 +27,32 @@ export interface Scenario {
 
 const REPO_ROOT = resolve(import.meta.dirname, "../../..");
 
-/** A small, fully occupied 15-floor tower: two elevators, offices and condos
- *  on every floor, one fast food. Deterministic (seeded founding, no ticks). */
+/** A small, fully occupied 15-floor tower: two elevators, a row of offices
+ *  (or, every third floor, condos) on floors 3 to 15, one fast food. Deterministic (seeded founding, no ticks). */
 export function buildSmallTower(): Simulation {
   const sim = Simulation.newGame(7, "classic");
   const t = sim.tower;
   sim.money = 1_000_000_000;
   const left = 120;
   const right = 260;
-  for (let x = left; x < right; x++) t.place("lobby", 1, x);
-  for (let f = 2; f <= 15; f++) for (let x = left; x < right; x++) t.place("floor", f, x);
+  // Every placement is asserted, so a rule change that refuses one fails
+  // here instead of quietly benchmarking a smaller tower than described.
+  const must = (kind: Parameters<typeof t.place>[0], floor: number, x: number): void => {
+    const r = t.place(kind, floor, x);
+    if (!r.ok) throw new Error(`small tower: ${kind} at floor ${floor}, x ${x} refused: ${r.reason}`);
+  };
+  for (let x = left; x < right; x++) must("lobby", 1, x);
+  for (let f = 2; f <= 15; f++) for (let x = left; x < right; x++) must("floor", f, x);
   for (const x of [left, right - FACILITIES.elevatorStandard.width]) {
     const r = t.placeTransport("elevatorStandard", x, 1, 15);
     if (!r.ok) throw new Error(`small tower: elevator at ${x} refused: ${r.reason}`);
   }
-  for (let f = 3; f <= 15; f++) for (let x = left + 8; x + 9 <= right - 8; x += 9) t.place(f % 3 === 0 ? "condo" : "office", f, x);
-  t.place("fastFood", 2, left + 10);
+  for (let f = 3; f <= 15; f++) {
+    const kind = f % 3 === 0 ? "condo" : "office";
+    const w = FACILITIES[kind].width;
+    for (let x = left + 8; x + w <= right - 8; x += w) must(kind, f, x);
+  }
+  must("fastFood", 2, left + 10);
   for (const u of t.units) {
     if (u.kind === "office" || u.kind === "condo") {
       u.state = "occupied";
