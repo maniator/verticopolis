@@ -147,14 +147,17 @@ export interface GameplayEventPayloads {
   };
   /**
    * A shaft's capacity changed: setCars changed the car count, or
-   * resizeTransport moved the span. A refused or no-op edit emits nothing. The
-   * TypeScript engine emits from the tower's own setCars and resizeTransport;
-   * the Rust engine emits from Simulation::set_cars and
-   * Simulation::resize_transport, and its bare tower methods emit nothing. The
-   * charge commands (addCar, removeCar, extendTransport) edit through these, so
-   * a paid edit reports the same event. Version 1, per occurrence. New. Takes
-   * over from economy_action with action capacity_tune in phase 2; the platform
-   * keeps the once-per-session latch.
+   * resizeTransport moved the span. A refused or no-op edit emits nothing. Both
+   * engines emit from the simulation layer (Simulation.setCars and
+   * Simulation.resizeTransport, Simulation::set_cars and
+   * Simulation::resize_transport), and the bare tower methods emit nothing in
+   * either. The charge commands (addCar, removeCar, extendTransport) edit
+   * through these, so a paid edit reports the same event. Version 1, per
+   * occurrence. New. Takes over from economy_action with action capacity_tune
+   * in phase 2; the platform keeps the once-per-session latch. On 2026-10-13
+   * (#906) the TypeScript engine moved its emission from the tower to the
+   * simulation layer, where the Rust engine already emitted; every host command
+   * reports exactly as before, so the payload and the version are unchanged.
    */
   capacity_changed: {
     kind: GameplayFacilityKind;
