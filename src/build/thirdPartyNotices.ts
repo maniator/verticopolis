@@ -99,7 +99,10 @@ export function sourceToPath(source: unknown, mapDir: string, sourceRoot: unknow
   const absolute = (s: string): string | null => {
     if (/^file:/i.test(s)) {
       try {
-        return join("", decodeURIComponent(new URL(s).pathname).replace(/^\/([A-Za-z]:)/, "$1"));
+        const url = new URL(s);
+        const path = decodeURIComponent(url.pathname).replace(/^\/([A-Za-z]:)/, "$1");
+        // file://server/share/... names a UNC share; its host is the server.
+        return url.host && url.host !== "localhost" ? join("", `//${url.host}${path}`) : join("", path);
       } catch {
         return null;
       }

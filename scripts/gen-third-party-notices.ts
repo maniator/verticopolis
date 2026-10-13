@@ -130,9 +130,11 @@ for (const map of maps) {
       // level off, relative to dist/ itself (workbox-build's temporary
       // directory and Vite's worker bundles), so a path under dist/ that is
       // missing is read again from the repository root.
+      // A directory is not a source file, so it identifies nothing that shipped.
+      const isFile = (p: string): boolean => existsSync(p) && statSync(p).isFile();
       let onDisk = inRepo;
-      if (!existsSync(ROOT + onDisk) && onDisk.startsWith("/dist/")) onDisk = onDisk.slice("/dist".length);
-      if (!existsSync(ROOT + onDisk)) fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which does not exist`);
+      if (!isFile(ROOT + onDisk) && onDisk.startsWith("/dist/")) onDisk = onDisk.slice("/dist".length);
+      if (!isFile(ROOT + onDisk)) fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which is not a file`);
       sources.push(onDisk);
     }
     // An id that names no file (a virtual module, a `\0` helper, a URL) could

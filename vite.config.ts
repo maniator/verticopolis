@@ -83,7 +83,7 @@ function emitVersionJson(): Plugin {
  */
 const PACKAGE_STYLESHEET = /[\\/]node_modules[\\/].*\.(css|less|sass|scss|styl|stylus|pcss|postcss|sss)(\?|$)/;
 const PACKAGE_FILE = /(^|[\\/])node_modules[\\/]/;
-const PACKAGE_CODE = /\.([mc]?[jt]sx?|json)(\?|$)/;
+const PACKAGE_CODE = /\.[mc]?[jt]sx?(\?|$)/;
 function noUnlistedPackageFiles(): Plugin {
   const refuse = (what: string): string => `${what}: the third-party notices cannot list this package file (see #951)`;
   return {
@@ -95,7 +95,8 @@ function noUnlistedPackageFiles(): Plugin {
     generateBundle(_options, bundle) {
       // A CSS @import, or a small image or font inlined as a data URL, never
       // reaches `transform` or the bundle as its own file; the build's watch
-      // list still names it. Package JavaScript is listed by its sourcemap.
+      // list still names it. Package JavaScript is listed by its sourcemap;
+      // package JSON is inlined without one, so it is refused like an asset.
       const inlined = this.getWatchFiles().filter((f) => PACKAGE_FILE.test(f) && !PACKAGE_CODE.test(f));
       if (inlined.length > 0) this.error(refuse(inlined.join(", ")));
       for (const file of Object.values(bundle)) {

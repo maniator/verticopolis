@@ -90,6 +90,8 @@ describe("third-party notices (#951)", () => {
     // A UNC share keeps its root, so a build from a network share still matches the repository path.
     expect(sourceToPath("../../node_modules/x/a.js", "//server/share/repo/dist/assets", undefined)).toBe("//server/share/repo/node_modules/x/a.js");
     expect(sourceToPath("\\\\server\\share\\repo\\a.js", "/d", undefined)).toBe("//server/share/repo/a.js");
+    expect(sourceToPath("file://server/share/repo/node_modules/x/a.js", "/d", undefined)).toBe("//server/share/repo/node_modules/x/a.js");
+    expect(sourceToPath("file://localhost/repo/a.js", "/d", undefined)).toBe("/repo/a.js");
     expect(sourceToPath("a.js", "/repo/dist", "file:///abs/root/")).toBe("/abs/root/a.js");
     expect(packageNameFromDir("/r/node_modules/@vercel/analytics")).toBe("@vercel/analytics");
   });
