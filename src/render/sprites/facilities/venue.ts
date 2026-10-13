@@ -155,8 +155,8 @@ export function drawAquaticCenter(d: DrawCtx, u: Unit, x: number, y: number, w: 
   // The shell ends: the diver on the board and the swimmers in the pool stay
   // with it, so only the deck-chair loungers come forward. The water, ropes
   // and ripples draw before the loungers, which sit on the deck above the
-  // rows they start on, so the order changes no pixel; the diver, swimmers
-  // and loungers still fill in that order.
+  // first pool row, so the order changes no pixel; the diver, swimmers and
+  // loungers still fill in that order.
   layerBreak(ctx);
   // Deck-chair loungers along the poolside band.
   for (let lx = 5; lx + 5 < w - 4; lx += 11) { f(lx, midY + 3, 7, 2, "#E0A85A"); lounge(lx + 1, midY + 5); }
