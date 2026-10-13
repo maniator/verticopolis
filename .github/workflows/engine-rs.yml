@@ -82,10 +82,12 @@ permissions:
 jobs:
   # A host outside the web game: engine-rs/consumer/ depends on the engine by
   # path and drives it through the documented surface (engine-rs/API.md). The
-  # checkout holds only engine-rs/ and conformance/, and node, npm and npx
-  # are shadowed by stubs that fail, so the engine library and the consumer
-  # are proven to build, run and replay the lock with no web game and no
-  # Node.js toolchain.
+  # checkout holds only engine-rs/ and conformance/, and the Node.js commands
+  # on PATH are stubs that fail, so the engine library and the consumer are
+  # shown to build and run, and to replay every scenario that starts from a
+  # new game, without the web game or a Node.js toolchain. (The scenarios
+  # that start from a save fixture need src/tests/fixtures/ until stage 3 of
+  # #980.)
   consumer:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -100,9 +102,10 @@ jobs:
 
       - name: Only the engine and the conformance suite are checked out
         run: |
-          for p in package.json package-lock.json src node_modules; do
-            if [ -e "$p" ]; then echo "$p is in the checkout"; exit 1; fi
-          done
+          top="$(ls -A | grep -vx '.git' | sort | tr '\n' ' ')"
+          if [ "$top" != "conformance engine-rs " ]; then
+            echo "the checkout holds: $top"; exit 1
+          fi
           test -f engine-rs/Cargo.toml
           test -f conformance/expected.json
 
@@ -110,7 +113,7 @@ jobs:
         run: |
           stub="$RUNNER_TEMP/no-node"
           mkdir -p "$stub"
-          for n in node npm npx; do
+          for n in node nodejs npm npx corepack yarn pnpm bun; do
             printf '#!/bin/sh\necho "%s is not available to the engine build" >&2\nexit 127\n' "$n" > "$stub/$n"
             chmod +x "$stub/$n"
           done
@@ -123,7 +126,9 @@ jobs:
 
       - name: Node.js is unreachable
         run: |
-          if node --version; then echo "node still runs"; exit 1; fi
+          for n in node nodejs npm npx corepack yarn pnpm bun; do
+            if "$n" --version; then echo "$n still runs"; exit 1; fi
+          done
 
       - name: The engine library builds alone
         working-directory: engine-rs
@@ -134,9 +139,13 @@ jobs:
         run: |
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
-          # The JavaScript binding is a feature a native host never turns on.
-          if cargo tree --locked -e normal --prefix none | grep -q '^wasm-bindgen'; then
-            echo "wasm-bindgen reached a native host's tree"; exit 1
+          # The JavaScript binding is a feature a native host never turns on,
+          # and nothing in the tree reaches a browser or the host's entropy.
+          # The tree is captured first so a cargo failure fails the step.
+          tree="$(cargo tree --locked -e normal --prefix none)"
+          test -n "$tree"
+          if grep -E '^(wasm-bindgen|js-sys|web-sys|getrandom) ' <<<"$tree"; then
+            echo "a browser or host crate reached a native host's tree"; exit 1
           fi
           cargo test --locked
           cargo run --locked --release

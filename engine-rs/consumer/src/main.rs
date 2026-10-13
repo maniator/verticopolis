@@ -1,11 +1,13 @@
-//! `cargo run` prints one smoke run and replays the new-game scenarios of
-//! the conformance suite. The suite's directory is the first argument, or
-//! `../../conformance` from this crate. Exits 1 on any failure.
+//! `cargo run` prints one smoke run and replays every scenario of the
+//! conformance suite that starts from a new game. The suite's directory is
+//! the first argument; without one it is `../../conformance` from this
+//! crate's source directory, a path fixed at build time, so pass it when the
+//! binary runs anywhere else. Exits 1 on any failure.
 
 use std::path::PathBuf;
 use std::process::exit;
 
-use verticopolis_engine_consumer::{replay, smoke, SEED};
+use verticopolis_engine_consumer::{new_game_scenarios, replay, smoke, SEED};
 
 fn main() {
     let conformance = std::env::args()
@@ -19,15 +21,26 @@ fn main() {
             r.spent, r.quoted, r.day, r.population, r.money, r.events, r.save_bytes, r.state
         ),
         Err(e) => {
-            println!("smoke FAILED: {e}");
+            eprintln!("smoke FAILED: {e}");
             ok = false;
         }
     }
-    for id in ["starter-classic", "starter-modern"] {
-        match replay(&conformance, id) {
+    let ids = match new_game_scenarios(&conformance) {
+        Ok(ids) if !ids.is_empty() => ids,
+        Ok(_) => {
+            eprintln!("no new-game scenario in {}", conformance.display());
+            exit(1);
+        }
+        Err(e) => {
+            eprintln!("{e}");
+            exit(1);
+        }
+    };
+    for id in ids {
+        match replay(&conformance, &id) {
             Ok(n) => println!("{id}: ok ({n} checkpoints)"),
             Err(e) => {
-                println!("{id}: FAILED: {e}");
+                eprintln!("{id}: FAILED: {e}");
                 ok = false;
             }
         }

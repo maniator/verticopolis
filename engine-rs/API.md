@@ -8,8 +8,8 @@ proves it runs the real simulation by replaying the conformance suite
 (`../conformance/`).
 
 `consumer/` is a working example and the CI gate for this page: a crate
-outside the engine that depends on it by path and does everything listed
-here. The `consumer` job in `.github/workflows/engine-rs.yml` builds and
+outside the engine that depends on it by path and makes every tier 1 call
+below. The `consumer` job in `.github/workflows/engine-rs.yml` builds and
 runs it from a checkout holding only `engine-rs/` and `conformance/`, with
 Node.js unavailable. The plan this page belongs to is issue #980.
 
@@ -29,37 +29,42 @@ toolchain in `Cargo.toml` (`rust-version`) and the `engine-rs/` and
 `conformance/` directories (the event catalog is compiled in from there).
 It needs no Node.js, no npm and nothing else from the web game.
 
-The engine does no IO. It reads no file, clock, environment or network,
-and spawns nothing; the host passes in bytes, time and its build name.
-`tests/independence.rs` fails if library code starts to.
+A game does no IO. The simulation reads no file, clock, environment,
+console or network, and spawns no thread or process; the host passes in
+bytes, time and its build name. The one exception is the conformance
+harness (`scenario.rs`, `tdt/referee.rs`), which reads the scenario and
+fixture files it is pointed at and is never reached from a running game.
+`tests/independence.rs` fails if any other library code reaches for those
+services.
 
 ## The host API
 
 These are the calls a frontend makes (tier 1 in #980). `consumer/` calls
 each of them, so a rename or a removal fails CI until this page and the
-consumer follow.
+consumer follow. The last row is tier 2, the harness a host uses to prove
+conformance.
 
 | Need | Call |
 | --- | --- |
 | Start a game | `sim::Simulation::new_game(seed, GameMode::Classic)`, or `new_game_with(seed, mode, calendar, start_unbridged)` |
 | Advance time | `sim.tick(dt_minutes)`: any `dt`, split into steps that never skip an hour. Same seed, same commands and the same sequence of `dt` give the same game |
-| Quote a placement | `sim.can_build(kind, floor, x)`: `{ ok, reason, cost }`, the dry run `build` makes, with the full price |
+| Quote a placement | `sim.can_build(kind, floor, x)`: `{ ok, reason, cost }`, the dry run `build` makes, with the full price. There is no quote call for a transport yet: an elevator costs the catalog `cost` plus `transportFloorCost` for each floor past its first, and stairs and escalators cost the catalog `cost` |
 | Player commands | `build`, `build_transport`, `sell_at`, `toggle_auto_bridge` (`build.rs`); `add_car`, `remove_car`, `extend_transport`, `remove_facility` (`charges.rs`), which charge or refund and report the money moved; `adjust_rent`, `set_no_rate`, `price_unit`, `apply_rent_batch` (`rent.rs`); `resolve_choice`, `set_film_policy` (`events.rs`) |
 | Read state | the public fields (`money`, `star`, `clock`, `tower`, `crowd`, `log`, ...) and `population()`; read them, never write them |
-| Gameplay events | `sim.gameplay.drain()` after each frame; `to_json()` on each event; names and payloads are listed in `conformance/events/catalog.json` (`gameplay::CATALOG_JSON`, checked with `check_event`) |
-| Reference data | `catalog::catalog(mode)` (or `catalog_json`): prices, sizes, caps and rules per facility kind, versioned by `CATALOG_VERSION` |
-| Snapshot hash | `canonical::digest(&scenario::state_view(&sim))`: the hashed view the conformance lock pins |
+| Gameplay events | `sim.gameplay.drain()` after each frame; `to_json()` on each event; names and payloads are listed in `conformance/events/catalog.json` (`gameplay::CATALOG_JSON`, checked with `check_event`). The buffer holds `GAMEPLAY_RING_CAP` events and counts any it had to drop in `sim.gameplay.dropped` |
+| Reference data | `catalog::catalog(mode)`: prices, sizes, caps and rules per facility kind, versioned by `CATALOG_VERSION` |
+| Snapshot hash | `canonical::digest(&scenario::state_view(&sim))`: the hashed view the conformance lock pins. `state_view` is tier 1 although it lives in the harness module until stage 2 of #980 moves it |
 | Save | `load::encode_simulation_vctower(&sim, app_version, saved_at_ms)`: the `.vctower` bytes the web game writes; `sim.serialize()` for the JSON |
 | Load | `load::decode_vctower(text)` then `load::deserialize(&save)` |
 | 1994 saves | `import_tdt(bytes, filename)` and `export_tdt(save_json)` |
-| Conformance | `scenario::Scenario::parse` and `scenario::run_scenario`, compared with `expected.json`, or `cargo run --bin conformance` from this directory |
+| Conformance (tier 2) | `scenario::Scenario::parse` and `scenario::run_scenario`, compared with `expected.json` (as `consumer/` does for every scenario that starts from a new game), or `cargo run --bin conformance` from this directory for the whole suite |
 
 Two behaviors a host should know:
 
-- **A save carries the tower, not the moment.** The live crowd and the
-  elevator dispatch are not saved, so a loaded game restarts them and does
-  not track the game that wrote the save. Two loads of the same save do
-  track each other exactly.
+- **A save holds the tower and leaves out the live crowd and the elevator
+  dispatch.** A loaded game restarts both, so it does not track the game
+  that wrote the save. Two loads of the same save do track each other
+  exactly.
 - **The loader repairs.** `deserialize` coerces damaged or forged fields
   the way the web game's loader does; it refuses only what it cannot read
   (`decode_vctower` refuses a file that is not a `.vctower`).
@@ -75,8 +80,9 @@ Two behaviors a host should know:
   game at that commit.
 - **Tier 1 above** changes only on purpose, in a pull request that updates
   this page and `consumer/` with it.
-- **The conformance harness** (`scenario`, `tdt::referee`, `src/bin/`) is
-  tier 2: usable to replay the lock, and expected to move behind a feature.
+- **The conformance harness** (`scenario`, apart from `state_view`,
+  `tdt::referee` and `src/bin/`) is tier 2: usable to replay the lock, and
+  expected to move behind a feature.
 - **Everything else is internal** (tier 3), even where it is `pub`. Modules
   and fields are public so the port reads side by side with the TypeScript
   engine and so the tests can reach them. Calling a per-phase step
@@ -88,4 +94,5 @@ Two behaviors a host should know:
 - **Not covered yet** (stages in #980): the per-frame read model
   (`frame_view`) is only in the WASM binding, the fixtures 15 of the 22
   scenarios start from live in `src/tests/fixtures/`, and the fixed-step
-  driver the web host uses is TypeScript (#867).
+  driver the web host uses is TypeScript (#867). There is no quote call for
+  a transport's price.

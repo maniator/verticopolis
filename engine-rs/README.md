@@ -45,8 +45,9 @@ depend on the crate, the calls a frontend makes, and what is stable.
 `consumer/` is a small crate that depends on the engine by path and makes
 those calls; CI builds and runs it from a checkout holding only `engine-rs/`
 and `conformance/`, with no Node.js (`engine-rs.yml`, job `consumer`), and
-`tests/independence.rs` keeps the library free of file, clock, network and
-process access and of the web game's tree.
+`tests/independence.rs` keeps the library (the conformance harness aside)
+free of file, clock, console, network, thread and process access and of the
+web game's tree.
 
 ## Running
 

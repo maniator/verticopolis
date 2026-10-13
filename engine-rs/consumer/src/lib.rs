@@ -6,8 +6,8 @@
 //! scenario. CI builds and runs it from a checkout that holds no web game
 //! (`.github/workflows/engine-rs.yml`, job `consumer`).
 //!
-//! It checks that the integration works, not the rules: the conformance
-//! referee (`cargo run --bin conformance`) owns those.
+//! It checks the integration. The rules belong to the conformance referee
+//! (`cargo run --bin conformance`).
 
 use std::path::Path;
 
@@ -20,7 +20,7 @@ use verticopolis_engine::facilities::Kind;
 use verticopolis_engine::gameplay::{check_catalog, check_event, RemovalMethod, CATALOG_JSON};
 use verticopolis_engine::load::{decode_vctower, deserialize, encode_simulation_vctower};
 use verticopolis_engine::rent::BatchTarget;
-use verticopolis_engine::scenario::{run_scenario, state_view, Checkpoint, Scenario};
+use verticopolis_engine::scenario::{run_scenario, state_view, Checkpoint, Scenario, Start};
 use verticopolis_engine::sim::Simulation;
 use verticopolis_engine::{export_tdt, import_tdt};
 
@@ -241,13 +241,14 @@ pub fn edit(sim: &mut Simulation) -> Result<(), String> {
     )?;
     check(
         sim.tower
-            .unit_at(3, 115)
+            .unit_at(3, 106)
             .is_none_or(|u| u.kind.is_structural()),
-        "the sold office is gone",
+        "sell_at removed the office it sold",
     )?;
 
-    // Classic always bridges, and no emergency is pending, so these change
-    // nothing; a host may still call them.
+    // `toggle_auto_bridge` returns the setting after the call. Classic
+    // always bridges, so it stays on; with no emergency pending, resolving a
+    // choice changes nothing. A host may call both at any time.
     check(
         sim.toggle_auto_bridge() && sim.auto_bridge,
         "Classic always bridges",
@@ -330,10 +331,10 @@ pub fn round_trip(sim: &Simulation) -> Result<(Simulation, usize), String> {
 }
 
 /// The whole smoke run: found, play two days, save, load, and play a third
-/// day. A save carries the tower, not the live crowd or the elevator
-/// dispatch (`conformance/README.md`, `reload`), so a loaded game restarts
-/// them and need not track the game that wrote it; two loads of the same
-/// save must track each other exactly.
+/// day. A save holds the tower and leaves out the live crowd and the
+/// elevator dispatch (`conformance/README.md`, `reload`), so a loaded game
+/// restarts them and need not track the game that wrote it; two loads of
+/// the same save must track each other exactly.
 pub fn smoke(seed: u32) -> Result<Report, String> {
     let events = event_catalog()?;
     let (mut sim, spent, quoted) = found(seed)?;
@@ -385,6 +386,9 @@ pub fn replay(conformance: &Path, id: &str) -> Result<usize, String> {
         .map_err(|e| e.to_string())?;
     let want: Vec<Checkpoint> = serde_json::from_value(lock["scenarios"][id].clone())
         .map_err(|e| format!("lock entry {id}: {e}"))?;
+    if want.is_empty() {
+        return Err(format!("the lock pins no checkpoint for {id}"));
+    }
     let scenario = Scenario::parse(&read(
         &conformance.join("scenarios").join(format!("{id}.json")),
     )?)?;
@@ -402,6 +406,31 @@ pub fn replay(conformance: &Path, id: &str) -> Result<usize, String> {
         return Err(format!("{id}: diverges from the lock at checkpoint {at}"));
     }
     Ok(want.len())
+}
+
+/// The ids of the scenarios that start from a new game, sorted. The other
+/// scenarios start from save fixtures that live in the web game's test tree
+/// (stage 3 of #980 moves them under `conformance/`).
+pub fn new_game_scenarios(conformance: &Path) -> Result<Vec<String>, String> {
+    let dir = conformance.join("scenarios");
+    let entries =
+        std::fs::read_dir(&dir).map_err(|e| format!("cannot read {}: {e}", dir.display()))?;
+    let mut ids = Vec::new();
+    for e in entries {
+        let p = e.map_err(|e| e.to_string())?.path();
+        let Some(id) = p.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if p.extension().is_none_or(|x| x != "json") {
+            continue;
+        }
+        let text = std::fs::read_to_string(&p).map_err(|e| e.to_string())?;
+        if matches!(Scenario::parse(&text)?.start, Start::NewGame { .. }) {
+            ids.push(id.to_string());
+        }
+    }
+    ids.sort();
+    Ok(ids)
 }
 
 #[cfg(test)]
@@ -471,6 +500,16 @@ mod tests {
     fn a_new_game_scenario_matches_the_lock() {
         let n = replay(&conformance_dir(), "starter-classic").expect("starter-classic");
         assert!(n > 1);
+    }
+
+    #[test]
+    fn the_new_game_scenarios_are_found() {
+        let ids = new_game_scenarios(&conformance_dir()).expect("scenario dir");
+        assert!(ids.contains(&"starter-classic".to_string()), "{ids:?}");
+        assert!(
+            !ids.contains(&"amenities-modern".to_string()),
+            "a fixture start"
+        );
     }
 
     #[test]
