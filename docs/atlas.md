@@ -233,16 +233,19 @@ front of the back wall. A room frame that supports this carries an optional
   (security, housekeeping, amusements), a cinema's aisle lights and EXIT signs,
   the wedding hall's petal row, and the metro's exit stairs, platform and
   track. The aquatic center keeps its pool whole on the shell: the diver on
-  the tower and the swimmers under the water stay there (they arrive as shell
-  steps), and only the deck-chair loungers come forward as furniture.
+  the board and the swimmers in the pool stay there (they arrive as shell
+  steps), and only the deck-chair loungers come forward as furniture (at the
+  catalog's size every attendee is a diver or a swimmer, so the chairs are
+  empty).
 - `furniture` holds the pixels that differ between the shell and the flat
   frame, transparent everywhere else.
 - `chains` splits the frame's chain step by step, under the same key
   (`occupants`; a frame with no chain, such as an `/away` frame, has none):
   `shell` holds what the step changes on the shell (an office's downlights or
-  a condo's ceiling light, switched on by the first occupant),
-  `furniture` holds the people who sit down. Each list starts with a null step
-  0 and is trimmed on its own, like a frame's chain steps.
+  a condo's ceiling light, switched on by the first occupant, or the aquatic
+  center's swimmers), `furniture` holds the people who sit down. Each list
+  starts with a null step 0 and is trimmed on its own, like a frame's chain
+  steps.
 - `soft` (with its own steps in `chains`) is an optional alternative to
   `furniture`; see below.
 
@@ -330,26 +333,26 @@ place of `furniture` (and its `chains` steps in place of the `furniture`
 steps); the order is the same. Over the shell it looks the same to the eye,
 but translucent paint rounds a step or two differently on its own than over
 the wall. Marks the game draws over the furniture (the night scrim) land on
-the soft furniture only where it has pixels; the shell carries
-them everywhere else. An opaque mark drawn over the furniture (a hotel roach
-on the bed, a sleeping guest's "z", a notice badge) is therefore on both the
-shell and the soft furniture: offset the soft furniture and it shows twice. In
-`furniture` the same mark stays on the shell only, leaving a gap in the
-furniture under it. In the current atlas 8% of the soft furniture's
-pixels differ from the flat frame (each pixel counted once per occupant count
-it shows at), by at most 2 of 255 in any channel; the export prints
-this measure and refuses an atlas whose soft furniture strays more than 4 of
-255 or misses a pixel of the furniture. Use `furniture` when exact pixels
-matter, and `soft` when the furniture moves away from the wall.
+the soft furniture only where it has pixels; the shell carries them everywhere
+else. An opaque mark drawn over the furniture (a hotel roach on the bed, a
+sleeping guest's "z", a notice badge) is therefore on both the shell and the
+soft furniture: offset the soft furniture and it shows twice. In `furniture`
+the same mark stays on the shell only, leaving a gap in the furniture under
+it. In the current atlas 8% of the soft furniture's pixels differ from the
+flat frame (each pixel counted once per occupant count it shows at), by at
+most 2 of 255 in any channel; the export prints this measure and refuses an
+atlas whose soft furniture strays more than 4 of 255 or misses a pixel of the
+furniture. Use `furniture` when exact pixels matter, and `soft` when the
+furniture moves away from the wall.
 
 A frame has no `soft` when an occupant step would have to change a
 translucent soft pixel, which source-over cannot do (it can only paint over
 one), or when its soft pass fails; the export counts them and names the
 first few. In the current atlas
-that is about one layered frame in eight, where an occupant step changes a
+that is about one layered frame in nine, where an occupant step changes a
 glow or a soft shadow in the restaurant, food hall, party hall, amusements,
-boutique bay, fitness club, nightclub and aquatic center; those frames offer
-`furniture` only.
+boutique bay, fitness club and nightclub; those frames offer `furniture`
+only.
 
 ## How it is checked
 

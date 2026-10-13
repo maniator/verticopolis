@@ -77,6 +77,28 @@ describe("depth-layer marks across the room catalog", () => {
   });
 });
 
+describe("the aquatic center's depth split", () => {
+  it("keeps the diver and the swimmers on the shell, so only the deck comes forward", () => {
+    const job = roomJobs().find((j): j is StillJob => j.type === "still" && (j.paint as UnitPaint).kind === "aquaticCenter" && j.layers === true && j.chains !== undefined);
+    expect(job).toBeDefined();
+    const steps = job!.chains!.occupants.steps;
+    const last = steps[steps.length - 1];
+    // Every rect drawn after the break: none may reach the pool rows, where
+    // the swimmers stand under the water.
+    let broke = false;
+    const after: number[] = [];
+    const ctx = sinkCtx();
+    (ctx as unknown as { fillRect: (x: number, y: number) => void }).fillRect = (_x, y) => {
+      if (broke) after.push(y);
+    };
+    withLayerHook({ shellEnd: () => (broke = true), furnitureEnd: () => undefined }, () => paint(ctx, last as UnitPaint, job!.w, job!.h));
+    expect(broke).toBe(true);
+    const midY = Math.round(job!.h * 0.42);
+    expect(after.length).toBeGreaterThan(0);
+    expect(Math.max(...after)).toBeLessThanOrEqual(midY + 5);
+  });
+});
+
 describe("the soft furniture pass's assumption", () => {
   it("holds: no paint routine sets a composite mode", () => {
     // The soft pass (`browserEntry.ts`) draws the marks after the furniture

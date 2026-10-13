@@ -152,11 +152,11 @@ export function drawAquaticCenter(d: DrawCtx, u: Unit, x: number, y: number, w: 
   // Lane ropes (dashed) and surface ripples on top.
   for (let ly = poolTop + 2; ly < poolBot - 1; ly += 4) for (let lx = 5; lx < w - 6; lx += 4) f(lx, ly, 2, 1, "#EAF6F8", 0.45);
   for (let rx = 6; rx < w - 6; rx += 5) f(rx, poolTop + 1 + ((rx >> 1) & 3), 3, 1, WATERLT, 0.5);
-  // The shell ends: the diver on the tower and the swimmers in the water stay
-  // with the pool, so only the deck-chair loungers come forward. The water,
-  // ropes and ripples moved ahead of the loungers, which sit on the deck
-  // above where they start, so no pixel changes, and the fill order (diver,
-  // swimmers, loungers) is the same.
+  // The shell ends: the diver on the board and the swimmers in the pool stay
+  // with it, so only the deck-chair loungers come forward. The water, ropes
+  // and ripples draw before the loungers, which sit on the deck above the
+  // rows they start on, so the order changes no pixel; the diver, swimmers
+  // and loungers still fill in that order.
   layerBreak(ctx);
   // Deck-chair loungers along the poolside band.
   for (let lx = 5; lx + 5 < w - 4; lx += 11) { f(lx, midY + 3, 7, 2, "#E0A85A"); lounge(lx + 1, midY + 5); }

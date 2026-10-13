@@ -300,8 +300,8 @@ function eachLayeredPicture(
 }
 
 /** Names of the frames whose depth layers break the manifest's rules (chain
- *  keys, one chain and no overlays, a null step 0, soft steps with soft
- *  furniture) or, read back out of the packed pages through the manifest the
+ *  keys, at most one chain and no overlays, a null step 0, soft steps exactly
+ *  where there is soft furniture) or, read back out of the packed pages through the manifest the
  *  way a frontend reads them, do not give back the frame's own pixels for
  *  some occupant count; empty when every layered frame passes. */
 export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): string[] {
