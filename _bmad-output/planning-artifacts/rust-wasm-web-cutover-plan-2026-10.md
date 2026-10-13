@@ -50,7 +50,7 @@ This document is a **BMAD-style planning input** for product/architecture review
 
 **B2** Differential long-run seeded tests: execute identical randomized command sequences in TS and Rust; compare full serialized saves, crowd, money, ledger, logs and emitted gameplay events, not only hashed state views. Persist and minimize failing seeds. Include boundary-hour, day/month, classic/modern and rare-event scenarios.
 
-**B3** Cross-format save fixtures: TS -> WASM -> TS, plus legacy migrations, founder state, malformed UTF-8, lone surrogate escapes, duplicate/colliding repaired keys, nonfinite/JS numeric coercions and 32 MiB limit. Coordinate #858, #944 and save durability and recovery.
+**B3** Cross-format save fixtures: TS -> WASM -> TS, plus legacy migrations, founder state, malformed UTF-8, lone surrogate escapes, duplicate/colliding repaired keys, nonfinite/JS numeric coercions and 32 MiB limit. Treat merged PR #944 as a tested baseline, not pending work; extend coverage under #858 and the remaining durability/recovery tasks.
 
 **B4** Current WASM-host lifecycle tests: engine attach/detach (whether currently on the main thread or existing infrastructure), in-flight load, stale generation, errors, restart, undo/redo, context loss and exterminator-booking attach (#902). No empty-tower reset or unhandled stale engine handles. Dedicated-Web-Worker lifecycle and backpressure tests belong to the post-cutover D2/#908 implementation, not this prerequisite.
 
@@ -60,7 +60,7 @@ This document is a **BMAD-style planning input** for product/architecture review
 
 **C2** Reconcile catalog and engine-owned charges with public #930 and merged #928. Enforce shared price/build/unlock policy across both hosts.
 
-**C3** Make analytics events provider-agnostic and engine-owned (#873, public #938); test deduplication, tower resets, event ordering and suppression without attributing a new tower to an old funnel. Frontends forward to platform analytics providers only.
+**C3** Verify the merged engine-event analytics bridge (#873, merged PR #938): test deduplication, tower resets, event ordering, consent and suppression without attributing a new tower to an old funnel. Engine events remain provider-agnostic; the web forwards them to its analytics provider only.
 
 **C4** Document API/version compatibility between public engine commit, WASM package and any published engine consumers; add compatibility CI that detects drift.
 
@@ -95,7 +95,7 @@ This document is a **BMAD-style planning input** for product/architecture review
 
 ## 6. Existing tracking / avoid duplicate work
 
-Public: #878 WASM suite parity; #868 frontend read model; #858 save-number fidelity; #886 TDT parity; #900 WASM performance baseline; #902 host attach issue; #908 worker/performance; #923 command argument validation; #873 analytics; PR #930 catalog, PR #938 analytics, PR #944 save Unicode/cap. Public PR #928 is closed; verify its merged commit rather than treating it as pending.
+Public: #878 WASM suite parity; #868 frontend read model; #858 save-number fidelity; #886 TDT parity; #900 WASM performance baseline; #902 host attach issue; #908 worker/performance; #923 command argument validation; #873 analytics; open PR #930 catalog and draft PR #950 simulation-layer capacity events; merged PR #938 analytics, merged PR #944 save Unicode/cap. Public PR #928 is closed; verify its merged commit rather than treating it as pending.
 
 
 ## 7. Risks, assumptions and open decisions
@@ -112,3 +112,17 @@ Public: #878 WASM suite parity; #868 frontend read model; #858 save-number fidel
 Run BMAD product/architecture review on this proposal, confirm scope and acceptance thresholds, then break epics into appropriately small implementation stories with dependencies and explicit test evidence. Use the repo's `_bmad/bmm/config.yaml` paths: planning artifacts in `_bmad-output/planning-artifacts`, implementation artifacts in `_bmad-output/implementation-artifacts`. This proposal belongs in planning artifacts and must not be mistaken for completed implementation.
 
 For coding agents: before implementation, restate requirements and flag missing/truncated instructions; make small meaningful commits; run relevant tests and CI coverage gates, restore coverage above required thresholds, and report the exact evidence and remaining exceptions. No giant all-in-one migration PR.
+
+## 9. PR reconciliation update (2026-10-13)
+
+This section supersedes older references to pending PRs elsewhere in this planning input. It is **public-engine/web-only** scope; no non-public repository topology or implementation details belong here.
+
+- **Merged #938:** provider-agnostic gameplay analytics forwarding exists. Retain consent, session-swap and event-drain regression coverage; do not file a second bridge implementation.
+- **Merged #944:** web save Unicode repair and 32 MiB reader/writer limits exist. Continue cross-engine pathological save, normalization collision, numeric and migration parity fixtures rather than recreating the codec.
+- **Open #930:** catalog API, nested structural validation, parity digests and charged-price checks were added on its reviewed head `0bf96e43`. Test CI and Rust engine workflows were green on that head, but GitHub reported a merge conflict. Resolve conflict, rerun the exact merged tree, and only then mark C2 delivered; do not treat this API as already on `main`.
+- **Draft #950:** moves TypeScript `capacity_changed` emission to `Simulation` and introduces explicit bare-tower WASM calls for differential replay. Re-review after the final merge/base update. The new `towerSetCars` and `towerResizeTransport` exports must be classified and protected under A3: they bypass the simulation-layer event and player-facing charge paths. No new public mutation escape hatch should become a production UI route.
+- **Open #943/#831/#817/#816:** rendering/atlas work is independent of the Rust simulation cutover except for canonical data contracts and render-performance baselines. Do not hold the engine cutover for unrelated art-review decisions.
+- **Open #947:** this BMAD planning PR. Its current-wasm-host lifecycle/recovery tests are prerequisites; the dedicated Web Worker introduction and worker-specific tests remain post-cutover under D2/#908.
+- **Public #948/#952:** workflow configuration and web notices are not part of engine-cutover implementation. Apply public-content boundary checks to any public automation/planning change; never import details from non-public projects into public PRs, commits, issues or documentation.
+
+**Handoff:** Before implementing any story, refresh the public PR queue and merge SHAs; identify implemented, unmerged and genuinely missing work. Retest dependency interactions in the final merged tree. Every story should have a small diff, targeted tests, passing coverage thresholds and a concrete rollback or recovery path when relevant.
