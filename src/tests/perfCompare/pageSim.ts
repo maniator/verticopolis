@@ -20,6 +20,9 @@ export interface SimRun {
    *  (decode, merge, read-model sync), plus how many ticks reached the
    *  engine through the wrapper (must equal `steps`). */
   attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; wrappedTotalMs: number; merges: number; engineTicks: number; exportCalls: number; exportsWrapped: number } | null;
+  /** Whether the page had gc() (Chromium's --expose-gc), so the loop began
+   *  from a full collection. */
+  gcAvailable: boolean;
   /** New host errors during the run (WASM), and whether the same host
    *  still held the tower at the end. */
   hostErrorsAdded: string[];
@@ -136,43 +139,45 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
   const mergesBefore = hostedWasm ? (h.merges as number) : 0;
   const attributing = arg.attribute && hostedWasm;
   let exportsWrapped = 0;
-  if (attributing) {
-    const e = h.engine;
-    const wrap = (name: string, slot: "tick" | "exp") => {
-      if (slot === "exp") exportsWrapped++;
-      const own = Object.getOwnPropertyDescriptor(e, name);
-      const orig = e[name];
-      e[name] = function (this: unknown, ...a: unknown[]) {
-        const t = performance.now();
-        try {
-          return orig.apply(this, a);
-        } finally {
-          acc[slot] += performance.now() - t;
-          if (slot === "tick") acc.ticks++;
-          else acc.calls++;
-        }
-      };
-      restore.push(() => {
-        if (own) Object.defineProperty(e, name, own);
-        else delete e[name];
-      });
-    };
-    wrap("tick", "tick");
-    // Every other method the binding's class has, so no export the host
-    // calls can land in the "host JS" remainder unseen.
-    for (const name of Object.getOwnPropertyNames(Object.getPrototypeOf(e))) {
-      if (name === "constructor" || name === "tick" || name === "free" || typeof e[name] !== "function") continue;
-      wrap(name, "exp");
-    }
-  }
-  // A full collection before the clock starts (Chromium runs with
-  // --expose-gc for both engines), so neither loop pays for the setup's
-  // garbage: the warmup instance, the parse above, a raw engine's fields().
-  (globalThis as any).gc?.();
-
   const stepMs = new Array<number>(arg.steps);
-  const t0 = performance.now();
+  const gcAvailable = typeof (globalThis as any).gc === "function";
+  let t0 = 0;
   try {
+    if (attributing) {
+      const e = h.engine;
+      const wrap = (name: string, slot: "tick" | "exp") => {
+        if (slot === "exp") exportsWrapped++;
+        const own = Object.getOwnPropertyDescriptor(e, name);
+        const orig = e[name];
+        e[name] = function (this: unknown, ...a: unknown[]) {
+          const t = performance.now();
+          try {
+            return orig.apply(this, a);
+          } finally {
+            acc[slot] += performance.now() - t;
+            if (slot === "tick") acc.ticks++;
+            else acc.calls++;
+          }
+        };
+        restore.push(() => {
+          if (own) Object.defineProperty(e, name, own);
+          else delete e[name];
+        });
+      };
+      wrap("tick", "tick");
+      // Every other method the binding's class has, so no export the host
+      // calls can land in the "host JS" remainder unseen.
+      for (const name of Object.getOwnPropertyNames(Object.getPrototypeOf(e))) {
+        if (name === "constructor" || name === "tick" || name === "free" || typeof e[name] !== "function") continue;
+        wrap(name, "exp");
+      }
+    }
+
+    // A full collection before the clock starts (Chromium runs with
+    // --expose-gc for both engines), so neither loop pays for the setup's
+    // garbage: the warmup instance, the parse above, a raw engine's fields().
+    (globalThis as any).gc?.();
+    t0 = performance.now();
     for (let i = 0; i < arg.steps; i++) {
       const a = performance.now();
       d.tick(arg.dt);
@@ -201,6 +206,7 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
       ? { engineTickMs: acc.tick, engineExportMs: acc.exp, hostJsMs: Math.max(0, sum - acc.tick - acc.exp), wrappedTotalMs: sum, merges: (h.merges as number) - mergesBefore, engineTicks: acc.ticks, exportCalls: acc.calls, exportsWrapped }
       : null,
     hostErrorsAdded,
+    gcAvailable,
     startMinutes,
     startKey: `${tag}:start`,
     endKey: `${tag}:end`,

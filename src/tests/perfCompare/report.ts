@@ -33,8 +33,8 @@ export function rawCsv(rows: readonly MetricRow[]): string {
 
 export function comparisonsCsv(rows: readonly Comparison[]): string {
   return toCsv(
-    ["group", "scenario", "throttle", "metric", "unit", "ts_median", "wasm_median", "wasm_over_ts", "ci_low", "ci_high", "verdict", "n_ts", "n_wasm"],
-    rows.map((c) => [c.group, c.scenario, c.throttle, c.metric, c.unit, c.tsMedian, c.wasmMedian, c.ratio, c.ciLow, c.ciHigh, c.verdict, c.n.ts, c.n.wasm]),
+    ["group", "scenario", "throttle", "metric", "unit", "ts_median", "wasm_median", "wasm_over_ts_paired", "ci_low", "ci_high", "verdict", "n_ts", "n_wasm", "n_pairs"],
+    rows.map((c) => [c.group, c.scenario, c.throttle, c.metric, c.unit, c.tsMedian, c.wasmMedian, c.ratio, c.ciLow, c.ciHigh, c.verdict, c.n.ts, c.n.wasm, c.n.pairs]),
   );
 }
 
@@ -78,7 +78,7 @@ export function markdownReport(res: CompareResults): string {
       ["Item", "Value"],
       [
         ["Commit", `${e.commit}${e.dirty ? " (dirty tree)" : ""} on ${e.branch}`],
-        ["Public main", e.mainCommit ? `${e.mainCommit} (merge base ${e.mergeBase ?? "unknown"}; ${e.behindMain === 0 ? "this tree contains it" : `${e.behindMain ?? "?"} commit(s) of it missing here`})` : "unknown"],
+        ["Public main (origin/main as last fetched)", e.mainCommit ? `${e.mainCommit} (merge base ${e.mergeBase ?? "unknown"}; ${e.behindMain === 0 ? "this tree contains it" : `${e.behindMain ?? "?"} commit(s) of it missing here`})` : "unknown"],
         ["App version", e.appVersion],
         ["OS", `${e.os} (kernel ${e.kernel}, ${e.arch})`],
         ["CPU", `${e.cpuModel}, ${e.logicalCpus} logical CPUs`],
@@ -87,6 +87,7 @@ export function markdownReport(res: CompareResults): string {
         ["Node", e.node],
         ["Rust", e.rust ?? "not installed"],
         ["Playwright", e.playwright ?? "unknown"],
+        ["Engine package bytes (SHA-256)", Object.entries(e.enginePackage ?? {}).map(([f, h]) => `${f} ${h.slice(0, 16)}`).join(", ") || "missing"],
         ["Engine package hash", `${e.engineBuildHash ?? "missing"}${e.engineSourceHash && e.engineBuildHash !== e.engineSourceHash ? ` (sources: ${e.engineSourceHash}, MISMATCH)` : ""}`],
         ["WebGL renderer", res.runs.find((r) => r.page?.webgl)?.page?.webgl?.renderer ?? "unknown"],
         ["Cross-origin isolated", String(res.runs.find((r) => r.page)?.page?.crossOriginIsolated ?? "unknown")],
@@ -101,7 +102,7 @@ export function markdownReport(res: CompareResults): string {
   out.push("", "## Outcome checks (Node, conformance digests)", "");
   out.push(table(["Scenario", "Steps", "Start state", "End state", "End crowd", "Match"], res.nodeChecks.map((n) => [n.scenario, String(n.steps), n.start.tsState === n.start.wasmState ? "same" : "DIFFERENT", n.end.tsState === n.end.wasmState ? "same" : "DIFFERENT", n.end.tsCrowd === n.end.wasmCrowd ? "same" : "DIFFERENT", n.match ? "yes" : "NO"])));
   const groups: [string, CompareResults["comparisons"][number]["group"]][] = [
-    ["Startup (CPU column: 1x, or the 4x cold start)", "startup"],
+    ["Startup (CPU column: 1x, or the throttled cold start)", "startup"],
     ["WASM load steps (TypeScript page, never compiled before)", "wasm-load"],
     ["Simulation only, engine as the app hosts it", "sim-hosted"],
     ["Simulation only, bare engine", "sim-raw"],

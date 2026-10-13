@@ -99,11 +99,13 @@ describe("validateResults", () => {
     const runs = good();
     runs[0].scenarios.small.hosted["1"] = step("ts", { startMinutes: 590 });
     runs[1].scenarios.small.raw["1"] = step("wasm", { endDigest: "a" });
+    runs[2].scenarios.small.hosted["1"] = step("wasm", { gcAvailable: false });
     const v = validateResults(config(), runs, [node()]);
     expect(v.errors).toEqual(
       expect.arrayContaining([
         "rep 0 ts: small hosted at 1x: the clock moved 10 minutes, expected 20",
         "rep 0 wasm: small raw at 1x: the end state equals the start state; the simulation did not advance",
+        "rep 1 wasm: small hosted at 1x: gc() was missing (the browser ignored --js-flags=--expose-gc), so the loop did not start from a full collection",
       ]),
     );
   });
@@ -150,46 +152,62 @@ describe("validateResults", () => {
     expect(v.warnings.some((w) => w.includes("only 40 frames in the window"))).toBe(true);
   });
 
-  it("warns when audio or the service worker did not start, and does not need the audio rows then", () => {
+  it("fails a repetition whose audio did not start, and warns when the service worker did not", () => {
     const runs = good();
     runs[0].audio = { started: false, muted: false, contexts: [] };
     runs[0].scenarios.small.framesAudio = {};
-    runs[1].firstVisitWithServiceWorker = { served: [], swActive: false, offlineEngineActive: null, offlinePageErrors: [], error: null };
-    runs[2].firstVisitWithServiceWorker = { served: [], swActive: false, offlineEngineActive: null, offlinePageErrors: [], error: "boom" };
+    runs[1].firstVisitWithServiceWorker = { served: [], swActive: false, onlineEngineActive: null, offlineEngineActive: null, onlinePageErrors: [], offlinePageErrors: [], error: null };
+    runs[2].firstVisitWithServiceWorker = { served: [], swActive: false, onlineEngineActive: null, offlineEngineActive: null, onlinePageErrors: [], offlinePageErrors: [], error: "boom" };
     const v = validateResults(config(), runs, [node()]);
-    expect(v.errors).toEqual([]);
+    expect(v.errors).toEqual(["rep 0 ts: audio did not start (contexts: none), so the audio-on rows have no sample from it"]);
     expect(v.warnings).toEqual(
       expect.arrayContaining([
-        "rep 0 ts: audio did not start, so the audio-on rows have no sample from it",
         "rep 0 wasm: the service worker first visit never activated; its transfer and offline rows have no sample from it",
         "rep 1 wasm: the service worker first visit failed (boom); its transfer and offline rows have no sample from it",
       ]),
     );
   });
 
-  it("names a fallback at the 4x cold start", () => {
+  it("names a fallback at the throttled cold start, and needs none without a throttle", () => {
     const runs = good();
     runs[1].cold4x = { ...runs[1].cold4x!, engineActive: "ts" };
-    expect(validateResults(config(), runs, [node()]).errors).toContain("rep 0 wasm: 4x cold start: the WASM engine did not initialize; the page fell back to TypeScript");
+    for (const r of runs) r.cpuProbe = { unthrottledMs: 50, throttledMs: 200, rate: 4, timed: { "4": 200 } };
+    expect(validateResults(config({ throttles: [1, 4] }), runs, [node()]).errors).toContain("rep 0 wasm: 4x cold start: the WASM engine did not initialize; the page fell back to TypeScript");
+    const none = good().map((r) => ({ ...r, cold4x: null }));
+    expect(validateResults(config({ throttles: [1] }), none, [node()]).errors).toEqual([]);
+  });
+
+  it("warns on a first visit that ran on the other engine or logged errors", () => {
+    const runs = good();
+    runs[1].firstVisitWithServiceWorker = { ...runs[1].firstVisitWithServiceWorker!, onlineEngineActive: "ts", onlinePageErrors: ["console: [wasm] the engine package did not load"] };
+    const v = validateResults(config(), runs, [node()]);
+    expect(v.errors).toEqual([]);
+    expect(v.warnings).toEqual(expect.arrayContaining(["rep 0 wasm: the service worker first visit ran on ts; its bytes are left out", "rep 0 wasm: the service worker first visit logged 1 page error(s), first: console: [wasm] the engine package did not load"]));
   });
 
   it("fails a frame window where the simulation did not advance, and a late WASM host", () => {
     const runs = good();
     runs[0].scenarios.small.frames["1"].ticks = 0;
     runs[1].cold = { ...runs[1].cold!, engineHostedMs: 400 };
+    runs[2].warm = { ...runs[2].warm!, engineHostedMs: null };
     const v = validateResults(config(), runs, [node()]);
     expect(v.errors).toEqual(
-      expect.arrayContaining(["rep 0 ts: small frames at 1x: the simulation did not advance during the window (0 ticks)", "rep 0 wasm: the engine was not hosted by the time the game was ready (hosted 400, ready 300)"]),
+      expect.arrayContaining(["rep 0 ts: small frames at 1x: the simulation did not advance during the window (0 ticks)", "rep 0 wasm: cold start: the engine was not hosted by the time the game was ready (hosted 400, ready 300)", "rep 1 wasm: warm start: the engine was not hosted by the time the game was ready (hosted never, ready 300)"]),
     );
   });
 
-  it("fails audio-on frames without a running context and an attribution pass with no export call, and warns on a weak throttle", () => {
+  it("fails audio-on frames without a running context, an attribution pass with no export call, and a throttle that did not hold", () => {
     const runs = good();
     runs[1].audio = { started: true, muted: false, contexts: ["suspended"] };
     runs[2].scenarios.small.hosted["1"].attribution = { engineTickMs: 1, engineExportMs: 0, hostJsMs: 1, wrappedTotalMs: 2, merges: 1, engineTicks: 10, exportCalls: 0, exportsWrapped: 40 };
-    runs[0].cpuProbe = { unthrottledMs: 50, throttledMs: 60, rate: 4 };
+    runs[0].cpuProbe = { unthrottledMs: 50, throttledMs: 60, rate: 4, timed: {} };
     const v = validateResults(config(), runs, [node()]);
     expect(v.errors).toEqual(expect.arrayContaining(["rep 0 wasm: audio-on frames ran with no running AudioContext (suspended)", "rep 1 wasm: small 1x: the attribution pass saw no export call, so its host JS share would include engine time"]));
-    expect(v.warnings.some((w) => w.startsWith("rep 0 ts: the CPU probe ran 60 ms under the 4x throttle"))).toBe(true);
+    expect(v.errors.some((w) => w.startsWith("rep 0 ts: the CPU probe ran 60 ms under the 4x throttle against 50 ms without it; the throttled cold start"))).toBe(true);
+    const throttled = good();
+    throttled[1].cpuProbe = { unthrottledMs: 50, throttledMs: 200, rate: 4, timed: { "4": 70 } };
+    const t = validateResults(config({ throttles: [1, 4] }), throttled, [node()]);
+    expect(t.errors.some((e) => e.startsWith("rep 0 wasm: the CPU probe ran 70 ms under the 4x throttle of the timed passes"))).toBe(true);
+    expect(t.errors).toContain("rep 0 ts: no CPU probe confirms the 4x throttle of the timed passes");
   });
 });

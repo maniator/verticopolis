@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { cpus, freemem, platform, release, totalmem, arch } from "node:os";
 import { join } from "node:path";
@@ -27,6 +28,8 @@ export interface Environment {
   appVersion: string;
   engineBuildHash: string | null;
   engineSourceHash: string | null;
+  /** SHA-256 of the served engine binary and loader (dist-perf/engine). */
+  enginePackage: Record<string, string>;
 }
 
 function run(cmd: string, args: string[], cwd: string): string | null {
@@ -48,6 +51,16 @@ function osName(): string {
   return `${platform()} ${release()}`;
 }
 
+/** SHA-256 of each file of a build's engine package, by name. */
+export function enginePackageDigests(distDir: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const f of ["verticopolis_engine_bg.wasm", "verticopolis_engine.js"]) {
+    const p = join(distDir, "engine", f);
+    if (existsSync(p)) out[f] = createHash("sha256").update(readFileSync(p)).digest("hex");
+  }
+  return out;
+}
+
 /** The engine package's recorded source hash, from a build directory. */
 export function engineBuildHash(distDir: string): string | null {
   const p = join(distDir, "engine", "BUILD.json");
@@ -58,7 +71,12 @@ export function engineBuildHash(distDir: string): string | null {
 export function collectEnvironment(repo: string, distDir: string, sourceHash: string | null): Environment {
   const commit = run("git", ["rev-parse", "HEAD"], repo) ?? "unknown";
   // Untracked files count too: a new source file changes the build.
-  const status = run("git", ["status", "--porcelain", "--untracked-files=normal"], repo);
+  // Committed-or-not results folders are output, not source, so they never
+  // make a tree dirty.
+  const status = run("git", ["status", "--porcelain", "--untracked-files=normal", "--", ".", ":(exclude)docs/performance/results"], repo);
+  // Best effort: bring origin/main up to date, then compare with it (as
+  // last fetched, when the fetch cannot reach the remote).
+  run("git", ["fetch", "-q", "origin", "main"], repo);
   const mainCommit = run("git", ["rev-parse", "origin/main"], repo);
   const behind = mainCommit ? run("git", ["rev-list", "--count", `HEAD..${mainCommit}`], repo) : null;
   const pkg = JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { version: string };
@@ -71,7 +89,8 @@ export function collectEnvironment(repo: string, distDir: string, sourceHash: st
   return {
     commit,
     commitShort: commit.slice(0, 7),
-    dirty: status === null ? false : status.length > 0,
+    // A status that could not be read counts as dirty: unknown is not clean.
+    dirty: status === null ? true : status.length > 0,
     branch: run("git", ["rev-parse", "--abbrev-ref", "HEAD"], repo) ?? "unknown",
     mainCommit,
     mergeBase: mainCommit ? run("git", ["merge-base", "HEAD", mainCommit], repo) : null,
@@ -89,6 +108,7 @@ export function collectEnvironment(repo: string, distDir: string, sourceHash: st
     appVersion: pkg.version,
     engineBuildHash: engineBuildHash(distDir),
     engineSourceHash: sourceHash,
+    enginePackage: enginePackageDigests(distDir),
   };
 }
 

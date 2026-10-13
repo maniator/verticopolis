@@ -61,6 +61,9 @@ export function measureFrames(arg: { windowMs: number; warmMs: number; speed: nu
       if (acc.on) acc.ui += performance.now() - t;
     }
   };
+  // A full collection first (Chromium runs with --expose-gc for both
+  // engines), so the window does not inherit the load's garbage.
+  (globalThis as any).gc?.();
   g.speed = arg.speed;
   g.engine.paused = false;
   return new Promise<FrameRun>((resolve) => {

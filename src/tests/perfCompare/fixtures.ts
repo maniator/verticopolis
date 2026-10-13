@@ -30,6 +30,7 @@ export function step(engine: EngineName, over: Partial<StepSummary> = {}): StepS
     attribution: null,
     engineActive: engine,
     hostErrorsAdded: [],
+    gcAvailable: true,
     startMinutes: 580,
     startDigest: "a",
     endDigest: "b",
@@ -73,7 +74,7 @@ export function processRun(rep: number, engine: EngineName, over: Partial<Proces
     cold: startupSample(engine),
     warm: startupSample(engine),
     cold4x: startupSample(engine, { gameReadyMs: 1200 }),
-    cpuProbe: { unthrottledMs: 50, throttledMs: 200, rate: 4 },
+    cpuProbe: { unthrottledMs: 50, throttledMs: 200, rate: 4, timed: {} },
     scenarios: {
       small: {
         adoptMs: 10 * scale,
@@ -86,7 +87,7 @@ export function processRun(rep: number, engine: EngineName, over: Partial<Proces
     },
     audio: { started: true, muted: false, contexts: ["running"] },
     wasmCold: engine === "ts" ? { fetchMs: 10, bytes: 1000, compileMs: 300, instantiateMs: 1, firstEngineMs: 20 } : null,
-    firstVisitWithServiceWorker: { served: [{ path: "/", status: 200, bytes: 2000, encoding: "br" }], swActive: true, offlineEngineActive: "ts", offlinePageErrors: [], error: null },
+    firstVisitWithServiceWorker: { served: [{ path: "/", status: 200, bytes: 2000, encoding: "br" }], swActive: true, onlineEngineActive: engine, offlineEngineActive: "ts", onlinePageErrors: [], offlinePageErrors: [], error: null },
     ...over,
   };
 }

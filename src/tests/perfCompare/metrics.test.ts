@@ -19,6 +19,8 @@ describe("aggregate", () => {
   it("measures engine-specific metrics on that engine only", () => {
     const rows = aggregate(runs(), ["small"], [1]);
     expect(rows.filter((r) => r.metric === "WASM linear memory").map((r) => r.engine)).toEqual(["wasm"]);
+    // No throttle above 1x: no throttled cold-start rows to collide with the 1x ones.
+    expect(rows.filter((r) => r.metric === "cold game ready").map((r) => r.throttle)).toEqual(["1", "1"]);
     expect(rows.filter((r) => r.metric === "cold compile").map((r) => r.engine)).toEqual(["ts"]);
     expect(rows.find((r) => r.metric === "cold engine hosted")!.values).toHaveLength(8);
   });
@@ -49,6 +51,11 @@ describe("compareEngines", () => {
     const comps = compareEngines(aggregate(runs(), ["small"], [1, 4]), skipped);
     expect(comps.find((c) => c.metric === "frames over 200 ms (game time clamped)")).toBeUndefined();
     expect(skipped.some((x) => x.includes("frames over 200 ms"))).toBe(true);
+    // One zero among the TypeScript repetitions is enough for no ratio.
+    const some = runs();
+    some[0].scenarios.small.frames["1"].clampedFrames = 0;
+    for (const r of some.slice(1)) r.scenarios.small.frames["1"].clampedFrames = 3;
+    expect(compareEngines(aggregate(some, ["small"], [1])).find((c) => c.group === "frames" && c.metric === "frames over 200 ms (game time clamped)")).toBeUndefined();
   });
 
   it("reports wasm / ts with the metric's direction", () => {

@@ -50,8 +50,12 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
   const good = runs.filter((r) => r.ok);
   for (const r of good) {
     const tag = `rep ${r.rep} ${r.engine}`;
-    for (const [phase, s] of [["cold start", r.cold], ["warm start", r.warm], ["4x cold start", r.cold4x]] as const) {
+    const slowRate = Math.max(...config.throttles);
+    const phases: [string, ProcessRun["cold"]][] = [["cold start", r.cold], ["warm start", r.warm]];
+    if (slowRate > 1) phases.push([`${slowRate}x cold start`, r.cold4x]);
+    for (const [phase, s] of phases) {
       if (!s) errors.push(`${tag}: no ${phase} sample`);
+      else if (r.engine === "wasm" && (s.engineHostedMs === null || s.gameReadyMs === null || s.engineHostedMs > s.gameReadyMs)) errors.push(`${tag}: ${phase}: the engine was not hosted by the time the game was ready (hosted ${s.engineHostedMs ?? "never"}, ready ${s.gameReadyMs ?? "never"})`);
       else if (s.engineActive !== r.engine) {
         errors.push(r.engine === "wasm" ? `${tag}: ${phase}: the WASM engine did not initialize; the page fell back to TypeScript` : `${tag}: ${phase}: the TypeScript run reports the WASM engine active`);
       }
@@ -71,6 +75,7 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
           if (s.engineActive !== r.engine) errors.push(`${tag}: ${name} ${mode} at ${t}x ran on ${s.engineActive}, not ${r.engine}`);
           if (s.hostErrorsAdded.length) errors.push(`${tag}: ${name} ${mode} at ${t}x: the host reported ${s.hostErrorsAdded.join("; ")}`);
           if (s.end.minutes !== s.startMinutes + config.steps * config.dt) errors.push(`${tag}: ${name} ${mode} at ${t}x: the clock moved ${s.end.minutes - s.startMinutes} minutes, expected ${config.steps * config.dt}`);
+          if (!s.gcAvailable) errors.push(`${tag}: ${name} ${mode} at ${t}x: gc() was missing (the browser ignored --js-flags=--expose-gc), so the loop did not start from a full collection`);
           if (s.startDigest === s.endDigest) errors.push(`${tag}: ${name} ${mode} at ${t}x: the end state equals the start state; the simulation did not advance`);
         }
         for (const [label, f] of [["frames", sc.frames[t]], ["frames with audio", sc.framesAudio?.[t]]] as const) {
@@ -94,18 +99,25 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
     const fatal = r.pageErrors.filter((e) => /\[wasm\]|\[tick\]/.test(e));
     if (fatal.length) errors.push(`rep ${r.rep} ${r.engine}: engine or frame errors in the page: ${fatal.slice(0, 3).join(" | ")}`);
     else if (r.pageErrors.length) warnings.push(`rep ${r.rep} ${r.engine}: ${r.pageErrors.length} page error(s), first: ${r.pageErrors[0]}`);
-    if (r.engine === "wasm" && r.cold) {
-      const { engineHostedMs, gameReadyMs } = r.cold;
-      if (engineHostedMs === null || gameReadyMs === null || engineHostedMs > gameReadyMs) errors.push(`rep ${r.rep} wasm: the engine was not hosted by the time the game was ready (hosted ${engineHostedMs ?? "never"}, ready ${gameReadyMs ?? "never"})`);
-    }
     if (r.audio?.started && !r.audio.contexts.includes("running") && Object.values(r.scenarios).some((sc) => Object.keys(sc.framesAudio ?? {}).length)) errors.push(`rep ${r.rep} ${r.engine}: audio-on frames ran with no running AudioContext (${r.audio.contexts.join(", ") || "none"})`);
-    if (r.cpuProbe && r.cpuProbe.throttledMs < r.cpuProbe.unthrottledMs * r.cpuProbe.rate * 0.5) warnings.push(`rep ${r.rep} ${r.engine}: the CPU probe ran ${r.cpuProbe.throttledMs.toFixed(0)} ms under the ${r.cpuProbe.rate}x throttle against ${r.cpuProbe.unthrottledMs.toFixed(0)} ms without it; the throttled cold start may not have been throttled`);
+    // A throttle that did not hold makes its rows unthrottled numbers: an
+    // error. Half the nominal slowdown is the bar (the probe is noisy).
+    const probe = r.cpuProbe;
+    if (probe) {
+      if (probe.throttledMs !== null && probe.throttledMs < probe.unthrottledMs * probe.rate * 0.5) errors.push(`rep ${r.rep} ${r.engine}: the CPU probe ran ${probe.throttledMs.toFixed(0)} ms under the ${probe.rate}x throttle against ${probe.unthrottledMs.toFixed(0)} ms without it; the throttled cold start was not throttled`);
+      for (const [rate, ms] of Object.entries(probe.timed ?? {})) if (ms < probe.unthrottledMs * Number(rate) * 0.5) errors.push(`rep ${r.rep} ${r.engine}: the CPU probe ran ${ms.toFixed(0)} ms under the ${rate}x throttle of the timed passes against ${probe.unthrottledMs.toFixed(0)} ms without it; those passes were not throttled`);
+    }
+    for (const t of config.throttles.filter((x) => x > 1).map(String)) if (!probe?.timed?.[t]) errors.push(`rep ${r.rep} ${r.engine}: no CPU probe confirms the ${t}x throttle of the timed passes`);
     for (const [name, sc] of Object.entries(r.scenarios)) {
       for (const [t, h] of Object.entries(sc.hosted)) if (r.engine === "wasm" && h.attribution && h.attribution.exportCalls === 0) errors.push(`rep ${r.rep} wasm: ${name} ${t}x: the attribution pass saw no export call, so its host JS share would include engine time`);
     }
-    if (!r.audio?.started) warnings.push(`rep ${r.rep} ${r.engine}: audio did not start, so the audio-on rows have no sample from it`);
+    // Audio-on rows pair repetitions, so one that lost its audio would skew
+    // them toward the repetitions where audio happened to start.
+    if (!r.audio?.started || !r.audio.contexts.includes("running")) errors.push(`rep ${r.rep} ${r.engine}: audio did not start (contexts: ${r.audio?.contexts.join(", ") || "none"}), so the audio-on rows have no sample from it`);
     const fv = r.firstVisitWithServiceWorker;
     if (!fv || fv.error || !fv.swActive) warnings.push(`rep ${r.rep} ${r.engine}: the service worker first visit ${fv?.error ? `failed (${fv.error})` : "never activated"}; its transfer and offline rows have no sample from it`);
+    else if (fv.onlineEngineActive !== r.engine) warnings.push(`rep ${r.rep} ${r.engine}: the service worker first visit ran on ${fv.onlineEngineActive ?? "no engine"}; its bytes are left out`);
+    if (fv?.onlinePageErrors.length) warnings.push(`rep ${r.rep} ${r.engine}: the service worker first visit logged ${fv.onlinePageErrors.length} page error(s), first: ${fv.onlinePageErrors[0]}`);
   }
 
   // Same start and same end, everywhere a scenario ran.

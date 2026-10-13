@@ -100,6 +100,7 @@ export function stepSummary(r: SimRun, startDigest: string, endDigest: string, a
     attribution,
     engineActive: r.engineActive,
     hostErrorsAdded: r.hostErrorsAdded,
+    gcAvailable: r.gcAvailable,
     startMinutes: r.startMinutes,
     startDigest,
     endDigest,
@@ -261,6 +262,10 @@ export async function runProcess(opts: RunnerOptions, rep: number, engine: Engin
         const digest = (key: string) => ev(page, "digest", digestStashed, key);
         await throttle(cdp, rate);
         try {
+          // Prove the throttle holds on this page, once per rate.
+          if (rate > 1 && !(t in (run.cpuProbe?.timed ?? {}))) {
+            run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: run.cpuProbe?.throttledMs ?? null, rate: slowRate, timed: { ...(run.cpuProbe?.timed ?? {}), [t]: await ev(page, "cpu probe", cpuProbe, undefined) } };
+          }
           const hosted = await sim("hosted", false);
           const hostedStart = await digest(hosted.startKey);
           const hostedEnd = await digest(hosted.endKey);
@@ -334,7 +339,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, engine: Engin
       });
       run.cold4x = c4.sample;
       if (c4.sample.engineActive !== engine) throw new Error(`${slowRate}x cold start: requested the ${engine} engine but ${c4.sample.engineActive} is active`);
-      run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: await ev(slowPage, "cpu probe", cpuProbe, undefined), rate: slowRate };
+      run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: await ev(slowPage, "cpu probe", cpuProbe, undefined), rate: slowRate, timed: run.cpuProbe?.timed ?? {} };
       await slow.close();
     }
     run.ok = true;
@@ -346,19 +351,25 @@ export async function runProcess(opts: RunnerOptions, rep: number, engine: Engin
   // service worker allowed, then an offline reload. Nothing in it can mark
   // the repetition failed.
   if (run.ok && browser) {
-    const side: string[] = [];
-    sink.side = side;
-    run.firstVisitWithServiceWorker = await firstVisit(browser, config, server, url, listen).catch((e: unknown) => ({ served: [], swActive: false, offlineEngineActive: null, offlinePageErrors: [], error: e instanceof Error ? e.message : String(e) }));
-    run.firstVisitWithServiceWorker.offlinePageErrors = side;
+    run.firstVisitWithServiceWorker = await firstVisit(browser, config, server, url, listen, sink).catch((e: unknown) => ({
+      served: [],
+      swActive: false,
+      onlineEngineActive: null,
+      offlineEngineActive: null,
+      onlinePageErrors: [],
+      offlinePageErrors: [],
+      error: e instanceof Error ? e.message : String(e),
+    }));
     sink.side = null;
   }
   await browser?.close().catch(() => {});
   return run;
 }
 
-async function firstVisit(browser: Browser, config: CompareConfig, server: PerfServer, url: string, listen: (p: Page) => void): Promise<NonNullable<ProcessRun["firstVisitWithServiceWorker"]>> {
-  const result: NonNullable<ProcessRun["firstVisitWithServiceWorker"]> = { served: [], swActive: false, offlineEngineActive: null, offlinePageErrors: [], error: null };
+async function firstVisit(browser: Browser, config: CompareConfig, server: PerfServer, url: string, listen: (p: Page) => void, sink: { side: string[] | null }): Promise<NonNullable<ProcessRun["firstVisitWithServiceWorker"]>> {
+  const result: NonNullable<ProcessRun["firstVisitWithServiceWorker"]> = { served: [], swActive: false, onlineEngineActive: null, offlineEngineActive: null, onlinePageErrors: [], offlinePageErrors: [], error: null };
   let sw: BrowserContext | null = null;
+  sink.side = result.onlinePageErrors;
   try {
     sw = await newContext(browser, config, "allow");
     const page = await sw.newPage();
@@ -371,10 +382,12 @@ async function firstVisit(browser: Browser, config: CompareConfig, server: PerfS
     await page.waitForTimeout(1000);
     await page.waitForLoadState("networkidle", { timeout: 60_000 });
     result.served = server.take();
+    result.onlineEngineActive = (await within("first visit info", page.evaluate(pageInfo), 60_000)).engineActive;
     if (result.swActive) {
       // Offline: reload with the network cut and see which engine the page
       // comes back on (the precache leaves engine/** out).
       await sw.setOffline(true);
+      sink.side = result.offlinePageErrors;
       try {
         await page.reload({ waitUntil: "commit" });
         await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 60_000 });
@@ -388,7 +401,9 @@ async function firstVisit(browser: Browser, config: CompareConfig, server: PerfS
     result.error = e instanceof Error ? e.message : String(e);
   } finally {
     server.take();
+    // Late offline errors land on the offline record until the context is gone.
     await sw?.close().catch(() => {});
+    sink.side = null;
   }
   return result;
 }

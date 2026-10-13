@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
-import { collectEnvironment, engineBuildHash, type Environment } from "./env";
+import { collectEnvironment, engineBuildHash, enginePackageDigests, type Environment } from "./env";
 import { aggregate, compareEngines, missingSamples } from "./metrics";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
@@ -82,20 +82,20 @@ export function makeConfig(args: Args, scenarioNames: string[]): CompareConfig {
 }
 
 const STATIC_LIMITATIONS = [
-  "One machine, headless Chromium in a container. Spread is reported (CV, order-statistic intervals of the median, bootstrap intervals of the ratios); results from other hardware, browsers or a GPU will differ.",
+  "One machine, headless Chromium in a container. Spread is reported (CV, order-statistic intervals of the median, order-statistic intervals of the paired median ratios); results from other hardware, browsers or a GPU will differ.",
   "Frame rates come from a software WebGL rasterizer (see the WebGL renderer row), so render cost is much higher than on a GPU device and dominates the frame. The simulation-only rows are unaffected by rendering.",
   "Both engines run on the main thread. The WASM host keeps a TypeScript read model of the tower, refreshed from the engine's frame view after every step and from a full save merge whenever the tower revision moves or an in-game hour passes (src/wasmhost/wasmHost.ts). The hosted rows include that cost; the bare-engine rows do not.",
   "The step driver (the frame loop's owed-minute math and fixed step) is the TypeScript host's for both engines (#867), and commands still run on both the read model and the engine (#954). This benchmark times ticks, which the engine alone runs when hosted; it does not time player commands.",
   "Pages are served cross-origin isolated (COOP/COEP) so performance.now() resolves to about 5 microseconds instead of 100. The production site is not isolated; isolation does not change how either engine executes.",
   "Transfer sizes are what this harness's server sent: Brotli quality 11 or gzip level 9 static compression, Cache-Control per vercel.json. A CDN's compression levels and protocol overhead differ; headers are not counted.",
-  "CPU throttling is Chromium's DevTools emulation (the renderer is paused in slices), not a slower CPU: it scales CPU time but not memory bandwidth or cache behavior.",
+  "CPU throttling is Chromium's DevTools emulation (the renderer is paused in slices), not a slower CPU: it scales CPU time but not memory bandwidth or cache behavior. A fixed CPU probe under each throttle must run at least half the nominal slowdown or the run fails; the throttled cold start's probe runs just after the start, so it shows the throttle held then, not every moment of the start.",
   "Memory is measured per scenario in its own freshly loaded page, after the save is loaded and two in-game hours run, then a forced GC through the DevTools protocol. WASM linear memory only grows, so each WASM figure is that page's high-water mark, which includes the boot tower the page hosted before the save was loaded. The JS heap leaves linear memory out, so the comparable row is JS heap plus linear memory. Process PSS sums the browser's processes (Linux only).",
   "Frame-time accounting times sim.tick and ui.update directly; the rest of each frame (the Excalibur canvas render, the compositor, GC and idle time until the next frame) is reported as one remainder. Render cost is therefore not isolated from idle time.",
   "Ratios are paired by repetition (the two engines' processes ran back to back, order alternating) with a distribution-free 95% interval of the median ratio, and a verdict needs six pairs. Every row is its own 95% interval, so across the report's many rows a few verdicts can be wrong by chance; read single borderline rows with that in mind.",
   "Startup is measured to the moment the app publishes its tooling handle (window.game) and to the first frame after it; it uses a VC_TOOLING=1 build of the same sources, which only adds that handle. The before-ready and after-ready byte split is cut where a 10 ms poll first sees the handle. The 4x cold start runs in a second fresh context of the same browser process (fresh HTTP cache, warm process).",
   "Gameplay frame windows are wall-clock time, so the slower engine simulates fewer in-game minutes in them; the achieved sim speed is reported beside every frame row. A frame over 200 ms is handed 1 ms of elapsed time by Excalibur, so rows with clamped frames (counted in the frames-over-200-ms row) understate the simulation's share.",
   "Audio-off means the game's audio never started (no gesture, so the Tone.js chunk never loads); audio-on starts it the way a first click does, unmuted, with Chromium's autoplay policy relaxed for both engines. Headless Chromium plays to no device, so the audio thread's cost on real output hardware may differ.",
-  "The WASM attribution (engine tick, exports the host reads, host JS) comes from a separate pass with wrappers on the engine's methods, never from the timed pass. The bare-engine (raw) rows tick a detached Engine and do not include the host's read-model sync.",
+  "The WASM attribution (engine tick, exports the host reads, host JS) comes from a separate pass with wrappers on every method of the engine, never from the timed pass; the wrappers' own bookkeeping outside their timed window lands in the host JS share, so that share is an upper bound. The bare-engine (raw) rows tick a detached Engine and do not include the host's read-model sync.",
   "The incremental WASM download counts the engine package (binary, loader, BUILD.json). The WASM host code (src/wasmhost) is inside the shared app chunks and is counted there for both configurations (backlog row perf-compare-host-js-share).",
   "Node timings (outcome check table) are a secondary data point on Node's V8; the engine order alternates by scenario.",
   "This is a pre-3.0 baseline of an engine still being cut over (#945), not release performance. Every result directory is named by date and commit so later runs can be compared with it.",
@@ -155,6 +155,12 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
 
   const validation = validateResults(config, runs, nodeChecks);
   const prodHash = engineBuildHash(dist);
+  // The served bytes themselves, so a rebuilt binary beside an old
+  // BUILD.json cannot pass as the same package.
+  const prodFiles = enginePackageDigests(dist);
+  if (JSON.stringify(prodFiles) !== JSON.stringify(environment.enginePackage)) validation.errors.push(`dist/ and dist-perf/ serve different engine bytes (${JSON.stringify(prodFiles)} vs ${JSON.stringify(environment.enginePackage)})`);
+  if (environment.commit === "unknown") validation.errors.push("the commit could not be read (git failed), so the results cannot be tied to a tree");
+  if (!environment.mainCommit) validation.warnings.push("origin/main is unknown here (no remote or no fetch), so whether this is a baseline of the latest main was not checked");
   if (!environment.engineBuildHash) validation.errors.push("the served engine package has no BUILD.json, so which sources it came from is unknown");
   else if (environment.engineSourceHash && environment.engineBuildHash !== environment.engineSourceHash) validation.errors.push(`the served engine package (${environment.engineBuildHash}) was not built from the current engine-rs sources (${environment.engineSourceHash}); rebuild it with npm run wasm:build`);
   if (!environment.engineSourceHash) validation.warnings.push("no engine-rs sources in this checkout, so the package's source hash was not checked");
@@ -208,18 +214,18 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
 
 /**
  * Where the results go. The default is a new folder per run under
- * docs/performance/results, named by date and commit (with -quick and
- * -dirty marks), and never an existing one: a second run of the same day
+ * docs/performance/results, named by date and commit (with -quick,
+ * -skipbuild (the builds were not made for this commit) and -dirty marks), and never an existing one: a second run of the same day
  * and commit gets -2, -3, and so on, so no result is overwritten. An
  * explicit --out must not exist yet either.
  */
-export function outputDir(repo: string, args: Pick<Args, "out" | "quick">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync): string {
+export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync): string {
   if (args.out) {
     const out = resolve(repo, args.out);
     if (exists(out)) throw new Error(`${out} already exists; results are never overwritten`);
     return out;
   }
-  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${env.dirty ? "-dirty" : ""}`);
+  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.skipBuild ? "-skipbuild" : ""}${env.dirty ? "-dirty" : ""}`);
   let out = base;
   for (let n = 2; exists(out); n++) out = `${base}-${n}`;
   return out;

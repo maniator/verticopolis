@@ -35,7 +35,7 @@ describe("runner summaries", () => {
   });
   it("summarizes a simulation run's steps", () => {
     const s = stepSummary(
-      { mode: "raw", engineActive: "wasm", steps: 4, dt: 2, loadMs: 3, totalMs: 10, stepMs: [1, 2, 3, 4], attribution: null, hostErrorsAdded: [], startMinutes: 0, startKey: "a", endKey: "b", end: { minutes: 8, money: 1, star: 1, population: 1, people: 0 } },
+      { mode: "raw", engineActive: "wasm", steps: 4, dt: 2, loadMs: 3, totalMs: 10, stepMs: [1, 2, 3, 4], attribution: null, hostErrorsAdded: [], gcAvailable: true, startMinutes: 0, startKey: "a", endKey: "b", end: { minutes: 8, money: 1, star: 1, population: 1, people: 0 } },
       "s",
       "e",
     );
@@ -53,12 +53,12 @@ describe("outputDir", () => {
   const env = { commitShort: "abc1234", dirty: false };
   it("names a new folder by date and commit and never reuses one", () => {
     const taken = new Set(["/r/docs/performance/results/2026-10-13-abc1234", "/r/docs/performance/results/2026-10-13-abc1234-2"]);
-    expect(outputDir("/r", { out: null, quick: false }, "2026-10-14", env, () => false)).toBe("/r/docs/performance/results/2026-10-14-abc1234");
-    expect(outputDir("/r", { out: null, quick: false }, "2026-10-13", env, (p) => taken.has(p))).toBe("/r/docs/performance/results/2026-10-13-abc1234-3");
+    expect(outputDir("/r", { out: null, quick: false, skipBuild: false }, "2026-10-14", env, () => false)).toBe("/r/docs/performance/results/2026-10-14-abc1234");
+    expect(outputDir("/r", { out: null, quick: false, skipBuild: false }, "2026-10-13", env, (p) => taken.has(p))).toBe("/r/docs/performance/results/2026-10-13-abc1234-3");
   });
   it("marks quick and dirty runs, and refuses an existing --out", () => {
-    expect(outputDir("/r", { out: null, quick: true }, "2026-10-13", { commitShort: "abc1234", dirty: true }, () => false)).toBe("/r/docs/performance/results/2026-10-13-abc1234-quick-dirty");
-    expect(outputDir("/r", { out: "x", quick: false }, "d", env, () => false)).toBe("/r/x");
-    expect(() => outputDir("/r", { out: "x", quick: false }, "d", env, () => true)).toThrow(/never overwritten/);
+    expect(outputDir("/r", { out: null, quick: true, skipBuild: true }, "2026-10-13", { commitShort: "abc1234", dirty: true }, () => false)).toBe("/r/docs/performance/results/2026-10-13-abc1234-quick-skipbuild-dirty");
+    expect(outputDir("/r", { out: "x", quick: false, skipBuild: false }, "d", env, () => false)).toBe("/r/x");
+    expect(() => outputDir("/r", { out: "x", quick: false, skipBuild: false }, "d", env, () => true)).toThrow(/never overwritten/);
   });
 });

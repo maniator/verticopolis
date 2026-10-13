@@ -38,6 +38,8 @@ export interface StepSummary {
   attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; wrappedTotalMs: number; merges: number; engineTicks: number; exportCalls: number; exportsWrapped: number } | null;
   engineActive: EngineName;
   hostErrorsAdded: string[];
+  /** The loop began from a full GC (gc() was there). */
+  gcAvailable: boolean;
   startMinutes: number;
   startDigest: string;
   endDigest: string;
@@ -120,15 +122,27 @@ export interface ProcessRun {
    *  default), in a second fresh context of the same browser process
    *  (fresh HTTP cache, not a fresh process). */
   cold4x: StartupSample | null;
-  /** A fixed CPU loop, unthrottled and under that throttle. */
-  cpuProbe: { unthrottledMs: number; throttledMs: number; rate: number } | null;
+  /** A fixed CPU loop: unthrottled, under the cold start's throttle, and
+   *  under each throttle of the timed passes (keyed by rate). */
+  cpuProbe: { unthrottledMs: number; throttledMs: number | null; rate: number; timed: Record<string, number> } | null;
   scenarios: Record<string, ScenarioRun>;
   wasmCold: { fetchMs: number; bytes: number; compileMs: number; instantiateMs: number; firstEngineMs: number } | null;
   /** A first visit with the service worker allowed, then an offline
    *  reload: which engine came back without the network. */
   /** The audio start for the audio-on frame pass. */
   audio: { started: boolean; muted: boolean; contexts: string[] } | null;
-  firstVisitWithServiceWorker: { served: ServedRequest[]; swActive: boolean; offlineEngineActive: EngineName | null; offlinePageErrors: string[]; error: string | null } | null;
+  firstVisitWithServiceWorker: {
+    served: ServedRequest[];
+    swActive: boolean;
+    /** The engine the online first visit ran on. */
+    onlineEngineActive: EngineName | null;
+    offlineEngineActive: EngineName | null;
+    /** Page errors of the online visit, and of the offline reload (where
+     *  the WASM package failing to load is the behavior measured). */
+    onlinePageErrors: string[];
+    offlinePageErrors: string[];
+    error: string | null;
+  } | null;
 }
 
 export interface MetricRow {

@@ -58,6 +58,7 @@ function results(ok: boolean): CompareResults {
       appVersion: "2.29.6",
       engineBuildHash: "h1",
       engineSourceHash: "h2",
+      enginePackage: { "verticopolis_engine_bg.wasm": "a".repeat(64) },
     },
     browser: { version: "141", headless: true, executable: null },
     scenarios: [{ name: "small", description: "d", sha256: "f".repeat(64), population: 700, units: 10, transports: 2, saveBytes: 1000 }],
@@ -78,7 +79,8 @@ describe("markdownReport", () => {
     expect(md).toContain("- error: boom");
     expect(md).toContain("- warning: careful");
     expect(md).toContain("(sources: h2, MISMATCH)");
-    expect(md).toContain("| Public main | c928ff4 (merge base c928ff4; this tree contains it) |");
+    expect(md).toContain("verticopolis_engine_bg.wasm aaaaaaaaaaaaaaaa");
+    expect(md).toContain("| Public main (origin/main as last fetched) | c928ff4 (merge base c928ff4; this tree contains it) |");
     expect(md).toContain("| small | 10 | same | same | DIFFERENT | NO |");
     expect(md).toContain("## Simulation only, engine as the app hosts it");
     expect(md).toMatch(/\| small \| 1x \| total for fixed duration \| 100 ms \| 200 ms \| 2\.00x \(2\.00 to 2\.00\) \| wasm slower \| 6\/6\/6 \|/);

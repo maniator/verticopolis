@@ -62,9 +62,10 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
   };
   startup("cold");
   startup("warm");
-  startup("cold4x");
-  // Only visits whose service worker activated count.
-  out.push({ group: "transfer", scenario: "-", throttle: "1", metric: "first visit with service worker, bytes served", unit: "bytes", better: "lower", value: (r) => (r.firstVisitWithServiceWorker?.swActive ? bytes(r.firstVisitWithServiceWorker.served) : null) });
+  if (slow !== "1") startup("cold4x");
+  // Only visits whose service worker activated and that ran on the
+  // requested engine count.
+  out.push({ group: "transfer", scenario: "-", throttle: "1", metric: "first visit with service worker, bytes served", unit: "bytes", better: "lower", value: (r) => { const f = r.firstVisitWithServiceWorker; return f?.swActive && f.onlineEngineActive === r.engine ? bytes(f.served) : null; } });
   for (const [metric, key] of [["fetch", "fetchMs"], ["compile", "compileMs"], ["instantiate", "instantiateMs"], ["first Engine", "firstEngineMs"]] as const) {
     out.push({ group: "wasm-load", scenario: "-", throttle: "1", metric: `cold ${metric}`, unit: "ms", better: "lower", value: (r) => r.wasmCold?.[key], engines: ["ts"] });
   }
@@ -160,10 +161,17 @@ export function compareEngines(rows: readonly MetricRow[], skipped: string[] = [
     const pairs: [number, number][] = [];
     wasm.reps.forEach((rep, i) => {
       const b = tsByRep.get(rep);
-      if (b !== undefined && b !== 0) pairs.push([wasm.values[i], b]);
+      if (b !== undefined) pairs.push([wasm.values[i], b]);
     });
     if (pairs.length === 0) {
       skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: no repetition has both engines`);
+      continue;
+    }
+    // A zero on the TypeScript side has no ratio. Dropping those pairs
+    // would keep only the repetitions where TypeScript did worst, so the
+    // whole metric goes without a ratio instead (reported per engine).
+    if (pairs.some(([, b]) => b === 0)) {
+      skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: a TypeScript repetition is 0, so no ratio`);
       continue;
     }
     const r = pairedRatio(pairs);
