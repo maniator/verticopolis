@@ -39,6 +39,19 @@ fn build_result(r: crate::build::BuildResult) -> String {
     outcome(r.ok, r.reason.as_deref())
 }
 
+/// A resize result as `{ ok, reason?, added, floorTilesCreated }`.
+fn resize_json(r: crate::tower::ResizeResult) -> String {
+    let mut v = serde_json::json!({
+        "ok": r.ok,
+        "added": r.added,
+        "floorTilesCreated": r.floor_tiles_created,
+    });
+    if let Some(reason) = r.reason {
+        v["reason"] = Value::String(reason);
+    }
+    v.to_string()
+}
+
 /// `canBuild`'s answer as the TypeScript spells it: `{ ok, reason?, cost }`.
 fn can_build_json(ok: bool, reason: Option<&str>, cost: f64) -> String {
     let mut v = serde_json::json!({ "ok": ok, "cost": cost });
@@ -361,9 +374,21 @@ impl Engine {
         self.sim.set_no_rate(id.into())
     }
 
+    /// `setCars(id, cars)`: the simulation-layer edit, which reports
+    /// `capacity_changed`.
     #[wasm_bindgen(js_name = setCars)]
     pub fn set_cars(&mut self, id: i32, cars: i32) -> bool {
         self.sim.set_cars(id.into(), cars.into())
+    }
+
+    /// `tower.setCars(id, cars)`: the bare tower edit, silent in both
+    /// engines (#906). Relay-only: the dual-run mirror replays a bare
+    /// TypeScript tower edit with it. Player and UI edits use the charge commands
+    /// (`addCar`, `removeCar`, `extendTransport`), and
+    /// `towerRelayOps.guard.test.ts` keeps other callers out.
+    #[wasm_bindgen(js_name = towerSetCars)]
+    pub fn tower_set_cars(&mut self, id: i32, cars: i32) -> bool {
+        self.sim.tower.set_cars(id.into(), cars.into())
     }
 
     /// `Tower.setSchedule(id, schedule)` with the schedule as JSON text.
@@ -411,22 +436,26 @@ impl Engine {
             .map(|r| batch_result_json(&r)))
     }
 
-    /// `tower.resizeTransport(id, bottom, top)`: JSON
+    /// `resizeTransport(id, bottom, top)`, the simulation-layer edit that
+    /// reports `capacity_changed`: JSON
     /// `{ ok, reason?, added, floorTilesCreated }`.
     #[wasm_bindgen(js_name = resizeTransport)]
     pub fn resize_transport(&mut self, id: i32, bottom: i32, top: i32) -> String {
         let r = self
             .sim
             .resize_transport(id.into(), bottom.into(), top.into());
-        let mut v = serde_json::json!({
-            "ok": r.ok,
-            "added": r.added,
-            "floorTilesCreated": r.floor_tiles_created,
-        });
-        if let Some(reason) = r.reason {
-            v["reason"] = Value::String(reason);
-        }
-        v.to_string()
+        resize_json(r)
+    }
+
+    /// `tower.resizeTransport(id, bottom, top)`, the bare tower edit, silent
+    /// in both engines (#906): the same JSON. Relay-only, as `towerSetCars`.
+    #[wasm_bindgen(js_name = towerResizeTransport)]
+    pub fn tower_resize_transport(&mut self, id: i32, bottom: i32, top: i32) -> String {
+        let r = self
+            .sim
+            .tower
+            .resize_transport(id.into(), bottom.into(), top.into());
+        resize_json(r)
     }
 
     /// `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car

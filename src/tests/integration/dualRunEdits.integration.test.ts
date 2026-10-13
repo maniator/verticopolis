@@ -42,16 +42,21 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     const shaft = sim.tower.transportAt(30, 196)!;
     // The engine-owned charges (#914): each command moves the money itself.
     const cars = shaft.cars;
-    expect(sim.tower.setCars(shaft.id, 2)).toBe(cars !== 2); // a known count, so both commands land
+    expect(sim.setCars(shaft.id, 2)).toBe(cars !== 2); // a known count, so both commands land
     expect(sim.addCar(shaft.id)).toEqual({ ok: true, delta: -ECON.addCarCost });
     expect(sim.removeCar(shaft.id)).toEqual({ ok: true, delta: carResaleRefund() });
     expect(shaft.cars).toBe(2);
-    expect(sim.tower.setCars(shaft.id, shaft.cars > 1 ? shaft.cars - 1 : 2)).toBe(true); // the raw edit stays free
+    expect(sim.setCars(shaft.id, shaft.cars > 1 ? shaft.cars - 1 : 2)).toBe(true); // the uncharged edit stays free
+    // The bare tower edits are silent in both engines (#906): the shadow
+    // applies them as its silent tower ops, so the event streams still agree.
+    expect(sim.tower.setCars(shaft.id, shaft.cars > 1 ? shaft.cars - 1 : 2)).toBe(true);
+    expect(sim.tower.resizeTransport(shaft.id, shaft.bottom, shaft.top + 1).ok).toBe(true);
+    expect(sim.tower.resizeTransport(shaft.id, shaft.bottom, shaft.top - 1).ok).toBe(true);
     sim.money += 1000; // a host's direct write is still mirrored as setMoney
     expect(sim.tower.setStop(shaft.id, 35, false)).toBe(true);
     expect(sim.tower.clearStops(shaft.id)).toBe(true);
     expect(sim.tower.setSchedule(shaft.id, { weekday: Array(24).fill(2), weekend: Array(24).fill(1) })).toBe(true);
-    const grown = sim.tower.resizeTransport(shaft.id, 30, 47);
+    const grown = sim.resizeTransport(shaft.id, 30, 47);
     expect(grown.ok).toBe(true);
     sim.money -= 5000;
     // A billed drag: out two floors, back one (free), out again within the mark.

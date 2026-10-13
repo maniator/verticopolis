@@ -151,6 +151,10 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
       return { op: "extendTransport", id: n(id), end: end as "up" | "down", targetFloor: n(targetFloor), hwm: mark ? { bottom: mark.bottom, top: mark.top } : null };
     });
     wrap(sim, "removeFacility", ([id, method]) => ({ op: "removeFacility", id: n(id), method: method as "sell" | "bulldoze" }));
+    // The capacity edits at the simulation layer report capacity_changed;
+    // the bare tower edits below relay as their silent tower ops (#906).
+    wrap(sim, "setCars", ([id, cars]) => ({ op: "setCars", id: n(id), cars: n(cars) }));
+    wrap(sim, "resizeTransport", ([id, bottom, top]) => ({ op: "resizeTransport", id: n(id), bottom: n(bottom), top: n(top) }));
     wrap(sim, "adjustRent", ([id, dir]) => ({ op: "adjustRent", id: n(id), dir: dir as 1 | -1 }));
     wrap(sim, "setNoRate", ([id]) => ({ op: "setNoRate", id: n(id) }));
     wrap(sim, "priceUnit", ([u, target]) => ({ op: "priceUnit", id: (u as { id: number }).id, target: n(target) }));
@@ -170,8 +174,8 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
 
     wrap(tower, "removeUnit", ([id]) => ({ op: "removeUnit", id: n(id) }));
     wrap(tower, "removeTransport", ([id]) => ({ op: "removeTransport", id: n(id) }));
-    wrap(tower, "resizeTransport", ([id, bottom, top]) => ({ op: "resizeTransport", id: n(id), bottom: n(bottom), top: n(top) }));
-    wrap(tower, "setCars", ([id, cars]) => ({ op: "setCars", id: n(id), cars: n(cars) }));
+    wrap(tower, "resizeTransport", ([id, bottom, top]) => ({ op: "towerResizeTransport", id: n(id), bottom: n(bottom), top: n(top) }));
+    wrap(tower, "setCars", ([id, cars]) => ({ op: "towerSetCars", id: n(id), cars: n(cars) }));
     wrap(tower, "setSchedule", ([id, raw]) => ({ op: "setSchedule", id: n(id), schedule: raw }));
     wrap(tower, "setStop", ([id, floor, stop]) => ({ op: "setStop", id: n(id), floor: n(floor), stop: stop as boolean }));
     wrap(tower, "setExpressStops", ([id]) => ({ op: "setExpressStops", id: n(id) }));

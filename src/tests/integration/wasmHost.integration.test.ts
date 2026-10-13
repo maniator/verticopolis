@@ -167,8 +167,8 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
       expect(sim.build("office", 2, 180).ok).toBe(true);
       expect(sim.buildTransport("elevatorStandard", 172, 1, 2).ok).toBe(true);
       const shaft = sim.tower.transportAt(1, 172)!;
-      expect(sim.tower.setCars(shaft.id, 2)).toBe(true);
-      expect(sim.tower.setCars(shaft.id, 2)).toBe(false); // a no-op emits nothing
+      expect(sim.setCars(shaft.id, 2)).toBe(true);
+      expect(sim.setCars(shaft.id, 2)).toBe(false); // a no-op emits nothing
       const office = sim.tower.unitAt(2, 180)!;
       expect(sim.adjustRent(office.id, 1)).not.toBeNull();
       expect(sim.sellAt(2, 199)).toBe(true);
@@ -262,7 +262,6 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     host.syncStructure();
     expect(host.merges).toBeGreaterThan(0);
     expect(sim.gameplayEvents).toBe(buffer);
-    expect(sim.tower.gameplayEvents).toBe(buffer);
     expect(buffer.discardOnHandOff).toBe(true);
     expect(buffer.length).toBe(1); // the read model's copy of the placement
     host.detach();
