@@ -1,9 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
-import { collectEnvironment, engineBuildHash, enginePackageDigests, type Environment } from "./env";
+import { buildTree, collectEnvironment, engineBuildHash, enginePackageDigests, type Environment } from "./env";
 import { aggregate, compareEngines, missingSamples } from "./metrics";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
@@ -88,7 +88,7 @@ const STATIC_LIMITATIONS = [
   "The step driver (the frame loop's owed-minute math and fixed step) is the TypeScript host's for both engines (#867), and commands still run on both the read model and the engine (#954). This benchmark times ticks, which the engine alone runs when hosted; it does not time player commands.",
   "Pages are served cross-origin isolated (COOP/COEP) so performance.now() resolves to about 5 microseconds instead of 100. The production site is not isolated; isolation does not change how either engine executes.",
   "Transfer sizes are what this harness's server sent: Brotli quality 11 or gzip level 9 static compression, Cache-Control per vercel.json. A CDN's compression levels and protocol overhead differ; headers are not counted.",
-  "CPU throttling is Chromium's DevTools emulation (the renderer is paused in slices), not a slower CPU: it scales CPU time but not memory bandwidth or cache behavior. A fixed CPU probe under each throttle must run at least half the nominal slowdown or the run fails; the throttled cold start's probe runs just after the start, so it shows the throttle held then, not every moment of the start.",
+  "CPU throttling is Chromium's DevTools emulation (the renderer is paused in slices), not a slower CPU: it scales CPU time but not memory bandwidth or cache behavior. A fixed CPU probe runs under each throttle before every scenario's timed passes, at the start of each frame block and just after the throttled cold start, and must show at least half the nominal slowdown or the run fails. A probe shows the throttle held at that moment, not at every moment after it.",
   "Memory is measured per scenario in its own freshly loaded page, after the save is loaded and two in-game hours run, then a forced GC through the DevTools protocol. WASM linear memory only grows, so each WASM figure is that page's high-water mark, which includes the boot tower the page hosted before the save was loaded. The JS heap leaves linear memory out, so the comparable row is JS heap plus linear memory. Process PSS sums the browser's processes (Linux only).",
   "Frame-time accounting times sim.tick and ui.update directly; the rest of each frame (the Excalibur canvas render, the compositor, GC and idle time until the next frame) is reported as one remainder. Render cost is therefore not isolated from idle time.",
   "Ratios are paired by repetition (the two engines' processes ran back to back, order alternating) with a distribution-free 95% interval of the median ratio, and a verdict needs six pairs. Every row is its own 95% interval, so across the report's many rows a few verdicts can be wrong by chance; read single borderline rows with that in mind.",
@@ -107,17 +107,23 @@ function sh(cmd: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = p
 
 export async function main(argv: readonly string[], repo: string): Promise<number> {
   const args = parseArgs(argv);
+  const startedAt = new Date().toISOString();
   const log = (line: string) => process.stderr.write(`${line}\n`);
   const dist = join(repo, "dist");
   const distPerf = join(repo, "dist-perf");
   if (!existsSync(join(repo, "src/public/engine/verticopolis_engine_bg.wasm"))) {
     throw new Error("the engine package src/public/engine/ is missing: build it first with `bash scripts/build-engine-wasm.sh` where that script exists (it installs the pinned toolchain), or `npm run wasm:build` (needs the wasm32 target and the pinned wasm-bindgen CLI)");
   }
+  // Which tree the builds came from, stamped beside them (gitignored), so a
+  // --skip-build run can prove its builds are this commit's.
+  const stampPath = join(repo, "dist-perf", ".perf-build.json");
+  const tree = buildTree(repo);
   if (!args.skipBuild) {
     log("perf:compare: production build (npm run build)");
     sh("npm", ["run", "build"], repo);
     log("perf:compare: tooling build of the same sources (VC_TOOLING=1) into dist-perf/");
     sh("npx", ["vite", "build", "--outDir", distPerf, "--emptyOutDir"], repo, { ...process.env, VC_TOOLING: "1" });
+    writeFileSync(stampPath, JSON.stringify(tree) + "\n");
   }
   for (const d of [dist, distPerf]) if (!existsSync(join(d, "index.html"))) throw new Error(`no build at ${d}; run without --skip-build`);
 
@@ -165,7 +171,13 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   else if (environment.engineSourceHash && environment.engineBuildHash !== environment.engineSourceHash) validation.errors.push(`the served engine package (${environment.engineBuildHash}) was not built from the current engine-rs sources (${environment.engineSourceHash}); rebuild it with npm run wasm:build`);
   if (!environment.engineSourceHash) validation.warnings.push("no engine-rs sources in this checkout, so the package's source hash was not checked");
   if (prodHash !== environment.engineBuildHash) validation.errors.push(`dist/ (sizes) and dist-perf/ (timings) carry different engine packages (${prodHash ?? "none"} vs ${environment.engineBuildHash ?? "none"}); rebuild without --skip-build`);
-  if (args.skipBuild) validation.warnings.push("--skip-build: dist/ and dist-perf/ were not rebuilt for this commit");
+  if (args.skipBuild) {
+    // The builds must be this clean commit's, or the app code measured is
+    // not the code the results are filed under.
+    const stamp = existsSync(stampPath) ? (JSON.parse(readFileSync(stampPath, "utf8")) as { commit: string; dirty: boolean }) : null;
+    if (!stamp) validation.errors.push("--skip-build: dist-perf/ has no build stamp, so which tree it came from is unknown; run once without --skip-build");
+    else if (stamp.commit !== tree.commit || stamp.dirty || tree.dirty) validation.errors.push(`--skip-build: the builds came from ${stamp.commit}${stamp.dirty ? " (dirty)" : ""}, the tree is ${tree.commit}${tree.dirty ? " (dirty)" : ""}; rebuild without --skip-build`);
+  }
   if (environment.dirty) validation.warnings.push("the working tree had uncommitted or untracked changes; the results folder is marked -dirty");
   if (environment.behindMain) validation.warnings.push(`the measured tree lacks ${environment.behindMain} commit(s) of origin/main (${environment.mainCommit}); it is not a baseline of the latest main`);
   const metrics = aggregate(runs, config.scenarios, config.throttles);
@@ -179,6 +191,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const renderer = runs.find((r) => r.page?.webgl)?.page?.webgl?.renderer;
   const results: CompareResults = {
     schema: 1,
+    startedAt,
     generatedAt: new Date().toISOString(),
     issue: "maniator/verticopolis#972",
     config,

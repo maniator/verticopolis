@@ -76,6 +76,7 @@ describe("markdownReport", () => {
   it("states the validation result, the environment and each section", () => {
     const md = markdownReport(results(false));
     expect(md).toContain("**Validation: FAILED.**");
+    expect(md).toContain("> **Snapshot, not a live figure.** Measured ? to 2026-10-13T00:00:00.000Z on commit `abc1234def`, with public main at `c928ff4`. A pre-3.0 baseline");
     expect(md).toContain("- error: boom");
     expect(md).toContain("- warning: careful");
     expect(md).toContain("(sources: h2, MISMATCH)");

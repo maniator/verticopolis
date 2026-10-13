@@ -224,6 +224,11 @@ export async function runProcess(opts: RunnerOptions, rep: number, engine: Engin
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ev = <A, R>(page: Page, label: string, fn: (arg: A) => R | Promise<R>, arg: A): Promise<R> => within(label, page.evaluate(fn as any, arg) as Promise<R>);
   const slowRate = Math.max(...config.throttles);
+  // The CPU probe under a throttle, kept by "<where>:<rate>".
+  const probe = async (page: Page, key: string): Promise<void> => {
+    const ms = await ev(page, "cpu probe", cpuProbe, undefined);
+    run.cpuProbe = { unthrottledMs: run.cpuProbe?.unthrottledMs ?? NaN, throttledMs: run.cpuProbe?.throttledMs ?? null, rate: slowRate, timed: { ...(run.cpuProbe?.timed ?? {}), [key]: ms } };
+  };
   let browser: Browser | null = null;
   try {
     // Autoplay without a gesture, so the audio-on block can start audio the
@@ -244,6 +249,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, engine: Engin
     run.warm = warm.sample;
     if (warm.sample.engineActive !== engine) throw new Error(`warm start: requested the ${engine} engine but ${warm.sample.engineActive} is active`);
     const unthrottledProbe = await ev(page, "cpu probe", cpuProbe, undefined);
+    run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: null, rate: slowRate, timed: {} };
     log(`  rep ${rep} ${engine}: cold ready ${cold.sample.gameReadyMs?.toFixed(0)} ms, warm ready ${warm.sample.gameReadyMs?.toFixed(0)} ms`);
 
     const memory = await memoryPass(page, cdp, opts, engine, engineUrl);
@@ -262,10 +268,8 @@ export async function runProcess(opts: RunnerOptions, rep: number, engine: Engin
         const digest = (key: string) => ev(page, "digest", digestStashed, key);
         await throttle(cdp, rate);
         try {
-          // Prove the throttle holds on this page, once per rate.
-          if (rate > 1 && !(t in (run.cpuProbe?.timed ?? {}))) {
-            run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: run.cpuProbe?.throttledMs ?? null, rate: slowRate, timed: { ...(run.cpuProbe?.timed ?? {}), [t]: await ev(page, "cpu probe", cpuProbe, undefined) } };
-          }
+          // Prove the throttle holds for this scenario's passes.
+          if (rate > 1) await probe(page, `${sc.name}:${t}`);
           const hosted = await sim("hosted", false);
           const hostedStart = await digest(hosted.startKey);
           const hostedEnd = await digest(hosted.endKey);
@@ -312,6 +316,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, engine: Engin
           await ev(page, "prepare", prepareLiveApp, undefined);
           await throttle(cdp, rate);
           try {
+            if (rate > 1 && sc === scenarios[0]) await probe(page, `frames-${block}:${rate}`);
             const f = frameSummary(await ev(page, `${sc.name} frames (audio ${block})`, measureFrames, { windowMs: config.frameWindowMs, warmMs: config.frameWarmMs, speed: config.speed }));
             (block === "on" ? run.scenarios[sc.name].framesAudio : run.scenarios[sc.name].frames)[String(rate)] = f;
             log(`  rep ${rep} ${engine} ${sc.name} ${rate}x audio ${block}: frames median ${f.medianMs.toFixed(1)} ms (${f.frames} frames, ${f.clampedFrames} over ${CLAMP_FRAME_MS} ms, ${f.simMinutesPerSecond.toFixed(1)} sim-min/s)`);

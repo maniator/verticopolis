@@ -171,7 +171,7 @@ describe("validateResults", () => {
   it("names a fallback at the throttled cold start, and needs none without a throttle", () => {
     const runs = good();
     runs[1].cold4x = { ...runs[1].cold4x!, engineActive: "ts" };
-    for (const r of runs) r.cpuProbe = { unthrottledMs: 50, throttledMs: 200, rate: 4, timed: { "4": 200 } };
+    for (const r of runs) r.cpuProbe = { unthrottledMs: 50, throttledMs: 200, rate: 4, timed: { "small:4": 200, "frames-off:4": 200, "frames-on:4": 200 } };
     expect(validateResults(config({ throttles: [1, 4] }), runs, [node()]).errors).toContain("rep 0 wasm: 4x cold start: the WASM engine did not initialize; the page fell back to TypeScript");
     const none = good().map((r) => ({ ...r, cold4x: null }));
     expect(validateResults(config({ throttles: [1] }), none, [node()]).errors).toEqual([]);
@@ -205,9 +205,9 @@ describe("validateResults", () => {
     expect(v.errors).toEqual(expect.arrayContaining(["rep 0 wasm: audio-on frames ran with no running AudioContext (suspended)", "rep 1 wasm: small 1x: the attribution pass saw no export call, so its host JS share would include engine time"]));
     expect(v.errors.some((w) => w.startsWith("rep 0 ts: the CPU probe ran 60 ms under the 4x throttle against 50 ms without it; the throttled cold start"))).toBe(true);
     const throttled = good();
-    throttled[1].cpuProbe = { unthrottledMs: 50, throttledMs: 200, rate: 4, timed: { "4": 70 } };
+    throttled[1].cpuProbe = { unthrottledMs: 50, throttledMs: 200, rate: 4, timed: { "small:4": 70, "frames-off:4": 200 } };
     const t = validateResults(config({ throttles: [1, 4] }), throttled, [node()]);
-    expect(t.errors.some((e) => e.startsWith("rep 0 wasm: the CPU probe ran 70 ms under the 4x throttle of the timed passes"))).toBe(true);
-    expect(t.errors).toContain("rep 0 ts: no CPU probe confirms the 4x throttle of the timed passes");
+    expect(t.errors.some((e) => e.startsWith("rep 0 wasm: the CPU probe ran 70 ms under the 4x throttle of small"))).toBe(true);
+    expect(t.errors).toEqual(expect.arrayContaining(["rep 0 ts: no CPU probe confirms the 4x throttle of small", "rep 0 wasm: no CPU probe confirms the 4x throttle of frames-on"]));
   });
 });

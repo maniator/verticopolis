@@ -105,9 +105,15 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
     const probe = r.cpuProbe;
     if (probe) {
       if (probe.throttledMs !== null && probe.throttledMs < probe.unthrottledMs * probe.rate * 0.5) errors.push(`rep ${r.rep} ${r.engine}: the CPU probe ran ${probe.throttledMs.toFixed(0)} ms under the ${probe.rate}x throttle against ${probe.unthrottledMs.toFixed(0)} ms without it; the throttled cold start was not throttled`);
-      for (const [rate, ms] of Object.entries(probe.timed ?? {})) if (ms < probe.unthrottledMs * Number(rate) * 0.5) errors.push(`rep ${r.rep} ${r.engine}: the CPU probe ran ${ms.toFixed(0)} ms under the ${rate}x throttle of the timed passes against ${probe.unthrottledMs.toFixed(0)} ms without it; those passes were not throttled`);
+      for (const [key, ms] of Object.entries(probe.timed ?? {})) {
+        const [where, rate] = [key.slice(0, key.lastIndexOf(":")), Number(key.slice(key.lastIndexOf(":") + 1))];
+        if (!(ms >= probe.unthrottledMs * rate * 0.5)) errors.push(`rep ${r.rep} ${r.engine}: the CPU probe ran ${ms.toFixed(0)} ms under the ${rate}x throttle of ${where} against ${probe.unthrottledMs.toFixed(0)} ms without it; those passes were not throttled`);
+      }
     }
-    for (const t of config.throttles.filter((x) => x > 1).map(String)) if (!probe?.timed?.[t]) errors.push(`rep ${r.rep} ${r.engine}: no CPU probe confirms the ${t}x throttle of the timed passes`);
+    for (const t of config.throttles.filter((x) => x > 1)) {
+      const where = [...config.scenarios, "frames-off", "frames-on"];
+      for (const w of where) if (!probe?.timed?.[`${w}:${t}`]) errors.push(`rep ${r.rep} ${r.engine}: no CPU probe confirms the ${t}x throttle of ${w}`);
+    }
     for (const [name, sc] of Object.entries(r.scenarios)) {
       for (const [t, h] of Object.entries(sc.hosted)) if (r.engine === "wasm" && h.attribution && h.attribution.exportCalls === 0) errors.push(`rep ${r.rep} wasm: ${name} ${t}x: the attribution pass saw no export call, so its host JS share would include engine time`);
     }

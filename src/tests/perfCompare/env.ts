@@ -34,7 +34,9 @@ export interface Environment {
 
 function run(cmd: string, args: string[], cwd: string): string | null {
   try {
-    return execFileSync(cmd, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    // Bounded, and never prompting for credentials, so a git that wants a
+    // password or a remote that hangs cannot stall the benchmark.
+    return execFileSync(cmd, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30_000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_SSH_COMMAND: "ssh -o BatchMode=yes" } }).trim();
   } catch {
     return null;
   }
@@ -156,4 +158,11 @@ export function processTreePss(rootPid: number, only: RegExp = /./): { bytes: nu
     }
   }
   return counted ? { bytes: kb * 1024, processes: counted } : null;
+}
+
+/** The tree a build comes from: HEAD and whether anything outside the
+ *  results folders differs from it. */
+export function buildTree(repo: string): { commit: string; dirty: boolean } {
+  const status = run("git", ["status", "--porcelain", "--untracked-files=normal", "--", ".", ":(exclude)docs/performance/results"], repo);
+  return { commit: run("git", ["rev-parse", "HEAD"], repo) ?? "unknown", dirty: status === null ? true : status.length > 0 };
 }

@@ -123,7 +123,8 @@ export interface ProcessRun {
    *  (fresh HTTP cache, not a fresh process). */
   cold4x: StartupSample | null;
   /** A fixed CPU loop: unthrottled, under the cold start's throttle, and
-   *  under each throttle of the timed passes (keyed by rate). */
+   *  under each throttle of every scenario's timed passes and of each frame
+   *  block (keyed "<scenario or frames-on/off>:<rate>"). */
   cpuProbe: { unthrottledMs: number; throttledMs: number | null; rate: number; timed: Record<string, number> } | null;
   scenarios: Record<string, ScenarioRun>;
   wasmCold: { fetchMs: number; bytes: number; compileMs: number; instantiateMs: number; firstEngineMs: number } | null;
@@ -180,6 +181,8 @@ export interface Comparison {
 
 export interface CompareResults {
   schema: 1;
+  /** When the run started and when it finished (ISO). */
+  startedAt?: string;
   generatedAt: string;
   issue: string;
   config: CompareConfig;
