@@ -1,4 +1,4 @@
-import { html, type TemplateResult } from "lit-html";
+import { html, nothing, type TemplateResult } from "lit-html";
 import { compareTemplate } from "./compare";
 
 /**
@@ -101,9 +101,18 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
   },
 ];
 
-/** The About section body (attribution + the interpolated app version). */
-export function helpAboutBody(version: string, engine = ""): TemplateResult {
-  return html`<p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br />Verticopolis <span class="app-version">v${version}</span>${engine}</p>`;
+/** The About section body (attribution, the interpolated app version and a
+ *  link to the third-party license notices the build generates,
+ *  `scripts/gen-third-party-notices.ts`, #951). The in-game modal uses the
+ *  default relative href, which resolves against the game page's own URL (the
+ *  site root on the web, where the file sits beside `index.html`); the `/help`
+ *  page passes the root-relative one so a trailing slash on its URL cannot
+ *  move the link. `showLicenses` is false in wrapped builds, whose shells do
+ *  not open a bundled file in a new tab. */
+export function helpAboutBody(version: string, engine = "", showLicenses = true, licensesHref = "third-party-notices.txt"): TemplateResult {
+  return html`<p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br />Verticopolis <span class="app-version">v${version}</span>${engine}</p>${showLicenses
+    ? html`<p class="help-licenses"><a href=${licensesHref} target="_blank" rel="noopener noreferrer">Third-party licenses<span class="visually-hidden"> (opens in a new tab)</span></a></p>`
+    : nothing}`;
 }
 
 /** The Privacy section body, shared by the in-game Help modal and the standalone
