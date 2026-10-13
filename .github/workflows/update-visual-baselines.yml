@@ -81,11 +81,14 @@ jobs:
       # this run is queued behind the sibling screenshots run, the tip already has
       # that run's commit, so the push here fast-forwards. Full history (depth 0)
       # also lets the rebase-retry below reconcile cleanly if anything did land.
-      # persist-credentials: false keeps the token out of .git/config: this job
-      # runs whatever the branch contains (npm ci, the build, Playwright), and a
-      # malicious dependency postinstall must not be able to read a write token
-      # off disk. Same pattern screenshot-capture.yml documents; the push step
-      # below authenticates explicitly instead.
+      # persist-credentials: false keeps the token off disk: this job runs
+      # whatever the branch contains (npm ci, the build, Playwright), and a
+      # malicious dependency postinstall must not be able to read a write
+      # token. checkout v6 and later keep a persisted token in a RUNNER_TEMP
+      # credentials file referenced by includeIf.gitdir rather than inline in
+      # .git/config, so an audit should read that file, not the config. Same pattern
+      # screenshot-capture.yml documents; the push step below authenticates
+      # explicitly instead.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.ref_name }}
