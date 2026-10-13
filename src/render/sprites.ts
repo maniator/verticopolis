@@ -1,6 +1,7 @@
 import { FACILITIES } from "../engine/facilities";
 import type { FacilityKind, Unit } from "../engine/types";
 import { drawRoom } from "./pixelSprites";
+import { layerEnd } from "./pixelSprites/layers";
 import type { DrawCtx } from "./sprites/common";
 import {
   drawAquaticCenter,
@@ -96,6 +97,7 @@ export function drawUnit(d: DrawCtx, u: Unit, x: number, y: number, w: number, h
   // staffed amenities, not leased tenants — they're never "for lease", so always
   // draw their interior regardless of the internal empty/idle state.
   drawInterior(d, u, x, y, w, h);
+  layerEnd(ctx);
 }
 
 /** Dispatch to the per-facility interior drawing (services & special only). */
