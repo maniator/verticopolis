@@ -210,7 +210,7 @@ that no action plays its cue twice.
 | `milestone_reached` | any id | `notify` | 6 |
 | `facility_placed`, `facility_removed`, `pricing_changed`, `capacity_changed` | any | none (the command result plays it) | Rule |
 | `tower_founded` | any | none (the program change is UI) | Rule |
-| Car stop counter | counter increases, cars in view only | new elevator chime, one per car per frame, rate capped | 5 |
+| Car stop counter | counter increases, cars in view only | new elevator chime, one per car per frame, rate capped | 5b (counter in 5a) |
 | Fx sequences | sequence increases | Santa, thief, treasure and VIP cues; the VIP cue is skipped when `evaluatedTower` turns true in the same frame (the winning visit, seen in the simulation state the win dialog already reads) | 6, auditioned |
 | Weather, clock, occupancy | continuous | rain bed, crowd gates, crowd level | Unchanged |
 | Command result | ok, refused, removed | `build`, `error`, `sell`, `click` | Unchanged |
@@ -262,7 +262,7 @@ fails the build until it is mapped to a cue or to none.
 | A separate audio event stream? | **No.** The gameplay catalog plus the read model cover every cue. | A cue that needs a gameplay fact neither carries. |
 | Elevator stops as catalog events? | **No.** A busy tower stops cars hundreds of times a game hour, which would flood the 1,024 ring at top speed. A per-car stop counter in the read model survives any frame rate, and only cars in view chime. | A playtest shows chimes that do not match visible stops. |
 | Third-party sound packs? | **None, UI effects included** (owner, 2026-10-13). Every sound is the project's own: code-generated, rendered from the project's code, or recorded by the owner. | None planned. |
-| Adaptive music? | **A later, optional enhancement** (owner, 2026-10-13): music layered from synchronized per-voice stems with transitions on the bar line. No stage builds it now; stage 4's render manifest records each program's tempo, beats per bar and bar-aligned loop points, and music keeps playing through its one existing seam (`setProgram` and the program's `Part` in `ToneAudioEngine`), so it can be added without rework. | An owner decision to schedule it, after the initial audio gate. |
+| Adaptive music? | **A later, optional enhancement** (owner, 2026-10-13): music layered from synchronized per-voice stems with transitions on the bar line. No stage builds it now; stage 4 adds tempo and beats per bar to each program's `Track` and its render manifest records them with bar-aligned loop points, and music keeps playing through its one existing seam (`setProgram` and the program's `Part` in `ToneAudioEngine`), so it can be added with little rework. | An owner decision to schedule it, after the initial audio gate. |
 | Performance budgets | **Provisional until measured on real hardware** (owner, 2026-10-13). The numbers below are starting targets for the stages' own micro-benchmarks, never CI thresholds without the owner's approval. | The first measurement on real hardware. |
 | Promote the fx sequences to catalog events? | **Not now.** A sequence that jumps by two still tells audio the moment happened; only the earlier position is lost, which is not audible. Dissent recorded: promoting them first would avoid a later lock change. | A playtest shows a missed or wrong cue traced to the latest-value counters. |
 | Where does the win cue live? | **On the win dialog**, as today, so a load or undo of a won tower replays it. | The win dialog's own replay rule changes. |
@@ -275,8 +275,9 @@ fails the build until it is mapped to a cue or to none.
 | 1 | `gameplay-event-hub` (#964) | The hub owns the drain (frame loop, plus the analytics session's flush hook for hide and consent); `ownFrom` in the event buffer through inherit, attach, detach and eviction; `reason`, per-batch `dropped`, guarded drain; the bridge becomes a consumer | No | `/gds-code-review` and `/bmad-code-review` |
 | 2 | `web-audio-engine-events` (#965) | Audio router on the hub; retire the `sim.star` poll; per-frame arbitration and cooldowns; the win and pending-choice cues stay on their dialogs | No | `/gds-code-review` |
 | 3 | `audio-scene-data` (#968) | Export the ambience scene tables as generated data pinned by a test; drop the dead `SCENES` fields | No | `/bmad-code-review` |
-| 4 | `audio-offline-render` (#969) | A tool that renders the programs, beds and cues offline (Tone.js `Offline`) to files for review and A/B listening | No (tooling) | `/bmad-code-review` |
-| 5 | `engine-car-door-state` (#966) | A per-car stop counter in the frame read model and on the TypeScript engine, with every frame decoder updated in the same PR; the web elevator chime for cars in view (the chime needs stage 2) | Yes (minor) | `/gds-code-review` |
+| 4 | `audio-offline-render` (#969) | A tool that renders the programs, beds and cues offline (Tone.js `Offline`) to files for review and A/B listening; each program's `Track` gains its tempo and beats per bar (no audible change, pinned by a test) so the manifest reads them | No (tooling) | `/bmad-code-review` |
+| 5a | `engine-car-door-state` (#966) | A per-car stop counter in the frame read model and on the TypeScript engine, with every frame decoder updated in the same PR | No (no version bump) | `/gds-code-review` |
+| 5b | `web-elevator-chime` (#981) | The web elevator chime for cars in view, on the 5a counter | Yes (minor) | `/gds-code-review` |
 | 6 | `web-audio-event-cues` (#967) | New cues: alarm and threat on the modal, explosion, low impact, milestone, timeout, fx cues, auditioned with stage 4's renders | Yes (minor) | `/gds-code-review` |
 | 7 | `audio-docs-drift` (#970) | Docs true-up and two comment fixes (below) | No | `/bmad-code-review` |
 | 8 | `web-audio-lifecycle-a11y` (#973) | Mute when the tab is hidden (on by default, kept apart from the player's mute), teardown and the `humSwell` leak, a mono toggle, and a test that every informative cue has a visual twin | Yes (minor) | `/bmad-code-review` |
@@ -285,12 +286,12 @@ The master volume slider joins the audio panel row (`audio-button-panel`,
 #483).
 
 **The initial audio gate** passes when stages 1 and 2 have shipped: the hub
-owns the one drain, and today's sounds play from engine events with no
-audible change, with the parity, swap, consent and no-double-play tests
-green on both engines. Stages 3, 4, 7 and 8 add no new composition and can
-land before or after it. The new sounds (stage 5's elevator chime and stage
-6's cues) are new compositions and wait until the gate passes (owner,
-2026-10-13); stage 5's engine field does not wait.
+owns the one drain, the star `promote` plays from `star_reached`, and every
+other cue sounds as today, with the parity, swap, consent and
+no-double-play tests green on both engines. Stages 3, 4, 5a, 7 and 8 add no
+new composition and can land before or after it. The new sounds (stage 5b's
+elevator chime and stage 6's cues) are new compositions and wait until the
+gate passes (owner, 2026-10-13).
 
 Dependencies and order around open work:
 
@@ -300,11 +301,11 @@ Dependencies and order around open work:
   detach) is the code `ownFrom` has to travel through. Stage 1 builds on
   #907's helpers instead of writing its own, and lands before or with #954
   (the engine answers commands).
-- 2 needs 1. The engine field in 5 needs nothing; its chime waits for the
+- 2 needs 1. 5a needs nothing. 5b needs 5a and 2, and waits for the
   initial audio gate. 6 waits for the gate and benefits from 4. 3, 4, 7 and
   8 need nothing and can go any time.
-- **5 and #958:** if #958 (the engine package is built in CI, no longer
-  committed) lands first, stage 5 commits no rebuilt package.
+- **5a and #958:** if #958 (the engine package is built in CI, no longer
+  committed) lands first, stage 5a commits no rebuilt package.
 - **7 coordinates with #823** (the open sounds contributor doc): if #823
   merges first, stage 7 trues it up with the rest.
 - **Benchmarking (#972) does not wait for audio.** It starts from `main`. No
@@ -315,9 +316,10 @@ Dependencies and order around open work:
   waiting on the other.
 - **The benchmark harness (#979) times engine exports by name,
   `drainGameplayEvents` among them.** Stage 1 keeps calling that export,
-  once per drain occasion, under the same name (as does #907's typed
-  wrapper), so the harness's per-export timings stay comparable across the
-  change. A rename updates the harness's list in the same PR.
+  once per drain occasion, under the same name (as #907's typed wrapper
+  will), and a rename updates the harness's list in the same PR. The
+  harness's per-export timing runs a paused tick loop that never drains, so
+  stage 1's per-frame cost shows in its frame-interval and FPS metrics.
 
 ## Test strategy
 
