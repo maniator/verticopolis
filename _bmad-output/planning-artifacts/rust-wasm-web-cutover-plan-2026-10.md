@@ -1,6 +1,6 @@
 # BMAD: Rust/WASM web cutover, remaining work and release gate
 
-**Status:** Planning, reviewed 2026-10-13 against `main` at `87527a0`. No implementation or cutover is
+**Status:** Planning, reviewed 2026-10-13 against `main` at `87527a0` and reconciled at `316595a` (#953 merged). No implementation or cutover is
 authorized by this document.
 **Scope:** The public Rust engine (`engine-rs/`), its WASM binding and the
 web host (`src/wasmhost/`, `src/dualrun/`). Nothing else.
@@ -25,16 +25,16 @@ This plan does not restate the roadmap. It records what is already on
 `main`, what the roadmap's stories still owe, the gaps no story owned, and
 the measurable gate for the default flip.
 
-## 2. Where things stand (`main` at `87527a0`, 2026-10-13)
+## 2. Where things stand (`main` at `316595a`, 2026-10-13)
 
 | Area | On `main` | Open PR | Still owed |
 | --- | --- | --- | --- |
 | Engine authority | The engine alone ticks under `?engine=wasm` (switch story AC2) | none | Command answers still come from the TypeScript instance, which runs each command and relays it (switch story, "How it works"). See S9 |
 | Clock | Rust `Clock` (`engine-rs/src/clock.rs`) owns game time while hosted; the frame view writes it back each frame | none | The step driver and day pace live in TypeScript (`src/engine/sim/fixedStep.ts`, `src/engine/timePacing.ts`, `src/game/frameLoop.ts`): #867 |
-| Prices and rules | Engine-owned charges (#928, `a412060`); engine catalog with a digest lock, nested validation and charged-price tests (#930, `562f104`) | none | The web UI still reads TypeScript tables (#921); build quote (#922); catalog second slice (#926) |
+| Prices and rules | Engine-owned charges (#928, `a412060`); engine catalog with a digest lock, nested validation and charged-price tests (#930, `562f104`) | #960 (engine `canBuild` on the binding, one price source, #922); #956 (e2e: charges move money inside the engine) | The web UI still reads TypeScript tables (#921); build quote (#922); catalog second slice (#926) |
 | Mutation surface | Player charge commands; the dual-run relay owns the raw ops | #950 (capacity events from the simulation layer, adds relay-only `towerSetCars` and `towerResizeTransport` with a guard test) | Tier every binding export and confine tier 3 (#946, #923) |
 | Read model | `frameView`, `logSince`, elevator telemetry, housekeeping report, `catalog` | none | Binding getters, result shapes, typed arrays, structural snapshot (#868); inspector read models (#919) |
-| Saves | Lone-surrogate repair in the engine (#941); web Unicode repair and the 32 MiB caps (#944); byte-exact engine writer (#949); engine encoder (#937) | #953 (the web writes through `encodeVctower` under `?engine=wasm`) | JavaScript number semantics for hand-edited saves (#858); RNG state 0 reload (#856); a rollback rule before any save-format bump (AD-5) |
+| Saves | Lone-surrogate repair in the engine (#941); web Unicode repair and the 32 MiB caps (#944); byte-exact engine writer (#949); engine encoder (#937); the web writes export and sync saves through `encodeVctower` under `?engine=wasm`, skipping saves past 8 MiB and latching off on a bad write (#953) | #958 (stop committing the built package; build it in CI and on deploy) | JavaScript number semantics for hand-edited saves (#858); RNG state 0 reload (#856); a rollback rule before any save-format bump (AD-5) |
 | Gameplay events | Engine events (#903) and the web bridge (#938) | none | Pin fx sequences and counters across engines (#879); drain glue (#907); close-out of #873 |
 | Tests | Conformance lock (22 scenario files, two of them refusal scenarios; refusal reasons are not pinned yet, S11), dual-run day gate, e2e on both engines (`chromium-wasm`), nightly fuzzer | #878 in progress | Vitest suites on WASM and the test-mapping table (#878); refusal reasons pinned (#865) |
 | Host lifecycle | Attach, sync, detach, swap away from a trapped engine on load | none | Fallback on throw or panic, undo after a trap, boot timeout (#874); attach after an exterminator booking (#902) |
@@ -100,7 +100,7 @@ the owner changes them.
 | # | Story | Issue | Priority | Modules | Acceptance criteria | Tests | Depends on |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | S1 | Capacity events from the simulation layer in both engines | #906 (PR #950) | P2 | `src/engine/sim/capacity.ts`, `engine-rs/src/wasm.rs`, `src/dualrun/` | `capacity_changed` emitted from `Simulation` in both engines; bare tower edits silent; relay-only ops reachable from `src/dualrun/` only. An earlier head (`179f16d`) predated #930 and its binding lacked `catalog(mode)`; head `053ef8e` contains #930 and its package exports `catalog`. Recheck at merge that the package and the TypeScript declarations were regenerated together and `BUILD.json` matches | `towerRelayOps.guard.test.ts`, dual-run edits integration, gameplay emission tests; catalog digest and event conformance on the combined artifact | none |
-| S2 | The web writes saves through the engine encoder | #935 (PR #953) | P2 | `src/storage/vctowerWriter.ts`, `src/bootstrap.ts` | Same bytes as the fflate writer on every fixture; first failure falls back and latches off. The timer autosave (`saveToAsync`) and `toTowerFile` keep their own writers in this PR; whether "one writer" (AD-5) later covers them is decided here or in a follow-up | Unit, boot, WASM-suite byte comparison; malformed engine output; saves at the 8 MiB and 32 MiB boundaries; a host that fails mid-session | none |
+| S2 | The web writes saves through the engine encoder (merged as #953; the scope question below stays open) | #935 | P2 | `src/storage/vctowerWriter.ts`, `src/bootstrap.ts` | Same bytes as the fflate writer on every fixture; first failure falls back and latches off. The timer autosave (`saveToAsync`) and `toTowerFile` keep their own writers in this PR; whether "one writer" (AD-5) later covers them is decided here or in a follow-up | Unit, boot, WASM-suite byte comparison; malformed engine output; saves at the 8 MiB and 32 MiB boundaries; a host that fails mid-session | none |
 | S3 | Vitest suites on the WASM engine and the test-mapping table | #878 | P1 | `src/tests/`, `vite.config.ts`, mapping table | Suites green on both engines or each exclusion named with a reason; table complete for `src/engine/` | The suites themselves, the table's completeness test | S6 (for the six merge-per-tick timeouts the structural snapshot fixes) |
 
 ### Wave 2: host reliability and the read model
@@ -170,7 +170,7 @@ Rows marked "proposed" need the owner's numbers before the gate is binding.
 | Performance (proposed) | Late-game fixture: Modern tick time no slower than TypeScript (roadmap rule); cold load within +500 ms of the TypeScript build; heap within 1.25x; a 5,000+ population fixture within the TypeScript engine's own `npm run perf` baseline (S13) |
 | Reliability (proposed) | One release on the TypeScript default with the engine instrument (S16's signal): over at least 1,000 engine sessions whose players consented to analytics (proposed minimum), engine fallback in under 0.1% of them, no engine-writer latch-off (#953), and every divergence report triaged to a cause |
 | Rollback | A rehearsal flips the default back with the flag and loads saves written by the engine build |
-| Deployment | S16 done: an old cached shell never runs a newer package, the offline rule is decided, and `scripts/vercel-build.sh` keeps its hash guard (a failed rebuild serves the committed package only when its hash matches the sources) |
+| Deployment | S16 done: an old cached shell never runs a newer package, the offline rule is decided, and no deploy serves an engine package whose hash differs from the sources (today `scripts/vercel-build.sh`'s hash guard; with #958 every failed build fails the deploy) |
 | Coverage | `vite.config.ts` floors and the Rust job's line floor hold |
 | Sign-off | The owner approves with the exception register attached |
 

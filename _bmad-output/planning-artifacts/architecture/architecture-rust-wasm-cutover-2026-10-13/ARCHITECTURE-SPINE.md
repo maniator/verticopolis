@@ -112,7 +112,7 @@ host; nothing in `src/ui` calls the binding directly.
   `towerSetCars` and `towerResizeTransport`. Tier 3 is reachable only from
   `src/dualrun/`, the host's suppressed frame sync in `src/wasmhost/`, the
   screenshot and gallery tooling in `scripts/`, the generated package in
-  `src/public/engine/`, and tests (`src/tests/**`, `*.test.ts`, `e2e/**`), and leaves the production binding (or moves behind a cargo
+  `src/public/engine/` (generated output; #958 stops committing it), and tests (`src/tests/**`, `*.test.ts`, `e2e/**`), and leaves the production binding (or moves behind a cargo
   feature) by retirement. The tiers apply to the instance surface the
   mirror relays as well: a write to `sim.money`, or a call to
   `tower.setCars` or `tower.resizeTransport`, from UI or game code
@@ -222,9 +222,10 @@ src/dualrun/     # relay, shadow, mirror (tier 3 callers, with the AD-3 exemptio
 
 - **Deployment at the flip:** the engine package is outside the offline
   precache; decide its precache and version-skew rule (an old cached shell
-  with a newer package), keep `scripts/vercel-build.sh`'s hash guard (a
-  failed rebuild serves the committed package only when its hash matches the
-  sources), and add a fallback-use signal, which the retirement gate needs.
+  with a newer package), never serve a package whose hash differs from the
+  sources (today's hash guard in `scripts/vercel-build.sh`; open #958 builds
+  the package on every deploy instead), and add a fallback-use signal, which
+  the retirement gate needs.
 - **AD-1 timing:** AD-1 and #945 put it before the flip; the owner confirms
   or moves it to before retirement.
 - **Reference data's home:** CLAUDE.md names `src/engine/facilities.ts` as
