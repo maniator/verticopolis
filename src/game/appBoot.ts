@@ -18,8 +18,6 @@ import { bindEngineBridge } from "../analyticsEngineBridge";
 import { bootCommonProps, distributionChannelLabel, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
 import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
-import { bindHostCommands, tickHostCommands } from "./hostCommands";
-import { IS_WRAPPED_BUILD } from "../platform";
 import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
 import { IS_DESKTOP_BUILD } from "../desktopConsent";
@@ -127,13 +125,6 @@ export function wireControllers(app: GameApp): void {
         getSim: () => app.sim,
         frameErrors: app.frameErrors,
       });
-      // Tell a wrapper shell that nothing can run now, so its menu grays out.
-      // Pushed from here because the frame loop is what normally publishes it
-      // and the frame loop has stopped: that is why this screen exists. Without
-      // this the desktop menu stays fully enabled behind the crash card, and a
-      // refusal cannot even be shown there (the card is a modal dialog, so the
-      // toast rail paints under its backdrop).
-      if (IS_WRAPPED_BUILD) tickHostCommands();
       // Then report the crash the moment its screen is shown (not just via the
       // next boot's reason), flattening the description plus build and tower
       // context. Sim reads are defensive: a crash is when sim state is least
@@ -422,21 +413,6 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     if (!isSplashUp()) void app.saveLoad.autosave();
   }, 30000);
 
-  // Commands from a wrapper shell's native menu (Electron's File menu today),
-  // routed to the same calls the in-game controls make. A browser session binds
-  // nothing: the port member is optional and only a wrapper defines it.
-  //
-  // LAST, deliberately, and this ordering is load-bearing. `bindHostCommands`
-  // publishes the opening availability set (and then registers the quit-time
-  // flush, whose ordering is not load-bearing), so binding before
-  // the title screen was decided meant the shell's first news was "all nine
-  // commands are available", computed with no splash up, immediately followed by
-  // a title screen where five of them are refused. The menu showed Save, Export,
-  // Undo, Redo, and Statistics enabled until the next pump tick corrected it. Binding
-  // after every branch above has run means the first push already describes the
-  // screen the player is looking at. Inbound commands are unaffected: one cannot
-  // arrive until the shell has a window, which is later than any of this.
-  if (IS_WRAPPED_BUILD) bindHostCommands(app);
 
   // The desktop build's first-run analytics notice (issue #781), and only on a
   // genuine first run: it no-ops once the player has answered. Last, after every

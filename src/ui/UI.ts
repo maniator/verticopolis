@@ -151,10 +151,7 @@ export class UI {
 
   /** Open the New Tower picker over a live tower. The toolbar always has one to
    *  abandon, so the picker shows its fold-in abandon warning and the mode
-   *  choice and the confirm are one step. Named rather than inlined in the
-   *  button handler because a native shell menu reaches the same command
-   *  through `src/game/hostCommands.ts`, and both callers must land on one code
-   *  path (a second copy of these options is how the two would drift). */
+   *  choice and the confirm are one step. */
   promptNewTower(): void {
     this.newTowerModal({ hasSave: true, onFound: (mode, cal, manual) => this.cb.onNew(mode, cal, manual) });
   }

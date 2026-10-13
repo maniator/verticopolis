@@ -34,14 +34,6 @@ export const EXPORT_WATCHDOG_MS = 10 * 60_000;
 let latchOwner = 0;
 let nextRun = 0;
 
-/** Whether an export (either format) is holding the single-flight latch right
- *  now. The wizard entry ({@link import("../ui/uiDialogs").confirmExport})
- *  reads this to refuse opening a second export choice dialog while one is in
- *  flight. */
-export function isExportInFlight(): boolean {
-  return latchOwner !== 0;
-}
-
 /**
  * Test seam for this module's state.
  *
