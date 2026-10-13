@@ -116,14 +116,14 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   }
   // Which tree the builds came from, stamped beside them (gitignored), so a
   // --skip-build run can prove its builds are this commit's.
-  const stampPath = join(repo, "dist-perf", ".perf-build.json");
+  const stampPaths = [join(dist, ".perf-build.json"), join(distPerf, ".perf-build.json")];
   const tree = buildTree(repo);
   if (!args.skipBuild) {
     log("perf:compare: production build (npm run build)");
     sh("npm", ["run", "build"], repo);
     log("perf:compare: tooling build of the same sources (VC_TOOLING=1) into dist-perf/");
     sh("npx", ["vite", "build", "--outDir", distPerf, "--emptyOutDir"], repo, { ...process.env, VC_TOOLING: "1" });
-    writeFileSync(stampPath, JSON.stringify(tree) + "\n");
+    for (const p of stampPaths) writeFileSync(p, JSON.stringify(tree) + "\n");
   }
   for (const d of [dist, distPerf]) if (!existsSync(join(d, "index.html"))) throw new Error(`no build at ${d}; run without --skip-build`);
 
@@ -166,6 +166,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const prodFiles = enginePackageDigests(dist);
   if (JSON.stringify(prodFiles) !== JSON.stringify(environment.enginePackage)) validation.errors.push(`dist/ and dist-perf/ serve different engine bytes (${JSON.stringify(prodFiles)} vs ${JSON.stringify(environment.enginePackage)})`);
   if (environment.commit === "unknown") validation.errors.push("the commit could not be read (git failed), so the results cannot be tied to a tree");
+  if (environment.mainCommit && !environment.mainFetched) validation.warnings.push(`origin/main could not be fetched just now, so ${environment.mainCommit} is the ref as last fetched and may not be the latest main`);
   if (!environment.mainCommit) validation.warnings.push("origin/main is unknown here (no remote or no fetch), so whether this is a baseline of the latest main was not checked");
   if (!environment.engineBuildHash) validation.errors.push("the served engine package has no BUILD.json, so which sources it came from is unknown");
   else if (environment.engineSourceHash && environment.engineBuildHash !== environment.engineSourceHash) validation.errors.push(`the served engine package (${environment.engineBuildHash}) was not built from the current engine-rs sources (${environment.engineSourceHash}); rebuild it with npm run wasm:build`);
@@ -174,9 +175,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   if (args.skipBuild) {
     // The builds must be this clean commit's, or the app code measured is
     // not the code the results are filed under.
-    const stamp = existsSync(stampPath) ? (JSON.parse(readFileSync(stampPath, "utf8")) as { commit: string; dirty: boolean }) : null;
-    if (!stamp) validation.errors.push("--skip-build: dist-perf/ has no build stamp, so which tree it came from is unknown; run once without --skip-build");
-    else if (stamp.commit !== tree.commit || stamp.dirty || tree.dirty) validation.errors.push(`--skip-build: the builds came from ${stamp.commit}${stamp.dirty ? " (dirty)" : ""}, the tree is ${tree.commit}${tree.dirty ? " (dirty)" : ""}; rebuild without --skip-build`);
+    for (const err of stampErrors(stampPaths, tree)) validation.errors.push(err);
   }
   if (environment.dirty) validation.warnings.push("the working tree had uncommitted or untracked changes; the results folder is marked -dirty");
   if (environment.behindMain) validation.warnings.push(`the measured tree lacks ${environment.behindMain} commit(s) of origin/main (${environment.mainCommit}); it is not a baseline of the latest main`);
@@ -241,5 +240,29 @@ export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skip
   const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.skipBuild ? "-skipbuild" : ""}${env.dirty ? "-dirty" : ""}`);
   let out = base;
   for (let n = 2; exists(out); n++) out = `${base}-${n}`;
+  return out;
+}
+
+/** What is wrong with the build stamps for a --skip-build run, if
+ *  anything: each build (dist/ for the sizes, dist-perf/ for the timings)
+ *  must carry a readable stamp from this same clean commit. */
+export function stampErrors(paths: readonly string[], tree: { commit: string; dirty: boolean }, read: (p: string) => string | null = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null)): string[] {
+  const out: string[] = [];
+  for (const p of paths) {
+    const text = read(p);
+    if (text === null) {
+      out.push(`--skip-build: ${p} is missing, so which tree that build came from is unknown; run once without --skip-build`);
+      continue;
+    }
+    let stamp: { commit?: unknown; dirty?: unknown };
+    try {
+      stamp = JSON.parse(text) as { commit?: unknown; dirty?: unknown };
+    } catch {
+      out.push(`--skip-build: ${p} is unreadable; run once without --skip-build`);
+      continue;
+    }
+    if (typeof stamp.commit !== "string" || typeof stamp.dirty !== "boolean") out.push(`--skip-build: ${p} is not a build stamp this harness wrote; run once without --skip-build`);
+    else if (stamp.commit !== tree.commit || stamp.dirty || tree.dirty) out.push(`--skip-build: ${p} came from ${stamp.commit}${stamp.dirty ? " (dirty)" : ""}, the tree is ${tree.commit}${tree.dirty ? " (dirty)" : ""}; rebuild without --skip-build`);
+  }
   return out;
 }

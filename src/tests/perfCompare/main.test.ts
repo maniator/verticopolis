@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { makeConfig, outputDir, parseArgs } from "./main";
+import { makeConfig, outputDir, parseArgs, stampErrors } from "./main";
 import { engineOrder, frameSummary, stepSummary } from "./runner";
 
 describe("parseArgs", () => {
@@ -60,5 +60,23 @@ describe("outputDir", () => {
     expect(outputDir("/r", { out: null, quick: true, skipBuild: true }, "2026-10-13", { commitShort: "abc1234", dirty: true }, () => false)).toBe("/r/docs/performance/results/2026-10-13-abc1234-quick-skipbuild-dirty");
     expect(outputDir("/r", { out: "x", quick: false, skipBuild: false }, "d", env, () => false)).toBe("/r/x");
     expect(() => outputDir("/r", { out: "x", quick: false, skipBuild: false }, "d", env, () => true)).toThrow(/never overwritten/);
+  });
+});
+
+describe("stampErrors", () => {
+  const tree = { commit: "abc", dirty: false };
+  const files = (m: Record<string, string | null>) => (p: string) => m[p] ?? null;
+  it("passes stamps from this clean commit in both builds", () => {
+    expect(stampErrors(["a", "b"], tree, files({ a: '{"commit":"abc","dirty":false}', b: '{"commit":"abc","dirty":false}' }))).toEqual([]);
+  });
+  it("names a missing, unreadable, foreign, other-commit or dirty stamp, never throwing", () => {
+    const errs = stampErrors(["a", "b", "c", "d", "e"], tree, files({ b: "{trunc", c: '{"sha":"abc"}', d: '{"commit":"def","dirty":false}', e: '{"commit":"abc","dirty":true}' }));
+    expect(errs).toHaveLength(5);
+    expect(errs[0]).toMatch(/a is missing/);
+    expect(errs[1]).toMatch(/b is unreadable/);
+    expect(errs[2]).toMatch(/c is not a build stamp/);
+    expect(errs[3]).toMatch(/d came from def, the tree is abc/);
+    expect(errs[4]).toMatch(/e came from abc \(dirty\)/);
+    expect(stampErrors(["a"], { commit: "abc", dirty: true }, files({ a: '{"commit":"abc","dirty":false}' }))[0]).toMatch(/the tree is abc \(dirty\)/);
   });
 });

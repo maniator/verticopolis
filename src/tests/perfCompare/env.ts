@@ -13,6 +13,9 @@ export interface Environment {
   /** origin/main at the run (as last fetched), the merge base with it, and
    *  how many of its commits the measured tree lacks (0: a baseline of it). */
   mainCommit: string | null;
+  /** Whether the fetch of origin/main just before the run succeeded (when
+   *  not, mainCommit is the ref as last fetched and may be stale). */
+  mainFetched: boolean;
   mergeBase: string | null;
   behindMain: number | null;
   os: string;
@@ -36,7 +39,9 @@ function run(cmd: string, args: string[], cwd: string): string | null {
   try {
     // Bounded, and never prompting for credentials, so a git that wants a
     // password or a remote that hangs cannot stall the benchmark.
-    return execFileSync(cmd, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30_000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_SSH_COMMAND: "ssh -o BatchMode=yes" } }).trim();
+    // (The user's own SSH settings are left alone; the timeout bounds an
+    // SSH prompt.)
+    return execFileSync(cmd, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30_000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } }).trim();
   } catch {
     return null;
   }
@@ -78,7 +83,7 @@ export function collectEnvironment(repo: string, distDir: string, sourceHash: st
   const status = run("git", ["status", "--porcelain", "--untracked-files=normal", "--", ".", ":(exclude)docs/performance/results"], repo);
   // Best effort: bring origin/main up to date, then compare with it (as
   // last fetched, when the fetch cannot reach the remote).
-  run("git", ["fetch", "-q", "origin", "main"], repo);
+  const fetched = run("git", ["fetch", "-q", "origin", "main"], repo) !== null;
   const mainCommit = run("git", ["rev-parse", "origin/main"], repo);
   const behind = mainCommit ? run("git", ["rev-list", "--count", `HEAD..${mainCommit}`], repo) : null;
   const pkg = JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { version: string };
@@ -95,6 +100,7 @@ export function collectEnvironment(repo: string, distDir: string, sourceHash: st
     dirty: status === null ? true : status.length > 0,
     branch: run("git", ["rev-parse", "--abbrev-ref", "HEAD"], repo) ?? "unknown",
     mainCommit,
+    mainFetched: fetched,
     mergeBase: mainCommit ? run("git", ["merge-base", "HEAD", mainCommit], repo) : null,
     behindMain: behind === null ? null : Number(behind),
     os: osName(),

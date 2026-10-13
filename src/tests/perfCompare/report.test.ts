@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { config, processRun } from "./fixtures";
 import { aggregate, compareEngines } from "./metrics";
-import { comparisonsCsv, csvCell, fmt, markdownReport, rawCsv, summaryCsv, toCsv } from "./report";
+import { comparisonsCsv, csvCell, fmt, markdownReport, preThree, rawCsv, summaryCsv, toCsv } from "./report";
 import type { CompareResults } from "./types";
 
 describe("csv", () => {
@@ -43,6 +43,7 @@ function results(ok: boolean): CompareResults {
       dirty: false,
       branch: "b",
       mainCommit: "c928ff4",
+      mainFetched: true,
       mergeBase: "c928ff4",
       behindMain: 0,
       os: "Linux",
@@ -76,7 +77,7 @@ describe("markdownReport", () => {
   it("states the validation result, the environment and each section", () => {
     const md = markdownReport(results(false));
     expect(md).toContain("**Validation: FAILED.**");
-    expect(md).toContain("> **Snapshot, not a live figure.** Measured ? to 2026-10-13T00:00:00.000Z on commit `abc1234def`, with public main at `c928ff4`. A pre-3.0 baseline");
+    expect(md).toContain("> **Snapshot, not a live figure.** Measured ? to 2026-10-13T00:00:00.000Z on commit `abc1234def` (app 2.29.6), with public main at `c928ff4`. A pre-3.0 baseline");
     expect(md).toContain("- error: boom");
     expect(md).toContain("- warning: careful");
     expect(md).toContain("(sources: h2, MISMATCH)");
@@ -96,5 +97,21 @@ describe("markdownReport", () => {
     const raw = rawCsv(r.metrics).trim().split("\n");
     expect(raw.length - 1).toBe(r.metrics.reduce((s, m) => s + m.values.length, 0));
     expect(comparisonsCsv(r.comparisons).trim().split("\n").length - 1).toBe(r.comparisons.length);
+  });
+});
+
+describe("preThree", () => {
+  it("calls only versions before 3.0.0 pre-cutover", () => {
+    expect(preThree("2.29.6")).toBe(true);
+    expect(preThree("3.0.0")).toBe(false);
+    expect(preThree("x")).toBe(false);
+  });
+  it("leaves the pre-3.0 sentence out of a 3.x report and names a stale main", () => {
+    const r = results(true);
+    r.environment.appVersion = "3.1.0";
+    r.environment.mainFetched = false;
+    const md = markdownReport(r);
+    expect(md).not.toContain("pre-3.0 baseline of an engine");
+    expect(md).toContain("as last fetched (the fetch before the run failed)");
   });
 });

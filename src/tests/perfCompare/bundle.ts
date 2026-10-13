@@ -108,7 +108,7 @@ export function wasmSections(bytes: Uint8Array): { name: string; bytes: number }
 
 function walk(dir: string, root: string, out: string[]): void {
   for (const name of readdirSync(dir).sort()) {
-    if (name === ".perf-build.json") continue; // the harness's own build stamp
+    if (name === ".perf-build.json") continue; // the harness's own build stamp (dist/ and dist-perf/)
     const p = join(dir, name);
     if (statSync(p).isDirectory()) walk(p, root, out);
     else out.push(relative(root, p).split("\\").join("/"));
