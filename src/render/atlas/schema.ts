@@ -103,9 +103,9 @@ export interface FrameRecord {
  * `soft` is an optional alternative to `furniture` (with its own chain steps
  * in `chains[k].soft`): the furniture painted on a transparent background, so
  * glows and soft shadows keep their transparency instead of carrying the wall
- * behind them. Over the shell it looks the same to the eye but is not exact
- * (translucent pixels round slightly differently); absent where it cannot be
- * stepped by source-over.
+ * behind them. Over the shell it looks the same to the eye, but translucent
+ * pixels round a step or two differently than in the flat frame; it is absent
+ * where it cannot be stepped by source-over.
  */
 export interface DepthLayers {
   shell: Placed[];
@@ -115,7 +115,8 @@ export interface DepthLayers {
 }
 
 /** One chain split for depth; each list is trimmed on its own and starts
- *  with a null step 0. */
+ *  with a null step 0. A list can run past the chain's `max` when a step
+ *  changes only pixels the flat frame hides, so clamp `n` to each list. */
 export interface DepthLayerChain {
   shell: LayerRef[];
   furniture: LayerRef[];

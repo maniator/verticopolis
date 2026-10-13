@@ -235,16 +235,17 @@ front of the back wall. A room frame that supports this carries an optional
   platform and track.
 - `furniture` holds the pixels that differ between the shell and the flat
   frame, transparent everywhere else.
-- `chains` (when the frame has an occupant chain) splits each occupant step
-  the same way: `shell` holds what the step changes on the shell (an office's
-  downlights or a condo's ceiling light, which switch on with the first
-  occupant), `furniture` holds the people who sit down. Each list starts with
+- `chains` splits the frame's chain (`occupants` in every layered room) step
+  by step, under the same key: `shell` holds what the step changes on the
+  shell (an office's downlights or a condo's ceiling light, which switch on
+  with the first occupant), `furniture` holds the people who sit down. Each list starts with
   a null step 0 and is trimmed on its own, like a frame's chain steps.
 - `soft` (with its own steps in `chains`) is an optional alternative to
   `furniture`; see below.
 
 Each picture is a list of placed parts like `parts` (a picture wider than a
-page, like the metro's, is cut into column slices). To show `n` visible
+page, like the metro's, is cut into column slices; an occupant step always
+fits one page, and the export refuses one that does not). To show `n` visible
 occupants, draw with ordinary source-over blending, in this order:
 
 1. the `shell` parts,
@@ -253,9 +254,13 @@ occupants, draw with ordinary source-over blending, in this order:
 4. the chain's `furniture` steps `1..min(n, len - 1)`.
 
 The result is the frame's own `parts` plus its chain steps `1..n`, exactly.
+Pass the visible occupant count itself and clamp it to each list on its own:
+a depth list can run past the chain's `max` when a step changes only pixels
+the flat frame hides (a light behind a desk). A layered frame has at most one
+chain and no overlays, so nothing else of the frame draws over these four.
 Draw anything of your own that belongs between the wall and the furniture
-(walkers, a depth offset) between steps 2 and 3. Then draw the frame's
-overlays on top as usual. Any list can be empty (a fully transparent picture).
+(walkers, a depth offset) between steps 2 and 3. Any list can be empty (a
+fully transparent picture).
 
 What that means for the pictures:
 
@@ -279,8 +284,8 @@ What that means for the pictures:
   seats they overlap. A frontend that offsets the furniture shows those pieces
   cut off where the structure covered them.
 - The shell's normal map is its own (it is a picture without the furniture).
-  The furniture's normals come from the flat frame, masked to its pixels, like
-  any other layer.
+  The furniture's normals, and the soft furniture's, come from the flat frame,
+  masked to their pixels, like any other layer.
 
 The game marks the split in each room's draw routine
 (`src/render/pixelSprites/layers.ts`): one call where the shell ends, and one
@@ -316,15 +321,27 @@ they existed.
 the shell, so its glows and soft shadows keep their transparency. Draw it in
 place of `furniture` (and its `chains` steps in place of the `furniture`
 steps); the order is the same. Over the shell it looks the same to the eye,
-but it is not exact: translucent paint rounds slightly differently on its own
-than over the wall. In the current atlas SOFT_PCT of the soft pixels differ
-from the flat frame, by at most SOFT_MAX of 255 in any channel (the export
-prints this measure). Use `furniture` when exact pixels matter, and `soft`
-when the furniture moves away from the wall.
+but translucent paint rounds a step or two differently on its own than over
+the wall. Marks the game draws over the furniture (the night scrim, the pool
+tint) land on the soft furniture only where it has pixels; the shell carries
+them everywhere else. An opaque mark drawn over the furniture (a hotel roach
+on the bed, a sleeping guest's "z", a notice badge) is therefore on both the
+shell and the soft furniture: offset the soft furniture and it shows twice.
+In `furniture` the same mark stays on the shell only, leaving a gap in the
+furniture under it. In the current atlas SOFT_PCT of the soft furniture's
+pixels differ from the flat frame (each pixel counted once per occupant count
+it shows at), by at most SOFT_MAX of 255 in any channel; the export prints
+this measure and refuses an atlas whose soft furniture strays more than 4 of
+255 or misses a pixel of the furniture. Use `furniture` when exact pixels matter, and
+`soft` when the furniture moves away from the wall.
 
-A frame has no `soft` when its occupant steps would change a translucent soft
-pixel (source-over can only add to it, not replace it); the export counts
-those frames.
+A frame has no `soft` when an occupant step would have to change a
+translucent soft pixel, which source-over cannot do (it can only paint over
+one); the export counts them and names the first few. In the current atlas
+that is about one layered frame in eight, where an occupant step changes a
+glow or a soft shadow in the restaurant, food hall, party hall, amusements,
+boutique bay, fitness club, nightclub and aquatic center; those frames offer
+`furniture` only.
 
 ## How it is checked
 
@@ -340,8 +357,9 @@ pictures and must report a mismatch. The bake refuses to write a layer that
 would not compose back to the game's pixels. A unit test rebuilds every frame
 and layer from the packed pages through the manifest.
 
-A room frame with depth layers is also composed through its shell and
-furniture (then its chains and overlays) and held to the same paint. After
+A room frame with depth layers is also composed through its depth split (the
+shell and its occupant steps, then the furniture and its occupant steps) and
+held to the same paint. After
 packing, the export rebuilds every layered frame from the pages through the
 manifest, shell then furniture with their occupant steps at every occupant
 count, and requires its flat frame's pixels. It also measures how far the soft

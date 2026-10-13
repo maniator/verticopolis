@@ -68,7 +68,7 @@ export function signature(): AtlasManifest["signature"] {
       parkingRoll: "a space holds a car when hash(int32(id * 31)) < parkingUse, where hash(n) is: x = int32(n * 2654435761) with the product taken as a float64 (IEEE double) multiply; x = imul32(x ^ (x >>> 15), 0x2c1b3c6d); x = imul32(x ^ (x >>> 13), 0x297a2d39); (x ^ (x >>> 16)) as unsigned / 2^32. int32(v) truncates v toward zero and wraps it modulo 2^32 to a signed 32-bit integer (JavaScript's v | 0); imul32 is a 32-bit integer multiply; ^ is a 32-bit xor and >>> a logical (zero-filling) right shift on the 32-bit pattern, so a negative x shifts in zeros. The first step is not imul32: the two can differ once the product's magnitude passes 2^53",
       cinema: "the cinema's marquee and screen read the animation clock; the web keeps whatever phase its last re-bake caught, the atlas bakes phase 0",
       originSeeded: `${[...ORIGIN_SEEDED].join(", ")}: a few details (staff shirts, skyline windows, climbing holds) follow the web's draw origin; the atlas carries the per-unit look at origin 0, 0`,
-      layers: "a room frame may carry 'layers' for drawing with depth: to show n visible occupants draw the 'shell' parts, its 'chains.occupants.shell' steps 1..min(n, len - 1), then the 'furniture' parts and its 'chains.occupants.furniture' steps the same way, each source-over; the result equals the frame's parts plus its occupant steps 1..n exactly. 'soft' (with 'chains.occupants.soft') is an optional furniture picture that keeps glows and soft shadows translucent; it looks the same over the shell but is not exact. A frame without 'layers' (vacancy, closed and gutted rooms, and the kinds whose art marks no split) is drawn flat",
+      layers: "a room frame may carry 'layers' for drawing with depth: to show n visible occupants draw the 'shell' parts, its 'chains.occupants.shell' steps 1..min(n, len - 1), then the 'furniture' parts and its 'chains.occupants.furniture' steps the same way, each source-over; the result equals the frame's parts plus its occupant steps 1..n exactly. 'soft' (with 'chains.occupants.soft') is an optional furniture picture that keeps glows and soft shadows translucent; over the shell it rounds a step or two away from the frame's parts. A frame without 'layers' (vacancy, closed and gutted rooms, and the kinds whose art marks no split) is drawn flat",
     },
   };
 }
@@ -257,7 +257,7 @@ function drawStep(dst: Image, pages: readonly Image[], step: LayerRef | undefine
  *  has one, the soft split. `visit` returns false to stop early. */
 function eachLayeredPicture(
   archive: Pick<Archive, "manifest" | "pages">,
-  visit: (name: string, n: number, flat: Image, exact: Image, soft: Image | null) => boolean,
+  visit: (name: string, n: number, flat: Image, exact: Image, soft: { picture: Image; layer: Image } | null) => boolean,
 ): void {
   const pages = archive.pages;
   for (const [name, rec] of Object.entries(archive.manifest.frames)) {
@@ -287,10 +287,11 @@ function eachLayeredPicture(
         }
         const exact = { w: rec.w, h: rec.h, data: shell.data.slice() };
         over(exact, furniture, 0, 0);
-        let softPicture: Image | null = null;
+        let softPicture: { picture: Image; layer: Image } | null = null;
         if (hasSoft) {
-          softPicture = { w: rec.w, h: rec.h, data: shell.data.slice() };
-          over(softPicture, soft, 0, 0);
+          const picture = { w: rec.w, h: rec.h, data: shell.data.slice() };
+          over(picture, soft, 0, 0);
+          softPicture = { picture, layer: soft };
         }
         if (!visit(name, n, flat, exact, softPicture)) break;
       }
@@ -304,6 +305,19 @@ function eachLayeredPicture(
  *  does. */
 export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): string[] {
   const bad = new Set<string>();
+  // A layered frame has at most one chain and no overlays; its chain has a
+  // depth split (and no split lacks its chain), each list starts with a null
+  // step 0, and soft furniture comes with soft steps for its chain.
+  for (const [name, rec] of Object.entries(archive.manifest.frames)) {
+    const layers = rec.layers;
+    if (!layers) continue;
+    const flat = Object.keys(rec.chains ?? {}).sort().join();
+    const depth = Object.keys(layers.chains ?? {}).sort().join();
+    const soft = layers.soft !== undefined;
+    const lists = Object.values(layers.chains ?? {}).flatMap((c) => [c.shell, c.furniture, ...(c.soft ? [c.soft] : [])]);
+    const oneChainNoOverlays = Object.keys(rec.chains ?? {}).length <= 1 && Object.keys(rec.overlays ?? {}).length === 0;
+    if (flat !== depth || !oneChainNoOverlays || lists.some((l) => l[0] !== null) || Object.values(layers.chains ?? {}).some((c) => (c.soft !== undefined) !== soft)) bad.add(name);
+  }
   eachLayeredPicture(archive, (name, _n, flat, exact) => {
     if (sameImage(flat, exact)) return true;
     bad.add(name);
@@ -312,21 +326,34 @@ export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): strin
   return [...bad];
 }
 
+/** The largest channel difference (of 255) the soft furniture may show
+ *  against the flat frame before the export refuses the atlas. Translucent
+ *  paint over the shell rounds a step or two away from the same paint baked
+ *  over it; anything far past that means the soft pass drew something else. */
+export const SOFT_DRIFT_LIMIT = 4;
+
 /** How far the soft furniture strays from the flat pictures it stands in
- *  for: pictures compared, pixels that differ, and the largest difference in
- *  any channel (0..255). */
-export function softLayerDrift(archive: Pick<Archive, "manifest" | "pages">): { frames: number; pictures: number; pixels: number; differing: number; maxDelta: number } {
+ *  for: pictures compared (one per frame and occupant count), the soft
+ *  furniture's own pixels in them, how many of those differ from the flat
+ *  picture, how many pixels outside it differ (none, unless the soft pass
+ *  missed part of the furniture), the largest difference in any channel
+ *  (0..255) anywhere, and the frame that shows it (or the first with a
+ *  pixel outside). A pixel counts once per picture it shows in. */
+export function softLayerDrift(archive: Pick<Archive, "manifest" | "pages">): { frames: number; pictures: number; pixels: number; differing: number; outside: number; maxDelta: number; worst: string } {
   const frames = new Set<string>();
-  const out = { frames: 0, pictures: 0, pixels: 0, differing: 0, maxDelta: 0 };
+  const out = { frames: 0, pictures: 0, pixels: 0, differing: 0, outside: 0, maxDelta: 0, worst: "" };
   eachLayeredPicture(archive, (name, _n, flat, _exact, soft) => {
     if (!soft) return true;
     frames.add(name);
     out.pictures++;
-    out.pixels += flat.w * flat.h;
     for (let i = 0; i < flat.data.length; i += 4) {
+      const covered = soft.layer.data[i + 3] > 0;
+      if (covered) out.pixels++;
       let d = 0;
-      for (let c = 0; c < 4; c++) d = Math.max(d, Math.abs(flat.data[i + c] - soft.data[i + c]));
-      if (d > 0) out.differing++;
+      for (let c = 0; c < 4; c++) d = Math.max(d, Math.abs(flat.data[i + c] - soft.picture.data[i + c]));
+      if (d > 0 && covered) out.differing++;
+      if (d > 0 && !covered && out.outside++ === 0) out.worst = name;
+      if (d > out.maxDelta && out.outside === 0) out.worst = name;
       if (d > out.maxDelta) out.maxDelta = d;
     }
     return true;

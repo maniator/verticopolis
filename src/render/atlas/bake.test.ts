@@ -2,9 +2,9 @@ import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, signature, softLayerDrift, ARCHIVE_ROOT } from "./archive";
 import { bake, ImageStore, type Renderer } from "./bake";
-import type { Job } from "./catalog";
+import type { Job, StillJob } from "./catalog";
 import type { PaintSpec } from "./paint";
-import { blank, sameImage, type Image } from "./pixels";
+import { LayerError, blank, sameImage, type Image } from "./pixels";
 import { blit } from "./raster";
 import { compareImages, composeFrame, composeLayered, composeLookup } from "./compose";
 import type { Placed } from "./schema";
@@ -299,7 +299,7 @@ const litFake: Renderer = {
 };
 
 describe("depth layers on occupant steps", () => {
-  const room = (name: string, fade = false): Job => ({
+  const room = (name: string, fade = false): StillJob => ({
     type: "still",
     name,
     w: 4,
@@ -310,7 +310,7 @@ describe("depth layers on occupant steps", () => {
     chains: { occupants: { input: "visibleOccupants", steps: [lit(0, fade), lit(1, fade), lit(2, fade), lit(2, fade)] } },
     layers: true,
   });
-  const stats = { softDropped: 0 };
+  const stats = { softDropped: [] as string[] };
   const r = bake([room("lit"), room("fading", true)], litFake, undefined, stats);
   const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
   const lit0 = r.frames.find((f) => f.name === "lit")!;
@@ -340,14 +340,58 @@ describe("depth layers on occupant steps", () => {
     const drift = softLayerDrift(buildArchive(r, info, undefined, 32));
     expect(drift.frames).toBe(1);
     expect(drift.pictures).toBe(3); // n = 0, 1, 2: the flat chain stops changing at 2
-    expect(drift.differing).toBeGreaterThan(0); // the glow pixel: not exact, by design
+    expect(drift.differing).toBeGreaterThan(0); // the glow pixel rounds differently over the shell
+    // Measured against the soft furniture's own pixels (desk, glow, people).
+    expect(drift.pixels).toBe(2 + 3 + 4);
+    expect(drift.differing).toBe(3); // the glow pixel, once per picture
+    expect(drift.outside).toBe(0);
   });
   it("drops the soft furniture when a step would change a translucent pixel", () => {
     const fading = r.frames.find((f) => f.name === "fading")!;
     expect(fading.layers!.soft).toBeUndefined();
     expect(fading.layers!.chains!.occupants.soft).toBeUndefined();
-    expect(stats.softDropped).toBe(1);
+    expect(stats.softDropped).toEqual(["fading"]);
     expect(() => composeLayered(r, fading, {}, [], true)).toThrow(/no soft furniture/);
+  });
+  it("refuses a layered frame with two chains, or a step whose paint marks no break", () => {
+    const steps = room("x").chains!.occupants;
+    expect(() => bake([{ ...room("two"), chains: { a: steps, b: steps } }], litFake)).toThrow(/two: depth layers need at most one chain/);
+    expect(() => bake([{ ...room("over"), overlays: { dead: lit(0) } }], litFake)).toThrow(/over: depth layers need at most one chain and no overlays/);
+    expect(() => bake([{ ...room("none"), overlays: {} }], litFake)).not.toThrow();
+    const noBreak: Renderer = { ...litFake, renderShell: (spec, w, h) => (spec.p === "solid" && spec.css === "lit:1" ? null : litFake.renderShell!(spec, w, h)) };
+    expect(() => bake([room("gap")], noBreak)).toThrow(/gap: chain occupants step 1 marks no layer break/);
+  });
+  it("names a layered frame whose chain has no depth split, or no soft steps", () => {
+    const a = buildArchive(r, info, undefined, 32);
+    delete a.manifest.frames.lit.layers!.chains;
+    expect(checkLayers(a)).toEqual(["lit"]);
+    // Soft furniture without its soft steps is caught too.
+    const b = buildArchive(r, info, undefined, 32);
+    delete b.manifest.frames.lit.layers!.chains!.occupants.soft;
+    expect(checkLayers(b)).toEqual(["lit"]);
+  });
+  it("leaves out the soft furniture, and counts the frame, when the soft pass fails or gives nothing", () => {
+    for (const renderSoft of [() => null, () => { throw new LayerError("soft marks"); }] as Renderer["renderSoft"][]) {
+      const got = { softDropped: [] as string[] };
+      const out = bake([room("bare")], { ...litFake, renderSoft }, undefined, got);
+      expect(out.frames[0].layers!.soft).toBeUndefined();
+      expect(out.frames[0].layers!.chains!.occupants.soft).toBeUndefined();
+      expect(got.softDropped).toEqual(["bare"]);
+    }
+  });
+  it("measures the soft furniture of a layered frame with no chain", () => {
+    const { chains: _, ...still } = room("still");
+    const one = bake([still], litFake);
+    expect(softLayerDrift(buildArchive(one, info, undefined, 32))).toMatchObject({ frames: 1, pictures: 1, pixels: 2, differing: 1, outside: 0, worst: "still" });
+  });
+  it("names a layered frame that breaks the manifest's depth rules", () => {
+    const step0 = buildArchive(r, info, undefined, 32);
+    const c = step0.manifest.frames.lit.layers!.chains!.occupants;
+    c.shell[0] = c.shell[1];
+    expect(checkLayers(step0)).toContain("lit");
+    const overlay = buildArchive(r, info, undefined, 32);
+    overlay.manifest.frames.lit.overlays = { dead: c.shell[1] };
+    expect(checkLayers(overlay)).toContain("lit");
   });
   it("catches an occupant step whose depth split is broken", () => {
     const a = buildArchive(r, info, undefined, 32);

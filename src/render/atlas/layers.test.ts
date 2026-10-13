@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { hasBusinessHours, isOpenAt } from "../../engine/facilities";
 import type { FacilityKind } from "../../engine/types";
@@ -72,5 +74,18 @@ describe("depth-layer marks across the room catalog", () => {
     // Every room kind outside the flat list splits somewhere in the catalog.
     const expected = roomKinds().filter((k) => !DEPTH_FLAT_KINDS.has(k));
     expect([...split].sort()).toEqual(expected.sort());
+  });
+});
+
+describe("the soft furniture pass's assumption", () => {
+  it("holds: no paint routine outside the atlas sets a composite mode", () => {
+    // The soft pass (`browserEntry.ts`) draws the marks after the furniture
+    // with source-atop and puts it back after every restore; a routine with a
+    // composite mode of its own would override that.
+    const root = join(__dirname, "..");
+    const files = readdirSync(root, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.startsWith("atlas"));
+    expect(files.length).toBeGreaterThan(20);
+    const offenders = files.filter((f) => readFileSync(join(root, f), "utf8").includes("globalCompositeOperation"));
+    expect(offenders).toEqual([]);
   });
 });

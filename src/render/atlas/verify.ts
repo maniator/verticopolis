@@ -17,8 +17,9 @@ import type { Sample } from "./samples";
  * ones `towerRegions` and `towerReconcile` call) with the scene the game
  * threads through its `DrawCtx`. The two must match pixel for pixel.
  *
- * A room frame with depth layers is also composed through them (shell, then
- * furniture, then its runtime layers) and held to the same paint.
+ * A room frame with depth layers is also composed through them (the shell
+ * and its occupant steps, then the furniture and its occupant steps) and held
+ * to the same paint.
  *
  * Settled rooms are painted at two different offsets inside a larger region
  * canvas, so any art that depends on where its region starts fails here.

@@ -16,8 +16,9 @@
  * Before writing, it checks the atlas against the game's own paint for the
  * sample signatures in `src/render/atlas/samples.ts` (flat, and through each
  * room's depth layers) and stops on any mismatch. After packing it checks that
- * every image comes back out of the pages, and that every room's depth layers,
- * read back from the pages, give back its flat frame. Writes
+ * every image comes back out of the pages, that every room's depth layers,
+ * read back from the pages, give back its flat frame at every occupant count,
+ * and that the soft furniture stays within rounding of it. Writes
  * `<out>/verticopolis-atlas-<label or version>.zip` and a `.sha256` beside it
  * (`verticopolis-atlas-preview.zip` for a `--filter` run, which skips the
  * sample check).
@@ -30,7 +31,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
 import { bundleBake } from "./atlas-bundle.ts";
-import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, softLayerDrift } from "../src/render/atlas/archive";
+import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, SOFT_DRIFT_LIMIT, softLayerDrift } from "../src/render/atlas/archive";
 import type { BakeResult } from "../src/render/atlas/bake";
 import type { Image } from "../src/render/atlas/pixels";
 
@@ -129,7 +130,8 @@ async function main(): Promise<void> {
     const summary = await page.evaluate((f) => (globalThis as any).__vcAtlas.run(f), filter);
     if (summary.frames === 0) throw new Error(`--filter ${filter} matches no frame`);
     console.log(`baked ${summary.frames} frames, ${summary.animations} animations, ${summary.images} unique images`);
-    if (summary.softDropped > 0) console.log(`soft furniture: dropped on ${summary.softDropped} frames whose steps would change a translucent pixel`);
+    const dropped: string[] = summary.softDropped;
+    console.log(`soft furniture: left out of ${dropped.length} layered frames whose occupant steps cannot be drawn over it${dropped.length > 0 ? ` (${dropped.slice(0, 5).join(", ")}${dropped.length > 5 ? ", ..." : ""})` : ""}`);
     const records = await page.evaluate(() => (globalThis as any).__vcAtlas.records());
     const images: Image[] = [];
     const normals: Image[] = [];
@@ -169,10 +171,15 @@ async function main(): Promise<void> {
   if (unsplit.length > 0) throw new Error(`depth layers hold no furniture for ${unsplit.join(", ")}: the shell kept it`);
   const layered = Object.values(archive.manifest.frames).filter((f) => f.layers).length;
   console.log(`depth layers: ${layered} room frames compose back to their flat frames at every occupant count`);
-  // The soft furniture is not exact by design; report how far it strays.
+  // The soft furniture is close to the flat frame but rounds differently;
+  // report how far it strays, and stop if it strays further than rounding.
   const drift = softLayerDrift(archive);
-  const share = drift.pixels > 0 ? ((100 * drift.differing) / drift.pixels).toFixed(3) : "0";
-  console.log(`soft furniture: ${drift.frames} frames, ${drift.pictures} pictures; ${share}% of pixels differ from the flat frame, by at most ${drift.maxDelta} of 255`);
+  const share = drift.pixels > 0 ? ((100 * drift.differing) / drift.pixels).toFixed(2) : "0";
+  console.log(`soft furniture: ${drift.frames} frames, ${drift.pictures} pictures; ${share}% of its pixels differ from the flat frame, by at most ${drift.maxDelta} of 255`);
+  // A soft pass that broke everywhere would leave nothing to measure.
+  if (!filter && layered > 0 && drift.frames === 0) throw new Error("no layered frame kept its soft furniture");
+  if (drift.outside > 0) throw new Error(`soft furniture misses ${drift.outside} pixels where the flat frame differs from the shell (first in ${drift.worst})`);
+  if (drift.maxDelta > SOFT_DRIFT_LIMIT) throw new Error(`soft furniture strays ${drift.maxDelta} of 255 from the flat frame in ${drift.worst}, past the limit of ${SOFT_DRIFT_LIMIT}`);
   mkdirSync(outDir, { recursive: true });
   const name = filter ? "verticopolis-atlas-preview.zip" : `verticopolis-atlas-${label ?? pkg.version}.zip`;
   writeFileSync(join(outDir, name), archive.zip);

@@ -97,16 +97,28 @@ export function canvasRenderer(doc: Document): Renderer {
     // drawn over the room only tint the furniture already there.
     renderSoft(spec: PaintSpec, w: number, h: number): Image | null {
       const ctx = prepare(canvas, w, h);
-      const empty = prepare(saved, w, h);
-      empty.restore();
-      const marks = shellMarks(
-        () => copyPixels(ctx, saved),
-        () => {
+      // A blank canvas to copy in at the break: the furniture is painted on
+      // transparency.
+      prepare(saved, w, h).restore();
+      // After the end, the marks drawn over the furniture land only on its
+      // pixels (source-atop), even past a `restore()` that would bring back
+      // source-over: no room routine sets a composite mode of its own.
+      const restore = ctx.restore.bind(ctx);
+      const atop = () => {
+        ctx.globalCompositeOperation = "source-atop";
+        ctx.restore = () => {
+          restore();
           ctx.globalCompositeOperation = "source-atop";
-        },
-      );
-      withLayerHook(marks.hook, () => paint(ctx, spec, w, h));
-      const split = marks.finish();
+        };
+      };
+      const marks = shellMarks(() => copyPixels(ctx, saved), atop);
+      let split: boolean;
+      try {
+        withLayerHook(marks.hook, () => paint(ctx, spec, w, h));
+        split = marks.finish();
+      } finally {
+        Reflect.deleteProperty(ctx, "restore");
+      }
       ctx.restore();
       if (!split) return null;
       return { w, h, data: ctx.getImageData(0, 0, w, h).data };
@@ -122,7 +134,7 @@ function toBase64(bytes: Uint8ClampedArray): string {
 }
 
 interface AtlasPage {
-  run(filter?: string): { images: number; frames: number; animations: number; softDropped: number };
+  run(filter?: string): { images: number; frames: number; animations: number; softDropped: string[] };
   records(): Omit<BakeResult, "images" | "normals">;
   /** Images from `from` on, at least one, until about `maxBytes` of base64. */
   images(from: number, maxBytes: number): { w: number; h: number; b64: string; normal: string }[];
@@ -133,7 +145,7 @@ let result: BakeResult | null = null;
 const api: AtlasPage = {
   run(filter) {
     const jobs = filter ? allJobs().filter((j) => j.name.startsWith(filter)) : allJobs();
-    const stats = { softDropped: 0 };
+    const stats = { softDropped: [] as string[] };
     result = bake(jobs, canvasRenderer(document), undefined, stats);
     return { images: result.images.length, frames: result.frames.length, animations: result.animations.length, softDropped: stats.softDropped };
   },
