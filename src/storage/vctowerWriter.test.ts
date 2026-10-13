@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "./SaveGame";
 import { STORE_MAGIC } from "./saveCompression";
-import { setEngineWriter } from "./vctowerWriter";
+import { ENGINE_WRITER_MAX_BYTES, packVctower, setEngineWriter } from "./vctowerWriter";
 
 const NOW = 1_760_000_000_123;
 
@@ -60,4 +60,14 @@ describe("the .vctower writer", () => {
       expect(writer).toHaveBeenCalledTimes(1);
     },
   );
+
+  it("writes a save past the engine's size limit on the TypeScript side, with the engine left on", () => {
+    const writer = vi.fn(() => "VCTOWER1\nZW5naW5l\n");
+    setEngineWriter(writer);
+    const stamp = { appVersion: "3.0.0", savedAt: NOW };
+    const big = new Uint8Array(ENGINE_WRITER_MAX_BYTES + 1);
+    expect(packVctower("", big, stamp)).toMatch(/^VCTOWER1\n[A-Za-z0-9+/]+={0,2}\n$/);
+    expect(writer).not.toHaveBeenCalled();
+    expect(packVctower("{}", new Uint8Array(ENGINE_WRITER_MAX_BYTES), stamp)).toBe("VCTOWER1\nZW5naW5l\n");
+  });
 });

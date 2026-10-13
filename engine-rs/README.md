@@ -130,7 +130,8 @@ When the WASM engine runs (`?engine=wasm`), the web game writes its own
 saves through this writer: `SaveGame.export` and `SaveGame.packSync` hand
 the stamped save JSON to `encodeVctower` (`src/storage/vctowerWriter.ts`),
 and fall back to the TypeScript writer if the engine throws or writes no
-`.vctower` file. The timer autosave (`saveToAsync`, which compresses off
+`.vctower` file. A save past 8 MiB skips the engine, which would parse and
+re-print it on the main thread. The timer autosave (`saveToAsync`, which compresses off
 the main thread) and the desktop store's `toTowerFile` re-header keep their
 own writers. The same test file checks that a file written that way is the
 one the web game writes on its own.

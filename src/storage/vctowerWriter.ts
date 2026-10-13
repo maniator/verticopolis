@@ -11,7 +11,8 @@ import { TOWER_FILE_MAGIC, toBase64 } from "./saveCompression";
  * over every fixture), so the switch changes no file. An engine call that
  * throws, or hands back text that is no `.vctower` file, falls back to the
  * fflate writer and turns the engine writer off for the session, so a save
- * is never lost to the engine. (`saveToAsync` and the desktop store's
+ * is never lost to the engine. A save past ENGINE_WRITER_MAX_BYTES is
+ * written by fflate too. (`saveToAsync` and the desktop store's
  * `toTowerFile` re-header keep their own writers.)
  */
 export type VctowerWriter = (json: string, appVersion: string, savedAtMs: number) => string;
@@ -23,14 +24,21 @@ export function setEngineWriter(writer: VctowerWriter | null): void {
   engineWriter = writer;
 }
 
+/** Saves past this size skip the engine: it parses and re-prints the whole
+ *  save on the main thread, and a save near the 32 MiB cap would take
+ *  seconds and grow the game's shared WASM memory for good. A real tower is
+ *  about 2 MB, and the fflate writer writes the same bytes. */
+export const ENGINE_WRITER_MAX_BYTES = 8 * 1024 * 1024;
+
 const FILE_SHAPE = new RegExp(`^${TOWER_FILE_MAGIC}\\n[A-Za-z0-9+/]+={0,2}\\n$`);
 
 /** The `.vctower` text of a stamped save: its JSON text, that text's UTF-8
  *  bytes (checked against the cap by `encodeSaveJson`), and its stamp. */
 export function packVctower(json: string, bytes: Uint8Array, stamp: { appVersion?: string; savedAt?: number }): string {
-  if (engineWriter && typeof stamp.appVersion === "string" && typeof stamp.savedAt === "number") {
+  const { appVersion, savedAt } = stamp;
+  if (engineWriter && bytes.length <= ENGINE_WRITER_MAX_BYTES && typeof appVersion === "string" && typeof savedAt === "number") {
     try {
-      const text = engineWriter(json, stamp.appVersion, stamp.savedAt);
+      const text = engineWriter(json, appVersion, savedAt);
       if (FILE_SHAPE.test(text)) return text;
       throw new Error("the engine wrote no .vctower file");
     } catch (e) {
