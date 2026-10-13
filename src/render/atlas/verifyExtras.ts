@@ -214,9 +214,10 @@ export function extraCases(): Case[] {
       frames: ["scenery/ground/pave/joint"],
       atlas: (get) => get("scenery/ground/pave/joint"),
       game: (doc) => {
-        const ctx = canvas(doc, TILE, 11);
+        // One column wider than a lot tile, as the game paints a strip tile.
+        const ctx = canvas(doc, TILE + 1, 11);
         drawStripTile(ctx, 0, 0, true);
-        return read(ctx, TILE, 11);
+        return read(ctx, TILE + 1, 11);
       },
     },
     {
