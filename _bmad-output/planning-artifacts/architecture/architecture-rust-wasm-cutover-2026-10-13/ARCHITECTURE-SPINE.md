@@ -130,7 +130,10 @@ host; nothing in `src/ui` calls the binding directly.
   The record widths (`FRAME_HEADER`, `PERSON_FIXED`) are Rust constants that
   `src/wasmhost/frameView.ts` copies by hand today; the binding exports them
   and a layout version, consumers check both, and a layout change bumps the
-  version.
+  version. The engine's identity (crate version, build hash, protocol, frame
+  layout and save format versions, catalog and lock digests) is one
+  versioned record built in Rust and read through the binding; a frontend
+  shows it beside its own app version and hardcodes none of it (#963).
 
 ### AD-5: One save codec
 

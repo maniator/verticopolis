@@ -132,7 +132,8 @@ S12 and S14 are P3: if open at the flip, they go in the exception register.
 | S13 | Performance baseline and budgets for the engine | #900 (with #905, #849 as found) | P2 | `e2e/` perf spec, `scripts/` | `npm run perf` compares each engine with its own baseline in CI; the late-game and 5,000+ population fixtures report tick time, cold load and heap for both engines | The perf spec on both engines | S6 |
 | S14 | Analytics close-out: fx and counter pins, drain glue, #873 | #879, #907, #873 | P3 | `engine-rs/src/gameplay.rs`, `src/analyticsEngineBridge.ts` | A deliberate off-by-one at any fx or counter site fails a test in both engines; one typed drain; #873's remaining phases closed or split | Both engines' unit tests; the bridge's consent, session-swap and exactly-once tests | S1 |
 | S16 | Engine package delivery: a content-hashed package URL or a version check, the precache decision, and a fallback-use signal | #945 | P1 for the flip | `src/wasmhost/startWasmHost.ts`, `vite.config.ts`, `scripts/vercel-build.sh` | An old cached shell never runs a newer package (or refuses it with the fallback); the offline rule is decided; each fallback and each engine-writer latch-off (S2) is counted in the host status and, with consent, in analytics | Unit tests for the version check; an e2e that serves a mismatched package; the existing hash guard stays | S2, S4 |
-| S15 | The release gate, one release on the TypeScript default with the new instrument, then the flip as 3.0.0 | #945 | P1 | `package.json` (3.0.0), `src/wasmhost/engineChoice.ts`, `CLAUDE.md` | Every row in section 6 passes (on the candidate commit, or over its stated window), with the exception register attached; the CLAUDE.md source-of-truth line names `engine-rs` for gameplay rules, caps and tuning | The rows themselves | S2 to S11, S13, S16 (S12 and S14 enter the exception register if open) |
+| S17 | UI version and engine identity in About, with Copy Diagnostics | #963 | P1 | `engine-rs/src/wasm.rs` (one identity call), `src/wasmhost/engineLabel.ts`, Help's About | The UI version and commit, the active engine (Rust/WASM, TypeScript default, or TypeScript fallback with its reason), and the engine's own versioned identity record (crate version, build hash, protocol, frame layout and save format versions, catalog and lock digests) read from the binding; mismatch and unavailable states from S16's check; works when the engine never loaded | Rust unit test pinning the record; UI tests for every state; a source guard against identity literals in TypeScript; e2e for loaded, failed and mismatched packages | S16 |
+| S15 | The release gate, one release on the TypeScript default with the new instrument, then the flip as 3.0.0 | #945 | P1 | `package.json` (3.0.0), `src/wasmhost/engineChoice.ts`, `CLAUDE.md` | Every row in section 6 passes (on the candidate commit, or over its stated window), with the exception register attached; the CLAUDE.md source-of-truth line names `engine-rs` for gameplay rules, caps and tuning | The rows themselves | S2 to S11, S13, S16, S17 (S12 and S14 enter the exception register if open) |
 
 ### After the flip (not cutover blockers)
 
@@ -173,6 +174,7 @@ after their baselines and measurement methods are approved.
 | Reliability (proposed) | One release on the TypeScript default with the engine instrument (S16's signal): over at least 1,000 engine sessions whose players consented to analytics (proposed minimum), engine fallback in under 0.1% of them, no engine-writer latch-off (#953), and every divergence report triaged to a cause |
 | Rollback | A rehearsal flips the default back with the flag and loads saves written by the engine build |
 | Deployment | S16 done: an old cached shell never runs a newer package, the offline rule is decided, and no deploy serves an engine package whose hash differs from the sources (today `scripts/vercel-build.sh`'s hash guard; with #958 every failed build fails the deploy) |
+| Version identity | About and Copy Diagnostics show the UI version and commit, the active engine with any fallback reason, and the engine's identity record from the binding, including the mismatch and unavailable states (S17, #963) |
 | Coverage | `vite.config.ts` floors and the Rust job's line floor hold |
 | Sign-off | The owner approves with the exception register attached |
 
@@ -210,7 +212,8 @@ Still open (risks, no decision needed yet):
 Reused: #865, #867, #868, #874, #878, #879, #893, #900, #902, #906, #907,
 #908, #919, #921, #922, #923, #926, #935, #945, #946, #856, #858, #873.
 
-New: #954 for S9 (engine-authoritative command answers). #945 (the release
+New: #954 for S9 (engine-authoritative command answers) and #963 for S17
+(UI version and engine identity in About, a pre-3.0.0 requirement). #945 (the release
 gate) and #946 (binding export tiers) are extended.
 All three carry backlog rows (`wasm-host-engine-answers`,
 `wasm-cutover-release-gate`, `wasm-binding-export-tiers`).
