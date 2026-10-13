@@ -748,6 +748,11 @@ fn compiled_in_data_comes_from_the_crate_or_the_conformance_suite() {
                 Err(e) => found.push(format!("{name}: {e}")),
             }
         }
+        // A module path set through `cfg_attr` hides from the #[path] reader;
+        // name the file with a plain #[path] under a #[cfg] instead.
+        if conditional_path(&lib.code) {
+            found.push(format!("{name}: a cfg_attr sets a module path"));
+        }
         // Code compiled in from anywhere but a `.rs` file under src/ (the
         // binaries aside) would escape the host-service scan, which reads
         // exactly those files.
@@ -765,6 +770,31 @@ fn compiled_in_data_comes_from_the_crate_or_the_conformance_suite() {
         found.is_empty(),
         "the library compiles in code or data from where it may not (data from engine-rs/ or conformance/, code from src/): {found:?}"
     );
+}
+
+/// Whether any `cfg_attr` in `code` (literals blanked) sets a `path`.
+fn conditional_path(code: &str) -> bool {
+    let c = squeeze(code);
+    c.match_indices("cfg_attr(").any(|(at, _)| {
+        let mut depth = 0;
+        for (i, ch) in c[at + 8..].char_indices() {
+            match ch {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        let args = &c[at + 8..at + 8 + i];
+                        return args.match_indices("path").any(|(j, _)| {
+                            (j == 0 || !is_ident(args.as_bytes()[j - 1]))
+                                && args[j + 4..].starts_with('=')
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+        false
+    })
 }
 
 /// The `key = value` lines of every TOML section whose header `keep`
@@ -965,6 +995,20 @@ mod g;
         assert!(got.contains(&Ok(want.into())), "{want}: {got:?}");
     }
     assert_eq!(got.iter().filter(|r| r.is_err()).count(), 2, "{got:?}");
+    for src in [
+        "#[cfg_attr(all(), path = \"../outside.rs\")]\nmod outside;",
+        "#[cfg_attr(\n    feature = \"x\",\n    path = \"a.rs\"\n)]\nmod a;",
+    ] {
+        assert!(conditional_path(&library("sample", src).0.code), "{src}");
+    }
+    assert!(!conditional_path(
+        &library(
+            "sample",
+            "#[cfg_attr(test, allow(dead_code))]\nfn classpath() {}"
+        )
+        .0
+        .code
+    ));
     assert_eq!(
         got.len(),
         7,
