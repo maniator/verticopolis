@@ -13,7 +13,9 @@ export interface WasmModule {
   Engine: typeof Engine;
 }
 
-/** Every method the adapters call on an instance, and on the class. */
+/** Every method the adapters call on an instance, and on the class.
+ *  `towerSetCars` and `towerResizeTransport` are relay-only (the mirror's bare
+ *  tower edits; see `towerRelayOps.guard.test.ts`). */
 export const INSTANCE_METHODS = [
   "free", "mode", "money", "setMoney", "build", "buildTransport", "sellAt", "unitAt", "transportAt",
   "adjustRent", "setNoRate", "priceUnit", "setCars", "setSchedule", "setStop", "setExpressStops", "clearStops",

@@ -112,7 +112,7 @@
       "payload": {
         "kind": { "type": "enum", "enum": "facilityKind" }
       },
-      "history": "New. Takes over from economy_action with action capacity_tune in phase 2; the platform keeps the once-per-session latch. On 2026-10-13 (#906) the TypeScript engine moved its emission from the tower to the simulation layer, where the Rust engine already emitted; every host command reports exactly as before, so the payload and the version are unchanged."
+      "history": "New. Takes over from economy_action with action capacity_tune in phase 2; the platform keeps the once-per-session latch. On 2026-10-13 (#906) the TypeScript engine moved its emission from the tower to the simulation layer, where the Rust engine already emitted; every simulation-layer and charged edit reports exactly as before, so the payload and the version are unchanged. A bare tower edit (tests, fixtures, tooling), which reported before, is now silent in both engines, and the dual-run relay replays it through silent tower ops."
     },
     {
       "name": "star_reached",

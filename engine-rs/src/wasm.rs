@@ -341,7 +341,9 @@ impl Engine {
     }
 
     /// `tower.setCars(id, cars)`: the bare tower edit, silent in both
-    /// engines (#906).
+    /// engines (#906). Relay-only: the dual-run mirror replays a bare
+    /// TypeScript tower edit with it. Player and UI edits use `setCars` or the
+    /// charge commands; `towerRelayOps.guard.test.ts` keeps other callers out.
     #[wasm_bindgen(js_name = towerSetCars)]
     pub fn tower_set_cars(&mut self, id: i32, cars: i32) -> bool {
         self.sim.tower.set_cars(id.into(), cars.into())
@@ -404,7 +406,7 @@ impl Engine {
     }
 
     /// `tower.resizeTransport(id, bottom, top)`, the bare tower edit, silent
-    /// in both engines (#906): the same JSON.
+    /// in both engines (#906): the same JSON. Relay-only, as `towerSetCars`.
     #[wasm_bindgen(js_name = towerResizeTransport)]
     pub fn tower_resize_transport(&mut self, id: i32, bottom: i32, top: i32) -> String {
         let r = self

@@ -138,6 +138,6 @@ describe("gameplay event catalog", () => {
   // which dashboards it moves, and this digest is updated in the same commit.
   it("is frozen: the parsed catalog matches its pinned digest", () => {
     const digest = createHash("sha256").update(JSON.stringify(raw())).digest("hex");
-    expect(digest).toBe("042f2b9e6792bd9d90e87953e00ae4b6bf16de1170c7d8190a6ba90c46168ba3");
+    expect(digest).toBe("30d312627f47c1ca45718781f90b7f406f4fa3dd1e7f95fe89283454ef5218ef");
   });
 });
