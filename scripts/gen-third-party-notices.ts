@@ -22,6 +22,7 @@ import {
   INJECTED_CODE,
   collectPackageDirs,
   declaredLicense,
+  engineRecordPackages,
   noticeProblem,
   packageDirFromSource,
   renderNotices,
@@ -186,7 +187,7 @@ for (const [dir, origin] of dirs) {
   }
   const read = readLicenseFiles(dir);
   if (read.problems.length > 0) {
-    problems.push(...read.problems.map((p) => p.replace(`${ROOT}/`, "")));
+    problems.push(...read.problems.map((p) => `${relative(ROOT, p.file)} ${p.reason}`));
     continue;
   }
   const pkg = {
@@ -206,21 +207,17 @@ for (const [dir, origin] of dirs) {
 // without one.
 if (existsSync(join(DIST, ENGINE_GLUE))) {
   const recordPath = join(DIST, "engine", ENGINE_THIRD_PARTY);
-  let record: unknown;
-  try {
-    record = JSON.parse(readFileSync(recordPath, "utf8"));
-  } catch {
-    fail(`${relative(ROOT, recordPath)} is missing or not valid JSON; the WASM engine's crates cannot be listed (rebuild it with npm run wasm:build)`);
-  }
-  if (!Array.isArray(record) || record.length === 0) fail(`${relative(ROOT, recordPath)} lists no crates`);
-  for (const entry of record as unknown[]) {
-    const e = (typeof entry === "object" && entry !== null ? entry : {}) as Record<string, unknown>;
-    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-    const crate = { name: str(e.name), version: str(e.version), license: str(e.license) ?? null, licenseText: str(e.licenseText) };
-    const problem = noticeProblem({ ...crate, hasLicenseFile: crate.licenseText !== undefined && crate.licenseText.trim() !== "" });
-    if (problem || e.kind !== "crate") problems.push(`${relative(ROOT, recordPath)}: ${problem ?? `${crate.name}@${crate.version} is not marked as a crate`}`);
-    else packages.push({ name: crate.name!, version: crate.version!, license: crate.license!, licenseText: crate.licenseText!, kind: "crate" });
-  }
+  const read = (path: string): unknown => {
+    try {
+      return JSON.parse(readFileSync(path, "utf8"));
+    } catch {
+      fail(`${relative(ROOT, path)} is missing or not valid JSON; the WASM engine's crates cannot be listed (rebuild it with npm run wasm:build)`);
+    }
+  };
+  const build = read(join(DIST, "engine", "BUILD.json")) as { sources?: unknown } | null;
+  const engine = engineRecordPackages(read(recordPath), build?.sources);
+  problems.push(...engine.problems.map((p) => `${relative(ROOT, recordPath)}: ${p}`));
+  packages.push(...engine.packages);
 }
 
 if (problems.length > 0) fail(problems.join("; "));

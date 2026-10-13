@@ -398,3 +398,31 @@ export function shippedCrates(meta: CargoMetadata): CargoMetadata["packages"][nu
     })
     .sort((a, b) => byCodePoint(a.name, b.name) || byVersion(a.version, b.version));
 }
+
+/**
+ * The packages in the engine's third-party record (`THIRD-PARTY.json`, which
+ * `npm run wasm:build` writes beside the WASM package, #955), checked the way
+ * npm packages are, plus every reason the record cannot be trusted. The
+ * record must name the same source hash as the package's own `BUILD.json`,
+ * so a record left over from another build of the engine is refused.
+ */
+export function engineRecordPackages(record: unknown, buildSources: unknown): { packages: NoticePackage[]; problems: string[] } {
+  const problems: string[] = [];
+  const packages: NoticePackage[] = [];
+  const r = (typeof record === "object" && record !== null ? record : {}) as { sources?: unknown; crates?: unknown };
+  if (typeof r.sources !== "string" || r.sources === "" || r.sources !== buildSources) {
+    problems.push("the record was not written by the build of the engine that ships (its source hash differs from BUILD.json)");
+  }
+  if (!Array.isArray(r.crates) || r.crates.length === 0) return { packages, problems: [...problems, "the record lists no crates"] };
+  for (const entry of r.crates as unknown[]) {
+    const e = (typeof entry === "object" && entry !== null ? entry : {}) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const crate = { name: str(e.name), version: str(e.version), license: str(e.license) ?? null, licenseText: str(e.licenseText) };
+    const problem =
+      noticeProblem({ ...crate, hasLicenseFile: e.hasLicenseFile === true }) ??
+      (e.kind === "crate" ? null : `${crate.name}@${crate.version} is not marked as a crate`);
+    if (problem) problems.push(problem);
+    else packages.push({ name: crate.name!, version: crate.version!, license: crate.license!, licenseText: crate.licenseText!, kind: "crate" });
+  }
+  return { packages, problems };
+}

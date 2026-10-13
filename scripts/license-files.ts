@@ -11,15 +11,15 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { byCodePoint, isLicenseFileName, isLicenseTextFileName, isNoticeFileName } from "../src/build/thirdPartyNotices.ts";
 
-export function readLicenseFiles(dir: string): { licenseText: string; hasLicenseFile: boolean; problems: string[] } {
-  const problems: string[] = [];
+export function readLicenseFiles(dir: string): { licenseText: string; hasLicenseFile: boolean; problems: { file: string; reason: string }[] } {
+  const problems: { file: string; reason: string }[] = [];
   const files = readdirSync(dir)
     .filter((n) => isLicenseFileName(n) || isNoticeFileName(n))
     .filter((n) => {
       try {
         return statSync(join(dir, n)).isFile();
       } catch {
-        problems.push(`${join(dir, n)} cannot be read (a broken link?)`);
+        problems.push({ file: join(dir, n), reason: "cannot be read (a broken link?)" });
         return false;
       }
     })
@@ -29,7 +29,7 @@ export function readLicenseFiles(dir: string): { licenseText: string; hasLicense
     try {
       texts.set(n, readFileSync(join(dir, n), "utf8"));
     } catch {
-      problems.push(`${join(dir, n)} cannot be read`);
+      problems.push({ file: join(dir, n), reason: "cannot be read" });
     }
   }
   const readable = files.filter((n) => texts.has(n));

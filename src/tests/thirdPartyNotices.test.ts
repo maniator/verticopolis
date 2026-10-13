@@ -5,6 +5,7 @@ import { render } from "lit-html";
 import {
   INJECTED_CODE,
   collectPackageDirs,
+  engineRecordPackages,
   declaredLicense,
   isAllowedLicense,
   isLicenseFileName,
@@ -226,5 +227,26 @@ describe("third-party notices (#951)", () => {
     expect(out).toMatch(/^base64@0\.22\.1$/m);
     // unicode-ident's license, compiled into the engine.
     expect(isAllowedLicense("(MIT OR Apache-2.0) AND Unicode-3.0")).toBe(true);
+  });
+
+  it("trusts the engine's record only when it matches the package and every crate checks out", () => {
+    const good = { name: "serde", version: "1.0.229", license: "MIT OR Apache-2.0", licenseText: "MIT text", hasLicenseFile: true, kind: "crate" };
+    const ok = engineRecordPackages({ sources: "abc", crates: [good] }, "abc");
+    expect(ok.problems).toEqual([]);
+    expect(ok.packages).toEqual([{ name: "serde", version: "1.0.229", license: "MIT OR Apache-2.0", licenseText: "MIT text", kind: "crate" }]);
+    // A record from another build of the engine.
+    expect(engineRecordPackages({ sources: "old", crates: [good] }, "abc").problems.join()).toMatch(/source hash differs/);
+    expect(engineRecordPackages({ crates: [good] }, undefined).problems.join()).toMatch(/source hash differs/);
+    // Missing, empty or malformed records.
+    for (const bad of [null, [], { sources: "abc" }, { sources: "abc", crates: [] }]) {
+      expect(engineRecordPackages(bad, "abc").problems.length).toBeGreaterThan(0);
+    }
+    // Each crate is held to the same checks as an npm package.
+    const check = (entry: object) => engineRecordPackages({ sources: "abc", crates: [{ ...good, ...entry }] }, "abc").problems.join();
+    expect(check({ license: "GPL-3.0-only" })).toMatch(/not on the allowlist/);
+    expect(check({ hasLicenseFile: false })).toMatch(/no license file/);
+    expect(check({ licenseText: " " })).toMatch(/no license file/);
+    expect(check({ version: undefined })).toMatch(/no version/);
+    expect(check({ kind: "npm" })).toMatch(/not marked as a crate/);
   });
 });

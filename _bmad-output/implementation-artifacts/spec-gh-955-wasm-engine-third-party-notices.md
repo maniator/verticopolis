@@ -63,6 +63,10 @@ context:
 - Given `npm run build` with the engine package, then the notices list the 29 crates the WASM build compiles in today and the Rust standard library, and no proc-macro or build-only crate.
 - Given `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, then all pass.
 
+## Spec Change Log
+
+- 2026-10-13, review round 1: the record is `{ sources, crates }` and must name the package's BUILD.json source hash; the site build checks each entry with the same license-file flag the WASM build computed (`engineRecordPackages`, unit-tested); the toolchain's copyright page decodes numeric entities; the standard library entry declares `(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib` (core's Unicode tables and foldhash reach wasm32; the page's MPL-2.0 and BSD-2-Clause parts build for other targets only) and carries the Unicode license text; `wasm:build` refuses a rustc whose minor release differs from `rust-version`, or one without rustup's doc layout, before compiling; CI's engine job runs on changes to the attribution code and checks the committed record is current. Deferred: #958's package cache key (row `third-party-notices-hardening`, #974).
+
 ## Design Notes
 
 The record sits beside the package, so a site build reads it without a Rust toolchain, and `BUILD.json`'s source hash (which covers `Cargo.lock`) already flags a package that is stale against the crates. Proc-macro crates run inside the compiler and ship no code, so their subtrees are left out; over-attribution would be harmless, but their deps (syn and friends) would add noise.

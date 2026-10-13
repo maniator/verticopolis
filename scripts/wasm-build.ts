@@ -23,7 +23,7 @@ import { copyFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "n
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { engineSourceHash } from "../src/wasmhost/packageHash.ts";
-import { ENGINE_THIRD_PARTY, engineThirdParty } from "./engine-third-party.ts";
+import { ENGINE_THIRD_PARTY, checkToolchain, engineThirdParty } from "./engine-third-party.ts";
 import { checkCatalog, renderGameplayEventRules, renderGameplayEventsDts } from "../src/engine/gameplayCatalog.ts";
 
 const CRATES: Record<string, { dir: string; lib: string }> = {
@@ -57,6 +57,13 @@ const cli = /^wasm-bindgen (\d+\.\d+\.\d+)\r?$/m.exec(probe)?.[1];
 if (!cli) throw new Error(`wasm-bindgen --version printed something unexpected: ${probe.trim()}`);
 if (cli !== pinned) throw new Error(`wasm-bindgen CLI ${cli} does not match the pinned crate ${pinned}; ${install}`);
 
+// The engine's notices record names the standard library it links, so the
+// toolchain is checked before the compile rather than after it.
+if (which === "engine") {
+  const rustVersion = /^rust-version\s*=\s*"([0-9.]+)"/m.exec(readFileSync(resolve(crate, "Cargo.toml"), "utf8"))?.[1];
+  if (!rustVersion) throw new Error(`${target.dir}/Cargo.toml declares no rust-version`);
+  checkToolchain(crate, rustVersion);
+}
 const run = (cmd: string, args: string[]) => execFileSync(cmd, args, { cwd: crate, stdio: "inherit" });
 // The crate is an rlib; the cdylib is asked for here so the native build
 // stays as it is. The old package goes first, so a failed run leaves no
@@ -85,11 +92,12 @@ if (which === "engine") {
   // The web target's own declaration is not needed next to the served files.
   rmSync(resolve(web, "verticopolis_engine.d.ts"), { force: true });
   rmSync(resolve(web, "verticopolis_engine_bg.wasm.d.ts"), { force: true });
-  writeFileSync(resolve(web, "BUILD.json"), `${JSON.stringify({ sources: engineSourceHash(crate) }, null, 2)}\n`);
+  const sources = engineSourceHash(crate);
+  writeFileSync(resolve(web, "BUILD.json"), `${JSON.stringify({ sources }, null, 2)}\n`);
   // The crates and the standard library compiled into the package, with
   // their licenses, so the site's notices can list them without a Rust
   // toolchain (#955). It throws on a crate that cannot be attributed.
-  writeFileSync(resolve(web, ENGINE_THIRD_PARTY), `${JSON.stringify(engineThirdParty(crate, "wasm"), null, 2)}\n`);
+  writeFileSync(resolve(web, ENGINE_THIRD_PARTY), `${JSON.stringify({ sources, crates: engineThirdParty(crate, "wasm") }, null, 2)}\n`);
   // The class declaration is the same for both targets; the Node copy is the
   // committed one (`src/dualrun/binding.ts` types against it).
   copyFileSync(resolve(crate, "pkg/verticopolis_engine.d.ts"), resolve(crate, "../src/dualrun/engine.d.ts"));
