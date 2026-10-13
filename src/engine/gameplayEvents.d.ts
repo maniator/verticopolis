@@ -123,12 +123,11 @@ export interface GameplayEventPayloads {
   };
   /**
    * A unit or shaft was removed by a player command, with method saying how.
-   * Emitted by the engine's sell command (sellAt, method sell) after the
-   * removal and refund. The editor's Sell and the bulldozer remove through the
-   * tower directly today; they move onto an engine command carrying the method
-   * in phase 2, which is when bulldoze is first emitted. Version 1, per
-   * occurrence. New. Takes over from economy_action with action demolish in
-   * phase 2.
+   * Emitted by the engine's removal command (removeFacility) after the removal
+   * and refund. The tile sell (sellAt) and the editor's Sell report method
+   * sell; the bulldozer reports bulldoze. A refused removal emits nothing.
+   * Version 1, per occurrence. New. Takes over from economy_action with action
+   * demolish in phase 2.
    */
   facility_removed: {
     kind: GameplayFacilityKind;
@@ -149,12 +148,13 @@ export interface GameplayEventPayloads {
   /**
    * A shaft's capacity changed: setCars changed the car count, or
    * resizeTransport moved the span. A refused or no-op edit emits nothing. The
-   * TypeScript engine emits from the tower's own setCars and resizeTransport
-   * (the editor calls them there); the Rust engine emits from
-   * Simulation::set_cars and Simulation::resize_transport, which its binding
-   * and referee call, and its bare tower methods emit nothing. Version 1, per
-   * occurrence. New. Takes over from economy_action with action capacity_tune
-   * in phase 2; the platform keeps the once-per-session latch.
+   * TypeScript engine emits from the tower's own setCars and resizeTransport;
+   * the Rust engine emits from Simulation::set_cars and
+   * Simulation::resize_transport, and its bare tower methods emit nothing. The
+   * charge commands (addCar, removeCar, extendTransport) edit through these, so
+   * a paid edit reports the same event. Version 1, per occurrence. New. Takes
+   * over from economy_action with action capacity_tune in phase 2; the platform
+   * keeps the once-per-session latch.
    */
   capacity_changed: {
     kind: GameplayFacilityKind;

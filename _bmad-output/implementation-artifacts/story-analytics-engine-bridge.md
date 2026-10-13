@@ -219,3 +219,7 @@ tower followed by a load reports the loaded tower's first placement as
 the wire vocabulary already says `first_build` can follow a continued save
 with no `new_game_started`; the event carries no tower identity.
 
+
+### Merge with main after #928 (2026-10-13)
+
+#928 (engine-owned charges) merged first. The resolution keeps its engine commands in `editorActions.ts` and `buildActions.ts` (`addCar`, `removeCar`, `extendTransport`, `removeFacility`) and drops the three `trackEconomyActionOnce("capacity_tune")` calls it carried, since the bridge's `capacity_changed` fold replaces them (the parity test drives every capacity control on both engines). The two `demolish` calls stay on the shell for now; with `removeFacility` emitting `facility_removed` (bulldoze included), folding it is the next bridge step. The catalog digest pin moves to the merged catalog (main's wording for `facility_removed` and `capacity_changed`); no payload or version changed. Backlog: #901 is done per main; the #873 row says so.
