@@ -91,6 +91,26 @@ export function canvasRenderer(doc: Document): Renderer {
       if (!split) return null;
       return { w, h, data: ctx.getImageData(0, 0, w, h).data };
     },
+    // The same paint once more: at the break the canvas is cleared, so the
+    // furniture lands on transparency with its own glows and shadows; at the
+    // end of the furniture the paint switches to source-atop, so the marks
+    // drawn over the room only tint the furniture already there.
+    renderSoft(spec: PaintSpec, w: number, h: number): Image | null {
+      const ctx = prepare(canvas, w, h);
+      const empty = prepare(saved, w, h);
+      empty.restore();
+      const marks = shellMarks(
+        () => copyPixels(ctx, saved),
+        () => {
+          ctx.globalCompositeOperation = "source-atop";
+        },
+      );
+      withLayerHook(marks.hook, () => paint(ctx, spec, w, h));
+      const split = marks.finish();
+      ctx.restore();
+      if (!split) return null;
+      return { w, h, data: ctx.getImageData(0, 0, w, h).data };
+    },
   };
 }
 
@@ -102,7 +122,7 @@ function toBase64(bytes: Uint8ClampedArray): string {
 }
 
 interface AtlasPage {
-  run(filter?: string): { images: number; frames: number; animations: number };
+  run(filter?: string): { images: number; frames: number; animations: number; softDropped: number };
   records(): Omit<BakeResult, "images" | "normals">;
   /** Images from `from` on, at least one, until about `maxBytes` of base64. */
   images(from: number, maxBytes: number): { w: number; h: number; b64: string; normal: string }[];
@@ -113,8 +133,9 @@ let result: BakeResult | null = null;
 const api: AtlasPage = {
   run(filter) {
     const jobs = filter ? allJobs().filter((j) => j.name.startsWith(filter)) : allJobs();
-    result = bake(jobs, canvasRenderer(document));
-    return { images: result.images.length, frames: result.frames.length, animations: result.animations.length };
+    const stats = { softDropped: 0 };
+    result = bake(jobs, canvasRenderer(document), undefined, stats);
+    return { images: result.images.length, frames: result.frames.length, animations: result.animations.length, softDropped: stats.softDropped };
   },
   records() {
     if (!result) throw new Error("run() first");

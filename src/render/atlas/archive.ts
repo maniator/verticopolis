@@ -12,6 +12,8 @@ import {
   ATLAS_SCALES,
   ATLAS_SCHEMA_VERSION,
   type AtlasManifest,
+  type DepthLayerChain,
+  type DepthLayers,
   type FrameRecord,
   type LayerRef,
   type Placed,
@@ -66,7 +68,7 @@ export function signature(): AtlasManifest["signature"] {
       parkingRoll: "a space holds a car when hash(int32(id * 31)) < parkingUse, where hash(n) is: x = int32(n * 2654435761) with the product taken as a float64 (IEEE double) multiply; x = imul32(x ^ (x >>> 15), 0x2c1b3c6d); x = imul32(x ^ (x >>> 13), 0x297a2d39); (x ^ (x >>> 16)) as unsigned / 2^32. int32(v) truncates v toward zero and wraps it modulo 2^32 to a signed 32-bit integer (JavaScript's v | 0); imul32 is a 32-bit integer multiply; ^ is a 32-bit xor and >>> a logical (zero-filling) right shift on the 32-bit pattern, so a negative x shifts in zeros. The first step is not imul32: the two can differ once the product's magnitude passes 2^53",
       cinema: "the cinema's marquee and screen read the animation clock; the web keeps whatever phase its last re-bake caught, the atlas bakes phase 0",
       originSeeded: `${[...ORIGIN_SEEDED].join(", ")}: a few details (staff shirts, skyline windows, climbing holds) follow the web's draw origin; the atlas carries the per-unit look at origin 0, 0`,
-      layers: "a room frame may carry 'layers' for drawing with depth: draw the 'shell' parts, then the 'furniture' parts source-over, and the two give back the frame's own parts exactly; draw its chains and overlays on top as usual. A frame without 'layers' (vacancy, closed and gutted rooms, and the kinds whose art marks no split) is drawn flat",
+      layers: "a room frame may carry 'layers' for drawing with depth: to show n visible occupants draw the 'shell' parts, its 'chains.occupants.shell' steps 1..min(n, len - 1), then the 'furniture' parts and its 'chains.occupants.furniture' steps the same way, each source-over; the result equals the frame's parts plus its occupant steps 1..n exactly. 'soft' (with 'chains.occupants.soft') is an optional furniture picture that keeps glows and soft shadows translucent; it looks the same over the shell but is not exact. A frame without 'layers' (vacancy, closed and gutted rooms, and the kinds whose art marks no split) is drawn flat",
     },
   };
 }
@@ -146,7 +148,18 @@ export function buildArchive(
     }
     if (f.layers) {
       const parts = (ref: ImageRef | null): Placed[] => (ref ? placedOf(ref, packed.placements[ref.id]) : []);
-      rec.layers = { shell: parts(f.layers.shell), furniture: parts(f.layers.furniture) };
+      const steps = (list: (ImageRef | null)[]) => list.map((s) => layerOf(s, packed.placements));
+      const layers: DepthLayers = { shell: parts(f.layers.shell), furniture: parts(f.layers.furniture) };
+      if ("soft" in f.layers) layers.soft = parts(f.layers.soft ?? null);
+      if (f.layers.chains) {
+        layers.chains = {};
+        for (const [k, c] of Object.entries(f.layers.chains)) {
+          const chain: DepthLayerChain = { shell: steps(c.shell), furniture: steps(c.furniture) };
+          if (c.soft) chain.soft = steps(c.soft);
+          layers.chains[k] = chain;
+        }
+      }
+      rec.layers = layers;
     }
     frames[f.name] = rec;
   }
@@ -232,21 +245,94 @@ function drawParts(dst: Image, pages: readonly Image[], parts: readonly Placed[]
   for (const p of parts) over(dst, crop(pages[p.rect.page], p.rect.x, p.rect.y, p.rect.w, p.rect.h), p.dx, p.dy);
 }
 
+/** Draw a chain step (or nothing for a null or missing one). */
+function drawStep(dst: Image, pages: readonly Image[], step: LayerRef | undefined): void {
+  if (step) drawParts(dst, pages, [step]);
+}
+
+/** Every picture a layered frame can show, read back out of the pages the
+ *  way a frontend reads them: for each chain input `n` from 0 to the longest
+ *  of its step lists, the flat frame plus steps `1..n`, the exact depth split
+ *  (shell and its steps, then furniture and its steps) and, when the frame
+ *  has one, the soft split. `visit` returns false to stop early. */
+function eachLayeredPicture(
+  archive: Pick<Archive, "manifest" | "pages">,
+  visit: (name: string, n: number, flat: Image, exact: Image, soft: Image | null) => boolean,
+): void {
+  const pages = archive.pages;
+  for (const [name, rec] of Object.entries(archive.manifest.frames)) {
+    const layers = rec.layers;
+    if (!layers) continue;
+    // A frame with no chain still has its own picture at n = 0.
+    const keys = Object.keys(rec.chains ?? {});
+    for (const key of keys.length > 0 ? keys : [""]) {
+      const flatSteps = rec.chains?.[key]?.steps ?? [null];
+      const split = layers.chains?.[key] ?? { shell: [null], furniture: [null] };
+      const hasSoft = layers.soft !== undefined && (key === "" || split.soft !== undefined);
+      const top = Math.max(flatSteps.length, split.shell.length, split.furniture.length, split.soft?.length ?? 0) - 1;
+      const flat = blank(rec.w, rec.h);
+      drawParts(flat, pages, rec.parts);
+      const shell = blank(rec.w, rec.h);
+      drawParts(shell, pages, layers.shell);
+      const furniture = blank(rec.w, rec.h);
+      drawParts(furniture, pages, layers.furniture);
+      const soft = blank(rec.w, rec.h);
+      if (hasSoft) drawParts(soft, pages, layers.soft ?? []);
+      for (let n = 0; n <= top; n++) {
+        if (n > 0) {
+          drawStep(flat, pages, flatSteps[n] ?? undefined);
+          drawStep(shell, pages, split.shell[n] ?? undefined);
+          drawStep(furniture, pages, split.furniture[n] ?? undefined);
+          if (hasSoft) drawStep(soft, pages, split.soft?.[n] ?? undefined);
+        }
+        const exact = { w: rec.w, h: rec.h, data: shell.data.slice() };
+        over(exact, furniture, 0, 0);
+        let softPicture: Image | null = null;
+        if (hasSoft) {
+          softPicture = { w: rec.w, h: rec.h, data: shell.data.slice() };
+          over(softPicture, soft, 0, 0);
+        }
+        if (!visit(name, n, flat, exact, softPicture)) break;
+      }
+    }
+  }
+}
+
 /** Names of the frames whose depth layers, read back out of the packed pages
  *  through the manifest the way a frontend reads them, do not give back the
- *  frame's own pixels; empty when every layered frame does. */
+ *  frame's own pixels for some occupant count; empty when every layered frame
+ *  does. */
 export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): string[] {
-  const bad: string[] = [];
-  for (const [name, rec] of Object.entries(archive.manifest.frames)) {
-    if (!rec.layers) continue;
-    const flat = blank(rec.w, rec.h);
-    drawParts(flat, archive.pages, rec.parts);
-    const split = blank(rec.w, rec.h);
-    drawParts(split, archive.pages, rec.layers.shell);
-    drawParts(split, archive.pages, rec.layers.furniture);
-    if (!sameImage(flat, split)) bad.push(name);
-  }
-  return bad;
+  const bad = new Set<string>();
+  eachLayeredPicture(archive, (name, _n, flat, exact) => {
+    if (sameImage(flat, exact)) return true;
+    bad.add(name);
+    return false;
+  });
+  return [...bad];
+}
+
+/** How far the soft furniture strays from the flat pictures it stands in
+ *  for: pictures compared, pixels that differ, and the largest difference in
+ *  any channel (0..255). */
+export function softLayerDrift(archive: Pick<Archive, "manifest" | "pages">): { frames: number; pictures: number; pixels: number; differing: number; maxDelta: number } {
+  const frames = new Set<string>();
+  const out = { frames: 0, pictures: 0, pixels: 0, differing: 0, maxDelta: 0 };
+  eachLayeredPicture(archive, (name, _n, flat, _exact, soft) => {
+    if (!soft) return true;
+    frames.add(name);
+    out.pictures++;
+    out.pixels += flat.w * flat.h;
+    for (let i = 0; i < flat.data.length; i += 4) {
+      let d = 0;
+      for (let c = 0; c < 4; c++) d = Math.max(d, Math.abs(flat.data[i + c] - soft.data[i + c]));
+      if (d > 0) out.differing++;
+      if (d > out.maxDelta) out.maxDelta = d;
+    }
+    return true;
+  });
+  out.frames = frames.size;
+  return out;
 }
 
 /** Room kinds whose frames carry depth layers but never any furniture. Shell

@@ -216,7 +216,12 @@ front of the back wall. A room frame that supports this carries an optional
 `layers` field next to its `parts`:
 
 ```json
-"layers": { "shell": [ { "rect": {...}, "dx": 0, "dy": 0 } ], "furniture": [ ... ] }
+"layers": {
+  "shell": [ { "rect": {...}, "dx": 0, "dy": 0 } ],
+  "furniture": [ ... ],
+  "soft": [ ... ],
+  "chains": { "occupants": { "shell": [null, ...], "furniture": [null, ...], "soft": [null, ...] } }
+}
 ```
 
 - `shell` is the room with its furniture and seated people taken out: the
@@ -230,13 +235,27 @@ front of the back wall. A room frame that supports this carries an optional
   platform and track.
 - `furniture` holds the pixels that differ between the shell and the flat
   frame, transparent everywhere else.
+- `chains` (when the frame has an occupant chain) splits each occupant step
+  the same way: `shell` holds what the step changes on the shell (an office's
+  downlights or a condo's ceiling light, which switch on with the first
+  occupant), `furniture` holds the people who sit down. Each list starts with
+  a null step 0 and is trimmed on its own, like a frame's chain steps.
+- `soft` (with its own steps in `chains`) is an optional alternative to
+  `furniture`; see below.
 
-Both are lists of placed parts like `parts` (a picture wider than a page, like
-the metro's, is cut into column slices). Draw the shell parts, then the
-furniture parts over them with ordinary source-over blending, and you get the
-frame's own `parts` exactly. Then draw the frame's chains and overlays on top
-as usual: the occupant steps are the people who sit down, so they ride with the
-furniture. Either list can be empty (a fully transparent picture).
+Each picture is a list of placed parts like `parts` (a picture wider than a
+page, like the metro's, is cut into column slices). To show `n` visible
+occupants, draw with ordinary source-over blending, in this order:
+
+1. the `shell` parts,
+2. the chain's `shell` steps `1..min(n, len - 1)`,
+3. the `furniture` parts,
+4. the chain's `furniture` steps `1..min(n, len - 1)`.
+
+The result is the frame's own `parts` plus its chain steps `1..n`, exactly.
+Draw anything of your own that belongs between the wall and the furniture
+(walkers, a depth offset) between steps 2 and 3. Then draw the frame's
+overlays on top as usual. Any list can be empty (a fully transparent picture).
 
 What that means for the pictures:
 
@@ -247,9 +266,10 @@ What that means for the pictures:
 - A mark drawn after the furniture sits on the shell, so the furniture layer
   carries the furniture as the flat frame shows it (darkened under the night
   scrim, tinted under the pool water).
-- A soft shadow or glow drawn with the furniture is baked into it as opaque
-  pixels (the translucent paint over the wall behind it), so anything a
-  frontend draws between the shell and the furniture is hidden under it.
+- A soft shadow or glow drawn with the furniture (a restaurant's candles, a
+  hotel or condo lamp) is baked into `furniture` as opaque pixels: the
+  translucent paint over the wall behind it. Offset from the shell, it shows
+  as a box of wall color. Use `soft` for those rooms.
 - The hotel's roaches and its sleeping guest's "z" draw after the furniture
   ends, so they sit on the shell, even the roach on the bed and the "z" over
   the sleeper.
@@ -290,6 +310,22 @@ The layers' own images are packed on pages after the frame images', so a
 frontend that ignores `layers` reads the same frames, parts and pages as before
 they existed.
 
+### Soft furniture
+
+`soft` is the furniture painted on a transparent background instead of over
+the shell, so its glows and soft shadows keep their transparency. Draw it in
+place of `furniture` (and its `chains` steps in place of the `furniture`
+steps); the order is the same. Over the shell it looks the same to the eye,
+but it is not exact: translucent paint rounds slightly differently on its own
+than over the wall. In the current atlas SOFT_PCT of the soft pixels differ
+from the flat frame, by at most SOFT_MAX of 255 in any channel (the export
+prints this measure). Use `furniture` when exact pixels matter, and `soft`
+when the furniture moves away from the wall.
+
+A frame has no `soft` when its occupant steps would change a translucent soft
+pixel (source-over can only add to it, not replace it); the export counts
+those frames.
+
 ## How it is checked
 
 `e2e/atlas.spec.ts` (and the export's own pre-flight) composes atlas frames and
@@ -307,7 +343,10 @@ and layer from the packed pages through the manifest.
 A room frame with depth layers is also composed through its shell and
 furniture (then its chains and overlays) and held to the same paint. After
 packing, the export rebuilds every layered frame from the pages through the
-manifest, shell then furniture, and requires its flat frame's pixels.
+manifest, shell then furniture with their occupant steps at every occupant
+count, and requires its flat frame's pixels. It also measures how far the soft
+furniture drifts from the flat frame and prints the share of pixels and the
+largest channel difference.
 
 The same check covers the other families (`verifyExtras.ts`): a whole express
 and standard shaft rebuilt from their floor pieces (skip floor included), cabs

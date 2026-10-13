@@ -39,20 +39,30 @@ export function composeFrame(
   return out;
 }
 
-/** Compose `rec` the way a frontend drawing with depth does: the shell, then
- *  the furniture, then the chain steps and overlays, each source-over. Throws
- *  for a frame without depth layers. */
+/** Compose `rec` the way a frontend drawing with depth does: the shell and
+ *  its chain's shell steps, then the furniture (or, with `soft`, the soft
+ *  furniture) and its chain's furniture steps, then the overlays, each
+ *  source-over. Throws for a frame without depth layers. */
 export function composeLayered(
   bake: Pick<BakeResult, "images">,
   rec: BakedFrame,
   chains: Record<string, number> = {},
   overlays: readonly string[] = [],
+  soft = false,
 ): Image {
-  if (!rec.layers) throw new Error(`${rec.name} has no depth layers`);
+  const layers = rec.layers;
+  if (!layers) throw new Error(`${rec.name} has no depth layers`);
+  if (soft && layers.soft === undefined) throw new Error(`${rec.name} has no soft furniture`);
   const out = blank(rec.w, rec.h);
-  place(out, bake, rec.layers.shell);
-  place(out, bake, rec.layers.furniture);
-  drawRuntime(out, bake, rec, chains, overlays);
+  const stepsOf = (key: string, n: number, list: (ImageRef | null)[] | undefined) => {
+    if (!list) throw new Error(`${rec.name} has no depth steps for chain ${key}`);
+    for (let k = 1; k <= Math.min(n, list.length - 1); k++) place(out, bake, list[k]);
+  };
+  place(out, bake, layers.shell);
+  for (const [key, n] of Object.entries(chains)) stepsOf(key, n, layers.chains?.[key]?.shell);
+  place(out, bake, soft ? (layers.soft ?? null) : layers.furniture);
+  for (const [key, n] of Object.entries(chains)) stepsOf(key, n, soft ? layers.chains?.[key]?.soft : layers.chains?.[key]?.furniture);
+  drawRuntime(out, bake, rec, {}, overlays);
   return out;
 }
 

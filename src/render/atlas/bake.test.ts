@@ -1,6 +1,6 @@
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, signature, ARCHIVE_ROOT } from "./archive";
+import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, signature, softLayerDrift, ARCHIVE_ROOT } from "./archive";
 import { bake, ImageStore, type Renderer } from "./bake";
 import type { Job } from "./catalog";
 import type { PaintSpec } from "./paint";
@@ -268,5 +268,92 @@ describe("depth layers", () => {
   });
   it("refuses a frame-image count outside the images", () => {
     expect(() => buildArchive({ ...layered, frameImages: layered.images.length + 1 }, info, undefined, 32)).toThrow(/frameImages/);
+  });
+});
+
+/** A fake occupied room for the step split: spec `lit:<n>[:fade]` is a 4 x 2
+ *  block in color 5 with a glow pixel at (1, 0) and a desk at (3, 1); from
+ *  n = 1 the ceiling light at (0, 0) is on, and occupant k sits at (k - 1, 1).
+ *  Its shell pass keeps the light; its soft pass paints the desk, the people
+ *  and the glow on transparency (with `fade` the glow's alpha follows n, so
+ *  the soft steps cannot be drawn source-over). */
+const lit = (n: number, fade = false): PaintSpec => ({ p: "solid", css: `lit:${n}${fade ? ":fade" : ""}` });
+function litPixels(spec: PaintSpec, pass: "flat" | "shell" | "soft"): Image | null {
+  if (spec.p !== "solid" || !spec.css.startsWith("lit:")) return null;
+  const [, ns, fade] = spec.css.split(":");
+  const n = Number(ns);
+  const img = blank(4, 2);
+  const at = (x: number, y: number, px: number[]) => img.data.set(px, (y * 4 + x) * 4);
+  if (pass !== "soft") for (let i = 0; i < 8; i++) img.data.set([5, 0, 0, 255], i * 4);
+  if (pass !== "soft" && n > 0) at(0, 0, [9, 0, 0, 255]);
+  if (pass === "shell") return img;
+  at(3, 1, [6, 0, 0, 255]);
+  for (let k = 1; k <= Math.min(n, 3); k++) at(k - 1, 1, [7, 0, 0, 255]);
+  at(1, 0, pass === "soft" ? [200, 0, 0, fade ? 40 + n : 40] : [8, 0, 0, 255]);
+  return img;
+}
+const litFake: Renderer = {
+  render: (spec, w, h) => litPixels(spec, "flat") ?? layeredFake.render(spec, w, h),
+  renderShell: (spec, w, h) => litPixels(spec, "shell") ?? layeredFake.renderShell!(spec, w, h),
+  renderSoft: (spec) => litPixels(spec, "soft"),
+};
+
+describe("depth layers on occupant steps", () => {
+  const room = (name: string, fade = false): Job => ({
+    type: "still",
+    name,
+    w: 4,
+    h: 2,
+    anchor: { x: 0, y: 0 },
+    keys: { kind: "office" },
+    paint: lit(0, fade),
+    chains: { occupants: { input: "visibleOccupants", steps: [lit(0, fade), lit(1, fade), lit(2, fade), lit(2, fade)] } },
+    layers: true,
+  });
+  const stats = { softDropped: 0 };
+  const r = bake([room("lit"), room("fading", true)], litFake, undefined, stats);
+  const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+  const lit0 = r.frames.find((f) => f.name === "lit")!;
+
+  it("puts a light that switches on with the first occupant on the shell, and the occupants in front", () => {
+    const c = lit0.layers!.chains!.occupants;
+    expect(c.shell).toHaveLength(2); // only step 1 changes the shell
+    expect(c.shell[1]).toMatchObject({ dx: 0, dy: 0 });
+    expect(c.furniture).toHaveLength(3); // two occupants, the third step changes nothing
+    expect(c.furniture[1]).toMatchObject({ dx: 0, dy: 1 });
+    expect(c.furniture[2]).toMatchObject({ dx: 1, dy: 1 });
+    expect(c.soft).toHaveLength(3);
+  });
+  it("gives back the flat frame plus its steps exactly at every occupant count", () => {
+    for (let n = 0; n <= 4; n++) {
+      expect(sameImage(composeLayered(r, lit0, { occupants: n }), composeFrame(r, lit0, { occupants: n })), `n = ${n}`).toBe(true);
+    }
+    const a = buildArchive(r, info, undefined, 32);
+    expect(checkLayers(a)).toEqual([]);
+  });
+  it("keeps the soft furniture's glow translucent and close to the flat frame", () => {
+    const soft = r.images[lit0.layers!.soft!.id];
+    // The glow pixel stays translucent instead of carrying the wall behind it.
+    const glow = (1 - lit0.layers!.soft!.dx + (0 - lit0.layers!.soft!.dy) * soft.w) * 4;
+    expect(soft.data[glow + 3]).toBe(40);
+    expect(() => composeLayered(r, lit0, { occupants: 2 }, [], true)).not.toThrow();
+    const drift = softLayerDrift(buildArchive(r, info, undefined, 32));
+    expect(drift.frames).toBe(1);
+    expect(drift.pictures).toBe(3); // n = 0, 1, 2: the flat chain stops changing at 2
+    expect(drift.differing).toBeGreaterThan(0); // the glow pixel: not exact, by design
+  });
+  it("drops the soft furniture when a step would change a translucent pixel", () => {
+    const fading = r.frames.find((f) => f.name === "fading")!;
+    expect(fading.layers!.soft).toBeUndefined();
+    expect(fading.layers!.chains!.occupants.soft).toBeUndefined();
+    expect(stats.softDropped).toBe(1);
+    expect(() => composeLayered(r, fading, {}, [], true)).toThrow(/no soft furniture/);
+  });
+  it("catches an occupant step whose depth split is broken", () => {
+    const a = buildArchive(r, info, undefined, 32);
+    // The light's shell step is a layer-only image (no flat frame shares it).
+    const step = a.manifest.frames.lit.layers!.chains!.occupants.shell[1]!.rect;
+    a.pages[step.page].data[(step.y * 32 + step.x) * 4] ^= 1;
+    expect(checkLayers(a)).toContain("lit");
   });
 });

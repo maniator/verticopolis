@@ -30,7 +30,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
 import { bundleBake } from "./atlas-bundle.ts";
-import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture } from "../src/render/atlas/archive";
+import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, softLayerDrift } from "../src/render/atlas/archive";
 import type { BakeResult } from "../src/render/atlas/bake";
 import type { Image } from "../src/render/atlas/pixels";
 
@@ -129,6 +129,7 @@ async function main(): Promise<void> {
     const summary = await page.evaluate((f) => (globalThis as any).__vcAtlas.run(f), filter);
     if (summary.frames === 0) throw new Error(`--filter ${filter} matches no frame`);
     console.log(`baked ${summary.frames} frames, ${summary.animations} animations, ${summary.images} unique images`);
+    if (summary.softDropped > 0) console.log(`soft furniture: dropped on ${summary.softDropped} frames whose steps would change a translucent pixel`);
     const records = await page.evaluate(() => (globalThis as any).__vcAtlas.records());
     const images: Image[] = [];
     const normals: Image[] = [];
@@ -167,7 +168,11 @@ async function main(): Promise<void> {
   const unsplit = filter ? [] : kindsWithoutFurniture(archive.manifest);
   if (unsplit.length > 0) throw new Error(`depth layers hold no furniture for ${unsplit.join(", ")}: the shell kept it`);
   const layered = Object.values(archive.manifest.frames).filter((f) => f.layers).length;
-  console.log(`depth layers: ${layered} room frames compose back to their flat frames`);
+  console.log(`depth layers: ${layered} room frames compose back to their flat frames at every occupant count`);
+  // The soft furniture is not exact by design; report how far it strays.
+  const drift = softLayerDrift(archive);
+  const share = drift.pixels > 0 ? ((100 * drift.differing) / drift.pixels).toFixed(3) : "0";
+  console.log(`soft furniture: ${drift.frames} frames, ${drift.pictures} pictures; ${share}% of pixels differ from the flat frame, by at most ${drift.maxDelta} of 255`);
   mkdirSync(outDir, { recursive: true });
   const name = filter ? "verticopolis-atlas-preview.zip" : `verticopolis-atlas-${label ?? pkg.version}.zip`;
   writeFileSync(join(outDir, name), archive.zip);

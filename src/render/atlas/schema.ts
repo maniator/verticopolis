@@ -85,13 +85,41 @@ export interface FrameRecord {
   chains?: Record<string, LayerChain>;
   /** Named single overlays (the dead-parking mark, a parked car color). */
   overlays?: Record<string, LayerRef>;
-  /** A room split for depth: draw the `shell` parts, then the `furniture`
-   *  parts over them source-over, and the result equals the frame's own
-   *  `parts`. Chains and overlays then draw on top as usual. Either list is
-   *  empty when that picture is fully transparent. Absent when the room's art
-   *  marks no split (vacancy, closed and gutted rooms, and the kinds listed in
-   *  docs/atlas.md); a frontend then draws the frame flat. */
-  layers?: { shell: Placed[]; furniture: Placed[] };
+  /** A room split for depth (docs/atlas.md, Depth layers). Absent when the
+   *  room's art marks no split (vacancy, closed and gutted rooms, and the
+   *  kinds listed in docs/atlas.md); a frontend then draws the frame flat. */
+  layers?: DepthLayers;
+}
+
+/**
+ * A room frame split for depth. To show chain input `n` (the visible
+ * occupants), draw `shell`, its chain's `shell` steps `1..min(n, len - 1)`,
+ * then `furniture`, then its chain's `furniture` steps the same way, each
+ * source-over: the result equals the frame's `parts` plus its chain steps
+ * `1..n` exactly. Draw a frontend's own in-between content (walkers, a depth
+ * offset) between the two halves. Either picture list is empty when that
+ * picture is fully transparent.
+ *
+ * `soft` is an optional alternative to `furniture` (with its own chain steps
+ * in `chains[k].soft`): the furniture painted on a transparent background, so
+ * glows and soft shadows keep their transparency instead of carrying the wall
+ * behind them. Over the shell it looks the same to the eye but is not exact
+ * (translucent pixels round slightly differently); absent where it cannot be
+ * stepped by source-over.
+ */
+export interface DepthLayers {
+  shell: Placed[];
+  furniture: Placed[];
+  soft?: Placed[];
+  chains?: Record<string, DepthLayerChain>;
+}
+
+/** One chain split for depth; each list is trimmed on its own and starts
+ *  with a null step 0. */
+export interface DepthLayerChain {
+  shell: LayerRef[];
+  furniture: LayerRef[];
+  soft?: LayerRef[];
 }
 
 export interface AnimationRecord {

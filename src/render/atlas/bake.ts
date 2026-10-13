@@ -1,6 +1,6 @@
 import type { Job } from "./catalog";
 import type { PaintSpec } from "./paint";
-import { LayerError, contentHash, crop, diffLayer, sameImage, trim, type Image, type Piece } from "./pixels";
+import { LayerError, contentHash, crop, diffLayer, over, sameImage, trim, type Image, type Piece } from "./pixels";
 import { maskTo, normalMap } from "./raster";
 
 /**
@@ -20,6 +20,37 @@ export interface Renderer {
    * marks no break. A renderer without it bakes no depth layers.
    */
   renderShell?(spec: PaintSpec, w: number, h: number): Image | null;
+  /**
+   * The room's furniture painted onto a transparent canvas from the paint's
+   * `layerBreak` on, so glows and soft shadows keep their own transparency;
+   * whatever the paint draws after its `layerEnd` only tints the furniture
+   * already there (source-atop). Null when the paint marks no break. A
+   * renderer without it bakes no soft furniture.
+   */
+  renderSoft?(spec: PaintSpec, w: number, h: number): Image | null;
+}
+
+/** A frame's chain split for depth: step `k` of `shell` is what changes on
+ *  the shell when the input goes from `k - 1` to `k` (a light switching on),
+ *  step `k` of `furniture` what changes in front of it (the person who sits
+ *  down). Each list is trimmed on its own; `steps[0]` is always null. */
+export interface BakedLayerChain {
+  shell: (ImageRef | null)[];
+  furniture: (ImageRef | null)[];
+  /** Steps over the soft furniture picture; absent when the soft picture
+   *  cannot be stepped source-over (a translucent pixel that changes). */
+  soft?: (ImageRef | null)[];
+}
+
+/** The frame split for depth. Drawing `shell`, the chain's shell steps,
+ *  `furniture`, then the chain's furniture steps gives back the frame plus
+ *  its chain steps exactly, for every input. `soft` is the furniture with its
+ *  own transparency: close to `furniture` over the shell, not exact. */
+export interface BakedLayers {
+  shell: ImageRef | null;
+  furniture: ImageRef | null;
+  soft?: ImageRef | null;
+  chains?: Record<string, BakedLayerChain>;
 }
 
 /** An image placed inside a frame: the unique image's id and its offset. */
@@ -38,10 +69,9 @@ export interface BakedFrame {
   image: ImageRef | null;
   chains?: Record<string, { input: string; steps: (ImageRef | null)[] }>;
   overlays?: Record<string, ImageRef | null>;
-  /** The frame split for depth: the shell, then the furniture drawn over it
-   *  source-over, give back the frame's image exactly. Null pieces are fully
-   *  transparent. Absent when the paint marks no break. */
-  layers?: { shell: ImageRef | null; furniture: ImageRef | null };
+  /** The frame split for depth (see {@link BakedLayers}). Null pieces are
+   *  fully transparent. Absent when the paint marks no break. */
+  layers?: BakedLayers;
 }
 
 export interface BakedAnimation {
@@ -156,10 +186,53 @@ function trimSteps(steps: (ImageRef | null)[]): (ImageRef | null)[] {
   return steps.slice(0, n);
 }
 
-export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: number, total: number) => void): BakeResult {
+/** The furniture picture for one step of a layered frame: the flat frame's
+ *  pixels wherever they differ from the shell, kept wherever an earlier
+ *  step's picture already had a pixel (so a step only ever adds or paints
+ *  over, which source-over can draw), transparent elsewhere. */
+function furniturePicture(prev: Image | null, flat: Image, shell: Image): Image {
+  const out: Image = { w: flat.w, h: flat.h, data: new Uint8ClampedArray(flat.data.length) };
+  const a = flat.data;
+  const b = shell.data;
+  for (let i = 0; i < a.length; i += 4) {
+    const differs = a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2] || a[i + 3] !== b[i + 3];
+    if (differs || (prev && prev.data[i + 3] !== 0)) out.data.set(a.subarray(i, i + 4), i);
+  }
+  return out;
+}
+
+/** True when `top` drawn source-over onto `under` gives `want` exactly. */
+function composesTo(under: Image, top: Image, want: Image): boolean {
+  const out = { w: under.w, h: under.h, data: under.data.slice() };
+  over(out, top, 0, 0);
+  return sameImage(out, want);
+}
+
+/** Pieces still waiting for their final image ids. */
+type PendingLayers = {
+  shell: PendingRef | null;
+  furniture: PendingRef | null;
+  soft?: PendingRef | null;
+  chains?: Record<string, { shell: (PendingRef | null)[]; furniture: (PendingRef | null)[]; soft?: (PendingRef | null)[] }>;
+};
+
+/** Drop trailing nulls from a depth step list (each list on its own). */
+function trimPending(steps: (PendingRef | null)[]): (PendingRef | null)[] {
+  let n = steps.length;
+  while (n > 1 && steps[n - 1] === null) n--;
+  return steps.slice(0, n);
+}
+
+export interface BakeStats {
+  /** Layered frames whose soft furniture was dropped because a step would
+   *  change a translucent pixel. */
+  softDropped: number;
+}
+
+export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: number, total: number) => void, stats?: BakeStats): BakeResult {
   const store = new ImageStore();
   const layerStore = new LayerStore(store);
-  const pending: { frame: BakedFrame; shell: PendingRef | null; furniture: PendingRef | null }[] = [];
+  const pending: { frame: BakedFrame; layers: PendingLayers }[] = [];
   const frames: BakedFrame[] = [];
   const animations: BakedAnimation[] = [];
   const names = new Set<string>();
@@ -184,15 +257,21 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
     const base = r.render(job.paint, job.w, job.h);
     const frame: BakedFrame = { name: job.name, w: job.w, h: job.h, anchor: job.anchor, keys: job.keys, image: store.ref(base) };
     try {
+      // The flat chains, exactly as before; their renders are kept for the
+      // depth split below.
+      const chainRenders: Record<string, Image[]> = {};
       for (const [key, chain] of Object.entries(job.chains ?? {})) {
         const steps: (ImageRef | null)[] = [null];
+        const renders: Image[] = [base];
         let prev = base;
         for (let k = 1; k < chain.steps.length; k++) {
           const cur = r.render(chain.steps[k], job.w, job.h);
           steps.push(store.layer(diffLayer(prev, cur), cur));
+          renders.push(cur);
           prev = cur;
         }
         (frame.chains ??= {})[key] = { input: chain.input, steps: trimSteps(steps) };
+        chainRenders[key] = renders;
       }
       for (const [key, spec] of Object.entries(job.overlays ?? {})) {
         const next = r.render(spec, job.w, job.h);
@@ -202,7 +281,53 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
       // shell plus the furniture gives back `base` exactly (diffLayer refuses
       // any pixel source-over could not reproduce).
       const shell = job.layers && r.renderShell ? r.renderShell(job.paint, job.w, job.h) : null;
-      if (shell) pending.push({ frame, shell: layerStore.shell(shell), furniture: layerStore.furniture(diffLayer(shell, base), base) });
+      if (shell) {
+        const layers: PendingLayers = { shell: layerStore.shell(shell), furniture: layerStore.furniture(diffLayer(shell, base), base) };
+        const soft0 = r.renderSoft ? r.renderSoft(job.paint, job.w, job.h) : null;
+        let softOk = soft0 !== null;
+        if (soft0) layers.soft = layerStore.furniture(trim(soft0), base);
+        // Each chain step splits the same way: what changes on the shell (a
+        // light that switches on with the first occupant) and what changes in
+        // front of it (the occupant).
+        for (const [key, chain] of Object.entries(job.chains ?? {})) {
+          const renders = chainRenders[key];
+          const split = { shell: [null] as (PendingRef | null)[], furniture: [null] as (PendingRef | null)[], soft: [null] as (PendingRef | null)[] };
+          let prevShell = shell;
+          let prevFurniture = furniturePicture(null, base, shell);
+          let prevSoft = soft0;
+          for (let k = 1; k < chain.steps.length; k++) {
+            const cur = renders[k];
+            const shellK = r.renderShell!(chain.steps[k], job.w, job.h);
+            if (!shellK) throw new LayerError(`chain ${key} step ${k} marks no layer break`);
+            const furnitureK = furniturePicture(prevFurniture, cur, shellK);
+            if (!composesTo(shellK, furnitureK, cur)) throw new LayerError(`chain ${key} step ${k}: shell and furniture do not compose to the frame`);
+            split.shell.push(layerStore.furniture(diffLayer(prevShell, shellK), shellK));
+            split.furniture.push(layerStore.furniture(diffLayer(prevFurniture, furnitureK), cur));
+            if (softOk && prevSoft) {
+              const softK = r.renderSoft!(chain.steps[k], job.w, job.h);
+              try {
+                if (!softK) throw new LayerError("no soft picture");
+                split.soft.push(layerStore.furniture(diffLayer(prevSoft, softK), cur));
+                prevSoft = softK;
+              } catch (e) {
+                if (!(e instanceof LayerError)) throw e;
+                softOk = false;
+              }
+            }
+            prevShell = shellK;
+            prevFurniture = furnitureK;
+          }
+          (layers.chains ??= {})[key] = { shell: trimPending(split.shell), furniture: trimPending(split.furniture), soft: trimPending(split.soft) };
+        }
+        if (!softOk && soft0) {
+          // A soft picture without composable steps would mislead; drop it.
+          delete layers.soft;
+          for (const c of Object.values(layers.chains ?? {})) delete c.soft;
+          if (stats) stats.softDropped++;
+        }
+        if (!soft0) for (const c of Object.values(layers.chains ?? {})) delete c.soft;
+        pending.push({ frame, layers });
+      }
     } catch (e) {
       if (e instanceof LayerError) throw new LayerError(`${job.name}: ${e.message}`);
       throw e;
@@ -213,7 +338,19 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
   // The layer store's own images go after the frame images.
   const frameImages = store.images.length;
   const resolve = (ref: PendingRef | null): ImageRef | null => (ref ? { id: ref.own ? ref.id + frameImages : ref.id, dx: ref.dx, dy: ref.dy } : null);
-  for (const p of pending) p.frame.layers = { shell: resolve(p.shell), furniture: resolve(p.furniture) };
+  for (const { frame, layers: p } of pending) {
+    const layers: BakedLayers = { shell: resolve(p.shell), furniture: resolve(p.furniture) };
+    if ("soft" in p) layers.soft = resolve(p.soft ?? null);
+    if (p.chains) {
+      layers.chains = {};
+      for (const [key, c] of Object.entries(p.chains)) {
+        const out: BakedLayerChain = { shell: c.shell.map(resolve), furniture: c.furniture.map(resolve) };
+        if (c.soft) out.soft = c.soft.map(resolve);
+        layers.chains[key] = out;
+      }
+    }
+    frame.layers = layers;
+  }
   return {
     images: [...store.images, ...layerStore.own.images],
     normals: [...store.normals, ...layerStore.own.normals],
