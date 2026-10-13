@@ -70,6 +70,15 @@ not. This is the TypeScript tie-in the owner asked for after #938.
   engine catalog (#930), one built package exports `catalog(mode)`, with
   digests matching the TypeScript catalog, and the relay-only tower ops, and
   the shipped glue in src/public/engine names both (owner review on #950).
+- `capacityEventMatrix.integration.test.ts` (owner request on #950, after
+  merging main through #961 with the WASM charge e2e #956): 18 edits (the
+  simulation-layer edits, the charges, their refusals and no-ops, the bare
+  tower edits) each report `capacity_changed` exactly the expected number of
+  times on the TypeScript engine and on the WASM host, with nothing owed at
+  detach; a loaded, restored or swapped tower reports only into its own
+  simulation; the host's hour merge keeps reporting once; and the dual run
+  agrees on every edit, event for event. `setCars` past the car limit clamps
+  to it in both engines, so it reports once unless the shaft is already there.
 - `cargo run --release --bin conformance`: every scenario ok; the TypeScript
   conformance runs match the lock.
 
