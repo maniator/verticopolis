@@ -144,13 +144,28 @@ engine (Rust under WASM, TypeScript otherwise)
   (never below 0), and any number of swaps between two drains leaves every
   earlier tower's events before it.
 - **`dropped`** is the per-batch delta of the live tower's cumulative drop
-  counter; the hub resets its baseline on a swap.
+  counter. The baseline is kept across a swap, because `inherit` and the WASM
+  host's detach already carry the replaced tower's count forward; if the
+  counter ever reads lower than the baseline (a tower that inherited
+  nothing), the hub rebases to it and reports 0.
+- **Swaps** need no signal beyond the buffer: `ownFrom` and the drop counter
+  travel with the events.
 - **`reason`** is `frame`, `hide` or `consentClose`, so the bridge keeps its
-  consent discard and audio ignores a batch drained as the tab hides.
+  consent discard and audio ignores a batch drained as the tab hides. The
+  hub takes the hide and consent drains through the analytics session's
+  existing flush hook (as `bindEngineBridge` does today) and adds no
+  listeners of its own; a build without those listeners publishes frame
+  batches only.
 - **Drain failures** stay guarded: a drain that throws or returns no array is
   counted and publishes nothing that occasion.
 - A consumer that throws is counted and isolated; the others still run.
-- The hub reads nothing else from the simulation and writes nothing to it.
+- The hub reads only the drain and the drop counter, and writes nothing to
+  the simulation.
+- **Timing:** the frame loop drains before it ticks (`frameLoop.ts`), so a
+  frame's batch holds the previous frame's tick events, while read-model
+  edges show the current frame. The plan keeps that order (analytics relies
+  on it around the modal freeze) and never pairs an event with a same-frame
+  state edge.
 - This matches the cutover plan's single-drain rule (AD-6 in PR #947). If the
   engine later moves into a worker, the worker drains and posts each batch
   with `ownFrom` and its snapshot; the hub's API is unchanged.
@@ -173,18 +188,20 @@ that no action plays its cue twice.
 | Source | Trigger | Cue | Stage |
 | --- | --- | --- | --- |
 | `star_reached` | `star` 2 to 5 | `promote` (the highest star in the frame) | 2: retires the `sim.star` poll |
-| Win dialog (`evaluatedTower`) | the dialog opens | the win `promote` | Unchanged: stays on the dialog, so a load or undo of a won tower replays it as today; `star_reached` 6 plays nothing |
+| Win dialog (`evaluatedTower`) | the dialog opens | `win` (today's `promote` sound, its own cue id) | Unchanged: stays on the dialog, so a load or undo of a won tower replays it as today; `star_reached` 6 plays nothing |
 | Pending-choice modal | the modal opens | `error` today; the alarm (fire rescue) or a threat cue (bomb) in stage 6 | Unchanged in stage 2; one cue per emergency |
 | `fire_started` | any | none (the modal that opens in the same step carries the alarm) | Rule: one fact, one cue |
 | `emergency_resolved` | `source: timeout` | `notify` | 6 |
 | `emergency_resolved` | `source: player` | none (the modal click is UI) | Rule |
-| `bomb_detonated` | `rooms` | new explosion cue | 6 |
+| `bomb_detonated` | `rooms` 1 or more | new explosion cue | 6 |
+| `bomb_detonated` | `rooms` 0 (nothing to burn, no explosion drawn) | none | Rule: the visual twin |
+| Explosion fx sequence | any | none (`bomb_detonated` carries it) | Rule: one fact, one cue |
 | `fire_gutted` | `rooms` | new low impact | 6, auditioned |
 | `milestone_reached` | any id | `notify` | 6 |
 | `facility_placed`, `facility_removed`, `pricing_changed`, `capacity_changed` | any | none (the command result plays it) | Rule |
 | `tower_founded` | any | none (the program change is UI) | Rule |
 | Car stop counter | counter increases, cars in view only | new elevator chime, one per car per frame, rate capped | 5 |
-| Fx sequences | sequence increases | Santa, thief, treasure and VIP cues; the VIP cue is skipped in a frame that brings `star_reached` 6 | 6, auditioned |
+| Fx sequences | sequence increases | Santa, thief, treasure and VIP cues; the VIP cue is skipped when `evaluatedTower` turns true in the same frame (the winning visit, seen in the read model) | 6, auditioned |
 | Weather, clock, occupancy | continuous | rain bed, crowd gates, crowd level | Unchanged |
 | Command result | ok, refused, removed | `build`, `error`, `sell`, `click` | Unchanged |
 
@@ -198,12 +215,14 @@ fails the build until it is mapped to a cue or to none.
 - **Arbitration per frame:** events and read-model edges are arbitrated
   together once per frame. Each distinct cue plays at most once per frame; if
   more than two distinct cues compete, the two highest play, in this order:
-  win, alarm or threat, explosion, promote, chime, notify, fx cues. Each cue
+  `win`, alarm or threat, explosion, `promote`, chime, `notify`, fx cues. A
+  `win` and a `promote` in the same frame play `win` only. Each cue
   also has a real-time cooldown. Events carry no time stamp and one frame can
   span hours of game time at top speed, so nothing is spread out or replayed.
 - **Pause:** ticks emit nothing while paused; commands still emit. A cue from
   the player's own action (a build, or the explosion after declining a bomb
-  ransom) plays while paused.
+  ransom) plays while paused. The first paused frame still drains the last
+  running frame's tick events, so a one-frame tail can play.
 - **Save, load, new game, undo, redo:** a load never emits, so no phantom
   promote; the router drops events before `ownFrom`; read-model edge
   detectors re-baseline on a swap and never fire on their first frame.
@@ -240,7 +259,7 @@ fails the build until it is mapped to a cue or to none.
 
 | # | Story | Change | Audible? | Review |
 | --- | --- | --- | --- | --- |
-| 1 | `gameplay-event-hub` (#964) | The hub owns the drain; `ownFrom` in the event buffer through inherit, attach, detach and eviction; `reason`, per-batch `dropped`, guarded drain; the bridge becomes a consumer | No | `/gds-code-review` and `/bmad-code-review` |
+| 1 | `gameplay-event-hub` (#964) | The hub owns the drain (frame loop, plus the analytics session's flush hook for hide and consent); `ownFrom` in the event buffer through inherit, attach, detach and eviction; `reason`, per-batch `dropped`, guarded drain; the bridge becomes a consumer | No | `/gds-code-review` and `/bmad-code-review` |
 | 2 | `web-audio-engine-events` (#965) | Audio router on the hub; retire the `sim.star` poll; per-frame arbitration and cooldowns; the win and pending-choice cues stay on their dialogs | No | `/gds-code-review` |
 | 3 | `audio-scene-data` (#968) | Export the ambience scene tables as generated data pinned by a test; drop the dead `SCENES` fields | No | `/bmad-code-review` |
 | 4 | `audio-offline-render` (#969) | A tool that renders the programs, beds and cues offline (Tone.js `Offline`) to files for review and A/B listening | No (tooling) | `/bmad-code-review` |
@@ -266,17 +285,20 @@ engine-answers work (#954) and is compatible with the typed drain cleanup
   match.
 - **One fact, one cue:** a build command and its `facility_placed` play one
   `build`; a fire plays one alarm (the modal), with `fire_started` silent; the
-  winning VIP visit plays the win cue and no VIP cue.
+  winning VIP visit plays `win` and no VIP cue; a bomb with nothing to burn
+  plays no explosion.
 - **Swap and backdrop:** a load, a new game, an undo and a redo play nothing
   from the replaced tower; two swaps between drains and an overflow after a
-  swap keep `ownFrom` right, on both engines; the title backdrop plays
+  swap keep `ownFrom` right, on both engines; an overflow, a drain, a swap
+  and a drain report 0 dropped; the title backdrop plays
   nothing; loading a tower above one star plays no star `promote`, and
   loading a won tower replays the win cue as today.
 - **Reasons:** a consent close still delivers the batch to audio and the
   bridge still discards it; a hide batch reaches analytics only.
 - **Fast-forward:** a batch with three `star_reached` plays one `promote`;
   cooldowns hold across consecutive frames; the chime cap holds at top speed.
-- **Pause and resume:** no tick-sourced cue while paused; a build while
+- **Pause and resume:** no tick-sourced cue after the first paused frame; a
+  build while
   paused plays `build`; today's ambience behavior is pinned by a test before
   anything changes.
 - **Volume controls:** the existing preference and graph suites stay green;
