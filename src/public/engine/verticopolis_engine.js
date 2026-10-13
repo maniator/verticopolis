@@ -171,6 +171,34 @@ export class Engine {
         }
     }
     /**
+     * `canBuild(kind, floor, x)`: JSON `{ ok, reason?, cost }`, the dry run
+     * `build` makes first. When the placement fits, `cost` is its full
+     * price: the facility, the floor tiles laid under a room, and the tiles
+     * bridged to the tower when bridging is on; a "Not enough money."
+     * refusal carries that same full price. Any other refusal (placement or
+     * star gate) carries the reason `build` would give and the facility's
+     * base price. An unknown kind answers the way TypeScript does, with
+     * "Unknown facility." and a cost of 0.
+     * @param {string} kind
+     * @param {number} floor
+     * @param {number} x
+     * @returns {string}
+     */
+    canBuild(kind, floor, x) {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ptr0 = passStringToWasm0(kind, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.engine_canBuild(this.__wbg_ptr, ptr0, len0, floor, x);
+            deferred2_0 = ret[0];
+            deferred2_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
      * @param {number} id
      * @returns {boolean}
      */

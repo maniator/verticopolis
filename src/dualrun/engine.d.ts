@@ -49,6 +49,17 @@ export class Engine {
      * `callExterminator()`: JSON `{ ok, reason? }`.
      */
     callExterminator(): string;
+    /**
+     * `canBuild(kind, floor, x)`: JSON `{ ok, reason?, cost }`, the dry run
+     * `build` makes first. When the placement fits, `cost` is its full
+     * price: the facility, the floor tiles laid under a room, and the tiles
+     * bridged to the tower when bridging is on; a "Not enough money."
+     * refusal carries that same full price. Any other refusal (placement or
+     * star gate) carries the reason `build` would give and the facility's
+     * base price. An unknown kind answers the way TypeScript does, with
+     * "Unknown facility." and a cost of 0.
+     */
+    canBuild(kind: string, floor: number, x: number): string;
     clearStops(id: number): boolean;
     /**
      * The crowd view's hash, as the lock records it.
