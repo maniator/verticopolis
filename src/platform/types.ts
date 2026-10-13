@@ -46,8 +46,6 @@
  *    unrecognized one reports.
  */
 
-import type { SaveStorePort } from "./saveStore";
-
 /**
  * A command a wrapper shell may ask the game to run, named for what the player
  * gets rather than for the affordance that sent it (a desktop menu item today,
@@ -123,29 +121,6 @@ export interface PlatformPort {
    * simply keeps the current loss bound (one autosave interval).
    */
   onFlushRequest?(handler: () => void): void;
-  /**
-   * Durable storage the game uses in place of localStorage when a shell offers
-   * it. Optional for the same reason as the two members above, and the reason
-   * bites harder here: the iOS Capacitor shell implements the three-member
-   * revision of this contract, so requiring a save store would demote it to the
-   * browser port and take its native file save with it.
-   *
-   * Omitted rather than stubbed on ports that have no store (see
-   * `./browser.ts`), so a caller can ask `if (port.saveStore)` and get a
-   * truthful runtime answer.
-   *
-   * That check does NOT make the store code fold out of a browser bundle, and
-   * an earlier version of this comment claimed it did. `port.saveStore` is a
-   * property read on a value returned by `getPlatform()`, which Rollup cannot
-   * prove undefined, so the branch and everything it references ship to every
-   * player. Only `IS_WRAPPED_BUILD` folds, because Vite statically replaces
-   * `import.meta.env.MODE` (see `./index.ts`). Anything that must stay out of
-   * the browser bundle goes behind that, and is checked in the built artifact
-   * by `scripts/verify-wrapper-seam.ts`, since a source test cannot see it.
-   *
-   * See `./saveStore.ts` for the blob shape and the opaque scope token.
-   */
-  saveStore?: SaveStorePort;
   /**
    * The commercial channel a DESKTOP artifact was packaged for: `"steam"` or
    * `"itch"`. Stamped by the shell at package time (the same renderer bundle

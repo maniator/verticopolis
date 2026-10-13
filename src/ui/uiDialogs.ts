@@ -5,7 +5,7 @@ import { updatePromptTemplate } from "./templates/updatePrompt";
 import { helpTemplate } from "./templates/help";
 import { isSplashUp } from "../game/interactionState";
 import { compareModalTemplate } from "./templates/compare";
-import { savesTemplate, type SaveScopeCaption } from "./templates/saves";
+import { savesTemplate } from "./templates/saves";
 import { newTowerTemplate } from "./templates/newTower";
 import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./templates/reports";
 import { statsModalTemplate } from "./templates/stats";
@@ -57,10 +57,9 @@ export function showStats(ui: UI, body: TemplateResult, handlers: Record<string,
   ui.wireActions(box, handlers);
 }
 
-/** Saves manager: auto-save + numbered slots, plus export/import. The scope
- *  caption is injected by callers that know the storage area (desktop). */
-export function showSaves(ui: UI, slots: SlotInfo[], scope?: SaveScopeCaption): void {
-  const box = ui.openModalTemplate(savesTemplate(slots, scope), { displaceable: true });
+/** Saves manager: auto-save + numbered slots, plus export/import. */
+export function showSaves(ui: UI, slots: SlotInfo[]): void {
+  const box = ui.openModalTemplate(savesTemplate(slots), { displaceable: true });
   box.querySelectorAll<HTMLElement>("[data-save]").forEach((b) =>
     b.addEventListener("click", () => {
       ui.cb.onSaveSlot(Number(b.dataset.save));

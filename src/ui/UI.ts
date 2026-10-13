@@ -1,7 +1,6 @@
 import { FACILITIES, isCommercialKind } from "../engine/facilities";
 import type { Simulation, LogEntry } from "../engine/Simulation";
 import type { SlotInfo } from "../storage/SaveGame";
-import type { SaveScopeCaption } from "./templates/saves";
 import type { ExportReport } from "../storage/tdtExport";
 import type { ImportReport } from "../storage/tdtImport";
 import type { FacilityKind, GameMode } from "../engine/types";
@@ -426,8 +425,8 @@ export class UI {
     dialogs.showStats(this, body, handlers);
   }
 
-  showSaves(slots: SlotInfo[], scope?: SaveScopeCaption): void {
-    dialogs.showSaves(this, slots, scope);
+  showSaves(slots: SlotInfo[]): void {
+    dialogs.showSaves(this, slots);
   }
 
   showTowerPicker(ctx: dialogs.TowerPickerCtx): void {

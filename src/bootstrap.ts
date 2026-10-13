@@ -4,8 +4,6 @@ import { injectVercelTelemetry } from "./telemetry";
 import { startGameplaySession, trackAppActionOnce } from "./analytics";
 import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
-import { IS_WRAPPED_BUILD } from "./platform";
-import { prepareSaveStore } from "./game/desktopSaveStore";
 import { dualRunRequested, startDualRun, type DualRunApp } from "./dualrun/dualRun";
 import { engineRequested } from "./wasmhost/engineChoice";
 import { loadWasmEngine, startWasmHost, type WasmHostApp } from "./wasmhost/startWasmHost";
@@ -157,24 +155,6 @@ export function bootGame(create: () => BootApp): Promise<void> {
     // session never opens and can't dilute the length signal. Host-gated inside,
     // like the page-view inject just above.
     startGameplaySession();
-    // Bring up a wrapper shell's save store BEFORE the game constructs, so the
-    // synchronous save readers (`SaveGame.load`, `hasSave`, `listSlots`,
-    // `hasSlot`) can answer from a resolved snapshot rather than being made
-    // async all the way up through the splash controller. Never rejects, so a
-    // broken or slow shell degrades to localStorage instead of stalling boot.
-    //
-    // Behind `IS_WRAPPED_BUILD`, not `if (port.saveStore)`: only the former is
-    // statically replaced by Vite, so only the former lets Rollup drop the
-    // store, the session model, and the migration out of a browser bundle.
-    // `scripts/verify-wrapper-seam.ts` checks the built artifact both ways.
-    //
-    // `.catch` even though `prepareSaveStore` is documented and tested never to
-    // reject. This await sits OUTSIDE the try below, so a rejection would skip
-    // the boot message and leave the player on a blank page. Making the
-    // "cannot take boot down" property structural at the call site costs one
-    // line and does not depend on a module three imports away keeping its
-    // promise. Boot continues on localStorage either way.
-    if (IS_WRAPPED_BUILD) await prepareSaveStore().catch(() => {});
     // The WASM engine (`?engine=wasm`, or `vc.engine` in storage) is fetched
     // before the app exists, so the first tower is hosted before its first
     // tick; a package that fails to load leaves the game on the TypeScript
