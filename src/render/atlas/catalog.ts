@@ -34,7 +34,7 @@ export interface StillJob {
    *  shell break (`pixelSprites/layers.ts`) gets shell and furniture layers. */
   layers?: boolean;
   /** True for a family added after the first atlas: its new images pack on
-   *  pages of their own, after every earlier family's (`BakeResult.groups`). */
+   *  pages after the first atlas's frame pages (`BakeResult.groups`). */
   ownPages?: boolean;
 }
 
@@ -52,7 +52,7 @@ export interface AnimJob {
   /** True when every frame should also be split for depth, like a still. */
   layers?: boolean;
   /** True for a family added after the first atlas: its new images pack on
-   *  pages of their own, after every earlier family's (`BakeResult.groups`). */
+   *  pages after the first atlas's frame pages (`BakeResult.groups`). */
   ownPages?: boolean;
 }
 
@@ -86,7 +86,6 @@ export const OCCUPANT_FREE = new Set<FacilityKind>(["parking", "parkingRamp", "s
  * so the atlas carries the per-unit bake's look (origin 0, 0). Tracked as a backlog defer (sprite-origin-seeds).
  */
 export const ORIGIN_SEEDED: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["security", "medical", "housekeeping", "skyBar", "fitnessClub"]);
-
 
 /** Kinds whose art changes after 23:00 and before 06:00: the condo (its
  *  asleep scrim and its residents) and the two rentals, which share the

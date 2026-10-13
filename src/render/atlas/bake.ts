@@ -92,10 +92,12 @@ export interface BakeResult {
    *  own images come after. The archive packs the two groups apart, so the
    *  layers never move a frame image (absent: every image is a frame image). */
   frameImages?: number;
-  /** Where each family added after the first atlas begins among the frame
-   *  images: each such family's new images pack on pages of their own, after
-   *  the earlier families' pages, so adding one never moves an older image
-   *  (absent: none). */
+  /** Where the families added after the first atlas begin among the frame
+   *  images: their new images pack on pages of their own, after the older
+   *  frame pages, so adding them never moves an older frame image (absent:
+   *  none). Today that is one group, the scenery; a later family that must
+   *  not repack it needs a group of its own. The depth layers' pages come
+   *  last, so those can move when a family is added. */
   groups?: number[];
   frames: BakedFrame[];
   animations: BakedAnimation[];

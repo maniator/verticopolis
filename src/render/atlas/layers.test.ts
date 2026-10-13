@@ -73,7 +73,7 @@ describe("depth-layer marks across the room catalog", () => {
       if (breaks === 1) split.add(s.kind);
     }
     expect(wrong.slice(0, 10)).toEqual([]);
-    // Every room kind outside the flat list splits somewhere in the catalog.
+    // Every room kind splits somewhere in the catalog.
     const expected = roomKinds();
     expect([...split].sort()).toEqual(expected.sort());
   });

@@ -79,6 +79,8 @@ verticopolis-atlas/
   manifest.json
   ATTRIBUTION.txt          the CC BY 4.0 attribution line
   ASSETS-LICENSE.md        the asset license, verbatim
+  icon/icon.svg            the app icon (see "The app icon")
+  icon/...                 its maskable SVG and PNGs up to 1024 x 1024
   1x/page-000.png          512 x 512 color page
   1x/page-000.normal.png   its normal map
   2x/...                   1024 x 1024
@@ -127,7 +129,9 @@ bumps it. New frames or optional fields do not.
   which animate, and the exact rule for each (`signature.rules`).
 - `variants`: the sampled placements behind each room variant.
 - `data`: small tables (the sky color at each quarter hour, the skyline fills,
-  the shirt colors, the person build sizes, the sampled seeds).
+  the shirt colors, the person build sizes, the sampled seeds), the scenery
+  layout (`scenery`), the sky's motion (`sky`) and the game's draw order
+  (`depth`).
 
 ### Anchors
 
@@ -322,7 +326,8 @@ boutique bay, fitness club, clinic, nightclub, spa, sky bar, daycare,
 security, medical center, housekeeping, party hall, wedding hall, aquatic
 center, metro station, recycling center, parking ramp and parking space. The
 recycling center's chain is its `fill`: the wall gauge (and its FULL cue)
-changes on the shell, the day's pile in front. The parking ramp's furniture is
+changes on the shell, the day's pile in front, and the machines stop at the
+deck curb, which stays whole on the shell. The parking ramp's furniture is
 the car parked at its foot. A parking space's shell is the whole bay and its
 furniture list is empty: its car comes as a `car<i>` overlay (and a dead
 space's red X as `dead`), which draws in front of everything.
@@ -339,11 +344,23 @@ shell, and the palms, the potted plant, the reception desk and its attendant,
 and the doorman are the furniture. Neither has a chain, so a frontend draws
 the shell and then the furniture (or the soft furniture).
 
+The elevator cabs (`car/...`) and the metro train (`vehicle/metrotrain/...`)
+split the same way, so the people inside sit between the car body and its
+front. A cab's shell is the cab with its doors open on an empty floor, its
+`riders` chain puts the riders on the furniture, and the door frames, the
+FULL bar and the lantern draw after the furniture ends, so they sit on the
+shell. The train's shell is the whole consist and its furniture the riders in
+the saloon windows; each window's glint draws after them, on the shell, so
+the furniture is transparent under it. The street cars and the garbage truck
+show no one inside and are drawn flat; they have a plane of their own in
+`data.depth`.
+
 The layers' own images are packed on pages after the frame images', so a
 frontend that ignores `layers` reads the same frames, parts and pages as before
 they existed. The same goes for the scenery, which joined the atlas later: its
 images pack on pages of their own between the older frames' pages and the
-layers'. An entrance animation can carry `soft` on some of its frames and not
+layers'. The layers' pages come last, so their page numbers can change when a
+family is added; read them from the manifest, never from an older one. An entrance animation can carry `soft` on some of its frames and not
 others (each frame splits on its own).
 
 ### Soft furniture
@@ -380,39 +397,125 @@ only.
 The scenery around the lot comes as its own frames, painted by the game's
 scenery painters (`src/render/excalibur/towerSceneryDraw.ts`), and
 `data.scenery` publishes the game's own placement table (`SCENERY` in
-`src/render/sceneryLayout.ts`). Positions are in pixels at 1x: x from the
-lot's left edge and y from the ground line (negative is up), for a frame's
-top-left corner. Draw, back to front:
+`src/render/sceneryLayout.ts`) and the rules it seeds the rest by. Positions
+are in pixels at 1x: x from the lot's left edge and y from the ground line
+(negative is up), for a frame's top-left corner. `lotTiles` is the lot's width
+in tiles. Draw, back to front (the planes are the ones in
+[Draw order](#draw-order)):
 
-1. The skyline: solid rectangles in the two `data.skylineFills` colors (the
-   `sky/skyline/<far or near>` frames are those fills). The game seeds its
-   rectangles by the tower, so a frontend picks its own.
-2. `ground.strip`: one frame per lot tile at x `tile * tile.w` and `y`, drawn
-   left to right. Each frame is one column wider than a lot tile, as the game
-   paints it, and the next tile covers that column where it reaches. The
-   tower paves one span from its leftmost to its rightmost ground-floor room,
-   widened by `apronPadTiles` on each side and kept on the lot; a paved tile
-   uses `scenery/ground/pave/joint` when its index is a multiple of
-   `jointEvery` and `scenery/ground/pave/plain` otherwise, and any other tile
-   uses the grass frame `ground.strip.grass[tile]` names.
-3. `ground.runs`: the two sidewalks, the forecourt and the two roads. Fill
-   each run's box (`x`, `y`, `w`, `h`) with copies of its tile frame placed
-   at `tileOriginX` plus whole multiples of the frame's width, clipped to the
-   box. For the roads that puts every lane dash where the game has it.
-4. `props`: the roundabout, the fountain (an animation; its motions share no
-   period, so its 24 frames at 0.1 s sample a stretch close to a loop), the
-   two plaza lamps, the street lamp with its "375 ST" sign, and the planter.
-   The lamps fade in through dusk and out through dawn (`lamp.fadeIn` and
+1. The skyline, seeded by the tower (see below): solid rectangles in the two
+   `data.skylineFills` colors (the `sky/skyline/<far or near>` frames are those
+   fills), the far band first.
+2. `ground.dirt` and `ground.line`: solid fills in their `color`. The dirt
+   spans `x` to `x + w` from y 0 down `h` pixels; the ground line spans the
+   same x and runs `h` pixels from `y`.
+3. `ground.strip`: one frame per lot tile at x `tile * tileW` and `y`, drawn
+   left to right. Each frame is one column wider than `tileW`, as the game
+   paints it, and the next tile covers that column. The tower paves one span
+   from its leftmost to its rightmost ground-floor room, widened by
+   `apronPadTiles` on each side and kept on the lot; a paved tile uses
+   `scenery/ground/pave/joint` when its index is a multiple of `jointEvery`
+   and `scenery/ground/pave/plain` otherwise, and any other tile uses the
+   grass frame `ground.strip.grass[tile]` names.
+4. `ground.runs`, in order: the plaza sidewalk, the roundabout, the left road,
+   the forecourt, the right sidewalk and the right road. Fill each run's box
+   (`x`, `y`, `w`, `h`) with copies of its frame placed at `tileOriginX` plus
+   whole multiples of the frame's width, clipped to the box (the roundabout's
+   box holds exactly one copy). That puts every lane dash where the game has
+   it, and the left road's last column over the roundabout's first, as the
+   game draws it.
+5. `props`, in order: the fountain (an animation; its motions share no period,
+   so its 24 frames at 0.1 s sample a stretch close to a loop), the two plaza
+   lamps, the street lamp with its "375 ST" sign, and the planter. The lamps
+   fade in through dusk and out through dawn (`lamp.fadeIn` and
    `lamp.fadeOut`, in hours, a straight ramp); the atlas carries them at 0,
    25, 50, 75 and 100 percent lit.
-5. The lot's trees and bushes. The game seeds their spots by the tower and
-   scales each between `plants.scale`; the atlas carries eight tree variants
-   (`scenery/tree/v<0-7>`) and a bush at their base size. A plant stands
-   centered on its lot tile with its bottom row at `plants.baseY`, and is
-   hidden once the paved span comes within `plants.clearTiles` tiles of it.
+6. The lot's trees and bushes, seeded by the tower (see below).
 
 The props and plants stand apart from the tower and the ground, so a frontend
 that draws with depth can set each at its own distance.
+
+### Seeded by the tower
+
+The skyline and the plants are a pure function of the tower's founding seed
+(the engine's initial RNG seed, fixed for the tower's life), through this
+hash, where `int32`, `imul32`, `^` and `>>>` are as in `signature.rules.parkingRoll`:
+
+```text
+hash01(n): h = int32(trunc(n)); h = imul32(h ^ (h >>> 16), 0x45d9f3b);
+           h = imul32(h ^ (h >>> 16), 0x45d9f3b); h = h ^ (h >>> 16);
+           return (h as unsigned) / 2^32
+```
+
+The skyline (`skyline`): for each band in `bands`, a building at every tile
+`t` from `start - overscanTiles` while `t < lotTiles + overscanTiles`, stepping
+by `step`. It is `w.base + hash01(seed + t * w.key) * w.span` tiles wide and
+`hFloors.base + hash01(seed + t * hFloors.key) * hFloors.span` floors tall
+(both fractional), with its left edge at x `t * 10` and its bottom on the
+ground line, filled with the band's `frame` color.
+
+The plants (`plants.rule`): a candidate at every tile `t` from `margin`
+while `t < lotTiles - margin`, stepping by `step`. With `r = hash01(seed * 3 +
+t)`, skip it when `r < skipBelow`; it is a bush when `r < bushBelow` and a
+tree otherwise. It stands on tile `t + floor(hash01(seed + t * jitter.key) *
+jitter.span) + jitter.min`, scaled `scale.base + hash01(seed + t * scale.key) *
+scale.span`. Its canvas is `round(size.tiles * 10 * scale)` wide and
+`round(size.floors * 45 * scale)` tall (`plants.size`, by kind), centered on
+the tile's left edge (x `tile * 10 - w / 2`, which can land on a half pixel),
+with its bottom edge at `bottomY` (its last row one above). The game paints a
+plant at that size; the atlas carries the tree in `treeVariants` variants and
+the bush at their base size, so a frontend scales the frame and picks the tree
+variant `(seed + tile) mod treeVariants`, which is close to, not exactly, the
+game's tree. A plant is hidden while the paved span reaches within
+`clearTiles` tiles of it: it shows only when `tile + clearTiles` is at most
+the span's first tile or `tile - clearTiles` is at least the tile after its
+last.
+
+### The sky
+
+`data.sky` gives the sky's motion in the game's own terms. Both are drawn in
+screen space, sized to the view (`viewW` by `viewH` pixels), behind the world.
+
+- The sun (`sky/sun`) shows from `sun.rise` to `sun.set` hours and the moon
+  (`sky/moon`) for the rest of the day, along the same arc. At fraction `p`
+  of its stretch, the disc's center is at x `p * viewW` and y `viewH *
+  baseY - sin(p * PI) * viewH * lift`.
+- The clouds show only on overcast and rainy days, as the
+  `sky/cloud/<weather>/<i>` frames, one per entry in `clouds.list`. At `t`
+  seconds of the game's animation clock, cloud `i` sits at x `((offset mod
+  (viewW + pad)) + t * speed) mod (viewW + pad) - pad / 2` and y `viewH * top
+  + row * viewH * band`.
+
+### Draw order
+
+`data.depth` lists the game's draw planes back to front, each with its `z`
+(the game's Excalibur z; higher draws in front) and the frame families on it:
+the sky, the two skyline bands, the dirt and ground line, the ground strip,
+the ground runs and roundabout, the props and plants, the fire escapes and
+crane, the floor and lobby tiles, the rooms, the ambient walkers, the burning
+and unbuilt rooms, the parking ramp's cars, the metro train and garbage truck,
+the shafts and stairs, the cabs, the commuting crowd and the overlays. Things
+on one plane draw in the order the game adds them. People appear on two
+planes: the walkers pacing the floors and lobby, and the crowd in front of
+them, which is every commuter the engine moves, the people waiting at an
+elevator on the lobby floor among them. A crowd figure is the
+`person/walker/...` frame: `shirt<i>` with i = |seed| mod the shirt count,
+`staff` for staff, and `fedUp` once a tenant (never staff) has waited more
+than 25 seconds on its current call, the game's cue that they are fed up.
+Its feet stand 3 px above the bottom of its floor (at its fractional floor
+while it climbs stairs), and a tenant riding a cab is hidden, since the cab's
+riders show them.
+
+## The app icon
+
+`icon/` holds the game's app icon, drawn in code like every sprite
+(`scripts/app-icon-svg.mjs`): a stepped art-deco tower with lit windows and a
+setting sun on a dusk sky. `icon.svg` bleeds to every edge and
+`icon-maskable.svg` keeps the tower inside the maskable safe zone (the center
+80 percent). The PNGs are the ones the web app ships: `icon-1024x1024.png`
+(the desktop master), `pwa-512x512.png`, `pwa-maskable-512x512.png`,
+`pwa-192x192.png`, `apple-touch-icon.png` (180) and `favicon.png` (64). They
+fall under the same asset license as the rest of the atlas.
 
 ## How it is checked
 
@@ -449,6 +552,6 @@ their depth layers.
 
 ## Not in the atlas yet
 
-Event cameos (Santa, the VIP limo, the thief) are not exported yet, and the
-skyline's rectangles and the lot's plant spots, which the game seeds by the
-tower, come as colors, variants and rules rather than a fixed layout.
+Event cameos (Santa, the VIP limo, the thief) are not exported yet. The lot's
+trees come as variants at their base size rather than the game's per-spot
+paint (see [Seeded by the tower](#seeded-by-the-tower)).
