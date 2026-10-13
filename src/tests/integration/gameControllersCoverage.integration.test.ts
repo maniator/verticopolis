@@ -929,13 +929,13 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
   });
 
   it("exportGame toasts the failure instead of swallowing it (main.ts fires it with `void`)", async () => {
-    // Simulate a browser that can't compress: SaveGame.export rejects, and the
+    // Simulate a save too large to export: SaveGame.export rejects, and the
     // controller must surface that as a toast, not download nothing in silence.
-    const spy = vi.spyOn(SaveGame, "export").mockRejectedValueOnce(new Error("This browser is too old to create tower files. Try a current browser."));
+    const spy = vi.spyOn(SaveGame, "export").mockRejectedValueOnce(new Error("This tower's save data is larger than 32 MB, the most a save can hold."));
     await saveLoad.exportGame();
     expect(f.downloads).toHaveLength(0);
     expect(f.toasts).toEqual([
-      { text: "Export failed: This browser is too old to create tower files. Try a current browser.", kind: "bad" },
+      { text: "Export failed: This tower's save data is larger than 32 MB, the most a save can hold.", kind: "bad" },
     ]);
     spy.mockRestore();
   });

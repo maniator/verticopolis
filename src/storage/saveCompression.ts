@@ -5,11 +5,14 @@ import { wellFormed } from "../engine/wellFormed";
  * Compression + base64 codec for the persistence layer. Extracted from
  * `SaveGame.ts`: a pure codec with no localStorage or Simulation coupling.
  *
- * Two directions coexist. localStorage saves use fflate's SYNCHRONOUS
- * inflate/deflate (see `SaveGame.saveTo`), because the write can run right
- * before a reload where an async flush could be lost. The `.vctower` FILE path
- * uses the native async CompressionStream (user-initiated, never racing a
- * reload). Untrusted input is always inflated behind a size cap so a
+ * Every writer except `saveToAsync` compresses with fflate's SYNCHRONOUS
+ * deflate at level 1 (see `SaveGame.saveTo`), because a localStorage write can
+ * run right before a reload where an async flush could be lost, and the
+ * `.vctower` export uses the same so the engine's writer can match its bits.
+ * `saveToAsync` compresses with the native CompressionStream, off the main
+ * thread. Reading
+ * a `.vctower` file (`SaveGame.import`) inflates with the native
+ * DecompressionStream. Untrusted input is always inflated behind a size cap so a
  * decompression bomb can't hang the tab.
  */
 
@@ -193,7 +196,7 @@ export function inflateCapped(packed: Uint8Array): Uint8Array {
 // the "deflate-raw" format string is newer than CompressionStream itself
 // (Chrome had the API before the format), so a `typeof` check alone would pass
 // on browsers that then throw at use. Probed separately because each caller
-// needs only one direction (export/saveToAsync encode, import decodes), and a
+// needs only one direction (saveToAsync encodes, import decodes), and a
 // browser missing one must not be blocked from the operation it can perform.
 export function compressionEncodeSupported(): boolean {
   try {
