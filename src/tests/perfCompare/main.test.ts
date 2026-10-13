@@ -1,0 +1,43 @@
+import { describe, expect, it } from "vitest";
+import { makeConfig, parseArgs } from "./main";
+import { engineOrder, frameSummary, stepSummary } from "./runner";
+
+describe("parseArgs", () => {
+  it("defaults to ten repetitions and both throttles", () => {
+    const a = parseArgs([]);
+    expect(a).toEqual({ reps: 10, quick: false, skipBuild: false, out: null, scenarios: null, throttles: null });
+    expect(makeConfig(a, ["small"])).toMatchObject({ reps: 10, steps: 720, dt: 2, throttles: [1, 4], speed: 3, quick: false });
+  });
+  it("reads every flag, and --quick lowers the default reps only", () => {
+    expect(parseArgs(["--quick"]).reps).toBe(2);
+    expect(parseArgs(["--quick", "--reps", "5"]).reps).toBe(5);
+    const a = parseArgs(["--skip-build", "--out", "x", "--scenarios", "small,large", "--throttles", "1,6"]);
+    expect(a).toMatchObject({ skipBuild: true, out: "x", scenarios: ["small", "large"], throttles: [1, 6] });
+    expect(makeConfig(parseArgs(["--quick"]), []).steps).toBeLessThan(720);
+  });
+  it("refuses bad values and unknown flags", () => {
+    expect(() => parseArgs(["--reps", "0"])).toThrow(/positive integer/);
+    expect(() => parseArgs(["--reps"])).toThrow(/needs a value/);
+    expect(() => parseArgs(["--throttles", "0.5"])).toThrow(/rates of 1 or more/);
+    expect(() => parseArgs(["--fast"])).toThrow(/unknown argument --fast/);
+  });
+});
+
+describe("runner summaries", () => {
+  it("alternates which engine goes first", () => {
+    expect(engineOrder(0)).toEqual(["ts", "wasm"]);
+    expect(engineOrder(1)).toEqual(["wasm", "ts"]);
+  });
+  it("summarizes a simulation run's steps", () => {
+    const s = stepSummary(
+      { mode: "raw", engineActive: "wasm", steps: 4, dt: 2, loadMs: 3, totalMs: 10, stepMs: [1, 2, 3, 4], attribution: null, startKey: "a", endKey: "b", end: { minutes: 8, money: 1, star: 1, population: 1, people: 0 } },
+      "s",
+      "e",
+    );
+    expect(s).toMatchObject({ totalMs: 10, loadMs: 3, stepMedianMs: 2.5, stepMaxMs: 4, startDigest: "s", endDigest: "e", engineActive: "wasm" });
+  });
+  it("summarizes frames with the achieved speed and the tick share", () => {
+    const f = frameSummary({ intervalsMs: [10, 10, 20], wallMs: 1000, simMinutes: 50, tickMs: 100, ticks: 9, uiMs: 10, engineActive: "ts" });
+    expect(f).toMatchObject({ frames: 3, medianMs: 10, simMinutesPerSecond: 50, tickShare: 0.1, uiShare: 0.01, ticks: 9, onePercentLowFps: 50 });
+  });
+});
