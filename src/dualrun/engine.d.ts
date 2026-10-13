@@ -252,8 +252,9 @@ export class Engine {
     /**
      * `tower.setCars(id, cars)`: the bare tower edit, silent in both
      * engines (#906). Relay-only: the dual-run mirror replays a bare
-     * TypeScript tower edit with it. Player and UI edits use `setCars` or the
-     * charge commands; `towerRelayOps.guard.test.ts` keeps other callers out.
+     * TypeScript tower edit with it. Player edits use the charge commands
+     * (`addCar`, `removeCar`, `extendTransport`), and
+     * `towerRelayOps.guard.test.ts` keeps other callers out.
      */
     towerSetCars(id: number, cars: number): boolean;
     /**

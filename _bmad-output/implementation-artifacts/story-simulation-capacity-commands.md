@@ -131,4 +131,20 @@ Round 3, confirming pass on the round-2 fixes:
   this record's "no non-test caller in src/" agree: the tooling callers live
   in scripts/, and tooling builds send no analytics.
 
-Round 4 confirms these fixes; its result is in the PR thread.
+Round 4, confirming pass on the round-3 fixes:
+
+- **patch** (Blind Hunter, Edge Case Hunter) The symlink walk could crash on
+  a dangling link, recurse on a cycle, and match the skipped glue only by
+  link path. It now walks by real path, follows each real directory once,
+  ignores dangling links and links leading out of the repository, and
+  reports files by real path. Checked by hand with a loop link, a dangling
+  link, a cross-tree link and a planted offender in tools/.
+- **patch** (Blind Hunter) Every scanned tree is required (a renamed tree
+  fails), and each must yield sources, replacing the bare file count.
+- **patch** (Acceptance Auditor) The `wasm.rs` relay-op doc (and the
+  generated declaration) pointed player edits at the uncharged `setCars`; it
+  now names the charge commands, as the guard does.
+- **dismissed** The whole of src/public/ is skipped: it holds only the built
+  WASM glue and static assets, none of it hand-written code.
+
+Round 5 confirms these fixes; its result follows in this record.
