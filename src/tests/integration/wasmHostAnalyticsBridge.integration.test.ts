@@ -33,7 +33,7 @@ function play(sim: Simulation): void {
   expect(sim.build("office", 2, 180).ok).toBe(true);
   expect(sim.buildTransport("elevatorStandard", 172, 1, 2).ok).toBe(true);
   const shaft = sim.tower.transportAt(1, 172)!;
-  expect(sim.tower.setCars(shaft.id, 2)).toBe(true);
+  expect(sim.setCars(shaft.id, 2)).toBe(true);
   const office = sim.tower.unitAt(2, 180)!;
   expect(sim.adjustRent(office.id, 1)).not.toBeNull();
   sim.tick(120);
@@ -85,9 +85,9 @@ describe.skipIf(!hasWasmPackage())("analytics bridge on both engines", () => {
     ["price pick", "price_tune", (sim) => sim.priceUnit(sim.tower.unitAt(2, 180)!, 15_000)],
     ["off the market", "price_tune", (sim) => sim.setNoRate(sim.tower.unitAt(2, 180)!.id)],
     ["batch pricing", "price_tune", (sim) => sim.applyRentBatch("office", 15_000)?.changed],
-    ["car added", "capacity_tune", (sim) => sim.tower.setCars(sim.tower.transportAt(1, 172)!.id, 2)],
-    ["shaft extended", "capacity_tune", (sim) => sim.tower.resizeTransport(sim.tower.transportAt(1, 172)!.id, 1, 3).ok],
-    ["shaft shrunk", "capacity_tune", (sim) => sim.tower.resizeTransport(sim.tower.transportAt(1, 172)!.id, 1, 2).ok],
+    ["car added", "capacity_tune", (sim) => sim.setCars(sim.tower.transportAt(1, 172)!.id, 2)],
+    ["shaft extended", "capacity_tune", (sim) => sim.resizeTransport(sim.tower.transportAt(1, 172)!.id, 1, 3).ok],
+    ["shaft shrunk", "capacity_tune", (sim) => sim.resizeTransport(sim.tower.transportAt(1, 172)!.id, 1, 2).ok],
   ];
   for (const [what, action, edit] of tuning) {
     it(`reports a ${what} as ${action} on both engines`, () => {

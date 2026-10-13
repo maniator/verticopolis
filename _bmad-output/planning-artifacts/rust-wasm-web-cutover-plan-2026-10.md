@@ -173,7 +173,7 @@ after their baselines and measurement methods are approved.
 | Performance (proposed) | Late-game fixture: Modern tick time no slower than TypeScript (roadmap rule); cold load within +500 ms of the TypeScript build; heap within 1.25x; a 5,000+ population fixture within the TypeScript engine's own `npm run perf` baseline (S13) |
 | Reliability (proposed) | One release on the TypeScript default with the engine instrument (S16's signal): over at least 1,000 engine sessions whose players consented to analytics (proposed minimum), engine fallback in under 0.1% of them, no engine-writer latch-off (#953), and every divergence report triaged to a cause |
 | Rollback | A rehearsal flips the default back with the flag and loads saves written by the engine build |
-| Deployment | S16 done: an old cached shell never runs a newer package, the offline rule is decided, and no deploy serves an engine package whose hash differs from the sources (today `scripts/vercel-build.sh`'s hash guard; with #958 every failed build fails the deploy) |
+| Deployment | S16 done: an old cached shell never runs a newer package, an installed PWA reopens offline with the engine active and today's sounds working (#985), and no deploy serves an engine package whose hash differs from the sources (today `scripts/vercel-build.sh`'s hash guard; with #958 every failed build fails the deploy) |
 | Version identity | About and Copy Diagnostics show the UI version and commit, the active engine with any fallback reason, and the engine's identity record from the binding, including the mismatch and unavailable states (S17, #963) |
 | Coverage | `vite.config.ts` floors and the Rust job's line floor hold |
 | Sign-off | The owner approves with the exception register attached |
@@ -200,7 +200,9 @@ Decided:
 Still open (risks, no decision needed yet):
 
 - **Offline play at the flip.** The engine package is left out of the
-  offline precache today; S16 decides the offline rule before the flip.
+  offline precache today. The owner set the rule (2026-10-13): the installed
+  game reopens offline with the engine and its sounds, a 3.0.0 requirement
+  tracked in #985 under S16.
 - **Save format bumps.** The copy catalog (row 6) bumps the save version; it
   does not ship in the flip release, so a rollback can still read every save
   (AD-5).

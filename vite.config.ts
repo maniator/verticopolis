@@ -74,6 +74,40 @@ function emitVersionJson(): Plugin {
   };
 }
 
+/**
+ * Stops the build when a package file reaches `dist/` by a road no sourcemap
+ * records (#951), so `scripts/gen-third-party-notices.ts` could not list it:
+ * a package stylesheet (Vite writes no CSS sourcemap), whether imported from
+ * JavaScript or inlined by a CSS `@import`, and a package asset such as a font
+ * or image from a CSS `url()`, whether emitted as a file or inlined.
+ */
+const PACKAGE_STYLESHEET = /[\\/]node_modules[\\/].*\.(css|less|sass|scss|styl|stylus|pcss|postcss|sss)(\?|$)/;
+const PACKAGE_FILE = /(^|[\\/])node_modules[\\/]/;
+const PACKAGE_CODE = /\.[mc]?[jt]sx?(\?|$)/;
+function noUnlistedPackageFiles(): Plugin {
+  const refuse = (what: string): string => `${what}: the third-party notices cannot list this package file (see #951)`;
+  return {
+    name: "no-unlisted-package-files",
+    apply: "build",
+    transform(_code, id) {
+      if (PACKAGE_STYLESHEET.test(id)) this.error(refuse(id));
+    },
+    generateBundle(_options, bundle) {
+      // A CSS @import, or a small image or font inlined as a data URL, never
+      // reaches `transform` or the bundle as its own file; the build's watch
+      // list still names it. Package JavaScript is listed by its sourcemap;
+      // package JSON is inlined without one, so it is refused like an asset.
+      const inlined = this.getWatchFiles().filter((f) => PACKAGE_FILE.test(f) && !PACKAGE_CODE.test(f));
+      if (inlined.length > 0) this.error(refuse(inlined.join(", ")));
+      for (const file of Object.values(bundle)) {
+        if (file.type !== "asset") continue;
+        const fromPackage = (file.originalFileNames ?? []).filter((n) => PACKAGE_FILE.test(n));
+        if (fromPackage.length > 0) this.error(refuse(`${file.fileName} (from ${fromPackage.join(", ")})`));
+      }
+    },
+  };
+}
+
 /** The one alt text for the shared social share card (og-image.png), reused by
  *  every page's og:image:alt / twitter:image:alt below. */
 const OG_IMAGE_ALT =
@@ -194,6 +228,7 @@ export default defineConfig({
   },
   plugins: [
     emitVersionJson(),
+    noUnlistedPackageFiles(),
     sharedHead(),
     // Installable PWA via Workbox (vite-plugin-pwa) — no hand-rolled service
     // worker. Registration is NOT auto-injected (`injectRegister: false`);
@@ -292,6 +327,9 @@ export default defineConfig({
         // Asset Links verifier fetches server-side and never meets a service
         // worker, so this changes nothing for verification itself; it is what
         // makes checking the file by hand tell the truth.
+        // `third-party-notices.txt` (#951, written after each build) is the
+        // same kind of document, so a navigation to it, query string or not,
+        // reaches the file itself.
         navigateFallbackDenylist: [
           /gallery/,
           /help/,
@@ -299,6 +337,7 @@ export default defineConfig({
           /version\.json$/,
           /robots\.txt$/,
           /sitemap\.xml$/,
+          /third-party-notices\.txt(\?.*)?$/,
           /og-image\.png$/,
           // No trailing slash: a bare `/.well-known` navigation should reach the
           // host's own 404 rather than the game shell, same as the file below it.

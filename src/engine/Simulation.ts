@@ -29,6 +29,7 @@ import * as churn from "./sim/churn";
 import * as congestion from "./sim/congestion";
 import * as build from "./sim/build";
 import * as charges from "./sim/charges";
+import * as capacity from "./sim/capacity";
 import * as star from "./sim/star";
 import * as services from "./sim/services";
 import * as events from "./sim/events";
@@ -202,13 +203,11 @@ export class Simulation implements SimContext {
     // Same strategy object to the tower, so mode-dependent placement checks
     // (the Classic-only escalator/office rule) agree with the sim.
     this.tower.rules = this.rules;
-    this.tower.gameplayEvents = this.gameplayEvents; // the tower's capacity edits report here too
     // Classic ALWAYS runs canon, so its modernCalendar is meaningless: clamp to
     // the harmless default so a hand-edited "canon" hint can't survive on disk
     // in a Classic save. Modern honors the player's choice as passed.
     this.modernCalendar = mode === "classic" ? "realWorld" : modernCalendar;
-    // Resolve the calendar once and hand it to the clock, replacing the
-    // field-initialized real-world clock before any tick reads a date.
+    // Resolve the calendar once; the clock replaces the field default before any tick.
     this.clock = new Clock(0, resolveCalendar(mode, this.modernCalendar));
     this.crowd = new Crowd(seed);
     this.events = new EventSystem(this, seed);
@@ -220,8 +219,7 @@ export class Simulation implements SimContext {
 
   // ---- Gameplay events ---------------------------------------------------
 
-  /** Every gameplay event since the last drain, oldest first, as `{ name,
-   *  payload }`; the buffer is empty afterwards. The host drains per tick. */
+  /** Every gameplay event since the last drain as `{ name, payload }`, oldest first; empties the buffer. The host drains per tick. */
   drainGameplayEvents(): GameplayEvent[] { return this.gameplayEvents.drain(); }
   /** Events a full buffer has pushed out since this engine was made. */
   get gameplayEventsDropped(): number { return this.gameplayEvents.dropped; }
@@ -239,7 +237,9 @@ export class Simulation implements SimContext {
   build(kind: FacilityKind, floor: number, x: number): { ok: boolean; reason?: string } { return build.build(this, kind, floor, x); }
   buildTransport( kind: FacilityKind, x: number, bottom: number, top: number, ): { ok: boolean; reason?: string } { return build.buildTransport(this, kind, x, bottom, top); }
   sellAt(floor: number, x: number): boolean { return build.sellAt(this, floor, x); }
-  // The engine-owned charges (sim/charges.ts): each moves the money itself.
+  // capacity_changed edits (sim/capacity.ts); charges move the money (sim/charges.ts).
+  setCars(id: number, cars: number): boolean { return capacity.setCars(this, id, cars); }
+  resizeTransport(id: number, bottom: number, top: number): ReturnType<Tower["resizeTransport"]> { return capacity.resizeTransport(this, id, bottom, top); }
   addCar(id: number): charges.ChargeResult { return charges.addCar(this, id); }
   removeCar(id: number): charges.ChargeResult { return charges.removeCar(this, id); }
   extendTransport(id: number, end: "up" | "down", targetFloor: number, hwm?: { bottom: number; top: number }): charges.ExtendResult { return charges.extendTransport(this, id, end, targetFloor, hwm); }

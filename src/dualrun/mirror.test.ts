@@ -79,15 +79,33 @@ describe("attachMirror", () => {
     sim.tower.removeUnit(u.id);
     expect(cmds).toEqual([
       { op: "setLabel", id: u.id, label: "Desk" },
-      { op: "setCars", id: t.id, cars: 2 },
+      { op: "towerSetCars", id: t.id, cars: 2 },
       { op: "setStop", id: t.id, floor: 2, stop: false },
       { op: "clearStops", id: t.id },
       { op: "setSchedule", id: t.id, schedule: { weekday: [] } },
-      { op: "resizeTransport", id: t.id, bottom: 1, top: 3 },
+      { op: "towerResizeTransport", id: t.id, bottom: 1, top: 3 },
       { op: "removeTransport", id: t.id },
       { op: "removeUnit", id: u.id },
     ]);
     expect(u.label).toBe("Desk");
+  });
+
+  it("relays a simulation-layer capacity edit once, apart from the bare tower edit (#906)", () => {
+    const sim = Simulation.newGame(3, "classic");
+    sim.money = 1e9;
+    const { cmds } = record(sim);
+    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    for (let fl = 2; fl <= 3; fl++) for (let x = 170; x < 200; x++) expect(sim.build("floor", fl, x).ok).toBe(true);
+    expect(sim.buildTransport("elevatorStandard", 190, 1, 2).ok).toBe(true);
+    const t = sim.tower.transportAt(1, 190)!;
+    cmds.length = 0;
+    expect(sim.setCars(t.id, 2)).toBe(true);
+    expect(sim.resizeTransport(t.id, 1, 3).ok).toBe(true);
+    // The tower call inside each runs within the recorded one, so it is not relayed again.
+    expect(cmds).toEqual([
+      { op: "setCars", id: t.id, cars: 2 },
+      { op: "resizeTransport", id: t.id, bottom: 1, top: 3 },
+    ]);
   });
 
   it("detaches cleanly: the instance is the plain object again and reports nothing", () => {

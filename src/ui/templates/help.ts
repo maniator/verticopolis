@@ -70,7 +70,7 @@ export function helpTemplate(onSplash: boolean, version: string, actions: HelpAc
       ${helpReportBlock()}
       <details class="help-modes">
         <summary><span role="heading" aria-level="3">About</span></summary>
-        ${helpAboutBody(version, engine)}
+        ${helpAboutBody(version, engine, !IS_WRAPPED_BUILD)}
       </details>
       <details class="help-modes">
         <summary><span role="heading" aria-level="3">Privacy</span></summary>
