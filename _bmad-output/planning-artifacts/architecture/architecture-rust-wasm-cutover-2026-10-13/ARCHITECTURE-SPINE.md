@@ -48,7 +48,7 @@ host; nothing in `src/ui` calls the binding directly.
 | --- | --- | --- |
 | Two engines, one simulation | `architecture-engine-rust-port-2026-10-08.md` | A simulation change lands in both engines with the regenerated lock until row 7 |
 | Order and gates (rows 4 to 7) | same | Switch, then test parity (#878), engine analytics (#873), one release on the TypeScript default, the flip as 3.0.0; then TDT in the crate (row 5) and the copy catalog (row 6); retirement (row 7) only after two releases on WASM and a complete test-mapping table |
-| TypeScript stays the reference until the flip | same | The lock, not a mirrored suite, carries every claim (test-mapping table) |
+| TypeScript stays the reference until the flip | same | The lock carries every claim, mapped in the test-mapping table |
 
 ## Invariants & Rules
 
@@ -63,8 +63,7 @@ host; nothing in `src/ui` calls the binding directly.
   answers in one shape, JSON `{ ok, reason?, delta? }` plus named extra
   fields, converted by one host adapter. The instance skips a command the
   engine refused, and while hosted only the engine writes the log and emits
-  gameplay events. A disagreement is reported, never resolved in the
-  instance's favor. Today the instance answers and relays (switch story,
+  gameplay events. A disagreement is reported and the engine's state wins. Today the instance answers and relays (switch story,
   "How it works"); that is the gap.
 
 ### AD-2: The step driver lives in the engine
@@ -77,9 +76,11 @@ host; nothing in `src/ui` calls the binding directly.
   the crate behind one call that takes real elapsed time, the speed and the
   steady-clock choice (#867). All of the step math moves: the pace factor,
   the catch-up cap, pause, the blocking-modal freeze and the speed-change
-  carry drop. Non-finite or negative elapsed time is ignored. The owed-time
-  debt lives on the engine handle, outside the save and the hash, and resets
-  on a restore and a mode change. A host never keeps its own game clock. Until
+  carry drop. A non-finite result drops the carried debt, as the TypeScript
+  reference does; negative elapsed time gets one guard in both drivers. The
+  owed-time debt lives on the engine handle, outside the save and the hash,
+  and resets on a restore, a step-mode change (speed or the steady-clock
+  choice) and a game-mode change. A host never keeps its own game clock. Until
   #867 lands, the TypeScript driver is the reference and the dual-run day
   gate judges any other driver.
 
@@ -89,9 +90,11 @@ host; nothing in `src/ui` calls the binding directly.
 - **Prevents:** a UI route that changes money, capacity or the tower without
   the engine's charge and refusal rules.
 - **Rule:** every binding export appears in one checked-in tier table, and a
-  test that parses `engine-rs/src/wasm.rs` (every `pub fn` in an exported
-  `impl` or free function, with or without a `js_name`) fails on an export
-  missing from it. Tier 1, player commands, is the only tier `src/ui` and
+  test that parses `engine-rs/src/wasm.rs` (every method in a
+  `#[wasm_bindgen]` impl and every `#[wasm_bindgen]` free function, with or
+  without a `js_name`) fails on an export missing from it. Host-loop ops,
+  `tick`, `drainGameplayEvents` and the step-driver call S8 adds, are called
+  only by the host (`src/wasmhost/` and `src/game/frameLoop.ts`). Tier 1, player commands, is the only tier `src/ui` and
   `src/game` may reach: `build`, `buildTransport`, `sellAt`, `addCar`,
   `removeCar`, `extendTransport`, `removeFacility`, the rent and policy
   commands (`adjustRent`, `setNoRate`, `priceUnit`, `applyRentBatch`,
@@ -105,8 +108,8 @@ host; nothing in `src/ui` calls the binding directly.
   `removeTransport`, `advanceClock`, `startFire`, `bombThreat`,
   `evaluateStar`, `seedElevatorTelemetry` and `seedLoopMemos`; PR #950 adds
   `towerSetCars` and `towerResizeTransport`. Tier 3 is reachable only from
-  `src/dualrun/`, the host's suppressed frame sync in `src/wasmhost/`, and
-  tests, and leaves the production binding (or moves behind a cargo
+  `src/dualrun/`, the host's suppressed frame sync in `src/wasmhost/`, the
+  screenshot and gallery tooling in `scripts/`, and tests, and leaves the production binding (or moves behind a cargo
   feature) by retirement. The tiers apply to the instance surface the
   mirror relays as well: a UI write to `sim.money`, or a call to
   `tower.setCars` or `tower.resizeTransport`, is a tier 3 op and fails the
@@ -206,9 +209,9 @@ src/dualrun/     # relay, shadow, mirror (tier 3 lives here only)
 - **The merge read model** (`mergeSimulation` and its `KEEP` set) has no
   version; it is replaced by the structural snapshot (#868), so it stays as
   it is until then.
-- **Toolchain majors:** held for the cutover. The reality-check lens reported
-  newer upstream majors (TypeScript, Vite, Vitest, Rust stable); moving them
-  is separate work.
+- **Toolchain upgrades:** held for the cutover. The reality-check lens
+  reported newer upstream releases (TypeScript, Vite, Vitest, Rust stable);
+  moving them is separate work.
 
 ## Open Questions
 

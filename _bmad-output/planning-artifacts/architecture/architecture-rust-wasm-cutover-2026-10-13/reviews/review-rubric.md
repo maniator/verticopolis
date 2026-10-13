@@ -22,7 +22,7 @@ question.
 ### F1 (high): the operational envelope for the flip is left as "unchanged"
 
 `Deferred` says deployment is unchanged and no new environment exists. That
-holds for the flag, not for the default flip, which is the only release in
+holds for the flag; the default flip is a separate case, which is the only release in
 scope that changes what every player runs.
 
 - **Offline / PWA.** AC5 of the switch story leaves the engine package out of
@@ -91,7 +91,7 @@ or list it as an open question.
 ### F5 (medium): AD-1 and AD-2 have no owning story or gate
 
 AD-1 reverses the switch story's current mechanism (the instance answers and
-relays). That is a deliberate change rather than a contradiction, and the spine
+relays). That is a deliberate change, and the spine
 says so, but no story or roadmap row carries it and the flip's gate does not
 require it. AD-2 says "until #867 lands" without saying whether #867 is a
 flip prerequisite. Fix: bind each to a story or a gate (for example "AD-1 is

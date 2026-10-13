@@ -13,7 +13,7 @@ documentsIncluded:
 
 > **Scope of this report.** It assessed the plan as it stood at `58f4bf6`,
 > the PR head before this review, against `main` at `562f104`. The plan was
-> then rewritten on `main` at `87527a0` to resolve these findings: it now
+> then rewritten against `main` at `87527a0` to resolve these findings: it now
 > follows the roadmap's rows instead of epics A to E, cites the architecture
 > document, names #954 for command authority, carries numeric gate rows and
 > current PR states, and has S4 to S16 with dependencies. The findings below

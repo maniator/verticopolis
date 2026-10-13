@@ -1,7 +1,7 @@
 # Review: reality check (Reviewer Gate)
 
 - **Spine:** `ARCHITECTURE-SPINE.md` (Rust/WASM web cutover, 2026-10-13)
-- **Lens:** every committed decision is reality-checked against the repository and the live registries, not asserted from memory.
+- **Lens:** every committed decision is reality-checked against the repository and the live registries.
 - **Baseline:** `origin/main` at `404bb9c` (merge of #948); PR branch PR #950's branch (open PR #950); npm registry, crates.io and the Rust stable channel queried 2026-10-13.
 
 ## Verdict
