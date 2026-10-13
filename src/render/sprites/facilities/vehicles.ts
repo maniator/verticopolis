@@ -1,4 +1,5 @@
 import { rand } from "../common";
+import { layerBreak, layerEnd } from "../../pixelSprites/layers";
 
 /**
  * The moving actors: the garbage truck, the parking-ramp sedans, and the
@@ -140,6 +141,9 @@ export function drawMetroTrain(ctx: CanvasRenderingContext2D, w: number, headlig
   const stripeY = H - 22; // red livery band
   const bandY = Math.round(H * 0.22); // window band top
   const bandH = Math.round(H * 0.3);
+  // Saloon windows, filled after the shell so the riders sit on a layer of
+  // their own (nothing else paints inside a window).
+  const windows: { wx: number; s: number }[] = [];
   for (let cx = 0; cx < w; cx += METRO_CAR_W) {
     const cw = Math.min(METRO_CAR_W, w - cx) - 4; // 4px coupling gap per car
     // A remainder too short to read as a car paints nothing (no stub bodies,
@@ -180,15 +184,7 @@ export function drawMetroTrain(ctx: CanvasRenderingContext2D, w: number, headlig
       } else {
         ctx.fillStyle = "#2A3440"; // saloon glass
         ctx.fillRect(wx, bandY, 12, bandH);
-        // Roughly two-thirds of windows carry a rider (sometimes two), seeded
-        // from car + slot alone so the cached bake never needs new inputs.
-        const s = carIdx * 31 + slotIdx;
-        if (rand(s) < 0.7) {
-          rider(ctx, wx + 1, bandY, rand(s + 1) < 0.4, s);
-          if (rand(s + 2) < 0.35) rider(ctx, wx + 7, bandY, false, s + 11);
-        }
-        ctx.fillStyle = "#9FC0E0"; // glass glint, unconditionally on top
-        ctx.fillRect(wx, bandY, 4, 2);
+        windows.push({ wx, s: carIdx * 31 + slotIdx });
       }
     }
     // Undercarriage skirt and two bogies (wheel trucks) per car.
@@ -223,4 +219,16 @@ export function drawMetroTrain(ctx: CanvasRenderingContext2D, w: number, headlig
   ctx.fillRect(w - 5, 6, 4, 3);
   ctx.fillStyle = headlightOn ? "#FFE27A" : "#9FC0E0"; // headlight, keyed on state
   ctx.fillRect(w - 3, stripeY - 6, 3, 4);
+  layerBreak(ctx);
+  // Roughly two-thirds of windows carry a rider (sometimes two), seeded from
+  // car + slot alone so the cached bake never needs new inputs.
+  for (const { wx, s } of windows) {
+    if (rand(s) < 0.7) {
+      rider(ctx, wx + 1, bandY, rand(s + 1) < 0.4, s);
+      if (rand(s + 2) < 0.35) rider(ctx, wx + 7, bandY, false, s + 11);
+    }
+  }
+  layerEnd(ctx);
+  ctx.fillStyle = "#9FC0E0"; // glass glints, on top of the riders
+  for (const { wx } of windows) ctx.fillRect(wx, bandY, 4, 2);
 }
