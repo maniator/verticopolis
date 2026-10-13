@@ -141,9 +141,11 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   covers the measure and you are not writing tested code, say so in the readout
   and propose a metric rather than quietly inventing a number.
 - **A published snapshot says so, at the top.** Anything dated and not
-  refreshing carries its window and a pointer to the live dashboard above the
-  figures, not in a footer. A date a reader meets after believing the number is
-  too late.
+  refreshing carries its window above the figures rather than in a footer, with
+  a pointer to wherever the live number lives: the dashboard when it carries
+  that figure, otherwise the script and the test that produce it, since a
+  governed definition is not always a dashboard tile. A date a reader meets
+  after believing the number is too late.
 
 ## Canon reference (don't re-derive from memory)
 
