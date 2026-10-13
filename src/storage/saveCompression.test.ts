@@ -3,6 +3,7 @@ import { deflateSync } from "fflate";
 import {
   encodeSaveJson,
   parseSaveJson,
+  repairSurrogateEscapes,
   INFLATE_CHUNK_BYTES,
   MAX_SAVE_INFLATED_BYTES,
   SaveTooLargeError,
@@ -114,6 +115,24 @@ describe("parseSaveJson", () => {
     expect(Object.getPrototypeOf(v)).toBe(Object.prototype);
     expect(Object.keys(v)).toEqual(["__proto__", "k\uFFFD"]);
     expect("units" in v).toBe(false);
+  });
+
+  // Repair runs on the text, as in the Rust engine, so keys that repair to
+  // one name are one key and the last one written wins, at every depth.
+  it("reads keys that repair to one name as one key, the last one winning", () => {
+    const F = "\uFFFD";
+    const read = (body: string): unknown => parseSaveJson(`{${body},"o":{${body},"i":{${body}}}}`);
+    const one = (v: unknown): unknown => ({ ["k" + F]: v, o: { ["k" + F]: v, i: { ["k" + F]: v } } });
+    expect(read(String.raw`"k\ud800":1,"k\udc00":2`)).toEqual(one(2));
+    expect(read(String.raw`"k\udc00":2,"k\ud800":1`)).toEqual(one(1));
+    expect(read(String.raw`"k\ud800":1,"k\uFFFD":2,"k\ud800":3`)).toEqual(one(3));
+  });
+
+  it("keeps escaped pairs and escaped backslashes, and leaves bad escapes to JSON.parse", () => {
+    expect(repairSurrogateEscapes(String.raw`["\ud83c\udfe2","\\ud800","\"\ud800"]`)).toBe(
+      String.raw`["\ud83c\udfe2","\\ud800","\"\ufffd"]`,
+    );
+    expect(() => parseSaveJson(String.raw`["\ud80"]`)).toThrow(SyntaxError);
   });
 
   it("repairs a raw lone surrogate, as a legacy uncompressed slot can hold", () => {
