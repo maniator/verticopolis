@@ -28,6 +28,7 @@ import type { Engine, encodeVctower, exportTdt } from "../../dualrun/engine";
 import { SaveGame } from "../../storage/SaveGame";
 import { fromBase64, inflateCapped, parseSaveJson, STORE_MAGIC } from "../../storage/saveCompression";
 import { fromTowerFile, toTowerFile } from "../../storage/towerFileCodec";
+import { setEngineWriter } from "../../storage/vctowerWriter";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { tsEngine } from "../conformance/scenario";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
@@ -94,6 +95,24 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
       // the same bits.
       expect(SaveGame.packSync(sim)).toBe(STORE_MAGIC + (webFile.split("\n")[1] ?? ""));
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // With the engine running, the web game writes its saves through the
+  // engine's writer (#935); the files stay the bytes it wrote on its own.
+  it.each(fixtures)("%s: the game's writers through the engine write what they write alone", async (name) => {
+    const sim = await SaveGame.import(readFileSync(resolve(FIXTURES, name), "utf8"));
+    vi.useFakeTimers({ now: SAVED_AT, toFake: ["Date"] });
+    const error = vi.spyOn(console, "error");
+    try {
+      const own = [await SaveGame.export(sim), SaveGame.packSync(sim)];
+      setEngineWriter(rust().encodeVctower);
+      expect([await SaveGame.export(sim), SaveGame.packSync(sim)]).toEqual(own);
+      expect(error).not.toHaveBeenCalled();
+    } finally {
+      error.mockRestore();
+      setEngineWriter(null);
       vi.useRealTimers();
     }
   });
