@@ -3,6 +3,7 @@ import type { BakeResult, ImageRef } from "./bake";
 import { variantPlacements, roomKinds, ORIGIN_SEEDED, RECYCLE_STEPS, PARKING_CAR_COLORS } from "./catalog";
 import { CAR_SEEDS, SKYLINE_FILLS, SKY_COLUMNS, STREET_CAR_SEEDS, BUILDS } from "./catalogExtras";
 import { pack, type PackedSlice } from "./pack";
+import { sceneryData } from "./scenery";
 import { blank, crop, over, sameImage, type Image } from "./pixels";
 import { encodePng } from "./png";
 import { blit, scaleNearest } from "./raster";
@@ -201,6 +202,7 @@ export function buildArchive(
       personBuilds: BUILDS,
       carSeeds: CAR_SEEDS,
       streetCarSeeds: STREET_CAR_SEEDS,
+      scenery: sceneryData(),
     },
   };
   files["manifest.json"] = strToU8(JSON.stringify(manifest) + "\n");

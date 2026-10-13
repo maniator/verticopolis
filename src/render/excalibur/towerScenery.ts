@@ -12,13 +12,27 @@ import {
   ROAD_TILES,
   SIDEWALK_START,
   apronRange,
-  hash01,
   plantSpots,
   plantVisible,
   skylineRects,
   type PlantSpot,
 } from "../sceneryLayout";
-import { drawBush, drawFountain, drawPlanter, drawPlazaLamp, drawRoundabout, drawStreetLamp, drawTree, lampAlpha } from "./towerSceneryDraw";
+import {
+  STRIP_ABOVE,
+  STRIP_BELOW,
+  drawBush,
+  drawForecourt,
+  drawFountain,
+  drawPlanter,
+  drawPlazaLamp,
+  drawRoad,
+  drawRoundabout,
+  drawSidewalk,
+  drawStreetLamp,
+  drawStripTile,
+  drawTree,
+  lampAlpha,
+} from "./towerSceneryDraw";
 import type { Simulation } from "../../engine/Simulation";
 import type { TowerEngine } from "./TowerEngine";
 
@@ -71,19 +85,15 @@ const Z_STRIP = -48;
 const Z_EDGE = -47;
 const Z_PLANT = -46;
 
-// Ground strip canvas geometry (world px). The strip straddles the ground
-// line: blades rise above it, a soil lip hangs just below.
-const STRIP_ABOVE = 7;
-const STRIP_BELOW = 4;
+// Ground strip canvas geometry (world px, STRIP_ABOVE and STRIP_BELOW from
+// towerSceneryDraw). The strip straddles the ground line: blades rise above
+// it, a soil lip hangs just below.
 /** Longest strip canvas in world px, under the 2048 mobile texture cap. Strips
  *  past this split into `ceil(total / STRIP_MAX_SEG)` segments, so the SEGMENT
  *  COUNT moves with `TILE`: a smaller tile shortens every strip and can drop a
  *  segment. Exported so tests derive that count rather than hardcode one that
  *  quietly rots the next time the world scale changes. */
 export const STRIP_MAX_SEG = 1800;
-
-const PAVE = "#b0b0a8";
-const PAVE_JOINT = "#8a8a82";
 
 function makeScenery(engine: TowerEngine): SceneryRec {
   const rec: SceneryRec = {
@@ -103,17 +113,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
   // arriving traffic turns around, then the road off the scene's left side.
   {
     const w = PLAZA_SIDEWALK_TILES * TILE;
-    const cv = new ex.Canvas({
-      width: w,
-      height: 11,
-      cache: true,
-      draw: (ctx) => {
-        ctx.fillStyle = "#b4b4aa";
-        ctx.fillRect(0, 0, w, 11);
-        ctx.fillStyle = "#8e8e86";
-        for (let x = 0; x < w; x += TILE) ctx.fillRect(x, 0, 1, 7);
-      },
-    });
+    const cv = new ex.Canvas({ width: w, height: 11, cache: true, draw: (ctx) => drawSidewalk(ctx, w) });
     const a = new ex.Actor({ pos: ex.vec(-PLAZA_SIDEWALK_TILES * TILE, -7), width: w, height: 11, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
@@ -174,17 +174,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
       // rhythm carries across segment seams unbroken.
       const period = TILE * 4;
       const phase = (((4 - x0) % period) + period) % period;
-      const cv = new ex.Canvas({
-        width: w,
-        height: 14,
-        cache: true,
-        draw: (ctx) => {
-          ctx.fillStyle = "#34343c";
-          ctx.fillRect(0, 0, w, 14);
-          ctx.fillStyle = "#c8b040";
-          for (let x = phase - period; x < w; x += period) ctx.fillRect(x, 6, TILE, 2);
-        },
-      });
+      const cv = new ex.Canvas({ width: w, height: 14, cache: true, draw: (ctx) => drawRoad(ctx, w, phase) });
       const a = new ex.Actor({ pos: ex.vec(x0, -2), width: w, height: 14, anchor: ex.vec(0, 0), z: Z_EDGE });
       a.graphics.use(cv);
       engine.engine.add(a);
@@ -194,17 +184,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
   // Forecourt (cement, same finish as the tower apron so it reads as yours).
   {
     const w = FORECOURT_TILES * TILE;
-    const cv = new ex.Canvas({
-      width: w,
-      height: 10,
-      cache: true,
-      draw: (ctx) => {
-        ctx.fillStyle = PAVE;
-        ctx.fillRect(0, 0, w, 10);
-        ctx.fillStyle = PAVE_JOINT;
-        for (let x = 0; x < w; x += TILE * 2) ctx.fillRect(x, 0, 1, 6);
-      },
-    });
+    const cv = new ex.Canvas({ width: w, height: 10, cache: true, draw: (ctx) => drawForecourt(ctx, w) });
     const a = new ex.Actor({ pos: ex.vec(GRID.width * TILE, -6), width: w, height: 10, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
@@ -213,17 +193,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
   // Sidewalk with expansion joints.
   {
     const w = (ROAD_START - SIDEWALK_START) * TILE;
-    const cv = new ex.Canvas({
-      width: w,
-      height: 11,
-      cache: true,
-      draw: (ctx) => {
-        ctx.fillStyle = "#b4b4aa";
-        ctx.fillRect(0, 0, w, 11);
-        ctx.fillStyle = "#8e8e86";
-        for (let x = 0; x < w; x += TILE) ctx.fillRect(x, 0, 1, 7);
-      },
-    });
+    const cv = new ex.Canvas({ width: w, height: 11, cache: true, draw: (ctx) => drawSidewalk(ctx, w) });
     const a = new ex.Actor({ pos: ex.vec(SIDEWALK_START * TILE, -7), width: w, height: 11, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
@@ -232,17 +202,8 @@ function makeScenery(engine: TowerEngine): SceneryRec {
   // The road: asphalt a curb-step below the sidewalk, with lane dashes.
   {
     const w = ROAD_TILES * TILE;
-    const cv = new ex.Canvas({
-      width: w,
-      height: 14,
-      cache: true,
-      draw: (ctx) => {
-        ctx.fillStyle = "#34343c";
-        ctx.fillRect(0, 0, w, 14);
-        ctx.fillStyle = "#c8b040";
-        for (let x = 4; x < w; x += TILE * 4) ctx.fillRect(x, 6, TILE, 2);
-      },
-    });
+    // Dashes from 4 px in (the first `phase - period` dash falls off the left).
+    const cv = new ex.Canvas({ width: w, height: 14, cache: true, draw: (ctx) => drawRoad(ctx, w, 4) });
     const a = new ex.Actor({ pos: ex.vec(ROAD_START * TILE, -2), width: w, height: 14, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
@@ -417,27 +378,8 @@ function drawStrip(ctx: CanvasRenderingContext2D, rec: SceneryRec, x0: number, w
   // grass to cement leaves no stale blade pixels above the pave line.
   ctx.clearRect(0, 0, w + 1, STRIP_ABOVE + STRIP_BELOW);
   const apron = rec.apron;
-  const gh = 4; // grass blade height
   for (let px = 0; px < w; px += TILE) {
     const tile = Math.floor((x0 + px) / TILE);
-    const paved = apron !== null && tile >= apron.min && tile < apron.max;
-    if (paved) {
-      ctx.fillStyle = PAVE;
-      ctx.fillRect(px, STRIP_ABOVE - 5, TILE + 1, 5 + STRIP_BELOW);
-      if (tile % 4 === 0) {
-        ctx.fillStyle = PAVE_JOINT;
-        ctx.fillRect(px, STRIP_ABOVE - 5, 1, 5);
-      }
-    } else {
-      const shade = hash01(tile * 17);
-      let grass = "#446c2e";
-      if (shade < 0.33) grass = "#4e7a34";
-      else if (shade < 0.66) grass = "#5b8a3c";
-      ctx.fillStyle = grass;
-      const wob = hash01(tile * 29) < 0.2 ? 1 : 0;
-      ctx.fillRect(px, STRIP_ABOVE - gh - wob, TILE + 1, gh + wob + STRIP_BELOW);
-      ctx.fillStyle = "#3c5c28";
-      ctx.fillRect(px, STRIP_ABOVE, TILE + 1, STRIP_BELOW);
-    }
+    drawStripTile(ctx, px, tile, apron !== null && tile >= apron.min && tile < apron.max);
   }
 }

@@ -4,7 +4,8 @@ import { hash01 } from "../sceneryLayout";
 /**
  * Pure canvas painters for the outside-world scenery: the plaza's roundabout,
  * fountain, and lamps, the right-edge street lamp and planter, and the lot's
- * trees and bushes. Split from towerScenery.ts (the actor/lifecycle half) at
+ * trees and bushes, and the ground pieces (sidewalk, road, forecourt and the
+ * lot's grass or cement strip). Split from towerScenery.ts (the actor/lifecycle half) at
  * the file-size ceiling; everything here draws into a plain 2D context and
  * holds no state, so the scenery tests drive each painter with a recording
  * spy context.
@@ -204,4 +205,64 @@ export function drawBush(ctx: CanvasRenderingContext2D, w: number, h: number): v
   ctx.fillRect(0, Math.round(h * 0.4), w, Math.ceil(h * 0.6));
   ctx.fillStyle = "#568c3e";
   ctx.fillRect(Math.round(w * 0.16), 0, Math.round(w * 0.68), Math.round(h * 0.5));
+}
+
+/** Cement paving and its joint lines (the forecourt and the tower's apron). */
+export const PAVE = "#b0b0a8";
+export const PAVE_JOINT = "#8a8a82";
+
+/** A sidewalk run `w` px wide (11 px tall) with an expansion joint every tile. */
+export function drawSidewalk(ctx: CanvasRenderingContext2D, w: number): void {
+  ctx.fillStyle = "#b4b4aa";
+  ctx.fillRect(0, 0, w, 11);
+  ctx.fillStyle = "#8e8e86";
+  for (let x = 0; x < w; x += TILE) ctx.fillRect(x, 0, 1, 7);
+}
+
+/** A road run `w` px wide (14 px tall) with lane dashes every four tiles,
+ *  the first starting `phase` px in (a dash may start off the left edge). */
+export function drawRoad(ctx: CanvasRenderingContext2D, w: number, phase: number): void {
+  const period = TILE * 4;
+  ctx.fillStyle = "#34343c";
+  ctx.fillRect(0, 0, w, 14);
+  ctx.fillStyle = "#c8b040";
+  for (let x = phase - period; x < w; x += period) ctx.fillRect(x, 6, TILE, 2);
+}
+
+/** The forecourt's cement run `w` px wide (10 px tall), a joint every two tiles. */
+export function drawForecourt(ctx: CanvasRenderingContext2D, w: number): void {
+  ctx.fillStyle = PAVE;
+  ctx.fillRect(0, 0, w, 10);
+  ctx.fillStyle = PAVE_JOINT;
+  for (let x = 0; x < w; x += TILE * 2) ctx.fillRect(x, 0, 1, 6);
+}
+
+/** Rows of the lot's ground strip above and below the ground line. */
+export const STRIP_ABOVE = 7;
+export const STRIP_BELOW = 4;
+
+/** One tile of the lot's ground strip at `px`: cement (with a joint on every
+ *  fourth lot tile) where the tower has paved it, else grass whose shade and
+ *  tuft come from the lot tile index. Fills one column past the tile, which
+ *  the next tile paints over, so a run of tiles has no seam. */
+export function drawStripTile(ctx: CanvasRenderingContext2D, px: number, tile: number, paved: boolean): void {
+  if (paved) {
+    ctx.fillStyle = PAVE;
+    ctx.fillRect(px, STRIP_ABOVE - 5, TILE + 1, 5 + STRIP_BELOW);
+    if (tile % 4 === 0) {
+      ctx.fillStyle = PAVE_JOINT;
+      ctx.fillRect(px, STRIP_ABOVE - 5, 1, 5);
+    }
+    return;
+  }
+  const gh = 4; // grass blade height
+  const shade = hash01(tile * 17);
+  let grass = "#446c2e";
+  if (shade < 0.33) grass = "#4e7a34";
+  else if (shade < 0.66) grass = "#5b8a3c";
+  ctx.fillStyle = grass;
+  const wob = hash01(tile * 29) < 0.2 ? 1 : 0;
+  ctx.fillRect(px, STRIP_ABOVE - gh - wob, TILE + 1, gh + wob + STRIP_BELOW);
+  ctx.fillStyle = "#3c5c28";
+  ctx.fillRect(px, STRIP_ABOVE, TILE + 1, STRIP_BELOW);
 }

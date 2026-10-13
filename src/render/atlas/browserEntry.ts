@@ -2,6 +2,7 @@ import { bake, type BakeResult, type Renderer } from "./bake";
 import { roomJobs, type Job } from "./catalog";
 import { facadeJobs, peopleJobs, skyJobs, structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
 import { paint, type PaintSpec } from "./paint";
+import { sceneryJobs } from "./scenery";
 import type { Image } from "./pixels";
 import { shellMarks } from "./shellMarks";
 import { withLayerHook } from "../pixelSprites/layers";
@@ -18,7 +19,7 @@ import { verifyExtras } from "./verifyExtras";
 
 /** Every job the atlas bakes, in a fixed order. */
 export function allJobs(): Job[] {
-  return [...roomJobs(), ...structureJobs(), ...transportJobs(), ...peopleJobs(), ...facadeJobs(), ...vehicleJobs(), ...skyJobs()];
+  return [...roomJobs(), ...structureJobs(), ...transportJobs(), ...peopleJobs(), ...facadeJobs(), ...vehicleJobs(), ...skyJobs(), ...sceneryJobs()];
 }
 
 /** A 2D context for `canvas` at `w` x `h`, cleared and prepared like an

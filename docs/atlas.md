@@ -153,6 +153,7 @@ Names follow the engine's own strings: the facility keys from
 | Facade | `facade/escape/<left or right>/<0 or 1>`, `facade/awning/<left or right>`, animation `facade/crane/<lit>` |
 | Vehicles | `vehicle/streetcar/s<0-3>` (sampled seeds in `data.streetCarSeeds`), `vehicle/garbagetruck`, `vehicle/metrotrain/<headlight or dark>` |
 | Sky | `sky/gradient` (one column per quarter hour), `sky/sun`, `sky/moon`, `sky/cloud/<overcast or rain>/<0-4>`, `sky/skyline/<far or near>` |
+| Scenery | `scenery/roundabout`, animation `scenery/fountain`, `scenery/plaza-lamp/a<0, 25, 50, 75 or 100>`, `scenery/street-lamp/a<...>` (with the "375 ST" sign), `scenery/planter`, `scenery/tree/v<0-7>`, `scenery/bush`, `scenery/ground/<sidewalk, forecourt or road>`, `scenery/ground/grass/s<0-2>/<flat or tuft>`, `scenery/ground/pave/<plain or joint>` (placed by `data.scenery`; see "The world outside the tower") |
 
 A shaft is drawn floor by floor: `top` for its top floor, `bottom` for its
 bottom floor, `stop` or `skip` for each floor between (an express skip floor
@@ -369,6 +370,34 @@ glow or a soft shadow in the restaurant, food hall, party hall, amusements,
 boutique bay, fitness club and nightclub; those frames offer `furniture`
 only.
 
+## The world outside the tower
+
+The scenery around the lot comes as its own frames, painted by the game's
+scenery painters (`src/render/excalibur/towerSceneryDraw.ts`), and
+`data.scenery` says where the game puts each one. Positions are in pixels at
+1x, x from the lot's left edge and y from the ground line (negative is up),
+for a frame's top-left corner, listed back to front:
+
+- `ground.strip`: one tile frame per lot tile at `y`. A tile the tower has
+  paved (its ground floor, padded by `apronPadTiles` on each side) uses
+  `scenery/ground/pave/<plain or joint>` (a joint on every fourth lot tile);
+  any other tile uses the grass frame `ground.strip.grass[tile]` names.
+- `ground.runs`: the sidewalks, the forecourt and the two roads. Repeat the
+  run's tile frame from `x` across `w`; a road's lane dashes line up when its
+  tile frames start on `tileOriginX` plus a whole number of tiles.
+- `props`: the roundabout, the fountain (an animation; its motions share no
+  period, so its 24 frames at 0.1 s sample a stretch close to a loop), the
+  two plaza lamps, the street lamp with its "375 ST" sign, and the planter.
+
+The lamps fade in through dusk and out through dawn (`lamp.fadeIn`,
+`lamp.fadeOut`, in hours); the atlas carries them at 0, 25, 50, 75 and 100
+percent lit. The skyline behind everything is solid rectangles in the two
+`data.skylineFills` colors. The lot's trees and bushes stand at spots seeded
+by the tower and vary a little in size; the atlas carries eight tree variants
+and a bush at their base size, and a frontend picks its own spots. These are
+props in their own right, so a frontend that draws with depth can set them
+at any distance from the tower.
+
 ## How it is checked
 
 `e2e/atlas.spec.ts` (and the export's own pre-flight) composes atlas frames and
@@ -396,12 +425,14 @@ missing from every frame.
 
 The same check covers the other families (`verifyExtras.ts`): a whole express
 and standard shaft rebuilt from their floor pieces (skip floor included), cabs
-with composed riders, a walker, lobby tiles, entrance poses, a fire escape
-and the sky strip, each against the game's draw call with the game's
-arguments. The lobby tiles and entrance poses are also composed through their
+with composed riders, a walker, lobby tiles, entrance poses, a fire escape,
+the sky strip and the scenery (a fountain frame, the street lamp and sign, a
+paved ground tile and the road), each against the game's draw call with the
+game's arguments. The lobby tiles and entrance poses are also composed through their
 depth layers.
 
 ## Not in the atlas yet
 
-Event cameos (Santa, the VIP limo, the thief), the plaza and street scenery,
-and the ground strip are not exported yet.
+Event cameos (Santa, the VIP limo, the thief) are not exported yet, and the
+skyline and the lot's plant spots come as data and a few variants rather
+than the game's exact per-tower layout.

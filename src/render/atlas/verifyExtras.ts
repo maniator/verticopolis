@@ -4,6 +4,7 @@ import { SHIRTS, personFigure } from "../pixelSprites/common";
 import { FLOOR, TILE } from "../scale";
 import { drawCar, drawEscapeStairs, drawLobbyEntrance, drawTransport, drawUnit } from "../sprites";
 import { skyColor } from "../sprites/sky";
+import { drawFountain, drawStreetLamp, drawStripTile, drawRoad } from "../excalibur/towerSceneryDraw";
 import { bake, type Renderer } from "./bake";
 import type { Job } from "./catalog";
 import { CAR_SEEDS, SKY_COLUMNS } from "./catalogExtras";
@@ -184,6 +185,48 @@ export function extraCases(): Case[] {
         const ctx = canvas(doc, TILE, FLOOR);
         drawLobbyEntrance({ ctx, lit: false, anim: 0, hour: 12, staffed: true }, "service", 0, 0, TILE, FLOOR);
         return read(ctx, TILE, FLOOR);
+      },
+    },
+    {
+      label: "plaza fountain, sixth frame",
+      frames: ["scenery/fountain/5"],
+      atlas: (get) => get("scenery/fountain/5"),
+      game: (doc) => {
+        const ctx = canvas(doc, 100, 112);
+        drawFountain(ctx, 100, 112, 0.5);
+        return read(ctx, 100, 112);
+      },
+    },
+    {
+      label: "street lamp and 375 ST sign, half lit",
+      frames: ["scenery/street-lamp/a50"],
+      atlas: (get) => get("scenery/street-lamp/a50"),
+      game: (doc) => {
+        const w = 8 * TILE;
+        const h = Math.round(FLOOR * 1.8);
+        const ctx = canvas(doc, w, h);
+        drawStreetLamp(ctx, w, h, 0.5);
+        return read(ctx, w, h);
+      },
+    },
+    {
+      label: "ground strip, paved lot tile with a joint",
+      frames: ["scenery/ground/pave/joint"],
+      atlas: (get) => get("scenery/ground/pave/joint"),
+      game: (doc) => {
+        const ctx = canvas(doc, TILE, 11);
+        drawStripTile(ctx, 0, 0, true);
+        return read(ctx, TILE, 11);
+      },
+    },
+    {
+      label: "road, one dash period",
+      frames: ["scenery/ground/road"],
+      atlas: (get) => get("scenery/ground/road"),
+      game: (doc) => {
+        const ctx = canvas(doc, 4 * TILE, 14);
+        drawRoad(ctx, 4 * TILE, 4);
+        return read(ctx, 4 * TILE, 14);
       },
     },
     {
