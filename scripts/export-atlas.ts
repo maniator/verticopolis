@@ -31,6 +31,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
 import { bundleBake } from "./atlas-bundle.ts";
+import { iconSvg } from "./app-icon-svg.mjs";
 import { LOBBY_VARIANTS } from "../src/render/sprites";
 import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, SOFT_DRIFT_LIMIT, softLayerDrift } from "../src/render/atlas/archive";
 import type { BakeResult } from "../src/render/atlas/bake";
@@ -43,6 +44,19 @@ const FLAGS = new Set(["--out", "--filter", "--label"]);
 /** Every argument must be one of {@link FLAGS} followed by its value; the
  *  `--flag=value` form, unknown flags and a repeated flag are refused so
  *  nothing is silently ignored. */
+/** The app icon for other frontends: the mark's SVG (full bleed and inside the
+ *  maskable safe zone) and the committed PNGs the web app ships. */
+function appIcons(root: string): Record<string, Uint8Array> {
+  const icons: Record<string, Uint8Array> = {
+    "icon.svg": new TextEncoder().encode(iconSvg(1024, false) + "\n"),
+    "icon-maskable.svg": new TextEncoder().encode(iconSvg(1024, true) + "\n"),
+  };
+  for (const name of ["icon-1024x1024.png", "pwa-512x512.png", "pwa-maskable-512x512.png", "pwa-192x192.png", "apple-touch-icon.png", "favicon.png"]) {
+    icons[name] = new Uint8Array(readFileSync(join(root, "src/public", name)));
+  }
+  return icons;
+}
+
 function checkArgs(argv: readonly string[]): void {
   const seen = new Set<string>();
   for (let i = 0; i < argv.length; i += 2) {
@@ -156,7 +170,7 @@ async function main(): Promise<void> {
   const licenseText = readFileSync(join(root, "ASSETS-LICENSE.md"), "utf8");
   const archive = buildArchive(
     bakeResult,
-    { version: pkg.version, commit: gitCommit(), attribution: attributionLine(licenseText), licenseText },
+    { version: pkg.version, commit: gitCommit(), attribution: attributionLine(licenseText), licenseText, icons: appIcons(root) },
     (msg) => console.log(msg),
   );
   // Every image must come back out of the pages it was packed into.
@@ -180,7 +194,7 @@ async function main(): Promise<void> {
     .map(([name]) => name);
   if (bareLobby.length > 0) throw new Error(`lobby frames without depth furniture: ${bareLobby.slice(0, 10).join(", ")}`);
   const layered = Object.values(archive.manifest.frames).filter((f) => f.layers).length;
-  console.log(`depth layers: ${layered} frames (rooms at every occupant count, lobby tiles and entrances) compose back to their flat frames`);
+  console.log(`depth layers: ${layered} frames (rooms at every occupant count, lobby tiles, entrances, cabs and the metro train) compose back to their flat frames`);
   // The soft furniture is close to the flat frame but rounds differently;
   // report how far it strays, and stop if it strays further than rounding.
   const drift = softLayerDrift(archive);

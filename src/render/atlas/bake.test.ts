@@ -1,4 +1,4 @@
-import { strFromU8, unzipSync } from "fflate";
+import { strFromU8, strToU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, signature, softLayerDrift, ARCHIVE_ROOT } from "./archive";
 import { bake, ImageStore, type Renderer } from "./bake";
@@ -91,7 +91,13 @@ describe("bake", () => {
   });
 
   it("archives into a deterministic zip with pages per scale, a manifest and the attribution", () => {
-    const info = { version: "9.9.9", commit: "abc", attribution: "Art by someone, CC BY 4.0.", licenseText: "# License\n" };
+    const info = {
+      version: "9.9.9",
+      commit: "abc",
+      attribution: "Art by someone, CC BY 4.0.",
+      licenseText: "# License\n",
+      icons: { "icon.svg": strToU8("<svg/>\n") },
+    };
     const a = buildArchive(r, info, undefined, 32);
     expect(buildArchive(r, info, undefined, 32).zip).toEqual(a.zip);
     const files = unzipSync(a.zip);
@@ -99,6 +105,7 @@ describe("bake", () => {
     expect(names).toContain(`${ARCHIVE_ROOT}/manifest.json`);
     expect(strFromU8(files[`${ARCHIVE_ROOT}/ATTRIBUTION.txt`])).toContain("Art by someone, CC BY 4.0.");
     expect(strFromU8(files[`${ARCHIVE_ROOT}/ASSETS-LICENSE.md`])).toBe("# License\n");
+    expect(strFromU8(files[`${ARCHIVE_ROOT}/icon/icon.svg`])).toBe("<svg/>\n");
     for (const s of ATLAS_SCALES) {
       expect(names).toContain(`${ARCHIVE_ROOT}/${s}x/page-000.png`);
       expect(names).toContain(`${ARCHIVE_ROOT}/${s}x/page-000.normal.png`);
