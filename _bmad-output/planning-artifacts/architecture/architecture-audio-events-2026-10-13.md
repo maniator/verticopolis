@@ -171,7 +171,9 @@ engine (Rust under WASM, TypeScript otherwise)
   edges show the current frame. The plan keeps that order (analytics relies
   on it around the modal freeze) and never pairs an event with a same-frame
   state edge.
-- This matches the cutover plan's single-drain rule (AD-6 in PR #947). If the
+- This matches the cutover plan's single-drain rule (AD-6 in
+  `_bmad-output/planning-artifacts/architecture/architecture-rust-wasm-cutover-2026-10-13/ARCHITECTURE-SPINE.md`,
+  merged in #947). If the
   engine later moves into a worker, the worker drains and posts each batch
   with `ownFrom` and its snapshot; the hub's API is unchanged.
 
