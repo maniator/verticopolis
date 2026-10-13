@@ -1,6 +1,6 @@
 import type { Simulation } from "../Simulation";
 
-import { rentConfig } from "../econConfig";
+import { ECON, rentConfig } from "../econConfig";
 import { removeFacility } from "./charges";
 import { storeRent } from "./constants";
 
@@ -208,9 +208,10 @@ export function buildTransport(sim: Simulation,
   if (!sim.isUnlocked(kind)) {
     return { ok: false, reason: `${f.name} unlocks at ${f.minStar}★.` };
   }
-  // Elevators charge per served floor on top of the base price.
+  // Elevators charge per floor of span on top of the base price, at the
+  // per-floor cost the catalog quotes.
   const span = top - bottom;
-  const extra = isElevatorKind(kind) ? span * 5_000 : 0;
+  const extra = isElevatorKind(kind) ? span * ECON.transportFloorCost : 0;
   const total = f.cost + extra;
   if (sim.money < total) return { ok: false, reason: "Not enough money." };
   const res = sim.tower.placeTransport(kind, x, bottom, top);

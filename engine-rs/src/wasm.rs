@@ -39,6 +39,15 @@ fn build_result(r: crate::build::BuildResult) -> String {
     outcome(r.ok, r.reason.as_deref())
 }
 
+/// `canBuild`'s answer as the TypeScript spells it: `{ ok, reason?, cost }`.
+fn can_build_json(ok: bool, reason: Option<&str>, cost: f64) -> String {
+    let mut v = serde_json::json!({ "ok": ok, "cost": cost });
+    if let Some(reason) = reason {
+        v["reason"] = Value::String(reason.into());
+    }
+    v.to_string()
+}
+
 /// `ChargeResult` as the TypeScript spells it: `{ ok, reason?, delta }`.
 fn charge_json(r: &crate::charges::ChargeResult) -> Value {
     let mut v = serde_json::json!({ "ok": r.ok, "delta": r.delta });
@@ -281,6 +290,23 @@ impl Engine {
     pub fn build(&mut self, kind: &str, floor: i32, x: i32) -> Result<String, JsError> {
         let kind = parse_kind(kind).map_err(err)?;
         Ok(build_result(self.sim.build(kind, floor.into(), x.into())))
+    }
+
+    /// `canBuild(kind, floor, x)`: JSON `{ ok, reason?, cost }`, the dry run
+    /// `build` makes first. When the placement fits, `cost` is its full
+    /// price: the facility, the floor tiles laid under a room, and the tiles
+    /// bridged to the tower when bridging is on; a "Not enough money."
+    /// refusal carries that same full price. Any other refusal (placement or
+    /// star gate) carries the reason `build` would give and the facility's
+    /// base price. An unknown kind answers the way TypeScript does, with
+    /// "Unknown facility." and a cost of 0.
+    #[wasm_bindgen(js_name = canBuild)]
+    pub fn can_build(&self, kind: &str, floor: i32, x: i32) -> String {
+        let Ok(kind) = parse_kind(kind) else {
+            return can_build_json(false, Some("Unknown facility."), 0.0);
+        };
+        let c = self.sim.can_build(kind, floor.into(), x.into());
+        can_build_json(c.ok, c.reason.as_deref(), c.cost)
     }
 
     /// `buildTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`.

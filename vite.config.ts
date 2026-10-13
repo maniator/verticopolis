@@ -136,6 +136,7 @@ function wasmParityProjects() {
     "**/conformance.integration.test.ts",
     "**/conformanceWasm.integration.test.ts",
     "**/conformanceWasmTdt.integration.test.ts",
+    "**/conformanceWasmCanBuild.integration.test.ts",
     "**/conformanceWasmVctower.integration.test.ts",
     "**/dualRunDay.integration.test.ts",
     "**/dualRunEdits.integration.test.ts",
