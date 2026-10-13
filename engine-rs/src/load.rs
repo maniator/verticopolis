@@ -144,12 +144,6 @@ fn repair_lone_surrogates(text: &[u8]) -> Option<Vec<u8>> {
 /// its version (`TOWER_FILE_MAGIC` in saveCompression.ts).
 pub const TOWER_FILE_MAGIC: &str = "VCTOWER1";
 
-/// DEFLATE level for the payload: the level of the web host's synchronous
-/// writer (`SaveGame.packSync`, whose output the desktop store re-headers
-/// into `.vctower` files), which `SaveGame.saveTo` chose because level 1
-/// lands within 0.8% of level 6 on a sparse save at a third of the cost.
-const VCTOWER_DEFLATE_LEVEL: u32 = 1;
-
 /// The inverse of [`decode_vctower`]: a serialized save in the `.vctower`
 /// container, as bytes. The framing and the base64 alphabet match the
 /// TypeScript writers (`SaveGame.export`, and `toTowerFile` for the desktop
@@ -157,15 +151,21 @@ const VCTOWER_DEFLATE_LEVEL: u32 = 1;
 /// with `=` padding, and a closing newline. The payload is raw DEFLATE (no
 /// zlib or gzip framing) of the save's JSON text in UTF-8.
 ///
-/// The JSON key order and the compressed bits differ from the TypeScript
-/// output, and every reader treats the result as the same save. The JSON
-/// text is the canonical form (`JSON.stringify` formatting with keys sorted
-/// by UTF-16 code unit, [`canonical_json`]), because `serde_json` here does
-/// not keep insertion order; no save reader depends on key order. The
-/// compressor is `flate2`, which is neither fflate nor the browser's
-/// `CompressionStream`, and those two already write different bits for the
-/// same save. The bytes are stable within one build of the engine; a
-/// different `flate2` version or backend may compress differently.
+/// The bytes are the web game's own: for the same save, stamp and time, the
+/// file equals the one `SaveGame.export` (or `toTowerFile`) writes. The JSON
+/// text is what `JSON.stringify` writes for the save as JavaScript holds it
+/// ([`js_json`]: every map in insertion order, array-index keys first), so a
+/// save parsed from the web game's JSON keeps the web game's key order. (A
+/// save built by [`Simulation::serialize`] has the engine's own key order,
+/// which every reader takes; the web game's order for a loaded tower follows
+/// the file it was loaded from, which the engine does not keep. A string
+/// holding half a surrogate pair is written as U+FFFD, where `JSON.stringify`
+/// writes the escape; the web game repairs such strings on load and on input,
+/// so its saves hold none.) The
+/// payload is compressed by a port of the web's compressor, fflate's
+/// `deflateSync` at level 1 ([`crate::fflate`]), which is the level
+/// `SaveGame.saveTo` chose: within 0.8% of level 6 on a sparse save at a
+/// third of the cost.
 ///
 /// The save is written as given, the way `toTowerFile` carries a stored
 /// value. A save written as a player's tower needs the stamp
@@ -177,23 +177,16 @@ const VCTOWER_DEFLATE_LEVEL: u32 = 1;
 /// [`decode_vctower`]) is refused: written, it would only fail to load as a
 /// file that looks crafted. A real tower is about 2 MB.
 ///
-/// [`canonical_json`]: crate::canonical::canonical_json
+/// [`js_json`]: crate::canonical::js_json
 pub fn encode_vctower(save: &Value) -> Result<Vec<u8>, String> {
-    use std::io::Write;
-    let json = crate::canonical::canonical_json(save);
+    let json = crate::canonical::js_json(save);
     if json.len() as u64 > MAX_SAVE_INFLATED_BYTES {
         return Err(format!(
             "this save is {} bytes of JSON, more than the {MAX_SAVE_INFLATED_BYTES} a .vctower reader will hold",
             json.len()
         ));
     }
-    let mut enc = flate2::write::DeflateEncoder::new(
-        Vec::new(),
-        flate2::Compression::new(VCTOWER_DEFLATE_LEVEL),
-    );
-    enc.write_all(json.as_bytes())
-        .expect("deflate into a Vec cannot fail");
-    let packed = enc.finish().expect("deflate into a Vec cannot fail");
+    let packed = crate::fflate::deflate_level1(json.as_bytes());
     let b64 = base64::engine::general_purpose::STANDARD.encode(packed);
     let mut out = Vec::with_capacity(TOWER_FILE_MAGIC.len() + b64.len() + 2);
     out.extend_from_slice(TOWER_FILE_MAGIC.as_bytes());
@@ -2226,9 +2219,10 @@ mod vctower_encode {
             .all(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'/' || b == b'='));
     }
 
-    /// The inflated payload is the save's `JSON.stringify` text in canonical
-    /// key order: integral doubles print as integers, strings escape as
-    /// JavaScript escapes them, and text outside ASCII is UTF-8 as written.
+    /// The inflated payload is the save's `JSON.stringify` text. Keys keep
+    /// their insertion order, as in JavaScript. Integral doubles print as
+    /// integers, strings escape as JavaScript escapes them, and text outside
+    /// ASCII is UTF-8 as written.
     #[test]
     fn payload_is_javascript_json_text() {
         let save = json!({
@@ -2240,7 +2234,7 @@ mod vctower_encode {
         });
         assert_eq!(
             inflate_payload(&encode_vctower(&save).unwrap()),
-            "{\"big\":1e+21,\"money\":1500000,\"rate\":0.1,\"towerName\":\"Caf\u{e9} \\\"Tower\\\"\\n\u{1F3E2}\",\"units\":[{\"floor\":1,\"x\":0}]}"
+            "{\"money\":1500000,\"rate\":0.1,\"towerName\":\"Caf\u{e9} \\\"Tower\\\"\\n\u{1F3E2}\",\"big\":1e+21,\"units\":[{\"x\":0,\"floor\":1}]}"
         );
     }
 

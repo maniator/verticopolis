@@ -22,6 +22,7 @@ pub mod econ;
 pub mod economy;
 pub mod events;
 pub mod facilities;
+pub mod fflate;
 pub mod gameplay;
 pub mod housekeeping;
 pub mod jsmath;

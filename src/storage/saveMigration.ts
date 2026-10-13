@@ -15,8 +15,8 @@ import { sameTowerFile, toTowerFile } from "./towerFileCodec";
  * also never be reported, because nobody can see a badge they no longer have.
  *
  * The mitigation is structural rather than careful. `SaveGame.saveTo` packs
- * with fflate's `deflateSync` and `SaveGame.export` packs with
- * `CompressionStream("deflate-raw")`, and BOTH produce raw deflate, so the two
+ * with fflate's `deflateSync` and `SaveGame.export` packs with the same
+ * `deflateSync` at level 1, and BOTH produce raw deflate, so the two
  * containers wrap byte-identical payloads:
  *
  *     localStorage:  VCZ1:<base64 of raw deflate>
