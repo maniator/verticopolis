@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.29.5
+
+- A tower or room name cut through an emoji (the name box had room for only part of it) now loads the same on the default engine as on the opt-in WASM engine, with a placeholder mark where the half character was.
+
 ## 2.29.4
 
 - On the opt-in WASM engine, rooms redraw the moment workers step out for lunch or guests arrive at a venue, instead of up to an hour later.

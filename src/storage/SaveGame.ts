@@ -13,9 +13,11 @@ import {
   compressionDecodeSupported,
   compressionEncodeSupported,
   deflate,
+  encodeSaveJson,
   fromBase64,
   inflate,
   inflateCapped,
+  parseSaveJson,
   STORE_MAGIC,
   toBase64,
   TOWER_FILE_MAGIC,
@@ -83,7 +85,7 @@ function readSlot(key: string): SerializedGame | null {
     const json = raw.startsWith(STORE_MAGIC)
       ? new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(fromBase64(raw.slice(STORE_MAGIC.length))))
       : raw;
-    return JSON.parse(json) as SerializedGame;
+    return parseSaveJson(json) as SerializedGame;
   } catch {
     return null;
   }
@@ -292,7 +294,7 @@ export const SaveGame = {
    */
   packSync(sim: Simulation): string {
     const data = stamp(sim.serialize());
-    return STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(data)), { level: 1 }));
+    return STORE_MAGIC + toBase64(deflateSync(encodeSaveJson(JSON.stringify(data)), { level: 1 }));
   },
 
   // ---- Shared writer + export/import -----------------------------------
@@ -315,10 +317,13 @@ export const SaveGame = {
       this.saveTo(key, sim);
       return;
     }
+    // Encode (and refuse an oversized save) before claiming the token: a
+    // refused save leaves no token behind, so an older save of the same slot
+    // still in flight commits instead of the slot keeping neither.
+    const bytes = encodeSaveJson(JSON.stringify(stamp(sim.serialize())));
     const token = {};
     latestAsyncSave = token;
-    const data = stamp(sim.serialize());
-    const packed = await deflate(new TextEncoder().encode(JSON.stringify(data)));
+    const packed = await deflate(bytes);
     if (latestAsyncSave !== token) return;
     latestAsyncSave = null;
     writeSlot(key, STORE_MAGIC + toBase64(packed));
@@ -333,7 +338,7 @@ export const SaveGame = {
     }
     // Exports carry the same write-time provenance as local saves: a moved
     // file says when and by which build it was written.
-    const packed = await deflate(new TextEncoder().encode(JSON.stringify(stamp(sim.serialize()))));
+    const packed = await deflate(encodeSaveJson(JSON.stringify(stamp(sim.serialize()))));
     return TOWER_FILE_MAGIC + "\n" + toBase64(packed) + "\n";
   },
 
@@ -371,7 +376,7 @@ export const SaveGame = {
       const packed = fromBase64(trimmed.slice(magic[0].length).replace(/\s+/g, ""));
       // fatal decoder: a flipped byte must fail the import loudly, never
       // silently half-load a tower with U+FFFD-mangled strings.
-      data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(await inflate(packed))) as SerializedGame;
+      data = parseSaveJson(new TextDecoder("utf-8", { fatal: true }).decode(await inflate(packed))) as SerializedGame;
     } catch (err) {
       // A crafted tiny file can inflate to gigabytes (a decompression bomb);
       // inflate() caps the output and throws this, distinct from "damaged".

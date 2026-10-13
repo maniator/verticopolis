@@ -1,4 +1,5 @@
 import { Inflate } from "fflate";
+import { wellFormed } from "../engine/wellFormed";
 
 /**
  * Compression + base64 codec for the persistence layer. Extracted from
@@ -63,6 +64,95 @@ export const MAX_SAVE_INFLATED_BYTES = 32 * 1024 * 1024;
  *  things to tell a player. */
 export class SaveTooLargeError extends Error {}
 
+/** The four hex digits at `at` as a UTF-16 code unit, or -1. */
+function hex4(text: string, at: number): number {
+  const digits = text.slice(at, at + 4);
+  return /^[0-9a-fA-F]{4}$/.test(digits) ? parseInt(digits, 16) : -1;
+}
+
+/**
+ * Save text with every lone surrogate escape inside a string rewritten to
+ * `\ufffd`, step for step as the Rust engine's `repair_lone_surrogates`
+ * (load.rs) rewrites it. A high escape followed at once by a low escape is a
+ * pair and stays; any other surrogate escape is half a character. A
+ * malformed escape is left for `JSON.parse` to refuse.
+ */
+export function repairSurrogateEscapes(text: string): string {
+  let out = "";
+  let copied = 0;
+  let repaired = false;
+  let inString = false;
+  let i = 0;
+  while (i < text.length) {
+    const c = text.charCodeAt(i);
+    if (!inString) {
+      inString = c === 0x22;
+      i += 1;
+    } else if (c === 0x22) {
+      inString = false;
+      i += 1;
+    } else if (c === 0x5c && text.charCodeAt(i + 1) === 0x75) {
+      const unit = hex4(text, i + 2);
+      if (unit < 0) {
+        i += 2;
+        continue;
+      }
+      const low = text.charCodeAt(i + 6) === 0x5c && text.charCodeAt(i + 7) === 0x75 ? hex4(text, i + 8) : -1;
+      if (unit >= 0xd800 && unit <= 0xdbff && low >= 0xdc00 && low <= 0xdfff) {
+        i += 12;
+      } else if (unit >= 0xd800 && unit <= 0xdfff) {
+        out += text.slice(copied, i) + "\\ufffd";
+        repaired = true;
+        i += 6;
+        copied = i;
+      } else {
+        i += 6;
+      }
+    } else if (c === 0x5c) {
+      // Any other escape is two characters; skipping both keeps an escaped
+      // quote or backslash from reading as the end of the string.
+      i += 2;
+    } else {
+      i += 1;
+    }
+  }
+  return repaired ? out + text.slice(copied) : text;
+}
+
+/**
+ * `JSON.parse` for a save's text, read exactly as the Rust engine reads it
+ * (`load::parse_save_json`): every lone surrogate escape in the text becomes
+ * U+FFFD before parsing ({@link repairSurrogateEscapes}), so a save loads into
+ * the same tower on both engines. Repairing the text before parsing gives both
+ * engines one rule for keys too: two keys that repair to the same
+ * name are one key, and the last one written wins, as a repeated key does in
+ * any JSON parser. A raw lone surrogate (only a legacy uncompressed slot can
+ * hold one) is repaired the same way first, by {@link wellFormed}. The loader
+ * keeps `excavated` and `milestones` in sets, so two halves that repair to
+ * one string collapse to one entry, as the Rust loader dedupes them.
+ */
+export function parseSaveJson(text: string): unknown {
+  // Only text holding a surrogate (escaped, or raw) can need repair; every
+  // other save is parsed as is.
+  if (!/\\u[dD][89a-fA-F]|[\uD800-\uDFFF]/.test(text)) return JSON.parse(text);
+  return JSON.parse(repairSurrogateEscapes(wellFormed(text)));
+}
+
+/**
+ * A save's JSON text as the UTF-8 bytes every writer compresses, refused with
+ * {@link SaveTooLargeError} when it passes {@link MAX_SAVE_INFLATED_BYTES}:
+ * every reader stops there, so a larger save would write and then fail to
+ * open as a file that looks crafted. A real tower is about 2 MB. The Rust
+ * engine's writer (`load::encode_vctower`) refuses at the same bound.
+ */
+export function encodeSaveJson(json: string): Uint8Array {
+  const bytes = new TextEncoder().encode(json);
+  if (bytes.length > MAX_SAVE_INFLATED_BYTES) {
+    throw new SaveTooLargeError("This tower's save data is larger than 32 MB, the most a save can hold.");
+  }
+  return bytes;
+}
+
 /** Compressed bytes fed to the inflater per push. The cap can only be enforced
  *  BETWEEN pushes, so this is what actually bounds a decompression bomb: the
  *  overshoot past {@link MAX_SAVE_INFLATED_BYTES} is at most what one push can
@@ -123,13 +213,9 @@ export function compressionDecodeSupported(): boolean {
   }
 }
 
-// Hard ceiling on a decompressed tower. A real maxed-out tower is comfortably
-// under 2MB of JSON; 64MB is generous headroom while still defusing a
-// decompression bomb (a few-KB file that would otherwise inflate to gigabytes
-// and hang the tab before validation ever runs).
-const MAX_INFLATED_BYTES = 64 * 1024 * 1024;
-
-/** Thrown by {@link inflate} when a decompressing stream exceeds MAX_INFLATED_BYTES. */
+/** Thrown by {@link inflate} when a decompressing stream exceeds
+ *  {@link MAX_SAVE_INFLATED_BYTES}, the one cap every save reader and writer
+ *  holds to (see {@link encodeSaveJson}). */
 export class TowerTooLargeError extends Error {}
 
 // deflate-raw via the native streams API (no zlib/gzip framing, the magic
@@ -141,7 +227,7 @@ export function deflate(bytes: Uint8Array): Promise<Uint8Array> {
 
 export function inflate(bytes: Uint8Array): Promise<Uint8Array> {
   // Decompressing untrusted input, cap the output to bound bombs.
-  return pipe(bytes, new DecompressionStream("deflate-raw"), MAX_INFLATED_BYTES);
+  return pipe(bytes, new DecompressionStream("deflate-raw"), MAX_SAVE_INFLATED_BYTES);
 }
 
 async function pipe(bytes: Uint8Array, transform: GenericTransformStream, maxBytes = Infinity): Promise<Uint8Array> {

@@ -26,7 +26,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Engine, encodeVctower, exportTdt } from "../../dualrun/engine";
 import { SaveGame } from "../../storage/SaveGame";
-import { fromBase64, inflateCapped, STORE_MAGIC } from "../../storage/saveCompression";
+import { fromBase64, inflateCapped, parseSaveJson, STORE_MAGIC } from "../../storage/saveCompression";
 import { fromTowerFile, toTowerFile } from "../../storage/towerFileCodec";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { canonicalJson } from "../conformance/canonical";
@@ -149,7 +149,8 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
   // A name cut through an emoji (the rename box counts UTF-16 units) leaves
   // half a surrogate pair, which JSON.stringify writes as an escape a Rust
   // string cannot hold. The web game writes such a tower; the engine has to
-  // open it, with U+FFFD where the half character was (#936).
+  // open it, with U+FFFD where the half character was, and the web game's own
+  // loader agrees (#936).
   it("a tower the web game wrote with a split emoji opens in the engine", async () => {
     const first = fixtures[0];
     expect(first).toBeDefined();
@@ -171,9 +172,36 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
       }
     }
 
+    // The web loader repairs the same string the same way, so both engines
+    // hold one tower and the dual run sees no divergence (#936).
+    const webLoaded = await SaveGame.import(webFile);
+    expect(webLoaded.tower.towerName).toBe("Sky \uFFFD");
+    // The Node decoder the dual-run and conformance harnesses load with too.
+    expect((decodeVctower(webFile) as { towerName?: unknown }).towerName).toBe("Sky \uFFFD");
+    const fromWebFile = rust().Engine.fromVctower(webFile);
+    try {
+      expect(tsEngine(webLoaded).stateDigest()).toBe(fromWebFile.stateDigest());
+    } finally {
+      fromWebFile.free();
+    }
+
     const written = rust().encodeVctower(json, VERSION, SAVED_AT);
     expect((await SaveGame.import(written)).tower.towerName).toBe("Sky \uFFFD");
     expect(rust().exportTdt(json).length).toBeGreaterThan(0);
+  });
+
+  // Both engines repair the save text before parsing it, so keys that
+  // repair to one name collapse the same way, last one winning, whatever
+  // their order and depth (#936).
+  it.each([
+    String.raw`"k\ud800":1,"k\udc00":2`,
+    String.raw`"k\udc00":2,"k\ud800":1`,
+    String.raw`"k\ud800":1,"k\uFFFD":2,"k\ud800":3`,
+  ])("keys that repair to one name read the same in both engines: %s", (body) => {
+    const json = `{"version":7,"minutes":0,"units":[{${body}}],${body},"o":{${body},"i":{${body}}}}`;
+    const web = parseSaveJson(json) as Record<string, unknown>;
+    const engine = JSON.parse(payloadText(rust().encodeVctower(json, VERSION, SAVED_AT))) as unknown;
+    expect(engine).toEqual({ ...web, savedAt: SAVED_AT, appVersion: VERSION });
   });
 
   it("refuses what the web game would load wrong or refuse", () => {
