@@ -1,4 +1,4 @@
-import type { Engine, encodeVctower } from "./engine";
+import type { Engine, catalog, encodeVctower } from "./engine";
 
 /**
  * The WASM binding's surface, as wasm-bindgen declares it from
@@ -11,6 +11,10 @@ export type WasmEngine = Engine;
 
 export interface WasmModule {
   Engine: typeof Engine;
+  /** The catalog for a mode as canonical JSON (`readCatalog` types it and
+   *  refuses a package without it). Optional here, so a host that never reads
+   *  the catalog still starts on a package built before it. */
+  catalog?: typeof catalog;
   /** The engine's `.vctower` writer; absent from a test double. */
   encodeVctower?: typeof encodeVctower;
 }

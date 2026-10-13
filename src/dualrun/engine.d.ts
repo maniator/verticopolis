@@ -250,6 +250,15 @@ export class Engine {
 }
 
 /**
+ * Every price, size and build rule a frontend shows, resolved for `mode`
+ * (`classic` or `modern`), as canonical JSON in the shape of the `Catalog`
+ * type (declared in `src/engine/catalogTypes.ts`, read through `readCatalog`
+ * in `src/dualrun/catalog.ts`; see `verticopolis_engine::catalog`). It needs
+ * no running game.
+ */
+export function catalog(mode: string): string;
+
+/**
  * `encodeVctower(saveJson, appVersion, savedAtMs)`: the `.vctower` file
  * text for a serialized game (what `serialize` returns), stamped the way
  * `SaveGame.export` stamps it (`load::stamp_save`). Text that is not JSON,
