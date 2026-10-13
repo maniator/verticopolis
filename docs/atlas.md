@@ -231,8 +231,10 @@ front of the back wall. A room frame that supports this carries an optional
   asleep), the notice badge, a hotel room's roaches (and an infested room's
   grime) and a sleeping guest's "z", ceiling lights and glow washes drawn last
   (security, housekeeping, amusements), a cinema's aisle lights and EXIT signs,
-  the wedding hall's petal row, the pool water, and the metro's exit stairs,
-  platform and track.
+  the wedding hall's petal row, and the metro's exit stairs, platform and
+  track. The aquatic center keeps its pool whole on the shell: the diver on
+  the tower and the swimmers under the water stay there (they arrive as shell
+  steps), and only the deck-chair loungers come forward as furniture.
 - `furniture` holds the pixels that differ between the shell and the flat
   frame, transparent everywhere else.
 - `chains` splits the frame's chain step by step, under the same key
@@ -274,7 +276,7 @@ What that means for the pictures:
   shell's color.
 - A mark drawn after the furniture sits on the shell, so the furniture layer
   carries the furniture as the flat frame shows it (darkened under the night
-  scrim, tinted under the pool water).
+  scrim).
 - A soft shadow or glow drawn with the furniture (a restaurant's candles, a
   hotel or condo lamp) is baked into `furniture` as opaque pixels: the
   translucent paint over the wall behind it. Offset from the shell, it shows
@@ -327,8 +329,8 @@ the shell, so its glows and soft shadows keep their transparency. Draw it in
 place of `furniture` (and its `chains` steps in place of the `furniture`
 steps); the order is the same. Over the shell it looks the same to the eye,
 but translucent paint rounds a step or two differently on its own than over
-the wall. Marks the game draws over the furniture (the night scrim, the pool
-tint) land on the soft furniture only where it has pixels; the shell carries
+the wall. Marks the game draws over the furniture (the night scrim) land on
+the soft furniture only where it has pixels; the shell carries
 them everywhere else. An opaque mark drawn over the furniture (a hotel roach
 on the bed, a sleeping guest's "z", a notice badge) is therefore on both the
 shell and the soft furniture: offset the soft furniture and it shows twice. In

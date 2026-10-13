@@ -143,25 +143,23 @@ export function drawAquaticCenter(d: DrawCtx, u: Unit, x: number, y: number, w: 
   f(0, midY + 2, w, 5, DECK);
   const poolTop = midY + 7, poolBot = fy - 1;
   f(3, poolTop, w - 6, poolBot - poolTop, WATER); f(3, poolTop, w - 6, 1, WATERLT);
-  // The shell ends; the people and the loungers follow. Two draws moved to
-  // put them here: the diver now draws after the deck and pool fills, which it
-  // does not touch, and the loungers now draw before the water, ropes and
-  // ripples, which start below them. Neither move changes a pixel, and the
-  // fill order (diver, swimmers, loungers) is the same.
-  layerBreak(ctx);
   swim(dvX - 6, midY - 16); // a diver waiting on the board
   // Swimmers standing on the pool floor, drawn BEFORE the water overlay so it
   // covers their legs and they read as waist-deep.
   for (let sx = 7; sx + 3 < w - 6; sx += 7) swim(sx, poolBot - 1);
-  // Deck-chair loungers along the poolside band.
-  for (let lx = 5; lx + 5 < w - 4; lx += 11) { f(lx, midY + 3, 7, 2, "#E0A85A"); lounge(lx + 1, midY + 5); }
-  // The water covers the whole pool, so the depth layers put it on the shell.
-  layerEnd(ctx);
   // A translucent water layer over the lower pool: tints the submerged bodies.
   f(3, poolTop + 3, w - 6, poolBot - poolTop - 3, WATER, 0.55);
   // Lane ropes (dashed) and surface ripples on top.
   for (let ly = poolTop + 2; ly < poolBot - 1; ly += 4) for (let lx = 5; lx < w - 6; lx += 4) f(lx, ly, 2, 1, "#EAF6F8", 0.45);
   for (let rx = 6; rx < w - 6; rx += 5) f(rx, poolTop + 1 + ((rx >> 1) & 3), 3, 1, WATERLT, 0.5);
+  // The shell ends: the diver on the tower and the swimmers in the water stay
+  // with the pool, so only the deck-chair loungers come forward. The water,
+  // ropes and ripples moved ahead of the loungers, which sit on the deck
+  // above where they start, so no pixel changes, and the fill order (diver,
+  // swimmers, loungers) is the same.
+  layerBreak(ctx);
+  // Deck-chair loungers along the poolside band.
+  for (let lx = 5; lx + 5 < w - 4; lx += 11) { f(lx, midY + 3, 7, 2, "#E0A85A"); lounge(lx + 1, midY + 5); }
 }
 
 /** One 3x3 pixel flower for the arch garland and topiary, ported from the

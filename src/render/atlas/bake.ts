@@ -33,20 +33,20 @@ export interface Renderer {
 /** A frame's chain split for depth: step `k` of `shell` is what changes on
  *  the shell when the input goes from `k - 1` to `k` (a light switching on),
  *  step `k` of `furniture` what changes in front of it (the person who sits
- *  down). Each list is trimmed on its own; `steps[0]` is always null. */
+ *  down). Each list is trimmed on its own; its step 0 is always null. */
 export interface BakedLayerChain {
   shell: (ImageRef | null)[];
   furniture: (ImageRef | null)[];
-  /** Steps over the soft furniture picture; absent when the soft picture
-   *  cannot be stepped source-over (a translucent pixel that changes). */
+  /** Steps over the soft furniture picture; absent along with it (a
+   *  translucent pixel that changes, or a failed soft pass). */
   soft?: (ImageRef | null)[];
 }
 
 /** The frame split for depth. Drawing `shell`, the chain's shell steps,
  *  `furniture`, then the chain's furniture steps gives back the frame plus
- *  its chain steps exactly, for every input (each list clamped on its own). `soft` is the furniture with its
- *  own transparency; over the shell it rounds a step or two away from
- *  `furniture`. */
+ *  its chain steps exactly, for every input (each list clamped on its own).
+ *  `soft` is the furniture with its own transparency; over the shell it
+ *  rounds a step or two away from `furniture`. */
 export interface BakedLayers {
   shell: ImageRef | null;
   furniture: ImageRef | null;
