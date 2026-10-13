@@ -78,5 +78,7 @@ describe("stampErrors", () => {
     expect(errs[3]).toMatch(/d came from def, the tree is abc/);
     expect(errs[4]).toMatch(/e came from abc \(dirty\)/);
     expect(stampErrors(["a"], { commit: "abc", dirty: true }, files({ a: '{"commit":"abc","dirty":false}' }))[0]).toMatch(/the tree is abc \(dirty\)/);
+    // A reader that throws (a directory in the stamp's place) is reported too.
+    expect(stampErrors(["a"], tree, () => { throw new Error("EISDIR"); })).toEqual(["--skip-build: a cannot be read; run once without --skip-build"]);
   });
 });

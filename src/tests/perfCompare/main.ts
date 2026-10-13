@@ -6,7 +6,7 @@ import { analyzeBundle } from "./bundle";
 import { buildTree, collectEnvironment, engineBuildHash, enginePackageDigests, type Environment } from "./env";
 import { aggregate, compareEngines, missingSamples } from "./metrics";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
-import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
+import { comparisonsCsv, markdownReport, preThree, rawCsv, summaryCsv } from "./report";
 import { engineOrder, runProcess } from "./runner";
 import { buildScenarios } from "./scenarios";
 import { startServer } from "./server";
@@ -98,8 +98,12 @@ const STATIC_LIMITATIONS = [
   "The WASM attribution (engine tick, exports the host reads, host JS) comes from a separate pass with wrappers on every method of the engine, never from the timed pass; the wrappers' own bookkeeping outside their timed window lands in the host JS share, so that share is an upper bound. The bare-engine (raw) rows tick a detached Engine and do not include the host's read-model sync.",
   "The incremental WASM download counts the engine package (binary, loader, BUILD.json). The WASM host code (src/wasmhost) is inside the shared app chunks and is counted there for both configurations (backlog row perf-compare-host-js-share).",
   "Node timings (outcome check table) are a secondary data point on Node's V8; the engine order alternates by scenario.",
-  "This is a pre-3.0 baseline of an engine still being cut over (#945), not release performance. Every result directory is named by date and commit so later runs can be compared with it.",
+  "Every result directory is named by date and commit so later runs can be compared with it.",
 ];
+
+/** The pre-cutover framing, added to the limitations only for an app
+ *  version before 3.0.0 (the header follows the same rule). */
+export const PRE_THREE_LIMITATION = "This is a pre-3.0 baseline of an engine still being cut over (#945), not release performance.";
 
 function sh(cmd: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env): void {
   execFileSync(cmd, args, { cwd, stdio: "inherit", env });
@@ -204,7 +208,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     metrics,
     comparisons,
     validation,
-    limitations: [...STATIC_LIMITATIONS, ...(renderer ? [`WebGL renderer in these runs: ${renderer}.`] : [])],
+    limitations: [...STATIC_LIMITATIONS, ...(preThree(environment.appVersion) ? [PRE_THREE_LIMITATION] : []), ...(renderer ? [`WebGL renderer in these runs: ${renderer}.`] : [])],
   };
 
   const out = outputDir(repo, args, results.generatedAt.slice(0, 10), environment);
@@ -249,7 +253,15 @@ export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skip
 export function stampErrors(paths: readonly string[], tree: { commit: string; dirty: boolean }, read: (p: string) => string | null = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null)): string[] {
   const out: string[] = [];
   for (const p of paths) {
-    const text = read(p);
+    let text: string | null;
+    try {
+      text = read(p);
+    } catch {
+      // A directory or an unreadable file in the stamp's place: an error to
+      // report, never a crash after the measurements.
+      out.push(`--skip-build: ${p} cannot be read; run once without --skip-build`);
+      continue;
+    }
     if (text === null) {
       out.push(`--skip-build: ${p} is missing, so which tree that build came from is unknown; run once without --skip-build`);
       continue;
