@@ -100,3 +100,63 @@ that a date a reader meets after believing the number is too late.
   glovebox.
 - Nobody has checked whether other published artifacts carry the same
   re-derived-metric problem. This was the only one anybody looked at.
+
+---
+
+# Second sitting, same day: the weekly CI analytics run
+
+Sent to fix `analytics-report.yml`. It is not broken, and the defect turned out
+to be in the rule written earlier the same day.
+
+## What was checked
+
+| Check | Result |
+| --- | --- |
+| Run history | 50 runs, 50 green |
+| The 2026-09-14 rename | Handled. Both names summed, with a comment saying the old one stays until cached PWA, TWA and iOS clients stop sending it |
+| Session length method | Collapses per page life (sum of peaks, not a plain `max`) before taking percentiles |
+| Divergence from the canonical view | Documented at `scripts/posthog-report.mjs` line 194, bites only at the window edge |
+| Numbers against the view, same 30-day window | **Identical**: 749 sessions, p50 132s, p90 3126s, both |
+| Drift between its copy of the walk and the view's | Pinned by `src/posthog-report.test.ts` line 111, whitespace-normalized so a formatting pass does not cry wolf |
+
+## The actual defect
+
+The `CLAUDE.md` rule committed earlier that day read "every figure in anything
+published comes from an approved catalog metric, a saved view, or a saved
+insight." `scripts/posthog-report.mjs` computes every one of its figures from
+its own HogQL, so that rule made the most rigorous analytics artifact in the
+repository non-compliant.
+
+The instinct behind the rule was right and the noun was wrong. It said
+**governed** where it meant **reviewed**. What separates the script from the
+September readout is not where the SQL lives. It is that the script documents
+what it measures and where it is a lower bound, went through review, and is
+bound by a test to the canonical copy, so something would catch it being wrong.
+The readout had none of that.
+
+Revised: a published number is computed by a governed definition, **or** by
+reviewed code that a test binds to one. Improvised-and-published is what is
+banned.
+
+## Sally's question, which nobody had asked
+
+Who reads the twice-weekly report?
+
+It renders to a job summary and a 90-day artifact. The rigorous artifact has
+been correct twice a week into an empty room, while the thing that actually
+reached a human was the September readout with no gate on it. The rigor and the
+readership are inversely proportional and nobody designed that.
+
+Backlog row `analytics-report-readership`, issue #959.
+
+## Also done in this sitting
+
+The Node 20 deprecation on the pinned actions, which the run log had been
+warning about. Repo-wide rather than analytics-specific: 50 call sites across 11
+workflows. Checked before bumping that no workflow uses `pull_request_target`
+or `workflow_run` (so `actions/checkout` v7's fork-PR refusal does not apply),
+that every runner is GitHub-hosted `ubuntu-latest` (so the v2.327.1 runner
+minimum is met), and that the one `github-script` block uses only injected
+globals with no `require` and no `getOctokit` redeclaration (so the v9 ESM move
+is safe). `upload-artifact` and `download-artifact` moved together, as their
+release notes ask.
