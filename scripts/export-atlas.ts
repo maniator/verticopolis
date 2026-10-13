@@ -170,7 +170,7 @@ async function main(): Promise<void> {
   const unsplit = filter ? [] : kindsWithoutFurniture(archive.manifest);
   if (unsplit.length > 0) throw new Error(`depth layers hold no furniture for ${unsplit.join(", ")}: the shell kept it`);
   const layered = Object.values(archive.manifest.frames).filter((f) => f.layers).length;
-  console.log(`depth layers: ${layered} room frames compose back to their flat frames at every occupant count`);
+  console.log(`depth layers: ${layered} frames (rooms, lobby tiles and entrances) compose back to their flat frames at every occupant count`);
   // The soft furniture is close to the flat frame but rounds differently;
   // report how far it strays, and stop if it strays further than rounding.
   const drift = softLayerDrift(archive);

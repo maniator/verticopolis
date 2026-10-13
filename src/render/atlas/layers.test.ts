@@ -5,7 +5,8 @@ import { hasBusinessHours, isOpenAt } from "../../engine/facilities";
 import type { FacilityKind } from "../../engine/types";
 import { withLayerHook } from "../pixelSprites/layers";
 import { DEPTH_FLAT_KINDS, roomJobs, roomKinds, type StillJob } from "./catalog";
-import { paint, type UnitPaint } from "./paint";
+import { structureJobs } from "./catalogExtras";
+import { paint, type PaintSpec, type UnitPaint } from "./paint";
 
 /** A 2D context that accepts every call (the pixels are checked in a real
  *  browser by the export and the e2e spec). */
@@ -74,6 +75,24 @@ describe("depth-layer marks across the room catalog", () => {
     // Every room kind outside the flat list splits somewhere in the catalog.
     const expected = roomKinds().filter((k) => !DEPTH_FLAT_KINDS.has(k));
     expect([...split].sort()).toEqual(expected.sort());
+  });
+});
+
+describe("depth-layer marks on the lobby", () => {
+  it("splits every lobby tile and every entrance frame with exactly one break", () => {
+    const lobby = structureJobs().filter((j) => j.keys.kind === "lobby");
+    const paints: [string, PaintSpec, number, number][] = lobby.flatMap((j) =>
+      j.type === "still" ? [[j.name, j.paint, j.w, j.h] as [string, PaintSpec, number, number]] : j.frames.map((f, i) => [`${j.name}/${i}`, f, j.w, j.h] as [string, PaintSpec, number, number]),
+    );
+    expect(paints.length).toBe(16 + 32);
+    for (const j of lobby) expect(j.layers, j.name).toBe(true);
+    const wrong: string[] = [];
+    for (const [name, spec, w, h] of paints) {
+      const seen: string[] = [];
+      withLayerHook({ shellEnd: () => seen.push("break"), furnitureEnd: () => seen.push("end") }, () => paint(sinkCtx(), spec, w, h));
+      if (seen.join() !== "break") wrong.push(`${name}: ${seen.join() || "no marks"}`);
+    }
+    expect(wrong).toEqual([]);
   });
 });
 

@@ -212,8 +212,9 @@ stretch (`loop: false`); play it forward and back, or hold, as suits you.
 
 A frontend that draws rooms with depth can use a room's shell and its furniture
 separately: for example, a 2.5D cutaway that sets the furniture a little in
-front of the back wall. A room frame that supports this carries an optional
-`layers` field next to its `parts`:
+front of the back wall. A room frame that supports this (and a lobby tile or
+entrance frame, below) carries an optional `layers` field next to its
+`parts`:
 
 ```json
 "layers": {
@@ -310,7 +311,8 @@ A frame has no `layers`, and a frontend draws it flat, when:
 
 - the room is vacant and shows its LEASE or SALE card (office, condo, studio,
   apartment), is closed and shows its shutter, or is gutted;
-- it is a burning or unbuilt room (those are animations);
+- it is a burning or unbuilt room (the entrance doors are the only animation
+  whose frames split);
 - its kind is one whose art does not mark a split yet: the parking space, the
   parking ramp and the recycling center (backlog row
   `atlas-depth-layers-flat-kinds`).
@@ -320,6 +322,17 @@ hotel grades, fast food, restaurant, food hall, cinema, shop, amusements,
 boutique bay, fitness club, clinic, nightclub, spa, sky bar, daycare,
 security, medical center, housekeeping, party hall, wedding hall, aquatic
 center and metro station.
+
+The lobby splits too, so a concourse can be drawn with depth like the rooms
+beside it. Every `structure/lobby/...` tile carries `layers`: the column,
+console, chandelier and planter come forward, while the wall, windows,
+cornice, floor, carpet, sconce and framed print stay on the shell (the
+sconce and print tile has an empty furniture list). Each frame of the
+`structure/entrance/...` animations carries its own `layers` too: the facade,
+glass, awning, doors and carpet (or the service door and its plate) are the
+shell, and the palms, the potted plant, the reception desk and its attendant,
+and the doorman are the furniture. Neither has a chain, so a frontend draws
+the shell and then the furniture (or the soft furniture).
 
 The layers' own images are packed on pages after the frame images', so a
 frontend that ignores `layers` reads the same frames, parts and pages as before
@@ -381,9 +394,10 @@ missing from every frame.
 
 The same check covers the other families (`verifyExtras.ts`): a whole express
 and standard shaft rebuilt from their floor pieces (skip floor included), cabs
-with composed riders, a walker, a lobby tile, an entrance pose, a fire escape
+with composed riders, a walker, lobby tiles, entrance poses, a fire escape
 and the sky strip, each against the game's draw call with the game's
-arguments.
+arguments. The lobby tiles and entrance poses are also composed through their
+depth layers.
 
 ## Not in the atlas yet
 

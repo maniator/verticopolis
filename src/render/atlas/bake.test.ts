@@ -266,6 +266,19 @@ describe("depth layers", () => {
     const frames = { a: rec("office", []), b: rec("office", [placed]), c: rec("spa", []), d: { ...rec("shop", []), layers: undefined } };
     expect(kindsWithoutFurniture({ frames })).toEqual(["spa"]);
   });
+  it("splits every frame of an animation that asks for it, and leaves its frame images alone", () => {
+    const anim: Job = { type: "anim", name: "door", w: 4, h: 2, anchor: { x: 0, y: 0 }, keys: { kind: "lobby" }, dt: 1, loop: true, frames: [room(5, 6), room(5, 7)], layers: true };
+    const split = bake([anim], layeredFake);
+    const plain = bake([{ ...anim, layers: false }], layeredFake);
+    expect(split.frames.map((f) => [f.name, !!f.layers])).toEqual([
+      ["door/0", true],
+      ["door/1", true],
+    ]);
+    expect(split.frames.map((f) => f.image)).toEqual(plain.frames.map((f) => f.image));
+    expect(split.animations).toEqual(plain.animations);
+    for (const f of split.frames) expect(sameImage(composeLayered(split, f), composeFrame(split, f)), f.name).toBe(true);
+    expect(checkLayers(buildArchive(split, info, undefined, 32))).toEqual([]);
+  });
   it("refuses a frame-image count outside the images", () => {
     expect(() => buildArchive({ ...layered, frameImages: layered.images.length + 1 }, info, undefined, 32)).toThrow(/frameImages/);
   });

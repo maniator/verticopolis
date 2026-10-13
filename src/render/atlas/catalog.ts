@@ -46,6 +46,8 @@ export interface AnimJob {
   dt: number;
   loop: boolean;
   frames: PaintSpec[];
+  /** True when every frame should also be split for depth, like a still. */
+  layers?: boolean;
 }
 
 export type Job = StillJob | AnimJob;

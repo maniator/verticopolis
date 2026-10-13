@@ -28,14 +28,15 @@ function still(name: string, w: number, h: number, paint: PaintSpec, keys: Keys,
   return { type: "still", name, w, h, anchor, keys, paint };
 }
 
-/** Floor and lobby tiles plus the four ground-floor entrance slices. */
+/** Floor and lobby tiles plus the four ground-floor entrance slices. The
+ *  lobby tiles and the entrance frames carry depth layers. */
 export function structureJobs(): Job[] {
   const jobs: Job[] = [still("structure/floor", TILE, FLOOR, { p: "floor" }, { kind: "floor" })];
   for (const ground of [true, false]) {
     for (const lit of [false, true]) {
       for (let v = 0; v < LOBBY_VARIANTS; v++) {
         const style = ground ? "ground" : "sky";
-        jobs.push(still(`structure/lobby/${style}/${lit2(lit)}/v${v}`, TILE, FLOOR, { p: "lobby", ground, variant: v, lit }, { kind: "lobby", style, lit, variant: v }));
+        jobs.push({ ...still(`structure/lobby/${style}/${lit2(lit)}/v${v}`, TILE, FLOOR, { p: "lobby", ground, variant: v, lit }, { kind: "lobby", style, lit, variant: v }), layers: true });
       }
     }
   }
@@ -55,6 +56,7 @@ export function structureJobs(): Job[] {
           dt: 1.5,
           loop: true,
           frames,
+          layers: true,
         };
         jobs.push(anim);
       }

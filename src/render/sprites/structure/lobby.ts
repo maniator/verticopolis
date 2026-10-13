@@ -1,6 +1,7 @@
 import type { Unit } from "../../../engine/types";
 import type { DrawCtx } from "../common";
 import { hash } from "../../pixelSprites/common";
+import { layerBreak } from "../../pixelSprites/layers";
 import { drawGrandCompact, drawGrandFacadeLeft, drawGrandFacadeRight, drawServiceEntrance } from "./entrance";
 
 /**
@@ -163,17 +164,24 @@ function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, v
 
   // Per-variant centerpiece, centered on the slice and kept inside it (each
   // slice is its own baked 11px canvas, so anything past the edge is clipped
-  // into a visible seam).
+  // into a visible seam). For depth, the column, console, chandelier and
+  // planter stand in front of the wall, so the shell ends before them; the
+  // sconce and the framed print hang on it, so it ends after them. The
+  // entrance slices mark their own split.
   if (variant === 0) {
+    layerBreak(ctx);
     fluteColumn(ctx, cx, y0, hh, ground);
   } else if (variant === 1) {
+    layerBreak(ctx);
     consolePanel(ctx, x0, ww, y0, floorTop, ground, lit);
   } else if (variant === 2) {
+    layerBreak(ctx);
     if (ground) chandelier(ctx, cx, y0, lit, ww);
     else planter(ctx, cx, floorTop);
   } else if (variant === 3) {
     if (ground) sconce(ctx, cx, y0, lit);
     else framedPrint(ctx, cx, y0);
+    layerBreak(ctx);
   } else if (variant === ENTRANCE_GRAND_LEFT && ground) {
     drawGrandFacadeLeft(d, x, y, w, h);
   } else if (variant === ENTRANCE_GRAND_RIGHT && ground) {

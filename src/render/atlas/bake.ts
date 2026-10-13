@@ -243,14 +243,42 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
     if (names.has(name)) throw new Error(`duplicate frame name ${name}`);
     names.add(name);
   };
+  /** The split of a frame's own paint: its shell, its furniture, and (when
+   *  the soft pass gives one) its soft picture, held back from the layer
+   *  store until the caller knows every step has one, so a dropped soft
+   *  picture leaves nothing on the pages. A soft pass that fails drops it. */
+  const splitBase = (spec: PaintSpec, w: number, h: number, base: Image, shell: Image) => {
+    const layers: PendingLayers = { shell: layerStore.shell(shell), furniture: layerStore.piece(diffLayer(shell, base), base) };
+    let soft: Image | null = null;
+    try {
+      soft = r.renderSoft ? r.renderSoft(spec, w, h) : null;
+    } catch (e) {
+      if (!(e instanceof LayerError)) throw e;
+    }
+    return { layers, softBase: soft ? { image: soft, piece: trim(soft) } : null };
+  };
   jobs.forEach((job, done) => {
     onProgress?.(done, jobs.length);
     if (job.type === "anim") {
       const frameNames = job.frames.map((spec, i) => {
         const name = `${job.name}/${i}`;
         claim(name);
-        const image = store.ref(r.render(spec, job.w, job.h));
-        frames.push({ name, w: job.w, h: job.h, anchor: job.anchor, keys: { ...job.keys, frame: i }, image });
+        const base = r.render(spec, job.w, job.h);
+        const frame: BakedFrame = { name, w: job.w, h: job.h, anchor: job.anchor, keys: { ...job.keys, frame: i }, image: store.ref(base) };
+        // An animation frame splits like a still with no chain.
+        const shell = job.layers && r.renderShell ? r.renderShell(spec, job.w, job.h) : null;
+        if (shell) {
+          try {
+            const { layers, softBase } = splitBase(spec, job.w, job.h, base, shell);
+            if (softBase) layers.soft = layerStore.piece(softBase.piece, base);
+            else if (r.renderSoft) stats?.softDropped.push(name);
+            pending.push({ frame, layers });
+          } catch (e) {
+            if (e instanceof LayerError) throw new LayerError(`${name}: ${e.message}`);
+            throw e;
+          }
+        }
+        frames.push(frame);
         return name;
       });
       animations.push({ name: job.name, dt: job.dt, loop: job.loop, keys: job.keys, frames: frameNames });
@@ -288,18 +316,9 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
         // One chain and no overlays: the draw order the manifest documents
         // (and the checks that prove it) covers exactly that.
         if (Object.keys(job.chains ?? {}).length > 1 || Object.keys(job.overlays ?? {}).length > 0) throw new LayerError("depth layers need at most one chain and no overlays");
-        const layers: PendingLayers = { shell: layerStore.shell(shell), furniture: layerStore.piece(diffLayer(shell, base), base) };
-        // The soft picture is optional: a soft pass that fails drops it.
-        let soft0: Image | null = null;
-        try {
-          soft0 = r.renderSoft ? r.renderSoft(job.paint, job.w, job.h) : null;
-        } catch (e) {
-          if (!(e instanceof LayerError)) throw e;
-        }
+        const { layers, softBase } = splitBase(job.paint, job.w, job.h, base, shell);
+        const soft0 = softBase?.image ?? null;
         let softOk = soft0 !== null;
-        // The soft pieces go into the layer store only once every step has
-        // one, so a dropped soft picture leaves nothing on the pages.
-        const softBase = soft0 ? trim(soft0) : null;
         const softSteps: Record<string, { piece: Piece | null; next: Image }[]> = {};
         // Each chain step splits the same way: what changes on the shell (a
         // light that switches on with the first occupant) and what changes in
@@ -336,7 +355,7 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
           (layers.chains ??= {})[key] = { shell: trimPending(split.shell), furniture: trimPending(split.furniture) };
         }
         if (softOk && soft0) {
-          layers.soft = layerStore.piece(softBase, base);
+          layers.soft = layerStore.piece(softBase!.piece, base);
           for (const [key, list] of Object.entries(softSteps)) layers.chains![key].soft = trimPending([null, ...list.map((s) => layerStore.piece(s.piece, s.next))]);
         } else if (r.renderSoft) {
           // A soft picture without composable steps would mislead; drop it.

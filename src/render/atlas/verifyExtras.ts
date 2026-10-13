@@ -7,7 +7,7 @@ import { skyColor } from "../sprites/sky";
 import { bake, type Renderer } from "./bake";
 import type { Job } from "./catalog";
 import { CAR_SEEDS, SKY_COLUMNS } from "./catalogExtras";
-import { compareImages, composeFrame } from "./compose";
+import { compareImages, composeFrame, composeLayered } from "./compose";
 import { blank, over, type Image } from "./pixels";
 import type { SampleResult } from "./verify";
 
@@ -127,6 +127,56 @@ export function extraCases(): Case[] {
       },
     },
     {
+      label: "lit ground-lobby tile, variant 2 (chandelier)",
+      frames: ["structure/lobby/ground/lit/v2"],
+      atlas: (get) => get("structure/lobby/ground/lit/v2"),
+      game: (doc) => {
+        const ctx = canvas(doc, TILE, FLOOR);
+        drawUnit({ ctx, lit: true, anim: 0, hour: 20 }, struct("lobby", 1, 2), 0, 0, TILE, FLOOR);
+        return read(ctx, TILE, FLOOR);
+      },
+    },
+    {
+      label: "unlit ground-lobby tile, variant 3 (sconce on the shell)",
+      frames: ["structure/lobby/ground/unlit/v3"],
+      atlas: (get) => get("structure/lobby/ground/unlit/v3"),
+      game: (doc) => {
+        const ctx = canvas(doc, TILE, FLOOR);
+        drawUnit({ ctx, lit: false, anim: 0, hour: 12 }, struct("lobby", 1, 3), 0, 0, TILE, FLOOR);
+        return read(ctx, TILE, FLOOR);
+      },
+    },
+    {
+      label: "grand entrance, left slice, unstaffed",
+      frames: ["structure/entrance/grand-left/unlit/unstaffed/0"],
+      atlas: (get) => get("structure/entrance/grand-left/unlit/unstaffed/0"),
+      game: (doc) => {
+        const ctx = canvas(doc, TILE, FLOOR);
+        drawLobbyEntrance({ ctx, lit: false, anim: 0, hour: 12, staffed: false }, "grand-left", 0, 0, TILE, FLOOR);
+        return read(ctx, TILE, FLOOR);
+      },
+    },
+    {
+      label: "compact grand entrance, staffed",
+      frames: ["structure/entrance/grand-solo/lit/staffed/0"],
+      atlas: (get) => get("structure/entrance/grand-solo/lit/staffed/0"),
+      game: (doc) => {
+        const ctx = canvas(doc, TILE, FLOOR);
+        drawLobbyEntrance({ ctx, lit: true, anim: 0, hour: 20, staffed: true }, "grand-solo", 0, 0, TILE, FLOOR);
+        return read(ctx, TILE, FLOOR);
+      },
+    },
+    {
+      label: "service entrance",
+      frames: ["structure/entrance/service/unlit/staffed/0"],
+      atlas: (get) => get("structure/entrance/service/unlit/staffed/0"),
+      game: (doc) => {
+        const ctx = canvas(doc, TILE, FLOOR);
+        drawLobbyEntrance({ ctx, lit: false, anim: 0, hour: 12, staffed: true }, "service", 0, 0, TILE, FLOOR);
+        return read(ctx, TILE, FLOOR);
+      },
+    },
+    {
       label: "right fire escape, odd floor",
       frames: ["facade/escape/right/1"],
       atlas: (get) => get("facade/escape/right/1"),
@@ -168,20 +218,26 @@ export function extraCases(): Case[] {
 /** Run every non-room case. Animation frames are addressed by their full
  *  frame name (`<animation>/<i>`); their job is the animation. */
 export function verifyExtras(doc: Document, jobs: readonly Job[], renderer: Renderer): SampleResult[] {
-  return extraCases().map((c) => {
+  return extraCases().flatMap((c) => {
     const jobNames = new Set(c.frames.map((f) => (jobs.some((j) => j.name === f) ? f : f.slice(0, f.lastIndexOf("/")))));
     const r = bake(
       jobs.filter((j) => jobNames.has(j.name)),
       renderer,
     );
-    const get = (name: string, chains: Record<string, number> = {}) => {
+    const recOf = (name: string) => {
       const rec = r.frames.find((f) => f.name === name);
       if (!rec) throw new Error(`no frame ${name}`);
-      return composeFrame(r, rec, chains);
+      return rec;
     };
-    const mine = c.atlas(get);
     const theirs = c.game(doc);
-    const cmp = compareImages(theirs, mine);
-    return { label: c.label, frame: c.frames.join(", "), pixels: theirs.w * theirs.h, mismatches: cmp.mismatches, box: cmp.box, offset: { x: 0, y: 0 }, control: c.control };
+    const result = (label: string, mine: Image): SampleResult => {
+      const cmp = compareImages(theirs, mine);
+      return { label, frame: c.frames.join(", "), pixels: theirs.w * theirs.h, mismatches: cmp.mismatches, box: cmp.box, offset: { x: 0, y: 0 }, control: c.control };
+    };
+    const out = [result(c.label, c.atlas((name, chains = {}) => composeFrame(r, recOf(name), chains)))];
+    // Frames split for depth (the lobby tiles and entrances) are composed
+    // through their shell and furniture as well.
+    if (c.frames.every((f) => recOf(f).layers)) out.push(result(`${c.label} (depth layers)`, c.atlas((name, chains = {}) => composeLayered(r, recOf(name), chains))));
+    return out;
   });
 }
