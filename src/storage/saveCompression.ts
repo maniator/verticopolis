@@ -5,11 +5,12 @@ import { wellFormed } from "../engine/wellFormed";
  * Compression + base64 codec for the persistence layer. Extracted from
  * `SaveGame.ts`: a pure codec with no localStorage or Simulation coupling.
  *
- * Every writer compresses with fflate's SYNCHRONOUS deflate at level 1 (see
- * `SaveGame.saveTo`), because a localStorage write can run right before a
- * reload where an async flush could be lost, and the `.vctower` export uses
- * the same so the engine's writer can match its bits; only `saveToAsync`
- * compresses with the native CompressionStream, off the main thread. Reading
+ * Every writer except `saveToAsync` compresses with fflate's SYNCHRONOUS
+ * deflate at level 1 (see `SaveGame.saveTo`), because a localStorage write can
+ * run right before a reload where an async flush could be lost, and the
+ * `.vctower` export uses the same so the engine's writer can match its bits.
+ * `saveToAsync` compresses with the native CompressionStream, off the main
+ * thread. Reading
  * a `.vctower` file (`SaveGame.import`) inflates with the native
  * DecompressionStream. Untrusted input is always inflated behind a size cap so a
  * decompression bomb can't hang the tab.

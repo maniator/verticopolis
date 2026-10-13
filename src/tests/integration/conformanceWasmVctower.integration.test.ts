@@ -99,7 +99,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
   });
 
   // A save that already carries a stamp keeps each stamp key where it was,
-  // as the spread in SaveGame's stamp() keeps it (#939).
+  // as the property assignments in SaveGame's stamp() keep it (#939).
   it("restamps a stamped save in place, as the web writer does", () => {
     const json = JSON.stringify({ savedAt: 1, version: 7, appVersion: "2.5.0", minutes: 0, units: [], towerName: "Sky" });
     const web = toTowerFile(JSON.stringify({ ...JSON.parse(json), savedAt: SAVED_AT, appVersion: VERSION }));
