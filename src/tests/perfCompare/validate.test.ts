@@ -94,4 +94,82 @@ describe("validateResults", () => {
     const runs = Array.from({ length: 10 }, (_, rep) => [processRun(rep, "ts"), processRun(rep, "wasm")]).flat();
     expect(validateResults(config({ reps: 10 }), runs, [node()]).warnings).toEqual([]);
   });
+
+  it("fails a sample whose clock did not move by its steps or whose state did not change", () => {
+    const runs = good();
+    runs[0].scenarios.small.hosted["1"] = step("ts", { startMinutes: 590 });
+    runs[1].scenarios.small.raw["1"] = step("wasm", { endDigest: "a" });
+    const v = validateResults(config(), runs, [node()]);
+    expect(v.errors).toEqual(
+      expect.arrayContaining([
+        "rep 0 ts: small hosted at 1x: the clock moved 10 minutes, expected 20",
+        "rep 0 wasm: small raw at 1x: the end state equals the start state; the simulation did not advance",
+      ]),
+    );
+  });
+
+  it("fails when the browser runs and the Node check disagree on the state", () => {
+    const n = node();
+    n.end.tsState = "z";
+    n.end.wasmState = "z";
+    expect(validateResults(config(), good(), [n]).errors).toContain("small: the browser runs ended in b, not the Node check's z");
+    const m = node();
+    m.start.tsState = "y";
+    m.start.wasmState = "y";
+    expect(validateResults(config(), good(), [m]).errors).toContain("small: the browser runs started from a, not the Node check's y");
+  });
+
+  it("fails on host errors and engine page errors, and warns on other page errors", () => {
+    const runs = good();
+    runs[1].scenarios.small.hosted["1"].hostErrorsAdded = ["trap"];
+    runs[1].scenarios.small.frames["1"].hostErrorsAdded = ["trap"];
+    runs[1].pageErrors = ["console: [wasm] not hosting this tower"];
+    runs[0].pageErrors = ["console: 404"];
+    const v = validateResults(config(), runs, [node()]);
+    expect(v.errors).toEqual(expect.arrayContaining(["rep 0 wasm: small hosted at 1x: the host reported trap", "rep 0 wasm: small frames at 1x: the host reported trap"]));
+    expect(v.errors.some((e) => e.startsWith("rep 0 wasm: engine or frame errors in the page"))).toBe(true);
+    expect(v.warnings.some((w) => w.startsWith("rep 0 ts: 1 page error(s)"))).toBe(true);
+  });
+
+  it("checks the audio state of both frame passes and warns on clamped or few frames", () => {
+    const runs = good();
+    runs[0].scenarios.small.frames["1"].audioStarted = true;
+    runs[1].scenarios.small.framesAudio["1"].audioStarted = false;
+    runs[2].scenarios.small.frames["1"].clampedFrames = 3;
+    runs[3].scenarios.small.frames["1"].frames = 40;
+    delete runs[3].scenarios.small.framesAudio["1"];
+    const v = validateResults(config(), runs, [node()]);
+    expect(v.errors).toEqual(
+      expect.arrayContaining([
+        "rep 0 ts: small frames at 1x ran with audio started; the audio-off rows are not audio-off",
+        "rep 0 wasm: small frames with audio at 1x ran without audio",
+        "rep 1 ts: small frames with audio at 1x missing",
+      ]),
+    );
+    expect(v.warnings.some((w) => w.includes("3 of 120 frames ran over 200 ms"))).toBe(true);
+    expect(v.warnings.some((w) => w.includes("only 40 frames in the window"))).toBe(true);
+  });
+
+  it("warns when audio or the service worker did not start, and does not need the audio rows then", () => {
+    const runs = good();
+    runs[0].audio = { started: false, muted: false, contexts: [] };
+    runs[0].scenarios.small.framesAudio = {};
+    runs[1].firstVisitWithServiceWorker = { served: [], swActive: false, offlineEngineActive: null, offlinePageErrors: [], error: null };
+    runs[2].firstVisitWithServiceWorker = { served: [], swActive: false, offlineEngineActive: null, offlinePageErrors: [], error: "boom" };
+    const v = validateResults(config(), runs, [node()]);
+    expect(v.errors).toEqual([]);
+    expect(v.warnings).toEqual(
+      expect.arrayContaining([
+        "rep 0 ts: audio did not start, so the audio-on rows have no sample from it",
+        "rep 0 wasm: the service worker first visit never activated; its transfer and offline rows have no sample from it",
+        "rep 1 wasm: the service worker first visit failed (boom); its transfer and offline rows have no sample from it",
+      ]),
+    );
+  });
+
+  it("names a fallback at the 4x cold start", () => {
+    const runs = good();
+    runs[1].cold4x = { ...runs[1].cold4x!, engineActive: "ts" };
+    expect(validateResults(config(), runs, [node()]).errors).toContain("rep 0 wasm: 4x cold start: the WASM engine did not initialize; the page fell back to TypeScript");
+  });
 });

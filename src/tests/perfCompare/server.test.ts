@@ -89,9 +89,21 @@ describe("startServer", () => {
     expect((await get(`${server.url}/nope.js`)).status).toBe(404);
     expect((await get(`${server.url}/..%2F..%2Fetc%2Fpasswd`)).status).toBe(404);
     expect((await get(`${server.url}/engine`)).status).toBe(404);
+    // A malformed escape is a 400, never a crash of the run.
+    expect((await get(`${server.url}/%E0%A4%A`)).status).toBe(400);
+    expect((await get(`${server.url}/`)).status).toBe(200);
     const head = await get(`${server.url}/index.html`, {}, "HEAD");
     expect(head.status).toBe(200);
     expect(server.take().pop()).toMatchObject({ path: "/index.html", bytes: 0, encoding: "identity" });
+  });
+
+  it("serves the same root spelled with a trailing separator", async () => {
+    const other = await startServer(`${dir}/`);
+    try {
+      expect((await get(`${other.url}/sw.js`)).status).toBe(200);
+    } finally {
+      await other.close();
+    }
   });
 
   it("refuses a directory with no build", async () => {

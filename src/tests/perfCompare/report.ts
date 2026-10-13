@@ -100,11 +100,12 @@ export function markdownReport(res: CompareResults): string {
   out.push("", "## Outcome checks (Node, conformance digests)", "");
   out.push(table(["Scenario", "Steps", "Start state", "End state", "End crowd", "Match"], res.nodeChecks.map((n) => [n.scenario, String(n.steps), n.start.tsState === n.start.wasmState ? "same" : "DIFFERENT", n.end.tsState === n.end.wasmState ? "same" : "DIFFERENT", n.end.tsCrowd === n.end.wasmCrowd ? "same" : "DIFFERENT", n.match ? "yes" : "NO"])));
   const groups: [string, CompareResults["comparisons"][number]["group"]][] = [
-    ["Startup", "startup"],
+    ["Startup (CPU column: 1x, or the 4x cold start)", "startup"],
     ["WASM load steps (TypeScript page, never compiled before)", "wasm-load"],
     ["Simulation only, engine as the app hosts it", "sim-hosted"],
     ["Simulation only, bare engine", "sim-raw"],
-    ["Gameplay frames", "frames"],
+    ["Gameplay frames, audio off (never started)", "frames"],
+    ["Gameplay frames, audio on", "frames-audio"],
     ["Memory and save load", "memory"],
     ["Transfer (bytes the server sent)", "transfer"],
   ];
@@ -130,16 +131,26 @@ export function markdownReport(res: CompareResults): string {
       ["WASM engine files alone (binary, glue, BUILD.json)", fmt(t.wasmOnly.raw, "bytes"), fmt(t.wasmOnly.gzip, "bytes"), fmt(t.wasmOnly.brotli, "bytes")],
       ["Everything in dist/", fmt(t.everything.raw, "bytes"), fmt(t.everything.gzip, "bytes"), fmt(t.everything.brotli, "bytes")],
     ]));
+    if (res.toolingBundleTotals) {
+      const d = res.toolingBundleTotals.game.brotli - t.game.brotli;
+      out.push("", `The timed runs used the VC_TOOLING=1 build of the same sources; its game files are ${fmt(res.toolingBundleTotals.game.brotli, "bytes")} Brotli (${d >= 0 ? "+" : ""}${fmt(d, "bytes")} against the production build above).`);
+    }
     out.push("", `Precache: ${res.bundle.precache.entries} entries, ${fmt(res.bundle.precache.raw, "bytes")} raw, ${fmt(res.bundle.precache.brotli, "bytes")} Brotli.`);
     if (res.bundle.wasm) {
       out.push("", `WASM sections of \`${res.bundle.wasm.path}\` (${fmt(res.bundle.wasm.raw, "bytes")}; custom sections ${fmt(res.bundle.wasm.customBytes, "bytes")}):`, "");
       out.push(table(["Section", "Bytes"], res.bundle.wasm.sections.map((s) => [s.name, fmt(s.bytes, "bytes")])));
     }
   }
-  const offline = res.runs.filter((r) => r.firstVisitWithServiceWorker).map((r) => `${r.engine}: ${r.firstVisitWithServiceWorker!.swActive ? (r.firstVisitWithServiceWorker!.offlineEngineActive ?? "did not boot") : "no service worker"}`);
+  const offlineOf = (r: CompareResults["runs"][number]): string => {
+    const f = r.firstVisitWithServiceWorker!;
+    if (f.error) return `${r.engine}: failed (${f.error})`;
+    if (!f.swActive) return `${r.engine}: no service worker`;
+    return `${r.engine}: ${f.offlineEngineActive ?? "did not boot"}`;
+  };
+  const offline = res.runs.filter((r) => r.firstVisitWithServiceWorker).map(offlineOf);
   out.push("", "## Offline reload after a first visit", "", "Which engine the page booted on when reloaded with the network cut, per process:", "", offline.join("; ") || "not measured");
   out.push("", "## Process runs", "");
-  out.push(table(["Rep", "Engine", "Order", "OK", "Error", "Page errors"], res.runs.map((r) => [String(r.rep), r.engine, String(r.order), r.ok ? "yes" : "NO", r.error ?? "", String(r.pageErrors.length)])));
+  out.push(table(["Rep", "Engine", "Order", "OK", "Error", "Page errors", "Audio"], res.runs.map((r) => [String(r.rep), r.engine, String(r.order), r.ok ? "yes" : "NO", r.error ?? "", String(r.pageErrors.length), r.audio ? `${r.audio.started ? "started" : "not started"} (${r.audio.contexts.join(", ") || "no context"})` : "n/a"])));
   out.push("", "## Limitations", "");
   for (const l of res.limitations) out.push(`- ${l}`);
   return out.join("\n") + "\n";

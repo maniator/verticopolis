@@ -57,6 +57,8 @@ describe("wasmSections", () => {
     expect(() => wasmSections(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]))).toThrow(/not a wasm module/);
     expect(() => wasmSections(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 1, 9, 0]))).toThrow(/past the end/);
     expect(() => wasmSections(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 1, 0x80]))).toThrow(/truncated/);
+    // A custom section whose name claims more bytes than the section holds.
+    expect(() => wasmSections(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 0, 2, 9, 0x6e, 1, 0]))).toThrow(/name runs past/);
     expect(() => wasmSections(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 1, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 1]))).toThrow(/too long/);
   });
   it("names an unknown section id", () => {

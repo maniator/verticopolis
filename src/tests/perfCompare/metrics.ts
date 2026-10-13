@@ -1,6 +1,7 @@
 import { ratioOfMedians, summarize, verdict } from "./stats";
 import type { Comparison, EngineName, MetricRow, ProcessRun } from "./types";
 import type { ServedRequest } from "./server";
+import { categorize, type Category } from "./bundle";
 
 /**
  * Turn the process runs into one value per successful repetition for every
@@ -24,22 +25,45 @@ interface Pick {
 
 const bytes = (served: readonly ServedRequest[] | undefined): number | null => (served ? served.reduce((s, x) => s + x.bytes, 0) : null);
 
+/** Served bytes of one build category (the same categories as the bundle
+ *  table), so the before-ready and after-ready split reads per category. */
+export function bytesIn(served: readonly ServedRequest[] | undefined, category: Category): number | null {
+  if (!served) return null;
+  return served.filter((x) => categorize(x.path.replace(/^\//, "")) === category).reduce((s, x) => s + x.bytes, 0);
+}
+
+const SERVED_CATEGORIES: Category[] = ["html", "app-js", "css", "wasm-glue", "wasm-binary", "audio-js", "audio-assets", "images", "service-worker", "other"];
+
+/** A verdict needs this many samples per side; below it, "inconclusive". */
+export const MIN_VERDICT_N = 6;
+
 function picks(scenarios: readonly string[], throttles: readonly string[]): Pick[] {
   const out: Pick[] = [];
-  const startup = (phase: "cold" | "warm") => {
-    const p = (metric: string, unit: string, value: Pick["value"], engines?: EngineName[]) => out.push({ group: "startup", scenario: "-", throttle: "1", metric: `${phase} ${metric}`, unit, better: "lower", value, engines });
+  const startup = (phase: "cold" | "warm" | "cold4x") => {
+    const throttle = phase === "cold4x" ? "4" : "1";
+    const label = phase === "cold4x" ? "cold" : phase;
+    const p = (metric: string, unit: string, value: Pick["value"], engines?: EngineName[]) => out.push({ group: "startup", scenario: "-", throttle, metric: `${label} ${metric}`, unit, better: "lower", value, engines });
     p("game ready", "ms", (r) => r[phase]?.gameReadyMs);
     p("first frame after ready", "ms", (r) => r[phase]?.firstFrameMs);
     p("DOMContentLoaded", "ms", (r) => r[phase]?.domContentLoadedMs);
     p("load event", "ms", (r) => r[phase]?.loadEventMs);
     p("engine hosted", "ms", (r) => r[phase]?.engineHostedMs, ["wasm"]);
     p("wasm fetch (resource timing)", "ms", (r) => r[phase]?.wasmFetchMs, ["wasm"]);
+    p("wasm compile and instantiate (boot path)", "ms", (r) => r[phase]?.wasmInstantiateMs, ["wasm"]);
+    if (phase === "cold4x") return;
     out.push({ group: "transfer", scenario: "-", throttle: "1", metric: `${phase} bytes served before ready`, unit: "bytes", better: "lower", value: (r) => bytes(r[phase]?.servedBeforeReady) });
     out.push({ group: "transfer", scenario: "-", throttle: "1", metric: `${phase} bytes served total`, unit: "bytes", better: "lower", value: (r) => { const a = bytes(r[phase]?.servedBeforeReady); const b = bytes(r[phase]?.servedAfterReady); return a === null || b === null ? null : a + b; } });
+    if (phase !== "cold") return;
+    for (const c of SERVED_CATEGORIES) {
+      out.push({ group: "transfer", scenario: "-", throttle: "1", metric: `cold before ready: ${c}`, unit: "bytes", better: "lower", value: (r) => bytesIn(r.cold?.servedBeforeReady, c) });
+      out.push({ group: "transfer", scenario: "-", throttle: "1", metric: `cold after ready: ${c}`, unit: "bytes", better: "lower", value: (r) => bytesIn(r.cold?.servedAfterReady, c) });
+    }
   };
   startup("cold");
   startup("warm");
-  out.push({ group: "transfer", scenario: "-", throttle: "1", metric: "first visit with service worker, bytes served", unit: "bytes", better: "lower", value: (r) => bytes(r.firstVisitWithServiceWorker?.served) });
+  startup("cold4x");
+  // Only visits whose service worker activated count.
+  out.push({ group: "transfer", scenario: "-", throttle: "1", metric: "first visit with service worker, bytes served", unit: "bytes", better: "lower", value: (r) => (r.firstVisitWithServiceWorker?.swActive ? bytes(r.firstVisitWithServiceWorker.served) : null) });
   for (const [metric, key] of [["fetch", "fetchMs"], ["compile", "compileMs"], ["instantiate", "instantiateMs"], ["first Engine", "firstEngineMs"]] as const) {
     out.push({ group: "wasm-load", scenario: "-", throttle: "1", metric: `cold ${metric}`, unit: "ms", better: "lower", value: (r) => r.wasmCold?.[key], engines: ["ts"] });
   }
@@ -63,16 +87,20 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
           step("host JS sync", "ms", "lower", (r) => r.scenarios[s]?.hosted[t]?.attribution?.hostJsMs, ["wasm"]);
         }
       }
-      const f = (metric: string, unit: string, better: "lower" | "higher", key: keyof NonNullable<ProcessRun["scenarios"][string]["frames"][string]>) =>
-        out.push({ group: "frames", scenario: s, throttle: t, metric, unit, better, value: (r) => r.scenarios[s]?.frames[t]?.[key] as number | undefined });
-      f("frame time median", "ms", "lower", "medianMs");
-      f("frame time p95", "ms", "lower", "p95Ms");
-      f("frame time p99", "ms", "lower", "p99Ms");
-      f("mean FPS", "fps", "higher", "meanFps");
-      f("1% low FPS", "fps", "higher", "onePercentLowFps");
-      f("sim minutes per real second", "min/s", "higher", "simMinutesPerSecond");
-      f("share of frame time in sim.tick", "ratio", "lower", "tickShare");
-      f("share of frame time in ui.update", "ratio", "lower", "uiShare");
+      for (const [group, slot] of [["frames", "frames"], ["frames-audio", "framesAudio"]] as const) {
+        const f = (metric: string, unit: string, better: "lower" | "higher", key: keyof NonNullable<ProcessRun["scenarios"][string]["frames"][string]>) =>
+          out.push({ group, scenario: s, throttle: t, metric, unit, better, value: (r) => r.scenarios[s]?.[slot]?.[t]?.[key] as number | undefined });
+        f("frame time median", "ms", "lower", "medianMs");
+        f("frame time p95", "ms", "lower", "p95Ms");
+        f("frame time p99", "ms", "lower", "p99Ms");
+        f("mean FPS", "fps", "higher", "meanFps");
+        f("1% low FPS", "fps", "higher", "onePercentLowFps");
+        f("sim minutes per real second", "min/s", "higher", "simMinutesPerSecond");
+        f("share of frame time in sim.tick", "ratio", "lower", "tickShare");
+        f("share of frame time in ui.update", "ratio", "lower", "uiShare");
+        f("share of frame time elsewhere (render, compositor, GC, idle)", "ratio", "lower", "restShare");
+        f("frames over 200 ms (game time clamped)", "frames", "lower", "clampedFrames");
+      }
     }
   }
   return out;
@@ -99,11 +127,12 @@ export function aggregate(runs: readonly ProcessRun[], scenarios: readonly strin
   return rows;
 }
 
-/** One comparison per metric both engines measured. `verdict` reads the
+/** One comparison per metric both engines measured, with at least
+ *  {@link MIN_VERDICT_N} samples a side before a verdict. `verdict` reads the
  *  ratio's interval against a 5% equivalence band (stats.verdict), in the
  *  metric's own direction: "faster"/"slower" for times and rates, "smaller"/
  *  "larger" for bytes. */
-export function compareEngines(rows: readonly MetricRow[]): Comparison[] {
+export function compareEngines(rows: readonly MetricRow[], skipped: string[] = []): Comparison[] {
   const out: Comparison[] = [];
   const key = (r: MetricRow) => `${r.group}|${r.scenario}|${r.throttle}|${r.metric}`;
   const byKey = new Map<string, Partial<Record<EngineName, MetricRow>>>();
@@ -111,9 +140,14 @@ export function compareEngines(rows: readonly MetricRow[]): Comparison[] {
   for (const pair of byKey.values()) {
     const ts = pair.ts;
     const wasm = pair.wasm;
-    if (!ts?.summary || !wasm?.summary || ts.summary.median === 0) continue;
+    if (!ts?.summary || !wasm?.summary) continue;
+    if (ts.summary.median === 0) {
+      // No ratio against zero (a byte count of 0, no clamped frames).
+      skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: TypeScript median is 0, WASM median ${wasm.summary.median}`);
+      continue;
+    }
     const r = ratioOfMedians(wasm.values, ts.values);
-    const v = verdict(r);
+    const v = ts.values.length < MIN_VERDICT_N || wasm.values.length < MIN_VERDICT_N ? "inconclusive" : verdict(r);
     let word: Comparison["verdict"] = v === "equivalent" ? "equivalent" : "inconclusive";
     if (v === "higher" || v === "lower") {
       const wasmBetter = (v === "lower") === (ts.better === "lower");
@@ -136,6 +170,18 @@ export function compareEngines(rows: readonly MetricRow[]): Comparison[] {
       verdict: word,
       n: { ts: ts.values.length, wasm: wasm.values.length },
     });
+  }
+  return out;
+}
+
+/** A warning for every metric with fewer values than successful processes
+ *  of its engine (a missing first frame, a resource that never loaded), so
+ *  no sample leaves a row unnoticed. */
+export function missingSamples(rows: readonly MetricRow[], runs: readonly ProcessRun[]): string[] {
+  const out: string[] = [];
+  for (const r of rows) {
+    const expected = runs.filter((x) => x.ok && x.engine === r.engine).length;
+    if (r.values.length < expected) out.push(`${r.group} ${r.scenario} ${r.throttle}x ${r.metric} (${r.engine}): ${r.values.length} of ${expected} processes produced a value`);
   }
   return out;
 }

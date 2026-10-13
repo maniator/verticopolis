@@ -33,8 +33,12 @@ export interface StepSummary {
   stepP95Ms: number;
   stepP99Ms: number;
   stepMaxMs: number;
-  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; merges: number } | null;
+  /** From a separate wrapped pass (hosted WASM only); the timings above
+   *  come from an unwrapped pass. */
+  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; merges: number; engineTicks: number } | null;
   engineActive: EngineName;
+  hostErrorsAdded: string[];
+  startMinutes: number;
   startDigest: string;
   endDigest: string;
   end: { minutes: number; money: number; star: number; population: number; people: number };
@@ -51,7 +55,15 @@ export interface FrameSummary {
   tickShare: number;
   uiShare: number;
   ticks: number;
+  /** 1 - tickShare - uiShare: the canvas render, compositor, GC and idle. */
+  restShare: number;
+  /** Frames longer than 200 ms. Excalibur hands such a frame 1 ms of
+   *  elapsed time, so the game advances almost nothing in it: frame rows
+   *  with clamped frames understate the sim work. */
+  clampedFrames: number;
   engineActive: EngineName;
+  hostErrorsAdded: string[];
+  audioStarted: boolean;
 }
 
 export interface MemorySummary {
@@ -72,6 +84,10 @@ export interface StartupSample {
   /** Resource timing of the engine package, when it loaded. */
   wasmFetchMs: number | null;
   glueFetchMs: number | null;
+  /** The boot path's own compile and instantiate of the engine package
+   *  (first instantiateStreaming or instantiate call), WASM only. */
+  wasmInstantiateMs: number | null;
+  wasmInstantiateVia: "instantiateStreaming" | "instantiate" | null;
   servedBeforeReady: ServedRequest[];
   servedAfterReady: ServedRequest[];
 }
@@ -82,7 +98,10 @@ export interface ScenarioRun {
   /** Keyed by the CPU throttle rate as a string ("1", "4"). */
   hosted: Record<string, StepSummary>;
   raw: Record<string, StepSummary>;
+  /** Audio not started (no gesture: the Tone.js chunk never loads). */
   frames: Record<string, FrameSummary>;
+  /** The same frames with the game's audio started and unmuted. */
+  framesAudio: Record<string, FrameSummary>;
 }
 
 export interface ProcessRun {
@@ -97,15 +116,20 @@ export interface ProcessRun {
   page: { crossOriginIsolated: boolean; timerResolutionMs: number; userAgent: string; viewport: { width: number; height: number; dpr: number }; webgl: { renderer: string; vendor: string } | null } | null;
   cold: StartupSample | null;
   warm: StartupSample | null;
+  /** A cold start under the 4x CPU throttle, in a second fresh context of
+   *  the same browser process (fresh HTTP cache, not a fresh process). */
+  cold4x: StartupSample | null;
   scenarios: Record<string, ScenarioRun>;
   wasmCold: { fetchMs: number; bytes: number; compileMs: number; instantiateMs: number; firstEngineMs: number } | null;
   /** A first visit with the service worker allowed, then an offline
    *  reload: which engine came back without the network. */
-  firstVisitWithServiceWorker: { served: ServedRequest[]; swActive: boolean; offlineEngineActive: EngineName | null } | null;
+  /** The audio start for the audio-on frame pass. */
+  audio: { started: boolean; muted: boolean; contexts: string[] } | null;
+  firstVisitWithServiceWorker: { served: ServedRequest[]; swActive: boolean; offlineEngineActive: EngineName | null; offlinePageErrors: string[]; error: string | null } | null;
 }
 
 export interface MetricRow {
-  group: "startup" | "sim-hosted" | "sim-raw" | "frames" | "memory" | "transfer" | "wasm-load";
+  group: "startup" | "sim-hosted" | "sim-raw" | "frames" | "frames-audio" | "memory" | "transfer" | "wasm-load";
   scenario: string;
   throttle: string;
   metric: string;
@@ -147,6 +171,8 @@ export interface CompareResults {
   nodeChecks: NodeCheck[];
   runs: ProcessRun[];
   bundle: BundleReport | null;
+  /** The same totals for the VC_TOOLING=1 build the timings ran on. */
+  toolingBundleTotals?: BundleReport["totals"];
   metrics: MetricRow[];
   comparisons: Comparison[];
   validation: { ok: boolean; errors: string[]; warnings: string[] };

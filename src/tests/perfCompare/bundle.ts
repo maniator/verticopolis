@@ -97,6 +97,7 @@ export function wasmSections(bytes: Uint8Array): { name: string; bytes: number }
     let name = SECTION_NAMES[id] ?? `unknown-${id}`;
     if (id === 0) {
       const n = uleb(bytes, next);
+      if (n.next + n.value > end) throw new Error("a custom section's name runs past its section");
       name = `custom:${new TextDecoder().decode(bytes.subarray(n.next, n.next + n.value))}`;
     }
     out.push({ name, bytes: end - pos });

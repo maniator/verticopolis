@@ -175,6 +175,8 @@ function wasmParityProjects() {
     "**/dualRunDay.integration.test.ts",
     "**/dualRunEdits.integration.test.ts",
     "**/loaderCases.integration.test.ts",
+    // The engine comparison's own checks run each engine themselves (#972).
+    "**/perfCompare/*.integration.test.ts",
     "**/wasmHost.integration.test.ts",
     "**/wasmHostCatalog.integration.test.ts",
     "**/wasmHostLogText.integration.test.ts",

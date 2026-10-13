@@ -17,6 +17,14 @@ import type { CompareConfig, EngineName, ProcessRun, StepSummary } from "./types
  * 4. The Node check (state and crowd conformance digests) matched.
  * 5. The two configurations are comparable: one browser build, one viewport,
  *    one isolation state, at least one good process per engine.
+ * 6. The simulation really ran: every sample's clock moved by exactly the
+ *    steps it was given, and its end state differs from its start. The
+ *    browser digests equal the Node check's (same save, steps and step).
+ * 7. No host error and no engine or frame error ([wasm], [tick]) appeared
+ *    during a run.
+ * Warnings (reported, not failing): other page errors, frames longer than
+ * the 200 ms clamp, frame windows under 100 frames, audio that did not
+ * start, a first visit whose service worker never activated.
  */
 export interface Validation {
   ok: boolean;
@@ -42,7 +50,7 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
   const good = runs.filter((r) => r.ok);
   for (const r of good) {
     const tag = `rep ${r.rep} ${r.engine}`;
-    for (const [phase, s] of [["cold start", r.cold], ["warm start", r.warm]] as const) {
+    for (const [phase, s] of [["cold start", r.cold], ["warm start", r.warm], ["4x cold start", r.cold4x]] as const) {
       if (!s) errors.push(`${tag}: no ${phase} sample`);
       else if (s.engineActive !== r.engine) {
         errors.push(r.engine === "wasm" ? `${tag}: ${phase}: the WASM engine did not initialize; the page fell back to TypeScript` : `${tag}: ${phase}: the TypeScript run reports the WASM engine active`);
@@ -56,14 +64,38 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
       }
       for (const t of config.throttles.map(String)) {
         for (const [mode, s] of [["hosted", sc.hosted[t]], ["raw", sc.raw[t]]] as const) {
-          if (!s) errors.push(`${tag}: ${name} ${mode} at ${t}x missing`);
-          else if (s.engineActive !== r.engine) errors.push(`${tag}: ${name} ${mode} at ${t}x ran on ${s.engineActive}, not ${r.engine}`);
+          if (!s) {
+            errors.push(`${tag}: ${name} ${mode} at ${t}x missing`);
+            continue;
+          }
+          if (s.engineActive !== r.engine) errors.push(`${tag}: ${name} ${mode} at ${t}x ran on ${s.engineActive}, not ${r.engine}`);
+          if (s.hostErrorsAdded.length) errors.push(`${tag}: ${name} ${mode} at ${t}x: the host reported ${s.hostErrorsAdded.join("; ")}`);
+          if (s.end.minutes !== s.startMinutes + config.steps * config.dt) errors.push(`${tag}: ${name} ${mode} at ${t}x: the clock moved ${s.end.minutes - s.startMinutes} minutes, expected ${config.steps * config.dt}`);
+          if (s.startDigest === s.endDigest) errors.push(`${tag}: ${name} ${mode} at ${t}x: the end state equals the start state; the simulation did not advance`);
         }
-        const f = sc.frames[t];
-        if (!f) errors.push(`${tag}: ${name} frames at ${t}x missing`);
-        else if (f.engineActive !== r.engine) errors.push(`${tag}: ${name} frames at ${t}x ran on ${f.engineActive}, not ${r.engine}`);
+        for (const [label, f] of [["frames", sc.frames[t]], ["frames with audio", sc.framesAudio?.[t]]] as const) {
+          if (!f) {
+            if (label === "frames" || r.audio?.started) errors.push(`${tag}: ${name} ${label} at ${t}x missing`);
+            continue;
+          }
+          if (f.engineActive !== r.engine) errors.push(`${tag}: ${name} ${label} at ${t}x ran on ${f.engineActive}, not ${r.engine}`);
+          if (f.hostErrorsAdded.length) errors.push(`${tag}: ${name} ${label} at ${t}x: the host reported ${f.hostErrorsAdded.join("; ")}`);
+          if (f.clampedFrames > 0) warnings.push(`${tag}: ${name} ${label} at ${t}x: ${f.clampedFrames} of ${f.frames} frames ran over 200 ms, which the game clamps to 1 ms of elapsed time, so that row understates the simulation work`);
+          if (f.frames < 100) warnings.push(`${tag}: ${name} ${label} at ${t}x: only ${f.frames} frames in the window; its p99 and 1% low rest on one or two frames`);
+          if (label === "frames" && f.audioStarted) errors.push(`${tag}: ${name} frames at ${t}x ran with audio started; the audio-off rows are not audio-off`);
+          if (label === "frames with audio" && !f.audioStarted) errors.push(`${tag}: ${name} frames with audio at ${t}x ran without audio`);
+        }
       }
     }
+  }
+
+  for (const r of good) {
+    const fatal = r.pageErrors.filter((e) => /\[wasm\]|\[tick\]/.test(e));
+    if (fatal.length) errors.push(`rep ${r.rep} ${r.engine}: engine or frame errors in the page: ${fatal.slice(0, 3).join(" | ")}`);
+    else if (r.pageErrors.length) warnings.push(`rep ${r.rep} ${r.engine}: ${r.pageErrors.length} page error(s), first: ${r.pageErrors[0]}`);
+    if (!r.audio?.started) warnings.push(`rep ${r.rep} ${r.engine}: audio did not start, so the audio-on rows have no sample from it`);
+    const fv = r.firstVisitWithServiceWorker;
+    if (!fv || fv.error || !fv.swActive) warnings.push(`rep ${r.rep} ${r.engine}: the service worker first visit ${fv?.error ? `failed (${fv.error})` : "never activated"}; its transfer and offline rows have no sample from it`);
   }
 
   // Same start and same end, everywhere a scenario ran.
@@ -84,6 +116,11 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
         (ends.get(s.endDigest) ?? ends.set(s.endDigest, []).get(s.endDigest)!).push(where);
         minutes.add(s.end.minutes);
       }
+    }
+    const node = nodeChecks.find((c) => c.scenario === name);
+    if (node && node.steps === config.steps && node.dt === config.dt) {
+      if (starts.size === 1 && !starts.has(node.start.tsState)) errors.push(`${name}: the browser runs started from ${[...starts.keys()][0]}, not the Node check's ${node.start.tsState}`);
+      if (ends.size === 1 && !ends.has(node.end.tsState)) errors.push(`${name}: the browser runs ended in ${[...ends.keys()][0]}, not the Node check's ${node.end.tsState}`);
     }
     if (starts.size > 1) errors.push(`${name}: the samples did not start from one state: ${describeGroups(starts)}`);
     if (ends.size > 1) errors.push(`${name}: the samples did not end in one state after the same ticks: ${describeGroups(ends)}`);

@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
-import { collectEnvironment } from "./env";
-import { aggregate, compareEngines } from "./metrics";
+import { collectEnvironment, engineBuildHash } from "./env";
+import { aggregate, compareEngines, missingSamples } from "./metrics";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
 import { engineOrder, runProcess } from "./runner";
@@ -48,10 +48,13 @@ export function parseArgs(argv: readonly string[]): Args {
       repsSet = true;
       if (!Number.isInteger(a.reps) || a.reps < 1) throw new Error("--reps must be a positive integer");
     } else if (arg === "--out") a.out = next();
-    else if (arg === "--scenarios") a.scenarios = next().split(",").filter(Boolean);
-    else if (arg === "--throttles") {
+    else if (arg === "--scenarios") {
+      a.scenarios = next().split(",").filter(Boolean);
+      if (new Set(a.scenarios).size !== a.scenarios.length) throw new Error("--scenarios names a scenario twice");
+    } else if (arg === "--throttles") {
       a.throttles = next().split(",").map(Number);
       if (a.throttles.some((t) => !(t >= 1))) throw new Error("--throttles takes rates of 1 or more, comma separated");
+      if (new Set(a.throttles).size !== a.throttles.length) throw new Error("--throttles names a rate twice");
     } else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --scenarios a,b, --throttles 1,4`);
   }
   if (a.quick && !repsSet) a.reps = 2;
@@ -83,7 +86,13 @@ const STATIC_LIMITATIONS = [
   "Transfer sizes are what this harness's server sent: Brotli quality 11 or gzip level 9 static compression, Cache-Control per vercel.json. A CDN's compression levels and protocol overhead differ; headers are not counted.",
   "CPU throttling is Chromium's DevTools emulation (the renderer is paused in slices), not a slower CPU: it scales CPU time but not memory bandwidth or cache behavior.",
   "WASM linear memory only grows. The scenarios run small, medium, large in one page, so each WASM memory figure is the high-water mark up to that scenario. The JS heap is measured after a forced GC through the DevTools protocol; process PSS sums every browser process (Linux only).",
-  "Startup is measured to the moment the app publishes its tooling handle (window.game) and to the first frame after it; it uses a VC_TOOLING=1 build of the same sources, which only adds that handle.",
+  "Startup is measured to the moment the app publishes its tooling handle (window.game) and to the first frame after it; it uses a VC_TOOLING=1 build of the same sources, which only adds that handle. The before-ready and after-ready byte split is cut where a 10 ms poll first sees the handle. The 4x cold start runs in a second fresh context of the same browser process (fresh HTTP cache, warm process).",
+  "Gameplay frame windows are wall-clock time, so the slower engine simulates fewer in-game minutes in them; the achieved sim speed is reported beside every frame row. A frame over 200 ms is handed 1 ms of elapsed time by Excalibur, so rows with clamped frames (counted in the frames-over-200-ms row) understate the simulation's share.",
+  "Audio-off means the game's audio never started (no gesture, so the Tone.js chunk never loads); audio-on starts it the way a first click does, unmuted, with Chromium's autoplay policy relaxed for both engines. Headless Chromium plays to no device, so the audio thread's cost on real output hardware may differ.",
+  "The WASM attribution (engine tick, exports the host reads, host JS) comes from a separate pass with wrappers on the engine's methods, never from the timed pass. The bare-engine (raw) rows tick a detached Engine and do not include the host's read-model sync.",
+  "The incremental WASM download counts the engine package (binary, loader, BUILD.json). The WASM host code (src/wasmhost) is inside the shared app chunks and is counted there for both configurations (backlog row perf-compare-host-js-share).",
+  "Node timings (outcome check table) are a secondary data point on Node's V8; the engine order alternates by scenario.",
+  "This is a pre-3.0 baseline of an engine still being cut over (#945), not release performance. Every result directory is named by date and commit so later runs can be compared with it.",
 ];
 
 function sh(cmd: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env): void {
@@ -96,7 +105,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const dist = join(repo, "dist");
   const distPerf = join(repo, "dist-perf");
   if (!existsSync(join(repo, "src/public/engine/verticopolis_engine_bg.wasm"))) {
-    throw new Error("the engine package src/public/engine/ is missing: build it first with `npm run wasm:build` (needs the wasm32 target and the pinned wasm-bindgen CLI)");
+    throw new Error("the engine package src/public/engine/ is missing: build it first with `bash scripts/build-engine-wasm.sh` where that script exists (it installs the pinned toolchain), or `npm run wasm:build` (needs the wasm32 target and the pinned wasm-bindgen CLI)");
   }
   if (!args.skipBuild) {
     log("perf:compare: production build (npm run build)");
@@ -115,7 +124,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
 
   log("perf:compare: Node conformance check of both engines on every scenario");
   const mod = await loadWebPackage(join(distPerf, "engine"));
-  const nodeChecks = scenarios.map((sc) => checkScenario(mod, sc, config.steps, config.dt, config.warmSteps));
+  const nodeChecks = scenarios.map((sc, i) => checkScenario(mod, sc, config.steps, config.dt, config.warmSteps, i % 2 === 0 ? "ts-first" : "wasm-first"));
   for (const c of nodeChecks) log(`  ${c.scenario}: ${c.match ? "engines agree" : "ENGINES DISAGREE"} (Node: ts ${c.nodeTsMs.toFixed(0)} ms, wasm ${c.nodeWasmMs.toFixed(0)} ms)`);
 
   const server = await startServer(distPerf);
@@ -137,14 +146,21 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   }
 
   const validation = validateResults(config, runs, nodeChecks);
-  if (environment.engineBuildHash && environment.engineSourceHash && environment.engineBuildHash !== environment.engineSourceHash) {
-    validation.errors.push(`the served engine package (${environment.engineBuildHash}) was not built from the current engine-rs sources (${environment.engineSourceHash}); rebuild it with npm run wasm:build`);
-    validation.ok = false;
-  }
+  const prodHash = engineBuildHash(dist);
+  if (!environment.engineBuildHash) validation.errors.push("the served engine package has no BUILD.json, so which sources it came from is unknown");
+  else if (environment.engineSourceHash && environment.engineBuildHash !== environment.engineSourceHash) validation.errors.push(`the served engine package (${environment.engineBuildHash}) was not built from the current engine-rs sources (${environment.engineSourceHash}); rebuild it with npm run wasm:build`);
+  if (!environment.engineSourceHash) validation.warnings.push("no engine-rs sources in this checkout, so the package's source hash was not checked");
+  if (prodHash !== environment.engineBuildHash) validation.errors.push(`dist/ (sizes) and dist-perf/ (timings) carry different engine packages (${prodHash ?? "none"} vs ${environment.engineBuildHash ?? "none"}); rebuild without --skip-build`);
+  if (args.skipBuild) validation.warnings.push("--skip-build: dist/ and dist-perf/ were not rebuilt for this commit");
   if (environment.dirty) validation.warnings.push("the working tree had uncommitted changes to tracked files");
   const metrics = aggregate(runs, config.scenarios, config.throttles);
+  // Pairs with a zero TypeScript median (WASM-only bytes, no clamped
+  // frames) get no ratio; the report lists them per engine instead.
   const comparisons = compareEngines(metrics);
+  for (const w of missingSamples(metrics, runs)) validation.warnings.push(w);
+  validation.ok = validation.errors.length === 0;
   const bundle = analyzeBundle(dist);
+  const toolingBundle = analyzeBundle(distPerf);
   const renderer = runs.find((r) => r.page?.webgl)?.page?.webgl?.renderer;
   const results: CompareResults = {
     schema: 1,
@@ -157,6 +173,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     nodeChecks,
     runs,
     bundle,
+    toolingBundleTotals: toolingBundle.totals,
     metrics,
     comparisons,
     validation,

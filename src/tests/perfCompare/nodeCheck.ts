@@ -39,7 +39,7 @@ export async function loadWebPackage(dir: string): Promise<WasmModule> {
   return checkBinding(glue);
 }
 
-export function checkScenario(mod: WasmModule, sc: Scenario, steps: number, dt: number, warmSteps: number): NodeCheck {
+export function checkScenario(mod: WasmModule, sc: Scenario, steps: number, dt: number, warmSteps: number, order: "ts-first" | "wasm-first" = "ts-first"): NodeCheck {
   // Warm both engines on throwaway copies, as the browser runs do.
   {
     const ts = Simulation.deserialize(JSON.parse(sc.save) as SerializedGame);
@@ -53,12 +53,20 @@ export function checkScenario(mod: WasmModule, sc: Scenario, steps: number, dt: 
   const ts = Simulation.deserialize(JSON.parse(sc.save) as SerializedGame);
   const w = mod.Engine.fromSave(sc.save);
   const start = { tsState: digest(stateView(ts)), wasmState: w.stateDigest(), tsCrowd: digest(crowdView(ts)), wasmCrowd: w.crowdDigest() };
-  let t = performance.now();
-  for (let i = 0; i < steps; i++) ts.tick(dt);
-  const nodeTsMs = performance.now() - t;
-  t = performance.now();
-  for (let i = 0; i < steps; i++) w.tick(dt);
-  const nodeWasmMs = performance.now() - t;
+  const time = (tick: () => void): number => {
+    const t = performance.now();
+    for (let i = 0; i < steps; i++) tick();
+    return performance.now() - t;
+  };
+  let nodeTsMs: number;
+  let nodeWasmMs: number;
+  if (order === "ts-first") {
+    nodeTsMs = time(() => ts.tick(dt));
+    nodeWasmMs = time(() => w.tick(dt));
+  } else {
+    nodeWasmMs = time(() => w.tick(dt));
+    nodeTsMs = time(() => ts.tick(dt));
+  }
   const end = { tsState: digest(stateView(ts)), wasmState: w.stateDigest(), tsCrowd: digest(crowdView(ts)), wasmCrowd: w.crowdDigest() };
   w.free();
   const match = start.tsState === start.wasmState && start.tsCrowd === start.wasmCrowd && end.tsState === end.wasmState && end.tsCrowd === end.wasmCrowd;

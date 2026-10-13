@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createServer, type Server } from "node:http";
-import { extname, join, normalize, sep } from "node:path";
+import { extname, join, normalize, resolve, sep } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 
 /**
@@ -85,6 +85,9 @@ export interface PerfServer {
 
 export async function startServer(root: string, port = 0): Promise<PerfServer> {
   if (!existsSync(join(root, "index.html"))) throw new Error(`no build at ${root} (index.html missing)`);
+  // One spelling of the root (no trailing separator), so the containment
+  // check below holds whatever the caller passed.
+  const base = resolve(root);
   const cache = new Map<string, Entry>();
   const log: ServedRequest[] = [];
   const entry = (file: string): Entry => {
@@ -109,14 +112,23 @@ export async function startServer(root: string, port = 0): Promise<PerfServer> {
       else entry(p);
     }
   };
-  warm(root);
+  warm(base);
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
-    let path = decodeURIComponent(url.pathname);
-    if (path.endsWith("/")) path += "index.html";
-    const file = normalize(join(root, path));
     const isolation = { "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Embedder-Policy": "require-corp", "Cross-Origin-Resource-Policy": "same-origin" };
-    if (!file.startsWith(normalize(root) + sep) || !existsSync(file) || !statSync(file).isFile()) {
+    let path: string;
+    try {
+      path = decodeURIComponent(url.pathname);
+    } catch {
+      // A malformed escape is the client's error, never a crash of the run.
+      res.writeHead(400, { "Content-Type": "text/plain", ...isolation });
+      res.end("bad request");
+      log.push({ path: url.pathname, status: 400, bytes: 11, encoding: "identity" });
+      return;
+    }
+    if (path.endsWith("/")) path += "index.html";
+    const file = normalize(join(base, path));
+    if (!file.startsWith(base + sep) || !existsSync(file) || !statSync(file).isFile()) {
       res.writeHead(404, { "Content-Type": "text/plain", ...isolation });
       res.end("not found");
       log.push({ path, status: 404, bytes: 9, encoding: "identity" });

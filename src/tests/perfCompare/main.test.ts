@@ -20,6 +20,8 @@ describe("parseArgs", () => {
     expect(() => parseArgs(["--reps"])).toThrow(/needs a value/);
     expect(() => parseArgs(["--throttles", "0.5"])).toThrow(/rates of 1 or more/);
     expect(() => parseArgs(["--fast"])).toThrow(/unknown argument --fast/);
+    expect(() => parseArgs(["--throttles", "1,1"])).toThrow(/a rate twice/);
+    expect(() => parseArgs(["--scenarios", "small,small"])).toThrow(/a scenario twice/);
   });
 });
 
@@ -30,14 +32,16 @@ describe("runner summaries", () => {
   });
   it("summarizes a simulation run's steps", () => {
     const s = stepSummary(
-      { mode: "raw", engineActive: "wasm", steps: 4, dt: 2, loadMs: 3, totalMs: 10, stepMs: [1, 2, 3, 4], attribution: null, startKey: "a", endKey: "b", end: { minutes: 8, money: 1, star: 1, population: 1, people: 0 } },
+      { mode: "raw", engineActive: "wasm", steps: 4, dt: 2, loadMs: 3, totalMs: 10, stepMs: [1, 2, 3, 4], attribution: null, hostErrorsAdded: [], startMinutes: 0, startKey: "a", endKey: "b", end: { minutes: 8, money: 1, star: 1, population: 1, people: 0 } },
       "s",
       "e",
     );
     expect(s).toMatchObject({ totalMs: 10, loadMs: 3, stepMedianMs: 2.5, stepMaxMs: 4, startDigest: "s", endDigest: "e", engineActive: "wasm" });
   });
   it("summarizes frames with the achieved speed and the tick share", () => {
-    const f = frameSummary({ intervalsMs: [10, 10, 20], wallMs: 1000, simMinutes: 50, tickMs: 100, ticks: 9, uiMs: 10, engineActive: "ts" });
-    expect(f).toMatchObject({ frames: 3, medianMs: 10, simMinutesPerSecond: 50, tickShare: 0.1, uiShare: 0.01, ticks: 9, onePercentLowFps: 50 });
+    const f = frameSummary({ audioStarted: false, intervalsMs: [10, 10, 20], wallMs: 1000, simMinutes: 50, tickMs: 100, ticks: 9, uiMs: 10, engineActive: "ts", hostErrorsAdded: [] });
+    expect(f).toMatchObject({ frames: 3, medianMs: 10, simMinutesPerSecond: 50, tickShare: 0.1, uiShare: 0.01, ticks: 9, onePercentLowFps: 50, clampedFrames: 0 });
+    expect(f.restShare).toBeCloseTo(0.89, 12);
+    expect(frameSummary({ audioStarted: true, intervalsMs: [16, 250, 201, 200], wallMs: 700, simMinutes: 1, tickMs: 0, ticks: 1, uiMs: 0, engineActive: "wasm", hostErrorsAdded: [] }).clampedFrames).toBe(2);
   });
 });

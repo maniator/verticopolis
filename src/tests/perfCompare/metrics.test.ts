@@ -31,6 +31,9 @@ describe("aggregate", () => {
     expect(rows.find((r) => r.metric === "cold bytes served before ready" && r.engine === "ts")!.values[0]).toBe(1000);
     expect(rows.find((r) => r.metric === "warm game ready" && r.engine === "ts")!.values).toHaveLength(7);
     expect(rows.find((r) => r.metric === "first visit with service worker, bytes served" && r.engine === "wasm")!.values[0]).toBe(2000);
+    expect(rows.find((r) => r.metric === "cold before ready: html" && r.engine === "ts")!.values[0]).toBe(0);
+    expect(rows.find((r) => r.metric === "cold game ready" && r.throttle === "4" && r.engine === "ts")!.values[0]).toBe(1200);
+    expect(rows.find((r) => r.group === "frames-audio" && r.metric === "mean FPS" && r.engine === "ts")!.values).toHaveLength(8);
   });
 
   it("has a null summary when nothing was measured", () => {
@@ -40,6 +43,13 @@ describe("aggregate", () => {
 });
 
 describe("compareEngines", () => {
+  it("skips a zero TypeScript median and says so", () => {
+    const skipped: string[] = [];
+    const comps = compareEngines(aggregate(runs(), ["small"], [1]), skipped);
+    expect(comps.find((c) => c.metric === "frames over 200 ms (game time clamped)")).toBeUndefined();
+    expect(skipped.some((x) => x.includes("frames over 200 ms"))).toBe(true);
+  });
+
   it("reports wasm / ts with the metric's direction", () => {
     const comps = compareEngines(aggregate(runs(), ["small"], [1]));
     const hosted = comps.find((c) => c.group === "sim-hosted" && c.metric === "total for fixed duration")!;
@@ -68,6 +78,9 @@ describe("compareEngines", () => {
 
   it("is inconclusive with one sample per side", () => {
     const comps = compareEngines(aggregate([processRun(0, "ts"), processRun(0, "wasm", {}, 2)], ["small"], [1]));
+    // Five a side is still under the floor, even with a clear difference.
+    const five = Array.from({ length: 5 }, (_, rep) => [processRun(rep, "ts"), processRun(rep, "wasm", {}, 2)]).flat();
+    expect(compareEngines(aggregate(five, ["small"], [1])).find((c) => c.group === "sim-hosted" && c.metric === "total for fixed duration")!.verdict).toBe("inconclusive");
     expect(comps.find((c) => c.group === "sim-hosted" && c.metric === "total for fixed duration")!.verdict).toBe("inconclusive");
   });
 });

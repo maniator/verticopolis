@@ -10,8 +10,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /** Init script: stamp the moment the app publishes `window.game` and the
- *  moment the WASM host publishes `window.__vcEngine`, by accessor, so the
- *  startup numbers need no polling and no change to the app. */
+ *  moment the WASM host publishes `window.__vcEngine`, by accessor, and the
+ *  engine package's instantiate on the boot path, so the startup numbers
+ *  need no polling and no change to the app. */
 export function installProbes(): void {
   const w = window as any;
   const marks: Record<string, number> = {};
@@ -31,6 +32,40 @@ export function installProbes(): void {
       }
     },
   });
+  // Count the audio contexts the page makes, so a run can say whether
+  // audio really started (Tone.js makes one on the first start()).
+  const contexts: { state: string }[] = [];
+  w.__perfAudioContexts = contexts;
+  const Ctx = w.AudioContext as (new (...a: unknown[]) => { state: string }) | undefined;
+  if (Ctx) {
+    w.AudioContext = class extends (Ctx as new (...a: unknown[]) => { state: string }) {
+      constructor(...a: unknown[]) {
+        super(...a);
+        contexts.push(this);
+      }
+    };
+  }
+  // Time the engine package's compile and instantiate on the app's own boot
+  // path (wasm-bindgen's loader calls instantiateStreaming, or instantiate
+  // as its fallback): the first call's start and end.
+  const wa = WebAssembly as any;
+  for (const name of ["instantiateStreaming", "instantiate"]) {
+    const orig = wa[name];
+    if (typeof orig !== "function") continue;
+    wa[name] = function (this: unknown, ...a: unknown[]) {
+      const t = performance.now();
+      const p = orig.apply(this, a) as Promise<unknown>;
+      if (marks.wasmInstantiateStart === undefined) {
+        marks.wasmInstantiateStart = t;
+        marks.wasmInstantiateVia = name === "instantiateStreaming" ? 1 : 2;
+        p.then(
+          () => (marks.wasmInstantiateEnd = performance.now()),
+          () => (marks.wasmInstantiateEnd = -1),
+        );
+      }
+      return p;
+    };
+  }
   Object.defineProperty(w, "__vcEngine", {
     configurable: true,
     get: () => host,
@@ -101,7 +136,8 @@ export function pageInfo(): PageInfo {
       decodedBodySize: r.decodedBodySize,
     })),
     crossOriginIsolated: Boolean((globalThis as any).crossOriginIsolated),
-    timerResolutionMs: res,
+    // -1 when the clock never moved in the sampling loop.
+    timerResolutionMs: Number.isFinite(res) ? res : -1,
     userAgent: navigator.userAgent,
     viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio },
     webgl,
@@ -150,12 +186,14 @@ export async function digestStashed(key: string): Promise<string> {
 }
 
 /** Calm the live app for scripted measurement, the way e2e/perf.spec.ts
- *  does: no title screen, no modal emergencies, no autosave, steady clock,
- *  paused. Identical on both engines. */
+ *  does: no title screen, no autosave, steady clock, paused, and an
+ *  emergency answered "decline" the moment the frame loop raises it (through
+ *  `sim.resolveChoice`, which the WASM host relays, so both engines see the
+ *  same answer; the pending field itself is never written, since a write to
+ *  the read model would not reach the engine). Identical on both engines. */
 export function prepareLiveApp(): void {
   const g = (window as any).game;
   document.getElementById("splash")?.remove();
-  g.sim.events.pending = null;
   g.ui.showEventChoice = (_m: string, _c: string, onResolve: (opt: "accept" | "decline") => void) => onResolve("decline");
   g.shownWin = true;
   g.shownChoice = false;
@@ -174,272 +212,36 @@ export interface AdoptResult {
 }
 
 /** Load a stashed scenario into the live app through `adoptSim`, the path a
- *  player's load takes on either engine. */
+ *  player's load takes on either engine. On WASM it counts as hosted only
+ *  when this adopt started a new engine and raised no new host error. */
 export function adoptScenario(name: string): AdoptResult {
   const w = window as any;
   const g = w.game;
   const save = w.__perfSaves[name] as string;
+  const h = w.__vcEngine;
+  const startsBefore = Number(h?.status?.starts ?? 0);
+  const errorsBefore = ((h?.status?.errors ?? []) as string[]).length;
   const t0 = performance.now();
   const sim = g.sim.constructor.deserialize(JSON.parse(save));
   g.adoptSim(sim);
   const adoptMs = performance.now() - t0;
   g.speed = 0;
   g.engine.paused = true;
-  g.sim.events.pending = null;
-  const h = w.__vcEngine;
-  const hosted = Boolean(h?.status?.hosted) && (h.status.errors as string[]).length === 0 && Boolean(h.current()) && Object.prototype.hasOwnProperty.call(g.sim, "serialize");
+  const hosted =
+    Boolean(h?.status?.hosted) &&
+    Number(h.status.starts) === startsBefore + 1 &&
+    (h.status.errors as string[]).length === errorsBefore &&
+    Boolean(h.current()) &&
+    Object.prototype.hasOwnProperty.call(g.sim, "serialize");
   return { adoptMs, engineActive: hosted ? "wasm" : "ts", starts: Number(h?.status?.starts ?? 0), population: g.sim.population };
 }
 
-export interface SimRun {
-  mode: "hosted" | "raw";
-  engineActive: "ts" | "wasm";
-  steps: number;
-  dt: number;
-  /** Time to make the measured instance from the save (raw only). */
-  loadMs: number;
-  totalMs: number;
-  stepMs: number[];
-  /** Hosted WASM only: time inside the engine's tick, inside the exports
-   *  the host reads back (serialize, frameView, logSince, telemetry), and
-   *  the JavaScript remainder (decode, merge, read-model sync). */
-  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; merges: number } | null;
-  /** Keys of the stashed start and end saves (see digestStashed). */
-  startKey: string;
-  endKey: string;
-  end: { minutes: number; money: number; star: number; population: number; people: number };
-}
-
-/**
- * Simulation-only timing. `hosted`: tick the live app's tower through
- * `sim.tick` (on the WASM project that is the engine's tick plus the
- * host's read-model sync; on TypeScript it is the engine itself). `raw`:
- * tick a detached instance with nothing attached (a TypeScript Simulation,
- * or a bare WASM Engine from the served package). Each mode warms up on a
- * throwaway instance first, then measures a fresh one from the same save.
- */
-export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine: "ts" | "wasm"; steps: number; warmSteps: number; dt: number; engineUrl: string }): Promise<SimRun> {
-  const w = window as any;
-  const g = w.game;
-  const save = w.__perfSaves[arg.name] as string;
-  // The start and end saves are stashed for digestStashed, so the digest
-  // code exists once in the page.
-  w.__perfStash = w.__perfStash ?? {};
-  const Sim = g.sim.constructor;
-
-  // A uniform driver over the three kinds of instance.
-  interface Driver { tick(dt: number): void; save(): unknown; fields(): { minutes: number; money: number; star: number; population: number; people: number }; free(): void }
-  let mod: any = null;
-  if (arg.mode === "raw" && arg.engine === "wasm") {
-    mod = await import(/* @vite-ignore */ arg.engineUrl);
-    await mod.default();
-  }
-  const make = (): { d: Driver; loadMs: number } => {
-    const t0 = performance.now();
-    if (arg.mode === "hosted") {
-      const sim = Sim.deserialize(JSON.parse(save));
-      g.adoptSim(sim);
-      g.speed = 0;
-      g.engine.paused = true;
-      g.sim.events.pending = null;
-      const live = g.sim;
-      return {
-        loadMs: performance.now() - t0,
-        d: {
-          tick: (dt) => live.tick(dt),
-          save: () => live.serialize(),
-          fields: () => ({ minutes: live.clock.minutes, money: live.money, star: live.star, population: live.population, people: live.crowd.people.length }),
-          free: () => {},
-        },
-      };
-    }
-    if (arg.engine === "ts") {
-      const sim = Sim.deserialize(JSON.parse(save));
-      return {
-        loadMs: performance.now() - t0,
-        d: {
-          tick: (dt) => sim.tick(dt),
-          save: () => sim.serialize(),
-          fields: () => ({ minutes: sim.clock.minutes, money: sim.money, star: sim.star, population: sim.population, people: sim.crowd.people.length }),
-          free: () => {},
-        },
-      };
-    }
-    const e = mod.Engine.fromSave(save);
-    const loadMs = performance.now() - t0;
-    return {
-      loadMs,
-      d: {
-        tick: (dt) => e.tick(dt),
-        save: () => JSON.parse(e.serialize()),
-        fields: () => {
-          const s = JSON.parse(e.serialize());
-          const sim = Sim.deserialize(s);
-          return { minutes: sim.clock.minutes, money: e.money(), star: sim.star, population: sim.population, people: (JSON.parse(e.crowdView()).people as unknown[]).length };
-        },
-        free: () => e.free(),
-      },
-    };
-  };
-
-  // Warm up: JIT and WASM tier-up on a throwaway instance.
-  {
-    const { d } = make();
-    for (let i = 0; i < arg.warmSteps; i++) d.tick(arg.dt);
-    d.free();
-  }
-  const { d, loadMs } = make();
-  const tag = `${arg.name}:${arg.mode}:${arg.engine}:${performance.now()}`;
-  w.__perfStash[`${tag}:start`] = d.save();
-
-  // Attribution wrappers on the hosted engine (WASM project only).
-  const h = w.__vcEngine?.current?.();
-  const hostedWasm = arg.mode === "hosted" && Boolean(h) && Object.prototype.hasOwnProperty.call(g.sim, "serialize");
-  const acc = { tick: 0, exp: 0 };
-  const restore: (() => void)[] = [];
-  const mergesBefore = hostedWasm ? (h.merges as number) : 0;
-  if (hostedWasm) {
-    const e = h.engine;
-    const wrap = (name: string, slot: "tick" | "exp") => {
-      const own = Object.getOwnPropertyDescriptor(e, name);
-      const orig = e[name];
-      e[name] = function (this: unknown, ...a: unknown[]) {
-        const t = performance.now();
-        try {
-          return orig.apply(this, a);
-        } finally {
-          acc[slot] += performance.now() - t;
-        }
-      };
-      restore.push(() => {
-        if (own) Object.defineProperty(e, name, own);
-        else delete e[name];
-      });
-    };
-    wrap("tick", "tick");
-    for (const name of ["serialize", "frameView", "logSince", "elevatorTelemetry", "housekeepingReport", "pendingChoice", "drainGameplayEvents"]) wrap(name, "exp");
-  }
-
-  const stepMs = new Array<number>(arg.steps);
-  const t0 = performance.now();
-  try {
-    for (let i = 0; i < arg.steps; i++) {
-      const a = performance.now();
-      d.tick(arg.dt);
-      stepMs[i] = performance.now() - a;
-    }
-  } finally {
-    for (const r of restore) r();
-  }
-  const totalMs = performance.now() - t0;
-  w.__perfStash[`${tag}:end`] = d.save();
-  const f = d.fields();
-  d.free();
-  const sum = stepMs.reduce((s, x) => s + x, 0);
-  return {
-    mode: arg.mode,
-    engineActive: hostedWasm || (arg.mode === "raw" && arg.engine === "wasm") ? "wasm" : "ts",
-    steps: arg.steps,
-    dt: arg.dt,
-    loadMs,
-    totalMs,
-    stepMs,
-    attribution: hostedWasm ? { engineTickMs: acc.tick, engineExportMs: acc.exp, hostJsMs: Math.max(0, sum - acc.tick - acc.exp), merges: (h.merges as number) - mergesBefore } : null,
-    startKey: `${tag}:start`,
-    endKey: `${tag}:end`,
-    end: f,
-  };
-}
-
-export interface FrameRun {
-  intervalsMs: number[];
-  wallMs: number;
-  simMinutes: number;
-  tickMs: number;
-  ticks: number;
-  uiMs: number;
-  engineActive: "ts" | "wasm";
-}
-
-/**
- * Gameplay frames: the real frame loop at the fastest speed (steady clock,
- * emergencies declined, autosave off), sampled by rAF for `windowMs` after
- * `warmMs`. Time inside `sim.tick` and `ui.update` is summed alongside, so
- * the report can tell engine time from the rest of the frame.
- */
-export function measureFrames(arg: { windowMs: number; warmMs: number; speed: number }): Promise<FrameRun> {
-  const w = window as any;
-  const g = w.game;
-  const sim = g.sim;
-  const ui = g.ui;
-  const ownTick = Object.getOwnPropertyDescriptor(sim, "tick");
-  const ownUpdate = Object.getOwnPropertyDescriptor(ui, "update");
-  const tick = sim.tick;
-  const update = ui.update;
-  const acc = { tick: 0, ticks: 0, ui: 0, on: false };
-  sim.tick = function (this: unknown, dt: number) {
-    const t = performance.now();
-    try {
-      return tick.call(this, dt);
-    } finally {
-      if (acc.on) {
-        acc.tick += performance.now() - t;
-        acc.ticks++;
-      }
-    }
-  };
-  ui.update = function (this: unknown, ...a: unknown[]) {
-    const t = performance.now();
-    try {
-      return update.apply(this, a);
-    } finally {
-      if (acc.on) acc.ui += performance.now() - t;
-    }
-  };
-  g.speed = arg.speed;
-  g.engine.paused = false;
-  const h = w.__vcEngine?.current?.();
-  const engineActive: "ts" | "wasm" = h && Object.prototype.hasOwnProperty.call(sim, "serialize") ? "wasm" : "ts";
-  return new Promise<FrameRun>((resolve) => {
-    const intervals: number[] = [];
-    let start = 0;
-    let startMinutes = 0;
-    let last = 0;
-    const begin = performance.now();
-    const done = (): void => {
-      g.speed = 0;
-      g.engine.paused = true;
-      acc.on = false;
-      if (ownTick) Object.defineProperty(sim, "tick", ownTick);
-      else delete sim.tick;
-      if (ownUpdate) Object.defineProperty(ui, "update", ownUpdate);
-      else delete ui.update;
-      resolve({ intervalsMs: intervals, wallMs: last - start, simMinutes: sim.clock.minutes - startMinutes, tickMs: acc.tick, ticks: acc.ticks, uiMs: acc.ui, engineActive });
-    };
-    const frame = (ts: number): void => {
-      if (start === 0) {
-        if (ts - begin >= arg.warmMs) {
-          start = ts;
-          last = ts;
-          startMinutes = sim.clock.minutes;
-          acc.on = true;
-        }
-        requestAnimationFrame(frame);
-        return;
-      }
-      intervals.push(ts - last);
-      last = ts;
-      if (ts - start >= arg.windowMs) done();
-      else requestAnimationFrame(frame);
-    };
-    requestAnimationFrame(frame);
-  });
-}
-
-/** Size of the engine's linear memory, when the page has loaded it. */
+/** Size of the engine's linear memory, when the page hosts the tower on it
+ *  (the loader's init returns the instance the app already made). The runner
+ *  calls it on the WASM process only, so a TypeScript page never loads it. */
 export async function wasmMemoryBytes(engineUrl: string): Promise<number | null> {
   const w = window as any;
-  if (!w.__vcEngine) return null;
+  if (!w.__vcEngine?.status?.hosted) return null;
   const mod = await import(/* @vite-ignore */ engineUrl);
   const exports = await mod.default();
   return (exports.memory as WebAssembly.Memory).buffer.byteLength;
@@ -457,10 +259,13 @@ export interface WasmColdLoad {
  * The engine package's load steps, timed apart, in a page that has never
  * compiled it (run on the TypeScript project, last): download the bytes,
  * compile them, instantiate the glue (a cache-busted copy, so it is a fresh
- * module), and build the first Engine from the boot tower's save.
+ * module), and build the first Engine from a fixed scenario's save. This is a
+ * step-by-step stand-in: the app itself streams the compile
+ * (instantiateStreaming), which the boot-path probe times on the WASM
+ * process.
  */
-export async function wasmColdLoad(arg: { wasmUrl: string; jsUrl: string }): Promise<WasmColdLoad> {
-  const g = (window as any).game;
+export async function wasmColdLoad(arg: { wasmUrl: string; jsUrl: string; scenario: string }): Promise<WasmColdLoad> {
+  const save = (window as any).__perfSaves[arg.scenario] as string;
   let t = performance.now();
   const bytes = await (await fetch(arg.wasmUrl, { cache: "no-store" })).arrayBuffer();
   const fetchMs = performance.now() - t;
@@ -471,7 +276,6 @@ export async function wasmColdLoad(arg: { wasmUrl: string; jsUrl: string }): Pro
   t = performance.now();
   glue.initSync({ module });
   const instantiateMs = performance.now() - t;
-  const save = JSON.stringify(g.sim.serialize());
   t = performance.now();
   glue.Engine.fromSave(save).free();
   const firstEngineMs = performance.now() - t;

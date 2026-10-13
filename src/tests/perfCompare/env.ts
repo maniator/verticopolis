@@ -82,8 +82,10 @@ export function collectEnvironment(repo: string, distDir: string, sourceHash: st
 }
 
 /** Proportional set size (kB to bytes) of a process tree on Linux, from
- *  /proc/<pid>/smaps_rollup; null elsewhere or when unreadable. */
-export function processTreePss(rootPid: number): { bytes: number; processes: number } | null {
+ *  /proc/<pid>/smaps_rollup, counting only descendants whose command name
+ *  matches `only` (the browser's processes, not tsx's esbuild service);
+ *  null elsewhere or when nothing matched. */
+export function processTreePss(rootPid: number, only: RegExp = /./): { bytes: number; processes: number } | null {
   if (platform() !== "linux") return null;
   const parent = new Map<number, number>();
   for (const d of readdirSync("/proc")) {
@@ -112,6 +114,7 @@ export function processTreePss(rootPid: number): { bytes: number; processes: num
   for (const pid of tree) {
     if (pid === rootPid) continue;
     try {
+      if (!only.test(readFileSync(`/proc/${pid}/comm`, "utf8").trim())) continue;
       const m = /^Pss:\s+(\d+) kB/m.exec(readFileSync(`/proc/${pid}/smaps_rollup`, "utf8"));
       if (m) {
         kb += Number(m[1]);
