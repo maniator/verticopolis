@@ -158,8 +158,22 @@ Round 5, confirming pass on the round-4 fixes:
   duplicates. It asserts every tree yields sources, src/ yields more than
   300, and every allowed file is scanned. A planted offender in tools/ is
   caught.
-- **patch** (Blind Hunter) The relay-op doc in `wasm.rs` names UI edits
-  again alongside player edits.
+- **patch** (Blind Hunter) The relay-op doc in `wasm.rs` (and the generated
+  `engine.d.ts`) names UI edits again alongside player edits.
 - Acceptance Auditor: no violations.
 
-Round 6 confirms these fixes; its result follows in this record.
+Round 6, confirming pass on the round-5 fixes: clean, with no patch
+findings.
+
+- Edge Case Hunter: CI runs the unit tests on an `ubuntu-latest` host with a
+  standard checkout, so `git ls-files` has a trusted work tree; `-z` output
+  is safe for any file name; no tracked symlinks or submodules sit in the
+  scanned trees.
+- **dismissed** (Blind Hunter, Edge Case Hunter) Local-only corners of the
+  `git ls-files` list: a new file is scanned once it is staged, an unstaged
+  deletion makes the read throw, and a run outside a git checkout errors at
+  collection. Each fails loudly or is caught when committed; none lets CI
+  pass with an offender in the committed tree.
+- **dismissed** (Blind Hunter) The guard reads tracked paths, so a future
+  tracked symlink would be read through; none exists today.
+- Acceptance Auditor: no violations.
