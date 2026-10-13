@@ -122,6 +122,30 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   forever or merge on your own. Note on the PR that the reviewers were down and
   how many rounds ran. Re-request Copilot/Codex and hold merge as usual the
   moment they are back.
+- **A published analytics number is either computed by a governed definition,
+  or by reviewed code that a test binds to one.** What is banned is the third
+  case: a measure improvised in a session and published. A readout may narrate,
+  interpret, argue and recommend, all the things a dashboard is bad at, but its
+  arithmetic has to come from somewhere that would catch it being wrong. The
+  governed sources are the **Verticopolis: Gameplay Analytics** dashboard, the
+  `session_lengths` view, its saved insights, and the PostHog data catalog;
+  check the catalog first. `scripts/posthog-report.mjs` is the worked example of
+  the second clause: it computes its own HogQL, and that is fine, because it
+  documents what it measures and where it is a lower bound, and
+  `src/posthog-report.test.ts` pins its page-life walk against the view's copy
+  so the two cannot drift. Improvising is how a published readout came to report
+  211 sessions at a median of 86s when the real figures were 132 and 42s: it
+  counted `session_end` rows, which re-fire on every tab-hide. A doc comment,
+  the view, the dashboard and the saved insights all carried that correction
+  already, and prose did not stop the query running. If no governed definition
+  covers the measure and you are not writing tested code, say so in the readout
+  and propose a metric rather than quietly inventing a number.
+- **A published snapshot says so, at the top.** Anything dated and not
+  refreshing carries its window above the figures rather than in a footer, with
+  a pointer to wherever the live number lives: the dashboard when it carries
+  that figure, otherwise the script and the test that produce it, since a
+  governed definition is not always a dashboard tile. A date a reader meets
+  after believing the number is too late.
 
 ## Canon reference (don't re-derive from memory)
 
