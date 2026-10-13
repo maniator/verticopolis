@@ -227,11 +227,14 @@ tower revision, from the engine's save, merged in place so the renderer's
 object references hold. Host commands still run on the instance (the caller
 gets the TypeScript answer) and relay to the engine. `window.__vcEngine`
 says which engine runs. The browser package is served from `src/public/engine/`
-and committed with a `BUILD.json` naming the Rust sources' hash; a unit test
-fails when the sources moved on without `npm run wasm:build`. The Vercel
-build (`scripts/vercel-build.sh`) installs the pinned toolchain and builds
-the package itself on every deploy, so a Rust change reaches the preview and
-production without a committed binary. The gate is
+with a `BUILD.json` naming the Rust sources' hash. It is build output and is
+not checked in: the Vercel build (`scripts/vercel-build.sh`) builds it on
+every deploy, and CI restores it from the Actions cache keyed on that hash,
+building it only when the engine changed (`.github/actions/engine-wasm`; jobs
+in the Playwright container download it as a run artifact). Every build, on
+Vercel or on a CI cache miss, installs the pinned toolchain through
+`scripts/build-engine-wasm.sh`. A unit test fails
+when a local package is stale. The gate is
 `src/tests/integration/wasmHost.integration.test.ts`: the instance's own
 state view equals the engine's at every hour of a day on every fixture.
 

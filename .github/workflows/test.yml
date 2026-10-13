@@ -23,6 +23,31 @@ permissions:
   contents: read
 
 jobs:
+  # The Rust engine's WASM package (src/public/engine/, engine-rs/pkg/) is build
+  # output and is not checked in. This job restores it from the Actions cache,
+  # keyed on the engine's source hash, or builds and caches it on a miss (an
+  # engine change), then hands it to the e2e job as a run artifact: e2e serves
+  # it to the chromium-wasm project, and its container has no Rust toolchain to
+  # build it. The test job needs no package (its hash test skips without one),
+  # so lint, typecheck and the unit tests never wait on a Rust build.
+  engine-wasm:
+    runs-on: ubuntu-latest
+    # A cache miss compiles the crate (a few minutes); anything near this is a hang.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - uses: ./.github/actions/engine-wasm
+        with:
+          artifact-name: engine-wasm
+
   test:
     runs-on: ubuntu-latest
 
@@ -74,7 +99,7 @@ jobs:
   # so the baselines it compares against are minted against the identical renderer. Kept
   # in its own job so the container pull never slows the fast lint/test lane.
   e2e:
-    needs: resolve-image
+    needs: [resolve-image, engine-wasm]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -93,6 +118,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # The engine's WASM package is build output, not checked in; the
+      # engine-wasm job restored it from the cache (or built it) and uploaded it.
+      - uses: ./.github/actions/engine-wasm-download
+        with:
+          artifact-name: engine-wasm
 
       # A tooling build: e2e drives the app through `window.game`, which only
       # VC_TOOLING=1 builds publish (production builds compile it away).

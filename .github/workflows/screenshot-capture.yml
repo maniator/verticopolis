@@ -105,6 +105,9 @@ jobs:
   # since this job never renders.
   resolve-image:
     runs-on: ubuntu-latest
+    # On the wasm leg a cache miss compiles the engine (a few minutes);
+    # anything near this is a hang.
+    timeout-minutes: 30
     permissions:
       contents: read
     env:
@@ -125,6 +128,17 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # The engine leg's WASM package is build output, not checked in: restore
+      # it from the cache (or build it on an engine change) and hand it to the
+      # shard jobs, whose container has no Rust toolchain. Only the wasm leg
+      # loads it, so the TypeScript gallery never waits on (or fails with) a
+      # Rust build. The name holds no "shots-", so a shots download never
+      # picks it up.
+      - if: inputs.engine == 'wasm'
+        uses: ./.github/actions/engine-wasm
+        with:
+          artifact-name: engine-wasm-package
 
       - name: Verify shard coverage
         run: node scripts/screenshot-shards.ts verify
@@ -176,6 +190,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - if: inputs.engine == 'wasm'
+        uses: ./.github/actions/engine-wasm-download
+        with:
+          artifact-name: engine-wasm-package
 
       # Render the shard TWICE from two independent builds and byte-compare the
       # renders (the whole determinism guard). The logic lives in a standalone
