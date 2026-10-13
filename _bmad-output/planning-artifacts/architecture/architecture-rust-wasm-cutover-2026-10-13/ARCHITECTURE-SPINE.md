@@ -74,7 +74,8 @@ host; nothing in `src/ui` calls the binding directly.
 - **Rule:** the engine's `Clock` owns game time, and the step driver
   (quantum, day pace curve, steps per frame, debt and its reset) moves into
   the crate behind one call that takes real elapsed time, the speed and the
-  steady-clock choice (#867). All of the step math moves: the pace factor,
+  steady-clock choice (#867), plus a frozen flag while a blocking modal is
+  open. All of the step math moves: the pace factor,
   the catch-up cap, pause, the blocking-modal freeze and the speed-change
   carry drop. A non-finite result drops the carried debt, as the TypeScript
   reference does; negative elapsed time gets one guard in both drivers. The
@@ -113,9 +114,11 @@ host; nothing in `src/ui` calls the binding directly.
   screenshot and gallery tooling in `scripts/`, the generated package in
   `src/public/engine/`, and tests (`src/tests/**`, `*.test.ts`, `e2e/**`), and leaves the production binding (or moves behind a cargo
   feature) by retirement. The tiers apply to the instance surface the
-  mirror relays as well: a UI write to `sim.money`, or a call to
-  `tower.setCars` or `tower.resizeTransport`, is a tier 3 op and fails the
-  same guard. Argument validation stays with #923.
+  mirror relays as well: a write to `sim.money`, or a call to
+  `tower.setCars` or `tower.resizeTransport`, from UI or game code
+  (`src/ui/`, `src/game/`, `src/render/`) is a tier 3 op and fails the same
+  guard; the TypeScript engine's own calls in `src/engine/` are out of
+  scope. Argument validation stays with #923.
 
 ### AD-4: An engine-owned, versioned read model
 
@@ -219,8 +222,9 @@ src/dualrun/     # relay, shadow, mirror (tier 3 callers, with the AD-3 exemptio
 
 - **Deployment at the flip:** the engine package is outside the offline
   precache; decide its precache and version-skew rule (an old cached shell
-  with a newer package), make a failed Rust build fail the deploy, and add a
-  fallback-use signal, which the retirement gate needs.
+  with a newer package), keep `scripts/vercel-build.sh`'s hash guard (a
+  failed rebuild serves the committed package only when its hash matches the
+  sources), and add a fallback-use signal, which the retirement gate needs.
 - **AD-1 timing:** AD-1 and #945 put it before the flip; the owner confirms
   or moves it to before retirement.
 - **Reference data's home:** CLAUDE.md names `src/engine/facilities.ts` as
