@@ -53,14 +53,17 @@ const HOST_ONLY: &[&str] = &[
 ];
 
 /// The `std` modules a grouped import (`use std::{...}`) may not name.
-const HOST_MODULES: &[&str] = &["env", "net", "process", "time", "thread"];
+const HOST_MODULES: &[&str] = &["env", "net", "os", "process", "time", "thread"];
 
 /// Every package `Cargo.lock` may name, optional ones (the binding's)
 /// included. A host service can arrive through a dependency without a
 /// `std::` path in `src/`, so a new crate fails this test until it is
 /// reviewed and listed here. Never list a crate that reaches a browser, the
 /// host's entropy, clock, console, threads or files on its own (`getrandom`,
-/// `js-sys`, `web-sys`, a logger, a thread pool, a time library).
+/// `js-sys`, `web-sys`, a logger, a thread pool, a time library). The
+/// exceptions are the optional binding's own crates (`wasm-bindgen*` and
+/// `bumpalo`, compiled only with the `wasm` feature) and `libc`, which the
+/// hashing and compression crates use for CPU feature detection.
 const ALLOWED_CRATES: &[&str] = &[
     "adler2",
     "base64",
@@ -312,7 +315,7 @@ fn strip_tests(name: &str, src: &str) -> (String, Vec<String>) {
         // that says what the attribute is on.
         let mut k = from;
         loop {
-            while k < b.len() && b[k].is_ascii_whitespace() {
+            while k < b.len() && (b[k].is_ascii_whitespace() || parts[k] == Part::Comment) {
                 k += 1;
             }
             if b.get(k) == Some(&b'#') {
@@ -741,14 +744,14 @@ fn the_binding_is_an_optional_feature() {
 }
 
 #[test]
-fn no_build_script_runs_on_the_host() {
+fn the_engine_has_no_build_script() {
     let toml = std::fs::read_to_string(crate_dir().join("Cargo.toml")).expect("Cargo.toml");
     assert!(
         !crate_dir().join("build.rs").exists()
             && toml_keys(&toml, |h| h == "[package]")
                 .iter()
                 .all(|(k, _)| k != "build"),
-        "a build script runs on every consumer's machine and is outside these checks"
+        "the engine's own build script would run on every consumer's machine, outside these checks"
     );
 }
 
@@ -823,6 +826,7 @@ fn the_scanner_finds_every_spelling_of_a_host_service() {
         ("fn f() { println!{\"x\"} }", "println!"),
         ("fn f() { let t = Instant::now(); }", "Instant::now"),
         ("use std::os::unix::net::UnixStream;", "std::os"),
+        ("use std::{os::unix::net::UnixStream};", "std::{os}"),
         ("extern \"C\" { fn open(p: *const u8) -> i32; }", "extern{"),
         ("pub extern \"C\" fn hook() {}", "extern fn"),
     ] {
@@ -901,7 +905,7 @@ fn a_cfg_test_on_anything_but_an_item_stops_the_scan() {
     }
     let (_, paths) = strip_tests(
         "sample",
-        "#[cfg(test)]\n#[allow(dead_code)]\npub(crate) mod helpers;\n#[cfg(test)]\nmod tests { }",
+        "#[cfg(test)]\n// helpers for the tests below\n#[allow(dead_code)]\npub(crate) mod helpers;\n#[cfg(test)]\nmod tests { }",
     );
     assert_eq!(
         paths,

@@ -154,7 +154,7 @@ jobs:
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
           # The JavaScript binding is a feature a native host never turns on,
-          # and nothing in the tree reaches a browser or the host's entropy.
+          # and no browser crate or getrandom is in the tree.
           # Normal and build dependencies on every target count; the tree is
           # captured first so a cargo failure fails the step.
           tree="$(cargo tree --locked -e normal,build --target all --prefix none)"

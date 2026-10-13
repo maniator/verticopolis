@@ -17,7 +17,9 @@ use verticopolis_engine::catalog::{catalog, CATALOG_VERSION};
 use verticopolis_engine::charges::ExtendEnd;
 use verticopolis_engine::clock::GameMode;
 use verticopolis_engine::facilities::Kind;
-use verticopolis_engine::gameplay::{check_catalog, check_event, RemovalMethod, CATALOG_JSON};
+use verticopolis_engine::gameplay::{
+    check_catalog, check_event, RemovalMethod, CATALOG_JSON, GAMEPLAY_RING_CAP,
+};
 use verticopolis_engine::load::{
     decode_vctower, deserialize, encode_simulation_vctower, encode_vctower,
     mark_founder_from_loaded_file, stamp_save,
@@ -302,6 +304,9 @@ pub fn advance(sim: &mut Simulation, minutes: u32, events: &Value) -> Result<usi
     let mut n = 0;
     for _ in 0..minutes {
         sim.tick(1.0);
+        if sim.gameplay.len() > GAMEPLAY_RING_CAP {
+            return Err("the event buffer outgrew its cap".into());
+        }
         for e in sim.gameplay.drain() {
             check_event(events, &e.to_json())?;
             n += 1;
@@ -373,6 +378,21 @@ pub fn smoke(seed: u32) -> Result<Report, String> {
             "two days from day {start_day} reached day {}",
             sim.clock.day()
         ));
+    }
+    // The state a frontend draws besides money and the tower: the rating,
+    // the live crowd and the message log.
+    if sim.star < 1 || sim.log.is_empty() {
+        return Err(format!(
+            "star {} and {} log entries",
+            sim.star,
+            sim.log.len()
+        ));
+    }
+    // People come and go; at the hour the run ends the tower may be empty,
+    // but two working days must have spawned some.
+    let crowd = sim.crowd.view();
+    if crowd["nextId"].as_i64().unwrap_or(0) <= 1 || !crowd["people"].is_array() {
+        return Err(format!("no one came in two days: {}", crowd["nextId"]));
     }
     let (mut first, save_bytes) = round_trip(&sim)?;
     let (mut second, _) = round_trip(&sim)?;
