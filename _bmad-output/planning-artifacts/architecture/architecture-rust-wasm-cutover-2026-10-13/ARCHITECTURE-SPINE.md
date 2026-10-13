@@ -94,7 +94,8 @@ host; nothing in `src/ui` calls the binding directly.
   `#[wasm_bindgen]` impl and every `#[wasm_bindgen]` free function, with or
   without a `js_name`) fails on an export missing from it. Host-loop ops,
   `tick`, `drainGameplayEvents` and the step-driver call S8 adds, are called
-  only by the host (`src/wasmhost/` and `src/game/frameLoop.ts`). Tier 1, player commands, is the only tier `src/ui` and
+  only by the host (`src/wasmhost/` and `src/game/frameLoop.ts`), the dual
+  run (`src/dualrun/`) and tests. Tier 1, player commands, is the only tier `src/ui` and
   `src/game` may reach: `build`, `buildTransport`, `sellAt`, `addCar`,
   `removeCar`, `extendTransport`, `removeFacility`, the rent and policy
   commands (`adjustRent`, `setNoRate`, `priceUnit`, `applyRentBatch`,
@@ -109,7 +110,8 @@ host; nothing in `src/ui` calls the binding directly.
   `evaluateStar`, `seedElevatorTelemetry` and `seedLoopMemos`; PR #950 adds
   `towerSetCars` and `towerResizeTransport`. Tier 3 is reachable only from
   `src/dualrun/`, the host's suppressed frame sync in `src/wasmhost/`, the
-  screenshot and gallery tooling in `scripts/`, and tests, and leaves the production binding (or moves behind a cargo
+  screenshot and gallery tooling in `scripts/`, the generated package in
+  `src/public/engine/`, and tests (`src/tests/**`, `*.test.ts`, `e2e/**`), and leaves the production binding (or moves behind a cargo
   feature) by retirement. The tiers apply to the instance surface the
   mirror relays as well: a UI write to `sim.money`, or a call to
   `tower.setCars` or `tower.resizeTransport`, is a tier 3 op and fails the
@@ -195,7 +197,7 @@ engine-rs/src/
   charges.rs     # engine-owned charges (tier 1)
   catalog.rs     # prices, sizes, rules (AD-4)
 src/wasmhost/    # host adapter: attach, sync, detach
-src/dualrun/     # relay, shadow, mirror (tier 3 lives here only)
+src/dualrun/     # relay, shadow, mirror (tier 3 callers, with the AD-3 exemptions)
 ```
 
 ## Deferred

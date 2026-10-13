@@ -118,7 +118,7 @@ the owner changes them.
 | # | Story | Issue | Priority | Modules | Acceptance criteria | Tests | Depends on |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | S9 | The engine answers commands; the instance mirrors | #954 | P1 | `src/wasmhost/wasmHost.ts`, `src/dualrun/mirror.ts`, `engine-rs/src/wasm.rs` | Under `?engine=wasm` every player command runs on the engine first and the caller gets the engine's result in one shape (`{ ok, reason?, delta? }` plus named fields); the instance skips a refused command; while hosted only the engine logs and emits events, refusal text comes from the engine's `reason`, and UI notices still reach the log through `emit`; a load or undo boots the engine from engine-written bytes (AD-8); a disagreement is reported and the engine's state wins | A test per command that the returned result is the engine's; a forced disagreement is reported; e2e on `chromium-wasm` | S4, S6 |
-| S10 | Tier every binding export; confine tier 3 | #946, with #923 | P1 | `engine-rs/src/wasm.rs`, `src/dualrun/`, guard tests | Every export listed in one tier table, methods without a `js_name` included, host-loop ops (`tick`, `drainGameplayEvents`) allowed only in the host; a test that parses `wasm.rs` fails on an untiered export; a guard fails on a tier 3 call outside `src/dualrun/`, the host's suppressed frame sync in `src/wasmhost/`, the tooling in `scripts/`, and tests, including UI writes to `sim.money` and calls to `tower.setCars` or `tower.resizeTransport` that the mirror would relay. Argument validation stays on #923 | Guard tests; boundary validation tests in both engines | S1, S9 |
+| S10 | Tier every binding export; confine tier 3 | #946, with #923 | P1 | `engine-rs/src/wasm.rs`, `src/dualrun/`, guard tests | Every export listed in one tier table, methods without a `js_name` included, host-loop ops (`tick`, `drainGameplayEvents`) allowed only in the host, the dual run and tests; a test that parses `wasm.rs` fails on an untiered export; a guard fails on a tier 3 call outside `src/dualrun/`, the host's suppressed frame sync in `src/wasmhost/`, the tooling in `scripts/`, the generated package in `src/public/engine/`, and tests (`src/tests/**`, `*.test.ts`, `e2e/**`), including UI writes to `sim.money` and calls to `tower.setCars` or `tower.resizeTransport` that the mirror would relay. Argument validation stays on #923 | Guard tests; boundary validation tests in both engines | S1, S9 |
 | S11 | Refusal reasons and their order pinned | #865 | P2 | `conformance/`, runners | Scenario steps can pin `reason`; a refusals scenario covers the four-star gates | Conformance in both runners | none |
 | S12 | Save edge cases | #858, #856 | P3 | `engine-rs/src/load.rs`, `src/storage/` | Hand-edited numbers load as the TypeScript loader reads them, or fail with the same message; a save at RNG state 0 reloads at state 0 | Loader table cases; round-trip tests | none |
 
@@ -130,8 +130,8 @@ S12 and S14 are P3: if open at the flip, they go in the exception register.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | S13 | Performance baseline and budgets for the engine | #900 (with #905, #849 as found) | P2 | `e2e/` perf spec, `scripts/` | `npm run perf` compares each engine with its own baseline in CI; the late-game and 5,000+ population fixtures report tick time, cold load and heap for both engines | The perf spec on both engines | S6 |
 | S14 | Analytics close-out: fx and counter pins, drain glue, #873 | #879, #907, #873 | P3 | `engine-rs/src/gameplay.rs`, `src/analyticsEngineBridge.ts` | A deliberate off-by-one at any fx or counter site fails a test in both engines; one typed drain; #873's remaining phases closed or split | Both engines' unit tests; the bridge's consent, session-swap and exactly-once tests | S1 |
-| S16 | Engine package delivery: a content-hashed package URL or a version check, the precache decision, and a fallback-use signal | #945 | P1 for the flip | `src/wasmhost/startWasmHost.ts`, `vite.config.ts`, `scripts/vercel-build.sh` | An old cached shell never runs a newer package (or refuses it with the fallback); the offline rule is decided; each fallback and each engine-writer latch-off (S2) is counted in the host status and, with consent, in analytics | Unit tests for the version check; an e2e that serves a mismatched package; the existing hash guard stays | S4 |
-| S15 | The release gate, one release on the TypeScript default with the new instrument, then the flip as 3.0.0 | #945 | P1 | `package.json` (3.0.0), `src/wasmhost/engineChoice.ts` | Every row in section 6 passes on one commit, with the exception register attached | The rows themselves | S3 to S11, S13, S16 (S12 and S14 enter the exception register if open) |
+| S16 | Engine package delivery: a content-hashed package URL or a version check, the precache decision, and a fallback-use signal | #945 | P1 for the flip | `src/wasmhost/startWasmHost.ts`, `vite.config.ts`, `scripts/vercel-build.sh` | An old cached shell never runs a newer package (or refuses it with the fallback); the offline rule is decided; each fallback and each engine-writer latch-off (S2) is counted in the host status and, with consent, in analytics | Unit tests for the version check; an e2e that serves a mismatched package; the existing hash guard stays | S2, S4 |
+| S15 | The release gate, one release on the TypeScript default with the new instrument, then the flip as 3.0.0 | #945 | P1 | `package.json` (3.0.0), `src/wasmhost/engineChoice.ts` | Every row in section 6 passes on one commit, with the exception register attached | The rows themselves | S2 to S11, S13, S16 (S12 and S14 enter the exception register if open) |
 
 ### After the flip (not cutover blockers)
 
@@ -152,8 +152,10 @@ S12 and S14 are P3: if open at the flip, they go in the exception register.
 
 ## 6. Release gate for the default flip (#945)
 
-Every row passes on the flip candidate's commit. Rows marked "proposed" need
-the owner's numbers before the gate is binding.
+Every row passes on the flip candidate's commit, except the two measured
+over time: Seeded replay covers the 14 nights before the candidate, and
+Reliability covers the release on the TypeScript default that precedes it.
+Rows marked "proposed" need the owner's numbers before the gate is binding.
 
 | Gate | Pass condition |
 | --- | --- |

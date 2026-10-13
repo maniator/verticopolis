@@ -24,7 +24,7 @@ AD-3 lists `towerSetCars` and `towerResizeTransport` beside `setMoney`, `setCars
 
 `FRAME_HEADER = 26` and `PERSON_FIXED = 18` are Rust `pub const`s in `engine-rs/src/wasm.rs` that the binding does **not** export; `src/wasmhost/frameView.ts` re-declares them by hand ("mirrors `PERSON_FIXED`"). No frame layout version exists anywhere in `engine-rs/src` or `src/wasmhost` (searched for `FRAME_VERSION`, `layoutVersion`, `frameVersion`). The catalog digest does exist (`catalog::catalog_digest`, locked in `conformance/catalog-digests.json`). The rule should say the version slot and a JS-visible export of the widths are new work, or a story will treat them as already shipped.
 
-### F4 (medium): Stack table records ranges, not resolved versions, and nothing marks upstream currency as checked
+### F4 (medium): Stack table records ranges where the lockfile resolves versions, and nothing marks upstream currency as checked
 
 | Row | Spine | Manifest | Lockfile | Upstream latest (2026-10-13) |
 | --- | --- | --- | --- | --- |
@@ -50,4 +50,4 @@ The spine depends on the `wasm-bindgen-cli` matching the crate pin (enforced by 
 - AD-1 "today the instance answers and relays" matches the switch story's "How it works".
 - Issues #867, #868, #873, #874, #878, #893, #908 and #923 are open with titles matching their use; #903 and #938 are merged. AD-6 is marked ADOPTED while #873 is still open; acceptable since phases 1 and 2 shipped, but say "phase 3 pending" if any remains.
 - Deployment: `vercel.json` runs `scripts/vercel-build.sh`, which installs the pinned Rust and wasm-bindgen CLI, consistent with "unchanged".
-- Companions `rust-wasm-web-cutover-plan-2026-10.md` and the readiness report exist only on the plan branch, not `main`; fine for a plan PR, but they must merge together.
+- Companions `rust-wasm-web-cutover-plan-2026-10.md` and the readiness report exist only on the plan branch so far; fine for a plan PR, but they must merge together.

@@ -122,7 +122,7 @@ read from the instance.
 **Fix (tighten AD-5 and AD-3 tier 2).** A restore hands the engine the
 original engine-written bytes (`fromSave`/`fromVctower`), and the TypeScript
 read model is built from `engine.serialize()`, never the reverse. Boundary
-markers come from the save or the engine, not the instance.
+markers come from the save or the engine; the instance supplies none of them.
 
 ### H5 (high): AD-2 splits the step driver between crate and host
 
