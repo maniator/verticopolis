@@ -100,8 +100,8 @@ the owner changes them.
 
 | # | Story | Issue | Priority | Modules | Acceptance criteria | Tests | Depends on |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| S1 | Capacity events from the simulation layer in both engines | #906 (PR #950) | P2 | `src/engine/sim/capacity.ts`, `engine-rs/src/wasm.rs`, `src/dualrun/` | `capacity_changed` emitted from `Simulation` in both engines; bare tower edits silent; relay-only ops reachable from `src/dualrun/` only | `towerRelayOps.guard.test.ts`, dual-run edits integration, gameplay emission tests, conformance | none |
-| S2 | The web writes saves through the engine encoder | #935 (PR #953) | P2 | `src/storage/vctowerWriter.ts`, `src/bootstrap.ts` | Same bytes as the fflate writer on every fixture; first failure falls back and latches off | Unit, boot, WASM-suite byte comparison | none |
+| S1 | Capacity events from the simulation layer in both engines | #906 (PR #950) | P2 | `src/engine/sim/capacity.ts`, `engine-rs/src/wasm.rs`, `src/dualrun/` | `capacity_changed` emitted from `Simulation` in both engines; bare tower edits silent; relay-only ops reachable from `src/dualrun/` only. Its head `179f16d` predates #930, so its generated binding and declarations lack `catalog(mode)`: rebase, regenerate the JS/WASM package and the TypeScript declarations together, and check `BUILD.json` | `towerRelayOps.guard.test.ts`, dual-run edits integration, gameplay emission tests; catalog digest and event conformance on the combined artifact | none |
+| S2 | The web writes saves through the engine encoder | #935 (PR #953) | P2 | `src/storage/vctowerWriter.ts`, `src/bootstrap.ts` | Same bytes as the fflate writer on every fixture; first failure falls back and latches off. The timer autosave (`saveToAsync`) and `toTowerFile` keep their own writers in this PR; whether "one writer" (AD-5) later covers them is decided here or in a follow-up | Unit, boot, WASM-suite byte comparison; malformed engine output; saves at the 8 MiB and 32 MiB boundaries; a host that fails mid-session | none |
 | S3 | Vitest suites on the WASM engine and the test-mapping table | #878 | P1 | `src/tests/`, `vite.config.ts`, mapping table | Suites green on both engines or each exclusion named with a reason; table complete for `src/engine/` | The suites themselves, the table's completeness test | none |
 
 ### Wave 2: host reliability and the read model
@@ -215,3 +215,8 @@ All three carry backlog rows (`wasm-host-engine-answers`,
 - Epics A to E were folded into the roadmap's rows and the stories above, so
   there is one plan for one migration.
 - The command-authority gap (S9) and the deployment rows of the gate are new.
+- The owner's mainline reconciliation of 2026-10-13 (a section 10 added to
+  the earlier draft) is folded in: #950 must be rebased onto #930 and its
+  binding regenerated (S1), and #953's writer scope and boundary tests are
+  in S2. #949 (byte-identical engine writer) is merged; routing live web
+  saves through it is #953.
