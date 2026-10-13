@@ -2,7 +2,8 @@
 
 Status: **proposed**, from a source-level audit of `main` at `316595a` and a
 planning review on 2026-10-13, revised after a `/bmad-code-review` of the plan
-(three layers). Nothing here is implemented. Each stage below is its own PR
+(three layers and three confirming passes) and the owner's decisions of the
+same day. Nothing here is implemented. Each stage below is its own PR
 with its own backlog row and issue.
 
 ## Why
@@ -25,13 +26,17 @@ audio adapter.
    state the engine publishes (a car's stop count, a room on fire); it never
    **infers** an engine decision from indirect signals (guessing an arrival
    from a car's position and direction).
-5. No audio playback code or dependency enters `engine-rs/` or `src/engine/`.
+5. Audio stays frontend-owned. The engine exposes gameplay events and state;
+   it never plays, schedules or mixes sound, and no audio playback code or
+   dependency enters `engine-rs/` or `src/engine/` (owner, 2026-10-13).
 6. Audio reuses the gameplay event catalog (`conformance/events/catalog.json`);
    there is no separate audio event system.
 7. Determinism and saves are untouched: audio only reads, and nothing it does
    enters the save, the hashed views or the RNG streams.
 8. One fact, one cue: when an event and a state change describe the same
    moment, exactly one of them carries the sound.
+9. Every sound is original to Verticopolis, UI effects included. No
+   third-party sound pack ships, free or paid (owner, 2026-10-13).
 
 ## Inventory (facts from the audit)
 
@@ -201,7 +206,7 @@ that no action plays its cue twice.
 | `facility_placed`, `facility_removed`, `pricing_changed`, `capacity_changed` | any | none (the command result plays it) | Rule |
 | `tower_founded` | any | none (the program change is UI) | Rule |
 | Car stop counter | counter increases, cars in view only | new elevator chime, one per car per frame, rate capped | 5 |
-| Fx sequences | sequence increases | Santa, thief, treasure and VIP cues; the VIP cue is skipped when `evaluatedTower` turns true in the same frame (the winning visit, seen in the read model) | 6, auditioned |
+| Fx sequences | sequence increases | Santa, thief, treasure and VIP cues; the VIP cue is skipped when `evaluatedTower` turns true in the same frame (the winning visit, seen in the simulation state the win dialog already reads) | 6, auditioned |
 | Weather, clock, occupancy | continuous | rain bed, crowd gates, crowd level | Unchanged |
 | Command result | ok, refused, removed | `build`, `error`, `sell`, `click` | Unchanged |
 
@@ -251,6 +256,8 @@ fails the build until it is mapped to a cue or to none.
 | --- | --- | --- |
 | A separate audio event stream? | **No.** The gameplay catalog plus the read model cover every cue. | A cue that needs a gameplay fact neither carries. |
 | Elevator stops as catalog events? | **No.** A busy tower stops cars hundreds of times a game hour, which would flood the 1,024 ring at top speed. A per-car stop counter in the read model survives any frame rate, and only cars in view chime. | A playtest shows chimes that do not match visible stops. |
+| Third-party sound packs? | **None, UI effects included** (owner, 2026-10-13). Every sound is the project's own: code-generated, rendered from the project's code, or recorded by the owner. | None planned. |
+| Performance budgets | **Provisional until measured on real hardware** (owner, 2026-10-13). The numbers below are starting targets for the stages' own micro-benchmarks, never CI thresholds without the owner's approval. | The first measurement on real hardware. |
 | Promote the fx sequences to catalog events? | **Not now.** A sequence that jumps by two still tells audio the moment happened; only the earlier position is lost, which is not audible. Dissent recorded: promoting them first would avoid a later lock change. | A playtest shows a missed or wrong cue traced to the latest-value counters. |
 | Where does the win cue live? | **On the win dialog**, as today, so a load or undo of a won tower replays it. | The win dialog's own replay rule changes. |
 | Baking the web's ambient score? | **Unchanged: rejected for the web** (backlog row `audio-first-cue-latency`, #554). An offline render tool for review and A/B listening is a separate tooling item. | As in #554. |
@@ -271,10 +278,24 @@ fails the build until it is mapped to a cue or to none.
 The master volume slider joins the audio panel row (`audio-button-panel`,
 #483).
 
-Dependencies: 2 needs 1. The engine field in 5 needs nothing; its chime needs
-2. 6 needs 2 and benefits from 4. 1 should land before or with the cutover's
-engine-answers work (#954) and is compatible with the typed drain cleanup
-(`gameplay-events-glue`, #907).
+Dependencies and order around open work:
+
+- **1 lands after #950 and #907.** #950 (capacity events from the
+  simulation layer) changes `Simulation.ts`, `wasmHost.ts` and the catalog;
+  #907 (one typed drain, one buffer restore with its drop count, a flatter
+  detach) is the code `ownFrom` has to travel through. Stage 1 builds on
+  #907's helpers instead of writing its own, and lands before or with #954
+  (the engine answers commands).
+- 2 needs 1. The engine field in 5 needs nothing; its chime needs 2. 6 needs
+  2 and benefits from 4. 3, 4, 7 and 8 need nothing and can go any time.
+- **7 coordinates with #823** (the open sounds contributor doc): if #823
+  merges first, stage 7 trues it up with the rest.
+- **Benchmarking (#972) does not wait for audio.** It starts from `main`. No
+  audio stage edits `e2e/perf.spec.ts`, `e2e/perf/baseline.json` or the
+  `perf:compare` harness, or adds a CI threshold. Stage 1 adds the same host
+  work on both engines; because `perf:compare` records the commit it ran on,
+  a run before and after stage 1 shows that cost without either effort
+  waiting on the other.
 
 ## Test strategy
 
@@ -307,9 +328,11 @@ engine-answers work (#954) and is compatible with the typed drain cleanup
 - **Determinism:** the conformance lock and the state, crowd and events
   hashes are unchanged with the hub and router attached; the hub never writes
   to the simulation.
-- **Performance:** the hub and router together cost 0.1 ms or less a frame
-  (median, 0.3 ms at the 99th percentile) on the perf fixture at top speed,
-  measured in the existing perf spec.
+- **Performance (provisional targets):** the hub and router together aim
+  for 0.1 ms or less a frame (median, 0.3 ms at the 99th percentile) at top
+  speed, measured by a Vitest micro-benchmark over recorded batches from the
+  perf towers. It reports and never fails the build; the targets are revised
+  once measured on real hardware.
 
 ## Docs drift found by the audit (stage 7)
 
@@ -331,6 +354,7 @@ engine-answers work (#954) and is compatible with the typed drain cleanup
 All web audio is the project's own work: code-generated synthesis of the
 owner's compositions, and two voice seeds the owner recorded, all licensed
 CC BY 4.0 (`ASSETS-LICENSE.md`). Nothing from the 1994 original and no
-third-party sample ships, and none of the stages above changes that. Any
+third-party sample or sound pack ships, UI effects included, and none of the
+stages above changes that. Any
 rendered file from stage 4 is a derived work of those assets and carries the
 same license and attribution.
