@@ -153,7 +153,7 @@ Names follow the engine's own strings: the facility keys from
 | Facade | `facade/escape/<left or right>/<0 or 1>`, `facade/awning/<left or right>`, animation `facade/crane/<lit>` |
 | Vehicles | `vehicle/streetcar/s<0-3>` (sampled seeds in `data.streetCarSeeds`), `vehicle/garbagetruck`, `vehicle/metrotrain/<headlight or dark>` |
 | Sky | `sky/gradient` (one column per quarter hour), `sky/sun`, `sky/moon`, `sky/cloud/<overcast or rain>/<0-4>`, `sky/skyline/<far or near>` |
-| Scenery | `scenery/roundabout`, animation `scenery/fountain`, `scenery/plaza-lamp/a<0, 25, 50, 75 or 100>`, `scenery/street-lamp/a<...>` (with the "375 ST" sign), `scenery/planter`, `scenery/tree/v<0-7>`, `scenery/bush`, `scenery/ground/<sidewalk, forecourt or road>`, `scenery/ground/grass/s<0-2>/<flat or tuft>`, `scenery/ground/pave/<plain or joint>` (placed by `data.scenery`; see "The world outside the tower") |
+| Scenery | `scenery/roundabout`, animation `scenery/fountain`, `scenery/plaza-lamp/a<0, 25, 50, 75 or 100>`, `scenery/street-lamp/a<...>` (with the "375 ST" sign), `scenery/planter`, `scenery/tree/v<0-7>`, `scenery/bush`, `scenery/ground/<sidewalk, forecourt or road>`, `scenery/ground/grass/s<0-2>/<flat or tuft>` (the looks the lot uses), `scenery/ground/pave/<plain or joint>` (see "The world outside the tower") |
 
 A shaft is drawn floor by floor: `top` for its top floor, `bottom` for its
 bottom floor, `stop` or `skip` for each floor between (an express skip floor
@@ -301,14 +301,14 @@ What that means for the pictures:
 
 The game marks the split in each room's draw routine, and in the lobby and
 entrance art (`src/render/pixelSprites/layers.ts`): one call where the shell
-ends, and one where the furniture ends and the marks drawn over it begin. In
-the game both calls do nothing. The export paints each split frame (and each
-occupant step)
-again with the marks live and records the canvas at them, once for the exact
-split and once more for the soft furniture; the flat frame comes from the
-ordinary paint, so adding layers never changes a frame's pixels. The export
-also requires every kind that splits to have furniture in some frame, since a
-shell that still showed the furniture would compose back too.
+ends and, in a room that draws over its furniture, one where the furniture
+ends and the marks drawn over it begin. In the game both calls do nothing. The
+export paints each split frame (and each occupant step) again with the marks
+live and records the canvas at them, once for the exact split and once more
+for the soft furniture; the flat frame comes from the ordinary paint, so
+adding layers never changes a frame's pixels. The export also requires every
+kind that splits to have furniture in some frame, since a shell that still
+showed the furniture would compose back too.
 
 A frame has no `layers`, and a frontend draws it flat, when:
 
@@ -341,7 +341,10 @@ the shell and then the furniture (or the soft furniture).
 
 The layers' own images are packed on pages after the frame images', so a
 frontend that ignores `layers` reads the same frames, parts and pages as before
-they existed.
+they existed. The same goes for the scenery, which joined the atlas later: its
+images pack on pages of their own between the older frames' pages and the
+layers'. An entrance animation can carry `soft` on some of its frames and not
+others (each frame splits on its own).
 
 ### Soft furniture
 
@@ -376,29 +379,40 @@ only.
 
 The scenery around the lot comes as its own frames, painted by the game's
 scenery painters (`src/render/excalibur/towerSceneryDraw.ts`), and
-`data.scenery` says where the game puts each one. Positions are in pixels at
-1x, x from the lot's left edge and y from the ground line (negative is up),
-for a frame's top-left corner, listed back to front:
+`data.scenery` publishes the game's own placement table (`SCENERY` in
+`src/render/sceneryLayout.ts`). Positions are in pixels at 1x: x from the
+lot's left edge and y from the ground line (negative is up), for a frame's
+top-left corner. Draw, back to front:
 
-- `ground.strip`: one tile frame per lot tile at `y`. A tile the tower has
-  paved (its ground floor, padded by `apronPadTiles` on each side) uses
-  `scenery/ground/pave/<plain or joint>` (a joint on every fourth lot tile);
-  any other tile uses the grass frame `ground.strip.grass[tile]` names.
-- `ground.runs`: the sidewalks, the forecourt and the two roads. Repeat the
-  run's tile frame from `x` across `w`; a road's lane dashes line up when its
-  tile frames start on `tileOriginX` plus a whole number of tiles.
-- `props`: the roundabout, the fountain (an animation; its motions share no
-  period, so its 24 frames at 0.1 s sample a stretch close to a loop), the
-  two plaza lamps, the street lamp with its "375 ST" sign, and the planter.
+1. The skyline: solid rectangles in the two `data.skylineFills` colors (the
+   `sky/skyline/<far or near>` frames are those fills). The game seeds its
+   rectangles by the tower, so a frontend picks its own.
+2. `ground.strip`: one frame per lot tile at x `tile * tile.w` and `y`, drawn
+   left to right. Each frame is one column wider than a lot tile, as the game
+   paints it, and the next tile covers that column where it reaches. The
+   tower paves one span from its leftmost to its rightmost ground-floor room,
+   widened by `apronPadTiles` on each side and kept on the lot; a paved tile
+   uses `scenery/ground/pave/joint` when its index is a multiple of
+   `jointEvery` and `scenery/ground/pave/plain` otherwise, and any other tile
+   uses the grass frame `ground.strip.grass[tile]` names.
+3. `ground.runs`: the two sidewalks, the forecourt and the two roads. Fill
+   each run's box (`x`, `y`, `w`, `h`) with copies of its tile frame placed
+   at `tileOriginX` plus whole multiples of the frame's width, clipped to the
+   box. For the roads that puts every lane dash where the game has it.
+4. `props`: the roundabout, the fountain (an animation; its motions share no
+   period, so its 24 frames at 0.1 s sample a stretch close to a loop), the
+   two plaza lamps, the street lamp with its "375 ST" sign, and the planter.
+   The lamps fade in through dusk and out through dawn (`lamp.fadeIn` and
+   `lamp.fadeOut`, in hours, a straight ramp); the atlas carries them at 0,
+   25, 50, 75 and 100 percent lit.
+5. The lot's trees and bushes. The game seeds their spots by the tower and
+   scales each between `plants.scale`; the atlas carries eight tree variants
+   (`scenery/tree/v<0-7>`) and a bush at their base size. A plant stands
+   centered on its lot tile with its bottom row at `plants.baseY`, and is
+   hidden once the paved span comes within `plants.clearTiles` tiles of it.
 
-The lamps fade in through dusk and out through dawn (`lamp.fadeIn`,
-`lamp.fadeOut`, in hours); the atlas carries them at 0, 25, 50, 75 and 100
-percent lit. The skyline behind everything is solid rectangles in the two
-`data.skylineFills` colors. The lot's trees and bushes stand at spots seeded
-by the tower and vary a little in size; the atlas carries eight tree variants
-and a bush at their base size, and a frontend picks its own spots. These are
-props in their own right, so a frontend that draws with depth can set them
-at any distance from the tower.
+The props and plants stand apart from the tower and the ground, so a frontend
+that draws with depth can set each at its own distance.
 
 ## How it is checked
 
@@ -430,11 +444,11 @@ and standard shaft rebuilt from their floor pieces (skip floor included), cabs
 with composed riders, a walker, lobby tiles, entrance poses, a fire escape,
 the sky strip and the scenery (a fountain frame, the street lamp and sign, a
 paved ground tile and the road), each against the game's draw call with the
-game's arguments. The lobby tiles and entrance poses are also composed through their
-depth layers.
+game's arguments. The lobby tiles and entrance poses are also composed through
+their depth layers.
 
 ## Not in the atlas yet
 
 Event cameos (Santa, the VIP limo, the thief) are not exported yet, and the
-skyline and the lot's plant spots come as data and a few variants rather
-than the game's exact per-tower layout.
+skyline's rectangles and the lot's plant spots, which the game seeds by the
+tower, come as colors, variants and rules rather than a fixed layout.

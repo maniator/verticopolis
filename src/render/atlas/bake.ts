@@ -92,6 +92,11 @@ export interface BakeResult {
    *  own images come after. The archive packs the two groups apart, so the
    *  layers never move a frame image (absent: every image is a frame image). */
   frameImages?: number;
+  /** Where each family added after the first atlas begins among the frame
+   *  images: each such family's new images pack on pages of their own, after
+   *  the earlier families' pages, so adding one never moves an older image
+   *  (absent: none). */
+  groups?: number[];
   frames: BakedFrame[];
   animations: BakedAnimation[];
 }
@@ -257,8 +262,15 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
     }
     return { layers, softBase: soft ? { image: soft, piece: trim(soft) } : null };
   };
+  const groups: number[] = [];
+  let ownPages = false;
   jobs.forEach((job, done) => {
     onProgress?.(done, jobs.length);
+    // A family on pages of its own starts a new image group; one that does
+    // not may not come after it, or its images would land in the new group.
+    if (job.ownPages && !ownPages) groups.push(store.images.length);
+    if (ownPages && !job.ownPages) throw new Error(`${job.name} comes after a family on pages of its own`);
+    ownPages ||= job.ownPages === true;
     if (job.type === "anim") {
       const frameNames = job.frames.map((spec, i) => {
         const name = `${job.name}/${i}`;
@@ -393,6 +405,7 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
     images: [...store.images, ...layerStore.own.images],
     normals: [...store.normals, ...layerStore.own.normals],
     frameImages,
+    ...(groups.length > 0 ? { groups } : {}),
     frames,
     animations,
   };

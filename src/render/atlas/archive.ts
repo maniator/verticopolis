@@ -106,15 +106,24 @@ export interface Archive {
 function packGroups(bake: BakeResult, pageSize: number): { pages: number; placements: PackedSlice[][] } {
   const split = bake.frameImages ?? bake.images.length;
   if (!(Number.isInteger(split) && split >= 0 && split <= bake.images.length)) throw new Error(`frameImages ${split} is outside 0..${bake.images.length}`);
-  const group = (from: number, to: number) => pack(
-    bake.images.slice(from, to).map((img, i) => ({ id: from + i, w: img.w, h: img.h })),
-    pageSize,
-    ATLAS_PADDING,
-  );
-  const framesPacked = group(0, split);
-  const layersPacked = group(split, bake.images.length);
-  const shifted = layersPacked.placements.map((list) => list.map((sl) => ({ ...sl, rect: { ...sl.rect, page: sl.rect.page + framesPacked.pages } })));
-  return { pages: framesPacked.pages + layersPacked.pages, placements: [...framesPacked.placements, ...shifted] };
+  const starts = bake.groups ?? [];
+  if (starts.some((s, i) => !Number.isInteger(s) || s < (starts[i - 1] ?? 0) || s > split)) throw new Error(`groups ${starts.join(", ")} are outside 0..${split} or out of order`);
+  // Each group packs on its own pages, in order: the first families' frame
+  // images, each later family's, then the depth layers' own images.
+  const bounds = [0, ...starts, split, bake.images.length];
+  let pages = 0;
+  const placements: PackedSlice[][] = [];
+  for (let g = 0; g + 1 < bounds.length; g++) {
+    const from = bounds[g];
+    const packed = pack(
+      bake.images.slice(from, bounds[g + 1]).map((img, i) => ({ id: from + i, w: img.w, h: img.h })),
+      pageSize,
+      ATLAS_PADDING,
+    );
+    for (const list of packed.placements) placements.push(list.map((sl) => ({ ...sl, rect: { ...sl.rect, page: sl.rect.page + pages } })));
+    pages += packed.pages;
+  }
+  return { pages, placements };
 }
 
 export function buildArchive(

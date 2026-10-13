@@ -31,6 +31,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
 import { bundleBake } from "./atlas-bundle.ts";
+import { LOBBY_VARIANTS } from "../src/render/sprites";
 import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, SOFT_DRIFT_LIMIT, softLayerDrift } from "../src/render/atlas/archive";
 import type { BakeResult } from "../src/render/atlas/bake";
 import type { Image } from "../src/render/atlas/pixels";
@@ -146,7 +147,7 @@ async function main(): Promise<void> {
         normals.push({ w: g.w, h: g.h, data: decode(g.normal, g.w, g.h, `normal ${id}`) });
       }
     }
-    bakeResult = { images, normals, frameImages: records.frameImages, frames: records.frames, animations: records.animations };
+    bakeResult = { images, normals, frameImages: records.frameImages, groups: records.groups, frames: records.frames, animations: records.animations };
   } finally {
     await browser.close();
   }
@@ -170,10 +171,12 @@ async function main(): Promise<void> {
   const unsplit = filter ? [] : kindsWithoutFurniture(archive.manifest);
   if (unsplit.length > 0) throw new Error(`depth layers hold no furniture for ${unsplit.join(", ")}: the shell kept it`);
   // The lobby shares one kind across its tiles and entrances, so check those
-  // frame by frame: every entrance frame and every tile but the sconce and
-  // print (variant 3, wall pieces only) has furniture in front of its wall.
+  // frame by frame: every one splits, and every one but the sconce and print
+  // tile (the last variant, wall pieces only) has furniture in front of its wall.
+  const lastVariant = `/v${LOBBY_VARIANTS - 1}`;
   const bareLobby = Object.entries(archive.manifest.frames)
-    .filter(([name, f]) => /^structure\/(entrance\/|lobby\/.*\/v[012]$)/.test(name) && (!f.layers || f.layers.furniture.length === 0))
+    .filter(([name]) => name.startsWith("structure/lobby/") || name.startsWith("structure/entrance/"))
+    .filter(([name, f]) => !f.layers || (f.layers.furniture.length === 0 && !name.endsWith(lastVariant)))
     .map(([name]) => name);
   if (bareLobby.length > 0) throw new Error(`lobby frames without depth furniture: ${bareLobby.slice(0, 10).join(", ")}`);
   const layered = Object.values(archive.manifest.frames).filter((f) => f.layers).length;

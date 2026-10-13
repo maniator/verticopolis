@@ -279,6 +279,18 @@ describe("depth layers", () => {
     for (const f of split.frames) expect(sameImage(composeLayered(split, f), composeFrame(split, f)), f.name).toBe(true);
     expect(checkLayers(buildArchive(split, info, undefined, 32))).toEqual([]);
   });
+  it("packs a family on pages of its own after the earlier families, leaving their pages as they were", () => {
+    const later: Job = { ...still("later", room(3, 4)), ownPages: true };
+    const both = bake([...jobs, later], layeredFake);
+    expect(both.groups).toEqual([layered.frameImages]);
+    const a = buildArchive(layered, info, undefined, 32);
+    const b = buildArchive(both, info, undefined, 32);
+    // The earlier frame pages come out the same, the new family after them.
+    const framePages = Math.max(...Object.values(a.manifest.frames).flatMap((f) => f.parts.map((p) => p.rect.page))) + 1;
+    for (let p = 0; p < framePages; p++) expect(sameImage(a.pages[p], b.pages[p]), `page ${p}`).toBe(true);
+    expect(b.manifest.frames.later.parts[0].rect.page).toBeGreaterThanOrEqual(framePages);
+    expect(() => bake([later, ...jobs], layeredFake)).toThrow(/comes after a family on pages of its own/);
+  });
   it("refuses a frame-image count outside the images", () => {
     expect(() => buildArchive({ ...layered, frameImages: layered.images.length + 1 }, info, undefined, 32)).toThrow(/frameImages/);
   });

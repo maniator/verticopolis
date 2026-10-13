@@ -1,5 +1,6 @@
 import { GRID } from "../engine/facilities";
 import type { Unit } from "../engine/types";
+import { FLOOR, TILE } from "./scale";
 
 /**
  * Pure layout for the world outside the tower (the scenery pass): the skyline
@@ -132,4 +133,51 @@ export function plantVisible(spot: PlantSpot, apron: { min: number; max: number 
   if (!apron) return true;
   const half = 2;
   return spot.tile + half <= apron.min || spot.tile - half >= apron.max;
+}
+
+/** Rows of the lot's ground strip above and below the ground line. */
+export const STRIP_ABOVE = 7;
+export const STRIP_BELOW = 4;
+
+/** A scenery piece's canvas in world px: x from the lot's left edge, y from
+ *  the ground line (negative is up), for its top-left corner. */
+export interface PieceRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+const PLAZA_LAMP_W = 84;
+const PLAZA_LAMP_H = Math.round(FLOOR * 1.6) + 14;
+const STREET_LAMP_W = 8 * TILE;
+const STREET_LAMP_H = Math.round(FLOOR * 1.8);
+const PLANTER_W = 2 * TILE;
+const PLANTER_H = 18;
+
+/** Where the game puts each fixed scenery piece (`towerScenery.ts` builds its
+ *  actors from these, and the sprite atlas publishes them). */
+export const SCENERY = {
+  plazaSidewalk: { x: -PLAZA_SIDEWALK_TILES * TILE, y: -7, w: PLAZA_SIDEWALK_TILES * TILE, h: 11 },
+  roundabout: { x: ROUNDABOUT_START * TILE, y: -30, w: ROUNDABOUT_TILES * TILE, h: 48 },
+  fountain: { x: FOUNTAIN_TILE * TILE - 50, y: -102, w: 100, h: 112 },
+  plazaLamps: PLAZA_LAMP_TILES.map((t) => ({ x: t * TILE - PLAZA_LAMP_W / 2, y: -PLAZA_LAMP_H + 4, w: PLAZA_LAMP_W, h: PLAZA_LAMP_H })),
+  /** The road from the scene's left edge to the roundabout (the game cuts it
+   *  into texture-safe segments, each 1 px wider to hide seams). */
+  leftRoad: { x: -GRID.width * TILE, y: -2, w: (ROUNDABOUT_START + GRID.width) * TILE, h: 14 },
+  forecourt: { x: GRID.width * TILE, y: -6, w: FORECOURT_TILES * TILE, h: 10 },
+  sidewalk: { x: SIDEWALK_START * TILE, y: -7, w: (ROAD_START - SIDEWALK_START) * TILE, h: 11 },
+  rightRoad: { x: ROAD_START * TILE, y: -2, w: ROAD_TILES * TILE, h: 14 },
+  streetLamp: { x: Math.round((SIDEWALK_START + 1) * TILE - STREET_LAMP_W / 2), y: -STREET_LAMP_H - 7, w: STREET_LAMP_W, h: STREET_LAMP_H },
+  planter: { x: Math.round((GRID.width + FORECOURT_TILES / 2) * TILE - PLANTER_W / 2), y: -PLANTER_H - 6, w: PLANTER_W, h: PLANTER_H },
+} satisfies Record<string, PieceRect | PieceRect[]>;
+
+/** A lot plant's canvas: a tree is 3 tiles by 1.5 floors and a bush 2 tiles
+ *  by half a floor, both scaled by the spot, centered on its tile and standing
+ *  on the ground strip. */
+export function plantRect(spot: PlantSpot): PieceRect {
+  const tree = spot.kind === "tree";
+  const w = Math.round((tree ? 3 : 2) * TILE * spot.scale);
+  const h = Math.round((tree ? FLOOR * 1.5 : FLOOR * 0.5) * spot.scale);
+  return { x: spot.tile * TILE - w / 2, y: -h - STRIP_ABOVE + 2, w, h };
 }

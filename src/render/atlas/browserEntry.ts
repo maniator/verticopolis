@@ -152,7 +152,7 @@ const api: AtlasPage = {
   },
   records() {
     if (!result) throw new Error("run() first");
-    return { frameImages: result.frameImages, frames: result.frames, animations: result.animations };
+    return { frameImages: result.frameImages, groups: result.groups, frames: result.frames, animations: result.animations };
   },
   images(from, maxBytes) {
     if (!result) throw new Error("run() first");

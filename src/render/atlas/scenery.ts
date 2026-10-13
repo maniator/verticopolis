@@ -1,22 +1,8 @@
 import { GRID } from "../../engine/facilities";
 import { FLOOR, TILE } from "../scale";
+import { APRON_PAD_TILES, SCENERY, STRIP_ABOVE, STRIP_BELOW, type PieceRect } from "../sceneryLayout";
 import {
-  APRON_PAD_TILES,
-  FORECOURT_TILES,
-  FOUNTAIN_TILE,
-  PLAZA_LAMP_TILES,
-  PLAZA_SIDEWALK_TILES,
-  ROAD_START,
-  ROAD_TILES,
-  ROUNDABOUT_START,
-  ROUNDABOUT_TILES,
-  SIDEWALK_START,
-  SIDEWALK_TILES,
-  hash01,
-} from "../sceneryLayout";
-import {
-  STRIP_ABOVE,
-  STRIP_BELOW,
+  PAVE_JOINT_EVERY,
   drawBush,
   drawForecourt,
   drawFountain,
@@ -28,6 +14,7 @@ import {
   drawStreetLamp,
   drawStripTile,
   drawTree,
+  grassLook,
 } from "../excalibur/towerSceneryDraw";
 import type { AnimJob, Job, Keys, StillJob } from "./catalog";
 
@@ -35,15 +22,13 @@ import type { AnimJob, Job, Keys, StillJob } from "./catalog";
  * The world outside the tower (`excalibur/towerScenery.ts`): the plaza's
  * roundabout, fountain and lamps, the street lamp with its "375 ST" sign, the
  * forecourt planter, the lot's trees and bushes, and the ground pieces. Every
- * frame is painted by the game's own scenery painters; {@link sceneryData}
- * says where the game puts each piece, so a frontend can rebuild the scene.
+ * frame is painted by the game's own scenery painters, and {@link sceneryData}
+ * publishes the game's own placement table (`SCENERY` in `sceneryLayout.ts`),
+ * so a frontend can rebuild the scene.
  */
 
 export type ScenerySpec =
-  | {
-      p: "scenery";
-      piece: "roundabout" | "planter" | "bush" | "sidewalk" | "forecourt";
-    }
+  | { p: "scenery"; piece: "roundabout" | "planter" | "bush" | "sidewalk" | "forecourt" }
   | { p: "scenery"; piece: "fountain"; t: number }
   | { p: "scenery"; piece: "plazaLamp" | "streetLamp"; a: number }
   | { p: "scenery"; piece: "tree"; seed: number }
@@ -51,12 +36,7 @@ export type ScenerySpec =
   | { p: "scenery"; piece: "strip"; tile: number; paved: boolean };
 
 /** Paint a scenery piece into a canvas `w` x `h`. */
-export function paintScenery(
-  ctx: CanvasRenderingContext2D,
-  s: ScenerySpec,
-  w: number,
-  h: number,
-): void {
+export function paintScenery(ctx: CanvasRenderingContext2D, s: ScenerySpec, w: number, h: number): void {
   switch (s.piece) {
     case "roundabout":
       return drawRoundabout(ctx, w);
@@ -83,19 +63,23 @@ export function paintScenery(
   }
 }
 
-/** Piece sizes (px), as the game sizes their canvases. */
+const size = (r: PieceRect) => ({ w: r.w, h: r.h });
+
+/** Frame sizes: the fixed pieces as the game sizes them, plants at their base
+ *  size, and the ground tiles one period of their pattern. A strip tile is one
+ *  column wider than a lot tile, as the game paints it. */
 const SIZE = {
-  roundabout: { w: ROUNDABOUT_TILES * TILE, h: 48 },
-  fountain: { w: 100, h: 112 },
-  plazaLamp: { w: 84, h: Math.round(FLOOR * 1.6) + 14 },
-  streetLamp: { w: 8 * TILE, h: Math.round(FLOOR * 1.8) },
-  planter: { w: 2 * TILE, h: 18 },
+  roundabout: size(SCENERY.roundabout),
+  fountain: size(SCENERY.fountain),
+  plazaLamp: size(SCENERY.plazaLamps[0]),
+  streetLamp: size(SCENERY.streetLamp),
+  planter: size(SCENERY.planter),
   tree: { w: 3 * TILE, h: Math.round(FLOOR * 1.5) },
   bush: { w: 2 * TILE, h: Math.round(FLOOR * 0.5) },
-  sidewalk: { w: TILE, h: 11 },
-  forecourt: { w: 2 * TILE, h: 10 },
-  road: { w: 4 * TILE, h: 14 },
-  strip: { w: TILE, h: STRIP_ABOVE + STRIP_BELOW },
+  sidewalk: { w: TILE, h: SCENERY.sidewalk.h },
+  forecourt: { w: 2 * TILE, h: SCENERY.forecourt.h },
+  road: { w: 4 * TILE, h: SCENERY.rightRoad.h },
+  strip: { w: TILE + 1, h: STRIP_ABOVE + STRIP_BELOW },
 };
 
 /** The lamp brightness steps baked (the game fades continuously). */
@@ -107,139 +91,47 @@ export const FOUNTAIN_DT = 0.1;
 /** Tree variants baked (the game seeds each tree by the tower and its spot). */
 export const TREE_VARIANTS = 8;
 
-/** The grass variant of lot tile `t`: its shade (0..2) and whether it has a
- *  tuft, exactly as `drawStripTile` picks them. */
-export function grassVariant(t: number): { shade: number; tuft: boolean } {
-  const s = hash01(t * 17);
-  let shade = 0;
-  if (s < 0.33) shade = 1;
-  else if (s < 0.66) shade = 2;
-  return { shade, tuft: hash01(t * 29) < 0.2 };
+/** The grass frame name for a lot tile. */
+export function grassName(tile: number): string {
+  const g = grassLook(tile);
+  return `s${g.shade}/${g.tuft ? "tuft" : "flat"}`;
 }
 
-/** A lot tile showing each grass variant (and each paving joint), for the bake. */
-function sampleTiles(): {
-  grass: Map<string, number>;
-  pave: Map<string, number>;
-} {
+/** A lot tile showing each grass look, for the bake. */
+function grassSamples(): Map<string, number> {
   const grass = new Map<string, number>();
-  for (let t = 0; t < GRID.width && grass.size < 6; t++) {
-    const g = grassVariant(t);
-    const key = `s${g.shade}/${g.tuft ? "tuft" : "flat"}`;
-    if (!grass.has(key)) grass.set(key, t);
-  }
-  return {
-    grass,
-    pave: new Map([
-      ["plain", 1],
-      ["joint", 0],
-    ]),
-  };
+  for (let t = 0; t < GRID.width && grass.size < 6; t++) if (!grass.has(grassName(t))) grass.set(grassName(t), t);
+  return grass;
 }
 
-function still(
-  name: string,
-  size: { w: number; h: number },
-  paint: ScenerySpec,
-  keys: Keys,
-): StillJob {
-  return {
-    type: "still",
-    name,
-    w: size.w,
-    h: size.h,
-    anchor: { x: 0, y: 0 },
-    keys: { kind: "scenery", ...keys },
-    paint,
-  };
+function still(name: string, sz: { w: number; h: number }, paint: ScenerySpec, keys: Keys): StillJob {
+  // The scenery joined the atlas after its first release, so its images pack
+  // on pages of their own and leave the older pages as they were.
+  return { type: "still", name, w: sz.w, h: sz.h, anchor: { x: 0, y: 0 }, keys: { kind: "scenery", ...keys }, paint, ownPages: true };
 }
 
 /** Every scenery frame. */
 export function sceneryJobs(): Job[] {
   const jobs: Job[] = [
-    still(
-      "scenery/roundabout",
-      SIZE.roundabout,
-      { p: "scenery", piece: "roundabout" },
-      { piece: "roundabout" },
-    ),
-    still(
-      "scenery/planter",
-      SIZE.planter,
-      { p: "scenery", piece: "planter" },
-      { piece: "planter" },
-    ),
-    still(
-      "scenery/bush",
-      SIZE.bush,
-      { p: "scenery", piece: "bush" },
-      { piece: "bush" },
-    ),
-    still(
-      "scenery/ground/sidewalk",
-      SIZE.sidewalk,
-      { p: "scenery", piece: "sidewalk" },
-      { piece: "sidewalk" },
-    ),
-    still(
-      "scenery/ground/forecourt",
-      SIZE.forecourt,
-      { p: "scenery", piece: "forecourt" },
-      { piece: "forecourt" },
-    ),
-    still(
-      "scenery/ground/road",
-      SIZE.road,
-      { p: "scenery", piece: "road", phase: 4 },
-      { piece: "road" },
-    ),
+    still("scenery/roundabout", SIZE.roundabout, { p: "scenery", piece: "roundabout" }, { piece: "roundabout" }),
+    still("scenery/planter", SIZE.planter, { p: "scenery", piece: "planter" }, { piece: "planter" }),
+    still("scenery/bush", SIZE.bush, { p: "scenery", piece: "bush" }, { piece: "bush" }),
+    still("scenery/ground/sidewalk", SIZE.sidewalk, { p: "scenery", piece: "sidewalk" }, { piece: "sidewalk" }),
+    still("scenery/ground/forecourt", SIZE.forecourt, { p: "scenery", piece: "forecourt" }, { piece: "forecourt" }),
+    still("scenery/ground/road", SIZE.road, { p: "scenery", piece: "road", phase: 4 }, { piece: "road" }),
   ];
   for (const pct of LAMP_STEPS) {
-    jobs.push(
-      still(
-        `scenery/plaza-lamp/a${pct}`,
-        SIZE.plazaLamp,
-        { p: "scenery", piece: "plazaLamp", a: pct / 100 },
-        { piece: "plazaLamp", lamp: pct },
-      ),
-    );
-    jobs.push(
-      still(
-        `scenery/street-lamp/a${pct}`,
-        SIZE.streetLamp,
-        { p: "scenery", piece: "streetLamp", a: pct / 100 },
-        { piece: "streetLamp", lamp: pct },
-      ),
-    );
+    jobs.push(still(`scenery/plaza-lamp/a${pct}`, SIZE.plazaLamp, { p: "scenery", piece: "plazaLamp", a: pct / 100 }, { piece: "plazaLamp", lamp: pct }));
+    jobs.push(still(`scenery/street-lamp/a${pct}`, SIZE.streetLamp, { p: "scenery", piece: "streetLamp", a: pct / 100 }, { piece: "streetLamp", lamp: pct }));
   }
-  for (let v = 0; v < TREE_VARIANTS; v++)
-    jobs.push(
-      still(
-        `scenery/tree/v${v}`,
-        SIZE.tree,
-        { p: "scenery", piece: "tree", seed: v },
-        { piece: "tree", variant: v },
-      ),
-    );
-  const { grass, pave } = sampleTiles();
-  for (const [key, tile] of grass)
-    jobs.push(
-      still(
-        `scenery/ground/grass/${key}`,
-        SIZE.strip,
-        { p: "scenery", piece: "strip", tile, paved: false },
-        { piece: "grass" },
-      ),
-    );
-  for (const [key, tile] of pave)
-    jobs.push(
-      still(
-        `scenery/ground/pave/${key}`,
-        SIZE.strip,
-        { p: "scenery", piece: "strip", tile, paved: true },
-        { piece: "pave" },
-      ),
-    );
+  for (let v = 0; v < TREE_VARIANTS; v++) jobs.push(still(`scenery/tree/v${v}`, SIZE.tree, { p: "scenery", piece: "tree", seed: v }, { piece: "tree", variant: v }));
+  for (const [name, tile] of grassSamples()) {
+    const g = grassLook(tile);
+    jobs.push(still(`scenery/ground/grass/${name}`, SIZE.strip, { p: "scenery", piece: "strip", tile, paved: false }, { piece: "grass", shade: g.shade, tuft: g.tuft }));
+  }
+  for (const joint of [false, true]) {
+    jobs.push(still(`scenery/ground/pave/${joint ? "joint" : "plain"}`, SIZE.strip, { p: "scenery", piece: "strip", tile: joint ? 0 : 1, paved: true }, { piece: "pave", joint }));
+  }
   const fountain: AnimJob = {
     type: "anim",
     name: "scenery/fountain",
@@ -248,98 +140,50 @@ export function sceneryJobs(): Job[] {
     keys: { kind: "scenery", piece: "fountain" },
     dt: FOUNTAIN_DT,
     loop: true,
-    frames: Array.from(
-      { length: FOUNTAIN_FRAMES },
-      (_, i) =>
-        ({
-          p: "scenery",
-          piece: "fountain",
-          t: i * FOUNTAIN_DT,
-        }) as ScenerySpec,
-    ),
+    ownPages: true,
+    frames: Array.from({ length: FOUNTAIN_FRAMES }, (_, i): ScenerySpec => ({ p: "scenery", piece: "fountain", t: i * FOUNTAIN_DT })),
   };
   jobs.push(fountain);
   return jobs;
 }
 
-/** Where the game places each piece: x from the lot's left edge and y from
- *  the ground line (both px, y negative upward, the frame's top-left corner),
- *  back to front. A run repeats its tile frame from `x` for `w` px. */
+const at = (r: PieceRect) => ({ x: r.x, y: r.y });
+
+/** Where the game places each piece (see docs/atlas.md, "The world outside
+ *  the tower"), back to front. */
 export function sceneryData() {
-  const plazaLamp = SIZE.plazaLamp;
-  const streetLamp = SIZE.streetLamp;
-  const planter = SIZE.planter;
   return {
     lotTiles: GRID.width,
     ground: {
       strip: {
         y: -STRIP_ABOVE,
         apronPadTiles: APRON_PAD_TILES,
-        grass: Array.from({ length: GRID.width }, (_, t) => {
-          const g = grassVariant(t);
-          return `s${g.shade}/${g.tuft ? "tuft" : "flat"}`;
-        }),
+        jointEvery: PAVE_JOINT_EVERY,
+        grass: Array.from({ length: GRID.width }, (_, t) => grassName(t)),
       },
       runs: [
-        {
-          frame: "scenery/ground/sidewalk",
-          x: -PLAZA_SIDEWALK_TILES * TILE,
-          y: -7,
-          w: PLAZA_SIDEWALK_TILES * TILE,
-        },
-        {
-          frame: "scenery/ground/road",
-          x: -GRID.width * TILE,
-          y: -2,
-          w: (ROUNDABOUT_START + GRID.width) * TILE,
-          tileOriginX: 0,
-        },
-        {
-          frame: "scenery/ground/forecourt",
-          x: GRID.width * TILE,
-          y: -6,
-          w: FORECOURT_TILES * TILE,
-        },
-        {
-          frame: "scenery/ground/sidewalk",
-          x: SIDEWALK_START * TILE,
-          y: -7,
-          w: SIDEWALK_TILES * TILE,
-        },
-        {
-          frame: "scenery/ground/road",
-          x: ROAD_START * TILE,
-          y: -2,
-          w: ROAD_TILES * TILE,
-          tileOriginX: ROAD_START * TILE,
-        },
+        { frame: "scenery/ground/sidewalk", ...SCENERY.plazaSidewalk, tileOriginX: SCENERY.plazaSidewalk.x },
+        { frame: "scenery/ground/road", ...SCENERY.leftRoad, tileOriginX: 0 },
+        { frame: "scenery/ground/forecourt", ...SCENERY.forecourt, tileOriginX: SCENERY.forecourt.x },
+        { frame: "scenery/ground/sidewalk", ...SCENERY.sidewalk, tileOriginX: SCENERY.sidewalk.x },
+        { frame: "scenery/ground/road", ...SCENERY.rightRoad, tileOriginX: SCENERY.rightRoad.x },
       ],
     },
     props: [
-      { frame: "scenery/roundabout", x: ROUNDABOUT_START * TILE, y: -30 },
-      {
-        frame: "scenery/fountain",
-        x: FOUNTAIN_TILE * TILE - SIZE.fountain.w / 2,
-        y: -102,
-      },
-      ...PLAZA_LAMP_TILES.map((t) => ({
-        frame: "scenery/plaza-lamp",
-        x: t * TILE - plazaLamp.w / 2,
-        y: -plazaLamp.h + 4,
-      })),
-      {
-        frame: "scenery/street-lamp",
-        x: Math.round((SIDEWALK_START + 1) * TILE - streetLamp.w / 2),
-        y: -streetLamp.h - 7,
-      },
-      {
-        frame: "scenery/planter",
-        x: Math.round(
-          (GRID.width + FORECOURT_TILES / 2) * TILE - planter.w / 2,
-        ),
-        y: -planter.h - 6,
-      },
+      { frame: "scenery/roundabout", ...at(SCENERY.roundabout) },
+      { frame: "scenery/fountain", ...at(SCENERY.fountain) },
+      ...SCENERY.plazaLamps.map((r) => ({ frame: "scenery/plaza-lamp", ...at(r) })),
+      { frame: "scenery/street-lamp", ...at(SCENERY.streetLamp) },
+      { frame: "scenery/planter", ...at(SCENERY.planter) },
     ],
+    plants: {
+      // Each plant stands centered on its lot tile, its bottom row two rows
+      // under the strip's top, scaled by its spot; the paved apron (with two
+      // tiles of half-width either side) displaces it.
+      scale: [0.8, 1.2],
+      baseY: -STRIP_ABOVE + 2,
+      clearTiles: 2,
+    },
     lamp: { steps: LAMP_STEPS, fadeIn: [18, 20], fadeOut: [5, 7] },
   };
 }

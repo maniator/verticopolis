@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { GRID } from "../../engine/facilities";
+import { lampAlpha } from "../excalibur/towerSceneryDraw";
+import { SCENERY } from "../sceneryLayout";
 import {
   FOUNTAIN_FRAMES,
   LAMP_STEPS,
   TREE_VARIANTS,
-  grassVariant,
   sceneryData,
   sceneryJobs,
 } from "./scenery";
@@ -51,11 +52,16 @@ describe("scenery in the atlas", () => {
     expect(data.ground.strip.grass).toHaveLength(GRID.width);
     for (const key of new Set(data.ground.strip.grass))
       expect(names.has(`scenery/ground/grass/${key}`), key).toBe(true);
-    // The grass picks its shade and tuft from the lot tile, as the game does.
-    const g = grassVariant(7);
-    expect(data.ground.strip.grass[7]).toBe(
-      `s${g.shade}/${g.tuft ? "tuft" : "flat"}`,
-    );
+    // The lamp fade the data states is the game's.
+    expect([18, 19, 20, 5, 6, 7].map((h) => lampAlpha(h))).toEqual([0, 0.5, 1, 1, 0.5, 0]);
+    expect(data.lamp.fadeIn).toEqual([18, 20]);
+    expect(data.lamp.fadeOut).toEqual([5, 7]);
+  });
+
+  it("publishes the game's own placement table", () => {
+    const data = sceneryData();
+    expect(data.props[0]).toMatchObject({ x: SCENERY.roundabout.x, y: SCENERY.roundabout.y });
+    expect(data.ground.runs[3]).toMatchObject(SCENERY.sidewalk);
   });
 
   it("places only frames it bakes (a lamp by its steps)", () => {

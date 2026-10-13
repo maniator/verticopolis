@@ -33,6 +33,9 @@ export interface StillJob {
   /** Try a depth split of the frame's paint (a room): a paint that marks a
    *  shell break (`pixelSprites/layers.ts`) gets shell and furniture layers. */
   layers?: boolean;
+  /** True for a family added after the first atlas: its new images pack on
+   *  pages of their own, after every earlier family's (`BakeResult.groups`). */
+  ownPages?: boolean;
 }
 
 /** An animation: one frame per paint, `dt` seconds apart. */
@@ -48,6 +51,9 @@ export interface AnimJob {
   frames: PaintSpec[];
   /** True when every frame should also be split for depth, like a still. */
   layers?: boolean;
+  /** True for a family added after the first atlas: its new images pack on
+   *  pages of their own, after every earlier family's (`BakeResult.groups`). */
+  ownPages?: boolean;
 }
 
 export type Job = StillJob | AnimJob;

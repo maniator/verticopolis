@@ -1,14 +1,14 @@
 import { TILE } from "../scale";
-import { hash01 } from "../sceneryLayout";
+import { STRIP_ABOVE, STRIP_BELOW, hash01 } from "../sceneryLayout";
 
 /**
  * Pure canvas painters for the outside-world scenery: the plaza's roundabout,
- * fountain, and lamps, the right-edge street lamp and planter, and the lot's
- * trees and bushes, and the ground pieces (sidewalk, road, forecourt and the
- * lot's grass or cement strip). Split from towerScenery.ts (the actor/lifecycle half) at
- * the file-size ceiling; everything here draws into a plain 2D context and
- * holds no state, so the scenery tests drive each painter with a recording
- * spy context.
+ * fountain, and lamps, the right-edge street lamp and planter, the lot's trees
+ * and bushes, and the ground pieces (sidewalk, road, forecourt and the lot's
+ * grass or cement strip). Split from towerScenery.ts (the actor/lifecycle
+ * half) at the file-size ceiling; everything here draws into a plain 2D
+ * context and holds no state, so the scenery tests drive each painter with a
+ * recording spy context, and the sprite atlas bakes the same painters.
  */
 
 export function drawRoundabout(ctx: CanvasRenderingContext2D, w: number): void {
@@ -237,31 +237,42 @@ export function drawForecourt(ctx: CanvasRenderingContext2D, w: number): void {
   for (let x = 0; x < w; x += TILE * 2) ctx.fillRect(x, 0, 1, 6);
 }
 
-/** Rows of the lot's ground strip above and below the ground line. */
-export const STRIP_ABOVE = 7;
-export const STRIP_BELOW = 4;
+export { STRIP_ABOVE, STRIP_BELOW };
+
+/** The lot's three grass shades. */
+export const GRASS_SHADES = ["#446c2e", "#4e7a34", "#5b8a3c"] as const;
+
+/** A lot tile's grass: its shade (an index into {@link GRASS_SHADES}) and
+ *  whether its blades stand one pixel taller (a tuft), both from the tile. */
+export function grassLook(tile: number): { shade: 0 | 1 | 2; tuft: boolean } {
+  const h = hash01(tile * 17);
+  let shade: 0 | 1 | 2 = 0;
+  if (h < 0.33) shade = 1;
+  else if (h < 0.66) shade = 2;
+  return { shade, tuft: hash01(tile * 29) < 0.2 };
+}
+
+/** Paving joints fall on every lot tile whose index is a multiple of this. */
+export const PAVE_JOINT_EVERY = 4;
 
 /** One tile of the lot's ground strip at `px`: cement (with a joint on every
  *  fourth lot tile) where the tower has paved it, else grass whose shade and
- *  tuft come from the lot tile index. Fills one column past the tile, which
- *  the next tile paints over, so a run of tiles has no seam. */
+ *  tuft come from the lot tile index. Fills one column past the tile; the
+ *  next tile, drawn after it, paints over the rows it covers. */
 export function drawStripTile(ctx: CanvasRenderingContext2D, px: number, tile: number, paved: boolean): void {
   if (paved) {
     ctx.fillStyle = PAVE;
     ctx.fillRect(px, STRIP_ABOVE - 5, TILE + 1, 5 + STRIP_BELOW);
-    if (tile % 4 === 0) {
+    if (tile % PAVE_JOINT_EVERY === 0) {
       ctx.fillStyle = PAVE_JOINT;
       ctx.fillRect(px, STRIP_ABOVE - 5, 1, 5);
     }
     return;
   }
   const gh = 4; // grass blade height
-  const shade = hash01(tile * 17);
-  let grass = "#446c2e";
-  if (shade < 0.33) grass = "#4e7a34";
-  else if (shade < 0.66) grass = "#5b8a3c";
-  ctx.fillStyle = grass;
-  const wob = hash01(tile * 29) < 0.2 ? 1 : 0;
+  const look = grassLook(tile);
+  ctx.fillStyle = GRASS_SHADES[look.shade];
+  const wob = look.tuft ? 1 : 0;
   ctx.fillRect(px, STRIP_ABOVE - gh - wob, TILE + 1, gh + wob + STRIP_BELOW);
   ctx.fillStyle = "#3c5c28";
   ctx.fillRect(px, STRIP_ABOVE, TILE + 1, STRIP_BELOW);
