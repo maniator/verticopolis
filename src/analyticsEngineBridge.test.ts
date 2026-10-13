@@ -267,6 +267,57 @@ describe("analytics engine bridge", () => {
     expect(propsFor("session_builds")).toEqual([{ builds: 4 }]);
   });
 
+  it("counts a fold that throws and folds the rest of the batch", () => {
+    const spy = vi.spyOn(gameplaySession, "noteStar").mockImplementation(() => {
+      throw new Error("fold bug");
+    });
+    try {
+      expect(() => forwardGameplayEvents([star(2), founded()])).not.toThrow();
+      expect(engineBridgeStats().foldFailures).toBe(1);
+      expect(propsFor("new_game_started")).toEqual([{ mode: "classic" }]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("folds every engine event exactly once across a swap, a page hide and a consent flip", () => {
+    // One live tower at a time, as the frame loop and the session see it.
+    let live = Simulation.newGame(7, "classic");
+    bindEngineBridge(() => live);
+    gameplaySession.begin();
+    live.money = 1e9;
+    drainEngineEvents(live); // the founding
+    for (let x = 180; x < 183; x++) expect(live.build("lobby", 1, x).ok).toBe(true);
+    // A failed drain in the middle loses and repeats nothing.
+    const real = live.drainGameplayEvents.bind(live);
+    live.drainGameplayEvents = () => {
+      throw new Error("trap");
+    };
+    drainEngineEvents(live);
+    live.drainGameplayEvents = real;
+    // A swap (a load) hands the undrained builds on; the new tower adds one.
+    const next = Simulation.deserialize(JSON.parse(JSON.stringify(live.serialize())) as SerializedGame);
+    next.gameplayEvents.inherit(live.gameplayEvents);
+    live = next;
+    live.money = 1e9;
+    expect(live.build("lobby", 1, 183).ok).toBe(true);
+    // A rejected event in the same batch is dropped without touching the rest.
+    live.gameplayEvents.pushEvent({ name: "tower_renamed", payload: {} } as never);
+    // The page hide folds what the engine still holds, once.
+    gameplaySession.end(false);
+    drainEngineEvents(live);
+    gameplaySession.end(false);
+    expect(propsFor("session_builds")).toEqual([{ builds: 4 }]);
+    expect(propsFor("new_game_started")).toEqual([{ mode: "classic" }]);
+    expect(propsFor("first_build")).toEqual([{ tool: "lobby" }]);
+    expect(engineBridgeStats()).toMatchObject({ rejected: 1, drainFailures: 1 });
+    // A consent flip drops what the engine holds unsent; nothing is folded twice.
+    expect(live.build("lobby", 1, 184).ok).toBe(true);
+    gameplaySession.startEpoch();
+    drainEngineEvents(live);
+    expect(engineBridgeStats().discarded).toBe(1);
+  });
+
   it("counts but sends nothing on a host where analytics is off", () => {
     window.location.href = localhost;
     forwardGameplayEvents([founded(), placed("office", 2), star(2)]);
