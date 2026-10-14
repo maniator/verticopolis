@@ -1006,8 +1006,8 @@ mod tests {
     fn the_tdt_binding_answers_from_the_lock() {
         use crate::canonical::digest;
         use crate::tdt::referee::{inflate, read_lock, sha256_hex};
-        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-        let lock = read_lock(&root.join("conformance").join("tdt-cases.json")).expect("lock");
+        let suite = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../conformance");
+        let lock = read_lock(&suite.join("tdt-cases.json")).expect("lock");
         let mut parsed = 0;
         for case in lock.import.iter().filter(|c| c.expected.is_some()) {
             let Ok(json) = import_tdt(&inflate(&case.bytes).expect("bytes"), &case.filename) else {
@@ -1220,7 +1220,7 @@ mod tests {
         // A real tower, so the view carries people, every unit kind and cars.
         let text = std::fs::read_to_string(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../src/tests/fixtures/towerone-star4.vctower"
+            "/../conformance/fixtures/towerone-star4.vctower"
         ))
         .expect("fixture");
         let raw = crate::load::decode_vctower(&text).expect("decodes");

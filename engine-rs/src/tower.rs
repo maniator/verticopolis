@@ -867,6 +867,17 @@ impl Tower {
         if kind.is_transport() {
             return Vec::new();
         }
+        // A footprint off the lot or outside the floor range has no bridge:
+        // every caller refuses it on those rules before the plan can count,
+        // so skipping the scan changes no answer, and an x far off the lot no
+        // longer scans one tile at a time back to it (#1003).
+        if x < 0
+            || x.saturating_add(w) > LOT_WIDTH
+            || floor < MIN_FLOOR
+            || floor.saturating_add(hgt - 1) > MAX_FLOOR
+        {
+            return Vec::new();
+        }
         let substrate = if kind == Kind::Lobby {
             Kind::Lobby
         } else {

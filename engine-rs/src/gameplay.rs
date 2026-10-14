@@ -607,8 +607,10 @@ mod tests {
             Some(EmergencyKind::BombThreat)
         );
         assert_eq!(EmergencyKind::parse("ransom"), None);
-        // The floor bounds are the grid's, and the TypeScript ring holds as
-        // many events as this one.
+        // The floor bounds are the grid's. (That the TypeScript ring holds as
+        // many events as this one is checked from the TypeScript side, in
+        // src/engine/gameplayEmission.test.ts, so this crate's tests read
+        // nothing outside engine-rs/ and conformance/.)
         let floor = &cat["events"][1]["payload"]["floor"];
         assert_eq!(
             (floor["min"].as_i64(), floor["max"].as_i64()),
@@ -617,12 +619,6 @@ mod tests {
                 Some(crate::facilities::MAX_FLOOR)
             )
         );
-        let ts = std::fs::read_to_string(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../src/engine/gameplayEventBuffer.ts"
-        ))
-        .expect("the TypeScript buffer");
-        assert!(ts.contains(&format!("GAMEPLAY_RING_CAP = {GAMEPLAY_RING_CAP};")));
         assert_eq!(serde_json::from_str::<Value>(CATALOG_JSON).unwrap(), cat);
         // A value outside a set, a stray field and an unknown name all fail.
         let mut bad = GameplayEvent::StarReached { star: 1 }.to_json();
@@ -747,7 +743,7 @@ mod tests {
         // A real four-star save, with its milestones, stars, shafts and prices.
         let text = std::fs::read_to_string(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../src/tests/fixtures/towerone-star4.vctower"
+            "/../conformance/fixtures/towerone-star4.vctower"
         ))
         .expect("fixture");
         let raw = crate::load::decode_vctower(&text).expect("decodes");
