@@ -221,14 +221,16 @@ export function bootGame(create: () => BootApp): Promise<void> {
     const booted = mainThreadWasm ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: () => loadWasmEngine() }) : typescriptBoot();
     let engineWorker: SpawnedWorker | null = null;
     let workerHost: WorkerHostHandle | null = null;
+    let bootState: EngineBootState = booted.state;
     if (!__WASM_ONLY__ && choice === "wasm-worker") {
       try {
         engineWorker = await spawnEngineWorker(makeBrowserWorker, enginePackageUrl());
       } catch (e) {
+        // Recorded with its reason, as a failed package load is (#874).
+        bootState = { ...bootState, failure: { stage: "load", message: e instanceof Error ? e.message : String(e) } };
         console.error("[wasm-worker] the engine worker did not start; running on the TypeScript engine:", e);
       }
     }
-    let bootState: EngineBootState = booted.state;
     publishBootState(bootState);
     // Start the gameplay session clock (foreground time + funnel state) only once
     // the game can run: a no-WebGL visitor bails above, and a wasm-only build
@@ -251,6 +253,8 @@ export function bootGame(create: () => BootApp): Promise<void> {
         try {
           workerHost = startWorkerHost(app as unknown as WasmHostApp, engineWorker, () => spawnEngineWorker(makeBrowserWorker, enginePackageUrl()));
           engineWorker = null; // the host owns it now
+          bootState = { ...bootState, engine: "wasm" };
+          publishBootState(bootState);
           refreshSplashVersion();
         } catch (e) {
           // A host that started before a later throw lets its tower go
@@ -259,6 +263,8 @@ export function bootGame(create: () => BootApp): Promise<void> {
           workerHost = null;
           engineWorker?.worker.terminate();
           engineWorker = null;
+          bootState = failBoot(bootState, "start", e instanceof Error ? e.message : String(e));
+          publishBootState(bootState);
           console.error("[wasm-worker] did not start; running on the TypeScript engine:", e);
         }
       }
@@ -279,7 +285,7 @@ export function bootGame(create: () => BootApp): Promise<void> {
         try {
           const handle = startWasmHost(app as unknown as WasmHostApp, wasmModule, console, {
             ...(__WASM_ONLY__ ? { strict: true, onFatal: (m: string) => stopForEngine(starting ? "start" : "host", m) } : {}),
-            sync: choice === "wasm-frame" ? "frame" : "step",
+            sync: !__WASM_ONLY__ && choice === "wasm-frame" ? "frame" : "step",
           });
           // A refused first tower: strict mode reported it through onFatal; a
           // switchable build leaves it on TypeScript, recorded here (#874).

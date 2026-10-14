@@ -12,7 +12,7 @@ vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // The WASM engine switch: the request and the package load are stubbed so the
 // fallback (package fails to load, the game boots on the TypeScript engine)
 // can be asserted without a package.
-const wasmStub = vi.hoisted(() => ({ requested: "ts" as "ts" | "wasm", loadError: null as Error | null, module: null as unknown }));
+const wasmStub = vi.hoisted(() => ({ requested: "ts" as "ts" | "wasm" | "wasm-worker", loadError: null as Error | null, module: null as unknown, workerError: null as Error | null }));
 vi.mock("./wasmhost/engineChoice", async (importOriginal) => {
   const real = await importOriginal<typeof import("./wasmhost/engineChoice")>();
   return { ...real, engineRequested: () => wasmStub.requested };
@@ -28,7 +28,21 @@ vi.mock("./wasmhost/startWasmHost", async (importOriginal) => {
     startWasmHost: vi.fn(() => ({ status: { engine: "wasm", starts: 1, hosted: true, errors: [] }, current: () => null, stop: () => {} })),
   };
 });
+// The experimental worker host (`?engine=wasm-worker`): the spawn and the
+// start are stubbed so the boot state it publishes can be asserted.
+vi.mock("./wasmhost/workerController", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./wasmhost/workerController")>();
+  return {
+    ...real,
+    spawnEngineWorker: vi.fn(async () => {
+      if (wasmStub.workerError) throw wasmStub.workerError;
+      return { worker: { terminate: vi.fn() }, catalogs: { classic: "{}", modern: "{}" } };
+    }),
+    startWorkerHost: vi.fn(() => ({ stop: vi.fn() })),
+  };
+});
 import { startWasmHost } from "./wasmhost/startWasmHost";
+import { startWorkerHost } from "./wasmhost/workerController";
 import { Simulation } from "./engine/Simulation";
 import { SaveGame } from "./storage/SaveGame";
 import { setEngineWriter } from "./storage/vctowerWriter";
@@ -346,6 +360,33 @@ describe("bootGame", () => {
     } finally {
       wasmStub.requested = "ts";
       wasmStub.loadError = null;
+    }
+  });
+
+  it("publishes the worker host as the WASM engine, and a worker that fails as a fallback with its reason", async () => {
+    stubWebGL();
+    wasmStub.requested = "wasm-worker";
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const boot = () => (globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot;
+    try {
+      await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+      expect(startWorkerHost).toHaveBeenCalledTimes(1);
+      expect(startWasmHost).not.toHaveBeenCalled();
+      expect(boot()).toEqual({ build: "switchable", engine: "wasm", failure: null });
+      vi.mocked(startWorkerHost).mockImplementationOnce(() => {
+        throw new Error("no worker host");
+      });
+      await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "no worker host" } });
+      wasmStub.workerError = new Error("the engine worker did not answer ready");
+      vi.mocked(startWorkerHost).mockClear();
+      await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+      expect(startWorkerHost).not.toHaveBeenCalled();
+      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "load", message: "the engine worker did not answer ready" } });
+      expect(error).toHaveBeenCalledWith(expect.stringContaining("[wasm-worker]"), expect.any(Error));
+    } finally {
+      wasmStub.requested = "ts";
+      wasmStub.workerError = null;
     }
   });
 
