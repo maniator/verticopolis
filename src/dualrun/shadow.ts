@@ -55,7 +55,7 @@ export class ShadowEngine {
       case "towerSetCars": this.live().towerSetCars(cmd.id, cmd.cars); return null;
       case "addCar": this.live().addCar(cmd.id); return null;
       case "removeCar": this.live().removeCar(cmd.id); return null;
-      case "extendTransport": this.live().extendTransport(cmd.id, cmd.end, cmd.targetFloor, cmd.hwm ? JSON.stringify(cmd.hwm) : null); return null;
+      case "extendTransport": this.live().extendTransport(cmd.id, cmd.end, cmd.targetFloor, cmd.hwm != null ? JSON.stringify(cmd.hwm) : null); return null;
       case "removeFacility": this.live().removeFacility(cmd.id, cmd.method); return null;
       case "setSchedule": this.live().setSchedule(cmd.id, JSON.stringify(cmd.schedule ?? null)); return null;
       case "setStop": this.live().setStop(cmd.id, cmd.floor, cmd.stop); return null;
