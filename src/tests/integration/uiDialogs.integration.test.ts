@@ -791,7 +791,7 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
       clicks.push({ href: this.href, download: this.download });
     });
 
-    ui.downloadFile("my-tower.vctower", "VCTOWER1\npayload");
+    expect(ui.downloadFile("my-tower.vctower", "VCTOWER1\npayload")).toBe(true);
     expect(clicks).toEqual([{ href: "blob:vctower", download: "my-tower.vctower" }]);
     expect(blobs).toHaveLength(1);
     // Revoking in the click's own task can abort the download on engines that
@@ -838,7 +838,10 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
       throw new Error("blocked");
     });
     const { ui } = makeUI();
-    expect(() => ui.downloadFile("t.vctower", "payload")).not.toThrow();
+    let started: boolean | undefined;
+    expect(() => (started = ui.downloadFile("t.vctower", "payload"))).not.toThrow();
+    // Reported back so the export flow skips its success line (GH #997).
+    expect(started).toBe(false);
     const toasts = [...document.getElementById("toast-wrap")!.children];
     expect(toasts.some((t) => t.className.includes("bad") && t.textContent!.includes("Couldn't save your tower file"))).toBe(true);
   });

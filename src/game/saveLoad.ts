@@ -362,11 +362,12 @@ export class SaveLoad {
       return;
     }
     this.deps.ui.showExportReport(built.report, {
-      // Through the shared export latch (GH #760 follow-on): the File > Export
-      // Tower menu command can reach this legacy download, and macOS keeps the
-      // app menu live during a native save dialog, so an unlatched download
-      // could stack dialogs. Held until downloadFile settles.
-      onDownload: () => void runLegacyDownload(this.deps.ui, () => this.deps.ui.downloadFile(built.report.filename, built.bytes)),
+      // Through the shared export latch (GH #760 follow-on), so a .TDT download
+      // and a .vctower export can never run at once.
+      onDownload: () =>
+        void runLegacyDownload(this.deps.ui, () => {
+          this.deps.ui.downloadFile(built.report.filename, built.bytes);
+        }),
     });
   }
 

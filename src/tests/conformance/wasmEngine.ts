@@ -77,7 +77,8 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
     setMoney: (amount) => live().setMoney(amount),
     build: (kind, floor, x) => outcome(live().build(kind, i32(floor, "floor"), i32(x, "x"))),
     buildTransport: (kind, x, bottom, top) => outcome(live().buildTransport(kind, i32(x, "x"), i32(bottom, "bottom"), i32(top, "top"))),
-    sellAt: (floor, x) => live().sellAt(i32(floor, "floor"), i32(x, "x")),
+    // Read raw by the binding, which refuses a malformed argument itself (#996).
+    sellAt: (floor, x) => live().sellAt(floor, x),
     unitAt: (floor, x) => {
       const text = live().unitAt(i32(floor, "floor"), i32(x, "x"));
       if (text === undefined) return null;
@@ -90,17 +91,18 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
       const t = JSON.parse(text) as SavedTransport;
       return { id: t.id, kind: t.kind, cars: t.cars };
     },
-    adjustRent: (id, dir) => live().adjustRent(i32(id, "id"), dir) ?? null,
-    setNoRate: (id) => live().setNoRate(i32(id, "id")),
-    setCars: (id, cars) => live().setCars(i32(id, "id"), i32(cars, "cars")),
-    // The charge commands read their arguments raw and refuse a malformed
-    // one themselves (#923), so they pass through unchecked.
+    // These and the charge commands below read their arguments raw and
+    // refuse a malformed one themselves (#923, #996), so they pass through
+    // unchecked.
+    adjustRent: (id, dir) => live().adjustRent(id, dir) ?? null,
+    setNoRate: (id) => live().setNoRate(id),
+    setCars: (id, cars) => live().setCars(id, cars),
     addCar: (id) => charge(live().addCar(id)),
     removeCar: (id) => charge(live().removeCar(id)),
     extendTransport: (id, end, targetFloor, hwm) =>
       charge(live().extendTransport(id, end, targetFloor, hwm != null ? JSON.stringify(hwm) : null)),
     removeFacility: (id, method) => charge(live().removeFacility(id, method)),
-    setSchedule: (id, schedule) => live().setSchedule(i32(id, "id"), JSON.stringify(schedule)),
+    setSchedule: (id, schedule) => live().setSchedule(id, JSON.stringify(schedule)),
     startFire: () => live().startFire(),
     fires: () => live().fires(),
     bombThreat: () => live().bombThreat(),
@@ -108,9 +110,9 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
     callExterminator: () => outcome(live().callExterminator()),
     autoBridge: () => live().autoBridge(),
     toggleAutoBridge: () => live().toggleAutoBridge(),
-    resizeTransport: (id, bottom, top) => outcome(live().resizeTransport(i32(id, "id"), i32(bottom, "bottom"), i32(top, "top"))),
+    resizeTransport: (id, bottom, top) => outcome(live().resizeTransport(id, bottom, top)),
     clearStops: (id) => live().clearStops(i32(id, "id")),
-    setStop: (id, floor, stop) => live().setStop(i32(id, "id"), i32(floor, "floor"), stop),
+    setStop: (id, floor, stop) => live().setStop(id, floor, stop),
     priceUnit: (id, target) => live().priceUnit(i32(id, "id"), target) ?? null,
     setFilmPolicy: (id, policy) => live().setFilmPolicy(i32(id, "id"), policy) ?? null,
     rerollSubtype: (id) => live().rerollSubtype(i32(id, "id")) ?? null,

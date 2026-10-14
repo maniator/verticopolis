@@ -63,7 +63,7 @@ function fakes() {
       sayVisibly: vi.fn(),
       downloadFile: (filename: string, contents: string | Uint8Array) => {
         downloads.push({ filename, contents });
-        return Promise.resolve();
+        return true;
       },
       showImportReport: (report: ImportReport, cb: { onOpen: () => void }) => {
         importReports.push({ report, open: cb.onOpen });

@@ -199,6 +199,46 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(report.checkpoints).toBe(2);
   });
 
+  it("a malformed relayed edit is refused in both engines and stays in step (#996)", () => {
+    // The mirror relays a non-number as NaN and a non-boolean stop as null,
+    // which the binding refuses as TypeScript does; a Symbol or a BigInt
+    // never reaches the shadow as itself.
+    const { sim, run } = DualRun.found(11, "classic");
+    sim.money = 1e9;
+    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    for (const fl of [2, 3]) for (let x = 170; x < 200; x++) expect(sim.build("floor", fl, x).ok).toBe(true);
+    expect(sim.buildTransport("elevatorStandard", 172, 1, 3).ok).toBe(true);
+    expect(sim.build("office", 2, 180).ok).toBe(true);
+    const lift = sim.tower.transportAt(1, 172)!.id;
+    const office = sim.tower.unitAt(2, 180)!.id;
+    const loose = <T>(v: unknown) => v as T;
+    const invalid = { ok: false, reason: INVALID_REQUEST };
+    for (const bad of ["2", null, true, 2.5, Number.NaN, 2 ** 53, BigInt(2), Symbol("v"), new Number(2)]) {
+      const v = loose<number>(bad);
+      expect(sim.sellAt(v, 180)).toBe(false);
+      expect(sim.setCars(lift, v)).toBe(false);
+      expect(sim.tower.setCars(v, 2)).toBe(false);
+      expect(sim.resizeTransport(lift, 1, v)).toEqual(invalid);
+      expect(sim.tower.resizeTransport(v, 1, 2)).toEqual(invalid);
+      expect(sim.tower.setStop(lift, v, false)).toBe(false);
+      expect(sim.tower.setSchedule(v, null)).toBe(false);
+      expect(sim.adjustRent(office, loose(bad))).toBeNull();
+      expect(sim.setNoRate(v)).toBe(false);
+    }
+    for (const stop of [null, 0, "true", new Boolean(true)]) expect(sim.tower.setStop(lift, 2, loose(stop))).toBe(false);
+    expect(sim.adjustRent(office, loose(2))).toBeNull();
+    // Well-formed edits still land in both.
+    expect(sim.setCars(lift, 2)).toBe(true);
+    expect(sim.tower.setStop(lift, 2, false)).toBe(true);
+    expect(sim.adjustRent(office, 1)).not.toBeNull();
+    expect(sim.resizeTransport(lift, 1, 2).ok).toBe(true);
+    new FrameDriver(sim, 3).run(60);
+    const report = run.stop();
+    expect(report.divergences).toEqual([]);
+    expect(report.eventDivergences).toEqual([]);
+    expect(report.checkpoints).toBe(2);
+  });
+
   it("a shadow that drifts is caught at the next hour with the path", () => {
     const { sim, run } = DualRun.found(5, "classic");
     sim.money = 1e9;

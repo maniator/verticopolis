@@ -119,7 +119,7 @@ describe("wireControllers", () => {
         showInspector: vi.fn(),
         showBatchPricingDialog: vi.fn(),
         showElevatorScheduleDialog: vi.fn(),
-        downloadFile: vi.fn(),
+        downloadFile: vi.fn(() => false),
         showImportReport: vi.fn(),
         showExportReport: vi.fn(),
       },
@@ -223,7 +223,7 @@ describe("wireControllers", () => {
     expect(app.adoptSim).toHaveBeenCalledWith("newsim");
     d.ui.toast("t", "info");
     expect(app.ui.toast).toHaveBeenCalledWith("t", "info");
-    d.ui.downloadFile("f.json", "body");
+    expect(d.ui.downloadFile("f.json", "body")).toBe(false); // passed through for GH #997
     expect(app.ui.downloadFile).toHaveBeenCalledWith("f.json", "body");
     d.ui.showImportReport("r", "cb");
     expect(app.ui.showImportReport).toHaveBeenCalledWith("r", "cb");
