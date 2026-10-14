@@ -131,3 +131,33 @@ describe("autoBridge persistence and migration", () => {
     expect(Simulation.deserialize(save).autoBridge).toBe(true);
   });
 });
+
+describe("a structural tile far off the lot (#1003)", () => {
+  // The bridge plan used to scan one tile at a time from x back to the lot,
+  // so a far x took seconds before the lot-edge refusal. It now has no plan
+  // off the lot, and the answer is the same refusal as before.
+  it("refuses at once with the lot-edge reason and plans no bridge", () => {
+    const sim = foundedWithLobby();
+    const started = performance.now();
+    for (const kind of ["floor", "lobby"] as const) {
+      for (const x of [2_147_483_647, -2_147_483_648, GRID.width, -1]) {
+        for (const floor of [1, 2, -1]) {
+          const q = sim.canBuild(kind, floor, x);
+          expect(q.ok, `${kind} @ ${floor},${x}`).toBe(false);
+          expect(q.reason).toBe("Off the edge of the lot.");
+          expect(sim.tower.bridgeFillPlan(kind, floor, x, FACILITIES[kind].width, 1)).toEqual([]);
+        }
+      }
+    }
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+
+  it("plans no bridge outside the floor range, and the same bridge as before inside it", () => {
+    const sim = foundedWithLobby();
+    expect(sim.canBuild("floor", GRID.maxFloor + 1, C).reason).toBe("Outside the buildable range.");
+    expect(sim.tower.bridgeFillPlan("floor", GRID.maxFloor + 1, C, 1, 1)).toEqual([]);
+    expect(sim.tower.bridgeFillPlan("floor", GRID.minFloor - 1, C, 1, 1)).toEqual([]);
+    // On the lot, a lobby a few tiles past the strip still bridges the gap.
+    expect(sim.tower.bridgeFillPlan("lobby", 1, C + 30, FACILITIES.lobby.width, 1).length).toBeGreaterThan(0);
+  });
+});

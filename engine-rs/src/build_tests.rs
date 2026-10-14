@@ -175,3 +175,45 @@ fn the_transport_quote_follows_the_catalog() {
         price(Kind::Stairs)
     );
 }
+
+/// A structural tile far off the lot or outside the floor range has no bridge
+/// plan (#1003): the plan used to scan one tile at a time back to the lot,
+/// and an extreme coordinate overflowed. The answer is the refusal it always
+/// was, and on the lot the plan is unchanged.
+#[test]
+fn a_structural_tile_far_off_the_lot_has_no_bridge_and_is_refused_at_once() {
+    let mut sim = shaft_site(GameMode::Modern, 1, 1e9);
+    let started = std::time::Instant::now();
+    for kind in [Kind::Floor, Kind::Lobby] {
+        for x in [
+            i64::MAX,
+            i64::MIN,
+            i64::from(i32::MAX),
+            i64::from(i32::MIN),
+            crate::facilities::LOT_WIDTH,
+            -1,
+        ] {
+            for floor in [1, 2, -1] {
+                let q = sim.can_build(kind, floor, x);
+                assert!(!q.ok, "{kind:?} @ {floor},{x}");
+                assert_eq!(q.reason.as_deref(), Some("Off the edge of the lot."));
+                assert!(sim.tower.bridge_fill_plan(kind, floor, x, 1, 1).is_empty());
+            }
+        }
+        for floor in [i64::MAX, i64::MIN, crate::facilities::MAX_FLOOR + 1] {
+            assert!(sim
+                .tower
+                .bridge_fill_plan(kind, floor, 100, 1, 1)
+                .is_empty());
+            assert!(!sim.can_build(kind, floor, 100).ok);
+        }
+    }
+    assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    // On the lot, a lobby past the strip still bridges the gap to it.
+    assert!(!sim
+        .tower
+        .bridge_fill_plan(Kind::Lobby, 1, 120, 1, 1)
+        .is_empty());
+    sim.auto_bridge = false;
+    assert!(!sim.can_build(Kind::Floor, 2, i64::MAX).ok);
+}
