@@ -61,6 +61,10 @@ src/engine/sim/services.ts
 src/engine/sim/star.ts
 src/engine/sim/stats.ts
 
+# The argument check the commands above share (#923, #996); commands still
+# run on the instance first (#954)
+src/engine/request.ts
+
 # The host-side step driver (AD-2, #867)
 src/engine/sim/fixedStep.ts
 src/engine/timePacing.ts
