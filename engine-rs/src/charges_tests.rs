@@ -142,6 +142,17 @@ fn a_gesture_stays_out_of_the_save_and_the_state_view() {
     assert!(sim.begin_extend(lift));
     assert_eq!(sim.serialize(), save);
     assert_eq!(crate::scenario::state_view(&sim), view);
+    // Billing inside the gesture saves exactly what billing outside one does.
+    assert_eq!(sim.extend_transport(lift, ExtendEnd::Up, 4).added, 2);
+    assert_eq!(sim.extend_transport(lift, ExtendEnd::Up, 2).added, 0);
+    let (mut twin, _, twin_lift, _) = fixture();
+    assert_eq!(twin.extend_transport(twin_lift, ExtendEnd::Up, 4).added, 2);
+    assert_eq!(twin.extend_transport(twin_lift, ExtendEnd::Up, 2).added, 0);
+    assert_eq!(sim.serialize(), twin.serialize());
+    assert_eq!(
+        crate::scenario::state_view(&sim),
+        crate::scenario::state_view(&twin)
+    );
     // A load builds a new simulation, which has no gesture open.
     let loaded = crate::load::deserialize(&sim.serialize()).unwrap();
     assert_eq!(loaded.extend_gesture, None);
@@ -158,6 +169,19 @@ fn another_shaft_wiggling_during_a_gesture_is_billed_every_time() {
     assert_eq!(sim.extend_transport(other, ExtendEnd::Up, 3).added, 1);
     // The gesture stays on its own shaft, untouched.
     assert_eq!(sim.extend_gesture, Some((lift, 1, 2)));
+}
+
+#[test]
+fn a_gesture_widens_to_a_span_grown_outside_it() {
+    let (mut sim, _, lift, _) = fixture();
+    assert!(sim.begin_extend(lift));
+    // Grown for free outside the gesture: those floors stand, so the next
+    // step bills only the floor past them.
+    assert!(sim.resize_transport(lift, 1, 3).ok);
+    assert_eq!(
+        sim.extend_transport(lift, ExtendEnd::Up, 4),
+        extended(ChargeResult::paid(-TRANSPORT_FLOOR_COST), 1, 4, 1)
+    );
 }
 
 #[test]

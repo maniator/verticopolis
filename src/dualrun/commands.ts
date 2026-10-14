@@ -14,7 +14,7 @@ import type { FacilityKind } from "../engine/types";
  * a checkpoint's answer, or an error, can be told from a previous tower's.
  */
 export type ShadowCommand =
-  | { op: "load"; gen: number; save: string; markers: BoundaryMarkers; extend?: number | null }
+  | { op: "load"; gen: number; save: string; markers: BoundaryMarkers }
   | { op: "tick"; dt: number }
   | { op: "build"; kind: FacilityKind; floor: number; x: number }
   | { op: "buildTransport"; kind: FacilityKind; x: number; bottom: number; top: number }
@@ -63,6 +63,8 @@ export interface BoundaryMarkers {
   lastDay: number;
   lastQuarter: number;
   lastMonth: number;
+  /** The open extend gesture (#990), which a save does not carry either. */
+  extendGesture?: { id: number; bottom: number; top: number } | null;
 }
 
 /** Where a shadow's state first departs from the live engine's. */

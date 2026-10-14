@@ -335,6 +335,13 @@ describe("malformed requests (#923)", () => {
     expect(sim.drainGameplayEvents()).toEqual([]); // no refusal emitted one
   });
 
+  it("widens the gesture's mark to a span grown outside it, so no standing floor is billed (#990)", () => {
+    const { sim, lift } = fixture();
+    expect(sim.beginExtend(lift.id)).toBe(true);
+    expect(sim.resizeTransport(lift.id, 1, 3).ok).toBe(true); // grown for free outside the gesture
+    expect(sim.extendTransport(lift.id, "up", 4)).toMatchObject({ ok: true, top: 4, added: 1, delta: -ECON.transportFloorCost });
+  });
+
   it("ignores a caller's mark: an inflated one buys no free floors (#990)", () => {
     const { sim, lift } = fixture();
     const extend = sim.extendTransport as (...a: unknown[]) => ReturnType<Simulation["extendTransport"]>;

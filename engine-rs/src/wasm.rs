@@ -213,6 +213,19 @@ fn apply_markers(sim: &mut Simulation, text: &str) -> Result<(), String> {
     sim.last_day = field("lastDay")?;
     sim.last_quarter = field("lastQuarter")?;
     sim.last_month = field("lastMonth")?;
+    // The live engine's open extend gesture (#990), when it has one.
+    match v.get("extendGesture") {
+        None | Some(Value::Null) => {}
+        Some(g) => {
+            let part = |name: &str| -> Result<i64, String> {
+                g.get(name)
+                    .and_then(Value::as_f64)
+                    .and_then(crate::charges::whole)
+                    .ok_or_else(|| format!("markers: extendGesture.{name} must be a whole number"))
+            };
+            sim.restore_extend(part("id")?, part("bottom")?, part("top")?);
+        }
+    }
     Ok(())
 }
 
@@ -282,10 +295,11 @@ impl Engine {
     /// (`load::parse_save_json`). Nothing else the import path does (the
     /// founder mark) runs.
     /// `markers`, when given, is JSON `{ lastHour, lastDay, lastQuarter,
-    /// lastMonth }`: the live engine's boundary markers, which a save does
-    /// not carry (a load rebuilds them from the clock, a founded game keeps
-    /// them unset until the first boundary), so a shadow can start exactly
-    /// where the live engine stands.
+    /// lastMonth, extendGesture? }`: the live engine's boundary markers and
+    /// open extend gesture `{ id, bottom, top }` (#990), which a save does
+    /// not carry (a load rebuilds the markers from the clock, a founded game
+    /// keeps them unset until the first boundary, and a load has no
+    /// gesture), so a shadow can start exactly where the live engine stands.
     #[wasm_bindgen(js_name = fromSave)]
     pub fn from_save(text: &str, markers: Option<String>) -> Result<Engine, JsError> {
         let raw = crate::load::parse_save_json(text.as_bytes()).map_err(err)?;
@@ -1478,6 +1492,40 @@ mod tests {
         assert!(apply_markers(&mut sim, "[]")
             .unwrap_err()
             .contains("lastHour"));
+    }
+
+    /// The live engine's open extend gesture rides with the markers (#990):
+    /// restored as given on an elevator, dropped on anything else, refused
+    /// when malformed.
+    #[test]
+    fn markers_carry_the_open_extend_gesture() {
+        use crate::facilities::Kind;
+        let mut sim = Simulation::new_game(1, GameMode::Classic);
+        for x in 10..40 {
+            assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+            assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+        }
+        sim.money = 1_000_000.0;
+        assert!(sim.build_transport(Kind::ElevatorStandard, 10, 1, 2).ok);
+        let lift = sim.tower.transport_at(1, 10).unwrap().id;
+        let base = r#""lastHour":7,"lastDay":0,"lastQuarter":-1,"lastMonth":-1"#;
+        let with = |g: &str| format!("{{{base},\"extendGesture\":{g}}}");
+        apply_markers(
+            &mut sim,
+            &with(&format!(r#"{{"id":{lift},"bottom":1,"top":5}}"#)),
+        )
+        .expect("a gesture lands");
+        assert_eq!(sim.extend_gesture, Some((lift, 1, 5)));
+        apply_markers(&mut sim, &with("null")).expect("no gesture lands");
+        assert_eq!(sim.extend_gesture, Some((lift, 1, 5)), "null leaves it");
+        apply_markers(&mut sim, &with(r#"{"id":99999,"bottom":1,"top":5}"#))
+            .expect("a gone shaft is no gesture");
+        assert_eq!(sim.extend_gesture, None);
+        assert!(
+            apply_markers(&mut sim, &with(r#"{"id":1.5,"bottom":1,"top":5}"#))
+                .unwrap_err()
+                .contains("extendGesture.id")
+        );
     }
 
     #[test]

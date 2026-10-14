@@ -43,17 +43,22 @@ against a mark it supplies and get floors for free.
   and closes it in `endExtend`. A tower swapped in mid-drag has no gesture,
   so the drag begins a new one on it.
 - **Attach:** the save a shadow or the WASM host starts from carries no
-  gesture, so `loadCommand` reopens an open one at its shaft's span and the
-  load command names the shaft, which the shadow reopens too. Both engines
-  then bill the rest of a drag in progress from the same mark; floors the
-  drag shrank away before the attach are billed again on a regrow (no UI
-  path attaches mid-drag: attaches come at boot or with a new tower).
+  gesture, so the open one rides with the boundary markers in the load
+  command, and `fromSave` restores it in Rust when its id still names an
+  elevator. `loadCommand` stays pure; both engines bill the rest of a drag
+  in progress against the same mark the live tower held.
 - **Conformance:** `beginExtend` and `endExtend` ops replace `hwmBottom` and
   `hwmTop`, in both runners and the scenario
   `engine-charges-classic`, whose drags are bracketed by them. Every
-  explicit mark the scenario carried equalled what the engine now holds, so
-  the lock is unchanged.
-- **No version bump:** the editor bills a drag exactly as before.
+  explicit mark the scenario carried equalled what the engine now holds.
+  After the first drag closes, the scenario shrinks and regrows the shaft,
+  billed one floor, so the lock pins `endExtend` too: that moves only the
+  `extended` checkpoint's events hash (the two capacity events), with the
+  state and crowd hashes unchanged, and the lock is regenerated for it.
+- **No version bump:** a drag bills as before. The one change a player could
+  meet is a one-floor press after a lost pointer-up (#1014), which now
+  bills a floor the drag already paid for zero times instead of twice: rare,
+  and only ever cheaper.
 
 ## Tests
 
@@ -175,3 +180,36 @@ against a mark it supplies and get floors for free.
   shows at the next billed step, which the dual run compares); the public
   Rust field (round 1); refused begins in the conformance lock (pinned
   across engines by `chargeBindingRaw` since round 2).
+
+### Round 4 (`/gds-code-review`)
+
+- [x] [Review][Patch] The attach reopened the gesture at the span, so a
+  drag in progress at an attach re-billed floors it had paid for, and
+  `loadCommand` changed the live tower even when the load then failed
+  (Edge Case Hunter with a repro, Blind Hunter) [src/dualrun/mirror.ts,
+  commands.ts, shadow.ts, engine-rs/src/wasm.rs, charges.rs]: the open
+  gesture now rides with the boundary markers and `fromSave` restores it
+  (`restore_extend`, crate-only), so `loadCommand` is pure again and both
+  engines hold the live tower's own mark. A Rust test pins the markers;
+  the dual-run test regrows paid floors free after the attach and fails
+  without the hand-over.
+- [x] [Review][Patch] Nothing pinned widening the gesture's mark to a span
+  grown outside it (Blind Hunter): tests in both engines grow the shaft
+  with the free `resizeTransport` mid-gesture and bill only the floor past
+  it.
+- [x] [Review][Patch] The scenario's `endExtend` ops were unobservable
+  (Blind Hunter): a billed shrink-and-regrow follows the first, and the
+  lock is regenerated (one events hash).
+- [x] [Review][Patch] The Rust save check ran only before billing (Acceptance
+  Auditor, Blind Hunter): it now compares a gestured tower with a twin.
+- [x] [Review][Patch] Prose (Acceptance Auditor, Blind Hunter): the version
+  reasoning names the press change; the WeakMap doc says the state view;
+  the `extend-drag-lifecycle` row scopes "never an overcharge" to the
+  lost pointer-up.
+- Dismissed (6): dropping a gesture when its shaft goes (an extend on a
+  gone shaft is refused, and ids are not reused); the editor and shadow
+  ignoring `beginExtend`'s answer (a split shows at the next billed step);
+  the two runners' wording of a refused begin (no harness compares it);
+  `charges` functions imported by the mirror (the shadow command boundary
+  is the relay's own); the `Simulation.ts` header merge (needed to stay
+  under the file cap); the public Rust field (round 1).

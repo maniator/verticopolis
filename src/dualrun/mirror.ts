@@ -2,7 +2,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { Tower } from "../engine/Tower";
 import { canonicalJson } from "../engine/canonicalJson";
 import { crowdView, stateView } from "../engine/conformanceView";
-import { beginExtend, endExtend, extendGestureId } from "../engine/sim/charges";
+import { extendGesture } from "../engine/sim/charges";
 import type { ShadowCommand } from "./commands";
 
 /**
@@ -28,21 +28,16 @@ type AnyFn = (...args: never[]) => unknown;
  *  the shadow can only start from a tower whose crowd is still empty (a game
  *  just founded or just loaded); anything later would diverge in the crowd
  *  view at the first hour by construction, so it is refused here. A save
- *  carries no extend gesture either (#990): an open one is reopened here at
- *  its shaft's span, and `extend` names the shaft so the shadow opens the
- *  same, so both bill the rest of a drag in progress from the same mark.
- *  This runs before any relay attaches, so it calls the engine directly. */
+ *  carries no extend gesture either (#990), so the open one rides with the
+ *  markers and the shadow restores it: both bill the rest of a drag in
+ *  progress against the same mark. */
 export function loadCommand(sim: Simulation, gen: number): Extract<ShadowCommand, { op: "load" }> {
   if (sim.crowd.people.length > 0) throw new Error("mirror: the shadow must start before the tower's crowd exists (right after founding or loading)");
-  const extend = extendGestureId(sim) ?? null;
-  endExtend(sim);
-  if (extend !== null) beginExtend(sim, extend);
   return {
     op: "load",
     gen,
     save: JSON.stringify(sim.serialize()),
-    markers: { lastHour: sim.lastHour, lastDay: sim.lastDay, lastQuarter: sim.lastQuarter, lastMonth: sim.lastMonth },
-    extend,
+    markers: { lastHour: sim.lastHour, lastDay: sim.lastDay, lastQuarter: sim.lastQuarter, lastMonth: sim.lastMonth, extendGesture: extendGesture(sim) ?? null },
   };
 }
 

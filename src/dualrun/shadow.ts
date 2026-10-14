@@ -41,8 +41,6 @@ export class ShadowEngine {
         this.engine = null;
         old?.free();
         this.engine = this.mod.Engine.fromSave(cmd.save, JSON.stringify(cmd.markers));
-        // The live tower's open extend gesture, reopened at the same span (#990).
-        if (cmd.extend != null) this.engine.beginExtend(cmd.extend);
         return null;
       }
       case "tick": this.live().tick(cmd.dt); return null;

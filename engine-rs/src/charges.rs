@@ -200,6 +200,18 @@ impl Simulation {
         }
     }
 
+    /// A host handing over its open gesture with a load (#990): kept as given
+    /// when `id` names an elevator, as `beginExtend` would open it, and
+    /// widened to the span at use like any gesture. Not a binding command:
+    /// a caller that can hand over a mark here can hand over a whole save.
+    #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+    pub(crate) fn restore_extend(&mut self, id: i64, bottom: i64, top: i64) {
+        self.extend_gesture = self
+            .elevator(id, ONLY_ELEVATOR_EXTEND)
+            .ok()
+            .map(|_| (id, bottom, top));
+    }
+
     /// `endExtend()`: close the open extend gesture, if any.
     pub fn end_extend(&mut self) {
         self.extend_gesture = None;
