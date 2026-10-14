@@ -80,11 +80,15 @@ fn the_named_slots_read_their_values() {
         (TRANSPORTS, sim.tower.transports.len() as f64),
     ];
     assert_eq!(want.len(), FRAME_HEADER, "every header slot is checked");
-    let counts = [v[PEOPLE], v[UNITS], v[TRANSPORTS], v[STAR]];
-    assert!(
-        (0..4).all(|i| (i + 1..4).all(|j| counts[i] != counts[j])),
-        "the counts and the star rating must differ to tell their slots apart: {counts:?}"
-    );
+    // Every expected value differs from every other, so no two slots can
+    // trade names unseen (the live counts included).
+    let values: Vec<f64> = want.iter().map(|(_, v)| *v).collect();
+    for (i, a) in values.iter().enumerate() {
+        assert!(
+            values[i + 1..].iter().all(|b| b != a),
+            "header values must differ to tell their slots apart: {values:?}"
+        );
+    }
     for (slot, value) in want {
         assert_eq!(v[slot], value, "header slot {slot}");
     }
@@ -143,6 +147,7 @@ fn walk_records(sim: &Simulation, v: &[f64]) {
         assert_eq!(r[unit::OCCUPANTS], u.occupants as f64);
         if i == 0 {
             for (slot, value) in [
+                (unit::STATE, 7.0),
                 (unit::OCCUPANTS, 3001.0),
                 (unit::CUSTOMERS_IN, 3002.0),
                 (unit::HOTEL_CUSTOMERS_IN, 3003.0),
@@ -196,6 +201,7 @@ fn set_apart(sim: &mut Simulation) {
     p.returning = true;
     p.dwell_seconds_left = Some(2006.0);
     let u = &mut sim.tower.units[0];
+    u.state = crate::tower::UnitState::Infested;
     u.occupants = 3001;
     u.customers_in = Some(3002);
     u.hotel_customers_in = Some(3003);

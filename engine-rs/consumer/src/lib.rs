@@ -17,7 +17,10 @@ use verticopolis_engine::catalog::{catalog, CATALOG_VERSION};
 use verticopolis_engine::charges::ExtendEnd;
 use verticopolis_engine::clock::GameMode;
 use verticopolis_engine::facilities::Kind;
-use verticopolis_engine::frame::*;
+use verticopolis_engine::frame::{
+    frame_view, header, log_since, person, transport, unit, CAR_RECORD, FRAME_HEADER, PERSON_FIXED,
+    TRANSPORT_FIXED, UNIT_RECORD, UNKNOWN_ROUTINE,
+};
 use verticopolis_engine::gameplay::{
     check_catalog, check_event, RemovalMethod, CATALOG_JSON, GAMEPLAY_RING_CAP,
 };
@@ -566,9 +569,8 @@ pub fn replay(conformance: &Path, id: &str) -> Result<usize, String> {
 
 /// The ids of every scenario in the suite, sorted, each parsed so a broken
 /// file fails here. Some start from a new game and some from a save under
-/// `conformance/fixtures/`; a scenario names its fixture relative to the
-/// directory that holds `conformance/`, which is the root `replay` hands the
-/// runner.
+/// `conformance/fixtures/`, named `conformance/fixtures/...` and found inside
+/// whatever directory `replay` hands the runner as the suite.
 pub fn scenarios(conformance: &Path) -> Result<Vec<String>, String> {
     let dir = conformance.join("scenarios");
     let entries =

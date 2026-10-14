@@ -38,8 +38,9 @@ const MAY_READ_FILES: &[(&str, &[&str])] = &[
         "src/tdt/referee.rs",
         &["fixture_save", "replay_export", "replay_all", "read_lock"],
     ),
-    // `fixture_path` reads no file: it builds the path the two above open,
-    // and the scan counts any `std::path` use as file access.
+    // `fixture_path` builds the path the two above open; it reads no file,
+    // and checks only whether the suite it is given holds the expected
+    // directories (the scan counts any `std::path` use as file access).
     ("src/suite.rs", &["fixture_path"]),
 ];
 
@@ -654,7 +655,17 @@ fn the_harness_is_an_optional_feature() {
         );
     }
     // Each `[[bin]]` table, read up to the next table header, by its path.
-    let toml = std::fs::read_to_string(crate_dir().join("Cargo.toml")).expect("Cargo.toml");
+    let toml = std::fs::read_to_string(crate_dir().join("Cargo.toml"))
+        .expect("Cargo.toml")
+        .replace("\r\n", "\n");
+    // Cargo would otherwise build `src/main.rs` and every `src/bin/` entry as
+    // a binary of its own, outside the tables below.
+    assert!(
+        toml_keys(&toml, |h| h == "[package]")
+            .iter()
+            .any(|(k, v)| k == "autobins" && v == "false"),
+        "autobins = false, so only the declared binaries build"
+    );
     let mut declared = Vec::new();
     for table in toml.split("\n[").filter(|t| t.starts_with("[bin]]")) {
         let keys: Vec<String> = table.lines().map(|l| l.replace(' ', "")).collect();
@@ -678,9 +689,6 @@ fn the_harness_is_an_optional_feature() {
     declared.sort();
     on_disk.sort();
     assert_eq!(declared, on_disk, "every binary is declared in Cargo.toml");
-    // Cargo would build `src/main.rs` as a binary of its own, outside the
-    // tables above.
-    assert!(!crate_dir().join("src/main.rs").exists());
 }
 
 /// The files a library source compiles in: the path of every `include!`,

@@ -8,7 +8,13 @@ use scan::{crate_dir, parts, rel, rust_files, Part};
 
 /// Calls that step up a directory without a `..` literal. The guard reports
 /// each one; a file that needs one lists it in [`REFUSED_EXAMPLES`] with why.
-const CLIMBS_IN_CODE: &[&str] = &[".parent()", ".ancestors()", "ParentDir"];
+const CLIMBS_IN_CODE: &[&str] = &[
+    ".parent()",
+    ".ancestors()",
+    "::parent(",
+    "::ancestors(",
+    "ParentDir",
+];
 
 /// Where a path literal climbs out of the crate, it is a `..` step on the way
 /// to the conformance suite and nowhere else: `"../conformance/..."`, or a

@@ -104,5 +104,6 @@ jobs:
         continue-on-error: true
         working-directory: engine-rs
         run: |
+          cargo build --locked --all-targets
           cargo build --locked --all-targets --features conformance
           cargo build --locked --release --features conformance --bin conformance --bin dump

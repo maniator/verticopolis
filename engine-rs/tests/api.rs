@@ -10,8 +10,8 @@ use verticopolis_engine::catalog::{catalog, CATALOG_VERSION};
 use verticopolis_engine::clock::GameMode;
 use verticopolis_engine::facilities::Kind;
 use verticopolis_engine::frame::{
-    frame_view, header, log_since, person, CAR_RECORD, FRAME_HEADER, PERSON_FIXED, TRANSPORT_FIXED,
-    UNIT_RECORD, UNKNOWN_ROUTINE,
+    car, frame_view, header, log_since, person, transport, unit, CAR_RECORD, FRAME_HEADER,
+    PERSON_FIXED, TRANSPORT_FIXED, UNIT_RECORD, UNKNOWN_ROUTINE,
 };
 use verticopolis_engine::gameplay::{check_event, GameplayEvent, CATALOG_JSON, GAMEPLAY_RING_CAP};
 use verticopolis_engine::load::{
@@ -63,6 +63,7 @@ fn the_host_api_is_in_place() {
         CAR_RECORD,
     );
     let _ = (UNKNOWN_ROUTINE, header::MONEY, person::ROUTINE);
+    let _ = (unit::STATE, transport::CARS, car::DIRECTION);
     // Saves, old and new.
     let _ = decode_vctower;
     let _ = deserialize;

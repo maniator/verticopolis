@@ -9,8 +9,18 @@ use std::path::{Component, Path, PathBuf};
 /// for the suite directory itself, whatever it is called on disk: a suite
 /// packaged under another name still finds its saved towers. A name that
 /// leaves the suite (another prefix, a `..` step, an absolute path) is
-/// refused, so a scenario reads nothing outside it.
+/// refused, so a scenario names nothing outside it. The check reads the name
+/// only; a symbolic link inside the suite is followed like any file.
+///
+/// A repository root passed where the suite belongs (the runners took the
+/// root before #980's stage 4) is refused with a message that says so.
 pub fn fixture_path(suite: &Path, fixture: &str) -> Result<PathBuf, String> {
+    if suite.join("conformance").is_dir() && !suite.join("scenarios").is_dir() {
+        return Err(format!(
+            "{}: pass the conformance directory itself, which holds scenarios/; this looks like the directory above it",
+            suite.display()
+        ));
+    }
     fixture
         .strip_prefix("conformance/")
         .map(Path::new)
@@ -57,6 +67,21 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_repository_root_passed_as_the_suite_is_named() {
+        // A root of its own: the suite under it, and no scenarios/ beside.
+        let root = std::env::temp_dir().join(format!("vc-suite-root-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("conformance/scenarios")).unwrap();
+        let err = fixture_path(&root, "conformance/fixtures/a.vctower").unwrap_err();
+        let inside = fixture_path(&root.join("conformance"), "conformance/fixtures/a.vctower");
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(
+            err.contains("pass the conformance directory itself"),
+            "{err}"
+        );
+        assert!(inside.is_ok());
+    }
+
     /// Every fixture the lock's scenarios and `.TDT` cases name resolves and
     /// exists, so the referee reads them from the suite alone.
     #[test]
@@ -80,7 +105,10 @@ mod tests {
         let mut names = Vec::new();
         let mut files = vec![suite.join("tdt-cases.json")];
         for entry in std::fs::read_dir(suite.join("scenarios")).unwrap() {
-            files.push(entry.unwrap().path());
+            let path = entry.unwrap().path();
+            if path.extension().is_some_and(|e| e == "json") {
+                files.push(path);
+            }
         }
         for file in files {
             let text = std::fs::read_to_string(&file).unwrap();

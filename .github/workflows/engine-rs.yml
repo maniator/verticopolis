@@ -158,6 +158,7 @@ jobs:
         working-directory: engine-rs
         run: |
           cargo test --locked
+          cargo test --locked --features conformance
           cargo test --locked --features wasm
           cargo run --locked --release --features conformance --bin conformance
 
@@ -187,6 +188,7 @@ jobs:
           # The suite under another name, as a packaged copy would be: a
           # fixture resolves inside whatever directory holds the suite.
           suite="$RUNNER_TEMP/suite-copy"
+          rm -rf "$suite"
           cp -R conformance "$suite"
           cd "$host"
           VC_CONFORMANCE="$suite" cargo test --locked
@@ -224,6 +226,7 @@ jobs:
       - name: Unit tests
         run: |
           cargo test --locked
+          cargo test --locked --features conformance
           cargo test --locked --features wasm
 
       - name: Conformance
@@ -270,6 +273,6 @@ jobs:
         run: |
           rustup component add llvm-tools-preview
           cargo install cargo-llvm-cov --locked --version 0.9.1
-          cargo llvm-cov --no-report --locked test
+          cargo llvm-cov --no-report --locked test --features conformance
           cargo llvm-cov --no-report --locked run --features conformance --bin conformance
           cargo llvm-cov report --fail-under-lines 87

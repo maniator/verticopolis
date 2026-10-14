@@ -6,6 +6,9 @@ rust-version = "1.97"
 license = "MIT"
 publish = false
 description = "The Verticopolis simulation engine, ported from src/engine and checked against conformance/"
+# Every binary is declared below with the conformance feature it needs; none
+# is found by its path alone (tests/independence.rs holds this).
+autobins = false
 
 [lib]
 name = "verticopolis_engine"

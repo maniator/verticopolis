@@ -46,8 +46,10 @@ A refactor that claims to change nothing must not touch `expected.json`.
 ## Fixtures the scenarios start from
 
 The `fixture` starts use the saves under `conformance/fixtures/`, named
-relative to the directory that holds `conformance/` (the root the runners
-resolve them against), so the suite needs nothing from the web game's tree.
+`conformance/fixtures/<file>`, so the suite needs nothing from the web game's
+tree. The TypeScript runner reads that name from the repository root; the
+Rust runner reads the leading `conformance/` as the suite directory itself,
+whatever it is called, and refuses a name outside it.
 The web game's tests load the same files. Four of them
 are derived from the others by editing a few fields of the serialized game
 and nothing else, so a branch no real save reaches can be scripted:
@@ -140,8 +142,9 @@ state hash.
 
 - `{ "newGame": { "seed": n, "mode": "classic" | "modern" } }`: a new game with
   the default calendar and automatic bridging on (`newGame(seed, mode)`).
-- `{ "fixture": "path/to/file.vctower", "mode"?: "classic" | "modern" }`: a save
-  file, path relative to the repository root, loaded the way an import loads
+- `{ "fixture": "conformance/fixtures/file.vctower", "mode"?: "classic" | "modern" }`:
+  a save file inside the suite (the name starts with `conformance/` and has no
+  `.` or `..` step), loaded the way an import loads
   it: decode, migrate and load, then mark a save with no `appVersion` stamp
   (one from before 2.0) as a founder's tower. `mode`, when present, overwrites
   the save's mode before loading.
