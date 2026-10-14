@@ -227,6 +227,11 @@ describe("third-party notices (#951)", () => {
     expect(htmlText("<p>a &#34;b&#34; &#x3c;c&#62; &lt;d&gt; &amp;lt;</p><br>e")).toBe('a "b" <c> <d> &lt;\n\ne');
     expect(() => htmlText("<p>&copy; 2026</p>")).toThrow(/&copy;/);
     expect(() => htmlText("&#x110000;")).toThrow(/&#x110000;/);
+    // One pass: an encoded ampersand is decoded once, whichever way it is written.
+    expect(htmlText("&#38;lt; &#x26;amp; &amp;amp;")).toBe("&lt; &amp; &amp;");
+    expect(() => htmlText("a&#0;b")).toThrow(/not a character/);
+    expect(() => htmlText("&#xD800;")).toThrow(/not a character/);
+    expect(htmlText("<!-- a > b -->kept")).toBe("kept");
   });
 
   it("labels Rust crates and keeps them apart from npm packages of the same name", () => {

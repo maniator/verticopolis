@@ -443,31 +443,35 @@ export function engineRecordPackages(record: unknown, buildSources: unknown): { 
   return { packages, problems };
 }
 
+/** The named entities the toolchain's copyright page uses (#955). */
+const HTML_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+
 /**
- * The text of an HTML page, for the Rust toolchain's copyright notice (#955). Throws on
- * an entity it does not decode, so a changed page cannot leak raw markup
- * into the notices.
+ * The text of an HTML page, for the Rust toolchain's copyright notice (#955).
+ * Entities are decoded in one pass, so an encoded "&amp;lt;" stays the
+ * literal text "&lt;". Throws on an entity it does not decode or a numeric
+ * reference that is not a character, so a changed page cannot leak raw
+ * markup or control bytes into the notices.
  */
 export function htmlText(html: string): string {
-  const text = html
+  return html
+    .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, "")
     .replace(/<\/(p|h[1-6]|li|div|tr|pre|ul|ol|table)>|<br\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, "")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    // Numeric references (the toolchain's page writes quotes as &#34;).
-    .replace(/&#(x[0-9a-f]+|\d+);/gi, (ref: string, code: string) => {
-      const cp = code[0].toLowerCase() === "x" ? parseInt(code.slice(1), 16) : Number(code);
-      return cp <= 0x10ffff ? String.fromCodePoint(cp) : ref;
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi, (ref: string, body: string) => {
+      if (body[0] !== "#") {
+        const named = HTML_ENTITIES[body.toLowerCase()];
+        if (named === undefined) throw new Error(`the toolchain's copyright page has an entity htmlText does not decode: ${ref}`);
+        return named;
+      }
+      const cp = body[1].toLowerCase() === "x" ? parseInt(body.slice(2), 16) : Number(body.slice(1));
+      // Printable characters only: no NUL or other C0 control (tab and newline aside), no lone surrogate.
+      const ok = (cp >= 0x20 || cp === 0x09 || cp === 0x0a) && cp <= 0x10ffff && !(cp >= 0xd800 && cp <= 0xdfff);
+      if (!ok) throw new Error(`the toolchain's copyright page has a numeric reference that is not a character: ${ref}`);
+      return String.fromCodePoint(cp);
     })
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-  const left = /&(?!amp;)(#x?[0-9a-f]+|[a-z][a-z0-9]*);/i.exec(text);
-  if (left) throw new Error(`the toolchain's copyright page has an entity htmlText does not decode: ${left[0]}`);
-  // Last, so an encoded "&amp;lt;" stays the literal text "&lt;".
-  return text.replace(/&amp;/g, "&");
 }

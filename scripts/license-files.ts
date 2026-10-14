@@ -13,7 +13,13 @@ import { byCodePoint, isLicenseFileName, isLicenseTextFileName, isNoticeFileName
 
 export function readLicenseFiles(dir: string): { licenseText: string; hasLicenseFile: boolean; problems: { file: string; reason: string }[] } {
   const problems: { file: string; reason: string }[] = [];
-  const files = readdirSync(dir)
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return { licenseText: "", hasLicenseFile: false, problems: [{ file: dir, reason: "cannot be listed" }] };
+  }
+  const files = names
     .filter((n) => isLicenseFileName(n) || isNoticeFileName(n))
     .filter((n) => {
       try {

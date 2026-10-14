@@ -67,13 +67,15 @@ if (which === "engine") {
 // The engine's crates and the Rust standard library, with their licenses,
 // gathered before anything is compiled or written, so a crate that cannot be
 // attributed stops the build with the old package still in place (#955).
-const engineRecord = which === "engine" ? engineThirdParty(crate, "wasm") : [];
+// One feature list for the record and the compile, so they describe the same build.
+const FEATURES = "wasm";
+const engineRecord = which === "engine" ? engineThirdParty(crate, FEATURES) : [];
 const run = (cmd: string, args: string[]) => execFileSync(cmd, args, { cwd: crate, stdio: "inherit" });
 // The crate is an rlib; the cdylib is asked for here so the native build
 // stays as it is. The old package goes first, so a failed run leaves no
 // stale package behind for the suite to replay.
 rmSync(resolve(crate, "pkg"), { recursive: true, force: true });
-run("cargo", ["rustc", "--locked", "--release", "--lib", "--target", "wasm32-unknown-unknown", "--features", "wasm", "--crate-type", "cdylib"]);
+run("cargo", ["rustc", "--locked", "--release", "--lib", "--target", "wasm32-unknown-unknown", "--features", FEATURES, "--crate-type", "cdylib"]);
 const wasm = `target/wasm32-unknown-unknown/release/${target.lib}.wasm`;
 run("wasm-bindgen", ["--target", "nodejs", "--out-dir", "pkg", wasm]);
 writeFileSync(resolve(crate, "pkg/package.json"), '{ "type": "commonjs" }\n');

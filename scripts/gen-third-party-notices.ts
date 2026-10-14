@@ -207,13 +207,13 @@ for (const [dir, origin] of dirs) {
 // without one: any file under dist/engine/ (the glue, the .wasm, or both)
 // requires it.
 const engineDir = join(DIST, "engine");
-if (existsSync(engineDir) && readdirSync(engineDir).length > 0) {
+if (existsSync(engineDir) && (!statSync(engineDir).isDirectory() || readdirSync(engineDir).length > 0)) {
   const recordPath = join(DIST, "engine", ENGINE_THIRD_PARTY);
   const read = (path: string): unknown => {
     try {
       return JSON.parse(readFileSync(path, "utf8"));
     } catch {
-      fail(`${relative(ROOT, path)} is missing or not valid JSON; the WASM engine's crates cannot be listed (rebuild it with npm run wasm:build)`);
+      fail(`${relative(ROOT, path)} is missing or not valid JSON, so the WASM engine that ships cannot be attributed (rebuild it with npm run wasm:build)`);
     }
   };
   const build = read(join(DIST, "engine", "BUILD.json")) as { sources?: unknown } | null;

@@ -16,8 +16,8 @@
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, relative, isAbsolute } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, join, relative, isAbsolute, sep } from "node:path";
 import { htmlText, noticeProblem, shippedCrates, type CargoMetadata, type NoticePackage } from "../src/build/thirdPartyNotices.ts";
 import { readLicenseFiles } from "./license-files.ts";
 
@@ -111,21 +111,23 @@ export function engineThirdParty(crate: string, features: string): (NoticePackag
   for (const p of crates) {
     const dir = dirname(p.manifest_path);
     const read = readLicenseFiles(dir);
-    problems.push(...read.problems.map((p) => `${p.file} ${p.reason}`));
+    problems.push(...read.problems.map((f) => `${p.name}@${p.version}: ${f.file} ${f.reason}`));
     let { licenseText, hasLicenseFile } = read;
     // A crate may name its license file in Cargo.toml instead of using a
     // conventional name; that file counts too.
     if (p.license_file) {
       const named = join(dir, p.license_file);
-      const inside = relative(dir, named);
       let text: string | undefined;
-      if (inside.startsWith("..") || isAbsolute(inside)) problems.push(`${p.name}@${p.version}: license-file ${p.license_file} is outside the crate`);
-      else {
-        try {
+      try {
+        // Resolved through links, so a link inside the crate cannot reach outside it.
+        const inside = relative(realpathSync(dir), realpathSync(named));
+        if (inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
+          problems.push(`${p.name}@${p.version}: license-file ${p.license_file} is outside the crate`);
+        } else {
           text = readFileSync(named, "utf8").trimEnd();
-        } catch (err) {
-          problems.push(`${p.name}@${p.version}: license-file ${p.license_file} cannot be read (${(err as NodeJS.ErrnoException).code ?? err})`);
         }
+      } catch (err) {
+        problems.push(`${p.name}@${p.version}: license-file ${p.license_file} cannot be read (${(err as NodeJS.ErrnoException).code ?? err})`);
       }
       if (text !== undefined) {
         if (!licenseText.includes(text)) licenseText = [licenseText, `--- ${p.license_file} ---\n\n${text}`].filter(Boolean).join("\n\n");
