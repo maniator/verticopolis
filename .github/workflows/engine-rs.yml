@@ -91,9 +91,12 @@ jobs:
           # engine path still counts. The three-dot form diffs from the merge
           # base, as the paths filter did, so engine changes that landed on
           # main after the branch split do not count as this PR's.
-          files=$(git -c core.quotePath=false diff --no-renames --name-only "$BASE_SHA...$HEAD_SHA") || exit 1
+          # -z keeps every path unquoted, so a name with a quote, tab,
+          # backslash or newline still matches its pattern.
+          list="$RUNNER_TEMP/changed-files"
+          git diff -z --no-renames --name-only "$BASE_SHA...$HEAD_SHA" > "$list" || exit 1
           engine=false
-          while IFS= read -r f; do
+          while IFS= read -r -d '' f; do
             [ -z "$f" ] && continue
             case "$f" in engine-rs/*) engine=true ;; esac
             case "$f" in conformance/*) engine=true ;; esac
@@ -130,7 +133,7 @@ jobs:
             case "$f" in .nvmrc) engine=true ;; esac
             case "$f" in vite.config.ts) engine=true ;; esac
             case "$f" in .github/workflows/engine-rs.yml) engine=true ;; esac
-          done <<< "$files"
+          done < "$list"
           echo "engine=$engine" >> "$GITHUB_OUTPUT"
 
   # A host outside the web game. The job runs in the official Rust image
