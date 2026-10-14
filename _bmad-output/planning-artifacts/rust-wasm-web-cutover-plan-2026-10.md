@@ -218,10 +218,14 @@ Still open (risks, no decision needed yet):
   engine glue, binary and `BUILD.json` checked as one
   version-matched set (a shell cached before 2.32.0 never precached the
   engine, so until it updates it pairs its old shell with whatever engine the
-  network serves), the precache coverage rule, an e2e that serves a second
-  deploy, install interruption, cache eviction, and cutting the service
-  worker's network in `e2e/offline.spec.ts` too (Playwright's offline mode
-  cuts only the page's, so a precache miss there is fetched quietly).
+  network serves), the precache coverage rule for the engine files (the audio
+  files are guarded since #1004; the engine side is in flight on
+  `claude/precache-coverage-985`), an e2e that serves a second deploy and
+  checks old engine caches are removed after the upgrade, install
+  interruption, a cold first visit with no cache (the expected message, not a
+  broken page), cache eviction, and cutting the service worker's network in
+  `e2e/offline.spec.ts` too (Playwright's offline mode cuts only the page's,
+  so a precache miss there is fetched quietly).
 - **Save format bumps.** The copy catalog (row 6) bumps the save version; it
   does not ship in the flip release, so a rollback can still read every save
   (AD-5).
