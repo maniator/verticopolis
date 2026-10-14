@@ -9,7 +9,7 @@ import { engineRequested } from "./wasmhost/engineChoice";
 import { loadWasmEngine, startWasmHost, type WasmHostApp } from "./wasmhost/startWasmHost";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { refreshSplashVersion } from "./wasmhost/engineLabel";
-import type { WasmModule } from "./dualrun/binding";
+import { engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState } from "./wasmhost/engineBoot";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -103,6 +103,24 @@ export function showBootMessage(content: TemplateResult | string, withReload = f
   );
 }
 
+/** Stop the game with the wasm-only build's engine failure: what happened,
+ *  why, and what to try. Covers the title screen and any running tower, like
+ *  every other boot-fallback message. */
+export function showEngineFailure(state: EngineBootState, online = typeof navigator === "undefined" || navigator.onLine !== false): void {
+  if (!state.failure) return;
+  const copy = engineFailureCopy(state.failure, online);
+  showBootMessage(
+    html`<div id="engine-failure" data-stage=${state.failure.stage}>
+      <p><b>${copy.headline}</b></p>
+      <p style="opacity:.8">Reason: ${copy.reason}</p>
+      <ul style="text-align:left;margin:0 auto;max-width:36em">
+        ${copy.steps.map((step) => html`<li>${step}</li>`)}
+      </ul>
+    </div>`,
+    true,
+  );
+}
+
 /** Boot the game once the DOM is ready. `create` builds the app instance (a
  *  `() => new GameApp()` thunk from `main.ts`), kept as a factory so this module
  *  imports no `GameApp` value and stays cycle-free. */
@@ -155,28 +173,46 @@ export function bootGame(create: () => BootApp): Promise<void> {
     // session never opens and can't dilute the length signal. Host-gated inside,
     // like the page-view inject just above.
     startGameplaySession();
-    // The WASM engine (`?engine=wasm`, or `vc.engine` in storage) is fetched
-    // before the app exists, so the first tower is hosted before its first
-    // tick; a package that fails to load leaves the game on the TypeScript
-    // engine with the reason in the console.
-    let wasmModule: WasmModule | null = null;
-    if (engineRequested() === "wasm") {
-      try {
-        wasmModule = await loadWasmEngine();
-      } catch (e) {
-        console.error("[wasm] the engine package did not load; running on the TypeScript engine:", e);
-      }
+    // The WASM engine is fetched before the app exists, so the first tower is
+    // hosted before its first tick. A switchable build loads it only when asked
+    // (`?engine=wasm`, or `vc.engine` in storage) and stays on the TypeScript
+    // engine when it fails to load. A wasm-only build (`VC_ENGINE=wasm`) always
+    // loads it and stops here when it cannot: the TypeScript step loop is not
+    // in that bundle, and a silent fallback is what the build rules out. The
+    // engine switch is compiled away there with the `__WASM_ONLY__` define.
+    // A TypeScript boot does not await, so it stays synchronous as before.
+    const booted =
+      __WASM_ONLY__ || engineRequested() === "wasm" ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: () => loadWasmEngine() }) : typescriptBoot();
+    let bootState: EngineBootState = booted.state;
+    publishBootState(bootState);
+    if (bootState.failure) {
+      showEngineFailure(bootState);
+      // A fixed deploy is the way out of a broken or stale engine package:
+      // with no tower running there is nothing to save, so take it at once.
+      registerPWA({ onUpdateAvailable: (activate) => void activate() });
+      throw new Error(`the WASM engine did not start (${bootState.failure.stage}): ${bootState.failure.message}`);
     }
     try {
       const app = create();
+      const wasmModule = booted.module;
       if (wasmModule) {
+        const stopForEngine = (stage: "start" | "host", message: string) => {
+          bootState = failBoot(bootState, stage, message);
+          publishBootState(bootState);
+          if (__WASM_ONLY__) showEngineFailure(bootState);
+        };
         try {
-          startWasmHost(app as unknown as WasmHostApp, wasmModule);
+          startWasmHost(app as unknown as WasmHostApp, wasmModule, console, __WASM_ONLY__ ? { strict: true, onFatal: (m) => stopForEngine("host", m) } : {});
           // Saves are written through the engine too (same bytes, #935).
           if (wasmModule.encodeVctower) setEngineWriter(wasmModule.encodeVctower);
           refreshSplashVersion(); // the title screen mounted before the host started
         } catch (e) {
-          console.error("[wasm] did not start; running on the TypeScript engine:", e);
+          const message = e instanceof Error ? e.message : String(e);
+          stopForEngine("start", message);
+          // A wasm-only build has stopped behind the engine-failure message;
+          // boot still registers the service worker below, so a fixed deploy
+          // can reach this install.
+          console.error(__WASM_ONLY__ ? "[wasm] did not start, and this build has no other engine:" : "[wasm] did not start; running on the TypeScript engine:", e);
         }
       }
       // Publish the tooling handle only where tooling runs: dev serves and
@@ -190,7 +226,7 @@ export function bootGame(create: () => BootApp): Promise<void> {
         // The dual run (the WASM engine shadowing the live one, compared
         // every hour) is a developer switch on the same tooling-only path.
         // A switch that fails to start is logged and never takes boot down.
-        if (dualRunRequested()) {
+        if (!__WASM_ONLY__ && dualRunRequested()) {
           try {
             startDualRun(app as unknown as DualRunApp);
           } catch (e) {

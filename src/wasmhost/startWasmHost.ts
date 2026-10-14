@@ -7,8 +7,10 @@ import { attachWasmHost, type WasmHost } from "./wasmHost";
  * current tower on it, and follow every later `adoptSim` (a load, a new
  * game, an undo restore) onto a fresh engine. The state is published on
  * `window.__vcEngine` for tooling and for a tester to confirm which engine
- * runs. A tower the host cannot start from is reported and left on the
- * TypeScript engine, so the switch never takes the game down.
+ * runs. In a switchable build a tower the host cannot start from is reported
+ * and left on the TypeScript engine, so the switch never takes the game down.
+ * In a wasm-only build (`strict`) there is no TypeScript engine to leave it
+ * on: the refusal is reported the same way and `onFatal` stops the game.
  */
 export interface WasmHostStatus {
   engine: "wasm";
@@ -47,9 +49,18 @@ export async function loadWasmEngine(url = enginePackageUrl()): Promise<WasmModu
   return checkBinding(mod);
 }
 
-export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Console, "info" | "error"> = console): WasmHostHandle {
+export interface WasmHostOptions {
+  /** A wasm-only build: a tower the host refuses is fatal, never left on the
+   *  TypeScript engine. */
+  strict?: boolean;
+  /** Called once, in strict mode, with the reason the host could not hold a tower. */
+  onFatal?: (message: string) => void;
+}
+
+export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Console, "info" | "error"> = console, opts: WasmHostOptions = {}): WasmHostHandle {
   const status: WasmHostStatus = { engine: "wasm", starts: 0, hosted: false, errors: [] };
   let host: WasmHost | null = null;
+  let fatal = false;
   const noteError = (message: string) => {
     if (status.errors.length >= 50) return;
     status.errors.push(message);
@@ -76,7 +87,12 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
       status.hosted = true;
       log.info(`[wasm] tower ${status.starts} runs on the WASM engine`);
     } catch (e) {
-      noteError(`not hosting this tower: ${e instanceof Error ? e.message : String(e)}`);
+      const message = `not hosting this tower: ${e instanceof Error ? e.message : String(e)}`;
+      noteError(message);
+      if (opts.strict && !fatal) {
+        fatal = true;
+        opts.onFatal?.(message);
+      }
     }
   };
   follow(app.sim);

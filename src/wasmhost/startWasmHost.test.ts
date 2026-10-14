@@ -241,6 +241,37 @@ describe("startWasmHost", () => {
     handle.stop();
   });
 
+  it("in a wasm-only build, stops the game once on a tower it cannot host instead of leaving it on TypeScript", () => {
+    const mod = fakeModule();
+    const a = app();
+    const log = quiet();
+    const onFatal = vi.fn();
+    const handle = startWasmHost(a, mod, log, { strict: true, onFatal });
+    expect(onFatal).not.toHaveBeenCalled();
+    const crowded = () => {
+      const sim = Simulation.newGame(6, "classic");
+      sim.crowd.people.push({ id: 1, seed: 1, state: "toDest", floor: 1, fy: 0, x: 170, floors: [], originFloor: 1, shafts: [], leg: 0, shaftId: null, carIndex: null, destX: 170, wait: 0, tripWait: 0, age: 0, linger: 0 });
+      return sim;
+    };
+    a.adoptSim(crowded());
+    a.adoptSim(crowded());
+    expect(handle.status.hosted).toBe(false);
+    expect(onFatal).toHaveBeenCalledTimes(1);
+    expect(onFatal.mock.calls[0][0]).toMatch(/not hosting this tower: .*crowd/);
+    handle.stop();
+  });
+
+  it("in a wasm-only build, reports a refusal of the first tower too", () => {
+    const mod = fakeModule();
+    const a = app();
+    a.sim.crowd.people.push({ id: 1, seed: 1, state: "toDest", floor: 1, fy: 0, x: 170, floors: [], originFloor: 1, shafts: [], leg: 0, shaftId: null, carIndex: null, destX: 170, wait: 0, tripWait: 0, age: 0, linger: 0 });
+    const onFatal = vi.fn();
+    const handle = startWasmHost(a, mod, quiet(), { strict: true, onFatal });
+    expect(onFatal).toHaveBeenCalledTimes(1);
+    expect(handle.current()).toBeNull();
+    handle.stop();
+  });
+
   it("resolves the package beside the app, under the page's base", () => {
     expect(enginePackageUrl("./", "https://example.test/play/index.html")).toBe("https://example.test/play/engine/verticopolis_engine.js");
     expect(enginePackageUrl("/", "https://example.test/play/")).toBe("https://example.test/engine/verticopolis_engine.js");

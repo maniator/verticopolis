@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { hasWebGL, showBootMessage, bootGame, hideBootCover } from "./bootstrap";
+import { hasWebGL, showBootMessage, bootGame, hideBootCover, showEngineFailure } from "./bootstrap";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import { inject as injectWebAnalytics } from "@vercel/analytics";
 
@@ -185,6 +185,36 @@ describe("showBootMessage", () => {
   });
 });
 
+describe("showEngineFailure", () => {
+  beforeEach(() => {
+    document.body.innerHTML = `<div id="stage"></div>`;
+  });
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("stops the game with the stage, the reason, the steps to try and a Reload button", () => {
+    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "load", message: "CompileError: <b>bad</b>" } }, false);
+    const box = document.getElementById("engine-failure")!;
+    expect(box.dataset.stage).toBe("load");
+    expect(box.textContent).toContain("could not start");
+    // The reason is text, never markup.
+    expect(box.textContent).toContain("Reason: CompileError: <b>bad</b>");
+    expect(box.querySelector("b b")).toBeNull();
+    expect([...box.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
+      expect.stringMatching(/^Reload the page/),
+      expect.stringMatching(/^You appear to be offline/),
+      expect.stringMatching(/^If it keeps happening/),
+    ]);
+    expect(document.querySelector("#boot-fallback button")?.textContent).toBe("Reload");
+  });
+
+  it("does nothing for a boot that has no failure", () => {
+    showEngineFailure({ build: "wasm-only", engine: "wasm", failure: null });
+    expect(document.getElementById("boot-fallback-host")).toBeNull();
+  });
+});
+
 describe("hideBootCover", () => {
   afterEach(() => {
     document.body.innerHTML = "";
@@ -282,6 +312,8 @@ describe("bootGame", () => {
       expect(startWasmHost).not.toHaveBeenCalled();
       expect(error).toHaveBeenCalledWith(expect.stringContaining("[wasm]"), wasmStub.loadError);
       expect(document.getElementById("boot-fallback-host")).toBeNull();
+      // A switchable build reports the engine it settled on.
+      expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: null });
     } finally {
       wasmStub.requested = "ts";
       wasmStub.loadError = null;
@@ -296,6 +328,7 @@ describe("bootGame", () => {
     try {
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
       expect(startWasmHost).toHaveBeenCalled();
+      expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "wasm", failure: null });
       expect(await SaveGame.export(new Simulation(1))).toBe("VCTOWER1\nZW5naW5l\n");
       expect(encodeVctower).toHaveBeenCalledTimes(1);
     } finally {
@@ -317,6 +350,8 @@ describe("bootGame", () => {
     try {
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
       expect(error).toHaveBeenCalledWith(expect.stringContaining("[wasm]"), expect.any(Error));
+      // The fallback is recorded with its reason (#874), not only logged.
+      expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "no host" } });
       expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
       expect(encodeVctower).not.toHaveBeenCalled();
     } finally {
