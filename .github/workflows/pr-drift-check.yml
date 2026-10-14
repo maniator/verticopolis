@@ -117,6 +117,18 @@ jobs:
             case "$f" in scripts/scenes/*) sign=+ ;; esac
             case "$f" in .github/workflows/pr-drift-check.yml) sign=+ ;; esac
             case "$f" in .github/workflows/screenshot-capture.yml) sign=+ ;; esac
+            # The Rust engine and the build of its WASM package: the engine legs
+            # (capture-wasm, engine-parity, engine-parity-visual) render on it.
+            # The package is build output, so an engine change no longer shows
+            # up as a src/public/engine/ change; its inputs count instead.
+            # The engine's inputs that can reach the package: the crate but its
+            # Markdown, and conformance/events/, the gameplay event catalog the
+            # engine compiles in (include_str! in engine-rs/src/gameplay.rs).
+            # engineSourceHash also covers the conformance files that only the
+            # engine's tests include; they never reach the package.
+            case "$f" in engine-rs/*|conformance/events/*) sign=+ ;; esac
+            case "$f" in engine-rs/*.md|conformance/events/*.md) sign=- ;; esac
+            case "$f" in scripts/wasm-build.ts|scripts/build-engine-wasm.sh|.github/actions/engine-wasm/*|.github/actions/engine-wasm-download/*) sign=+ ;; esac
             # The visual specs and their harness: engine-parity-visual is the only
             # job that runs visual.spec.ts on chromium-wasm (PW_WASM_VISUAL=1), so a
             # change to the spec, its helpers, its baselines or the Playwright
@@ -295,6 +307,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # The engine's WASM package is build output, not checked in; the WASM
+      # capture's resolve job restored or built it for this same head.
+      - uses: ./.github/actions/engine-wasm-download
+        with:
+          artifact-name: engine-wasm-package
 
       - name: Build
         run: npm run build
