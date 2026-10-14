@@ -20,10 +20,10 @@ fn main() {
     }
     let id = positional[0];
     let label = positional[1];
-    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-    let path = repo
-        .join("conformance/scenarios")
-        .join(format!("{id}.json"));
+    let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("conformance");
+    let path = suite.join("scenarios").join(format!("{id}.json"));
     let scenario = std::fs::read_to_string(&path)
         .map_err(|e| format!("cannot read {}: {e}", path.display()))
         .and_then(|text| Scenario::parse(&text))
@@ -31,12 +31,12 @@ fn main() {
             eprintln!("{e}");
             std::process::exit(2);
         });
-    match run_scenario_until(&scenario, &repo, label) {
+    match run_scenario_until(&scenario, &suite, label) {
         Ok(sim) => {
             let v = if crowd {
                 sim.crowd.view()
             } else {
-                verticopolis_engine::scenario::state_view(&sim)
+                verticopolis_engine::snapshot::state_view(&sim)
             };
             println!("{}", canonical_json(&v));
         }

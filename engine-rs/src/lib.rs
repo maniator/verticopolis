@@ -24,6 +24,7 @@ pub mod economy;
 pub mod events;
 pub mod facilities;
 pub mod fflate;
+pub mod frame;
 pub mod gameplay;
 pub mod housekeeping;
 pub mod jsmath;
@@ -34,12 +35,19 @@ pub mod rent;
 pub mod rng;
 pub mod rules;
 pub mod satisfaction;
+// The conformance harness reads the suite's files, so a host links it only
+// with the `conformance` feature (tier 2 in API.md). The crate's unit tests
+// always have it; a test under `tests/` needs the feature like any host.
+#[cfg(any(test, feature = "conformance"))]
 pub mod scenario;
 pub mod schedule;
 pub mod services;
 pub mod sim;
 pub mod sim_loop;
+pub mod snapshot;
 pub mod star;
+#[cfg(any(test, feature = "conformance"))]
+pub mod suite;
 pub mod tdt;
 pub use tdt::{export_tdt, import_tdt};
 pub mod telemetry;

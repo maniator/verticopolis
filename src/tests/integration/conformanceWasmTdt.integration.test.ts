@@ -97,7 +97,7 @@ import { exportInputs } from "../fixtures/tdtExportCases";
 import { importInputs } from "../fixtures/tdtImportCases";
 
 const REPO_ROOT = resolve(__dirname, "../../..");
-const FIXTURES = resolve(__dirname, "../fixtures");
+const FIXTURES = resolve(__dirname, "../../../conformance/fixtures");
 
 function envInt(name: string, fallback: number, min = 0): number {
   const raw = process.env[name];
@@ -169,7 +169,7 @@ const sampleBase = memo(() => (exportInputs().find(([id]) => id === "sample")![1
 const fixtureCases = memo((): (Case & { file: string })[] => {
   const out: (Case & { file: string })[] = [];
   for (const f of readdirSync(FIXTURES).filter((n) => n.endsWith(".vctower")).sort()) {
-    const file = `src/tests/fixtures/${f}`;
+    const file = `conformance/fixtures/${f}`;
     const save = fixtureSave(file);
     out.push({ id: `fixture-${f}`, save, filename: `${f.replace(/\.vctower$/, "").toUpperCase()}.TDT`, file });
   }

@@ -1,13 +1,14 @@
 //! `cargo run` prints one smoke run and replays every scenario of the
-//! conformance suite that starts from a new game. The suite's directory is
-//! the first argument; without one it is `../../conformance` from this
-//! crate's source directory, a path fixed at build time, so pass it when the
-//! binary runs anywhere else. Exits 1 on any failure.
+//! conformance suite, those that start from a save fixture included. The
+//! suite's directory is the first argument; without one it is
+//! `../../conformance` from this crate's source directory, a path fixed at
+//! build time, so pass it when the binary runs anywhere else. Exits 1 on any
+//! failure.
 
 use std::path::PathBuf;
 use std::process::exit;
 
-use verticopolis_engine_consumer::{new_game_scenarios, replay, smoke, SEED};
+use verticopolis_engine_consumer::{replay, scenarios, smoke, SEED};
 
 fn main() {
     let conformance = std::env::args()
@@ -25,10 +26,10 @@ fn main() {
             ok = false;
         }
     }
-    let ids = match new_game_scenarios(&conformance) {
+    let ids = match scenarios(&conformance) {
         Ok(ids) if !ids.is_empty() => ids,
         Ok(_) => {
-            eprintln!("no new-game scenario in {}", conformance.display());
+            eprintln!("no scenario in {}", conformance.display());
             exit(1);
         }
         Err(e) => {

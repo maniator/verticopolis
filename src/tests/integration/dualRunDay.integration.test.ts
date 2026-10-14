@@ -47,7 +47,7 @@ describe.skipIf(!hasWasmPackage())("dual run: a day at the game's own cadence", 
   it("a new Modern game at the fastest speed", () => foundedDay(4242, "modern", 3), 60_000);
   it("a new Modern game on the canon calendar, founded unbridged", () => foundedDay(99, "modern", 2, "canon", true), 60_000);
   it("a day driven at one steady reference frame rate", () => {
-    const sim = loadFixture("src/tests/fixtures/split-tower.vctower");
+    const sim = loadFixture("conformance/fixtures/split-tower.vctower");
     const run = new DualRun().follow(sim);
     const from = sim.clock.minutes;
     new FrameDriver(sim, 3, false, [1000 / 60]).run(DAY);
@@ -56,5 +56,5 @@ describe.skipIf(!hasWasmPackage())("dual run: a day at the game's own cadence", 
     expect(report.checkpoints).toBe(hoursCrossed(from, sim.clock.minutes));
     expect(report.checkpoints).toBe(24);
   }, 60_000);
-  it("the steady clock pacing on tower-one", () => day(loadFixture("src/tests/fixtures/towerone_6.vctower"), 3, true), 120_000);
+  it("the steady clock pacing on tower-one", () => day(loadFixture("conformance/fixtures/towerone_6.vctower"), 3, true), 120_000);
 });

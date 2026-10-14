@@ -3,6 +3,7 @@ import { HOUSEHOLD_SIZES } from "../../engine/households";
 import { hasHousehold } from "../../engine/residentialRentals";
 import { subtypeListFor } from "../../engine/retailSubtypes";
 import type { FacilityKind, UnitState } from "../../engine/types";
+import { LATE_NIGHT_KINDS, isLateHour } from "../lateNight";
 import { TILE, FLOOR } from "../scale";
 import { CONSTRUCTION_FRAMES, FIRE_FRAMES, ROOM_VARIANTS } from "./schema";
 import type { PaintSpec, UnitPaint } from "./paint";
@@ -10,7 +11,7 @@ import type { PaintSpec, UnitPaint } from "./paint";
 /**
  * The room half of the atlas catalog: every facility kind in every unit state,
  * baked on the static inputs of the web's re-bake signature
- * (`excalibur/towerReconcile.ts`) and split from the inputs a frontend
+ * (`excalibur/roomSignature.ts`) and split from the inputs a frontend
  * composes at runtime. Pure data; the bake runs it.
  */
 
@@ -80,15 +81,6 @@ export const UNIT_STATES: readonly UnitState[] = [
 /** Kinds whose art ignores `occupants` entirely, so they carry no presence
  *  split and no occupant chain. */
 export const OCCUPANT_FREE = new Set<FacilityKind>(["parking", "parkingRamp", "security", "medical", "housekeeping", "recycling", "metro"]);
-
-/** Kinds whose art changes after 23:00 and before 06:00: the condo (its
- *  asleep scrim and its residents) and the two rentals, which share the
- *  condo's draw (`residentialRentalSprites.ts`) and its hidden-residents rule. */
-export const LATE_NIGHT_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["condo", "rentalStudio", "rentalApartment"]);
-
-export function isLateHour(hour: number): boolean {
-  return hour >= 23 || hour < 6;
-}
 
 /** The web's re-bake bucket for the recycling pile (`r${round(fill * 8)}`). */
 export const RECYCLE_STEPS = 8;

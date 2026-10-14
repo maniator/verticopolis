@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { buildToStar, engineSave, expectEngineHosted, WASM_PROJECT } from "./helpers";
+import { buildToStar, engineSave, expectEngineHosted, onWasm } from "./helpers";
 
 // On chromium-wasm every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
@@ -26,7 +26,7 @@ test("winning the TOWER shows the congratulations modal", async ({ page }) => {
   expect(star).toBe(6); // the real win logic reached TOWER
   await expectEngineHosted(page);
   const engine = await engineSave(page);
-  if (test.info().project.name === WASM_PROJECT) expect(engine).toMatchObject({ star: 6, evaluatedTower: true });
+  if (onWasm(test.info().project.name)) expect(engine).toMatchObject({ star: 6, evaluatedTower: true });
 
   const modal = page.locator("#modal");
   await expect(modal).toBeVisible();

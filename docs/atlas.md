@@ -171,7 +171,7 @@ that stop line).
 ## Reading a room
 
 The web game re-bakes a room whenever its signature changes
-(`src/render/excalibur/towerReconcile.ts`). The atlas bakes the static part of
+(`src/render/excalibur/roomSignature.ts`). The atlas bakes the static part of
 that signature into frame names and leaves the rest as layers. The reference
 reader is `src/render/atlas/lookup.ts`; in short:
 
