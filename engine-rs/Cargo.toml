@@ -6,6 +6,9 @@ rust-version = "1.97"
 license = "MIT"
 publish = false
 description = "The Verticopolis simulation engine, ported from src/engine and checked against conformance/"
+# Every binary is declared below with the conformance feature it needs; none
+# is found by its path alone (tests/independence.rs holds this).
+autobins = false
 
 [lib]
 name = "verticopolis_engine"
@@ -17,6 +20,22 @@ path = "src/lib.rs"
 [[bin]]
 name = "conformance"
 path = "src/bin/conformance.rs"
+required-features = ["conformance"]
+
+[[bin]]
+name = "dump"
+path = "src/bin/dump.rs"
+required-features = ["conformance"]
+
+[[bin]]
+name = "fuzz"
+path = "src/bin/fuzz.rs"
+required-features = ["conformance"]
+
+[[bin]]
+name = "tdt"
+path = "src/bin/tdt.rs"
+required-features = ["conformance"]
 
 [dependencies]
 serde = { version = "1.0.229", features = ["derive"] }
@@ -32,6 +51,11 @@ wasm-bindgen = { version = "=0.2.129", optional = true }
 
 [features]
 wasm = ["dep:wasm-bindgen"]
+# The conformance harness (tier 2 in API.md): the scenario runner, the .TDT
+# referee and the binaries, which read the suite's files. Off by default, so a
+# host links no file reads; the referee and a host that replays the lock turn
+# it on (`cargo run --features conformance --bin conformance`).
+conformance = []
 
 [profile.release]
 debug = 1

@@ -25,7 +25,7 @@ import { toTowerFile } from "./towerFileCodec";
 const CAP = MAX_SAVE_INFLATED_BYTES;
 // SaveGame's autosave key, the slot `loadResult` reads first.
 const AUTO_KEY = "verticopolis-save";
-const FIXTURE = resolve(__dirname, "../tests/fixtures/split-tower.vctower");
+const FIXTURE = resolve(__dirname, "../../conformance/fixtures/split-tower.vctower");
 
 /** The JSON text inside a VCZ1 store value or a `.vctower` file. */
 function jsonOf(packed: string): string {

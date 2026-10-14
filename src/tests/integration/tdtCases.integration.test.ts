@@ -2,7 +2,7 @@
  * TDT conformance table: synthetic `.TDT` files run through `parseTDT`, and
  * serialized towers run through `buildTDT`, pinned into
  * `conformance/tdt-cases.json` for the Rust `tdt` referee
- * (`cargo run --release --bin tdt`) to replay. The cases are generated here
+ * (`cargo run --release --features conformance --bin tdt`) to replay. The cases are generated here
  * from code so they regenerate on purpose only, like the scenario lock:
  * `VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration tdtCases`.
  *
@@ -31,7 +31,7 @@ import { exportInputs } from "../fixtures/tdtExportCases";
 import { importInputs } from "../fixtures/tdtImportCases";
 
 const LOCK = resolve(__dirname, "../../../conformance/tdt-cases.json");
-const FIXTURES = resolve(__dirname, "../fixtures");
+const FIXTURES = resolve(__dirname, "../../../conformance/fixtures");
 const REPO_ROOT = resolve(__dirname, "../../..");
 const UPDATE = process.env.VC_CONFORMANCE_UPDATE === "1";
 if (UPDATE && process.env.CI) throw new Error("VC_CONFORMANCE_UPDATE is a local regeneration switch and never runs in CI");
@@ -115,7 +115,7 @@ function buildLock(): Lock {
     return { base: `export-${entry.base}`, patch, ...exportCase(`export-${id}`, input) };
   });
   for (const f of readdirSync(FIXTURES).filter((f) => f.endsWith(".vctower")).sort()) {
-    const fixture = `src/tests/fixtures/${f}`;
+    const fixture = `conformance/fixtures/${f}`;
     exports.push({ fixture, ...exportCase(`export-fixture-${f.replace(/\.vctower$/, "")}`, fixtureSave(fixture)) });
   }
   return { import: imports, export: exports };

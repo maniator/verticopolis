@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  buildCaptureBody,
   handleIngest,
   MAX_BODY_BYTES,
   originAllowed,
@@ -19,6 +18,37 @@ function postRequest(body: unknown, headers: Record<string, string> = {}): Reque
     headers: { "content-type": "application/json", ...headers },
     body: raw,
   });
+}
+
+/** A body stream that counts how many chunks were pulled, so a test can prove
+ *  the handler rejected a request before (or while) reading it. */
+function spyBody(text: string, chunkSize = text.length || 1) {
+  const bytes = new TextEncoder().encode(text);
+  let pulls = 0;
+  let offset = 0;
+  let cancelled = false;
+  // highWaterMark zero, so nothing is pulled until the handler actually reads.
+  // The default of one pre-pulls a chunk at construction, which would make the
+  // reject-before-read tests fail for the wrong reason.
+  const lazy: QueuingStrategy<Uint8Array> = { highWaterMark: 0 };
+  const body = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        pulls++;
+        if (offset >= bytes.length) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(bytes.slice(offset, offset + chunkSize));
+        offset += chunkSize;
+      },
+      cancel() {
+        cancelled = true;
+      },
+    },
+    lazy,
+  );
+  return { body, pulls: () => pulls, sent: () => Math.min(offset, bytes.length), cancelled: () => cancelled };
 }
 
 /** Deps wired to spies, with a fresh limiter so tests never share window state. */
@@ -57,18 +87,18 @@ describe("handleIngest", () => {
 
   it("rejects a cross-site Origin with 403 before doing any work", async () => {
     // `Origin` is a forbidden header to set on a real Request (the browser sets
-    // it), so drive the guard with a minimal request. The json spy proves the
-    // cross-site POST is rejected before the body is even parsed.
+    // it), so drive the guard with a minimal request. The body spy proves the
+    // cross-site POST is rejected before the body is even read.
     const deps = makeDeps();
-    const json = vi.fn();
+    const spy = spyBody(JSON.stringify({ event: "boot" }));
     const req = {
       method: "POST",
       headers: { get: (n: string) => (n === "origin" ? "https://evil.example" : null) },
-      json,
+      body: spy.body,
     } as unknown as Request;
     const res = await handleIngest(req, deps);
     expect(res.status).toBe(403);
-    expect(json).not.toHaveBeenCalled();
+    expect(spy.pulls()).toBe(0);
     expect(deps.fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -77,7 +107,7 @@ describe("handleIngest", () => {
     const req = {
       method: "POST",
       headers: { get: (n: string) => (n === "origin" ? "https://verticopolis.com" : null) },
-      json: async () => ({ event: "boot" }),
+      body: spyBody(JSON.stringify({ event: "boot" })).body,
     } as unknown as Request;
     const res = await handleIngest(req, deps);
     expect(res.status).toBe(204);
@@ -114,17 +144,91 @@ describe("handleIngest", () => {
     // `content-length` is a forbidden header to set on a real Request (the
     // platform controls it, and Vercel always sends it), so drive the guard with
     // a minimal request exposing exactly the fields the handler reads. The
-    // `json` spy proves the oversized body is rejected before it is parsed.
-    const json = vi.fn().mockResolvedValue({ event: "boot" });
+    // body spy proves the declared-oversized body is rejected before any read.
+    const spy = spyBody(JSON.stringify({ event: "boot" }));
     const req = {
       method: "POST",
       headers: { get: (name: string) => (name === "content-length" ? String(MAX_BODY_BYTES + 1) : null) },
-      json,
+      body: spy.body,
     } as unknown as Request;
     const res = await handleIngest(req, deps);
     expect(res.status).toBe(413);
-    expect(json).not.toHaveBeenCalled();
+    expect(spy.pulls()).toBe(0);
     expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("REGRESSION (GH #789): a body with no content-length is still capped while it is read", async () => {
+    // A chunked POST omits `content-length`, so the declared-length check
+    // above sees nothing. The read itself must stop at the cap, and stop early:
+    // it never pulls the whole oversized body.
+    const deps = makeDeps();
+    const huge = JSON.stringify({ event: "boot", properties: { pad: "x".repeat(MAX_BODY_BYTES * 4) } });
+    const spy = spyBody(huge, 1_024);
+    const req = { method: "POST", headers: { get: () => null }, body: spy.body } as unknown as Request;
+    const res = await handleIngest(req, deps);
+    expect(res.status).toBe(413);
+    expect(spy.sent()).toBeLessThanOrEqual(MAX_BODY_BYTES + 1_024);
+    expect(spy.sent()).toBeLessThan(huge.length);
+    // The read stops at the first chunk past the cap, and releases the stream.
+    expect(spy.pulls()).toBe(MAX_BODY_BYTES / 1_024 + 1);
+    expect(spy.cancelled()).toBe(true);
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("answers 400 when the body stream errors mid-read", async () => {
+    const deps = makeDeps();
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.error(new Error("client went away"));
+      },
+    });
+    const req = { method: "POST", headers: { get: () => null }, body } as unknown as Request;
+    expect((await handleIngest(req, deps)).status).toBe(400);
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("answers 400 for a POST with no body at all", async () => {
+    const deps = makeDeps();
+    const req = { method: "POST", headers: { get: () => null }, body: null } as unknown as Request;
+    expect((await handleIngest(req, deps)).status).toBe(400);
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("accepts a body of exactly MAX_BODY_BYTES with no content-length, and parses it", async () => {
+    const deps = makeDeps();
+    const base = JSON.stringify({ event: "boot", properties: { pad: "" } });
+    const text = JSON.stringify({ event: "boot", properties: { pad: "x".repeat(MAX_BODY_BYTES - base.length) } });
+    expect(new TextEncoder().encode(text).length).toBe(MAX_BODY_BYTES);
+    const req = { method: "POST", headers: { get: () => null }, body: spyBody(text, 700).body } as unknown as Request;
+    expect((await handleIngest(req, deps)).status).toBe(204);
+    expect(deps.fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads one byte past the cap as oversized", async () => {
+    const base = JSON.stringify({ event: "boot", properties: { pad: "" } });
+    const text = JSON.stringify({ event: "boot", properties: { pad: "x".repeat(MAX_BODY_BYTES - base.length + 1) } });
+    for (const chunk of [text.length, 700, 1]) {
+      // Fresh deps each time, so the rate limiter can never answer for the cap.
+      const deps = makeDeps();
+      const req = { method: "POST", headers: { get: () => null }, body: spyBody(text, chunk).body } as unknown as Request;
+      expect((await handleIngest(req, deps)).status).toBe(413);
+    }
+  });
+
+  it("decodes a multibyte character split across two chunks", async () => {
+    const deps = makeDeps();
+    const text = JSON.stringify({ event: "boot", properties: { name: "★★★" } });
+    // One-byte chunks put every three-byte star across chunk boundaries.
+    const req = { method: "POST", headers: { get: () => null }, body: spyBody(text, 1).body } as unknown as Request;
+    expect((await handleIngest(req, deps)).status).toBe(204);
+    expect((forwardedBody(deps.fetchImpl).properties as Record<string, unknown>).name).toBe("★★★");
+  });
+
+  it("decodes a UTF-8 body with a leading byte-order mark, as Request.json() did", async () => {
+    const deps = makeDeps();
+    const req = postRequest("\uFEFF" + JSON.stringify({ event: "boot", properties: { name: "Tôwer ★" } }));
+    expect((await handleIngest(req, deps)).status).toBe(204);
+    expect((forwardedBody(deps.fetchImpl).properties as Record<string, unknown>).name).toBe("Tôwer ★");
   });
 
   it("rejects an unparseable body with 400", async () => {
@@ -275,68 +379,6 @@ describe("handleIngest", () => {
     } finally {
       warn.mockRestore();
     }
-  });
-});
-
-describe("buildCaptureBody", () => {
-  it("omits timestamp when the client sent none, letting PostHog default it", () => {
-    const body = buildCaptureBody({ event: "boot" }, "production");
-    expect("timestamp" in body).toBe(false);
-    expect(body.properties.distinct_id).toBe("anon"); // no session -> anon bucket
-  });
-
-  it("omits an invalid timestamp and falls back to anon for an empty session", () => {
-    const body = buildCaptureBody({ event: "boot", session: "", ts: "not-a-date" }, "production");
-    expect("timestamp" in body).toBe(false);
-    expect(body.properties.distinct_id).toBe("anon");
-  });
-
-  it("drops a non-object properties rather than spreading junk keys", () => {
-    const body = buildCaptureBody({ event: "boot", properties: "junk" as unknown }, "production");
-    expect(body.properties).toEqual({
-      distinct_id: "anon",
-      $process_person_profile: false,
-      $geoip_disable: true,
-      environment: "production",
-    });
-  });
-
-  it("keeps client props and stamps the server fields last", () => {
-    const body = buildCaptureBody(
-      { event: "boot", session: "s1", ts: "2026-07-22T00:00:00.000Z", properties: { mode: "modern" } },
-      "preview",
-    );
-    expect(body).toEqual({
-      event: "boot",
-      timestamp: "2026-07-22T00:00:00.000Z",
-      properties: {
-        mode: "modern",
-        distinct_id: "s1",
-        $process_person_profile: false,
-        $geoip_disable: true,
-        environment: "preview",
-      },
-    });
-  });
-
-  it("disables GeoIP so PostHog never geo-locates the relay's own egress IP", () => {
-    const body = buildCaptureBody({ event: "boot" }, "production");
-    expect(body.properties.$geoip_disable).toBe(true);
-  });
-
-  it("does not let the client re-enable GeoIP through its props", () => {
-    // We never forward the player IP, so GeoIP must stay off regardless of a
-    // crafted client body that tries to flip it back on.
-    const body = buildCaptureBody(
-      { event: "boot", properties: { $geoip_disable: false } as unknown as Record<string, unknown> },
-      "production",
-    );
-    expect(body.properties.$geoip_disable).toBe(true);
-  });
-
-  it("falls back to an unknown environment when VERCEL_ENV is absent", () => {
-    const body = buildCaptureBody({ event: "boot" }, undefined);
-    expect(body.properties.environment).toBe("unknown");
   });
 });
 

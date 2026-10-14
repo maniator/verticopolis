@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, chromium, devices, type BrowserContext, type LaunchOptions, type Page } from "@playwright/test";
-import { WASM_PROJECT, expectEngineHosted } from "./helpers";
+import { onWasm, expectEngineHosted } from "./helpers";
 import {
   ENGINE_FILES,
   advanceClock,
@@ -29,7 +29,7 @@ import {
  * device, base URL and browser, and the engine choice (`vc.engine`, which the
  * project seeds into every other context) is stored by the online visit.
  */
-test.beforeEach(({}, info) => test.skip(info.project.name !== WASM_PROJECT, "the engine runs on the chromium-wasm project"));
+test.beforeEach(({}, info) => test.skip(!onWasm(info.project.name), "the engine runs on the chromium-wasm and chromium-wasm-only projects"));
 // An install, a browser restart and a game session each: more than the default 30s.
 test.setTimeout(120_000);
 

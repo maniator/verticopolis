@@ -55,7 +55,7 @@ export function signature(): AtlasManifest["signature"] {
     sampled: ["variant"],
     rules: {
       hours: "open or closed by the kind's business hours at the current hour; 'always' for kinds without hours",
-      late: "condo, studio and apartment: 'late' from 23:00 to 06:00, else 'notlate'; 'any' for every other kind. The game's re-bake does not yet flip the two rentals at 23:00 and 06:00 (issue #916), so on screen they can keep their earlier look until something else repaints them",
+      late: "condo, studio and apartment: 'late' from 23:00 to 06:00, else 'notlate'; 'any' for every other kind",
       presence: "'home' when the unit's occupants is above 0, else 'away'; kinds whose art ignores occupants (the garage, ramp, services, recycling, metro) carry no presence segment",
       width: "frames exist for each kind's catalog width only; a room imported at another width has no frame",
       subtype: "a subtype the engine does not list for the kind draws the default look, the '-' frame",
