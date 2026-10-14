@@ -180,16 +180,22 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(sim.addCar(lift.id).ok).toBe(true); // a well-formed call still lands
     // A mark whose fields answer differently on a second read: the mirror
     // reads it once, before the call, so both engines bill the same floors.
+    // The first read never reaches past the shaft, so no floor goes free.
     let reads = 0;
-    const shifting = { bottom: 1, get top() { return reads++ === 0 ? 5 : 2; } };
-    expect(sim.extendTransport(lift.id, "up", 6, shifting)).toMatchObject({ ok: true, top: 6, added: 1 });
+    const shifting = { bottom: 1, get top() { return reads++ === 0 ? 2 : 5; } };
+    expect(sim.extendTransport(lift.id, "up", 6, shifting)).toMatchObject({ ok: true, top: 6, added: 4 });
     let readsB = 0;
     const halving = { get bottom() { return readsB++ === 0 ? 1 : 0.5; }, top: 6 };
     expect(sim.extendTransport(lift.id, "up", 7, halving)).toMatchObject({ ok: true, top: 7 });
+    let readsC = 0; // a callable mark carries fields too
+    const callable = Object.assign(() => undefined, { bottom: 1 });
+    Object.defineProperty(callable, "top", { get: () => (readsC++ === 0 ? 7 : 2.5) });
+    expect(sim.extendTransport(lift.id, "up", 8, loose(callable) as unknown as { bottom: number; top: number })).toMatchObject({ ok: true, top: 8, added: 1 });
     new FrameDriver(sim, 3).run(60);
     const report = run.stop();
     expect(report.divergences).toEqual([]);
     expect(report.eventDivergences).toEqual([]);
+    // 60 frames at speed 3 from the founding hour: its pass, then 8:00.
     expect(report.checkpoints).toBe(2);
   });
 

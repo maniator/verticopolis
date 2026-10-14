@@ -79,7 +79,8 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
   /** Replace `obj[name]` with a wrapper that runs the original (or
    *  `replace` in its place) and, for a call from outside any other recorded
    *  call, reports it. `prepare` may rewrite the arguments first, so the
-   *  engine and the report read the same values. */
+   *  engine and the report read the same values; the engine then sees the
+   *  rewritten value, so it must not rely on an argument's identity. */
   function wrap<T extends object, K extends keyof T & string>(obj: T, name: K, report: (args: unknown[], result: unknown) => ShadowCommand | null, replace?: (args: unknown[]) => unknown, prepare?: (args: unknown[]) => void): void {
     const original = obj[name] as unknown as AnyFn;
     if (typeof original !== "function") throw new Error(`mirror: ${name} is not a method`);
@@ -161,11 +162,12 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
       const relayed = mark == null ? null : { bottom: num(mark.bottom), top: num(mark.top) };
       return { op: "extendTransport", id: num(id), end: str(end) as "up" | "down", targetFloor: num(targetFloor), hwm: relayed };
     }, undefined, (args) => {
-      // Read an object mark once, before the call: an accessor answering
+      // Read the mark once, before the call: an accessor answering
       // differently on a second read would otherwise bill one value in
-      // TypeScript and relay another to Rust.
+      // TypeScript and relay another to Rust. Any mark but null or undefined,
+      // as the engine reads fields off any such value (a function included).
       const mark = args[3];
-      if (mark != null && typeof mark === "object") {
+      if (mark != null) {
         const { bottom, top } = mark as { bottom?: unknown; top?: unknown };
         args[3] = { bottom, top };
       }

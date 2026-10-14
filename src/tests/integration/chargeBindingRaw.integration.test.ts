@@ -36,24 +36,29 @@ type Call = { name: string; ts: (sim: Simulation) => unknown; rust: (engine: Eng
 
 /** A lobby, a floor over it, an elevator on floors 1 and 2 and an office,
  *  with money to spend: the same tower in both engines, through one save. */
-function tower(): { sim: Simulation; engine: Engine; lift: number; office: number } {
+function tower(): { sim: Simulation; engine: Engine; lift: number; office: number; stairs: number } {
   const built = Simulation.newGame(7, "classic");
   built.money = 1e7;
   for (let x = 170; x < 200; x++) expect(built.build("lobby", 1, x).ok).toBe(true);
   for (let x = 170; x < 200; x++) expect(built.build("floor", 2, x).ok).toBe(true);
   expect(built.buildTransport("elevatorStandard", 172, 1, 2).ok).toBe(true);
   expect(built.build("office", 2, 180).ok).toBe(true);
+  expect(built.buildTransport("stairs", 190, 1, 2).ok).toBe(true);
   const save = JSON.stringify(built.serialize());
   const sim = Simulation.deserialize(JSON.parse(save) as SerializedGame);
   const engine = loose<Engine>(wasm().Engine.fromSave(save));
-  return { sim, engine, lift: sim.tower.transportAt(1, 172)!.id, office: sim.tower.unitAt(2, 180)!.id };
+  return { sim, engine, lift: sim.tower.transportAt(1, 172)!.id, office: sim.tower.unitAt(2, 180)!.id, stairs: sim.tower.transportAt(1, 190)!.id };
 }
 
 const loose = <T>(v: unknown) => v as T;
 const call = (f: unknown, self: Simulation, ...args: unknown[]) => loose<(...a: unknown[]) => unknown>(f).call(self, ...args);
 
-function cases(lift: number, office: number): Call[] {
+function cases(lift: number, office: number, stairs: number): Call[] {
   const list: Call[] = [];
+  // The refusal's ends are those of whatever the whole id names: a stair
+  // link's own, and 0 and 0 for a unit, which is no shaft.
+  list.push({ name: "extendTransport(stairs, end sideways)", ts: (s) => s.extendTransport(stairs, loose("sideways"), 3), rust: (e) => e.extendTransport(stairs, "sideways", 3) });
+  list.push({ name: "extendTransport(a unit's id, a fractional floor)", ts: (s) => s.extendTransport(office, "up", 3.5), rust: (e) => e.extendTransport(office, "up", 3.5) });
   const ids: [string, unknown][] = [
     ["a numeric string", String(lift)],
     ["null", null],
@@ -100,6 +105,7 @@ function cases(lift: number, office: number): Call[] {
   const marks: [string, unknown, unknown][] = [
     ["a fractional top", { bottom: 1, top: 2.5 }, '{"bottom":1,"top":2.5}'],
     ["a top past 2^53", { bottom: 1, top: 2 ** 53 }, '{"bottom":1,"top":9007199254740992}'],
+    ["a bottom past -2^53", { bottom: -(2 ** 53), top: 2 }, '{"bottom":-9007199254740992,"top":2}'],
     ["a string bottom", { bottom: "1", top: 2 }, '{"bottom":"1","top":2}'],
     ["a NaN bottom, stringified", { bottom: Number.NaN, top: 2 }, JSON.stringify({ bottom: Number.NaN, top: 2 })],
     ["a NaN bottom, written raw", { bottom: Number.NaN, top: 2 }, '{"bottom":NaN,"top":2}'],
@@ -139,7 +145,7 @@ const drained = (sim: Simulation, engine: Engine) => ({ ts: JSON.parse(JSON.stri
 
 describe.skipIf(!hasWasmPackage())("charge commands called raw through the binding (#923)", () => {
   it("refuse every malformed argument exactly as TypeScript does, moving nothing", () => {
-    const { sim, engine, lift, office } = tower();
+    const { sim, engine, lift, office, stairs } = tower();
     try {
       const tsDigest = () => digest(stateView(sim));
       const start = tsDigest();
@@ -158,8 +164,8 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
           expect(engine.stateDigest(), `${c.name}: Rust moved`).toBe(start);
         }
       };
-      const list = cases(lift, office);
-      expect(list).toHaveLength(118);
+      const list = cases(lift, office, stairs);
+      expect(list).toHaveLength(121);
       run(list, true);
       const edges = acceptedEdges(lift);
       expect(edges).toHaveLength(19);
@@ -194,6 +200,8 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
         { name: "extendTransport with the text null", ts: (s) => s.extendTransport(lift, "up", 4, null), rust: (e) => e.extendTransport(lift, "up", 4, "null") },
         { name: "extendTransport with three arguments", ts: (s) => s.extendTransport(lift, "up", 5), rust: (e) => e.extendTransport(lift, "up", 5) },
         { name: "addCar", ts: (s) => s.addCar(lift), rust: (e) => e.addCar(lift) },
+        { name: "removeCar", ts: (s) => s.removeCar(lift), rust: (e) => e.removeCar(lift) },
+        { name: "removeFacility", ts: (s) => s.removeFacility(office, "sell"), rust: (e) => e.removeFacility(office, "sell") },
       ];
       for (const c of good) {
         const ts = c.ts(sim) as { ok: boolean };

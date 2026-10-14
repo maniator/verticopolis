@@ -273,6 +273,24 @@ describe("malformed requests (#923)", () => {
     expect(sim.removeFacility(office.id, "burn" as "sell")).toEqual(refused);
     expect(sim.removeFacility(office.id, "Sell" as "sell")).toEqual(refused);
     expect(sim.extendTransport(lift.id, "UP" as "up", 3)).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
+    // Not a number or a string at all: a second frontend's untyped call.
+    const raw = <T>(v: unknown) => v as T;
+    for (const id of ["12", String(lift.id), null, undefined, true, BigInt(lift.id), new Number(lift.id), [lift.id], { id: lift.id }]) {
+      expect(sim.addCar(raw(id))).toEqual(refused);
+      expect(sim.removeCar(raw(id))).toEqual(refused);
+      expect(sim.removeFacility(raw(id), "sell")).toEqual(refused);
+      expect(sim.extendTransport(raw(id), "up", 3)).toEqual({ ...refused, bottom: 0, top: 0, added: 0 });
+      expect(sim.extendTransport(lift.id, "up", raw(id))).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
+    }
+    for (const word of [null, undefined, 5, true, new String("up"), new String("sell")]) {
+      expect(sim.extendTransport(lift.id, raw(word), 3)).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
+      expect(sim.removeFacility(office.id, raw(word))).toEqual(refused);
+    }
+    for (const mark of [0, "", false, "{\"bottom\":1,\"top\":2}", { bottom: "1", top: 2 }, { bottom: 1 }]) {
+      expect(sim.extendTransport(lift.id, "up", 3, raw(mark))).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
+    }
+    expect(raw<(...a: unknown[]) => unknown>(sim.addCar).call(sim)).toEqual(refused);
+    expect(raw<(...a: unknown[]) => unknown>(sim.removeFacility).call(sim, office.id)).toEqual(refused);
     let reads = 0; // a mark that answers 1, then 0.5: checked and billed on one read
     const shifty = { get bottom() { return reads++ === 0 ? 1 : 0.5; }, top: 2 };
     expect(sim.extendTransport(lift.id, "up", 1, shifty).ok).toBe(true); // a no-op inside the mark

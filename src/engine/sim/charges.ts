@@ -58,7 +58,7 @@ export const INVALID_REQUEST = "That request is not valid.";
 const refuse = (reason: string): ChargeResult => ({ ok: false, reason, delta: 0 });
 
 /** A whole number a command may take: a safe integer, so both engines read
- *  the same value (the Rust binding takes it as a float and checks the same). */
+ *  the same value (the Rust binding reads a raw JS number and checks the same). */
 const whole = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v);
 const isEnd = (v: unknown): v is "up" | "down" => v === "up" || v === "down";
 const isMethod = (v: unknown): v is RemovalMethod => v === "sell" || v === "bulldoze";
