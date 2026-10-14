@@ -3,6 +3,7 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ENGINE_THIRD_PARTY } from "../build/rustNotices";
+import { globCovers, readWorkboxGlob } from "../build/workboxGlob";
 import {
   ENGINE_BUILD_ONLY_FILES,
   ENGINE_BUILD_RECORD,
@@ -66,9 +67,9 @@ describe("ENGINE_PACKAGE", () => {
 
   it("marks every engine file the app source names as fetched", () => {
     // Node-only code (the build helpers and the test harnesses under
-    // src/tests/) reads build-only files on purpose; everything else is
+    // src/tests/, and the name lists) reads build-only files on purpose; everything else is
     // app code, where naming a package file means fetching it.
-    const nodeOnly = (f: string) => f.startsWith("build/") || f.startsWith("tests/") || f === "wasmhost/engineAssets.ts" || f === "wasmhost/packageHash.ts";
+    const nodeOnly = (f: string) => f.startsWith("build/") || f.startsWith("tests/") || f === "wasmhost/engineAssets.ts" || f === "wasmhost/enginePackageNames.ts" || f === "wasmhost/packageHash.ts";
     const named = new Map<string, string>();
     const built: string[] = [];
     for (const f of filesUnder(SRC)) {
@@ -86,12 +87,12 @@ describe("ENGINE_PACKAGE", () => {
 
   it("holds only fetched file types the workbox glob precaches, and keeps .json out of it", () => {
     const config = readFileSync(resolve(ROOT, "vite.config.ts"), "utf8");
-    const glob = /globPatterns:\s*\["\*\*\/\*\.\{([\w,]+)\}"\]/.exec(config);
-    expect(glob, "vite.config.ts globPatterns changed shape; update this test").not.toBeNull();
-    const exts = new Set(glob![1].toLowerCase().split(","));
-    for (const f of ENGINE_RUNTIME_FILES) expect(exts.has(f.slice(f.lastIndexOf(".") + 1)), f).toBe(true);
+    const glob = readWorkboxGlob(config);
+    expect(glob, "vite.config.ts globPatterns changed shape; update src/build/workboxGlob.ts").not.toBeNull();
+    for (const f of ENGINE_RUNTIME_FILES) expect(globCovers(glob!, f), f).toBe(true);
+    for (const f of ENGINE_BUILD_ONLY_FILES) expect(globCovers(glob!, f), f).toBe(false);
     // A blanket `json` would precache the build-only records (and version.json).
-    expect(exts.has("json")).toBe(false);
+    expect(glob!.extensions.has("json")).toBe(false);
   });
 });
 

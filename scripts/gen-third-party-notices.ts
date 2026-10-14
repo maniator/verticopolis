@@ -49,6 +49,7 @@ import {
 } from "../src/build/thirdPartyNotices.ts";
 import { installedLinkProblems } from "../src/build/installedLinks.ts";
 import { ENGINE_THIRD_PARTY, engineRecordPackages } from "../src/build/rustNotices.ts";
+import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../src/wasmhost/enginePackageNames.ts";
 import { readLicenseFiles } from "./license-files.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..").replace(/\\/g, "/");
@@ -113,8 +114,8 @@ if (maps.length === 0) fail("no sourcemaps in dist; they are needed to list the 
 // Shipped JavaScript with no sourcemap would carry unlisted code. The only one
 // is the WASM engine's wasm-bindgen glue, which is attributed instead by the
 // record its build writes beside it (read below, #955).
-const ENGINE_GLUE = "engine/verticopolis_engine.js";
-const MAPLESS_JS_ALLOWED = new Set([ENGINE_GLUE]);
+const ENGINE_GLUE_PATH = ENGINE_DIR + ENGINE_GLUE;
+const MAPLESS_JS_ALLOWED = new Set([ENGINE_GLUE_PATH]);
 const mapless = filesUnder(DIST, (n) => /\.[mc]?js$/.test(n))
   .filter((f) => !existsSync(`${f}.map`))
   .map((f) => relative(DIST, f).replace(/\\/g, "/"))
@@ -263,7 +264,7 @@ for (const [dir, origin] of dirs) {
 // without one: any file under dist/engine/ (the glue, the .wasm, or both)
 // requires it.
 const engineDir = join(DIST, "engine");
-const ENGINE_FILES = new Set(["verticopolis_engine.js", "verticopolis_engine_bg.wasm", "BUILD.json", ENGINE_THIRD_PARTY]);
+const ENGINE_FILES = new Set([ENGINE_GLUE, ENGINE_WASM, ENGINE_BUILD_RECORD, ENGINE_THIRD_PARTY]);
 if (existsSync(engineDir) && (!statSync(engineDir).isDirectory() || readdirSync(engineDir).length > 0)) {
   const recordPath = join(DIST, "engine", ENGINE_THIRD_PARTY);
   const read = (path: string): unknown => {

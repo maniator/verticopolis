@@ -1,7 +1,7 @@
 import type { Simulation } from "../engine/Simulation";
 import { checkBinding, type WasmModule } from "../dualrun/binding";
 import { attachWasmHost, type WasmHost } from "./wasmHost";
-import { ENGINE_DIR, ENGINE_GLUE } from "./engineAssets";
+import { ENGINE_DIR, ENGINE_GLUE } from "./enginePackageNames";
 
 /**
  * The app side of the WASM switch: load the browser package, host the
