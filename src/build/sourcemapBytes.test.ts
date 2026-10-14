@@ -27,6 +27,11 @@ describe("bytesBySource", () => {
     expect(text.get("a.ts")).toEqual(["abc", "xyz"]);
   });
 
+  it("counts lines past the last mappings group as unmapped", () => {
+    const { bytes } = bytesBySource("ab\n//# sourceMappingURL=x.map", { sources: ["s.ts"], mappings: "AAAA" });
+    expect(Object.fromEntries(bytes)).toEqual({ "s.ts": 2, [UNMAPPED]: 26 });
+  });
+
   it("keeps a line with no segments whole as unmapped, and sums to the code's length", () => {
     const code = "one\ntwo\nthree";
     const { bytes } = bytesBySource(code, { sources: ["s.ts"], mappings: "AAAA;;CAAA" });

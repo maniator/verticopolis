@@ -136,5 +136,7 @@ describe("precacheManifest", () => {
   it("is null when there is no manifest", () => {
     expect(precacheManifest("self.skipWaiting()")).toBeNull();
     expect(precacheManifest("precacheAndRoute(")).toBeNull();
+    // An inlined runtime's definition comes first and is skipped.
+    expect(precacheManifest('function precacheAndRoute(e,t){x([e])}precacheAndRoute([{url:"a.js",revision:"1"}])')).toEqual(["a.js"]);
   });
 });

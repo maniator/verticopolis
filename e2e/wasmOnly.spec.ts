@@ -203,8 +203,11 @@ test.describe("never falls back to the TypeScript engine", () => {
     expect(await bootState(page)).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage: "host" } });
     const after = await page.evaluate(() => ({ hosted: !!(window as any).__vcEngine?.status.hosted, speed: (window as any).game.speed, minutes: (window as any).game.sim.clock.minutes as number }));
     expect(after).toMatchObject({ hosted: false, speed: 0 });
-    // The refused tower never ticks on TypeScript.
+    // The refused tower never ticks on TypeScript, and the speed keys behind
+    // the message cannot restart it.
+    await page.keyboard.press("3");
     await page.waitForTimeout(500);
+    expect(await page.evaluate(() => (window as any).game.speed)).toBe(0);
     expect(await page.evaluate(() => (window as any).game.sim.clock.minutes)).toBe(after.minutes);
   });
 

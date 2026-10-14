@@ -48,7 +48,7 @@ describe("loadBootEngine, wasm-only build", () => {
     try {
       const pending = loadBootEngine({ wasmOnly: true, load: () => new Promise<WasmModule>(() => {}), log: quiet(), timeoutMs: 1000 });
       await vi.advanceTimersByTimeAsync(1000);
-      expect((await pending).state.failure).toEqual({ stage: "load", message: "the engine package did not load within 1 seconds" });
+      expect((await pending).state.failure).toEqual({ stage: "load", message: "the engine package did not load within 1 second" });
     } finally {
       vi.useRealTimers();
     }

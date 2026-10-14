@@ -25,15 +25,19 @@ if (WASM_ONLY && WASM_VISUAL) throw new Error("PW_WASM_ONLY=1 and PW_WASM_VISUAL
 // The lane must match the build it serves: the projects of one lane fail in
 // confusing ways against the other's build. The build records its mode.
 const builtMode = (() => {
+  let text: string;
   try {
-    return (JSON.parse(readFileSync(new URL("./dist/version.json", import.meta.url), "utf8")) as { engineBuild?: string }).engineBuild;
+    text = readFileSync(new URL("./dist/version.json", import.meta.url), "utf8");
   } catch {
-    return undefined; // no build yet: the web server step reports that
+    return null; // no build yet: the web server step reports that
   }
+  return (JSON.parse(text) as { engineBuild?: string }).engineBuild ?? "unrecorded";
 })();
-if (builtMode !== undefined && (builtMode === "wasm-only") !== WASM_ONLY) {
+if (builtMode !== null && (builtMode === "wasm-only") !== WASM_ONLY) {
   throw new Error(
-    `dist/ is a ${builtMode} build, but ${WASM_ONLY ? "PW_WASM_ONLY=1 expects a wasm-only one (VC_ENGINE=wasm)" : "this lane expects a switchable one; set PW_WASM_ONLY=1 for a VC_ENGINE=wasm build"}.`,
+    `dist/ is a${builtMode === "unrecorded" ? "n older build that records no engine mode" : ` ${builtMode} build`}, but ` +
+      `${WASM_ONLY ? "PW_WASM_ONLY=1 expects a wasm-only one" : "this lane expects a switchable one"}. Rebuild for the lane ` +
+      `(VC_TOOLING=1 npm run build, with VC_ENGINE=wasm for PW_WASM_ONLY=1), or set PW_WASM_ONLY to match the build.`,
   );
 }
 

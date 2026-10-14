@@ -44,7 +44,8 @@ export const ENGINE_LOAD_TIMEOUT_MS = 90_000;
 
 function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((done, fail) => {
-    const timer = setTimeout(() => fail(new Error(`the engine package did not load within ${Math.round(ms / 1000)} seconds`)), ms);
+    const seconds = Math.round(ms / 1000);
+    const timer = setTimeout(() => fail(new Error(`the engine package did not load within ${seconds} ${seconds === 1 ? "second" : "seconds"}`)), ms);
     work.then(
       (v) => {
         clearTimeout(timer);

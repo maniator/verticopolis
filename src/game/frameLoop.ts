@@ -4,7 +4,7 @@ import { drainFixedSteps, syncStepMode, type StepDebt } from "../engine/sim/fixe
 import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
 import { tickInstallAffordance } from "./installAffordance";
-import { hasBlockingModal, isEditorBusy, isSplashUp } from "./interactionState";
+import { hasBlockingModal, isEditorBusy, isEngineStopped, isSplashUp } from "./interactionState";
 import { positionPanels } from "./panelAnchoring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
 import { gameplaySession } from "../analytics";
@@ -109,6 +109,12 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // out from under the player, and the update prompt must not let a distracted
   // player lose game-hours at high speed while it waits for their answer.
   if (hasBlockingModal(app)) {
+    app.accMinutes = 0;
+    return;
+  }
+  // A wasm-only build stopped on its engine: no engine holds the tower, so
+  // time stops for good (the speed buttons and keys cannot restart it).
+  if (isEngineStopped()) {
     app.accMinutes = 0;
     return;
   }

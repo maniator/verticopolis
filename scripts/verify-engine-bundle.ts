@@ -20,13 +20,13 @@
 import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative, resolve } from "node:path";
-import { checkEngineBundle, parseAllowList, parseEngineBuild, precacheManifest, repoRelativeSource, type EmittedChunk, type EngineBuild } from "../src/build/engineBundle.ts";
+import { checkEngineBundle, ENGINE_PACKAGE_FILES, parseAllowList, parseEngineBuild, precacheManifest, repoRelativeSource, type EmittedChunk, type EngineBuild } from "../src/build/engineBundle.ts";
 import { sourceToPath } from "../src/build/thirdPartyNotices.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist");
 const ALLOW = join(ROOT, "scripts", "engine-bundle.allow.txt");
-const ENGINE_DIR = "engine/";
+
 
 function fail(msg: string): never {
   console.error(`verify-engine-bundle: ${msg}`);
@@ -63,9 +63,9 @@ for (const file of scripts) {
   const rel = relative(DIST, file).replace(/\\/g, "/");
   const mapFile = `${file}.map`;
   if (!existsSync(mapFile)) {
-    // The engine package (engine/) is the wasm-bindgen output of the Rust
+    // The engine package's glue is the wasm-bindgen output of the Rust
     // crate, copied in as built: it has no map and no TypeScript in it.
-    if (rel.startsWith(ENGINE_DIR)) continue;
+    if (ENGINE_PACKAGE_FILES.includes(rel)) continue;
     fail(`${rel} has no sourcemap, so the modules it carries cannot be checked`);
   }
   let map: { sources?: unknown; sourceRoot?: unknown };

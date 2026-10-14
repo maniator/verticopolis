@@ -226,7 +226,9 @@ the two relate:
 - **Switchable** (the default, `VC_ENGINE` unset): the TypeScript engine runs
   unless `?engine=wasm` or `vc.engine` asks for WASM, and a package that fails
   to load leaves the game on TypeScript.
-- **Wasm-only** (`VC_ENGINE=wasm`): the WASM engine is the only engine.
+- **Wasm-only** (`VC_ENGINE=wasm`): only the WASM engine advances the
+  simulation. The TypeScript instance stays as the read model, and commands
+  and loads still pass through it until #954 and #868 land.
   `bootstrap.ts` always loads it, the `__WASM_ONLY__` define compiles away
   the engine switch and the dual run, and a `resolve.alias` in
   `vite.config.ts` swaps the TypeScript step loop for

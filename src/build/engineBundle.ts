@@ -181,10 +181,11 @@ export function repoRelativeSource(path: string, root: string): string {
  *  `precacheAndRoute`, and nothing else in the worker. Null when the call or
  *  its array cannot be found. */
 export function precacheManifest(sw: string): string[] | null {
-  const start = sw.indexOf("precacheAndRoute(");
-  if (start === -1) return null;
-  const open = sw.indexOf("[", start);
-  if (open === -1) return null;
+  // The call with an array literal argument, so an inlined Workbox runtime's
+  // own `function precacheAndRoute(e,t){` is never read as the manifest.
+  const call = /precacheAndRoute\(\s*\[/.exec(sw);
+  if (!call) return null;
+  const open = call.index + call[0].length - 1;
   let depth = 0;
   for (let i = open; i < sw.length; i++) {
     if (sw[i] === "[") depth++;

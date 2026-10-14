@@ -18,15 +18,29 @@ function sources(dir: string, out: string[] = []): string[] {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) {
       if (name !== "public" && name !== "tests") sources(p, out);
-    } else if (/\.ts$/.test(name) && !/\.(test|spec)\.ts$/.test(name) && !name.endsWith(".d.ts")) out.push(p);
+    } else if (/\.[mc]?tsx?$/.test(name) && !/\.(test|spec)\.[mc]?tsx?$/.test(name) && !name.endsWith(".d.ts")) out.push(p);
   }
   return out;
 }
 
-/** Value-import specifiers of a file (type-only imports are erased). */
+/** Every specifier a file loads at run time: `import ... from`, `export ...
+ *  from`, a bare `import "x"` and a dynamic `import("x")`. Type-only
+ *  imports and exports are erased, so they are left out. */
 function imports(file: string): string[] {
   const text = readFileSync(file, "utf8");
-  return [...text.matchAll(/^\s*import\s+(?!type\b)[^;]*?from\s+["']([^"']+)["']/gm)].map((m) => m[1]);
+  const out: string[] = [];
+  for (const m of text.matchAll(/^\s*(?:import|export)\s+(?!type\b)[^;]*?\bfrom\s+["']([^"']+)["']/gm)) out.push(m[1]);
+  for (const m of text.matchAll(/^\s*import\s+["']([^"']+)["']/gm)) out.push(m[1]);
+  for (const m of text.matchAll(/\bimport\(\s*["']([^"']+)["']\s*\)/g)) out.push(m[1]);
+  return out;
+}
+
+/** Whether a specifier from `file` names `target` (repository-relative, no
+ *  extension), whatever relative form or extension it uses. */
+function names(file: string, spec: string, target: string): boolean {
+  if (!spec.startsWith(".")) return false;
+  const resolved = relative(ROOT, resolve(ROOT, file, "..", spec)).split("\\").join("/").replace(/\.[mc]?[jt]sx?$/, "");
+  return resolved === target;
 }
 
 const files = sources(SRC).map((f) => ({ file: relative(ROOT, f).split("\\").join("/"), specs: imports(f) }));
@@ -34,13 +48,14 @@ const files = sources(SRC).map((f) => ({ file: relative(ROOT, f).split("\\").joi
 describe("the engine aliases' specifiers", () => {
   it("only Simulation.ts imports ./sim/loop, and no app code reaches the loop another way", () => {
     expect(files.filter((f) => f.specs.includes("./sim/loop")).map((f) => f.file)).toEqual(["src/engine/Simulation.ts"]);
-    const other = files.filter((f) => f.file !== "src/engine/Simulation.ts" && f.specs.some((s) => /(^|\/)sim\/loop(\.ts)?$/.test(s) && s !== "./sim/loop"));
+    const other = files.filter((f) => f.specs.some((s) => names(f.file, s, "src/engine/sim/loop") && !(f.file === "src/engine/Simulation.ts" && s === "./sim/loop")));
     expect(other.map((f) => f.file)).toEqual([]);
   });
 
   it("only bootstrap.ts imports ./dualrun/dualRun as a value", () => {
     expect(files.filter((f) => f.specs.includes("./dualrun/dualRun")).map((f) => f.file)).toEqual(["src/bootstrap.ts"]);
-    const other = files.filter((f) => f.file !== "src/bootstrap.ts" && f.specs.some((s) => /(^|\/)dualRun(\.ts)?$/.test(s)));
+    // dualRunAbsent.ts imports the real module's types only, which are erased.
+    const other = files.filter((f) => f.specs.some((s) => names(f.file, s, "src/dualrun/dualRun") && !(f.file === "src/bootstrap.ts" && s === "./dualrun/dualRun")));
     expect(other.map((f) => f.file)).toEqual([]);
   });
 });

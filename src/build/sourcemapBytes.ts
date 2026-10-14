@@ -51,8 +51,9 @@ export function bytesBySource(code: string, map: { sources: string[]; mappings: 
     t.push(span);
   };
   const lines = code.split("\n");
+  const groups = map.mappings.split(";");
   let src = 0;
-  map.mappings.split(";").forEach((line, li) => {
+  groups.forEach((line, li) => {
     const textLine = lines[li] ?? "";
     let col = 0;
     const points: { col: number; source: number | null }[] = [];
@@ -69,5 +70,8 @@ export function bytesBySource(code: string, map: { sources: string[]; mappings: 
       add(p.source === null ? UNMAPPED : (map.sources[p.source] ?? UNMAPPED), textLine.slice(p.col, end));
     });
   });
+  // Lines past the last mappings group (the sourceMappingURL comment, say)
+  // have no segments at all.
+  for (let li = groups.length; li < lines.length; li++) add(UNMAPPED, lines[li]);
   return { bytes, text };
 }

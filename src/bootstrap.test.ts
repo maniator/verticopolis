@@ -25,7 +25,7 @@ vi.mock("./wasmhost/startWasmHost", async (importOriginal) => {
       if (wasmStub.module) return wasmStub.module;
       throw wasmStub.loadError ?? new Error("no package in this test");
     }),
-    startWasmHost: vi.fn(),
+    startWasmHost: vi.fn(() => ({ status: { engine: "wasm", starts: 1, hosted: true, errors: [] }, current: () => null, stop: () => {} })),
   };
 });
 import { startWasmHost } from "./wasmhost/startWasmHost";
@@ -354,6 +354,22 @@ describe("bootGame", () => {
       expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "no host" } });
       expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
       expect(encodeVctower).not.toHaveBeenCalled();
+    } finally {
+      setEngineWriter(null);
+      wasmStub.requested = "ts";
+      wasmStub.module = null;
+    }
+  });
+
+  it("records a switchable build's refused first tower as a fallback to TypeScript", async () => {
+    stubWebGL();
+    wasmStub.requested = "wasm";
+    wasmStub.module = { Engine: class {}, encodeVctower: vi.fn() };
+    vi.mocked(startWasmHost).mockImplementationOnce(() => ({ status: { engine: "wasm", starts: 0, hosted: false, errors: ["not hosting this tower: it has a crowd"] }, current: () => null, stop: () => {} }));
+    try {
+      await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+      expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "not hosting this tower: it has a crowd" } });
+      expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
     } finally {
       setEngineWriter(null);
       wasmStub.requested = "ts";

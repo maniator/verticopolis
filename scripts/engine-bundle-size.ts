@@ -45,6 +45,7 @@ const atBoot = wasmAtBoot ? [...initial, ...engine] : initial;
 
 // The TypeScript engine's share of the game JavaScript, from the sourcemaps.
 const ENGINE_SOURCE = /(^|\/)src\/engine\//;
+const PACKAGE_SOURCE = /(^|\/)node_modules\//;
 let mappedJs = 0;
 let engineJs = 0;
 const engineSpans: string[] = [];
@@ -54,7 +55,7 @@ for (const f of gameJs) {
   const { bytes, text } = bytesBySource(readFileSync(join(dir, f.path), "utf8"), JSON.parse(readFileSync(mapPath, "utf8")) as { sources: string[]; mappings: string });
   for (const [source, n] of bytes) {
     mappedJs += n;
-    if (ENGINE_SOURCE.test(source)) {
+    if (ENGINE_SOURCE.test(source) && !PACKAGE_SOURCE.test(source)) {
       engineJs += n;
       engineSpans.push(...(text.get(source) ?? []));
     }

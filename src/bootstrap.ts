@@ -168,11 +168,6 @@ export function bootGame(create: () => BootApp): Promise<void> {
       );
       return;
     }
-    // Start the gameplay session clock (foreground time + funnel state) only once
-    // we know the game will actually run: a no-WebGL visitor bails above, so its
-    // session never opens and can't dilute the length signal. Host-gated inside,
-    // like the page-view inject just above.
-    startGameplaySession();
     // The WASM engine is fetched before the app exists, so the first tower is
     // hosted before its first tick. A switchable build loads it only when asked
     // (`?engine=wasm`, or `vc.engine` in storage) and stays on the TypeScript
@@ -185,7 +180,14 @@ export function bootGame(create: () => BootApp): Promise<void> {
       __WASM_ONLY__ || engineRequested() === "wasm" ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: () => loadWasmEngine() }) : typescriptBoot();
     let bootState: EngineBootState = booted.state;
     publishBootState(bootState);
-    if (bootState.engine === "none" && bootState.failure) {
+    // Start the gameplay session clock (foreground time + funnel state) only once
+    // we know the game will actually run: a no-WebGL visitor bails above, and a
+    // wasm-only build whose engine did not load stops just below, so neither
+    // opens a session that would dilute the length signal. Host-gated inside,
+    // like the page-view inject above.
+    const engineless = bootState.engine === "none" && bootState.failure !== null;
+    if (!engineless) startGameplaySession();
+    if (engineless && bootState.failure) {
       showEngineFailure(bootState);
       // A fixed deploy is the way out of a broken or stale engine package:
       // with no tower running there is nothing to save, so take it at once.
@@ -210,8 +212,11 @@ export function bootGame(create: () => BootApp): Promise<void> {
         };
         let hosted = false;
         try {
-          startWasmHost(app as unknown as WasmHostApp, wasmModule, console, __WASM_ONLY__ ? { strict: true, onFatal: (m) => stopForEngine(starting ? "start" : "host", m) } : {});
-          hosted = true;
+          const handle = startWasmHost(app as unknown as WasmHostApp, wasmModule, console, __WASM_ONLY__ ? { strict: true, onFatal: (m) => stopForEngine(starting ? "start" : "host", m) } : {});
+          // A refused first tower: strict mode reported it through onFatal; a
+          // switchable build leaves it on TypeScript, recorded here (#874).
+          if (!handle.status.hosted && !bootState.failure) stopForEngine("start", handle.status.errors[handle.status.errors.length - 1] ?? "the host did not take the first tower");
+          hosted = handle.status.hosted;
         } catch (e) {
           stopForEngine("start", e instanceof Error ? e.message : String(e));
           console.error(__WASM_ONLY__ ? "[wasm] did not start, and this build has no other engine:" : "[wasm] did not start; running on the TypeScript engine:", e);

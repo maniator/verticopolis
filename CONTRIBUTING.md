@@ -106,7 +106,11 @@ Verticopolis has **two test tiers**:
     reads the emitted sourcemaps and fails when a TypeScript engine module
     that `scripts/engine-bundle.allow.txt` does not list ships, or when a
     listed one no longer does (delete its line: the list only shrinks). The
-    default build is unchanged (`VC_ENGINE` unset, or `switchable`). See
+    default build (`VC_ENGINE` unset, or `switchable`) keeps both engines;
+    like every player build, it no longer ships the dual-run worker, which
+    only dev serves and `VC_TOOLING=1` builds use. `VC_ENGINE` applies to
+    builds and dev serves only: with it exported, `npm test` refuses to start
+    (the WASM test lanes use `VC_REQUIRE_WASM=1`). See
     `docs/performance/wasm-only-bundle.md` for what still ships and why. Until the Rust engine is the default,
     every simulation change lands in both engines in one PR with
     the regenerated lock, and a PR that changes `src/engine/` without touching
