@@ -701,6 +701,10 @@ mod tests {
         let ids = scenarios(&dir).expect("scenario dir");
         let files = std::fs::read_dir(dir.join("scenarios"))
             .expect("scenario dir")
+            .filter(|e| {
+                e.as_ref()
+                    .is_ok_and(|e| e.path().extension().is_some_and(|x| x == "json"))
+            })
             .count();
         assert_eq!(ids.len(), files, "{ids:?}");
         let start = |id: &str| {

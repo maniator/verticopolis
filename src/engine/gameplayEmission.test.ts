@@ -58,7 +58,8 @@ describe("gameplay event buffer", () => {
     // The Rust crate's tests read nothing outside engine-rs/ and conformance/
     // (#980), so this side pins the two capacities together.
     const rust = readFileSync(resolve(root, "engine-rs/src/gameplay.rs"), "utf8");
-    expect(rust).toContain(`pub const GAMEPLAY_RING_CAP: usize = ${GAMEPLAY_RING_CAP};`);
+    const declared = /\bconst GAMEPLAY_RING_CAP\s*:\s*usize\s*=\s*([\d_]+)\s*;/.exec(rust)?.[1];
+    expect(declared?.replaceAll("_", "")).toBe(String(GAMEPLAY_RING_CAP));
   });
 
   it("inherits a replaced tower's owed events and drop count ahead of its own", () => {
