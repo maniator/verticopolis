@@ -67,8 +67,9 @@ jobs:
   #   guard watches), the render path (src/render/**), DOM chrome (src/ui/**,
   #   src/main.ts, styles, index.html), and the save-loading scenes (src/storage/**).
   #   So match all of src/, minus tests (the legacy src/tests/** home and the
-  #   colocated *.test.ts files), but re-include the fixtures the screenshot scenes
-  #   load (the migration scene reads a real save under src/tests/fixtures/**).
+  #   colocated *.test.ts files), but re-include the test fixtures
+  #   (src/tests/fixtures/**) and the saved towers (conformance/fixtures/**), so a
+  #   scene that loads one of them recaptures when it changes.
   #   Plus the generator, this workflow, the reusable capture, and the visual
   #   specs' harness (engine-parity-visual's inputs). The app version
   #   is deliberately NOT matched: the generator masks it to a fixed placeholder at
@@ -105,6 +106,7 @@ jobs:
             case "$f" in src/*) sign=+ ;; esac
             case "$f" in src/tests/*) sign=- ;; esac
             case "$f" in src/tests/fixtures/*) sign=+ ;; esac
+            case "$f" in conformance/fixtures/*) sign=+ ;; esac
             # Generator logic that lives beside its unit test (the ONLY filter,
             # the dialog phase watch) runs in every capture. The test files
             # themselves fall back out on the *.test.ts rule below, which only

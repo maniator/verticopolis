@@ -133,7 +133,7 @@ engine's key order, which every reader takes, and a string holding half a
 surrogate pair is written as U+FFFD where `JSON.stringify` writes the escape
 (the web game repairs such strings on load and on input, so its saves hold
 none). The Rust tests in `load.rs`
-round-trip every web-written fixture in `src/tests/fixtures/`, and
+round-trip every web-written fixture in `conformance/fixtures/`, and
 `src/tests/integration/conformanceWasmVctower.integration.test.ts` (part of
 `npm run test:wasm`) loads each fixture in the web game, writes it with the
 engine, checks the file against `SaveGame.export`'s and `toTowerFile`'s
@@ -323,5 +323,5 @@ this side, `stateView` on the TypeScript side) to find the field.
 
 A simulation change lands in both engines in the same pull request, with the
 regenerated `conformance/expected.json` (see `conformance/README.md`). CI runs
-the referee on every change to `engine-rs/`, `conformance/` or the save
-fixtures (`.github/workflows/engine-rs.yml`).
+the referee on every change to `engine-rs/` or `conformance/`, the save
+fixtures in `conformance/fixtures/` included (`.github/workflows/engine-rs.yml`).

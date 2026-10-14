@@ -45,7 +45,10 @@ A refactor that claims to change nothing must not touch `expected.json`.
 
 ## Fixtures the scenarios start from
 
-The `fixture` starts use the saves under `src/tests/fixtures/`. Four of them
+The `fixture` starts use the saves under `conformance/fixtures/`, named
+relative to the directory that holds `conformance/` (the root the runners
+resolve them against), so the suite needs nothing from the web game's tree.
+The web game's tests load the same files. Four of them
 are derived from the others by editing a few fields of the serialized game
 and nothing else, so a branch no real save reaches can be scripted:
 `sixseven-december` (the sixseven clock moved to early December, for the

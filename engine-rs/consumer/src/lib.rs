@@ -28,7 +28,7 @@ use verticopolis_engine::load::{
     mark_founder_from_loaded_file, stamp_save,
 };
 use verticopolis_engine::rent::BatchTarget;
-use verticopolis_engine::scenario::{run_scenario, Checkpoint, Scenario, Start};
+use verticopolis_engine::scenario::{run_scenario, Checkpoint, Scenario};
 use verticopolis_engine::sim::Simulation;
 use verticopolis_engine::snapshot::state_view;
 use verticopolis_engine::{export_tdt, import_tdt};
@@ -569,10 +569,12 @@ pub fn replay(conformance: &Path, id: &str) -> Result<usize, String> {
     Ok(want.len())
 }
 
-/// The ids of the scenarios that start from a new game, sorted. The other
-/// scenarios start from save fixtures that live in the web game's test tree
-/// (stage 3 of #980 moves them under `conformance/`).
-pub fn new_game_scenarios(conformance: &Path) -> Result<Vec<String>, String> {
+/// The ids of every scenario in the suite, sorted, each parsed so a broken
+/// file fails here. Some start from a new game and some from a save under
+/// `conformance/fixtures/`; a scenario names its fixture relative to the
+/// directory that holds `conformance/`, which is the root `replay` hands the
+/// runner.
+pub fn scenarios(conformance: &Path) -> Result<Vec<String>, String> {
     let dir = conformance.join("scenarios");
     let entries =
         std::fs::read_dir(&dir).map_err(|e| format!("cannot read {}: {e}", dir.display()))?;
@@ -586,9 +588,8 @@ pub fn new_game_scenarios(conformance: &Path) -> Result<Vec<String>, String> {
             continue;
         }
         let text = std::fs::read_to_string(&p).map_err(|e| e.to_string())?;
-        if matches!(Scenario::parse(&text)?.start, Start::NewGame { .. }) {
-            ids.push(id.to_string());
-        }
+        Scenario::parse(&text).map_err(|e| format!("{id}: {e}"))?;
+        ids.push(id.to_string());
     }
     ids.sort();
     Ok(ids)
@@ -598,6 +599,7 @@ pub fn new_game_scenarios(conformance: &Path) -> Result<Vec<String>, String> {
 mod tests {
     use super::*;
     use std::path::PathBuf;
+    use verticopolis_engine::scenario::Start;
 
     /// `VC_CONFORMANCE`, or the suite beside this crate in the repository.
     /// CI sets it when it runs a copy of this crate from outside the
@@ -694,17 +696,30 @@ mod tests {
     }
 
     #[test]
-    fn the_new_game_scenarios_are_found() {
-        let ids = new_game_scenarios(&conformance_dir()).expect("scenario dir");
-        assert!(ids.contains(&"starter-classic".to_string()), "{ids:?}");
-        let files = std::fs::read_dir(conformance_dir().join("scenarios"))
+    fn every_scenario_is_found_both_kinds_included() {
+        let dir = conformance_dir();
+        let ids = scenarios(&dir).expect("scenario dir");
+        let files = std::fs::read_dir(dir.join("scenarios"))
             .expect("scenario dir")
             .count();
-        assert!(
-            ids.len() > 1 && ids.len() < files,
-            "some scenarios start from a fixture: {} of {files}",
-            ids.len()
-        );
+        assert_eq!(ids.len(), files, "{ids:?}");
+        let start = |id: &str| {
+            let text = std::fs::read_to_string(dir.join("scenarios").join(format!("{id}.json")))
+                .expect("scenario");
+            Scenario::parse(&text).expect("parses").start
+        };
+        assert!(ids
+            .iter()
+            .any(|id| matches!(start(id), Start::NewGame { .. })));
+        assert!(ids
+            .iter()
+            .any(|id| matches!(start(id), Start::Fixture { .. })));
+    }
+
+    #[test]
+    fn a_fixture_scenario_matches_the_lock() {
+        let n = replay(&conformance_dir(), "star-climb-classic").expect("star-climb-classic");
+        assert!(n > 1);
     }
 
     #[test]

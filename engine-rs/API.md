@@ -13,17 +13,18 @@ below. The `consumer` job in `.github/workflows/engine-rs.yml` runs in the
 official Rust container image, which has no Node.js, from a checkout
 holding only `engine-rs/` and `conformance/`. It copies `consumer/` out of
 the checkout and builds, tests and runs the copy there, depending on the
-engine by an absolute path. The plan this page belongs to is issue #980.
+engine by an absolute path. The same job runs the engine's own tests and
+the full referee from that checkout. The plan this page belongs to is issue
+#980.
 
-What that proves today: the engine builds and runs with no web game and no
-Node.js, and a crate in another directory, reaching this repository only
-through its dependency line and the conformance directory it is given, can
-drive it and replay the conformance
-scenarios that start from a new game. What it does not prove yet: a
-registry or packaged release (the crate reads `../conformance/` at compile
-time, so it needs the repository beside it; #893), or the scenarios that
-start from a save fixture, which still live in `src/tests/fixtures/`
-(stage 3 of #980).
+What that proves today: the engine builds, passes its tests and runs with
+no web game and no Node.js, and a crate in another directory, reaching this
+repository only through its dependency line and the conformance directory
+it is given, can drive it and replay every conformance scenario, the ones
+that start from a saved tower (`conformance/fixtures/`) included. What it
+does not prove yet: a registry or packaged release (the crate reads
+`../conformance/` at compile time, so it needs the repository beside it;
+#893).
 
 ## Depending on the engine
 
@@ -87,7 +88,7 @@ conformance.
 | Save | `load::encode_simulation_vctower(&sim, app_version, saved_at_ms)`: the `.vctower` bytes the web game writes. A host that holds the save JSON (`sim.serialize()`) gets the same file from `load::stamp_save(&mut save, app_version, saved_at_ms)` then `load::encode_vctower(&save)` |
 | Load | `load::decode_vctower(text)`, then `load::deserialize(&save)`, then `load::mark_founder_from_loaded_file(&mut sim, &save)`, which marks a file with no build stamp as a founder's tower the way the web game does (skip it and a host drops that status on its next save) |
 | 1994 saves | `import_tdt(bytes, filename)` and `export_tdt(save_json)` |
-| Conformance (tier 2) | `scenario::Scenario::parse` and `scenario::run_scenario`, compared with `expected.json` (as `consumer/` does for every scenario that starts from a new game), or `cargo run --bin conformance` from this directory for the whole suite |
+| Conformance (tier 2) | `scenario::Scenario::parse` and `scenario::run_scenario`, compared with `expected.json` (as `consumer/` does for every scenario), or `cargo run --bin conformance` from this directory for the whole suite |
 
 Two behaviors a host should know:
 
@@ -121,7 +122,6 @@ Two behaviors a host should know:
   without charging; they exist to replay another engine's edits) or writing
   a field skips the rules a command applies, and any of them can change in
   any commit.
-- **Not covered yet** (stages in #980): the fixtures 15 of the 22
-  scenarios start from live in `src/tests/fixtures/`, the tiers are stated
-  here and not yet enforced in code, and the fixed-step driver the web host
-  uses is TypeScript (#867).
+- **Not covered yet** (stages in #980): the tiers are stated here and not
+  yet enforced in code, and the fixed-step driver the web host uses is
+  TypeScript (#867).

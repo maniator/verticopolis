@@ -35,7 +35,6 @@ on:
       - "src/tests/fixtures/tdtBuilder.ts"
       - "src/tests/fixtures/tdtImportCases.ts"
       - "src/tests/fixtures/tdtExportCases.ts"
-      - "src/tests/fixtures/*.vctower"
       - "scripts/wasm-build.ts"
       - "scripts/engine-third-party.ts"
       - "scripts/license-files.ts"
@@ -74,7 +73,6 @@ on:
       - "src/tests/fixtures/tdtBuilder.ts"
       - "src/tests/fixtures/tdtImportCases.ts"
       - "src/tests/fixtures/tdtExportCases.ts"
-      - "src/tests/fixtures/*.vctower"
       - "scripts/wasm-build.ts"
       - "scripts/engine-third-party.ts"
       - "scripts/license-files.ts"
@@ -96,12 +94,13 @@ jobs:
   # engine-rs/ and conformance/. engine-rs/consumer/ is then copied out of
   # the checkout and built there against the engine by an absolute path, the
   # way a crate in its own repository would depend on a local clone, and it
-  # lints, tests, runs the smoke and replays every scenario that starts from
-  # a new game (API.md). What this proves and what it does not: the engine
-  # builds and runs with no web game and no Node.js, from a crate outside
-  # the tree; it does not prove a packaged or registry release, which needs
-  # the conformance files inside the crate first (#893). The scenarios that
-  # start from a save fixture need src/tests/fixtures/ until stage 3 of #980.
+  # lints, tests, runs the smoke and replays every scenario of the lock
+  # (API.md). The engine's own tests and the full referee also run from the
+  # sparse checkout, the save fixtures included (conformance/fixtures/). What
+  # this proves and what it does not: the engine builds, tests and runs with
+  # no web game and no Node.js, from a crate outside the tree; it does not
+  # prove a packaged or registry release, which needs the conformance files
+  # inside the crate first (#893).
   consumer:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -148,6 +147,15 @@ jobs:
       - name: The engine library builds alone
         working-directory: engine-rs
         run: cargo build --locked --lib
+
+      # Every crate test and every scenario of the lock, from a checkout that
+      # holds no web game: the tests and the referee read nothing outside
+      # engine-rs/ and conformance/.
+      - name: The engine's tests and the full referee, without the web game
+        working-directory: engine-rs
+        run: |
+          cargo test --locked
+          cargo run --locked --release --bin conformance
 
       - name: The consumer, in place
         working-directory: engine-rs/consumer
