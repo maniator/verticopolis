@@ -122,19 +122,24 @@ describe("the recycling center's depth split", () => {
   it("paints its curb and gauge as shell art among the furniture", () => {
     const job = roomJobs().find((j): j is StillJob => j.type === "still" && (j.paint as UnitPaint).kind === "recycling" && j.layers === true && j.chains !== undefined);
     expect(job).toBeDefined();
-    const seen: string[] = [];
-    withLayerHook(
-      {
-        shellEnd: () => seen.push("break"),
-        furnitureEnd: () => seen.push("end"),
-        shellPaint: (_ctx, draw) => {
-          seen.push("shell");
-          draw();
+    // The frame and every fill step, the full one (with its FULL cue) too.
+    const steps = [job!.paint, ...job!.chains!.fill.steps];
+    expect(steps.some((p) => (p as UnitPaint).recycleFill === 1)).toBe(true);
+    for (const spec of steps) {
+      const seen: string[] = [];
+      withLayerHook(
+        {
+          shellEnd: () => seen.push("break"),
+          furnitureEnd: () => seen.push("end"),
+          shellPaint: (_ctx, draw) => {
+            seen.push("shell");
+            draw();
+          },
         },
-      },
-      () => paint(sinkCtx(), job!.paint, job!.w, job!.h),
-    );
-    expect(seen.join()).toBe("break,shell,shell,end");
+        () => paint(sinkCtx(), spec, job!.w, job!.h),
+      );
+      expect(seen.join()).toBe("break,shell,shell,end");
+    }
   });
 });
 

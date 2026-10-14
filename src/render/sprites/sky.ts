@@ -56,7 +56,8 @@ export function cloudMotion(seed: number): { speed: number; row: number; offset:
 }
 
 /** The sun's arc from `rise` to `set` (the moon takes the same arc through the
- *  night): at fraction p of it, the disc's center sits at x `p * viewWidth`
+ *  night, from `set` to the next `rise`): at fraction p of its stretch, the
+ *  disc's center sits at x `p * viewWidth`
  *  and y `viewHeight * baseY - sin(p * PI) * viewHeight * lift`. */
 export const SUN_ARC = { rise: 6, set: 18, baseY: 0.62, lift: 0.5 } as const;
 

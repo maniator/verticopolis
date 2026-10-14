@@ -16,8 +16,8 @@
  *
  * A mark reads the canvas as it stands, so it is safe under a transform (the
  * mirrored layouts call it inside `maybeMirrored`): the hook ignores the
- * transform. Do not mark inside a clip narrower than the room: the bake puts
- * the shell back only inside the clip active at the end mark.
+ * transform. Do not mark, or call {@link layerShell}, inside a clip narrower
+ * than the room: the bake copies the shell only inside the clip active then.
  */
 
 export interface LayerHook {
@@ -49,7 +49,9 @@ export function layerEnd(ctx: CanvasRenderingContext2D): void {
  *  curb over the machines standing on it, a wall gauge drawn late), between
  *  {@link layerBreak} and {@link layerEnd}. In the game it just calls `draw`,
  *  so the pixels are the routine's own; the atlas bake also paints it on the
- *  shell picture, and over the soft furniture only where that has pixels. */
+ *  shell picture, and cuts it out of the soft furniture.
+ *  The bake runs `draw` more than once, so it must only paint: no random
+ *  draws, no state the rest of the routine reads. */
 export function layerShell(ctx: CanvasRenderingContext2D, draw: () => void): void {
   if (hook?.shellPaint) hook.shellPaint(ctx, draw);
   else draw();

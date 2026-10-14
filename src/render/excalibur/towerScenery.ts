@@ -5,6 +5,7 @@ import { FLOOR, TILE } from "../scale";
 import {
   ROUNDABOUT_START,
   SCENERY,
+  SKYLINE_FILLS,
   apronRange,
   plantRect,
   plantSpots,
@@ -317,7 +318,7 @@ function rebuildSeeded(engine: TowerEngine, rec: SceneryRec, seed: number): void
         ctx.fillRect(0, 0, 2, 2);
       },
     });
-  const fills: [ex.Canvas, ex.Canvas] = [sharedFill("rgba(70, 86, 120, 0.55)"), sharedFill("rgba(52, 66, 96, 0.75)")];
+  const fills: [ex.Canvas, ex.Canvas] = [sharedFill(SKYLINE_FILLS[0]), sharedFill(SKYLINE_FILLS[1])];
   for (const r of skylineRects(seed)) {
     const h = r.hFloors * FLOOR;
     const a = new ex.Actor({

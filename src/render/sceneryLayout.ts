@@ -78,6 +78,9 @@ export interface SkylineBand {
   hFloors: { base: number; span: number; key: number };
 }
 
+/** Skyline fills, far band then near: translucent, so overlaps deepen. */
+export const SKYLINE_FILLS = ["rgba(70, 86, 120, 0.55)", "rgba(52, 66, 96, 0.75)"] as const;
+
 export const SKYLINE_BANDS: readonly SkylineBand[] = [
   { depth: 0, start: 0, step: 16, w: { base: 9, span: 8, key: 1 }, hFloors: { base: 10, span: 26, key: 3 } },
   { depth: 1, start: 5, step: 23, w: { base: 12, span: 10, key: 7 }, hFloors: { base: 5, span: 13, key: 13 } },

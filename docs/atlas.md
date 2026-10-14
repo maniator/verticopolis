@@ -308,8 +308,8 @@ entrance art (`src/render/pixelSprites/layers.ts`): one call where the shell
 ends and, in a room that draws over its furniture, one where the furniture
 ends and the marks drawn over it begin. A routine that draws some of its
 shell late, over furniture already in place, wraps that art in a third call
-(the recycling center's deck curb and wall gauge). In the game all three only
-draw what the routine draws. The
+(the recycling center's deck curb and wall gauge). In the game the first two
+do nothing and the third only runs its draw, once. The
 export paints each split frame (and each occupant step) again with the marks
 live and records the canvas at them, once for the exact split and once more
 for the soft furniture; the flat frame comes from the ordinary paint, so
@@ -330,9 +330,8 @@ security, medical center, housekeeping, party hall, wedding hall, aquatic
 center, metro station, recycling center, parking ramp and parking space. The
 recycling center's chain is its `fill`: the wall gauge (and its FULL cue)
 changes on the shell, the day's pile in front. The deck curb and the gauge
-draw after the machines, as the game draws them, and land on the shell, so
-the curb covers the machines' contact shadows in the furniture's pixels and
-stays whole on the shell. The parking ramp's furniture is
+draw after the machines, as the game draws them, and land on the shell; the
+furniture stops at the curb, which stays whole on the shell. The parking ramp's furniture is
 the car parked at its foot. A parking space's shell is the whole bay and its
 furniture list is empty: its car comes as a `car<i>` overlay (and a dead
 space's red X as `dead`), which draws in front of everything.
@@ -472,7 +471,8 @@ tree otherwise. It stands on tile `t + floor(hash01(seed + t * jitter.key) *
 jitter.span) + jitter.min`, scaled `scale.base + hash01(seed + t * scale.key) *
 scale.span`. Its canvas is `round(size.tiles * tileW * scale)` wide and
 `round(size.floors * floorH * scale)` tall (`plants.size`, by kind), centered on
-the tile's left edge (x `tile * tileW - w / 2`, which can land on a half pixel),
+the tile's left edge (x `tile * tileW - w / 2`, which can land on a half pixel;
+the game does not snap it, and draws with nearest sampling),
 with its bottom edge at `bottomY` (its last row one above). The game paints a
 plant at that size, `w` by `h`, with `plants.paint` (rectangles filled in
 order, `round` and `ceil` as in JavaScript):
@@ -504,12 +504,13 @@ world, in this order:
 2. The sun (`sky/sun`) from `sun.rise` (inclusive) to `sun.set` (exclusive),
    and the moon (`sky/moon`) for the rest of the day, along the same arc. With
    the time as `hour + minute / 60`, at fraction `p` of its stretch (the day
-   from rise to set, or the night from set to rise) the disc's anchor is at x
+   from rise to set, or the night from set to rise) the disc's center (the
+   frame's `anchor`) is at x
    `p * viewW` and y `viewH * baseY - sin(p * PI) * viewH * lift`.
-3. The clouds, whenever the weather is not clear: the engine's `cloudy` uses
-   the `sky/cloud/overcast/<i>` frames and `rain` the `sky/cloud/rain/<i>`
-   ones, one per entry in `clouds.list`. At `t` seconds of the game's
-   animation clock (never negative), cloud `i`'s anchor is at x `((offset %
+3. The clouds, on cloudy and rainy days: `clouds.weathers` maps the engine's
+   weather (`cloudy` or `rain`) to its frames, `sky/cloud/<frames>/<i>`, one
+   per entry in `clouds.list`. At `t` seconds of the game's animation clock
+   (never negative), cloud `i`'s frame `anchor` is at x `((offset %
    (viewW + pad)) + t * speed) % (viewW + pad) - pad / 2` and y `viewH * top +
    row * viewH * band`, with `%` the floating-point remainder.
 
@@ -528,7 +529,8 @@ the sky, the two skyline bands, the dirt and ground line, the ground strip,
 the ground runs and roundabout, the props and plants, the fire escapes and
 crane, the floor and lobby tiles, the rooms, the ambient walkers, the burning
 and unbuilt rooms, the parking ramp's cars, the metro train and garbage truck,
-the shafts and stairs, the cabs, the commuting crowd and the overlays. Things
+the shafts and stairs, the cabs, the commuting crowd and the overlays (the
+rain draws there, in front of everything). Things
 on one plane draw in the order the game adds them. People appear on two
 planes: the walkers pacing the floors and lobby, and the crowd in front of
 them, which is every commuter the engine moves, the people waiting at an

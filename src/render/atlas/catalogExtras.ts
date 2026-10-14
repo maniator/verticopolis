@@ -1,4 +1,5 @@
 import { FACILITIES, isElevatorKind } from "../../engine/facilities";
+import { SKYLINE_FILLS } from "../sceneryLayout";
 import type { FacilityKind } from "../../engine/types";
 import type { PersonBuild } from "../pixelSprites/common";
 import { BUILDS as FIGURE_BUILDS, SHIRTS, moodTint } from "../pixelSprites/common";
@@ -188,7 +189,7 @@ export function vehicleJobs(): Job[] {
 }
 
 /** Skyline fills (`excalibur/towerScenery.ts`): far, then near. */
-export const SKYLINE_FILLS = ["rgba(70, 86, 120, 0.55)", "rgba(52, 66, 96, 0.75)"];
+export { SKYLINE_FILLS } from "../sceneryLayout";
 
 /** Columns in the sky strip: one per quarter hour. */
 export const SKY_COLUMNS = 96;

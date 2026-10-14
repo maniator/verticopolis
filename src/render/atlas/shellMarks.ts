@@ -20,15 +20,18 @@ export function shellMarks(
   let broke = false;
   let ended = false;
   let endedFlat = false;
+  let inShell = false;
   return {
     hook: {
       shellEnd() {
+        if (inShell) throw new LayerError("a layer mark inside layerShell");
         if (broke) throw new LayerError("two layer breaks in one paint");
         if (endedFlat) throw new LayerError("a layer break after a layer end");
         broke = true;
         save();
       },
       furnitureEnd() {
+        if (inShell) throw new LayerError("a layer mark inside layerShell");
         if (ended) return; // a routine's own end, then its wrapper's: the first counts
         if (!broke) {
           endedFlat = true;
@@ -40,8 +43,14 @@ export function shellMarks(
       // Shell art drawn among the furniture: before the break or after the
       // end it is on the shell already.
       shellPaint(_ctx, draw) {
-        if (broke && !ended) onShell(draw);
-        else draw();
+        if (inShell) throw new LayerError("a layerShell inside layerShell");
+        inShell = true;
+        try {
+          if (broke && !ended) onShell(draw);
+          else draw();
+        } finally {
+          inShell = false;
+        }
       },
     },
     /** Call when the paint returns: true when it split. */

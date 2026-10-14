@@ -126,11 +126,11 @@ export function canvasRenderer(doc: Document): Renderer {
           ctx.globalCompositeOperation = "source-atop";
         };
       };
-      // Shell art among the furniture lands only on the furniture's pixels,
-      // as the marks after the end do.
+      // Shell art among the furniture belongs to the shell, so here it only
+      // cuts away the furniture it covers (the curb over the machines' feet).
       const onShell = (draw: () => void) => {
         const prev = ctx.globalCompositeOperation;
-        ctx.globalCompositeOperation = "source-atop";
+        ctx.globalCompositeOperation = "destination-out";
         draw();
         ctx.globalCompositeOperation = prev;
       };

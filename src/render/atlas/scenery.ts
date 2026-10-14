@@ -1,4 +1,5 @@
 import { GRID } from "../../engine/facilities";
+import type { WeatherKind } from "../../engine/types";
 import { FLOOR, TILE } from "../scale";
 import {
   APRON_PAD_TILES,
@@ -222,17 +223,20 @@ export function sceneryData() {
   };
 }
 
-/** The sun's arc and the clouds' drift (`towerScene.ts`), in the game's own
- *  terms. Both are drawn in screen space, sized to the view. */
+/** The sky's background, the sun's arc, the clouds' drift and the rain
+ *  (`towerScene.ts`, `towerOverlay.ts`), in the game's own terms, all drawn in
+ *  screen space, sized to the view. */
 export function skyData() {
   return {
-    // The view's background is data.skyColors[floor(hour) * 4], the color of
-    // the whole game hour; the sun or moon draws over it, then the clouds.
+    // The view's background is data.skyColors[floor(hour) * columnsPerHour],
+    // the color of the whole game hour; the sun or moon draws over it, then
+    // the clouds.
     background: { columnsPerHour: SKY_COLUMNS / 24 },
     sun: { ...SUN_ARC, day: "sky/sun", night: "sky/moon" },
     clouds: {
       ...CLOUD_DRIFT,
-      weathers: ["overcast", "rain"],
+      // The engine's weather to the cloud frames it shows (clear shows none).
+      weathers: { cloudy: "overcast", rain: "rain" } satisfies Record<Exclude<WeatherKind, "clear">, string>,
       list: Array.from({ length: CLOUD_COUNT }, (_, i) => ({ frame: i, ...cloudMotion(cloudSeed(i)) })),
     },
     // Drawn over the whole view, in front of the world, on rainy days.
