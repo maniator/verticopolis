@@ -1,9 +1,9 @@
 //! `cargo run` prints one smoke run and replays every scenario of the
 //! conformance suite, those that start from a save fixture included. The
-//! suite's directory is
-//! the first argument; without one it is `../../conformance` from this
-//! crate's source directory, a path fixed at build time, so pass it when the
-//! binary runs anywhere else. Exits 1 on any failure.
+//! suite's directory is the first argument; without one it is
+//! `../../conformance` from this crate's source directory, a path fixed at
+//! build time, so pass it when the binary runs anywhere else. Exits 1 on any
+//! failure.
 
 use std::path::PathBuf;
 use std::process::exit;
