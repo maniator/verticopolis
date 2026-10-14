@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CHECKPOINT_META, CHECKPOINT_RUNS, loadCheckpoint, makeConfig, outputDir, packageErrors, parseArgs, stampErrors } from "./main";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { packageState, type PackageState } from "./env";
 import { processRun } from "./fixtures";
 import { engineOrder, frameSummary, stepSummary } from "./runner";
 
@@ -124,16 +128,70 @@ describe("loadCheckpoint", () => {
 
 describe("packageErrors", () => {
   const files = { "verticopolis_engine_bg.wasm": "a", "verticopolis_engine.js": "b" };
-  const env = { engineBuildHash: "h", engineSourceHash: "h", enginePackage: files };
-  it("passes one package built from the current sources and served by both builds", () => {
-    expect(packageErrors(env, "h", { ...files })).toEqual([]);
+  const build = (over: Partial<PackageState> = {}): PackageState => ({ files: { ...files }, buildHash: "h", buildProblem: null, ...over });
+  it("passes one whole package built from the current sources and served by both builds", () => {
+    expect(packageErrors(build(), build(), "h")).toEqual([]);
+    // The same digests in another key order are the same package.
+    expect(packageErrors(build(), build({ files: { "verticopolis_engine.js": "b", "verticopolis_engine_bg.wasm": "a" } }), "h")).toEqual([]);
   });
-  it("fails closed on every way the served package can drift from the sources", () => {
-    expect(packageErrors({ ...env, engineSourceHash: "other" }, "h", files)).toEqual([expect.stringMatching(/was not built from the current engine-rs sources \(other\)/)]);
-    expect(packageErrors({ ...env, engineBuildHash: null }, null, files)).toEqual([expect.stringMatching(/has no BUILD.json/)]);
-    expect(packageErrors({ ...env, engineSourceHash: null }, "h", files)).toEqual([expect.stringMatching(/no engine-rs sources in this checkout/)]);
-    expect(packageErrors(env, "stale", files)).toEqual([expect.stringMatching(/dist\/ \(sizes\) and dist-perf\/ \(timings\) carry different engine packages \(stale vs h\)/)]);
-    expect(packageErrors(env, "h", { ...files, "verticopolis_engine_bg.wasm": "rebuilt" })).toEqual([expect.stringMatching(/serve different engine bytes/)]);
-    expect(packageErrors({ ...env, enginePackage: {} }, "h", {})).toEqual([expect.stringMatching(/serves no engine package/)]);
+  it.each<[string, PackageState, PackageState, string | null, RegExp[]]>([
+    ["built from other sources", build({ buildHash: "old" }), build({ buildHash: "old" }), "h", [/was not built from the current engine-rs sources \(h\)/]],
+    ["no BUILD.json", build({ buildHash: null, buildProblem: "has no BUILD.json" }), build({ buildHash: null, buildProblem: "has no BUILD.json" }), "h", [/\(dist-perf\/\) has no BUILD.json/, /the sizes build \(dist\/\) has no BUILD.json too/]],
+    ["a BUILD.json with no sources hash", build({ buildHash: null, buildProblem: "has a BUILD.json with no sources hash" }), build(), "h", [/has a BUILD.json with no sources hash/, /carry different engine packages \(h vs none: dist-perf\/ has a BUILD.json with no sources hash\)/]],
+    ["no engine-rs sources", build(), build(), null, [/no engine-rs sources in this checkout/]],
+    ["no sources and no BUILD.json", build({ buildHash: null, buildProblem: "has no BUILD.json" }), build({ buildHash: null, buildProblem: "has no BUILD.json" }), null, [/no engine-rs sources/, /\(dist-perf\/\) has no BUILD.json/, /the sizes build \(dist\/\) has no BUILD.json too/]],
+    ["dist/ built from another package", build(), build({ buildHash: "stale" }), "h", [/dist\/ \(sizes\) and dist-perf\/ \(timings\) carry different engine packages \(stale vs h\)/]],
+    ["dist/ with an unreadable BUILD.json", build(), build({ buildHash: null, buildProblem: "has a BUILD.json that is not JSON" }), "h", [/\(none: dist\/ has a BUILD.json that is not JSON vs h\)/]],
+    ["a rebuilt binary in one build", build(), build({ files: { ...files, "verticopolis_engine_bg.wasm": "rebuilt" } }), "h", [/serve different engine bytes/]],
+    ["no package in either build", build({ files: {} }), build({ files: {} }), "h", [/dist-perf\/ serves no engine package/, /dist\/ serves no engine package/]],
+    ["no package in dist/ only", build(), build({ files: {} }), "h", [/dist\/ serves no engine package/, /serve different engine bytes/]],
+    ["a package missing its loader in both builds", build({ files: { "verticopolis_engine_bg.wasm": "a" } }), build({ files: { "verticopolis_engine_bg.wasm": "a" } }), "h", [/dist-perf\/ serves an incomplete engine package \(missing or unreadable: verticopolis_engine.js\)/, /dist\/ serves an incomplete engine package/]],
+    ["a null hash with no recorded reason", build({ buildHash: null }), build({ buildHash: null }), "h", [/\(dist-perf\/\) has no source hash/, /the sizes build \(dist\/\) has no source hash too/]],
+    ["two builds with different BUILD.json problems", build({ buildHash: null, buildProblem: "has no BUILD.json" }), build({ buildHash: null, buildProblem: "has a BUILD.json that is not JSON" }), "h", [/\(dist-perf\/\) has no BUILD.json/, /the sizes build \(dist\/\) has a BUILD.json that is not JSON; rebuild/]],
+  ])("fails closed on %s", (_name, perf, prod, sourceHash, expected) => {
+    expect(packageErrors(perf, prod, sourceHash)).toEqual(expected.map((r) => expect.stringMatching(r)));
+  });
+  it("after the runs, fails a package that changed since it was recorded", () => {
+    expect(packageErrors(build(), build(), "h", { files: { ...files }, buildHash: "h" })).toEqual([]);
+    const rebuilt = { ...files, "verticopolis_engine_bg.wasm": "other" };
+    expect(packageErrors(build({ files: rebuilt }), build({ files: rebuilt }), "h", { files: { ...files }, buildHash: "h" })).toEqual([expect.stringMatching(/changed during the run/)]);
+    expect(packageErrors(build(), build(), "h", { files: { ...files }, buildHash: "old" })).toEqual([expect.stringMatching(/changed during the run \(recorded .* with old, now .* with h\)/)]);
+  });
+});
+
+describe("packageState", () => {
+  let dir = "";
+  let engine = "";
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "perf-pkg-"));
+    engine = join(dir, "engine");
+    mkdirSync(engine);
+    writeFileSync(join(engine, "verticopolis_engine_bg.wasm"), "w");
+    writeFileSync(join(engine, "verticopolis_engine.js"), "j");
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+  it("reads a whole package and its source hash", () => {
+    writeFileSync(join(engine, "BUILD.json"), '{"sources":"abc"}');
+    const s = packageState(dir);
+    expect(Object.keys(s.files).sort()).toEqual(["verticopolis_engine.js", "verticopolis_engine_bg.wasm"]);
+    expect(s).toMatchObject({ buildHash: "abc", buildProblem: null });
+  });
+  it("names why there is no source hash, never throwing", () => {
+    writeFileSync(join(engine, "BUILD.json"), "{trunc");
+    expect(packageState(dir)).toMatchObject({ buildHash: null, buildProblem: "has a BUILD.json that is not JSON" });
+    writeFileSync(join(engine, "BUILD.json"), '{"other":1}');
+    expect(packageState(dir)).toMatchObject({ buildHash: null, buildProblem: "has a BUILD.json with no sources hash" });
+    writeFileSync(join(engine, "BUILD.json"), "null");
+    expect(packageState(dir)).toMatchObject({ buildHash: null, buildProblem: "has a BUILD.json with no sources hash" });
+    rmSync(join(engine, "BUILD.json"));
+    expect(packageState(dir)).toMatchObject({ buildHash: null, buildProblem: "has no BUILD.json" });
+    mkdirSync(join(engine, "BUILD.json"));
+    expect(packageState(dir)).toMatchObject({ buildHash: null, buildProblem: "has a BUILD.json that cannot be read" });
+    expect(packageState(join(dir, "nowhere"))).toEqual({ files: {}, buildHash: null, buildProblem: "has no BUILD.json" });
+  });
+  it("leaves an unreadable package file out instead of throwing", () => {
+    rmSync(join(engine, "verticopolis_engine.js"));
+    mkdirSync(join(engine, "verticopolis_engine.js"));
+    expect(Object.keys(packageState(dir).files)).toEqual(["verticopolis_engine_bg.wasm"]);
   });
 });

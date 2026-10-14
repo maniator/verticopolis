@@ -159,6 +159,9 @@ export interface MetricRow {
   /** The repetition each value came from, parallel to `values`. */
   reps: number[];
   summary: Summary | null;
+  /** Why the two engines' values are not compared (no ratio, no verdict);
+   *  the report lists such a metric per engine. */
+  noVerdict?: string;
 }
 
 export interface Comparison {

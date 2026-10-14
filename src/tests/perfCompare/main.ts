@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, truncateSy
 import { join, resolve } from "node:path";
 import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
-import { buildTree, collectEnvironment, engineBuildHash, enginePackageDigests, type Environment } from "./env";
+import { buildTree, collectEnvironment, ENGINE_PACKAGE_FILES, packageState, type Environment, type PackageState } from "./env";
 import { aggregate, compareEngines, missingSamples } from "./metrics";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, preThree, rawCsv, summaryCsv } from "./report";
@@ -142,6 +142,10 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const config = makeConfig(args, scenarios.map((s) => s.name));
   const sourceHash = existsSync(join(repo, "engine-rs/src")) ? engineSourceHash(join(repo, "engine-rs")) : null;
   const environment = collectEnvironment(repo, distPerf, sourceHash);
+  // Fail closed before measuring anything: a run on a package that cannot
+  // be tied to these sources would spend hours on numbers that cannot pass.
+  const packageProblems = packageErrors(packageState(distPerf), packageState(dist), sourceHash);
+  if (packageProblems.length) throw new Error(`the engine package cannot be tied to this tree:\n  - ${packageProblems.join("\n  - ")}`);
 
   // The results folder is chosen up front: every finished process run is
   // checkpointed into it, so a run cut short (a killed shell, a restarted
@@ -212,7 +216,9 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   }
 
   const validation = validateResults(config, runs, nodeChecks);
-  for (const e of packageErrors(environment, engineBuildHash(dist), enginePackageDigests(dist))) validation.errors.push(e);
+  // Checked again after the runs, against the package recorded before them
+  // (the two ends only).
+  for (const e of packageErrors(packageState(distPerf), packageState(dist), sourceHash, { files: environment.enginePackage, buildHash: environment.engineBuildHash })) validation.errors.push(e);
   if (environment.commit === "unknown") validation.errors.push("the commit could not be read (git failed), so the results cannot be tied to a tree");
   if (environment.mainCommit && !environment.mainFetched) validation.warnings.push(`origin/main could not be fetched just now, so ${environment.mainCommit} is the ref as last fetched and may not be the latest main`);
   if (!environment.mainCommit) validation.warnings.push("origin/main is unknown here (no remote or no fetch), so whether this is a baseline of the latest main was not checked");
@@ -269,27 +275,35 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
 }
 
 /**
- * The engine package checks, all fail-closed: a run whose served package
- * cannot be tied to the current engine-rs sources, or whose two builds
- * (dist/ for sizes, dist-perf/ for timings) carry different engine bytes,
- * fails validation. `prodHash` and `prodFiles` describe dist/; the
- * environment describes dist-perf/ and the sources. A checkout without
- * engine-rs sources fails too, since then nothing proves which engine ran.
+ * The engine package checks, all fail-closed. `perf` is dist-perf/ (the
+ * timed build), `prod` is dist/ (the sizes), `sourceHash` the current
+ * engine-rs sources' hash. Each build must hold the whole package, both
+ * builds must serve the same bytes, and the timed build's BUILD.json must
+ * record these sources. BUILD.json records the sources, not the binary's
+ * bytes, so these checks tie the package to the sources only as far as the
+ * build that wrote it was honest. A checkout without engine-rs sources
+ * fails, since then nothing proves which engine ran. `recorded`, given after
+ * the runs, is the package recorded before them.
  */
-export function packageErrors(
-  env: Pick<Environment, "engineBuildHash" | "engineSourceHash" | "enginePackage">,
-  prodHash: string | null,
-  prodFiles: Record<string, string>,
-): string[] {
+export function packageErrors(perf: PackageState, prod: PackageState, sourceHash: string | null, recorded?: Pick<PackageState, "files" | "buildHash">): string[] {
   const errors: string[] = [];
-  // The served bytes themselves, so a rebuilt binary beside an old
-  // BUILD.json cannot pass as the same package.
-  if (Object.keys(env.enginePackage).length === 0) errors.push("dist-perf/ serves no engine package, so the WASM engine could not have run");
-  if (JSON.stringify(prodFiles) !== JSON.stringify(env.enginePackage)) errors.push(`dist/ and dist-perf/ serve different engine bytes (${JSON.stringify(prodFiles)} vs ${JSON.stringify(env.enginePackage)})`);
-  if (!env.engineSourceHash) errors.push("no engine-rs sources in this checkout, so the package's source hash cannot be checked; run from a full checkout");
-  if (!env.engineBuildHash) errors.push("the served engine package has no BUILD.json, so which sources it came from is unknown");
-  else if (env.engineSourceHash && env.engineBuildHash !== env.engineSourceHash) errors.push(`the served engine package (${env.engineBuildHash}) was not built from the current engine-rs sources (${env.engineSourceHash}); rebuild it with npm run wasm:build`);
-  if (prodHash !== env.engineBuildHash) errors.push(`dist/ (sizes) and dist-perf/ (timings) carry different engine packages (${prodHash ?? "none"} vs ${env.engineBuildHash ?? "none"}); rebuild without --skip-build`);
+  const sorted = (files: Record<string, string>) => JSON.stringify(Object.entries(files).sort(([a], [b]) => Number(a > b) - Number(a < b)));
+  const why = (b: PackageState) => b.buildProblem ?? "has no source hash";
+  for (const [name, build] of [["dist-perf/", perf], ["dist/", prod]] as const) {
+    const missing = ENGINE_PACKAGE_FILES.filter((f) => !(f in build.files));
+    if (missing.length === ENGINE_PACKAGE_FILES.length) errors.push(`${name} serves no engine package, so the WASM engine could not have run`);
+    else if (missing.length) errors.push(`${name} serves an incomplete engine package (missing or unreadable: ${missing.join(", ")})`);
+  }
+  if (sorted(perf.files) !== sorted(prod.files)) errors.push(`dist/ and dist-perf/ serve different engine bytes (${sorted(prod.files)} vs ${sorted(perf.files)})`);
+  if (!sourceHash) errors.push("no engine-rs sources in this checkout, so the package's source hash cannot be checked; run from a full checkout");
+  if (!perf.buildHash) errors.push(`the served engine package (dist-perf/) ${why(perf)}, so which sources it came from is unknown`);
+  else if (sourceHash && perf.buildHash !== sourceHash) errors.push(`the served engine package (${perf.buildHash}) was not built from the current engine-rs sources (${sourceHash}); rebuild it with npm run wasm:build`);
+  if (!prod.buildHash && !perf.buildHash) errors.push(`the sizes build (dist/) ${why(prod)}${why(prod) === why(perf) ? " too" : ""}; rebuild without --skip-build`);
+  if (prod.buildHash !== perf.buildHash) errors.push(`dist/ (sizes) and dist-perf/ (timings) carry different engine packages (${prod.buildHash ?? `none: dist/ ${why(prod)}`} vs ${perf.buildHash ?? `none: dist-perf/ ${why(perf)}`}); rebuild without --skip-build`);
+  // After the runs: the timed build's package must still be the one recorded
+  // before them. This compares the two ends only; a build swapped and
+  // restored between them is not caught.
+  if (recorded && (sorted(recorded.files) !== sorted(perf.files) || recorded.buildHash !== perf.buildHash)) errors.push(`the engine package in dist-perf/ changed during the run (recorded ${sorted(recorded.files)} with ${recorded.buildHash ?? "no source hash"}, now ${sorted(perf.files)} with ${perf.buildHash ?? "no source hash"})`);
   return errors;
 }
 

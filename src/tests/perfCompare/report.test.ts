@@ -87,6 +87,7 @@ describe("markdownReport", () => {
     expect(md).toContain("## Simulation only, engine as the app hosts it");
     expect(md).toMatch(/\| small \| 1x \| total for fixed duration \| 100 ms \| 200 ms \| 2\.00x \(2\.00 to 2\.00\) \| wasm slower \| 6\/6\/6 \|/);
     expect(md).toContain("ts: ts; wasm: ts");
+    expect(md).toMatch(/No engine comparison for cold DOMContentLoaded, cold load event, warm DOMContentLoaded, warm load event: boot order differs between engines/);
     expect(md).toContain("- one machine");
     expect(markdownReport(results(true))).toContain("**Validation: passed.**");
   });

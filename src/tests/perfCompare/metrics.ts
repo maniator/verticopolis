@@ -21,7 +21,16 @@ interface Pick {
   value: (r: ProcessRun) => number | null | undefined;
   /** Only meaningful for one engine (the WASM load steps, say). */
   engines?: EngineName[];
+  /** Why the engines' values are not compared; see MetricRow.noVerdict. */
+  noVerdict?: string;
 }
+
+/** In WASM mode boot awaits the engine package before it builds the app
+ *  (src/bootstrap.ts), so the module yields and DOMContentLoaded fires
+ *  early; in TypeScript mode the app is built inside module evaluation.
+ *  These events time boot ordering, so they get no cross-engine verdict
+ *  (docs/performance/ts-vs-wasm.md, Startup). */
+const BOOT_ORDER = "boot order differs between engines: WASM awaits its package before building the app, so these page events fire at different points of boot";
 
 const bytes = (served: readonly ServedRequest[] | undefined): number | null => (served ? served.reduce((s, x) => s + x.bytes, 0) : null);
 
@@ -43,11 +52,11 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
   const startup = (phase: "cold" | "warm" | "cold4x") => {
     const throttle = phase === "cold4x" ? slow : "1";
     const label = phase === "cold4x" ? "cold" : phase;
-    const p = (metric: string, unit: string, value: Pick["value"], engines?: EngineName[]) => out.push({ group: "startup", scenario: "-", throttle, metric: `${label} ${metric}`, unit, better: "lower", value, engines });
+    const p = (metric: string, unit: string, value: Pick["value"], engines?: EngineName[], noVerdict?: string) => out.push({ group: "startup", scenario: "-", throttle, metric: `${label} ${metric}`, unit, better: "lower", value, engines, noVerdict });
     p("game ready", "ms", (r) => r[phase]?.gameReadyMs);
     p("first frame after ready", "ms", (r) => r[phase]?.firstFrameMs);
-    p("DOMContentLoaded", "ms", (r) => r[phase]?.domContentLoadedMs);
-    p("load event", "ms", (r) => r[phase]?.loadEventMs);
+    p("DOMContentLoaded", "ms", (r) => r[phase]?.domContentLoadedMs, undefined, BOOT_ORDER);
+    p("load event", "ms", (r) => r[phase]?.loadEventMs, undefined, BOOT_ORDER);
     p("engine hosted", "ms", (r) => r[phase]?.engineHostedMs, ["wasm"]);
     p("wasm fetch (resource timing)", "ms", (r) => r[phase]?.wasmFetchMs, ["wasm"]);
     p("wasm compile and instantiate (boot path)", "ms", (r) => r[phase]?.wasmInstantiateMs, ["wasm"]);
@@ -129,7 +138,7 @@ export function aggregate(runs: readonly ProcessRun[], scenarios: readonly strin
           reps.push(r.rep);
         }
       }
-      rows.push({ group: p.group, scenario: p.scenario, throttle: p.throttle, metric: p.metric, unit: p.unit, better: p.better, engine, values, reps, summary: values.length ? summarize(values) : null });
+      rows.push({ group: p.group, scenario: p.scenario, throttle: p.throttle, metric: p.metric, unit: p.unit, better: p.better, engine, values, reps, summary: values.length ? summarize(values) : null, ...(p.noVerdict ? { noVerdict: p.noVerdict } : {}) });
     }
   }
   return rows;
@@ -150,6 +159,11 @@ export function compareEngines(rows: readonly MetricRow[], skipped: string[] = [
     const ts = pair.ts;
     const wasm = pair.wasm;
     if (!ts?.summary || !wasm?.summary) continue;
+    const noVerdict = ts.noVerdict ?? wasm.noVerdict;
+    if (noVerdict) {
+      skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: ${noVerdict}`);
+      continue;
+    }
     if (ts.summary.median === 0) {
       // No ratio against zero (a byte count of 0, no clamped frames).
       skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: TypeScript median is 0, WASM median ${wasm.summary.median}`);

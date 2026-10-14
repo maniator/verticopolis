@@ -58,21 +58,59 @@ function osName(): string {
   return `${platform()} ${release()}`;
 }
 
+/** The files an engine package must hold. */
+export const ENGINE_PACKAGE_FILES = ["verticopolis_engine_bg.wasm", "verticopolis_engine.js"] as const;
+
 /** SHA-256 of each file of a build's engine package, by name. */
 export function enginePackageDigests(distDir: string): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const f of ["verticopolis_engine_bg.wasm", "verticopolis_engine.js"]) {
+  for (const f of ENGINE_PACKAGE_FILES) {
     const p = join(distDir, "engine", f);
-    if (existsSync(p)) out[f] = createHash("sha256").update(readFileSync(p)).digest("hex");
+    // A file that cannot be read is left out, so the checks call the
+    // package incomplete instead of throwing.
+    try {
+      if (existsSync(p)) out[f] = createHash("sha256").update(readFileSync(p)).digest("hex");
+    } catch {
+      /* unreadable: reported as missing */
+    }
   }
   return out;
 }
 
+/** A build's engine package as the checks see it, read without throwing:
+ *  its file digests, and the source hash its BUILD.json records or why
+ *  there is none. */
+export interface PackageState {
+  files: Record<string, string>;
+  buildHash: string | null;
+  /** Why `buildHash` is null: no BUILD.json, unreadable, or no `sources`. */
+  buildProblem: string | null;
+}
+
+export function packageState(distDir: string): PackageState {
+  const files = enginePackageDigests(distDir);
+  const p = join(distDir, "engine", "BUILD.json");
+  if (!existsSync(p)) return { files, buildHash: null, buildProblem: "has no BUILD.json" };
+  let text: string;
+  try {
+    text = readFileSync(p, "utf8");
+  } catch {
+    return { files, buildHash: null, buildProblem: "has a BUILD.json that cannot be read" };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { files, buildHash: null, buildProblem: "has a BUILD.json that is not JSON" };
+  }
+  const sources = (parsed as { sources?: unknown } | null)?.sources;
+  if (typeof sources !== "string" || !sources) return { files, buildHash: null, buildProblem: "has a BUILD.json with no sources hash" };
+  return { files, buildHash: sources, buildProblem: null };
+}
+
 /** The engine package's recorded source hash, from a build directory. */
 export function engineBuildHash(distDir: string): string | null {
-  const p = join(distDir, "engine", "BUILD.json");
-  if (!existsSync(p)) return null;
-  return (JSON.parse(readFileSync(p, "utf8")) as { sources?: string }).sources ?? null;
+  return packageState(distDir).buildHash;
 }
 
 export function collectEnvironment(repo: string, distDir: string, sourceHash: string | null): Environment {

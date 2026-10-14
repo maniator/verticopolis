@@ -125,6 +125,8 @@ export function markdownReport(res: CompareResults): string {
     if (single.length) {
       out.push("");
       out.push(table(["Scenario", "CPU", "Metric", "Engine", "Median", "95% CI of median", "p95", "CV", "n"], single.map((m) => [m.scenario, `${m.throttle}x`, m.metric, m.engine, fmt(m.summary?.median, m.unit), m.summary?.medianCiLow != null ? `${fmt(m.summary.medianCiLow, m.unit)} to ${fmt(m.summary.medianCiHigh, m.unit)}` : "n/a", fmt(m.summary?.p95, m.unit), m.summary ? `${(m.summary.cv * 100).toFixed(1)}%` : "n/a", String(m.values.length)])));
+      const reasons = [...new Set(single.flatMap((m) => (m.noVerdict ? [m.noVerdict] : [])))];
+      for (const r of reasons) out.push("", `No engine comparison for ${[...new Set(single.filter((m) => m.noVerdict === r).map((m) => m.metric))].join(", ")}: ${r}.`);
     }
   }
   if (res.bundle) {

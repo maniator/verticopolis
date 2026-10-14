@@ -46,6 +46,23 @@ describe("aggregate", () => {
 });
 
 describe("compareEngines", () => {
+  it("gives the boot-order page events no verdict, keeping both engines' values", () => {
+    const skipped: string[] = [];
+    const rows = aggregate(runs(), ["small"], [1, 4]);
+    const comps = compareEngines(rows, skipped);
+    for (const m of ["cold DOMContentLoaded", "cold load event", "warm DOMContentLoaded", "warm load event"]) {
+      expect(comps.find((c) => c.metric === m)).toBeUndefined();
+      expect(rows.filter((r) => r.metric === m && r.throttle === "1").map((r) => r.engine).sort()).toEqual(["ts", "wasm"]);
+      expect(skipped.find((x) => x.includes(m))).toMatch(/boot order differs between engines/);
+    }
+    expect(comps.find((c) => c.metric === "cold game ready")).toBeDefined();
+  });
+  it("honors a no-verdict reason carried by the WASM row alone", () => {
+    const rows = aggregate(runs(), ["small"], [1]).map((r) => (r.metric === "cold game ready" && r.engine === "wasm" ? { ...r, noVerdict: "test reason" } : r));
+    const skipped: string[] = [];
+    expect(compareEngines(rows, skipped).find((c) => c.metric === "cold game ready")).toBeUndefined();
+    expect(skipped).toContain("startup - 1x cold game ready: test reason");
+  });
   it("skips a zero TypeScript median and says so", () => {
     const skipped: string[] = [];
     const comps = compareEngines(aggregate(runs(), ["small"], [1, 4]), skipped);
