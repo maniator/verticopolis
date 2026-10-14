@@ -285,10 +285,11 @@ fan-out, and an event is never handed out twice.
   - a digest test across the hosts;
   - a transferable buffer, with no SharedArrayBuffer and no COOP/COEP
     requirement.
-- **Offline.** The worker script (`assets/engineWorker-*.js`) is in the
-  service worker's precache. The engine package is not (#985). Offline, the
-  worker cannot load it, and the game boots on TypeScript, as the
-  main-thread host does today.
+- **Offline.** The worker script (`assets/engineWorker-*.js`) and the
+  engine package are both in the service worker's precache (#985). The
+  worker loads the package through the page's service worker, so an offline
+  reload comes back on the worker host, as the main-thread host comes back
+  on the engine.
 - **The engine.** Nothing in `engine-rs/` or `src/engine/` changed. The
   worker drives the same binding through the same `ShadowEngine` the dual
   run uses.
@@ -330,7 +331,8 @@ fan-out, and an event is never handed out twice.
   - the worker script is precached;
   - a fatal worker error falls back to TypeScript and a fresh worker takes the
     next tower (a real worker crash, `onerror`, is covered in Node);
-  - an offline reload with the service worker installed boots on TypeScript.
+  - an offline reload with the service worker installed comes back on the
+    worker host.
 
 ## Rust and WASM threads
 
