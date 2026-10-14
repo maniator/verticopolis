@@ -273,8 +273,9 @@ impl Simulation {
     /// TypeScript `buildTransport` refuses them, after the same money check).
     pub fn can_build_transport(&self, kind: Kind, x: i64, bottom: i64, top: i64) -> CanBuild {
         let f = kind.facility();
-        // Saturating, so a host's out-of-range drag input is refused rather
-        // than overflowing; any span the tower can hold is exact.
+        // Saturating, as are the placement checks, so an out-of-range span
+        // from a native host prices without overflowing and is refused by
+        // the placement rules; any span the tower can hold is exact.
         let span = top.saturating_sub(bottom);
         let extra = if kind.is_elevator() {
             span as f64 * crate::charges::TRANSPORT_FLOOR_COST
@@ -448,7 +449,8 @@ mod tests {
         let spans = [(1, 2), (1, 3), (2, 3), (3, 3), (3, 2), (1, 40)];
         let mut placed = 0;
         let mut refused = std::collections::BTreeSet::new();
-        // Classic at one star (every elevator but the standard one locked)
+        // Classic at one star (every elevator but the standard one, and the
+        // escalator, locked)
         // and Modern at five (all unlocked).
         for (mode, star) in [(GameMode::Classic, 1), (GameMode::Modern, 5)] {
             for kind in kinds {
@@ -499,6 +501,21 @@ mod tests {
             refused.iter().any(|r| r.contains("unlocks at")),
             "{refused:?}"
         );
+    }
+
+    /// Out-of-range input from a native host is refused by the placement
+    /// rules without overflowing, in a debug build as in a release one.
+    #[test]
+    fn an_out_of_range_shaft_is_refused_without_overflow() {
+        let mut sim = shaft_site(GameMode::Modern, 5, 1e30);
+        let q = sim.can_build_transport(Kind::Stairs, i64::MAX, 1, 2);
+        assert_eq!(q.reason.as_deref(), Some("Off the edge of the lot."));
+        let q = sim.can_build_transport(Kind::ElevatorStandard, 100, -2, i64::MAX);
+        assert!(!q.ok);
+        assert!(q.reason.unwrap().contains("can span at most"));
+        let q = sim.can_build_transport(Kind::Stairs, 100, i64::MIN, i64::MAX);
+        assert!(q.reason.unwrap().contains("links exactly two floors"));
+        assert!(!sim.build_transport(Kind::Stairs, i64::MAX, 1, 2).ok);
     }
 
     /// An elevator's quote is its catalog price plus the per-floor cost for

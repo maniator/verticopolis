@@ -17,7 +17,9 @@ use verticopolis_engine::catalog::{catalog, CATALOG_VERSION};
 use verticopolis_engine::charges::ExtendEnd;
 use verticopolis_engine::clock::GameMode;
 use verticopolis_engine::facilities::Kind;
-use verticopolis_engine::frame::{frame_view, log_since, FRAME_HEADER, PERSON_FIXED};
+use verticopolis_engine::frame::{
+    frame_view, log_since, FRAME_HEADER, PERSON_FIXED, UNKNOWN_ROUTINE,
+};
 use verticopolis_engine::gameplay::{
     check_catalog, check_event, RemovalMethod, CATALOG_JSON, GAMEPLAY_RING_CAP,
 };
@@ -334,7 +336,9 @@ pub fn advance(sim: &mut Simulation, minutes: u32, events: &Value) -> Result<usi
         }
     }
     // The buffer holds `GAMEPLAY_RING_CAP` events and counts what a full
-    // buffer pushed out; a host that drains every frame never loses one.
+    // buffer pushed out. One-minute frames stay far under the cap, but a
+    // host that ticks a long `dt` between drains can overflow it, so the
+    // count is checked whatever the frame length.
     if sim.gameplay.dropped > 0 {
         return Err(format!(
             "{} gameplay events were dropped from a buffer of {GAMEPLAY_RING_CAP}",
@@ -383,6 +387,12 @@ pub fn read_frame(sim: &Simulation) -> Result<usize, String> {
     for p in &sim.crowd.people {
         let fixed = slice(at, PERSON_FIXED)?;
         let want = [p.id as f64, p.floors.len() as f64, p.shafts.len() as f64];
+        if fixed[13] == UNKNOWN_ROUTINE {
+            return Err(format!(
+                "person {} has a routine the frame has no code for",
+                p.id
+            ));
+        }
         if [fixed[0], fixed[16], fixed[17]] != want {
             return Err(format!(
                 "person record at {at} reads {:?}, not {want:?}",
@@ -622,7 +632,8 @@ mod tests {
         let events = event_catalog().unwrap();
         let (mut sim, _, _) = found(7).unwrap();
         edit(&mut sim).unwrap();
-        // Through the morning, a frame at a time, until the crowd arrives.
+        // A new game opens at 7:00; eight hours a frame at a time takes it
+        // through the working morning, when the offices fill.
         let mut most = 0;
         for _ in 0..480 {
             advance(&mut sim, 1, &events).unwrap();

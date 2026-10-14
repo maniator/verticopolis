@@ -15,8 +15,8 @@ pub const PERSON_FIXED: usize = 18;
 
 /// The routine code for a routine `frame_view` has no code for. The
 /// TypeScript decoder rejects it, and a native decoder should too: it means
-/// the engine gained a routine this layout has not named yet (a debug build
-/// of the engine stops on it first).
+/// the engine gained a routine this layout has not named yet (the engine's
+/// own tests stop on it first).
 pub const UNKNOWN_ROUTINE: f64 = 255.0;
 
 /// The per-frame read model: every value the web host reads from the
@@ -120,10 +120,12 @@ pub fn frame_view(sim: &Simulation) -> Vec<f64> {
             Some("salesCall") => 2.0,
             // The routines are engine-set literals; a new one must be added
             // here and to `ROUTINES` in frameView.ts. Until then it crosses
-            // as a code the decoder rejects by name, so a release build
-            // fails loudly where a debug build fails here.
+            // as a code the decoder rejects by name. The engine's own tests
+            // stop here first; a host's build never panics in this read.
             Some(other) => {
-                debug_assert!(false, "routine {other} has no frame code");
+                if cfg!(test) {
+                    panic!("routine {other} has no frame code");
+                }
                 UNKNOWN_ROUTINE
             }
         };
