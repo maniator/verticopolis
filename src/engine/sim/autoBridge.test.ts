@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../Simulation";
 import { GRID, FACILITIES } from "../facilities";
+import { Tower } from "../Tower";
 
 /**
  * "Bridge floors between rooms" (autoBridge). Default on (the shipped auto-bridge
@@ -141,7 +142,9 @@ describe("a structural tile far off the lot (#1003)", () => {
     expect(sim.autoBridge).toBe(true);
     const started = performance.now();
     for (const kind of ["floor", "lobby"] as const) {
-      for (const x of [2_147_483_647, -2_147_483_648, GRID.width, -1]) {
+      // Nearest the lot first, so a regression fails on a cheap case before
+      // it reaches the slow ones.
+      for (const x of [GRID.width, -1, 2_147_483_647, -2_147_483_648]) {
         for (const floor of [1, 2, -1]) {
           const q = sim.canBuild(kind, floor, x);
           expect(q.ok, `${kind} @ ${floor},${x}`).toBe(false);
@@ -153,38 +156,70 @@ describe("a structural tile far off the lot (#1003)", () => {
     expect(performance.now() - started).toBeLessThan(2_000);
   });
 
-  it("plans no bridge for a footprint partly off the lot or above the top floor", () => {
+  it("plans no bridge for a footprint partly off the lot or outside the floor range", () => {
     const sim = foundedWithLobby();
     sim.star = 5;
     expect(sim.autoBridge).toBe(true);
-    for (const floor of [GRID.maxFloor + 1, GRID.minFloor - 1]) {
-      expect(sim.canBuild("floor", floor, C).reason).toBe("Outside the buildable range.");
-      expect(sim.tower.bridgeFillPlan("floor", floor, C, 1, 1)).toEqual([]);
+    for (const kind of ["floor", "lobby"] as const) {
+      for (const floor of [GRID.maxFloor + 1, GRID.minFloor - 1]) {
+        expect(sim.canBuild(kind, floor, C).reason).toBe("Outside the buildable range.");
+        expect(sim.tower.bridgeFillPlan(kind, floor, C, 1, 1)).toEqual([]);
+      }
     }
-    // Structure just outside the floor range that the old scan would have
-    // bridged to: a floor tile below the lowest basement, and one above the
-    // top floor resting on structure. The plan still has no tiles there.
-    const [low, high] = [GRID.minFloor - 1, GRID.maxFloor + 1];
-    sim.tower.structKind.set(sim.tower.key(low, C - 3), "floor");
-    sim.tower.structKind.set(sim.tower.key(high, C - 3), "floor");
-    for (const x of [C - 2, C - 1]) sim.tower.structure.set(sim.tower.key(high - 1, x), 0);
-    expect(sim.tower.bridgeFillPlan("floor", low, C, 1, 1)).toEqual([]);
-    expect(sim.tower.bridgeFillPlan("floor", high, C, 1, 1)).toEqual([]);
+    // Each case below seeds a neighbor the old scan would have bridged to,
+    // in a tower of its own, so the empty plan comes from the bound alone.
+    // A floor tile below the lowest basement.
+    let t = new Tower();
+    const low = GRID.minFloor - 1;
+    t.structKind.set(t.key(low, C - 3), "floor");
+    expect(t.bridgeFillPlan("floor", low, C, 1, 1)).toEqual([]);
+    // A floor tile above the top floor, resting on structure.
+    t = new Tower();
+    const high = GRID.maxFloor + 1;
+    t.structKind.set(t.key(high, C - 3), "floor");
+    for (const x of [C - 2, C - 1]) t.structure.set(t.key(high - 1, x), 0);
+    expect(t.bridgeFillPlan("floor", high, C, 1, 1)).toEqual([]);
     // A room whose footprint runs past the lot edge by one tile.
     const office = FACILITIES.office.width;
-    expect(sim.canBuild("office", 2, GRID.width - office + 1).reason).toBe("Off the edge of the lot.");
-    expect(sim.tower.bridgeFillPlan("office", 2, GRID.width - office + 1, office, 1)).toEqual([]);
+    const ox = GRID.width - office + 1;
+    expect(sim.canBuild("office", 2, ox).reason).toBe("Off the edge of the lot.");
+    t = new Tower();
+    t.structKind.set(t.key(2, ox - 3), "floor");
+    for (const x of [ox - 2, ox - 1]) t.structure.set(t.key(1, x), 0);
+    expect(t.bridgeFillPlan("office", 2, ox, office, 1)).toEqual([]);
     // A two-story room whose top story would sit above the top floor.
-    expect(sim.canBuild("cinema", GRID.maxFloor, C).reason).toBe("Not enough floors above for this facility.");
-    expect(sim.tower.bridgeFillPlan("cinema", GRID.maxFloor, C, FACILITIES.cinema.width, 2)).toEqual([]);
+    const top = GRID.maxFloor;
+    expect(sim.canBuild("cinema", top, C).reason).toBe("Not enough floors above for this facility.");
+    t = new Tower();
+    t.structKind.set(t.key(top, C - 3), "floor");
+    for (const x of [C - 2, C - 1]) t.structure.set(t.key(top - 1, x), 0);
+    expect(t.bridgeFillPlan("cinema", top, C, FACILITIES.cinema.width, 2)).toEqual([]);
+  });
+
+  it("still plans a bridge at each bound of the lot and the floor range", () => {
+    const at = (fl: number, x: number, kind: "floor" | "lobby", support = false): Tower => {
+      const t = new Tower();
+      t.structKind.set(t.key(fl, x), kind);
+      if (support) for (const g of [x - 2, x - 1, x + 1, x + 2]) t.structure.set(t.key(fl - 1, g), 0);
+      return t;
+    };
+    const xs = (plan: { fl: number; x: number }[]): number[] => plan.map((p) => p.x);
+    // The first column, bridging right to a lobby two tiles away.
+    expect(xs(at(1, 3, "lobby").bridgeFillPlan("lobby", 1, 0, 1, 1))).toEqual([2, 1]);
+    // The last column, bridging left to a lobby two tiles away.
+    const last = GRID.width - 1;
+    expect(xs(at(1, last - 3, "lobby").bridgeFillPlan("lobby", 1, last, 1, 1))).toEqual([last - 2, last - 1]);
+    // The lowest basement and the top floor.
+    expect(xs(at(GRID.minFloor, C - 3, "floor").bridgeFillPlan("floor", GRID.minFloor, C, 1, 1))).toEqual([C - 2, C - 1]);
+    expect(xs(at(GRID.maxFloor, C - 3, "floor", true).bridgeFillPlan("floor", GRID.maxFloor, C, 1, 1))).toEqual([C - 2, C - 1]);
   });
 
   it("plans the same bridge as before on the lot", () => {
     // The strip covers [C, C + 24); a lobby at C + 30 bridges exactly the six
-    // tiles between them, nearest the strip last (laid outward from it).
+    // tiles between them, laid outward from the strip.
     const sim = foundedWithLobby();
     const plan = sim.tower.bridgeFillPlan("lobby", 1, C + 30, FACILITIES.lobby.width, 1);
-    expect(plan.map((t) => t.x).sort((a, b) => a - b)).toEqual([24, 25, 26, 27, 28, 29].map((d) => C + d));
+    expect(plan.map((t) => t.x)).toEqual([24, 25, 26, 27, 28, 29].map((d) => C + d));
     expect(plan.every((t) => t.fl === 1)).toBe(true);
   });
 });
