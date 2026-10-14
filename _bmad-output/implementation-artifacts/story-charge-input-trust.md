@@ -32,10 +32,19 @@ engines.
     `Number.isSafeInteger` and the two known enums before any lookup.
   - Rust: `engine-rs/src/charges.rs` adds `whole(f64)`, the same rule.
 - **WASM binding:** `addCar`, `removeCar`, `extendTransport` and
-  `removeFacility` take ids and floors as `f64`. They return the refusal JSON,
-  with an extension's refusal carrying the shaft's ends as they stand. Before
-  this, `lift.id + 0.5` reached the engine as `lift.id`, and an unknown `end`
-  or a bad mark threw.
+  `removeFacility` read every argument raw as a `JsValue` (the `.d.ts` still
+  types them `number`, `"up" | "down"`, `"sell" | "bulldoze"` and an optional
+  `string | null` mark). A number counts only if it is a whole JS number
+  within `Number.isSafeInteger`; an enum only if it is that exact JS string; a
+  mark only if it is null, undefined or JSON `{ bottom, top }` text whose
+  fields are written as JSON integers (the text `null` is no mark). Anything
+  else gets the refusal JSON, with an extension's refusal carrying the shaft's
+  ends as they stand. Before this, `addCar("12")` bought a car, `lift.id + 0.5`
+  reached the engine as `lift.id`, and an unknown `end` or a bad mark threw.
+- **Intentionally unsupported raw inputs** (refused by the binding, moving
+  nothing, where TypeScript would act): a mark passed as an object instead of
+  its JSON text, and a mark field written as a JSON float (`2.0`, `1e1`,
+  `9007199254740990.5`), which an `f64` parse would round to a whole floor.
 - **Mirror:** the charge commands relay a non-number id, floor or mark field
   as NaN and a non-string `end` or `method` as an empty string, and check
   any mark but null or undefined, so the binding only ever sees values it
@@ -54,6 +63,16 @@ engines.
     that the save is byte-identical and a well-formed call still lands.
   - A dual-run test that sends malformed commands through the mirror and
     checks that both engines stay in step.
+  - `chargeBindingRaw.integration.test.ts` (in `npm run test:wasm` and the
+    Rust engine workflow's paths): 118 malformed calls straight into the
+    glue, each checked for no throw, the TypeScript refusal, an equal answer
+    and an unchanged state in both engines; whole ids that name nothing must
+    get the same answer from both; no gameplay event from either; then
+    well-formed calls must land with equal answers, states and events.
+- **#958:** that PR deletes the checked-in WASM package
+  (`src/public/engine/*`). Whichever of the two lands second reconciles it:
+  if #958 lands first, this branch drops its package changes and the build
+  produces them.
 - **Lock:** unchanged; no scenario sends a malformed command, and the scenario
   loader rejects one at load.
 
@@ -123,3 +142,27 @@ engines.
   `whole` (2^53 - 1, -0) and a billing getter on `top` are untested (the
   Edge Case Hunter traced both and found the engines agree). The loop ends
   here: the pass surfaced no new patch finding.
+
+### Round 4 (`/gds-code-review` on the raw `JsValue` binding, with Codex)
+
+- [x] [Review][Patch] `parse_hwm` read mark fields as `f64`, so
+  `{"bottom":1,"top":9007199254740990.5}` rounded to a whole floor and was
+  billed (Codex P2) [engine-rs/src/wasm.rs]: fields must be JSON integers
+  within the safe range; a native test and the raw test pin it.
+- [x] [Review][Patch] The JSON text `null` was refused as a mark, though it
+  is what `JSON.stringify(null)` sends (Edge Case Hunter, Acceptance Auditor)
+  [engine-rs/src/wasm.rs]: it is no mark.
+- [x] [Review][Patch] Taking `JsValue` turned the generated `.d.ts` into
+  `any` (Blind Hunter, Acceptance Auditor): `unchecked_param_type` restores
+  the types, and the docs on all four methods state the raw-argument rule.
+- [x] [Review][Patch] The raw test missed cases and parity (Edge Case Hunter,
+  Acceptance Auditor): it now covers every missing-argument shape, BigInt,
+  Symbol, boxed strings, `-2^53`, empty and raw-`NaN` marks, accepted
+  edge ids (`-0`, `-1`, `±(2^53 - 1)`), state per case, an exact case count,
+  gameplay events in both engines, and cross-engine state after the
+  well-formed calls; the file is in the Rust workflow's paths filter.
+- [x] [Review][Patch] `RawMark::None` read like `Option::None`: renamed
+  `Absent`.
+- [x] [Review][Patch] This story and the PR body described the `f64` binding
+  (Acceptance Auditor): updated.
+- Codex P1 (a raw call coerced in the glue) was fixed by 51e8a9f.

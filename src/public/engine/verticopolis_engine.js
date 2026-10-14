@@ -24,9 +24,10 @@ export class Engine {
     }
     /**
      * `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
-     * limit and the balance and pays for the car itself. The id arrives raw
-     * (#923): anything but a whole JS number is refused, never coerced.
-     * @param {any} id
+     * limit and the balance and pays for the car itself. The id is typed
+     * `number` but read raw (#923): anything but a whole JS number within
+     * `Number.isSafeInteger` is refused with `INVALID_REQUEST`, never coerced.
+     * @param {number} id
      * @returns {string}
      */
     addCar(id) {
@@ -294,14 +295,16 @@ export class Engine {
     }
     /**
      * `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
-     * as JSON `{ bottom, top }` text, or null or undefined for none: JSON
-     * `{ ok, reason?, delta, bottom, top, added }`, the floors billed past
-     * the mark. Every argument arrives raw (#923); a malformed one is
-     * refused with the shaft's ends as they stand.
-     * @param {any} id
-     * @param {any} end
-     * @param {any} target_floor
-     * @param {any} hwm
+     * as JSON `{ bottom, top }` text, or null, undefined or the text `null`
+     * for none: JSON `{ ok, reason?, delta, bottom, top, added }`, the floors
+     * billed past the mark. Every argument is read raw (#923): an id or floor
+     * that is not a whole JS number, an `end` that is not exactly `"up"` or
+     * `"down"`, or a mark that is not that text (an object included) is
+     * refused with `INVALID_REQUEST` and the shaft's ends as they stand.
+     * @param {number} id
+     * @param {"up" | "down"} end
+     * @param {number} target_floor
+     * @param {string | null} [hwm]
      * @returns {string}
      */
     extendTransport(id, end, target_floor, hwm) {
@@ -504,7 +507,8 @@ export class Engine {
     }
     /**
      * `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
-     * @param {any} id
+     * The id is read raw, as for `addCar` (#923).
+     * @param {number} id
      * @returns {string}
      */
     removeCar(id) {
@@ -521,9 +525,11 @@ export class Engine {
     }
     /**
      * `removeFacility(id, method)`: the player's sell or bulldoze of a unit
-     * or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`.
-     * @param {any} id
-     * @param {any} method
+     * or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`. Read
+     * raw (#923): an id that is not a whole JS number or a method that is not
+     * exactly `"sell"` or `"bulldoze"` is refused with `INVALID_REQUEST`.
+     * @param {number} id
+     * @param {"sell" | "bulldoze"} method
      * @returns {string}
      */
     removeFacility(id, method) {

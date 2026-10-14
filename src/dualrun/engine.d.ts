@@ -12,10 +12,11 @@ export class Engine {
     [Symbol.dispose](): void;
     /**
      * `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
-     * limit and the balance and pays for the car itself. The id arrives raw
-     * (#923): anything but a whole JS number is refused, never coerced.
+     * limit and the balance and pays for the car itself. The id is typed
+     * `number` but read raw (#923): anything but a whole JS number within
+     * `Number.isSafeInteger` is refused with `INVALID_REQUEST`, never coerced.
      */
-    addCar(id: any): string;
+    addCar(id: number): string;
     /**
      * `adjustRent(id, dir)`: the new rent, or null when nothing moved.
      */
@@ -88,12 +89,14 @@ export class Engine {
     evaluateStar(): void;
     /**
      * `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
-     * as JSON `{ bottom, top }` text, or null or undefined for none: JSON
-     * `{ ok, reason?, delta, bottom, top, added }`, the floors billed past
-     * the mark. Every argument arrives raw (#923); a malformed one is
-     * refused with the shaft's ends as they stand.
+     * as JSON `{ bottom, top }` text, or null, undefined or the text `null`
+     * for none: JSON `{ ok, reason?, delta, bottom, top, added }`, the floors
+     * billed past the mark. Every argument is read raw (#923): an id or floor
+     * that is not a whole JS number, an `end` that is not exactly `"up"` or
+     * `"down"`, or a mark that is not that text (an object included) is
+     * refused with `INVALID_REQUEST` and the shaft's ends as they stand.
      */
-    extendTransport(id: any, end: any, target_floor: any, hwm: any): string;
+    extendTransport(id: number, end: "up" | "down", target_floor: number, hwm?: string | null): string;
     /**
      * The number of units on fire.
      */
@@ -164,13 +167,16 @@ export class Engine {
     priceUnit(id: number, target: number): number | undefined;
     /**
      * `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
+     * The id is read raw, as for `addCar` (#923).
      */
-    removeCar(id: any): string;
+    removeCar(id: number): string;
     /**
      * `removeFacility(id, method)`: the player's sell or bulldoze of a unit
-     * or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`.
+     * or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`. Read
+     * raw (#923): an id that is not a whole JS number or a method that is not
+     * exactly `"sell"` or `"bulldoze"` is refused with `INVALID_REQUEST`.
      */
-    removeFacility(id: any, method: any): string;
+    removeFacility(id: number, method: "sell" | "bulldoze"): string;
     /**
      * `tower.removeTransport(id)`: whether a shaft went.
      */
