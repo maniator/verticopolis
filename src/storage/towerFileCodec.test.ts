@@ -1,15 +1,34 @@
 import { describe, it, expect } from "vitest";
 import { deflateSync, zlibSync } from "fflate";
 import { markFounderFromLoadedFile } from "../engine/sim/founderStatus";
-import { SLOT_COUNT } from "./SaveGame";
 import { fromBase64, inflate, inflateCapped, STORE_MAGIC, toBase64, TOWER_FILE_MAGIC } from "./saveCompression";
-import { MIGRATION_SOURCES, SAVE_SLOT_IDS, isSaveSlotId, toTowerFile } from "./saveMigration";
-import { PRE_2_0_SAVE, decodeTowerFile, storeValue } from "./saveMigration.fixture";
+import { toTowerFile } from "./towerFileCodec";
 
 /**
- * The pure byte-fidelity codec. Everything here takes a string and returns a
- * string. How the migration RUNS lives in `saveMigrationRun.test.ts`.
+ * The pure byte-fidelity codec (localStorage `VCZ1:` values to `.vctower` text).
+ * Everything here takes a string and returns a string. The reverse direction
+ * is pinned in `saveRehydrate.test.ts`.
  */
+
+/** A tower as an OLD build wrote it: no appVersion, which is the whole point.
+ *  Carries the two fields `SaveGame.import` insists on. */
+const PRE_2_0_SAVE = { minutes: 4321, units: [{ t: "office" }], towerName: "Old Guard", money: 500 };
+
+/** Packs a value exactly as `SaveGame.saveTo` writes it into localStorage. */
+function storeValue(obj: unknown): string {
+  return STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(obj)), { level: 1 }));
+}
+
+/** Decode `.vctower` text the way `SaveGame.import` would. */
+function decodeTowerFile(text: string): Record<string, unknown> {
+  const trimmed = text.trim();
+  expect(trimmed.startsWith(TOWER_FILE_MAGIC + "\n")).toBe(true);
+  const payload = trimmed.slice(TOWER_FILE_MAGIC.length).replace(/\s+/g, "");
+  return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(fromBase64(payload)))) as Record<
+    string,
+    unknown
+  >;
+}
 
 describe("toTowerFile (the byte-fidelity codec)", () => {
   it("re-headers a compressed save without touching the payload", () => {
@@ -26,7 +45,7 @@ describe("toTowerFile (the byte-fidelity codec)", () => {
 
   it("keeps a pre-2.0 tower's appVersion ABSENT, which is what earns Founder", () => {
     // The hazard this whole module is shaped around. `stamp()` sets appVersion
-    // unconditionally, so any migration that deserialized and re-saved would
+    // unconditionally, so any conversion that deserialized and re-saved would
     // hand this tower a version string and silently cost the player the badge.
     const result = toTowerFile(storeValue(PRE_2_0_SAVE));
     expect(result.ok).toBe(true);
@@ -44,7 +63,7 @@ describe("toTowerFile (the byte-fidelity codec)", () => {
   it("NEGATIVE CONTROL: a stamped tower does not earn Founder", () => {
     // Without this, the assertion above would pass even if
     // markFounderFromLoadedFile granted the badge unconditionally, and the test
-    // would be proving nothing about the migration at all.
+    // would be proving nothing about the codec at all.
     const stamped = { ...PRE_2_0_SAVE, appVersion: "2.4.0" };
     const result = toTowerFile(storeValue(stamped));
     expect(result.ok).toBe(true);
@@ -119,54 +138,6 @@ describe("toTowerFile (the byte-fidelity codec)", () => {
   });
 });
 
-describe("the source list", () => {
-  it("covers all six localStorage keys and maps them to distinct destinations", () => {
-    // Six, not one. A migration that read only the current autosave key would
-    // leave towers that live solely on a legacy key behind.
-    expect(MIGRATION_SOURCES.map((s) => s.key)).toEqual([
-      "verticopolis-save",
-      "simtower-clone-save",
-      "simtower-clone-slot-1",
-      "simtower-clone-slot-2",
-      "simtower-clone-slot-3",
-      "simtower-clone-unreadable",
-    ]);
-    const ids = MIGRATION_SOURCES.map((s) => s.id);
-    expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.every(isSaveSlotId)).toBe(true);
-  });
-
-  it("covers exactly as many numbered slots as SaveGame defines", () => {
-    // The keys are spelled out rather than generated, so this is what catches
-    // someone raising SLOT_COUNT and leaving the new slot unmigrated and
-    // unreported. Reads the real constant, not a copy of it.
-    const numbered = MIGRATION_SOURCES.filter((s) => /^simtower-clone-slot-\d+$/.test(s.key));
-    expect(numbered.length).toBe(SLOT_COUNT);
-    for (let n = 1; n <= SLOT_COUNT; n++) {
-      expect(MIGRATION_SOURCES.some((s) => s.key === `simtower-clone-slot-${n}`)).toBe(true);
-    }
-  });
-
-  it("keeps the two autosave keys on separate destinations", () => {
-    // Both can hold a real tower at once, and loadResult falls back to the
-    // legacy one, so collapsing them would drop whichever lost the race.
-    const auto = MIGRATION_SOURCES.find((s) => s.key === "verticopolis-save");
-    const legacy = MIGRATION_SOURCES.find((s) => s.key === "simtower-clone-save");
-    expect(auto?.id).not.toBe(legacy?.id);
-  });
-
-  it("marks the unreadable backup, and only it, for byte preservation", () => {
-    expect(MIGRATION_SOURCES.filter((s) => s.preserve).map((s) => s.id)).toEqual(["unreadable"]);
-  });
-
-  it("rejects an id outside the closed list", () => {
-    expect(isSaveSlotId("slot-4")).toBe(false);
-    expect(isSaveSlotId("../escape")).toBe(false);
-    expect(isSaveSlotId("__proto__")).toBe(false);
-    expect(SAVE_SLOT_IDS.every(isSaveSlotId)).toBe(true);
-  });
-});
-
 /**
  * The assumption the whole design rests on, asserted rather than believed.
  *
@@ -219,7 +190,7 @@ describe("preserve mode, every combination", () => {
   it("refuses a header with no payload as UNREADABLE, not as absent", () => {
     // A VCTOWER1 line and nothing after it is an empty file, not a rescue. The
     // distinction matters downstream: `empty` maps to "absent", so calling this
-    // empty would tell the player there was nothing to migrate when what they
+    // empty would report there was nothing to carry over when what they
     // actually have is a real save truncated to its prefix.
     for (const preserve of [true, false]) {
       expect(toTowerFile(STORE_MAGIC, preserve), `preserve=${preserve}`).toEqual({ ok: false, reason: "unreadable" });

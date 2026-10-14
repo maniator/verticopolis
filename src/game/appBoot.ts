@@ -18,14 +18,8 @@ import { bindEngineBridge } from "../analyticsEngineBridge";
 import { bootCommonProps, distributionChannelLabel, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
 import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
-import { bindHostCommands, tickHostCommands } from "./hostCommands";
-import { IS_WRAPPED_BUILD } from "../platform";
-import { hydrationConflictIds, noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
-import { conflictBulletinText } from "./desktopSaveHydrate";
 import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
-import { IS_DESKTOP_BUILD } from "../desktopConsent";
-import { showDesktopAnalyticsNotice } from "../ui/uiDesktopAnalytics";
 
 /**
  * Constructor collaborators for `GameApp`, split out to keep the class body a
@@ -129,13 +123,6 @@ export function wireControllers(app: GameApp): void {
         getSim: () => app.sim,
         frameErrors: app.frameErrors,
       });
-      // Tell a wrapper shell that nothing can run now, so its menu grays out.
-      // Pushed from here because the frame loop is what normally publishes it
-      // and the frame loop has stopped: that is why this screen exists. Without
-      // this the desktop menu stays fully enabled behind the crash card, and a
-      // refusal cannot even be shown there (the card is a modal dialog, so the
-      // toast rail paints under its backdrop).
-      if (IS_WRAPPED_BUILD) tickHostCommands();
       // Then report the crash the moment its screen is shown (not just via the
       // next boot's reason), flattening the description plus build and tower
       // context. Sim reads are defensive: a crash is when sim state is least
@@ -256,12 +243,8 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // One-time boot enrichment merged into EVERY event (S4): the platform and
   // distribution-channel dimensions (AUD-036, #710) plus anonymous on-device
   // buckets. Where each one comes from, since this is what rides on every event:
-  // `platform` is the build mode, then the injected port's wrapper flag, then
-  // the `?src=twa` marker on the launch URL; `distribution_channel` is the same
-  // injected port's optional `distributionChannel` member, read on desktop
-  // builds only. So only the build mode is fixed in the bundle; the wrapper
-  // flag, the marker, and the channel member are all live reads at boot. All
-  // four still describe the build and the shell it launched in; nothing about
+  // `platform` is read off the `?src=twa` marker on the launch URL, and
+  // `distribution_channel` mirrors it. Nothing about
   // the device, the browser, or the player is probed. The remaining buckets are
   // cookieless too, derived from state the device already holds (the onboarding
   // flag, the loaded tower's in-game age, and the autosave's write time), with
@@ -272,8 +255,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // enrichment hiccup can never throw past this point and abort boot, matching
   // the never-block-boot posture the boot snapshot below relies on.
   try {
-    // One platform read feeds both dimensions: the channel is resolved FROM the
-    // platform, so the runtime surface and the storefront cannot disagree.
+    // One platform read feeds both dimensions, so they cannot disagree.
     const platform = platformLabel();
     setCommonProps(
       bootCommonProps({
@@ -361,7 +343,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
       // The persistent splash install button (SPEC-pwa-install CAP-5): offered to
       // a not-standalone browser session, routed through the SAME activation the
       // in-game surfaces use (native prompt where captured, else an honest
-      // how-to). Wrapped builds are excluded inside splashInstallOffered.
+      // how-to).
       installOffered: () => splashInstallOffered(),
       onInstall: () => void activateInstall(app, "splash").catch(() => {}),
       // The 2.0 "Ground floor" badge (party 2026-07-23): a small, quiet mark by the
@@ -417,73 +399,10 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     );
   }
 
-  // The BOOT tower's origin: the autosave slot's when a save loaded, cleared
-  // when the sim behind the splash is the throwaway boot sim, so a later
-  // autosave can never inherit a scope from a tower that was not adopted. Set
-  // here rather than in the constructor because this runs synchronously at the
-  // end of construction, before any save path can fire, and this module
-  // already owns the wrapped-build boot wiring.
-  if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(app.hadReadableSave ? "auto" : undefined);
-
-  // A degraded desktop session: the shell listed saved towers and they could
-  // not be read this boot. Said HERE, in the same bulletin channel as the
-  // corrupt-save warning, because the failure modes rhyme: the player must not
-  // conclude their towers are gone, and must know saving is paused (every save
-  // path refuses in a degraded session; see storeReadDegraded for why a
-  // localStorage write would have no future).
-  if (IS_WRAPPED_BUILD && storeReadDegraded()) {
-    app.sim.emit(
-      "⚠️ Saved towers on this computer couldn't be read this session, so saving is paused. Your towers are safe; restart to try again.",
-      "bad",
-    );
-  }
-
-  // Hydration resolved a both-moved conflict for these slots: the local copy
-  // was stashed and the synced (store) copy won. Same bulletin channel and the
-  // same reason: the player must learn a divergence was resolved FOR them, and
-  // that the losing copy still exists, from the game rather than from a
-  // missing hour of progress.
-  if (IS_WRAPPED_BUILD) {
-    for (const id of hydrationConflictIds()) {
-      app.sim.emit(conflictBulletinText(id), "bad");
-    }
-  }
-
   // Autosave periodically, but never while the first-run splash is up, so an
   // idle first visit can't persist the throwaway boot sim (which would flip
   // hasSave() true for a tower the player never started).
   window.setInterval(() => {
     if (!isSplashUp()) void app.saveLoad.autosave();
   }, 30000);
-
-  // Commands from a wrapper shell's native menu (Electron's File menu today),
-  // routed to the same calls the in-game controls make. A browser session binds
-  // nothing: the port member is optional and only a wrapper defines it.
-  //
-  // LAST, deliberately, and this ordering is load-bearing. `bindHostCommands`
-  // publishes the opening availability set (and then registers the quit-time
-  // flush, whose ordering is not load-bearing), so binding before
-  // the title screen was decided meant the shell's first news was "all nine
-  // commands are available", computed with no splash up, immediately followed by
-  // a title screen where five of them are refused. The menu showed Save, Export,
-  // Undo, Redo, and Statistics enabled until the next pump tick corrected it. Binding
-  // after every branch above has run means the first push already describes the
-  // screen the player is looking at. Inbound commands are unaffected: one cannot
-  // arrive until the shell has a window, which is later than any of this.
-  if (IS_WRAPPED_BUILD) bindHostCommands(app);
-
-  // The desktop build's first-run analytics notice (issue #781), and only on a
-  // genuine first run: it no-ops once the player has answered. Last, after every
-  // branch above has decided what is on screen, so it opens over a settled
-  // title screen or a settled resumed tower rather than racing either.
-  //
-  // Nothing has been SENT by this point on a desktop build, whatever the boot
-  // path did: the gate is closed while consent is pending, and the boot snapshot
-  // fired above is held in memory until this resolves (see `desktopConsent.ts`).
-  // Behind `IS_DESKTOP_BUILD` so Rollup drops the notice and its template out of
-  // a browser bundle (the Settings row's copy stays: see the note on
-  // `IS_DESKTOP_BUILD` in `desktopConsent.ts` for what folds and what does not).
-  // `showDesktopAnalyticsNotice` re-checks the mode itself, so the guard is a
-  // bundling choice rather than the correctness argument.
-  if (IS_DESKTOP_BUILD) showDesktopAnalyticsNotice(app.ui);
 }

@@ -48,14 +48,10 @@ export interface EventThrottle {
    *  out. The two callers reach that the same way by different routes, because
    *  they latch on opposite sides of the telemetry gate:
    *
-   *  - `$exception` (`analyticsErrors.ts`) latches AFTER the gate, and never
-   *    enters the first-run held queue, so an un-sendable error never spends a
-   *    slot and there is nothing to hand back. It resets only in its test hook.
-   *  - `crash` (`analyticsCrash.ts`) latches BEFORE `trackEvent`, which is where
-   *    its gate and the hold both live, so a slot can be spent on an event whose
-   *    fate is still open. `analytics.ts` hands those back on a consent answer
-   *    that means the held crashes are about to be dropped, and keeps them on one
-   *    that means they are about to be sent.
+   *  - `$exception` (`analyticsErrors.ts`) latches AFTER the gate, so an
+   *    un-sendable error never spends a slot. It resets only in its test hook.
+   *  - `crash` (`analyticsCrash.ts`) latches BEFORE `trackEvent`, where its gate
+   *    lives. It resets through `releaseCrashThrottle`, the session reset.
    *
    *  The asymmetry is deliberate. An earlier note here called it undesigned and
    *  cited a backlog row; the row's premise was wrong and it closed (#842). */

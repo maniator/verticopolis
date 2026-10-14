@@ -390,16 +390,11 @@ describe("audio kick + pagehide", () => {
   });
 });
 
-describe("the modified-key surface a wrapper shell must not take", () => {
-  // The private Electron shell's native menu registers accelerators, and a menu
-  // accelerator is consumed BEFORE the page sees the keydown. So every modified
-  // chord this game binds is a chord the shell must leave alone, and the shell's
-  // GAME_BOUND_ACCELERATORS list is a hand-transcription of exactly this.
-  //
-  // Nothing across the repo boundary can verify that transcription, so this pins
-  // the public side: adding a modified-key binding here fails this test, which
-  // makes it a visible, reviewable event rather than a silent divergence that
-  // breaks the packaged desktop build only.
+describe("the modified-key surface the game takes from the browser", () => {
+  // Every modified chord the game binds is one the browser (and assistive
+  // technology) no longer gets: Ctrl+F, Ctrl+L, Ctrl+, and friends belong to the
+  // player. This pins the set, so adding a modified-key binding fails this test
+  // and becomes a visible, reviewable event.
 
   /** Every mock function reachable on the fake app, so a new binding is caught
    *  whatever it happens to call. Enumerating a few spies by hand was not
@@ -423,12 +418,10 @@ describe("the modified-key surface a wrapper shell must not take", () => {
     ["alt", { altKey: true }],
   ] as const;
 
-  // Generated rather than hand-listed, because a curated list is exactly how the
-  // one chord that mattered got missed: this omitted "," while the desktop shell
-  // registers Command+, and Control+, for Settings, so the guard whose whole job is
-  // "the game must never bind a chord the shell takes" was blind to it. It also
-  // omitted h, i, j, k, l, m, u, v, digits 4-9, ArrowRight, ArrowDown, and every
-  // function key but F11. Enumerating the space costs nothing here.
+  // Generated rather than hand-listed, because a curated list is exactly how a
+  // chord gets missed: an earlier list omitted ",", h, i, j, k, l, m, u, v,
+  // digits 4-9, ArrowRight, ArrowDown, and every function key but F11.
+  // Enumerating the space costs nothing here.
   const PROBE_KEYS = [
     ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i)), // a-z
     ...Array.from({ length: 10 }, (_, i) => String(i)), // 0-9
@@ -468,8 +461,7 @@ describe("the modified-key surface a wrapper shell must not take", () => {
     }
     expect(
       taken,
-      "the game took a modified chord the desktop shell may register as a menu accelerator. " +
-        "Update GAME_BOUND_ACCELERATORS in the private repo's desktop/shell/src/menu.ts in the same change.",
+      "the game took a modified chord from the browser. Bind it deliberately and list it in GAME_BOUND above.",
     ).toEqual([]);
   });
 

@@ -218,8 +218,8 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkgVersion),
     __APP_SHA__: JSON.stringify(gitShortSha()),
     // `window.game` gate. Only the tooling pipelines (e2e, screenshots, perf)
-    // build with VC_TOOLING=1; every other build, the Vercel deploy and the
-    // mobile wrappers included, gets `false` here and the publish in
+    // build with VC_TOOLING=1; every other build, the Vercel deploy
+    // included, gets `false` here and the publish in
     // bootstrap.ts is dead-code-eliminated out of the bundle, so a shipped
     // session has no console handle into the sim. Dev serves don't need the
     // variable: the gate also accepts `import.meta.env.DEV`. The value is
@@ -284,12 +284,12 @@ export default defineConfig({
         // new worker's whole manifest or none of it, activates it through
         // src/pwa.ts's save-then-reload or once every tab of the old version
         // has closed, and deletes
-        // the old version's entries, so from 2.30.1 on a page the worker
+        // the old version's entries, so from 2.31.1 on a page the worker
         // controls runs the shell and engine its install fetched together.
         // Not covered here, and tracked on #985 (the cutover plan's S16
         // version check): a page no worker controls yet (a first visit) fetches them
         // separately; an install that overlaps a deploy can store the engine's
-        // unhashed files from the newer build; and a worker from before 2.30.1
+        // unhashed files from the newer build; and a worker from before 2.31.1
         // never precached the engine at all. The
         // cost is about 430 KB compressed per install, paid by every player
         // (owner decision, 2026-10-13: the engine becomes the default at 3.0).
@@ -494,8 +494,7 @@ export default defineConfig({
         // Colocated test FIXTURES, same reasoning as the line above. A shared
         // fixture is test-only code that happens not to match `*.test.ts`, so
         // without this it would be scored as app source and move the floors for a
-        // file no player runs. `src/game/hostCommands.fixture.ts` is the first of
-        // these, created when its suite outgrew the 500-line ceiling and split.
+        // file no player runs.
         "**/*.fixture.ts",
         // Fixtures and any non-`.test.ts` helpers under the integration tree.
         "src/tests/**",
