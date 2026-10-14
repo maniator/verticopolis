@@ -22,7 +22,7 @@ differs.
 
 The runner drives any engine behind its `ScenarioEngine` interface. The
 TypeScript engine is the default; the Rust engine answers twice, natively
-through `cargo run --release --bin conformance` and through its WASM binding
+through `cargo run --release --features conformance --bin conformance` and through its WASM binding
 from Node (`npm run wasm:build && npm run test:wasm`, see
 `engine-rs/README.md`), where the same TypeScript runner replays every
 scenario against this lock. Beyond the scripted scenarios, the dual run
@@ -80,7 +80,7 @@ prices, sizes and build rules a frontend reads from the engine
 (`src/engine/catalog.ts`, `engine-rs/src/catalog.rs`). The TypeScript run
 writes it (`src/tests/integration/catalog.integration.test.ts`, regenerated
 with `VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration catalog`);
-a Rust crate test, `cargo run --release --bin conformance` and the WASM suite
+a Rust crate test, `cargo run --release --features conformance --bin conformance` and the WASM suite
 check against it. A moved digest means a price, a size or a build rule some
 frontend shows has changed: regenerate it on purpose only, in the same pull
 request, saying why.
@@ -97,7 +97,7 @@ sample variants as a base plus a top-level patch, and every `.vctower`
 fixture loaded and re-serialized), each pinned by the SHA-256 of the bytes
 `buildTDT` writes, or by the message of the refusal. It regenerates with the
 same switch as the lock (`VC_CONFORMANCE_UPDATE=1 npx vitest run --project
-integration tdtCases`); `cargo run --release --bin tdt` and a Rust unit test
+integration tdtCases`); `cargo run --release --features conformance --bin tdt` and a Rust unit test
 replay every case.
 
 The table pins chosen inputs only. `conformanceWasmTdt.integration.test.ts`,

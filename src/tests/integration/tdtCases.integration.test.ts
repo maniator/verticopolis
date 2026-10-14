@@ -2,7 +2,7 @@
  * TDT conformance table: synthetic `.TDT` files run through `parseTDT`, and
  * serialized towers run through `buildTDT`, pinned into
  * `conformance/tdt-cases.json` for the Rust `tdt` referee
- * (`cargo run --release --bin tdt`) to replay. The cases are generated here
+ * (`cargo run --release --features conformance --bin tdt`) to replay. The cases are generated here
  * from code so they regenerate on purpose only, like the scenario lock:
  * `VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration tdtCases`.
  *

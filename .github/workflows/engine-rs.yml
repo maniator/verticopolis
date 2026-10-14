@@ -144,6 +144,8 @@ jobs:
           rustup show active-toolchain | grep -q '^1\.97\.0'
           rustup component add rustfmt clippy
 
+      # Default features: no binding and no conformance harness, the
+      # library a host that only plays the game links.
       - name: The engine library builds alone
         working-directory: engine-rs
         run: cargo build --locked --lib
@@ -157,7 +159,7 @@ jobs:
         run: |
           cargo test --locked
           cargo test --locked --features wasm
-          cargo run --locked --release --bin conformance
+          cargo run --locked --release --features conformance --bin conformance
 
       - name: The consumer, in place
         working-directory: engine-rs/consumer
@@ -180,11 +182,15 @@ jobs:
           host="$RUNNER_TEMP/host"
           mkdir -p "$host"
           cp -R engine-rs/consumer/Cargo.toml engine-rs/consumer/Cargo.lock engine-rs/consumer/src "$host/"
-          sed -i "s|^verticopolis-engine = { path = \"..\" }|verticopolis-engine = { path = \"$ws/engine-rs\" }|" "$host/Cargo.toml"
-          grep -qx "verticopolis-engine = { path = \"$ws/engine-rs\" }" "$host/Cargo.toml"
+          sed -i "s|^verticopolis-engine = { path = \"..\", |verticopolis-engine = { path = \"$ws/engine-rs\", |" "$host/Cargo.toml"
+          grep -qx "verticopolis-engine = { path = \"$ws/engine-rs\", features = \[\"conformance\"\] }" "$host/Cargo.toml"
+          # The suite under another name, as a packaged copy would be: a
+          # fixture resolves inside whatever directory holds the suite.
+          suite="$RUNNER_TEMP/suite-copy"
+          cp -R conformance "$suite"
           cd "$host"
-          VC_CONFORMANCE="$ws/conformance" cargo test --locked
-          cargo run --locked --release -- "$ws/conformance"
+          VC_CONFORMANCE="$suite" cargo test --locked
+          cargo run --locked --release -- "$suite"
 
   engine-rs:
     runs-on: ubuntu-latest
@@ -211,6 +217,7 @@ jobs:
       - name: Lint
         run: |
           cargo clippy --locked --all-targets -- -D warnings
+          cargo clippy --locked --all-targets --features conformance -- -D warnings
           cargo clippy --locked --all-targets --features wasm -- -D warnings
           cargo clippy --locked --lib --target wasm32-unknown-unknown --features wasm -- -D warnings
 
@@ -220,7 +227,7 @@ jobs:
           cargo test --locked --features wasm
 
       - name: Conformance
-        run: cargo run --locked --release --bin conformance
+        run: cargo run --locked --release --features conformance --bin conformance
 
       # The referee again, through the WASM binding from Node: the same
       # TypeScript runner replays every scenario on the module wasm-bindgen
@@ -264,5 +271,5 @@ jobs:
           rustup component add llvm-tools-preview
           cargo install cargo-llvm-cov --locked --version 0.9.1
           cargo llvm-cov --no-report --locked test
-          cargo llvm-cov --no-report --locked run --bin conformance
+          cargo llvm-cov --no-report --locked run --features conformance --bin conformance
           cargo llvm-cov report --fail-under-lines 87

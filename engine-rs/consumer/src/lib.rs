@@ -18,7 +18,8 @@ use verticopolis_engine::charges::ExtendEnd;
 use verticopolis_engine::clock::GameMode;
 use verticopolis_engine::facilities::Kind;
 use verticopolis_engine::frame::{
-    frame_view, log_since, FRAME_HEADER, PERSON_FIXED, UNKNOWN_ROUTINE,
+    frame_view, header, log_since, person, CAR_RECORD, FRAME_HEADER, PERSON_FIXED, TRANSPORT_FIXED,
+    UNIT_RECORD, UNKNOWN_ROUTINE,
 };
 use verticopolis_engine::gameplay::{
     check_catalog, check_event, RemovalMethod, CATALOG_JSON, GAMEPLAY_RING_CAP,
@@ -358,13 +359,17 @@ pub fn read_frame(sim: &Simulation) -> Result<usize, String> {
         .get(..FRAME_HEADER)
         .ok_or("the frame is shorter than its header")?;
     let expect = [
-        (0, sim.clock.minutes, "minutes"),
-        (3, sim.log_seq as f64, "logSeq"),
-        (4, sim.money, "money"),
-        (5, sim.star as f64, "star"),
-        (23, sim.crowd.people.len() as f64, "people"),
-        (24, sim.tower.units.len() as f64, "units"),
-        (25, sim.tower.transports.len() as f64, "transports"),
+        (header::MINUTES, sim.clock.minutes, "minutes"),
+        (header::LOG_SEQ, sim.log_seq as f64, "logSeq"),
+        (header::MONEY, sim.money, "money"),
+        (header::STAR, sim.star as f64, "star"),
+        (header::PEOPLE, sim.crowd.people.len() as f64, "people"),
+        (header::UNITS, sim.tower.units.len() as f64, "units"),
+        (
+            header::TRANSPORTS,
+            sim.tower.transports.len() as f64,
+            "transports",
+        ),
     ];
     for (slot, want, name) in expect {
         if header[slot] != want {
@@ -387,35 +392,37 @@ pub fn read_frame(sim: &Simulation) -> Result<usize, String> {
     for p in &sim.crowd.people {
         let fixed = slice(at, PERSON_FIXED)?;
         let want = [p.id as f64, p.floors.len() as f64, p.shafts.len() as f64];
-        if fixed[13] == UNKNOWN_ROUTINE {
+        if fixed[person::ROUTINE] == UNKNOWN_ROUTINE {
             return Err(format!(
                 "person {} has a routine the frame has no code for",
                 p.id
             ));
         }
-        if [fixed[0], fixed[16], fixed[17]] != want {
-            return Err(format!(
-                "person record at {at} reads {:?}, not {want:?}",
-                [fixed[0], fixed[16], fixed[17]]
-            ));
+        let got = [
+            fixed[person::ID],
+            fixed[person::FLOOR_COUNT],
+            fixed[person::SHAFT_COUNT],
+        ];
+        if got != want {
+            return Err(format!("person record at {at} reads {got:?}, not {want:?}"));
         }
         at += PERSON_FIXED + p.floors.len() + p.shafts.len();
     }
     for u in &sim.tower.units {
-        if slice(at, 6)?[0] != u.id as f64 {
+        if slice(at, UNIT_RECORD)?[0] != u.id as f64 {
             return Err(format!("unit record at {at} is not unit {}", u.id));
         }
-        at += 6;
+        at += UNIT_RECORD;
     }
     for t in &sim.tower.transports {
-        let head = slice(at, 2)?;
+        let head = slice(at, TRANSPORT_FIXED)?;
         if head != [t.id as f64, t.cars as f64] {
             return Err(format!(
                 "shaft record at {at} reads {head:?}, not [{}, {}]",
                 t.id, t.cars
             ));
         }
-        at += 2 + 3 * t.cars as usize;
+        at += TRANSPORT_FIXED + CAR_RECORD * t.cars as usize;
     }
     if at != v.len() {
         return Err(format!("the frame records end at {at} of {}", v.len()));
@@ -436,7 +443,7 @@ pub fn read_frame(sim: &Simulation) -> Result<usize, String> {
     if entries(i64::MIN)?.len() != sim.log.len() || !entries(sim.log_seq)?.is_empty() {
         return Err("log_since does not number the ring back from logSeq".into());
     }
-    Ok(count(23))
+    Ok(count(header::PEOPLE))
 }
 
 /// Load a `.vctower` file the way the web game does: decode, deserialize,
@@ -537,8 +544,8 @@ pub fn smoke(seed: u32) -> Result<Report, String> {
 
 /// Replay one scenario of the conformance suite through the engine's own
 /// runner and compare every checkpoint with the lock, as the referee does.
-/// `conformance` is the suite's directory; a scenario that starts from a
-/// fixture also reads the fixture from the directory above it.
+/// `conformance` is the suite's directory, and a scenario that starts from
+/// a fixture reads it from there, whatever the directory is called.
 pub fn replay(conformance: &Path, id: &str) -> Result<usize, String> {
     let read = |p: &Path| {
         std::fs::read_to_string(p).map_err(|e| format!("cannot read {}: {e}", p.display()))
@@ -553,7 +560,7 @@ pub fn replay(conformance: &Path, id: &str) -> Result<usize, String> {
     let scenario = Scenario::parse(&read(
         &conformance.join("scenarios").join(format!("{id}.json")),
     )?)?;
-    let run = run_scenario(&scenario, &conformance.join(".."));
+    let run = run_scenario(&scenario, conformance);
     if let Some(e) = run.error {
         return Err(format!("{id}: {e:?}"));
     }

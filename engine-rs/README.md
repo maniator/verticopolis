@@ -48,20 +48,23 @@ those calls; CI builds and runs a copy of it outside the checkout, in the
 Rust container image with no Node.js and a checkout holding only
 `engine-rs/` and `conformance/` (`engine-rs.yml`, job `consumer`), and
 `tests/independence.rs` checks that the library source (the conformance
-harness aside) reaches for no file, clock, console, network, thread or
-process access, compiles in nothing from the web game's tree, and pulls in
-no unreviewed crate.
+harness aside, which is behind the `conformance` feature) reaches for no
+file, clock, console, network, thread or process access, compiles in
+nothing from the web game's tree, and pulls in no unreviewed crate.
+`tests/read_boundary.rs` keeps the tests and binaries reading only
+`engine-rs/` and `conformance/`, and `tests/api.rs` names the host API.
 
 ## Running
 
 ```sh
 cd engine-rs
 cargo test                                  # unit tests (rng, number formatting, hash)
-cargo run --release --bin conformance       # replay every scenario against expected.json
-cargo llvm-cov --no-report test && cargo llvm-cov --no-report run --bin conformance \
+# The referee and the tools below are the `conformance` feature.
+cargo run --release --features conformance --bin conformance       # replay every scenario against expected.json
+cargo llvm-cov --no-report test && cargo llvm-cov --no-report run --features conformance --bin conformance \
   && cargo llvm-cov report               # what the tests and the referee reach; CI floors lines at 87%
-cargo run --release --bin dump -- starter-classic t+60   # canonical JSON of one checkpoint
-cargo run --release --bin tdt                 # replay every .TDT case against conformance/tdt-cases.json
+cargo run --release --features conformance --bin dump -- starter-classic t+60   # canonical JSON of one checkpoint
+cargo run --release --features conformance --bin tdt                 # replay every .TDT case against conformance/tdt-cases.json
 (cd consumer && cargo test --locked && cargo run --locked --release)   # the frontend-free host (API.md)
 ```
 
@@ -77,7 +80,7 @@ serialized game (what `Simulation::serialize` writes). Its referee is
 `VC_CONFORMANCE_UPDATE=1` switch as the scenario lock): every synthetic
 `.TDT` case is pinned by the canonical-JSON hash of the save the TypeScript
 importer produces and its warnings, every export case by the SHA-256 of the
-bytes the TypeScript exporter writes. `cargo run --release --bin tdt` prints
+bytes the TypeScript exporter writes. `cargo run --release --features conformance --bin tdt` prints
 one line per case and exits non-zero on any mismatch; `cargo test` replays
 the same table. The engine never depends on the module.
 

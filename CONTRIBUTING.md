@@ -72,7 +72,7 @@ Verticopolis has **two test tiers**:
 
     **Two engines, one simulation.** `engine-rs/` is a Rust port of
     `src/engine/`, held to the same lock by its own referee
-    (`cargo run --release --bin conformance`, and again through the WASM
+    (`cargo run --release --features conformance --bin conformance`, and again through the WASM
     binding from Node with `npm run wasm:build && npm run test:wasm`, which
     also runs the dual run's day gate: both engines driven by the frame
     loop's own step math and compared every hour, and the `.TDT` codec's
@@ -111,7 +111,7 @@ Verticopolis has **two test tiers**:
     `conformance/loader-cases.json` (`loaderCases.integration.test.ts` writes
     it, a Rust test replays it), and the `.TDT` codec by
     `conformance/tdt-cases.json` (`tdtCases.integration.test.ts` writes it,
-    `cargo run --release --bin tdt` and a Rust test replay it). A nightly differential fuzzer
+    `cargo run --release --features conformance --bin tdt` and a Rust test replay it). A nightly differential fuzzer
     (`engine-fuzz.yml`) runs seeded random scenarios through both engines; a
     divergence it finds is pinned as a named scenario in the fix PR.
 
