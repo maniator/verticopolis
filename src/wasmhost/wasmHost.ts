@@ -42,6 +42,8 @@ import { PERSON_OPTIONALS, clearOptional } from "./personFields";
 export interface WasmHost {
   /** The engine behind the instance. */
   engine: WasmEngine;
+  /** When the read model follows the engine (see {@link WasmHostOptions}). */
+  readonly sync: "step" | "frame";
   /** Syncs so far: frame views applied and full merges done. */
   frames: number;
   merges: number;
@@ -123,6 +125,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   };
   const host: WasmHost = {
     engine,
+    sync: coalesce ? "frame" : "step",
     frames: 0,
     merges: 0,
     syncStructure() {

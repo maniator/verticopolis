@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, truncateSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { brotliCompressSync, constants } from "node:zlib";
 import { readdirSync } from "node:fs";
@@ -51,7 +51,11 @@ export function parseArgs(argv: readonly string[]): Args {
       if (!Number.isInteger(a.reps) || a.reps < 1) throw new Error("--reps must be a positive integer");
     } else if (arg === "--out") a.out = next();
     else if (arg === "--resume") a.resume = next();
-    else if (arg === "--scenarios") a.scenarios = next().split(",").filter(Boolean);
+    else if (arg === "--scenarios") {
+      a.scenarios = next().split(",").filter(Boolean);
+      if (a.scenarios.length === 0) throw new Error("--scenarios needs at least one name");
+      if (new Set(a.scenarios).size !== a.scenarios.length) throw new Error("--scenarios names a scenario twice");
+    }
     else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b`);
   }
   if (a.quick && !repsSet) a.reps = 2;
@@ -92,6 +96,9 @@ export const LIMITATIONS = [
   "Command latency times a tower rename (relayed by every host, read by nothing in the simulation) to the first frame drawn after the engine's answer is in the read model. The main-thread hosts answer in the call, so their figure is the wait for the next frame. One command is in flight at a time, one per second.",
   "Memory is measured after 30 steps on a freshly loaded page, after a forced GC. WASM linear memory only grows, so it is a high-water mark that includes the boot tower. The worker's JS heap is read through the DevTools target protocol; when that is unavailable the combined row has no worker sample. Process PSS sums the browser's processes (Linux).",
   "Frames render at a 640x360 CSS viewport (a common phone size), smaller than perf:compare's 1280x720: on this machine's software rasterizer a 1280x720 frame took about 250 ms, past Excalibur's 200 ms clamp (a longer frame is handed 1 ms of game time), so no mode simulated anything in its frames. Rows with clamped frames still understate the simulation work; the clamped-frame row counts them.",
+  "Message sizes are counted on the way in (frame views, full saves, events, log and pending text at two bytes a character); the way out (steps and commands, a few numbers each) is not measured, so as not to serialize every message twice on the measured thread.",
+  "The serialize and deserialize halves of the full save are split only on the worker host (the worker's reply time includes the serialize, the main thread's merge time the parse and merge). The main-thread hosts' read-model sync is split in perf:compare's attribution pass.",
+  "Throttles run in a fixed order (1x before 4x) in each process, and ten repetitions over four modes put two modes first three times and two modes first twice; the mode order otherwise rotates by repetition.",
   "Audio was not started in these frames (measured in perf:compare). The coalesced and worker hosts are experimental and opt-in; the shipped default is unchanged.",
 ];
 
@@ -99,23 +106,38 @@ function sh(cmd: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = p
   execFileSync(cmd, args, { cwd, stdio: "inherit", env });
 }
 
-/** Sizes of the app's own scripts in a build: the engine worker chunk and
- *  every other JavaScript asset, raw and Brotli 11. */
-export function scriptSizes(dist: string): { worker: { raw: number; brotli: number } | null; otherJs: { raw: number; brotli: number } } {
+interface Size { raw: number; brotli: number }
+
+/** Sizes in a production build, raw and Brotli 11: the engine worker chunk
+ *  (exactly one), every other JavaScript asset, and the engine package the
+ *  WASM modes download (`engine/`). Throws on a build without exactly one
+ *  worker chunk or without the package, before anything is measured. */
+export function scriptSizes(dist: string): { worker: Size; otherJs: Size; enginePackage: Size } {
+  const size = (path: string): Size => ({ raw: statSync(path).size, brotli: brotliCompressSync(readFileSync(path), { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } }).length });
+  const add = (a: Size, b: Size): Size => ({ raw: a.raw + b.raw, brotli: a.brotli + b.brotli });
   const assets = join(dist, "assets");
-  let worker: { raw: number; brotli: number } | null = null;
-  const other = { raw: 0, brotli: 0 };
+  const workers: Size[] = [];
+  let otherJs: Size = { raw: 0, brotli: 0 };
   for (const f of readdirSync(assets)) {
     if (!f.endsWith(".js")) continue;
-    const buf = readFileSync(join(assets, f));
-    const size = { raw: statSync(join(assets, f)).size, brotli: brotliCompressSync(buf, { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } }).length };
-    if (f.startsWith("engineWorker-")) worker = size;
-    else {
-      other.raw += size.raw;
-      other.brotli += size.brotli;
-    }
+    if (f.startsWith("engineWorker-")) workers.push(size(join(assets, f)));
+    else otherJs = add(otherJs, size(join(assets, f)));
   }
-  return { worker, otherJs: other };
+  if (workers.length !== 1) throw new Error(`${assets} holds ${workers.length} engine worker chunks (engineWorker-*.js); expected one`);
+  let enginePackage: Size = { raw: 0, brotli: 0 };
+  for (const f of ["verticopolis_engine_bg.wasm", "verticopolis_engine.js"]) {
+    const path = join(dist, "engine", f);
+    if (!existsSync(path)) throw new Error(`${path} is missing`);
+    enginePackage = add(enginePackage, size(path));
+  }
+  return { worker: workers[0], otherJs, enginePackage };
+}
+
+/** One CSV field: quoted when it holds a comma, a quote or a newline, with
+ *  quotes doubled. */
+export function csvField(v: string | number): string {
+  const t = String(v);
+  return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
 }
 
 export interface WorkerResults {
@@ -138,20 +160,20 @@ export function metricsCsv(metrics: readonly Metric[]): string {
   const rows = ["group,scenario,throttle,metric,unit,mode,n,median,ci_low,ci_high,mean,cv,values"];
   for (const m of metrics) {
     const s = m.summary;
-    rows.push([m.group, m.scenario, m.throttle, JSON.stringify(m.metric), m.unit, m.mode, s?.n ?? 0, s?.median ?? "", s?.medianCiLow ?? "", s?.medianCiHigh ?? "", s?.mean ?? "", s?.cv ?? "", JSON.stringify(m.values.join(" "))].join(","));
+    rows.push([m.group, m.scenario, m.throttle, m.metric, m.unit, m.mode, s?.n ?? 0, s?.median ?? "", s?.medianCiLow ?? "", s?.medianCiHigh ?? "", s?.mean ?? "", s?.cv ?? "", m.values.join(" ")].map(csvField).join(","));
   }
   return rows.join("\n") + "\n";
 }
 
 export function ratiosCsv(rs: readonly Ratio[]): string {
-  const rows = ["group,scenario,throttle,metric,mode,against,ratio,ci_low,ci_high,pairs,verdict"];
-  for (const r of rs) rows.push([r.group, r.scenario, r.throttle, JSON.stringify(r.metric), r.mode, r.against, r.ratio, r.ciLow ?? "", r.ciHigh ?? "", r.n, r.verdict].join(","));
+  const rows = ["group,scenario,throttle,metric,mode,against,ratio,ci_low,ci_high,pairs,zero_reference,verdict"];
+  for (const r of rs) rows.push([r.group, r.scenario, r.throttle, r.metric, r.mode, r.against, r.ratio, r.ciLow ?? "", r.ciHigh ?? "", r.n, r.zeroReference, r.verdict].map(csvField).join(","));
   return rows.join("\n") + "\n";
 }
 
 export async function main(argv: readonly string[], repo: string): Promise<number> {
   const args = parseArgs(argv);
-  const startedAt = new Date().toISOString();
+  const started = new Date().toISOString();
   const log = (line: string) => process.stderr.write(`${line}\n`);
   const dist = join(repo, "dist");
   const distPerf = join(repo, "dist-perf");
@@ -173,21 +195,22 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const environment = collectEnvironment(repo, distPerf, sourceHash);
   const problems = packageErrors(packageState(distPerf), packageState(dist), sourceHash);
   if (problems.length) throw new Error(`the engine package cannot be tied to this tree:\n  - ${problems.join("\n  - ")}`);
+  // The sizes, read before anything is measured: a build without the
+  // worker chunk or the package fails here, not after hours of runs.
+  const scripts = scriptSizes(dist);
   const executablePath = process.env.PW_CHROMIUM_PATH ?? null;
-  const meta = { commit: environment.commit, dirty: environment.dirty, config, enginePackage: environment.enginePackage, scenarios: scenarios.map((s) => s.sha256), machine: machineOf(environment, executablePath) };
+  const meta = { commit: environment.commit, dirty: environment.dirty, skipBuild: args.skipBuild, config, enginePackage: environment.enginePackage, scenarios: scenarios.map((s) => s.sha256), machine: machineOf(environment, executablePath) };
   const runs: ModeRun[] = [];
   let out: string;
+  let startedAt = started;
   if (args.resume) {
     out = resolve(repo, args.resume);
-    if (environment.dirty) throw new Error("--resume needs a clean tree");
-    const saved = JSON.parse(readFileSync(join(out, "checkpoint.json"), "utf8")) as typeof meta & { startedAt: string };
-    for (const k of ["commit", "config", "enginePackage", "scenarios", "machine"] as const) {
-      if (JSON.stringify(saved[k]) !== JSON.stringify(meta[k])) throw new Error(`cannot resume ${out}: its ${k} differs from this run's`);
-    }
-    for (const line of readFileSync(join(out, "runs.jsonl"), "utf8").split("\n")) if (line.trim()) runs.push(JSON.parse(line) as ModeRun);
-    log(`perf:worker: resuming ${out} with ${runs.length} finished run(s)`);
+    const cp = loadWorkerCheckpoint(out, meta);
+    runs.push(...cp.runs);
+    startedAt = cp.startedAt;
+    log(`perf:worker: resuming ${out} with ${runs.length} finished run(s)${cp.retried ? `; ${cp.retried} failed run(s) will run again` : ""}`);
   } else {
-    const day = startedAt.slice(0, 10);
+    const day = started.slice(0, 10);
     out = args.out ? resolve(repo, args.out) : resolve(repo, "docs/performance/results", `${day}-${environment.commitShort}-worker${args.quick ? "-quick" : ""}${environment.dirty ? "-dirty" : ""}`);
     if (existsSync(out)) throw new Error(`${out} already exists; results are never overwritten`);
     mkdirSync(out, { recursive: true });
@@ -223,7 +246,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     environment,
     browser: { version: runs.find((r) => r.browserVersion)?.browserVersion ?? null, executable: executablePath },
     scenarios: scenarios.map((s) => ({ name: s.name, sha256: s.sha256, population: s.population, units: s.units, transports: s.transports, saveBytes: s.save.length })),
-    scripts: scriptSizes(dist),
+    scripts,
     runs,
     metrics,
     ratios: ratios(metrics, config.modes),
@@ -243,4 +266,37 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     return 1;
   }
   return 0;
+}
+
+/**
+ * Read a stopped run's checkpoint for --resume: refuses a folder that holds
+ * final results, a run that started on a dirty tree or that this tree is
+ * not (commit, build mode, configuration, engine bytes, scenarios, machine
+ * and toolchain), and a tree that is dirty now. A last line the stop cut
+ * off is cut from the file; a bad line elsewhere is an error. A failed run
+ * is dropped, so it runs again.
+ */
+export function loadWorkerCheckpoint(dir: string, expected: Record<string, unknown>): { runs: ModeRun[]; startedAt: string; retried: number } {
+  if (existsSync(join(dir, "results.json"))) throw new Error(`${dir} already holds final results; nothing to resume`);
+  const saved = JSON.parse(readFileSync(join(dir, "checkpoint.json"), "utf8")) as Record<string, unknown> & { startedAt: string };
+  if (saved.dirty) throw new Error(`cannot resume ${dir}: it started on a dirty tree`);
+  if (expected.dirty) throw new Error("--resume needs a clean tree, the same one the run started on");
+  for (const k of ["commit", "skipBuild", "config", "enginePackage", "scenarios", "machine"]) {
+    if (JSON.stringify(saved[k]) !== JSON.stringify(expected[k])) throw new Error(`cannot resume ${dir}: its ${k} differs from this run's`);
+  }
+  const path = join(dir, "runs.jsonl");
+  let text = readFileSync(path, "utf8");
+  if (text && !text.endsWith("\n")) {
+    text = text.slice(0, text.lastIndexOf("\n") + 1);
+    truncateSync(path, Buffer.byteLength(text, "utf8"));
+  }
+  const all = text.split("\n").filter((l) => l.trim()).map((line, i) => {
+    try {
+      return JSON.parse(line) as ModeRun;
+    } catch {
+      throw new Error(`cannot resume ${dir}: line ${i + 1} of runs.jsonl is not JSON`);
+    }
+  });
+  const runs = all.filter((r) => r.ok);
+  return { runs, startedAt: saved.startedAt, retried: all.length - runs.length };
 }

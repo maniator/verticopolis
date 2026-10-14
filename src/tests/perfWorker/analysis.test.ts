@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { aggregate, definitions, ratios, validate } from "./analysis";
-import { makeConfig, metricsCsv, parseArgs, ratiosCsv } from "./main";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { csvField, loadWorkerCheckpoint, makeConfig, metricsCsv, parseArgs, ratiosCsv, scriptSizes } from "./main";
 import { markdown } from "./report";
 import { modeOrder, summarizeFrames, summarizeHosted, type ModeRun } from "./runner";
 import type { ModeName } from "./pageWorker";
@@ -12,13 +15,13 @@ const config = { ...makeConfig(parseArgs(["--reps", "6"]), ["small"]) };
 function run(rep: number, mode: ModeName, scale: number, over: Partial<ModeRun> = {}): ModeRun {
   const hosted = (t: number) => ({ wallMs: 100 * scale * t, mainMs: 50 * scale * t, batchMainP50Ms: 1, batchMainP95Ms: 2 * scale, batchMainMaxMs: 3, startDigest: "s", endDigest: "e", hostErrorsAdded: [],
     worker: mode === "wasm-worker" ? { replies: 180, staleReplies: 0, merges: 6, messagesSent: 200, messagesReceived: 181, bytesReceived: 1000, frameBytes: 1800, mergeBytes: 600, applyMs: 10, mergeMs: 5, workerOpsMs: 40, workerReplyMs: 4 } : null });
-  const frames = { frames: 60, meanFps: 10 / scale, medianMs: 100, p95Ms: 150, p99Ms: 190, onePercentLowFps: 5, simMinutesPerSecond: 50, clampedFrames: 0, longTasks: 3, blockingMs: 20 * scale, commands: 5, commandToFrameP50Ms: 30, commandToFrameP95Ms: 40, hostErrorsAdded: [],
+  const frames = { frames: 60, meanFps: 10 / scale, medianMs: 100, p95Ms: 150, p99Ms: 190, onePercentLowFps: 5, simMinutesPerSecond: 50, clampedFrames: 0, longTasks: 3, blockingMs: 20 * scale, commands: 5, commandsUnanswered: 0, commandToFrameP50Ms: 30, commandToFrameP95Ms: 40, hostErrorsAdded: [],
     worker: mode === "wasm-worker" ? { repliesPerSecond: 9, messagesPerSecond: 20, bytesPerSecond: 5000, staleReplies: 0, merges: 2, applyMsPerSecond: 3, commandAckP50Ms: 4, commandAckP95Ms: 6 } : null };
   return {
     rep, mode, order: 0, ok: true, error: null, pageErrors: [], browserVersion: "141", page: null,
     cold: { mode, gameReadyMs: 100, modeReadyMs: 200 * scale, firstFrameMs: 300, bytesBeforeReady: 1000, requestsBeforeReady: 9, wasmRequests: mode === "ts" || mode === "wasm-worker" ? 0 : 1 },
     warm: null, cold4x: null, cpuProbe: { unthrottledMs: 100, timed: { "small:4": 390 } },
-    scenarios: { small: { memory: { mainHeapUsedBytes: 10, workerHeapUsedBytes: mode === "wasm-worker" ? 5 : null, mainWasmBytes: mode === "wasm" || mode === "wasm-frame" ? 7 : null, workerWasmBytes: mode === "wasm-worker" ? 7 : null, processPssBytes: 100 }, hosted: { "1": hosted(1), "4": hosted(4) }, frames: { "1": frames, "4": frames } } },
+    scenarios: { small: { raw: mode === "ts" || mode === "wasm" ? { "1": { engine: mode === "ts" ? "ts" : "wasm", totalMs: 80 * scale, startDigest: "s", endDigest: "e" }, "4": { engine: mode === "ts" ? "ts" : "wasm", totalMs: 320 * scale, startDigest: "s", endDigest: "e" } } : {}, memory: { mainHeapUsedBytes: 10, workerHeapUsedBytes: mode === "wasm-worker" ? 5 : null, mainWasmBytes: mode === "wasm" || mode === "wasm-frame" ? 7 : null, workerWasmBytes: mode === "wasm-worker" ? 7 : null, processPssBytes: 100 }, hosted: { "1": hosted(1), "4": hosted(4) }, frames: { "1": frames, "4": frames } } },
     offline: null,
     ...over,
   };
@@ -85,7 +88,7 @@ describe("perf:worker analysis", () => {
   it("summarizes a hosted and a frames pass", () => {
     const h = summarizeHosted({ steps: 8, wallMs: 10, mainMs: 6, batchMainMs: [1, 2, 3, 4], worker: null, startKey: "a", endKey: "b", hostErrorsAdded: [] }, "s", "e");
     expect(h).toMatchObject({ wallMs: 10, mainMs: 6, batchMainP50Ms: 2.5, batchMainMaxMs: 4, startDigest: "s", endDigest: "e" });
-    const f = summarizeFrames({ intervalsMs: [100, 100, 300, 100], wallMs: 600, simMinutes: 30, longTasks: 2, longTaskMs: 400, blockingMs: 300, commandToFrameMs: [10, 30], worker: { replies: 6, staleReplies: 1, merges: 1, messagesSent: 7, messagesReceived: 6, bytesReceived: 600, applyMs: 12, commandAckMs: [4] }, hostErrorsAdded: [] });
+    const f = summarizeFrames({ intervalsMs: [100, 100, 300, 100], wallMs: 600, simMinutes: 30, longTasks: 2, longTaskMs: 400, blockingMs: 300, commandToFrameMs: [10, 30], commandsUnanswered: 0, worker: { replies: 6, staleReplies: 1, merges: 1, messagesSent: 7, messagesReceived: 6, bytesReceived: 600, applyMs: 12, commandAckMs: [4] }, hostErrorsAdded: [] });
     expect(f).toMatchObject({ frames: 4, clampedFrames: 1, simMinutesPerSecond: 50, commands: 2, commandToFrameP50Ms: 20, blockingMs: 300 });
     expect(f.worker).toMatchObject({ repliesPerSecond: 10, bytesPerSecond: 1000, applyMsPerSecond: 20, commandAckP50Ms: 4 });
   });
@@ -100,7 +103,7 @@ describe("perf:worker analysis", () => {
       schema: 1, startedAt: "2026-10-14T10:00:00Z", generatedAt: "2026-10-14T14:00:00Z", config, browser: { version: "141", executable: null },
       environment: { commitShort: "abc1234", appVersion: "2.31.1", dirty: false, enginePackage: { "verticopolis_engine_bg.wasm": "f".repeat(64) }, engineBuildHash: "h", cpuModel: "cpu", logicalCpus: 4, totalMemoryBytes: 2 ** 34, os: "linux", node: "22", playwright: "1.61" } as never,
       scenarios: [{ name: "small", sha256: "a".repeat(64), population: 10, units: 2, transports: 1, saveBytes: 5 }],
-      scripts: { worker: { raw: 8000, brotli: 2600 }, otherJs: { raw: 1, brotli: 1 } }, runs: rs, metrics, ratios: rr, validation: { ok: true, errors: [], warnings: [] }, limitations: ["one"],
+      scripts: { worker: { raw: 8000, brotli: 2600 }, otherJs: { raw: 1, brotli: 1 }, enginePackage: { raw: 900_000, brotli: 330_000 } }, runs: rs, metrics, ratios: rr, validation: { ok: true, errors: [], warnings: [] }, limitations: ["one"],
     });
     expect(md.split("\n")[2]).toMatch(/^> \*\*Snapshot, measured 2026-10-14T10:00:00Z to 2026-10-14T14:00:00Z on commit `abc1234`.*Live numbers: re-run `npm run perf:worker`.*Validation passed/);
     expect(md).toMatch(/\| small \| 1x \| wall time, 720 steps \(ms\) \|/);
@@ -108,7 +111,77 @@ describe("perf:worker analysis", () => {
     expect(definitions(config).length).toBeGreaterThan(20);
   });
 
+  it("separates the worker placement from the sync changes, and counts the pairs a zero reference dropped", () => {
+    const rs = ratios(aggregate(config, runs()), config.modes);
+    const placement = rs.find((r) => r.metric === "wall time, 720 steps" && r.throttle === "1" && r.mode === "wasm-worker" && r.against === "wasm-frame")!;
+    expect(placement.ratio).toBeCloseTo(0.5, 9);
+    expect(rs.some((r) => r.against === "wasm-frame" && r.mode !== "wasm-worker")).toBe(false);
+    const zeroed = runs().map((r) => (r.mode === "wasm" && r.rep < 2 ? { ...r, scenarios: { small: { ...r.scenarios.small, frames: { ...r.scenarios.small.frames, "1": { ...r.scenarios.small.frames["1"], blockingMs: 0 } } } } } : r));
+    const blocking = ratios(aggregate(config, zeroed), config.modes).find((r) => r.metric.startsWith("main-thread blocking") && r.throttle === "1" && r.mode === "ts" && r.against === "wasm")!;
+    expect(blocking.zeroReference).toBe(2);
+    expect(blocking.n).toBe(4);
+  });
+
+  it("checks the bare engine runs against the hosted end state", () => {
+    const rs = runs();
+    rs[0] = { ...rs[0], scenarios: { small: { ...rs[0].scenarios.small, raw: { ...rs[0].scenarios.small.raw, "1": { engine: "ts", totalMs: 1, startDigest: "s", endDigest: "drift" } } } } };
+    expect(validate(config, rs).errors.join()).toMatch(/small 1x: the modes or repetitions ended in 2 different states/);
+    const metrics = aggregate(config, runs());
+    expect(metrics.find((m) => m.group === "raw" && m.mode === "ts" && m.throttle === "1")!.values).toHaveLength(6);
+    expect(metrics.find((m) => m.group === "raw" && m.mode === "wasm-worker")!.values).toEqual([]);
+  });
+
+  it("resumes only a clean, matching, unfinished run, cuts a torn last line and runs failed ones again", () => {
+    const dir = mkdtempSync(join(tmpdir(), "perf-worker-"));
+    try {
+      const meta = { commit: "c", dirty: false, skipBuild: false, config, enginePackage: {}, scenarios: ["x"], machine: { cpu: "a" } };
+      writeFileSync(join(dir, "checkpoint.json"), JSON.stringify({ ...meta, startedAt: "2026-10-14T01:00:00Z" }));
+      const ok = run(0, "ts", 1);
+      const failed = { ...run(0, "wasm", 1), ok: false, error: "x" };
+      writeFileSync(join(dir, "runs.jsonl"), `${JSON.stringify(ok)}\n${JSON.stringify(failed)}\n{"rep":1,"mo`);
+      const cp = loadWorkerCheckpoint(dir, meta);
+      expect(cp.startedAt).toBe("2026-10-14T01:00:00Z");
+      expect(cp.runs.map((r) => r.mode)).toEqual(["ts"]);
+      expect(cp.retried).toBe(1);
+      expect(readFileSync(join(dir, "runs.jsonl"), "utf8").endsWith("\n")).toBe(true);
+      expect(() => loadWorkerCheckpoint(dir, { ...meta, commit: "other" })).toThrow(/its commit differs/);
+      expect(() => loadWorkerCheckpoint(dir, { ...meta, dirty: true })).toThrow(/clean tree/);
+      writeFileSync(join(dir, "checkpoint.json"), JSON.stringify({ ...meta, dirty: true, startedAt: "x" }));
+      expect(() => loadWorkerCheckpoint(dir, meta)).toThrow(/started on a dirty tree/);
+      writeFileSync(join(dir, "results.json"), "{}");
+      expect(() => loadWorkerCheckpoint(dir, meta)).toThrow(/already holds final results/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("quotes CSV fields and reads the build's sizes, refusing a build without one worker chunk or the package", () => {
+    expect(csvField("plain")).toBe("plain");
+    expect(csvField('a, "b"')).toBe('"a, ""b"""');
+    expect(csvField(1.5)).toBe("1.5");
+    const dist = mkdtempSync(join(tmpdir(), "perf-worker-dist-"));
+    try {
+      mkdirSync(join(dist, "assets"));
+      mkdirSync(join(dist, "engine"));
+      writeFileSync(join(dist, "assets", "main-1.js"), "x".repeat(100));
+      expect(() => scriptSizes(dist)).toThrow(/0 engine worker chunks/);
+      writeFileSync(join(dist, "assets", "engineWorker-1.js"), "y".repeat(50));
+      expect(() => scriptSizes(dist)).toThrow(/verticopolis_engine_bg\.wasm is missing/);
+      writeFileSync(join(dist, "engine", "verticopolis_engine_bg.wasm"), "z".repeat(10));
+      writeFileSync(join(dist, "engine", "verticopolis_engine.js"), "z".repeat(5));
+      const sizes = scriptSizes(dist);
+      expect(sizes.worker.raw).toBe(50);
+      expect(sizes.otherJs.raw).toBe(100);
+      expect(sizes.enginePackage.raw).toBe(15);
+      expect(sizes.worker.brotli).toBeGreaterThan(0);
+    } finally {
+      rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
   it("parses its arguments", () => {
+    expect(() => parseArgs(["--scenarios", ","])).toThrow(/at least one/);
+    expect(() => parseArgs(["--scenarios", "a,a"])).toThrow(/twice/);
     expect(parseArgs(["--quick"]).reps).toBe(2);
     expect(parseArgs(["--quick", "--reps", "3"]).reps).toBe(3);
     expect(() => parseArgs(["--reps", "0"])).toThrow(/positive/);

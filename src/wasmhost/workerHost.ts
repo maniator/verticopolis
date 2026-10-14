@@ -47,6 +47,9 @@ export interface WorkerHost {
   readonly stats: WorkerHostStats;
   /** Whether the worker has loaded the tower. */
   loaded(): boolean;
+  /** Whether the gate is open: loaded, nothing in flight, and the last reply
+   *  included every command. */
+  idle(): boolean;
   /** Route a worker reply here. */
   receive(msg: FromWorker): void;
   /** The frame loop's flush: send the batch with a frame request, when
@@ -296,6 +299,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     if (!caughtUp) exact = null;
     else if (r.merge) exact = { save: r.merge.save, seq };
     else if (exact?.seq !== seq) exact = null;
+    stats.ackedSeq = r.seq;
     const t1 = now();
     for (const [s, sent] of commandTimes) {
       if (s > r.seq) break;
@@ -322,6 +326,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     gen,
     stats,
     loaded: () => loaded,
+    idle: () => loaded && !detached && inFlight === null && lastFresh,
     flush: () => requestFrame(),
     receive(msg) {
       if (detached || !("gen" in msg) || msg.gen !== gen) {
@@ -408,6 +413,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       const keep = cmd.op === "setView" ? exactSave() : null;
       outbox.push({ seq: ++seq, cmd });
       cmdSeq = seq;
+      stats.lastCommandSeq = seq;
       commandTimes.set(seq, now());
       if (commandTimes.size > LATENCY_SAMPLES) commandTimes.delete(commandTimes.keys().next().value as number);
       exact = keep ? { save: keep.save, seq, view: { value: (cmd as { view: unknown }).view } } : null;
@@ -448,7 +454,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   Object.defineProperty(sim, "gameplayEventsDropped", { get: () => droppedAtAttach + droppedEngine, configurable: true });
   useTowerCatalogSource(sim, (mode) => catalogs[mode]);
   setStepGate(sim, {
-    canStep: () => loaded && !detached && inFlight === null && lastFresh,
+    canStep: () => host.idle(),
     flush: requestFrame,
     settle: () => host.settle(),
   });

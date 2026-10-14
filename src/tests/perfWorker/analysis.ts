@@ -10,7 +10,7 @@ import type { ModeRun, WorkerConfig } from "./runner";
  * the report prints comes from here.
  */
 export interface Metric {
-  group: "startup" | "hosted" | "frames" | "memory" | "traffic";
+  group: "startup" | "raw" | "hosted" | "frames" | "memory" | "traffic";
   scenario: string;
   throttle: string;
   metric: string;
@@ -33,6 +33,9 @@ export interface Ratio {
   ciLow: number | null;
   ciHigh: number | null;
   n: number;
+  /** Repetitions dropped because the reference was 0 there (a count that
+   *  is often zero), so `n` is the pairs that remained. */
+  zeroReference: number;
   verdict: "higher" | "lower" | "equivalent" | "inconclusive";
 }
 
@@ -41,6 +44,7 @@ interface Def { group: Metric["group"]; scenario: string; throttle: string; metr
 
 export function definitions(config: WorkerConfig): Def[] {
   const defs: Def[] = [];
+  const steps = config.steps;
   const add = (d: Def) => defs.push(d);
   add({ group: "startup", scenario: "-", throttle: "1", metric: "cold start to mode ready", unit: "ms", better: "lower", pick: (r) => r.cold?.modeReadyMs });
   add({ group: "startup", scenario: "-", throttle: "1", metric: "warm start to mode ready", unit: "ms", better: "lower", pick: (r) => r.warm?.modeReadyMs });
@@ -52,7 +56,11 @@ export function definitions(config: WorkerConfig): Def[] {
     add({ group: "memory", scenario: sc, throttle: "1", metric: "JS heaps + WASM memory (main and worker)", unit: "bytes", better: "lower", pick: (r) => {
       const m = s(r)?.memory;
       if (!m) return null;
+      // A sample only when every part of it was read: the worker's heap and
+      // linear memory on the worker host, the page's linear memory on the
+      // main-thread WASM hosts.
       if (r.mode === "wasm-worker" && (m.workerHeapUsedBytes === null || m.workerWasmBytes === null)) return null;
+      if ((r.mode === "wasm" || r.mode === "wasm-frame") && m.mainWasmBytes === null) return null;
       return m.mainHeapUsedBytes + (m.workerHeapUsedBytes ?? 0) + (m.mainWasmBytes ?? 0) + (m.workerWasmBytes ?? 0);
     } });
     add({ group: "memory", scenario: sc, throttle: "1", metric: "browser process PSS", unit: "bytes", better: "lower", pick: (r) => s(r)?.memory.processPssBytes });
@@ -60,8 +68,9 @@ export function definitions(config: WorkerConfig): Def[] {
       const t = String(rate);
       const h = (r: ModeRun) => s(r)?.hosted[t];
       const f = (r: ModeRun) => s(r)?.frames[t];
-      add({ group: "hosted", scenario: sc, throttle: t, metric: "wall time, 720 steps", unit: "ms", better: "lower", pick: (r) => h(r)?.wallMs });
-      add({ group: "hosted", scenario: sc, throttle: t, metric: "main-thread time, 720 steps", unit: "ms", better: "lower", pick: (r) => h(r)?.mainMs });
+      add({ group: "raw", scenario: sc, throttle: t, metric: `bare engine, ${steps} steps`, unit: "ms", better: "lower", pick: (r) => s(r)?.raw?.[t]?.totalMs });
+      add({ group: "hosted", scenario: sc, throttle: t, metric: `wall time, ${steps} steps`, unit: "ms", better: "lower", pick: (r) => h(r)?.wallMs });
+      add({ group: "hosted", scenario: sc, throttle: t, metric: `main-thread time, ${steps} steps`, unit: "ms", better: "lower", pick: (r) => h(r)?.mainMs });
       add({ group: "hosted", scenario: sc, throttle: t, metric: "main-thread time per batch, p95", unit: "ms", better: "lower", pick: (r) => h(r)?.batchMainP95Ms });
       add({ group: "hosted", scenario: sc, throttle: t, metric: "main-thread time per batch, max", unit: "ms", better: "lower", pick: (r) => h(r)?.batchMainMaxMs });
       add({ group: "frames", scenario: sc, throttle: t, metric: "mean FPS", unit: "fps", better: "higher", pick: (r) => f(r)?.meanFps });
@@ -72,15 +81,17 @@ export function definitions(config: WorkerConfig): Def[] {
       add({ group: "frames", scenario: sc, throttle: t, metric: "frames over 200 ms (clamped)", unit: "count", better: "lower", pick: (r) => f(r)?.clampedFrames });
       add({ group: "frames", scenario: sc, throttle: t, metric: "main-thread blocking (long tasks past 50 ms)", unit: "ms", better: "lower", pick: (r) => f(r)?.blockingMs });
       add({ group: "frames", scenario: sc, throttle: t, metric: "command to visible frame, median", unit: "ms", better: "lower", pick: (r) => f(r)?.commandToFrameP50Ms });
+      add({ group: "frames", scenario: sc, throttle: t, metric: "command to visible frame, p95", unit: "ms", better: "lower", pick: (r) => f(r)?.commandToFrameP95Ms });
       add({ group: "traffic", scenario: sc, throttle: t, metric: "worker replies per second (frames)", unit: "1/s", better: "higher", pick: (r) => f(r)?.worker?.repliesPerSecond });
+      add({ group: "traffic", scenario: sc, throttle: t, metric: "messages per second, both ways (frames)", unit: "1/s", better: "lower", pick: (r) => f(r)?.worker?.messagesPerSecond });
       add({ group: "traffic", scenario: sc, throttle: t, metric: "bytes received per second (frames)", unit: "bytes/s", better: "lower", pick: (r) => f(r)?.worker?.bytesPerSecond });
       add({ group: "traffic", scenario: sc, throttle: t, metric: "reply apply time per second (frames)", unit: "ms/s", better: "lower", pick: (r) => f(r)?.worker?.applyMsPerSecond });
       add({ group: "traffic", scenario: sc, throttle: t, metric: "command to ack, median (frames)", unit: "ms", better: "lower", pick: (r) => f(r)?.worker?.commandAckP50Ms });
       add({ group: "traffic", scenario: sc, throttle: t, metric: "frame view bytes per reply (hosted)", unit: "bytes", better: "lower", pick: (r) => (h(r)?.worker ? h(r)!.worker!.frameBytes / h(r)!.worker!.replies : null) });
       add({ group: "traffic", scenario: sc, throttle: t, metric: "full-save bytes per merge (hosted)", unit: "bytes", better: "lower", pick: (r) => (h(r)?.worker?.merges ? h(r)!.worker!.mergeBytes / h(r)!.worker!.merges : null) });
-      add({ group: "traffic", scenario: sc, throttle: t, metric: "full-save merges, 720 steps (hosted)", unit: "count", better: "lower", pick: (r) => h(r)?.worker?.merges });
-      add({ group: "traffic", scenario: sc, throttle: t, metric: "worker engine time, 720 steps (hosted)", unit: "ms", better: "lower", pick: (r) => (h(r)?.worker ? h(r)!.worker!.workerOpsMs + h(r)!.worker!.workerReplyMs : null) });
-      add({ group: "traffic", scenario: sc, throttle: t, metric: "main-thread merge time, 720 steps (hosted)", unit: "ms", better: "lower", pick: (r) => h(r)?.worker?.mergeMs });
+      add({ group: "traffic", scenario: sc, throttle: t, metric: `full-save merges, ${steps} steps (hosted)`, unit: "count", better: "lower", pick: (r) => h(r)?.worker?.merges });
+      add({ group: "traffic", scenario: sc, throttle: t, metric: `worker engine time, ${steps} steps (hosted)`, unit: "ms", better: "lower", pick: (r) => (h(r)?.worker ? h(r)!.worker!.workerOpsMs + h(r)!.worker!.workerReplyMs : null) });
+      add({ group: "traffic", scenario: sc, throttle: t, metric: `main-thread merge time, ${steps} steps (hosted)`, unit: "ms", better: "lower", pick: (r) => h(r)?.worker?.mergeMs });
     }
   }
   return defs;
@@ -118,21 +129,27 @@ export function ratios(metrics: readonly Metric[], modes: readonly ModeName[]): 
     byKey.get(k)!.set(m.mode, m);
   }
   for (const [, row] of byKey) {
-    for (const against of ["wasm", "ts"] as const) {
+    // Against the shipped host and TypeScript for every mode, and the worker
+    // host against the coalesced host: the same sync changes on both, so
+    // that ratio is the worker placement alone.
+    for (const against of ["wasm", "ts", "wasm-frame"] as const) {
       const b = row.get(against);
       if (!b) continue;
       for (const mode of modes) {
-        if (mode === against) continue;
+        if (mode === against || (against === "wasm-frame" && mode !== "wasm-worker")) continue;
         const a = row.get(mode);
         if (!a) continue;
         const pairs: [number, number][] = [];
+        let zeroReference = 0;
         a.reps.forEach((rep, i) => {
           const j = b.reps.indexOf(rep);
-          if (j >= 0 && b.values[j] !== 0) pairs.push([a.values[i], b.values[j]]);
+          if (j < 0) return;
+          if (b.values[j] === 0) zeroReference++;
+          else pairs.push([a.values[i], b.values[j]]);
         });
         if (pairs.length === 0) continue;
         const r = pairedRatio(pairs);
-        out.push({ group: a.group, scenario: a.scenario, throttle: a.throttle, metric: a.metric, mode, against, ...r, verdict: verdict(r) });
+        out.push({ group: a.group, scenario: a.scenario, throttle: a.throttle, metric: a.metric, mode, against, ...r, zeroReference, verdict: verdict(r) });
       }
     }
   }
@@ -152,10 +169,17 @@ export function validate(config: WorkerConfig, runs: readonly ModeRun[]): { erro
       else if (!r[0].ok) errors.push(`rep ${rep} ${mode}: failed: ${r[0].error}`);
     }
   }
-  const versions = new Set(runs.map((r) => r.browserVersion));
+  const versions = new Set(runs.map((r) => r.browserVersion).filter((v) => v !== null));
   if (versions.size > 1) errors.push(`the runs used different browser builds: ${[...versions].join(", ")}`);
   for (const r of runs) {
     if (!r.ok) continue;
+    if (r.offline?.error) warnings.push(`rep ${r.rep} ${r.mode}: the offline measurement failed: ${r.offline.error}`);
+    else if (r.offline && r.offline.onlineMode !== r.mode) warnings.push(`rep ${r.rep} ${r.mode}: the service-worker visit came up on ${r.offline.onlineMode}, not ${r.mode}`);
+    for (const [name, sc] of Object.entries(r.scenarios)) {
+      if (r.mode === "wasm-worker" && sc.memory.workerHeapUsedBytes === null) warnings.push(`rep ${r.rep} wasm-worker ${name}: the worker's JS heap could not be read, so its combined memory has no sample`);
+      const f1 = sc.frames["1"];
+      if (f1 && f1.simMinutesPerSecond < 1) warnings.push(`rep ${r.rep} ${r.mode} ${name} 1x frames: ${f1.simMinutesPerSecond.toFixed(2)} sim-minutes per second, so the window ran almost no simulation (clamped frames: ${f1.clampedFrames})`);
+    }
     if (r.pageErrors.length) warnings.push(`rep ${r.rep} ${r.mode}: ${r.pageErrors.length} page error(s): ${r.pageErrors.slice(0, 3).join(" | ")}`);
     for (const [name, sc] of Object.entries(r.scenarios)) {
       for (const [t, h] of Object.entries(sc.hosted)) if (h.hostErrorsAdded.length) errors.push(`rep ${r.rep} ${r.mode} ${name} ${t}x hosted: host errors ${h.hostErrorsAdded.join("; ")}`);
@@ -181,6 +205,14 @@ export function validate(config: WorkerConfig, runs: readonly ModeRun[]): { erro
         if (!h) continue;
         starts.add(h.startDigest);
         ends.add(h.endDigest);
+      }
+      // The bare engines ran the same steps from the same save.
+      for (const r of runs) {
+        const raw = r.ok ? r.scenarios[sc]?.raw?.[t] : undefined;
+        if (raw) {
+          starts.add(raw.startDigest);
+          ends.add(raw.endDigest);
+        }
       }
       if (starts.size > 1) errors.push(`${sc} ${t}x: the hosted runs started from ${starts.size} different states (${[...starts].join(", ")})`);
       if (ends.size > 1) errors.push(`${sc} ${t}x: the modes or repetitions ended in ${ends.size} different states (${[...ends].join(", ")}); the hosts must be deterministic and agree`);

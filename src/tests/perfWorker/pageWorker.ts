@@ -10,18 +10,19 @@
 
 export type ModeName = "ts" | "wasm" | "wasm-frame" | "wasm-worker";
 
-/** Which engine host the live tower runs on, read from the page: the
- *  TypeScript engine, the step host, the coalesced host or the worker host.
- *  "ts" also when a requested host holds no tower or reported an error. */
+/** Which engine host the live tower runs on, read from the hosts
+ *  themselves: the TypeScript engine, the step host, the coalesced host
+ *  (its `sync` reads "frame") or the worker host. "ts" also when a host
+ *  holds no tower or reported an error. */
 export function activeMode(): ModeName {
   const w = window as any;
   const h = w.__vcEngine;
   const sim = w.game?.sim;
   if (!h?.status?.hosted || (h.status.errors ?? []).length > 0 || !h.current?.() || !sim || !Object.prototype.hasOwnProperty.call(sim, "serialize")) return "ts";
   if (h.status.placement === "worker") return h.current().loaded() ? "wasm-worker" : "ts";
-  // The coalesced host registers a step gate; the step host does not. The
-  // gate is not reachable from the page, so the URL that booted it says.
-  return new URLSearchParams(location.search).get("engine") === "wasm-frame" ? "wasm-frame" : "wasm";
+  const sync = h.current().sync;
+  if (sync === "frame") return "wasm-frame";
+  return sync === "step" ? "wasm" : "ts";
 }
 
 export interface HostedRun {
@@ -29,11 +30,13 @@ export interface HostedRun {
   /** Wall time from the first step to the last reply applied. */
   wallMs: number;
   /** Main-thread time: the steps and flushes, plus (worker) the time spent
-   *  applying replies in message handlers. */
+   *  applying the replies in message handlers. */
   mainMs: number;
-  /** Main-thread time per batch of steps (a frame's worth). */
+  /** The same per batch of steps (a frame's worth), the batch's replies
+   *  included. */
   batchMainMs: number[];
-  /** Worker host only: its counters over the run. */
+  /** Worker host only: its counters over the timed steps (the settle that
+   *  fetches the exact end save comes after and is not counted). */
   worker: { replies: number; staleReplies: number; merges: number; messagesSent: number; messagesReceived: number; bytesReceived: number; frameBytes: number; mergeBytes: number; applyMs: number; mergeMs: number; workerOpsMs: number; workerReplyMs: number } | null;
   startKey: string;
   endKey: string;
@@ -46,50 +49,51 @@ export interface HostedRun {
  * minutes in batches of `batch` (the frame loop's cap of four), with the
  * frame loop's flush after each batch. The worker host's batch waits for
  * the worker's reply before the next one, as the frame loop's gate makes it
- * wait; the wait is wall time, not main-thread time. A warm-up run on a
+ * wait; the wait is idle wall time (the page is woken by the reply, not
+ * polling), and the reply's apply is main-thread time. A warm-up run on a
  * throwaway load comes first. The start and end saves are stashed for the
  * digest: the end save is the engine's exact one (the worker host settles
- * first).
+ * after the timed steps).
  */
-export async function hostedRun(arg: { name: string; steps: number; warmSteps: number; dt: number; batch: number }): Promise<HostedRun> {
+export async function hostedRun(arg: { name: string; steps: number; warmSteps: number; dt: number; batch: number; stash: boolean }): Promise<HostedRun> {
   const w = window as any;
   const g = w.game;
   w.__perfStash = w.__perfStash ?? {};
   const host = () => w.__vcEngine;
   const errorsNow = (): string[] => [...((host()?.status?.errors ?? []) as string[])];
-  // An uncapped yield: a message to a channel of our own runs in the next
-  // task without the nested-timer clamp setTimeout(0) gets.
-  const ch = new MessageChannel();
-  const waiters: (() => void)[] = [];
-  ch.port1.onmessage = () => waiters.shift()?.();
-  const yieldTask = () => new Promise<void>((r) => { waiters.push(r); ch.port2.postMessage(0); });
+  const isWorker = () => host()?.status?.placement === "worker";
+  // Woken by the host's own reply handling: the controller routes every
+  // worker message through `current().receive`, which this wraps for the
+  // run, so the wait costs no main-thread time.
+  const wake = (h: any, until: () => boolean, what: string, ms: number): Promise<void> =>
+    new Promise<void>((resolve, reject) => {
+      if (until()) return resolve();
+      const own = Object.getOwnPropertyDescriptor(h, "receive");
+      const receive = h.receive;
+      const done = (e?: Error) => {
+        clearTimeout(timer);
+        if (own) Object.defineProperty(h, "receive", own);
+        else delete h.receive;
+        if (e) reject(e);
+        else resolve();
+      };
+      const timer = setTimeout(() => done(new Error(`${arg.name}: ${what} within ${ms} ms`)), ms);
+      h.receive = function (this: unknown, m: unknown) {
+        receive.call(h, m);
+        if (!host().status.hosted) done(new Error(`${arg.name}: the worker host let the tower go (${errorsNow().join("; ")})`));
+        else if (until()) done();
+      };
+    });
   const adopt = async () => {
     g.adoptSim(g.sim.constructor.deserialize(JSON.parse(w.__perfSaves[arg.name])));
     g.speed = 0;
     g.engine.paused = true;
-    const h = host();
-    if (h?.status?.placement === "worker") {
-      const until = performance.now() + 60_000;
-      while (!h.current()?.loaded()) {
-        if (performance.now() > until || !h.status.hosted) throw new Error(`${arg.name}: the worker did not load the tower`);
-        await yieldTask();
-      }
-    }
+    const h = host()?.current?.();
+    if (isWorker()) await wake(h, () => h.loaded(), "the worker did not load the tower", 60_000);
     return g.sim;
   };
-  const isWorker = () => host()?.status?.placement === "worker";
   const run = async (sim: any, steps: number, perBatch?: number[]) => {
     const h = host()?.current?.();
-    const gateWait = async () => {
-      if (!isWorker()) return;
-      const until = performance.now() + 120_000;
-      // The gate holds while a reply is out; it is the stats' replies count here.
-      const want = h.stats.replies + 1;
-      while (h.stats.replies < want) {
-        if (performance.now() > until || !host().status.hosted) throw new Error(`${arg.name}: no worker reply`);
-        await yieldTask();
-      }
-    };
     let main = 0;
     for (let i = 0; i < steps; ) {
       const t = performance.now();
@@ -97,11 +101,18 @@ export async function hostedRun(arg: { name: string; steps: number; warmSteps: n
       for (let k = 0; k < n; k++) sim.tick(arg.dt);
       i += n;
       // The frame loop's flush (a no-op on the step host and on TypeScript).
-      host()?.current?.()?.flush?.();
-      const ms = performance.now() - t;
+      h?.flush?.();
+      let ms = performance.now() - t;
+      if (isWorker()) {
+        const apply = h.stats.applyMs;
+        const replies = h.stats.replies;
+        // A batch is answered by a fresh reply (a stale one is followed by
+        // a request of its own, which the gate waits for too).
+        await wake(h, () => h.stats.replies > replies && h.idle(), "no worker reply", 120_000);
+        ms += h.stats.applyMs - apply;
+      }
       main += ms;
       perBatch?.push(ms);
-      await gateWait();
     }
     return main;
   };
@@ -112,41 +123,35 @@ export async function hostedRun(arg: { name: string; steps: number; warmSteps: n
   const clock = g.engine.engine.clock;
   clock.stop();
   try {
-    return await measure();
+    // Warm-up on a throwaway load.
+    if (arg.warmSteps > 0) await run(await adopt(), arg.warmSteps);
+    const sim = await adopt();
+    const errorsAtStart = errorsNow().length;
+    const tag = `${arg.name}:hosted:${performance.now()}`;
+    if (arg.stash) w.__perfStash[`${tag}:start`] = JSON.stringify(sim.serialize());
+    const h = host()?.current?.();
+    const before = h?.stats ? { ...h.stats } : null;
+    (globalThis as any).gc?.();
+    const batchMainMs: number[] = [];
+    const t0 = performance.now();
+    const mainMs = await run(sim, arg.steps, batchMainMs);
+    const wallMs = performance.now() - t0;
+    const after = h?.stats ? { ...h.stats } : null;
+    if (isWorker()) await h.settle();
+    if (arg.stash) w.__perfStash[`${tag}:end`] = JSON.stringify(sim.serialize());
+    const d = (k: string) => (after![k] as number) - (before as any)[k];
+    return {
+      steps: arg.steps,
+      wallMs,
+      mainMs,
+      batchMainMs,
+      worker: isWorker() && before ? { replies: d("replies"), staleReplies: d("staleReplies"), merges: d("merges"), messagesSent: d("messagesSent"), messagesReceived: d("messagesReceived"), bytesReceived: d("bytesReceived"), frameBytes: d("frameBytes"), mergeBytes: d("mergeBytes"), applyMs: d("applyMs"), mergeMs: d("mergeMs"), workerOpsMs: d("workerOpsMs"), workerReplyMs: d("workerReplyMs") } : null,
+      startKey: `${tag}:start`,
+      endKey: `${tag}:end`,
+      hostErrorsAdded: errorsNow().slice(errorsAtStart),
+    };
   } finally {
     clock.start();
-  }
-  async function measure(): Promise<HostedRun> {
-  // Warm-up on a throwaway load.
-  await run(await adopt(), arg.warmSteps);
-  const sim = await adopt();
-  const errorsAtStart = errorsNow().length;
-  const tag = `${arg.name}:hosted:${performance.now()}`;
-  w.__perfStash[`${tag}:start`] = JSON.stringify(sim.serialize());
-  const h = host()?.current?.();
-  const before = h?.stats ? { ...h.stats } : null;
-  (globalThis as any).gc?.();
-  const batchMainMs: number[] = [];
-  const t0 = performance.now();
-  let mainMs = await run(sim, arg.steps, batchMainMs);
-  const wallMs = performance.now() - t0;
-  if (isWorker()) {
-    await h.settle();
-    mainMs += h.stats.applyMs - before!.applyMs;
-  }
-  w.__perfStash[`${tag}:end`] = sim.serialize();
-  const after = h?.stats;
-  const d = (k: string) => (after[k] as number) - (before as any)[k];
-  return {
-    steps: arg.steps,
-    wallMs,
-    mainMs,
-    batchMainMs,
-    worker: isWorker() && before ? { replies: d("replies"), staleReplies: d("staleReplies"), merges: d("merges"), messagesSent: d("messagesSent"), messagesReceived: d("messagesReceived"), bytesReceived: d("bytesReceived"), frameBytes: d("frameBytes"), mergeBytes: d("mergeBytes"), applyMs: d("applyMs"), mergeMs: d("mergeMs"), workerOpsMs: d("workerOpsMs"), workerReplyMs: d("workerReplyMs") } : null,
-    startKey: `${tag}:start`,
-    endKey: `${tag}:end`,
-    hostErrorsAdded: errorsNow().slice(errorsAtStart),
-  };
   }
 }
 
@@ -154,14 +159,17 @@ export interface FramesRun {
   intervalsMs: number[];
   wallMs: number;
   simMinutes: number;
-  /** Long tasks (over 50 ms) on the main thread during the window. */
-  longTasks: number;
-  longTaskMs: number;
+  /** Long tasks (over 50 ms) on the main thread during the window; null
+   *  when this browser has no long-task timing. */
+  longTasks: number | null;
+  longTaskMs: number | null;
   /** Sum over long tasks of the part past 50 ms. */
-  blockingMs: number;
+  blockingMs: number | null;
   /** Command to the first frame drawn after the engine's answer is in the
-   *  read model, ms, one per command issued in the window. */
+   *  read model, ms, one per command answered in the window, and the
+   *  commands still unanswered when it closed. */
   commandToFrameMs: number[];
+  commandsUnanswered: number;
   /** Worker host: the counters over the window. */
   worker: { replies: number; staleReplies: number; merges: number; messagesSent: number; messagesReceived: number; bytesReceived: number; applyMs: number; commandAckMs: number[] } | null;
   hostErrorsAdded: string[];
@@ -172,7 +180,8 @@ export interface FramesRun {
  * declined, autosave off), sampled by rAF for `windowMs` after `warmMs`,
  * with a long-task observer on the main thread and a player command every
  * `commandEveryMs` (a tower rename, which every host relays and which
- * changes nothing the simulation reads).
+ * changes nothing the simulation reads). On the worker host a command is
+ * answered when a reply includes its own sequence number.
  */
 export function framesRun(arg: { windowMs: number; warmMs: number; speed: number; commandEveryMs: number }): Promise<FramesRun> {
   const w = window as any;
@@ -182,16 +191,15 @@ export function framesRun(arg: { windowMs: number; warmMs: number; speed: number
   const h = host?.current?.();
   const worker = host?.status?.placement === "worker";
   const errorsAtStart = ((host?.status?.errors ?? []) as string[]).length;
-  const longs: number[] = [];
-  let on = false;
+  const longs: { start: number; duration: number }[] = [];
+  let longTasks = true;
   const obs = new PerformanceObserver((list) => {
-    if (!on) return;
-    for (const e of list.getEntries()) longs.push(e.duration);
+    for (const e of list.getEntries()) longs.push({ start: e.startTime, duration: e.duration });
   });
   try {
     obs.observe({ type: "longtask", buffered: false });
   } catch {
-    /* no long-task timing here: the run reports none */
+    longTasks = false;
   }
   (globalThis as any).gc?.();
   g.speed = arg.speed;
@@ -203,27 +211,33 @@ export function framesRun(arg: { windowMs: number; warmMs: number; speed: number
     let startMinutes = 0;
     let last = 0;
     let before: any = null;
-    let pending: { t: number; acked: number } | null = null;
+    let pending: { t: number; seq: number } | null = null;
     let commands = 0;
     let timer: ReturnType<typeof setInterval> | undefined;
     const begin = performance.now();
+    // The newest `k` of a bounded sample list (none when k is 0).
+    const lastSamples = (xs: number[], k: number): number[] => (k > 0 ? xs.slice(-Math.min(k, xs.length)) : []);
     const done = (): void => {
       clearInterval(timer);
-      on = false;
-      obs.disconnect();
       g.speed = 0;
       g.engine.paused = true;
       const after = h?.stats;
       const d = (k: string) => (after[k] as number) - before[k];
+      // Long tasks are delivered after they end: take the queued ones, and
+      // keep those that started inside the window.
+      for (const e of obs.takeRecords()) longs.push({ start: e.startTime, duration: e.duration });
+      obs.disconnect();
+      const inWindow = longs.filter((e) => e.start >= start && e.start < last);
       resolve({
         intervalsMs: intervals,
         wallMs: last - start,
         simMinutes: sim.clock.minutes - startMinutes,
-        longTasks: longs.length,
-        longTaskMs: longs.reduce((s, x) => s + x, 0),
-        blockingMs: longs.reduce((s, x) => s + Math.max(0, x - 50), 0),
+        longTasks: longTasks ? inWindow.length : null,
+        longTaskMs: longTasks ? inWindow.reduce((s, x) => s + x.duration, 0) : null,
+        blockingMs: longTasks ? inWindow.reduce((s, x) => s + Math.max(0, x.duration - 50), 0) : null,
         commandToFrameMs,
-        worker: worker && before ? { replies: d("replies"), staleReplies: d("staleReplies"), merges: d("merges"), messagesSent: d("messagesSent"), messagesReceived: d("messagesReceived"), bytesReceived: d("bytesReceived"), applyMs: d("applyMs"), commandAckMs: (after.commandAckMs as number[]).slice(before.commandAckMs.length) } : null,
+        commandsUnanswered: pending ? 1 : 0,
+        worker: worker && before ? { replies: d("replies"), staleReplies: d("staleReplies"), merges: d("merges"), messagesSent: d("messagesSent"), messagesReceived: d("messagesReceived"), bytesReceived: d("bytesReceived"), applyMs: d("applyMs"), commandAckMs: lastSamples(after.commandAckMs as number[], after.commandsAcked - before.commandsAcked) } : null,
         hostErrorsAdded: ((host?.status?.errors ?? []) as string[]).slice(errorsAtStart),
       });
     };
@@ -232,8 +246,8 @@ export function framesRun(arg: { windowMs: number; warmMs: number; speed: number
       const t = performance.now();
       sim.tower.towerName = `Perf ${++commands}`;
       // The main-thread hosts answer in the call; the worker host once a
-      // reply that includes the command is applied.
-      pending = { t, acked: worker ? (h.stats.commandsAcked as number) + 1 : 0 };
+      // reply includes this command's seq.
+      pending = { t, seq: worker ? h.stats.lastCommandSeq : 0 };
     };
     const frame = (ts: number): void => {
       if (start === 0) {
@@ -241,8 +255,7 @@ export function framesRun(arg: { windowMs: number; warmMs: number; speed: number
           start = ts;
           last = ts;
           startMinutes = sim.clock.minutes;
-          before = h?.stats ? { ...h.stats, commandAckMs: [...h.stats.commandAckMs], commandVisibleMs: [...h.stats.commandVisibleMs] } : null;
-          on = true;
+          before = h?.stats ? { ...h.stats } : null;
           timer = setInterval(issue, arg.commandEveryMs);
         }
         requestAnimationFrame(frame);
@@ -250,11 +263,9 @@ export function framesRun(arg: { windowMs: number; warmMs: number; speed: number
       }
       intervals.push(ts - last);
       last = ts;
-      if (pending) {
-        if (!worker || h.stats.commandsAcked >= pending.acked) {
-          commandToFrameMs.push(ts - pending.t);
-          pending = null;
-        }
+      if (pending && (!worker || h.stats.ackedSeq >= pending.seq)) {
+        commandToFrameMs.push(ts - pending.t);
+        pending = null;
       }
       if (ts - start >= arg.windowMs) done();
       else requestAnimationFrame(frame);
@@ -263,12 +274,14 @@ export function framesRun(arg: { windowMs: number; warmMs: number; speed: number
   });
 }
 
-/** Memory of the hosted tower after `steps` steps: the main thread's WASM
- *  linear memory (main-thread hosts, read through the app's own module) or
- *  the worker's (the worker host's last reply). The JS heaps and the
- *  process PSS come from the runner. */
+/** Memory of the hosted tower: the main thread's WASM linear memory
+ *  (main-thread hosts, read through the app's own module) or the worker's
+ *  (the worker host's last reply). The JS heaps and the process PSS come
+ *  from the runner. The harness's own stashed saves are dropped first, so
+ *  they are not counted as the game's. */
 export async function engineMemory(arg: { engineUrl: string }): Promise<{ mainWasmBytes: number | null; workerWasmBytes: number | null }> {
   const w = window as any;
+  w.__perfStash = {};
   const h = w.__vcEngine;
   if (!h?.status?.hosted) return { mainWasmBytes: null, workerWasmBytes: null };
   if (h.status.placement === "worker") return { mainWasmBytes: null, workerWasmBytes: h.current().stats.workerMemoryBytes ?? null };

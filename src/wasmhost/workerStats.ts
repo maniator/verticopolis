@@ -27,6 +27,10 @@ export interface WorkerHostStats {
   commandVisibleMs: number[];
   /** Commands a reply has included so far (not bounded). */
   commandsAcked: number;
+  /** The seq of the last command sent, and the last op a fresh reply
+   *  included, so a caller can wait for one command's acknowledgement. */
+  lastCommandSeq: number;
+  ackedSeq: number;
   /** `serialize` calls answered with the read model's own save (no exact
    *  engine save was current). */
   approximateSaves: number;
@@ -40,7 +44,7 @@ export const LATENCY_SAMPLES = 512;
 export function newWorkerHostStats(): WorkerHostStats {
   return {
     messagesSent: 0, messagesReceived: 0, opsSent: 0, bytesReceived: 0, frameBytes: 0, mergeBytes: 0, merges: 0, replies: 0, staleReplies: 0,
-    applyMs: 0, mergeMs: 0, workerOpsMs: 0, workerReplyMs: 0, commandAckMs: [], commandVisibleMs: [], commandsAcked: 0, approximateSaves: 0, workerMemoryBytes: null,
+    applyMs: 0, mergeMs: 0, workerOpsMs: 0, workerReplyMs: 0, commandAckMs: [], commandVisibleMs: [], commandsAcked: 0, lastCommandSeq: 0, ackedSeq: 0, approximateSaves: 0, workerMemoryBytes: null,
   };
 }
 

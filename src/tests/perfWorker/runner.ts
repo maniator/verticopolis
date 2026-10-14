@@ -4,6 +4,7 @@ import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepar
 import type { PerfServer } from "../perfCompare/server";
 import type { Scenario } from "../perfCompare/scenarios";
 import { frameStats, quantile } from "../perfCompare/stats";
+import { simRun } from "../perfCompare/pageSim";
 import { activeMode, engineMemory, framesRun, hostedRun, type ModeName } from "./pageWorker";
 
 /**
@@ -72,9 +73,11 @@ export interface FramesSummary {
   simMinutesPerSecond: number;
   /** Frames over 200 ms, which Excalibur hands 1 ms of game time. */
   clampedFrames: number;
-  longTasks: number;
-  blockingMs: number;
+  /** Null when the browser has no long-task timing. */
+  longTasks: number | null;
+  blockingMs: number | null;
   commands: number;
+  commandsUnanswered: number;
   commandToFrameP50Ms: number | null;
   commandToFrameP95Ms: number | null;
   worker: { repliesPerSecond: number; messagesPerSecond: number; bytesPerSecond: number; staleReplies: number; merges: number; applyMsPerSecond: number; commandAckP50Ms: number | null; commandAckP95Ms: number | null } | null;
@@ -89,8 +92,20 @@ export interface MemorySample {
   processPssBytes: number | null;
 }
 
+/** The bare engine (no host, no read model), timed in the TypeScript
+ *  process for the TypeScript engine and in the step host's process for the
+ *  WASM engine: perf:compare's raw pass, on the same steps as the hosted
+ *  runs. */
+export interface RawSummary {
+  engine: "ts" | "wasm";
+  totalMs: number;
+  startDigest: string;
+  endDigest: string;
+}
+
 export interface ScenarioResult {
   memory: MemorySample;
+  raw: Record<string, RawSummary>;
   hosted: Record<string, HostedSummary>;
   frames: Record<string, FramesSummary>;
 }
@@ -109,7 +124,7 @@ export interface ModeRun {
   cold4x: Startup | null;
   cpuProbe: { unthrottledMs: number; timed: Record<string, number> } | null;
   scenarios: Record<string, ScenarioResult>;
-  offline: { swActive: boolean; onlineMode: ModeName | null; offlineMode: ModeName | null; error: string | null } | null;
+  offline: { swActive: boolean; onlineMode: ModeName | null; offlineMode: ModeName | null; error: string | null; pageErrors: string[] } | null;
 }
 
 const STEP_TIMEOUT_MS = 20 * 60 * 1000;
@@ -140,6 +155,7 @@ export function summarizeHosted(r: Awaited<ReturnType<typeof hostedRun>>, startD
 }
 
 export function summarizeFrames(f: Awaited<ReturnType<typeof framesRun>>): FramesSummary {
+  if (f.intervalsMs.length === 0 || f.wallMs <= 0) throw new Error("the frames window drew no frames");
   const s = frameStats(f.intervalsMs);
   const secs = f.wallMs / 1000;
   return {
@@ -154,6 +170,7 @@ export function summarizeFrames(f: Awaited<ReturnType<typeof framesRun>>): Frame
     longTasks: f.longTasks,
     blockingMs: f.blockingMs,
     commands: f.commandToFrameMs.length,
+    commandsUnanswered: f.commandsUnanswered,
     commandToFrameP50Ms: p(f.commandToFrameMs, 0.5),
     commandToFrameP95Ms: p(f.commandToFrameMs, 0.95),
     worker: f.worker
@@ -180,14 +197,15 @@ async function newContext(browser: Browser, config: WorkerConfig, serviceWorkers
   return ctx;
 }
 
+/** Wait for the game, and for the requested mode to hold the tower. Every
+ *  mode, TypeScript included, is timed by the same 10 ms poll, so the
+ *  startup rows compare like with like. */
 async function waitMode(page: Page, mode: ModeName, ms = 120_000): Promise<void> {
-  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: ms, polling: 10 });
-  if (mode === "ts") return;
   await page.waitForFunction((m) => {
-    const w = window as unknown as { __perfMarks?: Record<string, number>; __vcEngine?: { status: { hosted: boolean; placement?: string }; current(): { loaded?: () => boolean } | null } };
+    const w = window as unknown as { game?: unknown; __perfMarks?: Record<string, number>; __vcEngine?: { status: { hosted: boolean; placement?: string }; current(): { loaded?: () => boolean } | null } };
+    if (!w.game) return false;
     const h = w.__vcEngine;
-    if (!h?.status.hosted || !h.current()) return false;
-    const ready = m !== "wasm-worker" || (h.status.placement === "worker" && Boolean(h.current()?.loaded?.()));
+    const ready = m === "ts" || (Boolean(h?.status.hosted) && Boolean(h?.current()) && (m !== "wasm-worker" || (h!.status.placement === "worker" && Boolean(h!.current()?.loaded?.()))));
     // The first time the poll sees the mode hold the tower, in page time.
     if (ready && w.__perfMarks && w.__perfMarks.modeReady === undefined) w.__perfMarks.modeReady = performance.now();
     return ready;
@@ -203,9 +221,9 @@ async function startup(page: Page, server: PerfServer, mode: ModeName, go: () =>
   await page.waitForFunction(() => (window as unknown as { __perfMarks?: { firstFrameAfterReady?: number } }).__perfMarks?.firstFrameAfterReady !== undefined, undefined, { timeout: 30_000 }).catch(() => {});
   server.take();
   const marks = await page.evaluate(() => ({ ...((window as unknown as { __perfMarks?: Record<string, number> }).__perfMarks ?? {}) }) as Record<string, number | undefined>);
-  // TypeScript is ready with the game; a WASM mode when the 10 ms poll
-  // first saw it hold the tower (the worker: loaded).
-  const modeReadyMs = mode === "ts" ? (marks.gameReady ?? null) : (marks.modeReady ?? null);
+  // When the 10 ms poll first saw the mode hold the tower (the worker:
+  // loaded; TypeScript: the game).
+  const modeReadyMs = marks.modeReady ?? null;
   const seen = await page.evaluate(activeMode);
   if (seen !== mode) throw new Error(`requested ${mode} but ${seen} holds the tower`);
   return {
@@ -248,10 +266,9 @@ async function workerHeapBytes(browser: Browser): Promise<number | null> {
       cdp.on("Target.receivedMessageFromTarget", (e: { sessionId: string; message: string }) => {
         if (e.sessionId !== sessionId) return;
         const m = JSON.parse(e.message) as { id?: number; result?: { usedSize: number } };
-        if (m.id === 2 && m.result) {
-          clearTimeout(timer);
-          resolve(m.result.usedSize);
-        }
+        if (m.id !== 2) return;
+        clearTimeout(timer);
+        resolve(m.result ? m.result.usedSize : null);
       });
     });
     await cdp.send("Target.sendMessageToTarget", { sessionId, message: JSON.stringify({ id: 1, method: "HeapProfiler.collectGarbage" }) });
@@ -312,8 +329,8 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
     for (const sc of scenarios) {
       await freshPage(page, mode, `${sc.name} boot`);
       await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
-      // Memory after an hour of steps on a fresh page.
-      await ev(page, `${sc.name} memory steps`, hostedRun, { name: sc.name, steps: config.memorySteps, warmSteps: 0, dt: config.dt, batch: config.batch });
+      // Memory after a few steps on a fresh page.
+      await ev(page, `${sc.name} memory steps`, hostedRun, { name: sc.name, steps: config.memorySteps, warmSteps: 0, dt: config.dt, batch: config.batch, stash: false });
       await cdp.send("HeapProfiler.collectGarbage");
       const heap = (await cdp.send("Runtime.getHeapUsage")) as { usedSize: number };
       const wasm = await ev(page, "engine memory", engineMemory, { engineUrl });
@@ -325,16 +342,23 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
         processPssBytes: processTreePss(process.pid, /chrom|headless_shell/i)?.bytes ?? null,
       };
       await expectMode(page, mode, `${sc.name} memory`);
-      run.scenarios[sc.name] = { memory, hosted: {}, frames: {} };
+      run.scenarios[sc.name] = { memory, raw: {}, hosted: {}, frames: {} };
       const result = run.scenarios[sc.name];
       for (const rate of config.throttles) {
         await throttle(cdp, rate);
         try {
           if (rate > 1) run.cpuProbe.timed[`${sc.name}:${rate}`] = await ev(page, "cpu probe", cpuProbe, undefined);
-          const r = await ev(page, `${sc.name} hosted`, hostedRun, { name: sc.name, steps: config.steps, warmSteps: config.warmSteps, dt: config.dt, batch: config.batch });
+          const r = await ev(page, `${sc.name} hosted`, hostedRun, { name: sc.name, steps: config.steps, warmSteps: config.warmSteps, dt: config.dt, batch: config.batch, stash: true });
           const start = await ev(page, "digest", digestStashed, r.startKey);
           const end = await ev(page, "digest", digestStashed, r.endKey);
           result.hosted[String(rate)] = summarizeHosted(r, start, end);
+          // The bare engine, once per engine (TypeScript in its own process,
+          // WASM in the step host's).
+          if (mode === "ts" || mode === "wasm") {
+            const engine = mode === "ts" ? "ts" : "wasm";
+            const raw = await ev(page, `${sc.name} raw`, simRun, { name: sc.name, mode: "raw", engine, steps: config.steps, warmSteps: config.warmSteps, dt: config.dt, engineUrl, attribute: false });
+            result.raw[String(rate)] = { engine, totalMs: raw.totalMs, startDigest: await ev(page, "digest", digestStashed, raw.startKey), endDigest: await ev(page, "digest", digestStashed, raw.endKey) };
+          }
         } finally {
           await throttle(cdp, 1);
         }
@@ -347,9 +371,10 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
         await waitMode(page, mode);
         await throttle(cdp, rate);
         try {
+          if (rate > 1) run.cpuProbe.timed[`frames-${sc.name}:${rate}`] = await ev(page, "cpu probe", cpuProbe, undefined);
           const f = summarizeFrames(await ev(page, `${sc.name} frames`, framesRun, { windowMs: config.frameWindowMs, warmMs: config.frameWarmMs, speed: config.speed, commandEveryMs: config.commandEveryMs }));
           result.frames[String(rate)] = f;
-          log(`  rep ${rep} ${mode} ${sc.name} ${rate}x frames: ${f.meanFps.toFixed(2)} fps mean, ${f.onePercentLowFps.toFixed(2)} 1% low, ${f.simMinutesPerSecond.toFixed(1)} sim-min/s, blocking ${f.blockingMs.toFixed(0)} ms`);
+          log(`  rep ${rep} ${mode} ${sc.name} ${rate}x frames: ${f.meanFps.toFixed(2)} fps mean, ${f.onePercentLowFps.toFixed(2)} 1% low, ${f.simMinutesPerSecond.toFixed(1)} sim-min/s, blocking ${f.blockingMs?.toFixed(0) ?? "n/a"} ms`);
         } finally {
           await throttle(cdp, 1);
         }
@@ -368,6 +393,8 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
         await slowPage.goto(url, { waitUntil: "commit" });
         await throttle(slowCdp, slowRate);
       });
+      // The throttle held in this context too.
+      run.cpuProbe.timed[`cold:${slowRate}`] = await ev(slowPage, "cpu probe", cpuProbe, undefined);
       await slow.close();
     }
     run.ok = true;
@@ -375,7 +402,7 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
     run.error = e instanceof Error ? e.message : String(e);
     log(`  rep ${rep} ${mode}: FAILED: ${run.error}`);
   }
-  if (run.ok && browser) run.offline = await offline(browser, config, url, listen, sink);
+  if (run.ok && browser) run.offline = await offline(browser, config, url, mode, listen, sink);
   await browser?.close().catch(() => {});
   return run;
 }
@@ -383,10 +410,19 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
 /** A first visit with the service worker allowed, then an offline reload:
  *  which mode comes back without the network. A side measurement: nothing
  *  in it fails the repetition. */
-async function offline(browser: Browser, config: WorkerConfig, url: string, listen: (p: Page) => void, sink: { side: string[] | null }): Promise<NonNullable<ModeRun["offline"]>> {
-  const result: NonNullable<ModeRun["offline"]> = { swActive: false, onlineMode: null, offlineMode: null, error: null };
-  const errors: string[] = [];
-  sink.side = errors;
+async function offline(browser: Browser, config: WorkerConfig, url: string, mode: ModeName, listen: (p: Page) => void, sink: { side: string[] | null }): Promise<NonNullable<ModeRun["offline"]>> {
+  const result: NonNullable<ModeRun["offline"]> = { swActive: false, onlineMode: null, offlineMode: null, error: null, pageErrors: [] };
+  sink.side = result.pageErrors;
+  // The mode a page settles on: the requested one if it comes up within
+  // the wait, otherwise whatever holds the tower then.
+  const settled = async (page: Page, ms: number): Promise<ModeName> => {
+    await page.waitForFunction((m) => {
+      const w = window as unknown as { __vcEngine?: { status: { hosted: boolean; placement?: string }; current(): { loaded?: () => boolean } | null } };
+      const h = w.__vcEngine;
+      return m === "ts" ? true : Boolean(h?.status.hosted && h.current() && (m !== "wasm-worker" || h.current()?.loaded?.()));
+    }, mode, { timeout: ms, polling: 50 }).catch(() => {});
+    return page.evaluate(activeMode);
+  };
   let ctx: BrowserContext | null = null;
   try {
     ctx = await newContext(browser, config, "allow");
@@ -396,15 +432,13 @@ async function offline(browser: Browser, config: WorkerConfig, url: string, list
     await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 120_000 });
     result.swActive = await within("service worker", page.evaluate(() => Promise.race([navigator.serviceWorker.ready.then(() => true), new Promise<boolean>((ok) => setTimeout(() => ok(false), 30_000))])), 60_000);
     await page.waitForLoadState("networkidle", { timeout: 120_000 });
-    await page.waitForTimeout(2000);
-    result.onlineMode = await page.evaluate(activeMode);
+    result.onlineMode = await settled(page, 30_000);
     if (result.swActive) {
       await ctx.setOffline(true);
       try {
         await page.reload({ waitUntil: "commit" });
         await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 60_000 });
-        await page.waitForTimeout(3000);
-        result.offlineMode = await page.evaluate(activeMode);
+        result.offlineMode = await settled(page, 30_000);
       } finally {
         await ctx.setOffline(false);
       }
