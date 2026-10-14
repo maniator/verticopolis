@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { catalogFor } from "../../engine/catalog";
@@ -29,8 +29,11 @@ describe.skipIf(!hasWasmPackage())("engine package surface", () => {
     expect(typeof proto.towerResizeTransport).toBe("function");
   });
 
-  it("the shipped glue in src/public/engine exports both surfaces", () => {
-    const glue = readFileSync(resolve(REPO_ROOT, "src/public/engine/verticopolis_engine.js"), "utf8");
+  // The web build's copy of the package; a checkout that builds it only for
+  // the jobs that serve it (#958) has no copy to check, so the case skips.
+  const SHIPPED_GLUE = resolve(REPO_ROOT, "src/public/engine/verticopolis_engine.js");
+  it.skipIf(!existsSync(SHIPPED_GLUE))("the shipped glue in src/public/engine exports both surfaces", () => {
+    const glue = readFileSync(SHIPPED_GLUE, "utf8");
     expect(glue).toMatch(/export function catalog\(/);
     expect(glue).toMatch(/\btowerSetCars\(/);
     expect(glue).toMatch(/\btowerResizeTransport\(/);
