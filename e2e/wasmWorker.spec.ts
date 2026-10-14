@@ -41,7 +41,9 @@ test("the game runs on the WASM engine in a worker behind ?engine=wasm-worker", 
     g.sim.money = 1e9;
     const ok = g.sim.build("lobby", 1, 160).ok;
     await h.settle();
+    const approximateBefore = h.current().stats.approximateSaves;
     const save = g.sim.serialize();
+    const exact = h.current().stats.approximateSaves === approximateBefore;
     return {
       ok,
       hosted: h.status.hosted,
@@ -49,10 +51,14 @@ test("the game runs on the WASM engine in a worker behind ?engine=wasm-worker", 
       replies: h.current().stats.replies,
       unitInEngine: save.units.some((u: { kind: string; x: number }) => u.kind === "lobby" && u.x === 160),
       money: save.money,
+      exact,
       save: JSON.stringify(save),
     };
   });
-  expect(result).toMatchObject({ ok: true, hosted: true, errors: [], unitInEngine: true });
+  expect(result).toMatchObject({ ok: true, hosted: true, errors: [], unitInEngine: true, exact: true });
+  // The lobby cost came out of the billion the engine was given.
+  expect(result.money).toBeLessThan(1e9);
+  expect(result.money).toBeGreaterThan(1e9 - 1e6);
   expect(result.replies).toBeGreaterThan(2);
   // The settled save is the engine's: a second engine loaded from it writes it back unchanged.
   const roundTrip = await page.evaluate(async (save) => {
@@ -69,7 +75,11 @@ test("the game runs on the WASM engine in a worker behind ?engine=wasm-worker", 
   // The worker's script is in the service worker's precache, so an offline
   // start finds it (the engine package itself is #985's).
   const sw = await page.evaluate(async () => (await fetch(new URL("sw.js", document.baseURI))).text());
-  expect(sw).toMatch(/assets\/engineWorker-[\w-]+\.js/);
+  const precached = /assets\/engineWorker-[\w-]+\.js/.exec(sw)?.[0];
+  expect(precached).toBeTruthy();
+  // The worker this page runs is that same script (one build, one hash).
+  const loadedWorker = await page.evaluate(() => performance.getEntriesByType("resource").map((e) => new URL(e.name).pathname).find((p) => /engineWorker-/.test(p)) ?? null);
+  expect(loadedWorker?.endsWith(precached!)).toBe(true);
   expect(errors).toEqual([]);
 });
 

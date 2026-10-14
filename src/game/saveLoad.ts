@@ -164,6 +164,12 @@ export class SaveLoad {
         // waiting costs nothing (no-op on every other engine). The camera is
         // stamped after the wait, so the save carries where it is now.
         await settleEngine(sim);
+        // A tower adopted during the wait is not the one to write: go round
+        // again with the tower the app holds now.
+        if (this.deps.getSim() !== sim) {
+          this.autosaveQueued = true;
+          continue;
+        }
         this.stampView(sim);
         await SaveGame.saveAsync(sim);
       } while (this.autosaveQueued);

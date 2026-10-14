@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { attachWorkerHost, type WorkerHost } from "./workerHost";
 import { EngineWorkerCore, MAX_ERRORS_PER_TOWER } from "./workerCore";
@@ -101,7 +101,7 @@ describe("worker host (fake engine)", () => {
     expect(r.gate().canStep()).toBe(false);
     const again = last(r.toWorker) as Extract<ToWorker, { type: "ops" }>;
     expect(again.request?.merge).toBe(true);
-    expect(again.ops.every((o) => "cmd" in o)).toBe(true);
+    expect(again.ops, "no new steps (the command went out on its own)").toEqual([]);
     await r.settleTasks();
     expect(r.host.stats.merges).toBe(1);
     expect(r.sim.money).toBe(1);
@@ -291,6 +291,110 @@ describe("worker host (fake engine)", () => {
   });
 });
 
+describe("worker host round 2 (fake engine)", () => {
+  afterEach(() => {
+    delete (globalThis as { document?: unknown }).document;
+  });
+
+  it("takes the engine's minute only from a fresh reply, and after a stale one drops (and counts) the copies at detach", async () => {
+    const r = rig();
+    await r.settleTasks();
+    const t0 = r.sim.clock.minutes;
+    expect(r.sim.build("lobby", 1, 170).ok).toBe(true);
+    await r.settleTasks();
+    r.sim.drainGameplayEvents();
+    r.sim.tick(5);
+    r.gate().flush();
+    expect(r.sim.build("lobby", 1, 171).ok).toBe(true); // after the request: its reply is stale
+    r.engine().owed = [{ name: "facility_placed", payload: { kind: "lobby", floor: 1, count: 1 } }];
+    // Let the stale reply in, and detach before the next one.
+    await new Promise((res) => setTimeout(res, 0));
+    await new Promise((res) => setTimeout(res, 0));
+    expect(r.host.stats.staleReplies).toBe(1);
+    r.host.detach();
+    expect(r.sim.clock.minutes, "back to the last fresh reply's minute").toBe(t0);
+    const events = r.sim.drainGameplayEvents();
+    expect(events.filter((e) => e.name === "facility_placed")).toHaveLength(1); // the engine's, never twice
+    expect(r.sim.gameplayEventsDropped).toBeGreaterThanOrEqual(1);
+  });
+
+  it("is fatal on a reply to a request that is not in flight, and a camera stamp leaves the reply in flight fresh", async () => {
+    const r = rig();
+    await r.settleTasks();
+    r.host.receive({ type: "frame", gen: 1, req: 42, seq: 0, view: new Float64Array(26), events: "[]", dropped: 0, log: null, pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    expect(r.fatal.join()).toMatch(/a reply to request 42 while no request was in flight/);
+    r.host.detach();
+
+    const v = rig();
+    await v.settleTasks();
+    v.sim.tick(1);
+    v.gate().flush();
+    v.sim.view = { x: 1, y: 1, zoom: 1 } as never;
+    await v.settleTasks();
+    expect(v.host.stats.staleReplies).toBe(0);
+    v.host.detach();
+  });
+
+  it("waits for a visible page before giving up on a reply, and opens the gate after a streak of stale replies", async () => {
+    (globalThis as { document?: unknown }).document = { hidden: true };
+    const mod = fakeModule();
+    const fatal: string[] = [];
+    const core = new EngineWorkerCore(mod, () => {});
+    const silent = attachWorkerHost(Simulation.newGame(2, "classic"), { gen: 1, catalogs: core.catalogs(), send: () => {}, onFatal: (m) => fatal.push(m), onError: () => {}, replyTimeoutMs: 5 });
+    await new Promise((res) => setTimeout(res, 25));
+    expect(fatal).toEqual([]);
+    (globalThis as { document?: unknown }).document = { hidden: false };
+    await new Promise((res) => setTimeout(res, 25));
+    expect(fatal.join()).toMatch(/did not answer the load/);
+    silent.detach();
+
+    const r = rig();
+    await r.settleTasks();
+    // A command lands after every request: each reply is stale.
+    const sim = r.sim;
+    for (let i = 0; i < 5; i++) {
+      sim.tick(1);
+      r.gate().flush();
+      sim.money = 1000 + i;
+      await new Promise((res) => setTimeout(res, 0));
+      await new Promise((res) => setTimeout(res, 0));
+    }
+    expect(r.host.stats.staleReplies).toBeGreaterThanOrEqual(4);
+    await r.settleTasks();
+    expect(r.gate().canStep()).toBe(true);
+    r.host.detach();
+  });
+
+  it("is fatal on a malformed frame view that answers the request in flight", () => {
+    const mod = fakeModule();
+    const core = new EngineWorkerCore(mod, () => {});
+    const sim = Simulation.newGame(4, "classic");
+    const sent: ToWorker[] = [];
+    const fatal: string[] = [];
+    const h = attachWorkerHost(sim, { gen: 1, catalogs: core.catalogs(), send: (m) => sent.push(m), onFatal: (m) => fatal.push(m), onError: () => {} });
+    const view = new Float64Array(26);
+    view[0] = sim.clock.minutes;
+    h.receive({ type: "loaded", gen: 1, view });
+    sim.tick(1);
+    h.flush();
+    const req = (last(sent) as Extract<ToWorker, { type: "ops" }>).request!.req;
+    h.receive({ type: "frame", gen: 1, req, seq: 1, view: new Float64Array(3), events: "[]", dropped: 0, log: null, pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    expect(fatal.join()).toMatch(/frame view: 3 numbers/);
+    h.detach();
+  });
+
+  it("drops a timed-out settle's waiter", async () => {
+    const mod = fakeModule();
+    const sent: ToWorker[] = [];
+    const core = new EngineWorkerCore(mod, () => {});
+    const h = attachWorkerHost(Simulation.newGame(3, "classic"), { gen: 1, catalogs: core.catalogs(), send: (m) => sent.push(m), onFatal: () => {}, onError: () => {} });
+    const t0 = Date.now();
+    await h.settle(); // nothing ever answers: the host's own cap lets it go
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(1900);
+    h.detach();
+  }, 10_000);
+});
+
 describe("worker core (fake engine)", () => {
   it("refuses a bad load and a gap as fatal, caps the refused ops it reports, and frees on free", () => {
     const mod = fakeModule();
@@ -310,12 +414,21 @@ describe("worker core (fake engine)", () => {
     core.handle({ type: "ops", gen: 1, ops: [{ seq: 1, dt: 1 }] }); // another tower's: ignored
     const engine = last(mod.engines)!;
     for (let i = 1; i <= MAX_ERRORS_PER_TOWER + 5; i++) {
-      engine.failOn = "tick";
-      core.handle({ type: "ops", gen: 2, ops: [{ seq: i, dt: 1 }] });
+      engine.failOn = "setMoney";
+      core.handle({ type: "ops", gen: 2, ops: [{ seq: i, cmd: { op: "setMoney", amount: i } }] });
     }
     const refused = out.filter((m) => m.type === "error" && m.gen === 2);
     expect(refused).toHaveLength(MAX_ERRORS_PER_TOWER);
     expect(refused.every((m) => m.type === "error" && !m.fatal)).toBe(true);
+    // A step that fails is fatal, past the cap too, and frees the engine.
+    const save2 = JSON.stringify(Simulation.newGame(2, "classic").serialize());
+    core.handle({ type: "load", gen: 30, save: save2, markers });
+    const stepping = last(mod.engines)!;
+    stepping.failOn = "tick";
+    core.handle({ type: "ops", gen: 30, ops: [{ seq: 1, dt: 1 }] });
+    expect(last(out)).toMatchObject({ type: "error", gen: 30, seq: 1, fatal: true, message: "tick: tick failed" });
+    expect(stepping.freed).toBe(true);
+    core.handle({ type: "load", gen: 2, save, markers });
     // Past the cap, a fatal error still goes out, and the engine is freed.
     core.handle({ type: "ops", gen: 2, ops: [{ seq: MAX_ERRORS_PER_TOWER + 9, dt: 1 }] });
     expect(last(out)).toMatchObject({ type: "error", gen: 2, fatal: true, message: expect.stringMatching(/gap/) });

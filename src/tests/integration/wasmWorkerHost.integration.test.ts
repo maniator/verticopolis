@@ -6,6 +6,11 @@ import { hasWasmPackage, wasmRequired } from "../conformance/wasmEngine";
 import { framePeople, frameMotion, frames, fromSave, host, ownStateView, script, type HostKind, type Hosted } from "../wasmWorker/hostDriver";
 import { drain } from "../wasmWorker/channel";
 import { stepGate } from "../../wasmhost/stepGate";
+import { advanceOwedMinutes, SPEEDS } from "../../game/frameLoop";
+import { ShadowEngine } from "../../dualrun/shadow";
+import { loadCommand } from "../../dualrun/mirror";
+import { wasm } from "../conformance/wasmEngine";
+import type { ToWorker } from "../../wasmhost/workerProtocol";
 
 const last = <T>(xs: readonly T[]): T | undefined => xs[xs.length - 1];
 
@@ -190,6 +195,45 @@ describe.skipIf(!hasWasmPackage())("the worker and coalesced hosts against the s
       expect(other.minutes).toBe(step.minutes);
       expect(other.save).toBe(step.save);
       expect(other.people).toBe(step.people);
+    }
+  }, 300_000);
+
+  it("pipelined as in the browser (no wait for replies, banked minutes, commands landing mid-flight): the engine ends as a bare engine fed the same ops", async () => {
+    const sim = fromSave(SCENARIOS[1].save);
+    const start = loadCommand(sim, 0);
+    const h = await host("worker", sim);
+    try {
+      const debt = { minutes: 0 };
+      const app = { sim, accMinutes: 0 };
+      let held = 0;
+      for (let f = 0; f < 600; f++) {
+        const gate = stepGate(sim)!;
+        if (!gate.canStep()) held++;
+        advanceOwedMinutes(app, debt, 1000 / 60, SPEEDS[3], false, gate.canStep());
+        gate.flush();
+        if (f % 37 === 5) sim.money = sim.money + 1000;
+        if (f % 53 === 11) sim.emit(`note ${f}`, "info");
+        if (f % 71 === 3) sim.tower.towerName = `Tower ${f}`;
+        // One task turn: a reply may or may not be in by the next frame.
+        await new Promise((r) => setImmediate(r));
+      }
+      expect(held, "frames that found a batch still in flight").toBeGreaterThan(0);
+      expect(h.worker!.host.stats.staleReplies, "replies that predated a command").toBeGreaterThan(0);
+      const save = canonicalJson(await h.exactSave());
+      expect(h.worker!.fatal).toEqual([]);
+      // The same ops, in the order sent, on a bare engine.
+      const bare = new ShadowEngine(wasm());
+      bare.apply(start);
+      for (const m of h.worker!.channel.sent as ToWorker[]) {
+        if (m.type !== "ops") continue;
+        for (const op of m.ops) bare.apply("dt" in op ? { op: "tick", dt: op.dt } : op.cmd);
+      }
+      expect(save).toBe(canonicalJson(JSON.parse(bare.handle().serialize())));
+      // And the read model, caught up, is the engine's.
+      expect(ownStateView(sim)).toBe(bare.handle().stateView());
+      bare.free();
+    } finally {
+      h.detach();
     }
   }, 300_000);
 

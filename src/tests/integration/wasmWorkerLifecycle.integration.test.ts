@@ -165,10 +165,11 @@ describe.skipIf(!hasWasmPackage())("worker host lifecycle", () => {
     h.receive({ type: "error", gen: h.gen, seq: 3, fatal: false, message: "refused" });
     expect(handle.status.hosted).toBe(true);
     expect(handle.status.errors.join()).toMatch(/op 3: refused/);
-    // A malformed frame view is fatal: the tower goes back to TypeScript.
+    // A reply the host cannot apply (here, one that answers no request) is
+    // fatal: the tower goes back to TypeScript.
     h.receive({ type: "frame", gen: h.gen, req: 1, seq: 0, view: new Float64Array(3), events: "[]", dropped: 0, log: null, pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
     expect(handle.status.hosted).toBe(false);
-    expect(handle.status.errors.join()).toMatch(/frame view: 3 numbers/);
+    expect(handle.status.errors.join()).toMatch(/reply: a reply to request 1 while no request was in flight/);
     // The restart fails: reported, the tower stays on TypeScript.
     a.adoptSim(Simulation.deserialize(JSON.parse(save())));
     await drain();

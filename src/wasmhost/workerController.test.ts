@@ -65,7 +65,8 @@ describe("worker controller (fake engine)", () => {
     const first = await spawnEngineWorker(fakeWorker, "u");
     const a = app();
     let resolveNext: (w: SpawnedWorker) => void = () => {};
-    const h = startWorkerHost(a, first, () => new Promise((r) => { resolveNext = r; }), quiet);
+    let respawns = 0;
+    const h = startWorkerHost(a, first, () => { respawns++; return new Promise((r) => { resolveNext = r; }); }, quiet);
     first.worker.onerror?.({});
     expect(h.status.hosted).toBe(false);
     expect(last(h.status.errors)).toMatch(/crashed: unknown error/);
@@ -75,6 +76,7 @@ describe("worker controller (fake engine)", () => {
     resolveNext(next);
     await tasks();
     expect(h.status).toMatchObject({ hosted: true, workers: 2 });
+    expect(respawns, "one restart for both adopts").toBe(1);
     h.stop();
     // A restart that finishes after a stop terminates its worker.
     const b = app();
@@ -109,11 +111,13 @@ describe("settleEngine", () => {
   it("resolves at once without a gate, waits for a gate, and gives up at the timeout", async () => {
     const sim = {};
     await settleEngine(sim);
-    let done = false;
     setStepGate(sim, { canStep: () => true, flush: () => {}, settle: () => new Promise<void>(() => {}) });
     expect(stepGate(sim)).toBeDefined();
-    await settleEngine(sim, 5).then(() => { done = true; });
-    expect(done).toBe(true);
+    const t0 = Date.now();
+    await settleEngine(sim, 5); // a gate that never settles: the timeout ends it
+    expect(Date.now() - t0).toBeLessThan(1000);
+    setStepGate(sim, { canStep: () => true, flush: () => {}, settle: () => Promise.reject(new Error("no")) });
+    await expect(settleEngine(sim)).resolves.toBeUndefined(); // never rejects
     expect(SETTLE_TIMEOUT_MS).toBeGreaterThan(0);
     setStepGate(sim, null);
     expect(stepGate(sim)).toBeUndefined();

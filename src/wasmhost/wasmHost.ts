@@ -136,6 +136,16 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     },
     detach() {
       if (detached) return;
+      // Coalesced mode: steps since the last sync are applied first, so the
+      // instance that becomes the authority again holds them (best effort:
+      // an engine that cannot answer is let go below as before).
+      if (coalesce && stale) {
+        try {
+          syncFrame();
+        } catch {
+          /* the teardown below still runs */
+        }
+      }
       detached = true;
       // The instance is the authority again: it keeps the events the engine
       // still owes and the engine's drop count. Every step of the teardown

@@ -7,7 +7,7 @@ import { initPwaInstall } from "./pwaInstall";
 import { dualRunRequested, startDualRun, type DualRunApp } from "./dualrun/dualRun";
 import { engineRequested } from "./wasmhost/engineChoice";
 import { enginePackageUrl, loadWasmEngine, startWasmHost, type WasmHostApp } from "./wasmhost/startWasmHost";
-import { makeBrowserWorker, spawnEngineWorker, startWorkerHost, type SpawnedWorker } from "./wasmhost/workerController";
+import { makeBrowserWorker, spawnEngineWorker, startWorkerHost, type SpawnedWorker, type WorkerHostHandle } from "./wasmhost/workerController";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { refreshSplashVersion } from "./wasmhost/engineLabel";
 import type { WasmModule } from "./dualrun/binding";
@@ -167,6 +167,7 @@ export function bootGame(create: () => BootApp): Promise<void> {
     const choice = engineRequested();
     let wasmModule: WasmModule | null = null;
     let engineWorker: SpawnedWorker | null = null;
+    let workerHost: WorkerHostHandle | null = null;
     if (choice === "wasm" || choice === "wasm-frame") {
       try {
         wasmModule = await loadWasmEngine();
@@ -184,10 +185,13 @@ export function bootGame(create: () => BootApp): Promise<void> {
       const app = create();
       if (engineWorker) {
         try {
-          startWorkerHost(app as unknown as WasmHostApp, engineWorker, () => spawnEngineWorker(makeBrowserWorker, enginePackageUrl()));
+          workerHost = startWorkerHost(app as unknown as WasmHostApp, engineWorker, () => spawnEngineWorker(makeBrowserWorker, enginePackageUrl()));
           engineWorker = null; // the host owns it now
           refreshSplashVersion();
         } catch (e) {
+          // A host that attached before the throw lets its tower go first.
+          workerHost?.stop();
+          workerHost = null;
           engineWorker?.worker.terminate();
           engineWorker = null;
           console.error("[wasm-worker] did not start; running on the TypeScript engine:", e);
@@ -228,6 +232,7 @@ export function bootGame(create: () => BootApp): Promise<void> {
       registerPWA({ onUpdateAvailable: (activate, info) => app.onUpdateAvailable(activate, info) });
     } catch (err) {
       // A worker started for a game that never came up is let go.
+      (workerHost as WorkerHostHandle | null)?.stop(); // assigned in the try above
       engineWorker?.worker.terminate();
       // A non-Error throw (a string, say) has no `.message`, so derive the text
       // defensively rather than render "undefined"; the original error is still

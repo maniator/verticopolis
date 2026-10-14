@@ -91,11 +91,22 @@ export class EngineWorkerCore {
         return;
       }
       this.seq = op.seq;
+      // A step that fails leaves the engine's clock and state where no
+      // later reply can be trusted, so it is fatal; a refused command is
+      // reported and the run goes on.
+      if ("dt" in op) {
+        try {
+          this.shadow.apply({ op: "tick", dt: op.dt });
+        } catch (e) {
+          this.fatal(op.seq, `tick: ${message(e)}`);
+          return;
+        }
+        continue;
+      }
       try {
-        if ("dt" in op) this.shadow.apply({ op: "tick", dt: op.dt });
-        else this.shadow.apply(op.cmd);
+        this.shadow.apply(op.cmd);
       } catch (e) {
-        this.fail(op.seq, `${"dt" in op ? "tick" : op.cmd.op}: ${message(e)}`);
+        this.fail(op.seq, `${op.cmd.op}: ${message(e)}`);
       }
     }
     const t1 = now();
