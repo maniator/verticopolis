@@ -106,6 +106,8 @@ describe("depth-layer marks on the cabs and the metro train", () => {
     expect(names.some((n) => n.startsWith("car/"))).toBe(true);
     expect(names.filter((n) => n.startsWith("vehicle/metrotrain/"))).toHaveLength(2);
     expect(names.some((n) => n.startsWith("vehicle/streetcar/") || n.startsWith("vehicle/garbagetruck"))).toBe(false);
+    // Each carries its riders inside: a front picture over them.
+    expect(jobs.every((j) => j.front === true)).toBe(true);
     const wrong: string[] = [];
     for (const j of jobs) {
       for (const [i, spec] of [j.paint, ...Object.values(j.chains ?? {}).flatMap((c) => c.steps)].entries()) {

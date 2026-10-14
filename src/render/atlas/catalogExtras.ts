@@ -111,8 +111,10 @@ export function transportJobs(): Job[] {
           jobs.push({
             ...still(`car/${kind}/${arrow ?? "idle"}/${full ? "full" : "notfull"}/s${s}`, w, FLOOR, car(0), { kind, arrow: arrow ?? "idle", full, variant: s }),
             chains: { riders: { input: "riders", steps } },
-            // The cab is the shell and its riders, step by step, the furniture.
+            // The cab's interior is the back, its riders, step by step, the
+            // furniture, and its door frames, FULL bar and lantern the front.
             layers: true,
+            front: true,
           });
         });
       }
@@ -182,7 +184,7 @@ export function vehicleJobs(): Job[] {
   const trainW = FACILITIES.metro.width * TILE - 6;
   for (const headlight of [true, false]) {
     jobs.push(
-      { ...still(`vehicle/metrotrain/${headlight ? "headlight" : "dark"}`, trainW, METRO_TRAIN_H, { p: "metroTrain", w: trainW, headlight }, { vehicle: "metrotrain", headlight }), layers: true },
+      { ...still(`vehicle/metrotrain/${headlight ? "headlight" : "dark"}`, trainW, METRO_TRAIN_H, { p: "metroTrain", w: trainW, headlight }, { vehicle: "metrotrain", headlight }), layers: true, front: true },
     );
   }
   return jobs;

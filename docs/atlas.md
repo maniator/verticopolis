@@ -349,15 +349,22 @@ and the doorman are the furniture. Neither has a chain, so a frontend draws
 the shell and then the furniture (or the soft furniture).
 
 The elevator cabs (`car/...`) and the metro train (`vehicle/metrotrain/...`)
-split the same way, so the people inside sit between the car body and its
-front. A cab's shell is the cab with its doors open on an empty floor, its
-`riders` chain puts the riders on the furniture, and the door frames, the
-FULL bar and the lantern draw after the furniture ends, so they sit on the
-shell. The train's shell is the whole consist and its furniture the riders in
-the saloon windows; each window's glint draws after them, on the shell, so
-the furniture is transparent under it. The street cars and the garbage truck
-show no one inside and are drawn flat; `data.depth` names the plane each
-draws on.
+carry the people inside them, so they split three ways and add a `front`
+picture (with `front` steps in their chain), drawn after the furniture:
+
+5. the `front` parts,
+6. the chain's `front` steps `1..min(n, len - 1)`.
+
+The shell is the interior seen through the doors or windows, the furniture
+the riders, and the front the vehicle around them: a cab's door frames,
+center seam, FULL bar and lantern, and the train's whole body with its window
+glints, cut away where the saloon windows are. A frontend that sets the
+riders a little behind the front keeps them inside the vehicle. Like the
+furniture, the front holds the flat frame's pixels where they differ from
+what is under them, so a cab's translucent door frames carry the rider color
+they cover. A frame with a front has no `soft` picture. The street cars and
+the garbage truck show no one inside and are drawn flat; `data.depth` names
+the plane each draws on.
 
 The layers' own images are packed on pages after the frame images', so a
 frontend that ignores `layers` reads the same frames, parts and pages as before

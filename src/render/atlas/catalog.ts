@@ -33,6 +33,10 @@ export interface StillJob {
   /** Try a depth split of the frame's paint (a room): a paint that marks a
    *  shell break (`pixelSprites/layers.ts`) gets shell and furniture layers. */
   layers?: boolean;
+  /** True for a vehicle: with `layers`, what the paint draws after its
+   *  `layerEnd` becomes a front picture over the riders instead of landing
+   *  on the shell (`BakedLayers.front`). */
+  front?: boolean;
   /** True for a family added after the first atlas: its new images pack on
    *  pages after the first atlas's frame pages (`BakeResult.groups`). */
   ownPages?: boolean;

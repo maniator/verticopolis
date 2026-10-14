@@ -29,6 +29,13 @@ export interface Renderer {
    * renderer without it bakes no soft furniture.
    */
   renderSoft?(spec: PaintSpec, w: number, h: number): Image | null;
+  /**
+   * For a frame with a front picture: the canvas at the paint's `layerBreak`
+   * (`back`) and at its `layerEnd` (`mid`, the back plus what came between),
+   * so what the paint draws after the end is the front. Null when the paint
+   * marks no break; with no end, `mid` is the finished paint.
+   */
+  renderSplit?(spec: PaintSpec, w: number, h: number): { back: Image; mid: Image } | null;
 }
 
 /** A frame's chain split for depth: step `k` of `shell` is what changes on
@@ -38,6 +45,8 @@ export interface Renderer {
 export interface BakedLayerChain {
   shell: (ImageRef | null)[];
   furniture: (ImageRef | null)[];
+  /** Steps over the front picture; present along with it. */
+  front?: (ImageRef | null)[];
   /** Steps over the soft furniture picture; absent along with it (a
    *  translucent pixel that changes, or a failed soft pass). */
   soft?: (ImageRef | null)[];
@@ -51,6 +60,11 @@ export interface BakedLayerChain {
 export interface BakedLayers {
   shell: ImageRef | null;
   furniture: ImageRef | null;
+  /** What the paint draws after its furniture that stands in front of it
+   *  (a cab's door frames, a train's body around its windows): drawn last,
+   *  over the furniture. Present only for frames that ask for it, which then
+   *  carry no soft picture. */
+  front?: ImageRef | null;
   soft?: ImageRef | null;
   chains?: Record<string, BakedLayerChain>;
 }
@@ -223,7 +237,8 @@ type PendingLayers = {
   shell: PendingRef | null;
   furniture: PendingRef | null;
   soft?: PendingRef | null;
-  chains?: Record<string, { shell: (PendingRef | null)[]; furniture: (PendingRef | null)[]; soft?: (PendingRef | null)[] }>;
+  front?: PendingRef | null;
+  chains?: Record<string, { shell: (PendingRef | null)[]; furniture: (PendingRef | null)[]; soft?: (PendingRef | null)[]; front?: (PendingRef | null)[] }>;
 };
 
 /** Drop trailing nulls from a depth step list (each list on its own). */
@@ -326,6 +341,39 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
         const next = r.render(spec, job.w, job.h);
         (frame.overlays ??= {})[key] = store.layer(diffLayer(base, next), next);
       }
+      // A vehicle splits three ways: the back (the interior seen through its
+      // windows), the riders, then the front (the body and frames around
+      // them), each what differs from the picture before it.
+      const split3 = job.layers && job.front && r.renderSplit ? r.renderSplit(job.paint, job.w, job.h) : null;
+      if (job.layers && job.front && r.renderSplit && !split3) throw new LayerError("marks no layer break");
+      if (split3) {
+        if (Object.keys(job.chains ?? {}).length > 1) throw new LayerError("depth layers need at most one chain");
+        const three = (prev: { back: Image; furniture: Image; front: Image } | null, flat: Image, s: { back: Image; mid: Image }) => {
+          const furniture = furniturePicture(prev?.furniture ?? null, s.mid, s.back);
+          const front = furniturePicture(prev?.front ?? null, flat, s.mid);
+          if (!composesTo(s.back, furniture, s.mid) || !composesTo(s.mid, front, flat)) throw new LayerError("back, furniture and front do not compose to the frame");
+          return { back: s.back, furniture, front };
+        };
+        let prev = three(null, base, split3);
+        const layers: PendingLayers = { shell: layerStore.shell(prev.back), furniture: layerStore.piece(trim(prev.furniture), base), front: layerStore.piece(trim(prev.front), base) };
+        for (const [key, chain] of Object.entries(job.chains ?? {})) {
+          const renders = chainRenders[key];
+          const out = { shell: [null] as (PendingRef | null)[], furniture: [null] as (PendingRef | null)[], front: [null] as (PendingRef | null)[] };
+          for (let k = 1; k < chain.steps.length; k++) {
+            const sk = r.renderSplit!(chain.steps[k], job.w, job.h);
+            if (!sk) throw new LayerError(`chain ${key} step ${k} marks no layer break`);
+            const next = three(prev, renders[k], sk);
+            out.shell.push(layerStore.piece(diffLayer(prev.back, next.back), next.back));
+            out.furniture.push(layerStore.piece(diffLayer(prev.furniture, next.furniture), renders[k]));
+            out.front.push(layerStore.piece(diffLayer(prev.front, next.front), renders[k]));
+            prev = next;
+          }
+          (layers.chains ??= {})[key] = { shell: trimPending(out.shell), furniture: trimPending(out.furniture), front: trimPending(out.front) };
+        }
+        pending.push({ frame, layers });
+        frames.push(frame);
+        return;
+      }
       // The depth split: the furniture is what differs from the shell, so the
       // shell plus the furniture gives back `base` exactly (diffLayer refuses
       // any pixel source-over could not reproduce).
@@ -394,11 +442,13 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
   for (const { frame, layers: p } of pending) {
     const layers: BakedLayers = { shell: resolve(p.shell), furniture: resolve(p.furniture) };
     if ("soft" in p) layers.soft = resolve(p.soft ?? null);
+    if ("front" in p) layers.front = resolve(p.front ?? null);
     if (p.chains) {
       layers.chains = {};
       for (const [key, c] of Object.entries(p.chains)) {
         const out: BakedLayerChain = { shell: c.shell.map(resolve), furniture: c.furniture.map(resolve) };
         if (c.soft) out.soft = c.soft.map(resolve);
+        if (c.front) out.front = c.front.map(resolve);
         layers.chains[key] = out;
       }
     }

@@ -71,7 +71,7 @@ export function signature(): AtlasManifest["signature"] {
       parkingRoll: "a space holds a car when hash(int32(id * 31)) < parkingUse, where hash(n) is: x = int32(n * 2654435761) with the product taken as a float64 (IEEE double) multiply; x = imul32(x ^ (x >>> 15), 0x2c1b3c6d); x = imul32(x ^ (x >>> 13), 0x297a2d39); (x ^ (x >>> 16)) as unsigned / 2^32. int32(v) truncates v toward zero and wraps it modulo 2^32 to a signed 32-bit integer (JavaScript's v | 0); imul32 is a 32-bit integer multiply; ^ is a 32-bit xor and >>> a logical (zero-filling) right shift on the 32-bit pattern, so a negative x shifts in zeros. The first step is not imul32: the two can differ once the product's magnitude passes 2^53",
       cinema: "the cinema's marquee and screen read the animation clock; the web keeps whatever phase its last re-bake caught, the atlas bakes phase 0",
       originSeeded: `${[...ORIGIN_SEEDED].join(", ")}: a few details (staff shirts, skyline windows, climbing holds) follow the web's draw origin; the atlas carries the per-unit look at origin 0, 0`,
-      layers: "a room frame, a lobby tile, an entrance frame, an elevator cab or the metro train may carry 'layers' for drawing with depth. To draw it with its chain at n (the frame's one chain, if any: 'occupants', 'riders' or 'fill'), draw the 'shell' parts and the chain's 'shell' steps 1..min(n, len - 1), then the 'furniture' parts and the chain's 'furniture' steps the same way, then any overlay the frame shows (a parking space's car or dead mark), each source-over; the result equals the frame's parts, its chain steps 1..n and the overlay exactly. 'soft' (with the chain's 'soft' steps) is an optional furniture picture that keeps glows and soft shadows translucent; over the shell it rounds a step or two away from the frame's parts. A frame without 'layers' (vacancy, closed and gutted rooms, and every family outside the ones named here) is drawn flat",
+      layers: "a room frame, a lobby tile, an entrance frame, an elevator cab or the metro train may carry 'layers' for drawing with depth. To draw it with its chain at n (the frame's one chain, if any: 'occupants', 'riders' or 'fill'), draw the 'shell' parts and the chain's 'shell' steps 1..min(n, len - 1), then the 'furniture' parts and the chain's 'furniture' steps the same way, then any overlay the frame shows (a parking space's car or dead mark), each source-over; an elevator cab or the metro train also has a 'front' picture (and 'front' chain steps), drawn after the furniture and before any overlay; the result equals the frame's parts, its chain steps 1..n and the overlay exactly. 'soft' (with the chain's 'soft' steps) is an optional furniture picture that keeps glows and soft shadows translucent; over the shell it rounds a step or two away from the frame's parts. A frame without 'layers' (vacancy, closed and gutted rooms, and every family outside the ones named here) is drawn flat",
       depth: "data.depth names the game's draw planes back to front ('z', higher in front; equal planes draw in the order the game adds their actors) and the frame families on each",
       skyMotion: "data.sky gives the sun's arc and each cloud's drift in the game's own terms; both are screen-space, sized to the view",
     },
@@ -165,11 +165,13 @@ export function buildArchive(
       const steps = (list: (ImageRef | null)[]) => list.map((s) => layerOf(s, packed.placements));
       const layers: DepthLayers = { shell: parts(f.layers.shell), furniture: parts(f.layers.furniture) };
       if ("soft" in f.layers) layers.soft = parts(f.layers.soft ?? null);
+      if ("front" in f.layers) layers.front = parts(f.layers.front ?? null);
       if (f.layers.chains) {
         layers.chains = {};
         for (const [k, c] of Object.entries(f.layers.chains)) {
           const chain: DepthLayerChain = { shell: steps(c.shell), furniture: steps(c.furniture) };
           if (c.soft) chain.soft = steps(c.soft);
+          if (c.front) chain.front = steps(c.front);
           layers.chains[k] = chain;
         }
       }
@@ -287,7 +289,9 @@ function eachLayeredPicture(
       const flatSteps = rec.chains?.[key]?.steps ?? [null];
       const split = layers.chains?.[key] ?? { shell: [null], furniture: [null] };
       const hasSoft = layers.soft !== undefined && (key === "" || split.soft !== undefined);
-      const top = Math.max(flatSteps.length, split.shell.length, split.furniture.length, split.soft?.length ?? 0) - 1;
+      const front = blank(rec.w, rec.h);
+      if (layers.front) drawParts(front, pages, layers.front);
+      const top = Math.max(flatSteps.length, split.shell.length, split.furniture.length, split.soft?.length ?? 0, split.front?.length ?? 0) - 1;
       const flat = blank(rec.w, rec.h);
       drawParts(flat, pages, rec.parts);
       const shell = blank(rec.w, rec.h);
@@ -302,9 +306,11 @@ function eachLayeredPicture(
           drawStep(shell, pages, split.shell[n] ?? undefined);
           drawStep(furniture, pages, split.furniture[n] ?? undefined);
           if (hasSoft) drawStep(soft, pages, split.soft?.[n] ?? undefined);
+          if (layers.front) drawStep(front, pages, split.front?.[n] ?? undefined);
         }
         const exact = { w: rec.w, h: rec.h, data: shell.data.slice() };
         over(exact, furniture, 0, 0);
+        if (layers.front) over(exact, front, 0, 0);
         let softPicture: { picture: Image; layer: Image } | null = null;
         if (hasSoft) {
           const picture = { w: rec.w, h: rec.h, data: shell.data.slice() };
@@ -334,7 +340,9 @@ export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): strin
     const flat = JSON.stringify(Object.keys(rec.chains ?? {}).sort());
     const depth = JSON.stringify(Object.keys(layers.chains ?? {}).sort());
     const soft = layers.soft !== undefined;
-    const lists = Object.values(layers.chains ?? {}).flatMap((c) => [c.shell, c.furniture, ...(c.soft ? [c.soft] : [])]);
+    const lists = Object.values(layers.chains ?? {}).flatMap((c) => [c.shell, c.furniture, ...(c.soft ? [c.soft] : []), ...(c.front ? [c.front] : [])]);
+    const front = layers.front !== undefined;
+    if (front && (soft || Object.values(layers.chains ?? {}).some((c) => c.front === undefined))) bad.add(name);
     const oneChain = Object.keys(rec.chains ?? {}).length <= 1;
     if (flat !== depth || !oneChain || lists.some((l) => l[0] !== null) || Object.values(layers.chains ?? {}).some((c) => (c.soft !== undefined) !== soft)) bad.add(name);
   }

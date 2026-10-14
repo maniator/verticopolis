@@ -441,3 +441,56 @@ describe("depth layers on occupant steps", () => {
     expect(checkLayers(a)).toContain("lit");
   });
 });
+
+/** A fake vehicle: an interior in 50, riders in 200 from pixel 1, then its
+ *  frame (90) at both ends and a seam at pixel 3, over any rider there. */
+const bus = (riders: number): PaintSpec => ({ p: "solid", css: `bus:${riders}` });
+function busPixels(spec: PaintSpec, w: number, h: number, upTo: "back" | "mid" | "flat"): Image | null {
+  if (spec.p !== "solid" || !spec.css.startsWith("bus:")) return null;
+  const riders = Number(spec.css.split(":")[1]);
+  const img = blank(w, h);
+  for (let i = 0; i < w * h; i++) img.data.set([50, 0, 0, 255], i * 4);
+  if (upTo === "back") return img;
+  for (let r = 1; r <= riders && r < w - 1; r++) img.data.set([200, 0, 0, 255], r * 4);
+  if (upTo === "mid") return img;
+  for (const x of [0, 3, w - 1]) img.data.set([90, 0, 0, 255], x * 4);
+  return img;
+}
+const busFake: Renderer = {
+  render: (spec, w, h) => busPixels(spec, w, h, "flat") ?? fake.render(spec, w, h),
+  renderShell: () => null,
+  renderSplit: (spec, w, h) => (busPixels(spec, w, h, "back") ? { back: busPixels(spec, w, h, "back")!, mid: busPixels(spec, w, h, "mid")! } : null),
+};
+
+describe("a vehicle's front picture", () => {
+  const job: Job = {
+    type: "still",
+    name: "bus",
+    w: 6,
+    h: 1,
+    anchor: { x: 0, y: 0 },
+    keys: {},
+    paint: bus(0),
+    chains: { riders: { input: "riders", steps: [bus(0), bus(1), bus(2), bus(3), bus(4)] } },
+    layers: true,
+    front: true,
+  };
+  const r = bake([job], busFake);
+  const f = r.frames[0];
+
+  it("splits into the interior, the riders and the frame in front of them", () => {
+    expect(f.layers?.front).toBeTruthy();
+    expect(f.layers?.soft).toBeUndefined();
+    expect(f.layers?.chains?.riders.front).toBeDefined();
+    // The back is the bare interior; nothing of the frame lands on it.
+    expect(sameImage(composeLayered(r, { ...f, layers: { shell: f.layers!.shell, furniture: null } }), busPixels(bus(0), 6, 1, "back")!)).toBe(true);
+  });
+  it("composes back, riders and front to the flat frame at every rider count", () => {
+    for (let n = 0; n <= 4; n++) expect(sameImage(composeLayered(r, f, { riders: n }), composeFrame(r, f, { riders: n })), `n=${n}`).toBe(true);
+    const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+    expect(checkLayers(buildArchive(r, info, undefined, 32))).toEqual([]);
+  });
+  it("refuses a vehicle whose paint marks no break", () => {
+    expect(() => bake([{ ...job, paint: solid("3"), chains: undefined }], busFake)).toThrow(/marks no layer break/);
+  });
+});

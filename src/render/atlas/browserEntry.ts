@@ -106,6 +106,25 @@ export function canvasRenderer(doc: Document): Renderer {
       if (!split) return null;
       return { w, h, data: ctx.getImageData(0, 0, w, h).data };
     },
+    // For a vehicle: the canvas at the break (the back) and at the end of the
+    // furniture (the back plus the riders); what the paint draws after the
+    // end is its front, which the bake takes from the flat frame.
+    renderSplit(spec: PaintSpec, w: number, h: number): { back: Image; mid: Image } | null {
+      const ctx = prepare(canvas, w, h);
+      const back = prepare(saved, w, h);
+      const mid = prepare(aside, w, h);
+      const marks = shellMarks(
+        () => copyPixels(back, canvas),
+        () => copyPixels(mid, canvas),
+      );
+      withLayerHook(marks.hook, () => paint(ctx, spec, w, h));
+      const split = marks.finish();
+      ctx.restore();
+      back.restore();
+      mid.restore();
+      if (!split) return null;
+      return { back: { w, h, data: back.getImageData(0, 0, w, h).data }, mid: { w, h, data: mid.getImageData(0, 0, w, h).data } };
+    },
     // The same paint once more: at the break the canvas is cleared, so the
     // furniture lands on transparency with its own glows and shadows; at the
     // end of the furniture the paint switches to source-atop, so the marks
