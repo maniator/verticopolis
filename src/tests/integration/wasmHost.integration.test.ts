@@ -286,7 +286,7 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
   });
 
   it("refuses a tower whose crowd already exists", () => {
-    const sim = loadFixture("src/tests/fixtures/towerone-star4.vctower");
+    const sim = loadFixture("conformance/fixtures/towerone-star4.vctower");
     sim.tick(60);
     expect(sim.crowd.people.length).toBeGreaterThan(0);
     expect(() => attachWasmHost(sim, wasm())).toThrow(/crowd/);

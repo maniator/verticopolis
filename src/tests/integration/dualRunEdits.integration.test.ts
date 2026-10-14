@@ -18,7 +18,7 @@ if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but 
 
 describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => {
   it("every host-side edit on the four-star tower stays in step", () => {
-    const sim = loadFixture("src/tests/fixtures/towerone-star4.vctower");
+    const sim = loadFixture("conformance/fixtures/towerone-star4.vctower");
     const run = new DualRun().follow(sim);
     const drive = new FrameDriver(sim, 3);
     drive.run(90);

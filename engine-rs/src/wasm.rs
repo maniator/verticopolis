@@ -1154,7 +1154,7 @@ mod tests {
         // A real tower, so the view carries people, every unit kind and cars.
         let text = std::fs::read_to_string(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../src/tests/fixtures/towerone-star4.vctower"
+            "/../conformance/fixtures/towerone-star4.vctower"
         ))
         .expect("fixture");
         let raw = crate::load::decode_vctower(&text).expect("decodes");

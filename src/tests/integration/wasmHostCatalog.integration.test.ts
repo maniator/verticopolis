@@ -93,7 +93,7 @@ describe.skipIf(!hasWasmPackage())("a hosted tower reads the engine's catalog (#
   });
 
   it("leaves the tables in place when it refuses a tower whose crowd already exists", () => {
-    const sim = loadFixture("src/tests/fixtures/towerone-star4.vctower");
+    const sim = loadFixture("conformance/fixtures/towerone-star4.vctower");
     sim.tick(60);
     expect(sim.crowd.people.length).toBeGreaterThan(0);
     const { mod, asked, built } = countingModule();

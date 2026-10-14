@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { inflateSync } from "fflate";
-import towerFile from "../fixtures/towerone_6.vctower?raw";
+import towerFile from "../../../conformance/fixtures/towerone_6.vctower?raw";
 import { Simulation } from "../../engine/Simulation";
 import { FLOOR, TILE, TowerEngine } from "../../render/excalibur/TowerEngine";
 import { GRID } from "../../engine/facilities";
