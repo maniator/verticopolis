@@ -75,8 +75,9 @@ describe("a vehicle's front picture", () => {
     const a = buildArchive(r, info, undefined, 32);
     const rec = a.manifest.frames.bus;
     const orphan = { ...rec, layers: { ...rec.layers!, front: undefined } };
-    const withSoft = { ...rec, layers: { ...rec.layers!, soft: [] } };
-    for (const bad of [orphan, withSoft]) expect(checkLayers({ ...a, manifest: { ...a.manifest, frames: { bus: bad } } })).toEqual(["bus"]);
+    const withSoft = { ...rec, layers: { ...rec.layers!, soft: [], chains: { riders: { ...rec.layers!.chains!.riders, soft: [null] } } } };
+    const missingSteps = { ...rec, layers: { ...rec.layers!, chains: { riders: { ...rec.layers!.chains!.riders, front: undefined } } } };
+    for (const bad of [orphan, withSoft, missingSteps]) expect(checkLayers({ ...a, manifest: { ...a.manifest, frames: { bus: bad } } })).toEqual(["bus"]);
   });
   it("refuses a front without layers, and a depth renderer that cannot split one", () => {
     expect(() => bake([{ ...job, layers: false }], busFake)).toThrow(/front picture needs layers/);

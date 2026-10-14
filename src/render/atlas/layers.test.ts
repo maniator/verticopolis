@@ -135,15 +135,21 @@ describe("the vehicles' draw order", () => {
     };
     const train = vehicleJobs().find((j): j is StillJob => j.name === "vehicle/metrotrain/headlight")!;
     const [tb, tm, tf] = phases(train.paint, train.w, train.h);
+    expect(tb.length).toBeGreaterThan(0);
     expect(tb.every((c) => c === "#2A3440")).toBe(true); // only the interior behind the riders
     expect(tm.length).toBeGreaterThan(0);
     expect(tm).not.toContain("#C6CCD4");
     expect(tf).toContain("#C6CCD4"); // the body comes after
-    const cab = transportJobs().find((j): j is StillJob => j.type === "still" && j.name.startsWith("car/") && j.front === true)!;
-    const [, cm, cf] = phases(cab.chains!.riders.steps[4], cab.w, cab.h);
-    expect(cm.length).toBeGreaterThan(0);
-    expect(cm.some((c) => c.startsWith("rgba(40,44,54"))).toBe(false);
-    expect(cf.some((c) => c.startsWith("rgba(40,44,54"))).toBe(true); // the door frames
+    // Every cab kind, arrow and FULL state, at its fullest.
+    const cabs = transportJobs().filter((j): j is StillJob => j.type === "still" && j.name.startsWith("car/"));
+    expect(cabs.length).toBeGreaterThan(0);
+    for (const cab of cabs) {
+      const steps = cab.chains!.riders.steps;
+      const [, cm, cf] = phases(steps[steps.length - 1], cab.w, cab.h);
+      expect(cm.length, cab.name).toBeGreaterThan(0);
+      expect(cm.some((c) => c.startsWith("rgba(40,44,54")), cab.name).toBe(false);
+      expect(cf.some((c) => c.startsWith("rgba(40,44,54")), cab.name).toBe(true); // the door frames
+    }
   });
 });
 

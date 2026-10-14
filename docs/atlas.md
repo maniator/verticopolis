@@ -230,8 +230,8 @@ entrance frame, below) carries an optional `layers` field next to its
 }
 ```
 
-A cab or the train carries `front` (and `front` chain steps) in place of
-`soft`; see below.
+A cab or the train carries `front` in place of `soft` (and the cab `front`
+chain steps); see below.
 
 - `shell` is the room with its furniture and seated people taken out: the
   ceiling, back wall, windows, wall art and floor band, plus whatever the game
@@ -353,7 +353,8 @@ the shell and then the furniture (or the soft furniture).
 
 The elevator cabs (`car/...`) and the metro train (`vehicle/metrotrain/...`)
 carry the people inside them, so they split three ways and add a `front`
-picture (with `front` steps in their chain), drawn after the furniture:
+picture (the cab with `front` steps in its `riders` chain), drawn after the
+furniture:
 
 5. the `front` parts,
 6. the chain's `front` steps `1..min(n, len - 1)`.
@@ -361,8 +362,8 @@ picture (with `front` steps in their chain), drawn after the furniture:
 The shell is the interior seen through the doors or windows, the furniture
 the riders, and the front the vehicle around them: a cab's door frames,
 center seam, FULL bar and lantern, and the train's body, cut away where the
-saloon windows are, with the glints on its window glass. A frontend that sets the
-riders a little behind the front keeps them inside the vehicle. Like the
+saloon windows are, with the glints on its window glass. A frontend that sets
+the riders a little behind the front keeps them inside the vehicle. Like the
 furniture, the front holds the flat frame's pixels where they differ from
 what is under them, so a cab's translucent door frames carry the rider color
 they cover. A frame with a front has no `soft` picture. The street cars and
@@ -580,9 +581,8 @@ and layer from the packed pages through the manifest.
 
 A room frame with depth layers is also composed through its depth split (the
 shell and its occupant steps, then the furniture and its occupant steps, then
-a vehicle's front and its steps) and
-held to the same paint. After
-packing, the export rebuilds every layered frame from the pages through the
+a vehicle's front and its steps) and held to the same paint. After packing,
+the export rebuilds every layered frame from the pages through the
 manifest, shell then furniture (then a vehicle's front) with their steps at
 every occupant count, and requires its flat frame's pixels. It also measures
 how far the soft furniture drifts from the flat frame, prints the share of
