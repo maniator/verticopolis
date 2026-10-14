@@ -103,18 +103,20 @@ export function extraCases(): Case[] {
     // The legacy widths a save keeps (LEGACY_SHAFT_WIDTHS).
     shaftCase("elevatorStandard", [], ["top", "stop", "bottom"], 3),
     cab("elevatorStandard", 0, 4, "up", true, 3),
-    {
-      label: "stairs 4 tiles wide",
-      frames: ["transport/stairs/w4"],
-      atlas: (get) => get("transport/stairs/w4"),
+    shaftCase("elevatorExpress", [], ["top", "stop", "bottom"], 4),
+    cab("elevatorExpress", 1, 2, "down", false, 4),
+    ...(["stairs", "escalator"] as const).map((kind): Case => ({
+      label: `${kind} 4 tiles wide`,
+      frames: [`transport/${kind}/w4`],
+      atlas: (get) => get(`transport/${kind}/w4`),
       game: (doc) => {
         const w = 4 * TILE;
         const ctx = canvas(doc, w, 2 * FLOOR);
-        const t: Transport = { id: 1, kind: "stairs", x: 0, width: 4, bottom: 1, top: 2, cars: 0, carPositions: [], carDir: [], load: 0, skipFloors: [] };
+        const t: Transport = { id: 1, kind, x: 0, width: 4, bottom: 1, top: 2, cars: 0, carPositions: [], carDir: [], load: 0, skipFloors: [] };
         drawTransport(ctx, t, 0, 0, w, FLOOR);
         return read(ctx, w, 2 * FLOOR);
       },
-    },
+    })),
     {
       label: "walker in shirt 2",
       frames: ["person/walker/shirt2"],

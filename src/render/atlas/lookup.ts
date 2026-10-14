@@ -94,8 +94,8 @@ function finite(n: number): number {
 
 /** A shaft's frame names: an elevator's bands are `<shaft>/<piece>` and its
  *  cabs `<car>/<arrow>/<full>/s<variant>`; stairs and escalators draw their
- *  one two-floor `shaft` frame. A legacy width the atlas bakes (stairs 4,
- *  standard elevator 3) names its own frames; any other width uses the
+ *  one two-floor `shaft` frame. A legacy width the atlas bakes
+ *  (`LEGACY_SHAFT_WIDTHS`) names its own frames; any other width uses the
  *  catalog's, with `stretchTo` as for a room. */
 export function lookupShaft(kind: FacilityKind, width: number): { shaft: string; car?: string; stretchTo?: number } {
   const cat = FACILITIES[kind]?.width;

@@ -84,9 +84,17 @@ export function transportJobs(): Job[] {
 }
 
 /** The narrower widths a legacy save keeps for a shaft (`deserialize` keeps a
- *  stored width up to the catalog's: canon widths only ever grew, stairs 4 to
- *  8 and the standard elevator 3 to 4). */
-export const LEGACY_SHAFT_WIDTHS: Partial<Record<FacilityKind, readonly number[]>> = { stairs: [4], elevatorStandard: [3] };
+ *  stored width up to the catalog's; canon widths only ever grew). Stairs and
+ *  escalators went 4 to 8 (E1b), and the migration leaves walkways as stored;
+ *  the standard elevator went 3 to 4 and the express 4 to 6, and a shaft boxed
+ *  in on both sides keeps its legacy width (`widenLegacyElevatorShafts`). The
+ *  service elevator has always been 4. */
+export const LEGACY_SHAFT_WIDTHS: Partial<Record<FacilityKind, readonly number[]>> = {
+  stairs: [4],
+  escalator: [4],
+  elevatorStandard: [3],
+  elevatorExpress: [4],
+};
 
 /** The legacy-width shafts and their cabs, named with a `w<tiles>` segment
  *  after the kind. They joined the atlas after its first release, so they

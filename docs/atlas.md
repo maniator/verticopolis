@@ -151,7 +151,7 @@ Names follow the engine's own strings: the facility keys from
 | Rooms | `room/<kind>/<state>/<subtype or ->/w<tiles>/<lit or unlit>/<open, closed or always>/<late, notlate or any>/v<variant>[/home or /away]` |
 | Fire, construction | animation `fire/<kind>`, `construction/<kind>`; frames `.../<i>` |
 | Structure | `structure/floor`, `structure/lobby/<ground or sky>/<lit>/v<0-3>`, animation `structure/entrance/<grand-left, grand-right, grand-solo or service>/<lit>/<staffed or unstaffed>` |
-| Shafts | `shaft/<elevator kind>[/w<tiles>]/<top, stop, skip, bottom, single, top-skip, bottom-skip or single-skip>`, `transport/stairs[/w<tiles>]`, `transport/escalator` (`w<tiles>` only on a legacy width, see below) |
+| Shafts | `shaft/<elevator kind>[/w<tiles>]/<top, stop, skip, bottom, single, top-skip, bottom-skip or single-skip>`, `transport/stairs[/w<tiles>]`, `transport/escalator[/w<tiles>]` (`w<tiles>` only on a legacy width, see below) |
 | Cars | `car/<elevator kind>[/w<tiles>]/<idle, up or down>/<full or notfull>/s<0-3>` with a `riders` chain (sampled seeds in `data.carSeeds`) |
 | People | `person/<seated, standing, walker, rider or hiVis>/<shirt<i>, staff, impatient or fedUp>`, one `shirt<i>` per entry of `data.shirts` |
 | Facade | `facade/escape/<left or right>/<0 or 1>`, `facade/awning/<left or right>`, animation `facade/crane/<lit>` |
@@ -207,13 +207,14 @@ game, which redraws the room at its real width (its furniture and figures keep
 their spacing), so it is a fallback rather than a match.
 
 A shaft's width is a small set: a legacy save keeps the narrower width canon
-used to have (stairs 4 tiles, the standard elevator 3), and the atlas bakes
-those too, named with a `w<tiles>` segment after the kind
-(`transport/stairs/w4`, `shaft/elevatorStandard/w3/top`,
-`car/elevatorStandard/w3/idle/notfull/s0`), on pages of their own after the
-scenery's. `lookupShaft` in the reference reader names them; a shaft at any
-other width (only a damaged save carries one) uses its catalog frames with
-`stretchTo`.
+used to have (stairs and escalators 4 tiles, the standard elevator 3, the
+express 4), and the atlas bakes those too, named with a `w<tiles>` segment
+after the kind (`transport/stairs/w4`, `transport/escalator/w4`,
+`shaft/elevatorStandard/w3/top`, `car/elevatorExpress/w4/idle/notfull/s0`),
+on pages of their own after the scenery's. `lookupShaft` in the reference
+reader names them; a shaft at any other width (only a damaged save carries
+one) uses its catalog frames with `stretchTo`. A legacy frame's `keys` carry
+its `width`; a catalog-width frame's carry none.
 
 Room variety in the web comes from each room's floor, column and id, which no
 finite atlas can cover. The atlas bakes four sampled placements per kind (the

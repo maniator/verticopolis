@@ -78,6 +78,9 @@ describe("lookupRoom", () => {
     expect(lookupShaft("elevatorStandard", 3)).toEqual({ shaft: "shaft/elevatorStandard/w3", car: "car/elevatorStandard/w3" });
     expect(lookupShaft("stairs", 4)).toEqual({ shaft: "transport/stairs/w4" });
     expect(lookupShaft("stairs", 8)).toEqual({ shaft: "transport/stairs" });
+    expect(lookupShaft("escalator", 4)).toEqual({ shaft: "transport/escalator/w4" });
+    expect(lookupShaft("elevatorExpress", 4)).toEqual({ shaft: "shaft/elevatorExpress/w4", car: "car/elevatorExpress/w4" });
+    expect(lookupShaft("elevatorService", 3)).toEqual({ shaft: "shaft/elevatorService", car: "car/elevatorService", stretchTo: 3 });
     expect(lookupShaft("elevatorExpress", 2)).toEqual({ shaft: "shaft/elevatorExpress", car: "car/elevatorExpress", stretchTo: 2 });
     expect(lookupShaft("escalator", NaN)).toEqual({ shaft: "transport/escalator" });
     expect(() => lookupShaft("office", 9)).toThrow(/not a transport kind/);
