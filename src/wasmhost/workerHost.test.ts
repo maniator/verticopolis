@@ -248,7 +248,7 @@ describe("worker host (fake engine)", () => {
     expect(Object.getOwnPropertyDescriptor(r.sim, "serialize")).toBeUndefined();
   });
 
-  it("refuses a tower whose crowd exists, and a catalog for another world", () => {
+  it("refuses a tower whose crowd exists, a catalog for another world and one with other kinds", () => {
     const sim = Simulation.newGame(1, "classic");
     sim.crowd.people.push({ id: 1 } as never);
     const mod = fakeModule();
@@ -256,7 +256,10 @@ describe("worker host (fake engine)", () => {
     expect(() => attachWorkerHost(sim, { gen: 1, catalogs: core.catalogs(), send: () => {}, onFatal: () => {}, onError: () => {} })).toThrow(/crowd/);
     const odd = JSON.parse(core.catalogs().classic) as { world: { lotWidth: number } };
     odd.world.lotWidth += 1;
-    expect(() => attachWorkerHost(Simulation.newGame(1, "classic"), { gen: 1, catalogs: { classic: JSON.stringify(odd), modern: core.catalogs().modern }, send: () => {}, onFatal: () => {}, onError: () => {} })).toThrow(/different world|catalog/);
+    expect(() => attachWorkerHost(Simulation.newGame(1, "classic"), { gen: 1, catalogs: { classic: JSON.stringify(odd), modern: core.catalogs().modern }, send: () => {}, onFatal: () => {}, onError: () => {} })).toThrow(/classic catalog states a different world from this build's tables \(lotWidth\)/);
+    const extra = JSON.parse(core.catalogs().modern) as { facilities: { key: string }[] };
+    extra.facilities.push({ ...extra.facilities[0], key: "zeppelinDock" });
+    expect(() => attachWorkerHost(Simulation.newGame(1, "modern"), { gen: 1, catalogs: { classic: core.catalogs().classic, modern: JSON.stringify(extra) }, send: () => {}, onFatal: () => {}, onError: () => {} })).toThrow(/modern catalog lists other facility kinds than this build draws \(unknown zeppelinDock\)/);
   });
 });
 

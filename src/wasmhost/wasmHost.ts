@@ -434,10 +434,8 @@ export function syncCars(sim: Simulation, frame: FrameView): void {
 /** Refuses a binding catalog that states another world, or lists other
  *  facility kinds, than this build's tables for the same mode: the view was
  *  sized from that world and the UI has a color and a description only for
- *  those kinds. The error names the field or the kinds that differ. */
-/** Refuse a binding catalog whose world or facility kinds differ from this
- *  build's tables. Shared with the worker host, so both hosts refuse the same
- *  bindings. */
+ *  those kinds. The error names the field or the kinds that differ. Shared
+ *  with the worker host, so both hosts refuse the same bindings. */
 export function refuseForeignCatalog(c: Catalog): void {
   const own = catalogFor(c.mode);
   for (const field of Object.keys(own.world) as (keyof CatalogWorld)[]) {
