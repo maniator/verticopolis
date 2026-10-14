@@ -57,15 +57,19 @@ export function resetExportFlowForTests(): void {
  * the awaited call: it frees the latch and tells the player, and if the
  * original export settles late its download still lands. The settle path
  * releases only a latch its own run still holds, so a late settle can never
- * unlock a newer export.
+ * unlock a newer export. A late settle says it finished after all, so its
+ * line reads as the end of the export the watchdog called stuck rather than
+ * contradicting that warning.
  */
 export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simulation) => void): Promise<void> {
   if (latchOwner !== 0) return;
   const run = ++nextRun;
   latchOwner = run;
+  let timedOut = false;
   const watchdog = setTimeout(() => {
     if (latchOwner !== run) return;
     latchOwner = 0;
+    timedOut = true;
     deps.ui.toast("The export is not responding. You can try exporting again.", "bad");
   }, EXPORT_WATCHDOG_MS);
   try {
@@ -74,9 +78,17 @@ export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simul
     // export at a stale view.
     stampView(sim);
     const file = await SaveGame.export(sim);
-    deps.ui.downloadFile(SaveGame.exportFilename(sim), file);
+    // A download that failed has already said so (GH #997); the success line
+    // would contradict it.
+    if (!deps.ui.downloadFile(SaveGame.exportFilename(sim), file)) return;
     // The container is pure ASCII, so string length == bytes on disk.
-    deps.ui.toast(`Tower exported (${(file.length / 1024).toFixed(1)} KB). Check your downloads.`, "good");
+    const size = `${(file.length / 1024).toFixed(1)} KB`;
+    deps.ui.toast(
+      timedOut
+        ? `The earlier export finished after all (${size}). Check your downloads.`
+        : `Tower exported (${size}). Check your downloads.`,
+      "good",
+    );
   } catch (err) {
     // Never fail silently: main.ts fires this with `void`, so an unhandled
     // rejection here would leave the player with no download and no feedback.
@@ -93,7 +105,9 @@ export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simul
  * neither can be re-fired mid-dialog. The legacy path builds its bytes before
  * the confirm dialog, so only the download itself needs guarding: hold the latch
  * until `download()` settles, with the same watchdog escape hatch and the same
- * quiet-no-op reentry.
+ * quiet-no-op reentry. The browser download is a synchronous click, so the
+ * latch spans only that call; what it buys is that a .TDT download never starts
+ * while a .vctower export is still compressing.
  */
 export async function runLegacyDownload(ui: Pick<UI, "toast">, download: () => void | Promise<void>): Promise<void> {
   if (latchOwner !== 0) return;

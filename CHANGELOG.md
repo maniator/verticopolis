@@ -13,9 +13,14 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.32.1
+## 2.33.1
 
 - Studio and apartment residents now go to bed at 11 PM and get up at 6 AM on time.
+
+## 2.33.0
+
+- When saving an exported tower file fails, the game now shows only the failure message, without a second one claiming the export worked.
+- An export that finishes after a "not responding" warning now says it finished after all.
 
 ## 2.32.0
 
