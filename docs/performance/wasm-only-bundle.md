@@ -2,7 +2,7 @@
 
 > **Snapshot, measured 2026-10-14.** Every figure below comes from builds of
 > two commits: `d03747d` (the baseline: `main` at `6b2bb34` with #993 at
-> `c608425` merged in) and `fe3c8c9` (this change), each built with
+> `c608425` merged in) and `a0210b9` (this change), each built with
 > `npx vite build` and the same engine package from the same Rust sources.
 > It does not refresh. To measure the current tree, run the commands in
 > [Reproduce](#reproduce): `scripts/engine-bundle-size.ts` produces every
@@ -24,7 +24,7 @@ In the wasm-only build, 85 of the 87 `src/engine/` modules the default build
 ships are still in the shipped JavaScript (the module counts come from the
 guard's `VC_ENGINE_REPORT`; see [Reproduce](#reproduce)). They come to 171,642 minified bytes
 (12.2% of the game's JavaScript). Brotli-compressed on their own, they are
-about 47.4 KiB. The step loop (`src/engine/sim/loop.ts`) and
+about 47.3 KiB. The step loop (`src/engine/sim/loop.ts`) and
 `economy/rentalIncome.ts`, which only the loop used, are gone. The engine's
 total fell by 2,739 minified bytes, a difference of the two builds' totals
 (renaming in the minifier can move a few bytes between modules). Every other module ships because the app is still built around a
@@ -64,24 +64,24 @@ in `index.html`. "Lazy" means the other game chunks (Tone.js and workbox-window)
 
 | | Baseline (`d03747d`) | Switchable (this branch) | Wasm-only (this branch) |
 | --- | --- | --- | --- |
-| Game JavaScript, raw | 1375.0 KiB (8 chunks) | 1377.9 KiB (8 chunks) | 1375.4 KiB (8 chunks) |
-| Game JavaScript, Brotli | 341.3 KiB | 342.2 KiB | 341.6 KiB |
-| Initial JavaScript, raw / Brotli | 1083.9 / 276.6 KiB | 1086.8 / 277.5 KiB | 1084.3 / 276.9 KiB |
+| Game JavaScript, raw | 1375.0 KiB (8 chunks) | 1378.2 KiB (8 chunks) | 1375.6 KiB (8 chunks) |
+| Game JavaScript, Brotli | 341.3 KiB | 342.3 KiB | 341.7 KiB |
+| Initial JavaScript, raw / Brotli | 1083.9 / 276.6 KiB | 1087.1 / 277.6 KiB | 1084.5 / 277.0 KiB |
 | Lazy JavaScript, raw / Brotli | 291.1 / 64.7 KiB | 291.1 / 64.7 KiB | 291.1 / 64.7 KiB |
 | WASM engine package (glue + binary), raw / Brotli | 1418.2 / 324.6 KiB | 1418.2 / 324.6 KiB | 1418.2 / 324.6 KiB |
 | Precache entries | 24 | 23 | 23 |
-| Precache, raw / Brotli | 2984.8 / 802.0 KiB | 2981.5 / 800.9 KiB | 2979.0 / 800.3 KiB |
+| Precache, raw / Brotli | 2984.8 / 802.0 KiB | 2981.8 / 801.0 KiB | 2979.2 / 800.4 KiB |
 | TypeScript engine in game JS (minified) | 174,381 B (12.4%) | 174,381 B (12.4%) | 171,642 B (12.2%) |
-| TypeScript engine, Brotli on its own (estimate) | 47.9 KiB | 47.9 KiB | 47.4 KiB |
+| TypeScript engine, Brotli on its own (estimate) | 47.9 KiB | 47.9 KiB | 47.3 KiB |
 
 What changed:
 
 - **No game JavaScript chunk was eliminated.** Against the baseline, the
-  wasm-only build's game JavaScript is 0.4 KiB larger raw and 0.3 KiB larger
+  wasm-only build's game JavaScript is 0.6 KiB larger raw and 0.4 KiB larger
   Brotli: the new boot code (the failure message, the boot state, the load
   limit, the stop gates) costs a little more than the removed step loop
   saves. Against the
-  switchable build of the same commit, it is 2.5 KiB smaller raw and 0.6 KiB
+  switchable build of the same commit, it is 2.6 KiB smaller raw and 0.6 KiB
   smaller Brotli.
 - **One precache entry is gone in both modes:** the dual-run worker
   (`assets/worker-*.js`, 6,409 bytes raw in the baseline build, read from a
@@ -93,8 +93,8 @@ What changed:
   out.
 - **What a first visit fetches before play** is the initial JavaScript, plus
   the engine package wherever the WASM engine runs. A wasm-only build always
-  fetches the package: 601.5 KiB Brotli before play (the initial JavaScript
-  plus the package, summed before rounding), against 277.5 KiB for a
+  fetches the package: 601.7 KiB Brotli before play (the initial JavaScript
+  plus the package, summed before rounding), against 277.6 KiB for a
   switchable build on the TypeScript engine. That difference is the engine
   itself, and #993 already precaches it for every install. It is not a cost
   of this change.
@@ -198,12 +198,12 @@ too, before the flip deploys it.
 ## Reproduce
 
 The size script and the guard are part of this change, so the baseline is
-built at `d03747d` and measured with the scripts from `fe3c8c9`:
+built at `d03747d` and measured with the scripts from `a0210b9`:
 
 ```sh
 git worktree add /tmp/base d03747d   # the baseline, built without this change
 (cd /tmp/base && npm ci && npm run wasm:build && npx vite build --outDir /tmp/out-base)
-git checkout fe3c8c9
+git checkout a0210b9
 npm ci && npm run wasm:build
 npx tsx scripts/engine-bundle-size.ts /tmp/out-base
 npx vite build --outDir /tmp/out-switchable
