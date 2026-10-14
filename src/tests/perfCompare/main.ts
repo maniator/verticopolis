@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
@@ -225,7 +225,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   if (!environment.engineSourceHash) validation.warnings.push("no engine-rs sources in this checkout, so the package's source hash was not checked");
   if (prodHash !== environment.engineBuildHash) validation.errors.push(`dist/ (sizes) and dist-perf/ (timings) carry different engine packages (${prodHash ?? "none"} vs ${environment.engineBuildHash ?? "none"}); rebuild without --skip-build`);
   for (const a of interruptedAttempts) validation.warnings.push(`rep ${a.rep} ${a.engine}: an attempt started at ${a.at} was interrupted (the run was stopped and resumed) and ran again; its partial measurements were not kept`);
-  if (resumes.length) validation.warnings.push(`the run was resumed ${resumes.length} time(s) (${resumes.map((r) => r.at).join(", ")}); the checkpoint proved the same commit, configuration, engine bytes, scenarios, machine and toolchain`);
+  if (resumes.length) validation.warnings.push(`the run was resumed ${resumes.length} time(s) (${resumes.map((r) => r.at).join(", ")}); the checkpoint proved the same commit, build mode, configuration, engine bytes, scenarios, machine and toolchain, and validation checked that every process ran the same browser build`);
   if (environment.dirty) validation.warnings.push("the working tree had uncommitted or untracked changes; the results folder is marked -dirty");
   if (environment.behindMain) validation.warnings.push(`the measured tree lacks ${environment.behindMain} commit(s) of origin/main (${environment.mainCommit}); it is not a baseline of the latest main`);
   const metrics = aggregate(runs, config.scenarios, config.throttles);
@@ -364,7 +364,9 @@ export function loadCheckpoint(
   dir: string,
   expected: Omit<CheckpointMeta, "startedAt">,
   read: (p: string) => string | null = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null),
-  rewrite: (p: string, text: string) => void = (p, text) => writeFileSync(p, text),
+  // In place: shortening the file never empties it, so a stop during the
+  // cut cannot lose the finished runs before the cut.
+  cut: (p: string, length: number) => void = (p, length) => truncateSync(p, length),
 ): { runs: ProcessRun[]; interrupted: { rep: number; engine: string; at: string }[]; resumes: { at: string; runsFromCheckpoint: number }[]; startedAt: string } {
   if (read(join(dir, "results.json")) !== null) throw new Error(`${dir} already holds final results; nothing to resume`);
   const metaText = read(join(dir, CHECKPOINT_META));
@@ -379,7 +381,7 @@ export function loadCheckpoint(
   let text = read(path) ?? "";
   if (text && !text.endsWith("\n")) {
     text = text.slice(0, text.lastIndexOf("\n") + 1); // the line the stop cut off
-    rewrite(path, text);
+    cut(path, Buffer.byteLength(text, "utf8"));
   }
   const runs: ProcessRun[] = [];
   const started: { rep: number; engine: string; at: string }[] = [];
@@ -392,9 +394,12 @@ export function loadCheckpoint(
     } catch {
       throw new Error(`cannot resume ${dir}: line ${i + 1} of ${CHECKPOINT_RUNS} is not JSON`);
     }
+    const bad = () => new Error(`cannot resume ${dir}: line ${i + 1} of ${CHECKPOINT_RUNS} is neither a run, a start marker nor a resume record`);
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) throw bad();
     if (entry.started) started.push(entry.started as { rep: number; engine: string; at: string });
     else if (entry.resumed) resumes.push({ at: String(entry.resumed), runsFromCheckpoint: Number(entry.runsFromCheckpoint) });
-    else runs.push(entry as unknown as ProcessRun);
+    else if (typeof entry.rep === "number" && (entry.engine === "ts" || entry.engine === "wasm") && typeof entry.scenarios === "object" && entry.scenarios !== null) runs.push(entry as unknown as ProcessRun);
+    else throw bad();
   });
   // An attempt with no run after it was interrupted.
   const interrupted = started.filter((s, i) => !runs.some((r) => r.rep === s.rep && r.engine === s.engine) || started.slice(i + 1).some((t) => t.rep === s.rep && t.engine === s.engine));

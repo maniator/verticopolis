@@ -97,17 +97,18 @@ describe("loadCheckpoint", () => {
   const started = (rep: number, engine: string) => JSON.stringify({ started: { rep, engine, at: `t${rep}${engine}` } });
   it("returns finished runs, interrupted attempts and resumes, and cuts a truncated tail", () => {
     const text = [started(0, "ts"), JSON.stringify(processRun(0, "ts")), started(0, "wasm"), started(0, "wasm"), JSON.stringify(processRun(0, "wasm")), JSON.stringify({ resumed: "r1", runsFromCheckpoint: 1 }), started(1, "wasm"), '{"rep":1,"eng'].join("\n");
-    let rewritten = "";
-    const cp = loadCheckpoint("d", expected, files({ [M]: meta, [R]: text }), (_p, t) => (rewritten = t));
+    let cutTo = -1;
+    const cp = loadCheckpoint("d", expected, files({ [M]: meta, [R]: text }), (_p, n) => (cutTo = n));
     expect(cp.runs.map((r) => `${r.rep}${r.engine}`)).toEqual(["0ts", "0wasm"]);
     expect(cp.interrupted.map((x) => x.at)).toEqual(["t0wasm", "t1wasm"]);
     expect(cp.resumes).toEqual([{ at: "r1", runsFromCheckpoint: 1 }]);
     expect(cp.startedAt).toBe("2026-10-14T00:00:00.000Z");
-    expect(rewritten.endsWith(`${started(1, "wasm")}\n`)).toBe(true);
+    expect(cutTo).toBe(Buffer.byteLength(text.slice(0, text.lastIndexOf("\n") + 1)));
   });
   it("refuses a bad line before the end, a dirty start, any mismatch, final results, or no checkpoint", () => {
     const at = files({ [M]: meta });
     expect(() => loadCheckpoint("d", expected, files({ [M]: meta, [R]: 'oops\n{"a":1}\n' }))).toThrow(/line 1 of runs.jsonl is not JSON/);
+    for (const line of ["{}", "5", "null", '{"rep":0,"engine":"go","scenarios":{}}']) expect(() => loadCheckpoint("d", expected, files({ [M]: meta, [R]: `${line}\n` }))).toThrow(/line 1 of runs.jsonl is neither a run/);
     expect(() => loadCheckpoint("d", expected, files({ [M]: JSON.stringify({ ...expected, dirty: true, startedAt: "x" }) }))).toThrow(/started on a dirty tree/);
     expect(() => loadCheckpoint("d", { ...expected, commit: "def" }, at)).toThrow(/its commit differs/);
     expect(() => loadCheckpoint("d", { ...expected, skipBuild: true }, at)).toThrow(/its skipBuild differs/);
