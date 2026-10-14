@@ -40,18 +40,21 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 - The simulation is deterministic and **headless-testable** (seeded `rng.ts`); tests are Vitest.
 
 ## Distribution targets (packaging only, game scope unchanged)
-- The web game at https://verticopolis.com stays the primary platform and the single
-  source of truth. Distribution now also targets **Android (a TWA of the live site)**
-  and **iOS (a Capacitor wrapper of the same web build)**; see
-  `_bmad-output/planning-artifacts/prds/prd-mobile-distribution-2026-07-08/prd.md`
-  and its paired arch/epics docs.
-- Wrapper projects, store configs, CI signing, and anything monetization-shaped live
-  in the **private distribution repo**, never here. Two
-  protocol-public exceptions (PRD N2): `src/public/.well-known/assetlinks.json` and
-  the Android application ID it names.
-- Public-repo mobile work is limited to platform seams (`src/platform/` port, PWA
-  gating, native build mode) that are **no-ops in the browser build**. This does not
-  loosen the parity scope: no new mechanics, `primary_platform` stays `web`.
+- The web game at https://verticopolis.com is browser and PWA only, and the single
+  source of truth. The Android TWA loads that same live site (marked by `?src=twa`),
+  so it is a browser surface too; `src/public/.well-known/assetlinks.json` and the
+  Android application ID it names stay public for it (PRD N2).
+- **Wrapper builds are retired (2026-10-14, #991).** There is no Electron
+  (`--mode desktop`) or Capacitor (`--mode native`) build mode, no `src/platform/`
+  injection seam, no host-command bridge, no shell save store, no desktop consent
+  flow and no `/api/ingest/desktop` route. Do not reintroduce a build mode or a
+  wrapper-detection branch: other frontends consume the Rust engine
+  (`engine-rs/`, the `verticopolis-engine` crate) directly rather than wrapping
+  this web build. Historical planning documents that describe the wrapper epics
+  stay as records.
+- Store configs, CI signing, and anything monetization-shaped never live here.
+  This does not loosen the parity scope: no new mechanics, `primary_platform`
+  stays `web`.
 
 ## Where the truth lives (engine)
 - `src/engine/facilities.ts`: **the tuning source of truth**: `GRID` (lot 375 wide, floors
@@ -123,6 +126,8 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
+  The Rust engine in `engine-rs/` follows these rules with no grandfathered
+  comments, plus the 500-line file ceiling (see CONTRIBUTING "Conventions").
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
 - **Version bump on player-facing change:** bump `package.json` `version` (semver
   by player impact: **minor** for a new player-facing capability, **patch** for a

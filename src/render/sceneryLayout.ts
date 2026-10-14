@@ -1,4 +1,4 @@
-import { GRID } from "../engine/facilities";
+import { viewWorld, type ViewWorld } from "../presentation/viewWorld";
 import type { Unit } from "../engine/types";
 import { FLOOR, TILE } from "./scale";
 
@@ -14,7 +14,7 @@ import { FLOOR, TILE } from "./scale";
  * actors.
  *
  * Geometry contract (owner-approved mockups, 2026-07-21): the buildable lot
- * (GRID.width tile columns, indices 0 through GRID.width - 1) is untouched
+ * (the world's lotWidth tile columns, indices 0 through lotWidth - 1) is untouched
  * canon. All scenery lives OUTSIDE it or
  * on its ground line, and everything draws BEHIND the tower (z order), so no
  * scenery can ever cover a built room.
@@ -37,11 +37,18 @@ export const APRON_PAD_TILES = 3;
 /** How far past each lot edge the skyline band runs: one full lot width, the
  *  same reach as the dirt ground, so the city ends exactly where the ground
  *  does even zoomed all the way out at a camera edge. */
-export const SKYLINE_OVERSCAN_TILES = GRID.width;
+export function skylineOverscanTiles(world: ViewWorld = viewWorld()): number {
+  return world.lotWidth;
+}
 
-/** First sidewalk tile, first road tile (both beyond the lot's last column). */
-export const SIDEWALK_START = GRID.width + FORECOURT_TILES;
-export const ROAD_START = SIDEWALK_START + SIDEWALK_TILES;
+/** First sidewalk tile, first road tile (both beyond the lot's last column),
+ *  from the view's world (the tower catalog's lot width). */
+export function sidewalkStart(world: ViewWorld = viewWorld()): number {
+  return world.lotWidth + FORECOURT_TILES;
+}
+export function roadStart(world: ViewWorld = viewWorld()): number {
+  return sidewalkStart(world) + SIDEWALK_TILES;
+}
 
 /** Deterministic unit-interval hash. Integer bit-mixing only (no trig, no
  *  floating-point transcendentals), so every engine renders identical pixels:
@@ -89,10 +96,10 @@ export const SKYLINE_BANDS: readonly SkylineBand[] = [
 /** The two-depth skyline band. It runs CONTINUOUSLY across the whole scene,
  *  the tower included: it draws behind everything, so it shows wherever the
  *  built tower does not cover it (owner call: the city is always back there). */
-export function skylineRects(seed: number): SkylineRect[] {
+export function skylineRects(seed: number, world: ViewWorld = viewWorld()): SkylineRect[] {
   const rects: SkylineRect[] = [];
-  const from = -SKYLINE_OVERSCAN_TILES;
-  const to = GRID.width + SKYLINE_OVERSCAN_TILES;
+  const from = -skylineOverscanTiles(world);
+  const to = world.lotWidth + skylineOverscanTiles(world);
   for (const b of SKYLINE_BANDS) {
     for (let t = from + b.start; t < to; t += b.step) {
       const w = b.w.base + hash01(seed + t * b.w.key) * b.w.span;
@@ -109,7 +116,7 @@ export interface PlantSpot {
 }
 
 /** The plant-spot rule, published in the atlas data. A candidate every
- *  `step` tiles from `margin` to `GRID.width - margin` (exclusive); with
+ *  `step` tiles from `margin` to `lotWidth - margin` (exclusive); with
  *  `r = hash01(seed * 3 + t)`, the spot is skipped below `skipBelow`, a bush
  *  below `bushBelow` and a tree otherwise. It sits at `t + floor(hash01(seed +
  *  t * jitter.key) * jitter.span) + jitter.min` and is scaled `scale.base +
@@ -125,10 +132,10 @@ export const PLANT_RULE = {
 
 /** Tree and bush spots on the open lot, deterministic per tower seed. Spots
  *  keep clear of both lot edges so nothing crowds the plaza sidewalk or the street. */
-export function plantSpots(seed: number): PlantSpot[] {
+export function plantSpots(seed: number, world: ViewWorld = viewWorld()): PlantSpot[] {
   const R = PLANT_RULE;
   const spots: PlantSpot[] = [];
-  for (let t = R.margin; t < GRID.width - R.margin; t += R.step) {
+  for (let t = R.margin; t < world.lotWidth - R.margin; t += R.step) {
     const r = hash01(seed * 3 + t);
     if (r < R.skipBelow) continue; // gaps keep the lot from reading as an orchard
     const jitter = Math.floor(hash01(seed + t * R.jitter.key) * R.jitter.span) + R.jitter.min;
@@ -155,7 +162,7 @@ export function apronRange(units: readonly Unit[]): { min: number; max: number }
   if (min === Infinity) return null;
   return {
     min: Math.max(0, min - APRON_PAD_TILES),
-    max: Math.min(GRID.width, max + APRON_PAD_TILES),
+    max: Math.min(viewWorld().lotWidth, max + APRON_PAD_TILES),
   };
 }
 
@@ -173,9 +180,15 @@ export function plantVisible(spot: PlantSpot, apron: { min: number; max: number 
 }
 
 /** The dirt under the scene: `lots` lot widths centered on the lot, from the
- *  ground line down `belowFloors` floors, and the `lineH`-px ground line
- *  centered on y 0 across the same span. */
-export const GROUND = { lots: 3, belowFloors: 2 - GRID.minFloor + 14, lineH: 6, dirt: "#3a3326", line: "#6f6a60" } as const;
+ *  ground line down {@link groundBelowFloors} floors, and the `lineH`-px
+ *  ground line centered on y 0 across the same span. */
+export const GROUND = { lots: 3, lineH: 6, dirt: "#3a3326", line: "#6f6a60" } as const;
+
+/** How many floors the dirt runs below the ground line: past the lowest
+ *  basement with room to spare. */
+export function groundBelowFloors(world: ViewWorld = viewWorld()): number {
+  return 2 - world.minFloor + 14;
+}
 
 /** Rows of the lot's ground strip above and below the ground line. */
 export const STRIP_ABOVE = 7;
@@ -197,22 +210,27 @@ const STREET_LAMP_H = Math.round(FLOOR * 1.8);
 const PLANTER_W = 2 * TILE;
 const PLANTER_H = 18;
 
-/** Where the game puts each fixed scenery piece (`towerScenery.ts` builds its
- *  actors from these, and the sprite atlas publishes them). */
-export const SCENERY = {
-  plazaSidewalk: { x: -PLAZA_SIDEWALK_TILES * TILE, y: -7, w: PLAZA_SIDEWALK_TILES * TILE, h: 11 },
-  roundabout: { x: ROUNDABOUT_START * TILE, y: -30, w: ROUNDABOUT_TILES * TILE, h: 48 },
-  fountain: { x: FOUNTAIN_TILE * TILE - 50, y: -102, w: 100, h: 112 },
-  plazaLamps: PLAZA_LAMP_TILES.map((t) => ({ x: t * TILE - PLAZA_LAMP_W / 2, y: -PLAZA_LAMP_H + 4, w: PLAZA_LAMP_W, h: PLAZA_LAMP_H })),
-  /** The road from the scene's left edge to the roundabout (the game cuts it
-   *  into texture-safe segments, each 1 px wider to hide seams). */
-  leftRoad: { x: -GRID.width * TILE, y: -2, w: (ROUNDABOUT_START + GRID.width) * TILE, h: 14 },
-  forecourt: { x: GRID.width * TILE, y: -6, w: FORECOURT_TILES * TILE, h: 10 },
-  sidewalk: { x: SIDEWALK_START * TILE, y: -7, w: (ROAD_START - SIDEWALK_START) * TILE, h: 11 },
-  rightRoad: { x: ROAD_START * TILE, y: -2, w: ROAD_TILES * TILE, h: 14 },
-  streetLamp: { x: Math.round((SIDEWALK_START + 1) * TILE - STREET_LAMP_W / 2), y: -STREET_LAMP_H - 7, w: STREET_LAMP_W, h: STREET_LAMP_H },
-  planter: { x: Math.round((GRID.width + FORECOURT_TILES / 2) * TILE - PLANTER_W / 2), y: -PLANTER_H - 6, w: PLANTER_W, h: PLANTER_H },
-} satisfies Record<string, PieceRect | PieceRect[]>;
+/** Where the game puts each fixed scenery piece in a world (`towerScenery.ts`
+ *  builds its actors from these, and the sprite atlas publishes them). */
+export function sceneryPieces(world: ViewWorld = viewWorld()) {
+  const lot = world.lotWidth;
+  const sidewalk = sidewalkStart(world);
+  const road = roadStart(world);
+  return {
+    plazaSidewalk: { x: -PLAZA_SIDEWALK_TILES * TILE, y: -7, w: PLAZA_SIDEWALK_TILES * TILE, h: 11 },
+    roundabout: { x: ROUNDABOUT_START * TILE, y: -30, w: ROUNDABOUT_TILES * TILE, h: 48 },
+    fountain: { x: FOUNTAIN_TILE * TILE - 50, y: -102, w: 100, h: 112 },
+    plazaLamps: PLAZA_LAMP_TILES.map((t) => ({ x: t * TILE - PLAZA_LAMP_W / 2, y: -PLAZA_LAMP_H + 4, w: PLAZA_LAMP_W, h: PLAZA_LAMP_H })),
+    /** The road from the scene's left edge to the roundabout (the game cuts it
+     *  into texture-safe segments, each 1 px wider to hide seams). */
+    leftRoad: { x: -lot * TILE, y: -2, w: (ROUNDABOUT_START + lot) * TILE, h: 14 },
+    forecourt: { x: lot * TILE, y: -6, w: FORECOURT_TILES * TILE, h: 10 },
+    sidewalk: { x: sidewalk * TILE, y: -7, w: (road - sidewalk) * TILE, h: 11 },
+    rightRoad: { x: road * TILE, y: -2, w: ROAD_TILES * TILE, h: 14 },
+    streetLamp: { x: Math.round((sidewalk + 1) * TILE - STREET_LAMP_W / 2), y: -STREET_LAMP_H - 7, w: STREET_LAMP_W, h: STREET_LAMP_H },
+    planter: { x: Math.round((lot + FORECOURT_TILES / 2) * TILE - PLANTER_W / 2), y: -PLANTER_H - 6, w: PLANTER_W, h: PLANTER_H },
+  } satisfies Record<string, PieceRect | PieceRect[]>;
+}
 
 /** A plant's size before its spot's scale: tiles wide, floors tall. */
 export const PLANT_SIZE = { tree: { tiles: 3, floors: 1.5 }, bush: { tiles: 2, floors: 0.5 } } as const;

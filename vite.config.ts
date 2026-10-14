@@ -180,7 +180,7 @@ function wasmParityProjects() {
     "**/wasmHostLogText.integration.test.ts",
     "**/wasmHostTelemetry.integration.test.ts",
   ];
-  const setupFiles = ["src/tests/parity/wasmHostSetup.ts"];
+  const setupFiles = ["src/tests/viewWorldSetup.ts", "src/tests/parity/wasmHostSetup.ts"];
   return [
     {
       extends: true,
@@ -218,8 +218,8 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkgVersion),
     __APP_SHA__: JSON.stringify(gitShortSha()),
     // `window.game` gate. Only the tooling pipelines (e2e, screenshots, perf)
-    // build with VC_TOOLING=1; every other build, the Vercel deploy and the
-    // mobile wrappers included, gets `false` here and the publish in
+    // build with VC_TOOLING=1; every other build, the Vercel deploy
+    // included, gets `false` here and the publish in
     // bootstrap.ts is dead-code-eliminated out of the bundle, so a shipped
     // session has no console handle into the sim. Dev serves don't need the
     // variable: the gate also accepts `import.meta.env.DEV`. The value is
@@ -421,6 +421,7 @@ export default defineConfig({
         test: {
           name: "unit",
           include: ["src/**/*.test.ts"],
+          setupFiles: ["src/tests/viewWorldSetup.ts"],
           // Setting `exclude` on a project REPLACES Vitest's built-in defaults
           // (node_modules, dist, etc.), so spread them back in before adding our
           // own. The `include` is scoped to `src/**` today so nothing vendored is
@@ -435,6 +436,7 @@ export default defineConfig({
         test: {
           name: "integration",
           include: ["src/**/*.integration.test.ts"],
+          setupFiles: ["src/tests/viewWorldSetup.ts"],
         },
       },
       // The parity projects (story-engine-test-parity, #878): the same two
@@ -471,8 +473,7 @@ export default defineConfig({
         // Colocated test FIXTURES, same reasoning as the line above. A shared
         // fixture is test-only code that happens not to match `*.test.ts`, so
         // without this it would be scored as app source and move the floors for a
-        // file no player runs. `src/game/hostCommands.fixture.ts` is the first of
-        // these, created when its suite outgrew the 500-line ceiling and split.
+        // file no player runs.
         "**/*.fixture.ts",
         // Fixtures and any non-`.test.ts` helpers under the integration tree.
         "src/tests/**",

@@ -1,15 +1,16 @@
-import { GRID } from "../../engine/facilities";
+import { catalogFor } from "../../engine/catalog";
 import type { WeatherKind } from "../../engine/types";
 import { FLOOR, TILE } from "../scale";
 import {
   APRON_PAD_TILES,
   GROUND,
+  groundBelowFloors,
   PLANT_CLEAR_TILES,
   PLANT_RULE,
   PLANT_SIZE,
-  SCENERY,
+  sceneryPieces,
   SKYLINE_BANDS,
-  SKYLINE_OVERSCAN_TILES,
+  skylineOverscanTiles,
   STRIP_ABOVE,
   STRIP_BELOW,
   type PieceRect,
@@ -41,7 +42,7 @@ import { SKY_COLUMNS } from "./catalogExtras";
  * roundabout, fountain and lamps, the street lamp with its "375 ST" sign, the
  * forecourt planter, the lot's trees and bushes, and the ground pieces. Every
  * frame is painted by the game's own scenery painters, and {@link sceneryData}
- * publishes the game's own placement table (`SCENERY` in `sceneryLayout.ts`),
+ * publishes the game's own placement table (`sceneryPieces` in `sceneryLayout.ts`),
  * so a frontend can rebuild the scene.
  */
 
@@ -81,6 +82,11 @@ export function paintScenery(ctx: CanvasRenderingContext2D, s: ScenerySpec, w: n
   }
 }
 
+/** The world the atlas publishes: the Modern catalog's lot and floors (both
+ *  engines' catalogs state the same world, and the game binds it per tower). */
+const WORLD = catalogFor("modern").world;
+const SCENERY = sceneryPieces(WORLD);
+
 const size = (r: PieceRect) => ({ w: r.w, h: r.h });
 
 /** Frame sizes: the fixed pieces as the game sizes them, plants at their base
@@ -118,7 +124,7 @@ export function grassName(tile: number): string {
 /** A lot tile showing each grass look, for the bake. */
 function grassSamples(): Map<string, number> {
   const grass = new Map<string, number>();
-  for (let t = 0; t < GRID.width && grass.size < 6; t++) if (!grass.has(grassName(t))) grass.set(grassName(t), t);
+  for (let t = 0; t < WORLD.lotWidth && grass.size < 6; t++) if (!grass.has(grassName(t))) grass.set(grassName(t), t);
   return grass;
 }
 
@@ -173,18 +179,18 @@ export function sceneryData() {
   return {
     tileW: TILE,
     floorH: FLOOR,
-    lotTiles: GRID.width,
+    lotTiles: WORLD.lotWidth,
     ground: {
       // Solid fills: the dirt from the ground line down, and the ground line
       // centered on y 0, both across `lots` lot widths centered on the lot.
-      dirt: { color: GROUND.dirt, x: -((GROUND.lots - 1) / 2) * GRID.width * TILE, w: GROUND.lots * GRID.width * TILE, y: 0, h: GROUND.belowFloors * FLOOR },
+      dirt: { color: GROUND.dirt, x: -((GROUND.lots - 1) / 2) * WORLD.lotWidth * TILE, w: GROUND.lots * WORLD.lotWidth * TILE, y: 0, h: groundBelowFloors(WORLD) * FLOOR },
       line: { color: GROUND.line, y: -GROUND.lineH / 2, h: GROUND.lineH },
       strip: {
         y: -STRIP_ABOVE,
         tileW: TILE,
         apronPadTiles: APRON_PAD_TILES,
         jointEvery: PAVE_JOINT_EVERY,
-        grass: Array.from({ length: GRID.width }, (_, t) => grassName(t)),
+        grass: Array.from({ length: WORLD.lotWidth }, (_, t) => grassName(t)),
       },
       runs: [
         { frame: "scenery/ground/sidewalk", ...SCENERY.plazaSidewalk, tileOriginX: SCENERY.plazaSidewalk.x },
@@ -207,7 +213,7 @@ export function sceneryData() {
     // The skyline and the plants are seeded by the tower's founding seed
     // (`hash01` and the rules below; docs/atlas.md spells them out).
     skyline: {
-      overscanTiles: SKYLINE_OVERSCAN_TILES,
+      overscanTiles: skylineOverscanTiles(WORLD),
       bands: SKYLINE_BANDS.map((b) => ({ ...b, frame: `sky/skyline/${b.depth === 0 ? "far" : "near"}` })),
     },
     plants: {

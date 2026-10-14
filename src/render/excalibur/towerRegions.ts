@@ -1,6 +1,7 @@
 import * as ex from "excalibur";
 import { Z } from "../depthPlanes";
-import { facilityFloors } from "../../engine/facilities";
+import { catalogFacility } from "../../engine/catalogTypes";
+import { towerCatalog } from "../../engine/towerCatalog";
 import { paintSettledUnit } from "../regionPaint";
 import { FLOOR, TILE } from "../scale";
 import { regionRect, regionsOf } from "../regionGrid";
@@ -60,7 +61,7 @@ function materialize(engine: TowerEngine, key: number): RegionRec {
       for (const id of units) {
         const u = engine.sim.tower.getUnit(id);
         if (!u) continue;
-        const hgt = facilityFloors(u.kind);
+        const hgt = catalogFacility(towerCatalog(engine.sim), u.kind).floors;
         const w = u.width * TILE;
         const h = hgt * FLOOR;
         const dx = engine.worldX(u.x) - r.x;
@@ -88,7 +89,7 @@ function materialize(engine: TowerEngine, key: number): RegionRec {
  *  regions would render a permanent hole, so the four divisions are cheap
  *  insurance (the old per-unit bake kept a width guard for the same reason). */
 export function markRegionUnit(engine: TowerEngine, u: Unit, sameFrame = false): void {
-  const fresh = regionsOf(u.floor, u.x, u.width, facilityFloors(u.kind));
+  const fresh = regionsOf(u.floor, u.x, u.width, catalogFacility(towerCatalog(engine.sim), u.kind).floors);
   const cached = engine.regionUnits.get(u.id);
   let keys = cached;
   if (!keys || keys.length !== fresh.length || keys.some((k, i) => k !== fresh[i])) {

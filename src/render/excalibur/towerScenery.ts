@@ -1,15 +1,15 @@
 import * as ex from "excalibur";
 import { Z } from "../depthPlanes";
-import { GRID } from "../../engine/facilities";
+import { viewWorld } from "../../presentation/viewWorld";
 import { FLOOR, TILE } from "../scale";
 import {
   ROUNDABOUT_START,
-  SCENERY,
   SKYLINE_FILLS,
   apronRange,
   plantRect,
   plantSpots,
   plantVisible,
+  sceneryPieces,
   skylineRects,
   type PlantSpot,
 } from "../sceneryLayout";
@@ -92,6 +92,7 @@ const Z_PLANT = Z.plant;
 export const STRIP_MAX_SEG = 1800;
 
 function makeScenery(engine: TowerEngine): SceneryRec {
+  const SCENERY = sceneryPieces();
   const rec: SceneryRec = {
     sim: null,
     seed: NaN,
@@ -154,7 +155,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
   {
     // Road running from the roundabout to the dirt's left edge, in
     // texture-safe segments (the full run is far past the 2048 cap).
-    const from = -GRID.width;
+    const from = -viewWorld().lotWidth;
     const to = ROUNDABOUT_START;
     const total = (to - from) * TILE;
     const segments = Math.ceil(total / STRIP_MAX_SEG);
@@ -239,7 +240,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
 
   // ---- the lot's ground strip (grass/apron), repainted on build -----------
   {
-    const lotW = GRID.width * TILE;
+    const lotW = viewWorld().lotWidth * TILE;
     const segments = Math.ceil(lotW / STRIP_MAX_SEG);
     // Round each segment up to a whole-tile width so the per-tile draw loop
     // never splits a tile across two canvases.

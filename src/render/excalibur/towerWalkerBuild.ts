@@ -3,6 +3,7 @@ import { Z } from "../depthPlanes";
 import { coveredUpperStories, lotCovered, lobbyLaneSpan } from "./towerCrowdLayout";
 import { FLOOR } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
+import { towerCatalog } from "../../engine/towerCatalog";
 
 /**
  * Construction of the ambient walker population: the structural runs a tower's
@@ -40,7 +41,7 @@ function oneSpot(floor: number, tileX: number): WalkerSpot {
 
 
 export function buildWalkers(engine: TowerEngine): void {
-  const coveredRows = coveredUpperStories(engine.sim.tower.units);
+  const coveredRows = coveredUpperStories(engine.sim.tower.units, towerCatalog(engine.sim));
   const byFloor = new Map<number, Map<number, "floor" | "lobby">>();
   for (const u of engine.sim.tower.units) {
     if (u.kind === "floor" || u.kind === "lobby") {

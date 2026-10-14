@@ -175,20 +175,11 @@ describe("appinstalled (CAP-4 signal, CAP-1 hide)", () => {
   });
 });
 
-describe("wrapped builds (native/desktop): no install surface at all", () => {
-  it("initPwaInstall binds nothing in a wrapped mode, so a shell BIP never arms the offer", () => {
-    initPwaInstall({}, "desktop");
-    window.dispatchEvent(fakeBip());
-    expect(canPromptInstall()).toBe(false);
-    expect(installAvailability()).toBe("none");
-  });
-  it("installAvailability reports none in wrapped modes even with a captured prompt", () => {
-    // Captured under the browser default (test mode)...
+describe("the install surface takes no build-mode input", () => {
+  it("a captured prompt arms the offer on the one build there is", () => {
     initPwaInstall({});
     window.dispatchEvent(fakeBip());
+    expect(canPromptInstall()).toBe(true);
     expect(installAvailability()).toBe("prompt");
-    // ...a wrapped build still offers nothing.
-    expect(installAvailability("native")).toBe("none");
-    expect(installAvailability("desktop")).toBe("none");
   });
 });

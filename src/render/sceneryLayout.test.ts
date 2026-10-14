@@ -7,10 +7,10 @@ import {
   FOUNTAIN_TILE,
   PLAZA_LAMP_TILES,
   PLAZA_SIDEWALK_TILES,
-  ROAD_START,
+  roadStart,
   ROUNDABOUT_START,
   ROUNDABOUT_TILES,
-  SIDEWALK_START,
+  sidewalkStart,
   apronRange,
   hash01,
   plantSpots,
@@ -89,8 +89,8 @@ describe("sceneryLayout", () => {
   });
 
   it("street geometry starts beyond the lot: forecourt, then sidewalk, then road", () => {
-    expect(SIDEWALK_START).toBe(GRID.width + FORECOURT_TILES);
-    expect(ROAD_START).toBeGreaterThan(SIDEWALK_START);
+    expect(sidewalkStart()).toBe(GRID.width + FORECOURT_TILES);
+    expect(roadStart()).toBeGreaterThan(sidewalkStart());
   });
 
   it("plaza geometry sits fully left of the lot: sidewalk, then the roundabout", () => {

@@ -1,6 +1,9 @@
 import * as ex from "excalibur";
 import { Z } from "../depthPlanes";
-import { GRID, facilityFloors, hasBusinessHours, isOpenAt } from "../../engine/facilities";
+import { hasBusinessHours, isOpenAt } from "../../engine/facilities";
+import { catalogFacility } from "../../engine/catalogTypes";
+import { towerCatalog } from "../../engine/towerCatalog";
+import { viewWorld } from "../../presentation/viewWorld";
 import { isPresent, type Transport, type Unit } from "../../engine/types";
 import {
   CRANE_H,
@@ -164,7 +167,7 @@ export function syncScene(engine: TowerEngine): void {
     // ran above, so blindly clearing here would wipe the replacement's
     // just-set graphic; only clear when no live floor/lobby unit owns the
     // cell anymore. Cell coords map back to the grid: row 0 is the top floor.
-    const live = tower.unitAt(GRID.maxFloor - cell.y, cell.x);
+    const live = tower.unitAt(viewWorld().maxFloor - cell.y, cell.x);
     if (!live || (live.kind !== "floor" && live.kind !== "lobby")) cell.clearGraphics();
   });
   reap(engine.animatedRooms, seenR, (a, id) => {
@@ -214,7 +217,7 @@ export function syncFacade(engine: TowerEngine): void {
   // built columns. (Every story of a multi-floor room counts, so a two-story
   // cinema at the edge still gets stairs on its upper row.)
   const hi = engine.sim.tower.highestFloor;
-  const { edges, topTiles } = facadeGeometry(engine.sim.tower.units, hi);
+  const { edges, topTiles } = facadeGeometry(engine.sim.tower.units, hi, towerCatalog(engine.sim));
   syncEscapes(engine, edges);
   syncCrane(engine, hi, topTiles);
 }
@@ -265,7 +268,7 @@ function syncEscapes(engine: TowerEngine, edges: Map<number, FloorEdge>): void {
 function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void {
   // No above-ground structure on the top row (basement-only/empty lot) or the
   // tower has topped out at the cap → no crane.
-  if (hi >= GRID.maxFloor || topTiles.size === 0) {
+  if (hi >= viewWorld().maxFloor || topTiles.size === 0) {
     if (engine.craneActor) {
       engine.craneActor.kill();
       engine.craneActor = null;
@@ -316,7 +319,7 @@ function addBoxActor(engine: TowerEngine, pos: ex.Vector, w: number, h: number, 
 function addStruct(engine: TowerEngine, u: Unit): void {
   // Floor/lobby units are one tile wide in the sim (and the old per-unit
   // actor drew exactly one tile regardless), so a unit maps to one cell.
-  const cell = engine.structTileMap.getTile(u.x, GRID.maxFloor - u.floor);
+  const cell = engine.structTileMap.getTile(u.x, viewWorld().maxFloor - u.floor);
   if (!cell) return; // outside the grid; the sim never places there
   const gfx = u.kind === "lobby" ? lobbyTileGfx(engine, u) : engine.floorGfx;
   cell.clearGraphics();
@@ -421,7 +424,7 @@ function refreshFloor1EntranceMap(engine: TowerEngine): void {
  *  lower, garage commute cars at exactly 0.5, so 0.45 avoids the insertion-
  *  order tie a 0.5 room would have with the cars driving past the flames. */
 function addRoom(engine: TowerEngine, u: Unit): void {
-  const hgt = facilityFloors(u.kind);
+  const hgt = catalogFacility(towerCatalog(engine.sim), u.kind).floors;
   const w = u.width * TILE;
   const h = hgt * FLOOR;
   const cv = new ex.Canvas({

@@ -412,7 +412,7 @@ only.
 
 The scenery around the lot comes as its own frames, painted by the game's
 scenery painters (`src/render/excalibur/towerSceneryDraw.ts`), and
-`data.scenery` publishes the game's own placement table (`SCENERY` in
+`data.scenery` publishes the game's own placement table (`sceneryPieces` in
 `src/render/sceneryLayout.ts`) and the rules it seeds the rest by. Positions
 are in pixels at 1x: x from the lot's left edge and y from the ground line
 (negative is up), for a frame's top-left corner. `lotTiles` is the lot's width

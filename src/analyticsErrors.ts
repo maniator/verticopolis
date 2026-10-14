@@ -27,7 +27,7 @@ import { createEventThrottle } from "./analyticsThrottle";
  *
  * Guardrails, because this runs on the error path:
  * - Host-gated by `telemetryHostAllowed`, exactly like the gameplay events, so
- *   nothing fires on localhost, the e2e preview server, or the native shell.
+ *   nothing fires on localhost, the e2e preview server, or any other host.
  * - Never-throw: every handler is wrapped, and a report cannot itself trigger a
  *   report (a re-entrancy latch), so a bug in here can never loop the error path.
  * - Deduplicated by fingerprint and hard-capped per session, so an error thrown

@@ -1,8 +1,8 @@
 import * as ex from "excalibur";
 import { Z } from "../depthPlanes";
-import { GROUND } from "../sceneryLayout";
+import { GROUND, groundBelowFloors } from "../sceneryLayout";
 import type { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
+import { bindViewWorld, viewWorld } from "../../presentation/viewWorld";
 import type { Unit } from "../../engine/types";
 import {
   AWNING_W,
@@ -23,6 +23,7 @@ import { FLOOR, TILE } from "../scale";
 import * as overlayFx from "./towerOverlay";
 import * as crowd from "./towerCrowd";
 import type { TowerEngine } from "./TowerEngine";
+import { towerCatalog } from "../../engine/towerCatalog";
 
 /**
  * Static scene construction, shared-graphics baking, the sky-layer painters
@@ -36,10 +37,18 @@ import type { TowerEngine } from "./TowerEngine";
 
 // ---- Static scene elements ----------------------------------------------
 
+/** Bind the view's world from the tower's catalog: the tile maps, region grid,
+ *  scenery and cursor clamps are all sized from it (#921). The engine binds it
+ *  when it is built, before any input can read it; a swapped-in tower must
+ *  state the same world. */
+export function bindSceneWorld(sim: Simulation): void {
+  bindViewWorld(towerCatalog(sim).world);
+}
+
 export function makeGround(engine: TowerEngine): void {
-  const total = GRID.width * TILE * GROUND.lots;
-  const centerX = (GRID.width / 2) * TILE;
-  const depth = GROUND.belowFloors * FLOOR;
+  const total = viewWorld().lotWidth * TILE * GROUND.lots;
+  const centerX = (viewWorld().lotWidth / 2) * TILE;
+  const depth = groundBelowFloors() * FLOOR;
   const leftEdge = centerX - total / 2;
   // One rectangle this wide (~11k px) would rasterize to a bitmap past the GPU
   // texture limit (4096 on mobile) and render as a black band. It needs the
@@ -123,11 +132,11 @@ export function makeOverlay(engine: TowerEngine): void {
  *  map's origin is its top-left corner in world space. */
 export function makeStructTileMap(engine: TowerEngine): void {
   engine.structTileMap = new ex.TileMap({
-    pos: ex.vec(0, engine.worldYTop(GRID.maxFloor)),
+    pos: ex.vec(0, engine.worldYTop(viewWorld().maxFloor)),
     tileWidth: TILE,
     tileHeight: FLOOR,
-    columns: GRID.width,
-    rows: GRID.maxFloor - GRID.minFloor + 1,
+    columns: viewWorld().lotWidth,
+    rows: viewWorld().maxFloor - viewWorld().minFloor + 1,
   });
   engine.structTileMap.z = Z.structure; // behind rooms (0) and transports (1), like the old actors
   engine.engine.add(engine.structTileMap);
@@ -339,6 +348,9 @@ export function disposeScene(engine: TowerEngine): void {
 }
 
 export function setSim(engine: TowerEngine, sim: Simulation, opts?: { keepCamera?: boolean }): void {
+  // The scene keeps its size, so the swapped-in tower must state the same
+  // world. Bind first: a refused world throws before anything is torn down.
+  bindSceneWorld(sim);
   disposeScene(engine);
   crowd.clearCrowd(engine);
   // Full input reset: a tower swap (new game / load) must not inherit a

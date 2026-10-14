@@ -4,7 +4,7 @@ import { drawBush, drawTree, lampAlpha } from "../excalibur/towerSceneryDraw";
 import { Z } from "../depthPlanes";
 import { allJobs } from "./browserEntry";
 import { TILE } from "../scale";
-import { SCENERY, hash01, plantRect, plantSpots, skylineRects } from "../sceneryLayout";
+import { hash01, plantRect, plantSpots, sceneryPieces, skylineRects } from "../sceneryLayout";
 import { CLOUD_COUNT, cloudSeed } from "../sprites/sky";
 import {
   FOUNTAIN_FRAMES,
@@ -66,9 +66,9 @@ describe("scenery in the atlas", () => {
 
   it("publishes the game's own placement table", () => {
     const data = sceneryData();
-    expect(data.ground.runs[1]).toMatchObject(SCENERY.roundabout);
-    expect(data.props[0]).toMatchObject({ x: SCENERY.fountain.x, y: SCENERY.fountain.y });
-    expect(data.ground.runs[4]).toMatchObject(SCENERY.sidewalk);
+    expect(data.ground.runs[1]).toMatchObject(sceneryPieces().roundabout);
+    expect(data.props[0]).toMatchObject({ x: sceneryPieces().fountain.x, y: sceneryPieces().fountain.y });
+    expect(data.ground.runs[4]).toMatchObject(sceneryPieces().sidewalk);
   });
 
   it("places only frames it bakes (a lamp by its steps)", () => {

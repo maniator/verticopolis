@@ -2,7 +2,8 @@ import type { Simulation } from "../engine/Simulation";
 import type { Unit, VacateReason } from "../engine/types";
 import { unmetCoverage, dominantGripe, nearNightclub, servingTransportKindsAt, bindingTransportClassAt } from "../engine/sim/gripe";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
-import { rentOf } from "../engine/econConfig";
+import { unitPrice } from "../ui/catalogPricing";
+import { towerCatalog } from "../engine/towerCatalog";
 import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../engine/facilities";
 import { isRentalKind } from "../engine/residentialRentals";
 
@@ -214,8 +215,9 @@ export function wontLeaseText(sim: Simulation, u: Unit): string | null {
  *  (`EconomySystem.payMaintenance`). Classic has neither sink (both rates 0), so an
  *  empty spot there costs nothing to hold and the note is omitted. */
 function carryingCostNote(sim: Simulation, u: Unit): string {
-  const overhead = sim.rules.operatingOverheadPerUnit();
-  const holdTax = u.kind === "condo" ? Math.ceil(rentOf(u) * sim.rules.condoHoldTaxRate()) : 0;
+  const catalog = towerCatalog(sim);
+  const overhead = catalog.economy.overheadPerUnitMonthly;
+  const holdTax = u.kind === "condo" ? Math.ceil(unitPrice(catalog, u) * catalog.economy.condoHoldTaxRate) : 0;
   const carry = overhead + holdTax;
   if (carry <= 0) return "";
   return ` It still costs about $${carry.toLocaleString()} a month to hold empty, so fix the cause or bulldoze it to stop the loss.`;
