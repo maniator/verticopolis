@@ -63,8 +63,31 @@ jobs:
           ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
           echo "image=mcr.microsoft.com/playwright:v${ver}-jammy" >> "$GITHUB_OUTPUT"
 
+  # The Rust engine's WASM package is build output, not checked in. Restore it
+  # from the Actions cache (or build and cache it) for the branch tip the jobs
+  # below check out, and hand it to them: their container has no Rust toolchain.
+  engine-wasm:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[update-baselines]')
+    runs-on: ubuntu-latest
+    # A cache miss compiles the crate (a few minutes); anything near this is a hang.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - uses: ./.github/actions/engine-wasm
+        with:
+          artifact-name: engine-wasm
+
   update:
-    needs: resolve-image
+    needs: [resolve-image, engine-wasm]
     runs-on: ubuntu-latest
     # Earns write: it pushes the refreshed baselines. The write token is only
     # ever exposed to the credentialed push step below, never to the steps
@@ -109,6 +132,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - uses: ./.github/actions/engine-wasm-download
+        with:
+          artifact-name: engine-wasm
 
       # A tooling build: the visual specs drive the app through `window.game`,
       # which only VC_TOOLING=1 builds publish (production builds compile it
@@ -172,10 +199,10 @@ jobs:
   # The engine leg. A separate job rather than a matrix entry on `update` so it
   # holds a read-only token: it only compares, never pushes.
   engine-parity:
-    needs: [resolve-image, update]
+    needs: [resolve-image, engine-wasm, update]
     # Compare even when the mint failed (against the tip as it stands), so the
     # engine result is never silently skipped on a mint run.
-    if: ${{ !cancelled() && needs.resolve-image.result == 'success' }}
+    if: ${{ !cancelled() && needs.resolve-image.result == 'success' && needs.engine-wasm.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -196,6 +223,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - uses: ./.github/actions/engine-wasm-download
+        with:
+          artifact-name: engine-wasm
 
       - name: Build
         run: npm run build
