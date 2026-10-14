@@ -24,8 +24,9 @@ export class Engine {
     }
     /**
      * `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
-     * limit and the balance and pays for the car itself.
-     * @param {number} id
+     * limit and the balance and pays for the car itself. The id arrives raw
+     * (#923): anything but a whole JS number is refused, never coerced.
+     * @param {any} id
      * @returns {string}
      */
     addCar(id) {
@@ -293,29 +294,26 @@ export class Engine {
     }
     /**
      * `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
-     * as JSON `{ bottom, top }` text or null: JSON `{ ok, reason?, delta,
-     * bottom, top, added }`, the floors billed past the mark. A malformed
-     * argument (#923) is refused with the shaft's ends as they stand.
-     * @param {number} id
-     * @param {string} end
-     * @param {number} target_floor
-     * @param {string | null} [hwm]
+     * as JSON `{ bottom, top }` text, or null or undefined for none: JSON
+     * `{ ok, reason?, delta, bottom, top, added }`, the floors billed past
+     * the mark. Every argument arrives raw (#923); a malformed one is
+     * refused with the shaft's ends as they stand.
+     * @param {any} id
+     * @param {any} end
+     * @param {any} target_floor
+     * @param {any} hwm
      * @returns {string}
      */
     extendTransport(id, end, target_floor, hwm) {
-        let deferred3_0;
-        let deferred3_1;
+        let deferred1_0;
+        let deferred1_1;
         try {
-            const ptr0 = passStringToWasm0(end, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-            const len0 = WASM_VECTOR_LEN;
-            var ptr1 = isLikeNone(hwm) ? 0 : passStringToWasm0(hwm, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-            var len1 = WASM_VECTOR_LEN;
-            const ret = wasm.engine_extendTransport(this.__wbg_ptr, id, ptr0, len0, target_floor, ptr1, len1);
-            deferred3_0 = ret[0];
-            deferred3_1 = ret[1];
+            const ret = wasm.engine_extendTransport(this.__wbg_ptr, id, end, target_floor, hwm);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);
         } finally {
-            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
         }
     }
     /**
@@ -506,7 +504,7 @@ export class Engine {
     }
     /**
      * `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
-     * @param {number} id
+     * @param {any} id
      * @returns {string}
      */
     removeCar(id) {
@@ -524,22 +522,20 @@ export class Engine {
     /**
      * `removeFacility(id, method)`: the player's sell or bulldoze of a unit
      * or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`.
-     * @param {number} id
-     * @param {string} method
+     * @param {any} id
+     * @param {any} method
      * @returns {string}
      */
     removeFacility(id, method) {
-        let deferred2_0;
-        let deferred2_1;
+        let deferred1_0;
+        let deferred1_1;
         try {
-            const ptr0 = passStringToWasm0(method, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-            const len0 = WASM_VECTOR_LEN;
-            const ret = wasm.engine_removeFacility(this.__wbg_ptr, id, ptr0, len0);
-            deferred2_0 = ret[0];
-            deferred2_1 = ret[1];
+            const ret = wasm.engine_removeFacility(this.__wbg_ptr, id, method);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);
         } finally {
-            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
         }
     }
     /**
@@ -1010,6 +1006,28 @@ function __wbg_get_imports() {
             const ret = Error(getStringFromWasm0(arg0, arg1));
             return ret;
         },
+        __wbg___wbindgen_is_null_e343b7d08827ba72: function(arg0) {
+            const ret = arg0 === null;
+            return ret;
+        },
+        __wbg___wbindgen_is_undefined_8865fb403f8fe9d8: function(arg0) {
+            const ret = arg0 === undefined;
+            return ret;
+        },
+        __wbg___wbindgen_number_get_2e0e7dee9f701a71: function(arg0, arg1) {
+            const obj = arg1;
+            const ret = typeof(obj) === 'number' ? obj : undefined;
+            getDataViewMemory0().setFloat64(arg0 + 8 * 1, isLikeNone(ret) ? 0 : ret, true);
+            getDataViewMemory0().setInt32(arg0 + 4 * 0, !isLikeNone(ret), true);
+        },
+        __wbg___wbindgen_string_get_0380ccaa2f57f0d9: function(arg0, arg1) {
+            const obj = arg1;
+            const ret = typeof(obj) === 'string' ? obj : undefined;
+            var ptr1 = isLikeNone(ret) ? 0 : passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            var len1 = WASM_VECTOR_LEN;
+            getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
+            getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
+        },
         __wbg___wbindgen_throw_41e9ee4f547fc59a: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
@@ -1041,6 +1059,14 @@ function getArrayF64FromWasm0(ptr, len) {
 function getArrayU8FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
+}
+
+let cachedDataViewMemory0 = null;
+function getDataViewMemory0() {
+    if (cachedDataViewMemory0 === null || cachedDataViewMemory0.buffer.detached === true || (cachedDataViewMemory0.buffer.detached === undefined && cachedDataViewMemory0.buffer !== wasm.memory.buffer)) {
+        cachedDataViewMemory0 = new DataView(wasm.memory.buffer);
+    }
+    return cachedDataViewMemory0;
 }
 
 let cachedFloat64ArrayMemory0 = null;
@@ -1151,6 +1177,7 @@ function __wbg_finalize_init(instance, module) {
     wasmInstance = instance;
     wasm = instance.exports;
     wasmModule = module;
+    cachedDataViewMemory0 = null;
     cachedFloat64ArrayMemory0 = null;
     cachedUint8ArrayMemory0 = null;
     wasm.__wbindgen_start();

@@ -12,9 +12,10 @@ export class Engine {
     [Symbol.dispose](): void;
     /**
      * `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
-     * limit and the balance and pays for the car itself.
+     * limit and the balance and pays for the car itself. The id arrives raw
+     * (#923): anything but a whole JS number is refused, never coerced.
      */
-    addCar(id: number): string;
+    addCar(id: any): string;
     /**
      * `adjustRent(id, dir)`: the new rent, or null when nothing moved.
      */
@@ -87,11 +88,12 @@ export class Engine {
     evaluateStar(): void;
     /**
      * `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
-     * as JSON `{ bottom, top }` text or null: JSON `{ ok, reason?, delta,
-     * bottom, top, added }`, the floors billed past the mark. A malformed
-     * argument (#923) is refused with the shaft's ends as they stand.
+     * as JSON `{ bottom, top }` text, or null or undefined for none: JSON
+     * `{ ok, reason?, delta, bottom, top, added }`, the floors billed past
+     * the mark. Every argument arrives raw (#923); a malformed one is
+     * refused with the shaft's ends as they stand.
      */
-    extendTransport(id: number, end: string, target_floor: number, hwm?: string | null): string;
+    extendTransport(id: any, end: any, target_floor: any, hwm: any): string;
     /**
      * The number of units on fire.
      */
@@ -163,12 +165,12 @@ export class Engine {
     /**
      * `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
      */
-    removeCar(id: number): string;
+    removeCar(id: any): string;
     /**
      * `removeFacility(id, method)`: the player's sell or bulldoze of a unit
      * or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`.
      */
-    removeFacility(id: number, method: string): string;
+    removeFacility(id: any, method: any): string;
     /**
      * `tower.removeTransport(id)`: whether a shaft went.
      */
