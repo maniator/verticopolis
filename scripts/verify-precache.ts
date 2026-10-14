@@ -14,7 +14,7 @@
  */
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
 
 const DIST = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist");
@@ -96,7 +96,7 @@ const total = urls.reduce((sum, u) => {
   }
   if (!existsSync(file)) fail(`precache entry ${u} has no file under dist/; cannot size the precache`);
   const real = relative(realDist, realpathSync(file));
-  if (real === ".." || real.startsWith(`..${sep}`) || real === "") fail(`precache entry ${u} links outside dist/`);
+  if (real === "" || real === ".." || real.startsWith(`..${sep}`) || isAbsolute(real)) fail(`precache entry ${u} links outside dist/`);
   return sum + statSync(file).size;
 }, 0);
 if (total > PRECACHE_BUDGET_BYTES) {
