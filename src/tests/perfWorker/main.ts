@@ -74,7 +74,10 @@ export function makeConfig(args: Args, scenarios: string[]): WorkerConfig {
     frameWarmMs: args.quick ? 1000 : 2000,
     commandEveryMs: 1000,
     speed: 3,
-    viewport: { width: 1280, height: 720 },
+    // A phone-sized CSS viewport: at 1280x720 this machine's software
+    // rasterizer drew one frame in about 250 ms, past the 200 ms clamp, so
+    // every mode's frames ran almost no simulation (see LIMITATIONS).
+    viewport: { width: 640, height: 360 },
     scenarios,
     modes: [...MODES],
     quick: args.quick,
@@ -88,6 +91,7 @@ export const LIMITATIONS = [
   "The worker host keeps one batch in flight. A frame that finds a batch still out takes no steps (the frame loop banks its minutes under the 30-minute cap), so on a tower the engine cannot step in real time the worker host simulates fewer minutes per second rather than queueing work; the sim-minutes-per-second row shows it.",
   "Command latency times a tower rename (relayed by every host, read by nothing in the simulation) to the first frame drawn after the engine's answer is in the read model. The main-thread hosts answer in the call, so their figure is the wait for the next frame. One command is in flight at a time, one per second.",
   "Memory is measured after 30 steps on a freshly loaded page, after a forced GC. WASM linear memory only grows, so it is a high-water mark that includes the boot tower. The worker's JS heap is read through the DevTools target protocol; when that is unavailable the combined row has no worker sample. Process PSS sums the browser's processes (Linux).",
+  "Frames render at a 640x360 CSS viewport (a common phone size), smaller than perf:compare's 1280x720: on this machine's software rasterizer a 1280x720 frame took about 250 ms, past Excalibur's 200 ms clamp (a longer frame is handed 1 ms of game time), so no mode simulated anything in its frames. Rows with clamped frames still understate the simulation work; the clamped-frame row counts them.",
   "Audio was not started in these frames (measured in perf:compare). The coalesced and worker hosts are experimental and opt-in; the shipped default is unchanged.",
 ];
 

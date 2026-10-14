@@ -70,6 +70,8 @@ export interface FramesSummary {
   p99Ms: number;
   onePercentLowFps: number;
   simMinutesPerSecond: number;
+  /** Frames over 200 ms, which Excalibur hands 1 ms of game time. */
+  clampedFrames: number;
   longTasks: number;
   blockingMs: number;
   commands: number;
@@ -148,6 +150,7 @@ export function summarizeFrames(f: Awaited<ReturnType<typeof framesRun>>): Frame
     p99Ms: s.p99Ms,
     onePercentLowFps: s.onePercentLowFps,
     simMinutesPerSecond: f.simMinutes / secs,
+    clampedFrames: f.intervalsMs.filter((x) => x > 200).length,
     longTasks: f.longTasks,
     blockingMs: f.blockingMs,
     commands: f.commandToFrameMs.length,

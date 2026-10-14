@@ -69,6 +69,7 @@ export function definitions(config: WorkerConfig): Def[] {
       add({ group: "frames", scenario: sc, throttle: t, metric: "frame time p95", unit: "ms", better: "lower", pick: (r) => f(r)?.p95Ms });
       add({ group: "frames", scenario: sc, throttle: t, metric: "frame time p99", unit: "ms", better: "lower", pick: (r) => f(r)?.p99Ms });
       add({ group: "frames", scenario: sc, throttle: t, metric: "sim minutes per second", unit: "min/s", better: "higher", pick: (r) => f(r)?.simMinutesPerSecond });
+      add({ group: "frames", scenario: sc, throttle: t, metric: "frames over 200 ms (clamped)", unit: "count", better: "lower", pick: (r) => f(r)?.clampedFrames });
       add({ group: "frames", scenario: sc, throttle: t, metric: "main-thread blocking (long tasks past 50 ms)", unit: "ms", better: "lower", pick: (r) => f(r)?.blockingMs });
       add({ group: "frames", scenario: sc, throttle: t, metric: "command to visible frame, median", unit: "ms", better: "lower", pick: (r) => f(r)?.commandToFrameP50Ms });
       add({ group: "traffic", scenario: sc, throttle: t, metric: "worker replies per second (frames)", unit: "1/s", better: "higher", pick: (r) => f(r)?.worker?.repliesPerSecond });
