@@ -7,10 +7,13 @@ import type { WasmEngine, WasmModule } from "../dualrun/binding";
 import { readCatalog } from "../dualrun/catalog";
 import { loadCommand, relayCommands } from "../dualrun/mirror";
 import { ShadowEngine } from "../dualrun/shadow";
-import { decodeFrame, type FrameView } from "./frameView";
+import { decodeFrame, decodeHeader, type FrameHeader, type FrameView } from "./frameView";
+import { appendEngineLog, applyRecords, checkRecords } from "./frameApply";
+import { setStepGate } from "./stepGate";
 import { mergeSimulation } from "./merge";
 import { adoptTelemetry, type TelemetryDocument } from "./telemetry";
 import { towerCatalog, useTowerCatalogSource } from "../engine/towerCatalog";
+import { PERSON_OPTIONALS, clearOptional } from "./personFields";
 
 /**
  * Run a live `Simulation` on the WASM engine (story-engine-wasm-switch).
@@ -44,6 +47,9 @@ export interface WasmHost {
   merges: number;
   /** Apply the engine's full save to the instance now. */
   syncStructure(): void;
+  /** The frame loop's flush: in coalesced mode, apply the engine's frame if
+   *  a step ran since the last one; nothing in step mode. */
+  flush(): void;
   /** Put the instance back the way it was and free the engine. */
   detach(): void;
 }
@@ -52,7 +58,20 @@ export interface WasmHost {
  *  tower already has a crowd (the engine starts from a save, which carries
  *  none), when a mirror or host is already attached, or when the binding's
  *  catalog cannot be read or states another world. While attached, `towerCatalog(sim)` is the engine's. */
-export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
+export interface WasmHostOptions {
+  /** When the read model follows the engine. "step" (the default, and the
+   *  only mode the shipped `?engine=wasm` uses) applies the frame view after
+   *  every step. "frame" (experimental, `?engine=wasm-frame`) applies it once
+   *  per rendered frame, from the frame loop's `flush` (see `stepGate.ts`),
+   *  straight from the engine's array (`frameApply.ts`); between steps the
+   *  instance's clock advances by the step's minutes, which is what the
+   *  engine's clock does, so the fixed step sizes the same steps. A caller
+   *  that ticks outside the frame loop syncs with `syncStructure`. */
+  sync?: "step" | "frame";
+}
+
+export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHostOptions = {}): WasmHost {
+  const coalesce = options.sync === "frame";
   // Read the binding's catalogs first, both modes (a Classic tower's
   // patronage readout uses the Modern yardstick): a binding whose catalog this
   // build cannot read refuses the attach before an engine is built.
@@ -85,6 +104,8 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
   let engineMealRev = decodeFrame(engine.frameView()).header.mealOverlayRevision;
   let simLogSeqAtSync = sim.logSeq;
   let detached = false;
+  /** Coalesced mode: steps ran since the last sync. */
+  let stale = false;
 
   // The instance's events up to now are real (it was the authority); the
   // engine's start from here. The instance keeps its own buffer object for
@@ -106,6 +127,9 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
     merges: 0,
     syncStructure() {
       syncFrame(true);
+    },
+    flush() {
+      if (coalesce && stale && !detached) syncFrame();
     },
     detach() {
       if (detached) return;
@@ -134,6 +158,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
         } finally {
           try {
             useTowerCatalogSource(sim, null);
+            setStepGate(sim, null);
             restoreOwn(sim, "serialize", ownSerialize);
             restoreOwn(sim, "drainGameplayEvents", ownDrain);
             restoreOwn(sim, "gameplayEventsDropped", ownDropped);
@@ -148,7 +173,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
     },
   };
 
-  const merge = (frame: FrameView) => {
+  const merge = (frame: Pick<FrameView, "header">) => {
     const fresh = Simulation.deserialize(JSON.parse(engine.serialize()));
     const buffer = sim.gameplayEvents;
     try {
@@ -172,11 +197,20 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
    *  first when the engine's hour pass ran or its tower moved (or when
    *  `force` asks for one). */
   const syncFrame = (force = false) => {
-    const frame = decodeFrame(engine.frameView());
-    const h = frame.header;
+    stale = false;
+    const view = engine.frameView();
+    let frame: FrameView | null = null;
+    let h: FrameHeader;
+    if (coalesce) {
+      h = decodeHeader(view);
+      checkRecords(view, h);
+    } else {
+      frame = decodeFrame(view);
+      h = frame.header;
+    }
     relay.suppress(() => {
       if (force || h.onHourRuns !== lastHourRuns || h.revision !== lastRevision) {
-        merge(frame);
+        merge({ header: h });
         lastHourRuns = h.onHourRuns;
       }
       // The meal overlay moves mid-hour (a worker leaves for lunch), and the
@@ -204,16 +238,24 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
       }
       if (h.logSeq !== engineLogSeq) {
         const ownSinceSync = sim.logSeq - simLogSeqAtSync;
-        const entries = (JSON.parse(engine.logSince(engineLogSeq)) as (LogEntry & { seq: number })[]).slice(ownSinceSync);
-        for (const e of entries) sim.log.push({ minute: e.minute, text: e.text, kind: e.kind });
-        while (sim.log.length > LOG_RING_CAP) sim.log.shift();
-        sim.logSeq += entries.length;
+        const all = JSON.parse(engine.logSince(engineLogSeq)) as (LogEntry & { seq: number })[];
+        if (coalesce) appendEngineLog(sim, all, ownSinceSync);
+        else {
+          const entries = all.slice(ownSinceSync);
+          for (const e of entries) sim.log.push({ minute: e.minute, text: e.text, kind: e.kind });
+          while (sim.log.length > LOG_RING_CAP) sim.log.shift();
+          sim.logSeq += entries.length;
+        }
         engineLogSeq = h.logSeq;
       }
       simLogSeqAtSync = sim.logSeq;
-      syncPeople(sim, frame);
-      syncUnits(sim, frame);
-      syncCars(sim, frame);
+      if (frame) {
+        syncPeople(sim, frame);
+        syncUnits(sim, frame);
+        syncCars(sim, frame);
+      } else {
+        applyRecords(sim, view, h);
+      }
     });
     host.frames++;
   };
@@ -228,7 +270,15 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
     relay = relayCommands(sim, (cmd) => { shadow.apply(cmd); }, {
       tick(dt) {
         engine.tick(dt);
-        syncFrame();
+        if (!coalesce) {
+          syncFrame();
+          return;
+        }
+        // The engine's clock moved by exactly these minutes; the instance's
+        // follows so the next step is sized from the same clock, and the
+        // rest of the frame waits for the flush.
+        sim.clock.minutes += dt;
+        stale = true;
       },
     });
   } catch (e) {
@@ -253,6 +303,16 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
   Object.defineProperty(sim, "gameplayEventsDropped", { get: () => droppedAtAttach + engine.gameplayEventsDropped(), configurable: true });
   // Prices, sizes and build rules come from the engine that runs the tower.
   useTowerCatalogSource(sim, (mode) => catalogs[mode]);
+  if (coalesce) {
+    setStepGate(sim, {
+      canStep: () => true,
+      flush: () => host.flush(),
+      settle: () => {
+        if (stale && !detached) syncFrame();
+        return Promise.resolve();
+      },
+    });
+  }
   return host;
 }
 
@@ -263,29 +323,7 @@ function restoreOwn(sim: Simulation, name: string, desc: PropertyDescriptor | un
   else delete (sim as unknown as Record<string, unknown>)[name];
 }
 
-/** The optional person fields the frame carries: set when the record has
- *  them, and otherwise left in the shape the TypeScript engine leaves them
- *  in, so a held person reads as the instance's own would. */
-const PERSON_OPTIONALS = ["originUnitId", "venueUnitId", "mealVenueId", "routine", "dwellSecondsLeft"] as const;
-
-/** The optional person fields the TypeScript engine clears by assigning
- *  undefined (`motion.ts`: the origin unit at the lobby, the venue and the
- *  hotel-guest flag when a meal ends), so a cleared one keeps its key with
- *  no value. Every other optional field is absent until set and is never
- *  cleared, and the three flags are absent or true (no engine path writes
- *  false). A person first seen in a frame has no key for a field the frame
- *  sends as absent. */
-const CLEARED_BY_ASSIGNMENT: ReadonlySet<string> = new Set(["originUnitId", "venueUnitId", "countedHotelGuest"]);
-
-/** Clear an optional person field the frame sends as absent, the way the
- *  TypeScript engine would. */
-function clearOptional(p: Person, key: keyof Person): void {
-  if (!(key in p)) return;
-  if (CLEARED_BY_ASSIGNMENT.has(key)) (p as unknown as Record<string, unknown>)[key] = undefined;
-  else delete (p as unknown as Record<string, unknown>)[key];
-}
-
-function syncPeople(sim: Simulation, frame: FrameView): void {
+export function syncPeople(sim: Simulation, frame: FrameView): void {
   const held = new Map<number, Person>();
   for (const p of sim.crowd.people) held.set(p.id, p);
   const next = frame.people.map((r) => {
@@ -330,7 +368,7 @@ function syncPeople(sim: Simulation, frame: FrameView): void {
   sim.crowd.people.splice(0, sim.crowd.people.length, ...next);
 }
 
-function syncUnits(sim: Simulation, frame: FrameView): void {
+export function syncUnits(sim: Simulation, frame: FrameView): void {
   for (const r of frame.units) {
     const u = sim.tower.byId.get(r.id);
     if (!u) continue;
@@ -342,7 +380,7 @@ function syncUnits(sim: Simulation, frame: FrameView): void {
   }
 }
 
-function syncCars(sim: Simulation, frame: FrameView): void {
+export function syncCars(sim: Simulation, frame: FrameView): void {
   for (const r of frame.transports) {
     const t = sim.tower.transportsById.get(r.id);
     if (!t) continue;

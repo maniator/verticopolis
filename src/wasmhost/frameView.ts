@@ -66,22 +66,24 @@ export interface FrameView {
   transports: TransportRecord[];
 }
 
-/** Decode one frame view. Throws when the array is shorter than its
- *  header says, so a binding that changed its layout fails by name. */
-export function decodeFrame(v: ArrayLike<number>): FrameView {
+/** A count the decoder reads before the records it counts: a negative or
+ *  non-integer one would misalign every record after it. */
+function count(n: number, what: string): number {
+  if (!Number.isInteger(n) || n < 0) throw new Error(`frame view: bad ${what} count ${n}`);
+  return n;
+}
+
+export function enumAt<T>(table: readonly T[], code: number, what: string): T {
+  const t = table[code];
+  if (t === undefined) throw new Error(`frame view: unknown ${what} code ${code}`);
+  return t;
+}
+
+/** Decode the header alone. Throws when the array is shorter than the
+ *  header, or a count or an enum code in it is bad. */
+export function decodeHeader(v: ArrayLike<number>): FrameHeader {
   if (v.length < FRAME_HEADER) throw new Error(`frame view: ${v.length} numbers, header needs ${FRAME_HEADER}`);
-  // A count the decoder reads before the records it counts: a negative or
-  // non-integer one would misalign every record after it.
-  const count = (n: number, what: string) => {
-    if (!Number.isInteger(n) || n < 0) throw new Error(`frame view: bad ${what} count ${n}`);
-    return n;
-  };
-  const enumAt = <T>(table: readonly T[], code: number, what: string): T => {
-    const t = table[code];
-    if (t === undefined) throw new Error(`frame view: unknown ${what} code ${code}`);
-    return t;
-  };
-  const header: FrameHeader = {
+  return {
     minutes: v[0],
     revision: v[1],
     mealOverlayRevision: v[2],
@@ -101,6 +103,12 @@ export function decodeFrame(v: ArrayLike<number>): FrameView {
     units: count(v[24], "unit"),
     transports: count(v[25], "transport"),
   };
+}
+
+/** Decode one frame view. Throws when the array is shorter than its
+ *  header says, so a binding that changed its layout fails by name. */
+export function decodeFrame(v: ArrayLike<number>): FrameView {
+  const header = decodeHeader(v);
   let i = FRAME_HEADER;
   const need = (n: number) => {
     if (i + n > v.length) throw new Error(`frame view: ${v.length} numbers, record at ${i} needs ${n}`);
