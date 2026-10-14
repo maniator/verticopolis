@@ -15,7 +15,9 @@ export interface WorkboxGlob {
 }
 
 export function readWorkboxGlob(config: string): WorkboxGlob | null {
-  const list = /globPatterns:\s*\[([^\]]*)\]/.exec(config);
+  // The array must hold only double-quoted strings, so a single-quoted entry,
+  // a spread or a variable makes the whole read fail instead of being skipped.
+  const list = /globPatterns:\s*\[((?:\s*"[^"]*"\s*,?)*)\s*\]/.exec(config);
   if (!list) return null;
   const entries = [...list[1].matchAll(/"([^"]*)"/g)].map((m) => m[1]);
   if (entries.length === 0) return null;

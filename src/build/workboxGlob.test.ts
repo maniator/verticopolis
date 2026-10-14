@@ -20,5 +20,9 @@ describe("readWorkboxGlob", () => {
     expect(readWorkboxGlob("no glob here")).toBeNull();
     expect(readWorkboxGlob('globPatterns: ["assets/**/*.js"],')).toBeNull();
     expect(readWorkboxGlob("globPatterns: [],")).toBeNull();
+    // Entries it cannot read make the whole read fail, never a silent skip.
+    expect(readWorkboxGlob(`globPatterns: ["**/*.{js,wasm}", 'engine/BUILD.json'],`)).toBeNull();
+    expect(readWorkboxGlob('globPatterns: ["**/*.{js,wasm}", ...extra],')).toBeNull();
+    expect(readWorkboxGlob('globPatterns: ["**/*.[jt]s", "engine/BUILD.json"],')).toBeNull();
   });
 });
