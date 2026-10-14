@@ -218,14 +218,6 @@
       "hasLicenseFile": true
     },
     {
-      "name": "zlib-rs",
-      "version": "0.6.8",
-      "license": "Zlib",
-      "licenseText": "(C) 2024 Trifecta Tech Foundation \n\nThis software is provided 'as-is', without any express or implied\nwarranty. In no event will the authors be held liable for any damages\narising from the use of this software.\n\nPermission is granted to anyone to use this software for any purpose,\nincluding commercial applications, and to alter it and redistribute it\nfreely, subject to the following restrictions:\n\n1. The origin of this software must not be misrepresented; you must not\n   claim that you wrote the original software. If you use this software\n   in a product, an acknowledgment in the product documentation would be\n   appreciated but is not required.\n\n2. Altered source versions must be plainly marked as such, and must not be\n   misrepresented as being the original software.\n\n3. This notice may not be removed or altered from any source distribution.",
-      "kind": "crate",
-      "hasLicenseFile": true
-    },
-    {
       "name": "zmij",
       "version": "1.0.23",
       "license": "MIT",

@@ -45,7 +45,8 @@ function htmlText(html: string): string {
 
 /** Where the toolchain keeps the standard library's copyright notice and license texts (the rustup layout). */
 function toolchainDocs(crate: string): { version: string; files: string[] } {
-  const rustc = (args: string[]) => execFileSync("rustc", args, { cwd: crate, encoding: "utf8" }).trim();
+  // The compiler cargo itself uses: $RUSTC when set, else rustc on PATH.
+  const rustc = (args: string[]) => execFileSync(process.env.RUSTC || "rustc", args, { cwd: crate, encoding: "utf8" }).trim();
   const version = /^rustc (\d+\.\d+\.\d+)/.exec(rustc(["--version"]))?.[1];
   if (!version) throw new Error("rustc --version printed no version");
   const doc = join(rustc(["--print", "sysroot"]), "share", "doc", "rust");
@@ -75,7 +76,7 @@ export function checkToolchain(crate: string, rustVersion: string): void {
   // the committed record all use.
   const want = rustVersion.split(".").length === 2 ? `${rustVersion}.0` : rustVersion;
   if (version !== want) {
-    throw new Error(`rustc ${version} is not ${want}, the release the engine's notices record is built with; run: rustup toolchain install ${want}, then build with RUSTUP_TOOLCHAIN=${want}`);
+    throw new Error(`rustc ${version} is not ${want}, the release the engine's notices record is built with; run: rustup toolchain install ${want} --target wasm32-unknown-unknown, then build with RUSTUP_TOOLCHAIN=${want}`);
   }
   const missing = files.filter((f) => !existsSync(f));
   if (missing.length > 0) throw new Error(`the Rust toolchain ships no ${missing.join(", ")}, so the standard library cannot be attributed; install Rust with rustup`);
@@ -111,7 +112,16 @@ export function engineThirdParty(crate: string, features: string): (NoticePackag
   ) as CargoMetadata;
   const out: (NoticePackage & { hasLicenseFile: true })[] = [];
   const problems: string[] = [];
-  for (const p of shippedCrates(meta)) {
+  const linked = new Set(
+    execFileSync("cargo", ["tree", "--locked", "-e", "normal", "--target", "wasm32-unknown-unknown", "--features", features, "--prefix", "none", "--format", "{p}"], {
+      cwd: crate,
+      encoding: "utf8",
+    })
+      .split("\n")
+      .map((line) => line.replace(/ \(.*$/, "").trim())
+      .filter(Boolean),
+  );
+  for (const p of shippedCrates(meta, linked)) {
     const dir = dirname(p.manifest_path);
     const read = readLicenseFiles(dir);
     problems.push(...read.problems.map((p) => `${p.file} ${p.reason}`));
@@ -132,7 +142,10 @@ export function engineThirdParty(crate: string, features: string): (NoticePackag
     if (problem) problems.push(problem);
     else out.push({ name: p.name, version: p.version, license: p.license!, licenseText, kind: "crate", hasLicenseFile: true });
   }
+  const std = standardLibrary(crate);
+  const stdProblem = noticeProblem(std);
+  if (stdProblem) problems.push(stdProblem);
   if (problems.length > 0) throw new Error(`the WASM engine cannot be attributed: ${problems.join("; ")}`);
-  out.push(standardLibrary(crate));
+  out.push(std);
   return out;
 }

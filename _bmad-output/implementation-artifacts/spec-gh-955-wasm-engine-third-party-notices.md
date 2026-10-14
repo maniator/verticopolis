@@ -60,13 +60,14 @@ context:
 - [x] `package.json`, backlog -- patch bump (no player line: the notices file is the only output that changes); row `wasm-engine-third-party-notices` done (closes #955 on merge).
 
 **Acceptance Criteria:**
-- Given `npm run build` with the engine package, then the notices list the 29 crates the WASM build compiles in today and the Rust standard library, and no proc-macro or build-only crate.
+- Given `npm run build` with the engine package, then the notices list the crates the WASM build compiles in (28 today, matching the rlibs a clean wasm32 compile produces) and the Rust standard library, and no proc-macro or build-only crate.
 - Given `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, then all pass.
 
 ## Spec Change Log
 
 - 2026-10-13, review round 1: the record is `{ sources, crates }` and must name the package's BUILD.json source hash; the site build checks each entry with the same license-file flag the WASM build computed (`engineRecordPackages`, unit-tested); the toolchain's copyright page decodes numeric entities; the standard library entry declares `(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib` (core's Unicode tables and foldhash reach wasm32; the page's MPL-2.0 and BSD-2-Clause parts build for other targets only) and carries the Unicode license text; `wasm:build` refuses a rustc whose minor release differs from `rust-version`, or one without rustup's doc layout, before compiling; CI's engine job runs on changes to the attribution code and checks the committed record is current. Deferred: #958's package cache key (row `third-party-notices-hardening`, #974).
 - 2026-10-14, review round 2: the toolchain check is exact (`rust-version` at `.0`, the release CI already pins), and `scripts/vercel-build.sh` installs that same release, so every build writes the same standard library entry; the record is gathered before the compile, so a crate that cannot be attributed leaves the old package in place; `noticeProblem` says "manifest" so its messages fit crates too.
+- 2026-10-14, review round 3 and the owner's artifact check on #992: the walk is narrowed by `cargo tree -e normal` for the same target and features, because `cargo metadata` unifies features across builds and listed `zlib-rs`, which the wasm32 build never compiles; the record now equals the 28 crates a clean wasm32 compile produces. The standard library entry is license-checked at `wasm:build`, the site build refuses a record without it, and `vercel-build.sh` shares `checkToolchain`'s version rule.
 
 ## Design Notes
 

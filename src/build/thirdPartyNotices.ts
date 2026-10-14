@@ -372,7 +372,7 @@ export interface CargoMetadata {
  * they nor anything only they pull in ships. The root itself (our own code)
  * is left out. Sorted by name, then version.
  */
-export function shippedCrates(meta: CargoMetadata): CargoMetadata["packages"][number][] {
+export function shippedCrates(meta: CargoMetadata, linked?: ReadonlySet<string>): CargoMetadata["packages"][number][] {
   const root = meta.resolve.root;
   if (!root) throw new Error("cargo metadata has no root package; run it inside the crate");
   const byId = new Map(meta.packages.map((p) => [p.id, p]));
@@ -391,6 +391,14 @@ export function shippedCrates(meta: CargoMetadata): CargoMetadata["packages"][nu
   }
   seen.delete(root);
   return [...seen]
+    // `cargo metadata` unifies features across every build of the workspace
+    // (tests included), so it can name an optional dependency this build
+    // never compiles; `linked` (from `cargo tree` for the same target and
+    // features, as "name vX.Y.Z") narrows the walk to what is compiled.
+    .filter((id) => {
+      const p = byId.get(id);
+      return !linked || (p !== undefined && linked.has(`${p.name} v${p.version}`));
+    })
     .map((id) => {
       const p = byId.get(id);
       if (!p) throw new Error(`cargo metadata's resolve graph names ${id}, which it does not describe`);
@@ -424,5 +432,6 @@ export function engineRecordPackages(record: unknown, buildSources: unknown): { 
     if (problem) problems.push(problem);
     else packages.push({ name: crate.name!, version: crate.version!, license: crate.license!, licenseText: crate.licenseText!, kind: "crate" });
   }
+  if (!packages.some((p) => p.name === "Rust standard library")) problems.push("the record does not list the Rust standard library");
   return { packages, problems };
 }

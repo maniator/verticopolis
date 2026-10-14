@@ -3,7 +3,7 @@
  * the notices generator (npm packages) and the WASM build (Rust crates).
  * Returns every LICENSE/COPYING/NOTICE-style file in file-name order, joined
  * with a header per file when there is more than one, and whether any of them
- * carries license terms; unreadable files are reported, never skipped.
+ * carries license terms; an unreadable file is reported as a problem.
  *
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */

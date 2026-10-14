@@ -194,7 +194,7 @@ describe("third-party notices (#951)", () => {
     expect(out.indexOf("tslib@2.8.1\n")).toBeLessThan(out.indexOf("tslib@10.0.0"));
   });
 
-  it("lists the crates a WASM build compiles in, never build-only ones (#955)", () => {
+  it("lists the crates a WASM build compiles in and leaves build-only ones out (#955)", () => {
     const pkg = (name: string, kind = "lib") => ({ id: name, name, version: "1.0.0", license: "MIT", manifest_path: `/r/${name}/Cargo.toml`, targets: [{ kind: [kind] }] });
     const dep = (name: string, kind: string | null = null) => ({ pkg: name, dep_kinds: [{ kind }] });
     const meta: CargoMetadata = {
@@ -215,6 +215,8 @@ describe("third-party notices (#951)", () => {
     // A proc-macro and what only it pulls in, build and dev dependencies and the root itself stay out.
     expect(shippedCrates(meta).map((p) => p.name)).toEqual(["itoa", "serde"]);
     expect(() => shippedCrates({ ...meta, resolve: { ...meta.resolve, root: null } })).toThrow(/no root/);
+    // Narrowed to what `cargo tree` says this build compiles (metadata unifies features across builds).
+    expect(shippedCrates(meta, new Set(["serde v1.0.0"])).map((p) => p.name)).toEqual(["serde"]);
   });
 
   it("labels Rust crates and keeps them apart from npm packages of the same name", () => {
@@ -231,18 +233,21 @@ describe("third-party notices (#951)", () => {
 
   it("trusts the engine's record only when it matches the package and every crate checks out", () => {
     const good = { name: "serde", version: "1.0.229", license: "MIT OR Apache-2.0", licenseText: "MIT text", hasLicenseFile: true, kind: "crate" };
-    const ok = engineRecordPackages({ sources: "abc", crates: [good] }, "abc");
+    const std = { name: "Rust standard library", version: "1.97.0", license: "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib", licenseText: "std text", hasLicenseFile: true, kind: "crate" };
+    const ok = engineRecordPackages({ sources: "abc", crates: [good, std] }, "abc");
     expect(ok.problems).toEqual([]);
-    expect(ok.packages).toEqual([{ name: "serde", version: "1.0.229", license: "MIT OR Apache-2.0", licenseText: "MIT text", kind: "crate" }]);
+    expect(ok.packages[0]).toEqual({ name: "serde", version: "1.0.229", license: "MIT OR Apache-2.0", licenseText: "MIT text", kind: "crate" });
+    // The standard library is always linked, so a record without it is refused.
+    expect(engineRecordPackages({ sources: "abc", crates: [good] }, "abc").problems.join()).toMatch(/Rust standard library/);
     // A record from another build of the engine.
-    expect(engineRecordPackages({ sources: "old", crates: [good] }, "abc").problems.join()).toMatch(/source hash differs/);
-    expect(engineRecordPackages({ crates: [good] }, undefined).problems.join()).toMatch(/source hash differs/);
+    expect(engineRecordPackages({ sources: "old", crates: [good, std] }, "abc").problems.join()).toMatch(/source hash differs/);
+    expect(engineRecordPackages({ crates: [good, std] }, undefined).problems.join()).toMatch(/source hash differs/);
     // Missing, empty or malformed records.
     for (const bad of [null, [], { sources: "abc" }, { sources: "abc", crates: [] }]) {
       expect(engineRecordPackages(bad, "abc").problems.length).toBeGreaterThan(0);
     }
     // Each crate is held to the same checks as an npm package.
-    const check = (entry: object) => engineRecordPackages({ sources: "abc", crates: [{ ...good, ...entry }] }, "abc").problems.join();
+    const check = (entry: object) => engineRecordPackages({ sources: "abc", crates: [{ ...good, ...entry }, std] }, "abc").problems.join();
     expect(check({ license: "GPL-3.0-only" })).toMatch(/not on the allowlist/);
     expect(check({ hasLicenseFile: false })).toMatch(/no license file/);
     expect(check({ licenseText: " " })).toMatch(/no license file/);
