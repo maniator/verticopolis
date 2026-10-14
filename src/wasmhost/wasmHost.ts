@@ -7,6 +7,7 @@ import type { WasmEngine, WasmModule } from "../dualrun/binding";
 import { readCatalog } from "../dualrun/catalog";
 import { loadCommand, relayCommands } from "../dualrun/mirror";
 import { ShadowEngine } from "../dualrun/shadow";
+import { drainEngineBatch } from "./engineEvents";
 import { decodeFrame, type FrameView } from "./frameView";
 import { mergeSimulation } from "./merge";
 import { adoptTelemetry, type TelemetryDocument } from "./telemetry";
@@ -94,12 +95,19 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
   // The read model's own ring overflows with duplicates while hosted, so the
   // drop count is the instance's at attach plus the engine's.
   const droppedAtAttach = sim.gameplayEvents.dropped;
+  // Events lost to a batch the host could not read (#907).
+  let unreadable = 0;
   const drainHosted = (): GameplayEvent[] => {
+    // The engine first: when it traps, the read model's copies stay for the
+    // detach to count what the trap took.
+    const batch = drainEngineBatch(engine);
     sim.gameplayEvents.drain();
-    const out = [...carried, ...(JSON.parse(engine.drainGameplayEvents()) as GameplayEvent[])];
+    unreadable += batch.lost;
+    const out = [...carried, ...batch.events];
     carried = [];
     return out;
   };
+  const droppedSoFar = () => droppedAtAttach + unreadable + engine.gameplayEventsDropped();
   const host: WasmHost = {
     engine,
     frames: 0,
@@ -122,29 +130,23 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
       // a command the engine's full ring already dropped is counted again
       // from its copy; and the copies stop at the read model's ring cap.
       const duplicates = sim.gameplayEvents.length;
-      let owed: GameplayEvent[] = carried;
-      let dropped = droppedAtAttach + duplicates;
-      try {
-        dropped += engine.gameplayEventsDropped();
-        owed = drainHosted();
-        dropped -= duplicates;
-      } finally {
-        try {
-          relay.detach();
-        } finally {
-          try {
-            useTowerCatalogSource(sim, null);
-            restoreOwn(sim, "serialize", ownSerialize);
-            restoreOwn(sim, "drainGameplayEvents", ownDrain);
-            restoreOwn(sim, "gameplayEventsDropped", ownDropped);
-            sim.gameplayEvents.drain(); // the read model's duplicates
-            sim.gameplayEvents.dropped = dropped;
-            for (const e of owed) sim.gameplayEvents.pushEvent(e);
-          } finally {
-            shadow.free();
-          }
-        }
-      }
+      const handOff = { events: carried, dropped: droppedAtAttach + unreadable + duplicates };
+      runEach(
+        () => {
+          const engineDropped = engine.gameplayEventsDropped();
+          handOff.dropped += engineDropped;
+          handOff.events = drainHosted();
+          handOff.dropped = droppedAtAttach + unreadable + engineDropped;
+        },
+        () => relay.detach(),
+        () => useTowerCatalogSource(sim, null),
+        () => restoreOwn(sim, "serialize", ownSerialize),
+        () => restoreOwn(sim, "drainGameplayEvents", ownDrain),
+        () => restoreOwn(sim, "gameplayEventsDropped", ownDropped),
+        // The read model's duplicates go; the owed batch takes their place.
+        () => sim.gameplayEvents.restore(handOff.events, handOff.dropped),
+        () => shadow.free(),
+      );
     },
   };
 
@@ -236,9 +238,12 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
     // host): the engine built for it must not leak, and the instance keeps
     // its own events.
     try {
-      shadow.free();
-    } finally {
-      for (const ev of carried) sim.gameplayEvents.pushEvent(ev);
+      runEach(
+        () => shadow.free(),
+        () => sim.gameplayEvents.restore(carried, sim.gameplayEvents.dropped),
+      );
+    } catch {
+      // The refusal is the caller's answer; a failure to free behind it is not.
     }
     throw e;
   }
@@ -250,10 +255,25 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
   // is the authority again, and never reaches the freed engine.
   const drainOverride = (): GameplayEvent[] => (detached ? sim.gameplayEvents.drain() : drainHosted());
   Object.defineProperty(sim, "drainGameplayEvents", { value: drainOverride, configurable: true, writable: true });
-  Object.defineProperty(sim, "gameplayEventsDropped", { get: () => droppedAtAttach + engine.gameplayEventsDropped(), configurable: true });
+  Object.defineProperty(sim, "gameplayEventsDropped", { get: droppedSoFar, configurable: true });
   // Prices, sizes and build rules come from the engine that runs the tower.
   useTowerCatalogSource(sim, (mode) => catalogs[mode]);
   return host;
+}
+
+/** Run every step, even after one throws, then throw the first error: a
+ *  teardown that must let the instance go and free the engine whatever an
+ *  earlier step did. */
+function runEach(...steps: (() => void)[]): void {
+  let failure: { error: unknown } | null = null;
+  for (const step of steps) {
+    try {
+      step();
+    } catch (error) {
+      failure ??= { error };
+    }
+  }
+  if (failure) throw failure.error;
 }
 
 /** Put back an own property the host replaced: the one that was there, or
