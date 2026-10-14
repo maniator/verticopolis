@@ -72,8 +72,13 @@ jobs:
       - name: Run tests
         run: npm run test:coverage -- --run
 
+      # This job only proves the bundle builds, with no engine package (the e2e
+      # job below builds with one), so it opts out of the engine requirement
+      # scripts/verify-precache.ts puts on every build.
       - name: Build
         run: npm run build
+        env:
+          VC_ALLOW_NO_ENGINE: "1"
 
   # Resolve the Playwright container tag from the repo's own Playwright version so
   # the e2e job's browser can never drift from the one baselines were minted with

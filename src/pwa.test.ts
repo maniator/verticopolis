@@ -105,3 +105,30 @@ describe("registerPWA: gating", () => {
     }
   });
 });
+
+describe("registerPWA: offline", () => {
+  afterEach(() => {
+    registerSW.mockClear();
+  });
+
+  it("still offers a waiting update when the version.json fetch fails offline (#945)", async () => {
+    // Offline, the incoming build's notes cannot be fetched. The update must
+    // still surface (with no info) and nothing may throw, so an installed game
+    // keeps running on its cached shell and engine until the player updates.
+    const restore = makeBrowserBranchReachable();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
+    try {
+      const { registerPWA } = await importPwa();
+      const onUpdateAvailable = vi.fn();
+      registerPWA({ onUpdateAvailable });
+      const opts = registerSW.mock.calls[0][0] as { onNeedRefresh: () => void };
+      opts.onNeedRefresh();
+      await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
+      expect(fetchSpy).toHaveBeenCalled();
+      expect(onUpdateAvailable.mock.calls[0][1]).toBeUndefined();
+    } finally {
+      fetchSpy.mockRestore();
+      restore();
+    }
+  });
+});
