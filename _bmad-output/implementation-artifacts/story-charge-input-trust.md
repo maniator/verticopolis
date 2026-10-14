@@ -42,13 +42,22 @@ engines.
   ends as they stand. Before this, `addCar("12")` bought a car, `lift.id + 0.5`
   reached the engine as `lift.id`, and an unknown `end` or a bad mark threw.
 - **Intentionally unsupported raw inputs** (refused by the binding, moving
-  nothing, where TypeScript would act): a mark passed as an object instead of
-  its JSON text, and a mark field written as a JSON float (`2.0`, `1e1`,
-  `9007199254740990.5`), which an `f64` parse would round to a whole floor.
+  nothing, where TypeScript would act):
+  - a mark passed as an object instead of its JSON text;
+  - a mark field written as a JSON float (`2.0`, `1e1`,
+    `9007199254740990.5`, and `-0`, which the JSON reader takes as a float),
+    since an `f64` parse would round a fraction to a whole floor;
+  - mark text that is not strict JSON anywhere, even in a field the engine
+    ignores (a lone surrogate escape, nesting past 128 levels).
+
+  The reverse also holds: TypeScript's `extendTransport` takes the mark as an
+  object, so JSON text handed to it is refused there. The mirror relays only
+  `{ bottom, top }` through `JSON.stringify`, which writes none of these.
 - **Mirror:** the charge commands relay a non-number id, floor or mark field
   as NaN and a non-string `end` or `method` as an empty string, and check
   any mark but null or undefined, so the binding only ever sees values it
-  refuses the way TypeScript does (round 1).
+  refuses the way TypeScript does (round 1) It reads an object mark once, before
+  the call, and hands the engine and the relay that copy (round 5).
 - **AC4:** already closed by #914, which widens the mark to the current span.
   A TypeScript test now pins it.
 - **AC5, owner decision (2026-10-13):** the confinement stays as #950's
@@ -66,13 +75,13 @@ engines.
   - `chargeBindingRaw.integration.test.ts` (in `npm run test:wasm` and the
     Rust engine workflow's paths): 118 malformed calls straight into the
     glue, each checked for no throw, the TypeScript refusal, an equal answer
-    and an unchanged state in both engines; whole ids that name nothing must
-    get the same answer from both; no gameplay event from either; then
+    and an unchanged state in both engines; 19 accepted edge values (ids
+    that name nothing, floors and marks at ±(2^53 - 1)) must get the same
+    answer from both; no gameplay event from either; then
     well-formed calls must land with equal answers, states and events.
-- **#958:** that PR deletes the checked-in WASM package
-  (`src/public/engine/*`). Whichever of the two lands second reconciles it:
-  if #958 lands first, this branch drops its package changes and the build
-  produces them.
+- **#958:** that PR removed the checked-in WASM package
+  (`src/public/engine/*`) and landed first, so this branch merges main and
+  drops its package changes; CI and Vercel build the package.
 - **Lock:** unchanged; no scenario sends a malformed command, and the scenario
   loader rejects one at load.
 
@@ -166,3 +175,36 @@ engines.
 - [x] [Review][Patch] This story and the PR body described the `f64` binding
   (Acceptance Auditor): updated.
 - Codex P1 (a raw call coerced in the glue) was fixed by 51e8a9f.
+
+### Round 5 (confirming pass)
+
+- [x] [Review][Patch] The mirror read a mark's fields again after the
+  TypeScript call, so an accessor mark billed one value in TypeScript and
+  relayed another (Edge Case Hunter with a repro, Blind Hunter; Round 2 had
+  dismissed it) [src/dualrun/mirror.ts]: the wrapper copies an object mark
+  once before the call and both read the copy. The dual-run test bills two
+  such marks and fails on the old mirror.
+- [x] [Review][Patch] The dual-run test never asserted that a checkpoint
+  compared the engines, and read the lift through a captured reference
+  (Blind Hunter) [dualRunEdits.integration.test.ts]: it pins 2 checkpoints
+  and re-reads the shaft by id.
+- [x] [Review][Patch] The raw test sent no accepted floor or mark at the
+  edge of the safe range (Acceptance Auditor): three such calls join the
+  parity cases.
+- [x] [Review][Patch] The unsupported-input list missed `-0` as JSON text,
+  non-strict JSON in an ignored field, and JSON text handed to TypeScript
+  (Edge Case Hunter, Blind Hunter, Acceptance Auditor): documented here and
+  in the raw test, which now pins each binding refusal.
+- [x] [Review][Patch] #958 landed first and the branch conflicted on the
+  package files; the backlog done row and the PR body described the `f64`
+  binding (Acceptance Auditor): main is merged with the package dropped,
+  and the prose is updated.
+- [x] [Review][Defer] Every other relayed command still coerces raw
+  arguments in the binding glue (Blind Hunter): backlog row
+  `relayed-command-input-trust`, #996.
+- Dismissed (4): `charges.ts` missing from the Rust workflow's paths (it is
+  under `src/engine/**`); the conformance adapter's dropped 32-bit guard
+  (the scenario loader checks charge arguments, Round 2); the hand-kept
+  `.d.ts` drifting (it is generated by `npm run wasm:build`, and the package
+  hash test catches a stale build); parsing the mark twice for the `null`
+  check (a few bytes per drag event).

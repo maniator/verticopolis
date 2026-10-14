@@ -15,11 +15,17 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
  * gameplay event, instead of coercing a value (`"5"` to 5, `null` to 0) or
  * throwing in the glue.
  *
- * Intentionally unsupported: the binding's mark is JSON text, so a mark
- * passed as an object is refused where TypeScript (taking the object) would
- * extend, and a mark field written as a JSON float (`2.0`, `1e1`,
- * `9007199254740990.5`) is refused though an f64 would read it as a whole
- * floor. Neither moves anything.
+ * Intentionally unsupported, each refused by the binding without moving
+ * where TypeScript (taking the mark as an object) would extend:
+ * - a mark passed as an object rather than its JSON text;
+ * - a mark field written as a JSON float (`2.0`, `1e1`,
+ *   `9007199254740990.5`, and `-0`, which the JSON reader takes as a float),
+ *   since an f64 would read the fraction away;
+ * - mark text that is not strict JSON anywhere, even in a field the engine
+ *   ignores (a lone surrogate escape, nesting past 128 levels).
+ * The reverse holds too: TypeScript's `extendTransport` takes the object, so
+ * JSON text handed to it is refused there. The mirror relays only
+ * `{ bottom, top }` through `JSON.stringify`, which writes none of these.
  */
 
 if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
@@ -110,10 +116,16 @@ function cases(lift: number, office: number): Call[] {
   return list;
 }
 
-/** Whole numbers the boundary accepts that name nothing in the tower: the
- *  engines refuse them with their own reason, and must agree on it. */
-function unknownIds(): Call[] {
-  const list: Call[] = [];
+/** Whole numbers the boundary accepts that name nothing in the tower, or a
+ *  floor or mark at the edge of the safe range: the engines refuse them with
+ *  their own reason, and must agree on it. */
+function acceptedEdges(lift: number): Call[] {
+  const max = Number.MAX_SAFE_INTEGER;
+  const list: Call[] = [
+    { name: "extendTransport(up to 2^53 - 1)", ts: (s) => s.extendTransport(lift, "up", max), rust: (e) => e.extendTransport(lift, "up", max) },
+    { name: "extendTransport(down to -(2^53 - 1))", ts: (s) => s.extendTransport(lift, "down", -max), rust: (e) => e.extendTransport(lift, "down", -max) },
+    { name: "extendTransport(a mark of ±(2^53 - 1))", ts: (s) => s.extendTransport(lift, "up", max, { bottom: -max, top: max }), rust: (e) => e.extendTransport(lift, "up", max, JSON.stringify({ bottom: -max, top: max })) },
+  ];
   for (const [what, id] of [["-0", -0], ["-1", -1], ["2^53 - 1", Number.MAX_SAFE_INTEGER], ["-(2^53 - 1)", -Number.MAX_SAFE_INTEGER]] as const) {
     list.push({ name: `addCar(${what})`, ts: (s) => s.addCar(id), rust: (e) => e.addCar(id) });
     list.push({ name: `removeCar(${what})`, ts: (s) => s.removeCar(id), rust: (e) => e.removeCar(id) });
@@ -149,16 +161,25 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
       const list = cases(lift, office);
       expect(list).toHaveLength(118);
       run(list, true);
-      const unknown = unknownIds();
-      expect(unknown).toHaveLength(16);
-      run(unknown, false);
+      const edges = acceptedEdges(lift);
+      expect(edges).toHaveLength(19);
+      run(edges, false);
       expect(drained(sim, engine), "a refusal emitted an event").toEqual({ ts: [], rust: [] });
 
-      // Intentionally unsupported: a mark passed as an object, or with a field
-      // written as a JSON float, is refused by the binding without moving.
-      // The last has no TypeScript twin: as a JS number it is already the
-      // whole 9007199254740990, which an f64 parse would also have taken.
-      for (const mark of [{ bottom: 1, top: 2 }, '{"bottom":1,"top":2.0}', '{"bottom":1,"top":1e1}', '{"bottom":1,"top":9007199254740990.5}']) {
+      // Intentionally unsupported (see the header): each is refused by the
+      // binding without moving. `9007199254740990.5` has no TypeScript twin:
+      // as a JS number it is already the whole 9007199254740990.
+      const deep = `${"[".repeat(200)}${"]".repeat(200)}`;
+      const unsupported: unknown[] = [
+        { bottom: 1, top: 2 },
+        '{"bottom":1,"top":2.0}',
+        '{"bottom":1,"top":1e1}',
+        '{"bottom":1,"top":9007199254740990.5}',
+        '{"bottom":-0,"top":2}',
+        '{"bottom":1,"top":2,"label":"\\ud800"}',
+        `{"bottom":1,"top":2,"label":${deep}}`,
+      ];
+      for (const mark of unsupported) {
         const refused = JSON.parse(engine.extendTransport(lift, "up", 3, mark));
         expect(refused, JSON.stringify(mark)).toEqual({ ok: false, reason: INVALID_REQUEST, delta: 0, bottom: 1, top: 2, added: 0 });
         expect(engine.stateDigest(), `Rust moved on ${JSON.stringify(mark)}`).toBe(start);

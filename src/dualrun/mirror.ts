@@ -78,11 +78,13 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
 
   /** Replace `obj[name]` with a wrapper that runs the original (or
    *  `replace` in its place) and, for a call from outside any other recorded
-   *  call, reports it. */
-  function wrap<T extends object, K extends keyof T & string>(obj: T, name: K, report: (args: unknown[], result: unknown) => ShadowCommand | null, replace?: (args: unknown[]) => unknown): void {
+   *  call, reports it. `prepare` may rewrite the arguments first, so the
+   *  engine and the report read the same values. */
+  function wrap<T extends object, K extends keyof T & string>(obj: T, name: K, report: (args: unknown[], result: unknown) => ShadowCommand | null, replace?: (args: unknown[]) => unknown, prepare?: (args: unknown[]) => void): void {
     const original = obj[name] as unknown as AnyFn;
     if (typeof original !== "function") throw new Error(`mirror: ${name} is not a method`);
     const wrapped = function (this: T, ...args: never[]): unknown {
+      prepare?.(args);
       const outer = depth === 0;
       depth++;
       let result: unknown;
@@ -158,6 +160,15 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
       const mark = hwm as { bottom?: unknown; top?: unknown } | null | undefined;
       const relayed = mark == null ? null : { bottom: num(mark.bottom), top: num(mark.top) };
       return { op: "extendTransport", id: num(id), end: str(end) as "up" | "down", targetFloor: num(targetFloor), hwm: relayed };
+    }, undefined, (args) => {
+      // Read an object mark once, before the call: an accessor answering
+      // differently on a second read would otherwise bill one value in
+      // TypeScript and relay another to Rust.
+      const mark = args[3];
+      if (mark != null && typeof mark === "object") {
+        const { bottom, top } = mark as { bottom?: unknown; top?: unknown };
+        args[3] = { bottom, top };
+      }
     });
     wrap(sim, "removeFacility", ([id, method]) => ({ op: "removeFacility", id: num(id), method: str(method) as "sell" | "bulldoze" }));
     // The capacity edits at the simulation layer report capacity_changed;

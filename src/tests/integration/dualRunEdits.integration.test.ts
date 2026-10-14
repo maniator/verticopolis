@@ -174,13 +174,23 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(sim.extendTransport(lift.id, "up", 3, { bottom: loose("1"), top: 2 })).toMatchObject(refused);
     expect(sim.removeFacility(lift.id, loose(null) as unknown as "sell")).toEqual(refused);
     expect(sim.removeFacility(lift.id, loose(7) as unknown as "sell")).toEqual(refused);
-    expect(lift.cars).toBe(1);
-    expect(lift.top).toBe(2);
+    const live = () => sim.tower.transportById(lift.id)!;
+    expect(live().cars).toBe(1);
+    expect(live().top).toBe(2);
     expect(sim.addCar(lift.id).ok).toBe(true); // a well-formed call still lands
+    // A mark whose fields answer differently on a second read: the mirror
+    // reads it once, before the call, so both engines bill the same floors.
+    let reads = 0;
+    const shifting = { bottom: 1, get top() { return reads++ === 0 ? 5 : 2; } };
+    expect(sim.extendTransport(lift.id, "up", 6, shifting)).toMatchObject({ ok: true, top: 6, added: 1 });
+    let readsB = 0;
+    const halving = { get bottom() { return readsB++ === 0 ? 1 : 0.5; }, top: 6 };
+    expect(sim.extendTransport(lift.id, "up", 7, halving)).toMatchObject({ ok: true, top: 7 });
     new FrameDriver(sim, 3).run(60);
     const report = run.stop();
     expect(report.divergences).toEqual([]);
     expect(report.eventDivergences).toEqual([]);
+    expect(report.checkpoints).toBe(2);
   });
 
   it("a shadow that drifts is caught at the next hour with the path", () => {
