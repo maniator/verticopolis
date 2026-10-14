@@ -7,8 +7,8 @@
  * (`engine-rs/src/charges.rs` `whole`).
  */
 
-/** The one refusal reason for a malformed command: an id, floor or count
- *  that is not a whole number, or an enum value the command does not know. */
+/** The one refusal reason for a malformed command: an id or floor that is
+ *  not a whole number, or an enum value the command does not know. */
 export const INVALID_REQUEST = "That request is not valid.";
 
 /** A whole number a command may take: a safe integer, so both engines read

@@ -283,5 +283,6 @@ engines read ids with the shared `whole`, and the binding's method list,
 
 - [x] [Review][Patch] The merge took main's `INVALID_REQUEST` from
   `src/engine/request.ts`, whose doc still named a mark (Acceptance Auditor)
-  [src/engine/request.ts]: it now names an id, floor or count, as the Rust
-  doc does.
+  [src/engine/request.ts]: it now names an id or floor, as the Rust doc
+  does. The confirming pass caught a "count" the first fix kept (a count is
+  refused with `false`, never with this reason), and it is gone too.
