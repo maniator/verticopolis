@@ -1,0 +1,221 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { test, expect, type Page } from "@playwright/test";
+import { WASM_ONLY_PROJECT, expectEngineHosted } from "./helpers";
+
+/**
+ * The wasm-only build (`VC_ENGINE=wasm`; src/build/engineBundle.ts) in a real
+ * browser. The Rust/WASM engine is the only engine: no URL or stored choice
+ * reaches the TypeScript engine, a package that cannot start stops the game
+ * with a message instead of falling back, and the TypeScript step loop is not
+ * in the bundle at all. The rest of the suite runs on this build too, on the
+ * same project (see playwright.config.ts, `PW_WASM_ONLY=1`).
+ */
+test.beforeEach(({}, info) => test.skip(info.project.name !== WASM_ONLY_PROJECT, "runs against the wasm-only build (PW_WASM_ONLY=1)"));
+test.setTimeout(90_000);
+
+interface BootState {
+  build: string;
+  engine: string;
+  failure: { stage: string; message: string } | null;
+}
+
+const bootState = (page: Page) => page.evaluate(() => (window as any).__vcEngineBoot as BootState | undefined);
+
+async function hostedGame(page: Page): Promise<void> {
+  await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, { timeout: 30_000 });
+  await page.evaluate(() => document.getElementById("splash")?.remove());
+}
+
+function pageErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
+  return errors;
+}
+
+test.describe("starts on the WASM engine", () => {
+  test.afterEach(async ({ page }) => expectEngineHosted(page));
+
+  test("boots on the WASM engine whatever the URL or storage asks for", async ({ page }) => {
+    const errors = pageErrors(page);
+    // Both of the switchable build's ways to pick the TypeScript engine.
+    await page.addInitScript(() => localStorage.setItem("vc.engine", "ts"));
+    await page.goto("/?engine=ts");
+    await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, { timeout: 30_000 });
+    expect(await bootState(page)).toEqual({ build: "wasm-only", engine: "wasm", failure: null });
+    await expect(page.locator(".splash-version")).toContainText("WASM engine");
+    await page.evaluate(() => document.getElementById("splash")?.remove());
+    await page.evaluate(() => (window as any).game.setSpeed(1));
+    const before = await page.evaluate(() => (window as any).game.sim.clock.minutes as number);
+    await page.waitForFunction((b) => (window as any).game.sim.clock.minutes > b + 5, before, { timeout: 30_000 });
+    expect(errors).toEqual([]);
+  });
+
+  test("ships no TypeScript step loop: only the engine can advance a tower", async ({ page }) => {
+    await page.goto("/");
+    await hostedGame(page);
+    const result = await page.evaluate(() => {
+      const sim = (window as any).game.sim;
+      (window as any).game.setSpeed(0);
+      const proto = Object.getPrototypeOf(sim);
+      const tries: Record<string, string> = {};
+      for (const step of ["tick", "advanceStep", "onHour", "onDay", "finishConstruction"]) {
+        try {
+          proto[step].call(sim, 1);
+          tries[step] = "ran";
+        } catch (e) {
+          tries[step] = (e as Error).name;
+        }
+      }
+      // The hosted instance's own `tick` is the engine's: it still advances.
+      const before = sim.clock.minutes;
+      sim.tick(30);
+      return { tries, advanced: sim.clock.minutes - before };
+    });
+    for (const step of Object.keys(result.tries)) expect(result.tries[step], step).toBe("StepLoopAbsentError");
+    expect(result.advanced).toBe(30);
+  });
+
+  test("saves, reloads and replays the same tower deterministically on the engine", async ({ page }) => {
+    await page.goto("/");
+    await hostedGame(page);
+    const setup = await page.evaluate(() => {
+      const g = (window as any).game;
+      g.setSpeed(0);
+      g.sim.money = 1e9;
+      const built = [] as boolean[];
+      for (let x = 150; x < 175; x++) built.push(g.sim.build("lobby", 1, x).ok);
+      for (let f = 2; f <= 3; f++) for (let x = 150; x < 175; x++) built.push(g.sim.build("floor", f, x).ok);
+      built.push(g.sim.build("office", 2, 152).ok, g.sim.build("office", 3, 152).ok);
+      built.push(g.sim.buildTransport("elevatorStandard", 168, 1, 3).ok);
+      g.saveToSlot(1);
+      return { built: built.every(Boolean), digest: (window as any).__vcEngine.current().engine.stateDigest() as string };
+    });
+    expect(setup.built, "the setup tower built").toBe(true);
+
+    // Two runs of the same two days from the same save land on the same state.
+    const run = () =>
+      page.evaluate(() => {
+        const g = (window as any).game;
+        g.loadFromSlot(1);
+        const engine = () => (window as any).__vcEngine.current().engine;
+        const start = engine().stateDigest() as string;
+        for (let i = 0; i < 96; i++) g.sim.tick(30);
+        return { start, end: engine().stateDigest() as string, minutes: g.sim.clock.minutes as number };
+      });
+    const first = await run();
+    const second = await run();
+    expect(first.start).toBe(setup.digest);
+    expect(second).toEqual(first);
+    expect(first.end).not.toBe(first.start);
+
+    // The save outlives the page: a reload boots the engine again and the slot
+    // loads the same state.
+    await page.reload();
+    await hostedGame(page);
+    const reloaded = await page.evaluate(() => {
+      const g = (window as any).game;
+      g.setSpeed(0);
+      g.loadFromSlot(1);
+      return (window as any).__vcEngine.current().engine.stateDigest() as string;
+    });
+    expect(reloaded).toBe(setup.digest);
+  });
+});
+
+test.describe("never falls back to the TypeScript engine", () => {
+  /** The page stopped behind the engine-failure message, with no game and no
+   *  host: nothing runs on TypeScript. */
+  async function expectStopped(page: Page, stage: string): Promise<string> {
+    const failure = page.locator("#engine-failure");
+    await expect(failure).toBeVisible({ timeout: 30_000 });
+    await expect(failure).toHaveAttribute("data-stage", stage);
+    await expect(page.locator("#boot-fallback button")).toHaveText("Reload");
+    const state = await bootState(page);
+    expect(state).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage } });
+    expect(await page.evaluate(() => ({ game: !!(window as any).game, host: !!(window as any).__vcEngine }))).toEqual({ game: false, host: false });
+    return (await failure.textContent()) ?? "";
+  }
+
+  test("a missing engine binary stops boot with recovery steps", async ({ page }) => {
+    await page.route("**/engine/verticopolis_engine_bg.wasm", (r) => r.fulfill({ status: 404, body: "" }));
+    await page.goto("/");
+    const text = await expectStopped(page, "load");
+    expect(text).toContain("could not start");
+    expect(text).toContain("Reload the page to try again");
+  });
+
+  test("a corrupted engine binary stops boot", async ({ page }) => {
+    await page.route("**/engine/verticopolis_engine_bg.wasm", (r) =>
+      r.fulfill({ status: 200, contentType: "application/wasm", body: Buffer.from("\0asm\x01\0\0\0not a module at all") }),
+    );
+    await page.goto("/");
+    await expectStopped(page, "load");
+  });
+
+  test("an engine glue from another build stops boot", async ({ page }) => {
+    // A glue that loads but lacks the binding's surface, as a glue from a
+    // mismatched build would.
+    await page.route("**/engine/verticopolis_engine.js", (r) =>
+      r.fulfill({ status: 200, contentType: "text/javascript", body: "export default async function init() {}\nexport class Engine {}\n" }),
+    );
+    await page.goto("/");
+    const text = await expectStopped(page, "load");
+    expect(text).toContain("the WASM binding lacks");
+  });
+
+  /** Install the worker and reload under it, so the engine package is in
+   *  the precache, then change the cached binary with `edit`. */
+  async function installThen(page: Page, edit: (url: string) => Promise<boolean>): Promise<void> {
+    await page.goto("/");
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller, undefined, { timeout: 30_000 });
+    const urls = await page.evaluate(async () => {
+      const out: string[] = [];
+      for (const name of await caches.keys()) for (const req of await (await caches.open(name)).keys()) if (req.url.includes("verticopolis_engine_bg.wasm")) out.push(req.url);
+      return out;
+    });
+    expect(urls.length, "the binary is in the precache").toBeGreaterThan(0);
+    for (const url of urls) expect(await edit(url)).toBe(true);
+  }
+
+  test("an installed game whose cached engine binary is gone stops offline, never on TypeScript", async ({ page, context }) => {
+    await installThen(page, (url) =>
+      page.evaluate(async (u) => {
+        let gone = false;
+        for (const name of await caches.keys()) gone = (await (await caches.open(name)).delete(u)) || gone;
+        return gone;
+      }, url),
+    );
+    // The browser's own HTTP cache would still answer the binary; an evicted
+    // install has neither. Offline emulation does not reach the service
+    // worker's own fetches, so the network is cut for those by a route too.
+    await (await context.newCDPSession(page)).send("Network.clearBrowserCache");
+    await context.route("**/engine/verticopolis_engine_bg.wasm*", (r) => r.abort("internetdisconnected"));
+    await context.setOffline(true);
+    await page.reload();
+    const text = await expectStopped(page, "load");
+    expect(text).toContain("You appear to be offline");
+  });
+
+  test("an installed game whose cached engine binary is corrupted stops offline, never on TypeScript", async ({ page, context }) => {
+    await installThen(page, (url) =>
+      page.evaluate(async (u) => {
+        let put = false;
+        for (const name of await caches.keys()) {
+          const cache = await caches.open(name);
+          if (!(await cache.match(u))) continue;
+          await cache.put(u, new Response(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 2, 3]), { headers: { "content-type": "application/wasm" } }));
+          put = true;
+        }
+        return put;
+      }, url),
+    );
+    await context.setOffline(true);
+    await page.reload();
+    await expectStopped(page, "load");
+  });
+});
