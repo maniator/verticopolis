@@ -2,7 +2,7 @@
 
 > **Snapshot, measured 2026-10-14.** Every figure below comes from builds of
 > two commits: `d03747d` (the baseline: `main` at `6b2bb34` with #993 at
-> `c608425` merged in) and `346f74e` (this change), each built with
+> `c608425` merged in) and `fe3c8c9` (this change), each built with
 > `npx vite build` and the same engine package from the same Rust sources.
 > It does not refresh. To measure the current tree, run the commands in
 > [Reproduce](#reproduce): `scripts/engine-bundle-size.ts` produces every
@@ -24,7 +24,7 @@ In the wasm-only build, 85 of the 87 `src/engine/` modules the default build
 ships are still in the shipped JavaScript (the module counts come from the
 guard's `VC_ENGINE_REPORT`; see [Reproduce](#reproduce)). They come to 171,642 minified bytes
 (12.2% of the game's JavaScript). Brotli-compressed on their own, they are
-about 47.2 KiB (48,307 bytes). The step loop (`src/engine/sim/loop.ts`) and
+about 47.4 KiB. The step loop (`src/engine/sim/loop.ts`) and
 `economy/rentalIncome.ts`, which only the loop used, are gone. The engine's
 total fell by 2,739 minified bytes, a difference of the two builds' totals
 (renaming in the minifier can move a few bytes between modules). Every other module ships because the app is still built around a
@@ -64,22 +64,23 @@ in `index.html`. "Lazy" means the other game chunks (Tone.js and workbox-window)
 
 | | Baseline (`d03747d`) | Switchable (this branch) | Wasm-only (this branch) |
 | --- | --- | --- | --- |
-| Game JavaScript, raw | 1375.0 KiB (8 chunks) | 1377.6 KiB (8 chunks) | 1375.1 KiB (8 chunks) |
-| Game JavaScript, Brotli | 341.3 KiB | 342.1 KiB | 341.5 KiB |
-| Initial JavaScript, raw / Brotli | 1083.9 / 276.6 KiB | 1086.5 / 277.4 KiB | 1084.0 / 276.8 KiB |
+| Game JavaScript, raw | 1375.0 KiB (8 chunks) | 1377.9 KiB (8 chunks) | 1375.4 KiB (8 chunks) |
+| Game JavaScript, Brotli | 341.3 KiB | 342.2 KiB | 341.6 KiB |
+| Initial JavaScript, raw / Brotli | 1083.9 / 276.6 KiB | 1086.8 / 277.5 KiB | 1084.3 / 276.9 KiB |
 | Lazy JavaScript, raw / Brotli | 291.1 / 64.7 KiB | 291.1 / 64.7 KiB | 291.1 / 64.7 KiB |
 | WASM engine package (glue + binary), raw / Brotli | 1418.2 / 324.6 KiB | 1418.2 / 324.6 KiB | 1418.2 / 324.6 KiB |
 | Precache entries | 24 | 23 | 23 |
-| Precache, raw / Brotli | 2984.8 / 802.0 KiB | 2981.2 / 800.8 KiB | 2978.7 / 800.2 KiB |
+| Precache, raw / Brotli | 2984.8 / 802.0 KiB | 2981.5 / 800.9 KiB | 2979.0 / 800.3 KiB |
 | TypeScript engine in game JS (minified) | 174,381 B (12.4%) | 174,381 B (12.4%) | 171,642 B (12.2%) |
-| TypeScript engine, Brotli on its own (estimate) | 47.9 KiB | 47.9 KiB | 47.2 KiB |
+| TypeScript engine, Brotli on its own (estimate) | 47.9 KiB | 47.9 KiB | 47.4 KiB |
 
 What changed:
 
 - **No game JavaScript chunk was eliminated.** Against the baseline, the
-  wasm-only build's game JavaScript is 0.1 KiB larger raw and 0.2 KiB larger
+  wasm-only build's game JavaScript is 0.4 KiB larger raw and 0.3 KiB larger
   Brotli: the new boot code (the failure message, the boot state, the load
-  limit) costs a little more than the removed step loop saves. Against the
+  limit, the stop gates) costs a little more than the removed step loop
+  saves. Against the
   switchable build of the same commit, it is 2.5 KiB smaller raw and 0.6 KiB
   smaller Brotli.
 - **One precache entry is gone in both modes:** the dual-run worker
@@ -92,7 +93,7 @@ What changed:
 - **What a first visit fetches before play** is the initial JavaScript, plus
   the engine package wherever the WASM engine runs. A wasm-only build always
   fetches the package: 601.5 KiB Brotli before play (the initial JavaScript
-  plus the package, summed before rounding), against 277.4 KiB for a
+  plus the package, summed before rounding), against 277.5 KiB for a
   switchable build on the TypeScript engine. That difference is the engine
   itself, and #993 already precaches it for every install. It is not a cost
   of this change.
@@ -196,7 +197,7 @@ too, before the flip deploys it.
 ## Reproduce
 
 ```sh
-git checkout 346f74e   # or d03747d for the baseline
+git checkout fe3c8c9   # or d03747d for the baseline
 npm ci && npm run wasm:build
 npx vite build --outDir /tmp/out-switchable
 VC_ENGINE=wasm npx vite build --outDir /tmp/out-wasm
