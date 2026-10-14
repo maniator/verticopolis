@@ -146,16 +146,36 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   // The results folder is chosen up front: every finished process run is
   // checkpointed into it, so a run cut short (a killed shell, a restarted
   // machine) continues with --resume instead of starting over.
-  const meta: CheckpointMeta = { commit: environment.commit, config, enginePackage: environment.enginePackage, scenarios: scenarios.map((s) => s.sha256), startedAt };
+  // A --skip-build run proves its builds are this clean commit's before it
+  // measures anything (and so before a checkpoint can carry its runs).
+  if (args.skipBuild) {
+    const errs = stampErrors(stampPaths, tree);
+    if (errs.length) throw new Error(errs.join("; "));
+  }
+  const meta: CheckpointMeta = {
+    commit: environment.commit,
+    dirty: environment.dirty,
+    skipBuild: args.skipBuild,
+    config,
+    enginePackage: environment.enginePackage,
+    scenarios: scenarios.map((s) => s.sha256),
+    machine: machineOf(environment, process.env.PW_CHROMIUM_PATH ?? null),
+    startedAt,
+  };
   let out: string;
   const runs: ProcessRun[] = [];
+  let interruptedAttempts: { rep: number; engine: string; at: string }[] = [];
+  const resumes: { at: string; runsFromCheckpoint: number }[] = [];
   if (args.resume) {
     out = resolve(repo, args.resume);
     if (environment.dirty) throw new Error("--resume needs a clean tree, the same one the run started on");
     const cp = loadCheckpoint(out, meta);
     runs.push(...cp.runs);
+    interruptedAttempts = cp.interrupted;
+    resumes.push(...cp.resumes, { at: startedAt, runsFromCheckpoint: cp.runs.length });
     meta.startedAt = cp.startedAt;
-    log(`perf:compare: resuming ${out} with ${runs.length} finished process run(s)`);
+    appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify({ resumed: startedAt, runsFromCheckpoint: cp.runs.length }) + "\n");
+    log(`perf:compare: resuming ${out} with ${runs.length} finished process run(s)${interruptedAttempts.length ? `; ${interruptedAttempts.length} attempt(s) were interrupted and run again` : ""}`);
   } else {
     out = outputDir(repo, args, startedAt.slice(0, 10), environment);
     mkdirSync(out, { recursive: true });
@@ -178,6 +198,9 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
         const position = order++;
         if (runs.some((r) => r.rep === rep && r.engine === engine)) continue; // checkpointed
         log(`perf:compare: rep ${rep + 1}/${config.reps}, ${engine}`);
+        // A marker first, so an attempt killed mid-way is reported, never
+        // silently replaced by its rerun.
+        appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify({ started: { rep, engine, at: new Date().toISOString() } }) + "\n");
         const run = await runProcess({ server, config, scenarios, executablePath, log }, rep, engine, position);
         browserVersion ??= run.browserVersion;
         runs.push(run);
@@ -201,11 +224,8 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   else if (environment.engineSourceHash && environment.engineBuildHash !== environment.engineSourceHash) validation.errors.push(`the served engine package (${environment.engineBuildHash}) was not built from the current engine-rs sources (${environment.engineSourceHash}); rebuild it with npm run wasm:build`);
   if (!environment.engineSourceHash) validation.warnings.push("no engine-rs sources in this checkout, so the package's source hash was not checked");
   if (prodHash !== environment.engineBuildHash) validation.errors.push(`dist/ (sizes) and dist-perf/ (timings) carry different engine packages (${prodHash ?? "none"} vs ${environment.engineBuildHash ?? "none"}); rebuild without --skip-build`);
-  if (args.skipBuild) {
-    // The builds must be this clean commit's, or the app code measured is
-    // not the code the results are filed under.
-    for (const err of stampErrors(stampPaths, tree)) validation.errors.push(err);
-  }
+  for (const a of interruptedAttempts) validation.warnings.push(`rep ${a.rep} ${a.engine}: an attempt started at ${a.at} was interrupted (the run was stopped and resumed) and ran again; its partial measurements were not kept`);
+  if (resumes.length) validation.warnings.push(`the run was resumed ${resumes.length} time(s) (${resumes.map((r) => r.at).join(", ")}); the checkpoint proved the same commit, configuration, engine bytes, scenarios, machine and toolchain`);
   if (environment.dirty) validation.warnings.push("the working tree had uncommitted or untracked changes; the results folder is marked -dirty");
   if (environment.behindMain) validation.warnings.push(`the measured tree lacks ${environment.behindMain} commit(s) of origin/main (${environment.mainCommit}); it is not a baseline of the latest main`);
   const metrics = aggregate(runs, config.scenarios, config.throttles);
@@ -220,6 +240,8 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const results: CompareResults = {
     schema: 1,
     startedAt: meta.startedAt,
+    resumes,
+    interruptedAttempts,
     generatedAt: new Date().toISOString(),
     issue: "maniator/verticopolis#972",
     config,
@@ -309,39 +331,72 @@ export const CHECKPOINT_META = "checkpoint.json";
 export const CHECKPOINT_RUNS = "runs.jsonl";
 
 /** What a run in progress records about itself, so a resume can prove it
- *  continues the same measurement. */
+ *  continues the same measurement: the tree (clean or not) and how it was
+ *  built, the configuration, the served engine bytes, the scenario saves,
+ *  and the machine and toolchain it ran on. */
 export interface CheckpointMeta {
   commit: string;
+  dirty: boolean;
+  skipBuild: boolean;
   config: CompareConfig;
   enginePackage: Env["enginePackage"];
   scenarios: string[];
+  machine: Record<string, string | number | null>;
   startedAt: string;
+}
+
+/** The machine and toolchain fields a resume must match. */
+export function machineOf(env: Env, executablePath: string | null): Record<string, string | number | null> {
+  return { cpuModel: env.cpuModel, logicalCpus: env.logicalCpus, totalMemoryBytes: env.totalMemoryBytes, os: env.os, kernel: env.kernel, arch: env.arch, node: env.node, rust: env.rust, playwright: env.playwright, executablePath };
 }
 
 /**
  * Read a stopped run's checkpoint for --resume: the finished process runs
- * so far and when the run began. Refuses a folder whose run measured a
- * different commit, configuration, engine package or scenario saves, and a
- * folder that already holds final results.
+ * so far, the attempts that started and never finished, earlier resumes,
+ * and when the run began. Refuses a folder that already holds final
+ * results, a run that started on a dirty tree, and one whose commit, build
+ * mode, configuration, engine bytes, scenario saves, machine or toolchain
+ * differ from this run's. A last line cut off by the stop is cut from the
+ * file (so the next append starts clean); a bad line anywhere else is an
+ * error, never skipped.
  */
-export function loadCheckpoint(dir: string, expected: Omit<CheckpointMeta, "startedAt">, read: (p: string) => string | null = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null)): { runs: ProcessRun[]; startedAt: string } {
+export function loadCheckpoint(
+  dir: string,
+  expected: Omit<CheckpointMeta, "startedAt">,
+  read: (p: string) => string | null = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null),
+  rewrite: (p: string, text: string) => void = (p, text) => writeFileSync(p, text),
+): { runs: ProcessRun[]; interrupted: { rep: number; engine: string; at: string }[]; resumes: { at: string; runsFromCheckpoint: number }[]; startedAt: string } {
   if (read(join(dir, "results.json")) !== null) throw new Error(`${dir} already holds final results; nothing to resume`);
   const metaText = read(join(dir, CHECKPOINT_META));
   if (metaText === null) throw new Error(`${dir} has no ${CHECKPOINT_META}; nothing to resume`);
   const meta = JSON.parse(metaText) as CheckpointMeta;
+  if (meta.dirty) throw new Error(`cannot resume ${dir}: it started on a dirty tree, so its first runs measured uncommitted code`);
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-  for (const key of ["commit", "config", "enginePackage", "scenarios"] as const) {
+  for (const key of ["commit", "skipBuild", "config", "enginePackage", "scenarios", "machine"] as const) {
     if (!same(meta[key], expected[key])) throw new Error(`cannot resume ${dir}: its ${key} differs from this run's (${JSON.stringify(meta[key])} vs ${JSON.stringify(expected[key])})`);
   }
-  const runs = (read(join(dir, CHECKPOINT_RUNS)) ?? "")
-    .split("\n")
-    .filter((line) => line.trim())
-    .flatMap((line) => {
-      try {
-        return [JSON.parse(line) as ProcessRun];
-      } catch {
-        return []; // a line cut off by the stop; that process runs again
-      }
-    });
-  return { runs, startedAt: meta.startedAt };
+  const path = join(dir, CHECKPOINT_RUNS);
+  let text = read(path) ?? "";
+  if (text && !text.endsWith("\n")) {
+    text = text.slice(0, text.lastIndexOf("\n") + 1); // the line the stop cut off
+    rewrite(path, text);
+  }
+  const runs: ProcessRun[] = [];
+  const started: { rep: number; engine: string; at: string }[] = [];
+  const resumes: { at: string; runsFromCheckpoint: number }[] = [];
+  text.split("\n").forEach((line, i) => {
+    if (!line.trim()) return;
+    let entry: Record<string, unknown>;
+    try {
+      entry = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      throw new Error(`cannot resume ${dir}: line ${i + 1} of ${CHECKPOINT_RUNS} is not JSON`);
+    }
+    if (entry.started) started.push(entry.started as { rep: number; engine: string; at: string });
+    else if (entry.resumed) resumes.push({ at: String(entry.resumed), runsFromCheckpoint: Number(entry.runsFromCheckpoint) });
+    else runs.push(entry as unknown as ProcessRun);
+  });
+  // An attempt with no run after it was interrupted.
+  const interrupted = started.filter((s, i) => !runs.some((r) => r.rep === s.rep && r.engine === s.engine) || started.slice(i + 1).some((t) => t.rep === s.rep && t.engine === s.engine));
+  return { runs, interrupted, resumes, startedAt: meta.startedAt };
 }

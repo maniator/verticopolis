@@ -88,21 +88,33 @@ describe("stampErrors", () => {
 
 describe("loadCheckpoint", () => {
   const config = makeConfig(parseArgs([]), ["small"]);
-  const expected = { commit: "abc", config, enginePackage: { "x.wasm": "h" }, scenarios: ["s1"] };
+  const machine = { cpuModel: "cpu", node: "v22" };
+  const expected = { commit: "abc", dirty: false, skipBuild: false, config, enginePackage: { "x.wasm": "h" }, scenarios: ["s1"], machine };
   const meta = JSON.stringify({ ...expected, startedAt: "2026-10-14T00:00:00.000Z" });
   const files = (m: Record<string, string>) => (p: string) => m[p] ?? null;
-  it("returns the finished runs and the start, skipping a line cut off by the stop", () => {
-    const lines = [JSON.stringify(processRun(0, "ts")), JSON.stringify(processRun(0, "wasm")), '{"rep":1,"eng'].join("\n");
-    const cp = loadCheckpoint("d", expected, files({ [`d/${CHECKPOINT_META}`]: meta, [`d/${CHECKPOINT_RUNS}`]: lines }));
+  const M = `d/${CHECKPOINT_META}`;
+  const R = `d/${CHECKPOINT_RUNS}`;
+  const started = (rep: number, engine: string) => JSON.stringify({ started: { rep, engine, at: `t${rep}${engine}` } });
+  it("returns finished runs, interrupted attempts and resumes, and cuts a truncated tail", () => {
+    const text = [started(0, "ts"), JSON.stringify(processRun(0, "ts")), started(0, "wasm"), started(0, "wasm"), JSON.stringify(processRun(0, "wasm")), JSON.stringify({ resumed: "r1", runsFromCheckpoint: 1 }), started(1, "wasm"), '{"rep":1,"eng'].join("\n");
+    let rewritten = "";
+    const cp = loadCheckpoint("d", expected, files({ [M]: meta, [R]: text }), (_p, t) => (rewritten = t));
     expect(cp.runs.map((r) => `${r.rep}${r.engine}`)).toEqual(["0ts", "0wasm"]);
+    expect(cp.interrupted.map((x) => x.at)).toEqual(["t0wasm", "t1wasm"]);
+    expect(cp.resumes).toEqual([{ at: "r1", runsFromCheckpoint: 1 }]);
     expect(cp.startedAt).toBe("2026-10-14T00:00:00.000Z");
+    expect(rewritten.endsWith(`${started(1, "wasm")}\n`)).toBe(true);
   });
-  it("refuses a different commit, configuration, engine or scenarios, final results, or no checkpoint", () => {
-    const at = files({ [`d/${CHECKPOINT_META}`]: meta });
+  it("refuses a bad line before the end, a dirty start, any mismatch, final results, or no checkpoint", () => {
+    const at = files({ [M]: meta });
+    expect(() => loadCheckpoint("d", expected, files({ [M]: meta, [R]: 'oops\n{"a":1}\n' }))).toThrow(/line 1 of runs.jsonl is not JSON/);
+    expect(() => loadCheckpoint("d", expected, files({ [M]: JSON.stringify({ ...expected, dirty: true, startedAt: "x" }) }))).toThrow(/started on a dirty tree/);
     expect(() => loadCheckpoint("d", { ...expected, commit: "def" }, at)).toThrow(/its commit differs/);
+    expect(() => loadCheckpoint("d", { ...expected, skipBuild: true }, at)).toThrow(/its skipBuild differs/);
     expect(() => loadCheckpoint("d", { ...expected, config: { ...config, reps: 3 } }, at)).toThrow(/its config differs/);
     expect(() => loadCheckpoint("d", { ...expected, enginePackage: { "x.wasm": "other" } }, at)).toThrow(/its enginePackage differs/);
     expect(() => loadCheckpoint("d", { ...expected, scenarios: ["s2"] }, at)).toThrow(/its scenarios differs/);
+    expect(() => loadCheckpoint("d", { ...expected, machine: { ...machine, node: "v24" } }, at)).toThrow(/its machine differs/);
     expect(() => loadCheckpoint("d", expected, files({ "d/results.json": "{}" }))).toThrow(/already holds final results/);
     expect(() => loadCheckpoint("d", expected, files({}))).toThrow(/nothing to resume/);
     expect(loadCheckpoint("d", expected, at).runs).toEqual([]);

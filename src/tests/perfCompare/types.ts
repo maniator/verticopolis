@@ -183,6 +183,10 @@ export interface CompareResults {
   schema: 1;
   /** When the run started and when it finished (ISO). */
   startedAt?: string;
+  /** Each --resume of the run, and the attempts a stop interrupted (rerun;
+   *  their partial measurements are not kept, and validation names them). */
+  resumes?: { at: string; runsFromCheckpoint: number }[];
+  interruptedAttempts?: { rep: number; engine: string; at: string }[];
   generatedAt: string;
   issue: string;
   config: CompareConfig;
