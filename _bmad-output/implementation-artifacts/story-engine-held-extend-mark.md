@@ -273,6 +273,12 @@ probe in both runners, the mutants) and all five criteria.
   integers); scripting more gesture cases in the scenario (the unit tests in
   both engines and the fuzz cover them).
 
+### Round 7 (`/gds-code-review`, confirming pass)
+
+Nothing left to fix: the round-6 prose fixes were correct, no stale
+reference to the caller's mark remained in the PR's diff, and the round-6
+claims matched the change.
+
 ### Round 8 (`/gds-code-review`, merge of main with #996)
 
 Copilot was rate-limited and Codex out of usage on the merge commit, so the
@@ -286,3 +292,9 @@ engines read ids with the shared `whole`, and the binding's method list,
   [src/engine/request.ts]: it now names an id or floor, as the Rust doc
   does. The confirming pass caught a "count" the first fix kept (a count is
   refused with `false`, never with this reason), and it is gone too.
+
+### Rounds 9 and 10 (`/gds-code-review`, confirming passes)
+
+Round 9 found the "count" the round-8 fix kept, fixed above. Round 10 found
+nothing left to fix: every `INVALID_REQUEST` in both engines is for a
+non-whole id or floor or an unknown enum, as the docs now say.
