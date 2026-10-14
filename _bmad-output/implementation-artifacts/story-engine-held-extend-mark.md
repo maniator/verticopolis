@@ -272,3 +272,16 @@ probe in both runners, the mutants) and all five criteria.
   style); the `extendGesture` fields' bound (both bounds accept the same
   integers); scripting more gesture cases in the scenario (the unit tests in
   both engines and the fuzz cover them).
+
+### Round 8 (`/gds-code-review`, merge of main with #996)
+
+Copilot was rate-limited and Codex out of usage on the merge commit, so the
+skill reviewed the merge resolution. No clash between #996 and #990: the
+mirror relays the extend commands through main's `num`/`str` helpers, both
+engines read ids with the shared `whole`, and the binding's method list,
+`engine.d.ts`, the shadow and the conformance runners carry both sides.
+
+- [x] [Review][Patch] The merge took main's `INVALID_REQUEST` from
+  `src/engine/request.ts`, whose doc still named a mark (Acceptance Auditor)
+  [src/engine/request.ts]: it now names an id, floor or count, as the Rust
+  doc does.
