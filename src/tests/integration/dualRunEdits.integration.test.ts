@@ -198,6 +198,26 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(report.checkpoints).toBe(2);
   });
 
+  it("a shadow started mid-drag starts in step: the open gesture closes (#990)", () => {
+    // A save holds no gesture, so following a tower closes the live one;
+    // otherwise its next step would be free here and billed in the shadow.
+    const sim = Simulation.newGame(9, "classic");
+    sim.money = 1e9;
+    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    for (let x = 170; x < 200; x++) expect(sim.build("floor", 2, x).ok).toBe(true);
+    expect(sim.buildTransport("elevatorStandard", 172, 1, 2).ok).toBe(true);
+    const lift = sim.tower.transportAt(1, 172)!;
+    expect(sim.beginExtend(lift.id)).toBe(true);
+    expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, added: 3 });
+    expect(sim.extendTransport(lift.id, "up", 3)).toMatchObject({ ok: true, added: 0 });
+    const run = new DualRun().follow(sim);
+    expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, added: 2 });
+    new FrameDriver(sim, 3).run(60);
+    const report = run.stop();
+    expect(report.divergences).toEqual([]);
+    expect(report.checkpoints).toBe(2);
+  });
+
   it("a shadow that drifts is caught at the next hour with the path", () => {
     const { sim, run } = DualRun.found(5, "classic");
     sim.money = 1e9;

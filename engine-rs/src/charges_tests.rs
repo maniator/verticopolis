@@ -136,6 +136,31 @@ fn a_gesture_bills_only_its_own_shaft_and_never_carries_over() {
 }
 
 #[test]
+fn a_gesture_stays_out_of_the_save_and_the_hashed_views() {
+    let (mut sim, _, lift, _) = fixture();
+    let (save, view) = (sim.serialize(), crate::scenario::state_view(&sim));
+    assert!(sim.begin_extend(lift));
+    assert_eq!(sim.serialize(), save);
+    assert_eq!(crate::scenario::state_view(&sim), view);
+    // A load builds a new simulation, which has no gesture open.
+    let loaded = crate::load::deserialize(&sim.serialize()).unwrap();
+    assert_eq!(loaded.extend_gesture, None);
+}
+
+#[test]
+fn another_shaft_wiggling_during_a_gesture_is_billed_every_time() {
+    let (mut sim, _, lift, _) = fixture();
+    assert!(sim.build_transport(Kind::ElevatorStandard, 14, 1, 2).ok);
+    let other = sim.tower.transport_at(1, 14).unwrap().id;
+    assert!(sim.begin_extend(lift));
+    assert_eq!(sim.extend_transport(other, ExtendEnd::Up, 3).added, 1);
+    assert_eq!(sim.extend_transport(other, ExtendEnd::Up, 2).added, 0);
+    assert_eq!(sim.extend_transport(other, ExtendEnd::Up, 3).added, 1);
+    // The gesture stays on its own shaft, untouched.
+    assert_eq!(sim.extend_gesture, Some((lift, 1, 2)));
+}
+
+#[test]
 fn extend_never_rebills_a_standing_floor() {
     let (mut sim, _, lift, _) = fixture();
     // The gesture's mark starts at the span, so its first floor is the only

@@ -26,9 +26,12 @@ type AnyFn = (...args: never[]) => unknown;
  *  boundary markers, under the generation given. A save carries no crowd, so
  *  the shadow can only start from a tower whose crowd is still empty (a game
  *  just founded or just loaded); anything later would diverge in the crowd
- *  view at the first hour by construction, so it is refused here. */
+ *  view at the first hour by construction, so it is refused here. A save
+ *  carries no extend gesture either (#990), so any open one is closed here:
+ *  the live tower and the shadow start the next drag step from the same mark. */
 export function loadCommand(sim: Simulation, gen: number): Extract<ShadowCommand, { op: "load" }> {
   if (sim.crowd.people.length > 0) throw new Error("mirror: the shadow must start before the tower's crowd exists (right after founding or loading)");
+  sim.endExtend();
   return {
     op: "load",
     gen,

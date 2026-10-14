@@ -176,6 +176,9 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
       const extend = (e: Engine | Simulation, ...a: unknown[]) => loose<(...b: unknown[]) => unknown>(e.extendTransport).apply(e, a);
       expect(beginTs(lift)).toBe(true);
       expect(begin(engine, lift)).toBe(true);
+      // An open gesture is in neither engine's hashed state.
+      expect(tsDigest(), "TypeScript hashed the gesture").toBe(start);
+      expect(engine.stateDigest(), "Rust hashed the gesture").toBe(start);
       const good: Call[] = [
         { name: "extendTransport in a gesture", ts: (s) => s.extendTransport(lift, "up", 4), rust: (e) => e.extendTransport(lift, "up", 4) },
         { name: "extendTransport back inside the mark", ts: (s) => s.extendTransport(lift, "up", 3), rust: (e) => e.extendTransport(lift, "up", 3) },
@@ -214,7 +217,7 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
     const proto = loose<Record<string, unknown>>(wasm().Engine.prototype);
     const glue = (name: string) => String(proto[name]);
     expect(glue("setTowerName")).toMatch(/passStringToWasm0/);
-    for (const name of ["addCar", "removeCar", "beginExtend", "extendTransport", "removeFacility"]) {
+    for (const name of ["addCar", "removeCar", "beginExtend", "extendTransport", "endExtend", "removeFacility"]) {
       expect(glue(name), name).not.toMatch(/passStringToWasm0/);
     }
   });

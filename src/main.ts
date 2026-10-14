@@ -412,8 +412,8 @@ class GameApp implements GameAppPorts {
   }
 
   /** @internal */ clearSelection(): void {
-    this.selected = null;
-    this.engine.selectedId = null;
+    this.selected = this.engine.selectedId = null;
+    this.editor.endExtend(); // a drag ends with its selection (and a tower swap clears it)
     this.ui.hideEditor();
   }
 

@@ -178,8 +178,8 @@ export class EditorActions {
     const sim = this.deps.getSim();
     if (!this.extendDrag || this.extendDrag.id !== t.id || this.extendDrag.sim !== sim) {
       this.extendDrag = { id: t.id, sim };
-      sim.beginExtend(t.id);
       this.deps.captureUndo("Extend");
+      sim.beginExtend(t.id);
     }
     const before = { bottom: t.bottom, top: t.top };
     const res = sim.extendTransport(t.id, end, targetFloor);
@@ -332,6 +332,7 @@ export class EditorActions {
         this.openSchedule();
       } else if (action === "extendUp" || action === "extendDown") {
         const up = action === "extendUp";
+        this.endExtend(); // a press bills from the span, never a stale drag's mark
         const res = sim.extendTransport(t.id, up ? "up" : "down", up ? t.top + 1 : t.bottom - 1);
         if (!res.ok) {
           // Short of money: refused before anything moved, so no undo step.

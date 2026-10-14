@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../Simulation";
 import { ECON, carResaleRefund, extendBill, resaleRefund } from "../econConfig";
 import { GRID, maxCarsFor } from "../facilities";
+import { stateView } from "../conformanceView";
 import type { Transport, Unit } from "../types";
 import { CAR_LIMIT, ELEVATOR_GONE, FACILITY_GONE, INVALID_REQUEST, LAST_CAR, NOT_ENOUGH_MONEY, ONLY_ELEVATOR_CARS, ONLY_ELEVATOR_EXTEND } from "./charges";
 
@@ -106,6 +107,9 @@ describe("extendTransport", () => {
     expect(sim.buildTransport("elevatorStandard", 14, 1, 2).ok).toBe(true);
     const other = sim.tower.transportAt(1, 14)!;
     expect(sim.extendTransport(other.id, "up", 3)).toMatchObject({ added: 1, delta: -per });
+    // Wiggling that other shaft bills it every time; the gesture is the lift's.
+    expect(sim.extendTransport(other.id, "up", 2).delta).toBe(0);
+    expect(sim.extendTransport(other.id, "up", 3)).toMatchObject({ added: 1, delta: -per });
     // A failed begin drops the open gesture: the shrink-and-regrow is billed.
     expect(sim.extendTransport(lift.id, "up", 3).delta).toBe(0);
     expect(sim.beginExtend(stairs.id)).toBe(false);
@@ -119,8 +123,10 @@ describe("extendTransport", () => {
   it("keeps the gesture out of the save and drops it with the simulation (#990)", () => {
     const { sim, lift } = fixture();
     const before = JSON.stringify(sim.serialize());
+    const view = JSON.stringify(stateView(sim));
     expect(sim.beginExtend(lift.id)).toBe(true);
     expect(JSON.stringify(sim.serialize())).toBe(before);
+    expect(JSON.stringify(stateView(sim))).toBe(view);
     expect(sim.extendTransport(lift.id, "up", 4).added).toBe(2);
     expect(sim.extendTransport(lift.id, "up", 2).delta).toBe(0);
     // A load or an undo swaps in a new simulation, which has no gesture open.
