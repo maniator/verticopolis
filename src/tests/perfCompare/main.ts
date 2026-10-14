@@ -212,18 +212,10 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   }
 
   const validation = validateResults(config, runs, nodeChecks);
-  const prodHash = engineBuildHash(dist);
-  // The served bytes themselves, so a rebuilt binary beside an old
-  // BUILD.json cannot pass as the same package.
-  const prodFiles = enginePackageDigests(dist);
-  if (JSON.stringify(prodFiles) !== JSON.stringify(environment.enginePackage)) validation.errors.push(`dist/ and dist-perf/ serve different engine bytes (${JSON.stringify(prodFiles)} vs ${JSON.stringify(environment.enginePackage)})`);
+  for (const e of packageErrors(environment, engineBuildHash(dist), enginePackageDigests(dist))) validation.errors.push(e);
   if (environment.commit === "unknown") validation.errors.push("the commit could not be read (git failed), so the results cannot be tied to a tree");
   if (environment.mainCommit && !environment.mainFetched) validation.warnings.push(`origin/main could not be fetched just now, so ${environment.mainCommit} is the ref as last fetched and may not be the latest main`);
   if (!environment.mainCommit) validation.warnings.push("origin/main is unknown here (no remote or no fetch), so whether this is a baseline of the latest main was not checked");
-  if (!environment.engineBuildHash) validation.errors.push("the served engine package has no BUILD.json, so which sources it came from is unknown");
-  else if (environment.engineSourceHash && environment.engineBuildHash !== environment.engineSourceHash) validation.errors.push(`the served engine package (${environment.engineBuildHash}) was not built from the current engine-rs sources (${environment.engineSourceHash}); rebuild it with npm run wasm:build`);
-  if (!environment.engineSourceHash) validation.warnings.push("no engine-rs sources in this checkout, so the package's source hash was not checked");
-  if (prodHash !== environment.engineBuildHash) validation.errors.push(`dist/ (sizes) and dist-perf/ (timings) carry different engine packages (${prodHash ?? "none"} vs ${environment.engineBuildHash ?? "none"}); rebuild without --skip-build`);
   for (const a of interruptedAttempts) validation.warnings.push(`rep ${a.rep} ${a.engine}: an attempt started at ${a.at} was interrupted (the run was stopped and resumed) and ran again; its partial measurements were not kept`);
   if (resumes.length) validation.warnings.push(`the run was resumed ${resumes.length} time(s) (${resumes.map((r) => r.at).join(", ")}); the checkpoint proved the same commit, build mode, configuration, engine bytes, scenarios, machine and toolchain, and validation checked that every process ran the same browser build`);
   if (environment.dirty) validation.warnings.push("the working tree had uncommitted or untracked changes; the results folder is marked -dirty");
@@ -274,6 +266,31 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   }
   for (const w of validation.warnings) log(`  warning: ${w}`);
   return 0;
+}
+
+/**
+ * The engine package checks, all fail-closed: a run whose served package
+ * cannot be tied to the current engine-rs sources, or whose two builds
+ * (dist/ for sizes, dist-perf/ for timings) carry different engine bytes,
+ * fails validation. `prodHash` and `prodFiles` describe dist/; the
+ * environment describes dist-perf/ and the sources. A checkout without
+ * engine-rs sources fails too, since then nothing proves which engine ran.
+ */
+export function packageErrors(
+  env: Pick<Environment, "engineBuildHash" | "engineSourceHash" | "enginePackage">,
+  prodHash: string | null,
+  prodFiles: Record<string, string>,
+): string[] {
+  const errors: string[] = [];
+  // The served bytes themselves, so a rebuilt binary beside an old
+  // BUILD.json cannot pass as the same package.
+  if (Object.keys(env.enginePackage).length === 0) errors.push("dist-perf/ serves no engine package, so the WASM engine could not have run");
+  if (JSON.stringify(prodFiles) !== JSON.stringify(env.enginePackage)) errors.push(`dist/ and dist-perf/ serve different engine bytes (${JSON.stringify(prodFiles)} vs ${JSON.stringify(env.enginePackage)})`);
+  if (!env.engineSourceHash) errors.push("no engine-rs sources in this checkout, so the package's source hash cannot be checked; run from a full checkout");
+  if (!env.engineBuildHash) errors.push("the served engine package has no BUILD.json, so which sources it came from is unknown");
+  else if (env.engineSourceHash && env.engineBuildHash !== env.engineSourceHash) errors.push(`the served engine package (${env.engineBuildHash}) was not built from the current engine-rs sources (${env.engineSourceHash}); rebuild it with npm run wasm:build`);
+  if (prodHash !== env.engineBuildHash) errors.push(`dist/ (sizes) and dist-perf/ (timings) carry different engine packages (${prodHash ?? "none"} vs ${env.engineBuildHash ?? "none"}); rebuild without --skip-build`);
+  return errors;
 }
 
 /**

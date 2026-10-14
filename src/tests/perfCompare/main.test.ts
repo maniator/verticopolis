@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHECKPOINT_META, CHECKPOINT_RUNS, loadCheckpoint, makeConfig, outputDir, parseArgs, stampErrors } from "./main";
+import { CHECKPOINT_META, CHECKPOINT_RUNS, loadCheckpoint, makeConfig, outputDir, packageErrors, parseArgs, stampErrors } from "./main";
 import { processRun } from "./fixtures";
 import { engineOrder, frameSummary, stepSummary } from "./runner";
 
@@ -119,5 +119,21 @@ describe("loadCheckpoint", () => {
     expect(() => loadCheckpoint("d", expected, files({ "d/results.json": "{}" }))).toThrow(/already holds final results/);
     expect(() => loadCheckpoint("d", expected, files({}))).toThrow(/nothing to resume/);
     expect(loadCheckpoint("d", expected, at).runs).toEqual([]);
+  });
+});
+
+describe("packageErrors", () => {
+  const files = { "verticopolis_engine_bg.wasm": "a", "verticopolis_engine.js": "b" };
+  const env = { engineBuildHash: "h", engineSourceHash: "h", enginePackage: files };
+  it("passes one package built from the current sources and served by both builds", () => {
+    expect(packageErrors(env, "h", { ...files })).toEqual([]);
+  });
+  it("fails closed on every way the served package can drift from the sources", () => {
+    expect(packageErrors({ ...env, engineSourceHash: "other" }, "h", files)).toEqual([expect.stringMatching(/was not built from the current engine-rs sources \(other\)/)]);
+    expect(packageErrors({ ...env, engineBuildHash: null }, null, files)).toEqual([expect.stringMatching(/has no BUILD.json/)]);
+    expect(packageErrors({ ...env, engineSourceHash: null }, "h", files)).toEqual([expect.stringMatching(/no engine-rs sources in this checkout/)]);
+    expect(packageErrors(env, "stale", files)).toEqual([expect.stringMatching(/dist\/ \(sizes\) and dist-perf\/ \(timings\) carry different engine packages \(stale vs h\)/)]);
+    expect(packageErrors(env, "h", { ...files, "verticopolis_engine_bg.wasm": "rebuilt" })).toEqual([expect.stringMatching(/serve different engine bytes/)]);
+    expect(packageErrors({ ...env, enginePackage: {} }, "h", {})).toEqual([expect.stringMatching(/serves no engine package/)]);
   });
 });
