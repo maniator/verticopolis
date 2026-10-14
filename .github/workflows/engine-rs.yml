@@ -59,8 +59,8 @@ permissions:
 
 jobs:
   # Whether this change touches the engine. Pushes to main only fire on
-  # the push paths above, so they always run; a PR runs the jobs below only
-  # when one of these files changed.
+  # the push paths above, so they always run; a PR runs the jobs below
+  # when one of these files changed or when this filter cannot decide.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -88,8 +88,10 @@ jobs:
           # engine checks below (they skip only on a successful "false").
           [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] || { echo "::error::missing PR shas"; exit 1; }
           # --no-renames lists both sides of a move, so a file moved out of an
-          # engine path still counts.
-          files=$(git -c core.quotePath=false diff --no-renames --name-only "$BASE_SHA" "$HEAD_SHA") || exit 1
+          # engine path still counts. The three-dot form diffs from the merge
+          # base, as the paths filter did, so engine changes that landed on
+          # main after the branch split do not count as this PR's.
+          files=$(git -c core.quotePath=false diff --no-renames --name-only "$BASE_SHA...$HEAD_SHA") || exit 1
           engine=false
           while IFS= read -r f; do
             [ -z "$f" ] && continue
@@ -147,7 +149,10 @@ jobs:
   consumer:
     needs: changes
     # Fail closed: run unless the filter succeeded and found no engine file.
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    # always() rather than !cancelled(): a skipped required job counts as
+    # passed, so a run cancelled before this job starts must not skip it.
+    # Its last step fails the job if the run was cancelled.
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -240,10 +245,19 @@ jobs:
           VC_CONFORMANCE="$suite" cargo test --locked
           cargo run --locked --release -- "$suite"
 
+      # A cancelled run can skip every step above and still leave the job
+      # green, which would pass the required check unchecked. Fail instead.
+      - name: Fail a cancelled run
+        if: ${{ cancelled() }}
+        run: exit 1
+
   engine-rs:
     needs: changes
     # Fail closed: run unless the filter succeeded and found no engine file.
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    # always() rather than !cancelled(): a skipped required job counts as
+    # passed, so a run cancelled before this job starts must not skip it.
+    # Its last step fails the job if the run was cancelled.
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     defaults:
@@ -325,3 +339,9 @@ jobs:
           cargo llvm-cov --no-report --locked test --features conformance
           cargo llvm-cov --no-report --locked run --features conformance --bin conformance
           cargo llvm-cov report --fail-under-lines 87
+
+      # A cancelled run can skip every step above and still leave the job
+      # green, which would pass the required check unchecked. Fail instead.
+      - name: Fail a cancelled run
+        if: ${{ cancelled() }}
+        run: exit 1
