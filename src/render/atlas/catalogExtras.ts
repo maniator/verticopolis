@@ -188,7 +188,7 @@ export function vehicleJobs(): Job[] {
   return jobs;
 }
 
-/** Skyline fills (`excalibur/towerScenery.ts`): far, then near. */
+/** Skyline fills (`sceneryLayout.ts`, which the game reads): far, then near. */
 export { SKYLINE_FILLS } from "../sceneryLayout";
 
 /** Columns in the sky strip: one per quarter hour. */

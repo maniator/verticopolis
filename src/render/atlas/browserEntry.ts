@@ -131,8 +131,11 @@ export function canvasRenderer(doc: Document): Renderer {
       const onShell = (draw: () => void) => {
         const prev = ctx.globalCompositeOperation;
         ctx.globalCompositeOperation = "destination-out";
-        draw();
-        ctx.globalCompositeOperation = prev;
+        try {
+          draw();
+        } finally {
+          ctx.globalCompositeOperation = prev;
+        }
       };
       const marks = shellMarks(() => copyPixels(ctx, saved), atop, onShell);
       let split: boolean;

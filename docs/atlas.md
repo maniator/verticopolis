@@ -331,8 +331,8 @@ center, metro station, recycling center, parking ramp and parking space. The
 recycling center's chain is its `fill`: the wall gauge (and its FULL cue)
 changes on the shell, the day's pile in front. The deck curb and the gauge
 draw after the machines, as the game draws them, and land on the shell; the
-furniture stops at the curb, which stays whole on the shell. The parking ramp's furniture is
-the car parked at its foot. A parking space's shell is the whole bay and its
+furniture stops at the curb, which stays whole on the shell. The parking
+ramp's furniture is the car parked at its foot. A parking space's shell is the whole bay and its
 furniture list is empty: its car comes as a `car<i>` overlay (and a dead
 space's red X as `dead`), which draws in front of everything.
 

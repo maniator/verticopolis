@@ -51,7 +51,8 @@ export function layerEnd(ctx: CanvasRenderingContext2D): void {
  *  so the pixels are the routine's own; the atlas bake also paints it on the
  *  shell picture, and cuts it out of the soft furniture.
  *  The bake runs `draw` more than once, so it must only paint: no random
- *  draws, no state the rest of the routine reads. */
+ *  draws, no state the rest of the routine reads. Where it covers furniture
+ *  it should be opaque, so the cut is clean. */
 export function layerShell(ctx: CanvasRenderingContext2D, draw: () => void): void {
   if (hook?.shellPaint) hook.shellPaint(ctx, draw);
   else draw();

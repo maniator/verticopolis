@@ -13,7 +13,7 @@ describe("draw planes", () => {
         .forEach((line, i) => {
           // A z set from a number: `z: 3`, `z: .5`, `.z = -1`, `.z += 1`, or
           // the box-actor helper's z argument.
-          if (/\bz: *-?[\d.]|\.z *[-+]?= *-?[\d.]|, *-?[\d.][\d.]*, *(cv|gfx)\)/.test(line)) literal.push(`${f}:${i + 1}`);
+          if (/\bz: *[-+]?[\d.]|\.z *[-+*/]?= *[-+]?[\d.]|, *-?[\d.][\d.]*, *(cv|gfx)\)/.test(line)) literal.push(`${f}:${i + 1}`);
         });
     }
     expect(literal).toEqual([]);

@@ -31,6 +31,7 @@ import {
   grassLook,
 } from "../excalibur/towerSceneryDraw";
 import type { AnimJob, Job, Keys, StillJob } from "./catalog";
+import type { PaintSpec } from "./paint";
 import { Z } from "../depthPlanes";
 import { CLOUD_COUNT, CLOUD_DRIFT, RAIN, SUN_ARC, cloudMotion, cloudSeed } from "../sprites/sky";
 import { SKY_COLUMNS } from "./catalogExtras";
@@ -236,7 +237,7 @@ export function skyData() {
     clouds: {
       ...CLOUD_DRIFT,
       // The engine's weather to the cloud frames it shows (clear shows none).
-      weathers: { cloudy: "overcast", rain: "rain" } satisfies Record<Exclude<WeatherKind, "clear">, string>,
+      weathers: { cloudy: "overcast", rain: "rain" } satisfies Record<Exclude<WeatherKind, "clear">, Extract<PaintSpec, { p: "cloud" }>["weather"]>,
       list: Array.from({ length: CLOUD_COUNT }, (_, i) => ({ frame: i, ...cloudMotion(cloudSeed(i)) })),
     },
     // Drawn over the whole view, in front of the world, on rainy days.

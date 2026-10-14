@@ -24,7 +24,8 @@ export interface Renderer {
    * The room's furniture painted onto a transparent canvas from the paint's
    * `layerBreak` on, so glows and soft shadows keep their own transparency;
    * whatever the paint draws after its `layerEnd` only tints the furniture
-   * already there (source-atop). Null when the paint marks no break. A
+   * already there (source-atop), and its `layerShell` art cuts the furniture
+   * it covers away (destination-out). Null when the paint marks no break. A
    * renderer without it bakes no soft furniture.
    */
   renderSoft?(spec: PaintSpec, w: number, h: number): Image | null;
