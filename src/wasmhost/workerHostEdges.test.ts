@@ -68,8 +68,7 @@ describe("worker host round 2 (fake engine)", () => {
       const gate = r.gate();
       if (gate.canStep()) {
         // Stepping on an open gate whose last reply was stale: the streak.
-        const fresh = r.host.stats.staleReplies;
-        if (f > 0 && fresh > 0 && r.host.stats.ackedSeq < r.host.stats.lastCommandSeq) steppedWhileStale = true;
+        if (f > 0 && r.host.stats.staleReplies > 0 && r.host.stats.ackedSeq < r.host.stats.lastCommandSeq) steppedWhileStale = true;
         r.sim.tick(1);
       }
       gate.flush();
@@ -112,7 +111,7 @@ describe("worker host round 2 (fake engine)", () => {
     await v.settleTasks();
     v.sim.tick(1);
     v.gate().flush();
-    v.sim.view = { x: 1, y: 1, zoom: 1 } as never;
+    v.sim.view = { tile: 1, floor: 1, zoom: 1 };
     await v.settleTasks();
     expect(v.host.stats.staleReplies).toBe(0);
     v.host.detach();
