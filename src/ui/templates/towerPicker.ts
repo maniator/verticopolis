@@ -2,8 +2,6 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import type { SlotInfo } from "../../storage/SaveGame";
 import { slotDetail, slotName } from "./saves";
 
-/** Distinct from the saves manager's, so the two can never collide. */
-
 /**
  * The title screen's LOAD-ONLY tower picker (SPEC-splash-load-tower CAP-2 to
  * CAP-4). It resembles the in-game Saved Towers manager (`./saves.ts`) and

@@ -40,7 +40,7 @@ describe("gameplay analytics events", () => {
     expect(sendToRelay).toHaveBeenNthCalledWith(2, "star_reached", { star: 3 });
   });
 
-  it("fires no event on a non-deployed host (localhost, e2e preview, native shell)", () => {
+  it("fires no event on a non-deployed host (localhost, e2e preview)", () => {
     window.location.href = localhost;
     gameplaySession.noteNewGame("classic");
     gameplaySession.noteBuild("floor");

@@ -41,7 +41,7 @@ describe("trackEvent routing", () => {
     trackEvent("boot", { reason: "fresh", version: "1.0.0", mode: "modern", star: 1, floors: 0, population: 0 });
     vi.mocked(telemetryHostAllowed).mockReturnValue(true);
     trackEvent("star_reached", { star: 2 });
-    expect(sent.map((e) => e.event), "the closed-gate event is gone, not queued").toEqual(["star_reached"]);
+    expect(sent.map((e) => e.event), "the closed-gate event is dropped rather than queued").toEqual(["star_reached"]);
   });
 
   it("keeps the per-event prop winning over a colliding common prop", () => {

@@ -6,7 +6,8 @@ import { noteCrash as reportCrash, releaseCrashThrottle as releaseCrashSlots } f
 /**
  * The per-tab {@link GameplaySession} and the one process-wide instance of it,
  * split out of `analytics.ts` at the 500-line file guard. `analytics.ts` keeps
- * the module's public surface (the re-exports and the boot wiring) and re-exports `gameplaySession`, so every caller keeps importing
+ * the module's public surface (the re-exports and the boot wiring) and
+ * re-exports `gameplaySession`, so every caller keeps importing
  * from `./analytics` exactly as before.
  *
  * The event vocabulary and the send choke point live in `analyticsCore.ts`, the
@@ -352,6 +353,11 @@ class GameplaySession {
    * Open a fresh measurement window: drop everything banked so far, and re-open
    * every latch, so the next summary describes only what happens from here.
    * The engine's pending gameplay events are dropped unsent with the window.
+   *
+   * Its only caller is {@link reset}, the test hook: no production path opens a
+   * new window since the desktop consent flow was retired (#991). It stays a
+   * separate method because the engine-bridge tests drive the window close on
+   * its own, without the rest of the reset.
    *
    * Two things deliberately survive: `armed`, because the page-hide listeners
    * are wired once per tab and a second pair would double-count `session_end`,

@@ -9,9 +9,8 @@ import type { GameRules } from "../../engine/gameRules";
  * The Help / How-to-play dialog. Package: the semantic structure and a11y hooks
  * (the splash-gated Replay button, the external report link with rel=noopener and
  * its visually-hidden span, the autofocus primary), the inline Replay `@click`
- * dispatch, and the version auto-escape. The report-link routing through
- * the platform wrapper and the Close action live in the controller and are pinned
- * by the showHelp integration tests.
+ * dispatch, and the version auto-escape. The Close action lives in the
+ * controller and is pinned by the showHelp integration tests.
  */
 
 const noop = { onReplay: () => {} };

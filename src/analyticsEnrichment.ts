@@ -3,7 +3,8 @@ import type { EventProps } from "./analyticsAdapter";
 /**
  * On-device, cookieless enrichment for the gameplay analytics events (S4). Every
  * value here is a COARSE, ANONYMOUS bucket computed once at boot from state the
- * device already holds: the URL the app launched with, the loaded tower's in-game age, and the autosave's write time. Nothing
+ * device already holds: the URL the app launched with, the loaded tower's
+ * in-game age, and the autosave's write time. Nothing
  * here is an identifier, nothing is persisted, and nothing crosses a session or
  * a device, so this stays inside the migration's cookieless / banner-free
  * invariant. `analytics.ts` merges the result into every event.

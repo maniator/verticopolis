@@ -108,8 +108,8 @@ export function showBootMessage(content: TemplateResult | string, withReload = f
  *  imports no `GameApp` value and stays cycle-free. */
 export function bootGame(create: () => BootApp): Promise<void> {
   if (typeof document === "undefined") return Promise.resolve();
-  // Async only so the wrapper save store can resolve before the game
-  // constructs. The rethrow below therefore becomes a REJECTION rather than a
+  // Async so the WASM engine can load before the game constructs. The rethrow
+  // below therefore becomes a REJECTION rather than a
   // synchronous throw, which is still captured: `installErrorTracking` binds
   // `unhandledrejection` alongside `error` (see analyticsErrors.ts), and it is
   // installed as the first statement here, so the listener is already up.
@@ -212,7 +212,7 @@ export function bootGame(create: () => BootApp): Promise<void> {
     }
   };
   // Returns the boot promise rather than firing and forgetting it. `boot` became
-  // async so the wrapper save store can resolve before the game constructs, and
+  // async so the WASM engine can load before the game constructs, and
   // its rethrow would otherwise be a floating rejection nothing could observe:
   // not the caller, and not a test.
   //

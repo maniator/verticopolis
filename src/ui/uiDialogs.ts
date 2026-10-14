@@ -39,9 +39,8 @@ export { showElevatorScheduleDialog, type ScheduleDialogCtx } from "./uiElevator
 // The title-screen tower picker likewise lives in its own module.
 export { showTowerPicker, type TowerPickerCtx } from "./uiTowerPicker";
 
-// The Settings controller moved to its own module when the desktop privacy
-// switch pushed this file to the readable-size ceiling; re-exported so
-// `UI.showSettings` and the shell's `settings` menu command are unchanged.
+// The Settings controller lives in its own module (readable-size ceiling);
+// re-exported so `UI.showSettings` is unchanged.
 export { showSettings } from "./uiSettings";
 
 // The file-picker entry point lives in its own module so the tower picker can

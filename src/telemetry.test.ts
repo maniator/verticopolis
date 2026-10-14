@@ -52,7 +52,7 @@ describe("injectVercelTelemetry host gate", () => {
     expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
   });
 
-  it("skips on any other host (localhost, preview server, native shell)", () => {
+  it("skips on any other host (localhost, preview server)", () => {
     window.location.href = localhost;
     injectVercelTelemetry();
     expect(injectSpeedInsights).not.toHaveBeenCalled();

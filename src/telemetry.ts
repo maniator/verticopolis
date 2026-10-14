@@ -11,9 +11,10 @@ import { analyticsAdapter } from "./analyticsAdapter";
  * exist: the production domain and Vercel preview deployments.
  *
  * Gating on the host keeps the injected scripts' 404s (and the console errors
- * they raise) out of localhost, the `vite preview` server the e2e console-error
- * guards run against. The inject is wrapped so a telemetry hiccup can never throw past the caller and
- * block boot; every page treats it as best-effort.
+ * they raise) out of localhost and the `vite preview` server the e2e
+ * console-error guards run against. The inject is wrapped so a telemetry hiccup
+ * can never throw past the caller and block boot; every page treats it as
+ * best-effort.
  *
  * Factoring it here means the three pages report the same telemetry the same
  * way from one gate, so the pages can never drift out of parity with the game.

@@ -70,9 +70,9 @@ describe("registerPWA: gating", () => {
   });
 
   it("registers under a former wrapper mode too: no build mode switches the PWA off", async () => {
-    // `--mode native` and `--mode desktop` used to skip registration and the
-    // update poll. Those modes are retired, so any build that reaches the
-    // browser preconditions registers, which keeps updates and offline play on.
+    // The retired wrapper build modes used to skip registration and the update
+    // poll. Any build that reaches the browser preconditions now registers,
+    // which keeps updates and offline play on.
     vi.stubEnv("MODE", "native");
     const restore = makeBrowserBranchReachable();
     try {

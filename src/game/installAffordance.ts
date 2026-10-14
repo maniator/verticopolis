@@ -25,9 +25,7 @@ import { isSplashUp } from "./interactionState";
  * Activation ({@link activateInstall}) is shared by all three: a native prompt
  * where a `beforeinstallprompt` is captured, else an honest how-to (iOS Safari
  * steps, or Chrome/Edge browser-menu steps). Standalone / TWA sessions are
- * offered nothing on any surface, and neither are wrapped builds (Capacitor,
- * Electron): they are not installable web apps, and they are not standalone
- * either, so every surface gates on the build mode as well.
+ * offered nothing on any surface.
  */
 
 /** Which affordance a player tapped to reach for the install, for the CAP-4

@@ -1713,8 +1713,7 @@ ul.slots .slot-actions .btn {
    is pinned just to its left, so the two utilities read as one small cluster in
    the top-right without competing with the action stack. The 48px min-height
    keeps a comfortable touch target; width follows the label. Shown only in a
-   not-standalone browser session (wrapped builds are excluded by build mode),
-   so a player already inside the installed app never sees it. */
+   not-standalone browser session, so a player already inside the installed app never sees it. */
 .splash-install {
   position: absolute;
   top: 14px;

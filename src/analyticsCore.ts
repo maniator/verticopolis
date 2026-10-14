@@ -12,7 +12,7 @@ import { telemetryHostAllowed } from "./telemetry";
  *
  * Every event goes through the SAME host gate as the page-view inject
  * (`telemetryHostAllowed`) and is best-effort: nothing fires on localhost, the
- * e2e preview server, or the native shell, and a transport hiccup can never
+ * e2e preview server, or any other host, and a transport hiccup can never
  * throw past the caller into the game loop. The vocabulary is deliberately
  * low-volume so a busy session stays well inside the provider's event budget.
  */

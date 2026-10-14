@@ -59,7 +59,7 @@ const SESSION_KEY = "vc-analytics-session";
 let session: string | undefined;
 
 /** A best-effort id for a context without a secure `crypto.randomUUID` (plain
- *  HTTP, an older WebView, the native shell). Correlation degrades to a
+ *  HTTP, an older WebView). Correlation degrades to a
  *  lower-entropy id rather than the module throwing. */
 function fallbackId(): string {
   return `s-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
