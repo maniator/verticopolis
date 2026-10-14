@@ -1,6 +1,6 @@
 import { bake, type BakeResult, type Renderer } from "./bake";
 import { roomJobs, type Job } from "./catalog";
-import { facadeJobs, peopleJobs, skyJobs, structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
+import { facadeJobs, legacyShaftJobs, peopleJobs, skyJobs, structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
 import { paint, type PaintSpec } from "./paint";
 import { sceneryJobs } from "./scenery";
 import { LayerError, type Image } from "./pixels";
@@ -25,7 +25,7 @@ bindViewWorld(catalogFor("modern").world);
 
 /** Every job the atlas bakes, in a fixed order. */
 export function allJobs(): Job[] {
-  return [...roomJobs(), ...structureJobs(), ...transportJobs(), ...peopleJobs(), ...facadeJobs(), ...vehicleJobs(), ...skyJobs(), ...sceneryJobs()];
+  return [...roomJobs(), ...structureJobs(), ...transportJobs(), ...peopleJobs(), ...facadeJobs(), ...vehicleJobs(), ...skyJobs(), ...sceneryJobs(), ...legacyShaftJobs()];
 }
 
 /** A 2D context for `canvas` at `w` x `h`, cleared and prepared like an

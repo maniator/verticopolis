@@ -175,7 +175,8 @@ reader is `src/render/atlas/lookup.ts`; in short:
 
 1. A burning or unbuilt room plays `fire/<kind>` or `construction/<kind>`.
 2. Otherwise build the frame name from the kind, state, subtype (a subtype
-   the engine does not list for the kind uses `-`), width, the lighting, the
+   the engine does not list for the kind uses `-`), the kind's catalog width
+   (a room at another width is drawn stretched, below), the lighting, the
    business hours at the current hour, the late night (23:00 to 06:00) of a
    condo, studio or apartment, and the variant you picked for that room.
 3. For most rooms, append `/home` when `occupants > 0`, else `/away`, and on a
@@ -195,8 +196,24 @@ change when the visible count goes from `k - 1` to `k`, at their place in the
 room (for most rooms, the figure that sits down in that slot). Draw them in
 order; a single step on its own is not a standalone figure.
 
-Frames exist for each kind's catalog width only. A room imported from an old
-tower at another width has no frame yet.
+Room frames exist for each kind's catalog width only. A room imported from an
+old tower (a TDT file) or loaded from an old save keeps its original width,
+anything from one tile to the lot's width, too many to bake. Such a room uses
+its catalog-width frame or animation: compose it as usual (chains, overlays and
+layers, all in catalog-width coordinates), then scale the picture horizontally
+to the room's real width, nearest neighbor from its left edge. The reference
+reader returns that width as `stretchTo`. The result approximates the web
+game, which redraws the room at its real width (its furniture and figures keep
+their spacing), so it is a fallback rather than a match.
+
+A shaft's width is a small set: a legacy save keeps the narrower width canon
+used to have (stairs 4 tiles, the standard elevator 3), and the atlas bakes
+those too, named with a `w<tiles>` segment after the kind
+(`transport/stairs/w4`, `shaft/elevatorStandard/w3/top`,
+`car/elevatorStandard/w3/idle/notfull/s0`), on pages of their own after the
+scenery's. `lookupShaft` in the reference reader names them; a shaft at any
+other width (only a damaged save carries one) uses its catalog frames with
+`stretchTo`.
 
 Room variety in the web comes from each room's floor, column and id, which no
 finite atlas can cover. The atlas bakes four sampled placements per kind (the

@@ -1,8 +1,9 @@
-import { hasBusinessHours, isOpenAt } from "../../engine/facilities";
+import { FACILITIES, hasBusinessHours, isElevatorKind, isOpenAt } from "../../engine/facilities";
 import { subtypeListFor } from "../../engine/retailSubtypes";
 import type { FacilityKind, UnitState } from "../../engine/types";
 import { rand } from "../sprites/common";
 import { LATE_NIGHT_KINDS, OCCUPANT_FREE, PARKING_CAR_COLORS, RECYCLE_STEPS, isLateHour } from "./catalog";
+import { LEGACY_SHAFT_WIDTHS } from "./catalogExtras";
 
 /**
  * The reference reader: how a frontend maps a live unit and scene to atlas
@@ -16,7 +17,8 @@ export interface LiveUnit {
   state: UnitState;
   subtype?: string;
   /** The room's width in tiles. The atlas bakes catalog widths only; a room
-   *  imported at another width names a frame the atlas does not carry. */
+   *  at another width (a TDT import or a legacy save keeps its original
+   *  width, #731) gets its catalog-width picture and a `stretchTo`. */
   width: number;
   occupants: number;
   outForMeal?: number;
@@ -35,11 +37,26 @@ export interface LiveScene {
   dead: boolean;
 }
 
+/** `stretchTo`, when present, is the room's real width in tiles: its frame or
+ *  animation is baked at the kind's catalog width, so compose it as usual
+ *  (chains, overlays, layers, all in catalog-width coordinates), then scale
+ *  the composed picture horizontally to `stretchTo` tiles, nearest neighbor
+ *  from its left edge. It approximates the web game, which redraws the room
+ *  at its real width. */
 export type Lookup =
-  | { animation: string }
-  | { frame: string; chains: Record<string, number>; overlays: string[] };
+  | { animation: string; stretchTo?: number }
+  | { frame: string; chains: Record<string, number>; overlays: string[]; stretchTo?: number };
 
 export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number): Lookup {
+  // An unknown kind keeps its own width (its frame is missing either way); a
+  // corrupt width (not finite, or under one tile) reads as the catalog's.
+  const cat = FACILITIES[u.kind]?.width ?? u.width;
+  const width = Number.isFinite(u.width) && Math.round(u.width) >= 1 ? Math.round(u.width) : cat;
+  const found = lookupAtCatalogWidth(u, s, variant, cat);
+  return width === cat ? found : { ...found, stretchTo: width };
+}
+
+function lookupAtCatalogWidth(u: LiveUnit, s: LiveScene, variant: number, width: number): Lookup {
   if (u.state === "fire" || u.state === "construction") return { animation: `${u.state}/${u.kind}` };
   let hours = "always";
   if (hasBusinessHours(u.kind)) hours = isOpenAt(u.kind, s.hour) ? "open" : "closed";
@@ -48,7 +65,7 @@ export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number): Lookup {
   // An unknown or legacy subtype draws the kind's default look, the "-" frame.
   const known = u.subtype !== undefined && (subtypeListFor(u.kind) ?? []).includes(u.subtype);
   const subtype = known ? u.subtype : "-";
-  const stem = `room/${u.kind}/${u.state}/${subtype}/w${u.width}/${s.lit ? "lit" : "unlit"}/${hours}/${late}/v${variant}`;
+  const stem = `room/${u.kind}/${u.state}/${subtype}/w${width}/${s.lit ? "lit" : "unlit"}/${hours}/${late}/v${variant}`;
   if (u.kind === "parking") {
     const overlays: string[] = [];
     if (s.dead) overlays.push("dead");
@@ -71,4 +88,17 @@ export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number): Lookup {
 /** A count or fraction from the engine, with a corrupt value read as 0. */
 function finite(n: number): number {
   return Number.isFinite(n) ? n : 0;
+}
+
+/** A shaft's frame names: an elevator's bands are `<shaft>/<piece>` and its
+ *  cabs `<car>/<arrow>/<full>/s<variant>`; stairs and escalators draw their
+ *  one two-floor `shaft` frame. A legacy width the atlas bakes (stairs 4,
+ *  standard elevator 3) names its own frames; any other width uses the
+ *  catalog's, with `stretchTo` as for a room. */
+export function lookupShaft(kind: FacilityKind, width: number): { shaft: string; car?: string; stretchTo?: number } {
+  const cat = FACILITIES[kind].width;
+  const w = Number.isFinite(width) && Math.round(width) >= 1 ? Math.round(width) : cat;
+  const seg = w !== cat && (LEGACY_SHAFT_WIDTHS[kind] ?? []).includes(w) ? `/w${w}` : "";
+  const names = isElevatorKind(kind) ? { shaft: `shaft/${kind}${seg}`, car: `car/${kind}${seg}` } : { shaft: `transport/${kind}${seg}` };
+  return w === cat || seg ? names : { ...names, stretchTo: w };
 }
