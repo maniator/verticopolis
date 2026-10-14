@@ -29,9 +29,8 @@ function fakeUi() {
       toast: (text: string, kind?: string) => {
         toasts.push({ text, kind: kind ?? "info" });
       },
-      downloadFile: (filename: string, contents: string | Uint8Array) => {
+      downloadFile: (filename: string, contents: string | Uint8Array): void => {
         downloads.push({ filename, contents });
-        return Promise.resolve();
       },
     },
   };

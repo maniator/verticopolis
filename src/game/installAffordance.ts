@@ -3,7 +3,6 @@ import { initPwaInstall, installAvailability, promptInstall, isStandalone, isIos
 import { trackAppAction, trackAppActionOnce } from "../analytics";
 import { showInstallHelp } from "../ui/uiDialogs";
 import { isSplashUp } from "./interactionState";
-import { isWrappedMode } from "../platform";
 
 /**
  * The install-affordance controller (SPEC-pwa-install). Ties the browser install
@@ -59,14 +58,9 @@ function markChipShownEver(): void {
 /** Whether the splash shows its persistent install button (CAP-5): any session
  *  that is not already installed. Deliberately NOT gated on a captured event, so
  *  it never depends on Chrome's engagement heuristic or a reveal race; a tap with
- *  no event degrades to the browser-menu how-to inside {@link activateInstall}.
- *  Wrapped builds (Capacitor, Electron) are the exception: they are not
- *  installable web apps and are not standalone either, so without the mode gate
- *  this button was the one install surface that leaked into a wrapper window,
- *  where its tap led to browser install steps for a menu that does not exist
- *  there. */
-export function splashInstallOffered(mode: string = import.meta.env.MODE): boolean {
-  return !isWrappedMode(mode) && !isStandalone();
+ *  no event degrades to the browser-menu how-to inside {@link activateInstall}. */
+export function splashInstallOffered(): boolean {
+  return !isStandalone();
 }
 
 /** Real play, the chip's gate: past the splash and with at least one unit in the

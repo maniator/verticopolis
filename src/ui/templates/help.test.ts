@@ -42,14 +42,10 @@ describe("helpTemplate structure and a11y", () => {
     expect(a.querySelector(".visually-hidden")?.textContent).toBe(" (opens GitHub in a new tab)");
   });
 
-  it("offers the full-page link in a browser build, external and deep-linked", () => {
-    // IS_WRAPPED_BUILD is false under vitest (the mode is "test"), so this is
-    // the browser-build shape. The wrapped-build twin, where the anchor must be
-    // withheld entirely, lives in helpWrappedLink.test.ts with the constant
-    // mocked true (#720).
+  it("offers the full-page link, external and deep-linked", () => {
     const frag = renderToFragment(helpTemplate(false, "1.2.3", noop));
     const a = frag.querySelector<HTMLAnchorElement>('a[data-act="open-help"]')!;
-    expect(a, "expected the Open full page link in a browser build").not.toBeNull();
+    expect(a, "expected the Open full page link").not.toBeNull();
     expect(a.getAttribute("href")).toBe("/help#classic-vs-modern");
     expect(a.getAttribute("target")).toBe("_blank");
     expect(a.getAttribute("rel")).toBe("noopener noreferrer");

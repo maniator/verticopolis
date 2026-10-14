@@ -17,9 +17,7 @@ import type { SlotInfo } from "../storage/SaveGame";
 import type { ImportReport } from "../storage/tdtImport";
 import type { ExportReport } from "../storage/tdtExport";
 import type { UpdateInfo } from "../pwa";
-import { routeExternalInWrapper } from "./externalLink";
 import { isInstalledStandalone } from "./standalone";
-import { getPlatform } from "../platform";
 import { trackAppAction } from "../analytics";
 import { engineSuffix } from "../wasmhost/engineLabel";
 
@@ -284,23 +282,16 @@ export function showHelp(ui: UI): void {
   // disabled, so a real browser suppresses the click, and onReplayOnboarding
   // also no-ops behind #splash; both make a splash-time trigger a no-op.
   const box = ui.openModalTemplate(helpTemplate(onSplash, version, { onReplay: () => ui.cb.onReplayOnboarding() }, engineSuffix()), { displaceable: true });
-  // Inside a native wrapper the report link routes to the system browser
-  // through the platform port (see routeExternalInWrapper).
-  routeExternalInWrapper(box.querySelector<HTMLAnchorElement>(".help-report a")!);
   // "Open the full help page" is a real <a href="/help#classic-vs-modern"
   // target="_blank">, so a plain browser tab opens the shareable help page
   // (deep-linked to the comparison section) as written. But from an installed
   // standalone PWA a new tab drops to the system browser and loses the session,
   // so there we keep the player in the running sim: swap the navigation for the
   // in-app compare modal, which pauses the tower and shows the same comparison.
-  // Wrapped builds render no anchor at all (helpTemplate withholds it behind
-  // IS_WRAPPED_BUILD, #720), so `fullPage` is null there and this wiring no-ops.
   const fullPage = box.querySelector<HTMLAnchorElement>('a[data-act="open-help"]');
   fullPage?.addEventListener("click", (e) => {
-    // Downgrade in an installed standalone PWA. The isNativeWrapper arm is a
-    // runtime backstop (a shell has no /help route either); with the anchor
-    // withheld from wrapped bundles it should never fire in a real build.
-    if (isInstalledStandalone() || getPlatform().isNativeWrapper) {
+    // Downgrade in an installed standalone PWA.
+    if (isInstalledStandalone()) {
       e.preventDefault();
       showCompare(ui);
     }

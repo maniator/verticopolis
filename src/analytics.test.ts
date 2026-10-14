@@ -184,7 +184,7 @@ describe("common event enrichment (S4)", () => {
   });
 
   it("clears the common props on reset, so a later event carries none", () => {
-    setCommonProps({ platform: "ios" });
+    setCommonProps({ platform: "twa" });
     gameplaySession.reset();
     gameplaySession.noteStar(2);
     expect(sendToRelay).toHaveBeenCalledWith("star_reached", { star: 2 });
@@ -397,7 +397,7 @@ const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
 
 describe("the platform and distribution-channel dimensions ride every event", () => {
   // The common props are MODULE state, so a suite that installs a boot set and
-  // walks away stamps `platform: "desktop"` on every event of every describe
+  // walks away stamps `platform: "twa"` on every event of every describe
   // added below this one. Captured and restored rather than cleared, so this
   // block stays honest about what it found even if the file grows a suite above
   // it that installs its own set.
@@ -418,13 +418,12 @@ describe("the platform and distribution-channel dimensions ride every event", ()
   it("stamps both dimensions on every event in the vocabulary", () => {
     // Assembled through the real bootCommonProps rather than a hand-written
     // literal, so dropping the channel from the assembled set fails here too,
-    // not only in the enrichment suite. A desktop/steam session is the case
-    // worth naming: it is the one where the two dimensions differ, so neither
-    // can be inferred from the other downstream.
+    // not only in the enrichment suite. A TWA session is the case worth naming:
+    // it is the one that differs from the default.
     setCommonProps(
       bootCommonProps({
-        platform: "desktop",
-        distributionChannel: "steam",
+        platform: "twa",
+        distributionChannel: "twa",
         version: "9.9.9",
         onboarded: true,
         tenureDay: 3,
@@ -442,8 +441,8 @@ describe("the platform and distribution-channel dimensions ride every event", ()
     for (const [i, name] of names.entries()) {
       const [sentName, props] = vi.mocked(sendToRelay).mock.calls[i];
       expect(sentName).toBe(name);
-      expect(props.platform, `${name} lost the platform dimension`).toBe("desktop");
-      expect(props.distribution_channel, `${name} lost the distribution-channel dimension`).toBe("steam");
+      expect(props.platform, `${name} lost the platform dimension`).toBe("twa");
+      expect(props.distribution_channel, `${name} lost the distribution-channel dimension`).toBe("twa");
     }
   });
 });
@@ -452,7 +451,7 @@ describe("no suite leaves its common props installed", () => {
   // A tripwire, deliberately last in the file. The common props are module
   // state that every event in every later suite would inherit, and the leak is
   // invisible while the suite that installs them happens to be the last one:
-  // the next describe someone appends silently gets `platform: "desktop"` on
+  // the next describe someone appends silently gets `platform: "twa"` on
   // every event and no failure says why. This fails the moment a suite above
   // stops restoring what it found.
   it("leaves the module-level common props empty for whatever runs next", () => {

@@ -1,4 +1,4 @@
-import { html, nothing, type TemplateResult } from "lit-html";
+import { html, type TemplateResult } from "lit-html";
 import { compareTemplate } from "./compare";
 
 /**
@@ -107,12 +107,9 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
  *  default relative href, which resolves against the game page's own URL (the
  *  site root on the web, where the file sits beside `index.html`); the `/help`
  *  page passes the root-relative one so a trailing slash on its URL cannot
- *  move the link. `showLicenses` is false in wrapped builds, whose shells do
- *  not open a bundled file in a new tab. */
-export function helpAboutBody(version: string, engine = "", showLicenses = true, licensesHref = "third-party-notices.txt"): TemplateResult {
-  return html`<p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br />Verticopolis <span class="app-version">v${version}</span>${engine}</p>${showLicenses
-    ? html`<p class="help-licenses"><a href=${licensesHref} target="_blank" rel="noopener noreferrer">Third-party licenses<span class="visually-hidden"> (opens in a new tab)</span></a></p>`
-    : nothing}`;
+ *  move the link. */
+export function helpAboutBody(version: string, engine = "", licensesHref = "third-party-notices.txt"): TemplateResult {
+  return html`<p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br />Verticopolis <span class="app-version">v${version}</span>${engine}</p><p class="help-licenses"><a href=${licensesHref} target="_blank" rel="noopener noreferrer">Third-party licenses<span class="visually-hidden"> (opens in a new tab)</span></a></p>`;
 }
 
 /** The Privacy section body, shared by the in-game Help modal and the standalone
@@ -151,9 +148,7 @@ export function helpPrivacyBody(): TemplateResult {
 }
 
 /** The "Found a bug?" report call to action (heading + blurb + external link).
- *  The wrapping `<p>` keeps `class="help-report"` so the modal controller's
- *  `.help-report a` selector finds the link and routes it through the platform
- *  wrapper (`routeExternalInWrapper`).
+ *  The wrapping `<p>` keeps `class="help-report"` for its styling.
  *
  *  The heading level is caller-chosen so each surface keeps a consistent document
  *  outline without forking the prose: the modal uses `h3` (matching its

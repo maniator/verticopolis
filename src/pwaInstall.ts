@@ -7,7 +7,6 @@
  * `beforeinstallprompt` can fire during initial load, so {@link initPwaInstall}
  * must run as early as the boot flow allows (before the game constructs).
  */
-import { isWrappedMode } from "./platform";
 
 /** The `beforeinstallprompt` event, not in every TS lib.dom. */
 interface BeforeInstallPromptEvent extends Event {
@@ -36,14 +35,7 @@ let installedHandler: (() => void) | null = null;
  * call never clobbers a set callback to null, and never double-binds). Inert
  * without a `window`.
  */
-export function initPwaInstall(
-  opts: { onChange?: () => void; onInstalled?: () => void } = {},
-  mode: string = import.meta.env.MODE,
-): void {
-  // Wrapped builds (Capacitor, Electron) are not installable web apps: bind
-  // nothing, so a shell that fires beforeinstallprompt (Electron's Chromium
-  // does) can never arm the install affordance.
-  if (isWrappedMode(mode)) return;
+export function initPwaInstall(opts: { onChange?: () => void; onInstalled?: () => void } = {}): void {
   if (typeof window === "undefined") return;
   if (opts.onChange) notifyChange = opts.onChange;
   if (opts.onInstalled) onInstalledCb = opts.onInstalled;
@@ -100,9 +92,7 @@ export type InstallAvailability = "prompt" | "ios-howto" | "none";
  * browser that has not made the app installable). A standalone/TWA session is
  * always `none`.
  */
-export function installAvailability(mode: string = import.meta.env.MODE): InstallAvailability {
-  // Wrapped builds offer no install path at all (see initPwaInstall).
-  if (isWrappedMode(mode)) return "none";
+export function installAvailability(): InstallAvailability {
   if (isStandalone()) return "none";
   if (canPromptInstall()) return "prompt";
   if (isIos()) return "ios-howto";

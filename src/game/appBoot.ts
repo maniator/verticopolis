@@ -243,12 +243,8 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // One-time boot enrichment merged into EVERY event (S4): the platform and
   // distribution-channel dimensions (AUD-036, #710) plus anonymous on-device
   // buckets. Where each one comes from, since this is what rides on every event:
-  // `platform` is the build mode, then the injected port's wrapper flag, then
-  // the `?src=twa` marker on the launch URL; `distribution_channel` is the same
-  // injected port's optional `distributionChannel` member, read on desktop
-  // builds only. So only the build mode is fixed in the bundle; the wrapper
-  // flag, the marker, and the channel member are all live reads at boot. All
-  // four still describe the build and the shell it launched in; nothing about
+  // `platform` is read off the `?src=twa` marker on the launch URL, and
+  // `distribution_channel` mirrors it. Nothing about
   // the device, the browser, or the player is probed. The remaining buckets are
   // cookieless too, derived from state the device already holds (the onboarding
   // flag, the loaded tower's in-game age, and the autosave's write time), with
@@ -259,8 +255,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // enrichment hiccup can never throw past this point and abort boot, matching
   // the never-block-boot posture the boot snapshot below relies on.
   try {
-    // One platform read feeds both dimensions: the channel is resolved FROM the
-    // platform, so the runtime surface and the storefront cannot disagree.
+    // One platform read feeds both dimensions, so they cannot disagree.
     const platform = platformLabel();
     setCommonProps(
       bootCommonProps({

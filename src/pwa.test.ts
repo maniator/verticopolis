@@ -2,11 +2,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 /**
- * Pins the two gating rules on `registerPWA` in `src/pwa.ts`: the plain build
- * registers the service worker and drives the update flow (the N1 tripwire for
- * the mobile-distribution E1b story), the `--mode native` build is a no-op
- * (F2). The Android TWA runs the plain build, so the gate is on the build's
- * Vite mode (inlined in production builds), not any runtime wrapper flag.
+ * Pins the gating rules on `registerPWA` in `src/pwa.ts`: the build registers
+ * the service worker and drives the update flow (the N1 tripwire), and the only
+ * gates left are the browser preconditions (a secure context with service
+ * worker support). No build mode turns it off.
  *
  * `virtual:pwa-register` is a Vite-plugin virtual module; we mock it so a
  * plain vitest run (no Vite plugin) still resolves the import and lets us
@@ -51,9 +50,8 @@ describe("registerPWA: gating", () => {
   });
 
   it("registers the service worker in the default vitest mode (browser branch: N1 tripwire)", async () => {
-    // Vitest pins `import.meta.env.MODE` to "test"; the native gate must not
-    // fire, and the browser preconditions must be satisfied for registration
-    // to reach `registerSW`.
+    // The browser preconditions must be satisfied for registration to reach
+    // `registerSW`.
     const restore = makeBrowserBranchReachable();
     try {
       const { registerPWA } = await importPwa();
@@ -71,37 +69,18 @@ describe("registerPWA: gating", () => {
     }
   });
 
-  it("under MODE=native leaves NO side effects behind: no registerSW, no interval, no visibilitychange, no fetch (F2)", async () => {
-    // The native bundle powers the iOS Capacitor wrapper: store updates only,
-    // no version.json poll (the fetch would only ever see the bundled snapshot).
-    // Assert each promised no-op directly instead of relying on the transitive
-    // fact that today all three side effects live inside `onRegisteredSW`. If
-    // a future refactor lifts the poll or listener out of that callback, these
-    // spies would catch the F2 regression that a plain `registerSW` check
-    // would miss.
+  it("registers under a former wrapper mode too: no build mode switches the PWA off", async () => {
+    // `--mode native` and `--mode desktop` used to skip registration and the
+    // update poll. Those modes are retired, so any build that reaches the
+    // browser preconditions registers, which keeps updates and offline play on.
     vi.stubEnv("MODE", "native");
     const restore = makeBrowserBranchReachable();
-    const setIntervalSpy = vi.spyOn(window, "setInterval");
-    const addEventSpy = vi.spyOn(document, "addEventListener");
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
     try {
       const { registerPWA } = await importPwa();
-      const onUpdateAvailable = vi.fn();
-      const onOfflineReady = vi.fn();
-      registerPWA({ onUpdateAvailable, onOfflineReady });
-      expect(registerSW).not.toHaveBeenCalled();
-      expect(setIntervalSpy).not.toHaveBeenCalled();
-      // Only visibilitychange matters here (that's the one registerPWA wires);
-      // no listener of any name should reach the document from this call.
-      expect(addEventSpy).not.toHaveBeenCalled();
-      expect(fetchSpy).not.toHaveBeenCalled();
-      expect(onUpdateAvailable).not.toHaveBeenCalled();
-      expect(onOfflineReady).not.toHaveBeenCalled();
+      registerPWA({ onUpdateAvailable: () => {} });
+      expect(registerSW).toHaveBeenCalledTimes(1);
     } finally {
       restore();
-      setIntervalSpy.mockRestore();
-      addEventSpy.mockRestore();
-      fetchSpy.mockRestore();
     }
   });
 

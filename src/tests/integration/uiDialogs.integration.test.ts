@@ -11,7 +11,6 @@ import type { Unit } from "../../engine/types";
 import { unitEditorTemplate } from "../../ui/templates/editor";
 import { toggleMute } from "../../game/audioPrefs";
 import { loadPrefs } from "../../storage/Prefs";
-import * as platformModule from "../../platform";
 
 /**
  * Pins the dialog/window wiring contracts in src/ui/UI.ts — the layer where
@@ -767,6 +766,9 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
 
 describe("export/import — file downloads and the file picker, no copy-paste path", () => {
   afterEach(() => {
+    // The download queues a 60s revoke timer; fake timers in each test keep it
+    // from firing after the URL stubs below are removed.
+    vi.useRealTimers();
     vi.restoreAllMocks();
     delete (URL as { createObjectURL?: unknown }).createObjectURL;
     delete (URL as { revokeObjectURL?: unknown }).revokeObjectURL;
@@ -797,97 +799,45 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     vi.useRealTimers();
   });
 
-  it("downloadFile hands the export to the platform port with the octet-stream MIME", () => {
-    const saveFile = vi.fn(() => Promise.resolve());
-    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
-      isNativeWrapper: true,
-      saveFile,
-      openExternal: () => {},
-    });
+  it("downloadFile hands the browser an octet-stream blob of the exact contents", async () => {
+    vi.useFakeTimers();
     const { ui } = makeUI();
+    const blobs: Blob[] = [];
+    (URL as { createObjectURL?: unknown }).createObjectURL = vi.fn((b: Blob) => {
+      blobs.push(b);
+      return "blob:vctower";
+    });
+    (URL as { revokeObjectURL?: unknown }).revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     ui.downloadFile("my-tower.vctower", "VCTOWER1\npayload");
-    expect(saveFile).toHaveBeenCalledExactlyOnceWith("my-tower.vctower", "VCTOWER1\npayload", "application/octet-stream");
+    expect(blobs).toHaveLength(1);
+    expect(blobs[0]!.type).toBe("application/octet-stream");
+    expect(await blobs[0]!.text()).toBe("VCTOWER1\npayload");
   });
 
-  it("REGRESSION (GH #773): downloadFile's promise tracks the port dialog, settling only when saveFile does", async () => {
-    // The export flow's single-flight latch spans the wrapped fallback dialog
-    // by awaiting this promise, so it must stay PENDING while the shell's
-    // save dialog is open. A fire-and-forget downloadFile that returns an
-    // already-resolved dummy reopens GH #773 while every flow-level test
-    // stays green (they stub this seam), which is why this pins the UI side.
-    let resolveSave!: () => void;
-    const gate = new Promise<void>((res) => {
-      resolveSave = res;
-    });
-    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
-      isNativeWrapper: true,
-      saveFile: () => gate,
-      openExternal: () => {},
-    });
+  it("downloadFile carries raw bytes through unchanged (the binary .TDT export)", async () => {
+    vi.useFakeTimers();
     const { ui } = makeUI();
-    let settled = false;
-    const delivered = ui.downloadFile("t.vctower", "payload").then(() => {
-      settled = true;
+    const blobs: Blob[] = [];
+    (URL as { createObjectURL?: unknown }).createObjectURL = vi.fn((b: Blob) => {
+      blobs.push(b);
+      return "blob:tdt";
     });
-    // Drain the microtask queue and a macrotask: the dialog is still open, so
-    // the promise must still be pending.
-    await new Promise((r) => setTimeout(r, 0));
-    expect(settled).toBe(false);
-    resolveSave();
-    await delivered;
-    expect(settled).toBe(true);
+    (URL as { revokeObjectURL?: unknown }).revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    ui.downloadFile("tower.tdt", new Uint8Array([0, 1, 254, 255]));
+    expect(new Uint8Array(await blobs[0]!.arrayBuffer())).toEqual(new Uint8Array([0, 1, 254, 255]));
   });
 
-  it("REGRESSION (GH #773): a rejecting saveFile still resolves the returned promise, after its own toast", async () => {
-    // The export flow awaits this promise inside its try; a rejection there
-    // would stack the generic "Export failed" toast on top of downloadFile's
-    // own failure toast. The internal catch folds the rejection into the
-    // toast and resolves, and awaiting the return proves the toast landed.
+  it("downloadFile never throws past the caller: a failed download toasts instead", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
-      isNativeWrapper: true,
-      saveFile: () => Promise.reject(new Error("disk full")),
-      openExternal: () => {},
-    });
-    const { ui } = makeUI();
-    await expect(ui.downloadFile("t.vctower", "payload")).resolves.toBeUndefined();
-    const toasts = [...document.getElementById("toast-wrap")!.children];
-    expect(toasts.some((t) => t.className.includes("bad") && t.textContent!.includes("Couldn't save your tower file"))).toBe(true);
-  });
-
-  it("downloadFile toasts when the port's saveFile rejects (a native real-failure path)", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
-      isNativeWrapper: true,
-      saveFile: () => Promise.reject(new Error("disk full")),
-      openExternal: () => {},
-    });
-    const { ui } = makeUI();
-    ui.downloadFile("t.vctower", "payload");
-    await vi.waitFor(() => {
-      const toasts = [...document.getElementById("toast-wrap")!.children];
-      expect(toasts.some((t) => t.className.includes("bad") && t.textContent!.includes("Couldn't save your tower file"))).toBe(true);
-    });
-  });
-
-  it("downloadFile survives a broken port whose saveFile throws synchronously, and still toasts", async () => {
-    // A bridged shell returning undefined or throwing outright is the exact
-    // contract slip the port guards against; it must reach the same toast,
-    // not become an uncaught TypeError at the export call site.
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
-      isNativeWrapper: true,
-      saveFile: (() => {
-        throw new Error("no bridge");
-      }) as unknown as () => Promise<void>,
-      openExternal: () => {},
+    (URL as { createObjectURL?: unknown }).createObjectURL = vi.fn(() => {
+      throw new Error("blocked");
     });
     const { ui } = makeUI();
     expect(() => ui.downloadFile("t.vctower", "payload")).not.toThrow();
-    await vi.waitFor(() => {
-      const toasts = [...document.getElementById("toast-wrap")!.children];
-      expect(toasts.some((t) => t.className.includes("bad") && t.textContent!.includes("Couldn't save your tower file"))).toBe(true);
-    });
+    const toasts = [...document.getElementById("toast-wrap")!.children];
+    expect(toasts.some((t) => t.className.includes("bad") && t.textContent!.includes("Couldn't save your tower file"))).toBe(true);
   });
 
   it("Export asks first: the file is only built and downloaded after clicking Export in the confirm dialog", () => {
@@ -1318,8 +1268,6 @@ describe("toast — kind class and stack cap", () => {
 describe("showHelp — the Report an issue link", () => {
   const CHOOSER = "https://github.com/maniator/verticopolis/issues/new/choose";
 
-  // A leaked getPlatform mock would silently flip later tests into native
-  // mode; restore unconditionally, even when an assertion fails mid-test.
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -1340,38 +1288,9 @@ describe("showHelp — the Report an issue link", () => {
     expect(cue?.textContent).toContain("new tab");
   });
 
-  it("routes activation through platform.openExternal inside a native wrapper", () => {
-    const openExternal = vi.fn();
-    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
-      isNativeWrapper: true,
-      saveFile: () => Promise.resolve(),
-      openExternal,
-    });
-    const { ui } = makeUI();
-    ui.showHelp();
-    const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`)!;
-    const click = new MouseEvent("click", { cancelable: true });
-    link.dispatchEvent(click);
-    // The wrapper's WebView must not navigate away: the anchor's default is
-    // cancelled and the URL goes out through the port instead.
-    expect(click.defaultPrevented).toBe(true);
-    expect(openExternal).toHaveBeenCalledExactlyOnceWith(CHOOSER);
-    // Middle-button activation fires auxclick, not click; it routes the same
-    // way, while other buttons (e.g. right, whose menu already fired) don't.
-    const middle = new MouseEvent("auxclick", { cancelable: true, button: 1 });
-    link.dispatchEvent(middle);
-    expect(middle.defaultPrevented).toBe(true);
-    expect(openExternal).toHaveBeenCalledTimes(2);
-    const right = new MouseEvent("auxclick", { cancelable: true, button: 2 });
-    link.dispatchEvent(right);
-    expect(right.defaultPrevented).toBe(false);
-    expect(openExternal).toHaveBeenCalledTimes(2);
-  });
-
-  it("keeps the plain anchor in the browser: no interception at all", () => {
-    // With the real (browser) platform, nothing intercepts the click,
-    // preserving middle-click and context-menu semantics that a delegating
-    // handler would break.
+  it("keeps the plain anchor: no interception at all", () => {
+    // Nothing intercepts the click, preserving middle-click and context-menu
+    // semantics that a delegating handler would break.
     const { ui } = makeUI();
     ui.showHelp();
     const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`)!;
@@ -1386,42 +1305,6 @@ describe("showHelp — the Report an issue link", () => {
     });
     link.dispatchEvent(new MouseEvent("click", { cancelable: true }));
     expect(preventedByGame).toBe(false);
-  });
-
-  it("falls back to window.open when the wrapper's openExternal throws", () => {
-    // The handler cancels the default before calling the port, so a throwing
-    // wrapper hook must not leave the link dead.
-    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
-      isNativeWrapper: true,
-      saveFile: () => Promise.resolve(),
-      openExternal: () => {
-        throw new Error("bridge gone");
-      },
-    });
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    const open = vi.spyOn(window, "open").mockImplementation(() => null);
-    const { ui } = makeUI();
-    ui.showHelp();
-    const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`)!;
-    link.dispatchEvent(new MouseEvent("click", { cancelable: true }));
-    expect(open).toHaveBeenCalledExactlyOnceWith(CHOOSER, "_blank", "noopener,noreferrer");
-  });
-
-  it("falls back to window.open when an async openExternal rejects (Capacitor-style Promise hook)", async () => {
-    // A Promise-returning wrapper hook (Browser.open) that rejects after
-    // preventDefault must reach the same fallback as a sync throw.
-    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
-      isNativeWrapper: true,
-      saveFile: () => Promise.resolve(),
-      openExternal: () => Promise.reject(new Error("browser plugin failed")),
-    });
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    const open = vi.spyOn(window, "open").mockImplementation(() => null);
-    const { ui } = makeUI();
-    ui.showHelp();
-    const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`)!;
-    link.dispatchEvent(new MouseEvent("click", { cancelable: true }));
-    await vi.waitFor(() => expect(open).toHaveBeenCalledExactlyOnceWith(CHOOSER, "_blank", "noopener,noreferrer"));
   });
 
   it("puts the link in the modal BODY, leaving the footer at its two buttons", () => {
@@ -3426,23 +3309,5 @@ describe("Help dialog: the 'Open full page' link downgrades to the compare modal
 
     // The help modal is untouched: the click was left to the real <a target=_blank>.
     expect(dialog().querySelector("h2")?.textContent).toContain("How to play");
-  });
-
-  it("also intercepts in the native Capacitor wrapper, which has no /help route", () => {
-    setStandalone(false); // not a standalone PWA, but a native shell
-    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
-      isNativeWrapper: true,
-      saveFile: () => Promise.resolve(),
-      openExternal: () => {},
-    });
-    const onSpeed = vi.fn();
-    const { ui } = makeUI({ getSpeed: () => 1, onSpeed });
-    ui.showHelp();
-
-    clickFullPage();
-
-    // Kept in the sim: the compare modal opens (paused) instead of a dead new tab.
-    expect(dialog().querySelector("h2")?.textContent).toContain("Classic vs Modern");
-    expect(onSpeed).toHaveBeenCalledWith(0);
   });
 });
