@@ -16,6 +16,7 @@ import { script, type Hosted } from "../wasmWorker/hostDriver";
  * let go of everything on stop, many times over without leaking engines.
  */
 
+const last = <T>(xs: readonly T[]): T | undefined => xs[xs.length - 1];
 const quiet = { info: () => {}, error: () => {} };
 
 function app(sim: Simulation): WasmHostApp {
@@ -94,7 +95,15 @@ describe.skipIf(!hasWasmPackage())("worker host lifecycle", () => {
     expect(frees).toBe(25);
     expect(handle.status.starts).toBe(26);
     expect(handle.status.errors).toEqual([]);
-    // Replies for an older tower are ignored: every one the current host saw is its own.
+    // Replies for an older tower are ignored: a frame reply stamped with the
+    // first tower's generation changes nothing on the current one.
+    const h = handle.current()!;
+    const replies = h.stats.replies;
+    const money = a.sim.money;
+    h.receive({ type: "frame", gen: 1, req: 1, seq: 999, view: new Float64Array(26), events: '[{"name":"x","payload":{}}]', dropped: 0, log: null, pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    expect(h.stats.replies).toBe(replies);
+    expect(a.sim.money).toBe(money);
+    expect(a.sim.drainGameplayEvents().some((e) => (e.name as string) === "x")).toBe(false);
     handle.stop();
   }, 120_000);
 
@@ -124,13 +133,36 @@ describe.skipIf(!hasWasmPackage())("worker host lifecycle", () => {
     expect(second.worker.terminated).toBe(true);
   }, 120_000);
 
+  it("survives ten crashes in a row, each tower on a fresh worker, terminating every broken one", async () => {
+    const workers: TestWorker[] = [];
+    const make = () => {
+      const s = spawned(wasm());
+      workers.push(s.worker);
+      return s;
+    };
+    const a = app(Simulation.deserialize(JSON.parse(save())));
+    const handle = startWorkerHost(a, make(), async () => make(), quiet);
+    for (let i = 0; i < 10; i++) {
+      await until(() => handle.current()?.loaded() ?? false, `load ${i}`);
+      await script(driven(handle, a), 4);
+      last(workers)!.crash(`crash ${i}`);
+      expect(handle.status.hosted).toBe(false);
+      a.adoptSim(Simulation.deserialize(JSON.parse(save())));
+    }
+    await until(() => handle.current()?.loaded() ?? false, "the last load");
+    expect(handle.status.workers).toBe(11);
+    expect(workers.slice(0, 10).every((w) => w.terminated)).toBe(true);
+    handle.stop();
+    expect(workers.every((w) => w.terminated)).toBe(true);
+  }, 120_000);
+
   it("falls back on a reply it cannot apply, and reports an op the engine refused without letting go", async () => {
     const first = spawned(wasm());
     const a = app(Simulation.deserialize(JSON.parse(save())));
     const handle = startWorkerHost(a, first, () => Promise.reject(new Error("no restart")), quiet);
     await until(() => handle.current()!.loaded(), "load");
     const h = handle.current()!;
-    h.receive({ type: "error", gen: h.gen, seq: 3, message: "refused" });
+    h.receive({ type: "error", gen: h.gen, seq: 3, fatal: false, message: "refused" });
     expect(handle.status.hosted).toBe(true);
     expect(handle.status.errors.join()).toMatch(/op 3: refused/);
     // A malformed frame view is fatal: the tower goes back to TypeScript.

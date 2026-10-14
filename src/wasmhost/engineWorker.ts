@@ -36,7 +36,7 @@ scope.onmessage = (e) => {
     loading = true;
     load(msg.url).catch((err: unknown) => {
       queue = null;
-      post({ type: "error", message: `could not load the WASM engine: ${err instanceof Error ? err.message : String(err)}` });
+      post({ type: "error", fatal: true, message: `could not load the WASM engine: ${err instanceof Error ? err.message : String(err)}` });
     });
     return;
   }

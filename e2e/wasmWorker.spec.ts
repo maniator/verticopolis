@@ -68,19 +68,19 @@ test("the game runs on the WASM engine in a worker behind ?engine=wasm-worker", 
   expect(roundTrip).toBe(true);
   // The worker's script is in the service worker's precache, so an offline
   // start finds it (the engine package itself is #985's).
-  const sw = await page.evaluate(async () => (await fetch("/sw.js")).text());
+  const sw = await page.evaluate(async () => (await fetch(new URL("sw.js", document.baseURI))).text());
   expect(sw).toMatch(/assets\/engineWorker-[\w-]+\.js/);
   expect(errors).toEqual([]);
 });
 
-test("a crashed worker leaves the tower on TypeScript, and the next tower gets a fresh worker", async ({ page }, info) => {
+test("a fatal worker error leaves the tower on TypeScript, and the next tower gets a fresh worker", async ({ page }, info) => {
   test.skip(info.project.name !== WASM_PROJECT, "the engine package is served on the chromium-wasm project");
   await boot(page);
   const after = await page.evaluate(async () => {
     const g = (window as any).game;
     const h = (window as any).__vcEngine;
     const own = h.current();
-    own.receive({ type: "error", message: "simulated crash" });
+    own.receive({ type: "error", fatal: true, message: "simulated crash" });
     const fellBack = !h.status.hosted && !Object.prototype.hasOwnProperty.call(g.sim, "serialize");
     g.adoptSim(g.sim.constructor.newGame(5, "classic"));
     return { fellBack, errors: h.status.errors.length };
@@ -91,4 +91,33 @@ test("a crashed worker leaves the tower on TypeScript, and the next tower gets a
     const h = (window as any).__vcEngine;
     return h.status.hosted && h.status.workers === 2 && h.current()?.loaded();
   }, undefined, { timeout: 30_000 });
+});
+
+/**
+ * Offline on the worker host: with the service worker installed, a reload
+ * without the network brings the game up on the TypeScript engine (the
+ * worker script is precached, the engine package is not, #985), with the
+ * failure reported and no page error.
+ */
+test("an offline reload on the worker host boots on TypeScript", async ({ browser }, info) => {
+  test.skip(info.project.name !== WASM_PROJECT, "the engine package is served on the chromium-wasm project");
+  const ctx = await browser.newContext({ serviceWorkers: "allow" });
+  try {
+    const page = await ctx.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.goto("/?engine=wasm-worker");
+    await page.waitForFunction(() => (window as any).__vcEngine?.current?.()?.loaded?.(), undefined, { timeout: 30_000 });
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.waitForLoadState("networkidle");
+    await ctx.setOffline(true);
+    await page.reload();
+    await page.waitForFunction(() => Boolean((window as any).game), undefined, { timeout: 30_000 });
+    const state = await page.evaluate(() => ({ host: Boolean((window as any).__vcEngine), hosted: Boolean((window as any).__vcEngine?.status?.hosted) }));
+    expect(state).toEqual({ host: false, hosted: false });
+    expect(errors).toEqual([]);
+  } finally {
+    await ctx.setOffline(false);
+    await ctx.close();
+  }
 });

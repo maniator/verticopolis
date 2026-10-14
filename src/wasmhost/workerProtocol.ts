@@ -112,11 +112,15 @@ export interface FrameReply {
 }
 
 /** A load, a step or a command the engine refused or failed on. `seq` is
- *  the op's, when it was one. */
+ *  the op's, when it was one. `fatal` marks an error the tower cannot go on
+ *  past (a refused load, a gap in the sequence, a reply that could not be
+ *  built): the main thread lets the tower go. An error without it is one
+ *  op the engine refused, reported while the host goes on. */
 export interface ErrorReply {
   type: "error";
   gen?: number;
   seq?: number;
+  fatal: boolean;
   message: string;
 }
 

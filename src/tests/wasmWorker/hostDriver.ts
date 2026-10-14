@@ -3,7 +3,8 @@ import type { Person } from "../../engine/crowd/person";
 import { canonicalJson } from "../../engine/canonicalJson";
 import { stateView } from "../../engine/conformanceView";
 import { quantumFor } from "../../engine/sim/fixedStep";
-import { SPEEDS } from "../../game/frameLoop";
+import { SPEEDS, advanceOwedMinutes } from "../../game/frameLoop";
+import type { StepDebt } from "../../engine/sim/fixedStep";
 import { attachWasmHost, type WasmHost } from "../../wasmhost/wasmHost";
 import { attachWorkerHost, type WorkerHost } from "../../wasmhost/workerHost";
 import { stepGate } from "../../wasmhost/stepGate";
@@ -121,4 +122,20 @@ export function frameMotion(sim: Simulation): unknown {
 /** A fresh tower from a save text. */
 export function fromSave(save: string): Simulation {
   return Simulation.deserialize(JSON.parse(save));
+}
+
+/** Drive the host through the frame loop's own owed-minute math, as
+ *  `runFrame` does: per frame, the gate decides whether the frame steps,
+ *  then the flush. `speeds` gives each frame's speed index (0 pauses), and
+ *  the frame time cycles 60, 30 and 120 Hz. The worker host's reply is
+ *  awaited after each frame, so every host steps the same sequence. */
+export async function frames(h: Hosted, speeds: readonly number[], steadyClock = false): Promise<void> {
+  const host = { sim: h.sim, accMinutes: 0 };
+  const debt: StepDebt = { minutes: 0 };
+  const dts = [1000 / 60, 1000 / 30, 1000 / 120];
+  for (let f = 0; f < speeds.length; f++) {
+    const gate = stepGate(h.sim);
+    advanceOwedMinutes(host, debt, dts[f % dts.length], SPEEDS[speeds[f]] ?? 0, steadyClock, gate ? gate.canStep() : true);
+    await h.sync();
+  }
 }

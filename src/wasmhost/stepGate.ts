@@ -37,13 +37,17 @@ export const SETTLE_TIMEOUT_MS = 2000;
 
 /** Wait for the host behind `sim`, if it has a gate, to catch up, for at
  *  most `timeoutMs`. A host without one (the TypeScript engine, the default
- *  WASM host) is always caught up, so this resolves at once. */
+ *  WASM host) is always caught up, so this resolves at once. It never
+ *  rejects. */
 export async function settleEngine(sim: object, timeoutMs = SETTLE_TIMEOUT_MS): Promise<void> {
   const gate = gates.get(sim);
   if (!gate) return;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await Promise.race([gate.settle(), new Promise<void>((resolve) => { timer = setTimeout(resolve, timeoutMs); })]);
+    // A host that fails to catch up (a throw, a rejection) is the same as
+    // one that times out: the save goes ahead with what the read model has.
+    const settled = Promise.resolve().then(() => gate.settle()).catch(() => undefined);
+    await Promise.race([settled, new Promise<void>((resolve) => { timer = setTimeout(resolve, timeoutMs); })]);
   } finally {
     clearTimeout(timer);
   }

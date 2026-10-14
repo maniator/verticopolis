@@ -14,9 +14,8 @@ import type { FromWorker, OpsMessage, ToWorker } from "./workerProtocol";
  */
 export type Post = (msg: FromWorker, transfer?: Transferable[]) => void;
 
-/** Errors reported per tower before the rest are dropped: a trapped engine
- *  fails every op after the first, and the main thread falls back on the
- *  first one anyway. */
+/** Refused ops reported per tower before the rest are dropped (a trapped
+ *  engine fails every op after the first). A fatal error is always sent. */
 export const MAX_ERRORS_PER_TOWER = 20;
 
 const now = (): number => (globalThis.performance ? performance.now() : Date.now());
@@ -79,7 +78,7 @@ export class EngineWorkerCore {
       this.sentHourRuns = view[22];
       this.post({ type: "loaded", gen, view }, [view.buffer]);
     } catch (e) {
-      this.fail(undefined, `load: ${message(e)}`);
+      this.fatal(undefined, `load: ${message(e)}`);
     }
   }
 
@@ -88,7 +87,7 @@ export class EngineWorkerCore {
     const t0 = now();
     for (const op of msg.ops) {
       if (op.seq !== this.seq + 1) {
-        this.fail(op.seq, `op ${op.seq} arrived after ${this.seq}; the sequence has a gap`);
+        this.fatal(op.seq, `op ${op.seq} arrived after ${this.seq}; the sequence has a gap`);
         return;
       }
       this.seq = op.seq;
@@ -131,17 +130,25 @@ export class EngineWorkerCore {
       };
       this.post(reply, [view.buffer]);
     } catch (e) {
-      this.fail(undefined, `frame: ${message(e)}`);
+      this.fatal(undefined, `frame: ${message(e)}`);
     }
   }
 
-  /** A full save the main thread skipped is owed again: the next reply
-   *  carries one whatever moved. */
-  private fail(seq: number | undefined, text: string): void {
+  /** One op the engine refused: reported (up to the cap), and the next
+   *  reply carries a full save whatever moved, so the read model takes the
+   *  engine's state after the refusal. */
+  private fail(seq: number, text: string): void {
     this.sentRevision = Number.NaN;
     if (this.errors >= MAX_ERRORS_PER_TOWER) return;
     this.errors++;
-    this.post({ type: "error", gen: this.gen, seq, message: text });
+    this.post({ type: "error", gen: this.gen, seq, fatal: false, message: text });
+  }
+
+  /** An error the tower cannot go on past. Nothing applies after it until
+   *  the next load, so the engine is freed. */
+  private fatal(seq: number | undefined, text: string): void {
+    this.shadow.free();
+    this.post({ type: "error", gen: this.gen, seq, fatal: true, message: text });
   }
 }
 

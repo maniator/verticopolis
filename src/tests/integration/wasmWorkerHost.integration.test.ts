@@ -3,7 +3,7 @@ import { Simulation } from "../../engine/Simulation";
 import { canonicalJson } from "../../engine/canonicalJson";
 import { buildScenarios } from "../perfCompare/scenarios";
 import { hasWasmPackage, wasmRequired } from "../conformance/wasmEngine";
-import { framePeople, frameMotion, fromSave, host, ownStateView, script, type HostKind, type Hosted } from "../wasmWorker/hostDriver";
+import { framePeople, frameMotion, frames, fromSave, host, ownStateView, script, type HostKind, type Hosted } from "../wasmWorker/hostDriver";
 import { drain } from "../wasmWorker/channel";
 import { stepGate } from "../../wasmhost/stepGate";
 
@@ -168,6 +168,30 @@ describe.skipIf(!hasWasmPackage())("the worker and coalesced hosts against the s
       h.detach();
     }
   }, 60_000);
+
+  it("speed changes, a pause and a resume through the frame loop leave every host on the same tower", async () => {
+    // Fastest, normal, paused (the carry drops), slow, then fastest again,
+    // with the steady clock off so the pacing curve sizes the steps.
+    const speeds = [...Array(120).fill(3), ...Array(90).fill(1), ...Array(30).fill(0), ...Array(90).fill(2), ...Array(120).fill(3)];
+    const run2 = async (kind: HostKind) => {
+      const h = await host(kind, fromSave(SCENARIOS[1].save));
+      try {
+        await frames(h, speeds);
+        return { save: canonicalJson(await h.exactSave()), minutes: h.sim.clock.minutes, people: JSON.stringify(framePeople(h.sim)) };
+      } finally {
+        h.detach();
+      }
+    };
+    const step = await run2("step");
+    const worker = await run2("worker");
+    const frame = await run2("frame");
+    expect(step.minutes).toBeGreaterThan(fromSave(SCENARIOS[1].save).clock.minutes);
+    for (const other of [worker, frame]) {
+      expect(other.minutes).toBe(step.minutes);
+      expect(other.save).toBe(step.save);
+      expect(other.people).toBe(step.people);
+    }
+  }, 300_000);
 
   it("saves and restores: the exact save resumes on a fresh worker as on the step host", async () => {
     const save = SCENARIOS[1].save;

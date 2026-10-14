@@ -185,8 +185,11 @@ export function bootGame(create: () => BootApp): Promise<void> {
       if (engineWorker) {
         try {
           startWorkerHost(app as unknown as WasmHostApp, engineWorker, () => spawnEngineWorker(makeBrowserWorker, enginePackageUrl()));
+          engineWorker = null; // the host owns it now
           refreshSplashVersion();
         } catch (e) {
+          engineWorker?.worker.terminate();
+          engineWorker = null;
           console.error("[wasm-worker] did not start; running on the TypeScript engine:", e);
         }
       }
@@ -224,6 +227,8 @@ export function bootGame(create: () => BootApp): Promise<void> {
       // GameApp.onUpdateAvailable.
       registerPWA({ onUpdateAvailable: (activate, info) => app.onUpdateAvailable(activate, info) });
     } catch (err) {
+      // A worker started for a game that never came up is let go.
+      engineWorker?.worker.terminate();
       // A non-Error throw (a string, say) has no `.message`, so derive the text
       // defensively rather than render "undefined"; the original error is still
       // rethrown untouched.

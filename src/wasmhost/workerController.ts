@@ -54,7 +54,14 @@ export const WORKER_READY_TIMEOUT_MS = 20_000;
  *  (the browser's module worker in the app; an in-process channel in the
  *  tests). Rejects on a load error, a crash or the timeout, terminating it. */
 export function spawnEngineWorker(make: () => EngineWorkerLike, url: string, timeoutMs = WORKER_READY_TIMEOUT_MS): Promise<SpawnedWorker> {
-  const worker = make();
+  // A worker that cannot even be made (a blocked script, a bad URL) rejects
+  // like one that fails to load, never throws at the caller.
+  let worker: EngineWorkerLike;
+  try {
+    worker = make();
+  } catch (e) {
+    return Promise.reject(e instanceof Error ? e : new Error(String(e)));
+  }
   return new Promise<SpawnedWorker>((resolve, reject) => {
     const fail = (message: string) => {
       clearTimeout(timer);
@@ -76,7 +83,11 @@ export function spawnEngineWorker(make: () => EngineWorkerLike, url: string, tim
       }
     };
     worker.onerror = (e) => fail(`the engine worker failed to start: ${e.message ?? "unknown error"}`);
-    worker.postMessage({ type: "init", url });
+    try {
+      worker.postMessage({ type: "init", url });
+    } catch (e) {
+      fail(`could not start the engine worker: ${e instanceof Error ? e.message : String(e)}`);
+    }
   });
 }
 
@@ -93,10 +104,11 @@ export function startWorkerHost(app: WasmHostApp, first: SpawnedWorker, respawn:
   let gen = 0;
   let stopped = false;
   let respawning: Promise<void> | null = null;
+  // The status keeps the first 50 errors; the console gets every one, so a
+  // late fallback's reason is never silent.
   const noteError = (message: string) => {
-    if (status.errors.length >= 50) return;
-    status.errors.push(message);
     log.error(`[wasm-worker] ${message}`);
+    if (status.errors.length < 50) status.errors.push(message);
   };
   const release = () => {
     const h = host;
@@ -135,7 +147,7 @@ export function startWorkerHost(app: WasmHostApp, first: SpawnedWorker, respawn:
       // the app holds once it is ready (a tower that ticked on TypeScript
       // meanwhile and has a crowd stays there).
       if (stopped || respawning) return;
-      respawning = respawn().then(
+      respawning = Promise.resolve().then(respawn).then(
         (next) => {
           respawning = null;
           if (stopped) {

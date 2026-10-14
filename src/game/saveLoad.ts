@@ -159,11 +159,12 @@ export class SaveLoad {
         const sim = this.deps.getSim();
         // Re-stamp per iteration: the camera may have moved while the
         // previous async compression was in flight.
-        this.stampView(sim);
         // The experimental worker host answers `serialize` from the engine
         // only once its read model has caught up; wait for that here, where
-        // waiting costs nothing (no-op on every other engine).
+        // waiting costs nothing (no-op on every other engine). The camera is
+        // stamped after the wait, so the save carries where it is now.
         await settleEngine(sim);
+        this.stampView(sim);
         await SaveGame.saveAsync(sim);
       } while (this.autosaveQueued);
     } catch {

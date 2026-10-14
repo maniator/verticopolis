@@ -80,7 +80,7 @@ describe("worker controller (fake engine)", () => {
     const b = app();
     let late: (w: SpawnedWorker) => void = () => {};
     const h2 = startWorkerHost(b, await spawnEngineWorker(fakeWorker, "u"), () => new Promise((r) => { late = r; }), quiet);
-    h2.current()!.receive({ type: "error", message: "gone" });
+    h2.current()!.receive({ type: "error", fatal: true, message: "gone" });
     b.adoptSim(Simulation.newGame(8, "classic"));
     h2.stop();
     const orphan = await spawnEngineWorker(fakeWorker, "u");

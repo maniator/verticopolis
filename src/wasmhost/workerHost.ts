@@ -11,6 +11,9 @@ import { mergeSimulation } from "./merge";
 import { setStepGate } from "./stepGate";
 import { adoptTelemetry, type TelemetryDocument } from "./telemetry";
 import type { FrameReply, FrameRequest, FromWorker, MergePayload, Op, ToWorker } from "./workerProtocol";
+import { LATENCY_SAMPLES, newWorkerHostStats, pushSample, type WorkerHostStats } from "./workerStats";
+
+export type { WorkerHostStats } from "./workerStats";
 
 /**
  * The main-thread half of the experimental worker host (`?engine=wasm-worker`;
@@ -38,35 +41,6 @@ import type { FrameReply, FrameRequest, FromWorker, MergePayload, Op, ToWorker }
  *   carried one and nothing was sent since; otherwise with the read model's
  *   own save. `settle` asks for an exact one, for the async save paths.
  */
-export interface WorkerHostStats {
-  /** Messages and payload sent to the worker and received from it. */
-  messagesSent: number;
-  messagesReceived: number;
-  opsSent: number;
-  /** Bytes received: frame views, plus the text fields at two bytes a
-   *  character (the size a structured clone of a JS string copies). */
-  bytesReceived: number;
-  frameBytes: number;
-  mergeBytes: number;
-  merges: number;
-  replies: number;
-  /** Replies that predated one of the instance's commands. */
-  staleReplies: number;
-  /** Main-thread time applying replies, and the worker's own time. */
-  applyMs: number;
-  mergeMs: number;
-  workerOpsMs: number;
-  workerReplyMs: number;
-  /** Command to the first reply that includes it (the ack) and to the end
-   *  of applying that reply (the change visible in the read model), in ms,
-   *  for the last commands (bounded). */
-  commandAckMs: number[];
-  commandVisibleMs: number[];
-  /** Commands a reply has included so far (not bounded). */
-  commandsAcked: number;
-  /** The worker's WASM linear memory at the last reply. */
-  workerMemoryBytes: number | null;
-}
 
 export interface WorkerHost {
   readonly gen: number;
@@ -97,9 +71,15 @@ export interface WorkerHostOptions {
   /** An op the engine refused or failed on: reported, and the host goes on,
    *  as the main-thread host goes on after a command the engine threw on. */
   onError(message: string): void;
+  /** How long the worker gets to answer a load or a frame request before
+   *  the host gives up on it (a hung worker, a lost reply). */
+  replyTimeoutMs?: number;
 }
 
-const LATENCY_SAMPLES = 512;
+/** The default reply watchdog: far past a working worker's reply (it
+ *  answers between frames), short enough that a stuck worker gives the
+ *  tower back to TypeScript while the player waits. */
+export const REPLY_TIMEOUT_MS = 10_000;
 const now = (): number => (globalThis.performance ? performance.now() : Date.now());
 
 export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): WorkerHost {
@@ -115,13 +95,29 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   }
   const { gen } = opts;
   const load = loadCommand(sim, gen); // refuses a tower whose crowd exists
-  const stats: WorkerHostStats = {
-    messagesSent: 0, messagesReceived: 0, opsSent: 0, bytesReceived: 0, frameBytes: 0, mergeBytes: 0, merges: 0, replies: 0, staleReplies: 0,
-    applyMs: 0, mergeMs: 0, workerOpsMs: 0, workerReplyMs: 0, commandAckMs: [], commandVisibleMs: [], commandsAcked: 0, workerMemoryBytes: null,
+  const stats = newWorkerHostStats();
+  const replyTimeoutMs = opts.replyTimeoutMs ?? REPLY_TIMEOUT_MS;
+  let watchdog: ReturnType<typeof setTimeout> | undefined;
+  const arm = (what: string) => {
+    clearTimeout(watchdog);
+    watchdog = setTimeout(() => fatal(`the worker did not answer ${what} within ${replyTimeoutMs} ms`), replyTimeoutMs);
   };
-  const send = (msg: ToWorker, transfer?: Transferable[]) => {
+  const disarm = () => {
+    clearTimeout(watchdog);
+    watchdog = undefined;
+  };
+  /** Post to the worker. A message that cannot be posted (a command whose
+   *  payload cannot be cloned, a closed port) would leave a gap in the
+   *  sequence the worker refuses, so it is fatal here. */
+  const send = (msg: ToWorker, transfer?: Transferable[]): boolean => {
     stats.messagesSent++;
-    opts.send(msg, transfer);
+    try {
+      opts.send(msg, transfer);
+      return true;
+    } catch (e) {
+      fatal(`could not post to the worker: ${e instanceof Error ? e.message : String(e)}`);
+      return false;
+    }
   };
 
   let loaded = false;
@@ -136,7 +132,17 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   let outbox: Op[] = [];
   let sendScheduled = false;
   let needMerge = false;
-  let exact: { save: string; seq: number } | null = null;
+  /** The engine's exact save at `seq`, while nothing but camera stamps
+   *  (`view`, which the save carries and the simulation never reads) was
+   *  sent after it. */
+  let exact: { save: string; seq: number; view?: { value: unknown } } | null = null;
+  /** The last reply was fresh (it included every command): the gate only
+   *  opens on one, so a stale reply is followed by a request with no new
+   *  steps instead of more steps. */
+  let lastFresh = true;
+  /** The engine's clock at the last reply (or the load), for the fallback. */
+  let engineMinutes = sim.clock.minutes;
+  const minutesAtAttach = sim.clock.minutes;
   const commandTimes = new Map<number, number>();
   let waiters: (() => void)[] = [];
   // The read model's cursors, as the main-thread host keeps them.
@@ -147,8 +153,12 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   let carried: GameplayEvent[] = sim.gameplayEvents.drain();
   const droppedAtAttach = sim.gameplayEvents.dropped;
   let droppedEngine = 0;
+  // The read model's own buffer holds its copies of the events of the
+  // commands it ran. They are dropped once a fresh reply has brought the
+  // engine's (which follow in `carried`), and handed back at a detach for
+  // the commands no reply has included yet, so a command's event is never
+  // lost to a fallback or a tower swap, and never handed out twice.
   const takeEvents = (): GameplayEvent[] => {
-    sim.gameplayEvents.drain(); // the read model's duplicates of the commands' events
     const out = carried;
     carried = [];
     return out;
@@ -167,7 +177,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       requestedSeq = seq;
       msg.request = inFlight;
     }
-    send(msg);
+    if (send(msg) && request) arm("a frame request");
   };
   const scheduleSend = () => {
     if (sendScheduled) return;
@@ -189,6 +199,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
 
   const fatal = (message: string) => {
     if (detached) return;
+    disarm();
     opts.onFatal(message);
   };
 
@@ -214,6 +225,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   const applyFrame = (r: FrameReply) => {
     const t0 = now();
     inFlight = null;
+    disarm();
     stats.replies++;
     stats.frameBytes += r.view.byteLength;
     stats.bytesReceived += r.view.byteLength + 2 * (r.events.length + (r.log?.length ?? 0) + (r.pending?.length ?? 0));
@@ -229,19 +241,31 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     checkRecords(r.view, h);
     for (const e of JSON.parse(r.events) as GameplayEvent[]) carried.push(e);
     droppedEngine = r.dropped;
-    // A reply that includes every command the instance ran.
+    engineMinutes = h.minutes;
+    // A reply that includes every command the instance ran. One that does
+    // not is refused (#908) except for its events: its state predates a
+    // command the instance already answered, and its crowd and cars may name
+    // what the command removed. The next request goes out at once, with no
+    // new steps, so the read model waits one round trip, not a frame.
     const fresh = r.seq >= cmdSeq;
-    if (!fresh) stats.staleReplies++;
+    lastFresh = fresh;
+    if (!fresh) {
+      stats.staleReplies++;
+      if (r.merge) needMerge = true;
+      stats.applyMs += now() - t0;
+      requestFrame();
+      return;
+    }
+    // Every command so far is in this reply: the read model's copies of
+    // their events are the engine's, which arrived above.
+    sim.gameplayEvents.drain();
     relay.suppress(() => {
-      if (r.merge) {
-        if (fresh) merge(r.merge, h);
-        else needMerge = true;
-      }
+      if (r.merge) merge(r.merge, h);
       if (h.mealOverlayRevision !== engineMealRev) {
         engineMealRev = h.mealOverlayRevision;
         sim.tower.bumpMealOverlayRevision();
       }
-      if (fresh) {
+      {
         sim.money = h.money;
         sim.star = h.star;
         sim.weather = h.weather;
@@ -252,9 +276,10 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
         if (sim.treasureFx.seq !== h.treasureFx.seq) sim.treasureFx = { floor: h.treasureFx.floor, x: h.treasureFx.x, seq: h.treasureFx.seq };
         sim.vipFxSeq = h.vipFxSeq;
         sim.events.adoptCounts(h.counts);
-        if (h.pending !== (sim.events.pending !== null)) {
-          sim.events.pending = h.pending && r.pending ? (JSON.parse(r.pending) as typeof sim.events.pending) : null;
-        }
+        // The pending choice, also when one replaced another between
+        // replies (the batching widens that window).
+        if (!h.pending) sim.events.pending = null;
+        else if (r.pending && r.pending !== JSON.stringify(sim.events.pending)) sim.events.pending = JSON.parse(r.pending) as typeof sim.events.pending;
         if (r.log !== null) {
           appendEngineLog(sim, JSON.parse(r.log) as LogEntry[], sim.logSeq - simLogSeqAtSync);
         }
@@ -263,7 +288,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       }
       applyRecords(sim, r.view, h);
     });
-    const caughtUp = fresh && r.seq === seq;
+    const caughtUp = r.seq === seq;
     if (caughtUp && h.minutes !== sim.clock.minutes) {
       fatal(`the engine's clock reads ${h.minutes} where the frame loop's reads ${sim.clock.minutes}`);
       return;
@@ -281,13 +306,17 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     }
     stats.applyMs += t1 - t0;
     if (waiters.length > 0) {
-      if (exact && exact.seq === seq && outbox.length === 0) resolveWaiters();
+      if (exactSave()) resolveWaiters();
       else {
         needMerge = true;
         requestFrame();
       }
     }
   };
+
+  /** The engine's exact save, when it is current: caught up with every
+   *  op sent (camera stamps aside) and nothing waiting to go out. */
+  const exactSave = () => (!detached && exact && exact.seq === seq && outbox.every((o) => "cmd" in o && o.cmd.op === "setView") ? exact : null);
 
   const host: WorkerHost = {
     gen,
@@ -296,15 +325,17 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     flush: () => requestFrame(),
     receive(msg) {
       if (detached || !("gen" in msg) || msg.gen !== gen) {
-        if (msg.type === "error" && msg.gen === undefined && !detached) fatal(msg.message);
+        if (msg.type === "error" && msg.gen === undefined) fatal(msg.message);
         return;
       }
       stats.messagesReceived++;
       try {
         switch (msg.type) {
           case "loaded": {
+            disarm();
             const h = decodeHeader(msg.view);
-            if (h.minutes !== sim.clock.minutes) throw new Error(`the engine loaded at minute ${h.minutes}, the tower is at ${sim.clock.minutes}`);
+            if (h.minutes !== minutesAtAttach) throw new Error(`the engine loaded at minute ${h.minutes}, the tower was at ${minutesAtAttach}`);
+            engineMinutes = h.minutes;
             engineLogSeq = h.logSeq;
             engineMealRev = h.mealOverlayRevision;
             loaded = true;
@@ -315,7 +346,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
             applyFrame(msg);
             return;
           case "error":
-            if (msg.seq === undefined) fatal(msg.message);
+            if (msg.fatal || msg.seq === undefined) fatal(msg.message);
             else opts.onError(`op ${msg.seq}: ${msg.message}`);
             return;
         }
@@ -325,7 +356,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     },
     settle() {
       if (detached) return Promise.resolve();
-      if (exact && exact.seq === seq && outbox.length === 0) return Promise.resolve();
+      if (exactSave()) return Promise.resolve();
       return new Promise<void>((resolve) => {
         waiters.push(resolve);
         needMerge = true;
@@ -334,12 +365,18 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     },
     detach() {
       if (detached) return;
-      detached = true;
-      // The engine's events still in the worker (the batch in flight) are
-      // not waited for; the docs list it. The instance is the authority
-      // again and keeps the events it was handed, with the engine's last
-      // reported drop count.
+      // The engine's events for steps still in the worker are not waited
+      // for (the docs list it). The instance is the authority again: it keeps
+      // the engine's events it was handed, then its own copies for the
+      // commands no reply included yet, and the engine's last drop count.
+      // Steps the engine never confirmed are given back: the clock returns
+      // to the engine's last reported minute, so the TypeScript engine does
+      // not start ahead of the state it holds.
       const owed = takeEvents();
+      const unconfirmed = sim.gameplayEvents.drain();
+      const lostSteps = !exactSave() && sim.clock.minutes !== engineMinutes;
+      detached = true;
+      disarm();
       try {
         send({ type: "free", gen });
       } finally {
@@ -351,9 +388,10 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
           restoreOwn(sim, "serialize", ownSerialize);
           restoreOwn(sim, "drainGameplayEvents", ownDrain);
           restoreOwn(sim, "gameplayEventsDropped", ownDropped);
-          sim.gameplayEvents.drain();
           sim.gameplayEvents.dropped = droppedAtAttach + droppedEngine;
           for (const e of owed) sim.gameplayEvents.pushEvent(e);
+          for (const e of unconfirmed) sim.gameplayEvents.pushEvent(e);
+          if (lostSteps) sim.clock.minutes = engineMinutes;
           resolveWaiters();
         }
       }
@@ -364,11 +402,15 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   try {
     relay = relayCommands(sim, (cmd: ShadowCommand) => {
       if (cmd.op === "load" || cmd.op === "tick" || cmd.op === "checkpoint") return; // host mode never reports these
+      if (detached) return;
+      // A camera stamp keeps the exact save (patched with the new view),
+      // so a save that stamps the camera first can still be exact.
+      const keep = cmd.op === "setView" ? exactSave() : null;
       outbox.push({ seq: ++seq, cmd });
       cmdSeq = seq;
       commandTimes.set(seq, now());
       if (commandTimes.size > LATENCY_SAMPLES) commandTimes.delete(commandTimes.keys().next().value as number);
-      exact = null;
+      exact = keep ? { save: keep.save, seq, view: { value: (cmd as { view: unknown }).view } } : null;
       scheduleSend();
     }, {
       tick(dt) {
@@ -386,7 +428,19 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   const ownDrain = Object.getOwnPropertyDescriptor(sim, "drainGameplayEvents");
   const ownDropped = Object.getOwnPropertyDescriptor(sim, "gameplayEventsDropped");
   Object.defineProperty(sim, "serialize", {
-    value: () => (!detached && exact && exact.seq === seq && outbox.length === 0 ? JSON.parse(exact.save) : Simulation.prototype.serialize.call(sim)),
+    value: () => {
+      const e = exactSave();
+      if (!e) {
+        stats.approximateSaves++;
+        return Simulation.prototype.serialize.call(sim);
+      }
+      const data = JSON.parse(e.save) as Record<string, unknown>;
+      if (e.view) {
+        if (e.view.value == null) delete data.view;
+        else data.view = e.view.value;
+      }
+      return data;
+    },
     configurable: true,
     writable: true,
   });
@@ -394,18 +448,18 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   Object.defineProperty(sim, "gameplayEventsDropped", { get: () => droppedAtAttach + droppedEngine, configurable: true });
   useTowerCatalogSource(sim, (mode) => catalogs[mode]);
   setStepGate(sim, {
-    canStep: () => loaded && !detached && inFlight === null,
+    canStep: () => loaded && !detached && inFlight === null && lastFresh,
     flush: requestFrame,
     settle: () => host.settle(),
   });
-  send({ type: "load", gen, save: load.save, markers: load.markers });
+  if (!send({ type: "load", gen, save: load.save, markers: load.markers })) {
+    host.detach();
+    throw new Error("could not post the tower to the worker");
+  }
+  arm("the load");
   return host;
 }
 
-function pushSample(list: number[], v: number): void {
-  list.push(v);
-  if (list.length > LATENCY_SAMPLES) list.shift();
-}
 
 function restoreOwn(sim: Simulation, name: string, desc: PropertyDescriptor | undefined): void {
   if (desc) Object.defineProperty(sim, name, desc);

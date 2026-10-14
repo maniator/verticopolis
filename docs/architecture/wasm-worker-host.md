@@ -39,22 +39,16 @@ The title screen reads "WASM engine (worker)" on the worker host.
 
 ### What it costs
 
-Measured in Node (V8) over 720 steps of 2 minutes, after 120 warm steps, on
-the `perf:compare` towers (a probe run for this design, not a published
-benchmark; the browser numbers are in the performance doc):
-
-| Tower | Bare engine ticks | `frameView` export | Decode | Frame size per step | Full save: serialize / deserialize, each | Save size | Hosted total |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| small | 173 ms | 63 ms | 331 ms | 119 KiB | 5.3 / 11.5 ms | 112 KiB | 1,131 ms |
-| medium | 1,451 ms | 429 ms | 768 ms | 587 KiB | 26.4 / 66.6 ms | 640 KiB | 8,718 ms |
-| large | 4,499 ms | 2,033 ms | 3,589 ms | 2.0 MiB | 100.6 / 260.8 ms | 2.3 MiB | 33,421 ms |
-
-- **Frequency.** A frame view per step (up to four a frame). A full save once
-  per in-game hour (an hour is half a real second at the fastest speed) and on
-  every tower edit.
-- On the large tower, the engine's own ticks are about 13% of the hosted
-  time. The rest is reading the engine's exports back and rebuilding the read
-  model.
+- **Frequency.** A frame view per step (up to four a frame), and a full save
+  once per in-game hour (an hour is half a real second at the fastest speed)
+  and on every tower edit.
+- **Size.** Both grow with the tower: a frame view carries every person,
+  unit and car, and the full save the whole structure.
+- **Measured.** The measured sizes and costs, per tower, are the traffic rows
+  of the `npm run perf:worker` report: frame view bytes per reply, full-save
+  bytes per merge, merges per 720 steps, and main-thread merge time. The
+  latest run is in [`docs/performance/wasm-worker-host.md`](../performance/wasm-worker-host.md),
+  dated at its top.
 
 Moving that host into a worker unchanged would move only the engine's ticks
 and exports off the main thread. The decode, the apply and the full-save
@@ -139,7 +133,13 @@ apply reply ◀──── frame (buffer transferred) ─┘
   - `log` holds the entries after the request's cursor.
   - `merge` is the full save. It is sent only when the revision or the hour
     pass moved since the last one sent, or when the request asks for it.
-- `error {gen?, seq?, message}`
+- `error {gen?, seq?, fatal, message}`: `fatal` for a refused load, a gap in
+  the sequence or a reply that could not be built (the worker frees the engine
+  and the main thread lets the tower go); without it, one op the engine
+  refused (reported, and the next reply carries a full save).
+- There is no separate ack message: a command is acknowledged by the first
+  frame reply whose `seq` includes it. A command sent between frames goes out
+  at once, and the next frame request (or `settle`) asks for that reply.
 
 **Ordering**
 
@@ -159,13 +159,19 @@ apply reply ◀──── frame (buffer transferred) ─┘
   steps (the fixed step's cap of four) are ever unacknowledged.
 
 **Stale replies.** A reply whose `seq` is older than the instance's last
-command:
+command is refused (#908), except for its gameplay events, which are the
+engine's and in order:
 
-- is applied as motion only (the crowd, the unit counters, the cars);
-- leaves money, star, log, pending choice and full save for a reply that
-  includes the command, so the command's local answer is never undone for a
-  frame;
-- asks again for the skipped full save (`merge: true` on the next request).
+- nothing of its state is applied, since it predates a command the instance
+  already answered and its crowd and cars may name what the command removed;
+- the next request goes out at once with no new steps (and asks for the
+  skipped full save), and the gate stays shut until a reply includes every
+  command, so a stream of commands holds the steps for a round trip each
+  instead of starving the read model.
+
+**Watchdog.** A load or a frame request that gets no answer within
+`REPLY_TIMEOUT_MS` (10 s) is fatal: a hung worker or a lost reply gives the
+tower back to TypeScript instead of freezing it.
 
 **Events.** The worker drains every reply. The main thread queues the events
 and answers `drainGameplayEvents` from that queue. There is one drain and one
@@ -176,17 +182,22 @@ fan-out, and an event is never handed out twice.
 `serialize` cannot wait for the worker, so:
 
 - It answers with the engine's exact save while the read model is caught up
-  (the last reply included every op sent, and carried a full save).
+  (the last reply included every op sent, and carried a full save). A camera
+  stamp (`view`, which the save carries and the simulation never reads) since
+  then is patched into it, so a save that stamps the camera first stays exact.
 - Otherwise it answers with the read model's own save. That save has the
   structure and money of the last sync, and the internals as of the last
   merge.
 - `settle()` asks for an exact save and resolves when it has one.
   - The autosave and the `.vctower` export call it through `settleEngine`,
-    with a 2-second cap so a hung worker cannot hold a save.
+    with a 2-second cap so a hung worker cannot hold a save, then stamp the
+    camera. Each settle costs one full save round trip (the worker serializes
+    and the main thread merges it), once per autosave or export.
   - The other `serialize` callers are synchronous: the quick save, the undo
     snapshot, the crash report, the pre-reload flush and the TDT export. They
-    get whichever save is current. That is a known gap of the experimental
-    host (backlog `wasm-worker-sync-serialize`).
+    get whichever save is current, and the host counts the ones that were
+    the read model's (`stats.approximateSaves`). That is a known gap of the
+    experimental host (backlog `wasm-worker-sync-serialize`, #1018).
 
 ### Errors, recovery and lifecycle
 
@@ -200,19 +211,28 @@ fan-out, and an event is never handed out twice.
   - a malformed reply;
   - a clock disagreement;
   - a crashed worker (`onerror`);
-  - a worker that reports an error with no op.
+  - a message that cannot be posted (a payload that cannot be cloned);
+  - a reply that does not come within the watchdog.
 - **Recovery.** The next tower the app adopts starts a fresh worker. A load
-  or a new game is the way back onto the engine.
+  or a new game is the way back onto the engine. The fresh worker needs the
+  package loaded again; a tower that ticks on TypeScript while it starts and
+  forms a crowd stays on TypeScript (the engine starts only from a save,
+  which carries no crowd).
 - **Start-up.** Before the app exists, the worker must answer ready within
   20 seconds (`WORKER_READY_TIMEOUT_MS`). Otherwise the game boots on
   TypeScript, as a failed package load does on the main-thread host.
 - **Steps before loading.** No step runs before the worker has loaded a
   tower: the gate holds them.
-- **Detach.**
-  - It sends `free`, restores every override and hands the queued events
-    back to the instance.
-  - The engine's events from a batch still in flight are not waited for.
-    Detach happens on a tower swap, where the old tower is being replaced.
+- **Detach** (a tower swap, or a fallback after a fatal error).
+  - It sends `free`, restores every override and hands back the engine's
+    events it was holding, then the read model's own copies of the events of
+    commands no reply had included yet, so a command's event is never lost or
+    handed out twice.
+  - The engine's own tick events from a batch still in flight (fires, stars,
+    milestones) are not waited for and are lost.
+  - Steps the engine never confirmed are given back: the clock returns to the
+    engine's last reported minute, so after a fallback the TypeScript engine
+    does not start ahead of the state it holds.
 
 ### Compatibility
 
@@ -220,14 +240,18 @@ fan-out, and an event is never handed out twice.
   exactly as the main-thread host does: placeholders for the fields a frame
   does not carry, and a full merge for the rest. It adds no new gap.
 - **#954 (engine-first answers).** Commands still answer from the
-  instance, as on the main-thread host. When #954 moves answers to the
+  instance, as on the main-thread host. On the coalesced and worker hosts the
+  instance is up to a frame (worker: a round trip) behind the engine, so an
+  answer can come from slightly older money or structure than the step
+  host's; a refusal by the engine is reported and the next full save corrects
+  the read model. When #954 moves answers to the
   engine, the worker host needs an asynchronous answer path, or the commands
   that need an answer have to stay synchronous. `commandAckMs` in the host's
   stats is the latency such a path would add.
 - **#908 (engine threads).** This is that row's worker half. It follows the
   row's direction:
   - sequence numbers on every command and snapshot;
-  - stale snapshots refused;
+  - stale snapshots refused (their events kept);
   - commands applied at step boundaries in send order;
   - in-flight steps bounded by the fixed-step cap;
   - a save answered after every earlier command;
@@ -250,14 +274,18 @@ fan-out, and an event is never handed out twice.
   - The step, coalesced and worker hosts run the same steps and commands on
     the small, medium and large towers. They must reach the same exact engine
     save, read model, crowd, cars and counters, log, events, money and clock.
+  - Speed changes, a pause and a resume through the frame loop's own
+    owed-minute math leave all three hosts on the same tower.
   - It also covers builds on a new game, a reply older than a command, the
     step gate, pause and commands while paused, and a save that resumes on a
     fresh worker.
 - `src/tests/integration/wasmWorkerLifecycle.integration.test.ts` covers:
   - the ready handshake, the label and the handle;
   - a timeout and an error at start;
-  - 25 adopted towers in one worker, freeing each;
-  - a crash with fallback and restart, and a malformed reply;
+  - 25 adopted towers in one worker, freeing each, with an older tower's
+    reply ignored;
+  - a crash with fallback and restart, ten crashes in a row on fresh workers,
+    and a malformed reply;
   - a refused load before any step;
   - `settle`, and its timeout.
 - The headless units run on a fake engine: `workerHost.test.ts`,
@@ -269,7 +297,9 @@ fan-out, and an event is never handed out twice.
   - a build reaches the engine;
   - the settled save round-trips through a second engine unchanged;
   - the worker script is precached;
-  - a crash falls back to TypeScript and a fresh worker takes the next tower.
+  - a fatal worker error falls back to TypeScript and a fresh worker takes the
+    next tower (a real worker crash, `onerror`, is covered in Node);
+  - an offline reload with the service worker installed boots on TypeScript.
 
 ## Rust and WASM threads
 

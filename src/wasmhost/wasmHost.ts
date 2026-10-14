@@ -197,7 +197,6 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
    *  first when the engine's hour pass ran or its tower moved (or when
    *  `force` asks for one). */
   const syncFrame = (force = false) => {
-    stale = false;
     const view = engine.frameView();
     let frame: FrameView | null = null;
     let h: FrameHeader;
@@ -257,6 +256,9 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
         applyRecords(sim, view, h);
       }
     });
+    // Cleared once the frame is in: a sync that threw is tried again at
+    // the next flush rather than skipped until another step runs.
+    stale = false;
     host.frames++;
   };
 

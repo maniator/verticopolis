@@ -71,10 +71,11 @@ export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simul
   }, EXPORT_WATCHDOG_MS);
   try {
     const sim = deps.getSim();
-    // stampView FIRST: the export must carry the live camera, or towers
-    // export at a stale view.
+    // The worker host's exact save first (a no-op on every other engine),
+    // then the live camera, right before the save, or towers export at a
+    // stale view.
+    await settleEngine(sim);
     stampView(sim);
-    await settleEngine(sim); // the worker host's exact save (no-op otherwise)
     const file = await SaveGame.export(sim);
     deps.ui.downloadFile(SaveGame.exportFilename(sim), file);
     // The container is pure ASCII, so string length == bytes on disk.
