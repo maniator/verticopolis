@@ -485,6 +485,9 @@ fn library_sources() -> Vec<(String, Library)> {
     let mut files = Vec::new();
     rust_files(&crate_dir().join("src"), &mut files);
     let mut test_only: Vec<String> = Vec::new();
+    // Files the library itself loads; a file both a test and the library
+    // load is library code and stays in the scan.
+    let mut production: Vec<String> = Vec::new();
     let mut out = Vec::new();
     for p in &files {
         let name = rel(p);
@@ -494,7 +497,7 @@ fn library_sources() -> Vec<(String, Library)> {
         let src = std::fs::read_to_string(p).expect("source reads");
         let (lib, paths) = library(&name, &src);
         let dir = p.parent().expect("dir");
-        for t in paths {
+        let resolve = |t: &str| {
             let file = match t.strip_prefix(MODULE_DIR) {
                 // `lib.rs` and `mod.rs` own their directory; `foo.rs` owns `foo/`.
                 Some(t) if matches!(name.rsplit('/').next(), Some("lib.rs" | "mod.rs")) => {
@@ -503,13 +506,45 @@ fn library_sources() -> Vec<(String, Library)> {
                 Some(t) => dir.join(p.file_stem().expect("stem")).join(t),
                 None => dir.join(t),
             };
-            test_only.push(rel(&file));
-        }
+            rel(&file)
+        };
+        test_only.extend(paths.iter().map(|t| resolve(t)));
+        production.extend(
+            path_attributes(&lib.src, &lib.parts, 0, lib.src.len())
+                .iter()
+                .map(|t| resolve(t)),
+        );
+        production.extend(
+            module_declarations(&lib.code)
+                .iter()
+                .flat_map(|m| {
+                    [
+                        format!("{MODULE_DIR}{m}.rs"),
+                        format!("{MODULE_DIR}{m}/mod.rs"),
+                    ]
+                })
+                .map(|t| resolve(&t)),
+        );
         out.push((name, lib));
     }
+    test_only.retain(|f| !production.contains(f));
     out.retain(|(name, _)| !test_only.contains(name));
     assert!(out.len() > 30, "found {} library files", out.len());
     out
+}
+
+/// The names of the file modules `code` declares (`mod name;`, with any
+/// visibility), test items already removed.
+fn module_declarations(code: &str) -> Vec<String> {
+    let c = squeeze(code);
+    c.match_indices("mod ")
+        .filter(|(i, _)| *i == 0 || !is_ident(c.as_bytes()[i - 1]))
+        .filter_map(|(i, _)| {
+            let rest = &c[i + 4..];
+            let n = rest.bytes().take_while(|b| is_ident(*b)).count();
+            (n > 0 && rest[n..].starts_with(';')).then(|| rest[..n].to_string())
+        })
+        .collect()
 }
 
 /// The code with whitespace dropped except one space between two words, so
@@ -1066,6 +1101,21 @@ mod g;
         got.len(),
         7,
         "the string and the comment are not includes: {got:?}"
+    );
+}
+
+#[test]
+fn a_file_the_library_also_loads_stays_library_code() {
+    let src = "#[cfg(test)]\n#[path = \"shared.rs\"]\nmod shared_tests;\n#[path = \"shared.rs\"]\nmod shared;\npub(crate) mod plain;\n";
+    let (lib, test_paths) = library("sample", src);
+    assert_eq!(test_paths, vec!["shared.rs".to_string()]);
+    assert_eq!(
+        path_attributes(&lib.src, &lib.parts, 0, lib.src.len()),
+        vec!["shared.rs".to_string()]
+    );
+    assert_eq!(
+        module_declarations(&lib.code),
+        vec!["shared".to_string(), "plain".to_string()]
     );
 }
 
