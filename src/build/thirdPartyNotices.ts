@@ -270,9 +270,9 @@ export function isAllowedLicense(expression: string): boolean {
 
 /** A problem that keeps a package out of the notices; the build fails on any of these. */
 export function noticeProblem(pkg: { name?: string; version?: string; license?: string | null; licenseText?: string; hasLicenseFile?: boolean }): string | null {
-  if (!pkg.name) return "a bundled package.json has no name";
-  if (!pkg.version) return `${pkg.name}: package.json has no version`;
-  if (!pkg.license) return `${pkg.name}@${pkg.version}: package.json declares no license`;
+  if (!pkg.name) return "a bundled package's manifest has no name";
+  if (!pkg.version) return `${pkg.name}: its manifest has no version`;
+  if (!pkg.license) return `${pkg.name}@${pkg.version}: its manifest declares no license`;
   if (!isAllowedLicense(pkg.license)) {
     return `${pkg.name}@${pkg.version}: license "${pkg.license}" is not on the allowlist in src/build/thirdPartyNotices.ts; a person decides before it ships`;
   }

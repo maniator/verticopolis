@@ -64,14 +64,18 @@ const STD_LICENSE = "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib";
 
 /**
  * Refuse a toolchain the record cannot be built from, before any compiling:
- * one whose minor release differs from the crate's `rust-version` (the record
- * names the standard library it links, and CI checks the committed record
- * against a build with that release), or one without the rustup doc layout.
+ * any release other than the crate's `rust-version` at `.0` (the record names
+ * the standard library it links and carries its copyright page, and CI checks
+ * the committed record against a build with that release), or one without
+ * the rustup doc layout.
  */
 export function checkToolchain(crate: string, rustVersion: string): void {
   const { version, files } = toolchainDocs(crate);
-  if (version.split(".").slice(0, 2).join(".") !== rustVersion.split(".").slice(0, 2).join(".")) {
-    throw new Error(`rustc ${version} does not match the engine's rust-version ${rustVersion}; build with it: rustup toolchain install ${rustVersion}.0 and RUSTUP_TOOLCHAIN=${rustVersion}.0`);
+  // rust-version names a minor release; its .0 is the one CI, the deploy and
+  // the committed record all use.
+  const want = rustVersion.split(".").length === 2 ? `${rustVersion}.0` : rustVersion;
+  if (version !== want) {
+    throw new Error(`rustc ${version} is not ${want}, the release the engine's notices record is built with; run: rustup toolchain install ${want}, then build with RUSTUP_TOOLCHAIN=${want}`);
   }
   const missing = files.filter((f) => !existsSync(f));
   if (missing.length > 0) throw new Error(`the Rust toolchain ships no ${missing.join(", ")}, so the standard library cannot be attributed; install Rust with rustup`);

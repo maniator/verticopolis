@@ -39,12 +39,12 @@ rebuild_engine() {
   # the crate's rust-version refuses it. Key the install on rustup, put rustup's
   # shims first on PATH, and pin the toolchain for every cargo call below.
   if ! command -v rustup >/dev/null 2>&1; then
-    echo "vercel-build: installing rustup with Rust ${RUST}"
-    curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --no-modify-path --default-toolchain "${RUST}" || return 1
+    echo "vercel-build: installing rustup with Rust ${RUST}.0"
+    curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --no-modify-path --default-toolchain "${RUST}.0" || return 1
   else
-    rustup toolchain install "${RUST}" --profile minimal || return 1
+    rustup toolchain install "${RUST}.0" --profile minimal || return 1
   fi
-  export RUSTUP_TOOLCHAIN="${RUST}"
+  export RUSTUP_TOOLCHAIN="${RUST}.0"
   rustup target add wasm32-unknown-unknown || return 1
   cargo --version || return 1
 

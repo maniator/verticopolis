@@ -64,6 +64,10 @@ if (which === "engine") {
   if (!rustVersion) throw new Error(`${target.dir}/Cargo.toml declares no rust-version`);
   checkToolchain(crate, rustVersion);
 }
+// The engine's crates and the Rust standard library, with their licenses,
+// gathered before anything is compiled or written, so a crate that cannot be
+// attributed stops the build with the old package still in place (#955).
+const engineRecord = which === "engine" ? engineThirdParty(crate, "wasm") : [];
 const run = (cmd: string, args: string[]) => execFileSync(cmd, args, { cwd: crate, stdio: "inherit" });
 // The crate is an rlib; the cdylib is asked for here so the native build
 // stays as it is. The old package goes first, so a failed run leaves no
@@ -96,8 +100,8 @@ if (which === "engine") {
   writeFileSync(resolve(web, "BUILD.json"), `${JSON.stringify({ sources }, null, 2)}\n`);
   // The crates and the standard library compiled into the package, with
   // their licenses, so the site's notices can list them without a Rust
-  // toolchain (#955). It throws on a crate that cannot be attributed.
-  writeFileSync(resolve(web, ENGINE_THIRD_PARTY), `${JSON.stringify({ sources, crates: engineThirdParty(crate, "wasm") }, null, 2)}\n`);
+  // toolchain (#955).
+  writeFileSync(resolve(web, ENGINE_THIRD_PARTY), `${JSON.stringify({ sources, crates: engineRecord }, null, 2)}\n`);
   // The class declaration is the same for both targets; the Node copy is the
   // committed one (`src/dualrun/binding.ts` types against it).
   copyFileSync(resolve(crate, "pkg/verticopolis_engine.d.ts"), resolve(crate, "../src/dualrun/engine.d.ts"));
