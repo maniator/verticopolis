@@ -274,8 +274,10 @@ impl Simulation {
     pub fn can_build_transport(&self, kind: Kind, x: i64, bottom: i64, top: i64) -> CanBuild {
         let f = kind.facility();
         // Saturating, as are the placement checks, so an out-of-range span
-        // from a native host prices without overflowing and is refused by
-        // the placement rules; any span the tower can hold is exact.
+        // from a native host prices without overflowing: an elevator's price
+        // then outruns any balance and the money check refuses it, and a
+        // fixed-price shaft reaches the placement rules. Any span the tower
+        // can hold is exact.
         let span = top.saturating_sub(bottom);
         let extra = if kind.is_elevator() {
             span as f64 * crate::charges::TRANSPORT_FLOOR_COST
@@ -515,9 +517,21 @@ mod tests {
         assert!(q.reason.unwrap().contains("can span at most"));
         let q = sim.can_build_transport(Kind::Stairs, 100, i64::MIN, i64::MAX);
         assert!(q.reason.unwrap().contains("links exactly two floors"));
-        // Spans of a valid length at both ends of the range reach the rest
-        // of the placement rules, which refuse them for want of floors.
-        for (bottom, top) in [(i64::MIN, i64::MIN + 1), (i64::MAX - 1, i64::MAX)] {
+        // At an ordinary balance a huge elevator span costs more than the
+        // tower holds, so the money check refuses it first.
+        let rich = shaft_site(GameMode::Modern, 5, 1e9);
+        let q = rich.can_build_transport(Kind::ElevatorStandard, 100, -2, i64::MAX);
+        assert_eq!(q.reason.as_deref(), Some("Not enough money."));
+        // Spans of a valid length (one floor, and an elevator's longest) at
+        // both ends of the range reach the rest of the placement rules,
+        // which refuse them for want of floors.
+        let longest = Kind::ElevatorStandard.max_span();
+        for (bottom, top) in [
+            (i64::MIN, i64::MIN + 1),
+            (i64::MAX - 1, i64::MAX),
+            (i64::MIN, i64::MIN + longest),
+            (i64::MAX - longest, i64::MAX),
+        ] {
             assert!(!sim.can_build_transport(Kind::Stairs, 100, bottom, top).ok);
             assert!(
                 !sim.can_build_transport(Kind::ElevatorStandard, 100, bottom, top)
