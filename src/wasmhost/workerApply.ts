@@ -11,17 +11,21 @@ import type { MergePayload } from "./workerProtocol";
 
 /** Merge the engine's full save into the read model, keeping the
  *  instance's clock (the frame loop's, which already counts the steps still
- *  in flight) and its own event buffer, and adopt the hourly telemetry and
+ *  in flight), its own event buffer and the camera view, and adopt the hourly telemetry and
  *  the housekeeping result the save leaves out. */
 export function mergeSave(sim: Simulation, m: MergePayload, h: FrameHeader): void {
   const fresh = Simulation.deserialize(JSON.parse(m.save));
   const buffer = sim.gameplayEvents;
   const minutes = sim.clock.minutes;
+  // The camera is the page's: a save sent before the last stamp carries an
+  // older view, which must not replace the one the page set.
+  const view = sim.view;
   try {
     mergeSimulation(sim, fresh, { revision: h.revision, mealOverlayRevision: sim.tower.mealOverlayRevision });
   } finally {
     sim.gameplayEvents = buffer;
     sim.clock.minutes = minutes;
+    sim.view = view;
   }
   adoptTelemetry(sim, JSON.parse(m.telemetry) as TelemetryDocument);
   sim.economy.adoptHousekeepingReport(m.housekeeping ? (JSON.parse(m.housekeeping) as { cleaned: number; leftover: number }) : null);

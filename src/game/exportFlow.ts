@@ -78,6 +78,7 @@ export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simul
     // The tower the app holds now (one adopted during the wait is the one
     // the player sees, so it is the one exported).
     const sim = deps.getSim();
+    if (sim !== settling) await settleEngine(sim);
     stampView(sim);
     const file = await SaveGame.export(sim);
     deps.ui.downloadFile(SaveGame.exportFilename(sim), file);

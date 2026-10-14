@@ -277,7 +277,7 @@ export function framesRun(arg: { windowMs: number; warmMs: number; speed: number
 /** Memory of the hosted tower: the main thread's WASM linear memory
  *  (main-thread hosts, read through the app's own module) or the worker's
  *  (the worker host's last reply). The JS heaps and the process PSS come
- *  from the runner. The harness's own stashed saves are dropped first, so
+ *  from the runner (which drops the harness's stashed saves before it reads the heap). It also drops them here, so
  *  they are not counted as the game's. */
 export async function engineMemory(arg: { engineUrl: string }): Promise<{ mainWasmBytes: number | null; workerWasmBytes: number | null }> {
   const w = window as any;

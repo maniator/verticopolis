@@ -183,6 +183,18 @@ export function startWorkerHost(app: WasmHostApp, first: SpawnedWorker, respawn:
   };
   follow(app.sim);
 
+  // Anything below that throws lets the tower and the worker go first, so a
+  // failed start never leaves the sim hooked to a host nobody holds.
+  try {
+    return finishStart();
+  } catch (e) {
+    release();
+    (worker as EngineWorkerLike | null)?.terminate();
+    worker = null;
+    throw e;
+  }
+
+  function finishStart(): WorkerHostHandle {
   const adopt = app.adoptSim;
   const ownAdopt = Object.getOwnPropertyDescriptor(app, "adoptSim");
   const wrappedAdopt = function (this: WasmHostApp, sim: Simulation, preserveHistory?: boolean): void {
@@ -214,4 +226,5 @@ export function startWorkerHost(app: WasmHostApp, first: SpawnedWorker, respawn:
   };
   (globalThis as unknown as { __vcEngine?: WorkerHostHandle }).__vcEngine = handle;
   return handle;
+  }
 }

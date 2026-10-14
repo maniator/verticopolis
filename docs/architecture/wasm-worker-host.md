@@ -163,8 +163,8 @@ apply reply ◀──── frame (buffer transferred) ─┘
   steps (the fixed step's cap of four) are ever unacknowledged.
 
 **Stale replies.** A reply whose `seq` is older than the instance's last
-command is refused (#908), except for its gameplay events, which are the
-engine's and in order:
+command is refused (#908). Its gameplay events are the engine's and are kept,
+held until the next fresh reply and handed out with it, in order:
 
 - nothing of its state is applied, since it predates a command the instance
   already answered and its crowd and cars may name what the command removed;
@@ -172,12 +172,15 @@ engine's and in order:
   skipped full save), and the gate stays shut until a reply includes every
   command, so a stream of commands holds the steps for a round trip each
   instead of starving the read model;
-- after `MAX_STALE_STREAK` (4) stale replies in a row the gate opens anyway,
-  so the clock does not stop while the player drags out a build (a command
-  per round trip); the read model then waits for a reply that includes every
+- after `MAX_STALE_STREAK` (4) stale replies in a row the next request waits
+  for the frame loop's flush, which sends it with the frame's steps, so the
+  clock does not stop while the player drags out a build (a command per
+  round trip); the read model then waits for a reply that includes every
   command;
-- a camera stamp (`setView`) does not make a reply stale: it changes nothing
-  the simulation, the money, the log or the pending choice holds.
+- a camera stamp (`setView`) does not make a reply stale, and a reply that
+  includes every op but camera stamps is caught up (its exact save gets the
+  latest stamp patched in): a stamp changes nothing the simulation, the
+  money, the log or the pending choice holds. A merge keeps the page's view.
 
 **Replies.** A frame reply must answer the request in flight (one at a time,
 answered in order); any other is fatal.
@@ -245,15 +248,16 @@ fan-out, and an event is never handed out twice.
   - It sends `free`, restores every override and hands back the engine's
     events it was holding, then the read model's own copies of the events of
     commands no reply had included yet, so a command's event is never lost or
-    handed out twice. After a stale reply (which brought the engine's events
-    for some of those commands) the copies are dropped instead, and counted
-    in the drop count.
+    handed out twice. The engine events stale replies brought and that no
+    fresh reply has released are not handed out: they belong to the steps
+    given back below, which the TypeScript engine runs again.
   - The engine's own tick events from a batch still in flight (fires, stars,
     milestones) are not waited for and are lost.
   - Steps the engine never confirmed are given back: the clock returns to the
     minute of the last fresh reply (the state the read model holds), so after
     a fallback the TypeScript engine does not start ahead of it. A meal-rush
-    bulletin for an hour the rollback crosses again can show twice.
+    bulletin for an hour the rollback crosses again can show twice (the frame
+    loop emits it, not the engine).
 
 ### Compatibility
 

@@ -189,7 +189,8 @@ export function bootGame(create: () => BootApp): Promise<void> {
           engineWorker = null; // the host owns it now
           refreshSplashVersion();
         } catch (e) {
-          // A host that attached before the throw lets its tower go first.
+          // A host that started before a later throw lets its tower go
+          // (startWorkerHost cleans up after its own throws).
           workerHost?.stop();
           workerHost = null;
           engineWorker?.worker.terminate();

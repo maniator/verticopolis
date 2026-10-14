@@ -1,3 +1,44 @@
+import type { FromWorker, ToWorker } from "./workerProtocol";
+
+/** The worker host's interface and its options (the host itself is
+ *  `workerHost.ts`). */
+export interface WorkerHost {
+  readonly gen: number;
+  readonly stats: WorkerHostStats;
+  /** Whether the worker has loaded the tower. */
+  loaded(): boolean;
+  /** Whether the gate is open: loaded, nothing in flight, and the last reply
+   *  included every command. */
+  idle(): boolean;
+  /** Route a worker reply here. */
+  receive(msg: FromWorker): void;
+  /** The frame loop's flush: send the batch with a frame request, when
+   *  nothing is in flight and there is something to answer for. */
+  flush(): void;
+  /** Resolve once the read model includes every op sent and the engine's
+   *  exact save is held (or the host has let go). */
+  settle(): Promise<void>;
+  detach(): void;
+}
+
+export interface WorkerHostOptions {
+  gen: number;
+  /** The catalogs' text from the worker's ready reply. */
+  catalogs: { classic: string; modern: string };
+  send(msg: ToWorker, transfer?: Transferable[]): void;
+  /** A failure the host cannot continue past (a refused load, a gap in the
+   *  sequence, a malformed reply, a clock that disagrees with the engine's).
+   *  The controller lets the host go and the tower continues on the
+   *  TypeScript engine from the read model. */
+  onFatal(message: string): void;
+  /** An op the engine refused or failed on: reported, and the host goes on,
+   *  as the main-thread host goes on after a command the engine threw on. */
+  onError(message: string): void;
+  /** How long the worker gets to answer a load or a frame request before
+   *  the host gives up on it (a hung worker, a lost reply). */
+  replyTimeoutMs?: number;
+}
+
 /** The worker host's counters, for the benchmark and for tooling: what
  *  crossed the boundary, how long the main thread spent on it, and how long
  *  commands took to be acknowledged. Kept apart from the host itself. */

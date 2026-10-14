@@ -33,7 +33,7 @@ function edits(step: number, sim: Simulation): void {
   if (step === 16) sim.emit("a note from the host", "info");
   if (step === 24) sim.tower.towerName = "Worker Tower";
   if (step === 32) sim.toggleAutoBridge();
-  if (step === 40) sim.view = { x: 12, y: 34, zoom: 1.5 } as never;
+  if (step === 40) sim.view = { tile: 140, floor: 3, zoom: 1.5 };
   if (step === 48) sim.evaluateStar();
 }
 

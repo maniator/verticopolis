@@ -12,6 +12,7 @@ export class FakeEngine {
   calls: string[] = [];
   minutes: number;
   money: number;
+  star: number;
   revision = 0;
   hourRuns = 0;
   logSeq = 0;
@@ -22,9 +23,10 @@ export class FakeEngine {
   /** Throw from the next call of this name. */
   failOn: string | null = null;
   constructor(private readonly save: string) {
-    const data = JSON.parse(save) as { minutes: number; money: number };
+    const data = JSON.parse(save) as { minutes: number; money: number; star?: number };
     this.minutes = data.minutes;
     this.money = data.money;
+    this.star = data.star ?? 1;
   }
   frameView(): Float64Array {
     const v = new Float64Array(FRAME_HEADER);
@@ -32,6 +34,7 @@ export class FakeEngine {
     v[1] = this.revision;
     v[3] = this.logSeq;
     v[4] = this.money;
+    v[5] = this.star;
     v[21] = this.pending ? 1 : 0;
     v[22] = this.hourRuns;
     return v;

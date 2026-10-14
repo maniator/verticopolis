@@ -176,6 +176,11 @@ export function validate(config: WorkerConfig, runs: readonly ModeRun[]): { erro
     if (r.offline?.error) warnings.push(`rep ${r.rep} ${r.mode}: the offline measurement failed: ${r.offline.error}`);
     else if (r.offline && r.offline.onlineMode !== r.mode) warnings.push(`rep ${r.rep} ${r.mode}: the service-worker visit came up on ${r.offline.onlineMode}, not ${r.mode}`);
     for (const [name, sc] of Object.entries(r.scenarios)) {
+      if (r.mode === "wasm-worker") {
+        if (sc.memory.workerWasmBytes === null) warnings.push(`rep ${r.rep} wasm-worker ${name}: the worker's WASM memory was not reported, so its combined memory has no sample`);
+        for (const [t, h] of Object.entries(sc.hosted)) if (!h.worker) errors.push(`rep ${r.rep} wasm-worker ${name} ${t}x hosted: no worker counters`);
+        for (const [t, f] of Object.entries(sc.frames)) if (!f.worker) errors.push(`rep ${r.rep} wasm-worker ${name} ${t}x frames: no worker counters`);
+      }
       if (r.mode === "wasm-worker" && sc.memory.workerHeapUsedBytes === null) warnings.push(`rep ${r.rep} wasm-worker ${name}: the worker's JS heap could not be read, so its combined memory has no sample`);
       const f1 = sc.frames["1"];
       if (f1 && f1.simMinutesPerSecond < 1) warnings.push(`rep ${r.rep} ${r.mode} ${name} 1x frames: ${f1.simMinutesPerSecond.toFixed(2)} sim-minutes per second, so the window ran almost no simulation (clamped frames: ${f1.clampedFrames})`);

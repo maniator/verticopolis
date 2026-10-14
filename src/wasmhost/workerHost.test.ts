@@ -296,26 +296,83 @@ describe("worker host round 2 (fake engine)", () => {
     delete (globalThis as { document?: unknown }).document;
   });
 
-  it("takes the engine's minute only from a fresh reply, and after a stale one drops (and counts) the copies at detach", async () => {
+  it("after a stale reply, a detach gives back the unconfirmed steps and hands each command's event out once", async () => {
     const r = rig();
     await r.settleTasks();
     const t0 = r.sim.clock.minutes;
     expect(r.sim.build("lobby", 1, 170).ok).toBe(true);
+    r.gate().flush(); // a fresh reply confirms the first build
     await r.settleTasks();
     r.sim.drainGameplayEvents();
     r.sim.tick(5);
     r.gate().flush();
-    expect(r.sim.build("lobby", 1, 171).ok).toBe(true); // after the request: its reply is stale
-    r.engine().owed = [{ name: "facility_placed", payload: { kind: "lobby", floor: 1, count: 1 } }];
-    // Let the stale reply in, and detach before the next one.
+    const second = r.sim.build("lobby", 1, 190); expect(second.ok, JSON.stringify(second)).toBe(true); // after the request: its reply is stale
+    // The stale reply brings a tick event of the unconfirmed steps.
+    r.engine().owed = [{ name: "star_reached", payload: { star: 2 } }];
     await new Promise((res) => setTimeout(res, 0));
     await new Promise((res) => setTimeout(res, 0));
     expect(r.host.stats.staleReplies).toBe(1);
+    expect(r.sim.drainGameplayEvents(), "held until a fresh reply").toEqual([]);
     r.host.detach();
     expect(r.sim.clock.minutes, "back to the last fresh reply's minute").toBe(t0);
     const events = r.sim.drainGameplayEvents();
-    expect(events.filter((e) => e.name === "facility_placed")).toHaveLength(1); // the engine's, never twice
-    expect(r.sim.gameplayEventsDropped).toBeGreaterThanOrEqual(1);
+    // The build's event once (the read model's copy); the star is not handed
+    // out, since its steps run again on TypeScript.
+    expect(events.filter((e) => e.name === "facility_placed")).toHaveLength(1);
+    expect(events.some((e) => e.name === "star_reached")).toBe(false);
+  });
+
+  it("delivers held events with the next fresh reply, in order", async () => {
+    const r = rig();
+    await r.settleTasks();
+    r.sim.drainGameplayEvents();
+    r.sim.tick(1);
+    r.gate().flush();
+    r.sim.money = 5;
+    r.engine().owed = [{ name: "star_reached", payload: { star: 2 } }];
+    await r.settleTasks();
+    const events = r.sim.drainGameplayEvents();
+    expect(events.map((e) => e.name)).toEqual(["star_reached"]);
+    r.host.detach();
+  });
+
+  it("opens the gate after a streak of stale replies, so steps go on while commands stream", async () => {
+    const r = rig();
+    await r.settleTasks();
+    let steppedWhileStale = false;
+    for (let f = 0; f < 40; f++) {
+      const gate = r.gate();
+      if (gate.canStep()) {
+        if (r.host.stats.staleReplies > 0 && f > 0) steppedWhileStale = true;
+        r.sim.tick(1);
+      }
+      gate.flush();
+      r.sim.money = 1000 + f; // a command every frame, after the request
+      await new Promise((res) => setTimeout(res, 0));
+      await new Promise((res) => setTimeout(res, 0));
+    }
+    expect(r.host.stats.staleReplies).toBeGreaterThanOrEqual(4);
+    expect(steppedWhileStale).toBe(true);
+    await r.settleTasks();
+    expect(r.engine().minutes).toBe(r.sim.clock.minutes);
+    r.host.detach();
+  });
+
+  it("a fresh reply sent before a camera stamp is still exact (view patched in) and keeps the page's view", async () => {
+    const r = rig();
+    await r.settleTasks();
+    r.sim.view = { x: 1, y: 1, zoom: 1 } as never;
+    r.sim.tick(1);
+    r.engine().revision++; // the reply carries a merge
+    r.gate().flush();
+    r.sim.view = { x: 9, y: 9, zoom: 2 } as never; // after the request
+    await r.settleTasks();
+    expect(r.host.stats.staleReplies).toBe(0);
+    expect(r.sim.view).toEqual({ x: 9, y: 9, zoom: 2 });
+    const before = r.host.stats.approximateSaves;
+    expect((r.sim.serialize() as { view?: unknown }).view).toEqual({ x: 9, y: 9, zoom: 2 });
+    expect(r.host.stats.approximateSaves).toBe(before);
+    r.host.detach();
   });
 
   it("is fatal on a reply to a request that is not in flight, and a camera stamp leaves the reply in flight fresh", async () => {
@@ -335,7 +392,7 @@ describe("worker host round 2 (fake engine)", () => {
     v.host.detach();
   });
 
-  it("waits for a visible page before giving up on a reply, and opens the gate after a streak of stale replies", async () => {
+  it("waits for a visible page before giving up on a reply", async () => {
     (globalThis as { document?: unknown }).document = { hidden: true };
     const mod = fakeModule();
     const fatal: string[] = [];
@@ -348,21 +405,6 @@ describe("worker host round 2 (fake engine)", () => {
     expect(fatal.join()).toMatch(/did not answer the load/);
     silent.detach();
 
-    const r = rig();
-    await r.settleTasks();
-    // A command lands after every request: each reply is stale.
-    const sim = r.sim;
-    for (let i = 0; i < 5; i++) {
-      sim.tick(1);
-      r.gate().flush();
-      sim.money = 1000 + i;
-      await new Promise((res) => setTimeout(res, 0));
-      await new Promise((res) => setTimeout(res, 0));
-    }
-    expect(r.host.stats.staleReplies).toBeGreaterThanOrEqual(4);
-    await r.settleTasks();
-    expect(r.gate().canStep()).toBe(true);
-    r.host.detach();
   });
 
   it("is fatal on a malformed frame view that answers the request in flight", () => {
