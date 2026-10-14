@@ -85,6 +85,7 @@ export function composeLookup(bake: Pick<BakeResult, "images" | "frames">, found
 /** Scale a picture horizontally to `w` pixels, nearest neighbor from its left
  *  edge: the reader's `stretchTo` rule. */
 export function stretch(image: Image, w: number): Image {
+  if (!Number.isInteger(w) || w < 1 || image.w < 1) throw new Error(`cannot stretch a ${image.w} px picture to ${w} px`);
   const out: Image = { w, h: image.h, data: new Uint8ClampedArray(w * image.h * 4) };
   for (let y = 0; y < image.h; y++) {
     for (let x = 0; x < w; x++) {

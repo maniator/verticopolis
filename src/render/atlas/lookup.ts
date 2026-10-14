@@ -48,9 +48,11 @@ export type Lookup =
   | { frame: string; chains: Record<string, number>; overlays: string[]; stretchTo?: number };
 
 export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number): Lookup {
-  // An unknown kind keeps its own width (its frame is missing either way); a
-  // corrupt width (not finite, or under one tile) reads as the catalog's.
-  const cat = FACILITIES[u.kind]?.width ?? u.width;
+  // An unknown kind names its own width and no stretch (its frame is missing
+  // either way); a corrupt width (not finite, or under one tile) reads as the
+  // catalog's.
+  const cat = FACILITIES[u.kind]?.width;
+  if (cat === undefined) return lookupAtCatalogWidth(u, s, variant, u.width);
   const width = Number.isFinite(u.width) && Math.round(u.width) >= 1 ? Math.round(u.width) : cat;
   const found = lookupAtCatalogWidth(u, s, variant, cat);
   return width === cat ? found : { ...found, stretchTo: width };
@@ -96,7 +98,8 @@ function finite(n: number): number {
  *  standard elevator 3) names its own frames; any other width uses the
  *  catalog's, with `stretchTo` as for a room. */
 export function lookupShaft(kind: FacilityKind, width: number): { shaft: string; car?: string; stretchTo?: number } {
-  const cat = FACILITIES[kind].width;
+  const cat = FACILITIES[kind]?.width;
+  if (cat === undefined || !FACILITIES[kind].transport) throw new Error(`${kind} is not a transport kind`);
   const w = Number.isFinite(width) && Math.round(width) >= 1 ? Math.round(width) : cat;
   const seg = w !== cat && (LEGACY_SHAFT_WIDTHS[kind] ?? []).includes(w) ? `/w${w}` : "";
   const names = isElevatorKind(kind) ? { shaft: `shaft/${kind}${seg}`, car: `car/${kind}${seg}` } : { shaft: `transport/${kind}${seg}` };

@@ -151,8 +151,8 @@ Names follow the engine's own strings: the facility keys from
 | Rooms | `room/<kind>/<state>/<subtype or ->/w<tiles>/<lit or unlit>/<open, closed or always>/<late, notlate or any>/v<variant>[/home or /away]` |
 | Fire, construction | animation `fire/<kind>`, `construction/<kind>`; frames `.../<i>` |
 | Structure | `structure/floor`, `structure/lobby/<ground or sky>/<lit>/v<0-3>`, animation `structure/entrance/<grand-left, grand-right, grand-solo or service>/<lit>/<staffed or unstaffed>` |
-| Shafts | `shaft/<elevator kind>/<top, stop, skip, bottom, single, top-skip, bottom-skip or single-skip>`, `transport/stairs`, `transport/escalator` |
-| Cars | `car/<elevator kind>/<idle, up or down>/<full or notfull>/s<0-3>` with a `riders` chain (sampled seeds in `data.carSeeds`) |
+| Shafts | `shaft/<elevator kind>[/w<tiles>]/<top, stop, skip, bottom, single, top-skip, bottom-skip or single-skip>`, `transport/stairs[/w<tiles>]`, `transport/escalator` (`w<tiles>` only on a legacy width, see below) |
+| Cars | `car/<elevator kind>[/w<tiles>]/<idle, up or down>/<full or notfull>/s<0-3>` with a `riders` chain (sampled seeds in `data.carSeeds`) |
 | People | `person/<seated, standing, walker, rider or hiVis>/<shirt<i>, staff, impatient or fedUp>`, one `shirt<i>` per entry of `data.shirts` |
 | Facade | `facade/escape/<left or right>/<0 or 1>`, `facade/awning/<left or right>`, animation `facade/crane/<lit>` |
 | Vehicles | `vehicle/streetcar/s<0-3>` (sampled seeds in `data.streetCarSeeds`), `vehicle/garbagetruck`, `vehicle/metrotrain/<headlight or dark>` |

@@ -284,9 +284,9 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
   let ownPages: boolean | string = false;
   jobs.forEach((job, done) => {
     onProgress?.(done, jobs.length);
-    // A family on pages of its own starts a new image group (each later
-    // family its own); one that does not may not come after it, or its
-    // images would land in the new group.
+    // A family on pages of its own starts a new image group whenever its
+    // `ownPages` value changes (keep each family's jobs together); one that
+    // does not may not come after it, or its images would land in the group.
     if (job.ownPages && job.ownPages !== ownPages) groups.push(store.images.length);
     if (ownPages && !job.ownPages) throw new Error(`${job.name} comes after a family on pages of its own`);
     if (job.ownPages) ownPages = job.ownPages;

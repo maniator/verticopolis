@@ -51,16 +51,19 @@ interface Case {
   game: (doc: Document) => Image;
 }
 
-function shaftCase(kind: FacilityKind, skip: number[], pieces: string[]): Case {
-  const w = FACILITIES[kind].width * TILE;
+/** A shaft stack; `tiles` other than the catalog width names a legacy
+ *  width's frames (`shaft/<kind>/w<tiles>/...`). */
+function shaftCase(kind: FacilityKind, skip: number[], pieces: string[], tiles = FACILITIES[kind].width): Case {
+  const w = tiles * TILE;
   const floors = pieces.length;
+  const stem = tiles === FACILITIES[kind].width ? `shaft/${kind}` : `shaft/${kind}/w${tiles}`;
   // Bands run from the top floor down; `pieces` names each band's frame.
   return {
-    label: `${kind} shaft, ${floors} floors skipping ${skip.join(", ") || "none"}`,
-    frames: [...new Set(pieces)].map((p) => `shaft/${kind}/${p}`),
+    label: `${kind} shaft${tiles === FACILITIES[kind].width ? "" : ` ${tiles} tiles wide`}, ${floors} floors skipping ${skip.join(", ") || "none"}`,
+    frames: [...new Set(pieces)].map((p) => `${stem}/${p}`),
     atlas: (get) => {
       const out = blank(w, floors * FLOOR);
-      pieces.forEach((p, i) => over(out, get(`shaft/${kind}/${p}`), 0, i * FLOOR));
+      pieces.forEach((p, i) => over(out, get(`${stem}/${p}`), 0, i * FLOOR));
       return out;
     },
     game: (doc) => {
@@ -73,11 +76,12 @@ function shaftCase(kind: FacilityKind, skip: number[], pieces: string[]): Case {
 }
 
 export function extraCases(): Case[] {
-  const cab = (kind: FacilityKind, s: number, riders: number, arrow: "up" | "down" | null, full: boolean): Case => {
-    const w = FACILITIES[kind].width * TILE;
-    const name = `car/${kind}/${arrow ?? "idle"}/${full ? "full" : "notfull"}/s${s}`;
+  const cab = (kind: FacilityKind, s: number, riders: number, arrow: "up" | "down" | null, full: boolean, tiles = FACILITIES[kind].width): Case => {
+    const w = tiles * TILE;
+    const seg = tiles === FACILITIES[kind].width ? "" : `/w${tiles}`;
+    const name = `car/${kind}${seg}/${arrow ?? "idle"}/${full ? "full" : "notfull"}/s${s}`;
     return {
-      label: `${kind} cab with ${riders} riders`,
+      label: `${kind} cab${seg ? ` ${tiles} tiles wide` : ""} with ${riders} riders`,
       frames: [name],
       atlas: (get) => get(name, { riders }),
       game: (doc) => {
@@ -96,6 +100,21 @@ export function extraCases(): Case[] {
     cab("elevatorStandard", 1, 3, "up", false),
     cab("elevatorService", 2, 4, null, true),
     cab("elevatorExpress", 3, 1, "down", false),
+    // The legacy widths a save keeps (LEGACY_SHAFT_WIDTHS).
+    shaftCase("elevatorStandard", [], ["top", "stop", "bottom"], 3),
+    cab("elevatorStandard", 0, 4, "up", true, 3),
+    {
+      label: "stairs 4 tiles wide",
+      frames: ["transport/stairs/w4"],
+      atlas: (get) => get("transport/stairs/w4"),
+      game: (doc) => {
+        const w = 4 * TILE;
+        const ctx = canvas(doc, w, 2 * FLOOR);
+        const t: Transport = { id: 1, kind: "stairs", x: 0, width: 4, bottom: 1, top: 2, cars: 0, carPositions: [], carDir: [], load: 0, skipFloors: [] };
+        drawTransport(ctx, t, 0, 0, w, FLOOR);
+        return read(ctx, w, 2 * FLOOR);
+      },
+    },
     {
       label: "walker in shirt 2",
       frames: ["person/walker/shirt2"],

@@ -80,6 +80,7 @@ describe("lookupRoom", () => {
     expect(lookupShaft("stairs", 8)).toEqual({ shaft: "transport/stairs" });
     expect(lookupShaft("elevatorExpress", 2)).toEqual({ shaft: "shaft/elevatorExpress", car: "car/elevatorExpress", stretchTo: 2 });
     expect(lookupShaft("escalator", NaN)).toEqual({ shaft: "transport/escalator" });
+    expect(() => lookupShaft("office", 9)).toThrow(/not a transport kind/);
   });
   it("occupant-free kinds carry no presence", () => {
     expect(look({ kind: "security", state: "occupied", occupants: 5, id: 1 }, DAY, 0)).toEqual({

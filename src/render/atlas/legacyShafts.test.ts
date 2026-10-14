@@ -20,7 +20,8 @@ describe("legacy shaft widths (#917)", () => {
         expect(mine.every((j) => j.w === tiles * TILE)).toBe(true);
         // The reader names exactly these frames.
         const names = lookupShaft(kind as keyof typeof FACILITIES, tiles);
-        expect(mine.every((j) => j.name.startsWith(names.shaft) || (names.car !== undefined && j.name.startsWith(names.car)))).toBe(true);
+        expect(names).not.toHaveProperty("stretchTo");
+        expect(mine.every((j) => j.name === names.shaft || j.name.startsWith(`${names.shaft}/`) || (names.car !== undefined && j.name.startsWith(`${names.car}/`)))).toBe(true);
       }
     }
   });
@@ -32,5 +33,7 @@ describe("legacy shaft widths (#917)", () => {
     expect(out.w).toBe(5);
     expect(Array.from(out.data)).toEqual([...px(255, 0, 0), ...px(255, 0, 0), ...px(255, 0, 0), ...px(0, 0, 255), ...px(0, 0, 255)]);
     expect(Array.from(stretch(src, 1).data)).toEqual(px(255, 0, 0));
+    expect(() => stretch(src, 0)).toThrow();
+    expect(() => stretch(src, 2.5)).toThrow();
   });
 });
