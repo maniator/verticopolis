@@ -1,4 +1,5 @@
 import { FACILITIES, isElevatorKind } from "../../engine/facilities";
+import { SKYLINE_FILLS } from "../sceneryLayout";
 import type { FacilityKind } from "../../engine/types";
 import type { PersonBuild } from "../pixelSprites/common";
 import { BUILDS as FIGURE_BUILDS, SHIRTS, moodTint } from "../pixelSprites/common";
@@ -28,14 +29,15 @@ function still(name: string, w: number, h: number, paint: PaintSpec, keys: Keys,
   return { type: "still", name, w, h, anchor, keys, paint };
 }
 
-/** Floor and lobby tiles plus the four ground-floor entrance slices. */
+/** Floor and lobby tiles plus the four ground-floor entrance slices. The
+ *  lobby tiles and the entrance frames carry depth layers. */
 export function structureJobs(): Job[] {
   const jobs: Job[] = [still("structure/floor", TILE, FLOOR, { p: "floor" }, { kind: "floor" })];
   for (const ground of [true, false]) {
     for (const lit of [false, true]) {
       for (let v = 0; v < LOBBY_VARIANTS; v++) {
         const style = ground ? "ground" : "sky";
-        jobs.push(still(`structure/lobby/${style}/${lit2(lit)}/v${v}`, TILE, FLOOR, { p: "lobby", ground, variant: v, lit }, { kind: "lobby", style, lit, variant: v }));
+        jobs.push({ ...still(`structure/lobby/${style}/${lit2(lit)}/v${v}`, TILE, FLOOR, { p: "lobby", ground, variant: v, lit }, { kind: "lobby", style, lit, variant: v }), layers: true });
       }
     }
   }
@@ -55,6 +57,7 @@ export function structureJobs(): Job[] {
           dt: 1.5,
           loop: true,
           frames,
+          layers: true,
         };
         jobs.push(anim);
       }
@@ -108,6 +111,10 @@ export function transportJobs(): Job[] {
           jobs.push({
             ...still(`car/${kind}/${arrow ?? "idle"}/${full ? "full" : "notfull"}/s${s}`, w, FLOOR, car(0), { kind, arrow: arrow ?? "idle", full, variant: s }),
             chains: { riders: { input: "riders", steps } },
+            // The cab's interior is the back, its riders, step by step, the
+            // furniture, and its door frames, FULL bar and lantern the front.
+            layers: true,
+            front: true,
           });
         });
       }
@@ -177,14 +184,14 @@ export function vehicleJobs(): Job[] {
   const trainW = FACILITIES.metro.width * TILE - 6;
   for (const headlight of [true, false]) {
     jobs.push(
-      still(`vehicle/metrotrain/${headlight ? "headlight" : "dark"}`, trainW, METRO_TRAIN_H, { p: "metroTrain", w: trainW, headlight }, { vehicle: "metrotrain", headlight }),
+      { ...still(`vehicle/metrotrain/${headlight ? "headlight" : "dark"}`, trainW, METRO_TRAIN_H, { p: "metroTrain", w: trainW, headlight }, { vehicle: "metrotrain", headlight }), layers: true, front: true },
     );
   }
   return jobs;
 }
 
-/** Skyline fills (`excalibur/towerScenery.ts`): far, then near. */
-export const SKYLINE_FILLS = ["rgba(70, 86, 120, 0.55)", "rgba(52, 66, 96, 0.75)"];
+/** Skyline fills (`sceneryLayout.ts`, which the game reads): far, then near. */
+export { SKYLINE_FILLS } from "../sceneryLayout";
 
 /** Columns in the sky strip: one per quarter hour. */
 export const SKY_COLUMNS = 96;

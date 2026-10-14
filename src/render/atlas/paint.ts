@@ -8,6 +8,7 @@ import { drawAwning, drawCrane, drawEscapeStairs, drawLobbyEntrance } from "../s
 import { drawGarbageTruck, drawMetroTrain, drawStreetCar } from "../sprites";
 import { paintAnimatedUnit, paintSettledUnit } from "../regionPaint";
 import { cloudFill, drawCloud, drawSunDisc, skyColor } from "../sprites/sky";
+import { paintScenery, type ScenerySpec } from "./scenery";
 
 /**
  * One draw call the atlas bakes, as plain data: the catalog lists these, the
@@ -33,7 +34,8 @@ export type PaintSpec =
   | { p: "skyGradient" }
   | { p: "disc"; day: boolean; r: number }
   | { p: "cloud"; weather: "overcast" | "rain"; r: number }
-  | { p: "solid"; css: string };
+  | { p: "solid"; css: string }
+  | ScenerySpec;
 
 /** The fields of a placed room the sprite code reads, plus the scene inputs
  *  the web threads through its `DrawCtx` at bake time. */
@@ -146,6 +148,8 @@ export function paint(ctx: CanvasRenderingContext2D, s: PaintSpec, w: number, h:
       return drawGarbageTruck(ctx, s.w);
     case "metroTrain":
       return drawMetroTrain(ctx, s.w, s.headlight);
+    case "scenery":
+      return paintScenery(ctx, s, w, h);
     default:
       return paintSky(ctx, s, w, h);
   }

@@ -41,9 +41,9 @@ export function composeFrame(
 
 /** Compose `rec` the way a frontend drawing with depth does: the shell and
  *  its chain's shell steps, then the furniture (or, with `soft`, the soft
- *  furniture) and its chain's furniture (or soft) steps, each source-over. Named
- *  overlays draw last, though a layered frame has none (the bake refuses
- *  them). Throws for a frame without depth layers. */
+ *  furniture) and its chain's furniture (or soft) steps, then a vehicle's front
+ *  and its steps, each source-over. Named overlays (a parking space's car or
+ *  dead mark) draw last. Throws for a frame without depth layers. */
 export function composeLayered(
   bake: Pick<BakeResult, "images">,
   rec: BakedFrame,
@@ -63,6 +63,10 @@ export function composeLayered(
   for (const [key, n] of Object.entries(chains)) stepsOf(key, n, layers.chains?.[key]?.shell);
   place(out, bake, soft ? (layers.soft ?? null) : layers.furniture);
   for (const [key, n] of Object.entries(chains)) stepsOf(key, n, soft ? layers.chains?.[key]?.soft : layers.chains?.[key]?.furniture);
+  if (layers.front !== undefined) {
+    place(out, bake, layers.front);
+    for (const [key, n] of Object.entries(chains)) stepsOf(key, n, layers.chains?.[key]?.front);
+  }
   drawRuntime(out, bake, rec, {}, overlays);
   return out;
 }

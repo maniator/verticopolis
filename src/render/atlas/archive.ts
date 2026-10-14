@@ -3,6 +3,7 @@ import type { BakeResult, ImageRef } from "./bake";
 import { variantPlacements, roomKinds, ORIGIN_SEEDED, RECYCLE_STEPS, PARKING_CAR_COLORS } from "./catalog";
 import { CAR_SEEDS, SKYLINE_FILLS, SKY_COLUMNS, STREET_CAR_SEEDS, BUILDS } from "./catalogExtras";
 import { pack, type PackedSlice } from "./pack";
+import { depthData, sceneryData, skyData } from "./scenery";
 import { blank, crop, over, sameImage, type Image } from "./pixels";
 import { encodePng } from "./png";
 import { blit, scaleNearest } from "./raster";
@@ -36,6 +37,8 @@ export interface ArchiveInfo {
   attribution: string;
   /** ASSETS-LICENSE.md itself, shipped verbatim. */
   licenseText: string;
+  /** The app icon files, shipped under `icon/` by name. */
+  icons?: Record<string, Uint8Array>;
 }
 
 export const ARCHIVE_ROOT = "verticopolis-atlas";
@@ -68,7 +71,9 @@ export function signature(): AtlasManifest["signature"] {
       parkingRoll: "a space holds a car when hash(int32(id * 31)) < parkingUse, where hash(n) is: x = int32(n * 2654435761) with the product taken as a float64 (IEEE double) multiply; x = imul32(x ^ (x >>> 15), 0x2c1b3c6d); x = imul32(x ^ (x >>> 13), 0x297a2d39); (x ^ (x >>> 16)) as unsigned / 2^32. int32(v) truncates v toward zero and wraps it modulo 2^32 to a signed 32-bit integer (JavaScript's v | 0); imul32 is a 32-bit integer multiply; ^ is a 32-bit xor and >>> a logical (zero-filling) right shift on the 32-bit pattern, so a negative x shifts in zeros. The first step is not imul32: the two can differ once the product's magnitude passes 2^53",
       cinema: "the cinema's marquee and screen read the animation clock; the web keeps whatever phase its last re-bake caught, the atlas bakes phase 0",
       originSeeded: `${[...ORIGIN_SEEDED].join(", ")}: a few details (staff shirts, skyline windows, climbing holds) follow the web's draw origin; the atlas carries the per-unit look at origin 0, 0`,
-      layers: "a room frame may carry 'layers' for drawing with depth: to show n visible occupants draw the 'shell' parts, its 'chains.occupants.shell' steps 1..min(n, len - 1), then the 'furniture' parts and its 'chains.occupants.furniture' steps the same way, each source-over; the result equals the frame's parts plus its occupant steps 1..n exactly. 'soft' (with 'chains.occupants.soft') is an optional furniture picture that keeps glows and soft shadows translucent; over the shell it rounds a step or two away from the frame's parts. A frame without 'layers' (vacancy, closed and gutted rooms, and the kinds whose art marks no split) is drawn flat",
+      layers: "a room frame, a lobby tile, an entrance frame, an elevator cab or the metro train may carry 'layers' for drawing with depth. To draw it with its chain at n (the frame's one chain, if any: 'occupants', 'riders' or 'fill'), draw the 'shell' parts and the chain's 'shell' steps 1..min(n, len - 1), then the 'furniture' parts and the chain's 'furniture' steps the same way, then any overlay the frame shows (a parking space's car or dead mark), each source-over; an elevator cab or the metro train also has a 'front' picture (and, for the cab's riders, 'front' chain steps), drawn after the furniture and before any overlay; the result equals the frame's parts, its chain steps 1..n and the overlay exactly. 'soft' (with the chain's 'soft' steps) is an optional furniture picture that keeps glows and soft shadows translucent; over the shell it rounds a step or two away from the frame's parts. A frame without 'layers' (vacancy, closed and gutted rooms, and every family outside the ones named here) is drawn flat",
+      depth: "data.depth names the game's draw planes back to front ('z', higher in front; equal planes draw in the order the game adds their actors) and the frame families on each",
+      skyMotion: "data.sky gives the sun's arc and each cloud's drift in the game's own terms; both are screen-space, sized to the view",
     },
   };
 }
@@ -105,15 +110,24 @@ export interface Archive {
 function packGroups(bake: BakeResult, pageSize: number): { pages: number; placements: PackedSlice[][] } {
   const split = bake.frameImages ?? bake.images.length;
   if (!(Number.isInteger(split) && split >= 0 && split <= bake.images.length)) throw new Error(`frameImages ${split} is outside 0..${bake.images.length}`);
-  const group = (from: number, to: number) => pack(
-    bake.images.slice(from, to).map((img, i) => ({ id: from + i, w: img.w, h: img.h })),
-    pageSize,
-    ATLAS_PADDING,
-  );
-  const framesPacked = group(0, split);
-  const layersPacked = group(split, bake.images.length);
-  const shifted = layersPacked.placements.map((list) => list.map((sl) => ({ ...sl, rect: { ...sl.rect, page: sl.rect.page + framesPacked.pages } })));
-  return { pages: framesPacked.pages + layersPacked.pages, placements: [...framesPacked.placements, ...shifted] };
+  const starts = bake.groups ?? [];
+  if (starts.some((s, i) => !Number.isInteger(s) || s < (starts[i - 1] ?? 0) || s > split)) throw new Error(`groups ${starts.join(", ")} are outside 0..${split} or out of order`);
+  // Each group packs on its own pages, in order: the first families' frame
+  // images, each later family's, then the depth layers' own images.
+  const bounds = [0, ...starts, split, bake.images.length];
+  let pages = 0;
+  const placements: PackedSlice[][] = [];
+  for (let g = 0; g + 1 < bounds.length; g++) {
+    const from = bounds[g];
+    const packed = pack(
+      bake.images.slice(from, bounds[g + 1]).map((img, i) => ({ id: from + i, w: img.w, h: img.h })),
+      pageSize,
+      ATLAS_PADDING,
+    );
+    for (const list of packed.placements) placements.push(list.map((sl) => ({ ...sl, rect: { ...sl.rect, page: sl.rect.page + pages } })));
+    pages += packed.pages;
+  }
+  return { pages, placements };
 }
 
 export function buildArchive(
@@ -151,11 +165,13 @@ export function buildArchive(
       const steps = (list: (ImageRef | null)[]) => list.map((s) => layerOf(s, packed.placements));
       const layers: DepthLayers = { shell: parts(f.layers.shell), furniture: parts(f.layers.furniture) };
       if ("soft" in f.layers) layers.soft = parts(f.layers.soft ?? null);
+      if ("front" in f.layers) layers.front = parts(f.layers.front ?? null);
       if (f.layers.chains) {
         layers.chains = {};
         for (const [k, c] of Object.entries(f.layers.chains)) {
           const chain: DepthLayerChain = { shell: steps(c.shell), furniture: steps(c.furniture) };
           if (c.soft) chain.soft = steps(c.soft);
+          if (c.front) chain.front = steps(c.front);
           layers.chains[k] = chain;
         }
       }
@@ -201,11 +217,15 @@ export function buildArchive(
       personBuilds: BUILDS,
       carSeeds: CAR_SEEDS,
       streetCarSeeds: STREET_CAR_SEEDS,
+      scenery: sceneryData(),
+      sky: skyData(),
+      depth: depthData(),
     },
   };
   files["manifest.json"] = strToU8(JSON.stringify(manifest) + "\n");
   files["ATTRIBUTION.txt"] = strToU8(attributionText(info));
   files["ASSETS-LICENSE.md"] = strToU8(info.licenseText);
+  for (const [name, bytes] of Object.entries(info.icons ?? {})) files[`icon/${name}`] = bytes;
 
   const zippable: Zippable = {};
   for (const path of Object.keys(files).sort()) {
@@ -269,7 +289,9 @@ function eachLayeredPicture(
       const flatSteps = rec.chains?.[key]?.steps ?? [null];
       const split = layers.chains?.[key] ?? { shell: [null], furniture: [null] };
       const hasSoft = layers.soft !== undefined && (key === "" || split.soft !== undefined);
-      const top = Math.max(flatSteps.length, split.shell.length, split.furniture.length, split.soft?.length ?? 0) - 1;
+      const front = blank(rec.w, rec.h);
+      if (layers.front) drawParts(front, pages, layers.front);
+      const top = Math.max(flatSteps.length, split.shell.length, split.furniture.length, split.soft?.length ?? 0, split.front?.length ?? 0) - 1;
       const flat = blank(rec.w, rec.h);
       drawParts(flat, pages, rec.parts);
       const shell = blank(rec.w, rec.h);
@@ -284,9 +306,11 @@ function eachLayeredPicture(
           drawStep(shell, pages, split.shell[n] ?? undefined);
           drawStep(furniture, pages, split.furniture[n] ?? undefined);
           if (hasSoft) drawStep(soft, pages, split.soft?.[n] ?? undefined);
+          if (layers.front) drawStep(front, pages, split.front?.[n] ?? undefined);
         }
         const exact = { w: rec.w, h: rec.h, data: shell.data.slice() };
         over(exact, furniture, 0, 0);
+        if (layers.front) over(exact, front, 0, 0);
         let softPicture: { picture: Image; layer: Image } | null = null;
         if (hasSoft) {
           const picture = { w: rec.w, h: rec.h, data: shell.data.slice() };
@@ -300,14 +324,14 @@ function eachLayeredPicture(
 }
 
 /** Names of the frames whose depth layers break the manifest's rules (chain
- *  keys, at most one chain and no overlays, a null step 0, soft steps exactly
+ *  keys, at most one chain, a null step 0, soft steps exactly
  *  where there is soft furniture) or, read back out of the packed pages
  *  through the manifest the way a frontend reads them, do not give back the
  *  frame's own pixels for some occupant count; empty when every layered frame
  *  passes. */
 export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): string[] {
   const bad = new Set<string>();
-  // A layered frame has at most one chain and no overlays; its chain has a
+  // A layered frame has at most one chain (its overlays draw last); its chain has a
   // depth split (and no split lacks its chain), each list starts with a null
   // step 0, and soft furniture comes with soft steps for its chain.
   for (const [name, rec] of Object.entries(archive.manifest.frames)) {
@@ -316,9 +340,11 @@ export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): strin
     const flat = JSON.stringify(Object.keys(rec.chains ?? {}).sort());
     const depth = JSON.stringify(Object.keys(layers.chains ?? {}).sort());
     const soft = layers.soft !== undefined;
-    const lists = Object.values(layers.chains ?? {}).flatMap((c) => [c.shell, c.furniture, ...(c.soft ? [c.soft] : [])]);
-    const oneChainNoOverlays = Object.keys(rec.chains ?? {}).length <= 1 && Object.keys(rec.overlays ?? {}).length === 0;
-    if (flat !== depth || !oneChainNoOverlays || lists.some((l) => l[0] !== null) || Object.values(layers.chains ?? {}).some((c) => (c.soft !== undefined) !== soft)) bad.add(name);
+    const lists = Object.values(layers.chains ?? {}).flatMap((c) => [c.shell, c.furniture, ...(c.soft ? [c.soft] : []), ...(c.front ? [c.front] : [])]);
+    const front = layers.front !== undefined;
+    if ((front && soft) || Object.values(layers.chains ?? {}).some((c) => (c.front !== undefined) !== front)) bad.add(name);
+    const oneChain = Object.keys(rec.chains ?? {}).length <= 1;
+    if (flat !== depth || !oneChain || lists.some((l) => l[0] !== null) || Object.values(layers.chains ?? {}).some((c) => (c.soft !== undefined) !== soft)) bad.add(name);
   }
   eachLayeredPicture(archive, (name, _n, flat, exact) => {
     if (sameImage(flat, exact)) return true;
@@ -374,9 +400,13 @@ export function kindsWithoutFurniture(manifest: Pick<AtlasManifest, "frames">): 
   const furnished = new Set<string>();
   for (const rec of Object.values(manifest.frames)) {
     if (!rec.layers) continue;
-    const kind = String(rec.keys.kind);
+    const kind = String(rec.keys.kind ?? rec.keys.vehicle ?? rec.keys.piece ?? "unkeyed");
     split.add(kind);
-    if (rec.layers.furniture.length > 0) furnished.add(kind);
+    // A parking space's car comes as a 'car<i>' overlay, which draws in
+    // front, and an empty elevator cab's riders as its chain's furniture steps.
+    const steps = Object.values(rec.layers.chains ?? {}).some((c) => c.furniture.some((s) => s !== null));
+    const car = Object.keys(rec.overlays ?? {}).some((o) => /^car\d+$/.test(o));
+    if (rec.layers.furniture.length > 0 || steps || car) furnished.add(kind);
   }
   return [...split].filter((k) => !furnished.has(k)).sort();
 }
