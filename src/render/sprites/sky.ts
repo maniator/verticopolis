@@ -43,6 +43,40 @@ export function cloudRadius(seed: number): number {
   return 56 + (seed % 44);
 }
 
+/** Where the clouds drift: they wrap over the view's width plus `pad`
+ *  (entering `pad / 2` px left of it) and fly in a band from `top` of the
+ *  view's height, `band` of it deep. */
+export const CLOUD_DRIFT = { pad: 240, top: 0.1, band: 0.22 } as const;
+
+/** How cloud `seed` drifts across a view `W` x `H` at `t` seconds: its x is
+ *  `((offset % (W + pad)) + t * speed) % (W + pad) - pad / 2` and its y is
+ *  `H * top + row * H * band` ({@link CLOUD_DRIFT}). */
+export function cloudMotion(seed: number): { speed: number; row: number; offset: number } {
+  return { speed: 6 + (seed % 7), row: (seed % 100) / 100, offset: seed * 53 };
+}
+
+/** The sun's arc from `rise` to `set` (the moon takes the same arc through the
+ *  night, from `set` to the next `rise`): at fraction p of its stretch, the
+ *  disc's center sits at x `p * viewWidth`
+ *  and y `viewHeight * baseY - sin(p * PI) * viewHeight * lift`. */
+export const SUN_ARC = { rise: 6, set: 18, baseY: 0.62, lift: 0.5 } as const;
+
+/** The rain over the whole view on rainy days: a `tint` fill, then `count`
+ *  streaks stroked `lineWidth` wide in `stroke`. Streak i starts at x
+ *  `((i * xMul) >>> 0) % viewW` (the product as a double, then to uint32) and
+ *  y `((i * yStep) % viewH + t * speed) % viewH`, and runs `dx`, `dy` px. */
+export const RAIN = {
+  tint: "rgba(34,40,56,0.16)",
+  stroke: "rgba(200,214,236,0.45)",
+  lineWidth: 1,
+  count: 140,
+  xMul: 2654435761,
+  yStep: 37,
+  speed: 320,
+  dx: -3,
+  dy: 9,
+} as const;
+
 /** Cloud fill: a dark gray in the rain, a bright white on an overcast day. */
 export function cloudFill(weather: string): string {
   return weather === "rain" ? "rgba(86,92,108,0.55)" : "rgba(244,247,255,0.72)";

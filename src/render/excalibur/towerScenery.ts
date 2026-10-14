@@ -1,24 +1,33 @@
 import * as ex from "excalibur";
+import { Z } from "../depthPlanes";
 import { viewWorld } from "../../presentation/viewWorld";
 import { FLOOR, TILE } from "../scale";
 import {
-  FORECOURT_TILES,
-  FOUNTAIN_TILE,
-  PLAZA_LAMP_TILES,
-  PLAZA_SIDEWALK_TILES,
-  ROUNDABOUT_START,
-  ROUNDABOUT_TILES,
-  roadStart,
-  ROAD_TILES,
-  sidewalkStart,
+  SKYLINE_FILLS,
   apronRange,
-  hash01,
+  plantRect,
   plantSpots,
   plantVisible,
+  sceneryPieces,
   skylineRects,
   type PlantSpot,
 } from "../sceneryLayout";
-import { drawBush, drawFountain, drawPlanter, drawPlazaLamp, drawRoundabout, drawStreetLamp, drawTree, lampAlpha } from "./towerSceneryDraw";
+import {
+  STRIP_ABOVE,
+  STRIP_BELOW,
+  drawBush,
+  drawForecourt,
+  drawFountain,
+  drawPlanter,
+  drawPlazaLamp,
+  drawRoad,
+  drawRoundabout,
+  drawSidewalk,
+  drawStreetLamp,
+  drawStripTile,
+  drawTree,
+  lampAlpha,
+} from "./towerSceneryDraw";
 import type { Simulation } from "../../engine/Simulation";
 import type { TowerEngine } from "./TowerEngine";
 
@@ -65,16 +74,15 @@ interface SceneryRec {
 const recs = new WeakMap<TowerEngine, SceneryRec>();
 
 // Z order, back to front (sky sits at -60, dirt at -50, ground line at -49):
-const Z_SKY_FAR = -56;
-const Z_SKY_NEAR = -55;
-const Z_STRIP = -48;
-const Z_EDGE = -47;
-const Z_PLANT = -46;
+const Z_SKY_FAR = Z.skylineFar;
+const Z_SKY_NEAR = Z.skylineNear;
+const Z_STRIP = Z.strip;
+const Z_EDGE = Z.groundEdge;
+const Z_PLANT = Z.plant;
 
-// Ground strip canvas geometry (world px). The strip straddles the ground
-// line: blades rise above it, a soil lip hangs just below.
-const STRIP_ABOVE = 7;
-const STRIP_BELOW = 4;
+// Ground strip canvas geometry (world px, STRIP_ABOVE and STRIP_BELOW from
+// towerSceneryDraw). The strip straddles the ground line: blades rise above
+// it, a soil lip hangs just below.
 /** Longest strip canvas in world px, under the 2048 mobile texture cap. Strips
  *  past this split into `ceil(total / STRIP_MAX_SEG)` segments, so the SEGMENT
  *  COUNT moves with `TILE`: a smaller tile shortens every strip and can drop a
@@ -82,10 +90,8 @@ const STRIP_BELOW = 4;
  *  quietly rots the next time the world scale changes. */
 export const STRIP_MAX_SEG = 1800;
 
-const PAVE = "#b0b0a8";
-const PAVE_JOINT = "#8a8a82";
-
 function makeScenery(engine: TowerEngine): SceneryRec {
+  const pieces = sceneryPieces();
   const rec: SceneryRec = {
     sim: null,
     seed: NaN,
@@ -102,28 +108,17 @@ function makeScenery(engine: TowerEngine): SceneryRec {
   // Left edge: sidewalk off the lot line, then a fountain roundabout where
   // arriving traffic turns around, then the road off the scene's left side.
   {
-    const w = PLAZA_SIDEWALK_TILES * TILE;
-    const cv = new ex.Canvas({
-      width: w,
-      height: 11,
-      cache: true,
-      draw: (ctx) => {
-        ctx.fillStyle = "#b4b4aa";
-        ctx.fillRect(0, 0, w, 11);
-        ctx.fillStyle = "#8e8e86";
-        for (let x = 0; x < w; x += TILE) ctx.fillRect(x, 0, 1, 7);
-      },
-    });
-    const a = new ex.Actor({ pos: ex.vec(-PLAZA_SIDEWALK_TILES * TILE, -7), width: w, height: 11, anchor: ex.vec(0, 0), z: Z_EDGE });
+    const { x, y, w, h } = pieces.plazaSidewalk;
+    const cv = new ex.Canvas({ width: w, height: h, cache: true, draw: (ctx) => drawSidewalk(ctx, w) });
+    const a = new ex.Actor({ pos: ex.vec(x, y), width: w, height: h, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
   {
     // Roundabout: an elliptical drive around a grassy center island.
-    const w = ROUNDABOUT_TILES * TILE;
-    const h = 48;
+    const { x, y, w, h } = pieces.roundabout;
     const cv = new ex.Canvas({ width: w, height: h, cache: true, draw: (ctx) => drawRoundabout(ctx, w) });
-    const a = new ex.Actor({ pos: ex.vec(ROUNDABOUT_START * TILE, -30), width: w, height: h, anchor: ex.vec(0, 0), z: Z_EDGE });
+    const a = new ex.Actor({ pos: ex.vec(x, y), width: w, height: h, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
@@ -133,10 +128,9 @@ function makeScenery(engine: TowerEngine): SceneryRec {
     // the decorative clock; it freezes with pause and reduced motion, and the
     // stepped clock keeps screenshots deterministic. The canvas is tiny, so
     // the per-frame cost is noise.
-    const w = 100;
-    const h = 112;
+    const { x, y, w, h } = pieces.fountain;
     const cv = new ex.Canvas({ width: w, height: h, cache: false, draw: (ctx) => drawFountain(ctx, w, h, engine.d.anim) });
-    const a = new ex.Actor({ pos: ex.vec(FOUNTAIN_TILE * TILE - w / 2, -102), width: w, height: h, anchor: ex.vec(0, 0), z: Z_PLANT });
+    const a = new ex.Actor({ pos: ex.vec(x, y), width: w, height: h, anchor: ex.vec(0, 0), z: Z_PLANT });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
@@ -145,16 +139,14 @@ function makeScenery(engine: TowerEngine): SceneryRec {
     // dark fixtures by day, fading in through dusk to a warm glow with a pool
     // of light on the pavement, keyed to the sim clock so pause and the
     // stepped screenshot clock behave.
-    for (const tile of PLAZA_LAMP_TILES) {
-      const w = 84;
-      const h = Math.round(FLOOR * 1.6) + 14;
+    for (const { x, y, w, h } of pieces.plazaLamps) {
       const cv = new ex.Canvas({
         width: w,
         height: h,
         cache: false,
         draw: (ctx) => drawPlazaLamp(ctx, w, h, lampAlpha(engine.sim.clock.minuteOfDay / 60)),
       });
-      const a = new ex.Actor({ pos: ex.vec(tile * TILE - w / 2, -h + 4), width: w, height: h, anchor: ex.vec(0, 0), z: Z_PLANT });
+      const a = new ex.Actor({ pos: ex.vec(x, y), width: w, height: h, anchor: ex.vec(0, 0), z: Z_PLANT });
       a.graphics.use(cv);
       engine.engine.add(a);
     }
@@ -162,8 +154,8 @@ function makeScenery(engine: TowerEngine): SceneryRec {
   {
     // Road running from the roundabout to the dirt's left edge, in
     // texture-safe segments (the full run is far past the 2048 cap).
-    const from = -viewWorld().lotWidth;
-    const to = ROUNDABOUT_START;
+    const from = pieces.leftRoad.x / TILE;
+    const to = (pieces.leftRoad.x + pieces.leftRoad.w) / TILE;
     const total = (to - from) * TILE;
     const segments = Math.ceil(total / STRIP_MAX_SEG);
     const segW = Math.ceil(total / segments / TILE) * TILE;
@@ -174,17 +166,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
       // rhythm carries across segment seams unbroken.
       const period = TILE * 4;
       const phase = (((4 - x0) % period) + period) % period;
-      const cv = new ex.Canvas({
-        width: w,
-        height: 14,
-        cache: true,
-        draw: (ctx) => {
-          ctx.fillStyle = "#34343c";
-          ctx.fillRect(0, 0, w, 14);
-          ctx.fillStyle = "#c8b040";
-          for (let x = phase - period; x < w; x += period) ctx.fillRect(x, 6, TILE, 2);
-        },
-      });
+      const cv = new ex.Canvas({ width: w, height: 14, cache: true, draw: (ctx) => drawRoad(ctx, w, phase) });
       const a = new ex.Actor({ pos: ex.vec(x0, -2), width: w, height: 14, anchor: ex.vec(0, 0), z: Z_EDGE });
       a.graphics.use(cv);
       engine.engine.add(a);
@@ -193,57 +175,28 @@ function makeScenery(engine: TowerEngine): SceneryRec {
 
   // Forecourt (cement, same finish as the tower apron so it reads as yours).
   {
-    const w = FORECOURT_TILES * TILE;
-    const cv = new ex.Canvas({
-      width: w,
-      height: 10,
-      cache: true,
-      draw: (ctx) => {
-        ctx.fillStyle = PAVE;
-        ctx.fillRect(0, 0, w, 10);
-        ctx.fillStyle = PAVE_JOINT;
-        for (let x = 0; x < w; x += TILE * 2) ctx.fillRect(x, 0, 1, 6);
-      },
-    });
-    const a = new ex.Actor({ pos: ex.vec(viewWorld().lotWidth * TILE, -6), width: w, height: 10, anchor: ex.vec(0, 0), z: Z_EDGE });
+    const { x, y, w, h } = pieces.forecourt;
+    const cv = new ex.Canvas({ width: w, height: h, cache: true, draw: (ctx) => drawForecourt(ctx, w) });
+    const a = new ex.Actor({ pos: ex.vec(x, y), width: w, height: h, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
 
   // Sidewalk with expansion joints.
   {
-    const w = (roadStart() - sidewalkStart()) * TILE;
-    const cv = new ex.Canvas({
-      width: w,
-      height: 11,
-      cache: true,
-      draw: (ctx) => {
-        ctx.fillStyle = "#b4b4aa";
-        ctx.fillRect(0, 0, w, 11);
-        ctx.fillStyle = "#8e8e86";
-        for (let x = 0; x < w; x += TILE) ctx.fillRect(x, 0, 1, 7);
-      },
-    });
-    const a = new ex.Actor({ pos: ex.vec(sidewalkStart() * TILE, -7), width: w, height: 11, anchor: ex.vec(0, 0), z: Z_EDGE });
+    const { x, y, w, h } = pieces.sidewalk;
+    const cv = new ex.Canvas({ width: w, height: h, cache: true, draw: (ctx) => drawSidewalk(ctx, w) });
+    const a = new ex.Actor({ pos: ex.vec(x, y), width: w, height: h, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
 
   // The road: asphalt a curb-step below the sidewalk, with lane dashes.
   {
-    const w = ROAD_TILES * TILE;
-    const cv = new ex.Canvas({
-      width: w,
-      height: 14,
-      cache: true,
-      draw: (ctx) => {
-        ctx.fillStyle = "#34343c";
-        ctx.fillRect(0, 0, w, 14);
-        ctx.fillStyle = "#c8b040";
-        for (let x = 4; x < w; x += TILE * 4) ctx.fillRect(x, 6, TILE, 2);
-      },
-    });
-    const a = new ex.Actor({ pos: ex.vec(roadStart() * TILE, -2), width: w, height: 14, anchor: ex.vec(0, 0), z: Z_EDGE });
+    const { x, y, w, h } = pieces.rightRoad;
+    // Dashes from 4 px in (the first `phase - period` dash falls off the left).
+    const cv = new ex.Canvas({ width: w, height: h, cache: true, draw: (ctx) => drawRoad(ctx, w, 4) });
+    const a = new ex.Actor({ pos: ex.vec(x, y), width: w, height: h, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
@@ -251,8 +204,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
   // Street lamp with the 375 ST sign, on the sidewalk. Same live day/night
   // head as the plaza lamps; the sign reads at any hour.
   {
-    const w = 8 * TILE;
-    const h = Math.round(FLOOR * 1.8);
+    const { x, y, w, h } = pieces.streetLamp;
     const cv = new ex.Canvas({
       width: w,
       height: h,
@@ -260,7 +212,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
       draw: (ctx) => drawStreetLamp(ctx, w, h, lampAlpha(engine.sim.clock.minuteOfDay / 60)),
     });
     const a = new ex.Actor({
-      pos: ex.vec(Math.round((sidewalkStart() + 1) * TILE - w / 2), -h - 7),
+      pos: ex.vec(x, y),
       width: w,
       height: h,
       anchor: ex.vec(0, 0),
@@ -272,11 +224,10 @@ function makeScenery(engine: TowerEngine): SceneryRec {
 
   // Planter on the forecourt: a touch of green that survives a full-width lot.
   {
-    const w = 2 * TILE;
-    const h = 18;
+    const { x, y, w, h } = pieces.planter;
     const cv = new ex.Canvas({ width: w, height: h, cache: true, draw: (ctx) => drawPlanter(ctx, w, h) });
     const a = new ex.Actor({
-      pos: ex.vec(Math.round((viewWorld().lotWidth + FORECOURT_TILES / 2) * TILE - w / 2), -h - 6),
+      pos: ex.vec(x, y),
       width: w,
       height: h,
       anchor: ex.vec(0, 0),
@@ -367,7 +318,7 @@ function rebuildSeeded(engine: TowerEngine, rec: SceneryRec, seed: number): void
         ctx.fillRect(0, 0, 2, 2);
       },
     });
-  const fills: [ex.Canvas, ex.Canvas] = [sharedFill("rgba(70, 86, 120, 0.55)"), sharedFill("rgba(52, 66, 96, 0.75)")];
+  const fills: [ex.Canvas, ex.Canvas] = [sharedFill(SKYLINE_FILLS[0]), sharedFill(SKYLINE_FILLS[1])];
   for (const r of skylineRects(seed)) {
     const h = r.hFloors * FLOOR;
     const a = new ex.Actor({
@@ -386,8 +337,7 @@ function rebuildSeeded(engine: TowerEngine, rec: SceneryRec, seed: number): void
   // Plants: one small canvas actor per spot; visibility follows the apron.
   for (const spot of plantSpots(seed)) {
     const tree = spot.kind === "tree";
-    const w = Math.round((tree ? 3 : 2) * TILE * spot.scale);
-    const h = Math.round((tree ? FLOOR * 1.5 : FLOOR * 0.5) * spot.scale);
+    const { x, y, w, h } = plantRect(spot);
     const cv = new ex.Canvas({
       width: w,
       height: h,
@@ -395,7 +345,7 @@ function rebuildSeeded(engine: TowerEngine, rec: SceneryRec, seed: number): void
       draw: (ctx) => (tree ? drawTree(ctx, w, h, seed + spot.tile) : drawBush(ctx, w, h)),
     });
     const a = new ex.Actor({
-      pos: ex.vec(spot.tile * TILE - w / 2, -h - STRIP_ABOVE + 2),
+      pos: ex.vec(x, y),
       width: w,
       height: h,
       anchor: ex.vec(0, 0),
@@ -417,27 +367,8 @@ function drawStrip(ctx: CanvasRenderingContext2D, rec: SceneryRec, x0: number, w
   // grass to cement leaves no stale blade pixels above the pave line.
   ctx.clearRect(0, 0, w + 1, STRIP_ABOVE + STRIP_BELOW);
   const apron = rec.apron;
-  const gh = 4; // grass blade height
   for (let px = 0; px < w; px += TILE) {
     const tile = Math.floor((x0 + px) / TILE);
-    const paved = apron !== null && tile >= apron.min && tile < apron.max;
-    if (paved) {
-      ctx.fillStyle = PAVE;
-      ctx.fillRect(px, STRIP_ABOVE - 5, TILE + 1, 5 + STRIP_BELOW);
-      if (tile % 4 === 0) {
-        ctx.fillStyle = PAVE_JOINT;
-        ctx.fillRect(px, STRIP_ABOVE - 5, 1, 5);
-      }
-    } else {
-      const shade = hash01(tile * 17);
-      let grass = "#446c2e";
-      if (shade < 0.33) grass = "#4e7a34";
-      else if (shade < 0.66) grass = "#5b8a3c";
-      ctx.fillStyle = grass;
-      const wob = hash01(tile * 29) < 0.2 ? 1 : 0;
-      ctx.fillRect(px, STRIP_ABOVE - gh - wob, TILE + 1, gh + wob + STRIP_BELOW);
-      ctx.fillStyle = "#3c5c28";
-      ctx.fillRect(px, STRIP_ABOVE, TILE + 1, STRIP_BELOW);
-    }
+    drawStripTile(ctx, px, tile, apron !== null && tile >= apron.min && tile < apron.max);
   }
 }

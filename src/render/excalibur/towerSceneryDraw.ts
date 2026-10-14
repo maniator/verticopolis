@@ -1,13 +1,14 @@
 import { TILE } from "../scale";
-import { hash01 } from "../sceneryLayout";
+import { STRIP_ABOVE, STRIP_BELOW, hash01 } from "../sceneryLayout";
 
 /**
  * Pure canvas painters for the outside-world scenery: the plaza's roundabout,
- * fountain, and lamps, the right-edge street lamp and planter, and the lot's
- * trees and bushes. Split from towerScenery.ts (the actor/lifecycle half) at
- * the file-size ceiling; everything here draws into a plain 2D context and
- * holds no state, so the scenery tests drive each painter with a recording
- * spy context.
+ * fountain, and lamps, the right-edge street lamp and planter, the lot's trees
+ * and bushes, and the ground pieces (sidewalk, road, forecourt and the lot's
+ * grass or cement strip). Split from towerScenery.ts (the actor/lifecycle
+ * half) at the file-size ceiling; everything here draws into a plain 2D
+ * context and holds no state, so the scenery tests drive each painter with a
+ * recording spy context, and the sprite atlas bakes the same painters.
  */
 
 export function drawRoundabout(ctx: CanvasRenderingContext2D, w: number): void {
@@ -180,28 +181,115 @@ export function drawPlanter(ctx: CanvasRenderingContext2D, w: number, h: number)
   ctx.fillRect(Math.round(w * 0.2), h - 16, Math.round(w * 0.6), 5);
 }
 
+/** The tree and bush paint, as a table the atlas publishes (docs/atlas.md,
+ *  "Seeded by the tower") so a frontend can paint a plant at its own size. */
+export const PLANT_PAINT = {
+  tree: {
+    trunk: { color: "#6d4c2a", w: 0.12, minW: 2, h: 0.3 },
+    canopy: [
+      { w: 1.0, y: 0.32, color: "#3e6b2e" },
+      { w: 0.78, y: 0.52, color: "#4a7c36" },
+      { w: 0.5, y: 0.72, color: "#568c3e" },
+    ],
+    canopyH: 0.26,
+    jitterKey: 97,
+  },
+  bush: {
+    base: { color: "#4a7c36", y: 0.4, h: 0.6 },
+    top: { color: "#568c3e", x: 0.16, w: 0.68, h: 0.5 },
+  },
+} as const;
+
 export function drawTree(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number): void {
-  const trunkW = Math.max(2, Math.round(w * 0.12));
-  const trunkH = Math.round(h * 0.3);
-  ctx.fillStyle = "#6d4c2a";
+  const T = PLANT_PAINT.tree;
+  const trunkW = Math.max(T.trunk.minW, Math.round(w * T.trunk.w));
+  const trunkH = Math.round(h * T.trunk.h);
+  ctx.fillStyle = T.trunk.color;
   ctx.fillRect(Math.round(w / 2 - trunkW / 2), h - trunkH, trunkW, trunkH);
-  const layers: [number, number, string][] = [
-    [1.0, 0.32, "#3e6b2e"],
-    [0.78, 0.52, "#4a7c36"],
-    [0.5, 0.72, "#568c3e"],
-  ];
-  layers.forEach(([lw, ly, col], li) => {
+  T.canopy.forEach(({ w: lw, y: ly, color }, li) => {
     // Integer hash key (hash01 truncates): the layer index, not the fractional
     // layer offset, carries the per-layer variation.
-    const jitter = Math.round((hash01(seed + li * 97) - 0.5) * 2);
-    ctx.fillStyle = col;
-    ctx.fillRect(Math.round(w * (1 - lw) / 2) + jitter, Math.round(h - trunkH - h * ly), Math.round(w * lw), Math.round(h * 0.26));
+    const jitter = Math.round((hash01(seed + li * T.jitterKey) - 0.5) * 2);
+    ctx.fillStyle = color;
+    ctx.fillRect(Math.round(w * (1 - lw) / 2) + jitter, Math.round(h - trunkH - h * ly), Math.round(w * lw), Math.round(h * T.canopyH));
   });
 }
 
 export function drawBush(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-  ctx.fillStyle = "#4a7c36";
-  ctx.fillRect(0, Math.round(h * 0.4), w, Math.ceil(h * 0.6));
-  ctx.fillStyle = "#568c3e";
-  ctx.fillRect(Math.round(w * 0.16), 0, Math.round(w * 0.68), Math.round(h * 0.5));
+  const { base, top } = PLANT_PAINT.bush;
+  ctx.fillStyle = base.color;
+  ctx.fillRect(0, Math.round(h * base.y), w, Math.ceil(h * base.h));
+  ctx.fillStyle = top.color;
+  ctx.fillRect(Math.round(w * top.x), 0, Math.round(w * top.w), Math.round(h * top.h));
+}
+
+/** Cement paving and its joint lines (the forecourt and the tower's apron). */
+export const PAVE = "#b0b0a8";
+export const PAVE_JOINT = "#8a8a82";
+
+/** A sidewalk run `w` px wide (11 px tall) with an expansion joint every tile. */
+export function drawSidewalk(ctx: CanvasRenderingContext2D, w: number): void {
+  ctx.fillStyle = "#b4b4aa";
+  ctx.fillRect(0, 0, w, 11);
+  ctx.fillStyle = "#8e8e86";
+  for (let x = 0; x < w; x += TILE) ctx.fillRect(x, 0, 1, 7);
+}
+
+/** A road run `w` px wide (14 px tall) with lane dashes every four tiles,
+ *  the first starting `phase` px in (a dash may start off the left edge). */
+export function drawRoad(ctx: CanvasRenderingContext2D, w: number, phase: number): void {
+  const period = TILE * 4;
+  ctx.fillStyle = "#34343c";
+  ctx.fillRect(0, 0, w, 14);
+  ctx.fillStyle = "#c8b040";
+  for (let x = phase - period; x < w; x += period) ctx.fillRect(x, 6, TILE, 2);
+}
+
+/** The forecourt's cement run `w` px wide (10 px tall), a joint every two tiles. */
+export function drawForecourt(ctx: CanvasRenderingContext2D, w: number): void {
+  ctx.fillStyle = PAVE;
+  ctx.fillRect(0, 0, w, 10);
+  ctx.fillStyle = PAVE_JOINT;
+  for (let x = 0; x < w; x += TILE * 2) ctx.fillRect(x, 0, 1, 6);
+}
+
+export { STRIP_ABOVE, STRIP_BELOW };
+
+/** The lot's three grass shades. */
+export const GRASS_SHADES = ["#446c2e", "#4e7a34", "#5b8a3c"] as const;
+
+/** A lot tile's grass: its shade (an index into {@link GRASS_SHADES}) and
+ *  whether its blades stand one pixel taller (a tuft), both from the tile. */
+export function grassLook(tile: number): { shade: 0 | 1 | 2; tuft: boolean } {
+  const h = hash01(tile * 17);
+  let shade: 0 | 1 | 2 = 0;
+  if (h < 0.33) shade = 1;
+  else if (h < 0.66) shade = 2;
+  return { shade, tuft: hash01(tile * 29) < 0.2 };
+}
+
+/** Paving joints fall on every lot tile whose index is a multiple of this. */
+export const PAVE_JOINT_EVERY = 4;
+
+/** One tile of the lot's ground strip at `px`: cement (with a joint on every
+ *  fourth lot tile) where the tower has paved it, else grass whose shade and
+ *  tuft come from the lot tile index. Fills one column past the tile; the
+ *  next tile, drawn after it, paints over the rows it covers. */
+export function drawStripTile(ctx: CanvasRenderingContext2D, px: number, tile: number, paved: boolean): void {
+  if (paved) {
+    ctx.fillStyle = PAVE;
+    ctx.fillRect(px, STRIP_ABOVE - 5, TILE + 1, 5 + STRIP_BELOW);
+    if (tile % PAVE_JOINT_EVERY === 0) {
+      ctx.fillStyle = PAVE_JOINT;
+      ctx.fillRect(px, STRIP_ABOVE - 5, 1, 5);
+    }
+    return;
+  }
+  const gh = 4; // grass blade height
+  const look = grassLook(tile);
+  ctx.fillStyle = GRASS_SHADES[look.shade];
+  const wob = look.tuft ? 1 : 0;
+  ctx.fillRect(px, STRIP_ABOVE - gh - wob, TILE + 1, gh + wob + STRIP_BELOW);
+  ctx.fillStyle = "#3c5c28";
+  ctx.fillRect(px, STRIP_ABOVE, TILE + 1, STRIP_BELOW);
 }
