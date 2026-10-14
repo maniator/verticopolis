@@ -2,6 +2,7 @@ import { html, type TemplateResult } from "lit-html";
 import type { Simulation } from "../engine/Simulation";
 import type { Unit } from "../engine/types";
 import { HK_MAIDS_PER_UNIT, HK_NOMINAL_ROOMS_PER_MAID, INFEST_DAYS } from "../engine/economy/housekeeping";
+import { towerCatalog } from "../engine/towerCatalog";
 
 /**
  * Housekeeping / cockroach inspector lines, split out of `facilityDiagnostics`
@@ -22,7 +23,7 @@ export function hotelInfestationLines(sim: Simulation, u: Unit): TemplateResult[
   }
   if (u.state === "infested") {
     return [
-      sim.rules.infestationRecovery()
+      towerCatalog(sim).economy.exterminator
         ? html`<div style="color:var(--bad)">Cockroach infested: neglected too long, so housekeeping can no longer clean it. Call an exterminator (clears every room infested at the time you book) or bulldoze this one and rebuild.</div>`
         : html`<div style="color:var(--bad)">Cockroach infested: neglected too long. It can't be cleaned. Bulldoze it and rebuild.</div>`,
     ];
@@ -56,7 +57,7 @@ export function housekeepingCoverageLines(sim: Simulation): TemplateResult[] {
   }
   if (c.infested > 0) {
     out.push(
-      html`<div style="color:var(--bad)">${c.infested} room(s) are infested; cleaning can't recover them. ${sim.rules.infestationRecovery() ? "Call an exterminator, or bulldoze and rebuild." : "Bulldoze and rebuild to clear them."}</div>`,
+      html`<div style="color:var(--bad)">${c.infested} room(s) are infested; cleaning can't recover them. ${towerCatalog(sim).economy.exterminator ? "Call an exterminator, or bulldoze and rebuild." : "Bulldoze and rebuild to clear them."}</div>`,
     );
   }
   if (c.outOfReach > 0) {

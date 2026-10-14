@@ -10,9 +10,8 @@ import {
   residentCount,
 } from "../../engine/facilities";
 import { householdPrice, ladderRungFor } from "../../engine/gameRules";
-import { rentOf } from "../../engine/econConfig";
 import { catalogFacility } from "../../engine/catalogTypes";
-import { priceOptionsFor } from "../catalogPricing";
+import { priceOptionsFor, unitPrice } from "../catalogPricing";
 import { isRentalKind } from "../../engine/residentialRentals";
 import { facilityDiagnostics, hasAccessDiagnostic, transportDiagnostics } from "../../game/facilityDiagnostics";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
@@ -124,7 +123,7 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
     // where the price normally shows for a unit taken off the market.
     const rent = u.noRate
       ? "No Rate"
-      : `$${(u.kind === "condo" ? householdPrice(rentOf(u), u.residents) : rentOf(u)).toLocaleString()}${isHotelKind(u.kind) ? "/night" : ""}`;
+      : `$${(u.kind === "condo" ? householdPrice(unitPrice(towerCatalog(sim), u), u.residents) : unitPrice(towerCatalog(sim), u)).toLocaleString()}${isHotelKind(u.kind) ? "/night" : ""}`;
     rows.push(kv(label, rent, "rent"));
   }
   if (u.kind === "cinema" && isOperational(u)) {
@@ -157,7 +156,7 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
   const priceShape = priceOptionsFor(towerCatalog(sim), u.kind);
   if (priceShape?.shape === "ladder") {
     const locked = u.kind === "condo" && u.everOccupied;
-    const current: RungChoice = u.noRate ? "noRate" : ladderRungFor(priceShape.rungs, rentOf(u)).level;
+    const current: RungChoice = u.noRate ? "noRate" : ladderRungFor(priceShape.rungs, unitPrice(towerCatalog(sim), u)).level;
     let ariaLabel = "Rent level";
     if (u.kind === "condo") ariaLabel = "Sale price level";
     else if (isHotelKind(u.kind)) ariaLabel = "Room rate level";

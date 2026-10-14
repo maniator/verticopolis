@@ -1,4 +1,4 @@
-import { facilityFloors } from "../engine/facilities";
+import { catalogFacility, type Catalog } from "../engine/catalogTypes";
 import type { Unit } from "../engine/types";
 
 /** Left/right built extent of one above-ground floor row, in tile columns
@@ -12,7 +12,7 @@ export interface FloorEdge {
  * The tower's exterior silhouette, derived from its units in a SINGLE pass —
  * consumed by the escape stairs (per-floor edges) and the rooftop crane
  * (top-floor tiles). Pure and free of any Excalibur/canvas dependency (it reads
- * only unit data + `facilityFloors`) so it is unit-testable without standing up
+ * only unit data + the catalog's unit heights) so it is unit-testable without standing up
  * the render engine, and computed once so a structural change doesn't scan the
  * (potentially thousands of) units more than necessary.
  *
@@ -34,12 +34,12 @@ export interface FacadeGeometry {
  * top occupied floor (passed in so the caller's canonical value drives which
  * row the crane reads, rather than re-deriving it here).
  */
-export function facadeGeometry(units: readonly Unit[], highestFloor: number): FacadeGeometry {
+export function facadeGeometry(units: readonly Unit[], highestFloor: number, catalog: Catalog): FacadeGeometry {
   const edges = new Map<number, FloorEdge>();
   const topTiles = new Set<number>();
   for (const u of units) {
     const right = u.x + u.width;
-    const top = u.floor + facilityFloors(u.kind);
+    const top = u.floor + catalogFacility(catalog, u.kind).floors;
     for (let f = Math.max(1, u.floor); f < top; f++) {
       const e = edges.get(f);
       if (!e) edges.set(f, { min: u.x, max: right });

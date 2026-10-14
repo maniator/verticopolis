@@ -1,4 +1,4 @@
-import { FACILITIES } from "../engine/facilities";
+import { facilityColor } from "../presentation/facilityPresentation";
 import type { FacilityKind, Unit } from "../engine/types";
 import { drawRoom } from "./pixelSprites";
 import { layerEnd } from "./pixelSprites/layers";
@@ -125,7 +125,7 @@ function drawInterior(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: n
     case "weddingHall":
       return drawWeddingHall(d, u, x, y, w, h);
     default:
-      ctx.fillStyle = FACILITIES[u.kind].color;
+      ctx.fillStyle = facilityColor(u.kind);
       ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
   }
 }

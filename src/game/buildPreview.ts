@@ -1,8 +1,7 @@
 import type { GameApp } from "../main";
 import type { FacilityKind } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
-import { catalogFacility } from "../engine/catalogTypes";
-import { groundFloorStructureKind } from "../engine/tower/towerTopology";
+import { catalogBuildKind, catalogFacility } from "../engine/catalogTypes";
 import { brushTiles, snapX, type PlaceOutcome } from "../ui/placement";
 import { buildRefusalTemplate } from "../ui/templates/inspector";
 import { isPaintKind } from "./gesture";
@@ -114,7 +113,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const span = tiles[tiles.length - 1] - left + 1;
     // Ground floor is lobby-only: the Floor tool on floor 1 lays a lobby, so the
     // ghost must PREVIEW a lobby rather than spring a permanent 10x charge.
-    const ghostKind = groundFloorStructureKind(kind, floor);
+    const ghostKind = catalogBuildKind(towerCatalog(app.sim), kind, floor);
     const can = app.sim.canBuild(ghostKind, floor, snapX(towerCatalog(app.sim), kind, tile));
     // Whole-brush affordability, not a single tile: the ghost spans the entire
     // brush and paintBrush charges per tile, so a single-tile check would show an

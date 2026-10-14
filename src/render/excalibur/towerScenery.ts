@@ -1,5 +1,5 @@
 import * as ex from "excalibur";
-import { GRID } from "../../engine/facilities";
+import { viewWorld } from "../../presentation/viewWorld";
 import { FLOOR, TILE } from "../scale";
 import {
   FORECOURT_TILES,
@@ -8,9 +8,9 @@ import {
   PLAZA_SIDEWALK_TILES,
   ROUNDABOUT_START,
   ROUNDABOUT_TILES,
-  ROAD_START,
+  roadStart,
   ROAD_TILES,
-  SIDEWALK_START,
+  sidewalkStart,
   apronRange,
   hash01,
   plantSpots,
@@ -162,7 +162,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
   {
     // Road running from the roundabout to the dirt's left edge, in
     // texture-safe segments (the full run is far past the 2048 cap).
-    const from = -GRID.width;
+    const from = -viewWorld().lotWidth;
     const to = ROUNDABOUT_START;
     const total = (to - from) * TILE;
     const segments = Math.ceil(total / STRIP_MAX_SEG);
@@ -205,14 +205,14 @@ function makeScenery(engine: TowerEngine): SceneryRec {
         for (let x = 0; x < w; x += TILE * 2) ctx.fillRect(x, 0, 1, 6);
       },
     });
-    const a = new ex.Actor({ pos: ex.vec(GRID.width * TILE, -6), width: w, height: 10, anchor: ex.vec(0, 0), z: Z_EDGE });
+    const a = new ex.Actor({ pos: ex.vec(viewWorld().lotWidth * TILE, -6), width: w, height: 10, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
 
   // Sidewalk with expansion joints.
   {
-    const w = (ROAD_START - SIDEWALK_START) * TILE;
+    const w = (roadStart() - sidewalkStart()) * TILE;
     const cv = new ex.Canvas({
       width: w,
       height: 11,
@@ -224,7 +224,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
         for (let x = 0; x < w; x += TILE) ctx.fillRect(x, 0, 1, 7);
       },
     });
-    const a = new ex.Actor({ pos: ex.vec(SIDEWALK_START * TILE, -7), width: w, height: 11, anchor: ex.vec(0, 0), z: Z_EDGE });
+    const a = new ex.Actor({ pos: ex.vec(sidewalkStart() * TILE, -7), width: w, height: 11, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
@@ -243,7 +243,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
         for (let x = 4; x < w; x += TILE * 4) ctx.fillRect(x, 6, TILE, 2);
       },
     });
-    const a = new ex.Actor({ pos: ex.vec(ROAD_START * TILE, -2), width: w, height: 14, anchor: ex.vec(0, 0), z: Z_EDGE });
+    const a = new ex.Actor({ pos: ex.vec(roadStart() * TILE, -2), width: w, height: 14, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
   }
@@ -260,7 +260,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
       draw: (ctx) => drawStreetLamp(ctx, w, h, lampAlpha(engine.sim.clock.minuteOfDay / 60)),
     });
     const a = new ex.Actor({
-      pos: ex.vec(Math.round((SIDEWALK_START + 1) * TILE - w / 2), -h - 7),
+      pos: ex.vec(Math.round((sidewalkStart() + 1) * TILE - w / 2), -h - 7),
       width: w,
       height: h,
       anchor: ex.vec(0, 0),
@@ -276,7 +276,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
     const h = 18;
     const cv = new ex.Canvas({ width: w, height: h, cache: true, draw: (ctx) => drawPlanter(ctx, w, h) });
     const a = new ex.Actor({
-      pos: ex.vec(Math.round((GRID.width + FORECOURT_TILES / 2) * TILE - w / 2), -h - 6),
+      pos: ex.vec(Math.round((viewWorld().lotWidth + FORECOURT_TILES / 2) * TILE - w / 2), -h - 6),
       width: w,
       height: h,
       anchor: ex.vec(0, 0),
@@ -288,7 +288,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
 
   // ---- the lot's ground strip (grass/apron), repainted on build -----------
   {
-    const lotW = GRID.width * TILE;
+    const lotW = viewWorld().lotWidth * TILE;
     const segments = Math.ceil(lotW / STRIP_MAX_SEG);
     // Round each segment up to a whole-tile width so the per-tile draw loop
     // never splits a tile across two canvases.

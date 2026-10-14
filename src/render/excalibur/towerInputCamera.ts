@@ -1,5 +1,6 @@
 import * as ex from "excalibur";
-import { GRID, isCommercialKind } from "../../engine/facilities";
+import { isCommercialKind } from "../../engine/facilities";
+import { viewWorld } from "../../presentation/viewWorld";
 import { findCatalogFacility } from "../../engine/catalogTypes";
 import type { FacilityKind, SerializedView, WeatherKind } from "../../engine/types";
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../engine/types";
@@ -340,16 +341,15 @@ export function clampGestureZoom(engine: TowerEngine, z: number): number {
   return Number.isFinite(z) ? Math.max(effectiveLo, Math.min(MAX_ZOOM, z)) : effectiveLo;
 }
 function clamp(engine: TowerEngine): void {
-  const x = Math.max(0, Math.min(GRID.width * TILE, engine.cam.pos.x));
-  // Zoom-aware vertical clamp: bound the visible top/bottom edges (not just
-  // the center) so panning/zooming out never exposes empty void below the
-  // deepest buildable basement. See {@link clampCameraY}.
-  const y = clampCameraY(engine.cam.pos.y, engine.viewHeight, engine.cam.zoom, FLOOR, GRID.minFloor, GRID.maxFloor);
+  const x = Math.max(0, Math.min(viewWorld().lotWidth * TILE, engine.cam.pos.x));
+  // Zoom-aware vertical clamp on the visible top/bottom edges, so zooming out
+  // never shows void below the deepest basement. See {@link clampCameraY}.
+  const y = clampCameraY(engine.cam.pos.y, engine.viewHeight, engine.cam.zoom, FLOOR, viewWorld().minFloor, viewWorld().maxFloor);
   engine.cam.pos = ex.vec(x, y);
 }
 export function center(engine: TowerEngine): void {
   const hi = engine.sim.tower.highestFloor;
-  engine.cam.pos = ex.vec((GRID.width / 2) * TILE, -(Math.max(6, hi) / 2) * FLOOR);
+  engine.cam.pos = ex.vec((viewWorld().lotWidth / 2) * TILE, -(Math.max(6, hi) / 2) * FLOOR);
 }
 
 /** The live camera as save-file cargo: center in grid units plus zoom (the exact

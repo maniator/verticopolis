@@ -74,6 +74,14 @@ describe.skipIf(!hasWasmPackage())("a hosted tower reads the engine's catalog (#
     host.detach();
   });
 
+  it("refuses a binding that states a different world, before building an engine", () => {
+    const sim = Simulation.newGame(45, "modern");
+    const { mod, built } = countingModule((text) => text.replace('"lotWidth":375', '"lotWidth":376'));
+    expect(() => attachWasmHost(sim, mod)).toThrow(/states a different world/);
+    expect(built()).toBe(0);
+    expect(towerCatalog(sim)).toEqual(catalogFor("modern"));
+  });
+
   it("refuses a binding whose other mode's catalog is unreadable, so no render meets it later", () => {
     // A Classic tower reads the Modern catalog too (its patronage yardstick),
     // so both modes are checked at attach.
