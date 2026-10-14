@@ -19,10 +19,7 @@ import { createEventThrottle } from "./analyticsThrottle";
  *  reload (the screen re-shows in place: 8,269 events in one page life), reloads
  *  are human-paced so they cannot threaten the per-IP budget, and a crash that
  *  survives one is a new incident worth seeing. Persisting it anyway is a tracked
- *  backlog decision. A desktop consent change can also hand the budget back
- *  within one page life (see {@link releaseCrashThrottle}): toggling sharing is
- *  human-paced too, and a held budget would leave the next consented window
- *  silent. Its own literal, not shared with `analyticsErrors.ts`'s cap:
+ *  backlog decision. Its own literal, not shared with `analyticsErrors.ts`'s cap:
  *  they agree at 10 today but bound different streams. */
 const MAX_CRASHES_PER_PAGE_LIFE = 10;
 
@@ -30,7 +27,7 @@ const MAX_CRASHES_PER_PAGE_LIFE = 10;
  *  PAGE LIFE: a reload re-opens it and the session id outlives that. The cap
  *  matches the `$exception` path's, whose identical guard is why the same incident
  *  produced 11 error reports rather than thousands. Deliberately does NOT follow
- *  the consent measurement window; see {@link releaseCrashThrottle}. */
+ *  a new measurement window; see {@link releaseCrashThrottle}. */
 const crashes = createEventThrottle(MAX_CRASHES_PER_PAGE_LIFE);
 
 /**
@@ -81,25 +78,8 @@ export function noteCrash(info: GameplayEvents["crash"]): void {
   trackEvent("crash", info);
 }
 
-/** Hand back the throttle's spent slots, for a caller that knows the crashes
- *  which spent them were never transmitted.
- *
- *  Deliberately not tied to the consent measurement window: a slot should stay
- *  spent if and only if its crash went out, and only the consent layer knows
- *  which. `setDesktopConsent` notifies watchers BEFORE it settles the held queue,
- *  so exactly one transition means "these are about to be sent": a first-run
- *  grant, `pending` to `granted`. `analytics.ts` keeps the slots on that one and
- *  releases on every other, where the queue is either discarded or was never
- *  there. Both directions matter. Releasing on the grant re-sends a crash that
- *  just flushed; keeping on the rest lets a loop during an opted-out stretch
- *  spend the entire cap on dropped events and leave the player's next window
- *  silent.
- *
- *  One bounded gap is left, and it is the held queue's own: `PENDING_CAP` is 32
- *  events of every kind, oldest evicted first, so a first run noisy enough to
- *  overflow it before answering can evict a held crash whose slot then stays
- *  spent. It needs more than 32 events emitted with the notice still open, and it
- *  errs toward reporting less, which is the safe direction for a flood guard. */
+/** Hand back the throttle's spent slots. The session reset (`GameplaySession.reset`)
+ *  calls this so each test starts with a full budget. */
 export function releaseCrashThrottle(): void {
   crashes.reset();
 }

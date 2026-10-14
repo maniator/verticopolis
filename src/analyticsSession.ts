@@ -6,8 +6,7 @@ import { noteCrash as reportCrash, releaseCrashThrottle as releaseCrashSlots } f
 /**
  * The per-tab {@link GameplaySession} and the one process-wide instance of it,
  * split out of `analytics.ts` at the 500-line file guard. `analytics.ts` keeps
- * the module's public surface (the re-exports, the consent subscription, and the
- * boot wiring) and re-exports `gameplaySession`, so every caller keeps importing
+ * the module's public surface (the re-exports and the boot wiring) and re-exports `gameplaySession`, so every caller keeps importing
  * from `./analytics` exactly as before.
  *
  * The event vocabulary and the send choke point live in `analyticsCore.ts`, the
@@ -272,15 +271,9 @@ class GameplaySession {
       this.resumedAt = null;
     }
     // Nothing below runs while the gate is shut, and the reason is the LATCHES
-    // rather than the sends. Every `trackEvent` here already declines to send with
-    // sharing off, but each latch is set BEFORE the call it guards, so a page-hide
-    // during an off stretch would mark the depth and fps summaries reported and
-    // suppress them for the rest of the session even after the player turned
-    // sharing back on. It also keeps a summary out of the first-run hold, which a
-    // later reset could not undo: a held event freezes its payload at emit time,
-    // so a summary computed before the answer would still carry those totals when
-    // the queue drains after a grant (see `desktopConsent.ts`). The clock above is
-    // banked either way, so an off-stretch hide still stops counting time.
+    // rather than the sends: each latch is set BEFORE the call it guards, so a
+    // page-hide off a real deployment would otherwise mark the summaries
+    // reported. The clock above is banked either way.
     if (!telemetryHostAllowed()) return;
     // Session depth, emitted AT MOST ONCE per session (the first `end` after
     // something was built). `end` re-fires on every tab-hide, and these events
@@ -358,32 +351,13 @@ class GameplaySession {
   /**
    * Open a fresh measurement window: drop everything banked so far, and re-open
    * every latch, so the next summary describes only what happens from here.
+   * The engine's pending gameplay events are dropped unsent with the window.
    *
-   * Called on any change of the desktop consent answer, in BOTH directions (see
-   * the subscription below this class), which is what keeps the accumulators
-   * describing one consent state at a time:
-   *
-   * - Turning sharing ON drops what came before it, so no summary emitted after
-   *   the grant can describe play the player had not agreed to share. That is the
-   *   half that matters most: the totals are cumulative and the summaries fire
-   *   late, so without this a grant at the end of a session would report the
-   *   whole session.
-   * - Turning sharing OFF drops the same way, which is what stops the window up
-   *   to that moment from being transmitted later.
-   *
-   * Three things deliberately survive. `armed` does, because the page-hide
-   * listeners are wired once per tab and a second pair would double-count
-   * `session_end`. The boot-set common props do, because they describe the build
-   * and the device rather than the play. The crash throttle does, because it is a
-   * flood guard rather than a measurement: see {@link releaseCrashThrottle}.
-   *
-   * The per-tower `first_build` latch and the per-tool `tool_used` latch DO re-open
-   * with everything else, so a window that opens mid-play reports the funnel step
-   * and the tool mix it sees rather than staying silenced by an earlier window
-   * nothing was sent from. The price is one repeat of each on the one path where
-   * the earlier window WAS transmitted (a first run whose held queue flushed on
-   * the grant), the cheaper side of that trade for two deduped, rare events. That
-   * same path is why the crash throttle, ten slots rather than one shot, is not.
+   * Two things deliberately survive: `armed`, because the page-hide listeners
+   * are wired once per tab and a second pair would double-count `session_end`,
+   * and the boot-set common props, which describe the build rather than the
+   * play. The crash throttle survives too, since it is a flood guard rather than
+   * a measurement; {@link releaseCrashThrottle} hands it back separately.
    */
   startEpoch(): void {
     // What the engine emitted before this moment belongs to the window that is
