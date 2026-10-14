@@ -421,8 +421,8 @@ pub fn read_frame(sim: &Simulation) -> Result<usize, String> {
         return Err(format!("the frame records end at {at} of {}", v.len()));
     }
     // The log ring is numbered back from `log_seq`: the newest entry is
-    // `log_seq`, every entry is after a number below the ring, none after
-    // `log_seq` itself.
+    // `log_seq`, asking from below the ring returns every entry, and asking
+    // from `log_seq` returns none.
     let entries = |seq: i64| -> Result<Vec<Value>, String> {
         log_since(sim, seq)
             .as_array()

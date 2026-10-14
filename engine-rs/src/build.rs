@@ -275,9 +275,9 @@ impl Simulation {
         let f = kind.facility();
         // Saturating, as are the placement checks, so an out-of-range span
         // from a native host prices without overflowing: an elevator's price
-        // then outruns any balance and the money check refuses it, and a
-        // fixed-price shaft reaches the placement rules. Any span the tower
-        // can hold is exact.
+        // then outruns any ordinary balance, so the money check refuses it
+        // (failing that, the span rule does), and a fixed-price shaft reaches
+        // the placement rules. Any span the tower can hold is exact.
         let span = top.saturating_sub(bottom);
         let extra = if kind.is_elevator() {
             span as f64 * crate::charges::TRANSPORT_FLOOR_COST
@@ -433,9 +433,10 @@ mod tests {
         sim
     }
 
-    /// `can_build_transport` answers what `build_transport` then does: the
-    /// same verdict and reason, and on success a charge of exactly the
-    /// quoted price, over every transport kind (and one room kind), spans
+    /// `can_build_transport` answers what `build_transport` then does. The
+    /// build refuses through the quote, so its refusals match by
+    /// construction; what this pins is that a quote that passes is a shaft
+    /// placed and a charge of exactly the quoted price, over every transport kind (and one room kind), spans
     /// that fit, are too short or too tall, positions on and off the lot,
     /// locked and unlocked, with money flush, exact and one dollar short.
     #[test]
@@ -469,6 +470,7 @@ mod tests {
                             let quote = sim.can_build_transport(kind, x, bottom, top);
                             let p = *price.get_or_insert(quote.cost);
                             assert_eq!(quote.cost, p);
+                            let shafts = sim.tower.transports.len();
                             let built = sim.build_transport(kind, x, bottom, top);
                             let case =
                                 format!("{mode:?} {star}★ {kind:?} x{x} {bottom}..{top} ${money}");
@@ -476,6 +478,8 @@ mod tests {
                             assert_eq!(built.reason, quote.reason, "{case}");
                             if quote.ok {
                                 assert_eq!(money - sim.money, p, "{case}");
+                                // The quote passed, so the shaft really stands.
+                                assert_eq!(sim.tower.transports.len(), shafts + 1, "{case}");
                                 placed += 1;
                             } else {
                                 assert_eq!(sim.money, money, "{case}");
