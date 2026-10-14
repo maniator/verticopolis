@@ -6,12 +6,14 @@
  * `scripts/gen-third-party-notices.ts` lists it whenever the engine ships, so
  * a site build needs no Rust toolchain to attribute the engine.
  *
- * The record is `{ sources, crates }`: `sources` is the package's BUILD.json
- * source hash, so the notices generator can refuse a record left over from
- * another build. The crate list is `cargo metadata` resolved for the same target and
- * features as the build (see `shippedCrates`). Throws, naming every crate at
- * fault, on a missing license file or a license outside the allowlist, so
- * an unattributable engine never gets packaged.
+ * The record is `{ sources, wasm, crates }`: `sources` is the package's
+ * BUILD.json source hash and `wasm` the SHA-256 of the `.wasm` it describes
+ * (both written by `scripts/wasm-build.ts`), so the notices generator can
+ * refuse a record left over from another build. The crate list is
+ * `cargo metadata` resolved for the same target and features as the build,
+ * narrowed by `cargo tree -e normal` (see `shippedCrates`). Throws, naming
+ * every crate at fault, on a missing license file or a license outside the
+ * allowlist, so an unattributable engine never gets packaged.
  *
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */
@@ -64,7 +66,7 @@ export function checkToolchain(crate: string, rustVersion: string): void {
     throw new Error(`rustc ${version} is not ${want}, the release the engine's notices record is built with; run: rustup toolchain install ${want} --target wasm32-unknown-unknown, then build with RUSTUP_TOOLCHAIN=${want}`);
   }
   const missing = files.filter((f) => !existsSync(f));
-  if (missing.length > 0) throw new Error(`the Rust toolchain ships no ${missing.join(", ")}, so the standard library cannot be attributed; install Rust with rustup`);
+  if (missing.length > 0) throw new Error(`the Rust toolchain ships no ${missing.join(", ")}, so the standard library cannot be attributed; use a rustup toolchain with its rustc component (its docs carry these files)`);
 }
 
 /** The standard library the toolchain links into every Rust binary, from the toolchain's own copyright notice. */
@@ -81,10 +83,14 @@ function standardLibrary(crate: string): NoticePackage & { hasLicenseFile: true 
   if (notice === "") throw new Error(`the Rust toolchain's ${files[0]} has no text; the standard library cannot be attributed`);
   // Zlib (foldhash) has no license file in the toolchain; its text is the
   // notice the page carries in foldhash's own section.
-  const start = notice.indexOf("\u{1F4E6} foldhash-");
-  const next = notice.indexOf("\u{1F4E6}", start + 1);
-  const foldhash = start < 0 ? "" : notice.slice(start, next < 0 ? undefined : next);
-  if (!foldhash.includes("This software is provided 'as-is'")) {
+  // The part's own section: from its heading (as stdLicenseProblems reads it,
+  // with or without the package mark) to the next part's.
+  const heading = /^[ \t]*(?:\u{1F4E6}[ \t]*)?foldhash-\d[^\n]*$/mu.exec(notice);
+  const after = heading ? notice.slice(heading.index + heading[0].length) : "";
+  const next = /^[ \t]*\u{1F4E6}/mu.exec(after);
+  const foldhash = next ? after.slice(0, next.index) : after;
+  // Two sentences only the zlib license has.
+  if (!foldhash.includes("This software is provided 'as-is'") || !foldhash.includes("Altered source versions must be plainly marked as such")) {
     throw new Error(`the Rust toolchain's ${files[0]} no longer carries foldhash's Zlib notice; the standard library cannot be attributed`);
   }
   return {

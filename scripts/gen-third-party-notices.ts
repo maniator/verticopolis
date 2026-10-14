@@ -217,6 +217,7 @@ for (const [dir, origin] of dirs) {
 // without one: any file under dist/engine/ (the glue, the .wasm, or both)
 // requires it.
 const engineDir = join(DIST, "engine");
+const ENGINE_FILES = new Set(["verticopolis_engine.js", "verticopolis_engine_bg.wasm", "BUILD.json", ENGINE_THIRD_PARTY]);
 if (existsSync(engineDir) && (!statSync(engineDir).isDirectory() || readdirSync(engineDir).length > 0)) {
   const recordPath = join(DIST, "engine", ENGINE_THIRD_PARTY);
   const read = (path: string): unknown => {
@@ -228,7 +229,17 @@ if (existsSync(engineDir) && (!statSync(engineDir).isDirectory() || readdirSync(
   };
   const build = read(join(DIST, "engine", "BUILD.json")) as { sources?: unknown } | null;
   const wasmPath = join(DIST, "engine", "verticopolis_engine_bg.wasm");
-  const wasm = existsSync(wasmPath) ? createHash("sha256").update(readFileSync(wasmPath)).digest("hex") : null;
+  let wasm: string | null = null;
+  if (existsSync(wasmPath)) {
+    try {
+      wasm = createHash("sha256").update(readFileSync(wasmPath)).digest("hex");
+    } catch {
+      fail(`${relative(ROOT, wasmPath)} cannot be read`);
+    }
+  }
+  // The record describes this package and nothing else, so another file here would ship unattributed.
+  const extra = statSync(engineDir).isDirectory() ? readdirSync(engineDir).filter((f) => !ENGINE_FILES.has(f)) : [];
+  if (extra.length > 0) problems.push(`dist/engine/ ships ${extra.join(", ")}, which the engine's record does not describe`);
   const engine = engineRecordPackages(read(recordPath), { sources: build?.sources, wasm });
   problems.push(...engine.problems.map((p) => `${relative(ROOT, recordPath)}: ${p}`));
   packages.push(...engine.packages);

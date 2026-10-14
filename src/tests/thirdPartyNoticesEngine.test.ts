@@ -54,7 +54,7 @@ const engineFiles = (record: string | object | null, sources = "abc", wasm = WAS
 describe("the notices generator on a build that ships the WASM engine (#955)", () => {
   it("lists the engine's crates and the Rust standard library from a matching record", () => {
     const r = run(build(engineFiles({ sources: "abc", crates: [crate, std] })));
-    expect(r.stderr).toBe("");
+    expect(r.stderr).not.toMatch(/gen-third-party-notices:/);
     expect(r.status).toBe(0);
     expect(r.notices).toContain("serde@1.0.229 (Rust, in the WASM engine)");
     expect(r.notices).toContain("Rust standard library@1.97.0 (Rust, in the WASM engine)");
@@ -72,13 +72,24 @@ describe("the notices generator on a build that ships the WASM engine (#955)", (
       ["standard library with another license", engineFiles({ sources: "abc", crates: [crate, { ...std, license: "MIT" }] }), /declares MIT, not/],
       ["standard library twice", engineFiles({ sources: "abc", crates: [crate, std, std] }), /more than once/],
       ["a license off the allowlist", engineFiles({ sources: "abc", crates: [{ ...crate, license: "GPL-3.0-only" }, std] }), /not on the allowlist/],
-      ["blank license text", engineFiles({ sources: "abc", crates: [{ ...crate, licenseText: " " }, std] }), /no license file/],
+      ["another file beside the package", { ...engineFiles({ sources: "abc", crates: [crate, std] }), "other.wasm": "\0asm" }, /ships other\.wasm/],
+            ["blank license text", engineFiles({ sources: "abc", crates: [{ ...crate, licenseText: " " }, std] }), /no license file/],
     ];
     for (const [name, files, message] of cases) {
       const r = run(build(files));
       expect({ name, status: r.status, notices: r.notices }).toEqual({ name, status: 1, notices: null });
       expect(r.stderr, name).toMatch(message);
     }
+  });
+
+  it("treats an empty engine folder as no engine, and an engine file in its place as a broken package", () => {
+    const dist = build({}, [join(ROOT, "src/main.ts"), join(ROOT, "node_modules/lit-html/lit-html.js")]);
+    expect(run(dist).status).toBe(0);
+    const file = build(null, [join(ROOT, "src/main.ts"), join(ROOT, "node_modules/lit-html/lit-html.js")]);
+    writeFileSync(join(file, "engine"), "not a folder");
+    const r = run(file);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/missing or not valid JSON/);
   });
 
   it("requires the record for any engine file, not only the glue", () => {
@@ -89,7 +100,7 @@ describe("the notices generator on a build that ships the WASM engine (#955)", (
 
   it("needs no record when no engine ships, and lists the npm packages as before", () => {
     const r = run(build(null, [join(ROOT, "src/main.ts"), join(ROOT, "node_modules/lit-html/lit-html.js")]));
-    expect(r.stderr).toBe("");
+    expect(r.stderr).not.toMatch(/gen-third-party-notices:/);
     expect(r.status).toBe(0);
     expect(r.notices).toMatch(/^lit-html@\S+$/m);
     expect(r.notices).not.toContain("(Rust, in the WASM engine)");

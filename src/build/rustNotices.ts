@@ -97,7 +97,8 @@ export function engineRecordPackages(record: unknown, shipped: { sources: unknow
   const r = (typeof record === "object" && record !== null ? record : {}) as { sources?: unknown; wasm?: unknown; crates?: unknown };
   if (typeof r.sources !== "string" || r.sources === "" || r.sources !== shipped.sources) {
     problems.push("the record was not written by the build of the engine that ships (its source hash differs from BUILD.json)");
-  }  if (shipped.wasm === null) problems.push("the engine package ships no verticopolis_engine_bg.wasm");
+  }
+  if (shipped.wasm === null) problems.push("the engine package ships no verticopolis_engine_bg.wasm");
   else if (r.wasm !== shipped.wasm) problems.push("the record was not written for the .wasm that ships (its SHA-256 differs)");
 
   if (!Array.isArray(r.crates) || r.crates.length === 0) return { packages, problems: [...problems, "the record lists no crates"] };
@@ -187,11 +188,17 @@ export const STD_REVIEWED_PARTS: Record<string, { license: string; wasm32: boole
 export function stdLicenseProblems(copyrightHtml: string, stdLicense: string): string[] {
   const parts: { name: string; licenses: string[] }[] = [];
   const problems: string[] = [];
-  const re = /<b>File\/Directory:<\/b>\s*<code>([^<]*)<\/code>|<h3\b[^>]*>([\s\S]*?)<\/h3>|<b>License:<\/b>\s*([^<]*)/gu;
+  const re = /<b>File\/Directory:<\/b>\s*<code>([^<]*)<\/code>|<h3\b[^>]*>([\s\S]*?)<\/h3>|<b>License:<\/b>\s*([^<]*)/giu;
+  let dirs = 0;
   let h3s = 0;
   let licenses = 0;
-  for (const m of copyrightHtml.matchAll(re)) {
-    if (m[1] !== undefined) parts.push({ name: m[1].trim(), licenses: [] });
+  // Commented-out markup is not on the page.
+  const html = copyrightHtml.replace(/<!--[\s\S]*?-->/g, "");
+  for (const m of html.matchAll(re)) {
+    if (m[1] !== undefined) {
+      dirs++;
+      parts.push({ name: m[1].trim(), licenses: [] });
+    }
     else if (m[2] !== undefined) {
       h3s++;
       const heading = m[2].replace(/<[^>]*>/g, "").replace(/\u{1F4E6}/gu, "").trim();
@@ -205,19 +212,24 @@ export function stdLicenseProblems(copyrightHtml: string, stdLicense: string): s
     }
   }
   if (parts.length === 0) return ["the toolchain's copyright page lists no parts with a license; its layout may have changed"];
-  // Every heading and every "License:" on the page must be one this parse
-  // read, so a relabeled or restyled part fails rather than slipping past.
-  const rawH3s = (copyrightHtml.match(/<h3\b/g) ?? []).length;
-  const rawLicenses = (copyrightHtml.match(/License\s*(?:<\/\w+>\s*)?:/g) ?? []).length;
-  if (rawH3s !== h3s || rawLicenses !== licenses) {
-    problems.push(`the toolchain's copyright page has ${rawH3s} parts and ${rawLicenses} license lines, of which ${h3s} and ${licenses} were read; its layout may have changed`);
+  // Every part heading and license label on the page must be one this parse
+  // read, and each part has exactly one license line, so a restyled or
+  // relabeled part fails instead of lending its license to its neighbor.
+  const rawH3s = (html.match(/<h3\b/gi) ?? []).length;
+  const rawDirs = (html.match(/File\s*\/\s*Directory/gi) ?? []).length;
+  const rawLicenses = (html.match(/<(?:b|strong)>\s*License\b/gi) ?? []).length;
+  if (rawH3s !== h3s || rawDirs !== dirs || rawLicenses !== licenses || licenses !== parts.length) {
+    problems.push(
+      `the toolchain's copyright page has ${rawH3s + rawDirs} parts and ${rawLicenses} license lines, of which ${h3s + dirs} and ${licenses} were read; its layout may have changed`,
+    );
   }
   // A part reviewed as reaching wasm32 must still be listed, or the review no
   // longer describes this toolchain.
   for (const [name, reviewed] of Object.entries(STD_REVIEWED_PARTS)) {
     if (reviewed.wasm32 && !parts.some((p) => p.name === name)) problems.push(`${name} (${reviewed.why}) is no longer listed; review the standard library's parts again`);
   }
-  const tokens = new Set(stdLicense.split(/[\s()]+/).filter(Boolean));
+  const spdxIds = (expression: string) => expression.split(/[\s()]+/).filter((t) => t !== "" && !/^(AND|OR|WITH)$/.test(t));
+  const tokens = new Set(spdxIds(stdLicense));
   const offersMitOrApache = (license: string) =>
     license
       .replace(/^\((.*)\)$/, "$1")
@@ -227,10 +239,10 @@ export function stdLicenseProblems(copyrightHtml: string, stdLicense: string): s
   for (const p of parts) {
     if (p.licenses.length === 0) problems.push(`${p.name} has no license line the parse could read`);
     for (const license of p.licenses) {
-      const reviewed = STD_REVIEWED_PARTS[p.name];
+      const reviewed = Object.prototype.hasOwnProperty.call(STD_REVIEWED_PARTS, p.name) ? STD_REVIEWED_PARTS[p.name] : undefined;
       if (reviewed) {
         if (reviewed.license !== license) problems.push(`${p.name} is now ${license} (reviewed as ${reviewed.license})`);
-        else if (reviewed.wasm32 && !tokens.has(reviewed.license)) problems.push(`${p.name} (${license}) reaches wasm32 but the entry's license leaves it out`);
+        else if (reviewed.wasm32 && !spdxIds(reviewed.license).every((id) => tokens.has(id))) problems.push(`${p.name} (${license}) reaches wasm32 but the entry's license leaves it out`);
       } else if (/\bAND\b/.test(license) || !offersMitOrApache(license)) {
         problems.push(`${p.name} is ${license}, which is not reviewed; decide whether it reaches wasm32 and add it to STD_REVIEWED_PARTS`);
       }
