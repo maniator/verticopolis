@@ -3,6 +3,7 @@ import type { Simulation } from "../Simulation";
 import { ECON, carResaleRefund, extendBill, resaleRefund } from "../econConfig";
 import { isElevatorKind, maxCarsFor } from "../facilities";
 import type { GameplayRemovalMethod } from "../gameplayEvents";
+import { INVALID_REQUEST, whole } from "../request";
 import type { Transport } from "../types";
 
 /**
@@ -50,16 +51,12 @@ export const ONLY_ELEVATOR_EXTEND = "Only elevators can be extended.";
 export const CAR_LIMIT = "This elevator has all the cars it can hold.";
 export const LAST_CAR = "An elevator needs at least one car.";
 export const FACILITY_GONE = "That facility is gone.";
-/** The one refusal for a malformed command (#923): an id or floor that is
- *  not a whole number, or an `end` or `method` the command does not know.
- *  The web never sends one; a second frontend or a relay might. */
-export const INVALID_REQUEST = "That request is not valid.";
+/** The one refusal for a malformed command (#923), shared with the other
+ *  relayed commands (#996) from `../request`. */
+export { INVALID_REQUEST };
 
 const refuse = (reason: string): ChargeResult => ({ ok: false, reason, delta: 0 });
 
-/** A whole number a command may take: a safe integer, so both engines read
- *  the same value (the Rust binding reads a raw JS number and checks the same). */
-const whole = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v);
 const isEnd = (v: unknown): v is "up" | "down" => v === "up" || v === "down";
 const isMethod = (v: unknown): v is RemovalMethod => v === "sell" || v === "bulldoze";
 

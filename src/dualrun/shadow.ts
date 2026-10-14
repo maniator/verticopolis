@@ -60,7 +60,9 @@ export class ShadowEngine {
       case "endExtend": this.live().endExtend(); return null;
       case "removeFacility": this.live().removeFacility(cmd.id, cmd.method); return null;
       case "setSchedule": this.live().setSchedule(cmd.id, JSON.stringify(cmd.schedule ?? null)); return null;
-      case "setStop": this.live().setStop(cmd.id, cmd.floor, cmd.stop); return null;
+      // A null stop is the mirror's relay of a non-boolean, which the binding
+      // reads raw and refuses as TypeScript did (#996).
+      case "setStop": this.live().setStop(cmd.id, cmd.floor, cmd.stop as boolean); return null;
       case "setExpressStops": this.live().setExpressStops(cmd.id); return null;
       case "clearStops": this.live().clearStops(cmd.id); return null;
       case "adjustRent": this.live().adjustRent(cmd.id, cmd.dir); return null;

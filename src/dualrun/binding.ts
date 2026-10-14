@@ -29,8 +29,9 @@ export const INSTANCE_METHODS = [
   "startFire", "fires", "bombThreat", "evaluateStar", "callExterminator", "autoBridge", "toggleAutoBridge", "setFilmPolicy",
   "rerollSubtype", "applyRentBatch", "pendingChoice", "resolveChoice", "tick", "serialize", "stateView", "crowdView",
   "stateDigest", "crowdDigest", "frameView", "logSince", "elevatorTelemetry", "seedElevatorTelemetry", "advanceClock",
-  "seedLoopMemos", "loopMemos", "housekeepingReport", "drainGameplayEvents", "gameplayEventsDropped",
-  "addCar", "removeCar", "beginExtend", "extendTransport", "endExtend", "removeFacility", "towerSetCars", "towerResizeTransport",
+  "seedLoopMemos", "loopMemos", "housekeepingReport", "drainGameplayEvents", "gameplayEventsPending",
+  "gameplayEventsDropped", "addCar", "removeCar", "beginExtend", "extendTransport", "endExtend", "removeFacility", "towerSetCars",
+  "towerResizeTransport",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 

@@ -71,6 +71,17 @@ export class GameplayEventBuffer {
     for (const e of own) this.pushEvent(e);
   }
 
+  /** Make this buffer hold exactly `batch`, oldest first, with `dropped` as
+   *  its drop count: how a host hands a drained batch back to the tower that
+   *  becomes the authority again. Whatever the buffer held is discarded. A
+   *  batch longer than the ring drops its oldest and counts them, as a push
+   *  does. */
+  restore(batch: readonly GameplayEvent[], dropped: number): void {
+    this.drain();
+    this.dropped = dropped;
+    for (const e of batch) this.pushEvent(e);
+  }
+
   get length(): number {
     return this.ring.length;
   }
