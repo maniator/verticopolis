@@ -1,11 +1,13 @@
 import type { Simulation, LogEntry } from "../engine/Simulation";
-import { FACILITIES } from "../engine/facilities";
+import { catalogFacility } from "../engine/catalogTypes";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { UI } from "./UI";
 import { render } from "lit-html";
 import { appendMessageWithIcons } from "./icons";
-import { syncPaletteTabs } from "./uiPalette";
+import { relabelPalette, syncPaletteTabs } from "./uiPalette";
+import { toolInfoFor } from "./templates/toolInfo";
 import { towerStatsTemplate } from "./templates/towerStats";
+import { towerCatalog } from "../engine/towerCatalog";
 
 /**
  * Status-bar, palette-lock, tower-stats and bulletin-log rendering for
@@ -47,6 +49,16 @@ export function update(ui: UI, sim: Simulation): void {
   ui.el.time.textContent = sim.clock.format();
   ui.el.date.textContent = sim.clock.formatRetroDate();
 
+  // The palette and the build tool's card show the tower's catalog: redraw
+  // them when it is no longer the one they were drawn from (a WASM host
+  // attached or let go, or a tower was swapped in), so a hosted tower never
+  // shows the TypeScript tables' values (#921).
+  const catalog = towerCatalog(sim);
+  if (catalog !== ui.paletteCatalog) {
+    relabelPalette(ui, catalog);
+    if (ui.tool.type === "build") render(toolInfoFor(catalog, ui.tool.kind), ui.el.toolInfo);
+  }
+
   // Dirty-gate the palette lock/afford scan (E5-S3): its DOM pass depends on the
   // star and the mode (isUnlocked is star-vs-minStar, plus a Modern-only gate for
   // modernOnly kinds like the Food Hall) and on which kinds the current funds can
@@ -57,7 +69,7 @@ export function update(ui: UI, sim: Simulation): void {
   // ~6 Hz pump skips the two querySelectorAll walks and the class writes almost
   // always. The key is a cheap string over engine data (no DOM reads).
   let scanKey = sim.mode + ":" + sim.star;
-  for (const kind in FACILITIES) scanKey += sim.money >= FACILITIES[kind as FacilityKind].cost ? "1" : "0";
+  for (const f of catalog.facilities) scanKey += sim.money >= f.cost ? "1" : "0";
   if (scanKey !== ui.paletteScanKey) {
     ui.paletteScanKey = scanKey;
     // Palette unlock state. Parity with the original: a locked facility is HIDDEN
@@ -67,7 +79,7 @@ export function update(ui: UI, sim: Simulation): void {
     ui.el.palette.querySelectorAll<HTMLElement>(".pal-item[data-kind]").forEach((item) => {
       const kind = item.dataset.kind as FacilityKind;
       const locked = !sim.isUnlocked(kind);
-      const affordable = sim.money >= FACILITIES[kind].cost;
+      const affordable = sim.money >= catalogFacility(catalog, kind).cost;
       item.classList.toggle("locked", locked);
       item.classList.toggle("unaffordable", !locked && !affordable);
     });
