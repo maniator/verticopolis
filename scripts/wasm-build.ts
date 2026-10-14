@@ -11,16 +11,20 @@
  * (and the bridge's rules beside it, src/engine/gameplayEventRules.ts)
  * from conformance/events/catalog.json (the same as `npm run gen:events`).
  * The browser target lands in src/public/engine/ with a BUILD.json naming the
- * sources it came from (see src/wasmhost/packageHash.ts).
+ * sources it came from (see src/wasmhost/packageHash.ts) and a
+ * THIRD-PARTY.json listing the crates compiled into it (see
+ * scripts/engine-third-party.ts).
  * Needs the wasm32-unknown-unknown target and a wasm-bindgen CLI of the
  * version Cargo.toml pins (`rustup target add wasm32-unknown-unknown`,
  * `cargo install wasm-bindgen-cli --locked --version <pinned>`).
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { engineSourceHash } from "../src/wasmhost/packageHash.ts";
+import { ENGINE_THIRD_PARTY, checkToolchain, engineThirdParty } from "./engine-third-party.ts";
 import { checkCatalog, renderGameplayEventRules, renderGameplayEventsDts } from "../src/engine/gameplayCatalog.ts";
 
 const CRATES: Record<string, { dir: string; lib: string }> = {
@@ -54,12 +58,25 @@ const cli = /^wasm-bindgen (\d+\.\d+\.\d+)\r?$/m.exec(probe)?.[1];
 if (!cli) throw new Error(`wasm-bindgen --version printed something unexpected: ${probe.trim()}`);
 if (cli !== pinned) throw new Error(`wasm-bindgen CLI ${cli} does not match the pinned crate ${pinned}; ${install}`);
 
+// The engine's notices record names the standard library it links, so the
+// toolchain is checked before the compile rather than after it.
+if (which === "engine") {
+  const rustVersion = /^rust-version\s*=\s*"([0-9.]+)"/m.exec(readFileSync(resolve(crate, "Cargo.toml"), "utf8"))?.[1];
+  if (!rustVersion) throw new Error(`${target.dir}/Cargo.toml declares no rust-version`);
+  checkToolchain(crate, rustVersion);
+}
+// The engine's crates and the Rust standard library, with their licenses,
+// gathered before anything is compiled or written, so a crate that cannot be
+// attributed stops the build with the old package still in place (#955).
+// One feature list for the record and the compile, so they describe the same build.
+const FEATURES = "wasm";
+const engineRecord = which === "engine" ? engineThirdParty(crate, FEATURES) : [];
 const run = (cmd: string, args: string[]) => execFileSync(cmd, args, { cwd: crate, stdio: "inherit" });
 // The crate is an rlib; the cdylib is asked for here so the native build
 // stays as it is. The old package goes first, so a failed run leaves no
 // stale package behind for the suite to replay.
 rmSync(resolve(crate, "pkg"), { recursive: true, force: true });
-run("cargo", ["rustc", "--locked", "--release", "--lib", "--target", "wasm32-unknown-unknown", "--features", "wasm", "--crate-type", "cdylib"]);
+run("cargo", ["rustc", "--locked", "--release", "--lib", "--target", "wasm32-unknown-unknown", "--features", FEATURES, "--crate-type", "cdylib"]);
 const wasm = `target/wasm32-unknown-unknown/release/${target.lib}.wasm`;
 run("wasm-bindgen", ["--target", "nodejs", "--out-dir", "pkg", wasm]);
 writeFileSync(resolve(crate, "pkg/package.json"), '{ "type": "commonjs" }\n');
@@ -82,7 +99,15 @@ if (which === "engine") {
   // The web target's own declaration is not needed next to the served files.
   rmSync(resolve(web, "verticopolis_engine.d.ts"), { force: true });
   rmSync(resolve(web, "verticopolis_engine_bg.wasm.d.ts"), { force: true });
-  writeFileSync(resolve(web, "BUILD.json"), `${JSON.stringify({ sources: engineSourceHash(crate) }, null, 2)}\n`);
+  const sources = engineSourceHash(crate);
+  writeFileSync(resolve(web, "BUILD.json"), `${JSON.stringify({ sources }, null, 2)}\n`);
+  // The crates and the standard library compiled into the package, with
+  // their licenses, so the site's notices can list them without a Rust
+  // toolchain (#955).
+  // The record also names the .wasm it describes, so the site build can tell a
+  // record from another build of the same sources (or a .wasm copied in).
+  const wasmSha = createHash("sha256").update(readFileSync(resolve(web, "verticopolis_engine_bg.wasm"))).digest("hex");
+  writeFileSync(resolve(web, ENGINE_THIRD_PARTY), `${JSON.stringify({ sources, wasm: wasmSha, crates: engineRecord }, null, 2)}\n`);
   // The class declaration is the same for both targets; the Node copy is the
   // committed one (`src/dualrun/binding.ts` types against it).
   copyFileSync(resolve(crate, "pkg/verticopolis_engine.d.ts"), resolve(crate, "../src/dualrun/engine.d.ts"));

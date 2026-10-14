@@ -3,6 +3,9 @@ import type { GameApp } from "../main";
 import type { Simulation } from "../engine/Simulation";
 import { showStats, showSaves, saveToSlot, loadFromSlot, deleteSlot, showTowerPicker, loadFromSplash } from "./appModals";
 import { SaveGame } from "../storage/SaveGame";
+import { catalogFor } from "../engine/catalog";
+import { useTowerCatalogSource } from "../engine/towerCatalog";
+import type { CatalogEconomy } from "../engine/catalogTypes";
 
 /**
  * These pin the stats/exterminator/save-slot commands against a hand-built fake
@@ -43,7 +46,7 @@ interface Refusal {
 interface SimShape {
   view: unknown;
   exterminationDueDay: number | undefined;
-  rules: { infestationRecovery: ReturnType<typeof vi.fn> };
+  mode: "modern";
   housekeepingCoverage: ReturnType<typeof vi.fn>;
   callExterminator: ReturnType<typeof vi.fn>;
   emit: ReturnType<typeof vi.fn>;
@@ -52,15 +55,26 @@ interface SimShape {
 /** A sim where the exterminator is offerable: Modern recovery exists, rooms are
  *  infested, and none is en route. Callers dial the pieces they need. */
 function makeSim(over: Partial<SimShape> = {}): SimShape {
-  return {
+  const sim: SimShape = {
     view: null,
     exterminationDueDay: undefined,
-    rules: { infestationRecovery: vi.fn(() => ({ calloutFee: 100, perRoomFee: 50 })) },
+    mode: "modern",
     housekeepingCoverage: vi.fn(() => ({ infested: 2 })),
     callExterminator: vi.fn(() => ({ ok: true })),
     emit: vi.fn(),
     ...over,
   };
+  withExterminator(sim, { calloutFee: 100, perRoomFee: 50 });
+  return sim;
+}
+
+/** Point the fake tower's catalog at one whose exterminator is `rec` (null:
+ *  no exterminator, the Classic case). The commands read it from the tower's
+ *  catalog (#921). */
+function withExterminator(sim: SimShape, rec: CatalogEconomy["exterminator"]): void {
+  const base = catalogFor("modern");
+  const catalog = { ...base, economy: { ...base.economy, exterminator: rec } };
+  useTowerCatalogSource(sim, () => catalog);
 }
 
 function makeApp(sim: SimShape) {
@@ -101,7 +115,8 @@ describe("showStats", () => {
 
   it("wires NO handlers when the action is not offerable", () => {
     // No recovery rule (Classic-style): canCallExterminator is false.
-    const sim = makeSim({ rules: { infestationRecovery: vi.fn(() => null) } });
+    const sim = makeSim();
+    withExterminator(sim, null);
     const { app, ui } = makeApp(sim);
     showStats(app);
     const handlers = ui.showStats.mock.calls[0][1] as Record<string, () => void>;
@@ -190,7 +205,7 @@ describe("confirmExterminate refusals surfaced by the confirm callback", () => {
     const { app, ui } = makeApp(sim);
     showStats(app);
     const handlers = ui.showStats.mock.calls[0][1] as Record<string, () => void>;
-    sim.rules.infestationRecovery.mockReturnValue(null);
+    withExterminator(sim, null);
     handlers.exterminate();
     expect(ui.confirmModal).not.toHaveBeenCalled();
     expect(sim.emit).toHaveBeenCalledExactlyOnceWith("The exterminator is unavailable.", "bad");

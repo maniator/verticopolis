@@ -175,12 +175,14 @@ function wasmParityProjects() {
     "**/dualRunDay.integration.test.ts",
     "**/dualRunEdits.integration.test.ts",
     "**/loaderCases.integration.test.ts",
+    // The engine comparison's own checks run each engine themselves (#972).
+    "**/perfCompare/*.integration.test.ts",
     "**/wasmHost.integration.test.ts",
     "**/wasmHostCatalog.integration.test.ts",
     "**/wasmHostLogText.integration.test.ts",
     "**/wasmHostTelemetry.integration.test.ts",
   ];
-  const setupFiles = ["src/tests/parity/wasmHostSetup.ts"];
+  const setupFiles = ["src/tests/viewWorldSetup.ts", "src/tests/parity/wasmHostSetup.ts"];
   return [
     {
       extends: true,
@@ -421,6 +423,7 @@ export default defineConfig({
         test: {
           name: "unit",
           include: ["src/**/*.test.ts"],
+          setupFiles: ["src/tests/viewWorldSetup.ts"],
           // Setting `exclude` on a project REPLACES Vitest's built-in defaults
           // (node_modules, dist, etc.), so spread them back in before adding our
           // own. The `include` is scoped to `src/**` today so nothing vendored is
@@ -435,6 +438,7 @@ export default defineConfig({
         test: {
           name: "integration",
           include: ["src/**/*.integration.test.ts"],
+          setupFiles: ["src/tests/viewWorldSetup.ts"],
         },
       },
       // The parity projects (story-engine-test-parity, #878): the same two

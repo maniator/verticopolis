@@ -30,10 +30,7 @@ export const RENTAL_FACILITIES: Record<RentalKind, Facility> = {
     cost: 22000,
     minStar: 2,
     population: 1,
-    color: "#86c5a8",
     modernOnly: true,
-    description:
-      "Modern: a small rented studio. Pays monthly rent you set; the easygoing tenant stays unless the tower gets truly bad. Modern only.",
   },
   rentalApartment: {
     kind: "rentalApartment",
@@ -43,10 +40,7 @@ export const RENTAL_FACILITIES: Record<RentalKind, Facility> = {
     cost: 60000,
     minStar: 3,
     population: 2,
-    color: "#a8c06a",
     modernOnly: true,
-    description:
-      "Modern: a rented apartment for a small household. Higher monthly rent you set, but noise, a bad commute, or over-high rent drives the tenant out. Modern only.",
   },
 };
 

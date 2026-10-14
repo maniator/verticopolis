@@ -80,26 +80,124 @@ fn extend_json(r: &crate::charges::ExtendResult) -> Value {
     v
 }
 
-fn parse_extend_end(s: &str) -> Result<crate::charges::ExtendEnd, String> {
-    crate::charges::ExtendEnd::parse(s).ok_or_else(|| format!("end must be up or down, got {s}"))
+/// A high-water mark as JSON `{ bottom, top }` text, whole floors; `None`
+/// for anything else, which the command refuses as malformed (#923). Each
+/// field must be written as a JSON integer within `Number.isSafeInteger`'s
+/// range: a number written with a fraction or an exponent (`2.0`, `1e3`,
+/// `9007199254740990.5`, which an `f64` would round to a whole number) is
+/// refused rather than rounded. The commands read marks through
+/// [`parse_mark`], which takes the text `null` as no mark; this is its field
+/// rule alone, for the tests, so `null` is `None` here too.
+#[cfg(test)]
+fn parse_hwm(text: &str) -> Option<(i64, i64)> {
+    parse_mark(text).flatten()
 }
 
-fn parse_removal_method(s: &str) -> Result<crate::gameplay::RemovalMethod, String> {
-    crate::gameplay::RemovalMethod::parse(s)
-        .ok_or_else(|| format!("method must be sell or bulldoze, got {s}"))
-}
-
-/// A high-water mark as JSON `{ bottom, top }` text, whole floors.
-fn parse_hwm(text: &str) -> Result<(i64, i64), String> {
-    let v: Value = serde_json::from_str(text).map_err(|e| format!("hwm: {e}"))?;
-    let field = |name: &str| -> Result<i64, String> {
+/// A mark's text read once: `Some(None)` for the JSON `null` (no mark, as
+/// `JSON.stringify(null)` writes it), `Some(Some(..))` for a well-formed
+/// mark (whole-number fields written as JSON integers within
+/// `Number.isSafeInteger`'s range), and `None` for anything else.
+fn parse_mark(text: &str) -> Option<Option<(i64, i64)>> {
+    let v: Value = serde_json::from_str(text).ok()?;
+    if v.is_null() {
+        return Some(None);
+    }
+    let field = |name: &str| {
         v.get(name)
-            .and_then(Value::as_f64)
-            .filter(|x| x.fract() == 0.0 && x.abs() < 9007199254740992.0)
-            .map(|x| x as i64)
-            .ok_or_else(|| format!("hwm: {name} must be a whole number"))
+            .and_then(Value::as_i64)
+            .filter(|n| n.unsigned_abs() <= 9_007_199_254_740_991)
     };
-    Ok((field("bottom")?, field("top")?))
+    Some(Some((field("bottom")?, field("top")?)))
+}
+
+/// The refusal JSON for a malformed charge command (#923).
+fn invalid_charge() -> String {
+    charge_json(&crate::charges::ChargeResult::refuse(
+        crate::charges::INVALID_REQUEST,
+    ))
+    .to_string()
+}
+
+/// A charge command's high-water mark as the binding received it (#923):
+/// absent (null, undefined or the JSON text `null`), JSON text, or anything
+/// else, which is refused. A mark passed as an object rather than its JSON
+/// text is refused too: TypeScript takes the object, the binding its text.
+pub(crate) enum RawMark {
+    Absent,
+    Text(String),
+    Bad,
+}
+
+/// The charge commands behind the binding, on arguments already read off
+/// their `JsValue`s: a number is `Some` only for a JS number and a string
+/// only for a JS string (`JsValue::as_f64`, `as_string`), so a numeric
+/// string, `null`, a boolean or a missing argument reaches here as `None`
+/// and is refused with `INVALID_REQUEST`, the TypeScript engine's answer.
+/// Native tests call these directly; `JsValue` itself needs a wasm target.
+impl Engine {
+    pub(crate) fn add_car_checked(&mut self, id: Option<f64>) -> String {
+        match id.and_then(crate::charges::whole) {
+            Some(id) => charge_json(&self.sim.add_car(id)).to_string(),
+            None => invalid_charge(),
+        }
+    }
+
+    pub(crate) fn remove_car_checked(&mut self, id: Option<f64>) -> String {
+        match id.and_then(crate::charges::whole) {
+            Some(id) => charge_json(&self.sim.remove_car(id)).to_string(),
+            None => invalid_charge(),
+        }
+    }
+
+    pub(crate) fn extend_checked(
+        &mut self,
+        id: Option<f64>,
+        end: Option<String>,
+        target_floor: Option<f64>,
+        mark: RawMark,
+    ) -> String {
+        use crate::charges::{whole, ChargeResult, ExtendEnd, ExtendResult, INVALID_REQUEST};
+        let id_whole = id.and_then(whole);
+        let hwm = match mark {
+            RawMark::Absent => Some(None),
+            RawMark::Text(text) => parse_mark(&text),
+            RawMark::Bad => None,
+        };
+        let end = end.as_deref().and_then(ExtendEnd::parse);
+        let r = match (id_whole, end, target_floor.and_then(whole), hwm) {
+            (Some(id), Some(end), Some(target), Some(hwm)) => {
+                self.sim.extend_transport(id, end, target, hwm)
+            }
+            _ => {
+                let (bottom, top) = id_whole
+                    .and_then(|id| self.sim.tower.get_transport(id))
+                    .map_or((0, 0), |t| (t.bottom, t.top));
+                ExtendResult {
+                    charge: ChargeResult::refuse(INVALID_REQUEST),
+                    bottom,
+                    top,
+                    added: 0,
+                }
+            }
+        };
+        extend_json(&r).to_string()
+    }
+
+    pub(crate) fn remove_facility_checked(
+        &mut self,
+        id: Option<f64>,
+        method: Option<String>,
+    ) -> String {
+        let method = method
+            .as_deref()
+            .and_then(crate::gameplay::RemovalMethod::parse);
+        match (id.and_then(crate::charges::whole), method) {
+            (Some(id), Some(method)) => {
+                charge_json(&self.sim.remove_facility(id, method)).to_string()
+            }
+            _ => invalid_charge(),
+        }
+    }
 }
 
 /// `{ kind, cost, message }` for the choice the engine is waiting on.
@@ -460,43 +558,67 @@ impl Engine {
     }
 
     /// `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
-    /// limit and the balance and pays for the car itself.
+    /// limit and the balance and pays for the car itself. The id is typed
+    /// `number` but read raw (#923): anything but a whole JS number within
+    /// `Number.isSafeInteger` is refused with `INVALID_REQUEST`, never coerced.
     #[wasm_bindgen(js_name = addCar)]
-    pub fn add_car(&mut self, id: i32) -> String {
-        charge_json(&self.sim.add_car(id.into())).to_string()
+    pub fn add_car(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+    ) -> String {
+        self.add_car_checked(id.as_f64())
     }
 
     /// `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
+    /// The id is read raw, as for `addCar` (#923).
     #[wasm_bindgen(js_name = removeCar)]
-    pub fn remove_car(&mut self, id: i32) -> String {
-        charge_json(&self.sim.remove_car(id.into())).to_string()
+    pub fn remove_car(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+    ) -> String {
+        self.remove_car_checked(id.as_f64())
     }
 
     /// `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
-    /// as JSON `{ bottom, top }` text or null: JSON `{ ok, reason?, delta,
-    /// bottom, top, added }`, the floors billed past the mark.
+    /// as JSON `{ bottom, top }` text, or null, undefined or the text `null`
+    /// for none: JSON `{ ok, reason?, delta, bottom, top, added }`, the floors
+    /// billed past the mark. Write the mark with `JSON.stringify` on
+    /// `{ bottom, top }` alone: the engine's JSON reader refuses the whole
+    /// text if any key holds a lone surrogate escape. Each field must be a
+    /// whole number within `Number.isSafeInteger`'s range, written as digits
+    /// with an optional leading minus, no fraction or exponent (`2.0` and
+    /// `1e1` are refused), and not `-0`, which the reader takes as a float.
+    /// Every argument is read raw (#923): an id or floor
+    /// that is not a whole JS number, an `end` that is not exactly `"up"` or
+    /// `"down"`, or a mark that is not that text (an object included) is
+    /// refused with `INVALID_REQUEST` and the shaft's ends as they stand.
     #[wasm_bindgen(js_name = extendTransport)]
     pub fn extend_transport(
         &mut self,
-        id: i32,
-        end: &str,
-        target_floor: i32,
-        hwm: Option<String>,
-    ) -> Result<String, JsError> {
-        let end = parse_extend_end(end).map_err(err)?;
-        let hwm = hwm.as_deref().map(parse_hwm).transpose().map_err(err)?;
-        let r = self
-            .sim
-            .extend_transport(id.into(), end, target_floor.into(), hwm);
-        Ok(extend_json(&r).to_string())
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "\"up\" | \"down\"")] end: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] target_floor: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] hwm: JsValue,
+    ) -> String {
+        let mark = if hwm.is_null() || hwm.is_undefined() {
+            RawMark::Absent
+        } else {
+            hwm.as_string().map_or(RawMark::Bad, RawMark::Text)
+        };
+        self.extend_checked(id.as_f64(), end.as_string(), target_floor.as_f64(), mark)
     }
 
     /// `removeFacility(id, method)`: the player's sell or bulldoze of a unit
-    /// or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`.
+    /// or shaft by id, paying the refund. JSON `{ ok, reason?, delta }`. Read
+    /// raw (#923): an id that is not a whole JS number or a method that is not
+    /// exactly `"sell"` or `"bulldoze"` is refused with `INVALID_REQUEST`.
     #[wasm_bindgen(js_name = removeFacility)]
-    pub fn remove_facility(&mut self, id: i32, method: &str) -> Result<String, JsError> {
-        let method = parse_removal_method(method).map_err(err)?;
-        Ok(charge_json(&self.sim.remove_facility(id.into(), method)).to_string())
+    pub fn remove_facility(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "\"sell\" | \"bulldoze\"")] method: JsValue,
+    ) -> String {
+        self.remove_facility_checked(id.as_f64(), method.as_string())
     }
 
     /// `tower.removeUnit(id)`: whether a unit went.
@@ -906,17 +1028,125 @@ mod tests {
             (v["bottom"].as_i64(), v["top"].as_i64(), v["added"].as_i64()),
             (Some(1), Some(4), Some(2))
         );
-        assert_eq!(parse_extend_end("down"), Ok(ExtendEnd::Down));
-        assert!(parse_extend_end("sideways").is_err());
+        assert_eq!(ExtendEnd::parse("down"), Some(ExtendEnd::Down));
+        assert_eq!(ExtendEnd::parse("sideways"), None);
         assert_eq!(
-            parse_removal_method("bulldoze"),
-            Ok(RemovalMethod::Bulldoze)
+            RemovalMethod::parse("bulldoze"),
+            Some(RemovalMethod::Bulldoze)
         );
-        assert!(parse_removal_method("burn").is_err());
-        assert_eq!(parse_hwm(r#"{"bottom":-2,"top":30}"#), Ok((-2, 30)));
-        assert!(parse_hwm(r#"{"bottom":1.5,"top":3}"#).is_err());
-        assert!(parse_hwm(r#"{"top":3}"#).is_err());
-        assert!(parse_hwm("not json").is_err());
+        assert_eq!(RemovalMethod::parse("burn"), None);
+        assert_eq!(parse_hwm(r#"{"bottom":-2,"top":30}"#), Some((-2, 30)));
+        assert_eq!(parse_hwm(r#"{"bottom":1.5,"top":3}"#), None);
+        // Exact JSON integers only: an f64 would round these to whole floors.
+        assert_eq!(parse_hwm(r#"{"bottom":1,"top":9007199254740990.5}"#), None);
+        assert_eq!(parse_hwm(r#"{"bottom":1,"top":2.0}"#), None);
+        assert_eq!(parse_hwm(r#"{"bottom":1,"top":1e1}"#), None);
+        assert_eq!(parse_hwm(r#"{"bottom":1,"top":9007199254740992}"#), None);
+        assert_eq!(
+            parse_hwm(r#"{"bottom":-9007199254740991,"top":9007199254740991}"#),
+            Some((-9_007_199_254_740_991, 9_007_199_254_740_991))
+        );
+        assert_eq!(parse_hwm(r#"{"top":3}"#), None);
+        assert_eq!(parse_hwm("not json"), None);
+        // The text null is no mark; malformed text is no answer at all.
+        assert_eq!(parse_mark("null"), Some(None));
+        assert_eq!(parse_mark(" null "), Some(None));
+        assert_eq!(parse_mark("not json"), None);
+        assert_eq!(parse_mark(r#"{"bottom":1}"#), None);
+        assert_eq!(parse_mark(r#"{"bottom":1,"top":2}"#), Some(Some((1, 2))));
+    }
+
+    /// A malformed charge command (#923) is refused with one reason and moves
+    /// nothing: a fractional or NaN id or floor that the old `i32` arguments
+    /// truncated to a real shaft, an unknown `end` or `method`, a bad mark.
+    #[test]
+    fn a_malformed_charge_command_is_refused_and_moves_nothing() {
+        use crate::charges::INVALID_REQUEST;
+        use crate::facilities::Kind;
+        let mut sim = Simulation::new_game(1, crate::clock::GameMode::Classic);
+        for x in 10..40 {
+            assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+        }
+        for x in 10..40 {
+            assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+        }
+        assert!(sim.build_transport(Kind::ElevatorStandard, 10, 1, 2).ok);
+        let lift = sim.tower.transport_at(1, 10).unwrap().id;
+        sim.money = 1_000_000.0;
+        let mut e = Engine { sim };
+        let before = e.serialize();
+        e.sim.gameplay.drain();
+        let refused = |text: String| -> Value {
+            let v: Value = serde_json::from_str(&text).unwrap();
+            assert_eq!(v["ok"], false, "{text}");
+            assert_eq!(v["reason"], INVALID_REQUEST, "{text}");
+            assert_eq!(v["delta"].as_f64(), Some(0.0), "{text}");
+            v
+        };
+        let id = Some(lift as f64);
+        let near = Some(lift as f64 + 0.5);
+        let up = || Some("up".to_string());
+        // A non-number id (a numeric string, null, a boolean, a missing
+        // argument) reaches the checked call as None and is refused.
+        refused(e.add_car_checked(None));
+        refused(e.add_car_checked(near));
+        refused(e.add_car_checked(Some(f64::NAN)));
+        refused(e.remove_car_checked(None));
+        refused(e.remove_car_checked(Some(f64::INFINITY)));
+        refused(e.remove_car_checked(Some(f64::NEG_INFINITY)));
+        refused(e.add_car_checked(Some(9_007_199_254_740_992.0))); // 2^53: past Number.isSafeInteger
+        refused(e.extend_checked(id, Some("UP".into()), Some(3.0), RawMark::Absent)); // exact match
+        refused(e.remove_facility_checked(id, Some("Sell".into())));
+        let v = refused(e.extend_checked(id, Some("sideways".into()), Some(3.0), RawMark::Absent));
+        assert_eq!(
+            (v["bottom"].as_i64(), v["top"].as_i64()),
+            (Some(1), Some(2))
+        );
+        let v = refused(e.extend_checked(id, None, Some(3.0), RawMark::Absent)); // a non-string end
+        assert_eq!(
+            (v["bottom"].as_i64(), v["top"].as_i64()),
+            (Some(1), Some(2))
+        );
+        refused(e.extend_checked(id, up(), Some(3.5), RawMark::Absent));
+        refused(e.extend_checked(id, up(), Some(f64::NAN), RawMark::Absent));
+        refused(e.extend_checked(id, up(), None, RawMark::Absent));
+        let v = refused(e.extend_checked(near, up(), Some(3.0), RawMark::Absent));
+        assert_eq!(
+            (v["bottom"].as_i64(), v["top"].as_i64()),
+            (Some(0), Some(0))
+        );
+        let bad = |t: &str| RawMark::Text(t.to_string());
+        refused(e.extend_checked(id, up(), Some(3.0), bad(r#"{"bottom":1,"top":2.5}"#)));
+        refused(e.extend_checked(id, up(), Some(3.0), bad(r#"{"bottom":"1","top":2}"#)));
+        refused(e.extend_checked(id, up(), Some(3.0), bad(r#"{"bottom":null,"top":2}"#)));
+        refused(e.extend_checked(id, up(), Some(3.0), bad("[1,2]")));
+        refused(e.extend_checked(id, up(), Some(3.0), bad("not json")));
+        refused(e.extend_checked(id, up(), Some(3.0), bad("")));
+        refused(e.extend_checked(id, up(), Some(3.0), bad(r#"{"bottom":1,"top":2.0}"#)));
+        refused(e.extend_checked(id, up(), Some(3.0), RawMark::Bad)); // a mark that is not text
+        refused(e.remove_facility_checked(id, Some("burn".into())));
+        refused(e.remove_facility_checked(id, None));
+        refused(e.remove_facility_checked(near, Some("sell".into())));
+        refused(e.remove_facility_checked(None, Some("sell".into())));
+        assert_eq!(
+            e.serialize(),
+            before,
+            "a refusal moved the tower or the money"
+        );
+        assert!(
+            e.sim.gameplay.drain().is_empty(),
+            "a refusal emitted an event"
+        );
+        // A well-formed call still lands.
+        let ok: Value = serde_json::from_str(&e.add_car_checked(id)).unwrap();
+        assert_eq!(ok["ok"], true);
+        // The JSON text `null` is no mark, as TypeScript's null is.
+        let ok: Value =
+            serde_json::from_str(&e.extend_checked(id, up(), Some(3.0), bad(" null "))).unwrap();
+        assert_eq!(
+            (ok["ok"].as_bool(), ok["top"].as_i64()),
+            (Some(true), Some(3))
+        );
     }
 
     #[test]

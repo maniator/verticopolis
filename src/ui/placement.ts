@@ -1,9 +1,7 @@
-// The lot geometry (GRID) moves to the catalog's `world` in #921 part 2, as
-// one piece with the renderer's geometry reads. Facility widths and names
-// come from the catalog already.
-import { GRID } from "../engine/facilities";
-import { catalogFacility, type Catalog } from "../engine/catalogTypes";
-import { groundFloorStructureKind } from "../engine/tower/towerTopology";
+// The lot geometry comes from the view's world (bound from the tower's
+// catalog), and facility widths and names from the catalog itself (#921).
+import { viewWorld } from "../presentation/viewWorld";
+import { catalogBuildKind, catalogFacility, type Catalog } from "../engine/catalogTypes";
 import type { FacilityKind } from "../engine/types";
 
 /**
@@ -19,7 +17,7 @@ export const STRUCTURE_BRUSH = 8;
 
 /** A tile clamped to the lot's buildable columns. */
 export function clampTile(x: number): number {
-  return Math.max(0, Math.min(GRID.width - 1, x));
+  return Math.max(0, Math.min(viewWorld().lotWidth - 1, x));
 }
 
 /** True when a raw (pre-clamp) tile falls outside the buildable lot. Every
@@ -27,7 +25,7 @@ export function clampTile(x: number): number {
  *  so this predicate is the only place that still knows the player aimed past
  *  the line; the build path uses it to say so instead of a silent no-op. */
 export function isOffLot(tile: number): boolean {
-  return tile < 0 || tile >= GRID.width;
+  return tile < 0 || tile >= viewWorld().lotWidth;
 }
 
 /** The placement column for `kind` at `tile`: shifted left just enough that
@@ -35,7 +33,7 @@ export function isOffLot(tile: number): boolean {
  *  near the right edge places instead of failing. */
 export function snapX(catalog: Catalog, kind: FacilityKind, tile: number): number {
   const w = catalogFacility(catalog, kind).width;
-  return Math.max(0, Math.min(GRID.width - w, tile));
+  return Math.max(0, Math.min(viewWorld().lotWidth - w, tile));
 }
 
 /** The tiles a single floor/lobby tap paints — a strip centered on the
@@ -78,10 +76,10 @@ export interface CursorCell {
  *  clamped to the grid. A null `from` starts from mid-lot on the ground floor
  *  (the first press just reveals the cursor there). */
 export function stepCursor(from: CursorCell | null, dTile: number, dFloor: number): CursorCell {
-  const c = from ?? { tile: Math.floor(GRID.width / 2), floor: 1 };
+  const c = from ?? { tile: Math.floor(viewWorld().lotWidth / 2), floor: 1 };
   return {
-    tile: Math.max(0, Math.min(GRID.width - 1, c.tile + dTile)),
-    floor: Math.max(GRID.minFloor, Math.min(GRID.maxFloor, c.floor + dFloor)),
+    tile: Math.max(0, Math.min(viewWorld().lotWidth - 1, c.tile + dTile)),
+    floor: Math.max(viewWorld().minFloor, Math.min(viewWorld().maxFloor, c.floor + dFloor)),
   };
 }
 
@@ -102,7 +100,7 @@ export function announceForPlacement(placed: PlaceOutcome, catalog: Catalog, kin
   // Ground floor is lobby-only: the Floor tool on floor 1 lays a lobby, so the
   // spoken line must name a lobby too, matching the visual toast (a screen-reader
   // user was otherwise told "Floor" for a lobby that was built).
-  const name = catalogFacility(catalog, groundFloorStructureKind(kind, floor)).name;
+  const name = catalogFacility(catalog, catalogBuildKind(catalog, kind, floor)).name;
   if (placed.what === "paint") {
     if (placed.ok) return `Placed ${name} on floor ${floor}`;
     return placed.reason ?? `Can't place ${name} here`;

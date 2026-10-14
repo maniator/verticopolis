@@ -1,4 +1,4 @@
-import { GRID } from "../engine/facilities";
+import { viewWorld } from "../presentation/viewWorld";
 import { FLOOR, TILE } from "./scale";
 
 /**
@@ -21,11 +21,16 @@ import { FLOOR, TILE } from "./scale";
 export const REGION_TILES = 32;
 export const REGION_FLOORS = 20;
 
-/** Grid dimensions in regions. The lot is 375 tiles x 110 floors, so 12 x 6
- *  regions bound the whole world; only regions holding a settled room ever
- *  materialize a canvas. */
-export const REGION_COLS = Math.ceil(GRID.width / REGION_TILES);
-export const REGION_ROWS = Math.ceil((GRID.maxFloor - GRID.minFloor + 1) / REGION_FLOORS);
+/** Grid dimensions in regions, from the view's world (the tower catalog's).
+ *  The lot is 375 tiles x 110 floors, so 12 x 6 regions bound the whole world;
+ *  only regions holding a settled room ever materialize a canvas. */
+export function regionCols(): number {
+  return Math.ceil(viewWorld().lotWidth / REGION_TILES);
+}
+export function regionRows(): number {
+  const w = viewWorld();
+  return Math.ceil((w.maxFloor - w.minFloor + 1) / REGION_FLOORS);
+}
 
 /** Column of the region containing this tile. */
 export function regionCol(tile: number): number {
@@ -34,12 +39,12 @@ export function regionCol(tile: number): number {
 
 /** Row of the region containing this floor (rows count up from minFloor). */
 export function regionRow(floor: number): number {
-  return Math.floor((floor - GRID.minFloor) / REGION_FLOORS);
+  return Math.floor((floor - viewWorld().minFloor) / REGION_FLOORS);
 }
 
 /** Stable scalar key for a region cell. */
 export function regionKey(col: number, row: number): number {
-  return row * REGION_COLS + col;
+  return row * regionCols() + col;
 }
 
 /** Every region key a unit footprint intersects: floors `floor..floor+floors-1`,
@@ -49,13 +54,13 @@ export function regionKey(col: number, row: number): number {
  *  own rect, so the union equals the unclipped draw with no visible seam (the
  *  transport-band argument). Ranges clamp to the grid: placement and save
  *  import already reject off-lot footprints, but a raw caller must never be
- *  handed a key outside `[0, REGION_COLS * REGION_ROWS)`, because column
+ *  handed a key outside `[0, regionCols() * regionRows())`, because column
  *  overflow would alias into the next row's keys. */
 export function regionsOf(floor: number, x: number, width: number, floors: number): number[] {
   const c0 = Math.max(0, regionCol(x));
-  const c1 = Math.min(regionCol(x + width - 1), REGION_COLS - 1);
+  const c1 = Math.min(regionCol(x + width - 1), regionCols() - 1);
   const r0 = Math.max(0, regionRow(floor));
-  const r1 = Math.min(regionRow(floor + floors - 1), REGION_ROWS - 1);
+  const r1 = Math.min(regionRow(floor + floors - 1), regionRows() - 1);
   const keys: number[] = [];
   for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) keys.push(regionKey(c, r));
   return keys;
@@ -66,9 +71,10 @@ export function regionsOf(floor: number, x: number, width: number, floors: numbe
  *  world y in [-f*FLOOR, -(f-1)*FLOOR), so the region's top edge sits at the
  *  top of its highest floor. */
 export function regionRect(key: number): { x: number; y: number; w: number; h: number } {
-  const row = Math.floor(key / REGION_COLS);
-  const col = key % REGION_COLS;
-  const topFloor = GRID.minFloor + (row + 1) * REGION_FLOORS - 1;
+  const cols = regionCols();
+  const row = Math.floor(key / cols);
+  const col = key % cols;
+  const topFloor = viewWorld().minFloor + (row + 1) * REGION_FLOORS - 1;
   return {
     x: col * REGION_TILES * TILE,
     y: -topFloor * FLOOR,

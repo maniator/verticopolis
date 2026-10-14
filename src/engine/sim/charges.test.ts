@@ -3,7 +3,7 @@ import { Simulation } from "../Simulation";
 import { ECON, carResaleRefund, extendBill, resaleRefund } from "../econConfig";
 import { GRID, maxCarsFor } from "../facilities";
 import type { Transport, Unit } from "../types";
-import { CAR_LIMIT, ELEVATOR_GONE, FACILITY_GONE, LAST_CAR, NOT_ENOUGH_MONEY, ONLY_ELEVATOR_CARS, ONLY_ELEVATOR_EXTEND } from "./charges";
+import { CAR_LIMIT, ELEVATOR_GONE, FACILITY_GONE, INVALID_REQUEST, LAST_CAR, NOT_ENOUGH_MONEY, ONLY_ELEVATOR_CARS, ONLY_ELEVATOR_EXTEND } from "./charges";
 
 /**
  * The engine-owned charges (#914): each command checks, moves the tower and
@@ -251,5 +251,72 @@ describe("gameplay events from the charges", () => {
       { name: "facility_removed", payload: { kind: "stairs", method: "bulldoze" } },
       { name: "facility_removed", payload: { kind: "office", method: "sell" } },
     ]);
+  });
+});
+
+describe("malformed requests (#923)", () => {
+  it("refuses a non-whole id, floor or mark and an unknown end or method, moving nothing", () => {
+    const { sim, lift, office } = fixture();
+    const before = JSON.stringify(sim.serialize());
+    sim.drainGameplayEvents();
+    const refused = { ok: false, reason: INVALID_REQUEST, delta: 0 };
+    for (const id of [lift.id + 0.5, Number.NaN, Infinity, -Infinity, 2 ** 53]) {
+      expect(sim.addCar(id)).toEqual(refused);
+      expect(sim.removeCar(id)).toEqual(refused);
+      expect(sim.removeFacility(id, "bulldoze")).toEqual(refused);
+    }
+    expect(sim.extendTransport(lift.id, "up", 3.5)).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
+    expect(sim.extendTransport(lift.id, "up", Number.NaN)).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
+    expect(sim.extendTransport(lift.id, "left" as "up", 3)).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
+    expect(sim.extendTransport(lift.id, "up", 3, { bottom: 1, top: Number.NaN })).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
+    expect(sim.extendTransport(lift.id + 0.5, "up", 3)).toEqual({ ...refused, bottom: 0, top: 0, added: 0 });
+    expect(sim.removeFacility(office.id, "burn" as "sell")).toEqual(refused);
+    expect(sim.removeFacility(office.id, "Sell" as "sell")).toEqual(refused);
+    expect(sim.extendTransport(lift.id, "UP" as "up", 3)).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
+    // Not a number or a string at all: a second frontend's untyped call.
+    const raw = <T>(v: unknown) => v as T;
+    for (const id of ["12", String(lift.id), null, undefined, true, BigInt(lift.id), new Number(lift.id), [lift.id], { id: lift.id }]) {
+      expect(sim.addCar(raw(id))).toEqual(refused);
+      expect(sim.removeCar(raw(id))).toEqual(refused);
+      expect(sim.removeFacility(raw(id), "sell")).toEqual(refused);
+      expect(sim.extendTransport(raw(id), "up", 3)).toEqual({ ...refused, bottom: 0, top: 0, added: 0 });
+      expect(sim.extendTransport(lift.id, "up", raw(id))).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
+    }
+    for (const word of [null, undefined, 5, true, new String("up"), new String("sell")]) {
+      expect(sim.extendTransport(lift.id, raw(word), 3)).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
+      expect(sim.removeFacility(office.id, raw(word))).toEqual(refused);
+    }
+    for (const mark of [0, "", false, "{\"bottom\":1,\"top\":2}", { bottom: "1", top: 2 }, { bottom: 1 }]) {
+      expect(sim.extendTransport(lift.id, "up", 3, raw(mark))).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
+    }
+    expect(raw<(...a: unknown[]) => unknown>(sim.addCar).call(sim)).toEqual(refused);
+    expect(raw<(...a: unknown[]) => unknown>(sim.removeFacility).call(sim, office.id)).toEqual(refused);
+    let reads = 0; // a mark that answers 1, then 0.5: checked and billed on one read
+    const shifty = { get bottom() { return reads++ === 0 ? 1 : 0.5; }, top: 2 };
+    expect(sim.extendTransport(lift.id, "up", 1, shifty).ok).toBe(true); // a no-op inside the mark
+    expect(reads).toBe(1);
+    expect(JSON.stringify(sim.serialize())).toBe(before);
+    expect(sim.drainGameplayEvents()).toEqual([]); // no refusal emitted one
+    // A mark answering 2, then 5, on a real extension: billed on the first
+    // read, four floors, never on the second.
+    let topReads = 0;
+    const shifting = { bottom: 1, get top() { return topReads++ === 0 ? 2 : 5; } };
+    expect(sim.extendTransport(lift.id, "up", 6, shifting)).toMatchObject({ ok: true, top: 6, added: 4, delta: -4 * ECON.transportFloorCost });
+    expect(topReads).toBe(1);
+  });
+
+  it("takes a -0 mark field as 0 (the binding's mark text refuses it; see chargeBindingRaw)", () => {
+    const { sim, lift } = fixture();
+    expect(sim.extendTransport(lift.id, "up", 3, { bottom: -0, top: 2 })).toMatchObject({ ok: true, top: 3, added: 1 });
+  });
+
+  it("widens a mark narrower than the shaft, so no standing floor is billed again", () => {
+    const { sim, lift } = fixture();
+    expect(sim.extendTransport(lift.id, "up", 4).ok).toBe(true); // shaft 1..4
+    const money = sim.money;
+    // A caller's stale mark of 1..2 must not bill floors 3 and 4 again.
+    const r = sim.extendTransport(lift.id, "up", 5, { bottom: 1, top: 2 });
+    expect(r).toMatchObject({ ok: true, top: 5, added: 1, delta: -ECON.transportFloorCost });
+    expect(sim.money).toBe(money - ECON.transportFloorCost);
   });
 });

@@ -1,11 +1,10 @@
 import type { Simulation } from "../engine/Simulation";
-import { catalogFacility } from "../engine/catalogTypes";
+import { catalogBuildKind, catalogFacility } from "../engine/catalogTypes";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
-import { groundFloorStructureKind } from "../engine/tower/towerTopology";
 import { trackEconomyAction } from "../analytics";
 import { towerCatalog } from "../engine/towerCatalog";
 
@@ -114,10 +113,14 @@ export class BuildActions {
     // lobby (permanent, and pricier than a floor tile), so confirm what happened
     // once per gesture. The preview already showed a lobby ghost and the lobby
     // price; this is the belt-and-braces spoken confirmation. Keyed off the
-    // coercion helper so the rule has one source of truth.
-    if (placed > 0 && groundFloorStructureKind(kind, floor) !== kind) {
+    // catalog's ground-floor rule (catalogBuildKind), the same rule the preview
+    // and the tool card use.
+    const catalog = towerCatalog(sim);
+    const laid = catalogBuildKind(catalog, kind, floor);
+    if (placed > 0 && laid !== kind) {
+      const f = catalogFacility(catalog, laid);
       this.deps.ui.toast(
-        `The ground floor is a lobby, so a lobby ($${catalogFacility(towerCatalog(sim), "lobby").cost.toLocaleString()}/tile) went here.`,
+        `The ground floor is a ${f.name.toLowerCase()}, so a ${f.name.toLowerCase()} ($${f.cost.toLocaleString()}/tile) went here.`,
         "info",
       );
     }

@@ -187,6 +187,11 @@ generated TypeScript sees as `number`. Beside the class, the free function
 `catalog(mode)` returns the catalog (below) as canonical JSON.
 Nothing in the binding simulates anything.
 
+`wasm:build` runs only on the release `rust-version` names, at `.0`
+(1.97.0 today), because the package's `THIRD-PARTY.json` attributes the
+standard library that release links (#955). On another toolchain, install
+that release and build with `RUSTUP_TOOLCHAIN=1.97.0 npm run wasm:build`.
+
 ```sh
 rustup target add wasm32-unknown-unknown
 cargo install wasm-bindgen-cli --locked --version 0.2.129   # the version Cargo.toml pins
