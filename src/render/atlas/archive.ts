@@ -1,6 +1,7 @@
 import { zipSync, strToU8, type Zippable } from "fflate";
 import type { BakeResult, ImageRef } from "./bake";
-import { variantPlacements, roomKinds, ORIGIN_SEEDED, RECYCLE_STEPS, PARKING_CAR_COLORS } from "./catalog";
+import { variantPlacements, roomKinds, ORIGIN_SEEDED, RECYCLE_BREAKS, RECYCLE_STEPS, PARKING_CAR_COLORS } from "./catalog";
+import { CINEMA_CYCLES } from "./cycles";
 import { CAR_SEEDS, SKYLINE_FILLS, SKY_COLUMNS, STREET_CAR_SEEDS, BUILDS } from "./catalogExtras";
 import { pack, type PackedSlice } from "./pack";
 import { depthData, sceneryData, skyData } from "./scenery";
@@ -50,8 +51,8 @@ const ZIP_TIME = new Date(1980, 0, 2, 0, 0, 0);
 export function signature(): AtlasManifest["signature"] {
   return {
     baked: ["kind", "state", "subtype", "width", "lit", "hours", "late", "presence", "variant"],
-    composed: ["visibleOccupants", "riders", "recyclingFill", "parkingCar", "deadParking"],
-    animated: ["fire", "construction", "entranceDoorman", "crane"],
+    composed: ["visibleOccupants", "riders", "recyclingFill", "parkingCar", "deadParking", "recyclingFillExact"],
+    animated: ["fire", "construction", "entranceDoorman", "crane", "cinema"],
     sampled: ["variant"],
     rules: {
       hours: "open or closed by the kind's business hours at the current hour; 'always' for kinds without hours",
@@ -62,6 +63,7 @@ export function signature(): AtlasManifest["signature"] {
       visibleOccupants: "occupants minus outForMeal, rounded up and clamped at 0; draw chain steps 1..min(n, max) over the 'home' frame. Chains cover every count the engine produces (population, venue attendance, the largest household)",
       riders: "the cab's rider indicator (0..4, the game's load quantized to quarters); draw chain steps 1..min(n, max) over the car frame",
       recyclingFill: `round(fill * ${RECYCLE_STEPS}) for the tower's recycling fill in 0..1; draw chain steps over the frame. The web re-bakes on the same eighths but paints the exact fill, so a pile between steps can differ by a bag or a gauge pixel`,
+      recyclingFillExact: "the 'fillExact' chain, drawn instead of 'fill' (never with it): n is how many entries of data.recyclingFillBreaks are at or below the fill, read as the game reads it (clamped to 0..1, a non-finite fill as 0). Each break is a fill where the picture changes (a bag, a gauge row, the second row past 0.5, amber past 0.7, red and FULL at 1), so every fill matches the game's paint exactly",
       parkingCar: `overlay 'car<i>' with i = unit id % ${PARKING_CAR_COLORS} when the space holds a car; never on a dead space. The game re-paints a space when the garage's use crosses a sixth, so its cars can trail the live use slightly`,
       deadParking: "overlay 'dead' when the space is not chained to a ramp (not on a burning or unbuilt space)",
       fire: "state 'fire' plays the animation fire/<kind>",
@@ -69,9 +71,11 @@ export function signature(): AtlasManifest["signature"] {
       variant: "the web seeds room variety from the room's floor, column and id; the atlas ships a fixed sample (see 'variants'), pick one per room and keep it",
       sky: "sky/gradient has one column per quarter hour from 00:00; the web's color is a cosine blend, t = cos((hour - 13) / 24 * 2 * pi) * 0.5 + 0.5, from #1c2246 (t 0) to #82afe0 (t 1) per channel, rounded",
       parkingRoll: "a space holds a car when hash(int32(id * 31)) < parkingUse, where hash(n) is: x = int32(n * 2654435761) with the product taken as a float64 (IEEE double) multiply; x = imul32(x ^ (x >>> 15), 0x2c1b3c6d); x = imul32(x ^ (x >>> 13), 0x297a2d39); (x ^ (x >>> 16)) as unsigned / 2^32. int32(v) truncates v toward zero and wraps it modulo 2^32 to a signed 32-bit integer (JavaScript's v | 0); imul32 is a 32-bit integer multiply; ^ is a 32-bit xor and >>> a logical (zero-filling) right shift on the 32-bit pattern, so a negative x shifts in zeros. The first step is not imul32: the two can differ once the product's magnitude passes 2^53",
-      cinema: "the cinema's marquee and screen read the animation clock; the web keeps whatever phase its last re-bake caught, the atlas bakes phase 0",
+      cinema: `the cinema's marquee and screen read the animation clock. Its frames are baked at clock 0 and carry 'cycles': at t seconds draw ${Object.entries(CINEMA_CYCLES)
+        .map(([k, c]) => `'${k}' step floor(t * ${c.rate}) % ${c.frames}`)
+        .join(" and ")} (a cycle a frame does not carry never changes it). The web itself keeps whatever moment its last re-bake caught`,
       originSeeded: `${[...ORIGIN_SEEDED].join(", ")}: a few details (staff shirts, skyline windows, climbing holds) follow the web's draw origin; the atlas carries the per-unit look at origin 0, 0`,
-      layers: "a room frame, a lobby tile, an entrance frame, an elevator cab or the metro train may carry 'layers' for drawing with depth. To draw it with its chain at n (the frame's one chain, if any: 'occupants', 'riders' or 'fill'), draw the 'shell' parts and the chain's 'shell' steps 1..min(n, len - 1), then the 'furniture' parts and the chain's 'furniture' steps the same way, then any overlay the frame shows (a parking space's car or dead mark), each source-over; an elevator cab or the metro train also has a 'front' picture (and, for the cab's riders, 'front' chain steps), drawn after the furniture and before any overlay; the result equals the frame's parts, its chain steps 1..n and the overlay exactly. 'soft' (with the chain's 'soft' steps) is an optional furniture picture that keeps glows and soft shadows translucent; over the shell it rounds a step or two away from the frame's parts. A frame without 'layers' (vacancy, closed and gutted rooms, and every family outside the ones named here) is drawn flat",
+      layers: "a room frame, a lobby tile, an entrance frame, an elevator cab or the metro train may carry 'layers' for drawing with depth. To draw it with its chain at n (the frame's one chain, if any: 'occupants', 'riders' or 'fill', or the chain marked 'alternativeTo' it, drawn instead), draw the 'shell' parts and the chain's 'shell' steps 1..min(n, len - 1), then any 'cycles' steps, then the 'furniture' parts and the chain's 'furniture' steps the same way, then any overlay the frame shows (a parking space's car or dead mark), each source-over; an elevator cab or the metro train also has a 'front' picture (and, for the cab's riders, 'front' chain steps), drawn after the furniture and before any overlay; the result equals the frame's parts, its chain steps 1..n and the overlay exactly. 'soft' (with the chain's 'soft' steps) is an optional furniture picture that keeps glows and soft shadows translucent; over the shell it rounds a step or two away from the frame's parts. A frame without 'layers' (vacancy, closed and gutted rooms, and every family outside the ones named here) is drawn flat",
       depth: "data.depth names the game's draw planes back to front ('z', higher in front; equal planes draw in the order the game adds their actors) and the frame families on each",
       skyMotion: "data.sky gives the sun's arc and each cloud's drift in the game's own terms; both are screen-space, sized to the view",
     },
@@ -103,18 +107,22 @@ export interface Archive {
 
 /**
  * Pack the frame images, then the depth layers' own images on pages of their
- * own after them. The frame images pack exactly as they would in a bake with
- * no layers, so adding layers never moves a frame's part or changes a byte of
- * its pages.
+ * own after them, then the added images (`BakeResult.addedImages`) after
+ * those. The frame images pack exactly as they would in a bake with no
+ * layers, so adding layers never moves a frame's part or changes a byte of
+ * its pages, and the added images move nothing at all.
  */
 function packGroups(bake: BakeResult, pageSize: number): { pages: number; placements: PackedSlice[][] } {
   const split = bake.frameImages ?? bake.images.length;
   if (!(Number.isInteger(split) && split >= 0 && split <= bake.images.length)) throw new Error(`frameImages ${split} is outside 0..${bake.images.length}`);
   const starts = bake.groups ?? [];
   if (starts.some((s, i) => !Number.isInteger(s) || s < (starts[i - 1] ?? 0) || s > split)) throw new Error(`groups ${starts.join(", ")} are outside 0..${split} or out of order`);
+  const addedFrom = bake.addedImages ?? bake.images.length;
+  if (!(Number.isInteger(addedFrom) && addedFrom >= split && addedFrom <= bake.images.length)) throw new Error(`addedImages ${addedFrom} is outside ${split}..${bake.images.length}`);
   // Each group packs on its own pages, in order: the first families' frame
-  // images, each later family's, then the depth layers' own images.
-  const bounds = [0, ...starts, split, bake.images.length];
+  // images, each later family's, the depth layers' own images, then the
+  // images added to frames that already shipped.
+  const bounds = [0, ...starts, split, ...(bake.addedImages === undefined ? [] : [addedFrom]), bake.images.length];
   let pages = 0;
   const placements: PackedSlice[][] = [];
   for (let g = 0; g + 1 < bounds.length; g++) {
@@ -153,7 +161,7 @@ export function buildArchive(
     if (f.chains) {
       rec.chains = {};
       for (const [k, c] of Object.entries(f.chains)) {
-        rec.chains[k] = { input: c.input, max: c.steps.length - 1, steps: c.steps.map((s) => layerOf(s, packed.placements)) };
+        rec.chains[k] = { input: c.input, max: c.steps.length - 1, steps: c.steps.map((s) => layerOf(s, packed.placements)), ...(c.alternativeTo ? { alternativeTo: c.alternativeTo } : {}) };
       }
     }
     if (f.overlays) {
@@ -176,6 +184,10 @@ export function buildArchive(
         }
       }
       rec.layers = layers;
+    }
+    if (f.cycles) {
+      rec.cycles = {};
+      for (const [k, c] of Object.entries(f.cycles)) rec.cycles[k] = { rate: c.rate, steps: c.steps.map((s) => layerOf(s, packed.placements)) };
     }
     frames[f.name] = rec;
   }
@@ -220,6 +232,7 @@ export function buildArchive(
       scenery: sceneryData(),
       sky: skyData(),
       depth: depthData(),
+      recyclingFillBreaks: [...RECYCLE_BREAKS],
     },
   };
   files["manifest.json"] = strToU8(JSON.stringify(manifest) + "\n");
@@ -324,7 +337,7 @@ function eachLayeredPicture(
 }
 
 /** Names of the frames whose depth layers break the manifest's rules (chain
- *  keys, at most one chain, a null step 0, soft steps exactly
+ *  keys, at most one chain besides its alternatives, a null step 0, soft steps exactly
  *  where there is soft furniture) or, read back out of the packed pages
  *  through the manifest the way a frontend reads them, do not give back the
  *  frame's own pixels for some occupant count; empty when every layered frame
@@ -343,7 +356,11 @@ export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): strin
     const lists = Object.values(layers.chains ?? {}).flatMap((c) => [c.shell, c.furniture, ...(c.soft ? [c.soft] : []), ...(c.front ? [c.front] : [])]);
     const front = layers.front !== undefined;
     if ((front && soft) || Object.values(layers.chains ?? {}).some((c) => (c.front !== undefined) !== front)) bad.add(name);
-    const oneChain = Object.keys(rec.chains ?? {}).length <= 1;
+    // An alternative chain names a chain the frame has that is not one itself.
+    const chains = rec.chains ?? {};
+    const primary = Object.values(chains).filter((c) => c.alternativeTo === undefined);
+    const alternativesOk = Object.values(chains).every((c) => c.alternativeTo === undefined || (Object.prototype.hasOwnProperty.call(chains, c.alternativeTo) && chains[c.alternativeTo].alternativeTo === undefined));
+    const oneChain = primary.length <= 1 && alternativesOk && (primary.length > 0 || Object.keys(chains).length === 0);
     if (flat !== depth || !oneChain || lists.some((l) => l[0] !== null) || Object.values(layers.chains ?? {}).some((c) => (c.soft !== undefined) !== soft)) bad.add(name);
   }
   eachLayeredPicture(archive, (name, _n, flat, exact) => {

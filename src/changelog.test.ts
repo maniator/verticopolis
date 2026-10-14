@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { notesForVersion } from "./changelog";
+import { marked } from "marked";
+import { escapeMarkdown, notesForVersion, releaseNoteLines } from "./changelog";
 import { MAX_NOTES, MAX_NOTE_LEN } from "./pwaUpdateInfo";
 
 /**
@@ -116,5 +117,59 @@ describe("notesForVersion", () => {
 
   it("turns a hard line break inside a bullet into a space", () => {
     expect(notesForVersion("## 1.0.0\n- line one  \n  line two\n", "1.0.0")).toEqual(["line one line two"]);
+  });
+});
+
+/** What a Markdown renderer makes of one release-note bullet, as HTML. */
+function rendered(line: string): string {
+  return marked.parse(line, { async: false });
+}
+
+/** The HTML a bullet holding exactly `text` renders to: one list item with the
+ *  text escaped for HTML and no other markup. */
+function literalBullet(text: string): string {
+  const html = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  return `<ul>\n<li>${html}</li>\n</ul>\n`;
+}
+
+describe("releaseNoteLines", () => {
+  const TRICKY = [
+    "## 2.0.0",
+    "",
+    "- An escaped \\*star\\* and \\_under\\_ stay literal.",
+    "- A code span `<Tower />` and another `_x_` and `**y**`.",
+    "- Ampersands &amp; entities like &copy; stay as typed, and a `|` pipe | too.",
+    "- Dollars $5 and $6, `~~not struck~~`, `[a link](u)` and `# not a heading`.",
+    "- `1. not a list` and `- not a list` or `+ either`.",
+    "- `\\` a backslash.",
+    "",
+  ].join("\n");
+
+  it("prints one bullet per note, escaped so the page shows the plain text", () => {
+    const notes = notesForVersion(TRICKY, "2.0.0", { maxNotes: Infinity, maxLen: Infinity });
+    const lines = releaseNoteLines(TRICKY, "2.0.0");
+    expect(notes[0]).toBe("An escaped *star* and _under_ stay literal.");
+    expect(notes[1]).toBe("A code span <Tower /> and another _x_ and **y**.");
+    expect(lines).toHaveLength(6);
+    lines.forEach((line, i) => expect(rendered(line), line).toBe(literalBullet(notes[i])));
+  });
+
+  it("escapes a note that starts like a list, a rule, a heading or a quote", () => {
+    for (const text of ["- dash", "+ plus", "1. one", "12) twelve", "---", "***", "___", "# hash", "> quote", "1.5x faster"]) {
+      expect(rendered(`- ${escapeMarkdown(text)}`), text).toBe(literalBullet(text));
+    }
+  });
+
+  it("collapses a note's whitespace to one line", () => {
+    expect(releaseNoteLines("## 3.0.0\n\n- First line  \n  second line\n", "3.0.0")).toEqual(["- First line second line"]);
+  });
+
+  it("is empty for a version with no player notes", () => {
+    expect(releaseNoteLines(CHANGELOG, "9.9.9")).toEqual([]);
+  });
+
+  it("leaves plain prose as it reads", () => {
+    const prose = "Elevators pick up riders faster, at 3:00 p.m. (mostly).";
+    expect(escapeMarkdown(prose)).toBe(prose);
   });
 });

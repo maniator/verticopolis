@@ -94,3 +94,27 @@ export function notesForVersion(
   }
   return [];
 }
+
+/**
+ * `text` with every character Markdown (and GitHub's flavor of it) could read
+ * as formatting escaped with a backslash, so a renderer shows the text
+ * literally: emphasis and code markers, link and image brackets, raw HTML,
+ * entities, strikethrough, table pipes, math dollars and heading hashes. A
+ * leading `-` or `+`, or a leading number's `.` or `)`, is escaped too, so the
+ * text never opens a list or a rule. Expects one line (callers collapse whitespace).
+ */
+export function escapeMarkdown(text: string): string {
+  return text.replace(/[\\`*_[\]<>~|&$#]/g, "\\$&").replace(/^[-+]|^(\d+)([.)])/, (m, num?: string, mark?: string) => (num === undefined ? `\\${m}` : `${num}\\${mark}`));
+}
+
+/**
+ * The release page's notes for `version`: one Markdown bullet per player note
+ * ({@link notesForVersion} with the caps lifted), whitespace collapsed to one
+ * line and the plain text escaped ({@link escapeMarkdown}), so a note shows on
+ * the page exactly as the update prompt shows it. The atlas release workflow
+ * (`.github/workflows/atlas-release.yml`) prints these lines. Empty when the
+ * version has no player notes.
+ */
+export function releaseNoteLines(changelog: string, version: string): string[] {
+  return notesForVersion(changelog, version, { maxNotes: Infinity, maxLen: Infinity }).map((n) => `- ${escapeMarkdown(n.replace(/\s+/g, " "))}`);
+}

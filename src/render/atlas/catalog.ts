@@ -6,6 +6,8 @@ import type { FacilityKind, UnitState } from "../../engine/types";
 import { TILE, FLOOR } from "../scale";
 import { CONSTRUCTION_FRAMES, FIRE_FRAMES, ROOM_VARIANTS } from "./schema";
 import type { PaintSpec, UnitPaint } from "./paint";
+import { CINEMA_CYCLES, clockFor } from "./cycles";
+import { recyclingFillBreaks } from "./recyclingFill";
 
 /**
  * The room half of the atlas catalog: every facility kind in every unit state,
@@ -26,8 +28,19 @@ export interface StillJob {
   keys: Keys;
   paint: PaintSpec;
   /** Ordered steps; layer `k` is what changes from step `k-1` to step `k`.
-   *  Step 0 is the frame's own paint. */
-  chains?: Record<string, { input: string; steps: PaintSpec[] }>;
+   *  Step 0 is the frame's own paint. `alternativeTo` names the chain this
+   *  one is drawn instead of (never with it); an alternative came after the
+   *  first atlas, so its images pack after every older page. */
+  chains?: Record<string, { input: string; steps: PaintSpec[]; alternativeTo?: string }>;
+  /** Looping pictures over the frame, each its own loop (the cinema's marquee
+   *  and screen): step `k` is what changes from the frame's own paint
+   *  (`steps[0]`) to picture `k`, and a frontend shows step
+   *  `floor(clock * rate) % steps.length`. Added after the first atlas, so
+   *  their images pack after every older page. */
+  cycles?: Record<string, { rate: number; steps: PaintSpec[] }>;
+  /** Moments the bake recomposes from the frame, its cycles at `at` and its
+   *  chains at `chains`, and holds to `paint`. */
+  cycleChecks?: { at: Record<string, number>; chains: Record<string, number>; paint: PaintSpec }[];
   /** Single overlays: what changes from the frame's paint to this one. */
   overlays?: Record<string, PaintSpec>;
   /** Try a depth split of the frame's paint (a room): a paint that marks a
@@ -102,6 +115,11 @@ export function isLateHour(hour: number): boolean {
 
 /** The web's re-bake bucket for the recycling pile (`r${round(fill * 8)}`). */
 export const RECYCLE_STEPS = 8;
+
+/** Every fill where the recycling center's picture changes, ascending: the
+ *  exact chain's steps (`recyclingFill.ts`), published as
+ *  `data.recyclingFillBreaks`. */
+export const RECYCLE_BREAKS: readonly number[] = recyclingFillBreaks();
 
 /** Parked car colors: `ACCENTS[id % 7]` in the garage art. */
 export const PARKING_CAR_COLORS = 7;
@@ -207,7 +225,39 @@ export function roomJobs(): Job[] {
  *  (the paint decides whether it has one: a vacancy card, a shutter or a
  *  gutted shell paints flat). */
 function roomStills(kind: FacilityKind, stem: string, w: number, h: number, base: UnitPaint, keys: Keys): StillJob[] {
-  return roomStillJobs(kind, stem, w, h, base, keys, { x: 0, y: 0 }).map((j) => ({ ...j, layers: true }));
+  const jobs = roomStillJobs(kind, stem, w, h, base, keys, { x: 0, y: 0 }).map((j) => ({ ...j, layers: true }));
+  return kind === "cinema" ? jobs.map(withCinemaCycles) : jobs;
+}
+
+/** The cinema's marquee and screen loops on a frame baked at clock 0. Each
+ *  cycle's picture `k` is painted at a clock that shows step `k` of it and
+ *  step 0 of the other, and the bake checks every pairing of the two (with
+ *  no one seated, and with the chain's full house) against the paint. */
+function withCinemaCycles(job: StillJob): StillJob {
+  const at = (spec: PaintSpec, clock: number): PaintSpec => ({ ...(spec as UnitPaint), anim: clock });
+  const clock = (want: Record<string, number>): number => {
+    const t = clockFor(CINEMA_CYCLES, want);
+    if (t === null) throw new Error(`no clock shows ${JSON.stringify(want)}`);
+    return t;
+  };
+  const cycles: NonNullable<StillJob["cycles"]> = {};
+  for (const [key, c] of Object.entries(CINEMA_CYCLES)) {
+    cycles[key] = { rate: c.rate, steps: Array.from({ length: c.frames }, (_, k) => (k === 0 ? job.paint : at(job.paint, clock({ [key]: k })))) };
+  }
+  const [mk, sk] = Object.keys(CINEMA_CYCLES);
+  const chain = Object.entries(job.chains ?? {})[0];
+  const cycleChecks: NonNullable<StillJob["cycleChecks"]> = [];
+  for (let m = 0; m < CINEMA_CYCLES[mk].frames; m++) {
+    for (let s = 0; s < CINEMA_CYCLES[sk].frames; s++) {
+      const want = { [mk]: m, [sk]: s };
+      cycleChecks.push({ at: want, chains: {}, paint: at(job.paint, clock(want)) });
+      if (chain) {
+        const top = chain[1].steps.length - 1;
+        cycleChecks.push({ at: want, chains: { [chain[0]]: top }, paint: at(chain[1].steps[top], clock(want)) });
+      }
+    }
+  }
+  return { ...job, cycles, cycleChecks };
 }
 
 /** The presence split and the composed layers each kind carries. */
@@ -220,7 +270,10 @@ function roomStillJobs(kind: FacilityKind, stem: string, w: number, h: number, b
   if (kind === "recycling") {
     const steps: PaintSpec[] = [];
     for (let k = 0; k <= RECYCLE_STEPS; k++) steps.push({ ...base, recycleFill: k / RECYCLE_STEPS });
-    return [{ type: "still", name: stem, w, h, anchor, keys, paint: base, chains: { fill: { input: "recyclingFill", steps } } }];
+    // The exact chain: one step per fill where the picture changes.
+    const exact: PaintSpec[] = [base, ...RECYCLE_BREAKS.map((fill) => ({ ...base, recycleFill: fill }))];
+    const chains = { fill: { input: "recyclingFill", steps }, fillExact: { input: "recyclingFillExact", steps: exact, alternativeTo: "fill" } };
+    return [{ type: "still", name: stem, w, h, anchor, keys, paint: base, chains }];
   }
   if (OCCUPANT_FREE.has(kind)) return [{ type: "still", name: stem, w, h, anchor, keys, paint: base }];
   const away: StillJob = { type: "still", name: `${stem}/away`, w, h, anchor, keys: { ...keys, presence: "away" }, paint: base };

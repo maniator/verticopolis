@@ -1,7 +1,10 @@
-import type { Job } from "./catalog";
+import { bakeCycles, checkCycles, type BakedCycles } from "./bakeAdditions";
+import type { Job, StillJob } from "./catalog";
 import type { PaintSpec } from "./paint";
-import { LayerError, contentHash, crop, diffLayer, over, sameImage, trim, type Image, type Piece } from "./pixels";
-import { maskTo, normalMap } from "./raster";
+import { LayerError, diffLayer, over, sameImage, trim, type Image, type Piece } from "./pixels";
+import { AddedStore, ImageStore, LayerStore, type ImageRef, type PendingRef } from "./store";
+
+export { ImageStore, type ImageRef, type PendingRef };
 
 /**
  * Runs the catalog through a renderer: one render per frame, per animation
@@ -69,13 +72,6 @@ export interface BakedLayers {
   chains?: Record<string, BakedLayerChain>;
 }
 
-/** An image placed inside a frame: the unique image's id and its offset. */
-export interface ImageRef {
-  id: number;
-  dx: number;
-  dy: number;
-}
-
 export interface BakedFrame {
   name: string;
   w: number;
@@ -83,8 +79,12 @@ export interface BakedFrame {
   anchor: { x: number; y: number };
   keys: Record<string, string | number | boolean>;
   image: ImageRef | null;
-  chains?: Record<string, { input: string; steps: (ImageRef | null)[] }>;
+  /** `alternativeTo` names the chain this one is drawn instead of. */
+  chains?: Record<string, { input: string; steps: (ImageRef | null)[]; alternativeTo?: string }>;
   overlays?: Record<string, ImageRef | null>;
+  /** Looping pictures over the frame (see `StillJob.cycles`); added after
+   *  the first atlas, so their images are added images. */
+  cycles?: BakedCycles;
   /** The frame split for depth (see {@link BakedLayers}). Null pieces are
    *  fully transparent. Absent when the paint marks no break. */
   layers?: BakedLayers;
@@ -114,91 +114,12 @@ export interface BakeResult {
    *  not repack it needs a group of its own. The depth layers' pages come
    *  last, so those can move when a family is added. */
   groups?: number[];
+  /** Images from here on were added to frames that already shipped (an
+   *  alternative chain, a frame's cycles); the archive packs them after every
+   *  other page, so they never move an older image (absent: none). */
+  addedImages?: number;
   frames: BakedFrame[];
   animations: BakedAnimation[];
-}
-
-/** Unique color-and-normal pairs by content. A normal map is taken over a
- *  whole frame before anything is cut from it, so trimming, slicing and
- *  layering never leave a false bevel at a cut. */
-export class ImageStore {
-  readonly images: Image[] = [];
-  readonly normals: Image[] = [];
-  private readonly byHash = new Map<string, number[]>();
-
-  /** The id of a stored pair equal to this one, or -1. */
-  find(img: Image, normal: Image): number {
-    for (const id of this.byHash.get(`${contentHash(img)}|${contentHash(normal)}`) ?? []) {
-      if (sameImage(this.images[id], img) && sameImage(this.normals[id], normal)) return id;
-    }
-    return -1;
-  }
-
-  add(img: Image, normal: Image): number {
-    const key = `${contentHash(img)}|${contentHash(normal)}`;
-    const ids = this.byHash.get(key) ?? [];
-    for (const id of ids) if (sameImage(this.images[id], img) && sameImage(this.normals[id], normal)) return id;
-    const id = this.images.length;
-    this.images.push(img);
-    this.normals.push(normal);
-    ids.push(id);
-    this.byHash.set(key, ids);
-    return id;
-  }
-
-  /** Trim a whole frame and store it; null for a fully transparent frame. */
-  ref(img: Image): ImageRef | null {
-    const t = trim(img);
-    if (!t) return null;
-    const normal = crop(normalMap(img), t.x, t.y, t.w, t.h);
-    return { id: this.add({ w: t.w, h: t.h, data: t.data }, normal), dx: t.x, dy: t.y };
-  }
-
-  /** Store a layer cut from the whole frame `next`; its normals come from
-   *  that frame, masked to the layer's own pixels. */
-  layer(piece: Piece | null, next: Image): ImageRef | null {
-    if (!piece) return null;
-    const normal = maskTo(crop(normalMap(next), piece.x, piece.y, piece.w, piece.h), piece);
-    return { id: this.add({ w: piece.w, h: piece.h, data: piece.data }, normal), dx: piece.x, dy: piece.y };
-  }
-}
-
-/** A depth-layer image: a frame image's id, or (`own`) an id in the layer
- *  store, which the bake moves past the frame images once it is done. */
-interface PendingRef extends ImageRef {
-  own: boolean;
-}
-
-/** The depth layers' images, kept apart from the frame images so a bake with
- *  layers stores every frame image under the same id, in the same order, as a
- *  bake without them. A layer equal to a frame image already stored reuses it
- *  (one equal to a later frame's image is stored twice, which costs only
- *  space). */
-class LayerStore {
-  readonly own = new ImageStore();
-  constructor(private readonly frames: ImageStore) {}
-
-  private put(img: Image, normal: Image, dx: number, dy: number): PendingRef {
-    const hit = this.frames.find(img, normal);
-    return hit >= 0 ? { id: hit, dx, dy, own: false } : { id: this.own.add(img, normal), dx, dy, own: true };
-  }
-
-  /** A whole shell picture, trimmed; its normals are its own (the shell is a
-   *  picture of its own, drawn without the furniture). */
-  shell(img: Image): PendingRef | null {
-    const t = trim(img);
-    if (!t) return null;
-    return this.put({ w: t.w, h: t.h, data: t.data }, crop(normalMap(img), t.x, t.y, t.w, t.h), t.x, t.y);
-  }
-
-  /** A piece (the furniture, or one depth step) cut from the whole picture
-   *  `next`; its normals come from that picture, masked to its own pixels,
-   *  like any other layer. */
-  piece(piece: Piece | null, next: Image): PendingRef | null {
-    if (!piece) return null;
-    const normal = maskTo(crop(normalMap(next), piece.x, piece.y, piece.w, piece.h), piece);
-    return this.put({ w: piece.w, h: piece.h, data: piece.data }, normal, piece.x, piece.y);
-  }
 }
 
 /** Drop trailing empty steps so `max` is the last step that changes pixels.
@@ -258,6 +179,8 @@ export interface BakeStats {
 export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: number, total: number) => void, stats?: BakeStats): BakeResult {
   const store = new ImageStore();
   const layerStore = new LayerStore(store);
+  const added = new AddedStore(store, layerStore.own);
+  const withCycles: StillJob[] = [];
   const pending: { frame: BakedFrame; layers: PendingLayers }[] = [];
   const frames: BakedFrame[] = [];
   const animations: BakedAnimation[] = [];
@@ -330,16 +253,22 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
         let prev = base;
         for (let k = 1; k < chain.steps.length; k++) {
           const cur = r.render(chain.steps[k], job.w, job.h);
-          steps.push(store.layer(diffLayer(prev, cur), cur));
+          // An alternative chain came after the first atlas: added images.
+          steps.push(chain.alternativeTo ? added.piece(diffLayer(prev, cur), cur) : store.layer(diffLayer(prev, cur), cur));
           renders.push(cur);
           prev = cur;
         }
-        (frame.chains ??= {})[key] = { input: chain.input, steps: trimSteps(steps) };
+        (frame.chains ??= {})[key] = { input: chain.input, steps: trimSteps(steps), ...(chain.alternativeTo ? { alternativeTo: chain.alternativeTo } : {}) };
         chainRenders[key] = renders;
       }
       for (const [key, spec] of Object.entries(job.overlays ?? {})) {
         const next = r.render(spec, job.w, job.h);
         (frame.overlays ??= {})[key] = store.layer(diffLayer(base, next), next);
+      }
+      const cycles = bakeCycles(job, base, r, added);
+      if (cycles) {
+        frame.cycles = cycles;
+        withCycles.push(job);
       }
       // A vehicle splits three ways: the back (the interior seen through its
       // windows), the riders, then the front (the body and frames around
@@ -350,7 +279,7 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
       const split3 = job.front && r.renderSplit ? r.renderSplit(job.paint, job.w, job.h) : null;
       if (job.front && r.renderSplit && !split3) throw new LayerError("marks no layer break");
       if (split3) {
-        if (Object.keys(job.chains ?? {}).length > 1) throw new LayerError("depth layers need at most one chain");
+        if (primaryChains(job) > 1) throw new LayerError("depth layers need at most one chain");
         const three = (prev: { back: Image; furniture: Image; front: Image } | null, flat: Image, s: { back: Image; mid: Image }) => {
           const furniture = furniturePicture(prev?.furniture ?? null, s.mid, s.back);
           const front = furniturePicture(prev?.front ?? null, flat, s.mid);
@@ -364,14 +293,15 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
         const layers: PendingLayers = { shell: layerStore.shell(prev.back), furniture: layerStore.piece(trim(prev.furniture), base), front: layerStore.piece(trim(prev.front), base) };
         for (const [key, chain] of Object.entries(job.chains ?? {})) {
           const renders = chainRenders[key];
+          const depth = chain.alternativeTo ? added : layerStore;
           const out = { shell: [null] as (PendingRef | null)[], furniture: [null] as (PendingRef | null)[], front: [null] as (PendingRef | null)[] };
           for (let k = 1; k < chain.steps.length; k++) {
             const sk = r.renderSplit!(chain.steps[k], job.w, job.h);
             if (!sk) throw new LayerError(`chain ${key} step ${k} marks no layer break`);
             const next = three(prev, renders[k], sk);
-            out.shell.push(layerStore.piece(diffLayer(prev.back, next.back), next.back));
-            out.furniture.push(layerStore.piece(diffLayer(prev.furniture, next.furniture), renders[k]));
-            out.front.push(layerStore.piece(diffLayer(prev.front, next.front), renders[k]));
+            out.shell.push(depth.piece(diffLayer(prev.back, next.back), next.back));
+            out.furniture.push(depth.piece(diffLayer(prev.furniture, next.furniture), renders[k]));
+            out.front.push(depth.piece(diffLayer(prev.front, next.front), renders[k]));
             prev = next;
           }
           (layers.chains ??= {})[key] = { shell: trimPending(out.shell), furniture: trimPending(out.furniture), front: trimPending(out.front) };
@@ -387,7 +317,7 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
       if (shell) {
         // At most one chain: the draw order the manifest documents (and the
         // checks that prove it) covers one; overlays draw last, in front.
-        if (Object.keys(job.chains ?? {}).length > 1) throw new LayerError("depth layers need at most one chain");
+        if (primaryChains(job) > 1) throw new LayerError("depth layers need at most one chain");
         const { layers, softBase } = splitBase(job.paint, job.w, job.h, base, shell);
         const soft0 = softBase?.image ?? null;
         let softOk = softBase !== null;
@@ -397,6 +327,7 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
         // front of it (the occupant).
         for (const [key, chain] of Object.entries(job.chains ?? {})) {
           const renders = chainRenders[key];
+          const depth = chain.alternativeTo ? added : layerStore;
           const split = { shell: [null] as (PendingRef | null)[], furniture: [null] as (PendingRef | null)[] };
           let prevShell = shell;
           let prevFurniture = furniturePicture(null, base, shell);
@@ -408,8 +339,8 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
             if (!shellK) throw new LayerError(`chain ${key} step ${k} marks no layer break`);
             const furnitureK = furniturePicture(prevFurniture, cur, shellK);
             if (!composesTo(shellK, furnitureK, cur)) throw new LayerError(`chain ${key} step ${k}: shell and furniture do not compose to the frame`);
-            split.shell.push(layerStore.piece(diffLayer(prevShell, shellK), shellK));
-            split.furniture.push(layerStore.piece(diffLayer(prevFurniture, furnitureK), cur));
+            split.shell.push(depth.piece(diffLayer(prevShell, shellK), shellK));
+            split.furniture.push(depth.piece(diffLayer(prevFurniture, furnitureK), cur));
             if (softOk && prevSoft) {
               try {
                 const softK = r.renderSoft!(chain.steps[k], job.w, job.h);
@@ -428,7 +359,10 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
         }
         if (softOk && softBase) {
           layers.soft = layerStore.piece(softBase.piece, base);
-          for (const [key, list] of Object.entries(softSteps)) layers.chains![key].soft = trimPending([null, ...list.map((s) => layerStore.piece(s.piece, s.next))]);
+          for (const [key, list] of Object.entries(softSteps)) {
+            const depth = job.chains?.[key].alternativeTo ? added : layerStore;
+            layers.chains![key].soft = trimPending([null, ...list.map((s) => depth.piece(s.piece, s.next))]);
+          }
         } else if (r.renderSoft) {
           // A soft picture without composable steps would mislead; drop it.
           stats?.softDropped.push(job.name);
@@ -442,8 +376,10 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
     frames.push(frame);
   });
   onProgress?.(jobs.length, jobs.length);
-  // The layer store's own images go after the frame images.
+  // The layer store's own images go after the frame images, and the added
+  // images after those.
   const frameImages = store.images.length;
+  added.finish(frameImages, layerStore.own.images.length);
   const resolve = (ref: PendingRef | null): ImageRef | null => (ref ? { id: ref.own ? ref.id + frameImages : ref.id, dx: ref.dx, dy: ref.dy } : null);
   for (const { frame, layers: p } of pending) {
     const layers: BakedLayers = { shell: resolve(p.shell), furniture: resolve(p.furniture) };
@@ -460,12 +396,22 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
     }
     frame.layers = layers;
   }
-  return {
-    images: [...store.images, ...layerStore.own.images],
-    normals: [...store.normals, ...layerStore.own.normals],
+  const addedImages = frameImages + layerStore.own.images.length;
+  const result: BakeResult = {
+    images: [...store.images, ...layerStore.own.images, ...added.own.images],
+    normals: [...store.normals, ...layerStore.own.normals, ...added.own.normals],
     frameImages,
     ...(groups.length > 0 ? { groups } : {}),
+    ...(added.own.images.length > 0 ? { addedImages } : {}),
     frames,
     animations,
   };
+  checkCycles(result, r, withCycles);
+  return result;
+}
+
+/** The job's chains that are not alternatives to another; a depth split
+ *  covers one (each alternative splits the same way, on its own). */
+function primaryChains(job: StillJob): number {
+  return Object.values(job.chains ?? {}).filter((c) => !c.alternativeTo).length;
 }

@@ -121,17 +121,25 @@ bumps it. New frames or optional fields do not.
   [Depth layers](#depth-layers)).
 - `chains`: composed layers indexed by an engine number. To show input `n`, draw
   the frame, then steps `1..min(n, max)` in order with ordinary source-over
-  blending; a `null` step draws nothing.
+  blending; a `null` step draws nothing. A chain with `alternativeTo` is drawn
+  instead of the chain it names, never with it (the recycling center's
+  `fillExact`, the exact alternative to its `fill` eighths).
 - `overlays`: single named layers drawn the same way.
+- `cycles`: looping pictures over a frame (the cinema's marquee and screen),
+  by name, each with its `rate` (steps a second) and `steps`. At `t` seconds
+  of the game's animation clock, draw step `floor(t * rate) % steps.length` of
+  each, source-over, right after the frame's parts and before its chain steps;
+  step 0 (the frame itself) is `null`. A frame carries only the cycles that
+  change it.
 - `animations`: frame names in play order, the seconds each holds (`dt`), and
   whether the last frame loops into the first.
 - `signature`: which inputs are baked into frames, which a frontend composes,
   which animate, and the exact rule for each (`signature.rules`).
 - `variants`: the sampled placements behind each room variant.
 - `data`: small tables (the sky color at each quarter hour, the skyline fills,
-  the shirt colors, the person build sizes, the sampled seeds), the scenery
-  layout (`scenery`), the sky's motion (`sky`) and the game's draw order
-  (`depth`).
+  the shirt colors, the person build sizes, the sampled seeds, the recycling
+  fill breaks), the scenery layout (`scenery`), the sky's motion (`sky`) and
+  the game's draw order (`depth`).
 
 ### Anchors
 
@@ -186,9 +194,17 @@ reader is `src/render/atlas/lookup.ts`; in short:
    roll is spelled out in `signature.rules.parkingRoll`; the game re-paints a
    space only when the garage's use crosses a sixth, so its cars can trail the
    live use slightly). A recycling center
-   draws its `fill` chain up to `round(fill * 8)`. The game re-bakes the pile on
-   the same eighths but paints the exact fill, so between steps a pile can
-   differ by a bag or a gauge pixel.
+   draws its `fillExact` chain up to the number of entries in
+   `data.recyclingFillBreaks` at or below its fill (clamped to 0..1, a
+   non-finite fill read as 0). Each break is a fill where the picture changes
+   (a bag joins the pile, a gauge row lights, the pile stacks a second row past
+   0.5, the gauge turns amber past 0.7 and red with FULL at 1), written as the
+   first fill that shows it, so every fill matches the game's paint exactly.
+   The older `fill` chain, up to `round(fill * 8)`, follows the game's re-bake
+   buckets instead; between its steps a pile can differ by a bag or a gauge
+   pixel. Draw one of the two, never both.
+5. A cinema draws its `cycles` (see below) after the frame's parts and before
+   its occupant steps.
 
 The chain layers carry the occupants: step `k` holds exactly the pixels that
 change when the visible count goes from `k - 1` to `k`, at their place in the
@@ -206,9 +222,18 @@ position, and keep it.
 A few details in the security office, medical center, housekeeping, sky bar
 and fitness club follow the draw origin in the web game rather than the room's
 position. The atlas carries the look at the origin; see
-`signature.rules.originSeeded`. The cinema's marquee and screen read the
-animation clock; the game keeps whatever phase its last re-bake caught, and
-the atlas bakes phase 0.
+`signature.rules.originSeeded`.
+
+The cinema's marquee and screen read the animation clock. The atlas bakes
+each cinema frame at clock 0 and carries the rest as two `cycles`: the
+marquee bulbs swap colors 4 times a second (`marquee`, 2 steps) and the
+screen steps through its 5 frames 2.5 times a second (`screen`), so together
+they repeat every 2 seconds. At `t` seconds draw `marquee` step
+`floor(t * 4) % 2` and `screen` step `floor(t * 2.5) % 5` over the frame,
+then the occupant steps, and the room matches the game's paint at that clock.
+A closed cinema (its shutter down) carries no cycles. The game itself keeps
+whatever moment its last re-bake caught, so a frontend that animates them
+shows more motion than the game does.
 
 The crane's motion never repeats in the game. Its animation is a sampled
 stretch (`loop: false`); play it forward and back, or hold, as suits you.
@@ -264,7 +289,8 @@ fits one page, and the export refuses one that does not). To show `n` visible
 occupants, draw with ordinary source-over blending, in this order:
 
 1. the `shell` parts,
-2. the chain's `shell` steps `1..min(n, len - 1)`,
+2. the chain's `shell` steps `1..min(n, len - 1)`, then the frame's `cycles`
+   steps, if it has any,
 3. the `furniture` parts,
 4. the chain's `furniture` steps `1..min(n, len - 1)`.
 
@@ -272,8 +298,9 @@ The result is the frame's own `parts` plus its chain steps `1..n`, exactly.
 Pass the visible occupant count itself and clamp it to each list on its own:
 a depth list can run past the chain's `max` when a step changes only pixels
 the flat frame hides (a light behind a desk). A layered frame has at most one
-chain, and its overlays (only the parking space has any) draw after these
-four (and after a vehicle's front, below), in front.
+chain, plus any chain marked `alternativeTo` it (split the same way, under its
+own key, and drawn in its place), and its overlays (only the parking space has
+any) draw after these four (and after a vehicle's front, below), in front.
 Draw anything of your own that belongs between the wall and the furniture
 (walkers, a depth offset) between steps 2 and 3. Any list can be empty (a
 fully transparent picture).
@@ -332,7 +359,8 @@ boutique bay, fitness club, clinic, nightclub, spa, sky bar, daycare,
 security, medical center, housekeeping, party hall, wedding hall, aquatic
 center, metro station, recycling center, parking ramp and parking space. The
 recycling center's chain is its `fill`: the wall gauge (and its FULL cue)
-changes on the shell, the day's pile in front. The deck curb and the gauge
+changes on the shell, the day's pile in front, and its `fillExact` chain
+splits the same way. The deck curb and the gauge
 draw after the machines, as the game draws them, and land on the shell; the
 furniture stops at the curb, which stays whole on the shell. The parking
 ramp's furniture is the car parked at its foot. A parking space's shell is the whole bay and its
@@ -372,7 +400,10 @@ the plane each draws on.
 
 The layers' own images are packed on pages after the frame images', so a
 frontend that ignores `layers` reads the same frames, parts and pages as before
-they existed. The same goes for the scenery, which joined the atlas later: its
+they existed. The images added to frames that had already shipped (the
+recycling center's `fillExact` chain, flat and split, and the cinema's
+`cycles`) pack on pages after all of those, so they moved no older part and
+changed no older page. The same goes for the scenery, which joined the atlas later: its
 images pack on pages of their own between the older frames' pages and the
 layers'. The layers' pages come last, so their page numbers can change when a
 family is added; read them from the manifest, never from an older one. An
@@ -582,8 +613,14 @@ would not compose back to the game's pixels. A unit test rebuilds every frame
 and layer from the packed pages through the manifest.
 
 A room frame with depth layers is also composed through its depth split (the
-shell and its occupant steps, then the furniture and its occupant steps, then
-a vehicle's front and its steps) and held to the same paint. After packing,
+shell and its occupant steps, then its cycles, then the furniture and its
+occupant steps, then a vehicle's front and its steps) and held to the same
+paint. The samples include recycling fills between the eighths and cinemas at
+clocks other than 0. The bake also recomposes every cinema frame at each
+pairing of its marquee and screen steps, empty and at its full house, flat and
+through its depth layers, and requires the game's paint at a clock that shows
+that pairing; a unit test holds that the recycling and cinema art read their
+fill and clock only through the breaks and cycles the atlas carries. After packing,
 the export rebuilds every layered frame from the pages through the
 manifest, shell then furniture (then a vehicle's front) with their steps at
 every occupant count, and requires its flat frame's pixels. It also measures
@@ -602,4 +639,5 @@ their depth layers.
 
 ## Not in the atlas yet
 
-Event cameos (Santa, the VIP limo, the thief) are not exported yet.
+Event cameos (Santa, the VIP limo, the thief) are not exported yet (backlog
+row `atlas-event-cameos`).

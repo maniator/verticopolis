@@ -64,6 +64,20 @@ export interface LayerChain {
   input: string;
   max: number;
   steps: LayerRef[];
+  /** Present on a chain drawn instead of another (never with it): the other
+   *  chain's key. The recycling center's `fillExact` is the exact alternative
+   *  to its `fill` eighths. */
+  alternativeTo?: string;
+}
+
+/** A looping picture over a frame (the cinema's marquee and screen), one of
+ *  possibly several that loop on their own. At `t` seconds of the game's
+ *  animation clock, draw step `floor(t * rate) % steps.length` over the frame
+ *  source-over; step 0, the frame's own picture, is null. */
+export interface LayerCycle {
+  /** Steps a second. */
+  rate: number;
+  steps: LayerRef[];
 }
 
 export interface FrameRecord {
@@ -85,6 +99,11 @@ export interface FrameRecord {
   chains?: Record<string, LayerChain>;
   /** Named single overlays (the dead-parking mark, a parked car color). */
   overlays?: Record<string, LayerRef>;
+  /** Looping pictures by name (docs/atlas.md, Reading a room): drawn after
+   *  the frame's parts (or its depth shell and shell steps) and before its
+   *  chain steps (or its furniture). Absent when nothing on the frame
+   *  loops. */
+  cycles?: Record<string, LayerCycle>;
   /** A room split for depth (docs/atlas.md, Depth layers). Absent when the
    *  room's art marks no split (vacancy, closed and gutted rooms, and the
    *  kinds listed in docs/atlas.md); a frontend then draws the frame flat. */
