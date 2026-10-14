@@ -27,7 +27,9 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   gates are **not** a substitute for the review skill, and "the diff is tiny" is
   not an exemption.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
-  `npm test`, `npm run build`. All four must be green.
+  `npm test`, `npm run build`. All four must be green. The build needs the
+  engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a
+  deliberate TypeScript-only build; see CONTRIBUTING.md.
 - **American English everywhere;** keep `src/engine/` free of DOM/rendering.
 - **No em-dashes in prose** (player-facing copy, docs, comments, commit and PR
   text) in anything new you write. Use commas, colons, parentheses, or separate
@@ -53,7 +55,8 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   `mcr.microsoft.com/playwright:v<lockfile-playwright-version>-jammy` the workflow
   resolves), running `npm ci && VC_TOOLING=1 npm run build && RUN_SERVER=1 node
   scripts/screenshots.ts` in it (`VC_TOOLING=1` publishes the `window.game`
-  handle the scenes drive; a plain production build compiles it away). Output
+  handle the scenes drive; a plain production build compiles it away). Build
+  the engine package on the host first, since the image has no Rust toolchain. Output
   from the pinned image is equivalent to CI's and may be committed. There is no `[update-screenshots]` marker workflow
   anymore (retired once drift became a hard gate on the PR); every gallery refresh
   flows through a PR. Mint `e2e/visual.spec.ts-snapshots` only via

@@ -12,19 +12,18 @@
  *
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
-import { ALLOW_NO_ENGINE, engineOptional, precacheFile } from "../src/precacheEntry.ts";
+import { dirname, relative, resolve, sep } from "node:path";
+import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
 
 const DIST = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const SW = resolve(DIST, "sw.js");
 
 /** The WASM engine package, precached with the shell so the engine starts
- *  offline (#945). Every build must carry it, whatever hosts it, unless the
- *  build opts out with VC_ALLOW_NO_ENGINE=1 (a checkout with no Rust
- *  toolchain, or a CI job that only proves the bundle compiles; see
- *  CONTRIBUTING.md). */
+ *  offline (#945). Every build must carry it, whatever hosts it, unless a
+ *  build that is not a deploy opts out with VC_ALLOW_NO_ENGINE=1
+ *  (missingEngine in src/precacheEntry.ts; see CONTRIBUTING.md). */
 const ENGINE_FILES = ["engine/verticopolis_engine.js", "engine/verticopolis_engine_bg.wasm"];
 
 /** What a first install may download, uncompressed. About 2.9 MiB with the
@@ -87,6 +86,7 @@ if (dupes.length > 0) fail(`duplicate precache entries (each asset must be liste
 const missing = REQUIRED_ICONS.filter((icon) => !seen.has(icon));
 if (missing.length > 0) fail(`expected icons missing from the precache manifest (a narrowed glob or moved file?): ${missing.join(", ")}`);
 
+const realDist = realpathSync(DIST);
 const total = urls.reduce((sum, u) => {
   let file: string;
   try {
@@ -95,6 +95,8 @@ const total = urls.reduce((sum, u) => {
     fail(e instanceof Error ? e.message : String(e));
   }
   if (!existsSync(file)) fail(`precache entry ${u} has no file under dist/; cannot size the precache`);
+  const real = relative(realDist, realpathSync(file));
+  if (real === ".." || real.startsWith(`..${sep}`) || real === "") fail(`precache entry ${u} links outside dist/`);
   return sum + statSync(file).size;
 }, 0);
 if (total > PRECACHE_BUDGET_BYTES) {
@@ -104,12 +106,10 @@ if (total > PRECACHE_BUDGET_BYTES) {
 // Every build needs the whole package, precached, so a partial build (glue
 // without binary) or a missing one stops here before it can reach a player
 // as a silent fallback to the TypeScript engine. Only an explicit opt-in
-// skips it.
+// skips it, and never on a deploy.
 const builtEngine = [...ENGINE_FILES, "engine/BUILD.json"].some((f) => existsSync(resolve(DIST, f)));
-const optional = engineOptional(process.env);
-if (!builtEngine && !optional) {
-  fail(`this build has no engine package in dist/, so it would ship without the WASM engine; build it first (npm run wasm:build, or scripts/build-engine-wasm.sh), or set ${ALLOW_NO_ENGINE}=1 for a deliberate TypeScript-only build`);
-}
+const stop = missingEngine(process.env, builtEngine);
+if (stop) fail(stop);
 if (builtEngine) {
   const notBuilt = ENGINE_FILES.filter((f) => !existsSync(resolve(DIST, f)));
   if (notBuilt.length > 0) fail(`the engine package in dist/ is incomplete (rebuild it with npm run wasm:build): ${notBuilt.join(", ")}`);

@@ -205,7 +205,9 @@ For the exact twice-render determinism check used by the drift workflow, replace
 node scripts/screenshot-determinism-check.ts --all
 ```
 
-To regenerate `e2e/visual.spec.ts-snapshots` in the same pinned image:
+To regenerate `e2e/visual.spec.ts-snapshots` in the same pinned image (its
+`npm run build` needs the engine package, and the image has no Rust toolchain,
+so build `src/public/engine/` on the host first; see the engine note above):
 
 ```bash
 docker run --rm --ipc=host \
