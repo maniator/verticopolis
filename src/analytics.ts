@@ -1,5 +1,4 @@
 import { telemetryHostAllowed } from "./telemetry";
-import { onDesktopConsentChange } from "./desktopConsent";
 import { gameplaySession } from "./analyticsSession";
 
 /**
@@ -39,50 +38,6 @@ export {
   trackEconomyActionOnce,
   trackEmergencyChoice,
 } from "./analyticsActions";
-
-/**
- * Start a fresh measurement window whenever the desktop consent answer changes.
- *
- * Wired here, on the module's wiring side rather than at the two consent
- * surfaces: `setDesktopConsent` is the single place the answer is ever written, so
- * hanging the reset off that is one hook a future third surface cannot forget to
- * call. (`armSessionOnGrant` in `uiDesktopAnalytics.ts` is where the two surfaces
- * share their grant work, but it is a helper each of them opts into, and it never
- * runs on the way OFF.) The callback travels outward because `desktopConsent.ts`
- * sits BELOW analytics and importing analytics back would close a cycle through
- * `telemetry.ts`.
- *
- * Turning sharing OFF drops the window rather than emitting a farewell summary of
- * the play up to that instant, which is a deliberate choice between two defensible
- * ones. A player who turns the switch off expects the switch to stop traffic; a
- * summary sent BY the act of turning it off is traffic caused by opting out, and
- * it would also be a timestamped marker of the decision, which is the one thing
- * these surfaces go out of their way never to report (see the note at the top of
- * `uiDesktopAnalytics.ts`). The cost is small: the summaries are once-per-session
- * lower bounds by design, so a dropped partial window reads one session shallower
- * rather than losing a measurement anyone could otherwise recover.
- *
- * A browser build never writes the consent value at all (both surfaces are behind
- * `IS_DESKTOP_BUILD`), so this never fires there and the web session behaves
- * exactly as it did before any of this landed.
- */
-onDesktopConsentChange((previous, next) => {
-  gameplaySession.startEpoch();
-  // The crash throttle is a flood guard, not a measurement, so it does not simply
-  // follow the window. A slot should stay spent only if the crash that spent it
-  // actually went out, and exactly ONE transition can say yes: a first-run grant,
-  // where the watchers run just ahead of the held queue draining. Every other
-  // answer either drops that queue (`pending` to `declined`) or never had one
-  // (`declined` to `granted`, `granted` to `declined`), so the slots those crashes
-  // spent bought nothing and are handed back.
-  //
-  // Getting this wrong is not cosmetic in either direction: releasing on the grant
-  // re-sends a crash that just flushed, and keeping on the others lets a crash loop
-  // during an opted-out stretch spend the whole cap on events that were dropped and
-  // leave the player's next window unable to report anything at all.
-  const heldCrashesAreAboutToFlush = previous === "pending" && next === "granted";
-  if (!heldCrashesAreAboutToFlush) gameplaySession.releaseCrashThrottle();
-});
 
 /**
  * Start the gameplay session at boot and keep its foreground clock in step with
