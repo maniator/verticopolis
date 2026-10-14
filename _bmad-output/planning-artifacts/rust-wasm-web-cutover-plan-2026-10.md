@@ -222,8 +222,8 @@ Still open (risks, no decision needed yet):
   files are guarded since #1004; the engine side is in flight on
   `claude/precache-coverage-985`), an e2e that serves a second deploy and
   checks old engine caches are removed after the upgrade, install
-  interruption, a cold first visit with no cache (the expected message, not a
-  broken page), cache eviction, and cutting the service worker's network in
+  interruption, a cold first visit with no cache (it shows the expected
+  message instead of a broken page), cache eviction, and cutting the service worker's network in
   `e2e/offline.spec.ts` too (Playwright's offline mode cuts only the page's,
   so a precache miss there is fetched quietly).
 - **Save format bumps.** The copy catalog (row 6) bumps the save version; it
