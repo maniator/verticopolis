@@ -10,6 +10,7 @@
  * `src/engine/gameplayCatalog.test.ts` fails while either committed file is
  * stale, so a catalog change, its types and its rules land together.
  */
+// copies-package: none
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

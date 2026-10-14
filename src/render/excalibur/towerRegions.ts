@@ -1,4 +1,5 @@
 import * as ex from "excalibur";
+import { Z } from "../depthPlanes";
 import { catalogFacility } from "../../engine/catalogTypes";
 import { towerCatalog } from "../../engine/towerCatalog";
 import { paintSettledUnit } from "../regionPaint";
@@ -72,7 +73,7 @@ function materialize(engine: TowerEngine, key: number): RegionRec {
       }
     },
   });
-  const actor = new ex.Actor({ pos: ex.vec(r.x, r.y), width: r.w, height: r.h, anchor: ex.vec(0, 0), z: 0 });
+  const actor = new ex.Actor({ pos: ex.vec(r.x, r.y), width: r.w, height: r.h, anchor: ex.vec(0, 0), z: Z.room });
   actor.graphics.use(cv);
   engine.engine.add(actor);
   const rec: RegionRec = { actor, cv, units };

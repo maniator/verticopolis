@@ -1,4 +1,4 @@
-import { strFromU8, unzipSync } from "fflate";
+import { strFromU8, strToU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, signature, softLayerDrift, ARCHIVE_ROOT } from "./archive";
 import { bake, ImageStore, type Renderer } from "./bake";
@@ -91,7 +91,13 @@ describe("bake", () => {
   });
 
   it("archives into a deterministic zip with pages per scale, a manifest and the attribution", () => {
-    const info = { version: "9.9.9", commit: "abc", attribution: "Art by someone, CC BY 4.0.", licenseText: "# License\n" };
+    const info = {
+      version: "9.9.9",
+      commit: "abc",
+      attribution: "Art by someone, CC BY 4.0.",
+      licenseText: "# License\n",
+      icons: { "icon.svg": strToU8("<svg/>\n") },
+    };
     const a = buildArchive(r, info, undefined, 32);
     expect(buildArchive(r, info, undefined, 32).zip).toEqual(a.zip);
     const files = unzipSync(a.zip);
@@ -99,6 +105,7 @@ describe("bake", () => {
     expect(names).toContain(`${ARCHIVE_ROOT}/manifest.json`);
     expect(strFromU8(files[`${ARCHIVE_ROOT}/ATTRIBUTION.txt`])).toContain("Art by someone, CC BY 4.0.");
     expect(strFromU8(files[`${ARCHIVE_ROOT}/ASSETS-LICENSE.md`])).toBe("# License\n");
+    expect(strFromU8(files[`${ARCHIVE_ROOT}/icon/icon.svg`])).toBe("<svg/>\n");
     for (const s of ATLAS_SCALES) {
       expect(names).toContain(`${ARCHIVE_ROOT}/${s}x/page-000.png`);
       expect(names).toContain(`${ARCHIVE_ROOT}/${s}x/page-000.normal.png`);
@@ -266,6 +273,31 @@ describe("depth layers", () => {
     const frames = { a: rec("office", []), b: rec("office", [placed]), c: rec("spa", []), d: { ...rec("shop", []), layers: undefined } };
     expect(kindsWithoutFurniture({ frames })).toEqual(["spa"]);
   });
+  it("splits every frame of an animation that asks for it, and leaves its frame images alone", () => {
+    const anim: Job = { type: "anim", name: "door", w: 4, h: 2, anchor: { x: 0, y: 0 }, keys: { kind: "lobby" }, dt: 1, loop: true, frames: [room(5, 6), room(5, 7)], layers: true };
+    const split = bake([anim], layeredFake);
+    const plain = bake([{ ...anim, layers: false }], layeredFake);
+    expect(split.frames.map((f) => [f.name, !!f.layers])).toEqual([
+      ["door/0", true],
+      ["door/1", true],
+    ]);
+    expect(split.frames.map((f) => f.image)).toEqual(plain.frames.map((f) => f.image));
+    expect(split.animations).toEqual(plain.animations);
+    for (const f of split.frames) expect(sameImage(composeLayered(split, f), composeFrame(split, f)), f.name).toBe(true);
+    expect(checkLayers(buildArchive(split, info, undefined, 32))).toEqual([]);
+  });
+  it("packs a family on pages of its own after the earlier families, leaving their pages as they were", () => {
+    const later: Job = { ...still("later", room(3, 4)), ownPages: true };
+    const both = bake([...jobs, later], layeredFake);
+    expect(both.groups).toEqual([layered.frameImages]);
+    const a = buildArchive(layered, info, undefined, 32);
+    const b = buildArchive(both, info, undefined, 32);
+    // The earlier frame pages come out the same, the new family after them.
+    const framePages = Math.max(...Object.values(a.manifest.frames).flatMap((f) => f.parts.map((p) => p.rect.page))) + 1;
+    for (let p = 0; p < framePages; p++) expect(sameImage(a.pages[p], b.pages[p]), `page ${p}`).toBe(true);
+    expect(b.manifest.frames.later.parts[0].rect.page).toBeGreaterThanOrEqual(framePages);
+    expect(() => bake([later, ...jobs], layeredFake)).toThrow(/comes after a family on pages of its own/);
+  });
   it("refuses a frame-image count outside the images", () => {
     expect(() => buildArchive({ ...layered, frameImages: layered.images.length + 1 }, info, undefined, 32)).toThrow(/frameImages/);
   });
@@ -357,11 +389,14 @@ describe("depth layers on occupant steps", () => {
     expect(stats.softDropped).toEqual(["fading"]);
     expect(() => composeLayered(r, fading, {}, [], true)).toThrow(/no soft furniture/);
   });
-  it("refuses a layered frame with two chains, or a step whose paint marks no break", () => {
+  it("refuses a layered frame with two chains, or a step whose paint marks no break, and keeps its overlays", () => {
     const steps = room("x").chains!.occupants;
     expect(() => bake([{ ...room("two"), chains: { a: steps, b: steps } }], litFake)).toThrow(/two: depth layers need at most one chain/);
-    expect(() => bake([{ ...room("over"), overlays: { dead: lit(0) } }], litFake)).toThrow(/over: depth layers need at most one chain and no overlays/);
-    expect(() => bake([{ ...room("none"), overlays: {} }], litFake)).not.toThrow();
+    // Overlays are fine: they draw last, over the furniture, as over the flat frame.
+    const over = bake([{ ...room("over"), overlays: { lamp: lit(1) } }], litFake);
+    const f = over.frames[0];
+    expect(f.layers).toBeDefined();
+    expect(sameImage(composeLayered(over, f, { occupants: 2 }, ["lamp"]), composeFrame(over, f, { occupants: 2 }, ["lamp"]))).toBe(true);
     const noBreak: Renderer = { ...litFake, renderShell: (spec, w, h) => (spec.p === "solid" && spec.css === "lit:1" ? null : litFake.renderShell!(spec, w, h)) };
     expect(() => bake([room("gap")], noBreak)).toThrow(/gap: chain occupants step 1 marks no layer break/);
   });
@@ -393,9 +428,10 @@ describe("depth layers on occupant steps", () => {
     const c = step0.manifest.frames.lit.layers!.chains!.occupants;
     c.shell[0] = c.shell[1];
     expect(checkLayers(step0)).toContain("lit");
-    const overlay = buildArchive(r, info, undefined, 32);
-    overlay.manifest.frames.lit.overlays = { dead: c.shell[1] };
-    expect(checkLayers(overlay)).toContain("lit");
+    const two = buildArchive(r, info, undefined, 32);
+    two.manifest.frames.lit.chains!.extra = two.manifest.frames.lit.chains!.occupants;
+    two.manifest.frames.lit.layers!.chains!.extra = two.manifest.frames.lit.layers!.chains!.occupants;
+    expect(checkLayers(two)).toContain("lit");
   });
   it("catches an occupant step whose depth split is broken", () => {
     const a = buildArchive(r, info, undefined, 32);

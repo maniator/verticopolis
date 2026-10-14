@@ -33,6 +33,13 @@ export interface StillJob {
   /** Try a depth split of the frame's paint (a room): a paint that marks a
    *  shell break (`pixelSprites/layers.ts`) gets shell and furniture layers. */
   layers?: boolean;
+  /** True for a vehicle: with `layers`, what the paint draws after its
+   *  `layerEnd` becomes a front picture over the riders instead of landing
+   *  on the shell (`BakedLayers.front`). */
+  front?: boolean;
+  /** True for a family added after the first atlas: its new images pack on
+   *  pages after the first atlas's frame pages (`BakeResult.groups`). */
+  ownPages?: boolean;
 }
 
 /** An animation: one frame per paint, `dt` seconds apart. */
@@ -46,6 +53,11 @@ export interface AnimJob {
   dt: number;
   loop: boolean;
   frames: PaintSpec[];
+  /** True when every frame should also be split for depth, like a still. */
+  layers?: boolean;
+  /** True for a family added after the first atlas: its new images pack on
+   *  pages after the first atlas's frame pages (`BakeResult.groups`). */
+  ownPages?: boolean;
 }
 
 export type Job = StillJob | AnimJob;
@@ -78,15 +90,6 @@ export const OCCUPANT_FREE = new Set<FacilityKind>(["parking", "parkingRamp", "s
  * so the atlas carries the per-unit bake's look (origin 0, 0). Tracked as a backlog defer (sprite-origin-seeds).
  */
 export const ORIGIN_SEEDED: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["security", "medical", "housekeeping", "skyBar", "fitnessClub"]);
-
-/**
- * Kinds whose art marks no depth split, so their frames carry no `layers`: the
- * garage space and ramp (bare structure with no furniture of their own; the
- * parked cars are overlays) and the recycling center (its deck curb draws after
- * its machinery and its worker after the pile, so a split needs the draw order
- * reworked). Tracked as a backlog row (atlas-depth-layers-flat-kinds).
- */
-export const DEPTH_FLAT_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["parking", "parkingRamp", "recycling"]);
 
 /** Kinds whose art changes after 23:00 and before 06:00: the condo (its
  *  asleep scrim and its residents) and the two rentals, which share the
@@ -201,10 +204,10 @@ export function roomJobs(): Job[] {
 }
 
 /** The still frames for one static signature, each tried for a depth split
- *  unless its kind is flat (the paint decides whether it has one). */
+ *  (the paint decides whether it has one: a vacancy card, a shutter or a
+ *  gutted shell paints flat). */
 function roomStills(kind: FacilityKind, stem: string, w: number, h: number, base: UnitPaint, keys: Keys): StillJob[] {
-  const layers = !DEPTH_FLAT_KINDS.has(kind);
-  return roomStillJobs(kind, stem, w, h, base, keys, { x: 0, y: 0 }).map((j) => ({ ...j, layers }));
+  return roomStillJobs(kind, stem, w, h, base, keys, { x: 0, y: 0 }).map((j) => ({ ...j, layers: true }));
 }
 
 /** The presence split and the composed layers each kind carries. */

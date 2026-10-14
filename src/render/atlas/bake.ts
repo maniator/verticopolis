@@ -24,10 +24,18 @@ export interface Renderer {
    * The room's furniture painted onto a transparent canvas from the paint's
    * `layerBreak` on, so glows and soft shadows keep their own transparency;
    * whatever the paint draws after its `layerEnd` only tints the furniture
-   * already there (source-atop). Null when the paint marks no break. A
+   * already there (source-atop), and its `layerShell` art cuts the furniture
+   * it covers away (destination-out). Null when the paint marks no break. A
    * renderer without it bakes no soft furniture.
    */
   renderSoft?(spec: PaintSpec, w: number, h: number): Image | null;
+  /**
+   * For a frame with a front picture: the canvas at the paint's `layerBreak`
+   * (`back`) and at its `layerEnd` (`mid`, the back plus what came between),
+   * so what the paint draws after the end is the front. Null when the paint
+   * marks no break; with no end, `mid` is the finished paint.
+   */
+  renderSplit?(spec: PaintSpec, w: number, h: number): { back: Image; mid: Image } | null;
 }
 
 /** A frame's chain split for depth: step `k` of `shell` is what changes on
@@ -37,6 +45,8 @@ export interface Renderer {
 export interface BakedLayerChain {
   shell: (ImageRef | null)[];
   furniture: (ImageRef | null)[];
+  /** Steps over the front picture; present along with it. */
+  front?: (ImageRef | null)[];
   /** Steps over the soft furniture picture; absent along with it (a
    *  translucent pixel that changes, or a failed soft pass). */
   soft?: (ImageRef | null)[];
@@ -50,6 +60,11 @@ export interface BakedLayerChain {
 export interface BakedLayers {
   shell: ImageRef | null;
   furniture: ImageRef | null;
+  /** What the paint draws after its furniture that stands in front of it
+   *  (a cab's door frames, a train's body around its windows): drawn last,
+   *  over the furniture. Present only for frames that ask for it, which then
+   *  carry no soft picture. */
+  front?: ImageRef | null;
   soft?: ImageRef | null;
   chains?: Record<string, BakedLayerChain>;
 }
@@ -92,6 +107,13 @@ export interface BakeResult {
    *  own images come after. The archive packs the two groups apart, so the
    *  layers never move a frame image (absent: every image is a frame image). */
   frameImages?: number;
+  /** Where the families added after the first atlas begin among the frame
+   *  images: their new images pack on pages of their own, after the older
+   *  frame pages, so adding them never moves an older frame image (absent:
+   *  none). Today that is one group, the scenery; a later family that must
+   *  not repack it needs a group of its own. The depth layers' pages come
+   *  last, so those can move when a family is added. */
+  groups?: number[];
   frames: BakedFrame[];
   animations: BakedAnimation[];
 }
@@ -215,7 +237,8 @@ type PendingLayers = {
   shell: PendingRef | null;
   furniture: PendingRef | null;
   soft?: PendingRef | null;
-  chains?: Record<string, { shell: (PendingRef | null)[]; furniture: (PendingRef | null)[]; soft?: (PendingRef | null)[] }>;
+  front?: PendingRef | null;
+  chains?: Record<string, { shell: (PendingRef | null)[]; furniture: (PendingRef | null)[]; soft?: (PendingRef | null)[]; front?: (PendingRef | null)[] }>;
 };
 
 /** Drop trailing nulls from a depth step list (each list on its own). */
@@ -243,14 +266,52 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
     if (names.has(name)) throw new Error(`duplicate frame name ${name}`);
     names.add(name);
   };
+  /** The split of a frame's own paint: its shell and furniture, stored at
+   *  once, and (when the soft pass gives one) its soft picture, which the
+   *  caller stores only once every step has one, so a dropped soft picture
+   *  leaves nothing on the pages. A soft pass that fails gives none. */
+  const splitBase = (spec: PaintSpec, w: number, h: number, base: Image, shell: Image) => {
+    const layers: PendingLayers = { shell: layerStore.shell(shell), furniture: layerStore.piece(diffLayer(shell, base), base) };
+    let soft: Image | null = null;
+    try {
+      soft = r.renderSoft ? r.renderSoft(spec, w, h) : null;
+    } catch (e) {
+      if (!(e instanceof LayerError)) throw e;
+    }
+    return { layers, softBase: soft ? { image: soft, piece: trim(soft) } : null };
+  };
+  const groups: number[] = [];
+  let ownPages = false;
   jobs.forEach((job, done) => {
     onProgress?.(done, jobs.length);
+    // A family on pages of its own starts a new image group; one that does
+    // not may not come after it, or its images would land in the new group.
+    if (job.ownPages && !ownPages) groups.push(store.images.length);
+    if (ownPages && !job.ownPages) throw new Error(`${job.name} comes after a family on pages of its own`);
+    ownPages ||= job.ownPages === true;
     if (job.type === "anim") {
       const frameNames = job.frames.map((spec, i) => {
         const name = `${job.name}/${i}`;
         claim(name);
-        const image = store.ref(r.render(spec, job.w, job.h));
-        frames.push({ name, w: job.w, h: job.h, anchor: job.anchor, keys: { ...job.keys, frame: i }, image });
+        const base = r.render(spec, job.w, job.h);
+        const frame: BakedFrame = { name, w: job.w, h: job.h, anchor: job.anchor, keys: { ...job.keys, frame: i }, image: store.ref(base) };
+        // An animation frame splits like a still with no chain.
+        try {
+          const shell = job.layers && r.renderShell ? r.renderShell(spec, job.w, job.h) : null;
+          // Unlike a room (whose vacancy card or shutter paints flat), every
+          // frame of an animation that asks for layers must split.
+          if (job.layers && r.renderShell && !shell) throw new LayerError("marks no layer break");
+          if (shell) {
+            const { layers, softBase } = splitBase(spec, job.w, job.h, base, shell);
+            if (softBase) layers.soft = layerStore.piece(softBase.piece, base);
+            else if (r.renderSoft) stats?.softDropped.push(name);
+            pending.push({ frame, layers });
+          }
+        } catch (e) {
+          if (e instanceof LayerError) throw new LayerError(`${name}: ${e.message}`);
+          throw e;
+        }
+        frames.push(frame);
         return name;
       });
       animations.push({ name: job.name, dt: job.dt, loop: job.loop, keys: job.keys, frames: frameNames });
@@ -280,26 +341,56 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
         const next = r.render(spec, job.w, job.h);
         (frame.overlays ??= {})[key] = store.layer(diffLayer(base, next), next);
       }
+      // A vehicle splits three ways: the back (the interior seen through its
+      // windows), the riders, then the front (the body and frames around
+      // them), each what differs from the picture before it.
+      if (job.front && !job.layers) throw new LayerError("a front picture needs layers");
+      // A renderer that splits for depth must split a vehicle three ways.
+      if (job.front && r.renderShell && !r.renderSplit) throw new LayerError("the renderer cannot split a front picture");
+      const split3 = job.front && r.renderSplit ? r.renderSplit(job.paint, job.w, job.h) : null;
+      if (job.front && r.renderSplit && !split3) throw new LayerError("marks no layer break");
+      if (split3) {
+        if (Object.keys(job.chains ?? {}).length > 1) throw new LayerError("depth layers need at most one chain");
+        const three = (prev: { back: Image; furniture: Image; front: Image } | null, flat: Image, s: { back: Image; mid: Image }) => {
+          const furniture = furniturePicture(prev?.furniture ?? null, s.mid, s.back);
+          const front = furniturePicture(prev?.front ?? null, flat, s.mid);
+          if (!composesTo(s.back, furniture, s.mid) || !composesTo(s.mid, front, flat)) throw new LayerError("back, furniture and front do not compose to the frame");
+          return { back: s.back, furniture, front };
+        };
+        let prev = three(null, base, split3);
+        // A vehicle's front is never empty (its frames or body); one would mean
+        // its paint ends the furniture after drawing them.
+        if (trim(prev.front) === null) throw new LayerError("a vehicle with an empty front");
+        const layers: PendingLayers = { shell: layerStore.shell(prev.back), furniture: layerStore.piece(trim(prev.furniture), base), front: layerStore.piece(trim(prev.front), base) };
+        for (const [key, chain] of Object.entries(job.chains ?? {})) {
+          const renders = chainRenders[key];
+          const out = { shell: [null] as (PendingRef | null)[], furniture: [null] as (PendingRef | null)[], front: [null] as (PendingRef | null)[] };
+          for (let k = 1; k < chain.steps.length; k++) {
+            const sk = r.renderSplit!(chain.steps[k], job.w, job.h);
+            if (!sk) throw new LayerError(`chain ${key} step ${k} marks no layer break`);
+            const next = three(prev, renders[k], sk);
+            out.shell.push(layerStore.piece(diffLayer(prev.back, next.back), next.back));
+            out.furniture.push(layerStore.piece(diffLayer(prev.furniture, next.furniture), renders[k]));
+            out.front.push(layerStore.piece(diffLayer(prev.front, next.front), renders[k]));
+            prev = next;
+          }
+          (layers.chains ??= {})[key] = { shell: trimPending(out.shell), furniture: trimPending(out.furniture), front: trimPending(out.front) };
+        }
+        pending.push({ frame, layers });
+        frames.push(frame);
+        return;
+      }
       // The depth split: the furniture is what differs from the shell, so the
       // shell plus the furniture gives back `base` exactly (diffLayer refuses
       // any pixel source-over could not reproduce).
       const shell = job.layers && r.renderShell ? r.renderShell(job.paint, job.w, job.h) : null;
       if (shell) {
-        // One chain and no overlays: the draw order the manifest documents
-        // (and the checks that prove it) covers exactly that.
-        if (Object.keys(job.chains ?? {}).length > 1 || Object.keys(job.overlays ?? {}).length > 0) throw new LayerError("depth layers need at most one chain and no overlays");
-        const layers: PendingLayers = { shell: layerStore.shell(shell), furniture: layerStore.piece(diffLayer(shell, base), base) };
-        // The soft picture is optional: a soft pass that fails drops it.
-        let soft0: Image | null = null;
-        try {
-          soft0 = r.renderSoft ? r.renderSoft(job.paint, job.w, job.h) : null;
-        } catch (e) {
-          if (!(e instanceof LayerError)) throw e;
-        }
-        let softOk = soft0 !== null;
-        // The soft pieces go into the layer store only once every step has
-        // one, so a dropped soft picture leaves nothing on the pages.
-        const softBase = soft0 ? trim(soft0) : null;
+        // At most one chain: the draw order the manifest documents (and the
+        // checks that prove it) covers one; overlays draw last, in front.
+        if (Object.keys(job.chains ?? {}).length > 1) throw new LayerError("depth layers need at most one chain");
+        const { layers, softBase } = splitBase(job.paint, job.w, job.h, base, shell);
+        const soft0 = softBase?.image ?? null;
+        let softOk = softBase !== null;
         const softSteps: Record<string, { piece: Piece | null; next: Image }[]> = {};
         // Each chain step splits the same way: what changes on the shell (a
         // light that switches on with the first occupant) and what changes in
@@ -335,8 +426,8 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
           }
           (layers.chains ??= {})[key] = { shell: trimPending(split.shell), furniture: trimPending(split.furniture) };
         }
-        if (softOk && soft0) {
-          layers.soft = layerStore.piece(softBase, base);
+        if (softOk && softBase) {
+          layers.soft = layerStore.piece(softBase.piece, base);
           for (const [key, list] of Object.entries(softSteps)) layers.chains![key].soft = trimPending([null, ...list.map((s) => layerStore.piece(s.piece, s.next))]);
         } else if (r.renderSoft) {
           // A soft picture without composable steps would mislead; drop it.
@@ -357,11 +448,13 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
   for (const { frame, layers: p } of pending) {
     const layers: BakedLayers = { shell: resolve(p.shell), furniture: resolve(p.furniture) };
     if ("soft" in p) layers.soft = resolve(p.soft ?? null);
+    if ("front" in p) layers.front = resolve(p.front ?? null);
     if (p.chains) {
       layers.chains = {};
       for (const [key, c] of Object.entries(p.chains)) {
         const out: BakedLayerChain = { shell: c.shell.map(resolve), furniture: c.furniture.map(resolve) };
         if (c.soft) out.soft = c.soft.map(resolve);
+        if (c.front) out.front = c.front.map(resolve);
         layers.chains[key] = out;
       }
     }
@@ -371,6 +464,7 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
     images: [...store.images, ...layerStore.own.images],
     normals: [...store.normals, ...layerStore.own.normals],
     frameImages,
+    ...(groups.length > 0 ? { groups } : {}),
     frames,
     animations,
   };
