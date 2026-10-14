@@ -105,6 +105,18 @@ export async function hostedRun(arg: { name: string; steps: number; warmSteps: n
     }
     return main;
   };
+  // No rendering during the hosted runs, in every mode: the renderer's
+  // frames would sit between the worker host's replies (a reply waits for
+  // the main thread) where the synchronous hosts never yield to one. The
+  // frames pass measures the two together.
+  const clock = g.engine.engine.clock;
+  clock.stop();
+  try {
+    return await measure();
+  } finally {
+    clock.start();
+  }
+  async function measure(): Promise<HostedRun> {
   // Warm-up on a throwaway load.
   await run(await adopt(), arg.warmSteps);
   const sim = await adopt();
@@ -135,6 +147,7 @@ export async function hostedRun(arg: { name: string; steps: number; warmSteps: n
     endKey: `${tag}:end`,
     hostErrorsAdded: errorsNow().slice(errorsAtStart),
   };
+  }
 }
 
 export interface FramesRun {
