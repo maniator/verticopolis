@@ -1,6 +1,7 @@
 import type { Simulation } from "../engine/Simulation";
 import { checkBinding, type WasmModule } from "../dualrun/binding";
 import { attachWasmHost, type WasmHost } from "./wasmHost";
+import { ENGINE_DIR, ENGINE_GLUE } from "./engineAssets";
 
 /**
  * The app side of the WASM switch: load the browser package, host the
@@ -35,9 +36,10 @@ export interface WasmHostHandle {
 
 /** Where the built package lives: `src/public/engine/`, served beside the app
  *  (see scripts/wasm-build.ts). Resolved against the page, so a relocated
- *  deployment finds it under its own base. */
+ *  deployment finds it under its own base. Every file the package loads at
+ *  run time is listed in engineAssets.ts, which the precache check reads. */
 export function enginePackageUrl(base = import.meta.env.BASE_URL, href = globalThis.location?.href ?? "http://localhost/"): string {
-  return new URL(`${base}engine/verticopolis_engine.js`, href).href;
+  return new URL(`${base}${ENGINE_DIR}${ENGINE_GLUE}`, href).href;
 }
 
 /** Load and initialize the browser package. */

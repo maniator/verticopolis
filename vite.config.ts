@@ -298,9 +298,21 @@ export default defineConfig({
         // never precached the engine at all. The
         // cost is about 430 KB compressed per install, paid by every player
         // (owner decision, 2026-10-13: the engine becomes the default at 3.0).
-        // `engine/BUILD.json` stays out (a `.json`, which the pattern does not
-        // match): the page never reads it. scripts/verify-precache.ts fails
-        // the build when a built engine is missing from the manifest.
+        // Which engine files the game fetches at run time is recorded in
+        // src/wasmhost/engineAssets.ts: the glue and the `.wasm` are fetched,
+        // while `engine/BUILD.json` and `engine/THIRD-PARTY.json` are read only
+        // at build and test time. Both stay out because the pattern matches no
+        // `.json` at all, and it should stay that way: a blanket `json` would
+        // also sweep in THIRD-PARTY.json (about 0.6 MB), `version.json` (the
+        // update check, which must come from the network) and any later data
+        // file. If the game starts reading a `.json` at run time (BUILD.json
+        // for #985's package check, or audio data for #968), mark it in
+        // engineAssets.ts or audioAssets.ts and add that one file to this
+        // list by its own path (for example "engine/BUILD.json").
+        // scripts/verify-precache.ts fails the build when a run-time engine
+        // or audio file is missing from the manifest, when a build-only
+        // engine file is in it, and when the package holds a file the list
+        // does not classify.
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3,wasm}"],
         // og-image.png is the social/crawler share card, not part of the game
         // shell, so keep it out of the offline precache. `help.html` and its own
