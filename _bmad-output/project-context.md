@@ -123,6 +123,8 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
+  The Rust engine in `engine-rs/` follows these rules with no grandfathered
+  comments, plus the 500-line file ceiling (see CONTRIBUTING "Conventions").
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
 - **Version bump on player-facing change:** bump `package.json` `version` (semver
   by player impact: **minor** for a new player-facing capability, **patch** for a
