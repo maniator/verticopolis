@@ -282,11 +282,12 @@ export default defineConfig({
         // an installed game starts the engine offline (#945). One precache
         // version holds the shell and the engine together: Workbox installs a
         // new worker's whole manifest or none of it, activates it through
-        // src/pwa.ts's save-then-reload or on the next cold start, and deletes
+        // src/pwa.ts's save-then-reload or once every tab of the old version
+        // has closed, and deletes
         // the old version's entries, so from 2.30.1 on a page the worker
         // controls runs the shell and engine its install fetched together.
-        // Not covered here, and owned by the cutover plan's S16 version check
-        // (#945): a page no worker controls yet (a first visit) fetches them
+        // Not covered here, and tracked on #985 (the cutover plan's S16
+        // version check): a page no worker controls yet (a first visit) fetches them
         // separately; an install that overlaps a deploy can store the engine's
         // unhashed files from the newer build; and a worker from before 2.30.1
         // never precached the engine at all. The
@@ -356,7 +357,7 @@ export default defineConfig({
           /preview/,
           /version\.json$/,
           // The engine package's own files (its BUILD.json above all) are
-          // documents, never app routes.
+          // documents; a navigation to one must reach the file itself.
           /\/engine\//,
           /robots\.txt$/,
           /sitemap\.xml$/,

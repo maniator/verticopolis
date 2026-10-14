@@ -9,7 +9,7 @@ describe("precacheFile", () => {
     expect(precacheFile(DIST, "engine/verticopolis_engine_bg.wasm?__WB_REVISION__=abc")).toBe(resolve(DIST, "engine/verticopolis_engine_bg.wasm"));
     expect(precacheFile(DIST, "assets/a%20b.js#x")).toBe(resolve(DIST, "assets/a b.js"));
     expect(precacheFile(DIST, "./index.html")).toBe(resolve(DIST, "index.html"));
-    // A name that only starts with dots is a file, not a parent segment.
+    // A file name may start with dots; only a whole ".." segment climbs.
     expect(precacheFile(DIST, "..foo.js")).toBe(resolve(DIST, "..foo.js"));
   });
 

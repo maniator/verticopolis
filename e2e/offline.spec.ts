@@ -3,19 +3,20 @@ import { test, expect, type Page } from "@playwright/test";
 import { WASM_PROJECT, expectEngineHosted } from "./helpers";
 
 /**
- * The installed game on the WASM engine without a network (#945). The service
+ * The installed game on the WASM engine without a network (#985). The service
  * worker precaches the shell and the engine package together (vite.config.ts),
- * so after one online visit the game must start the engine offline, keep it
- * through a lost connection, and save and load on it. "On the engine" means
- * the host holds the live tower, never a silent fallback to the TypeScript
- * engine (expectEngineHosted, after every test), and the engine binary came
- * from the service worker.
+ * so after one online visit the game must start the engine on an offline
+ * reload, keep it through a lost connection, and save and load on it. "On the
+ * engine" means the host holds the live tower with no silent fallback to the
+ * TypeScript engine (expectEngineHosted, after every test), and the engine
+ * binary came from the service worker. A reload here keeps the browser
+ * context; a start in a fresh browser session is still open on #985.
  *
  * These run against the production build `npm run e2e` serves (vite preview),
  * on the chromium-wasm project, where the engine is the chosen one.
  */
 test.beforeEach(({}, info) => test.skip(info.project.name !== WASM_PROJECT, "the engine runs on the chromium-wasm project"));
-// An install, a cold start and a game session each: more than the default 30s.
+// An install, an offline reload and a game session each: more than the default 30s.
 test.setTimeout(90_000);
 test.afterEach(async ({ page }) => expectEngineHosted(page));
 
@@ -107,12 +108,13 @@ function watch(page: Page): { errors: string[]; failed: string[] } {
   return seen;
 }
 
-test("an installed game starts the WASM engine offline, and plays, saves and loads", async ({ page, context }) => {
+test("an installed game starts the WASM engine on an offline reload, and plays, saves and loads", async ({ page, context }) => {
   await install(page);
   await context.setOffline(true);
   const seen = watch(page);
-  // A cold start with no network: the shell and the engine come from the
-  // precache only, and the binary is answered by the service worker.
+  // An offline reload in the same browser context: the shell and the engine
+  // come from the precache only, and the binary is answered by the service
+  // worker.
   const binary = page.waitForResponse((r) => r.url().includes("engine/verticopolis_engine_bg.wasm"), { timeout: 30_000 });
   await page.reload();
   expect((await binary).fromServiceWorker(), "the engine binary is served by the service worker").toBe(true);

@@ -61,8 +61,10 @@ npm run typecheck && npm run lint && npm test && npm run build
 
 `npm run build` refuses a build without the WASM engine package
 (`src/public/engine/`, built by `npm run wasm:build`). When the setup steps
-could not build it, they set `VC_ALLOW_NO_ENGINE=1`, which lets the build go
-on as a deliberate TypeScript-only build; see CONTRIBUTING.md.
+could not build it, they set `VC_ALLOW_NO_ENGINE=1` for the setup build. If
+your own `npm run build` stops for the missing engine, run it as
+`VC_ALLOW_NO_ENGINE=1 npm run build` (a deliberate TypeScript-only build);
+see CONTRIBUTING.md.
 
 CI (`.github/workflows/test.yml`) runs all of the above on every PR. When you push
 new commits to a PR, **re-request a Copilot review**. Copilot reviews are one-shot

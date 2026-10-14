@@ -66,7 +66,11 @@ jobs:
       # the engine in place, builds keep the strict check.
       - name: Allow builds without the engine (engine step failed)
         if: steps.engine.outcome == 'failure'
-        run: echo "VC_ALLOW_NO_ENGINE=1" >> "$GITHUB_ENV"
+        # A step that failed partway can leave part of the package, which the
+        # build refuses even with the opt-in; clear it.
+        run: |
+          rm -rf src/public/engine
+          echo "VC_ALLOW_NO_ENGINE=1" >> "$GITHUB_ENV"
 
       # A tooling build, so an agent that runs `npm run e2e` against this dist
       # gets the `window.game` handle the specs depend on (production builds
