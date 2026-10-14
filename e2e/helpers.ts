@@ -22,6 +22,14 @@ import { test, expect, type Page } from "@playwright/test";
 
 /** The Playwright project that seeds `vc.engine = wasm` (playwright.config.ts). */
 export const WASM_PROJECT = "chromium-wasm";
+/** The project that runs the suite against a wasm-only build (`VC_ENGINE=wasm`,
+ *  see playwright.config.ts): the WASM engine is the only engine there. */
+export const WASM_ONLY_PROJECT = "chromium-wasm-only";
+
+/** Whether a project runs every page on the WASM engine. */
+export function onWasm(projectName: string): boolean {
+  return projectName === WASM_PROJECT || projectName === WASM_ONLY_PROJECT;
+}
 
 /**
  * Skip the calling test on the `chromium-wasm` project, with the reason in the
@@ -30,7 +38,8 @@ export const WASM_PROJECT = "chromium-wasm";
  * for `tsOnlyOnWasm(` to list them all.
  */
 export function tsOnlyOnWasm(reason: string): void {
-  test.skip(test.info().project.name === WASM_PROJECT, `TypeScript-only on ${WASM_PROJECT}: ${reason}`);
+  const project = test.info().project.name;
+  test.skip(onWasm(project), `TypeScript-only on ${project}: ${reason}`);
 }
 
 /**
@@ -43,7 +52,7 @@ export function tsOnlyOnWasm(reason: string): void {
  */
 export async function expectEngineHosted(page: Page): Promise<void> {
   const info = test.info();
-  if (info.project.name !== WASM_PROJECT || info.expectedStatus === "skipped") return;
+  if (!onWasm(info.project.name) || info.expectedStatus === "skipped") return;
   // Leave an already-failed test's own failure on top of the report.
   if (info.status === "failed" || info.status === "timedOut" || info.status === "interrupted") return;
   const state = await page.evaluate(() => {
@@ -69,7 +78,7 @@ export async function expectEngineHosted(page: Page): Promise<void> {
  * spec that asserts the engine reached a state rather than the read model.
  */
 export async function engineSave(page: Page): Promise<Record<string, any> | null> {
-  if (test.info().project.name !== WASM_PROJECT) return null;
+  if (!onWasm(test.info().project.name)) return null;
   return page.evaluate(() => {
     const host = (window as any).__vcEngine?.current();
     return host ? JSON.parse(host.engine.serialize()) : null;
@@ -114,12 +123,13 @@ export function buildToStar(target: number): number {
   const hosted = Boolean((window as any).__vcEngine?.current());
   // The WASM engine was asked for but holds no tower: building in place here
   // would script the read model alone, so fail loudly instead.
-  let wantsWasm = false;
+  // A wasm-only build has no other engine, whatever the URL or storage say.
+  let wantsWasm = (window as any).__vcEngineBoot?.build === "wasm-only";
   try {
     // The same rule as engineRequested (src/wasmhost/engineChoice.ts): the
     // query wins, then the stored choice.
     const q = new URLSearchParams(location.search).get("engine");
-    wantsWasm = q === "wasm" || (q !== "ts" && localStorage.getItem("vc.engine") === "wasm");
+    wantsWasm ||= q === "wasm" || (q !== "ts" && localStorage.getItem("vc.engine") === "wasm");
   } catch {
     /* storage blocked: decide on the host alone */
   }

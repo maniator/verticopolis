@@ -8,7 +8,7 @@ import type { ImportReport } from "../storage/tdtImport";
 import { runExportFlow, runLegacyDownload } from "./exportFlow";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
 import { shouldArm } from "../ui/Onboarding";
-import { isCrashed, isSplashUp } from "./interactionState";
+import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import type { UI } from "../ui/UI";
 
 /**
@@ -206,6 +206,10 @@ export class SaveLoad {
    *   them straight back into the tower.
    */
   recoverFromContextLoss(): void {
+    // A wasm-only build that stopped on its engine already owns the session:
+    // no engine holds the tower, so nothing may be flushed over the save the
+    // engine-failure message points back to, and a reload is the way out.
+    if (isEngineStopped()) return;
     // Same guard as the autosave timer: never persist the throwaway boot sim
     // while the first-run splash is still up. The splash also means there is
     // nothing to flush (it pauses the sim), so "flushed" stays honest.
