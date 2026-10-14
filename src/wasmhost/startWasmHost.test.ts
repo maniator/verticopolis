@@ -28,6 +28,7 @@ class FakeEngine {
   housekeepingReport(): string | undefined { return undefined; }
   /** What the engine still owes: handed over once, then empty. */
   owed: unknown[] = [];
+  gameplayEventsPending(): number { return this.owed.length; }
   drainGameplayEvents(): string {
     const out = JSON.stringify(this.owed);
     this.owed = [];

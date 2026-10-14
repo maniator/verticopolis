@@ -20,13 +20,18 @@ them into the same wire events, so the event names and fields are unchanged:
   `bomb_detonated` across every tower the session played. The `counts` sampler
   is retired; the frame loop's throttled refresh still marks a session as
   played, so the denominator is unchanged.
-- `demolish` stays on the shell's removal path until the bulldozer and the
-  editor's Sell remove through an engine command (backlog
-  `analytics-removal-command`, #901, carried by #928).
+- From 2.31.2 `demolish` comes from the engine's `facility_removed`: the
+  bulldozer and the editor's Sell remove through `removeFacility` (#928), so
+  each removal sends one `demolish` with its method as `detail`, up to 40 in
+  each one-minute window (removals past that in the window are not sent). It leaves at
+  the next frame's drain. A removal the player then undid still counts, as a
+  build does. The engine's `sellAt` emits `facility_removed` too; no player
+  path calls it. Until 2.31.2 the shell sent `demolish`, as the sections
+  below record.
 
 ## Events
 
-> Superseded from 2.29.5 by the engine bridge (see the section above): kept as the #611 record. The hook sites and the `counts` sampler below are no longer how these events are produced.
+> Superseded from 2.29.5 by the engine bridge (from 2.31.2 for `demolish`; see the section above): kept as the #611 record. The hook sites and the `counts` sampler below are no longer how these events are produced.
 
 | Event | Fields (closed enums / integers only) | Cadence | User- or sim-fired | Hook site |
 | :-- | :-- | :-- | :-- | :-- |
@@ -36,6 +41,8 @@ them into the same wire events, so the event names and fields are unchanged:
 
 ## Coverage detail
 
+> Superseded by the engine bridge (see the section above): from 2.29.5 for `price_tune`, `capacity_tune` and the emergencies, and from 2.31.2 for `demolish`. Kept as the #611 record.
+
 - **`demolish`** — one choke point covers both the bulldoze tool and the editor-card Sell: `tryRemoveUnit(u, verb, quiet)` where `verb` is already `"sell" | "bulldoze"` (that is the `detail`). The transport refund path (`removeTransportWithRefund`) is the same behavior for shafts and emits `demolish` too (detail chosen to match the gesture).
 - **`price_tune`** — latches on the first of: rent up/down, rung price pick / no-rate, batch-pricing apply. The value set is not captured.
 - **`capacity_tune`** — latches on the first of: add elevator car, remove car, paid shaft extend (button or drag commit). The count is not captured.
@@ -44,7 +51,7 @@ them into the same wire events, so the event names and fields are unchanged:
 
 ## Engine counter surface (CAP-3)
 
-> Superseded from 2.29.5 by the engine bridge (see the section above): kept as the #611 record. The hook sites and the `counts` sampler below are no longer how these events are produced.
+> Superseded from 2.29.5 by the engine bridge (from 2.31.2 for `demolish`; see the section above): kept as the #611 record. The hook sites and the `counts` sampler below are no longer how these events are produced.
 
 `EventSystem.ts` exposes three read-only integers, incremented where the events already occur:
 - fires ignited — at `startFire()`.
@@ -55,7 +62,7 @@ Reset per new game alongside the rest of the emergency state. The frame loop sam
 
 ## Acceptance criteria (vitest)
 
-> Superseded from 2.29.5 by the engine bridge (see the section above): kept as the #611 record. The hook sites and the `counts` sampler below are no longer how these events are produced.
+> Superseded from 2.29.5 by the engine bridge (from 2.31.2 for `demolish`; see the section above): kept as the #611 record. The hook sites and the `counts` sampler below are no longer how these events are produced.
 
 1. **Host-gate** — on a non-deployed host, none of the three events fire.
 2. **Per-action** — two demolishes fire two `economy_action { action: "demolish" }` with the right `detail` each.

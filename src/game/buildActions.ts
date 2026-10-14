@@ -5,7 +5,6 @@ import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
-import { trackEconomyAction } from "../analytics";
 import { towerCatalog } from "../engine/towerCatalog";
 
 /**
@@ -211,22 +210,19 @@ export class BuildActions {
       }
       return false;
     }
-    // A real player removal (the sole choke point for the bulldoze tool and the
-    // editor Sell); `verb` is the sell-vs-bulldoze detail. Per-action: a drag
-    // sweep is many genuine removals, each its own demolish.
-    trackEconomyAction("demolish", verb);
+    // The engine reports the removal (`facility_removed`, with `verb` as its
+    // method), and the analytics bridge sends it as `demolish`.
     return true;
   }
 
   /** Tear out a shaft through the engine's `removeFacility`, which pays its
    *  resale: the ONE refund path shared by the editor's Sell and the
    *  bulldozer. `verb` is the sell-vs-bulldoze telemetry detail (the
-   *  caller's gesture). False when the engine refused (the shaft is already
-   *  gone), so the caller plays no sale. */
+   *  caller's gesture), which the engine reports as the removal's method.
+   *  False when the engine refused (the shaft is already gone), so the caller
+   *  plays no sale. */
   removeTransportWithRefund(t: Transport, verb: "sell" | "bulldoze"): boolean {
-    if (!this.deps.getSim().removeFacility(t.id, verb).ok) return false;
-    trackEconomyAction("demolish", verb);
-    return true;
+    return this.deps.getSim().removeFacility(t.id, verb).ok;
   }
 
   /** Bulldoze whatever Excalibur reported under the pointer, with a refund.
