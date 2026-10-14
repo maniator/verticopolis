@@ -228,7 +228,9 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       // streak (a command every round trip, as while dragging out a build)
       // the frame loop's next flush sends the next steps with the request
       // instead, so the clock does not stop.
-      if (staleStreak < MAX_STALE_STREAK) requestFrame();
+      // A waiting settle asks at once either way (the frame loop may not be
+      // flushing: a modal open).
+      if (staleStreak < MAX_STALE_STREAK || waiters.length > 0) requestFrame();
       return;
     }
     // Every command so far is in this reply: the read model's copies of
