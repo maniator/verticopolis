@@ -33,7 +33,7 @@ pub const FACILITY_GONE: &str = "That facility is gone.";
 /// The typed engine API takes `i64` ids and floors and parsed enums, so it
 /// cannot see a fraction or an unknown string; the WASM binding checks its raw
 /// arguments (ids and floors with [`whole`], enums with their `parse`, a mark
-/// as JSON integers in `parse_hwm`) and refuses with this before calling the
+/// as JSON integers in `parse_mark`) and refuses with this before calling the
 /// engine.
 /// A native Rust host gets no such check and must pass values in range.
 pub const INVALID_REQUEST: &str = "That request is not valid.";

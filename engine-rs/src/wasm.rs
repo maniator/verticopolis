@@ -85,7 +85,8 @@ fn extend_json(r: &crate::charges::ExtendResult) -> Value {
 /// range: a number written with a fraction or an exponent (`2.0`, `1e3`,
 /// `9007199254740990.5`, which an `f64` would round to a whole number) is
 /// refused rather than rounded. The commands read marks through
-/// [`parse_mark`]; this is its field rule alone, for the tests.
+/// [`parse_mark`], which takes the text `null` as no mark; this is its field
+/// rule alone, for the tests, so `null` is `None` here too.
 #[cfg(test)]
 fn parse_hwm(text: &str) -> Option<(i64, i64)> {
     parse_mark(text).flatten()
@@ -580,9 +581,12 @@ impl Engine {
     /// `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
     /// as JSON `{ bottom, top }` text, or null, undefined or the text `null`
     /// for none: JSON `{ ok, reason?, delta, bottom, top, added }`, the floors
-    /// billed past the mark. Write the mark with `JSON.stringify`: each field
-    /// must be a JSON integer, so a float spelling such as `2.0`, `1e1` or
-    /// `-0` is refused. Every argument is read raw (#923): an id or floor
+    /// billed past the mark. Write the mark with `JSON.stringify` on
+    /// `{ bottom, top }` alone (text with any other key must still be strict
+    /// JSON, which a lone surrogate escape is not): each field
+    /// must be digits with an optional leading minus, no fraction or exponent
+    /// (`2.0` and `1e1` are refused), and not `-0`, which the JSON reader
+    /// takes as a float. Every argument is read raw (#923): an id or floor
     /// that is not a whole JS number, an `end` that is not exactly `"up"` or
     /// `"down"`, or a mark that is not that text (an object included) is
     /// refused with `INVALID_REQUEST` and the shaft's ends as they stand.
@@ -1241,6 +1245,12 @@ mod tests {
         );
         assert_eq!(parse_hwm(r#"{"top":3}"#), None);
         assert_eq!(parse_hwm("not json"), None);
+        // The text null is no mark; malformed text is no answer at all.
+        assert_eq!(parse_mark("null"), Some(None));
+        assert_eq!(parse_mark(" null "), Some(None));
+        assert_eq!(parse_mark("not json"), None);
+        assert_eq!(parse_mark(r#"{"bottom":1}"#), None);
+        assert_eq!(parse_mark(r#"{"bottom":1,"top":2}"#), Some(Some((1, 2))));
     }
 
     /// A malformed charge command (#923) is refused with one reason and moves

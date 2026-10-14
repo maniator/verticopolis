@@ -106,7 +106,8 @@ function cases(lift: number, office: number, stairs: number): Call[] {
     ["a fractional top", { bottom: 1, top: 2.5 }, '{"bottom":1,"top":2.5}'],
     ["a top past 2^53", { bottom: 1, top: 2 ** 53 }, '{"bottom":1,"top":9007199254740992}'],
     ["a bottom past -2^53", { bottom: -(2 ** 53), top: 2 }, '{"bottom":-9007199254740992,"top":2}'],
-    ["an Infinity top", { bottom: 1, top: Infinity }, JSON.stringify({ bottom: 1, top: Infinity })],
+    ["an Infinity top, written past the f64 range", { bottom: 1, top: Infinity }, '{"bottom":1,"top":1e400}'],
+    ["an Infinity top, written as a word", { bottom: 1, top: Infinity }, '{"bottom":1,"top":Infinity}'],
     ["a string bottom", { bottom: "1", top: 2 }, '{"bottom":"1","top":2}'],
     ["a NaN bottom, stringified", { bottom: Number.NaN, top: 2 }, JSON.stringify({ bottom: Number.NaN, top: 2 })],
     ["a NaN bottom, written raw", { bottom: Number.NaN, top: 2 }, '{"bottom":NaN,"top":2}'],
@@ -132,6 +133,9 @@ function acceptedEdges(lift: number): Call[] {
     { name: "extendTransport(up to 2^53 - 1)", ts: (s) => s.extendTransport(lift, "up", max), rust: (e) => e.extendTransport(lift, "up", max) },
     { name: "extendTransport(down to -(2^53 - 1))", ts: (s) => s.extendTransport(lift, "down", -max), rust: (e) => e.extendTransport(lift, "down", -max) },
     { name: "extendTransport(a mark of ±(2^53 - 1))", ts: (s) => s.extendTransport(lift, "up", max, { bottom: -max, top: max }), rust: (e) => e.extendTransport(lift, "up", max, JSON.stringify({ bottom: -max, top: max })) },
+    // Floor 3 plus or minus 2^32 was floor 3 to the old i32 binding.
+    { name: "extendTransport(up to 3 + 2^32)", ts: (s) => s.extendTransport(lift, "up", 3 + 2 ** 32), rust: (e) => e.extendTransport(lift, "up", 3 + 2 ** 32) },
+    { name: "extendTransport(down to 3 - 2^32)", ts: (s) => s.extendTransport(lift, "down", 3 - 2 ** 32), rust: (e) => e.extendTransport(lift, "down", 3 - 2 ** 32) },
   ];
   // The shaft's id plus or minus 2^32 named the shaft itself when the binding
   // truncated to i32; now each names nothing, in both engines.
@@ -163,16 +167,19 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
           expect(() => { raw = c.rust(engine); }, `${c.name}: the binding threw`).not.toThrow();
           expect(ts.ok, `${c.name}: TypeScript accepted it`).toBe(false);
           if (malformed) expect(ts.reason, c.name).toBe(INVALID_REQUEST);
+          else expect(ts.reason, `${c.name}: refused as malformed`).not.toBe(INVALID_REQUEST);
           expect(JSON.parse(raw), c.name).toEqual(ts);
           expect(tsDigest(), `${c.name}: TypeScript moved`).toBe(start);
           expect(engine.stateDigest(), `${c.name}: Rust moved`).toBe(start);
         }
       };
       const list = cases(lift, office, stairs);
-      expect(list).toHaveLength(122);
+      // 2 ends checks + 16 ids x 5 + 7 missing + 10 ends + 10 methods + 14 marks.
+      expect(list).toHaveLength(123);
       run(list, true);
       const edges = acceptedEdges(lift);
-      expect(edges).toHaveLength(27);
+      // 5 floor and mark edges + 6 ids x 4 commands.
+      expect(edges).toHaveLength(29);
       run(edges, false);
       expect(drained(sim, engine), "a refusal emitted an event").toEqual({ ts: [], rust: [] });
 

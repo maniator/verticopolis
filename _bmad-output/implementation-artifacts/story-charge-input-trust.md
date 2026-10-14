@@ -32,9 +32,9 @@ engines.
     `Number.isSafeInteger` and the two known enums before any lookup.
   - Rust: `engine-rs/src/charges.rs` adds `whole(f64)`, the same rule.
 - **WASM binding:** `addCar`, `removeCar`, `extendTransport` and
-  `removeFacility` read every argument raw as a `JsValue` (the `.d.ts` still
+  `removeFacility` read every argument raw as a `JsValue`, while the `.d.ts`
   types them `number`, `"up" | "down"`, `"sell" | "bulldoze"` and an optional
-  `string | null` mark). A number counts only if it is a whole JS number
+  `string | null` mark (the enums narrowed from `string`). A number counts only if it is a whole JS number
   within `Number.isSafeInteger`; an enum only if it is that exact JS string; a
   mark only if it is null, undefined or JSON `{ bottom, top }` text whose
   fields are written as JSON integers (the text `null` is no mark). Anything
@@ -74,14 +74,15 @@ engines.
   - A dual-run test that sends malformed commands through the mirror and
     checks that both engines stay in step.
   - `chargeBindingRaw.integration.test.ts` (in `npm run test:wasm` and the
-    Rust engine workflow's paths): 122 malformed calls straight into the
+    Rust engine workflow's paths): 123 malformed calls straight into the
     glue, each checked for no throw, the TypeScript refusal, an equal answer
-    and an unchanged state in both engines; 27 accepted edge values (ids
-    that name nothing, among them the shaft's id plus or minus 2^32, which
-    the old `i32` truncation aliased to the shaft; floors and marks at
-    ±(2^53 - 1)) must get the same
-    answer from both; no gameplay event from either; then
-    well-formed calls must land with equal answers, states and events.
+    and an unchanged state in both engines. 29 accepted edge values must get
+    the same refusal from both, never `INVALID_REQUEST`: ids that name
+    nothing, among them the shaft's id plus or minus 2^32, which the old
+    `i32` truncation aliased to the shaft; floor 3 plus or minus 2^32, which
+    it read as floor 3; and floors and marks at ±(2^53 - 1). No gameplay
+    event comes from either engine; then well-formed calls must land with
+    equal answers, states and events.
 - **#958:** that PR removed the checked-in WASM package
   (`src/public/engine/*`) and landed first, so this branch merges main and
   drops its package changes; CI and Vercel build the package.
@@ -275,3 +276,30 @@ engines.
   accepting zero-fraction floats in a mark (they cannot be told from a
   rounded fraction once parsed, so the rule stays integers only and is now
   documented on the binding).
+
+### Round 8 (confirming pass)
+
+- [x] [Review][Patch] Round 7's unit-test edit drained the event buffer
+  after the billed shifting mark and then asserted it empty, so the
+  refusals' no-event check could not fail (all three layers)
+  [charges.test.ts]: the buffer is checked right after the refusals.
+- [x] [Review][Patch] The Infinity mark case reached the binding as JSON
+  `null`, a case already covered (Blind Hunter): it is written raw, as
+  `1e400` and as the word `Infinity`.
+- [x] [Review][Patch] Only ids were pinned against `i32` aliasing, not
+  floors; the accepted edges checked only that the engines agree, not that
+  neither called them malformed (Blind Hunter) [chargeBindingRaw]: floor 3
+  plus or minus 2^32 joins them, and each must not be `INVALID_REQUEST`.
+- [x] [Review][Patch] The native test no longer told the text `null` from
+  malformed text (Blind Hunter) [engine-rs/src/wasm.rs]: it asserts
+  `parse_mark` directly.
+- [x] [Review][Patch] Prose (all layers): the binding doc called `-0` a
+  float spelling and did not say to stringify `{ bottom, top }` alone (an
+  extra key with a lone surrogate escape gets the mark refused); the
+  `parse_hwm` doc missed the `null` text; the `INVALID_REQUEST` doc named
+  `parse_hwm`; the `-0` unit test's name claimed the binding half; the
+  story said the `.d.ts` "still" typed the enums, which it narrows; the
+  dual-run marks now assert their bottom end; the case counts carry their
+  arithmetic.
+- Edge Case Hunter: otherwise clean (BOM, duplicate keys, top-level
+  non-objects, `i64::MIN`, `u64::MAX`, inverted marks all agree or refuse).

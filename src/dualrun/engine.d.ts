@@ -91,9 +91,12 @@ export class Engine {
      * `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
      * as JSON `{ bottom, top }` text, or null, undefined or the text `null`
      * for none: JSON `{ ok, reason?, delta, bottom, top, added }`, the floors
-     * billed past the mark. Write the mark with `JSON.stringify`: each field
-     * must be a JSON integer, so a float spelling such as `2.0`, `1e1` or
-     * `-0` is refused. Every argument is read raw (#923): an id or floor
+     * billed past the mark. Write the mark with `JSON.stringify` on
+     * `{ bottom, top }` alone (text with any other key must still be strict
+     * JSON, which a lone surrogate escape is not): each field
+     * must be digits with an optional leading minus, no fraction or exponent
+     * (`2.0` and `1e1` are refused), and not `-0`, which the JSON reader
+     * takes as a float. Every argument is read raw (#923): an id or floor
      * that is not a whole JS number, an `end` that is not exactly `"up"` or
      * `"down"`, or a mark that is not that text (an object included) is
      * refused with `INVALID_REQUEST` and the shaft's ends as they stand.
