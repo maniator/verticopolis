@@ -2,7 +2,8 @@ import { FACILITIES, hasBusinessHours, isElevatorKind, isOpenAt } from "../../en
 import { subtypeListFor } from "../../engine/retailSubtypes";
 import type { FacilityKind, UnitState } from "../../engine/types";
 import { rand } from "../sprites/common";
-import { LATE_NIGHT_KINDS, OCCUPANT_FREE, PARKING_CAR_COLORS, RECYCLE_STEPS, isLateHour } from "./catalog";
+import { LATE_NIGHT_KINDS, isLateHour } from "../lateNight";
+import { OCCUPANT_FREE, PARKING_CAR_COLORS, RECYCLE_STEPS } from "./catalog";
 import { LEGACY_SHAFT_WIDTHS } from "./catalogExtras";
 
 /**

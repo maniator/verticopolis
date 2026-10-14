@@ -40,7 +40,7 @@ jobs:
           rustup toolchain install 1.97.0 --profile minimal
           rustup default 1.97.0
       - name: Build the fuzzer
-        run: cargo build --locked --release --bin fuzz
+        run: cargo build --locked --release --features conformance --bin fuzz
         working-directory: engine-rs
       - name: Fuzz
         run: |
@@ -72,7 +72,7 @@ jobs:
             engine-rs/target/release/fuzz "$seed" fuzz-out 40 || { status=1; continue; }
             npx tsx scripts/fuzz-compare.ts "fuzz-out/fuzz-$seed.json" || status=1
           done
-          echo "replay one seed with: workflow_dispatch seed=<number>, or locally: cargo run --release --manifest-path engine-rs/Cargo.toml --bin fuzz -- <number> out 40 && npx tsx scripts/fuzz-compare.ts out/fuzz-<number>.json"
+          echo "replay one seed with: workflow_dispatch seed=<number>, or locally: cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin fuzz -- <number> out 40 && npx tsx scripts/fuzz-compare.ts out/fuzz-<number>.json"
           exit $status
       - name: Keep the scenarios of this run
         if: always()

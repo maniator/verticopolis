@@ -12,20 +12,15 @@
  *
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets.ts";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
+import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, glueLoads } from "../src/wasmhost/engineAssets.ts";
 
 const DIST = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const SW = resolve(DIST, "sw.js");
-
-/** The WASM engine package, precached with the shell so the engine starts
- *  offline (#945). Every build must carry it, whatever hosts it, unless a
- *  build that is not a deploy opts out with VC_ALLOW_NO_ENGINE=1
- *  (missingEngine in src/precacheEntry.ts; see CONTRIBUTING.md). */
-const ENGINE_FILES = ["engine/verticopolis_engine.js", "engine/verticopolis_engine_bg.wasm"];
 
 /** What a first install may download, uncompressed. About 2.9 MiB with the
  *  engine (2026-10-13); the headroom is for ordinary growth. Crossing it should
@@ -107,15 +102,38 @@ if (total > PRECACHE_BUDGET_BYTES) {
 // Every build needs the whole package, precached, so a partial build (glue
 // without binary) or a missing one stops here before it can reach a player
 // as a silent fallback to the TypeScript engine. Only an explicit opt-in
-// skips it, and never on a deploy.
-const builtEngine = [...ENGINE_FILES, "engine/BUILD.json"].some((f) => existsSync(resolve(DIST, f)));
+// skips it, and never on a deploy (VC_ALLOW_NO_ENGINE=1, missingEngine in
+// src/precacheEntry.ts; see CONTRIBUTING.md). The package's files, and which
+// of them the game fetches at run time, are listed in
+// src/wasmhost/engineAssets.ts (kept complete by engineAssets.test.ts and by
+// the package build itself).
+const engineDir = resolve(DIST, ENGINE_DIR);
+const builtEngine = existsSync(engineDir) && readdirSync(engineDir).length > 0;
 const stop = missingEngine(process.env, builtEngine);
 if (stop) fail(stop);
 if (builtEngine) {
-  const notBuilt = ENGINE_FILES.filter((f) => !existsSync(resolve(DIST, f)));
+  const notBuilt = ENGINE_RUNTIME_FILES.filter((f) => !existsSync(resolve(DIST, f)));
   if (notBuilt.length > 0) fail(`the engine package in dist/ is incomplete (rebuild it with npm run wasm:build): ${notBuilt.join(", ")}`);
-  const absent = ENGINE_FILES.filter((f) => !seen.has(f));
-  if (absent.length > 0) fail(`the built engine package is missing from the precache manifest, so the WASM engine would not start offline (#945); check the workbox globPatterns and maximumFileSizeToCacheInBytes in vite.config.ts: ${absent.join(", ")}`);
+  // A file in the package that the list does not classify could be one the
+  // game fetches, so it stops the build until someone says which it is.
+  const shipped = readdirSync(engineDir, { recursive: true, withFileTypes: true })
+    .filter((e) => !e.isDirectory())
+    .map((e) => ENGINE_DIR + relative(engineDir, resolve(e.parentPath, e.name)).split(sep).join("/"));
+  const unclassified = shipped.filter((f) => !ENGINE_RUNTIME_FILES.includes(f) && !ENGINE_BUILD_ONLY_FILES.includes(f));
+  if (unclassified.length > 0) fail(`dist/${ENGINE_DIR} holds files src/wasmhost/engineAssets.ts does not list; add each with whether the game fetches it at run time: ${unclassified.join(", ")}`);
+  // The glue fetches its binary (and would fetch any snippet) relative to
+  // itself; each such file must be one the list marks as fetched.
+  const glueRefs = glueLoads(readFileSync(resolve(DIST, ENGINE_DIR + ENGINE_GLUE), "utf8")).map((f) => ENGINE_DIR + f);
+  if (!glueRefs.some((f) => f !== ENGINE_DIR + ENGINE_GLUE)) fail(`found no file the engine glue loads beside itself (its binary); did wasm-bindgen's output change shape? (glueLoads in src/wasmhost/engineAssets.ts)`);
+  const notRuntime = glueRefs.filter((f) => !ENGINE_RUNTIME_FILES.includes(f));
+  if (notRuntime.length > 0) fail(`the engine glue loads files src/wasmhost/engineAssets.ts does not mark as fetched at run time, so they would not be precached: ${notRuntime.join(", ")}`);
+  const absent = ENGINE_RUNTIME_FILES.filter((f) => !seen.has(f));
+  if (absent.length > 0) fail(`engine files the game fetches at run time are missing from the precache manifest, so the WASM engine would not start offline (#945, #985); check the workbox globPatterns and maximumFileSizeToCacheInBytes in vite.config.ts: ${absent.join(", ")}`);
+  // A build-only file in the manifest costs every install its download for
+  // nothing (THIRD-PARTY.json alone is about 0.6 MB). If the game starts
+  // reading one, mark it runtime in engineAssets.ts instead.
+  const wasted = ENGINE_BUILD_ONLY_FILES.filter((f) => seen.has(f));
+  if (wasted.length > 0) fail(`engine files the game never fetches are in the precache manifest (src/wasmhost/engineAssets.ts marks them build-only): ${wasted.join(", ")}`);
 }
 
 // Today's sounds must play offline too (#985): the lazy chunk that carries
@@ -168,5 +186,5 @@ if (silent.length > 0) fail(`audio files the game fetches at run time are missin
 
 console.log(
   `verify-precache: ${urls.length} unique precache entries (${(total / 1048576).toFixed(2)} MiB); all ${REQUIRED_ICONS.length} required icons present exactly once; the audio chunk and ${AUDIO_RUNTIME_FILES.length} audio files are precached; ` +
-    (builtEngine ? "the engine package is precached" : `no engine package in this build (${ALLOW_NO_ENGINE}=1)`),
+    (builtEngine ? `the ${ENGINE_RUNTIME_FILES.length} engine files fetched at run time are precached` : `no engine package in this build (${ALLOW_NO_ENGINE}=1)`),
 );

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { inflateSync } from "fflate";
 // A real v4 save (the owner's SixSeven tower): 15 shafts, every standard
 // elevator stored at the legacy 3-tile width beside 4-wide service/express.
-import towerFile from "../fixtures/sixseven_2.vctower?raw";
+import towerFile from "../../../conformance/fixtures/sixseven_2.vctower?raw";
 import { Simulation } from "../../engine/Simulation";
 import { SAVE_VERSION, migrateSave, upgradeV4toV5 } from "../../engine/saveMigration";
 import { FACILITIES, GRID, isElevatorKind } from "../../engine/facilities";

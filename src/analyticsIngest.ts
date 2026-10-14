@@ -39,8 +39,10 @@
  * keeps an ordinary page on a named host out, and that is all the filter does.
  *
  * What bounds abuse is the per-IP rate limiter (best-effort and per instance;
- * see {@link RateLimiter}) and the 8 KiB body cap, which bounds the bytes
- * actually read rather than trusting a declared `content-length`. A forged
+ * see {@link RateLimiter}), the 8 KiB body cap, which bounds the bytes
+ * actually read rather than trusting a declared `content-length`, and the
+ * five-second read deadline, which bounds how long a slow body can hold the
+ * function open (408). A forged
  * post's blast radius is anonymous noise in the dataset: no key, no cookie, no
  * response body. `platform` and `distribution_channel` pass only when they
  * carry a label from the client's closed set ({@link INGEST_PLATFORM_LABELS});
@@ -100,6 +102,21 @@ export interface IngestDeps {
  *  parsed. Vercel's platform body limit is the outer backstop. */
 export const MAX_BODY_BYTES = 8_192;
 
+/** How long the whole body read may take, in milliseconds. An event post is a
+ *  few hundred bytes, so five seconds is far past any honest client; a body
+ *  that is still arriving then is a slow drip holding the function open
+ *  (GH #1010). */
+export const READ_DEADLINE_MS = 5_000;
+
+/** Thrown by {@link readCappedText} when the body is still arriving at the
+ *  deadline. The handler answers it with 408. */
+export class ReadDeadlineError extends Error {
+  constructor() {
+    super("request body read passed its deadline");
+    this.name = "ReadDeadlineError";
+  }
+}
+
 /**
  * Read a request body as text, giving up as soon as it passes `max` bytes.
  *
@@ -107,26 +124,47 @@ export const MAX_BODY_BYTES = 8_192;
  * omits it, and nothing makes a client tell the truth in it (GH #789). This
  * counts the bytes as they stream in and cancels the read at the first chunk
  * that passes the cap, so at most the cap plus one platform chunk is held,
- * however long the body is. Returns `null` when
- * the cap was passed. A request with no body reads as empty text. Decoding
- * matches `Request.json()`: UTF-8, with a leading byte-order mark dropped.
+ * however long the body is. Returns `null` when the cap was passed.
+ *
+ * The byte cap bounds memory. To bound time as well, the whole read runs against
+ * `deadlineMs`: a body still arriving then is cancelled and the read throws
+ * {@link ReadDeadlineError} (GH #1010). A request with no body reads as empty
+ * text. Decoding matches `Request.json()`: UTF-8, with a leading byte-order
+ * mark dropped.
  */
-export async function readCappedText(request: Request, max: number): Promise<string | null> {
+export async function readCappedText(
+  request: Request,
+  max: number,
+  deadlineMs: number = READ_DEADLINE_MS,
+): Promise<string | null> {
   const stream = request.body;
   if (!stream) return "";
   const reader = stream.getReader();
+  // Not awaited anywhere: a source whose cancel never settles must not hold
+  // the answer.
+  const release = (): void => void reader.cancel().catch(() => {});
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new ReadDeadlineError()), deadlineMs);
+  });
   const chunks: Uint8Array[] = [];
   let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > max) {
-      // Not awaited: a source whose cancel never settles must not hold the 413.
-      void reader.cancel().catch(() => {});
-      return null;
+  try {
+    for (;;) {
+      const { done, value } = await Promise.race([reader.read(), deadline]);
+      if (done) break;
+      total += value.byteLength;
+      if (total > max) {
+        release();
+        return null;
+      }
+      chunks.push(value);
     }
-    chunks.push(value);
+  } catch (err) {
+    release();
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
   const bytes = new Uint8Array(total);
   let offset = 0;
@@ -271,7 +309,7 @@ export function buildCaptureBody(
  * Handle one request to the relay (`POST /api/ingest`), the browser's
  * same-origin path, bound by `api/ingest.ts`. See the module comment for the
  * full contract. Pure apart from the injected `deps`, so every branch (405 /
- * 403 / 204 no-op / 429 / 413 / 400 / forward) is unit-testable.
+ * 403 / 204 no-op / 429 / 413 / 408 / 400 / forward) is unit-testable.
  */
 export async function handleIngest(request: Request, deps: IngestDeps): Promise<Response> {
   if (request.method !== "POST") return new Response(null, { status: 405 });
@@ -300,8 +338,8 @@ export async function handleIngest(request: Request, deps: IngestDeps): Promise<
   let text: string | null;
   try {
     text = await readCappedText(request, MAX_BODY_BYTES);
-  } catch {
-    return new Response(null, { status: 400 });
+  } catch (err) {
+    return new Response(null, { status: err instanceof ReadDeadlineError ? 408 : 400 });
   }
   if (text === null) return new Response(null, { status: 413 });
 

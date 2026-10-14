@@ -24,11 +24,17 @@ function deferred<T>() {
  *  already toasted its own failure. */
 function fakeUi(downloadStarts: boolean[] = []) {
   const toasts: { text: string; kind: string }[] = [];
+  // What reached the player through sayVisibly (which falls back to a toast in the real UI).
+  const said: { text: string; kind: string }[] = [];
   const downloads: { filename: string; contents: string | Uint8Array }[] = [];
   return {
     toasts,
+    said,
     downloads,
     ui: {
+      sayVisibly: (text: string, kind?: string) => {
+        said.push({ text, kind: kind ?? "bad" });
+      },
       toast: (text: string, kind?: string) => {
         toasts.push({ text, kind: kind ?? "info" });
       },
@@ -197,8 +203,8 @@ describe("export single-flight latch (GH #760)", () => {
 });
 
 describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", () => {
-  it("REGRESSION: a second legacy download while the first is open is a quiet no-op, and the latch frees on settle", async () => {
-    const { ui } = fakeUi();
+  it("REGRESSION: a second legacy download while the first is open runs nothing, and the latch frees on settle", async () => {
+    const { ui, toasts, said } = fakeUi();
     const gate = deferred<void>();
     let downloads = 0;
     const dl = () => {
@@ -206,11 +212,14 @@ describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", (
       return gate.promise;
     };
     const first = runLegacyDownload(ui, dl);
-    // A second legacy export fired while the first is still settling: no second download.
-    await runLegacyDownload(ui, dl);
+    // A second legacy export fired while the first is still settling: no second
+    // download, and no message, since the player's own download is the one running.
+    expect(await runLegacyDownload(ui, dl)).toBe(false);
     expect(downloads).toBe(1);
+    expect(said).toEqual([]);
+    expect(toasts).toEqual([]);
     gate.resolve();
-    await first;
+    expect(await first).toBe(true);
     // Latch freed on settle: the next legacy download runs.
     await runLegacyDownload(ui, () => {
       downloads++;
@@ -219,8 +228,28 @@ describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", (
     expect(downloads).toBe(2);
   });
 
+  it("REGRESSION (GH #1012): a .TDT download clicked while a .vctower export runs says why nothing happened", async () => {
+    const slow = deferred<string>();
+    vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise);
+    const { ui, toasts, said, downloads } = fakeUi();
+    const vctower = runExportFlow(flowDeps(ui), () => {});
+    let legacy = 0;
+    const ran = await runLegacyDownload(ui, () => {
+      legacy++;
+    });
+    expect(ran).toBe(false);
+    expect(legacy).toBe(0);
+    // Through sayVisibly: closing the report dialog can reopen a queued one over a plain toast.
+    expect(said).toEqual([{ text: "Another export is still running. Try again when it finishes.", kind: "info" }]);
+    // The .vctower export that held the latch still finishes and announces itself.
+    slow.resolve("VCTOWER1\nfake");
+    await vctower;
+    expect(downloads).toHaveLength(1);
+    expect(toasts).toEqual([LIVE_TOAST]);
+  });
+
   it("a legacy download and a .vctower export are mutually exclusive on the shared latch", async () => {
-    const { ui, downloads } = fakeUi();
+    const { ui, downloads, said } = fakeUi();
     const gate = deferred<void>();
     let legacy = 0;
     const held = runLegacyDownload(ui, () => {
@@ -232,6 +261,8 @@ describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", (
     await runExportFlow(flowDeps(ui), () => {});
     expect(legacy).toBe(1);
     expect(downloads).toEqual([]);
+    // ...and quietly: the #1012 message is only for a .TDT click.
+    expect(said).toEqual([]);
     gate.resolve();
     await held;
   });

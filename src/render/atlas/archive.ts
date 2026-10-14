@@ -55,7 +55,7 @@ export function signature(): AtlasManifest["signature"] {
     sampled: ["variant"],
     rules: {
       hours: "open or closed by the kind's business hours at the current hour; 'always' for kinds without hours",
-      late: "condo, studio and apartment: 'late' from 23:00 to 06:00, else 'notlate'; 'any' for every other kind. The game's re-bake does not yet flip the two rentals at 23:00 and 06:00 (issue #916), so on screen they can keep their earlier look until something else repaints them",
+      late: "condo, studio and apartment: 'late' from 23:00 to 06:00, else 'notlate'; 'any' for every other kind",
       presence: "'home' when the unit's occupants is above 0, else 'away'; kinds whose art ignores occupants (the garage, ramp, services, recycling, metro) carry no presence segment",
       width: "room frames exist for each kind's catalog width only. A room at another width (a TDT import or an old save keeps its original width) uses the catalog-width frame or animation, composed as usual, then scaled horizontally to its real width, nearest neighbor from the left edge (the reference reader's stretchTo); it approximates the web game, which redraws the room at its real width. Legacy shaft widths (stairs and escalators 4, standard elevator 3, express 4) have frames of their own, named with a w<tiles> segment after the kind; a shaft at any other width stretches its catalog frames the same way",
       subtype: "a subtype the engine does not list for the kind draws the default look, the '-' frame",
