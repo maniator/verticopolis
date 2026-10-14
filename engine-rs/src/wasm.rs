@@ -213,9 +213,9 @@ fn apply_markers(sim: &mut Simulation, text: &str) -> Result<(), String> {
     sim.last_day = field("lastDay")?;
     sim.last_quarter = field("lastQuarter")?;
     sim.last_month = field("lastMonth")?;
-    // The live engine's open extend gesture (#990), when it has one.
+    // The live engine's open extend gesture (#990); absent or null is none.
     match v.get("extendGesture") {
-        None | Some(Value::Null) => {}
+        None | Some(Value::Null) => sim.end_extend(),
         Some(g) => {
             let part = |name: &str| -> Result<i64, String> {
                 g.get(name)
@@ -1517,7 +1517,14 @@ mod tests {
         .expect("a gesture lands");
         assert_eq!(sim.extend_gesture, Some((lift, 1, 5)));
         apply_markers(&mut sim, &with("null")).expect("no gesture lands");
-        assert_eq!(sim.extend_gesture, Some((lift, 1, 5)), "null leaves it");
+        assert_eq!(sim.extend_gesture, None, "null is no gesture");
+        apply_markers(
+            &mut sim,
+            &with(&format!(r#"{{"id":{lift},"bottom":1,"top":5}}"#)),
+        )
+        .expect("a gesture lands again");
+        apply_markers(&mut sim, &format!("{{{base}}}")).expect("an absent gesture lands");
+        assert_eq!(sim.extend_gesture, None, "absent is no gesture");
         apply_markers(&mut sim, &with(r#"{"id":99999,"bottom":1,"top":5}"#))
             .expect("a gone shaft is no gesture");
         assert_eq!(sim.extend_gesture, None);

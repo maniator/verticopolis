@@ -51,14 +51,19 @@ against a mark it supplies and get floors for free.
   `hwmTop`, in both runners and the scenario
   `engine-charges-classic`, whose drags are bracketed by them. Every
   explicit mark the scenario carried equalled what the engine now holds.
-  After the first drag closes, the scenario shrinks and regrows the shaft,
-  billed one floor, so the lock pins `endExtend` too: that moves only the
-  `extended` checkpoint's events hash (the two capacity events), with the
-  state and crowd hashes unchanged, and the lock is regenerated for it.
+  Each drag is followed, once its gesture has closed, by a shrink and a
+  regrow billed one floor, and two new checkpoints (`dragged` and `dragged
+  down`) come before the next `setMoney`, so the lock pins each drag's money
+  and each `endExtend`: dropping any one begin or end op from the scenario
+  moves a hash. The lock is regenerated for the two new checkpoints and the
+  `extended` events hash (the extra capacity events); the state and crowd
+  hashes of every existing checkpoint are unchanged.
 - **No version bump:** a drag bills as before. The one change a player could
   meet is a one-floor press after a lost pointer-up (#1014), which now
-  bills a floor the drag already paid for zero times instead of twice: rare,
-  and only ever cheaper.
+  bills a floor the drag already paid for zero times instead of twice: only
+  ever cheaper, never a floor that was not paid once. It is not rare (a
+  mouse released over the inspector panel loses the pointer-up), so #1014
+  carries the trigger.
 
 ## Tests
 
@@ -213,3 +218,36 @@ against a mark it supplies and get floors for free.
   `charges` functions imported by the mirror (the shadow command boundary
   is the relay's own); the `Simulation.ts` header merge (needed to stay
   under the file cap); the public Rust field (round 1).
+
+### Round 5 (`/gds-code-review`)
+
+- [x] [Review][Patch] The lock could not see a drag's billing: a `setMoney`
+  overwrote the balance before every checkpoint after each drag, and the
+  capacity events carry no amount, so the round-4 claim that the lock pinned
+  `endExtend` was wrong, as were the earlier dismissals resting on "the
+  unchanged lock shows it" (Acceptance Auditor with a deletion probe, Blind
+  Hunter) [conformance/scenarios/engine-charges-classic.json]: checkpoints
+  `dragged` and `dragged down` precede the `setMoney`s, the second drag also
+  shrinks and regrows after its `endExtend`, and dropping any one begin or
+  end op now moves a hash (probe rerun; a mutant no-op `endExtend` fails the
+  lock).
+- [x] [Review][Patch] Rust `apply_markers` read a null `extendGesture` as
+  "leave any open gesture" while TypeScript sends null for none (Blind
+  Hunter, Acceptance Auditor) [engine-rs/src/wasm.rs]: absent or null now
+  closes it; the test checks both.
+- [x] [Review][Patch] No dual-run test refused a begin with a gesture open
+  (Blind Hunter) [dualRunEdits]: one now does, and the billed regrow after
+  it stays in step.
+- [x] [Review][Patch] The #1014 fix shape (close the gesture on a press with
+  no pointer down) contradicted the pinned free press without saying so,
+  and the story called the lost pointer-up rare (Blind Hunter, Edge Case
+  Hunter: a mouse released over the inspector panel never reaches the
+  canvas) [backlog, story]: the row says the pinned test changes with that
+  fix and names the trigger; the story drops "rare".
+- Dismissed (4): a gone shaft's gesture handed over by TypeScript and
+  dropped by Rust (inert: an extend on a gone shaft is refused before the
+  mark is read, a begin clears it, and ids are not reused); making
+  `extendGesture` required (the only producer, `loadCommand`, always sets
+  it, and absent now means none in Rust as well); a `fromSave` caller
+  supplying a mark (a caller of `fromSave` supplies the whole save,
+  `restore_extend` is not a binding command); the version bump (story).

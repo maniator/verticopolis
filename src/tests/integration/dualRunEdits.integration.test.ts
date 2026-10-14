@@ -195,6 +195,12 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(sim.extendTransport(lift.id, "up", 6)).toMatchObject({ ok: true, top: 6, added: 2 });
     expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, top: 5, added: 0 });
     expect(sim.extendTransport(lift.id, "up", 6)).toMatchObject({ ok: true, top: 6, added: 0 });
+    // A refused begin with a gesture open drops it in both engines: the
+    // shrink and regrow after it is billed.
+    expect(sim.beginExtend(loose(String(lift.id)))).toBe(false);
+    expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, top: 5, added: 0 });
+    expect(sim.extendTransport(lift.id, "up", 6)).toMatchObject({ ok: true, top: 6, added: 1 });
+    expect(sim.beginExtend(lift.id)).toBe(true);
     sim.endExtend();
     expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, top: 5, added: 0 });
     expect(sim.extendTransport(lift.id, "up", 6)).toMatchObject({ ok: true, top: 6, added: 1 });
