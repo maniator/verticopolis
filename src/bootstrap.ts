@@ -104,11 +104,16 @@ export function showBootMessage(content: TemplateResult | string, withReload = f
   );
 }
 
+let inertWatch: MutationObserver | null = null;
+
 /** Stop the game with the wasm-only build's engine failure: what happened,
  *  why, and what to try. Covers the title screen and any running tower, like
  *  every other boot-fallback message. */
 export function showEngineFailure(state: EngineBootState, online = typeof navigator === "undefined" || navigator.onLine !== false): void {
   if (!state.failure) return;
+  // An open modal dialog sits in the top layer above any z-index and makes
+  // the rest of the page inert, the Reload button included, so close it.
+  for (const dialog of Array.from(document.querySelectorAll("dialog[open]"))) (dialog as HTMLDialogElement).close();
   const copy = engineFailureCopy(state.failure, online);
   showBootMessage(
     html`<div id=${ENGINE_FAILURE_ID} data-stage=${state.failure.stage}>
@@ -123,8 +128,17 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
   // Everything behind the message goes inert, so a button that kept focus
   // cannot be pressed with Enter or Space and the title screen's keys do
   // nothing: the message and its Reload button are all that is left.
-  for (const el of Array.from(document.body.children)) {
+  // A surface mounted later (a panel, a dialog) goes inert as it arrives.
+  const settle = (el: Element) => {
     if (el.id !== "boot-fallback-host") (el as HTMLElement).inert = true;
+  };
+  for (const el of Array.from(document.body.children)) settle(el);
+  if (!inertWatch && typeof MutationObserver !== "undefined") {
+    inertWatch = new MutationObserver((records) => {
+      if (!document.getElementById(ENGINE_FAILURE_ID)) return;
+      records.forEach((r) => r.addedNodes.forEach((n) => n instanceof Element && settle(n)));
+    });
+    inertWatch.observe(document.body, { childList: true });
   }
   const active = document.activeElement as HTMLElement | null;
   if (active && !document.getElementById("boot-fallback-host")?.contains(active)) active.blur?.();

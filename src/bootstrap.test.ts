@@ -209,7 +209,7 @@ describe("showEngineFailure", () => {
     expect(document.querySelector("#boot-fallback button")?.textContent).toBe("Reload");
   });
 
-  it("leaves only the message reachable: everything behind it goes inert and loses focus", () => {
+  it("leaves only the message reachable: everything behind it goes inert and loses focus", async () => {
     document.body.innerHTML = `<div id="stage"><button id="quick-save">Quick Save</button></div><div id="splash"></div>`;
     const button = document.getElementById("quick-save") as HTMLButtonElement;
     button.focus();
@@ -218,6 +218,19 @@ describe("showEngineFailure", () => {
     expect((document.getElementById("splash") as HTMLElement).inert).toBe(true);
     expect((document.getElementById("boot-fallback-host") as HTMLElement).inert).toBeFalsy();
     expect(document.activeElement).not.toBe(button);
+    // A surface mounted after the stop goes inert too.
+    const late = document.createElement("div");
+    document.body.appendChild(late);
+    await Promise.resolve();
+    expect(late.inert).toBe(true);
+  });
+
+  it("closes an open modal dialog, which would otherwise cover the Reload button", () => {
+    document.body.innerHTML = `<div id="stage"></div><dialog id="modal"></dialog>`;
+    const dialog = document.getElementById("modal") as HTMLDialogElement;
+    dialog.showModal();
+    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "host", message: "x" } });
+    expect(dialog.open).toBe(false);
   });
 
   it("does nothing for a boot that has no failure", () => {
@@ -375,12 +388,15 @@ describe("bootGame", () => {
   it("records a switchable build's refused first tower as a fallback to TypeScript", async () => {
     stubWebGL();
     wasmStub.requested = "wasm";
-    wasmStub.module = { Engine: class {}, encodeVctower: vi.fn() };
+    const encodeVctower = vi.fn(() => "VCTOWER1\nZW5naW5l\n");
+    wasmStub.module = { Engine: class {}, encodeVctower };
     vi.mocked(startWasmHost).mockImplementationOnce(() => ({ status: { engine: "wasm", starts: 0, hosted: false, errors: ["not hosting this tower: it has a crowd"] }, current: () => null, stop: () => {} }));
     try {
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
       expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "not hosting this tower: it has a crowd" } });
-      expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
+      // The host follows later adopts, so saves keep the engine's writer.
+      expect(await SaveGame.export(new Simulation(1))).toBe("VCTOWER1\nZW5naW5l\n");
+      expect(encodeVctower).toHaveBeenCalledTimes(1);
     } finally {
       setEngineWriter(null);
       wasmStub.requested = "ts";

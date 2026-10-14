@@ -6,7 +6,8 @@
 > `npx vite build` and the same engine package from the same Rust sources.
 > It does not refresh. To measure the current tree, run the commands in
 > [Reproduce](#reproduce): `scripts/engine-bundle-size.ts` produces every
-> figure here. It reuses the #979 size analysis
+> size figure here; the module counts come from `scripts/verify-engine-bundle.ts`
+> (`VC_ENGINE_REPORT`), and the worker's size from a directory listing. It reuses the #979 size analysis
 > (`src/tests/perfCompare/bundle.ts`) and attributes bytes to sources with
 > `src/build/sourcemapBytes.ts`, which `src/build/sourcemapBytes.test.ts`
 > pins.
@@ -172,9 +173,12 @@ and the visual baselines are skipped there.
   tower stops at the start stage, and a tower the host refuses mid-game stops
   at the host stage; in both, the tower never ticks on TypeScript. Nothing runs on TypeScript.
 - **A stop is final:** once the message is up, the frame loop advances
-  nothing, the keyboard shortcuts and autosave do nothing, and the speed
-  buttons sit under the message, so neither the player nor a timer can change
-  or save the tower. The save the message points back to stays as it was.
+  nothing; the keyboard shortcuts, the title screen's keys, autosave and
+  context-loss recovery do nothing; an open dialog closes; and everything
+  behind the message is inert, so only its Reload button can be used. The
+  save the message points back to stays as it was. (A `.TDT` import whose
+  tower the host refuses is still written to a fresh, empty slot, as every
+  import is, so the import is kept and no save is overwritten.)
 - **Recovery:** the message gives the reason and what to try. A stopped game
   takes a waiting update at once instead of prompting under the message, and
   a load that never settles gives up after 90 seconds.
@@ -202,9 +206,11 @@ built at `d03747d` and measured with the scripts from `a0210b9`:
 
 ```sh
 git worktree add /tmp/base d03747d   # the baseline, built without this change
-(cd /tmp/base && npm ci && npm run wasm:build && npx vite build --outDir /tmp/out-base)
 git checkout a0210b9
 npm ci && npm run wasm:build
+# the same engine package for the baseline, so the builds differ only in JavaScript
+mkdir -p /tmp/base/src/public && cp -r src/public/engine /tmp/base/src/public/engine
+(cd /tmp/base && npm ci && npx vite build --outDir /tmp/out-base)
 npx tsx scripts/engine-bundle-size.ts /tmp/out-base
 npx vite build --outDir /tmp/out-switchable
 VC_ENGINE=wasm npx vite build --outDir /tmp/out-wasm
@@ -222,6 +228,4 @@ branch, so it is in the branch history.
 The tables use `npx vite build`, which writes what the deploy serves before
 the postbuild checks run. `npm run build` adds `third-party-notices.txt` and
 the prerendered `/help` page, neither of which is game JavaScript or
-precached. For the published figures the baseline used the same engine
-package as the other two builds (copied into its `src/public/engine/`), so
-the builds differ only in their JavaScript.
+precached.

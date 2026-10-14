@@ -93,8 +93,10 @@ export function advanceOwedMinutes(host: { sim: { tick(dtMinutes: number): void;
 export function runFrame(app: GameApp, dtMs: number): void {
   // A wasm-only build stopped on its engine: no engine holds the tower, so
   // time stops for good (the speed buttons and keys cannot restart it), and
-  // a stopped game samples no frames for the session either.
+  // a stopped game samples no frames for the session either. Events the
+  // engine emitted before it stopped still reach analytics.
   if (isEngineStopped()) {
+    drainEngineEvents(app.sim);
     app.accMinutes = 0;
     return;
   }

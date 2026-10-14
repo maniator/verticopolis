@@ -34,7 +34,7 @@ const builtMode = (() => {
   try {
     return (JSON.parse(text) as { engineBuild?: string } | null)?.engineBuild ?? "unrecorded";
   } catch {
-    return "unrecorded"; // a corrupt file: rebuild, as the message says
+    throw new Error("dist/version.json is unreadable; rebuild (VC_TOOLING=1 npm run build, with VC_ENGINE=wasm for PW_WASM_ONLY=1).");
   }
 })();
 if (builtMode !== null && (builtMode === "wasm-only") !== WASM_ONLY) {
