@@ -1,4 +1,4 @@
-import { facilityFloors } from "../../engine/facilities";
+import { catalogFacility, type Catalog } from "../../engine/catalogTypes";
 import type { Unit } from "../../engine/types";
 
 /**
@@ -12,10 +12,10 @@ import type { Unit } from "../../engine/types";
  *  facility's floor lots, but an ambient walker placed there would stand on the
  *  facility's mid-line and float above its real floor, so `buildWalkers` drops
  *  these lots from its runs. */
-export function coveredUpperStories(units: readonly Unit[]): Map<number, Array<[number, number]>> {
+export function coveredUpperStories(units: readonly Unit[], catalog: Catalog): Map<number, Array<[number, number]>> {
   const rows = new Map<number, Array<[number, number]>>();
   for (const u of units) {
-    const span = facilityFloors(u.kind);
+    const span = catalogFacility(catalog, u.kind).floors;
     if (span <= 1) continue;
     for (let k = 1; k < span; k++) {
       const row = u.floor + k;

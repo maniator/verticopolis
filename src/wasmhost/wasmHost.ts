@@ -10,7 +10,7 @@ import { ShadowEngine } from "../dualrun/shadow";
 import { decodeFrame, type FrameView } from "./frameView";
 import { mergeSimulation } from "./merge";
 import { adoptTelemetry, type TelemetryDocument } from "./telemetry";
-import { useTowerCatalogSource } from "../engine/towerCatalog";
+import { towerCatalog, useTowerCatalogSource } from "../engine/towerCatalog";
 
 /**
  * Run a live `Simulation` on the WASM engine (story-engine-wasm-switch).
@@ -51,12 +51,21 @@ export interface WasmHost {
 /** Attach a host to `sim`. Throws, leaving the instance untouched, when the
  *  tower already has a crowd (the engine starts from a save, which carries
  *  none), when a mirror or host is already attached, or when the binding's
- *  catalog cannot be read. While attached, `towerCatalog(sim)` is the engine's. */
+ *  catalog cannot be read or states another world. While attached, `towerCatalog(sim)` is the engine's. */
 export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
   // Read the binding's catalogs first, both modes (a Classic tower's
   // patronage readout uses the Modern yardstick): a binding whose catalog this
   // build cannot read refuses the attach before an engine is built.
   const catalogs = { classic: readCatalog(mod, "classic"), modern: readCatalog(mod, "modern") };
+  // The view was sized from the tower's current world and cannot resize: a
+  // binding that states another world is refused here, once, instead of
+  // failing the status pump on every tick after the switch.
+  const world = towerCatalog(sim).world;
+  for (const c of Object.values(catalogs)) {
+    if (c.world.lotWidth !== world.lotWidth || c.world.minFloor !== world.minFloor || c.world.maxFloor !== world.maxFloor) {
+      throw new Error(`the WASM engine's ${c.mode} catalog states a different world from the tower's`);
+    }
+  }
   const shadow = new ShadowEngine(mod);
   shadow.apply(loadCommand(sim, 0));
   const engine = shadow.handle();

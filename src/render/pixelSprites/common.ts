@@ -1,5 +1,5 @@
 import type { FacilityKind, Unit } from "../../engine/types";
-import { GRID } from "../../engine/facilities";
+import { viewWorld } from "../../presentation/viewWorld";
 
 /**
  * Shared primitives for the dollhouse room art: the signature palette, the
@@ -101,7 +101,7 @@ export function hash(seed: number): number {
  *  inheriting correlated picks. */
 export function geoVariant(u: Pick<Unit, "kind" | "floor" | "x">, axis: number, n: number): number {
   const kindSalt = (u.kind.length * 7919 + u.kind.charCodeAt(0) * 31) | 0;
-  return Math.floor(hash(kindSalt + (u.floor - GRID.minFloor) * GRID.width + u.x + axis * 104729) * n);
+  return Math.floor(hash(kindSalt + (u.floor - viewWorld().minFloor) * viewWorld().lotWidth + u.x + axis * 104729) * n);
 }
 
 /** Run `draw` mirrored horizontally inside the room rect when `flip` is set:

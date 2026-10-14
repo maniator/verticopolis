@@ -30,3 +30,13 @@ export function priceOptionsFromRent(rent: CatalogRent | null): PriceOptions | n
   });
   return { shape: "ladder", rungs, noRate: true };
 }
+
+/** What a unit charges, by the tower's catalog: nothing when it is off the
+ *  market (No Rate), its stored price when the player set one, and the kind's
+ *  catalog default otherwise. A Classic build stores its Average rung, so an
+ *  unset Classic unit is one whose Average equals the default (an office),
+ *  and both engines charge exactly this (#921). */
+export function unitPrice(catalog: Catalog, u: { kind: FacilityKind; rent?: number; noRate?: boolean }): number {
+  if (u.noRate) return 0;
+  return u.rent ?? catalogFacility(catalog, u.kind).rent?.default ?? 0;
+}

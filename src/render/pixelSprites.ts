@@ -1,5 +1,6 @@
 import type { FacilityKind, Unit, UnitState } from "../engine/types";
-import { FACILITIES, hasBusinessHours, isOpenAt } from "../engine/facilities";
+import { hasBusinessHours, isOpenAt } from "../engine/facilities";
+import { facilityColor } from "../presentation/facilityPresentation";
 import { POPULATED, closedShutter, noticeBadge, type RoomCtx } from "./pixelSprites/common";
 import { layerEnd } from "./pixelSprites/layers";
 import { condo, hotel, office } from "./pixelSprites/residential";
@@ -45,7 +46,7 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
     u.state !== "construction" &&
     !isOpenAt(u.kind, d.hour)
   ) {
-    closedShutter(d, x, y, w, h, FACILITIES[u.kind].color);
+    closedShutter(d, x, y, w, h, facilityColor(u.kind));
     return;
   }
   switch (u.kind) {

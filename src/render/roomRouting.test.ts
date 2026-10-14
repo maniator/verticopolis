@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { Unit } from "../engine/types";
 import { drawUnit, type DrawCtx } from "./sprites";
 import { FACILITIES } from "../engine/facilities";
+import { facilityColor } from "../presentation/facilityPresentation";
 import { isElevatorKind } from "../engine/facilityPredicates";
 import { isFixedSpanTransport } from "../engine/facilityCaps";
 
@@ -11,7 +12,7 @@ import { isFixedSpanTransport } from "../engine/facilityCaps";
  * because the two kinds were added to drawRoom's per-kind switch but NOT to the
  * ROOM_KINDS gate in sprites.ts that decides whether drawUnit even calls
  * drawRoom. Missing the gate, they fell through to drawInterior's `default`
- * case: one fillRect in FACILITIES[kind].color.
+ * case: one fillRect in the kind's presentation color.
  *
  * Every leased tenant room is pinned to the rich dollhouse path here, so a
  * future room kind can't slip through the same gap: a real room sets dozens of
@@ -62,7 +63,7 @@ describe("drawUnit routes leased tenant rooms to the detailed dollhouse, not the
 describe("no facility kind falls through to the flat facility-color fallback (systemic guard)", () => {
   // The rental bug's root cause was structural: ROOM_KINDS (the gate in sprites.ts)
   // is a hand-maintained mirror of drawRoom's per-kind switch, and drawInterior's
-  // `default` paints one flat FACILITIES[kind].color block. A kind that is a real
+  // `default` paints one flat presentation-color block. A kind that is a real
   // room but forgotten in ROOM_KINDS (or a service missing its drawInterior case)
   // renders as that flat block, silently, past a green suite. Render EVERY facility
   // kind and assert none produces the flat-fallback signature, so the next kind
@@ -78,7 +79,7 @@ describe("no facility kind falls through to the flat facility-color fallback (sy
     drawUnit(draw(s.ctx), unit({ kind, width: FACILITIES[kind].width ?? 6, state: "occupied", occupants: 2 }), 0, 0, w, 34);
     const colors = new Set(s.log.filter((l) => l.startsWith("fillStyle=")).map((l) => l.slice("fillStyle=".length)));
     // The flat fallback sets exactly the one facility color and nothing else.
-    const hitFlatFallback = colors.size <= 1 && colors.has(FACILITIES[kind].color);
-    expect(hitFlatFallback, `${kind} rendered as a flat ${FACILITIES[kind].color} block, missing from ROOM_KINDS or lacking a drawInterior case?`).toBe(false);
+    const hitFlatFallback = colors.size <= 1 && colors.has(facilityColor(kind));
+    expect(hitFlatFallback, `${kind} rendered as a flat ${facilityColor(kind)} block, missing from ROOM_KINDS or lacking a drawInterior case?`).toBe(false);
   });
 });

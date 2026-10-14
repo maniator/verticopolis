@@ -3,6 +3,7 @@ import type { Simulation } from "../engine/Simulation";
 import { SaveGame, saveFailureMessage } from "../storage/SaveGame";
 import { canCallExterminator, statsTemplate } from "../ui/templates/stats";
 import { trackAppAction } from "../analytics";
+import { towerCatalog } from "../engine/towerCatalog";
 
 /**
  * The tower-statistics modal, its exterminator action, and the manual save-slot
@@ -32,7 +33,7 @@ export function showStats(app: GameApp): void {
  *  the gate above should already have prevented. */
 function confirmExterminate(app: GameApp): void {
   const cov = app.sim.housekeepingCoverage();
-  const recovery = app.sim.rules.infestationRecovery();
+  const recovery = towerCatalog(app.sim).economy.exterminator;
   if (!recovery || cov.infested === 0) {
     // The tower can change between rendering the stats modal and clicking the
     // button (a fire or bulldoze clears the last infested room, or the mode
