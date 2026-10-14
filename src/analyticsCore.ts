@@ -180,7 +180,12 @@ export interface GameplayEvents {
    *  Since 2.29.5, `price_tune` and `capacity_tune` latch on
    *  the engine's report of a real change (`pricing_changed`,
    *  `capacity_changed`): a rent nudge already at its limit no longer counts,
-   *  and shrinking a shaft now does. `demolish` is still reported by the shell. */
+   *  and shrinking a shaft now does. Since 2.31.2,
+   *  `demolish` comes from the engine's `facility_removed` (#873): one per
+   *  removal the bulldozer or the editor's Sell makes (the engine's `sellAt`
+   *  emits it too, and no player path calls that), with `detail` the method,
+   *  sent at the next frame's drain, at most 40 per page in each
+   *  one-minute window. */
   economy_action: { action: EconomyActionName; detail?: string };
   /** The player answered an in-game emergency prompt (pay for rescue, or gamble
    *  the containment / bomb search). Per occurrence, so the accept/decline split

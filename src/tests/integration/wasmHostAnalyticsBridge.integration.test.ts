@@ -115,6 +115,39 @@ describe.skipIf(!hasWasmPackage())("analytics bridge on both engines", () => {
     });
   }
 
+  it("reports each removal as demolish with its method, and a refused one as nothing, on both engines", () => {
+    for (const hosted of [false, true]) {
+      gameplaySession.reset();
+      resetEngineBridge();
+      const sim = Simulation.newGame(45, "classic");
+      sim.money = 1e9;
+      for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+      for (let x = 170; x < 200; x++) expect(sim.build("floor", 2, x).ok).toBe(true);
+      expect(sim.build("office", 2, 180).ok).toBe(true);
+      expect(sim.buildTransport("stairs", 190, 1, 2).ok).toBe(true);
+      const host = hosted ? attachWasmHost(sim, wasm()) : null;
+      const engine = hosted ? "WASM host" : "TypeScript";
+      try {
+        drainEngineEvents(sim);
+        vi.mocked(sendToRelay).mockReset();
+        // The editor's Sell and the bulldozer both remove through removeFacility.
+        expect(sim.removeFacility(sim.tower.unitAt(2, 180)!.id, "sell").ok, engine).toBe(true);
+        expect(sim.removeFacility(sim.tower.transportAt(1, 190)!.id, "bulldoze").ok, engine).toBe(true);
+        // A lobby tile is permanent: refused, and reports nothing.
+        const refused = sim.removeFacility(sim.tower.unitAt(1, 180)!.id, "bulldoze");
+        expect(refused.ok, engine).toBe(false);
+        expect(refused.reason, engine).toMatch(/^Lobby tiles are permanent/);
+        drainEngineEvents(sim);
+        expect(wire(), engine).toEqual([
+          ["economy_action", { action: "demolish", detail: "sell" }],
+          ["economy_action", { action: "demolish", detail: "bulldoze" }],
+        ]);
+      } finally {
+        host?.detach();
+      }
+    }
+  });
+
   it("loses and repeats nothing when the engine fails one drain", () => {
     const sim = Simulation.newGame(43, "modern");
     const host = attachWasmHost(sim, wasm());

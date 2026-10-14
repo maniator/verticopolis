@@ -121,6 +121,19 @@ describe("BuildActions (the money boundary)", () => {
     expect(sim.money).toBe(before);
   });
 
+  it("reports each shell removal to the engine with the gesture as its method, and a refusal as none", () => {
+    // The analytics bridge sends demolish from these; the shell no longer does.
+    const removals = () => sim.drainGameplayEvents().filter((e) => e.name === "facility_removed");
+    removals();
+    expect(build.tryRemoveUnit(office, "bulldoze")).toBe(true);
+    expect(build.removeTransportWithRefund(lift, "sell")).toBe(true);
+    expect(build.removeTransportWithRefund(lift, "bulldoze")).toBe(false);
+    expect(removals().map((e) => e.payload)).toEqual([
+      { kind: "office", method: "bulldoze" },
+      { kind: "elevatorStandard", method: "sell" },
+    ]);
+  });
+
   it("tryRemoveUnit surfaces the engine's refusal: a burning unit stays, no refund", () => {
     office.state = "fire";
     const before = sim.money;

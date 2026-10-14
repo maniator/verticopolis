@@ -3,7 +3,7 @@ import { GAMEPLAY_EVENT_RULES } from "./engine/gameplayEventRules";
 import type { GameplayEvent } from "./engine/gameplayEvents";
 import { RateLimiter } from "./analyticsRateLimit";
 import { gameplaySession } from "./analyticsSession";
-import { trackEconomyActionOnce, trackEmergencyChoice } from "./analyticsActions";
+import { trackEconomyAction, trackEconomyActionOnce, trackEmergencyChoice } from "./analyticsActions";
 
 /**
  * The analytics engine bridge (#873 phase 2): the one place the game's gameplay
@@ -45,6 +45,19 @@ export interface GameplayEventSource {
  *  tower, climbs a star or answers an emergency a handful of times an hour, so
  *  this only ever bites on a runaway loop. */
 export const BRIDGE_SEND_LIMIT = 20;
+/** Removals sent per one-minute window. A bulldozer drag removes one facility
+ *  per tile it crosses (a bare floor tile is a facility of its own), so a
+ *  player clearing a floor can pass the per-name limit in seconds; removals
+ *  get their own, larger budget. It still truncates a heavy clear: a window
+ *  with more removals than this reports only the first `REMOVAL_SEND_LIMIT`.
+ *  This window and the ingest route's per-IP window (`RATE_LIMIT_MAX`, one
+ *  request per event) start independently, so up to twice this can land in
+ *  one ingest window: kept under that limit, demolition from one page cannot
+ *  trip it (several tabs or players behind one IP each bring a budget).
+ *  The player's other events share the route's limit, as they did when the
+ *  shell sent every removal unlimited. The budget lives in the page, so a
+ *  reload starts a fresh one. */
+export const REMOVAL_SEND_LIMIT = 40;
 const BRIDGE_SEND_WINDOW_MS = 60_000;
 
 /** A clock that never steps back (a wall-clock correction would otherwise hold
@@ -80,7 +93,10 @@ function warnOnce(kind: string, detail: unknown): void {
   console.warn(`[analytics bridge] ${kind}`, detail);
 }
 let stats = freshStats();
-let limiter = new RateLimiter(BRIDGE_SEND_LIMIT, BRIDGE_SEND_WINDOW_MS, 16);
+const freshLimiter = () => new RateLimiter(BRIDGE_SEND_LIMIT, BRIDGE_SEND_WINDOW_MS, 16);
+const freshRemovalLimiter = () => new RateLimiter(REMOVAL_SEND_LIMIT, BRIDGE_SEND_WINDOW_MS, 1);
+let limiter = freshLimiter();
+let removalLimiter = freshRemovalLimiter();
 
 /** The bridge's drop counters (a copy). */
 export function engineBridgeStats(): EngineBridgeStats {
@@ -90,6 +106,13 @@ export function engineBridgeStats(): EngineBridgeStats {
 /** Whether a per-occurrence send under `name` may go now. */
 function allowSend(name: string, now: number): boolean {
   if (limiter.allow(name, now)) return true;
+  stats.rateLimited++;
+  return false;
+}
+
+/** Whether a removal may be sent now, on its own budget. */
+function allowRemoval(now: number): boolean {
+  if (removalLimiter.allow("demolish", now)) return true;
   stats.rateLimited++;
   return false;
 }
@@ -132,7 +155,12 @@ function fold(event: GameplayEvent, now: number): void {
     case "capacity_changed":
       trackEconomyActionOnce("capacity_tune");
       return;
-    case "facility_removed": // demolish stays on the shell until the bulldozer removes through the engine (#901, #928)
+    case "facility_removed":
+      // Every player removal (the bulldozer and the editor's Sell) goes through
+      // the engine's removeFacility, which reports it with how it was removed.
+      // The engine's sellAt reports one too; no player path calls it.
+      if (allowRemoval(now)) trackEconomyAction("demolish", event.payload.method);
+      return;
     case "milestone_reached": // reaches the wire in migration step 3
       return;
     default: {
@@ -219,13 +247,15 @@ export function bindEngineBridge(live: () => GameplayEventSource | undefined): v
     const batch = source ? drain(source) : null;
     if (batch) stats.discarded += batch.length;
     // The new window starts with a full send budget, like its other latches.
-    limiter = new RateLimiter(BRIDGE_SEND_LIMIT, BRIDGE_SEND_WINDOW_MS, 16);
+    limiter = freshLimiter();
+    removalLimiter = freshRemovalLimiter();
   });
 }
 
 /** Test hook: zero the counters, the rate limit and the console latches. */
 export function resetEngineBridge(): void {
   stats = freshStats();
-  limiter = new RateLimiter(BRIDGE_SEND_LIMIT, BRIDGE_SEND_WINDOW_MS, 16);
+  limiter = freshLimiter();
+  removalLimiter = freshRemovalLimiter();
   warned.clear();
 }
