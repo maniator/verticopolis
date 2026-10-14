@@ -298,7 +298,7 @@ describe("gameplay events from the charges", () => {
 });
 
 describe("malformed requests (#923)", () => {
-  it("refuses a non-whole id, floor or mark and an unknown end or method, moving nothing", () => {
+  it("refuses a non-whole id or floor, an unknown end or method, and a malformed beginExtend id, moving nothing", () => {
     const { sim, lift, office } = fixture();
     const before = JSON.stringify(sim.serialize());
     sim.drainGameplayEvents();

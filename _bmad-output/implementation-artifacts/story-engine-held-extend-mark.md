@@ -251,3 +251,24 @@ against a mark it supplies and get floors for free.
   it, and absent now means none in Rust as well); a `fromSave` caller
   supplying a mark (a caller of `fromSave` supplies the whole save,
   `restore_extend` is not a binding command); the version bump (story).
+
+### Round 6 (`/gds-code-review`)
+
+No code findings: the Edge Case Hunter fed 400 random 40-op sequences
+(begins on any shaft, refused and budget-clamped steps, money at exactly the
+cost, free resizes) to both engines with byte-identical results, and attached
+a shadow mid-gesture at a random step in each with no divergence; the
+Acceptance Auditor confirmed every round-5 claim (the lock diff, the deletion
+probe in both runners, the mutants) and all five criteria.
+
+- [x] [Review][Patch] Stale prose (Acceptance Auditor, Blind Hunter)
+  [engine-rs/src/charges.rs, src/engine/sim/charges.test.ts]: the Rust
+  `INVALID_REQUEST` doc no longer names a mark or `parse_mark`, a TypeScript
+  test title no longer names a mark, and the `restore_extend` doc says which
+  shafts it keeps.
+- Dismissed (5): the glue check's `endExtend` entry passing trivially (it
+  takes no arguments; kept for completeness); "never saved or hashed" in
+  What landed (true of the Rust field); the done row's "—" GH cell (house
+  style); the `extendGesture` fields' bound (both bounds accept the same
+  integers); scripting more gesture cases in the scenario (the unit tests in
+  both engines and the fuzz cover them).

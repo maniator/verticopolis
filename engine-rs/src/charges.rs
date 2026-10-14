@@ -28,13 +28,12 @@ pub const ONLY_ELEVATOR_EXTEND: &str = "Only elevators can be extended.";
 pub const CAR_LIMIT: &str = "This elevator has all the cars it can hold.";
 pub const LAST_CAR: &str = "An elevator needs at least one car.";
 pub const FACILITY_GONE: &str = "That facility is gone.";
-/// `INVALID_REQUEST`: the one refusal for a malformed command (#923), an id,
-/// floor or mark that is not a whole number, or an unknown `end` or `method`.
+/// `INVALID_REQUEST`: the one refusal for a malformed command (#923), an id or
+/// floor that is not a whole number, or an unknown `end` or `method`.
 /// The typed engine API takes `i64` ids and floors and parsed enums, so it
 /// cannot see a fraction or an unknown string; the WASM binding checks its raw
-/// arguments (ids and floors with [`whole`], enums with their `parse`, a mark
-/// as JSON integers in `parse_mark`) and refuses with this before calling the
-/// engine.
+/// arguments (ids and floors with [`whole`], enums with their `parse`) and
+/// refuses with this before calling the engine.
 /// A native Rust host gets no such check and must pass values in range.
 pub const INVALID_REQUEST: &str = "That request is not valid.";
 
@@ -201,7 +200,7 @@ impl Simulation {
     }
 
     /// A host handing over its open gesture with a load (#990): kept as given
-    /// when `id` names an elevator, as `beginExtend` would open it, and
+    /// when `id` names an elevator (the shafts `beginExtend` accepts), and
     /// widened to the span at use like any gesture. Not a binding command:
     /// a caller that can hand over a mark here can hand over a whole save.
     #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
