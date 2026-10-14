@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
 import { notesForVersion } from "./src/changelog";
+import { parseEngineBuild, type EngineBuild } from "./src/build/engineBundle";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
 
@@ -40,6 +41,46 @@ function toolingBuild(): boolean {
   return on;
 }
 
+/** The engine build mode (`VC_ENGINE`; see src/build/engineBundle.ts). A
+ *  wasm-only build ships the Rust/WASM engine as the only engine: no runtime
+ *  switch, no TypeScript step loop, no fallback. The value is validated, and
+ *  `VC_ENGINE` is refused under Vitest, whose suites pick their engine with
+ *  `VC_REQUIRE_WASM` and need the TypeScript step loop the alias below removes. */
+function engineBuild(): EngineBuild {
+  const mode = parseEngineBuild(process.env.VC_ENGINE);
+  if (process.env.VITEST && process.env.VC_ENGINE) {
+    throw new Error("VC_ENGINE selects a build mode and does not apply to Vitest; unset it (the WASM test lanes use VC_REQUIRE_WASM=1).");
+  }
+  if (mode === "wasm-only") console.warn("[build] VC_ENGINE=wasm: a wasm-only build (no TypeScript step loop, no fallback).");
+  return mode;
+}
+
+const ENGINE_BUILD = engineBuild();
+const TOOLING_BUILD = toolingBuild();
+
+/**
+ * Module swaps that keep engine-specific code out of a bundle that cannot use
+ * it. Plain `resolve.alias` entries, matched on the exact import specifier, so
+ * each swap is one line here and `scripts/verify-engine-bundle.ts` proves from
+ * the emitted sourcemaps that the swapped module did not ship.
+ *   - wasm-only builds: `Simulation.ts`'s step loop becomes a stand-in that
+ *     throws, since the WASM host replaces `tick` on every tower it holds.
+ *   - every build that is neither a dev serve nor a tooling build, and every
+ *     wasm-only build: the dual run becomes an inert stand-in. Its call in
+ *     bootstrap.ts is compiled away there already, but Vite still emitted (and
+ *     the precache still shipped) its Web Worker.
+ */
+function engineAliases(command: "build" | "serve"): { find: RegExp; replacement: string }[] {
+  const aliases: { find: RegExp; replacement: string }[] = [];
+  if (ENGINE_BUILD === "wasm-only") {
+    aliases.push({ find: /^\.\/sim\/loop$/, replacement: resolve(__dirname, "src/wasmhost/stepLoopAbsent.ts") });
+  }
+  if (ENGINE_BUILD === "wasm-only" || (command === "build" && !TOOLING_BUILD)) {
+    aliases.push({ find: /^\.\/dualrun\/dualRun$/, replacement: resolve(__dirname, "src/dualrun/dualRunAbsent.ts") });
+  }
+  return aliases;
+}
+
 /** Short git SHA of the build, or "unknown" outside a checkout. */
 function gitShortSha(): string {
   try {
@@ -68,7 +109,7 @@ function emitVersionJson(): Plugin {
       this.emitFile({
         type: "asset",
         fileName: "version.json",
-        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes() }),
+        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes(), engineBuild: ENGINE_BUILD }),
       });
     },
   };
@@ -207,8 +248,9 @@ function wasmParityProjects() {
   ];
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   root: "src",
+  resolve: { alias: engineAliases(command) },
   base: "./",
   // Compile-time app version, shown on the splash. (package.json isn't importable
   // in the browser bundle.)
@@ -227,7 +269,11 @@ export default defineConfig({
     // variable: the gate also accepts `import.meta.env.DEV`. The value is
     // validated by `toolingBuild()` above; scripts/verify-game-handle.ts
     // asserts the resulting dist matches the mode on every `npm run build`.
-    __TOOLING_BUILD__: JSON.stringify(toolingBuild()),
+    __TOOLING_BUILD__: JSON.stringify(TOOLING_BUILD),
+    // The engine build mode (see `engineBuild` above). True compiles away the
+    // runtime engine switch, the TypeScript fallback and the dual run in
+    // bootstrap.ts; scripts/verify-engine-bundle.ts checks the result.
+    __WASM_ONLY__: JSON.stringify(ENGINE_BUILD === "wasm-only"),
   },
   plugins: [
     emitVersionJson(),
@@ -580,4 +626,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
