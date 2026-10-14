@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
@@ -11,6 +11,7 @@ import { engineOrder, runProcess } from "./runner";
 import { buildScenarios } from "./scenarios";
 import { startServer } from "./server";
 import type { CompareConfig, CompareResults, ProcessRun } from "./types";
+import type { Environment as Env } from "./env";
 import { validateResults } from "./validate";
 
 /**
@@ -27,12 +28,14 @@ export interface Args {
   quick: boolean;
   skipBuild: boolean;
   out: string | null;
+  /** A results folder whose run stopped part way: continue it. */
+  resume: string | null;
   scenarios: string[] | null;
   throttles: number[] | null;
 }
 
 export function parseArgs(argv: readonly string[]): Args {
-  const a: Args = { reps: 10, quick: false, skipBuild: false, out: null, scenarios: null, throttles: null };
+  const a: Args = { reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, throttles: null };
   let repsSet = false;
   const seen = new Set<string>();
   for (let i = 0; i < argv.length; i++) {
@@ -51,6 +54,7 @@ export function parseArgs(argv: readonly string[]): Args {
       repsSet = true;
       if (!Number.isInteger(a.reps) || a.reps < 1) throw new Error("--reps must be a positive integer");
     } else if (arg === "--out") a.out = next();
+    else if (arg === "--resume") a.resume = next();
     else if (arg === "--scenarios") {
       a.scenarios = next().split(",").filter(Boolean);
       if (a.scenarios.length === 0) throw new Error("--scenarios needs at least one name");
@@ -59,9 +63,10 @@ export function parseArgs(argv: readonly string[]): Args {
       a.throttles = next().split(",").map(Number);
       if (a.throttles.some((t) => !Number.isFinite(t) || t < 1 || t > 20)) throw new Error("--throttles takes rates from 1 to 20, comma separated");
       if (new Set(a.throttles).size !== a.throttles.length) throw new Error("--throttles names a rate twice");
-    } else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --scenarios a,b, --throttles 1,4`);
+    } else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --throttles 1,4`);
   }
   if (a.quick && !repsSet) a.reps = 2;
+  if (a.resume && a.out) throw new Error("--resume continues its own folder; it takes no --out");
   return a;
 }
 
@@ -138,7 +143,25 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const sourceHash = existsSync(join(repo, "engine-rs/src")) ? engineSourceHash(join(repo, "engine-rs")) : null;
   const environment = collectEnvironment(repo, distPerf, sourceHash);
 
-  if (args.out && existsSync(resolve(repo, args.out))) throw new Error(`${resolve(repo, args.out)} already exists; results are never overwritten`);
+  // The results folder is chosen up front: every finished process run is
+  // checkpointed into it, so a run cut short (a killed shell, a restarted
+  // machine) continues with --resume instead of starting over.
+  const meta: CheckpointMeta = { commit: environment.commit, config, enginePackage: environment.enginePackage, scenarios: scenarios.map((s) => s.sha256), startedAt };
+  let out: string;
+  const runs: ProcessRun[] = [];
+  if (args.resume) {
+    out = resolve(repo, args.resume);
+    if (environment.dirty) throw new Error("--resume needs a clean tree, the same one the run started on");
+    const cp = loadCheckpoint(out, meta);
+    runs.push(...cp.runs);
+    meta.startedAt = cp.startedAt;
+    log(`perf:compare: resuming ${out} with ${runs.length} finished process run(s)`);
+  } else {
+    out = outputDir(repo, args, startedAt.slice(0, 10), environment);
+    mkdirSync(out, { recursive: true });
+    writeFileSync(join(out, CHECKPOINT_META), JSON.stringify(meta, null, 1) + "\n");
+    writeFileSync(join(out, CHECKPOINT_RUNS), "");
+  }
   log(`perf:compare: measuring ${environment.commit}${environment.dirty ? " (dirty tree)" : ""}; origin/main is ${environment.mainCommit ?? "unknown"}${environment.behindMain !== null ? `, ${environment.behindMain} commit(s) not in this tree` : ""}`);
   log("perf:compare: Node conformance check of both engines on every scenario");
   const mod = await loadWebPackage(join(distPerf, "engine"));
@@ -147,16 +170,18 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
 
   const server = await startServer(distPerf);
   const executablePath = process.env.PW_CHROMIUM_PATH ?? null;
-  const runs: ProcessRun[] = [];
-  let browserVersion: string | null = null;
+  let browserVersion: string | null = runs.find((r) => r.browserVersion)?.browserVersion ?? null;
   try {
     for (let rep = 0; rep < config.reps; rep++) {
       let order = 0;
       for (const engine of engineOrder(rep)) {
+        const position = order++;
+        if (runs.some((r) => r.rep === rep && r.engine === engine)) continue; // checkpointed
         log(`perf:compare: rep ${rep + 1}/${config.reps}, ${engine}`);
-        const run = await runProcess({ server, config, scenarios, executablePath, log }, rep, engine, order++);
+        const run = await runProcess({ server, config, scenarios, executablePath, log }, rep, engine, position);
         browserVersion ??= run.browserVersion;
         runs.push(run);
+        appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify(run) + "\n");
       }
     }
   } finally {
@@ -194,7 +219,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const renderer = runs.find((r) => r.page?.webgl)?.page?.webgl?.renderer;
   const results: CompareResults = {
     schema: 1,
-    startedAt,
+    startedAt: meta.startedAt,
     generatedAt: new Date().toISOString(),
     issue: "maniator/verticopolis#972",
     config,
@@ -211,13 +236,14 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     limitations: [...STATIC_LIMITATIONS, ...(preThree(environment.appVersion) ? [PRE_THREE_LIMITATION] : []), ...(renderer ? [`WebGL renderer in these runs: ${renderer}.`] : [])],
   };
 
-  const out = outputDir(repo, args, results.generatedAt.slice(0, 10), environment);
-  mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "results.json"), JSON.stringify(results, null, 1) + "\n");
   writeFileSync(join(out, "metrics.csv"), summaryCsv(metrics));
   writeFileSync(join(out, "raw.csv"), rawCsv(metrics));
   writeFileSync(join(out, "comparisons.csv"), comparisonsCsv(comparisons));
   writeFileSync(join(out, "report.md"), markdownReport(results));
+  // results.json now holds every run; the checkpoint files are spent.
+  rmSync(join(out, CHECKPOINT_RUNS), { force: true });
+  rmSync(join(out, CHECKPOINT_META), { force: true });
   log(`perf:compare: wrote ${out}`);
   if (!validation.ok) {
     log("perf:compare: VALIDATION FAILED:");
@@ -277,4 +303,45 @@ export function stampErrors(paths: readonly string[], tree: { commit: string; di
     else if (stamp.commit !== tree.commit || stamp.dirty || tree.dirty) out.push(`--skip-build: ${p} came from ${stamp.commit}${stamp.dirty ? " (dirty)" : ""}, the tree is ${tree.commit}${tree.dirty ? " (dirty)" : ""}; rebuild without --skip-build`);
   }
   return out;
+}
+
+export const CHECKPOINT_META = "checkpoint.json";
+export const CHECKPOINT_RUNS = "runs.jsonl";
+
+/** What a run in progress records about itself, so a resume can prove it
+ *  continues the same measurement. */
+export interface CheckpointMeta {
+  commit: string;
+  config: CompareConfig;
+  enginePackage: Env["enginePackage"];
+  scenarios: string[];
+  startedAt: string;
+}
+
+/**
+ * Read a stopped run's checkpoint for --resume: the finished process runs
+ * so far and when the run began. Refuses a folder whose run measured a
+ * different commit, configuration, engine package or scenario saves, and a
+ * folder that already holds final results.
+ */
+export function loadCheckpoint(dir: string, expected: Omit<CheckpointMeta, "startedAt">, read: (p: string) => string | null = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null)): { runs: ProcessRun[]; startedAt: string } {
+  if (read(join(dir, "results.json")) !== null) throw new Error(`${dir} already holds final results; nothing to resume`);
+  const metaText = read(join(dir, CHECKPOINT_META));
+  if (metaText === null) throw new Error(`${dir} has no ${CHECKPOINT_META}; nothing to resume`);
+  const meta = JSON.parse(metaText) as CheckpointMeta;
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  for (const key of ["commit", "config", "enginePackage", "scenarios"] as const) {
+    if (!same(meta[key], expected[key])) throw new Error(`cannot resume ${dir}: its ${key} differs from this run's (${JSON.stringify(meta[key])} vs ${JSON.stringify(expected[key])})`);
+  }
+  const runs = (read(join(dir, CHECKPOINT_RUNS)) ?? "")
+    .split("\n")
+    .filter((line) => line.trim())
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line) as ProcessRun];
+      } catch {
+        return []; // a line cut off by the stop; that process runs again
+      }
+    });
+  return { runs, startedAt: meta.startedAt };
 }
