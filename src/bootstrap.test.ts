@@ -207,9 +207,12 @@ describe("showEngineFailure", () => {
       expect.stringMatching(/^If it keeps happening/),
     ]);
     expect(document.querySelector("#boot-fallback button")?.textContent).toBe("Reload");
+    // The stop announces itself to assistive technology.
+    expect(box.getAttribute("role")).toBe("alert");
+    expect(box.getAttribute("aria-live")).toBe("assertive");
   });
 
-  it("leaves only the message reachable: everything behind it goes inert and loses focus", async () => {
+  it("leaves only the message reachable: everything behind it goes inert and focus moves to Reload", async () => {
     document.body.innerHTML = `<div id="stage"><button id="quick-save">Quick Save</button></div><div id="splash"></div>`;
     const button = document.getElementById("quick-save") as HTMLButtonElement;
     button.focus();
@@ -218,6 +221,8 @@ describe("showEngineFailure", () => {
     expect((document.getElementById("splash") as HTMLElement).inert).toBe(true);
     expect((document.getElementById("boot-fallback-host") as HTMLElement).inert).toBeFalsy();
     expect(document.activeElement).not.toBe(button);
+    // Focus lands on Reload, the one control left.
+    expect(document.activeElement).toBe(document.querySelector("#boot-fallback button"));
     // A surface mounted after the stop goes inert too.
     const late = document.createElement("div");
     document.body.appendChild(late);

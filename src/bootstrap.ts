@@ -116,7 +116,7 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
   for (const dialog of Array.from(document.querySelectorAll("dialog[open]"))) (dialog as HTMLDialogElement).close();
   const copy = engineFailureCopy(state.failure, online);
   showBootMessage(
-    html`<div id=${ENGINE_FAILURE_ID} data-stage=${state.failure.stage}>
+    html`<div id=${ENGINE_FAILURE_ID} data-stage=${state.failure.stage} role="alert" aria-live="assertive">
       <p><b>${copy.headline}</b></p>
       <p style="opacity:.8">Reason: ${copy.reason}</p>
       <ul style="text-align:left;margin:0 auto;max-width:36em">
@@ -140,8 +140,16 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
     });
     inertWatch.observe(document.body, { childList: true });
   }
-  const active = document.activeElement as HTMLElement | null;
-  if (active && !document.getElementById("boot-fallback-host")?.contains(active)) active.blur?.();
+  // The stop announces itself (role=alert above), and focus lands on Reload,
+  // the one control left, so a keyboard or screen-reader user is not left on
+  // an inert element.
+  const host = document.getElementById("boot-fallback-host");
+  const reload = host?.querySelector<HTMLButtonElement>("#boot-fallback button");
+  if (reload) reload.focus();
+  else {
+    const active = document.activeElement as HTMLElement | null;
+    if (active && !host?.contains(active)) active.blur?.();
+  }
 }
 
 /** Boot the game once the DOM is ready. `create` builds the app instance (a
