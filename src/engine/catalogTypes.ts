@@ -230,3 +230,10 @@ export function catalogFacility(catalog: Catalog, kind: FacilityKind): CatalogFa
   if (!f) throw new Error(`the ${catalog.mode} catalog lists no facility "${kind}"`);
   return f;
 }
+
+/** What a build of `kind` on `floor` lays, by the catalog's ground-floor rule:
+ *  the floor tool lays the world's ground-floor structure (a lobby) on the
+ *  ground floor, and every other build lays its own kind. */
+export function catalogBuildKind(catalog: Catalog, kind: FacilityKind, floor: number): FacilityKind {
+  return kind === "floor" && floor === catalog.world.groundFloor ? catalog.world.groundFloorStructure : kind;
+}

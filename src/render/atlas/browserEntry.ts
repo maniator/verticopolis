@@ -8,6 +8,12 @@ import { withLayerHook } from "../pixelSprites/layers";
 import { SAMPLES, type Sample } from "./samples";
 import { verifySample, type SampleResult } from "./verify";
 import { verifyExtras } from "./verifyExtras";
+import { catalogFor } from "../../engine/catalog";
+import { bindViewWorld } from "../../presentation/viewWorld";
+
+// A tooling page draws sprites without a tower, so it binds the Modern
+// catalog's world for the view (the lot geometry the sprites hash on).
+bindViewWorld(catalogFor("modern").world);
 
 /**
  * The atlas bake's browser half, bundled by `scripts/export-atlas.ts` and run

@@ -20,6 +20,13 @@ export interface NoticePackage {
   license: string;
   /** Every license and NOTICE file the package ships, in file-name order. */
   licenseText: string;
+  /** Where it comes from: an npm package (the default) or a Rust crate compiled into the WASM engine. */
+  kind?: "npm" | "crate";
+}
+
+/** The label a package carries in the notices, so an npm package and a crate of the same name stay apart. */
+function kindLabel(p: NoticePackage): string {
+  return p.kind === "crate" ? " (Rust, in the WASM engine)" : "";
 }
 
 const NODE_MODULES = "/node_modules/";
@@ -40,6 +47,9 @@ export const ALLOWED_LICENSES: ReadonlySet<string> = new Set([
   "CC0-1.0",
   "Unlicense",
   "BlueOak-1.0.0",
+  // The Unicode data license (unicode-ident, in the WASM engine): permissive,
+  // a copyright and permission notice like MIT's.
+  "Unicode-3.0",
 ]);
 
 /**
@@ -260,9 +270,9 @@ export function isAllowedLicense(expression: string): boolean {
 
 /** A problem that keeps a package out of the notices; the build fails on any of these. */
 export function noticeProblem(pkg: { name?: string; version?: string; license?: string | null; licenseText?: string; hasLicenseFile?: boolean }): string | null {
-  if (!pkg.name) return "a bundled package.json has no name";
-  if (!pkg.version) return `${pkg.name}: package.json has no version`;
-  if (!pkg.license) return `${pkg.name}@${pkg.version}: package.json declares no license`;
+  if (!pkg.name) return "a bundled package's manifest has no name";
+  if (!pkg.version) return `${pkg.name}: its manifest has no version`;
+  if (!pkg.license) return `${pkg.name}@${pkg.version}: its manifest declares no license`;
   if (!isAllowedLicense(pkg.license)) {
     return `${pkg.name}@${pkg.version}: license "${pkg.license}" is not on the allowlist in src/build/thirdPartyNotices.ts; a person decides before it ships`;
   }
@@ -277,7 +287,7 @@ export function noticeProblem(pkg: { name?: string; version?: string; license?: 
  * (`1.0.0-beta`) sorts before its release and prereleases compare by SemVer
  * identifier (`beta.2` before `beta.10`); build metadata (`+x`) is ignored.
  */
-function byVersion(a: string, b: string): number {
+export function byVersion(a: string, b: string): number {
   const [coreA, preA = ""] = a.split("+")[0].split(/-(.*)/s);
   const [coreB, preB = ""] = b.split("+")[0].split(/-(.*)/s);
   const pa = coreA.split(".");
@@ -317,14 +327,15 @@ function byParts(pa: string[], pb: string[]): number {
 /**
  * The notices file: a short header, then one block per package. The same
  * package at two versions keeps both blocks; the same name and version from
- * two directories (a nested duplicate) is listed once.
+ * two directories (a nested duplicate) is listed once. A Rust crate is
+ * labeled as one, so it never merges with an npm package of the same name.
  */
 export function renderNotices(packages: readonly NoticePackage[]): string {
   const seen = new Set<string>();
   const unique = [...packages]
-    .sort((a, b) => byCodePoint(a.name, b.name) || byVersion(a.version, b.version))
+    .sort((a, b) => byCodePoint(a.name, b.name) || byVersion(a.version, b.version) || byCodePoint(a.kind ?? "npm", b.kind ?? "npm"))
     .filter((p) => {
-      const key = `${p.name}@${p.version}`;
+      const key = `${p.kind ?? "npm"}:${p.name}@${p.version}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -342,7 +353,7 @@ export function renderNotices(packages: readonly NoticePackage[]): string {
     "",
   ].join("\n");
   const blocks = unique.map((p) =>
-    [rule, `${p.name}@${p.version}`, `License: ${p.license}`, rule, "", p.licenseText.replace(/\r\n?/g, "\n").trimEnd(), ""].join("\n"),
+    [rule, `${p.name}@${p.version}${kindLabel(p)}`, `License: ${p.license}`, rule, "", p.licenseText.replace(/\r\n?/g, "\n").trimEnd(), ""].join("\n"),
   );
   return `${header}\n${blocks.join("\n")}`;
 }

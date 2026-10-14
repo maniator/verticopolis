@@ -1,5 +1,7 @@
 import * as ex from "excalibur";
-import { GARBAGE_COLLECT_HOUR, isElevatorKind, transportCarCapacity } from "../../engine/facilities";
+import { GARBAGE_COLLECT_HOUR, isElevatorKind } from "../../engine/facilities";
+import { catalogFacility } from "../../engine/catalogTypes";
+import { towerCatalog } from "../../engine/towerCatalog";
 import type { FacilityKind } from "../../engine/types";
 import { isOperational } from "../../engine/types";
 import { drawCar, drawGarbageTruck, drawMetroTrain, drawStreetCar } from "../sprites";
@@ -383,7 +385,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     // cached per state so we only redraw when the state actually changes.
     const load = c.t.carLoad?.[c.i] ?? 0;
     const dir = c.t.carDir?.[c.i] ?? 0;
-    const ind = carIndicator(dir, load, transportCarCapacity(c.t.kind));
+    const ind = carIndicator(dir, load, catalogFacility(towerCatalog(engine.sim), c.t.kind).carCapacity ?? 0);
     const key = carKey(ind);
     if (key !== c.shown) {
       c.shown = key;

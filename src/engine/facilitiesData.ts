@@ -21,9 +21,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 5000,
     minStar: 1,
     population: 0,
-    color: "#d8d2b0",
-    description:
-      "Ground-floor and sky lobbies. People pass through to reach elevators. Build every 15 floors.",
   },
   floor: {
     kind: "floor",
@@ -33,8 +30,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 500,
     minStar: 1,
     population: 0,
-    color: "#9a9486",
-    description: "Structural floor space. Must exist before placing rooms.",
   },
   office: {
     kind: "office",
@@ -44,8 +39,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 40000,
     minStar: 1,
     population: 6,
-    color: "#6fb1d6",
-    description: "Rents to a company. Workers arrive mornings, leave evenings. Pays quarterly rent.",
   },
   condo: {
     kind: "condo",
@@ -55,8 +48,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 80000,
     minStar: 1,
     population: 3,
-    color: "#7ec97e",
-    description: "Sold once to a resident family for a large lump sum. Residents live here permanently.",
   },
   hotelSingle: {
     kind: "hotelSingle",
@@ -66,8 +57,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 20000,
     minStar: 2,
     population: 1,
-    color: "#e0b15e",
-    description: "Hotel single. Guests check in at night, out in the morning. Needs housekeeping.",
   },
   hotelDouble: {
     kind: "hotelDouble",
@@ -77,8 +66,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 50000,
     minStar: 3,
     population: 2,
-    color: "#e0a94e",
-    description: "Hotel double room. Higher nightly income than a single.",
   },
   hotelSuite: {
     kind: "hotelSuite",
@@ -90,8 +77,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     // A suite houses a larger party than a double, matching the 1994 original
     // (review F36).
     population: 3,
-    color: "#d99a2e",
-    description: "Luxury hotel suite. Best nightly income, demanding guests.",
   },
   fastFood: {
     kind: "fastFood",
@@ -101,8 +86,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 100000,
     minStar: 1,
     population: 25,
-    color: "#e87b6e",
-    description: "Quick dining. Busy at lunch. Income scales with foot traffic.",
   },
   restaurant: {
     kind: "restaurant",
@@ -112,8 +95,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 200000,
     minStar: 3,
     population: 35,
-    color: "#d4564a",
-    description: "Fine dining, busy at lunch and dinner. Needs good elevator access.",
   },
   foodHall: {
     kind: "foodHall",
@@ -123,9 +104,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 250000,
     minStar: 3,
     population: 40,
-    color: "#e0965a",
     modernOnly: true,
-    description: "Modern: a hall of food stalls. Earns from foot traffic and satisfies many cravings from one spot, so it covers a wide reach of hungry tenants.",
   },
   shop: {
     kind: "shop",
@@ -135,8 +114,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 100000,
     minStar: 3,
     population: 20,
-    color: "#b58ad6",
-    description: "Retail. Earns from shoppers passing by. Thrives near lobbies and offices.",
   },
   cinema: {
     kind: "cinema",
@@ -148,8 +125,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     minStar: 3,
     population: 0,
     attendance: 30,
-    color: "#8a6fd6",
-    description: "A two-story movie theater. Draws large evening crowds; demands heavy transport capacity.",
   },
   partyHall: {
     kind: "partyHall",
@@ -161,8 +136,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     minStar: 3,
     population: 0,
     attendance: 20,
-    color: "#cf7fb0",
-    description: "A two-story rentable function space for events. Guests enter on the lower floor. Periodic income.",
   },
   amusements: {
     kind: "amusements",
@@ -172,9 +145,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 180000,
     minStar: 3,
     population: 25,
-    color: "#d24a9c",
     modernOnly: true,
-    description: "Modern: an arcade and amusements hall (classic cabinets, VR, claw machines, mini-golf). Draws teens and families for games and earns from foot traffic, and is busier on weekends.",
   },
   boutiqueBay: {
     kind: "boutiqueBay",
@@ -184,9 +155,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 150000,
     minStar: 3,
     population: 22,
-    color: "#3aa88c",
     modernOnly: true,
-    description: "Modern: a bay of small independent trades (florist, barber, phone repair, vintage, tattoo, record store, gallery). Earns from foot traffic and offers the widest variety of any single build, busier on weekends.",
   },
   fitnessClub: {
     kind: "fitnessClub",
@@ -196,9 +165,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 220000,
     minStar: 3,
     population: 20,
-    color: "#4a86c8",
     modernOnly: true,
-    description: "Modern: a members' gym (weight floor, yoga, spin, boxing, climbing). Pays a membership lease like an office, and nearby condos are happier for having it close (a capped bonus that fades with distance).",
   },
   clinic: {
     kind: "clinic",
@@ -208,9 +175,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 120000,
     minStar: 3,
     population: 12,
-    color: "#5ab0c8",
     modernOnly: true,
-    description: "Modern: a small health clinic (dental, urgent care, optometry, pharmacy, physio). Pays a lease like an office: a quiet, steady tenant.",
   },
   nightclub: {
     kind: "nightclub",
@@ -220,9 +185,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 350000,
     minStar: 3,
     population: 30,
-    color: "#a24ad0",
     modernOnly: true,
-    description: "Modern: a nightclub that fills after dark, earning when the office crowd is gone. Pays a monthly DJ booking, and its noise makes nearby homes unhappy: keep it away from condos.",
   },
   spa: {
     kind: "spa",
@@ -232,9 +195,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 200000,
     minStar: 3,
     population: 18,
-    color: "#5cc0a0",
     modernOnly: true,
-    description: "Modern: a wellness spa (massage, sauna, hot tubs). Earns from foot traffic, busier on weekends, and hotel rooms on nearby floors rest better for it (a capped bonus that fades with distance).",
   },
   skyBar: {
     kind: "skyBar",
@@ -244,9 +205,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 260000,
     minStar: 3,
     population: 22,
-    color: "#d89050",
     modernOnly: true,
-    description: "Modern: a rooftop cocktail bar that fills in the evening. Earns from foot traffic, and the higher you place it the more it earns: the skyline view is the draw, so a bar up top pours far more than one down low.",
   },
   aquaticCenter: {
     kind: "aquaticCenter",
@@ -258,9 +217,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     minStar: 3,
     population: 0,
     attendance: 24,
-    color: "#33b0c2",
     modernOnly: true,
-    description: "Modern: a two-story swimming pool complex. Like a cinema it earns from the crowd that comes to swim and lounge, filling with real visitors through the day, so it needs the transport to move them.",
   },
   daycare: {
     kind: "daycare",
@@ -270,9 +227,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 160000,
     minStar: 3,
     population: 14,
-    color: "#eeb63c",
     modernOnly: true,
-    description: "Modern: a children's daycare. Earns from parents dropping off and collecting kids, busiest on weekdays when they are at work, and condos on nearby floors are happier for it, most of all the biggest families who lean on childcare the most (a bonus that grows with family size and fades over the next few floors).",
   },
   stairs: {
     kind: "stairs",
@@ -282,9 +237,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 5000,
     minStar: 1,
     population: 0,
-    color: "#b0a890",
     transport: true,
-    description: "Cheap two-floor link: one tap places the whole flight. People will only climb a short distance.",
   },
   escalator: {
     kind: "escalator",
@@ -294,9 +247,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 20000,
     minStar: 3,
     population: 0,
-    color: "#c8c0a0",
     transport: true,
-    description: "Moves crowds between adjacent floors. Great for lobbies, shops and food courts.",
   },
   elevatorStandard: {
     kind: "elevatorStandard",
@@ -313,9 +264,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 200000,
     minStar: 1,
     population: 0,
-    color: "#5a5a6a",
     transport: true,
-    description: "Serves up to 30 floors with several cars. The backbone of any tower.",
   },
   elevatorService: {
     kind: "elevatorService",
@@ -325,11 +274,8 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 100000,
     minStar: 2,
     population: 0,
-    color: "#4a4a52",
     transport: true,
     staffOnly: true,
-    description:
-      "Staff-only: housekeepers ride it to reach hotel floors; tenants and visitors never do. Cheap way to link service floors.",
   },
   elevatorExpress: {
     kind: "elevatorExpress",
@@ -345,9 +291,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 400000,
     minStar: 3,
     population: 0,
-    color: "#3a3a8a",
     transport: true,
-    description: "Stops only at lobbies and sky lobbies. Essential for very tall towers.",
   },
   parkingRamp: {
     kind: "parkingRamp",
@@ -357,9 +301,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 50000,
     minStar: 3,
     population: 0,
-    color: "#6a6a6a",
     basement: true,
-    description: "Basement car-ramp. Parking spaces must chain to a ramp to be usable.",
   },
   parking: {
     kind: "parking",
@@ -369,10 +311,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 3000,
     minStar: 3,
     population: 0,
-    color: "#888888",
     basement: true,
-    description:
-      "Basement parking. Must connect to a Parking Ramp. One space serves ~24 office workers (one per four offices), and every hotel suite needs a space of its own (VIPs drive).",
   },
   security: {
     kind: "security",
@@ -384,8 +323,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     // before the tower is 3★ or the rating deadlocks at 2★ forever.
     minStar: 2,
     population: 0,
-    color: "#4f6f9f",
-    description: "Security office. Reduces crime/terrorist events and improves evaluation.",
   },
   medical: {
     kind: "medical",
@@ -395,8 +332,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 500000,
     minStar: 3,
     population: 0,
-    color: "#e0e0e8",
-    description: "Handles illness and emergencies. Required for high ratings in large towers.",
   },
   housekeeping: {
     kind: "housekeeping",
@@ -406,9 +341,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 50000,
     minStar: 2,
     population: 0,
-    color: "#c0d0c0",
-    description:
-      "Fields 6 maids who clean hotel rooms through the day shift so they can be rented again. Maids reach rooms by service elevator or stairs (never passenger elevators or escalators), so how many rooms they finish depends on placement and staff transport.",
   },
   recycling: {
     kind: "recycling",
@@ -419,10 +351,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 500000,
     minStar: 3,
     population: 0,
-    color: "#7f9f5f",
     basement: true,
-    description:
-      "Basement facility that fills with the tower's daily waste: one center processes ~2,500 population; build more as you grow. A garbage truck collects each morning. 4★ requires demand met.",
   },
   metro: {
     kind: "metro",
@@ -435,9 +364,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     cost: 1000000,
     minStar: 4,
     population: 0,
-    color: "#9f7f5f",
     basement: true,
-    description: "A whole-floor deep-basement subway station. Brings huge numbers of visitors to your tower.",
   },
   weddingHall: {
     kind: "weddingHall",
@@ -448,8 +375,6 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     minStar: 5,
     population: 0,
     attendance: 12,
-    color: "#f3ecdc",
-    description: "A grand wedding & events hall atop a 5-star tower (floor 100). Triggers the final TOWER evaluation.",
   },
   // Modern rental living (Studio + Apartment): catalog entries live in their own
   // module so this file stays under the size ceiling. The spread keeps the

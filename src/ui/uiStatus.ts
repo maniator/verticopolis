@@ -8,6 +8,7 @@ import { relabelPalette, syncPaletteTabs } from "./uiPalette";
 import { toolInfoFor } from "./templates/toolInfo";
 import { towerStatsTemplate } from "./templates/towerStats";
 import { towerCatalog } from "../engine/towerCatalog";
+import { bindViewWorld } from "../presentation/viewWorld";
 
 /**
  * Status-bar, palette-lock, tower-stats and bulletin-log rendering for
@@ -55,6 +56,8 @@ export function update(ui: UI, sim: Simulation): void {
   // shows the TypeScript tables' values (#921).
   const catalog = towerCatalog(sim);
   if (catalog !== ui.paletteCatalog) {
+    // A new catalog must state the world the view was built for.
+    bindViewWorld(catalog.world);
     relabelPalette(ui, catalog);
     if (ui.tool.type === "build") render(toolInfoFor(catalog, ui.tool.kind), ui.el.toolInfo);
   }

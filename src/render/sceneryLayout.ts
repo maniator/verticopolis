@@ -1,4 +1,4 @@
-import { GRID } from "../engine/facilities";
+import { viewWorld } from "../presentation/viewWorld";
 import type { Unit } from "../engine/types";
 
 /**
@@ -13,7 +13,7 @@ import type { Unit } from "../engine/types";
  * actors.
  *
  * Geometry contract (owner-approved mockups, 2026-07-21): the buildable lot
- * (GRID.width tile columns, indices 0 through GRID.width - 1) is untouched
+ * (the world's lotWidth tile columns, indices 0 through lotWidth - 1) is untouched
  * canon. All scenery lives OUTSIDE it or
  * on its ground line, and everything draws BEHIND the tower (z order), so no
  * scenery can ever cover a built room.
@@ -33,14 +33,14 @@ export const SIDEWALK_TILES = 4;
 export const ROAD_TILES = 44;
 /** The cement apron extends this far past the built ground-floor footprint. */
 export const APRON_PAD_TILES = 3;
-/** How far past each lot edge the skyline band runs: one full lot width, the
- *  same reach as the dirt ground, so the city ends exactly where the ground
- *  does even zoomed all the way out at a camera edge. */
-const SKYLINE_OVERSCAN_TILES = GRID.width;
-
-/** First sidewalk tile, first road tile (both beyond the lot's last column). */
-export const SIDEWALK_START = GRID.width + FORECOURT_TILES;
-export const ROAD_START = SIDEWALK_START + SIDEWALK_TILES;
+/** First sidewalk tile, first road tile (both beyond the lot's last column),
+ *  from the view's world (the tower catalog's lot width). */
+export function sidewalkStart(): number {
+  return viewWorld().lotWidth + FORECOURT_TILES;
+}
+export function roadStart(): number {
+  return sidewalkStart() + SIDEWALK_TILES;
+}
 
 /** Deterministic unit-interval hash. Integer bit-mixing only (no trig, no
  *  floating-point transcendentals), so every engine renders identical pixels:
@@ -70,8 +70,12 @@ export interface SkylineRect {
  *  built tower does not cover it (owner call: the city is always back there). */
 export function skylineRects(seed: number): SkylineRect[] {
   const rects: SkylineRect[] = [];
-  const from = -SKYLINE_OVERSCAN_TILES;
-  const to = GRID.width + SKYLINE_OVERSCAN_TILES;
+  // The band runs one full lot width past each lot edge, the same reach as
+  // the dirt ground, so the city ends exactly where the ground does even
+  // zoomed all the way out at a camera edge.
+  const lotWidth = viewWorld().lotWidth;
+  const from = -lotWidth;
+  const to = lotWidth + lotWidth;
   for (let t = from; t < to; t += 16) {
     const w = 9 + hash01(seed + t) * 8;
     rects.push({ tile: t, w, hFloors: 10 + hash01(seed + t * 3) * 26, depth: 0 });
@@ -93,7 +97,8 @@ export interface PlantSpot {
  *  keep clear of both lot edges so nothing crowds the plaza sidewalk or the street. */
 export function plantSpots(seed: number): PlantSpot[] {
   const spots: PlantSpot[] = [];
-  for (let t = 6; t < GRID.width - 6; t += 13) {
+  const lotWidth = viewWorld().lotWidth;
+  for (let t = 6; t < lotWidth - 6; t += 13) {
     const r = hash01(seed * 3 + t);
     if (r < 0.42) continue; // gaps keep the lot from reading as an orchard
     const jitter = Math.floor(hash01(seed + t * 5) * 7) - 3;
@@ -120,7 +125,7 @@ export function apronRange(units: readonly Unit[]): { min: number; max: number }
   if (min === Infinity) return null;
   return {
     min: Math.max(0, min - APRON_PAD_TILES),
-    max: Math.min(GRID.width, max + APRON_PAD_TILES),
+    max: Math.min(viewWorld().lotWidth, max + APRON_PAD_TILES),
   };
 }
 

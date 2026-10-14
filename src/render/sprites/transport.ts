@@ -1,4 +1,5 @@
-import { FACILITIES, isElevatorKind } from "../../engine/facilities";
+import { isElevatorKind } from "../../engine/facilities";
+import { facilityColor } from "../../presentation/facilityPresentation";
 import type { FacilityKind, Transport } from "../../engine/types";
 import { personRider } from "../pixelSprites/common";
 import type { CarArrow } from "../carIndicator";
@@ -14,7 +15,7 @@ export function drawTransport(
   w: number,
   floorH: number,
 ): void {
-  const f = FACILITIES[t.kind];
+  const color = facilityColor(t.kind);
   const height = (t.top - t.bottom + 1) * floorH;
 
   // NOTE: this draws only the *static* structure. Everything that moves
@@ -56,9 +57,9 @@ export function drawTransport(
     // rails, stop lines, floor numbers, motor caps and car are still drawn.
     const express = t.kind === "elevatorExpress";
     if (express) {
-      ctx.fillStyle = shadeAlpha(f.color, -34, 0.35); // express glass backing
+      ctx.fillStyle = shadeAlpha(color, -34, 0.35); // express glass backing
     } else {
-      ctx.fillStyle = shade(f.color, -34);
+      ctx.fillStyle = shade(color, -34);
     }
     ctx.fillRect(sx, topY, w, height);
     ctx.fillStyle = "rgba(0,0,0,0.5)";
@@ -324,7 +325,7 @@ export function drawCar(
   const express = kind === "elevatorExpress";
   // Always a real color (unused on the standard path) so no branch can ever
   // feed shade() an empty string, which canvas would swallow silently.
-  const accent = FACILITIES[kind].color;
+  const accent = facilityColor(kind);
   const cw = Math.max(1, Math.round(w));
   const midX = Math.round(cw / 2);
   // Cab frame, then the warm walnut interior with a brass ceiling rail. Service

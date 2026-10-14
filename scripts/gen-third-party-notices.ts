@@ -7,34 +7,43 @@
  * from `INJECTED_CODE`. Serverless `api/` dependencies never reach a browser
  * bundle, so they never appear here.
  *
+ * When anything ships under `dist/engine/`, the WASM engine's Rust crates and
+ * the Rust standard library come from the record its build wrote beside it
+ * (`THIRD-PARTY.json`, #955), which must match the package's `BUILD.json`.
+ *
  * Fails the build (one line, non-zero exit) when no sourcemap is found, a
  * sourcemap is malformed, shipped JavaScript has no sourcemap (outside a
- * short allowlist), or a bundled package lacks a name, version, allowed
- * license id or license text, so an incomplete notices file never ships. Runs
+ * short allowlist), a bundled package or recorded crate lacks a name,
+ * version, allowed license id or license text, or the engine ships without a
+ * valid, matching record, so an incomplete notices file never ships. Runs
  * first in `verify:dist`, for every build mode.
  *
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */
 import { readFileSync, readdirSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import { dirname, resolve, join, relative } from "node:path";
 import {
   INJECTED_CODE,
-  byCodePoint,
   collectPackageDirs,
   declaredLicense,
-  isLicenseFileName,
-  isLicenseTextFileName,
-  isNoticeFileName,
   noticeProblem,
   packageDirFromSource,
   renderNotices,
   sourceToPath,
   type NoticePackage,
 } from "../src/build/thirdPartyNotices.ts";
+import { ENGINE_THIRD_PARTY, engineRecordPackages } from "../src/build/rustNotices.ts";
+import { readLicenseFiles } from "./license-files.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..").replace(/\\/g, "/");
-const DIST = join(ROOT, "dist").replace(/\\/g, "/");
+// VC_NOTICES_DIST points the generator at another built tree; its tests use
+// it to run the real script against fixture builds (thirdPartyNoticesEngine.test.ts).
+// Honored only under vitest, so a stray variable in a real build cannot send
+// the notices to another tree.
+const DIST_OVERRIDE = process.env.VITEST ? process.env.VC_NOTICES_DIST : undefined;
+const DIST = (DIST_OVERRIDE ? resolve(DIST_OVERRIDE) : join(ROOT, "dist")).replace(/\\/g, "/");
 const OUT = join(DIST, "third-party-notices.txt");
 
 function fail(msg: string): never {
@@ -57,9 +66,10 @@ const maps = filesUnder(DIST, (n) => /\.([mc]?js|css)\.map$/.test(n));
 if (maps.length === 0) fail("no sourcemaps in dist; they are needed to list the bundled packages");
 
 // Shipped JavaScript with no sourcemap would carry unlisted code. The only one
-// today is the WASM engine's wasm-bindgen glue; its Rust crates are row
-// `wasm-engine-third-party-notices` (#955).
-const MAPLESS_JS_ALLOWED = new Set(["engine/verticopolis_engine.js"]);
+// is the WASM engine's wasm-bindgen glue, which is attributed instead by the
+// record its build writes beside it (read below, #955).
+const ENGINE_GLUE = "engine/verticopolis_engine.js";
+const MAPLESS_JS_ALLOWED = new Set([ENGINE_GLUE]);
 const mapless = filesUnder(DIST, (n) => /\.[mc]?js$/.test(n))
   .filter((f) => !existsSync(`${f}.map`))
   .map((f) => relative(DIST, f).replace(/\\/g, "/"))
@@ -185,43 +195,58 @@ for (const [dir, origin] of dirs) {
     problems.push(`${relative(ROOT, manifestPath)} is not a valid package.json`);
     continue;
   }
-  const files = readdirSync(dir)
-    .filter((n) => isLicenseFileName(n) || isNoticeFileName(n))
-    .filter((n) => {
-      try {
-        return statSync(join(dir, n)).isFile();
-      } catch {
-        problems.push(`${relative(ROOT, join(dir, n))} cannot be read (a broken link?)`);
-        return false;
-      }
-    })
-    .sort(byCodePoint);
-  const texts = new Map<string, string>();
-  for (const n of files) {
-    try {
-      texts.set(n, readFileSync(join(dir, n), "utf8"));
-    } catch {
-      problems.push(`${relative(ROOT, join(dir, n))} cannot be read`);
-    }
+  const read = readLicenseFiles(dir);
+  if (read.problems.length > 0) {
+    problems.push(...read.problems.map((p) => `${relative(ROOT, p.file)} ${p.reason}`));
+    continue;
   }
-  if (texts.size < files.length) continue;
   const pkg = {
     name: typeof manifest.name === "string" ? manifest.name : undefined,
     version: typeof manifest.version === "string" ? manifest.version : undefined,
     license: declaredLicense(manifest),
-    // An empty LICENSE, or a COPYRIGHT line alone, does not count as license text.
-    hasLicenseFile: files.some((n) => isLicenseTextFileName(n) && texts.get(n)!.trim() !== ""),
-    licenseText: files
-      .map((n) => (files.length > 1 ? `--- ${n} ---\n\n` : "") + texts.get(n)!.trimEnd())
-      .join("\n\n"),
+    hasLicenseFile: read.hasLicenseFile,
+    licenseText: read.licenseText,
   };
   const problem = noticeProblem(pkg);
   if (problem) problems.push(problem);
   else packages.push({ name: pkg.name!, version: pkg.version!, license: pkg.license!, licenseText: pkg.licenseText });
 }
 
+// The WASM engine: its crates and the Rust standard library, from the record
+// every engine build writes beside the package. The engine never ships
+// without one: any file under dist/engine/ (the glue, the .wasm, or both)
+// requires it.
+const engineDir = join(DIST, "engine");
+const ENGINE_FILES = new Set(["verticopolis_engine.js", "verticopolis_engine_bg.wasm", "BUILD.json", ENGINE_THIRD_PARTY]);
+if (existsSync(engineDir) && (!statSync(engineDir).isDirectory() || readdirSync(engineDir).length > 0)) {
+  const recordPath = join(DIST, "engine", ENGINE_THIRD_PARTY);
+  const read = (path: string): unknown => {
+    try {
+      return JSON.parse(readFileSync(path, "utf8"));
+    } catch {
+      fail(`${relative(ROOT, path)} is missing or not valid JSON, so the WASM engine that ships cannot be attributed (rebuild it with npm run wasm:build)`);
+    }
+  };
+  const build = read(join(DIST, "engine", "BUILD.json")) as { sources?: unknown } | null;
+  const wasmPath = join(DIST, "engine", "verticopolis_engine_bg.wasm");
+  let wasm: string | null = null;
+  if (existsSync(wasmPath)) {
+    try {
+      wasm = createHash("sha256").update(readFileSync(wasmPath)).digest("hex");
+    } catch {
+      fail(`${relative(ROOT, wasmPath)} cannot be read`);
+    }
+  }
+  // The record describes this package and nothing else, so another file here would ship unattributed.
+  const extra = statSync(engineDir).isDirectory() ? readdirSync(engineDir).filter((f) => !ENGINE_FILES.has(f)) : [];
+  if (extra.length > 0) problems.push(`dist/engine/ ships ${extra.join(", ")}, which the engine's record does not describe`);
+  const engine = engineRecordPackages(read(recordPath), { sources: build?.sources, wasm });
+  problems.push(...engine.problems.map((p) => `${relative(ROOT, recordPath)}: ${p}`));
+  packages.push(...engine.packages);
+}
+
 if (problems.length > 0) fail(problems.join("; "));
 if (packages.length === 0) fail("the build lists no third-party packages; refusing to write an empty notices file");
 
 writeFileSync(OUT, renderNotices(packages));
-console.log(`gen-third-party-notices: ${packages.length} packages -> dist/third-party-notices.txt`);
+console.log(`gen-third-party-notices: ${packages.length} packages -> ${relative(ROOT, OUT)}`);
