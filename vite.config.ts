@@ -60,9 +60,12 @@ const TOOLING_BUILD = toolingBuild();
 
 /**
  * Module swaps that keep engine-specific code out of a bundle that cannot use
- * it. Plain `resolve.alias` entries, matched on the exact import specifier, so
- * each swap is one line here and `scripts/verify-engine-bundle.ts` proves from
- * the emitted sourcemaps that the swapped module did not ship.
+ * it. Plain `resolve.alias` entries match an import specifier's text from any
+ * importer, so src/build/engineAliases.test.ts pins that exactly one file uses
+ * each specifier and that no other specifier reaches the real module, and
+ * `scripts/verify-engine-bundle.ts` proves from the emitted sourcemaps that
+ * the swapped module did not ship. The step-loop swap applies to a dev serve
+ * with `VC_ENGINE=wasm` too, so that serve behaves like the wasm-only build.
  *   - wasm-only builds: `Simulation.ts`'s step loop becomes a stand-in that
  *     throws, since the WASM host replaces `tick` on every tower it holds.
  *   - every build that is neither a dev serve nor a tooling build, and every

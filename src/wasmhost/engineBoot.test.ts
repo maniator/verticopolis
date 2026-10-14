@@ -19,7 +19,7 @@ describe("loadBootEngine, switchable build", () => {
   it("falls back to the TypeScript engine on a load failure, with the reason in the console", async () => {
     const log = quiet();
     const r = await loadBootEngine({ wasmOnly: false, load: async () => Promise.reject(new Error("404")), log });
-    expect(r).toEqual({ module: null, state: { build: "switchable", engine: "ts", failure: null } });
+    expect(r).toEqual({ module: null, state: { build: "switchable", engine: "ts", failure: { stage: "load", message: "404" } } });
     expect(log.error).toHaveBeenCalledWith(expect.stringContaining("running on the TypeScript engine"), expect.any(Error));
   });
 
@@ -41,6 +41,17 @@ describe("loadBootEngine, wasm-only build", () => {
     const r = await loadBootEngine({ wasmOnly: true, load: async () => Promise.reject(new Error("CompileError: bad magic")), log });
     expect(r).toEqual({ module: null, state: { build: "wasm-only", engine: "none", failure: { stage: "load", message: "CompileError: bad magic" } } });
     expect(log.error).toHaveBeenCalledWith(expect.stringContaining("no other engine"), expect.any(Error));
+  });
+
+  it("gives up on a load that never settles", async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = loadBootEngine({ wasmOnly: true, load: () => new Promise<WasmModule>(() => {}), log: quiet(), timeoutMs: 1000 });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect((await pending).state.failure).toEqual({ stage: "load", message: "the engine package did not load within 1 seconds" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("names a thrown non-Error", async () => {
@@ -81,7 +92,9 @@ describe("engineFailureCopy", () => {
   });
 
   it("tells a mid-game stop apart from a failed start", () => {
-    expect(engineFailureCopy({ stage: "host", message: "x" }, true).headline).toMatch(/stopped running this tower/);
+    const host = engineFailureCopy({ stage: "host", message: "x" }, true);
+    expect(host.headline).toMatch(/stopped running this tower, so the game has stopped/);
+    expect(host.steps[0]).toMatch(/continue from your last save/);
   });
 
   it("keeps the copy free of em-dashes", () => {

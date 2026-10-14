@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 // The engine legs of the visual gate (pr-drift-check.yml and
 // update-visual-baselines.yml) set PW_WASM_VISUAL=1 to run visual.spec.ts on
@@ -19,7 +20,22 @@ if (WASM_VISUAL && process.argv.some((a) => a === "-u" || (a.startsWith("--updat
 // no engine preference because the build has no engine switch to read. It
 // replaces the other two projects, whose builds it does not serve.
 const WASM_ONLY = process.env.PW_WASM_ONLY === "1";
+if (process.env.PW_WASM_ONLY && !WASM_ONLY) throw new Error(`PW_WASM_ONLY must be "1" or unset; got "${process.env.PW_WASM_ONLY}".`);
 if (WASM_ONLY && WASM_VISUAL) throw new Error("PW_WASM_ONLY=1 and PW_WASM_VISUAL=1 are separate lanes; set one.");
+// The lane must match the build it serves: the projects of one lane fail in
+// confusing ways against the other's build. The build records its mode.
+const builtMode = (() => {
+  try {
+    return (JSON.parse(readFileSync(new URL("./dist/version.json", import.meta.url), "utf8")) as { engineBuild?: string }).engineBuild;
+  } catch {
+    return undefined; // no build yet: the web server step reports that
+  }
+})();
+if (builtMode !== undefined && (builtMode === "wasm-only") !== WASM_ONLY) {
+  throw new Error(
+    `dist/ is a ${builtMode} build, but ${WASM_ONLY ? "PW_WASM_ONLY=1 expects a wasm-only one (VC_ENGINE=wasm)" : "this lane expects a switchable one; set PW_WASM_ONLY=1 for a VC_ENGINE=wasm build"}.`,
+  );
+}
 
 export default defineConfig({
   testDir: "./e2e",

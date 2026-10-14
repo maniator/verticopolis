@@ -51,7 +51,7 @@ test("the game runs on the WASM engine behind ?engine=wasm", async ({ page }) =>
  * and the two balances agree after every step. A refusal moves neither.
  */
 test("the car, extend and removal commands charge inside the WASM engine", async ({ page }, info) => {
-  test.skip(!onWasm(info.project.name), "the hosted engine runs on the chromium-wasm project");
+  test.skip(!onWasm(info.project.name), "the hosted engine runs on the chromium-wasm and chromium-wasm-only projects");
   await page.goto("/?engine=wasm");
   await page.waitForFunction(() => {
     const w = window as unknown as { __vcEngine?: { status: { hosted: boolean } }; game?: { sim: unknown } };

@@ -16,7 +16,7 @@ import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAsset
  * These run against the production build `npm run e2e` serves (vite preview),
  * on the chromium-wasm project, where the engine is the chosen one.
  */
-test.beforeEach(({}, info) => test.skip(!onWasm(info.project.name), "the engine runs on the chromium-wasm project"));
+test.beforeEach(({}, info) => test.skip(!onWasm(info.project.name), "the engine runs on the chromium-wasm and chromium-wasm-only projects"));
 // An install, an offline reload and a game session each: more than the default 30s.
 test.setTimeout(90_000);
 test.afterEach(async ({ page }) => expectEngineHosted(page));

@@ -1,6 +1,6 @@
 /**
  * Postbuild guard for the engine build mode (see src/build/engineBundle.ts).
- * It reads what the build emitted, not the source imports: every JavaScript
+ * It reads what the build emitted rather than the source imports: every JavaScript
  * file's sourcemap (the bundler's own record of which modules it carries),
  * the service worker's precache list and the mode `dist/version.json`
  * records. The mode it checks against comes from `VC_ENGINE` and
@@ -17,16 +17,16 @@
  *
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative, resolve } from "node:path";
-import { checkEngineBundle, parseAllowList, parseEngineBuild, type EmittedChunk, type EngineBuild } from "../src/build/engineBundle.ts";
+import { checkEngineBundle, parseAllowList, parseEngineBuild, precacheManifest, repoRelativeSource, type EmittedChunk, type EngineBuild } from "../src/build/engineBundle.ts";
 import { sourceToPath } from "../src/build/thirdPartyNotices.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist");
 const ALLOW = join(ROOT, "scripts", "engine-bundle.allow.txt");
-const ENGINE_GLUE = "engine/verticopolis_engine.js";
+const ENGINE_DIR = "engine/";
 
 function fail(msg: string): never {
   console.error(`verify-engine-bundle: ${msg}`);
@@ -37,7 +37,9 @@ function filesUnder(dir: string, keep: (name: string) => boolean): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
-    if (statSync(p).isDirectory()) out.push(...filesUnder(p, keep));
+    const st = lstatSync(p);
+    if (st.isSymbolicLink()) fail(`${relative(DIST, p)} is a symbolic link; the build writes none, so it cannot be checked`);
+    if (st.isDirectory()) out.push(...filesUnder(p, keep));
     else if (keep(name)) out.push(p);
   }
   return out;
@@ -61,9 +63,9 @@ for (const file of scripts) {
   const rel = relative(DIST, file).replace(/\\/g, "/");
   const mapFile = `${file}.map`;
   if (!existsSync(mapFile)) {
-    // The engine package's wasm-bindgen glue is generated from the Rust
-    // crate, not bundled from src/, so it has no map and no TypeScript in it.
-    if (rel === ENGINE_GLUE) continue;
+    // The engine package (engine/) is the wasm-bindgen output of the Rust
+    // crate, copied in as built: it has no map and no TypeScript in it.
+    if (rel.startsWith(ENGINE_DIR)) continue;
     fail(`${rel} has no sourcemap, so the modules it carries cannot be checked`);
   }
   let map: { sources?: unknown; sourceRoot?: unknown };
@@ -78,14 +80,14 @@ for (const file of scripts) {
   for (const s of map.sources) {
     const path = sourceToPath(s, mapDir, map.sourceRoot);
     if (path === null) continue; // a virtual or bundler module
-    const inRepo = path.startsWith(`${ROOT_PATH}/`) ? path.slice(ROOT_PATH.length + 1) : path.replace(/^\//, "");
-    sources.push(inRepo);
+    sources.push(repoRelativeSource(path, ROOT_PATH));
   }
   chunks.push({ file: rel, sources });
 }
 
-const sw = existsSync(join(DIST, "sw.js")) ? readFileSync(join(DIST, "sw.js"), "utf8") : "";
-const precache = [...sw.matchAll(/["']?url["']?\s*:\s*(["'])(.*?)\1/g)].map((m) => m[2].replace(/^\.?\//, ""));
+if (!existsSync(join(DIST, "sw.js"))) fail("no dist/sw.js, so the precache cannot be checked");
+const precache = precacheManifest(readFileSync(join(DIST, "sw.js"), "utf8"));
+if (precache === null) fail("found no precacheAndRoute manifest in dist/sw.js; did the workbox output format change?");
 
 let stamp: unknown;
 try {

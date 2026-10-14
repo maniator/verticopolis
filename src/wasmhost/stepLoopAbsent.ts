@@ -36,7 +36,7 @@ export function finishConstruction(_sim: Simulation): void {
   throw new StepLoopAbsentError("finishConstruction");
 }
 
-/** A read, not a step: the hour passes the tower has seen. The host keeps
+/** The hour passes the tower has seen. It only reads a field, so it stays. The host keeps
  *  `onHourRuns` in step with the engine's frame. */
 export function hourTicks(sim: Simulation): number {
   return sim.onHourRuns;

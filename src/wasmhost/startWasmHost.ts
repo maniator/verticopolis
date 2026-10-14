@@ -91,7 +91,12 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
       noteError(message);
       if (opts.strict && !fatal) {
         fatal = true;
-        opts.onFatal?.(message);
+        // The stop is reported, never thrown into the adopt that caused it.
+        try {
+          opts.onFatal?.(message);
+        } catch (err) {
+          log.error(`[wasm] stopping the game failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
     }
   };

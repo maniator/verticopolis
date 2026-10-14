@@ -51,7 +51,8 @@ export const TS_ENGINE_DIR = "src/engine/";
 export const ENGINE_PACKAGE_FILES: readonly string[] = ["engine/verticopolis_engine.js", "engine/verticopolis_engine_bg.wasm"];
 
 /** One emitted JavaScript file and the repository-relative sources its
- *  sourcemap lists (`src/...`, `node_modules/...`). */
+ *  sourcemap lists (`src/...`, `node_modules/...`), with any query suffix
+ *  (`?worker`) removed. */
 export interface EmittedChunk {
   file: string;
   sources: readonly string[];
@@ -77,7 +78,8 @@ export interface EngineBundleResult {
   engineModules: string[];
 }
 
-const isTestSource = (s: string): boolean => s.startsWith("src/tests/") || /\.test\.[mc]?[jt]sx?$/.test(s) || s.startsWith("e2e/");
+const isTestSource = (s: string): boolean =>
+  s.startsWith("src/tests/") || s.startsWith("e2e/") || s.includes("/__mocks__/") || /\.(test|spec)\.[mc]?[jt]sx?$/.test(s);
 
 /** Sources no production build may carry: tests and test fixtures. */
 function forbiddenEverywhere(s: string): string | null {
@@ -122,6 +124,11 @@ export function checkEngineBundle(input: EngineBundleInput): EngineBundleResult 
     }
   }
   const engineModules = [...engine].sort();
+  // A switchable build runs the TypeScript engine by default, so it must
+  // still carry the step loop; its absence means a wasm-only swap leaked.
+  if (input.build === "switchable" && input.chunks.length > 0 && !engine.has(TS_STEP_LOOP)) {
+    errors.push(`the switchable build does not carry the TypeScript step loop (${TS_STEP_LOOP}), so its default engine could not run; check the wasm-only aliases in vite.config.ts`);
+  }
   if (input.build === "wasm-only") {
     const allowed = new Set(input.allowed);
     const unlisted = engineModules.filter((m) => !allowed.has(m));
@@ -160,4 +167,30 @@ export function parseAllowList(text: string): { modules: string[]; errors: strin
     }
   }
   return { modules, errors };
+}
+
+/** A sourcemap source as a repository-relative path: the query suffix a
+ *  bundler adds to a module id (`?worker_file&type=module`) is dropped, so
+ *  the checks above compare plain paths. */
+export function repoRelativeSource(path: string, root: string): string {
+  const plain = path.replace(/[?#].*$/, "");
+  return plain.startsWith(`${root}/`) ? plain.slice(root.length + 1) : plain.replace(/^\//, "");
+}
+
+/** The precache URLs in a Workbox `sw.js`: the entries of the array passed to
+ *  `precacheAndRoute`, and nothing else in the worker. Null when the call or
+ *  its array cannot be found. */
+export function precacheManifest(sw: string): string[] | null {
+  const start = sw.indexOf("precacheAndRoute(");
+  if (start === -1) return null;
+  const open = sw.indexOf("[", start);
+  if (open === -1) return null;
+  let depth = 0;
+  for (let i = open; i < sw.length; i++) {
+    if (sw[i] === "[") depth++;
+    else if (sw[i] === "]" && --depth === 0) {
+      return [...sw.slice(open, i + 1).matchAll(/["']?url["']?\s*:\s*(["'])(.*?)\1/g)].map((m) => m[2].replace(/^\.?\//, ""));
+    }
+  }
+  return null;
 }

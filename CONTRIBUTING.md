@@ -95,7 +95,10 @@ Verticopolis has **two test tiers**:
     build ships a silent TypeScript fallback. Without a Rust toolchain, run
     `VC_ALLOW_NO_ENGINE=1 npm run build` for a deliberate TypeScript-only
     build. A stale local build fails the unit test that checks its source
-    hash. `VC_ENGINE=wasm npm run build` makes the wasm-only build the 3.0.0
+    hash. CI restores it from the
+    Actions cache, keyed on the engine's source hash, and builds it once per
+    engine change (`.github/actions/engine-wasm`); Vercel builds it on every
+    deploy through `scripts/vercel-build.sh`. `VC_ENGINE=wasm npm run build` makes the wasm-only build the 3.0.0
     flip will deploy: the WASM engine is the only engine, `?engine=` and
     `vc.engine` are ignored, the TypeScript step loop is swapped out, and an
     engine that cannot start stops the game with a message instead of
@@ -104,10 +107,7 @@ Verticopolis has **two test tiers**:
     that `scripts/engine-bundle.allow.txt` does not list ships, or when a
     listed one no longer does (delete its line: the list only shrinks). The
     default build is unchanged (`VC_ENGINE` unset, or `switchable`). See
-    `docs/performance/wasm-only-bundle.md` for what still ships and why. CI restores it from the
-    Actions cache, keyed on the engine's source hash, and builds it once per
-    engine change (`.github/actions/engine-wasm`); Vercel builds it on every
-    deploy through `scripts/vercel-build.sh`. Until the Rust engine is the default,
+    `docs/performance/wasm-only-bundle.md` for what still ships and why. Until the Rust engine is the default,
     every simulation change lands in both engines in one PR with
     the regenerated lock, and a PR that changes `src/engine/` without touching
     `engine-rs/` says why (a UI readout, prose, a transient the hash never

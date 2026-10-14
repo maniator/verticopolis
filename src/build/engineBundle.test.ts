@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { checkEngineBundle, DEFAULT_ENGINE_BUILD, ENGINE_PACKAGE_FILES, parseAllowList, parseEngineBuild, TS_STEP_LOOP, type EngineBundleInput } from "./engineBundle";
+import { checkEngineBundle, DEFAULT_ENGINE_BUILD, ENGINE_PACKAGE_FILES, parseAllowList, parseEngineBuild, precacheManifest, repoRelativeSource, TS_STEP_LOOP, type EngineBundleInput } from "./engineBundle";
 
 const ROOT = resolve(__dirname, "..", "..");
 
@@ -84,12 +84,17 @@ describe("checkEngineBundle", () => {
     const ok = checkEngineBundle({ build: "switchable", tooling: false, chunks, precache: [], stamp: "switchable", allowed: [] });
     expect(ok.errors).toEqual([]);
     expect(ok.engineModules).toEqual(["src/engine/crowd/motion.ts", TS_STEP_LOOP]);
-    const tests = [{ file: "assets/main.js", sources: ["src/tests/fixtures/towers.ts", "src/foo.test.ts", "e2e/helpers.ts"] }];
-    expect(checkEngineBundle({ build: "switchable", tooling: true, chunks: tests, precache: [], stamp: "switchable", allowed: [] }).errors).toHaveLength(3);
+    const tests = [{ file: "assets/main.js", sources: [TS_STEP_LOOP, "src/tests/fixtures/towers.ts", "src/foo.test.ts", "e2e/helpers.ts", "src/ui/x.spec.ts", "src/audio/__mocks__/tone.ts"] }];
+    expect(checkEngineBundle({ build: "switchable", tooling: true, chunks: tests, precache: [], stamp: "switchable", allowed: [] }).errors).toHaveLength(5);
+  });
+
+  it("fails a switchable build that lost the TypeScript step loop (a wasm-only swap leaked)", () => {
+    const chunks = [{ file: "assets/main.js", sources: ["src/engine/Simulation.ts"] }];
+    expect(checkEngineBundle({ build: "switchable", tooling: false, chunks, precache: [], stamp: "switchable", allowed: [] }).errors).toEqual([expect.stringContaining("does not carry the TypeScript step loop")]);
   });
 
   it("keeps the dual run out of a player build and lets a tooling build keep it", () => {
-    const chunks = [{ file: "assets/worker-x.js", sources: ["src/dualrun/worker.ts"] }];
+    const chunks = [{ file: "assets/main.js", sources: [TS_STEP_LOOP] }, { file: "assets/worker-x.js", sources: ["src/dualrun/worker.ts"] }];
     const base = { build: "switchable" as const, chunks, precache: [], stamp: "switchable", allowed: [] };
     expect(checkEngineBundle({ ...base, tooling: false }).errors).toEqual(["assets/worker-x.js carries the dual run (src/dualrun/worker.ts), a tooling-only switch, in a player build"]);
     expect(checkEngineBundle({ ...base, tooling: true }).errors).toEqual([]);
@@ -111,5 +116,25 @@ describe("parseAllowList", () => {
     expect(modules.length).toBeGreaterThan(0);
     expect(modules.filter((m) => !existsSync(resolve(ROOT, m)))).toEqual([]);
     expect(modules).not.toContain(TS_STEP_LOOP);
+  });
+});
+
+describe("repoRelativeSource", () => {
+  it("makes a path repository-relative and drops a module id's query", () => {
+    expect(repoRelativeSource("/repo/src/dualrun/worker.ts?worker_file&type=module", "/repo")).toBe("src/dualrun/worker.ts");
+    expect(repoRelativeSource("/repo/src/engine/sim/loop.ts", "/repo")).toBe(TS_STEP_LOOP);
+    expect(repoRelativeSource("/elsewhere/x.ts#frag", "/repo")).toBe("elsewhere/x.ts");
+  });
+});
+
+describe("precacheManifest", () => {
+  it("reads only the precacheAndRoute array", () => {
+    const sw = 'e.precacheAndRoute([{url:"index.html",revision:"1"},{url:"./engine/verticopolis_engine.js",revision:null}],{});e.registerRoute(new e.NavigationRoute({url:"engine/verticopolis_engine_bg.wasm"}))';
+    expect(precacheManifest(sw)).toEqual(["index.html", "engine/verticopolis_engine.js"]);
+  });
+
+  it("is null when there is no manifest", () => {
+    expect(precacheManifest("self.skipWaiting()")).toBeNull();
+    expect(precacheManifest("precacheAndRoute(")).toBeNull();
   });
 });

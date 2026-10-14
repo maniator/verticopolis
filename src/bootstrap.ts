@@ -185,7 +185,7 @@ export function bootGame(create: () => BootApp): Promise<void> {
       __WASM_ONLY__ || engineRequested() === "wasm" ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: () => loadWasmEngine() }) : typescriptBoot();
     let bootState: EngineBootState = booted.state;
     publishBootState(bootState);
-    if (bootState.failure) {
+    if (bootState.engine === "none" && bootState.failure) {
       showEngineFailure(bootState);
       // A fixed deploy is the way out of a broken or stale engine package:
       // with no tower running there is nothing to save, so take it at once.
@@ -196,23 +196,31 @@ export function bootGame(create: () => BootApp): Promise<void> {
       const app = create();
       const wasmModule = booted.module;
       if (wasmModule) {
+        // The host reports a refusal through `onFatal` (wasm-only builds), and
+        // the first tower's refusal arrives during `startWasmHost` itself, so
+        // `starting` tells a failed start from a later tower the host lost.
+        let starting = true;
         const stopForEngine = (stage: "start" | "host", message: string) => {
           bootState = failBoot(bootState, stage, message);
           publishBootState(bootState);
-          if (__WASM_ONLY__) showEngineFailure(bootState);
+          if (!__WASM_ONLY__) return;
+          showEngineFailure(bootState);
+          // Nothing can advance a tower now; stop asking the frame loop to.
+          (app as { setSpeed?: (s: number) => void }).setSpeed?.(0);
         };
+        let hosted = false;
         try {
-          startWasmHost(app as unknown as WasmHostApp, wasmModule, console, __WASM_ONLY__ ? { strict: true, onFatal: (m) => stopForEngine("host", m) } : {});
+          startWasmHost(app as unknown as WasmHostApp, wasmModule, console, __WASM_ONLY__ ? { strict: true, onFatal: (m) => stopForEngine(starting ? "start" : "host", m) } : {});
+          hosted = true;
+        } catch (e) {
+          stopForEngine("start", e instanceof Error ? e.message : String(e));
+          console.error(__WASM_ONLY__ ? "[wasm] did not start, and this build has no other engine:" : "[wasm] did not start; running on the TypeScript engine:", e);
+        }
+        starting = false;
+        if (hosted) {
           // Saves are written through the engine too (same bytes, #935).
           if (wasmModule.encodeVctower) setEngineWriter(wasmModule.encodeVctower);
           refreshSplashVersion(); // the title screen mounted before the host started
-        } catch (e) {
-          const message = e instanceof Error ? e.message : String(e);
-          stopForEngine("start", message);
-          // A wasm-only build has stopped behind the engine-failure message;
-          // boot still registers the service worker below, so a fixed deploy
-          // can reach this install.
-          console.error(__WASM_ONLY__ ? "[wasm] did not start, and this build has no other engine:" : "[wasm] did not start; running on the TypeScript engine:", e);
         }
       }
       // Publish the tooling handle only where tooling runs: dev serves and
@@ -237,7 +245,12 @@ export function bootGame(create: () => BootApp): Promise<void> {
       // Register the service worker so the game is installable and offline-ready.
       // On a new build: prompt the player (never force a reload), see
       // GameApp.onUpdateAvailable.
-      registerPWA({ onUpdateAvailable: (activate, info) => app.onUpdateAvailable(activate, info) });
+      // A wasm-only build that has stopped on its engine takes an update at
+      // once instead: the prompt would sit under the engine-failure message,
+      // and a fixed deploy is the way out.
+      registerPWA({
+        onUpdateAvailable: (activate, info) => (__WASM_ONLY__ && bootState.failure ? void activate() : app.onUpdateAvailable(activate, info)),
+      });
     } catch (err) {
       // A non-Error throw (a string, say) has no `.message`, so derive the text
       // defensively rather than render "undefined"; the original error is still

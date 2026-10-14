@@ -38,7 +38,8 @@ export function onWasm(projectName: string): boolean {
  * for `tsOnlyOnWasm(` to list them all.
  */
 export function tsOnlyOnWasm(reason: string): void {
-  test.skip(onWasm(test.info().project.name), `TypeScript-only on ${WASM_PROJECT}: ${reason}`);
+  const project = test.info().project.name;
+  test.skip(onWasm(project), `TypeScript-only on ${project}: ${reason}`);
 }
 
 /**
@@ -122,12 +123,13 @@ export function buildToStar(target: number): number {
   const hosted = Boolean((window as any).__vcEngine?.current());
   // The WASM engine was asked for but holds no tower: building in place here
   // would script the read model alone, so fail loudly instead.
-  let wantsWasm = false;
+  // A wasm-only build has no other engine, whatever the URL or storage say.
+  let wantsWasm = (window as any).__vcEngineBoot?.build === "wasm-only";
   try {
     // The same rule as engineRequested (src/wasmhost/engineChoice.ts): the
     // query wins, then the stored choice.
     const q = new URLSearchParams(location.search).get("engine");
-    wantsWasm = q === "wasm" || (q !== "ts" && localStorage.getItem("vc.engine") === "wasm");
+    wantsWasm ||= q === "wasm" || (q !== "ts" && localStorage.getItem("vc.engine") === "wasm");
   } catch {
     /* storage blocked: decide on the host alone */
   }

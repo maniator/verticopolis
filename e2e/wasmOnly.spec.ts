@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import { WASM_ONLY_PROJECT, expectEngineHosted } from "./helpers";
+import { INSTANCE_METHODS, STATIC_METHODS } from "../src/dualrun/binding";
 
 /**
  * The wasm-only build (`VC_ENGINE=wasm`; src/build/engineBundle.ts) in a real
@@ -164,6 +165,47 @@ test.describe("never falls back to the TypeScript engine", () => {
     await page.goto("/");
     const text = await expectStopped(page, "load");
     expect(text).toContain("the WASM binding lacks");
+  });
+
+  test("an engine that loads but cannot host the first tower stops the game at start", async ({ page }) => {
+    // A glue with the whole binding surface (so it passes the binding check)
+    // but no catalog, which the host reads before it builds an engine.
+    const methods = INSTANCE_METHODS.map((m) => `Engine.prototype.${m} = function () { throw new Error("stub"); };`).join("\n");
+    const statics = STATIC_METHODS.map((m) => `Engine.${m} = function () { throw new Error("stub"); };`).join("\n");
+    const glue = `export default async function init() {}\nexport function encodeVctower() { return ""; }\nexport class Engine {}\n${methods}\n${statics}\n`;
+    await page.route("**/engine/verticopolis_engine.js", (r) => r.fulfill({ status: 200, contentType: "text/javascript", body: glue }));
+    await page.goto("/");
+    const failure = page.locator("#engine-failure");
+    await expect(failure).toBeVisible({ timeout: 30_000 });
+    await expect(failure).toHaveAttribute("data-stage", "start");
+    await expect(failure).toContainText("could not start");
+    expect(await bootState(page)).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage: "start" } });
+    // The app exists (the host refused its tower), but nothing advances it.
+    expect(await page.evaluate(() => ({ hosted: !!(window as any).__vcEngine?.status.hosted, speed: (window as any).game?.speed }))).toEqual({ hosted: false, speed: 0 });
+  });
+
+  test("a tower the host refuses mid-game stops the game instead of running it on TypeScript", async ({ page }) => {
+    await page.goto("/");
+    await hostedGame(page);
+    await page.evaluate(() => {
+      const g = (window as any).game;
+      g.setSpeed(1);
+      // The host starts a tower from its save, which carries no crowd, so it
+      // refuses one that already has people.
+      const crowded = g.sim.constructor.newGame(6, "classic");
+      crowded.crowd.people.push({ id: 1, seed: 1, state: "toDest", floor: 1, fy: 0, x: 170, floors: [], originFloor: 1, shafts: [], leg: 0, shaftId: null, carIndex: null, destX: 170, wait: 0, tripWait: 0, age: 0, linger: 0 });
+      g.adoptSim(crowded);
+    });
+    const failure = page.locator("#engine-failure");
+    await expect(failure).toBeVisible();
+    await expect(failure).toHaveAttribute("data-stage", "host");
+    await expect(failure).toContainText("continue from your last save");
+    expect(await bootState(page)).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage: "host" } });
+    const after = await page.evaluate(() => ({ hosted: !!(window as any).__vcEngine?.status.hosted, speed: (window as any).game.speed, minutes: (window as any).game.sim.clock.minutes as number }));
+    expect(after).toMatchObject({ hosted: false, speed: 0 });
+    // The refused tower never ticks on TypeScript.
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => (window as any).game.sim.clock.minutes)).toBe(after.minutes);
   });
 
   /** Install the worker and reload under it, so the engine package is in

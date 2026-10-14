@@ -215,6 +215,9 @@ jobs:
         shell: bash
         run: |
           cp src/bootstrap.ts "$RUNNER_TEMP/bootstrap.ts"
+          # Put the file back however the step ends; the next build step then
+          # rebuilds dist/ from the real source.
+          trap 'cp "$RUNNER_TEMP/bootstrap.ts" src/bootstrap.ts' EXIT
           printf 'import { tick as legacyTick } from "./engine/sim/loop";\n(globalThis as unknown as { legacyTick?: unknown }).legacyTick = legacyTick;\n' >> src/bootstrap.ts
           if VC_ENGINE=wasm npm run build > canary.log 2>&1; then
             cat canary.log
@@ -222,7 +225,6 @@ jobs:
             exit 1
           fi
           grep -F "carries the TypeScript step loop (src/engine/sim/loop.ts) in a wasm-only build" canary.log
-          cp "$RUNNER_TEMP/bootstrap.ts" src/bootstrap.ts
 
       - name: Build (wasm-only, tooling)
         run: npm run build

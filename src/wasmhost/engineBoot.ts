@@ -32,6 +32,30 @@ export interface EngineBootOptions {
   wasmOnly: boolean;
   load: () => Promise<WasmModule>;
   log?: Pick<Console, "error">;
+  /** How long the load may take before boot gives up on it (ms). */
+  timeoutMs?: number;
+}
+
+/** The load's limit when the caller sets none. Generous: a first visit on a
+ *  slow connection downloads the whole engine; an installed game reads it
+ *  from the precache in milliseconds. Without a limit, a stalled fetch would
+ *  leave a wasm-only boot on a blank page with no message. */
+export const ENGINE_LOAD_TIMEOUT_MS = 90_000;
+
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((done, fail) => {
+    const timer = setTimeout(() => fail(new Error(`the engine package did not load within ${Math.round(ms / 1000)} seconds`)), ms);
+    work.then(
+      (v) => {
+        clearTimeout(timer);
+        done(v);
+      },
+      (e: unknown) => {
+        clearTimeout(timer);
+        fail(e);
+      },
+    );
+  });
 }
 
 export interface EngineBootResult {
@@ -54,11 +78,12 @@ export async function loadBootEngine(opts: EngineBootOptions): Promise<EngineBoo
   const build = opts.wasmOnly ? "wasm-only" : "switchable";
   let mod: WasmModule;
   try {
-    mod = await opts.load();
+    mod = await withTimeout(opts.load(), opts.timeoutMs ?? ENGINE_LOAD_TIMEOUT_MS);
   } catch (e) {
     if (!opts.wasmOnly) {
+      // The fallback is recorded with its reason (#874) as well as logged.
       log.error("[wasm] the engine package did not load; running on the TypeScript engine:", e);
-      return typescriptBoot();
+      return { module: null, state: { build, engine: "ts", failure: { stage: "load", message: messageOf(e) } } };
     }
     log.error("[wasm] the engine package did not load, and this build has no other engine:", e);
     return { module: null, state: { build, engine: "none", failure: { stage: "load", message: messageOf(e) } } };
@@ -93,11 +118,13 @@ export interface EngineFailureCopy {
 }
 
 export function engineFailureCopy(failure: EngineBootFailure, online: boolean): EngineFailureCopy {
-  const headline =
-    failure.stage === "host"
-      ? "The game engine stopped running this tower, so the game has paused here."
-      : "The game engine could not start, so the game cannot run.";
-  const steps = ["Reload the page to try again. Your saved towers stay in this browser."];
+  const host = failure.stage === "host";
+  const headline = host ? "The game engine stopped running this tower, so the game has stopped." : "The game engine could not start, so the game cannot run.";
+  const steps = [
+    host
+      ? "Reload the page to continue from your last save. Changes since that save may be lost."
+      : "Reload the page to try again. Your saved towers stay in this browser.",
+  ];
   if (!online) {
     steps.push("You appear to be offline. If the game was updated since this device last opened it, connect to the internet and reload once so the new engine can download.");
   }

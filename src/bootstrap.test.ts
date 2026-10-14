@@ -312,8 +312,8 @@ describe("bootGame", () => {
       expect(startWasmHost).not.toHaveBeenCalled();
       expect(error).toHaveBeenCalledWith(expect.stringContaining("[wasm]"), wasmStub.loadError);
       expect(document.getElementById("boot-fallback-host")).toBeNull();
-      // A switchable build reports the engine it settled on.
-      expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: null });
+      // A switchable build reports the engine it settled on, and why.
+      expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "load", message: "404 engine/verticopolis_engine.js" } });
     } finally {
       wasmStub.requested = "ts";
       wasmStub.loadError = null;
@@ -350,7 +350,7 @@ describe("bootGame", () => {
     try {
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
       expect(error).toHaveBeenCalledWith(expect.stringContaining("[wasm]"), expect.any(Error));
-      // The fallback is recorded with its reason (#874), not only logged.
+      // The fallback is recorded with its reason (#874) as well as logged.
       expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "no host" } });
       expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
       expect(encodeVctower).not.toHaveBeenCalled();
