@@ -2,6 +2,7 @@ import type { Simulation } from "../Simulation";
 
 import { ECON, rentConfig } from "../econConfig";
 import { removeFacility } from "./charges";
+import { whole } from "../request";
 import { storeRent } from "./constants";
 
 import { FACILITIES, buildMinutes, facilityFloors, isElevatorKind, isFacilityKind } from "../facilities";
@@ -224,8 +225,10 @@ export function buildTransport(sim: Simulation,
 /** Sell whatever stands at a tile for a partial refund: a room before
  *  the shaft or floor beneath it, then the shaft, then the floor tile. The
  *  refund and the refusals are {@link removeFacility}'s, the one removal path
- *  the editor and the bulldozer share. */
+ *  the editor and the bulldozer share. A floor or column that is not a whole
+ *  number is refused before anything moves (#996). */
 export function sellAt(sim: Simulation, floor: number, x: number): boolean {
+  if (!whole(floor) || !whole(x)) return false;
   const t = sim.tower.transportAt(floor, x);
   const u = sim.tower.unitAt(floor, x);
   // Prefer removing a room over the transport/floor beneath it.

@@ -41,6 +41,14 @@ describe("vendored icon paths are generated from pixelarticons", () => {
     ).toEqual([]);
   });
 
+  it("names the installed pixelarticons version in its header, which the notices list (#974)", () => {
+    const header = readFileSync(resolve(here, "iconPaths.generated.ts"), "utf8").slice(0, 400);
+    const pinned = /\bfrom pixelarticons@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/.exec(header)?.[1];
+    const pkg = resolve(here, "..", "..", "node_modules", "pixelarticons", "package.json");
+    const installed = (JSON.parse(readFileSync(pkg, "utf8")) as { version: string }).version;
+    expect(pinned, `iconPaths.generated.ts copies pixelarticons@${pinned}, but ${installed} is installed; re-run scripts/gen-icon-paths.ts`).toBe(installed);
+  });
+
   it("maps every source to path data (no empty or missing entry)", () => {
     for (const name of Object.keys(VENDORED_ICON_SOURCES)) {
       expect(VENDORED_ICON_PATHS[name]?.length, `${name} has no generated path`).toBeGreaterThan(0);

@@ -9,6 +9,7 @@ import {
   PHRASE_VAR_S,
   PHRASE_RAMP_S,
 } from "./toneCrowdData";
+import { VOICE_LAUGHS_SEED, VOICE_TALK_SEED } from "./audioAssets";
 
 /**
  * The voice half of the crowd layer: the two seed recordings (talk and
@@ -40,7 +41,7 @@ export class CrowdVoices {
    *  context exists; a failed fetch or decode leaves the layer tone-only. */
   load(baseUrl: string): void {
     try {
-      this.talk = new Tone.ToneAudioBuffer(`${baseUrl}audio/voice-talk.mp3`, () => {
+      this.talk = new Tone.ToneAudioBuffer(`${baseUrl}${VOICE_TALK_SEED}`, () => {
         try {
           const buf = this.talk?.get();
           if (!buf || this.disposed) return;
@@ -51,7 +52,7 @@ export class CrowdVoices {
           this.talkMask = null; // undecodable seed: stay tone-only
         }
       });
-      this.laughs = new Tone.ToneAudioBuffer(`${baseUrl}audio/voice-laughs.mp3`, () => {});
+      this.laughs = new Tone.ToneAudioBuffer(`${baseUrl}${VOICE_LAUGHS_SEED}`, () => {});
     } catch {
       this.talk = this.laughs = null;
     }

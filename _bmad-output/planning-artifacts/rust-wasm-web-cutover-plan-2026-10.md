@@ -205,8 +205,17 @@ Decided:
 
 Still open (risks, no decision needed yet):
 
-- **Offline play at the flip.** The engine package is left out of the
-  offline precache today; decision 6 sets the rule and #985 tracks the work.
+- **Offline play at the flip.** Decision 6 sets the rule and #985 tracks the
+  work. 2.32.0 (#993) is a partial slice: it precaches the engine package with
+  the game shell for every player (owner decision), so an installed game
+  reopened in the same browser context starts the engine offline and saves
+  and loads on it. It does not meet decision 6. Still open on #985: a cold
+  start in a fresh browser session, today's sounds offline, recovering a save
+  made online, the engine glue, binary and `BUILD.json` checked as one
+  version-matched set (a shell cached before 2.32.0 never precached the
+  engine, so until it updates it pairs its old shell with whatever engine the
+  network serves), the precache coverage rule, an e2e that serves a second
+  deploy, install interruption, and cache eviction.
 - **Save format bumps.** The copy catalog (row 6) bumps the save version; it
   does not ship in the flip release, so a rollback can still read every save
   (AD-5).
