@@ -36,7 +36,7 @@ fn main() {
             let v = if crowd {
                 sim.crowd.view()
             } else {
-                verticopolis_engine::scenario::state_view(&sim)
+                verticopolis_engine::snapshot::state_view(&sim)
             };
             println!("{}", canonical_json(&v));
         }

@@ -571,7 +571,7 @@ impl Tower {
         if !(MIN_FLOOR..=MAX_FLOOR).contains(&floor) {
             return Some("Outside the buildable range.".into());
         }
-        if x < 0 || x + f.width > LOT_WIDTH {
+        if x < 0 || x.saturating_add(f.width) > LOT_WIDTH {
             return Some("Off the edge of the lot.".into());
         }
         if kind == Kind::WeddingHall && floor != 100 {
@@ -618,7 +618,7 @@ impl Tower {
         if !(MIN_FLOOR..=MAX_FLOOR).contains(&floor) {
             return PlaceResult::fail("Outside the buildable range.");
         }
-        if x < 0 || x + f.width > LOT_WIDTH {
+        if x < 0 || x.saturating_add(f.width) > LOT_WIDTH {
             return PlaceResult::fail("Off the edge of the lot.");
         }
         if f.transport {
@@ -687,7 +687,7 @@ impl Tower {
         if !(MIN_FLOOR..=MAX_FLOOR).contains(&floor) {
             return PlaceResult::fail("Outside the buildable range.");
         }
-        if x < 0 || x + f.width > LOT_WIDTH {
+        if x < 0 || x.saturating_add(f.width) > LOT_WIDTH {
             return PlaceResult::fail("Off the edge of the lot.");
         }
         if kind == Kind::Lobby && !is_lobby_floor(floor) {
@@ -962,7 +962,7 @@ impl Tower {
 
     fn span_reason(&self, kind: Kind, bottom: i64, top: i64) -> Option<String> {
         let max_span = kind.max_span();
-        if top - bottom <= max_span {
+        if top.saturating_sub(bottom) <= max_span {
             return None;
         }
         if kind.is_fixed_span() {
@@ -988,7 +988,7 @@ impl Tower {
         if top <= bottom {
             return PlaceResult::fail("Transport needs height.");
         }
-        if x < 0 || x + f.width > LOT_WIDTH {
+        if x < 0 || x.saturating_add(f.width) > LOT_WIDTH {
             return PlaceResult::fail("Off the edge of the lot.");
         }
         if let Some(r) = self.span_reason(kind, bottom, top) {
