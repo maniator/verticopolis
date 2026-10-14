@@ -138,6 +138,7 @@ describe("a structural tile far off the lot (#1003)", () => {
   // off the lot, and the answer is the same refusal as before.
   it("refuses at once with the lot-edge reason and plans no bridge", () => {
     const sim = foundedWithLobby();
+    expect(sim.autoBridge).toBe(true);
     const started = performance.now();
     for (const kind of ["floor", "lobby"] as const) {
       for (const x of [2_147_483_647, -2_147_483_648, GRID.width, -1]) {
@@ -152,12 +153,38 @@ describe("a structural tile far off the lot (#1003)", () => {
     expect(performance.now() - started).toBeLessThan(2_000);
   });
 
-  it("plans no bridge outside the floor range, and the same bridge as before inside it", () => {
+  it("plans no bridge for a footprint partly off the lot or above the top floor", () => {
     const sim = foundedWithLobby();
-    expect(sim.canBuild("floor", GRID.maxFloor + 1, C).reason).toBe("Outside the buildable range.");
-    expect(sim.tower.bridgeFillPlan("floor", GRID.maxFloor + 1, C, 1, 1)).toEqual([]);
-    expect(sim.tower.bridgeFillPlan("floor", GRID.minFloor - 1, C, 1, 1)).toEqual([]);
-    // On the lot, a lobby a few tiles past the strip still bridges the gap.
-    expect(sim.tower.bridgeFillPlan("lobby", 1, C + 30, FACILITIES.lobby.width, 1).length).toBeGreaterThan(0);
+    sim.star = 5;
+    expect(sim.autoBridge).toBe(true);
+    for (const floor of [GRID.maxFloor + 1, GRID.minFloor - 1]) {
+      expect(sim.canBuild("floor", floor, C).reason).toBe("Outside the buildable range.");
+      expect(sim.tower.bridgeFillPlan("floor", floor, C, 1, 1)).toEqual([]);
+    }
+    // Structure just outside the floor range that the old scan would have
+    // bridged to: a floor tile below the lowest basement, and one above the
+    // top floor resting on structure. The plan still has no tiles there.
+    const [low, high] = [GRID.minFloor - 1, GRID.maxFloor + 1];
+    sim.tower.structKind.set(sim.tower.key(low, C - 3), "floor");
+    sim.tower.structKind.set(sim.tower.key(high, C - 3), "floor");
+    for (const x of [C - 2, C - 1]) sim.tower.structure.set(sim.tower.key(high - 1, x), 0);
+    expect(sim.tower.bridgeFillPlan("floor", low, C, 1, 1)).toEqual([]);
+    expect(sim.tower.bridgeFillPlan("floor", high, C, 1, 1)).toEqual([]);
+    // A room whose footprint runs past the lot edge by one tile.
+    const office = FACILITIES.office.width;
+    expect(sim.canBuild("office", 2, GRID.width - office + 1).reason).toBe("Off the edge of the lot.");
+    expect(sim.tower.bridgeFillPlan("office", 2, GRID.width - office + 1, office, 1)).toEqual([]);
+    // A two-story room whose top story would sit above the top floor.
+    expect(sim.canBuild("cinema", GRID.maxFloor, C).reason).toBe("Not enough floors above for this facility.");
+    expect(sim.tower.bridgeFillPlan("cinema", GRID.maxFloor, C, FACILITIES.cinema.width, 2)).toEqual([]);
+  });
+
+  it("plans the same bridge as before on the lot", () => {
+    // The strip covers [C, C + 24); a lobby at C + 30 bridges exactly the six
+    // tiles between them, nearest the strip last (laid outward from it).
+    const sim = foundedWithLobby();
+    const plan = sim.tower.bridgeFillPlan("lobby", 1, C + 30, FACILITIES.lobby.width, 1);
+    expect(plan.map((t) => t.x).sort((a, b) => a - b)).toEqual([24, 25, 26, 27, 28, 29].map((d) => C + d));
+    expect(plan.every((t) => t.fl === 1)).toBe(true);
   });
 });
