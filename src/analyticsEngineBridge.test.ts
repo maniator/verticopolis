@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { sendToRelay } from "./analyticsRelay";
 import { gameplaySession } from "./analytics";
 import { Simulation } from "./engine/Simulation";
 import type { SerializedGame } from "./engine/serializedGame";
+import { RATE_LIMIT_MAX } from "./analyticsRateLimit";
 import {
   BRIDGE_SEND_LIMIT,
+  REMOVAL_SEND_LIMIT,
   bindEngineBridge,
   drainEngineEvents,
   engineBridgeStats,
@@ -34,6 +39,7 @@ function propsFor(name: string): unknown[] {
 const founded = (mode = "classic") => ({ name: "tower_founded", payload: { mode } });
 const placed = (kind: string, floor: number, count = 1) => ({ name: "facility_placed", payload: { kind, floor, count } });
 const star = (s: number) => ({ name: "star_reached", payload: { star: s } });
+const removed = (kind: string, method: string) => ({ name: "facility_removed", payload: { kind, method } });
 const resolved = (kind: string, decision: string, source: string) => ({ name: "emergency_resolved", payload: { kind, decision, source } });
 
 /** A drain source over a fixed queue. */
@@ -78,13 +84,33 @@ describe("analytics engine bridge", () => {
     ]);
   });
 
-  it("sends nothing for a removal or a milestone yet (demolish stays on the shell until #928)", () => {
+  it("sends every removal as demolish with its method, and nothing for a milestone yet", () => {
     forwardGameplayEvents([
-      { name: "facility_removed", payload: { kind: "office", method: "sell" } },
+      removed("office", "sell"),
+      removed("stairs", "bulldoze"),
+      removed("office", "bulldoze"),
       { name: "milestone_reached", payload: { id: "pop-500" } },
     ]);
-    expect(sent()).toEqual([]);
+    expect(sent()).toEqual([
+      ["economy_action", { action: "demolish", detail: "sell" }],
+      ["economy_action", { action: "demolish", detail: "bulldoze" }],
+      ["economy_action", { action: "demolish", detail: "bulldoze" }],
+    ]);
     expect(engineBridgeStats().rejected).toBe(0);
+  });
+
+  it("gives removals their own budget, larger than a wire name's", () => {
+    expect(REMOVAL_SEND_LIMIT).toBeGreaterThan(BRIDGE_SEND_LIMIT);
+    // Two misaligned windows can put twice the budget in one ingest window.
+    expect(2 * REMOVAL_SEND_LIMIT).toBeLessThan(RATE_LIMIT_MAX);
+    const now = 1_000;
+    // A bulldozer drag runs on its own budget, past a wire name's.
+    for (let i = 0; i < REMOVAL_SEND_LIMIT + 3; i++) forwardGameplayEvents([removed("office", "bulldoze")], now);
+    expect(propsFor("economy_action")).toHaveLength(REMOVAL_SEND_LIMIT);
+    expect(engineBridgeStats().rateLimited).toBe(3);
+    // A new minute refills it.
+    forwardGameplayEvents([removed("office", "sell")], now + 60_000);
+    expect(propsFor("economy_action")).toHaveLength(REMOVAL_SEND_LIMIT + 1);
   });
 
   it("reports a timed-out emergency as nothing, and the decision that took effect", () => {
@@ -250,6 +276,17 @@ describe("analytics engine bridge", () => {
     expect(sent()).toEqual([["star_reached", { star: 4 }]]);
   });
 
+  it("refills the removal budget when a window closes", () => {
+    bindEngineBridge(() => source([]));
+    for (let i = 0; i <= REMOVAL_SEND_LIMIT; i++) forwardGameplayEvents([removed("office", "bulldoze")], 5);
+    expect(propsFor("economy_action")).toHaveLength(REMOVAL_SEND_LIMIT);
+    expect(engineBridgeStats().rateLimited).toBe(1);
+    gameplaySession.startEpoch();
+    vi.mocked(sendToRelay).mockReset();
+    forwardGameplayEvents([removed("office", "sell")], 5);
+    expect(sent()).toEqual([["economy_action", { action: "demolish", detail: "sell" }]]);
+  });
+
   it("counts a build the player then undid", () => {
     // Undo swaps in the earlier save; its own events are none, and the undone
     // build was already drained (or rides the hand-off), so it still counts.
@@ -265,6 +302,36 @@ describe("analytics engine bridge", () => {
     expect(propsFor("new_game_started")).toEqual([{ mode: "classic" }]);
     expect(propsFor("first_build")).toEqual([{ tool: "lobby" }]);
     expect(propsFor("session_builds")).toEqual([{ builds: 4 }]);
+  });
+
+  it("is the only sender of demolish: no shell code reports a removal itself", () => {
+    // A shell call next to the bridge's fold would send every removal twice.
+    // Every source file but the bridge itself; tests and the type that names
+    // the action are left out by the pattern, which looks for the value as code.
+    const src = dirname(fileURLToPath(import.meta.url));
+    const files = readdirSync(src, { recursive: true, encoding: "utf8" })
+      .map((f) => f.replace(/\\/g, "/")) // Windows joins with backslashes
+      .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.endsWith(".d.ts"))
+      .filter((f) => f !== "analyticsEngineBridge.ts");
+    expect(files).toContain("game/buildActions.ts");
+    const senders = files.filter((f) => /["'`]demolish["'`]\s*[,)};]/.test(readFileSync(resolve(src, f), "utf8")));
+    expect(senders).toEqual([]);
+  });
+
+  it("counts a removal the player then undid", () => {
+    const sim = Simulation.newGame(6, "classic");
+    sim.money = 1e9;
+    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    for (let x = 170; x < 200; x++) expect(sim.build("floor", 2, x).ok).toBe(true);
+    expect(sim.build("office", 2, 180).ok).toBe(true);
+    drainEngineEvents(sim);
+    vi.mocked(sendToRelay).mockReset();
+    const before = sim.serialize();
+    expect(sim.removeFacility(sim.tower.unitAt(2, 180)!.id, "bulldoze").ok).toBe(true);
+    const undone = Simulation.deserialize(JSON.parse(JSON.stringify(before)) as SerializedGame);
+    undone.gameplayEvents.inherit(sim.gameplayEvents); // what adoptSim does
+    drainEngineEvents(undone);
+    expect(sent()).toEqual([["economy_action", { action: "demolish", detail: "bulldoze" }]]);
   });
 
   it("counts a fold that throws and folds the rest of the batch", () => {
