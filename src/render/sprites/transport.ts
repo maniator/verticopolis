@@ -2,6 +2,7 @@ import { isElevatorKind } from "../../engine/facilities";
 import { facilityColor } from "../../presentation/facilityPresentation";
 import type { FacilityKind, Transport } from "../../engine/types";
 import { personRider } from "../pixelSprites/common";
+import { layerBreak, layerEnd } from "../pixelSprites/layers";
 import type { CarArrow } from "../carIndicator";
 import { shade, shadeAlpha } from "./common";
 
@@ -366,6 +367,10 @@ export function drawCar(
     ctx.fillStyle = shade(accent, 120);
     ctx.fillRect(2, floorH - 5, cw - 4, 1);
   }
+  // The cab is the back; its riders are the furniture, and the door frames,
+  // the center seam, the FULL bar and the lantern drawn over them are the
+  // front (depth layers, `pixelSprites/layers.ts`).
+  layerBreak(ctx);
   // Riders stand on the cab floor as the 17px rider silhouette, packed tighter
   // as the car fills so a crowded cab reads at a glance. `riders` is the car's
   // load from the caller; the passenger FILL reconciliation is the people-system
@@ -379,6 +384,7 @@ export function drawCar(
       personRider(ctx, rx, floorH - 3, (p * 13 + seed) | 0);
     }
   }
+  layerEnd(ctx);
   // Door frames + the central seam, drawn over the riders so the cab reads as
   // an enclosed car.
   ctx.fillStyle = "rgba(40,44,54,0.24)";

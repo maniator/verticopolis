@@ -111,6 +111,9 @@ export interface DepthLayers {
   shell: Placed[];
   furniture: Placed[];
   soft?: Placed[];
+  /** A vehicle's front (its body around the windows, a cab's door frames),
+   *  drawn after the furniture. Frames with a front carry no `soft`. */
+  front?: Placed[];
   chains?: Record<string, DepthLayerChain>;
 }
 
@@ -121,6 +124,8 @@ export interface DepthLayerChain {
   shell: LayerRef[];
   furniture: LayerRef[];
   soft?: LayerRef[];
+  /** Steps over the front; present with it. */
+  front?: LayerRef[];
 }
 
 export interface AnimationRecord {

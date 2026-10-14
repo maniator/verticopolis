@@ -532,12 +532,12 @@ function buildInsights(ids) {
     // "which player bulldozed" is NOT. No currency amounts are ever collected.
     {
       name: "Economy actions by type",
-      description: "economy_action broken down by action: demolish (per action) vs the latched price_tune / capacity_tune bits, production, 30d. COOKIELESS session counts.",
+      description: "economy_action broken down by action: demolish (per action; from 2.31.2 at most 40 per page in each one-minute window, so a heavy bulldozer clear is undercounted) vs the latched price_tune / capacity_tune bits, production, 30d. COOKIELESS session counts.",
       query: trends([series("economy_action", "Economy actions")], { breakdown: "action", display: "ActionsTable", breakdownLimit: 10 }),
     },
     {
       name: "Demolitions: sell vs bulldoze",
-      description: "economy_action demolish split by method (sell / bulldoze), production. Does removal happen via the editor Sell or the bulldozer.",
+      description: "economy_action demolish split by method (sell / bulldoze), production. Does removal happen via the editor Sell or the bulldozer. From 2.31.2 capped at 40 per page in each one-minute window, which trims bulldoze more than sell.",
       query: trends([series("economy_action", "Demolitions")], { breakdown: "detail", display: "ActionsPie", where: [inAction(["demolish"])] }),
     },
     {
