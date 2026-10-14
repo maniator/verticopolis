@@ -253,9 +253,9 @@ export function bootGame(create: () => BootApp): Promise<void> {
         try {
           workerHost = startWorkerHost(app as unknown as WasmHostApp, engineWorker, () => spawnEngineWorker(makeBrowserWorker, enginePackageUrl()));
           engineWorker = null; // the host owns it now
-          // A refused first tower is reported on the status, not thrown; it
-          // stays on TypeScript, recorded as the main-thread host records it
-          // (#874). The host follows every later adopt either way.
+          // startWorkerHost reports a refused first tower on its status. That
+          // tower stays on TypeScript, recorded as the main-thread host records
+          // it (#874); the host follows every later adopt either way.
           const { hosted, errors } = workerHost.status;
           bootState = hosted ? { ...bootState, engine: "wasm" } : failBoot(bootState, "start", errors[errors.length - 1] ?? "the worker host did not take the first tower");
           publishBootState(bootState);
@@ -345,9 +345,9 @@ export function bootGame(create: () => BootApp): Promise<void> {
       // defensively rather than render "undefined"; the original error is still
       // rethrown untouched.
       const message = err instanceof Error ? err.message : String(err);
-      // An engine that had started is let go above, so the published state
-      // stops claiming it.
-      if (bootState.engine === "wasm" && !bootState.failure) {
+      // The worker host that had started is let go above, so the published
+      // state stops claiming it.
+      if (workerHost && bootState.engine === "wasm" && !bootState.failure) {
         bootState = failBoot(bootState, "start", message);
         publishBootState(bootState);
       }
