@@ -1,3 +1,4 @@
+import { settleEngine } from "../wasmhost/stepGate";
 import { Simulation } from "../engine/Simulation";
 import type { GameMode, SerializedView } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
@@ -159,6 +160,10 @@ export class SaveLoad {
         // Re-stamp per iteration: the camera may have moved while the
         // previous async compression was in flight.
         this.stampView(sim);
+        // The experimental worker host answers `serialize` from the engine
+        // only once its read model has caught up; wait for that here, where
+        // waiting costs nothing (no-op on every other engine).
+        await settleEngine(sim);
         await SaveGame.saveAsync(sim);
       } while (this.autosaveQueued);
     } catch {

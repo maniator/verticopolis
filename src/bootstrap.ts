@@ -6,7 +6,8 @@ import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
 import { dualRunRequested, startDualRun, type DualRunApp } from "./dualrun/dualRun";
 import { engineRequested } from "./wasmhost/engineChoice";
-import { loadWasmEngine, startWasmHost, type WasmHostApp } from "./wasmhost/startWasmHost";
+import { enginePackageUrl, loadWasmEngine, startWasmHost, type WasmHostApp } from "./wasmhost/startWasmHost";
+import { makeBrowserWorker, spawnEngineWorker, startWorkerHost, type SpawnedWorker } from "./wasmhost/workerController";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { refreshSplashVersion } from "./wasmhost/engineLabel";
 import type { WasmModule } from "./dualrun/binding";
@@ -159,19 +160,39 @@ export function bootGame(create: () => BootApp): Promise<void> {
     // before the app exists, so the first tower is hosted before its first
     // tick; a package that fails to load leaves the game on the TypeScript
     // engine with the reason in the console.
+    // `wasm-frame` and `wasm-worker` are experimental hosts of the same
+    // engine, for measurement only (docs/architecture/wasm-worker-host.md).
+    // The worker host never loads the engine on the main thread: the worker
+    // loads it and answers ready before the app exists, for the same reason.
+    const choice = engineRequested();
     let wasmModule: WasmModule | null = null;
-    if (engineRequested() === "wasm") {
+    let engineWorker: SpawnedWorker | null = null;
+    if (choice === "wasm" || choice === "wasm-frame") {
       try {
         wasmModule = await loadWasmEngine();
       } catch (e) {
         console.error("[wasm] the engine package did not load; running on the TypeScript engine:", e);
       }
+    } else if (choice === "wasm-worker") {
+      try {
+        engineWorker = await spawnEngineWorker(makeBrowserWorker, enginePackageUrl());
+      } catch (e) {
+        console.error("[wasm-worker] the engine worker did not start; running on the TypeScript engine:", e);
+      }
     }
     try {
       const app = create();
+      if (engineWorker) {
+        try {
+          startWorkerHost(app as unknown as WasmHostApp, engineWorker, () => spawnEngineWorker(makeBrowserWorker, enginePackageUrl()));
+          refreshSplashVersion();
+        } catch (e) {
+          console.error("[wasm-worker] did not start; running on the TypeScript engine:", e);
+        }
+      }
       if (wasmModule) {
         try {
-          startWasmHost(app as unknown as WasmHostApp, wasmModule);
+          startWasmHost(app as unknown as WasmHostApp, wasmModule, console, { sync: choice === "wasm-frame" ? "frame" : "step" });
           // Saves are written through the engine too (same bytes, #935).
           if (wasmModule.encodeVctower) setEngineWriter(wasmModule.encodeVctower);
           refreshSplashVersion(); // the title screen mounted before the host started

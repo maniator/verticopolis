@@ -1,6 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
 import { checkBinding, type WasmModule } from "../dualrun/binding";
-import { attachWasmHost, type WasmHost } from "./wasmHost";
+import { attachWasmHost, type WasmHost, type WasmHostOptions } from "./wasmHost";
 
 /**
  * The app side of the WASM switch: load the browser package, host the
@@ -47,7 +47,7 @@ export async function loadWasmEngine(url = enginePackageUrl()): Promise<WasmModu
   return checkBinding(mod);
 }
 
-export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Console, "info" | "error"> = console): WasmHostHandle {
+export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Console, "info" | "error"> = console, options: WasmHostOptions = {}): WasmHostHandle {
   const status: WasmHostStatus = { engine: "wasm", starts: 0, hosted: false, errors: [] };
   let host: WasmHost | null = null;
   const noteError = (message: string) => {
@@ -71,7 +71,7 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
   const follow = (sim: Simulation) => {
     release();
     try {
-      host = attachWasmHost(sim, mod);
+      host = attachWasmHost(sim, mod, options);
       status.starts++;
       status.hosted = true;
       log.info(`[wasm] tower ${status.starts} runs on the WASM engine`);

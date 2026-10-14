@@ -9,7 +9,7 @@ import { APP_VERSION } from "../appVersion";
  * from the title screen which engine they are on without opening the console.
  */
 interface EngineHandle {
-  status: { hosted: boolean };
+  status: { hosted: boolean; placement?: "worker" };
 }
 
 /** The engine the current tower runs on: "wasm" while the WASM host has a
@@ -20,8 +20,10 @@ export function activeEngine(g: { __vcEngine?: EngineHandle } = globalThis as { 
 }
 
 /** The suffix the version lines append: empty on the default engine. */
-export function engineSuffix(g?: { __vcEngine?: EngineHandle }): string {
-  return activeEngine(g) === "wasm" ? " · WASM engine" : "";
+export function engineSuffix(g: { __vcEngine?: EngineHandle } = globalThis as { __vcEngine?: EngineHandle }): string {
+  if (activeEngine(g) !== "wasm") return "";
+  // The experimental worker host says so, so a tester can tell the two apart.
+  return g.__vcEngine?.status.placement === "worker" ? " · WASM engine (worker)" : " · WASM engine";
 }
 
 /** The full version line, "v2.29.0" or "v2.29.0 · WASM engine". */

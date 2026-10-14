@@ -1,3 +1,4 @@
+import { settleEngine } from "../wasmhost/stepGate";
 import type { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
 import type { UI } from "../ui/UI";
@@ -73,6 +74,7 @@ export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simul
     // stampView FIRST: the export must carry the live camera, or towers
     // export at a stale view.
     stampView(sim);
+    await settleEngine(sim); // the worker host's exact save (no-op otherwise)
     const file = await SaveGame.export(sim);
     deps.ui.downloadFile(SaveGame.exportFilename(sim), file);
     // The container is pure ASCII, so string length == bytes on disk.

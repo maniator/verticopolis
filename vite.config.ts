@@ -514,6 +514,9 @@ export default defineConfig({
         // the shadow engine and the command vocabulary are measured and
         // tested in Node (the controller against a worker stand-in).
         "src/dualrun/worker.ts",
+        // The engine worker's entry point, for the same reason: the glue
+        // around EngineWorkerCore, which is measured and tested in Node.
+        "src/wasmhost/engineWorker.ts",
         // The atlas bake's browser half: the page API the export script
         // drives and the pixel checks, all of which read pixels back from a
         // live canvas (getImageData). The pipeline they call (bake, compose,
