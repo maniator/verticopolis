@@ -62,6 +62,21 @@ describe("gameplay event buffer", () => {
     expect(declared?.replace(/_/g, "")).toBe(String(GAMEPLAY_RING_CAP));
   });
 
+  it("restores a handed-back batch and its drop count in place of what it held", () => {
+    const buf = new GameplayEventBuffer();
+    buf.push("star_reached", { star: 2 }); // discarded by the restore
+    buf.dropped = 9;
+    const batch = [{ name: "fire_started", payload: {} }, { name: "star_reached", payload: { star: 3 } }] as const;
+    buf.restore([...batch], 4);
+    expect(buf.dropped).toBe(4);
+    expect(buf.drain()).toEqual(batch);
+    // A batch longer than the ring keeps the newest and counts the rest.
+    const long = Array.from({ length: GAMEPLAY_RING_CAP + 2 }, (_, i) => ({ name: "star_reached" as const, payload: { star: i } }));
+    buf.restore(long, 1);
+    expect(buf.dropped).toBe(3);
+    expect(buf.drain()[0]).toEqual({ name: "star_reached", payload: { star: 2 } });
+  });
+
   it("inherits a replaced tower's owed events and drop count ahead of its own", () => {
     const old = tower();
     expect(old.build("office", 2, 180).ok).toBe(true);

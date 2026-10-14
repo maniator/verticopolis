@@ -54,7 +54,7 @@ function fakes() {
         toasts.push({ text, kind });
       },
       sayVisibly: vi.fn(),
-      downloadFile: () => Promise.resolve(),
+      downloadFile: () => true,
       showImportReport: () => {},
       showExportReport: () => {},
     },

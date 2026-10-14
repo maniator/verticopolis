@@ -2,6 +2,7 @@ import type { Simulation } from "../Simulation";
 
 import { rentOf, rentConfig } from "../econConfig";
 import { ladderRungFor, priceNeutral, snapToLadder } from "../gameRules";
+import { whole } from "../request";
 
 import type { FacilityKind, Unit } from "../types";
 
@@ -59,7 +60,7 @@ export function priceUnit(sim: Simulation, u: Unit, target: number): number | nu
  * Returns true when the unit is now off-market.
  */
 export function setNoRate(sim: Simulation, id: number): boolean {
-  const u = sim.tower.getUnit(id);
+  const u = whole(id) ? sim.tower.getUnit(id) : undefined; // a non-whole id is refused (#996)
   if (!u) return false;
   const opts = sim.rules.priceOptions(u.kind);
   if (!opts || opts.shape !== "ladder" || !opts.noRate) return false;
@@ -73,8 +74,10 @@ export function setNoRate(sim: Simulation, id: number): boolean {
 /** Nudge a unit's price one step, offices/hotels any time, condos only while
  *  unsold: one band step in Modern, one rung up or down the ladder in Classic
  *  (so any residual nudge caller stays on the canon rungs). Returns the new
- *  price, or null if not adjustable. */
+ *  price, or null if not adjustable. A non-whole id, or a `dir` other than
+ *  exactly 1 or -1, is refused with null before anything moves (#996). */
 export function adjustRent(sim: Simulation, id: number, dir: 1 | -1): number | null {
+  if (!whole(id) || (dir !== 1 && dir !== -1)) return null;
   const u = sim.tower.getUnit(id);
   if (!u) return null;
   const cfg = rentConfig(u.kind);

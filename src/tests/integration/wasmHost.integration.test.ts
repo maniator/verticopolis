@@ -217,6 +217,70 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     expect(() => host.engine.mode()).toThrow(); // freed
   });
 
+  it("counts a batch it cannot read as dropped, while hosted and at detach", () => {
+    const sim = Simulation.newGame(47, "classic");
+    const host = attachWasmHost(sim, wasm());
+    const engine = host.engine as { drainGameplayEvents: () => string };
+    const real = engine.drainGameplayEvents.bind(engine);
+    const garbled = () => real().slice(0, -1); // the engine's batch, cut short
+    sim.money = 1e9;
+    sim.drainGameplayEvents(); // the founding
+    // Four placements whose batch arrives unreadable are lost, and counted.
+    for (let x = 170; x < 174; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    engine.drainGameplayEvents = garbled;
+    expect(sim.drainGameplayEvents()).toEqual([]);
+    expect(sim.gameplayEventsDropped).toBe(4);
+    // The next batch reads again.
+    engine.drainGameplayEvents = real;
+    expect(sim.build("lobby", 1, 174).ok).toBe(true);
+    expect(sim.drainGameplayEvents()).toEqual([{ name: "facility_placed", payload: { kind: "lobby", floor: 1, count: 1 } }]);
+    // At detach the instance keeps the count, two more included.
+    for (let x = 175; x < 177; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    engine.drainGameplayEvents = garbled;
+    host.detach();
+    expect(sim.drainGameplayEvents()).toEqual([]);
+    expect(sim.gameplayEventsDropped).toBe(6);
+  });
+
+  it("keeps an unreadable batch's loss when the engine traps at detach", () => {
+    const sim = Simulation.newGame(48, "classic");
+    const host = attachWasmHost(sim, wasm());
+    const engine = host.engine as { drainGameplayEvents: () => string };
+    const real = engine.drainGameplayEvents.bind(engine);
+    sim.money = 1e9;
+    sim.drainGameplayEvents(); // the founding
+    for (let x = 170; x < 173; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    engine.drainGameplayEvents = () => real().slice(0, -1);
+    expect(sim.drainGameplayEvents()).toEqual([]); // three lost to an unreadable batch
+    for (let x = 173; x < 175; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    engine.drainGameplayEvents = () => {
+      throw new Error("unreachable executed");
+    };
+    expect(() => host.detach()).toThrow(/unreachable/);
+    // The three counted while hosted, and the two the trap took, estimated
+    // from the read model's copies.
+    expect(sim.drainGameplayEvents()).toEqual([]);
+    expect(sim.gameplayEventsDropped).toBe(5);
+  });
+
+  it("counts what a trap took while hosted once the host lets go", () => {
+    const sim = Simulation.newGame(49, "classic");
+    const host = attachWasmHost(sim, wasm());
+    sim.money = 1e9;
+    sim.drainGameplayEvents(); // the founding
+    for (let x = 170; x < 173; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    (host.engine as { drainGameplayEvents: () => string }).drainGameplayEvents = () => {
+      throw new Error("unreachable executed");
+    };
+    expect(() => sim.drainGameplayEvents()).toThrow(/unreachable/); // the bridge counts a failed drain
+    for (let x = 173; x < 175; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    expect(() => host.detach()).toThrow(/unreachable/);
+    // All five, estimated from the read model's copies, the three from the
+    // hosted trap included.
+    expect(sim.drainGameplayEvents()).toEqual([]);
+    expect(sim.gameplayEventsDropped).toBe(5);
+  });
+
   // A paused player builds, then undoes before anything drains: the app swaps
   // in the restored tower and the host follows it. The events the engine
   // still owed reach the restored tower ahead of its own, once; the
