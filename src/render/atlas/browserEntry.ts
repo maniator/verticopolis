@@ -2,7 +2,8 @@ import { bake, type BakeResult, type Renderer } from "./bake";
 import { roomJobs, type Job } from "./catalog";
 import { facadeJobs, peopleJobs, skyJobs, structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
 import { paint, type PaintSpec } from "./paint";
-import type { Image } from "./pixels";
+import { sceneryJobs } from "./scenery";
+import { LayerError, type Image } from "./pixels";
 import { shellMarks } from "./shellMarks";
 import { withLayerHook } from "../pixelSprites/layers";
 import { SAMPLES, type Sample } from "./samples";
@@ -24,7 +25,7 @@ bindViewWorld(catalogFor("modern").world);
 
 /** Every job the atlas bakes, in a fixed order. */
 export function allJobs(): Job[] {
-  return [...roomJobs(), ...structureJobs(), ...transportJobs(), ...peopleJobs(), ...facadeJobs(), ...vehicleJobs(), ...skyJobs()];
+  return [...roomJobs(), ...structureJobs(), ...transportJobs(), ...peopleJobs(), ...facadeJobs(), ...vehicleJobs(), ...skyJobs(), ...sceneryJobs()];
 }
 
 /** A 2D context for `canvas` at `w` x `h`, cleared and prepared like an
@@ -69,6 +70,7 @@ function copyPixels(dst: CanvasRenderingContext2D, src: HTMLCanvasElement): void
 export function canvasRenderer(doc: Document): Renderer {
   const canvas = doc.createElement("canvas");
   const saved = doc.createElement("canvas");
+  const aside = doc.createElement("canvas");
   return {
     render(spec: PaintSpec, w: number, h: number): Image {
       const ctx = prepare(canvas, w, h);
@@ -86,16 +88,52 @@ export function canvasRenderer(doc: Document): Renderer {
     renderShell(spec: PaintSpec, w: number, h: number): Image | null {
       const ctx = prepare(canvas, w, h);
       const store = prepare(saved, w, h);
+      const spare = prepare(aside, w, h);
       const marks = shellMarks(
         () => copyPixels(store, canvas),
         () => copyPixels(ctx, saved),
+        // Shell art among the furniture: paint it on the shell kept aside
+        // (swapped onto the canvas, since the paint holds the canvas's
+        // context), then on the canvas as the flat frame has it.
+        (draw) => {
+          copyPixels(spare, canvas);
+          copyPixels(ctx, saved);
+          draw();
+          copyPixels(store, canvas);
+          copyPixels(ctx, aside);
+          draw();
+        },
       );
       withLayerHook(marks.hook, () => paint(ctx, spec, w, h));
       const split = marks.finish();
       ctx.restore();
       store.restore();
+      spare.restore();
       if (!split) return null;
       return { w, h, data: ctx.getImageData(0, 0, w, h).data };
+    },
+    // For a vehicle: the canvas at the break (the back) and at the end of the
+    // furniture (the back plus the riders); what the paint draws after the
+    // end is its front, which the bake takes from the flat frame.
+    renderSplit(spec: PaintSpec, w: number, h: number): { back: Image; mid: Image } | null {
+      const ctx = prepare(canvas, w, h);
+      const back = prepare(saved, w, h);
+      const mid = prepare(aside, w, h);
+      const marks = shellMarks(
+        () => copyPixels(back, canvas),
+        () => copyPixels(mid, canvas),
+        // No vehicle draws shell art among its riders; it would land on them.
+        () => {
+          throw new LayerError("layerShell in a vehicle's paint");
+        },
+      );
+      withLayerHook(marks.hook, () => paint(ctx, spec, w, h));
+      const split = marks.finish();
+      ctx.restore();
+      back.restore();
+      mid.restore();
+      if (!split) return null;
+      return { back: { w, h, data: back.getImageData(0, 0, w, h).data }, mid: { w, h, data: mid.getImageData(0, 0, w, h).data } };
     },
     // The same paint once more: at the break the canvas is cleared, so the
     // furniture lands on transparency with its own glows and shadows; at the
@@ -117,7 +155,18 @@ export function canvasRenderer(doc: Document): Renderer {
           ctx.globalCompositeOperation = "source-atop";
         };
       };
-      const marks = shellMarks(() => copyPixels(ctx, saved), atop);
+      // Shell art among the furniture belongs to the shell, so here it only
+      // cuts away the furniture it covers (the curb over the machines' feet).
+      const onShell = (draw: () => void) => {
+        const prev = ctx.globalCompositeOperation;
+        ctx.globalCompositeOperation = "destination-out";
+        try {
+          draw();
+        } finally {
+          ctx.globalCompositeOperation = prev;
+        }
+      };
+      const marks = shellMarks(() => copyPixels(ctx, saved), atop, onShell);
       let split: boolean;
       try {
         withLayerHook(marks.hook, () => paint(ctx, spec, w, h));
@@ -157,7 +206,7 @@ const api: AtlasPage = {
   },
   records() {
     if (!result) throw new Error("run() first");
-    return { frameImages: result.frameImages, frames: result.frames, animations: result.animations };
+    return { frameImages: result.frameImages, groups: result.groups, frames: result.frames, animations: result.animations };
   },
   images(from, maxBytes) {
     if (!result) throw new Error("run() first");

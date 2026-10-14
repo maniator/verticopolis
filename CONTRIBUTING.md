@@ -90,8 +90,12 @@ Verticopolis has **two test tiers**:
     on x86_64 Linux (it installs the pinned toolchain) or `npm run wasm:build`
     once the toolchain in engine-rs/README.md is installed. `npm run e2e`
     needs it too, since its `chromium-wasm` project runs every spec on the
-    WASM engine. A stale local build fails the unit test that checks its
-    source hash. CI restores it from the
+    WASM engine, and so does `npm run build`: its precache check
+    (`scripts/verify-precache.ts`) refuses a build without the engine, so no
+    build ships a silent TypeScript fallback. Without a Rust toolchain, run
+    `VC_ALLOW_NO_ENGINE=1 npm run build` for a deliberate TypeScript-only
+    build. A stale local build fails the unit test that checks its source
+    hash. CI restores it from the
     Actions cache, keyed on the engine's source hash, and builds it once per
     engine change (`.github/actions/engine-wasm`); Vercel builds it on every
     deploy through `scripts/vercel-build.sh`. Until the Rust engine is the default,
@@ -201,7 +205,9 @@ For the exact twice-render determinism check used by the drift workflow, replace
 node scripts/screenshot-determinism-check.ts --all
 ```
 
-To regenerate `e2e/visual.spec.ts-snapshots` in the same pinned image:
+To regenerate `e2e/visual.spec.ts-snapshots` in the same pinned image (its
+`npm run build` needs the engine package, and the image has no Rust toolchain,
+so build `src/public/engine/` on the host first; see the engine note above):
 
 ```bash
 docker run --rm --ipc=host \
