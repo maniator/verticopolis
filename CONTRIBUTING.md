@@ -84,11 +84,17 @@ Verticopolis has **two test tiers**:
     writer's test, `conformanceWasmVctower.integration.test.ts`, which writes
     every fixture with the engine and reads it back through the web game's
     readers. The game runs on the WASM engine behind `?engine=wasm` (the
-    TypeScript engine stays the default); after any change under
-    `engine-rs/`, run `npm run wasm:build` and commit `src/public/engine/`
-    (the served package); otherwise the unit
-    test that checks its source hash fails. Vercel rebuilds the package itself
-    on every deploy through `scripts/vercel-build.sh`. Until the Rust engine is the default,
+    TypeScript engine stays the default). The served package
+    (`src/public/engine/`) is build output and is not checked in: build it
+    locally to use `?engine=wasm`, with `bash scripts/build-engine-wasm.sh`
+    on x86_64 Linux (it installs the pinned toolchain) or `npm run wasm:build`
+    once the toolchain in engine-rs/README.md is installed. `npm run e2e`
+    needs it too, since its `chromium-wasm` project runs every spec on the
+    WASM engine. A stale local build fails the unit test that checks its
+    source hash. CI restores it from the
+    Actions cache, keyed on the engine's source hash, and builds it once per
+    engine change (`.github/actions/engine-wasm`); Vercel builds it on every
+    deploy through `scripts/vercel-build.sh`. Until the Rust engine is the default,
     every simulation change lands in both engines in one PR with
     the regenerated lock, and a PR that changes `src/engine/` without touching
     `engine-rs/` says why (a UI readout, prose, a transient the hash never

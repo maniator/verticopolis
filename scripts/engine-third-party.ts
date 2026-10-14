@@ -66,14 +66,14 @@ const STD_LICENSE = "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib";
 /**
  * Refuse a toolchain the record cannot be built from, before any compiling:
  * any release other than the crate's `rust-version` at `.0` (the record names
- * the standard library it links and carries its copyright page, and CI checks
- * the committed record against a build with that release), or one without
- * the rustup doc layout.
+ * the standard library it links and carries its copyright page, so every
+ * build, local, CI or deploy, must link the same one), or one without the
+ * rustup doc layout.
  */
 export function checkToolchain(crate: string, rustVersion: string): void {
   const { version, files } = toolchainDocs(crate);
-  // rust-version names a minor release; its .0 is the one CI, the deploy and
-  // the committed record all use.
+  // rust-version names a minor release; its .0 is the one CI and the deploy
+  // install (scripts/build-engine-wasm.sh).
   const want = rustVersion.split(".").length === 2 ? `${rustVersion}.0` : rustVersion;
   if (version !== want) {
     throw new Error(`rustc ${version} is not ${want}, the release the engine's notices record is built with; run: rustup toolchain install ${want} --target wasm32-unknown-unknown, then build with RUSTUP_TOOLCHAIN=${want}`);
