@@ -39,11 +39,13 @@ against a mark it supplies and get floors for free.
   round 5) existed only for the caller's mark and is gone.
 - **Editor:** `EditorActions` tracks only which shaft and simulation the
   drag is on, opens the gesture on the first step (after the undo capture)
-  and closes it in `endExtend`, which a cleared selection (and so a tower
-  swap) and a one-floor button press also call, so a press always bills
-  from the span.
+  and closes it in `endExtend`. A tower swapped in mid-drag has no gesture,
+  so the drag begins a new one on it.
 - **Attach:** `loadCommand` closes any open gesture, since the save the
-  shadow or the WASM host starts from carries none.
+  shadow or the WASM host starts from carries none; both engines then bill
+  the next step from the span (a drag in progress at an attach re-bills a
+  regrow, which no UI path reaches: attaches happen at boot or with a new
+  tower).
 - **Conformance:** `beginExtend` and `endExtend` ops replace `hwmBottom` and
   `hwmTop`, in both runners and the scenario
   `engine-charges-classic`, whose drags are bracketed by them. Every
@@ -56,7 +58,8 @@ against a mark it supplies and get floors for free.
 - TypeScript unit tests: a wiggle billed once inside a gesture and again
   after it closes; a gesture only on an elevator, only on its own shaft,
   never inherited by a new gesture, dropped by a failed begin; the gesture
-  out of the save and absent from a deserialized simulation; an inflated
+  out of the save and the state view, and absent from a deserialized
+  simulation; an inflated
   caller mark buying nothing; raw `beginExtend` ids refused.
 - Rust tests in `charges_tests.rs` cover the same billing, scope and
   out-of-the-save cases; the binding's native test covers
@@ -80,14 +83,13 @@ against a mark it supplies and get floors for free.
   closes the gesture; a dual-run test starts a shadow mid-drag and fails
   without it.
 - [x] [Review][Patch] A one-floor button press billed against a gesture a
-  lost pointer-up left open (Edge Case Hunter, Blind Hunter, Acceptance
-  Auditor) [src/game/editorActions.ts]: the press closes it first; the
-  editor test fails without it.
-- [x] [Review][Patch] A tower swap mid-drag kept the old simulation in the
-  editor's drag (Edge Case Hunter) [src/main.ts]: `clearSelection`, which
-  `adoptSim` calls, ends the drag.
+  lost pointer-up left open, and a tower swap mid-drag kept the old
+  simulation in the editor's drag (Edge Case Hunter, Blind Hunter,
+  Acceptance Auditor): the press closed the gesture and `clearSelection`
+  ended the drag. Both reverted in round 2 (see there).
 - [x] [Review][Patch] The gesture opened before the undo capture (Blind
-  Hunter): the capture comes first.
+  Hunter): the capture comes first. Behavior-neutral today (the gesture is
+  not in the snapshot), kept for a clear order.
 - [x] [Review][Patch] Test gaps (Blind Hunter, Acceptance Auditor): Rust
   tests for the gesture out of the save, the hashed view and a loaded
   simulation; the TypeScript test checks the hashed view; the raw-binding
@@ -96,14 +98,43 @@ against a mark it supplies and get floors for free.
 - [x] [Review][Patch] Docs: `engine-rs/API.md` and the cutover spine's
   tier 1 list name the new commands; the story's test claims match the
   tests.
-- Dismissed (7): a selection change mid-drag re-billing (it predates #990
-  and the drag ends with its selection now); `beginExtend`'s result
+- Dismissed (7): a selection change mid-drag re-billing (it predates #990;
+  deferred in round 2 as #1014); `beginExtend`'s result
   unchecked in the editor (it refuses only what `isElevatorKind` already
   rules out); `endExtend` on the replaced simulation (it has no gesture and
   no relay); the public Rust field (every `Simulation` field is public to
   native code, which can set `money` too); a refused `beginExtend` op in
   the scenario and `endExtend` in the lock (both pinned across engines by
-  `chargeBindingRaw`, which fails if either engine drops or keeps a gesture
-  the other does not); the backlog row marked done before merge (house
+  `chargeBindingRaw`; the refused-begin half was only pinned in round 2); the backlog row marked done before merge (house
   style, as in #923); the scenario's mark equivalence (the unchanged lock
   shows it).
+
+### Round 2 (`/gds-code-review`)
+
+- [x] [Review][Patch] Round 1's `clearSelection` and button closes ended
+  the editor's gesture but not the canvas drag: a selection cleared and
+  restored, or a second finger on the button, during a held drag began a
+  fresh gesture from the span, re-billing paid floors and recapturing undo
+  mid-drag (Edge Case Hunter with a repro) [src/main.ts,
+  src/game/editorActions.ts]: both reverted. The drag lifecycle (a lost
+  pointer-up, a selection change while held) predates #990 and is deferred
+  whole: backlog row `extend-drag-lifecycle`, #1014.
+- [x] [Review][Patch] Round 1 dismissed a refused `beginExtend` op on the
+  claim that `chargeBindingRaw` pinned it across engines, but its bad begins
+  ran with no gesture open (Blind Hunter) [chargeBindingRaw]: it now opens a
+  gesture, pays and shrinks, issues each refused begin, and requires the
+  regrow billed and equal in both engines; the dual-run test regrows after
+  its refused begins too.
+- [x] [Review][Patch] `loadCommand` called the wrapped `sim.endExtend`, so
+  on a tower a relay already watched it relayed an `endExtend` ahead of the
+  load (Blind Hunter) [src/dualrun/mirror.ts]: it calls the engine's own.
+- [x] [Review][Patch] Prose (Acceptance Auditor, Blind Hunter): the attach
+  re-bills from the span, said so; "the hashed views" narrowed to the state
+  view the tests check; the undo-order change called behavior-neutral.
+- Dismissed (6): carrying the gesture into the shadow at attach (no UI path
+  attaches mid-drag); a stale gesture on a reused id (ids are never reused
+  within a tower); `endExtend` closing a gesture another caller opened (one
+  editor drives gestures); no money check on the begin and end scenario
+  ops (neither engine moves money there, and the unit tests pin it); the
+  backlog row and the story status (house style); the scenario's mark
+  equivalence (the unchanged lock shows it, and the Auditor traced it).

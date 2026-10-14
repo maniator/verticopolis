@@ -332,7 +332,6 @@ export class EditorActions {
         this.openSchedule();
       } else if (action === "extendUp" || action === "extendDown") {
         const up = action === "extendUp";
-        this.endExtend(); // a press bills from the span, never a stale drag's mark
         const res = sim.extendTransport(t.id, up ? "up" : "down", up ? t.top + 1 : t.bottom - 1);
         if (!res.ok) {
           // Short of money: refused before anything moved, so no undo step.

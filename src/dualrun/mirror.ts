@@ -2,6 +2,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { Tower } from "../engine/Tower";
 import { canonicalJson } from "../engine/canonicalJson";
 import { crowdView, stateView } from "../engine/conformanceView";
+import { endExtend } from "../engine/sim/charges";
 import type { ShadowCommand } from "./commands";
 
 /**
@@ -31,7 +32,7 @@ type AnyFn = (...args: never[]) => unknown;
  *  the live tower and the shadow start the next drag step from the same mark. */
 export function loadCommand(sim: Simulation, gen: number): Extract<ShadowCommand, { op: "load" }> {
   if (sim.crowd.people.length > 0) throw new Error("mirror: the shadow must start before the tower's crowd exists (right after founding or loading)");
-  sim.endExtend();
+  endExtend(sim); // the engine's own, so a relay attached to `sim` relays nothing
   return {
     op: "load",
     gen,

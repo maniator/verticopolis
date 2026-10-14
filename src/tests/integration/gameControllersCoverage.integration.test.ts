@@ -762,14 +762,6 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     editor.endExtend();
     sim.extendTransport(lift.id, "up", 5);
     expect(before - sim.money).toBe(4 * ECON.transportFloorCost);
-    // A drag whose end never arrived leaves a gesture open; the one-floor
-    // button closes it first, so the press bills from the span.
-    editor.extendSelectedTo("up", 6); // paid floor 6
-    editor.extendSelectedTo("up", 5); // shrank back, the gesture still open
-    render(transportEditorTemplate(sim, lift), root);
-    editor.handleEditAction("extendUp", root);
-    expect(lift.top).toBe(6);
-    expect(before - sim.money).toBe(6 * ECON.transportFloorCost);
   });
 
   it("a tower swapped in mid-drag starts a fresh high-water mark, so nothing grows unbilled", () => {

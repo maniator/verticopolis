@@ -183,6 +183,10 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     // caller passes is ignored, so an inflated one buys nothing in either.
     const extend = sim.extendTransport as (...a: unknown[]) => ReturnType<typeof sim.extendTransport>;
     expect(extend.call(sim, lift.id, "up", 4, { bottom: 1, top: 50 })).toMatchObject({ ok: true, top: 4, added: 2 });
+    // The refused begins above opened no gesture in either engine: a shrink
+    // and regrow is billed in both.
+    expect(sim.extendTransport(lift.id, "up", 3)).toMatchObject({ ok: true, added: 0 });
+    expect(sim.extendTransport(lift.id, "up", 4)).toMatchObject({ ok: true, added: 1 });
     expect(sim.beginExtend(lift.id)).toBe(true);
     expect(sim.extendTransport(lift.id, "up", 6)).toMatchObject({ ok: true, top: 6, added: 2 });
     expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, top: 5, added: 0 });

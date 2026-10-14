@@ -200,6 +200,25 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
       // Two floors billed out, none back in, none regrown, and the press after
       // the gesture bills its floors past the span: the mark was engine-held.
       expect(added).toEqual([2, 0, 0, 0, 2]);
+      // A refused begin drops an open gesture in both engines: after it, a
+      // shrink and regrow inside the old mark is billed again, alike.
+      for (const bad of [[lift + 0.5], [String(lift)], [stairs], []]) {
+        expect(beginTs(lift)).toBe(true);
+        expect(begin(engine, lift)).toBe(true);
+        const steps: Call[] = [
+          { name: "a paid floor", ts: (s) => s.extendTransport(lift, "up", 6), rust: (e) => e.extendTransport(lift, "up", 6) },
+          { name: "back down", ts: (s) => s.extendTransport(lift, "up", 5), rust: (e) => e.extendTransport(lift, "up", 5) },
+        ];
+        for (const c of steps) expect(JSON.parse(c.rust(engine)), c.name).toEqual(c.ts(sim));
+        expect(beginTs(...bad)).toBe(false);
+        expect(begin(engine, ...bad)).toBe(false);
+        const ts = sim.extendTransport(lift, "up", 6);
+        expect(ts, `regrow after beginExtend(${String(bad[0])})`).toMatchObject({ ok: true, added: 1 });
+        expect(JSON.parse(engine.extendTransport(lift, "up", 6))).toEqual(ts);
+        expect(engine.stateDigest()).toBe(tsDigest());
+        expect(sim.extendTransport(lift, "up", 5).ok).toBe(true);
+        expect(JSON.parse(engine.extendTransport(lift, "up", 5)).ok).toBe(true);
+      }
       const events = drained(sim, engine);
       expect(events.rust).toEqual(events.ts);
     } finally {
