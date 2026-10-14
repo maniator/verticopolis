@@ -50,15 +50,15 @@ The changes:
   `gameplayEventsDropped` reports it while hosted and the instance keeps it
   after detach.
 - The detach is one flat list of steps, each run even after an earlier one
-  throws, with the first error thrown at the end (`runEach`). It reads the
+  throws, with the first error thrown at the end (`runEach`). That keeps the
+  old guarantee (the instance is always let go, the engine always freed) and
+  closes a gap: before, a throw from `useTowerCatalogSource` skipped the
+  property restores and the buffer hand-back in the same block. It reads the
   engine's drop count once. A refused attach still throws its own reason when
   freeing the engine behind it also fails.
 - The host's drain reads the engine before it empties the read model's
   copies, so a drain that traps while hosted leaves them for the detach to
-  count. That keeps the
-  old guarantee (the instance is always let go, the engine always freed) and
-  closes a gap: before, a throw from `useTowerCatalogSource` skipped the
-  property restores and the buffer hand-back in the same block.
+  count.
 
 Internal only: no wire, save, catalog or conformance-lock change, and no
 version bump.
@@ -71,10 +71,33 @@ version bump.
   still throws.
 - `src/engine/gameplayEmission.test.ts`: `restore` replaces what the buffer
   held, sets the drop count, and a batch past the ring counts its overflow.
-- `src/tests/integration/wasmHost.integration.test.ts`: under the real WASM
-  engine, an unreadable batch while hosted is counted in
-  `gameplayEventsDropped`, the next batch reads again, and an unreadable batch
-  at detach leaves the count on the instance, and an unreadable batch
-  followed by a trapped detach keeps both losses, and a drain that traps
-  while hosted is counted once the host lets go. The existing host tests are
-  unchanged and pass.
+- `src/tests/integration/wasmHost.integration.test.ts`, under the real WASM
+  engine. The existing host tests are unchanged and pass. New cases:
+  - an unreadable batch while hosted is counted in `gameplayEventsDropped`,
+    the next batch reads again, and an unreadable batch at detach leaves the
+    count on the instance;
+  - an unreadable batch followed by a trapped detach keeps both losses;
+  - a drain that traps while hosted is counted once the host lets go.
+
+## Review record (`/bmad-code-review`)
+
+- **Round 1.** Patched:
+  - The typed drain shape-checks entries and counts any shortfall against the pending count.
+  - The detach reads the engine's drop count once.
+  - A refused attach throws its own reason when freeing also fails.
+  - Added a test for an unreadable batch followed by a trapped detach.
+  - Notes on where the drain lives and why the merge needs no restore, and the #873 row's follow-up line.
+
+  Dismissed:
+  - The refused attach's `restore` equals the old append (nothing can push between the drain and the refusal).
+  - A stale binding is refused at load (`checkBinding`) and the app falls back to the TypeScript engine.
+  - The `f64` return matches `gameplayEventsDropped`.
+
+  Deferred: none. The drop count can still fall after a trapped detach, as before; the estimate is documented in the detach comment.
+- **Round 2.** Patched:
+  - The host's drain reads the engine before it empties the read model, so a hosted trap is counted at detach. The new test fails on the old order.
+  - Story layout.
+
+  Dismissed: swallowing a free failure behind a refused attach (the refusal reason is the caller's answer).
+- **Round 3.** No code findings from any layer. Two story wording fixes, patched.
+
