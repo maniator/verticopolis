@@ -68,11 +68,11 @@ for (const f of [`${target.lib}.js`, `${target.lib}_bg.wasm`]) {
 }
 if (which === "engine") {
   // The browser build, served beside the app from src/public/engine/ (the WASM
-  // host and the dual run's worker load it by URL) and committed, so a
-  // deployment without a Rust toolchain (the preview) ships the engine. Its
-  // BUILD.json records a hash of the Rust sources it was built from;
-  // src/wasmhost/packageHash.test.ts fails when the sources moved on without
-  // a rebuild.
+  // host and the dual run's worker load it by URL). It is build output, not
+  // checked in; Vercel and CI build it (scripts/build-engine-wasm.sh). Its
+  // BUILD.json records a hash of the Rust sources it was built from: CI keys
+  // its cache on that hash, and src/wasmhost/packageHash.test.ts fails when
+  // the sources moved on without a rebuild.
   const web = resolve(crate, "../src/public/engine");
   rmSync(web, { recursive: true, force: true });
   run("wasm-bindgen", ["--target", "web", "--out-dir", web, wasm]);
