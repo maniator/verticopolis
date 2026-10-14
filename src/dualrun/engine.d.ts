@@ -137,6 +137,12 @@ export class Engine {
      */
     gameplayEventsDropped(): number;
     /**
+     * How many gameplay events wait for the next drain. A host reads it
+     * before draining, so a batch whose text it cannot read is counted as
+     * lost rather than vanishing (the drain empties the buffer either way).
+     */
+    gameplayEventsPending(): number;
+    /**
      * `economy.housekeepingReport()`: yesterday's shift result as JSON
      * `{ cleaned, leftover }`, or nothing (`undefined`) before the first
      * morning checkout.
