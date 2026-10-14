@@ -30,6 +30,6 @@ runs:
           echo "::error::the engine package in $ARTIFACT was built from sources $built, but this checkout's Rust sources hash to $want"
           exit 1
         fi
-        for f in verticopolis_engine.js verticopolis_engine_bg.wasm; do
+        for f in verticopolis_engine.js verticopolis_engine_bg.wasm THIRD-PARTY.json; do
           test -f "src/public/engine/$f" || { echo "::error::src/public/engine/$f is missing from $ARTIFACT"; exit 1; }
         done

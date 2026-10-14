@@ -13,6 +13,8 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.31.1
+
 ## 2.31.0
 
 - Help's Privacy section is shorter: it now describes only the game you play in your browser, with the same anonymous, cookie-free counts as before.
