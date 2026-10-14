@@ -116,7 +116,7 @@ export function escapeMarkdown(text: string): string {
   return text
     .replace(/[\\`*_[\]<>~|&$#]/g, "\\$&")
     .replace(/^[-+]|^(\d+)([.)])/, (m, num?: string, mark?: string) => (num === undefined ? `\\${m}` : `${num}\\${mark}`))
-    .replace(/([@#])(?=[\p{L}\p{N}_])|(:)(?=[\p{L}/]|[\p{N}+_-][\w+-]*:)/gu, `$1$2${JOIN}`)
+    .replace(/([@#])(?=[\p{L}\p{N}_])|(:)(?=[\p{L}/]|[\p{N}+-][\w\\+-]*:)/gu, `$1$2${JOIN}`)
     .replace(/\b(GH-)(?=\d)/gi, `$1${JOIN}`)
     .replace(/\b(www)(?=\.)/gi, `$1${JOIN}`)
     .replace(/\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])([0-9a-f]{4})(?=[0-9a-f]{3,}\b)/gi, `$1${JOIN}`);

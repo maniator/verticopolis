@@ -361,6 +361,8 @@ export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): strin
     const soft = layers.soft !== undefined;
     const lists = Object.values(layers.chains ?? {}).flatMap((c) => [c.shell, c.furniture, ...(c.soft ? [c.soft] : []), ...(c.front ? [c.front] : [])]);
     const front = layers.front !== undefined;
+    // A vehicle's three-way split walks one chain; it carries no alternative.
+    if (front && Object.values(chains).some((c) => c.alternativeTo !== undefined)) bad.add(name);
     if ((front && soft) || Object.values(layers.chains ?? {}).some((c) => (c.front !== undefined) !== front)) bad.add(name);
     const primary = Object.values(chains).filter((c) => c.alternativeTo === undefined);
     const oneChain = primary.length <= 1 && alternativesOk && (primary.length > 0 || Object.keys(chains).length === 0);

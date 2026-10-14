@@ -183,5 +183,16 @@ describe("data added to frames that already shipped", () => {
     flat.layers = undefined;
     flat.chains = { lone: { input: "lone", max: 0, steps: [null], alternativeTo: "nope" } };
     expect(checkLayers(b)).toContain("other");
+    // And a vehicle (a frame with a front picture) carries none at all.
+    room.chains!.people.alternativeTo = undefined;
+    expect(checkLayers(b)).not.toContain("room");
+    room.layers!.front = [];
+    for (const c of Object.values(room.layers!.chains!)) c.front = [null];
+    room.layers!.soft = undefined;
+    for (const c of Object.values(room.layers!.chains!)) c.soft = undefined;
+    expect(checkLayers(b)).toContain("room");
+    delete room.chains!.exact;
+    delete room.layers!.chains!.exact;
+    expect(checkLayers(b)).not.toContain("room");
   });
 });
