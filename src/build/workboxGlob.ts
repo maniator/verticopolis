@@ -15,9 +15,14 @@ export interface WorkboxGlob {
 }
 
 export function readWorkboxGlob(config: string): WorkboxGlob | null {
-  // The array must hold only double-quoted strings, so a single-quoted entry,
-  // a spread or a variable makes the whole read fail instead of being skipped.
-  const list = /globPatterns:\s*\[((?:\s*"[^"]*"\s*,?)*)\s*\]/.exec(config);
+  // One `globPatterns` only: with two, a failed read of the first must not
+  // fall through to the second.
+  if (config.split("globPatterns:").length !== 2) return null;
+  // The array must hold only double-quoted strings separated by commas, so a
+  // single-quoted entry, a spread or a variable makes the whole read fail
+  // instead of being skipped. The commas are required, which keeps the match
+  // linear on malformed input.
+  const list = /globPatterns:\s*\[\s*((?:"[^"]*"\s*,\s*)*(?:"[^"]*"\s*)?)\]/.exec(config);
   if (!list) return null;
   const entries = [...list[1].matchAll(/"([^"]*)"/g)].map((m) => m[1]);
   if (entries.length === 0) return null;
