@@ -81,16 +81,6 @@ export const UNIT_STATES: readonly UnitState[] = [
  *  split and no occupant chain. */
 export const OCCUPANT_FREE = new Set<FacilityKind>(["parking", "parkingRamp", "security", "medical", "housekeeping", "recycling", "metro"]);
 
-/**
- * Kinds whose art seeds a detail from the DRAW origin instead of the room's
- * geography: the staff figures' shirts (security, medical, housekeeping hash
- * `Math.round(x)`), the sky bar's skyline windows and the fitness club's
- * climbing holds (absolute pixel coordinates). In the web these details follow
- * the room's offset inside its compositor region, which the atlas cannot know,
- * so the atlas carries the per-unit bake's look (origin 0, 0). Tracked as a backlog defer (sprite-origin-seeds).
- */
-export const ORIGIN_SEEDED: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["security", "medical", "housekeeping", "skyBar", "fitnessClub"]);
-
 /** Kinds whose art changes after 23:00 and before 06:00: the condo (its
  *  asleep scrim and its residents) and the two rentals, which share the
  *  condo's draw (`residentialRentalSprites.ts`) and its hidden-residents rule. */

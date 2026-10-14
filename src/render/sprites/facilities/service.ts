@@ -1,5 +1,5 @@
 import type { Unit } from "../../../engine/types";
-import { ceilingFixture, personHiVis, personSeated, personStanding, roomGlow, SKIN } from "../../pixelSprites/common";
+import { ceilingFixture, geoVariant, personHiVis, personSeated, personStanding, roomGlow, SKIN } from "../../pixelSprites/common";
 import { layerBreak, layerEnd, layerShell } from "../../pixelSprites/layers";
 import { rand, serviceLabel, type DrawCtx } from "../common";
 import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./serviceKit";
@@ -18,9 +18,15 @@ import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./servic
  * draw their interior, never a lease or vacancy card.
  */
 
+/** The staff figures' seed, from the room's floor and column (`geoVariant`),
+ *  so it holds wherever the compositor's region places the room. */
+function staffSeed(u: Pick<Unit, "kind" | "floor" | "x">): number {
+  return geoVariant(u, 6, 997);
+}
+
 // ---- Security ---------------------------------------------------------------
 
-export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: number): void {
+export function drawSecurity(d: DrawCtx, u: Pick<Unit, "kind" | "floor" | "x">, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
   const RW = 88;
   const RH = 44;
@@ -53,7 +59,7 @@ export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: num
   // Console desk with a seated guard behind it.
   box(F, 58, fy - 8, 26, 8, "#2A3550");
   F(58, fy - 8, 26, 1, "#3E4A66");
-  personSeated(ctx, sx(66), sy(fy - 8), (Math.round(x) * 3 + 5) | 0);
+  personSeated(ctx, sx(66), sy(fy - 8), staffSeed(u) * 3 + 5);
   // Brass badge shield.
   F(60, fy - 14, 6, 6, "#D8B05A");
   F(62, fy - 13, 2, 4, "#8A6A2A");
@@ -65,7 +71,7 @@ export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: num
 
 // ---- Medical ----------------------------------------------------------------
 
-export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: number): void {
+export function drawMedical(d: DrawCtx, u: Pick<Unit, "kind" | "floor" | "x">, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
   const RW = 176;
   const RH = 44;
@@ -109,9 +115,9 @@ export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: numb
   const nurseX = sx(84);
   const doctorX = sx(92);
   const foot = sy(fy);
-  personStanding(ctx, nurseX, foot, (Math.round(x) * 2 + 1) | 0);
+  personStanding(ctx, nurseX, foot, staffSeed(u) * 2 + 1);
   whiteCoat(ctx, nurseX, foot);
-  personStanding(ctx, doctorX, foot, (Math.round(x) * 2 + 7) | 0);
+  personStanding(ctx, doctorX, foot, staffSeed(u) * 2 + 7);
   whiteCoat(ctx, doctorX, foot);
   // Stocked supply cabinet.
   box(F, 104, fy - 16, 22, 16, "#F4F4F0");
@@ -132,7 +138,7 @@ export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: numb
 
 // ---- Housekeeping -----------------------------------------------------------
 
-export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h: number): void {
+export function drawHousekeeping(d: DrawCtx, u: Pick<Unit, "kind" | "floor" | "x">, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
   const RW = 88;
   const RH = 44;
@@ -167,7 +173,7 @@ export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h:
   for (let k = 0; k < 4; k++) F(W - 20 + k * 4, fy - 9, 1, 9, "#9A8460");
   F(W - 20, fy - 11, 12, 3, "#F4F0EC");
   // Standing housekeeper by the cart (the teal cart carries the uniform read).
-  personStanding(ctx, sx(38), sy(fy), (Math.round(x) * 3 + 3) | 0);
+  personStanding(ctx, sx(38), sy(fy), staffSeed(u) * 3 + 3);
   layerEnd(ctx); // the ceiling light belongs to the shell but draws last
   ceilingFixture(ctx, x, y, w, d.lit);
 }

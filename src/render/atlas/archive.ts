@@ -1,6 +1,6 @@
 import { zipSync, strToU8, type Zippable } from "fflate";
 import type { BakeResult, ImageRef } from "./bake";
-import { variantPlacements, roomKinds, ORIGIN_SEEDED, RECYCLE_STEPS, PARKING_CAR_COLORS } from "./catalog";
+import { variantPlacements, roomKinds, RECYCLE_STEPS, PARKING_CAR_COLORS } from "./catalog";
 import { CAR_SEEDS, SKYLINE_FILLS, SKY_COLUMNS, STREET_CAR_SEEDS, BUILDS } from "./catalogExtras";
 import { pack, type PackedSlice } from "./pack";
 import { depthData, sceneryData, skyData } from "./scenery";
@@ -70,7 +70,6 @@ export function signature(): AtlasManifest["signature"] {
       sky: "sky/gradient has one column per quarter hour from 00:00; the web's color is a cosine blend, t = cos((hour - 13) / 24 * 2 * pi) * 0.5 + 0.5, from #1c2246 (t 0) to #82afe0 (t 1) per channel, rounded",
       parkingRoll: "a space holds a car when hash(int32(id * 31)) < parkingUse, where hash(n) is: x = int32(n * 2654435761) with the product taken as a float64 (IEEE double) multiply; x = imul32(x ^ (x >>> 15), 0x2c1b3c6d); x = imul32(x ^ (x >>> 13), 0x297a2d39); (x ^ (x >>> 16)) as unsigned / 2^32. int32(v) truncates v toward zero and wraps it modulo 2^32 to a signed 32-bit integer (JavaScript's v | 0); imul32 is a 32-bit integer multiply; ^ is a 32-bit xor and >>> a logical (zero-filling) right shift on the 32-bit pattern, so a negative x shifts in zeros. The first step is not imul32: the two can differ once the product's magnitude passes 2^53",
       cinema: "the cinema's marquee and screen read the animation clock; the web keeps whatever phase its last re-bake caught, the atlas bakes phase 0",
-      originSeeded: `${[...ORIGIN_SEEDED].join(", ")}: a few details (staff shirts, skyline windows, climbing holds) follow the web's draw origin; the atlas carries the per-unit look at origin 0, 0`,
       layers: "a room frame, a lobby tile, an entrance frame, an elevator cab or the metro train may carry 'layers' for drawing with depth. To draw it with its chain at n (the frame's one chain, if any: 'occupants', 'riders' or 'fill'), draw the 'shell' parts and the chain's 'shell' steps 1..min(n, len - 1), then the 'furniture' parts and the chain's 'furniture' steps the same way, then any overlay the frame shows (a parking space's car or dead mark), each source-over; an elevator cab or the metro train also has a 'front' picture (and, for the cab's riders, 'front' chain steps), drawn after the furniture and before any overlay; the result equals the frame's parts, its chain steps 1..n and the overlay exactly. 'soft' (with the chain's 'soft' steps) is an optional furniture picture that keeps glows and soft shadows translucent; over the shell it rounds a step or two away from the frame's parts. A frame without 'layers' (vacancy, closed and gutted rooms, and every family outside the ones named here) is drawn flat",
       depth: "data.depth names the game's draw planes back to front ('z', higher in front; equal planes draw in the order the game adds their actors) and the frame families on each",
       skyMotion: "data.sky gives the sun's arc and each cloud's drift in the game's own terms; both are screen-space, sized to the view",

@@ -128,6 +128,11 @@ function drawClaw(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   const gap = 4;
   const macH = Math.min(floorY - top - 2, 24);
   const macY = floorY - macH;
+  // The prize colors key on the room's seed and each prize's place in its
+  // machine, so the region compositor paints the same prizes wherever the
+  // room's region starts. Hashing the seed keeps the
+  // index in range for a basement room's negative seed.
+  const prizeShift = Math.floor(hash(seed) * SCREEN_HUES.length);
   let i = 0;
   for (let mx = x + 3; mx + macW <= x + w - 3; mx += macW + gap, i++) {
     ctx.fillStyle = shade(look.neon, -30); // machine frame
@@ -138,8 +143,8 @@ function drawClaw(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
     ctx.fillRect(mx + 1, glassY, macW - 2, glassH);
     // A jumble of plush prizes inside.
     for (let py = 0; py < 2; py++) {
-      for (let gx = mx + 2; gx + 2 < mx + macW - 1; gx += 3) {
-        ctx.fillStyle = SCREEN_HUES[(gx + py + seed) % SCREEN_HUES.length];
+      for (let gx = mx + 2, c = 0; gx + 2 < mx + macW - 1; gx += 3, c++) {
+        ctx.fillStyle = SCREEN_HUES[(i * 4 + c + py + prizeShift) % SCREEN_HUES.length];
         ctx.fillRect(gx, glassY + glassH - 3 - py * 3, 2, 2);
       }
     }

@@ -126,7 +126,9 @@ bumps it. New frames or optional fields do not.
 - `animations`: frame names in play order, the seconds each holds (`dt`), and
   whether the last frame loops into the first.
 - `signature`: which inputs are baked into frames, which a frontend composes,
-  which animate, and the exact rule for each (`signature.rules`).
+  which animate, and the exact rule for each (`signature.rules`). The rules
+  are prose for whoever ports a reader; one that stops applying is removed
+  without a schema bump.
 - `variants`: the sampled placements behind each room variant.
 - `data`: small tables (the sky color at each quarter hour, the skyline fills,
   the shirt colors, the person build sizes, the sampled seeds), the scenery
@@ -203,12 +205,8 @@ finite atlas can cover. The atlas bakes four sampled placements per kind (the
 metro, which fills the lot, has one); pick one per room, for example from its
 position, and keep it.
 
-A few details in the security office, medical center, housekeeping, sky bar
-and fitness club follow the draw origin in the web game rather than the room's
-position. The atlas carries the look at the origin; see
-`signature.rules.originSeeded`. The cinema's marquee and screen read the
-animation clock; the game keeps whatever phase its last re-bake caught, and
-the atlas bakes phase 0.
+The cinema's marquee and screen read the animation clock; the game keeps
+whatever phase its last re-bake caught, and the atlas bakes phase 0.
 
 The crane's motion never repeats in the game. Its animation is a sampled
 stretch (`loop: false`); play it forward and back, or hold, as suits you.
@@ -574,12 +572,10 @@ layers for the sample room signatures with the reference reader, paints the
 same rooms through the game's own paint functions (`src/render/regionPaint.ts`,
 which the region compositor and the burning-room canvas call), and requires an
 exact pixel match. Settled rooms are painted at two region offsets; burning and
-unbuilt rooms at the per-unit origin the game paints them at; and the five
-origin-seeded kinds at the per-unit origin, the look the atlas carries (the
-game's region paint can differ for them, #915). A control case compares two different
-pictures and must report a mismatch. The bake refuses to write a layer that
-would not compose back to the game's pixels. A unit test rebuilds every frame
-and layer from the packed pages through the manifest.
+unbuilt rooms at the per-unit origin the game paints them at. A control case
+compares two different pictures and must report a mismatch. The bake refuses
+to write a layer that would not compose back to the game's pixels. A unit test
+rebuilds every frame and layer from the packed pages through the manifest.
 
 A room frame with depth layers is also composed through its depth split (the
 shell and its occupant steps, then the furniture and its occupant steps, then
