@@ -106,6 +106,7 @@ function cases(lift: number, office: number, stairs: number): Call[] {
     ["a fractional top", { bottom: 1, top: 2.5 }, '{"bottom":1,"top":2.5}'],
     ["a top past 2^53", { bottom: 1, top: 2 ** 53 }, '{"bottom":1,"top":9007199254740992}'],
     ["a bottom past -2^53", { bottom: -(2 ** 53), top: 2 }, '{"bottom":-9007199254740992,"top":2}'],
+    // These two are refused by the JSON reader itself, before the field rule.
     ["an Infinity top, written past the f64 range", { bottom: 1, top: Infinity }, '{"bottom":1,"top":1e400}'],
     ["an Infinity top, written as a word", { bottom: 1, top: Infinity }, '{"bottom":1,"top":Infinity}'],
     ["a string bottom", { bottom: "1", top: 2 }, '{"bottom":"1","top":2}'],
@@ -116,6 +117,7 @@ function cases(lift: number, office: number, stairs: number): Call[] {
     ["a number", 0, 0],
     ["a boolean", false, false],
     ["empty text", "", ""],
+    ["a boxed String", new String('{"bottom":1,"top":2}'), new String('{"bottom":1,"top":2}')],
     ["text that is not JSON", "{oops", "{oops"],
   ];
   for (const [what, tsMark, rustMark] of marks) {
@@ -174,8 +176,8 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
         }
       };
       const list = cases(lift, office, stairs);
-      // 2 ends checks + 16 ids x 5 + 7 missing + 10 ends + 10 methods + 14 marks.
-      expect(list).toHaveLength(123);
+      // 2 ends checks + 16 ids x 5 + 7 missing + 10 ends + 10 methods + 15 marks.
+      expect(list).toHaveLength(124);
       run(list, true);
       const edges = acceptedEdges(lift);
       // 5 floor and mark edges + 6 ids x 4 commands.
@@ -224,6 +226,21 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
       expect(events.rust).toEqual(events.ts);
     } finally {
       engine.free();
+    }
+  });
+
+  it("hand end and method to Rust as they are, so the glue cannot throw on a non-string", () => {
+    // A `&str` parameter is converted in the JS glue (passStringToWasm0),
+    // which throws on a non-string before Rust could refuse. The charge
+    // commands take `JsValue` instead. A number parameter is coerced at the
+    // wasm call rather than in the glue, so the numeric half of the contract
+    // is pinned by behavior above (a numeric string id would buy a car).
+    // setTowerName, which takes a string, shows the check bites.
+    const proto = loose<Record<string, unknown>>(wasm().Engine.prototype);
+    const glue = (name: string) => String(proto[name]);
+    expect(glue("setTowerName")).toMatch(/passStringToWasm0/);
+    for (const name of ["addCar", "removeCar", "extendTransport", "removeFacility"]) {
+      expect(glue(name), name).not.toMatch(/passStringToWasm0/);
     }
   });
 });
