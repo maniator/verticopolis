@@ -3,6 +3,10 @@
 node_modules/
 dist/
 dist-single/
+dist-perf/
+# perf:compare checkpoints of a run in progress (results.json replaces them)
+docs/performance/results/*/checkpoint.json
+docs/performance/results/*/runs.jsonl
 dist-atlas/
 tower-tycoon.html
 *.log

@@ -50,8 +50,18 @@ export const ONLY_ELEVATOR_EXTEND = "Only elevators can be extended.";
 export const CAR_LIMIT = "This elevator has all the cars it can hold.";
 export const LAST_CAR = "An elevator needs at least one car.";
 export const FACILITY_GONE = "That facility is gone.";
+/** The one refusal for a malformed command (#923): an id, floor or mark that
+ *  is not a whole number, or an `end` or `method` the command does not know.
+ *  The web never sends one; a second frontend or a relay might. */
+export const INVALID_REQUEST = "That request is not valid.";
 
 const refuse = (reason: string): ChargeResult => ({ ok: false, reason, delta: 0 });
+
+/** A whole number a command may take: a safe integer, so both engines read
+ *  the same value (the Rust binding reads a raw JS number and checks the same). */
+const whole = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v);
+const isEnd = (v: unknown): v is "up" | "down" => v === "up" || v === "down";
+const isMethod = (v: unknown): v is RemovalMethod => v === "sell" || v === "bulldoze";
 
 /** The shaft behind an elevator command, or the refusal to return. */
 function elevator(sim: Simulation, id: number, notElevator: string): Transport | ChargeResult {
@@ -65,6 +75,7 @@ function elevator(sim: Simulation, id: number, notElevator: string): Transport |
  *  kind's car limit (checked first, so a broke player at the limit hears
  *  about the limit) and when the balance is short. */
 export function addCar(sim: Simulation, id: number): ChargeResult {
+  if (!whole(id)) return refuse(INVALID_REQUEST);
   const t = elevator(sim, id, ONLY_ELEVATOR_CARS);
   if ("ok" in t) return t;
   if (t.cars >= maxCarsFor(t.kind)) return refuse(CAR_LIMIT);
@@ -78,6 +89,7 @@ export function addCar(sim: Simulation, id: number): ChargeResult {
 /** Sell one car back for {@link carResaleRefund}, half the add-car cost.
  *  Refused on the last car: an elevator keeps at least one. */
 export function removeCar(sim: Simulation, id: number): ChargeResult {
+  if (!whole(id)) return refuse(INVALID_REQUEST);
   const t = elevator(sim, id, ONLY_ELEVATOR_CARS);
   if ("ok" in t) return t;
   if (t.cars <= 1 || !sim.setCars(id, t.cars - 1)) return refuse(LAST_CAR);
@@ -102,16 +114,25 @@ export function removeCar(sim: Simulation, id: number): ChargeResult {
  * floor of it, and with the tower's reason when the new span does not fit.
  * A request that changes nothing succeeds with nothing billed. A request the
  * budget pays only part of succeeds as far as it got: read the ends from the
- * result, not from the request.
+ * result, not from the request. A malformed request (an id, floor or mark
+ * that is not a whole number, or an unknown `end`) is refused with
+ * {@link INVALID_REQUEST} before anything moves.
  */
-export function extendTransport(sim: Simulation, id: number, end: "up" | "down", targetFloor: number, hwm?: { bottom: number; top: number }): ExtendResult {
+export function extendTransport(sim: Simulation, id: number, end: "up" | "down", targetFloor: number, hwm?: { bottom: number; top: number } | null): ExtendResult {
+  // Read the mark once: a getter that answers differently on a second read
+  // must not pass the check and then bill against another value.
+  const given = hwm == null ? null : { bottom: hwm.bottom, top: hwm.top };
+  if (!whole(id) || !isEnd(end) || !whole(targetFloor) || (given != null && (!whole(given.bottom) || !whole(given.top)))) {
+    const cur = whole(id) ? sim.tower.transportById(id) : undefined;
+    return { ...refuse(INVALID_REQUEST), bottom: cur?.bottom ?? 0, top: cur?.top ?? 0, added: 0 };
+  }
   const t = elevator(sim, id, ONLY_ELEVATOR_EXTEND);
   if ("ok" in t) {
     // No shaft, or not an elevator: report the shaft's ends when it stands.
     const cur = sim.tower.transportById(id);
     return { ...t, bottom: cur?.bottom ?? 0, top: cur?.top ?? 0, added: 0 };
   }
-  const mark = { bottom: Math.min(hwm?.bottom ?? t.bottom, t.bottom), top: Math.max(hwm?.top ?? t.top, t.top) };
+  const mark = { bottom: Math.min(given?.bottom ?? t.bottom, t.bottom), top: Math.max(given?.top ?? t.top, t.top) };
   const perFloor = ECON.transportFloorCost;
   const bill = extendBill({ bottom: t.bottom, top: t.top }, mark, end, targetFloor, sim.money, perFloor);
   const unchanged = { bottom: t.bottom, top: t.top, added: 0 };
@@ -132,9 +153,12 @@ export function extendTransport(sim: Simulation, id: number, end: "up" | "down",
  * ({@link resaleRefund}), nothing for a gutted unit. Refused for a burning
  * unit and for structure the tower must keep (`Tower.removalReason`). Removing
  * the last Wedding Hall before the VIP's inspection cancels the visit. Units
- * and shafts share one id counter, so `id` names exactly one of them.
+ * and shafts share one id counter, so `id` names exactly one of them. An id
+ * that is not a whole number, or an unknown method, is refused with
+ * {@link INVALID_REQUEST}.
  */
 export function removeFacility(sim: Simulation, id: number, method: RemovalMethod): ChargeResult {
+  if (!whole(id) || !isMethod(method)) return refuse(INVALID_REQUEST);
   const u = sim.tower.getUnit(id);
   if (u) {
     if (u.state === "fire") return refuse(`You can't ${method} a burning unit. Call fire rescue or let it burn out.`);

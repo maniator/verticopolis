@@ -1,4 +1,5 @@
 import type { Unit } from "../../../engine/types";
+import { layerBreak, layerEnd } from "../../pixelSprites/layers";
 import { ACCENTS, rand, shade, type DrawCtx } from "../common";
 import { box, floorb, refMap } from "./serviceKit";
 
@@ -28,6 +29,9 @@ export function drawParking(d: DrawCtx, u: Unit, x: number, y: number, w: number
   F(4, 2, 1, fy - 2, "#4E535B");
   F(10, fy - 16, 1, 15, "#DCDCD0", 0.5);
   F(W - 4, fy - 16, 1, 15, "#DCDCD0", 0.5);
+  // The deck is the shell; the car parked in front of it is the furniture, and
+  // the P sign hangs on the wall (depth layers, `pixelSprites/layers.ts`).
+  layerBreak(ctx);
   // A single car, centered, shown only when this space actually holds one and
   // is not dead. `parkingUse` and `parkingDead` are prepared inputs; a stable
   // per-space roll versus the tower-wide usage fraction fills the same spaces
@@ -45,6 +49,7 @@ export function drawParking(d: DrawCtx, u: Unit, x: number, y: number, w: number
     F(38, fy - 8, 2, 2, "#FFE27A");
     F(16, fy + 2, 20, 1, "#000000", 0.25);
   }
+  layerEnd(ctx);
   // Blue P sign.
   F(W - 12, 8, 9, 9, "#2A5AA8");
   F(W - 10, 10, 2, 5, "#FFFFFF");
@@ -154,6 +159,9 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: Unit, x: numbe
   F(168, 32, 8, 5, "#6E6A62");
   F(170, 35, 4, 4, "#16181C");
   F(171, 35, 2, 1, "#6A6E76");
+  // The ramp structure is the shell; the car parked at its foot is the
+  // furniture (depth layers, `pixelSprites/layers.ts`).
+  layerBreak(ctx);
   // Primary parked car at the ramp foot (side view, wheels on the deck).
   F(135, 40, 20, 1, "#2C3036");
   F(137, 35, 5, 4, "#16181C");

@@ -93,11 +93,13 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
     adjustRent: (id, dir) => live().adjustRent(i32(id, "id"), dir) ?? null,
     setNoRate: (id) => live().setNoRate(i32(id, "id")),
     setCars: (id, cars) => live().setCars(i32(id, "id"), i32(cars, "cars")),
-    addCar: (id) => charge(live().addCar(i32(id, "id"))),
-    removeCar: (id) => charge(live().removeCar(i32(id, "id"))),
+    // The charge commands read their arguments raw and refuse a malformed
+    // one themselves (#923), so they pass through unchecked.
+    addCar: (id) => charge(live().addCar(id)),
+    removeCar: (id) => charge(live().removeCar(id)),
     extendTransport: (id, end, targetFloor, hwm) =>
-      charge(live().extendTransport(i32(id, "id"), end, i32(targetFloor, "targetFloor"), hwm ? JSON.stringify({ bottom: i32(hwm.bottom, "hwm bottom"), top: i32(hwm.top, "hwm top") }) : null)),
-    removeFacility: (id, method) => charge(live().removeFacility(i32(id, "id"), method)),
+      charge(live().extendTransport(id, end, targetFloor, hwm != null ? JSON.stringify(hwm) : null)),
+    removeFacility: (id, method) => charge(live().removeFacility(id, method)),
     setSchedule: (id, schedule) => live().setSchedule(i32(id, "id"), JSON.stringify(schedule)),
     startFire: () => live().startFire(),
     fires: () => live().fires(),

@@ -31,6 +31,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
 import { bundleBake } from "./atlas-bundle.ts";
+import { iconSvg } from "./app-icon-svg.mjs";
+import { LOBBY_VARIANTS } from "../src/render/sprites";
 import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, SOFT_DRIFT_LIMIT, softLayerDrift } from "../src/render/atlas/archive";
 import type { BakeResult } from "../src/render/atlas/bake";
 import type { Image } from "../src/render/atlas/pixels";
@@ -38,6 +40,19 @@ import type { Image } from "../src/render/atlas/pixels";
 const root = resolve(import.meta.dirname, "..");
 
 const FLAGS = new Set(["--out", "--filter", "--label"]);
+
+/** The app icon for other frontends: the mark's SVG (full bleed and inside the
+ *  maskable safe zone) and the committed PNGs the web app ships. */
+function appIcons(root: string): Record<string, Uint8Array> {
+  const icons: Record<string, Uint8Array> = {
+    "icon.svg": new TextEncoder().encode(iconSvg(1024, false) + "\n"),
+    "icon-maskable.svg": new TextEncoder().encode(iconSvg(1024, true) + "\n"),
+  };
+  for (const name of ["icon-1024x1024.png", "pwa-512x512.png", "pwa-maskable-512x512.png", "pwa-192x192.png", "apple-touch-icon.png", "favicon.png"]) {
+    icons[name] = new Uint8Array(readFileSync(join(root, "src/public", name)));
+  }
+  return icons;
+}
 
 /** Every argument must be one of {@link FLAGS} followed by its value; the
  *  `--flag=value` form, unknown flags and a repeated flag are refused so
@@ -146,7 +161,7 @@ async function main(): Promise<void> {
         normals.push({ w: g.w, h: g.h, data: decode(g.normal, g.w, g.h, `normal ${id}`) });
       }
     }
-    bakeResult = { images, normals, frameImages: records.frameImages, frames: records.frames, animations: records.animations };
+    bakeResult = { images, normals, frameImages: records.frameImages, groups: records.groups, frames: records.frames, animations: records.animations };
   } finally {
     await browser.close();
   }
@@ -155,7 +170,7 @@ async function main(): Promise<void> {
   const licenseText = readFileSync(join(root, "ASSETS-LICENSE.md"), "utf8");
   const archive = buildArchive(
     bakeResult,
-    { version: pkg.version, commit: gitCommit(), attribution: attributionLine(licenseText), licenseText },
+    { version: pkg.version, commit: gitCommit(), attribution: attributionLine(licenseText), licenseText, icons: appIcons(root) },
     (msg) => console.log(msg),
   );
   // Every image must come back out of the pages it was packed into.
@@ -169,8 +184,23 @@ async function main(): Promise<void> {
   // catalog only, so a --filter preview skips it.
   const unsplit = filter ? [] : kindsWithoutFurniture(archive.manifest);
   if (unsplit.length > 0) throw new Error(`depth layers hold no furniture for ${unsplit.join(", ")}: the shell kept it`);
+  // The lobby shares one kind across its tiles and entrances, so check those
+  // frame by frame: every one splits, and every one but the sconce and print
+  // tile (the last variant, wall pieces only) has furniture in front of its wall.
+  const lastVariant = `/v${LOBBY_VARIANTS - 1}`;
+  const bareLobby = Object.entries(archive.manifest.frames)
+    .filter(([name]) => name.startsWith("structure/lobby/") || name.startsWith("structure/entrance/"))
+    .filter(([name, f]) => !f.layers || (f.layers.furniture.length === 0 && !name.endsWith(lastVariant)))
+    .map(([name]) => name);
+  if (bareLobby.length > 0) throw new Error(`lobby frames without depth furniture: ${bareLobby.slice(0, 10).join(", ")}`);
+  // The cabs and the train carry their riders inside: each has a front.
+  const openVehicles = Object.entries(archive.manifest.frames)
+    .filter(([name]) => name.startsWith("car/") || name.startsWith("vehicle/metrotrain/"))
+    .filter(([, f]) => !f.layers?.front || f.layers.front.length === 0)
+    .map(([name]) => name);
+  if (openVehicles.length > 0) throw new Error(`vehicle frames without a front: ${openVehicles.slice(0, 10).join(", ")}`);
   const layered = Object.values(archive.manifest.frames).filter((f) => f.layers).length;
-  console.log(`depth layers: ${layered} room frames compose back to their flat frames at every occupant count`);
+  console.log(`depth layers: ${layered} frames (rooms at every occupant count, lobby tiles, entrances, cabs and the metro train) compose back to their flat frames`);
   // The soft furniture is close to the flat frame but rounds differently;
   // report how far it strays, and stop if it strays further than rounding.
   const drift = softLayerDrift(archive);
