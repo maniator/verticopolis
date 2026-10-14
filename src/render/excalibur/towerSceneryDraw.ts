@@ -181,30 +181,46 @@ export function drawPlanter(ctx: CanvasRenderingContext2D, w: number, h: number)
   ctx.fillRect(Math.round(w * 0.2), h - 16, Math.round(w * 0.6), 5);
 }
 
+/** The tree and bush paint, as a table the atlas publishes (docs/atlas.md,
+ *  "Seeded by the tower") so a frontend can paint a plant at its own size. */
+export const PLANT_PAINT = {
+  tree: {
+    trunk: { color: "#6d4c2a", w: 0.12, minW: 2, h: 0.3 },
+    canopy: [
+      { w: 1.0, y: 0.32, color: "#3e6b2e" },
+      { w: 0.78, y: 0.52, color: "#4a7c36" },
+      { w: 0.5, y: 0.72, color: "#568c3e" },
+    ],
+    canopyH: 0.26,
+    jitterKey: 97,
+  },
+  bush: {
+    base: { color: "#4a7c36", y: 0.4, h: 0.6 },
+    top: { color: "#568c3e", x: 0.16, w: 0.68, h: 0.5 },
+  },
+} as const;
+
 export function drawTree(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number): void {
-  const trunkW = Math.max(2, Math.round(w * 0.12));
-  const trunkH = Math.round(h * 0.3);
-  ctx.fillStyle = "#6d4c2a";
+  const T = PLANT_PAINT.tree;
+  const trunkW = Math.max(T.trunk.minW, Math.round(w * T.trunk.w));
+  const trunkH = Math.round(h * T.trunk.h);
+  ctx.fillStyle = T.trunk.color;
   ctx.fillRect(Math.round(w / 2 - trunkW / 2), h - trunkH, trunkW, trunkH);
-  const layers: [number, number, string][] = [
-    [1.0, 0.32, "#3e6b2e"],
-    [0.78, 0.52, "#4a7c36"],
-    [0.5, 0.72, "#568c3e"],
-  ];
-  layers.forEach(([lw, ly, col], li) => {
+  T.canopy.forEach(({ w: lw, y: ly, color }, li) => {
     // Integer hash key (hash01 truncates): the layer index, not the fractional
     // layer offset, carries the per-layer variation.
-    const jitter = Math.round((hash01(seed + li * 97) - 0.5) * 2);
-    ctx.fillStyle = col;
-    ctx.fillRect(Math.round(w * (1 - lw) / 2) + jitter, Math.round(h - trunkH - h * ly), Math.round(w * lw), Math.round(h * 0.26));
+    const jitter = Math.round((hash01(seed + li * T.jitterKey) - 0.5) * 2);
+    ctx.fillStyle = color;
+    ctx.fillRect(Math.round(w * (1 - lw) / 2) + jitter, Math.round(h - trunkH - h * ly), Math.round(w * lw), Math.round(h * T.canopyH));
   });
 }
 
 export function drawBush(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-  ctx.fillStyle = "#4a7c36";
-  ctx.fillRect(0, Math.round(h * 0.4), w, Math.ceil(h * 0.6));
-  ctx.fillStyle = "#568c3e";
-  ctx.fillRect(Math.round(w * 0.16), 0, Math.round(w * 0.68), Math.round(h * 0.5));
+  const { base, top } = PLANT_PAINT.bush;
+  ctx.fillStyle = base.color;
+  ctx.fillRect(0, Math.round(h * base.y), w, Math.ceil(h * base.h));
+  ctx.fillStyle = top.color;
+  ctx.fillRect(Math.round(w * top.x), 0, Math.round(w * top.w), Math.round(h * top.h));
 }
 
 /** Cement paving and its joint lines (the forecourt and the tower's apron). */

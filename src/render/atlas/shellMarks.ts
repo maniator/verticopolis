@@ -5,13 +5,18 @@ import { LayerError } from "./pixels";
  * The layer marks of one shell pass (`browserEntry.ts` `renderShell`), apart
  * from the canvas so the rules are testable: `save` runs at the break, and
  * `restore` at the first end after it (or when the paint finishes without
- * one), so whatever the paint draws after the end lands on the shell.
+ * one), so whatever the paint draws after the end lands on the shell, and
+ * `onShell` paints a `layerShell` draw made between the two.
  *
  * A paint with no split (a vacancy card, a shutter) still passes its
  * wrapper's end (`drawRoom`, `drawUnit`); that end is ignored. A second
  * break, or a break after such an end, is a misplaced mark and throws.
  */
-export function shellMarks(save: () => void, restore: () => void): { hook: LayerHook; finish(): boolean } {
+export function shellMarks(
+  save: () => void,
+  restore: () => void,
+  onShell: (draw: () => void) => void = (draw) => draw(),
+): { hook: LayerHook; finish(): boolean } {
   let broke = false;
   let ended = false;
   let endedFlat = false;
@@ -31,6 +36,12 @@ export function shellMarks(save: () => void, restore: () => void): { hook: Layer
         }
         ended = true;
         restore();
+      },
+      // Shell art drawn among the furniture: before the break or after the
+      // end it is on the shell already.
+      shellPaint(_ctx, draw) {
+        if (broke && !ended) onShell(draw);
+        else draw();
       },
     },
     /** Call when the paint returns: true when it split. */

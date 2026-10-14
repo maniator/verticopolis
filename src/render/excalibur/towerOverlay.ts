@@ -1,4 +1,5 @@
 import type { HeatmapMode } from "../../engine/Simulation";
+import { RAIN } from "../sprites/sky";
 import { GRID, facilityFloors, isElevatorKind } from "../../engine/facilities";
 import type { Transport, Unit } from "../../engine/types";
 import { drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";
@@ -315,16 +316,16 @@ function drawRain(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   const H = engine.viewHeight;
   const t = engine.d.anim;
   // A faint overcast tint over the whole scene.
-  ctx.fillStyle = "rgba(34,40,56,0.16)";
+  ctx.fillStyle = RAIN.tint;
   ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = "rgba(200,214,236,0.45)";
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = RAIN.stroke;
+  ctx.lineWidth = RAIN.lineWidth;
   ctx.beginPath();
-  for (let i = 0; i < 140; i++) {
-    const x = ((i * 2654435761) >>> 0) % W;
-    const y = (((i * 37) % H) + t * 320) % H;
+  for (let i = 0; i < RAIN.count; i++) {
+    const x = ((i * RAIN.xMul) >>> 0) % W;
+    const y = (((i * RAIN.yStep) % H) + t * RAIN.speed) % H;
     ctx.moveTo(x, y);
-    ctx.lineTo(x - 3, y + 9);
+    ctx.lineTo(x + RAIN.dx, y + RAIN.dy);
   }
   ctx.stroke();
 }

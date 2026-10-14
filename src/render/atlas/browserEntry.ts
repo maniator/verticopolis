@@ -64,6 +64,7 @@ function copyPixels(dst: CanvasRenderingContext2D, src: HTMLCanvasElement): void
 export function canvasRenderer(doc: Document): Renderer {
   const canvas = doc.createElement("canvas");
   const saved = doc.createElement("canvas");
+  const aside = doc.createElement("canvas");
   return {
     render(spec: PaintSpec, w: number, h: number): Image {
       const ctx = prepare(canvas, w, h);
@@ -81,14 +82,27 @@ export function canvasRenderer(doc: Document): Renderer {
     renderShell(spec: PaintSpec, w: number, h: number): Image | null {
       const ctx = prepare(canvas, w, h);
       const store = prepare(saved, w, h);
+      const spare = prepare(aside, w, h);
       const marks = shellMarks(
         () => copyPixels(store, canvas),
         () => copyPixels(ctx, saved),
+        // Shell art among the furniture: paint it on the shell kept aside
+        // (swapped onto the canvas, since the paint holds the canvas's
+        // context), then on the canvas as the flat frame has it.
+        (draw) => {
+          copyPixels(spare, canvas);
+          copyPixels(ctx, saved);
+          draw();
+          copyPixels(store, canvas);
+          copyPixels(ctx, aside);
+          draw();
+        },
       );
       withLayerHook(marks.hook, () => paint(ctx, spec, w, h));
       const split = marks.finish();
       ctx.restore();
       store.restore();
+      spare.restore();
       if (!split) return null;
       return { w, h, data: ctx.getImageData(0, 0, w, h).data };
     },
@@ -112,7 +126,15 @@ export function canvasRenderer(doc: Document): Renderer {
           ctx.globalCompositeOperation = "source-atop";
         };
       };
-      const marks = shellMarks(() => copyPixels(ctx, saved), atop);
+      // Shell art among the furniture lands only on the furniture's pixels,
+      // as the marks after the end do.
+      const onShell = (draw: () => void) => {
+        const prev = ctx.globalCompositeOperation;
+        ctx.globalCompositeOperation = "source-atop";
+        draw();
+        ctx.globalCompositeOperation = prev;
+      };
+      const marks = shellMarks(() => copyPixels(ctx, saved), atop, onShell);
       let split: boolean;
       try {
         withLayerHook(marks.hook, () => paint(ctx, spec, w, h));

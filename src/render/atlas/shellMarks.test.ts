@@ -29,4 +29,22 @@ describe("shell pass marks", () => {
     expect(() => run("bb")).toThrow(LayerError);
     expect(() => run("eb")).toThrow(/after a layer end/);
   });
+  it("sends shell art among the furniture to the shell pass, and draws it plainly elsewhere", () => {
+    const log: string[] = [];
+    const m = shellMarks(
+      () => log.push("save"),
+      () => log.push("restore"),
+      (draw) => {
+        log.push("onShell");
+        draw();
+      },
+    );
+    const art = () => log.push("draw");
+    m.hook.shellPaint!(ctx, art);
+    m.hook.shellEnd(ctx);
+    m.hook.shellPaint!(ctx, art);
+    m.hook.furnitureEnd(ctx);
+    m.hook.shellPaint!(ctx, art);
+    expect(log).toEqual(["draw", "save", "onShell", "draw", "restore", "draw"]);
+  });
 });

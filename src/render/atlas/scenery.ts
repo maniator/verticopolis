@@ -15,6 +15,7 @@ import {
 } from "../sceneryLayout";
 import {
   PAVE_JOINT_EVERY,
+  PLANT_PAINT,
   drawBush,
   drawForecourt,
   drawFountain,
@@ -30,7 +31,8 @@ import {
 } from "../excalibur/towerSceneryDraw";
 import type { AnimJob, Job, Keys, StillJob } from "./catalog";
 import { Z } from "../depthPlanes";
-import { CLOUD_COUNT, CLOUD_DRIFT, SUN_ARC, cloudMotion, cloudSeed } from "../sprites/sky";
+import { CLOUD_COUNT, CLOUD_DRIFT, RAIN, SUN_ARC, cloudMotion, cloudSeed } from "../sprites/sky";
+import { SKY_COLUMNS } from "./catalogExtras";
 
 /**
  * The world outside the tower (`excalibur/towerScenery.ts`): the plaza's
@@ -214,6 +216,7 @@ export function sceneryData() {
       bottomY: -STRIP_ABOVE + 2,
       clearTiles: PLANT_CLEAR_TILES,
       treeVariants: TREE_VARIANTS,
+      paint: PLANT_PAINT,
     },
     lamp: { steps: LAMP_STEPS, fadeIn: [18, 20], fadeOut: [5, 7] },
   };
@@ -223,12 +226,17 @@ export function sceneryData() {
  *  terms. Both are drawn in screen space, sized to the view. */
 export function skyData() {
   return {
+    // The view's background is data.skyColors[floor(hour) * 4], the color of
+    // the whole game hour; the sun or moon draws over it, then the clouds.
+    background: { columnsPerHour: SKY_COLUMNS / 24 },
     sun: { ...SUN_ARC, day: "sky/sun", night: "sky/moon" },
     clouds: {
       ...CLOUD_DRIFT,
       weathers: ["overcast", "rain"],
       list: Array.from({ length: CLOUD_COUNT }, (_, i) => ({ frame: i, ...cloudMotion(cloudSeed(i)) })),
     },
+    // Drawn over the whole view, in front of the world, on rainy days.
+    rain: RAIN,
   };
 }
 

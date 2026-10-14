@@ -306,7 +306,10 @@ What that means for the pictures:
 The game marks the split in each room's draw routine, and in the lobby and
 entrance art (`src/render/pixelSprites/layers.ts`): one call where the shell
 ends and, in a room that draws over its furniture, one where the furniture
-ends and the marks drawn over it begin. In the game both calls do nothing. The
+ends and the marks drawn over it begin. A routine that draws some of its
+shell late, over furniture already in place, wraps that art in a third call
+(the recycling center's deck curb and wall gauge). In the game all three only
+draw what the routine draws. The
 export paints each split frame (and each occupant step) again with the marks
 live and records the canvas at them, once for the exact split and once more
 for the soft furniture; the flat frame comes from the ordinary paint, so
@@ -326,8 +329,10 @@ boutique bay, fitness club, clinic, nightclub, spa, sky bar, daycare,
 security, medical center, housekeeping, party hall, wedding hall, aquatic
 center, metro station, recycling center, parking ramp and parking space. The
 recycling center's chain is its `fill`: the wall gauge (and its FULL cue)
-changes on the shell, the day's pile in front, and the machines stop at the
-deck curb, which stays whole on the shell. The parking ramp's furniture is
+changes on the shell, the day's pile in front. The deck curb and the gauge
+draw after the machines, as the game draws them, and land on the shell, so
+the curb covers the machines' contact shadows in the furniture's pixels and
+stays whole on the shell. The parking ramp's furniture is
 the car parked at its foot. A parking space's shell is the whole bay and its
 furniture list is empty: its car comes as a `car<i>` overlay (and a dead
 space's red X as `dead`), which draws in front of everything.
@@ -454,8 +459,11 @@ The skyline (`skyline`): for each band in `bands`, a building at every tile
 `t` from `start - overscanTiles` while `t < lotTiles + overscanTiles`, stepping
 by `step`. It is `w.base + hash01(seed + t * w.key) * w.span` tiles wide and
 `hFloors.base + hash01(seed + t * hFloors.key) * hFloors.span` floors tall
-(both fractional), with its left edge at x `t * tileW` and its bottom on the
-ground line, filled with the band's `frame` color.
+(both fractional; `w * tileW` by `hFloors * floorH` pixels), with its left
+edge at x `t * tileW` and its bottom on the ground line. The game draws each
+rectangle on its own in the band's translucent `frame` color, the far band
+first, so where two overlap the color deepens; it scales a solid fill to the
+fractional size with nearest sampling, with no rounding of its own.
 
 The plants (`plants.rule`): a candidate at every tile `t` from `margin`
 while `t < lotTiles - margin`, stepping by `step`. With `r = hash01(seed * 3 +
@@ -466,28 +474,51 @@ scale.span`. Its canvas is `round(size.tiles * tileW * scale)` wide and
 `round(size.floors * floorH * scale)` tall (`plants.size`, by kind), centered on
 the tile's left edge (x `tile * tileW - w / 2`, which can land on a half pixel),
 with its bottom edge at `bottomY` (its last row one above). The game paints a
-plant at that size; the atlas carries the tree in `treeVariants` variants and
-the bush at their base size, so a frontend scales the frame and picks the tree
-variant `(seed + tile) mod treeVariants`, which comes close to the game's
-tree. A plant is hidden while the paved span reaches within
+plant at that size, `w` by `h`, with `plants.paint` (rectangles filled in
+order, `round` and `ceil` as in JavaScript):
+
+- a tree, with `ts = seed + tile`: the trunk `tw = max(trunk.minW, round(w *
+  trunk.w))` wide and `th = round(h * trunk.h)` tall at x `round(w / 2 - tw /
+  2)`, y `h - th`; then each `canopy` layer `i` at x `round(w * (1 - c.w) / 2)
+  + round((hash01(ts + i * jitterKey) - 0.5) * 2)`, y `round(h - th - h *
+  c.y)`, `round(w * c.w)` wide and `round(h * canopyH)` tall;
+- a bush: `base` at x 0, y `round(h * base.y)`, `w` wide and `ceil(h *
+  base.h)` tall, then `top` at x `round(w * top.x)`, y 0, `round(w * top.w)`
+  wide and `round(h * top.h)` tall.
+
+The `scenery/tree/v<0-7>` and `scenery/bush` frames are those plants at their
+base size (trees seeded 0 to 7), for a frontend that would rather scale a
+frame. A plant is hidden while the paved span reaches within
 `clearTiles` tiles of it: it shows only when `tile + clearTiles` is at most
 the span's first tile or `tile - clearTiles` is at least the tile after its
 last.
 
 ### The sky
 
-`data.sky` gives the sky's motion in the game's own terms. Both are drawn in
-screen space, sized to the view (`viewW` by `viewH` pixels), behind the world.
+`data.sky` gives the sky's motion in the game's own terms. The sky is drawn
+in screen space, sized to the view (`viewW` by `viewH` pixels), behind the
+world, in this order:
 
-- The sun (`sky/sun`) shows from `sun.rise` to `sun.set` hours and the moon
-  (`sky/moon`) for the rest of the day, along the same arc. At fraction `p`
-  of its stretch (the day from rise to set, or the night from set to rise), the disc's center is at x `p * viewW` and y `viewH *
-  baseY - sin(p * PI) * viewH * lift`.
-- The clouds show only on overcast and rainy days, as the
-  `sky/cloud/<weather>/<i>` frames, one per entry in `clouds.list`. At `t`
-  seconds of the game's animation clock, cloud `i` sits at x `((offset mod
-  (viewW + pad)) + t * speed) mod (viewW + pad) - pad / 2` and y `viewH * top
-  + row * viewH * band`.
+1. The background: `data.skyColors[floor(hour) * background.columnsPerHour]`,
+   the color of the whole game hour (it changes on the hour).
+2. The sun (`sky/sun`) from `sun.rise` (inclusive) to `sun.set` (exclusive),
+   and the moon (`sky/moon`) for the rest of the day, along the same arc. With
+   the time as `hour + minute / 60`, at fraction `p` of its stretch (the day
+   from rise to set, or the night from set to rise) the disc's anchor is at x
+   `p * viewW` and y `viewH * baseY - sin(p * PI) * viewH * lift`.
+3. The clouds, whenever the weather is not clear: the engine's `cloudy` uses
+   the `sky/cloud/overcast/<i>` frames and `rain` the `sky/cloud/rain/<i>`
+   ones, one per entry in `clouds.list`. At `t` seconds of the game's
+   animation clock (never negative), cloud `i`'s anchor is at x `((offset %
+   (viewW + pad)) + t * speed) % (viewW + pad) - pad / 2` and y `viewH * top +
+   row * viewH * band`, with `%` the floating-point remainder.
+
+On rainy days the game also draws `sky.rain` over the whole view, in front of
+the world and the tower: a `tint` fill, then `count` streaks stroked
+`lineWidth` wide in `stroke`, streak `i` from x `((i * xMul) >>> 0) % viewW`
+(the product taken as a double, then wrapped to an unsigned 32-bit integer)
+and y `((i * yStep) % viewH + t * speed) % viewH`, to `dx`, `dy` pixels
+further.
 
 ### Draw order
 
@@ -517,8 +548,9 @@ setting sun on a dusk sky. `icon.svg` bleeds to every edge and
 `icon-maskable.svg` keeps the tower inside the maskable safe zone (the center
 80 percent). The PNGs are the ones the web app ships: `icon-1024x1024.png`
 (the desktop master), `pwa-512x512.png`, `pwa-maskable-512x512.png`,
-`pwa-192x192.png`, `apple-touch-icon.png` (180) and `favicon.png` (64). They
-fall under the same asset license as the rest of the atlas.
+`pwa-192x192.png`, `apple-touch-icon.png` (180) and `favicon.png` (64),
+rasterized from the same mark by `scripts/gen-pwa-icons.mjs`. They fall under
+the same asset license as the rest of the atlas.
 
 ## How it is checked
 
@@ -555,6 +587,4 @@ their depth layers.
 
 ## Not in the atlas yet
 
-Event cameos (Santa, the VIP limo, the thief) are not exported yet. The lot's
-trees come as variants at their base size rather than the game's per-spot
-paint (see [Seeded by the tower](#seeded-by-the-tower)).
+Event cameos (Santa, the VIP limo, the thief) are not exported yet.

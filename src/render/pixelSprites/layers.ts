@@ -26,6 +26,9 @@ export interface LayerHook {
   /** The furniture is complete; everything drawn from here on lands on the
    *  shell (and shows in the flat frame as before). */
   furnitureEnd(ctx: CanvasRenderingContext2D): void;
+  /** `draw` paints shell art over furniture already drawn (see
+   *  {@link layerShell}). */
+  shellPaint?(ctx: CanvasRenderingContext2D, draw: () => void): void;
 }
 
 let hook: LayerHook | null = null;
@@ -40,6 +43,16 @@ export function layerBreak(ctx: CanvasRenderingContext2D): void {
  *  recording layers. */
 export function layerEnd(ctx: CanvasRenderingContext2D): void {
   hook?.furnitureEnd(ctx);
+}
+
+/** Paint shell art that the game draws after some of the furniture (a deck
+ *  curb over the machines standing on it, a wall gauge drawn late), between
+ *  {@link layerBreak} and {@link layerEnd}. In the game it just calls `draw`,
+ *  so the pixels are the routine's own; the atlas bake also paints it on the
+ *  shell picture, and over the soft furniture only where that has pixels. */
+export function layerShell(ctx: CanvasRenderingContext2D, draw: () => void): void {
+  if (hook?.shellPaint) hook.shellPaint(ctx, draw);
+  else draw();
 }
 
 /** Run `draw` with `h` receiving the layer marks, then restore the previous

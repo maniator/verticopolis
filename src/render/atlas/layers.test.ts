@@ -6,7 +6,7 @@ import type { FacilityKind } from "../../engine/types";
 import { withLayerHook } from "../pixelSprites/layers";
 import { roomJobs, roomKinds, type StillJob } from "./catalog";
 import { LOBBY_VARIANTS } from "../sprites";
-import { structureJobs } from "./catalogExtras";
+import { structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
 import { paint, type PaintSpec, type UnitPaint } from "./paint";
 
 /** A 2D context that accepts every call (the pixels are checked in a real
@@ -96,6 +96,45 @@ describe("depth-layer marks on the lobby", () => {
       if (seen.join() !== "break") wrong.push(`${name}: ${seen.join() || "no marks"}`);
     }
     expect(wrong).toEqual([]);
+  });
+});
+
+describe("depth-layer marks on the cabs and the metro train", () => {
+  it("breaks every cab and train frame once, at every rider count, and ends the cab's riders", () => {
+    const jobs = [...transportJobs(), ...vehicleJobs()].filter((j): j is StillJob => j.type === "still" && j.layers === true);
+    const names = jobs.map((j) => j.name);
+    expect(names.some((n) => n.startsWith("car/"))).toBe(true);
+    expect(names.filter((n) => n.startsWith("vehicle/metrotrain/"))).toHaveLength(2);
+    expect(names.some((n) => n.startsWith("vehicle/streetcar/") || n.startsWith("vehicle/garbagetruck"))).toBe(false);
+    const wrong: string[] = [];
+    for (const j of jobs) {
+      for (const [i, spec] of [j.paint, ...Object.values(j.chains ?? {}).flatMap((c) => c.steps)].entries()) {
+        const seen: string[] = [];
+        withLayerHook({ shellEnd: () => seen.push("break"), furnitureEnd: () => seen.push("end") }, () => paint(sinkCtx(), spec, j.w, j.h));
+        if (seen.join() !== "break,end") wrong.push(`${j.name} step ${i}: ${seen.join() || "no marks"}`);
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+});
+
+describe("the recycling center's depth split", () => {
+  it("paints its curb and gauge as shell art among the furniture", () => {
+    const job = roomJobs().find((j): j is StillJob => j.type === "still" && (j.paint as UnitPaint).kind === "recycling" && j.layers === true && j.chains !== undefined);
+    expect(job).toBeDefined();
+    const seen: string[] = [];
+    withLayerHook(
+      {
+        shellEnd: () => seen.push("break"),
+        furnitureEnd: () => seen.push("end"),
+        shellPaint: (_ctx, draw) => {
+          seen.push("shell");
+          draw();
+        },
+      },
+      () => paint(sinkCtx(), job!.paint, job!.w, job!.h),
+    );
+    expect(seen.join()).toBe("break,shell,shell,end");
   });
 });
 

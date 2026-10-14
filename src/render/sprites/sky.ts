@@ -60,6 +60,22 @@ export function cloudMotion(seed: number): { speed: number; row: number; offset:
  *  and y `viewHeight * baseY - sin(p * PI) * viewHeight * lift`. */
 export const SUN_ARC = { rise: 6, set: 18, baseY: 0.62, lift: 0.5 } as const;
 
+/** The rain over the whole view on rainy days: a `tint` fill, then `count`
+ *  streaks stroked `lineWidth` wide in `stroke`. Streak i starts at x
+ *  `((i * xMul) >>> 0) % viewW` (the product as a double, then to uint32) and
+ *  y `((i * yStep) % viewH + t * speed) % viewH`, and runs `dx`, `dy` px. */
+export const RAIN = {
+  tint: "rgba(34,40,56,0.16)",
+  stroke: "rgba(200,214,236,0.45)",
+  lineWidth: 1,
+  count: 140,
+  xMul: 2654435761,
+  yStep: 37,
+  speed: 320,
+  dx: -3,
+  dy: 9,
+} as const;
+
 /** Cloud fill: a dark gray in the rain, a bright white on an overcast day. */
 export function cloudFill(weather: string): string {
   return weather === "rain" ? "rgba(86,92,108,0.55)" : "rgba(244,247,255,0.72)";

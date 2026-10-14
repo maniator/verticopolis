@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GRID } from "../../engine/facilities";
-import { lampAlpha } from "../excalibur/towerSceneryDraw";
+import { drawBush, drawTree, lampAlpha } from "../excalibur/towerSceneryDraw";
 import { Z } from "../depthPlanes";
 import { allJobs } from "./browserEntry";
 import { TILE } from "../scale";
@@ -129,5 +129,38 @@ describe("scenery in the atlas", () => {
     const sky = skyData();
     expect(sky.clouds.list).toHaveLength(CLOUD_COUNT);
     expect(sky.clouds.list[1].offset).toBe(cloudSeed(1) * 53);
+  });
+
+  it("publishes the plant paint so a frontend paints any spot as the game does", () => {
+    const P = sceneryData().plants.paint;
+    const record = (draw: (ctx: CanvasRenderingContext2D) => void) => {
+      const ops: unknown[] = [];
+      const ctx = {
+        set fillStyle(v: string) {
+          ops.push(v);
+        },
+        fillRect: (...a: number[]) => ops.push(a),
+      } as unknown as CanvasRenderingContext2D;
+      draw(ctx);
+      return ops;
+    };
+    for (const [w, h, seed] of [[30, 68, 4400], [24, 54, 7], [36, 81, 123456]]) {
+      const T = P.tree;
+      const trunkW = Math.max(T.trunk.minW, Math.round(w * T.trunk.w));
+      const trunkH = Math.round(h * T.trunk.h);
+      const want: unknown[] = [T.trunk.color, [Math.round(w / 2 - trunkW / 2), h - trunkH, trunkW, trunkH]];
+      T.canopy.forEach((c, li) => {
+        const jitter = Math.round((hash01(seed + li * T.jitterKey) - 0.5) * 2);
+        want.push(c.color, [Math.round((w * (1 - c.w)) / 2) + jitter, Math.round(h - trunkH - h * c.y), Math.round(w * c.w), Math.round(h * T.canopyH)]);
+      });
+      expect(record((ctx) => drawTree(ctx, w, h, seed))).toEqual(want);
+      const B = P.bush;
+      expect(record((ctx) => drawBush(ctx, w, h))).toEqual([
+        B.base.color,
+        [0, Math.round(h * B.base.y), w, Math.ceil(h * B.base.h)],
+        B.top.color,
+        [Math.round(w * B.top.x), 0, Math.round(w * B.top.w), Math.round(h * B.top.h)],
+      ]);
+    }
   });
 });
