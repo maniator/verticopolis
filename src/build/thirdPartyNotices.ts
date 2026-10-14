@@ -378,6 +378,12 @@ export function shippedCrates(meta: CargoMetadata, linked?: ReadonlySet<string>)
   const byId = new Map(meta.packages.map((p) => [p.id, p]));
   const nodes = new Map(meta.resolve.nodes.map((n) => [n.id, n]));
   const isProcMacro = (id: string) => byId.get(id)?.targets.some((t) => t.kind.includes("proc-macro")) ?? false;
+  const rootPkg = byId.get(root);
+  // A `cargo tree` listing without the root itself was not parsed right (or
+  // came from another crate), and would silently filter every crate out.
+  if (linked && (!rootPkg || !linked.has(`${rootPkg.name} v${rootPkg.version}`))) {
+    throw new Error("the cargo tree listing does not name the root crate; it cannot narrow the walk");
+  }
   const seen = new Set<string>([root]);
   const queue = [root];
   while (queue.length > 0) {
@@ -433,5 +439,35 @@ export function engineRecordPackages(record: unknown, buildSources: unknown): { 
     else packages.push({ name: crate.name!, version: crate.version!, license: crate.license!, licenseText: crate.licenseText!, kind: "crate" });
   }
   if (!packages.some((p) => p.name === "Rust standard library")) problems.push("the record does not list the Rust standard library");
+  if (!packages.some((p) => p.name !== "Rust standard library")) problems.push("the record lists no crate besides the Rust standard library");
   return { packages, problems };
+}
+
+/**
+ * The text of an HTML page, for the Rust toolchain's copyright notice (#955). Throws on
+ * an entity it does not decode, so a changed page cannot leak raw markup
+ * into the notices.
+ */
+export function htmlText(html: string): string {
+  const text = html
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, "")
+    .replace(/<\/(p|h[1-6]|li|div|tr|pre|ul|ol|table)>|<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    // Numeric references (the toolchain's page writes quotes as &#34;).
+    .replace(/&#(x[0-9a-f]+|\d+);/gi, (ref: string, code: string) => {
+      const cp = code[0].toLowerCase() === "x" ? parseInt(code.slice(1), 16) : Number(code);
+      return cp <= 0x10ffff ? String.fromCodePoint(cp) : ref;
+    })
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  const left = /&(?!amp;)(#x?[0-9a-f]+|[a-z][a-z0-9]*);/i.exec(text);
+  if (left) throw new Error(`the toolchain's copyright page has an entity htmlText does not decode: ${left[0]}`);
+  // Last, so an encoded "&amp;lt;" stays the literal text "&lt;".
+  return text.replace(/&amp;/g, "&");
 }

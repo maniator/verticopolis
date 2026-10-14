@@ -6,6 +6,7 @@ import {
   INJECTED_CODE,
   collectPackageDirs,
   engineRecordPackages,
+  htmlText,
   declaredLicense,
   isAllowedLicense,
   isLicenseFileName,
@@ -216,7 +217,16 @@ describe("third-party notices (#951)", () => {
     expect(shippedCrates(meta).map((p) => p.name)).toEqual(["itoa", "serde"]);
     expect(() => shippedCrates({ ...meta, resolve: { ...meta.resolve, root: null } })).toThrow(/no root/);
     // Narrowed to what `cargo tree` says this build compiles (metadata unifies features across builds).
-    expect(shippedCrates(meta, new Set(["serde v1.0.0"])).map((p) => p.name)).toEqual(["serde"]);
+    expect(shippedCrates(meta, new Set(["engine v1.0.0", "serde v1.0.0"])).map((p) => p.name)).toEqual(["serde"]);
+    // A listing that does not name the root was misread, and would drop every crate.
+    expect(() => shippedCrates(meta, new Set(["serde v1.0.0"]))).toThrow(/root crate/);
+    expect(() => shippedCrates(meta, new Set())).toThrow(/root crate/);
+  });
+
+  it("decodes the toolchain's copyright page and refuses an entity it does not know", () => {
+    expect(htmlText("<p>a &#34;b&#34; &#x3c;c&#62; &lt;d&gt; &amp;lt;</p><br>e")).toBe('a "b" <c> <d> &lt;\n\ne');
+    expect(() => htmlText("<p>&copy; 2026</p>")).toThrow(/&copy;/);
+    expect(() => htmlText("&#x110000;")).toThrow(/&#x110000;/);
   });
 
   it("labels Rust crates and keeps them apart from npm packages of the same name", () => {
@@ -239,6 +249,8 @@ describe("third-party notices (#951)", () => {
     expect(ok.packages[0]).toEqual({ name: "serde", version: "1.0.229", license: "MIT OR Apache-2.0", licenseText: "MIT text", kind: "crate" });
     // The standard library is always linked, so a record without it is refused.
     expect(engineRecordPackages({ sources: "abc", crates: [good] }, "abc").problems.join()).toMatch(/Rust standard library/);
+    // Nor is one with only the standard library: the engine always compiles in crates.
+    expect(engineRecordPackages({ sources: "abc", crates: [std] }, "abc").problems.join()).toMatch(/no crate besides/);
     // A record from another build of the engine.
     expect(engineRecordPackages({ sources: "old", crates: [good, std] }, "abc").problems.join()).toMatch(/source hash differs/);
     expect(engineRecordPackages({ crates: [good, std] }, undefined).problems.join()).toMatch(/source hash differs/);

@@ -203,9 +203,11 @@ for (const [dir, origin] of dirs) {
 }
 
 // The WASM engine: its crates and the Rust standard library, from the record
-// `npm run wasm:build` writes beside the package. The engine never ships
-// without one.
-if (existsSync(join(DIST, ENGINE_GLUE))) {
+// every engine build writes beside the package. The engine never ships
+// without one: any file under dist/engine/ (the glue, the .wasm, or both)
+// requires it.
+const engineDir = join(DIST, "engine");
+if (existsSync(engineDir) && readdirSync(engineDir).length > 0) {
   const recordPath = join(DIST, "engine", ENGINE_THIRD_PARTY);
   const read = (path: string): unknown => {
     try {

@@ -17,38 +17,21 @@
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { noticeProblem, shippedCrates, type CargoMetadata, type NoticePackage } from "../src/build/thirdPartyNotices.ts";
+import { dirname, join, relative, isAbsolute } from "node:path";
+import { htmlText, noticeProblem, shippedCrates, type CargoMetadata, type NoticePackage } from "../src/build/thirdPartyNotices.ts";
 import { readLicenseFiles } from "./license-files.ts";
 
 /** The record's file name inside the package directory. */
 export const ENGINE_THIRD_PARTY = "THIRD-PARTY.json";
 
-/** The text of an HTML page, for the toolchain's copyright notice. */
-function htmlText(html: string): string {
-  return html
-    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, "")
-    .replace(/<\/(p|h[1-6]|li|div|tr|pre|ul|ol|table)>|<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    // Numeric references (the toolchain's page writes quotes as &#34;).
-    .replace(/&#(x[0-9a-f]+|\d+);/gi, (_, code: string) => String.fromCodePoint(code[0].toLowerCase() === "x" ? parseInt(code.slice(1), 16) : Number(code)))
-    .replace(/&amp;/g, "&")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
 /** Where the toolchain keeps the standard library's copyright notice and license texts (the rustup layout). */
 function toolchainDocs(crate: string): { version: string; files: string[] } {
   // The compiler cargo itself uses: $RUSTC when set, else rustc on PATH.
   const rustc = (args: string[]) => execFileSync(process.env.RUSTC || "rustc", args, { cwd: crate, encoding: "utf8" }).trim();
-  const version = /^rustc (\d+\.\d+\.\d+)/.exec(rustc(["--version"]))?.[1];
-  if (!version) throw new Error("rustc --version printed no version");
+  const printed = rustc(["--version"]);
+  // A stable release only: a beta or nightly ("1.97.0-nightly") links a different standard library.
+  const version = /^rustc (\d+\.\d+\.\d+)(?: |$)/.exec(printed)?.[1];
+  if (!version) throw new Error(`rustc --version printed "${printed}", which is not a stable release`);
   const doc = join(rustc(["--print", "sysroot"]), "share", "doc", "rust");
   return { version, files: STD_FILES.map((f) => join(doc, f)) };
 }
@@ -88,6 +71,8 @@ function standardLibrary(crate: string): NoticePackage & { hasLicenseFile: true 
   const missing = files.filter((f) => !existsSync(f));
   if (missing.length > 0) throw new Error(`the Rust toolchain ships no ${missing.join(", ")}; the standard library cannot be attributed`);
   const [copyright, ...licenses] = files.map((f) => readFileSync(f, "utf8"));
+  const empty = files.filter((_, i) => (i === 0 ? copyright : licenses[i - 1]).trim() === "");
+  if (empty.length > 0) throw new Error(`the Rust toolchain's ${empty.join(", ")} is empty; the standard library cannot be attributed`);
   return {
     name: "Rust standard library",
     version,
@@ -121,7 +106,9 @@ export function engineThirdParty(crate: string, features: string): (NoticePackag
       .map((line) => line.replace(/ \(.*$/, "").trim())
       .filter(Boolean),
   );
-  for (const p of shippedCrates(meta, linked)) {
+  const crates = shippedCrates(meta, linked);
+  if (crates.length === 0) throw new Error("cargo tree and cargo metadata agree on no crate the WASM engine compiles in; check their output");
+  for (const p of crates) {
     const dir = dirname(p.manifest_path);
     const read = readLicenseFiles(dir);
     problems.push(...read.problems.map((p) => `${p.file} ${p.reason}`));
@@ -130,9 +117,17 @@ export function engineThirdParty(crate: string, features: string): (NoticePackag
     // conventional name; that file counts too.
     if (p.license_file) {
       const named = join(dir, p.license_file);
-      if (!existsSync(named)) problems.push(`${p.name}@${p.version}: license-file ${p.license_file} does not exist`);
+      const inside = relative(dir, named);
+      let text: string | undefined;
+      if (inside.startsWith("..") || isAbsolute(inside)) problems.push(`${p.name}@${p.version}: license-file ${p.license_file} is outside the crate`);
       else {
-        const text = readFileSync(named, "utf8").trimEnd();
+        try {
+          text = readFileSync(named, "utf8").trimEnd();
+        } catch (err) {
+          problems.push(`${p.name}@${p.version}: license-file ${p.license_file} cannot be read (${(err as NodeJS.ErrnoException).code ?? err})`);
+        }
+      }
+      if (text !== undefined) {
         if (!licenseText.includes(text)) licenseText = [licenseText, `--- ${p.license_file} ---\n\n${text}`].filter(Boolean).join("\n\n");
         hasLicenseFile ||= text.trim() !== "";
       }

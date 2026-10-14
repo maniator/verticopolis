@@ -55,7 +55,7 @@ context:
 - [x] `scripts/engine-third-party.ts` -- runs `cargo metadata`, reads each crate's license and notice files, adds the standard library from the toolchain's `share/doc/rust`, validates, returns the record -- the IO side of the walk.
 - [x] `scripts/wasm-build.ts` -- writes `src/public/engine/THIRD-PARTY.json` -- the record travels with the package.
 - [x] `scripts/gen-third-party-notices.ts` -- require and merge the record when the engine ships -- closes the allowlisted gap.
-- [x] `engine-rs/Cargo.toml` -- `license = "MIT"`, then rebuild the committed package -- the record and the hash stay in step.
+- [x] `engine-rs/Cargo.toml` -- `license = "MIT"` -- every engine build writes the record with the package's own source hash (the package is build output since #958).
 - [x] `src/tests/thirdPartyNotices.test.ts` -- the matrix rows the pure module decides.
 - [x] `package.json`, backlog -- patch bump (no player line: the notices file is the only output that changes); row `wasm-engine-third-party-notices` done (closes #955 on merge).
 
@@ -69,6 +69,7 @@ context:
 - 2026-10-14, review round 2: the toolchain check is exact (`rust-version` at `.0`, the release CI already pins), and `scripts/vercel-build.sh` installs that same release, so every build writes the same standard library entry; the record is gathered before the compile, so a crate that cannot be attributed leaves the old package in place; `noticeProblem` says "manifest" so its messages fit crates too.
 - 2026-10-14, review round 3 and the owner's artifact check on #992: the walk is narrowed by `cargo tree -e normal` for the same target and features, because `cargo metadata` unifies features across builds and listed `zlib-rs`, which the wasm32 build never compiles; the record now equals the 28 crates a clean wasm32 compile produces. The standard library entry is license-checked at `wasm:build`, the site build refuses a record without it, and `vercel-build.sh` shares `checkToolchain`'s version rule.
 - 2026-10-14, after #958 merged: the engine package (record included) is build output, written by `scripts/build-engine-wasm.sh` on every deploy and CI job that serves it, so the record is no longer committed and CI's staleness check on it is gone; `.github/actions/engine-wasm`'s cache key now hashes the attribution code, so a change to the walk or the allowlist rebuilds the record (closes #974's item 8).
+- 2026-10-14, review round 4: the walk refuses a `cargo tree` listing that does not name the root crate, and the WASM build refuses an empty crate list, so a misread listing cannot drop every crate; the site build refuses a record with only the standard library; any file under `dist/engine/` requires the record; a crate's `license-file` must sit inside the crate and an unreadable one is a named problem; rustc must be a stable release; an empty toolchain license file is refused; the copyright page's decoder refuses an entity it does not know. Deferred: checking the standard library's license expression against the toolchain's copyright page on a `rust-version` bump (row `third-party-notices-hardening`, #974).
 
 ## Design Notes
 
