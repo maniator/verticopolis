@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 /// `.TDT` referee open the scenario fixtures and the lock tables they are
 /// given a path to, and none is reached from a game a host runs. Only these
 /// bodies (and the files' `std::path` / `std::fs` imports) are exempt; the
-/// rest of each file, `state_view` and any helper included, is scanned like
+/// rest of each file, every helper included, is scanned like
 /// any other library code. Moving the harness behind a feature is a later
 /// stage of the engine-independence plan (#980).
 const MAY_READ_FILES: &[(&str, &[&str])] = &[
