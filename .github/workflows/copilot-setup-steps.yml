@@ -10,6 +10,9 @@ on:
       - .github/actions/engine-wasm/**
       - scripts/build-engine-wasm.sh
       - scripts/wasm-build.ts
+      - scripts/engine-third-party.ts
+      - scripts/license-files.ts
+      - src/build/thirdPartyNotices.ts
       - src/wasmhost/packageHash.ts
   pull_request:
     paths:
@@ -17,6 +20,9 @@ on:
       - .github/actions/engine-wasm/**
       - scripts/build-engine-wasm.sh
       - scripts/wasm-build.ts
+      - scripts/engine-third-party.ts
+      - scripts/license-files.ts
+      - src/build/thirdPartyNotices.ts
       - src/wasmhost/packageHash.ts
 
 # Least privilege at the workflow level too (the job below restates it): setup

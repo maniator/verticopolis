@@ -101,6 +101,7 @@ export function engineThirdParty(crate: string, features: string): (NoticePackag
     execFileSync("cargo", ["tree", "--locked", "-e", "normal", "--target", "wasm32-unknown-unknown", "--features", features, "--prefix", "none", "--format", "{p}"], {
       cwd: crate,
       encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
     }),
   );
   const crates = shippedCrates(meta, linked);

@@ -63,7 +63,7 @@ runs:
           echo "::error::src/public/engine/BUILD.json names sources $built, but the tree's Rust sources hash to $SOURCES"
           exit 1
         fi
-        for f in src/public/engine/verticopolis_engine.js src/public/engine/verticopolis_engine_bg.wasm engine-rs/pkg/verticopolis_engine.js engine-rs/pkg/verticopolis_engine_bg.wasm engine-rs/pkg/package.json; do
+        for f in src/public/engine/verticopolis_engine.js src/public/engine/verticopolis_engine_bg.wasm src/public/engine/THIRD-PARTY.json engine-rs/pkg/verticopolis_engine.js engine-rs/pkg/verticopolis_engine_bg.wasm engine-rs/pkg/package.json; do
           test -f "$f" || { echo "::error::$f is missing from the engine package"; exit 1; }
         done
 
