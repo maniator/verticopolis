@@ -12,6 +12,7 @@
  * self-contained). `src/ui/iconPaths.generated.test.ts` checks the
  * committed output still matches the installed package.
  */
+// copies-package: pixelarticons -> src/ui/iconPaths.generated.ts
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";

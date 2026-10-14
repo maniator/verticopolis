@@ -62,7 +62,8 @@ export interface WorkerHostStats {
   workerOpsMs: number;
   workerReplyMs: number;
   /** Command to the first reply that includes it (the ack) and to the end
-   *  of applying that reply (the change visible in the read model), in ms,
+   *  of applying the first fresh reply that includes it (the change visible
+   *  in the read model), in ms,
    *  for the last commands (bounded). */
   commandAckMs: number[];
   commandVisibleMs: number[];

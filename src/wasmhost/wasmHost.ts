@@ -7,12 +7,15 @@ import type { WasmEngine, WasmModule } from "../dualrun/binding";
 import { readCatalog } from "../dualrun/catalog";
 import { loadCommand, relayCommands } from "../dualrun/mirror";
 import { ShadowEngine } from "../dualrun/shadow";
+import { drainEngineBatch } from "./engineEvents";
 import { decodeFrame, decodeHeader, type FrameHeader, type FrameView } from "./frameView";
 import { appendEngineLog, applyRecords, checkRecords } from "./frameApply";
 import { setStepGate } from "./stepGate";
 import { mergeSimulation } from "./merge";
 import { adoptTelemetry, type TelemetryDocument } from "./telemetry";
-import { towerCatalog, useTowerCatalogSource } from "../engine/towerCatalog";
+import { useTowerCatalogSource } from "../engine/towerCatalog";
+import { catalogFor } from "../engine/catalog";
+import type { Catalog, CatalogWorld } from "../engine/catalogTypes";
 import { PERSON_OPTIONALS, clearOptional } from "./personFields";
 
 /**
@@ -59,7 +62,9 @@ export interface WasmHost {
 /** Attach a host to `sim`. Throws, leaving the instance untouched, when the
  *  tower already has a crowd (the engine starts from a save, which carries
  *  none), when a mirror or host is already attached, or when the binding's
- *  catalog cannot be read or states another world. While attached, `towerCatalog(sim)` is the engine's. */
+ *  catalog cannot be read, states another world or lists other facility
+ *  kinds than this build's tables. While attached, `towerCatalog(sim)` is the
+ *  engine's. */
 export interface WasmHostOptions {
   /** When the read model follows the engine. "step" (the default, and the
    *  only mode the shipped `?engine=wasm` uses) applies the frame view after
@@ -78,15 +83,12 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   // patronage readout uses the Modern yardstick): a binding whose catalog this
   // build cannot read refuses the attach before an engine is built.
   const catalogs = { classic: readCatalog(mod, "classic"), modern: readCatalog(mod, "modern") };
-  // The view was sized from the tower's current world and cannot resize: a
-  // binding that states another world is refused here, once, instead of
-  // failing the status pump on every tick after the switch.
-  const world = towerCatalog(sim).world;
-  for (const c of Object.values(catalogs)) {
-    if (c.world.lotWidth !== world.lotWidth || c.world.minFloor !== world.minFloor || c.world.maxFloor !== world.maxFloor) {
-      throw new Error(`the WASM engine's ${c.mode} catalog states a different world from the tower's`);
-    }
-  }
+  // The view was sized from the tables' world and cannot resize, the read
+  // model applies the tables' world rules (the ground floor and its structure,
+  // the lobby interval), and the UI draws only the kinds it has a presentation
+  // for. A binding that states another world or lists other kinds is refused
+  // here, once, instead of failing the status pump after the switch.
+  for (const c of Object.values(catalogs)) refuseForeignCatalog(c);
   const shadow = new ShadowEngine(mod);
   shadow.apply(loadCommand(sim, 0));
   const engine = shadow.handle();
@@ -117,12 +119,19 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   // The read model's own ring overflows with duplicates while hosted, so the
   // drop count is the instance's at attach plus the engine's.
   const droppedAtAttach = sim.gameplayEvents.dropped;
+  // Events lost to a batch the host could not read (#907).
+  let unreadable = 0;
   const drainHosted = (): GameplayEvent[] => {
+    // The engine first: when it traps, the read model's copies stay for the
+    // detach to count what the trap took.
+    const batch = drainEngineBatch(engine);
     sim.gameplayEvents.drain();
-    const out = [...carried, ...(JSON.parse(engine.drainGameplayEvents()) as GameplayEvent[])];
+    unreadable += batch.lost;
+    const out = [...carried, ...batch.events];
     carried = [];
     return out;
   };
+  const droppedSoFar = () => droppedAtAttach + unreadable + engine.gameplayEventsDropped();
   const host: WasmHost = {
     engine,
     sync: coalesce ? "frame" : "step",
@@ -159,30 +168,24 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
       // a command the engine's full ring already dropped is counted again
       // from its copy; and the copies stop at the read model's ring cap.
       const duplicates = sim.gameplayEvents.length;
-      let owed: GameplayEvent[] = carried;
-      let dropped = droppedAtAttach + duplicates;
-      try {
-        dropped += engine.gameplayEventsDropped();
-        owed = drainHosted();
-        dropped -= duplicates;
-      } finally {
-        try {
-          relay.detach();
-        } finally {
-          try {
-            useTowerCatalogSource(sim, null);
-            setStepGate(sim, null);
-            restoreOwn(sim, "serialize", ownSerialize);
-            restoreOwn(sim, "drainGameplayEvents", ownDrain);
-            restoreOwn(sim, "gameplayEventsDropped", ownDropped);
-            sim.gameplayEvents.drain(); // the read model's duplicates
-            sim.gameplayEvents.dropped = dropped;
-            for (const e of owed) sim.gameplayEvents.pushEvent(e);
-          } finally {
-            shadow.free();
-          }
-        }
-      }
+      const handOff = { events: carried, dropped: droppedAtAttach + unreadable + duplicates };
+      runEach(
+        () => {
+          const engineDropped = engine.gameplayEventsDropped();
+          handOff.dropped += engineDropped;
+          handOff.events = drainHosted();
+          handOff.dropped = droppedAtAttach + unreadable + engineDropped;
+        },
+        () => relay.detach(),
+        () => useTowerCatalogSource(sim, null),
+        () => setStepGate(sim, null),
+        () => restoreOwn(sim, "serialize", ownSerialize),
+        () => restoreOwn(sim, "drainGameplayEvents", ownDrain),
+        () => restoreOwn(sim, "gameplayEventsDropped", ownDropped),
+        // The read model's duplicates go; the owed batch takes their place.
+        () => sim.gameplayEvents.restore(handOff.events, handOff.dropped),
+        () => shadow.free(),
+      );
     },
   };
 
@@ -301,9 +304,12 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     // host): the engine built for it must not leak, and the instance keeps
     // its own events.
     try {
-      shadow.free();
-    } finally {
-      for (const ev of carried) sim.gameplayEvents.pushEvent(ev);
+      runEach(
+        () => shadow.free(),
+        () => sim.gameplayEvents.restore(carried, sim.gameplayEvents.dropped),
+      );
+    } catch {
+      // The refusal is the caller's answer; a failure to free behind it is not.
     }
     throw e;
   }
@@ -315,7 +321,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   // is the authority again, and never reaches the freed engine.
   const drainOverride = (): GameplayEvent[] => (detached ? sim.gameplayEvents.drain() : drainHosted());
   Object.defineProperty(sim, "drainGameplayEvents", { value: drainOverride, configurable: true, writable: true });
-  Object.defineProperty(sim, "gameplayEventsDropped", { get: () => droppedAtAttach + engine.gameplayEventsDropped(), configurable: true });
+  Object.defineProperty(sim, "gameplayEventsDropped", { get: droppedSoFar, configurable: true });
   // Prices, sizes and build rules come from the engine that runs the tower.
   useTowerCatalogSource(sim, (mode) => catalogs[mode]);
   if (coalesce) {
@@ -329,6 +335,21 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     });
   }
   return host;
+}
+
+/** Run every step, even after one throws, then throw the first error: a
+ *  teardown that must let the instance go and free the engine whatever an
+ *  earlier step did. */
+function runEach(...steps: (() => void)[]): void {
+  let failure: { error: unknown } | null = null;
+  for (const step of steps) {
+    try {
+      step();
+    } catch (error) {
+      failure ??= { error };
+    }
+  }
+  if (failure) throw failure.error;
 }
 
 /** Put back an own property the host replaced: the one that was there, or
@@ -407,5 +428,31 @@ export function syncCars(sim: Simulation, frame: FrameView): void {
     } else {
       delete t.carLoad;
     }
+  }
+}
+
+/** Refuses a binding catalog that states another world, or lists other
+ *  facility kinds, than this build's tables for the same mode: the view was
+ *  sized from that world and the UI has a color and a description only for
+ *  those kinds. The error names the field or the kinds that differ. */
+/** Refuse a binding catalog whose world or facility kinds differ from this
+ *  build's tables. Shared with the worker host, so both hosts refuse the same
+ *  bindings. */
+export function refuseForeignCatalog(c: Catalog): void {
+  const own = catalogFor(c.mode);
+  for (const field of Object.keys(own.world) as (keyof CatalogWorld)[]) {
+    if (c.world[field] !== own.world[field]) {
+      throw new Error(`the WASM engine's ${c.mode} catalog states a different world from this build's tables (${field})`);
+    }
+  }
+  // `readCatalog` already refuses a kind listed twice.
+  const keys = c.facilities.map((f) => f.key);
+  const kinds = new Set(own.facilities.map((f) => f.key));
+  const listed = new Set(keys);
+  const extra = keys.filter((k) => !kinds.has(k));
+  const missing = [...kinds].filter((k) => !listed.has(k));
+  if (extra.length > 0 || missing.length > 0) {
+    const parts = [extra.length > 0 ? `unknown ${extra.join(", ")}` : "", missing.length > 0 ? `missing ${missing.join(", ")}` : ""];
+    throw new Error(`the WASM engine's ${c.mode} catalog lists other facility kinds than this build draws (${parts.filter(Boolean).join("; ")})`);
   }
 }

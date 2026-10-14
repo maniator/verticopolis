@@ -16,6 +16,8 @@ An opportunity to close two blind spots left by the cookieless PostHog migration
 
 ## Capabilities
 
+> Since the analytics engine bridge (#873) the engine reports these facts and `src/analyticsEngineBridge.ts` folds them into the same events: from 2.29.5 for the tuning latches and the emergencies, and from 2.31.2 for `demolish`, which is now sent at most 40 times in each one-minute window. `event-catalog.md` (its first section) records each change; the capabilities below are the #611 contract as it shipped.
+
 - **CAP-1**
   - **intent:** A player who demolishes a facility, tunes pricing, or tunes transport capacity has that behavior recorded through one parametrized gameplay event `economy_action { action; detail? }`, so the economy action surface breaks down by behavior on a dashboard.
   - **success:** A demolish fires `economy_action { action: "demolish", detail: "sell" | "bulldoze" }` once per removal; the first pricing change of a session fires `economy_action { action: "price_tune" }` exactly once and never again that session; the first capacity change fires `economy_action { action: "capacity_tune" }` exactly once; no schedule edit, film policy, variety reroll, price value, or rent value is ever emitted. All host-gated, never-throw. Asserted in vitest.

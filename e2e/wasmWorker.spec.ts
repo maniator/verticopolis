@@ -73,7 +73,7 @@ test("the game runs on the WASM engine in a worker behind ?engine=wasm-worker", 
   }, result.save);
   expect(roundTrip).toBe(true);
   // The worker's script is in the service worker's precache, so an offline
-  // start finds it (the engine package itself is #985's).
+  // start finds it (with the engine package, which #985 precaches).
   const sw = await page.evaluate(async () => (await fetch(new URL("sw.js", document.baseURI))).text());
   const precached = /assets\/engineWorker-[\w-]+\.js/.exec(sw)?.[0];
   expect(precached).toBeTruthy();
@@ -105,11 +105,11 @@ test("a fatal worker error leaves the tower on TypeScript, and the next tower ge
 
 /**
  * Offline on the worker host: with the service worker installed, a reload
- * without the network brings the game up on the TypeScript engine (the
- * worker script is precached, the engine package is not, #985), with the
- * failure reported and no page error.
+ * without the network brings the game back up on the worker host. The
+ * worker script and the engine package are both precached (#985), and the
+ * worker fetches the package through the page's service worker.
  */
-test("an offline reload on the worker host boots on TypeScript", async ({ browser }, info) => {
+test("an offline reload on the worker host comes back on the worker", async ({ browser }, info) => {
   test.skip(info.project.name !== WASM_PROJECT, "the engine package is served on the chromium-wasm project");
   const ctx = await browser.newContext({ serviceWorkers: "allow" });
   try {
@@ -122,9 +122,9 @@ test("an offline reload on the worker host boots on TypeScript", async ({ browse
     await page.waitForLoadState("networkidle");
     await ctx.setOffline(true);
     await page.reload();
-    await page.waitForFunction(() => Boolean((window as any).game), undefined, { timeout: 30_000 });
-    const state = await page.evaluate(() => ({ host: Boolean((window as any).__vcEngine), hosted: Boolean((window as any).__vcEngine?.status?.hosted) }));
-    expect(state).toEqual({ host: false, hosted: false });
+    await page.waitForFunction(() => Boolean((window as any).game) && Boolean((window as any).__vcEngine?.current?.()?.loaded?.()), undefined, { timeout: 30_000 });
+    const state = await page.evaluate(() => ({ placement: (window as any).__vcEngine?.status?.placement, hosted: Boolean((window as any).__vcEngine?.status?.hosted) }));
+    expect(state).toEqual({ placement: "worker", hosted: true });
     expect(errors).toEqual([]);
   } finally {
     await ctx.setOffline(false);

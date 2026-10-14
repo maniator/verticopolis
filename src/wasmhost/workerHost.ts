@@ -1,13 +1,14 @@
 import { Simulation } from "../engine/Simulation";
 import type { GameplayEvent } from "../engine/gameplayEvents";
 import type { LogEntry } from "../engine/types";
-import { towerCatalog, useTowerCatalogSource } from "../engine/towerCatalog";
+import { useTowerCatalogSource } from "../engine/towerCatalog";
 import { readCatalog } from "../dualrun/catalog";
 import type { ShadowCommand } from "../dualrun/commands";
 import { loadCommand, relayCommands, type CommandRelay } from "../dualrun/mirror";
 import { appendEngineLog, applyRecords, checkRecords } from "./frameApply";
 import { decodeHeader } from "./frameView";
 import { SETTLE_TIMEOUT_MS, setStepGate } from "./stepGate";
+import { refuseForeignCatalog } from "./wasmHost";
 import type { FrameReply, FrameRequest, Op, ToWorker } from "./workerProtocol";
 import { applyHeaderFields, mergeSave, restoreOwn, structuredCloneOf } from "./workerApply";
 import { LATENCY_SAMPLES, newWorkerHostStats, pushSample, type WorkerHost, type WorkerHostOptions } from "./workerStats";
@@ -57,12 +58,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     classic: readCatalog({ catalog: () => opts.catalogs.classic }, "classic"),
     modern: readCatalog({ catalog: () => opts.catalogs.modern }, "modern"),
   };
-  const world = towerCatalog(sim).world;
-  for (const c of Object.values(catalogs)) {
-    if (c.world.lotWidth !== world.lotWidth || c.world.minFloor !== world.minFloor || c.world.maxFloor !== world.maxFloor) {
-      throw new Error(`the WASM engine's ${c.mode} catalog states a different world from the tower's`);
-    }
-  }
+  for (const c of Object.values(catalogs)) refuseForeignCatalog(c); // the same check the main-thread host makes
   const { gen } = opts;
   const load = loadCommand(sim, gen); // refuses a tower whose crowd exists
   const stats = newWorkerHostStats();
@@ -426,7 +422,11 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
         cmdSeq = seq;
         stats.lastCommandSeq = seq;
         commandTimes.set(seq, now());
-        if (commandTimes.size > LATENCY_SAMPLES) commandTimes.delete(commandTimes.keys().next().value as number);
+        if (commandTimes.size > LATENCY_SAMPLES) {
+          const oldest = commandTimes.keys().next().value as number;
+          commandTimes.delete(oldest);
+          ackedAt.delete(oldest);
+        }
       }
       exact = keep ? { save: keep.save, seq, view: { value: structuredCloneOf((cmd as { view: unknown }).view) } } : null;
       scheduleSend();
