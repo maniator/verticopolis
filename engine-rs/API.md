@@ -52,11 +52,11 @@ be packaged on its own yet (#893).
 
 A game does no IO. The simulation reads no file, clock, environment,
 console or network, and spawns no thread or process; the host passes in
-bytes, time and its build name. The one exception is the conformance
-harness (`scenario.rs`, `tdt/referee.rs`), which reads the scenario and
-fixture files it is pointed at and is never reached from a running game.
-`state_view`, the one host call that lives in `scenario.rs`, gets no such
-exception: its body is checked like any other library code.
+bytes, time and its build name. The one exception is a short list of
+conformance harness functions in `scenario.rs` and `tdt/referee.rs`, which
+read the scenario and fixture files they are pointed at and are never
+reached from a running game. The rest of both files, `state_view` included,
+is checked like any other library code.
 `tests/independence.rs` scans the library source for those services (by
 path, grouped import, macro and foreign-function block), refuses a build
 script for the engine itself, data (`include_str!`, `include_bytes!`) from

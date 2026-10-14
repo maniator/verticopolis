@@ -8,21 +8,33 @@
 //!
 //! Test code (`#[cfg(test)]` items and the files they pull in with `#[path]`)
 //! and the binaries under `src/bin/` may read files: they are the referee and
-//! its tools. Two harness modules may read files too (see
-//! [`MAY_READ_FILES`]).
+//! its tools. A few named functions in two harness modules may read files
+//! too (see [`MAY_READ_FILES`]).
 
 use std::path::{Path, PathBuf};
 
-/// Library files that may read files: the conformance runner and the `.TDT`
-/// referee open the scenario fixtures and the lock tables they are given a
-/// path to. Neither is reached from a game a host runs. Moving them behind a
-/// feature is a later stage of the engine-independence plan (#980).
-const MAY_READ_FILES: &[&str] = &["src/scenario.rs", "src/tdt/referee.rs"];
-
-/// Host API functions that live in a [`MAY_READ_FILES`] module until stage 2
-/// of #980 moves them out. The exemption covers the harness around them, never
-/// these bodies: each is scanned like any other library code.
-const HOST_API_IN_HARNESS: &[(&str, &str)] = &[("src/scenario.rs", "state_view")];
+/// The library functions that may read files: the conformance runner and the
+/// `.TDT` referee open the scenario fixtures and the lock tables they are
+/// given a path to, and none is reached from a game a host runs. Only these
+/// bodies (and the files' `std::path` / `std::fs` imports) are exempt; the
+/// rest of each file, `state_view` and any helper included, is scanned like
+/// any other library code. Moving the harness behind a feature is a later
+/// stage of the engine-independence plan (#980).
+const MAY_READ_FILES: &[(&str, &[&str])] = &[
+    (
+        "src/scenario.rs",
+        &[
+            "start_sim",
+            "run_scenario",
+            "run_scenario_until",
+            "run_scenario_inner",
+        ],
+    ),
+    (
+        "src/tdt/referee.rs",
+        &["fixture_save", "replay_export", "replay_all", "read_lock"],
+    ),
+];
 
 /// Host services the simulation never reaches for, as they read in
 /// [`squeeze`]d code: the host owns IO, time, threads, the process and
@@ -509,11 +521,8 @@ fn library_sources() -> Vec<(String, Library)> {
             rel(&file)
         };
         test_only.extend(paths.iter().map(|t| resolve(t)));
-        production.extend(
-            path_attributes(&lib.src, &lib.parts, 0, lib.src.len())
-                .iter()
-                .map(|t| resolve(t)),
-        );
+        // `#[path]` modules and `include!` targets.
+        production.extend(included_code(&lib).iter().map(|t| resolve(t)));
         production.extend(
             module_declarations(&lib.code)
                 .iter()
@@ -680,30 +689,41 @@ fn function_body<'a>(code: &'a str, name: &str) -> Option<&'a str> {
     None
 }
 
+/// `code` with the [`MAY_READ_FILES`] functions of `name` and the file
+/// imports blanked out. Each listed function must exist.
+fn without_exempt_functions(name: &str, code: &str) -> String {
+    let Some((_, functions)) = MAY_READ_FILES.iter().find(|(f, _)| *f == name) else {
+        return code.to_string();
+    };
+    let mut out = code.to_string();
+    for function in *functions {
+        let body = function_body(code, function)
+            .unwrap_or_else(|| panic!("{name} has no fn {function}; update MAY_READ_FILES"));
+        let at = body.as_ptr() as usize - code.as_ptr() as usize;
+        out.replace_range(at..at + body.len(), &" ".repeat(body.len()));
+    }
+    out.lines()
+        .map(|l| {
+            let t = l.trim_start();
+            if t.starts_with("use std::path") || t.starts_with("use std::fs") {
+                ""
+            } else {
+                l
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[test]
 fn the_library_uses_no_host_service() {
     let mut found = Vec::new();
     for (name, lib) in library_sources() {
-        let (services, reads_files) = host_services(&lib.code);
+        let code = without_exempt_functions(&name, &lib.code);
+        let (services, reads_files) = host_services(&code);
         found.extend(services.into_iter().map(|s| format!("{name}: {s}")));
-        if reads_files && !MAY_READ_FILES.contains(&name.as_str()) {
+        if reads_files {
             found.push(format!("{name}: file access (std::fs or std::path)"));
-        }
-        for (file, function) in HOST_API_IN_HARNESS.iter().filter(|(f, _)| *f == name) {
-            let body = function_body(&lib.code, function).unwrap_or_else(|| {
-                panic!("{file} has no fn {function}; update HOST_API_IN_HARNESS")
-            });
-            let (services, reads_files) = host_services(body);
-            found.extend(
-                services
-                    .into_iter()
-                    .map(|s| format!("{file}::{function}: {s}")),
-            );
-            if reads_files {
-                found.push(format!(
-                    "{file}::{function}: file access (std::fs or std::path)"
-                ));
-            }
         }
     }
     assert!(
@@ -836,6 +856,11 @@ fn compiled_in_data_comes_from_the_crate_or_the_conformance_suite() {
                 Err(e) => found.push(format!("{name}: {e}")),
             }
         }
+        // An imported include macro (`use std::include as inc;`) hides its
+        // calls from the include reader.
+        if imports_include_macro(&lib.code) {
+            found.push(format!("{name}: an include macro is imported"));
+        }
         // A module path set through `cfg_attr` hides from the #[path] reader;
         // name the file with a plain #[path] under a #[cfg] instead.
         if conditional_path(&lib.code) {
@@ -858,6 +883,26 @@ fn compiled_in_data_comes_from_the_crate_or_the_conformance_suite() {
         found.is_empty(),
         "the library compiles in code or data from where it may not (data from engine-rs/ or conformance/, code from src/): {found:?}"
     );
+}
+
+/// Whether `code` imports an include macro from `std` or `core`, by path or
+/// in a group.
+fn imports_include_macro(code: &str) -> bool {
+    let c = squeeze(code);
+    ["std::", "core::"].iter().any(|root| {
+        c.match_indices(root).any(|(i, _)| {
+            let rest = &c[i + root.len()..];
+            if rest.starts_with("include") {
+                return true;
+            }
+            rest.strip_prefix('{').is_some_and(|g| {
+                let group = &g[..g.find('}').unwrap_or(g.len())];
+                group
+                    .split([',', '{'])
+                    .any(|h| h.trim().starts_with("include"))
+            })
+        })
+    })
 }
 
 /// Whether any `cfg_attr` in `code` (literals blanked) sets a `path`.
@@ -1089,6 +1134,19 @@ mod g;
     ] {
         assert!(conditional_path(&library("sample", src).0.code), "{src}");
     }
+    for src in [
+        "use std::include as inc;",
+        "use core::{include_str as s, fmt};",
+        "use ::std::include_bytes;",
+    ] {
+        assert!(
+            imports_include_macro(&library("sample", src).0.code),
+            "{src}"
+        );
+    }
+    assert!(!imports_include_macro(
+        &library("sample", "use std::{fmt, io::Read};").0.code
+    ));
     assert!(!conditional_path(
         &library(
             "sample",
