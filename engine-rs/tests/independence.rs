@@ -19,6 +19,11 @@ use std::path::{Path, PathBuf};
 /// feature is a later stage of the engine-independence plan (#980).
 const MAY_READ_FILES: &[&str] = &["src/scenario.rs", "src/tdt/referee.rs"];
 
+/// Host API functions that live in a [`MAY_READ_FILES`] module until stage 2
+/// of #980 moves them out. The exemption covers the harness around them, never
+/// these bodies: each is scanned like any other library code.
+const HOST_API_IN_HARNESS: &[(&str, &str)] = &[("src/scenario.rs", "state_view")];
+
 /// Host services the simulation never reaches for, as they read in
 /// [`squeeze`]d code: the host owns IO, time, threads, the process and
 /// foreign code. A needle that starts with a letter matches only at the start
@@ -608,6 +613,38 @@ fn host_services(code: &str) -> (Vec<String>, bool) {
     (found, reads_files)
 }
 
+/// The source of the free function `name` in `code` (literals and comments
+/// blanked): from `fn name` to the brace that closes its body.
+fn function_body<'a>(code: &'a str, name: &str) -> Option<&'a str> {
+    let needle = format!("fn {name}");
+    let at = code
+        .match_indices(&needle)
+        .find(|(i, _)| {
+            let after = code
+                .as_bytes()
+                .get(i + needle.len())
+                .copied()
+                .unwrap_or(b' ');
+            !is_ident(after) && (*i == 0 || !is_ident(code.as_bytes()[i - 1]))
+        })?
+        .0;
+    let open = at + code[at..].find('{')?;
+    let mut depth = 0;
+    for (i, ch) in code[open..].char_indices() {
+        match ch {
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(&code[at..open + i + 1]);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 #[test]
 fn the_library_uses_no_host_service() {
     let mut found = Vec::new();
@@ -616,6 +653,22 @@ fn the_library_uses_no_host_service() {
         found.extend(services.into_iter().map(|s| format!("{name}: {s}")));
         if reads_files && !MAY_READ_FILES.contains(&name.as_str()) {
             found.push(format!("{name}: file access (std::fs or std::path)"));
+        }
+        for (file, function) in HOST_API_IN_HARNESS.iter().filter(|(f, _)| *f == name) {
+            let body = function_body(&lib.code, function).unwrap_or_else(|| {
+                panic!("{file} has no fn {function}; update HOST_API_IN_HARNESS")
+            });
+            let (services, reads_files) = host_services(body);
+            found.extend(
+                services
+                    .into_iter()
+                    .map(|s| format!("{file}::{function}: {s}")),
+            );
+            if reads_files {
+                found.push(format!(
+                    "{file}::{function}: file access (std::fs or std::path)"
+                ));
+            }
         }
     }
     assert!(
