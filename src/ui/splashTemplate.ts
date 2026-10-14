@@ -36,7 +36,7 @@ export interface SplashHandlers {
   onToggleMute?: (e: Event) => void;
   /** Tap the persistent splash install button (SPEC-pwa-install CAP-5). The
    *  button renders only when `installOffered` says so, which excludes
-   *  standalone / TWA sessions and wrapped builds. */
+   *  standalone / TWA sessions. */
   onInstall?: () => void;
 }
 

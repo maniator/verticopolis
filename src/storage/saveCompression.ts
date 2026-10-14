@@ -29,9 +29,9 @@ export const STORE_MAGIC = "VCZ1:";
  * The payload after it is the same deflate-then-base64 as {@link STORE_MAGIC}.
  *
  * Both live here, in the codec module, rather than beside their readers,
- * because the two containers wrap byte-identical payloads and the desktop
- * migration converts one into the other by rewriting only the header (see
- * `./saveMigration.ts`). Splitting them across modules is how that stops being
+ * because the two containers wrap byte-identical payloads and
+ * `./towerFileCodec.ts` converts one into the other by rewriting only the
+ * header. Splitting them across modules is how that stops being
  * obviously true.
  */
 export const TOWER_FILE_MAGIC = "VCTOWER1";

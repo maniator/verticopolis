@@ -19,7 +19,6 @@
  */
 import { registerSW } from "virtual:pwa-register";
 import { parseUpdateInfo, isDifferentBuild, type UpdateInfo } from "./pwaUpdateInfo";
-import { isWrappedMode } from "./platform";
 
 /**
  * High-level facts about the INCOMING build, read at prompt time from the
@@ -89,17 +88,6 @@ async function fetchUpdateInfo(): Promise<UpdateInfo | null> {
 const UPDATE_POLL_MS = 60 * 60 * 1000;
 
 export function registerPWA(handlers: PwaHandlers): void {
-  // Wrapped builds (`--mode native` for the iOS Capacitor shell, `--mode
-  // desktop` for the Electron shell) get their updates from the store or the
-  // wrapper's own channel. Skip registration and the hourly `version.json`
-  // poll entirely; the poll would only ever see the bundled snapshot the
-  // wrapper shipped anyway. The Android TWA renders the live site with the
-  // plain build, so it deliberately keeps this flow; the gate reads the
-  // build's Vite mode (the literal is inlined at build time; the predicate
-  // call itself is runtime), not any runtime wrapper flag.
-  if (isWrappedMode(import.meta.env.MODE)) {
-    return;
-  }
   // Service workers only work in a secure context with SW support. Bail cleanly
   // otherwise — a non-browser environment, insecure `http://`, or a page opened
   // straight from `file://` — rather than let registration throw a

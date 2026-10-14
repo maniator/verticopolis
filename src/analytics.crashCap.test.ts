@@ -99,12 +99,11 @@ describe("crash event cap and dedup", () => {
     expect(crashCalls()).toHaveLength(10);
   });
 
-  it("re-opens the cap when a consent change hands the budget back", () => {
+  it("re-opens the cap when the budget is handed back", () => {
     const crash = { kind: "webgl-context-lost", repeat: false, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
     gameplaySession.noteCrash(crash);
     gameplaySession.noteCrash(crash); // deduped
-    // The consent watcher's path: a new measurement window, then the crash slots
-    // released (every transition but a first-run grant does this).
+    // A new measurement window, then the crash slots released (the session reset).
     gameplaySession.startEpoch();
     gameplaySession.releaseCrashThrottle();
     gameplaySession.noteCrash(crash);

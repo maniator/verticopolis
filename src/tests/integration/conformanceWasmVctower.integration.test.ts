@@ -8,7 +8,7 @@
  * Every `.vctower` fixture the web game wrote is loaded the way an import
  * loads it, serialized, then stamped and written by the engine, and read back
  * by each web reader: `decodeVctower` (the Node container decoder),
- * `fromTowerFile` (the desktop store's re-header), and `SaveGame.import` (the
+ * `fromTowerFile` (the byte-preserving re-header), and `SaveGame.import` (the
  * player's import). The engine's file must be the web game's file of the
  * same save, stamp and time, byte for byte (#939): the JSON is
  * `JSON.stringify`'s text in the web's key order, and the compressor is a

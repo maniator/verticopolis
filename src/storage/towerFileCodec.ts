@@ -3,11 +3,9 @@ import { encodeSaveJson, fromBase64, inflateCapped, STORE_MAGIC, toBase64, TOWER
 
 /**
  * The `.vctower` container codec: localStorage `VCZ1:` values to `.vctower`
- * file text and back, byte-preserving by construction. Split out of
- * `saveMigration.ts` at the 500-line guard; that module owns WHEN a value
- * moves, this one owns the pure conversions whose correctness is a
- * byte-fidelity question (see the migration module's header for why nothing
- * here may deserialize: a decode-and-re-encode would burn Founder status).
+ * file text and back, byte-preserving by construction. Nothing here may
+ * deserialize: a decode-and-re-encode would burn Founder status. The WASM
+ * `.vctower` conformance suite uses it to compare the two engines' files.
  */
 
 /** Outcome of converting one stored value into `.vctower` text. */
@@ -49,7 +47,7 @@ function looksLikeTower(parsed: unknown): boolean {
  * no store, no clock, and no globals to stand in the way of testing it.
  *
  * `preserve` switches from "only carry a loadable tower" to "keep these bytes
- * whatever they are". See `MIGRATION_SOURCES` in `saveMigration.ts`.
+ * whatever they are".
  */
 export function toTowerFile(raw: string, preserve = false): ConversionResult {
   const trimmed = raw.trim();
@@ -136,8 +134,8 @@ export function toTowerFile(raw: string, preserve = false): ConversionResult {
  * THREE-WAY, and that is the whole point of putting it here rather than
  * reaching for `SaveGame.import`. Import handles a newer container correctly
  * ("made by a newer version, update the game to load it") and it also
- * deserializes, which would burn Founder status on the way (see the migration
- * module's header). This has to preserve the same distinction WITHOUT
+ * deserializes, which would burn Founder status on the way (see this module's
+ * header). This has to preserve the same distinction WITHOUT
  * decoding, so it reports the three outcomes the caller actually has to tell
  * apart:
  *
@@ -165,7 +163,7 @@ export function fromTowerFile(text: string, preserve = false): FromTowerFileResu
   if (!magic) return { ok: false, reason: "unreadable" };
   if (magic[0] !== TOWER_FILE_MAGIC) return { ok: false, reason: "too-new" };
 
-  // PRESERVE mode mirrors the forward migration's: the unreadable stash holds
+  // PRESERVE mode mirrors `toTowerFile`'s: an unreadable stash holds
   // bytes, not a tower, so its payload comes back verbatim rather than
   // whitespace-normalized. Verbatim in must mean verbatim out. ONE leading
   // newline is stripped, because that newline is the CONTAINER's own separator
@@ -189,7 +187,7 @@ export function fromTowerFile(text: string, preserve = false): FromTowerFileResu
   // Validated to the SAME bar as the forward direction, and by DOING the work
   // rather than pattern-matching it: decode, inflate, fatal-UTF-8, parse,
   // tower shape, then THROW THE DECODED BYTES AWAY and re-header the original,
-  // so Founder is untouched (see the migration module's header). Two review
+  // so Founder is untouched (see this module's header). Two review
   // findings forced each half. A base64 regex still accepted strings `atob`
   // throws on (bad length or padding), so a corrupted record with an intact
   // header OVERWROTE a readable localStorage tower with a value `readSlot`
