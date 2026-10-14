@@ -76,11 +76,11 @@ when the engine's or the consumer's `Cargo.lock` names
 a crate nobody reviewed for host access. It also checks that the harness
 modules and every binary sit behind the `conformance` feature.
 `tests/read_boundary.rs` checks the Rust files under `src/`, `tests/` and
-`consumer/src/` (the two scanner files themselves aside, whose examples
-climb on purpose): a `..` path leads only to `conformance/`. Both read
-source text, so they catch the ordinary spellings; review still owns the
-rest, and the sparse CI job is the proof for a path that steps up another
-way (`Path::parent`, `ancestors`).
+`consumer/src/` (`tests/independence.rs` and `tests/read_boundary.rs`
+aside, whose examples climb on purpose): a `..` path leads only to
+`conformance/`. Both read source text, so they catch the ordinary
+spellings; review still owns the rest, and the sparse CI job is the proof
+for a path that steps up another way (`Path::parent`, `ancestors`).
 
 ## The host API
 
