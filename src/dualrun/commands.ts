@@ -30,10 +30,13 @@ export type ShadowCommand =
   | { op: "extendTransport"; id: number; end: "up" | "down"; targetFloor: number; hwm: { bottom: number; top: number } | null }
   | { op: "removeFacility"; id: number; method: "sell" | "bulldoze" }
   | { op: "setSchedule"; id: number; schedule: unknown }
-  | { op: "setStop"; id: number; floor: number; stop: boolean }
+  /** `stop` is null when the live call passed a non-boolean (#996). */
+  | { op: "setStop"; id: number; floor: number; stop: boolean | null }
   | { op: "setExpressStops"; id: number }
   | { op: "clearStops"; id: number }
-  | { op: "adjustRent"; id: number; dir: 1 | -1 }
+  /** `dir` is 1 or -1 when well formed; anything else is relayed for the
+   *  binding to refuse as TypeScript did (#996). */
+  | { op: "adjustRent"; id: number; dir: number }
   | { op: "setNoRate"; id: number }
   | { op: "priceUnit"; id: number; target: number }
   | { op: "applyRentBatch"; kind: FacilityKind; target: number | "default" | "noRate"; onlyDefaultPriced: boolean }
