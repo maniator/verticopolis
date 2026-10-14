@@ -30,8 +30,10 @@ describe("readWorkboxGlob", () => {
 
   it("fails fast on a malformed list", () => {
     // Entries with no commas between them once made the match backtrack for
-    // minutes; the read must stay quick and refuse it.
-    const malformed = "globPatterns: [" + '\n          "**/*.{js}"'.repeat(30) + "\n x";
+    // minutes; the read must stay quick and refuse it. Ten entries took
+    // seconds on that old pattern, so a regression fails this bound instead
+    // of hanging the run.
+    const malformed = "globPatterns: [" + '\n          "**/*.{js}"'.repeat(10) + "\n x";
     const started = performance.now();
     expect(readWorkboxGlob(malformed)).toBeNull();
     expect(performance.now() - started).toBeLessThan(1000);
