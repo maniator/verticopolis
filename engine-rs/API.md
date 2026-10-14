@@ -75,9 +75,9 @@ from anything but a `.rs` file under `src/` outside `src/bin/`, and fails
 when the engine's or the consumer's `Cargo.lock` names
 a crate nobody reviewed for host access. It also checks that the harness
 modules and every binary sit behind the `conformance` feature.
-`tests/read_boundary.rs` checks every Rust file in the crate and the
-consumer: a `..` path leads only to `conformance/`, and no code steps up a
-directory another way (`parent`, `ancestors`, `ParentDir`). Both
+`tests/read_boundary.rs` checks the Rust files under `src/`, `tests/` and
+`consumer/src/` (the two scanners' own example files aside): a `..` path
+leads only to `conformance/`, and no code steps up a directory another way (`parent`, `ancestors`, `ParentDir`). Both
 read source text, so they catch the ordinary spellings; review still owns
 the rest.
 

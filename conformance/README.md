@@ -144,7 +144,7 @@ state hash.
   the default calendar and automatic bridging on (`newGame(seed, mode)`).
 - `{ "fixture": "conformance/fixtures/file.vctower", "mode"?: "classic" | "modern" }`:
   a save file inside the suite (the name starts with `conformance/` and has no
-  `.` or `..` step), loaded the way an import loads
+  empty, `.` or `..` step), loaded the way an import loads
   it: decode, migrate and load, then mark a save with no `appVersion` stamp
   (one from before 2.0) as a founder's tower. `mode`, when present, overwrites
   the save's mode before loading.

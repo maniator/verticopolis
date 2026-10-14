@@ -25,7 +25,7 @@ pub fn fixture_path(suite: &Path, fixture: &str) -> Result<PathBuf, String> {
         .strip_prefix("conformance/")
         // The text first: `components()` drops a `.` or an empty step in the
         // middle of a name, and the rule is that a name has none. A step of
-        // dots alone (empty, `.`, `..`) is refused.
+        // dots alone (empty, `.`, `..`, or any run of dots) is refused.
         .filter(|rest| {
             rest.split(['/', '\\'])
                 .all(|step| !step.chars().all(|c| c == '.'))

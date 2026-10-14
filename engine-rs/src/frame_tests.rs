@@ -86,7 +86,7 @@ fn the_named_slots_read_their_values() {
     for (i, a) in values.iter().enumerate() {
         assert!(
             values[i + 1..].iter().all(|b| b != a),
-            "header values must differ to tell their slots apart; if a live count (people, units, shafts) now equals a set value, set that value apart again: {values:?}"
+            "header values must differ to tell their slots apart; if a live count (people, units, transports) now equals a set value, set that value apart again: {values:?}"
         );
     }
     for (slot, value) in want {
@@ -115,6 +115,7 @@ fn walk_records(sim: &Simulation, v: &[f64]) {
         if i == 0 {
             assert_eq!(p.state, PState::Dwelling);
             let want = [
+                (person::ID, 2014.0),
                 (person::SEED, 2010.0),
                 (person::FLOOR, 2011.0),
                 (person::X, 2012.0),
@@ -166,6 +167,9 @@ fn walk_records(sim: &Simulation, v: &[f64]) {
     let mut cars_seen = 0;
     for t in &sim.tower.transports {
         let r = &v[at..at + TRANSPORT_FIXED];
+        if cars_seen == 0 && t.cars > 0 {
+            assert_eq!(r[transport::ID], 4003.0, "the shaft set apart");
+        }
         assert_eq!(r[transport::ID], t.id as f64);
         assert_eq!(r[transport::CARS], t.cars as f64);
         at += TRANSPORT_FIXED;
@@ -194,6 +198,7 @@ fn walk_records(sim: &Simulation, v: &[f64]) {
 fn set_apart(sim: &mut Simulation) {
     use crate::crowd::PState;
     let p = &mut sim.crowd.people[0];
+    p.id = 2014;
     p.seed = 2010;
     p.floor = 2011;
     p.x = 2012.0;
@@ -222,6 +227,7 @@ fn set_apart(sim: &mut Simulation) {
         .iter_mut()
         .find(|t| t.cars > 0)
         .unwrap();
+    t.id = 4003;
     t.car_positions[0] = 4001.0;
     let cars = t.cars as usize;
     t.car_load = Some(vec![4002.0; cars]);

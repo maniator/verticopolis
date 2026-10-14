@@ -18,9 +18,9 @@ const CLIMBS_IN_CODE: &[&str] = &[
 
 /// Where a path literal climbs out of the crate, it is a `..` step on the way
 /// to the conformance suite and nowhere else: `"../conformance/..."`, or a
-/// bare `".."` joined straight onto `"conformance"`. Every Rust file counts,
-/// tests, binaries and the consumer included, so the crate's tests and the
-/// referee read only `engine-rs/` and `conformance/` (the sparse CI job
+/// bare `".."` joined straight onto `"conformance"`. Every Rust file under
+/// `src/`, `tests/` and `consumer/src/` counts (the two scanners' example
+/// files aside), so the crate's tests and the referee read only `engine-rs/` and `conformance/` (the sparse CI job
 /// proves the same by running them from a checkout that holds nothing else).
 fn climbs_outside_the_suite(src: &str) -> Vec<String> {
     let parts = parts(src);
@@ -39,7 +39,14 @@ fn climbs_outside_the_suite(src: &str) -> Vec<String> {
         .map(|(_, c)| c)
         .collect();
     for step in CLIMBS_IN_CODE {
-        if code.contains(step) {
+        // A spelling that ends in a name counts only where the name ends, so
+        // `::parent` matches `Path::parent` and not `Foo::parent_id`.
+        let ends_in_name = step.ends_with(|c: char| c.is_alphanumeric() || c == '_');
+        let hit = code.match_indices(step).any(|(at, _)| {
+            !ends_in_name
+                || !code[at + step.len()..].starts_with(|c: char| c.is_alphanumeric() || c == '_')
+        });
+        if hit {
             found.push(step.to_string());
         }
     }
@@ -129,6 +136,9 @@ fn the_climb_check_reads_each_spelling() {
         let h = "a/../b"; // a comment may say .parent() freely
         let k = dir.parent().unwrap().join("src");
         let l = Path::new(".").ancestors().nth(2);
+        let m = p.and_then(Path::parent);
+        let n = Some(p).map(Path::ancestors);
+        let o = Foo::parent_id(x) + Bar::ancestors_seen;
         let i = concat!(env!("X"), "/../conformance/a.json");
         let j = concat!(env!("X"), "/../src/a.ts");
     "#;
@@ -137,6 +147,8 @@ fn the_climb_check_reads_each_spelling() {
         [
             ".parent()",
             ".ancestors()",
+            "::parent",
+            "::ancestors",
             "..",
             "../../src/tests/fixtures/x.vctower",
             "../conformance/../src",
