@@ -6,6 +6,7 @@ import type { Job, StillJob } from "./catalog";
 import type { PaintSpec } from "./paint";
 import { LayerError, blank, sameImage, type Image } from "./pixels";
 import { blit } from "./raster";
+import { TILE } from "../scale";
 import { compareImages, composeFrame, composeLayered, composeLookup } from "./compose";
 import type { Placed } from "./schema";
 import { ATLAS_SCALES, ATLAS_SCHEMA_VERSION } from "./schema";
@@ -162,6 +163,15 @@ describe("bake", () => {
     expect(composeLookup(r, { frame: "cab", chains: { riders: 9 }, overlays: [] }).name).toBe("cab");
     expect(composeLookup(r, { animation: "loop" }, 1).name).toBe("loop/1");
     expect(() => composeLookup(r, { frame: "nope", chains: {}, overlays: [] })).toThrow(/no frame nope/);
+    // A lookup carrying `stretchTo` (tiles) comes back stretched to that many
+    // tiles' worth of pixels, nearest neighbor from the left edge.
+    const plain = composeLookup(r, { frame: "cab", chains: { riders: 2 }, overlays: [] }).image;
+    const wide = composeLookup(r, { frame: "cab", chains: { riders: 2 }, overlays: [], stretchTo: 3 }).image;
+    expect(wide.w).toBe(3 * TILE);
+    expect(wide.h).toBe(plain.h);
+    expect(Array.from(wide.data.subarray(0, 4))).toEqual(Array.from(plain.data.subarray(0, 4)));
+    const last = (plain.w - 1) * 4;
+    expect(Array.from(wide.data.subarray((wide.w - 1) * 4, wide.w * 4))).toEqual(Array.from(plain.data.subarray(last, last + 4)));
     expect(compareImages(two, two)).toEqual({ mismatches: 0, box: undefined });
     expect(compareImages(two, blank(4, 1))).toMatchObject({ mismatches: 2, box: { x0: 0, x1: 1 } });
     expect(compareImages(two, blank(2, 1)).mismatches).toBe(4);
