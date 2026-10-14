@@ -19,8 +19,8 @@ const CLIMBS_IN_CODE: &[&str] = &[
 /// Where a path literal climbs out of the crate, it is a `..` step on the way
 /// to the conformance suite and nowhere else: `"../conformance/..."`, or a
 /// bare `".."` joined straight onto `"conformance"`. Every Rust file under
-/// `src/`, `tests/` and `consumer/src/` counts (the two scanners' example
-/// files aside), so the crate's tests and the referee read only `engine-rs/` and `conformance/` (the sparse CI job
+/// `src/`, `tests/` and `consumer/src/` counts (the two scanner files
+/// themselves aside, whose examples climb on purpose), so the crate's tests and the referee read only `engine-rs/` and `conformance/` (the sparse CI job
 /// proves the same by running them from a checkout that holds nothing else).
 fn climbs_outside_the_suite(src: &str) -> Vec<String> {
     let parts = parts(src);
@@ -33,18 +33,25 @@ fn climbs_outside_the_suite(src: &str) -> Vec<String> {
     };
     let mut found = Vec::new();
     // A path can also climb in code, with no `..` literal at all.
-    let code: String = src
+    let kept: Vec<(usize, char)> = src
         .char_indices()
         .filter(|(at, c)| parts[*at] == Part::Code && !c.is_whitespace())
-        .map(|(_, c)| c)
         .collect();
+    let code: String = kept.iter().map(|(_, c)| c).collect();
+    let name_char = |c: char| c.is_alphanumeric() || c == '_';
     for step in CLIMBS_IN_CODE {
         // A spelling that ends in a name counts only where the name ends, so
-        // `::parent` matches `Path::parent` and not `Foo::parent_id`.
-        let ends_in_name = step.ends_with(|c: char| c.is_alphanumeric() || c == '_');
+        // `::parent` matches `Path::parent` and not `Foo::parent_id`. The end
+        // is read in the source, where whitespace, a comment or a literal
+        // also ends a name (`Path::parent as fn(..)`).
+        let ends_in_name = step.ends_with(name_char);
         let hit = code.match_indices(step).any(|(at, _)| {
-            !ends_in_name
-                || !code[at + step.len()..].starts_with(|c: char| c.is_alphanumeric() || c == '_')
+            if !ends_in_name {
+                return true;
+            }
+            let last = code[..at + step.len()].chars().count() - 1;
+            let (src_at, c) = kept[last];
+            !src[src_at + c.len_utf8()..].starts_with(name_char)
         });
         if hit {
             found.push(step.to_string());
@@ -157,4 +164,14 @@ fn the_climb_check_reads_each_spelling() {
             "/../src/a.ts"
         ]
     );
+    // The end of a name is read in the source, not in the squeezed code.
+    assert_eq!(
+        climbs_outside_the_suite("let q = Path::parent as fn(&Path) -> Option<&Path>;"),
+        ["::parent"]
+    );
+    assert_eq!(
+        climbs_outside_the_suite("let a = Path::ancestors /* all */ (p);"),
+        ["::ancestors"]
+    );
+    assert!(climbs_outside_the_suite("let b = Foo::parent_id;").is_empty());
 }
