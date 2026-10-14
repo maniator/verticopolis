@@ -316,3 +316,17 @@ body.retro-page {
     font-size: 12px;
   }
 }
+
+/* Screen-reader-only text (the game's rule in styles.css, which pages do not load). */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

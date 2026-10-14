@@ -141,6 +141,15 @@ describe("helpPageTemplate", () => {
     expect(gallery!.textContent).toContain("Sprite Gallery");
   });
 
+  it("links the third-party license notices from About, in a new tab (#951)", () => {
+    const frag = renderToFragment(helpPageTemplate());
+    const link = frag.querySelector<HTMLAnchorElement>('section#about a[href="/third-party-notices.txt"]');
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toContain("Third-party licenses");
+    expect(link!.getAttribute("target")).toBe("_blank");
+    expect(link!.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
   it("carries a report call to action linking out to GitHub", () => {
     const frag = renderToFragment(helpPageTemplate());
     const report = frag.querySelector<HTMLAnchorElement>('a[href*="issues/new"]');

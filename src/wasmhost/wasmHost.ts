@@ -138,7 +138,6 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
       mergeSimulation(sim, fresh, { revision: frame.header.revision, mealOverlayRevision: sim.tower.mealOverlayRevision });
     } finally {
       sim.gameplayEvents = buffer; // the merge copies the fresh, empty one
-      sim.tower.gameplayEvents = buffer;
     }
     // The hourly elevator telemetry the save leaves out (the schedule dialog,
     // the stats screen, the diagnostics): it only moves in the engine's hour

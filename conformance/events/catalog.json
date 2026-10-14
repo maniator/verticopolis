@@ -108,11 +108,11 @@
       "name": "capacity_changed",
       "version": 1,
       "cardinality": "per_occurrence",
-      "semantics": "A shaft's capacity changed: setCars changed the car count, or resizeTransport moved the span. A refused or no-op edit emits nothing. The TypeScript engine emits from the tower's own setCars and resizeTransport; the Rust engine emits from Simulation::set_cars and Simulation::resize_transport, and its bare tower methods emit nothing. The charge commands (addCar, removeCar, extendTransport) edit through these, so a paid edit reports the same event.",
+      "semantics": "A shaft's capacity changed: setCars changed the car count, or resizeTransport moved the span. A refused or no-op edit emits nothing. Both engines emit from the simulation layer (Simulation.setCars and Simulation.resizeTransport, Simulation::set_cars and Simulation::resize_transport), and the bare tower methods emit nothing in either. The charge commands (addCar, removeCar, extendTransport) edit through these, so a paid edit reports the same event.",
       "payload": {
         "kind": { "type": "enum", "enum": "facilityKind" }
       },
-      "history": "New. Takes over from economy_action with action capacity_tune in phase 2; the platform keeps the once-per-session latch."
+      "history": "New. Takes over from economy_action with action capacity_tune in phase 2; the platform keeps the once-per-session latch. On 2026-10-13 (#906) the TypeScript engine moved its emission from the tower to the simulation layer, where the Rust engine already emitted; every simulation-layer and charged edit reports exactly as before, so the payload and the version are unchanged. A bare tower edit (tests, fixtures, tooling), which reported before, is now silent in both engines, and the dual-run relay replays it through silent tower ops."
     },
     {
       "name": "star_reached",
