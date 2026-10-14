@@ -38,6 +38,18 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
+- **Rust follows the same source rules.** The engine port in `engine-rs/` is held to
+  the same conventions as the TypeScript, with no grandfathered comments:
+  American English, no em-dashes (`src/tests/rustProse.guard.test.ts` keeps the
+  Rust sources at zero), and the 500-line file ceiling that
+  `src/tests/fileSize.guard.test.ts` enforces on `src/` and `scripts/` (it scans
+  `.rs` files too, inline `#[cfg(test)]` modules included; today's oversized
+  Rust files sit on the same shrink-only ratchet, `src/tests/fileSize.ratchet.txt`).
+  The other gates have Rust counterparts: lint and typecheck map to `cargo fmt
+  --check` and `cargo clippy -D warnings` (`engine-rs.yml`), and the engine
+  boundary rules to `engine-rs/tests/independence.rs`, which keeps the simulation
+  free of host access (files, network, console, clock; a few named referee
+  functions may read fixtures) and the JavaScript binding inside `src/wasm.rs`.
 - **Bump `package.json` `version` on any player-facing change**, keyed to "would a
   player notice anything different?": **major** for a save/compat break or a
   headline milestone, **minor** as the default for anything a player notices,

@@ -17,6 +17,8 @@ in the stats/editor panels. Existing `src/` code comments are grandfathered;
 don't sweep them, but don't add new em-dashes either. Skip the "X, not Y"
 emphatic-restatement pattern and AI marketing vocabulary. Keep copy plain,
 human, and grammatically correct.
+The Rust engine in `engine-rs/` follows these rules with no grandfathered
+comments, plus the 500-line file ceiling (see CONTRIBUTING "Conventions").
 
 ## Use BMAD-METHOD for non-trivial work
 
