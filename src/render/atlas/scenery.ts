@@ -85,7 +85,7 @@ export function paintScenery(ctx: CanvasRenderingContext2D, s: ScenerySpec, w: n
 /** The world the atlas publishes: the Modern catalog's lot and floors (both
  *  engines' catalogs state the same world, and the game binds it per tower). */
 const WORLD = catalogFor("modern").world;
-const SCENERY = sceneryPieces(WORLD);
+const PIECES = sceneryPieces(WORLD);
 
 const size = (r: PieceRect) => ({ w: r.w, h: r.h });
 
@@ -93,16 +93,16 @@ const size = (r: PieceRect) => ({ w: r.w, h: r.h });
  *  size, and the ground tiles one period of their pattern. A strip tile is one
  *  column wider than a lot tile, as the game paints it. */
 const SIZE = {
-  roundabout: size(SCENERY.roundabout),
-  fountain: size(SCENERY.fountain),
-  plazaLamp: size(SCENERY.plazaLamps[0]),
-  streetLamp: size(SCENERY.streetLamp),
-  planter: size(SCENERY.planter),
+  roundabout: size(PIECES.roundabout),
+  fountain: size(PIECES.fountain),
+  plazaLamp: size(PIECES.plazaLamps[0]),
+  streetLamp: size(PIECES.streetLamp),
+  planter: size(PIECES.planter),
   tree: { w: PLANT_SIZE.tree.tiles * TILE, h: Math.round(FLOOR * PLANT_SIZE.tree.floors) },
   bush: { w: PLANT_SIZE.bush.tiles * TILE, h: Math.round(FLOOR * PLANT_SIZE.bush.floors) },
-  sidewalk: { w: TILE, h: SCENERY.sidewalk.h },
-  forecourt: { w: 2 * TILE, h: SCENERY.forecourt.h },
-  road: { w: 4 * TILE, h: SCENERY.rightRoad.h },
+  sidewalk: { w: TILE, h: PIECES.sidewalk.h },
+  forecourt: { w: 2 * TILE, h: PIECES.forecourt.h },
+  road: { w: 4 * TILE, h: PIECES.rightRoad.h },
   strip: { w: TILE + 1, h: STRIP_ABOVE + STRIP_BELOW },
 };
 
@@ -193,22 +193,22 @@ export function sceneryData() {
         grass: Array.from({ length: WORLD.lotWidth }, (_, t) => grassName(t)),
       },
       runs: [
-        { frame: "scenery/ground/sidewalk", ...SCENERY.plazaSidewalk, tileOriginX: SCENERY.plazaSidewalk.x },
+        { frame: "scenery/ground/sidewalk", ...PIECES.plazaSidewalk, tileOriginX: PIECES.plazaSidewalk.x },
         // The roundabout shares the ground's plane: one copy, before the road.
-        { frame: "scenery/roundabout", ...SCENERY.roundabout, tileOriginX: SCENERY.roundabout.x },
+        { frame: "scenery/roundabout", ...PIECES.roundabout, tileOriginX: PIECES.roundabout.x },
         // The game's last road segment runs one column on, over the roundabout's
         // first column.
-        { frame: "scenery/ground/road", ...SCENERY.leftRoad, w: SCENERY.leftRoad.w + 1, tileOriginX: 0 },
-        { frame: "scenery/ground/forecourt", ...SCENERY.forecourt, tileOriginX: SCENERY.forecourt.x },
-        { frame: "scenery/ground/sidewalk", ...SCENERY.sidewalk, tileOriginX: SCENERY.sidewalk.x },
-        { frame: "scenery/ground/road", ...SCENERY.rightRoad, tileOriginX: SCENERY.rightRoad.x },
+        { frame: "scenery/ground/road", ...PIECES.leftRoad, w: PIECES.leftRoad.w + 1, tileOriginX: 0 },
+        { frame: "scenery/ground/forecourt", ...PIECES.forecourt, tileOriginX: PIECES.forecourt.x },
+        { frame: "scenery/ground/sidewalk", ...PIECES.sidewalk, tileOriginX: PIECES.sidewalk.x },
+        { frame: "scenery/ground/road", ...PIECES.rightRoad, tileOriginX: PIECES.rightRoad.x },
       ],
     },
     props: [
-      { frame: "scenery/fountain", ...at(SCENERY.fountain) },
-      ...SCENERY.plazaLamps.map((r) => ({ frame: "scenery/plaza-lamp", ...at(r) })),
-      { frame: "scenery/street-lamp", ...at(SCENERY.streetLamp) },
-      { frame: "scenery/planter", ...at(SCENERY.planter) },
+      { frame: "scenery/fountain", ...at(PIECES.fountain) },
+      ...PIECES.plazaLamps.map((r) => ({ frame: "scenery/plaza-lamp", ...at(r) })),
+      { frame: "scenery/street-lamp", ...at(PIECES.streetLamp) },
+      { frame: "scenery/planter", ...at(PIECES.planter) },
     ],
     // The skyline and the plants are seeded by the tower's founding seed
     // (`hash01` and the rules below; docs/atlas.md spells them out).

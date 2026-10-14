@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GRID } from "../../engine/facilities";
+import { catalogFor } from "../../engine/catalog";
 import { drawBush, drawTree, lampAlpha } from "../excalibur/towerSceneryDraw";
 import { Z } from "../depthPlanes";
 import { allJobs } from "./browserEntry";
@@ -55,7 +55,7 @@ describe("scenery in the atlas", () => {
 
   it("bakes a grass tile for every variant the lot shows, and maps every lot tile to one", () => {
     const data = sceneryData();
-    expect(data.ground.strip.grass).toHaveLength(GRID.width);
+    expect(data.ground.strip.grass).toHaveLength(catalogFor("modern").world.lotWidth);
     for (const key of new Set(data.ground.strip.grass))
       expect(names.has(`scenery/ground/grass/${key}`), key).toBe(true);
     // The lamp fade the data states is the game's.
@@ -66,9 +66,9 @@ describe("scenery in the atlas", () => {
 
   it("publishes the game's own placement table", () => {
     const data = sceneryData();
-    expect(data.ground.runs[1]).toMatchObject(sceneryPieces().roundabout);
-    expect(data.props[0]).toMatchObject({ x: sceneryPieces().fountain.x, y: sceneryPieces().fountain.y });
-    expect(data.ground.runs[4]).toMatchObject(sceneryPieces().sidewalk);
+    expect(data.ground.runs[1]).toMatchObject(sceneryPieces(catalogFor("modern").world).roundabout);
+    expect(data.props[0]).toMatchObject({ x: sceneryPieces(catalogFor("modern").world).fountain.x, y: sceneryPieces(catalogFor("modern").world).fountain.y });
+    expect(data.ground.runs[4]).toMatchObject(sceneryPieces(catalogFor("modern").world).sidewalk);
   });
 
   it("places only frames it bakes (a lamp by its steps)", () => {

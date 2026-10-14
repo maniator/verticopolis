@@ -151,7 +151,7 @@ export function plantSpots(seed: number, world: ViewWorld = viewWorld()): PlantS
 /** The cement apron under and around the tower: the built ground-floor
  *  footprint padded by {@link APRON_PAD_TILES}, clamped to the lot. Null when
  *  nothing is built on the ground floor yet (a fresh lot is all grass). */
-export function apronRange(units: readonly Unit[]): { min: number; max: number } | null {
+export function apronRange(units: readonly Unit[], world: ViewWorld = viewWorld()): { min: number; max: number } | null {
   let min = Infinity;
   let max = -Infinity;
   for (const u of units) {
@@ -162,7 +162,7 @@ export function apronRange(units: readonly Unit[]): { min: number; max: number }
   if (min === Infinity) return null;
   return {
     min: Math.max(0, min - APRON_PAD_TILES),
-    max: Math.min(viewWorld().lotWidth, max + APRON_PAD_TILES),
+    max: Math.min(world.lotWidth, max + APRON_PAD_TILES),
   };
 }
 

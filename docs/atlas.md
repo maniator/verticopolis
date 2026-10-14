@@ -417,6 +417,8 @@ scenery painters (`src/render/excalibur/towerSceneryDraw.ts`), and
 are in pixels at 1x: x from the lot's left edge and y from the ground line
 (negative is up), for a frame's top-left corner. `lotTiles` is the lot's width
 in tiles, `tileW` a tile's width and `floorH` a floor's height, in pixels.
+The game sizes the lot from the tower catalog's world; both catalogs state the
+same one, and the atlas publishes its positions for it.
 Draw, back to front (the planes are the ones in
 [Draw order](#draw-order)):
 
