@@ -1,7 +1,7 @@
 /**
  * Replay a fuzzer scenario on the TypeScript engine and compare its
  * checkpoints with the Rust engine's. Usage:
- *   cargo run --release --manifest-path engine-rs/Cargo.toml --bin fuzz -- <seed> <dir> [commands]
+ *   cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin fuzz -- <seed> <dir> [commands]
  *   npx tsx scripts/fuzz-compare.ts <dir>/fuzz-<seed>.json
  * Exit 1 on the first divergence, naming the checkpoint and both hashes.
  */

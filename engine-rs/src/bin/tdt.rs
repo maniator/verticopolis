@@ -23,8 +23,7 @@ fn main() {
             exit(2);
         }
     };
-    let repo_root = root.join("..");
-    let verdicts = replay_all(&lock, &repo_root);
+    let verdicts = replay_all(&lock, &root);
     let mut failed = 0;
     for (id, verdict) in &verdicts {
         match verdict {

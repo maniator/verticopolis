@@ -2,7 +2,7 @@
   "id": "fixture-split-tower",
   "description": "A v7 Modern save with a split tower, one day, then a save round trip, then twelve hours at the 20-minute quantum.",
   "start": {
-    "fixture": "src/tests/fixtures/split-tower.vctower"
+    "fixture": "conformance/fixtures/split-tower.vctower"
   },
   "commands": [
     {

@@ -18,6 +18,7 @@ pub mod import_report;
 pub mod pacing;
 pub mod parse;
 pub mod part_merge;
+#[cfg(any(test, feature = "conformance"))]
 pub mod referee;
 pub mod stamp;
 pub mod tables;

@@ -57,7 +57,7 @@ describe.skipIf(!hasWasmPackage())("engine conformance through the WASM binding"
   it("refuses a scenario start it cannot honor with an error that leaves the module usable", () => {
     expect(() => startWasmEngine({ newGame: { seed: 1, mode: "arcade" as "classic" } })).toThrow(/classic or modern/);
     expect(() => startWasmEngine({ fixture: "conformance/README.md" })).toThrow(/not a VCTOWER1 file/);
-    expect(() => startWasmEngine({ fixture: "src/tests/fixtures/sixseven-december.vctower", mode: "arcade" as "classic" })).toThrow(/classic or modern/);
+    expect(() => startWasmEngine({ fixture: "conformance/fixtures/sixseven-december.vctower", mode: "arcade" as "classic" })).toThrow(/classic or modern/);
     // The module still answers after the refusals: a fresh game founds and
     // hashes the same as the lock's starter.
     const want = lock.scenarios["starter-classic"]?.[0];

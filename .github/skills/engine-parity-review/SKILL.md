@@ -72,7 +72,7 @@ not replace it.
 ```sh
 npm test                                            # runs the conformance suite
 VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration conformance   # regenerate the lock on purpose
-cargo run --release --manifest-path engine-rs/Cargo.toml --bin conformance # the Rust referee
+cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin conformance # the Rust referee
 cargo test --manifest-path engine-rs/Cargo.toml     # loader table, canon caps, number helpers
 ```
 

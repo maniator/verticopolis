@@ -68,13 +68,12 @@ fn main() {
     // the report prints sorted by id, the order the lock is written in. A
     // panic inside one scenario (a save the loader refuses) is caught and
     // reported as that scenario's failure instead of aborting the referee.
-    let repo_root = root.join("..");
     let runs: Vec<Result<Run, String>> = std::thread::scope(|scope| {
         let handles: Vec<_> = want
             .keys()
             .map(|id| {
                 let path = root.join("scenarios").join(format!("{id}.json"));
-                let repo_root = &repo_root;
+                let root = &root;
                 scope.spawn(move || -> Result<Run, String> {
                     let text = std::fs::read_to_string(&path)
                         .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
@@ -90,7 +89,7 @@ fn main() {
                             id
                         ));
                     }
-                    std::panic::catch_unwind(|| run_scenario(&scenario, repo_root)).map_err(|p| {
+                    std::panic::catch_unwind(|| run_scenario(&scenario, root)).map_err(|p| {
                         let msg = p
                             .downcast_ref::<String>()
                             .cloned()

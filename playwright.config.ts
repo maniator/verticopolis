@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 // The engine legs of the visual gate (pr-drift-check.yml and
 // update-visual-baselines.yml) set PW_WASM_VISUAL=1 to run visual.spec.ts on
@@ -14,6 +15,36 @@ if (WASM_VISUAL && process.argv.some((a) => a === "-u" || (a.startsWith("--updat
 // Playwright drives the BUILT app (via `vite preview`) for the Tier-2 end-to-end
 // smoke. Headless Tier-1 playthrough tests live in vitest (the `src` tree); this
 // config only covers the `e2e` folder. Run with `npm run e2e` after a build.
+// The wasm-only lane (`VC_ENGINE=wasm` build; see src/build/engineBundle.ts):
+// the suite runs once more against that build on its own project, which sets
+// no engine preference because the build has no engine switch to read. It
+// replaces the other two projects, whose builds it does not serve.
+const WASM_ONLY = process.env.PW_WASM_ONLY === "1";
+if (process.env.PW_WASM_ONLY && !WASM_ONLY) throw new Error(`PW_WASM_ONLY must be "1" or unset; got "${process.env.PW_WASM_ONLY}".`);
+if (WASM_ONLY && WASM_VISUAL) throw new Error("PW_WASM_ONLY=1 and PW_WASM_VISUAL=1 are separate lanes; set one.");
+// The lane must match the build it serves: the projects of one lane fail in
+// confusing ways against the other's build. The build records its mode.
+const builtMode = (() => {
+  let text: string;
+  try {
+    text = readFileSync(new URL("./dist/version.json", import.meta.url), "utf8");
+  } catch {
+    return null; // no build yet: the web server step reports that
+  }
+  try {
+    return (JSON.parse(text) as { engineBuild?: string } | null)?.engineBuild ?? "unrecorded";
+  } catch {
+    throw new Error("dist/version.json is unreadable; rebuild (VC_TOOLING=1 npm run build, with VC_ENGINE=wasm for PW_WASM_ONLY=1).");
+  }
+})();
+if (builtMode !== null && (builtMode === "wasm-only") !== WASM_ONLY) {
+  throw new Error(
+    `dist/ is a${builtMode === "unrecorded" ? "n older build that records no engine mode" : ` ${builtMode} build`}, but ` +
+      `${WASM_ONLY ? "PW_WASM_ONLY=1 expects a wasm-only one" : "this lane expects a switchable one"}. Rebuild for the lane ` +
+      `(VC_TOOLING=1 npm run build, with VC_ENGINE=wasm for PW_WASM_ONLY=1), or set PW_WASM_ONLY to match the build.`,
+  );
+}
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -46,8 +77,10 @@ export default defineConfig({
     // the normal case, including CI — Playwright uses its own browser.
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
   },
-  projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+  projects: WASM_ONLY
+    ? [{ name: "chromium-wasm-only", testIgnore: /visual\.spec\.ts/, use: { ...devices["Desktop Chrome"] } }]
+    : [
+    { name: "chromium", testIgnore: /wasmOnly\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
     // The same specs on the WASM engine: the stored engine choice (`vc.engine`,
     // see src/wasmhost/engineChoice.ts) is seeded into localStorage so every
     // page the suite opens boots on the Rust engine. Visual baselines are the
@@ -55,7 +88,7 @@ export default defineConfig({
     // (PW_WASM_VISUAL=1), and it reads the `chromium` baseline files.
     {
       name: "chromium-wasm",
-      testIgnore: WASM_VISUAL ? [] : /visual\.spec\.ts/,
+      testIgnore: WASM_VISUAL ? [/wasmOnly\.spec\.ts/] : [/visual\.spec\.ts/, /wasmOnly\.spec\.ts/],
       ...(WASM_VISUAL ? { snapshotPathTemplate: "{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}-chromium{-snapshotSuffix}{ext}" } : {}),
       use: {
         ...devices["Desktop Chrome"],

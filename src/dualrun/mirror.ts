@@ -129,12 +129,14 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
   const tower: Tower = sim.tower;
   const n = (v: unknown) => v as number;
   const s = (v: unknown) => v as string;
-  // The charge commands refuse a malformed argument in both engines (#923).
-  // The binding's glue would coerce a non-number into one (ToNumber: "5" is
-  // 5, null is 0) or throw on a non-string, so these relay a non-number as
-  // NaN and a non-string as "", which the binding refuses as TypeScript does.
+  // The charge commands (#923) and the other relayed edits (#996) refuse a
+  // malformed argument in both engines. The binding's glue would coerce a
+  // non-number into one (ToNumber: "5" is 5, null is 0) or throw on a
+  // non-string, so these relay a non-number as NaN, a non-string as "" and a
+  // non-boolean as null, which the binding refuses as TypeScript does.
   const num = (v: unknown) => (typeof v === "number" ? v : Number.NaN);
   const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const bool = (v: unknown) => (typeof v === "boolean" ? v : null);
 
   try {
     if (opts.tick) {
@@ -150,7 +152,7 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
     }
     wrap(sim, "build", ([kind, floor, x]) => ({ op: "build", kind, floor: n(floor), x: n(x) }) as ShadowCommand);
     wrap(sim, "buildTransport", ([kind, x, bottom, top]) => ({ op: "buildTransport", kind, x: n(x), bottom: n(bottom), top: n(top) }) as ShadowCommand);
-    wrap(sim, "sellAt", ([floor, x]) => ({ op: "sellAt", floor: n(floor), x: n(x) }));
+    wrap(sim, "sellAt", ([floor, x]) => ({ op: "sellAt", floor: num(floor), x: num(x) }));
     // The engine-owned charges (#914): the command carries the money move, so
     // the shadow charges or refunds for itself and no setMoney follows.
     wrap(sim, "addCar", ([id]) => ({ op: "addCar", id: num(id) }));
@@ -175,10 +177,10 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
     wrap(sim, "removeFacility", ([id, method]) => ({ op: "removeFacility", id: num(id), method: str(method) as "sell" | "bulldoze" }));
     // The capacity edits at the simulation layer report capacity_changed;
     // the bare tower edits below relay as their silent tower ops (#906).
-    wrap(sim, "setCars", ([id, cars]) => ({ op: "setCars", id: n(id), cars: n(cars) }));
-    wrap(sim, "resizeTransport", ([id, bottom, top]) => ({ op: "resizeTransport", id: n(id), bottom: n(bottom), top: n(top) }));
-    wrap(sim, "adjustRent", ([id, dir]) => ({ op: "adjustRent", id: n(id), dir: dir as 1 | -1 }));
-    wrap(sim, "setNoRate", ([id]) => ({ op: "setNoRate", id: n(id) }));
+    wrap(sim, "setCars", ([id, cars]) => ({ op: "setCars", id: num(id), cars: num(cars) }));
+    wrap(sim, "resizeTransport", ([id, bottom, top]) => ({ op: "resizeTransport", id: num(id), bottom: num(bottom), top: num(top) }));
+    wrap(sim, "adjustRent", ([id, dir]) => ({ op: "adjustRent", id: num(id), dir: num(dir) }));
+    wrap(sim, "setNoRate", ([id]) => ({ op: "setNoRate", id: num(id) }));
     wrap(sim, "priceUnit", ([u, target]) => ({ op: "priceUnit", id: (u as { id: number }).id, target: n(target) }));
     wrap(sim, "applyRentBatch", ([kind, target, opts]) => ({ op: "applyRentBatch", kind, target, onlyDefaultPriced: (opts as { onlyDefaultPriced?: boolean } | undefined)?.onlyDefaultPriced ?? false }) as ShadowCommand);
     wrap(sim, "setFilmPolicy", ([id, policy]) => ({ op: "setFilmPolicy", id: n(id), policy }) as ShadowCommand);
@@ -196,10 +198,13 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
 
     wrap(tower, "removeUnit", ([id]) => ({ op: "removeUnit", id: n(id) }));
     wrap(tower, "removeTransport", ([id]) => ({ op: "removeTransport", id: n(id) }));
-    wrap(tower, "resizeTransport", ([id, bottom, top]) => ({ op: "towerResizeTransport", id: n(id), bottom: n(bottom), top: n(top) }));
-    wrap(tower, "setCars", ([id, cars]) => ({ op: "towerSetCars", id: n(id), cars: n(cars) }));
-    wrap(tower, "setSchedule", ([id, raw]) => ({ op: "setSchedule", id: n(id), schedule: raw }));
-    wrap(tower, "setStop", ([id, floor, stop]) => ({ op: "setStop", id: n(id), floor: n(floor), stop: stop as boolean }));
+    wrap(tower, "resizeTransport", ([id, bottom, top]) => ({ op: "towerResizeTransport", id: num(id), bottom: num(bottom), top: num(top) }));
+    wrap(tower, "setCars", ([id, cars]) => ({ op: "towerSetCars", id: num(id), cars: num(cars) }));
+    // A malformed id is refused before the payload is read, in both engines,
+    // so the payload is not relayed then: the shadow serializes it, and a
+    // value JSON cannot write (a BigInt) would otherwise throw there.
+    wrap(tower, "setSchedule", ([id, raw]) => ({ op: "setSchedule", id: num(id), schedule: Number.isSafeInteger(id) ? raw : null }));
+    wrap(tower, "setStop", ([id, floor, stop]) => ({ op: "setStop", id: num(id), floor: num(floor), stop: bool(stop) }));
     wrap(tower, "setExpressStops", ([id]) => ({ op: "setExpressStops", id: n(id) }));
     wrap(tower, "clearStops", ([id]) => ({ op: "clearStops", id: n(id) }));
     // The label as stored (trimmed, or the catalog name), so the shadow never

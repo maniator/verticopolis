@@ -12,7 +12,8 @@ description = "A frontend-free host of the Verticopolis engine: the smoke test t
 [workspace]
 
 [dependencies]
-# Default features only: the `wasm` feature (the JavaScript binding) stays
-# off, and CI checks that wasm-bindgen is not in this tree.
-verticopolis-engine = { path = ".." }
+# The `wasm` feature (the JavaScript binding) stays off, and CI checks that
+# wasm-bindgen is not in this tree. `conformance` is the harness this host
+# replays the lock with; a host that only plays the game leaves it off.
+verticopolis-engine = { path = "..", features = ["conformance"] }
 serde_json = "1.0.151"
