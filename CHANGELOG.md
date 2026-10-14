@@ -13,9 +13,13 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.31.3
+## 2.32.1
 
 - Studio and apartment residents now go to bed at 11 PM and get up at 6 AM on time.
+
+## 2.32.0
+
+- On the opt-in WASM engine, an installed game reopened in the same browser session now starts on that engine with no connection, instead of quietly switching back to the default one. Starting offline in a fresh browser session is still to come.
 
 ## 2.31.2
 

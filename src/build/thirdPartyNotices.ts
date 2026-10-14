@@ -55,21 +55,25 @@ export const ALLOWED_LICENSES: ReadonlySet<string> = new Set([
 /**
  * Code that build tools inject into the bundle without listing it in any
  * sourcemap, and package content that a code generator copies into a file of
- * our own (a test holds every "AUTO-GENERATED ... from <pkg>@" file to an
- * entry here). Each entry names the package and how to spot its code: a source
- * id in a sourcemap, or a string the emitted JavaScript always contains. A
- * source id matched here is the only kind allowed outside the repository.
+ * our own (a test holds every "AUTO-GENERATED ... from <pkg>@" file, and every
+ * `copies-package:` line in a `scripts/gen-*` file, to an entry here). Each
+ * entry names the package and how to spot its code: a source id in a
+ * sourcemap, or a string the emitted JavaScript always contains. Only an entry
+ * marked `outsideRepo` may excuse a source id outside the repository.
  */
 export const INJECTED_CODE: ReadonlyArray<{
   pkg: string;
   from?: string;
   sourcePattern?: RegExp;
   codeMarker?: string;
-  /** Its chunk is this tool's code alone, so a sourcemap with no sources is expected. */
+  /** Its chunk is this tool's code alone, so a sourcemap with no sources is expected (see isWholeInjectedChunk). */
   wholeChunk?: boolean;
+  /** Its source id resolves to a path outside the repository, which only this entry's pattern may excuse. */
+  outsideRepo?: true;
 }> = [
-  // vite-plugin-pwa's generated register module (virtual:pwa-register).
-  { pkg: "vite-plugin-pwa", sourcePattern: /virtual:pwa-register/ },
+  // vite-plugin-pwa's generated register module (virtual:pwa-register). Its
+  // sourcemap id climbs out of dist/ to a `/@vite-plugin-pwa/` path.
+  { pkg: "vite-plugin-pwa", sourcePattern: /(^|\/)(@vite-plugin-pwa\/)?virtual:pwa-register$/, outsideRepo: true },
   // Vite's dynamic-import preload helper.
   { pkg: "vite", codeMarker: "vite:preloadError" },
   // Vite's modulepreload polyfill (its chunk's sourcemap has no sources).
@@ -78,10 +82,123 @@ export const INJECTED_CODE: ReadonlyArray<{
   // source file of our own, so its sourcemap entry is not under node_modules.
   { pkg: "pixelarticons", sourcePattern: /(^|\/)src\/ui\/iconPaths\.generated\.ts$/ },
   // workbox-build's service worker template (its AMD loader); the sourcemap
-  // lists it as a temporary file outside node_modules.
+  // lists it as a temporary file outside the repository.
   // `from` names the package that resolves it, so a nested copy is the one read.
-  { pkg: "workbox-build", from: "vite-plugin-pwa", sourcePattern: /\/[0-9a-f]{32}\/sw\.js$/, codeMarker: "register its module" },
+  {
+    pkg: "workbox-build",
+    from: "vite-plugin-pwa",
+    sourcePattern: /(^|\/)[0-9a-f]{32}\/sw\.js$/,
+    codeMarker: "register its module",
+    outsideRepo: true,
+  },
 ];
+
+/** True when an `INJECTED_CODE` entry marked `outsideRepo` attributes a source id that resolves outside the repository. */
+export function isKnownOutsideRepoSource(source: string, entries: typeof INJECTED_CODE = INJECTED_CODE): boolean {
+  return entries.some((inj) => inj.outsideRepo === true && inj.sourcePattern !== undefined && inj.sourcePattern.test(source));
+}
+
+/**
+ * The most a whole injected chunk may hold, in UTF-8 bytes, once its
+ * sourcemap comment is stripped. Vite's modulepreload polyfill is about 710
+ * bytes; the headroom absorbs a small change in a Vite release, and a bigger one fails
+ * the build so a person looks at the chunk before raising this.
+ */
+export const WHOLE_CHUNK_MAX_BYTES = 1536;
+
+/**
+ * True when a chunk whose sourcemap lists no sources is one injected tool's
+ * code and nothing else: it carries the tool's marker, is one immediately
+ * invoked function (the shape Vite emits for its modulepreload polyfill),
+ * and is at most `WHOLE_CHUNK_MAX_BYTES` bytes of UTF-8. A chunk that also carries other
+ * code fails, so a sourcemap that lost its sources cannot hide a package.
+ */
+export function isWholeInjectedChunk(code: string, marker: string): boolean {
+  const body = code.replace(/\r\n?/g, "\n").replace(/\n?\/\/# sourceMappingURL=\S*\s*$/, "").trim();
+  if (new TextEncoder().encode(body).length > WHOLE_CHUNK_MAX_BYTES || !body.includes(marker)) return false;
+  const iife = /^\((?:function\s*\(\s*\)|\(\s*\)\s*=>)\s*\{[\s\S]*\}\)\(\);?$/;
+  // One function: its opening and the call that closes it each appear once.
+  const opens = body.match(/\((?:function\s*\(\s*\)|\(\s*\)\s*=>)\s*\{/g) ?? [];
+  const closes = body.match(/\}\)\(\)/g) ?? [];
+  return iife.test(body) && opens.length === 1 && closes.length === 1;
+}
+
+/**
+ * True when a module id or file path lies inside a `node_modules` folder, with
+ * either separator. A `?query` suffix is ignored, so a query that mentions
+ * `node_modules` does not count. With `extension`, the path (query stripped)
+ * must also match it. The generator and the `no-unlisted-package-files` plugin
+ * in vite.config.ts share this, so their idea of a package file cannot drift.
+ */
+export function isPackagePath(id: string, extension?: RegExp): boolean {
+  const path = id.replace(/\?.*$/s, "");
+  return /(^|[\\/])node_modules[\\/]/.test(path) && (extension === undefined || extension.test(path));
+}
+
+/** A stylesheet extension that ends the path or a query part (`?vue&type=style&lang.css&inline`). */
+export const PACKAGE_STYLESHEET = /\.(css|less|sass|scss|styl|stylus|pcss|postcss|sss)(?=$|[?&#])/;
+
+/** The dependency fields of a package.json that can name a local folder. */
+const DEPENDENCY_FIELDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"] as const;
+
+/**
+ * The lockfile's view of the same road: npm marks every package installed as
+ * a link (`npm link`, a `file:` folder, a workspace) with `"link": true`, at
+ * any depth of the tree, including ones package.json does not name.
+ */
+export function lockfileLinkProblems(lockfile: unknown, name = "package-lock.json"): string[] {
+  const packages = typeof lockfile === "object" && lockfile !== null ? (lockfile as { packages?: unknown }).packages : undefined;
+  if (typeof packages !== "object" || packages === null) return [];
+  return Object.entries(packages as Record<string, unknown>)
+    .filter(([, entry]) => typeof entry === "object" && entry !== null && (entry as { link?: unknown }).link === true)
+    .map(([path]) => `${name} installs ${path} as a link`);
+}
+
+/** A dependency spec that names a local package: a link protocol, or a relative, home, absolute or drive path. */
+function isLocalSpec(spec: string): boolean {
+  // A tarball is unpacked as a copy under node_modules, where the notices find it.
+  if (/\.(tgz|tar\.gz|tar)\s*$/i.test(spec)) return false;
+  return /^\s*((file|link|portal|workspace):|\.{1,2}([\\/]|$)|~[\\/]|[\\/]|[A-Za-z]:[\\/])/i.test(spec);
+}
+
+/**
+ * Why the project's package.json could let a package be counted as our own
+ * code: a `file:`, `link:`, `portal:` or `workspace:` dependency, a bare
+ * local path (`./x`, `../x`, `~/x`, `/x`, `C:/x`, which npm reads as `file:`),
+ * the same in npm `overrides` or yarn and pnpm `resolutions`/`overrides`, or a
+ * `workspaces` field links a package whose real path can sit inside the
+ * repository but outside `node_modules`, where the notices would never list
+ * it. None exists today; one fails the build until the generator learns to
+ * attribute it.
+ */
+export function linkedDependencyProblems(manifest: Record<string, unknown>): string[] {
+  const problems: string[] = [];
+  if (manifest.workspaces !== undefined) problems.push("package.json declares workspaces");
+  for (const field of DEPENDENCY_FIELDS) {
+    const deps = manifest[field];
+    if (deps === undefined) continue;
+    if (typeof deps !== "object" || deps === null || Array.isArray(deps)) {
+      problems.push(`package.json ${field} is not an object`);
+      continue;
+    }
+    for (const [name, spec] of Object.entries(deps)) {
+      if (typeof spec === "string" && isLocalSpec(spec)) problems.push(`package.json ${field} links ${name} (${spec.trim()})`);
+    }
+  }
+  // npm overrides and yarn resolutions can point at a local package too, at any depth.
+  const walk = (field: string, value: unknown, at: string): void => {
+    if (typeof value === "string") {
+      if (isLocalSpec(value)) problems.push(`package.json ${field} links ${at} (${value.trim()})`);
+    } else if (typeof value === "object" && value !== null) {
+      for (const [k, v] of Object.entries(value)) walk(field, v, at ? `${at} > ${k}` : k);
+    }
+  };
+  walk("overrides", manifest.overrides, "");
+  walk("resolutions", manifest.resolutions, "");
+  const pnpm = manifest.pnpm;
+  if (typeof pnpm === "object" && pnpm !== null) walk("pnpm.overrides", (pnpm as Record<string, unknown>).overrides, "");
+  return problems;
+}
 
 /**
  * A sourcemap `sources` entry as an absolute, `/`-separated path, or null for

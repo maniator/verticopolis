@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
 import { notesForVersion } from "./src/changelog";
+import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
 
@@ -79,29 +80,31 @@ function emitVersionJson(): Plugin {
  * records (#951), so `scripts/gen-third-party-notices.ts` could not list it:
  * a package stylesheet (Vite writes no CSS sourcemap), whether imported from
  * JavaScript or inlined by a CSS `@import`, and a package asset such as a font
- * or image from a CSS `url()`, whether emitted as a file or inlined.
+ * or image from a CSS `url()`, whether emitted as a file or inlined. What
+ * counts as a package file comes from `isPackagePath`, the same test the
+ * generator uses.
  */
-const PACKAGE_STYLESHEET = /[\\/]node_modules[\\/].*\.(css|less|sass|scss|styl|stylus|pcss|postcss|sss)(\?|$)/;
-const PACKAGE_FILE = /(^|[\\/])node_modules[\\/]/;
-const PACKAGE_CODE = /\.[mc]?[jt]sx?(\?|$)/;
+const CODE = /\.[mc]?[jt]sx?$/;
 function noUnlistedPackageFiles(): Plugin {
   const refuse = (what: string): string => `${what}: the third-party notices cannot list this package file (see #951)`;
   return {
     name: "no-unlisted-package-files",
     apply: "build",
     transform(_code, id) {
-      if (PACKAGE_STYLESHEET.test(id)) this.error(refuse(id));
+      // A stylesheet's extension can also sit in the query (a component's
+      // `?type=style&lang.css` block), so the whole id is checked too.
+      if (isPackagePath(id, PACKAGE_STYLESHEET) || (isPackagePath(id) && PACKAGE_STYLESHEET.test(id))) this.error(refuse(id));
     },
     generateBundle(_options, bundle) {
       // A CSS @import, or a small image or font inlined as a data URL, never
       // reaches `transform` or the bundle as its own file; the build's watch
       // list still names it. Package JavaScript is listed by its sourcemap;
       // package JSON is inlined without one, so it is refused like an asset.
-      const inlined = this.getWatchFiles().filter((f) => PACKAGE_FILE.test(f) && !PACKAGE_CODE.test(f));
+      const inlined = this.getWatchFiles().filter((f) => isPackagePath(f) && !isPackagePath(f, CODE));
       if (inlined.length > 0) this.error(refuse(inlined.join(", ")));
       for (const file of Object.values(bundle)) {
         if (file.type !== "asset") continue;
-        const fromPackage = (file.originalFileNames ?? []).filter((n) => PACKAGE_FILE.test(n));
+        const fromPackage = (file.originalFileNames ?? []).filter((n) => isPackagePath(n));
         if (fromPackage.length > 0) this.error(refuse(`${file.fileName} (from ${fromPackage.join(", ")})`));
       }
     },
@@ -278,7 +281,27 @@ export default defineConfig({
       workbox: {
         // Precache the game shell only. The dev/tooling entry points and their
         // chunks are excluded so an install ships just the game.
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3}"],
+        //
+        // The shell includes the WASM engine package (`engine/`, its glue and
+        // `.wasm`, built on every deploy by scripts/build-engine-wasm.sh), so
+        // an installed game starts the engine offline (#945). One precache
+        // version holds the shell and the engine together: Workbox installs a
+        // new worker's whole manifest or none of it, activates it through
+        // src/pwa.ts's save-then-reload or once every tab of the old version
+        // has closed, and deletes
+        // the old version's entries, so from 2.32.0 on a page the worker
+        // controls runs the shell and engine its install fetched together.
+        // Not covered here, and tracked on #985 (the cutover plan's S16
+        // version check): a page no worker controls yet (a first visit) fetches them
+        // separately; an install that overlaps a deploy can store the engine's
+        // unhashed files from the newer build; and a worker from before 2.32.0
+        // never precached the engine at all. The
+        // cost is about 430 KB compressed per install, paid by every player
+        // (owner decision, 2026-10-13: the engine becomes the default at 3.0).
+        // `engine/BUILD.json` stays out (a `.json`, which the pattern does not
+        // match): the page never reads it. scripts/verify-precache.ts fails
+        // the build when a built engine is missing from the manifest.
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3,wasm}"],
         // og-image.png is the social/crawler share card, not part of the game
         // shell, so keep it out of the offline precache. `help.html` and its own
         // page entry chunk (`help-*.js`) are excluded too (see the note below),
@@ -294,7 +317,7 @@ export default defineConfig({
         // the game shell: the PWA needs nothing that large, so it stays out
         // of every web player's offline precache (a review catch on the PR
         // that added it).
-        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png", "**/engine/**"],
+        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png"],
         navigateFallback: "index.html",
         // Keep the non-game pages and the real static files out of the app-shell
         // fallback, letting them fall through to the network rather than the game
@@ -338,6 +361,9 @@ export default defineConfig({
           /help/,
           /preview/,
           /version\.json$/,
+          // The engine package's own files (its BUILD.json above all) are
+          // documents; a navigation to one must reach the file itself.
+          /\/engine\//,
           /robots\.txt$/,
           /sitemap\.xml$/,
           /third-party-notices\.txt(\?.*)?$/,
