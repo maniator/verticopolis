@@ -14,7 +14,8 @@
  */
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
+import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets.ts";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
 
 const DIST = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist");
@@ -117,7 +118,55 @@ if (builtEngine) {
   if (absent.length > 0) fail(`the built engine package is missing from the precache manifest, so the WASM engine would not start offline (#945); check the workbox globPatterns and maximumFileSizeToCacheInBytes in vite.config.ts: ${absent.join(", ")}`);
 }
 
+// Today's sounds must play offline too (#985): the lazy chunk that carries
+// Tone.js and every synthesized sound, and each recorded file the audio layer
+// fetches (src/audio/audioAssets.ts, kept complete by audioAssets.test.ts).
+const audioChunks = urls.map((u) => u.split("?")[0]).filter((u) => AUDIO_ENGINE_CHUNK.test(u));
+if (audioChunks.length === 0) {
+  fail(`no precache entry matches the audio engine chunk (${AUDIO_ENGINE_CHUNK}), so an installed game would play no sound offline (#985); check the workbox globPatterns and the chunk's name`);
+}
+// The chunk is self-contained today. If a later build splits Tone.js (or
+// anything else it uses) into other chunks, every file it loads, directly or
+// through another chunk, must be precached too, or the lazy import fails
+// offline. Follows relative imports, `new URL(..., import.meta.url)` assets
+// and Vite's preload lists ("assets/..."), with POSIX paths so the manifest
+// keys match on every OS.
+const audioDeps = new Set<string>();
+const unresolved: string[] = [];
+const queue = [...audioChunks];
+while (queue.length > 0) {
+  const chunk = queue.pop()!;
+  if (!existsSync(resolve(DIST, chunk))) fail(`precache entry ${chunk} has no file under dist/`);
+  const text = readFileSync(resolve(DIST, chunk), "utf8");
+  const from = (ref: string) => (ref.startsWith("/") ? ref.slice(1) : posix.join(posix.dirname(chunk), ref));
+  // A relative import is real code the chunk runs: it must resolve.
+  for (const m of text.matchAll(/(?:from|import)\s*\(?\s*["'`](\.\.?\/[^"'`]+\.js)["'`]/g)) {
+    const ref = from(m[1]);
+    if (ref.startsWith("..") || !existsSync(resolve(DIST, ref))) unresolved.push(`${m[1]} (from ${chunk})`);
+    else if (!audioDeps.has(ref) && !audioChunks.includes(ref)) {
+      audioDeps.add(ref);
+      queue.push(ref);
+    }
+  }
+  // Asset references: only those that name a real file under dist/ count, so
+  // a string that merely looks like a path cannot fail the build.
+  const assets = [
+    ...[...text.matchAll(/new URL\(\s*["'`]([^"'`:]+)["'`]\s*,\s*import\.meta\.url/g)].map((m) => from(m[1])),
+    ...[...text.matchAll(/["'`](assets\/[\w./-]+\.(?:js|css|wasm|mp3|ogg|wav|m4a|flac|aac|opus|webm|json))["'`]/g)].map((m) => m[1]),
+  ];
+  for (const ref of assets) {
+    if (ref.startsWith("..") || audioDeps.has(ref) || audioChunks.includes(ref) || !existsSync(resolve(DIST, ref))) continue;
+    audioDeps.add(ref);
+    if (ref.endsWith(".js")) queue.push(ref);
+  }
+}
+if (unresolved.length > 0) fail(`the audio engine chunk imports files that are not in dist/: ${unresolved.join(", ")}`);
+const unprecached = [...audioDeps].filter((f) => !seen.has(f));
+if (unprecached.length > 0) fail(`the audio engine chunk loads files missing from the precache manifest, so it would not load offline (#985): ${unprecached.join(", ")}`);
+const silent = AUDIO_RUNTIME_FILES.filter((f) => !seen.has(f));
+if (silent.length > 0) fail(`audio files the game fetches at run time are missing from the precache manifest, so they would not play offline (#985): ${silent.join(", ")}`);
+
 console.log(
-  `verify-precache: ${urls.length} unique precache entries (${(total / 1048576).toFixed(2)} MiB); all ${REQUIRED_ICONS.length} required icons present exactly once; ` +
+  `verify-precache: ${urls.length} unique precache entries (${(total / 1048576).toFixed(2)} MiB); all ${REQUIRED_ICONS.length} required icons present exactly once; the audio chunk and ${AUDIO_RUNTIME_FILES.length} audio files are precached; ` +
     (builtEngine ? "the engine package is precached" : `no engine package in this build (${ALLOW_NO_ENGINE}=1)`),
 );

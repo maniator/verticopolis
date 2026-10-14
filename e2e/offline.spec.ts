@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import { WASM_PROJECT, expectEngineHosted } from "./helpers";
+import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets";
 
 /**
  * The installed game on the WASM engine without a network (#985). The service
@@ -141,4 +142,111 @@ test("losing the network mid-session keeps the game playing on the WASM engine",
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   await playSaveAndLoad(page);
   expect(seen.errors).toEqual([]);
+});
+
+/**
+ * Today's sounds offline (#985, criterion 3). The audio is the existing Tone
+ * engine: one lazy chunk synthesizes the music and every cue, and the crowd
+ * plays the recorded files in src/audio/audioAssets.ts. Nothing here changes
+ * it; the test reads the engine's own objects through the tooling build's
+ * `window.game.audio` (its loaded engine, `impl`) to see that the context
+ * runs, the recordings decode, the composed program plays notes and a build
+ * plays its cue, all from the precache with the network off.
+ */
+test("an installed game plays today's sounds offline after the first gesture", async ({ page, context }) => {
+  await installWorker(page);
+  // As in the cold-start test: the first navigation the worker controls is
+  // the offline one.
+  await context.setOffline(true);
+  const seen = watch(page);
+  // Every audio fetch the cold start makes: the Tone chunk and the recordings.
+  const audioResponses: { file: string; ok: boolean; fromSW: boolean }[] = [];
+  page.on("response", (r) => {
+    const path = new URL(r.url()).pathname;
+    const file = AUDIO_ENGINE_CHUNK.test(path) ? "audio engine chunk" : AUDIO_RUNTIME_FILES.find((f) => path.endsWith(`/${f}`));
+    if (file) audioResponses.push({ file, ok: r.ok(), fromSW: r.fromServiceWorker() });
+  });
+  await page.reload();
+  await expectControlledWithEngine(page);
+  await hostedGame(page);
+  const before = await page.evaluate(() => ({ started: (window as any).game.audio.started, muted: (window as any).game.audio.muted }));
+  expect(before, "the game starts no audio before a gesture, and is not muted").toEqual({ started: false, muted: false });
+
+  // The first gesture starts the audio (src/game/inputKeys.ts's kick). A
+  // click is a real user activation; a modifier-only key press is not.
+  const box = await page.locator("canvas").first().boundingBox();
+  expect(box, "the tower canvas is on screen").not.toBeNull();
+  await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.waitForFunction(() => !!(window as any).game.audio.impl?.started, undefined, { timeout: 30_000 });
+  const absentAtStart = await page.evaluate(() => {
+    const impl = (window as any).game.audio.impl;
+    const probes: Record<string, unknown> = {
+      "master.context": impl.master?.context,
+      "crowd.voices": impl.crowd?.voices,
+      sfx: typeof impl.sfx === "function" ? impl.sfx : undefined,
+    };
+    return Object.keys(probes).filter((k) => probes[k] === undefined);
+  });
+  expect(absentAtStart, "the engine objects this test observes exist (renamed in ToneAudioEngine.ts or toneCrowd.ts?)").toEqual([]);
+  await page.waitForFunction(() => (window as any).game.audio.impl.master.context.state === "running", undefined, { timeout: 30_000 });
+  // The crowd's recordings decode from the cache (the layer stays tone-only,
+  // and silent about it, if they never arrive, so wait for them explicitly).
+  // `ready` means the talk seed decoded and was masked.
+  await page.waitForFunction(() => {
+    const voices = (window as any).game.audio.impl.crowd?.voices;
+    return !!voices?.ready && !!voices.laughs?.loaded;
+  }, undefined, { timeout: 30_000 });
+
+  // Count what the engine plays from here on: the cues it is asked for, and
+  // the notes its voices actually trigger (the composed program's voices and
+  // the bloop the build cue sounds on).
+  const missing = await page.evaluate(() => {
+    const impl = (window as any).game.audio.impl;
+    const counts = { music: 0, bloop: 0, cues: [] as string[] };
+    const absent: string[] = [];
+    const spy = (voice: any, name: string, key: "music" | "bloop") => {
+      if (typeof voice?.triggerAttackRelease !== "function") return absent.push(name);
+      const play = voice.triggerAttackRelease.bind(voice);
+      voice.triggerAttackRelease = (...args: unknown[]) => {
+        counts[key]++;
+        return play(...args);
+      };
+    };
+    spy(impl.arp, "arp", "music");
+    spy(impl.bassVoice, "bassVoice", "music");
+    spy(impl.hook, "hook", "music");
+    spy(impl.sfxVoices?.bloop, "sfxVoices.bloop", "bloop");
+    const sfx = impl.sfx.bind(impl);
+    impl.sfx = (name: string) => {
+      counts.cues.push(name);
+      return sfx(name);
+    };
+    (window as any).__audioCounts = counts;
+    return absent;
+  });
+  expect(missing, "the engine objects this test observes exist (renamed in ToneAudioEngine.ts?)").toEqual([]);
+  await page.waitForFunction(() => (window as any).__audioCounts.music > 0, undefined, { timeout: 30_000 });
+
+  const lobbyAt160 = () =>
+    page.evaluate(() => (JSON.parse((window as any).__vcEngine.current().engine.serialize()).units as { kind: string; x: number }[]).some((u) => u.kind === "lobby" && u.x === 160));
+  expect(await lobbyAt160(), "no lobby at the build spot yet").toBe(false);
+  await page.evaluate(() => {
+    const g = (window as any).game;
+    // Count only what the build itself plays.
+    Object.assign((window as any).__audioCounts, { bloop: 0, cues: [] });
+    g.sim.money = 1e9;
+    g.build.tryBuild("lobby", 1, 160);
+    (window as any).__vcEngine.current().syncStructure();
+  });
+  expect(await lobbyAt160(), "the lobby was built").toBe(true);
+  const cue = await page.evaluate(() => ({ ...(window as any).__audioCounts }));
+  expect(cue.cues, "the build played its cue").toContain("build");
+  expect(cue.cues, "no error cue").not.toContain("error");
+  expect(cue.bloop, "the build cue sounded").toBeGreaterThan(0);
+
+  // Every audio file came from the service worker, with nothing fetched from
+  // the network.
+  expect(new Set(audioResponses.map((r) => r.file))).toEqual(new Set(["audio engine chunk", ...AUDIO_RUNTIME_FILES]));
+  expect(audioResponses.filter((r) => !r.ok || !r.fromSW), "every audio file is served by the service worker").toEqual([]);
+  expect(seen).toEqual({ errors: [], failed: [] });
 });
