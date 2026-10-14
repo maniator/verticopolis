@@ -106,3 +106,31 @@ describe("the notices generator on a build that ships the WASM engine (#955)", (
     expect(r.notices).not.toContain("(Rust, in the WASM engine)");
   });
 });
+
+describe("the notices generator's closed roads (#974)", () => {
+  const ownCode = [join(ROOT, "src/main.ts"), join(ROOT, "node_modules/lit-html/lit-html.js")];
+  const polyfill = `(function(){for(const e of document.querySelectorAll('link[rel="modulepreload"]'))fetch(e.href)})();\n`;
+  /** A build with one more chunk whose sourcemap lists no sources. */
+  const withSourcelessChunk = (code: string): string => {
+    const dist = build(null, ownCode);
+    writeFileSync(join(dist, "polyfill.js"), `${code}//# sourceMappingURL=polyfill.js.map\n`);
+    writeFileSync(join(dist, "polyfill.js.map"), JSON.stringify({ version: 3, sources: [], mappings: "" }));
+    return dist;
+  };
+
+  it("accepts a sourceless chunk that is the modulepreload polyfill alone, and refuses one that carries more", () => {
+    expect(run(withSourcelessChunk(polyfill)).status).toBe(0);
+    const r = run(withSourcelessChunk(`var leftPad=function(s){return s};${polyfill}`));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/polyfill\.js\.map lists no sources/);
+  });
+
+  it("excuses an outside-repo source only through an entry marked for it", () => {
+    // workbox-build's template in a temporary folder is expected.
+    expect(run(build(null, [...ownCode, "/tmp/ee960543882c65087dd93d10ef853802/sw.js"])).status).toBe(0);
+    // A file outside the repository that looks like the generated icon module is not.
+    const r = run(build(null, [...ownCode, "/elsewhere/src/ui/iconPaths.generated.ts"]));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/iconPaths\.generated\.ts.*which is outside the repository/);
+  });
+});
