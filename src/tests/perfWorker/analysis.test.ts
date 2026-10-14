@@ -3,7 +3,7 @@ import { aggregate, definitions, ratios, validate } from "./analysis";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { csvField, loadWorkerCheckpoint, makeConfig, metricsCsv, parseArgs, ratiosCsv, scriptSizes } from "./main";
+import { csvField, limitations, loadWorkerCheckpoint, makeConfig, metricsCsv, parseArgs, ratiosCsv, scriptSizes } from "./main";
 import { markdown } from "./report";
 import { modeOrder, summarizeFrames, summarizeHosted, type ModeRun } from "./runner";
 import type { ModeName } from "./pageWorker";
@@ -156,6 +156,7 @@ describe("perf:worker analysis", () => {
       expect(cp.retried).toBe(1);
       expect(readFileSync(join(dir, "runs.jsonl"), "utf8").endsWith("\n")).toBe(true);
       expect(() => loadWorkerCheckpoint(dir, { ...meta, commit: "other" })).toThrow(/its commit differs/);
+      expect(() => loadWorkerCheckpoint(dir, { ...meta, config: makeConfig(parseArgs(["--reps", "6", "--viewport", "1280x720"]), ["small"]) })).toThrow(/its config differs from this run's \(viewport; pass the options the run started with\)/);
       expect(() => loadWorkerCheckpoint(dir, { ...meta, dirty: true })).toThrow(/clean tree/);
       writeFileSync(join(dir, "checkpoint.json"), JSON.stringify({ ...meta, dirty: true, startedAt: "x" }));
       expect(() => loadWorkerCheckpoint(dir, meta)).toThrow(/started on a dirty tree/);
@@ -203,5 +204,7 @@ describe("perf:worker analysis", () => {
     expect(makeConfig(parseArgs(["--viewport", "1280x720"]), ["small"]).viewport).toEqual({ width: 1280, height: 720 });
     for (const bad of ["1280", "1280x", "x720", "1280X720", "100x100", "9000x720", "1280x720x1"]) expect(() => parseArgs(["--viewport", bad])).toThrow(/WIDTHxHEIGHT/);
     expect(() => parseArgs(["--viewport"])).toThrow(/needs a value/);
+    expect(limitations(makeConfig(parseArgs([]), ["small"])).join("\n")).toMatch(/640x360 CSS viewport \(the default.*so at that size no mode simulated/);
+    expect(limitations(makeConfig(parseArgs(["--viewport", "1280x720"]), ["small"])).join("\n")).toMatch(/1280x720 CSS viewport \(set with --viewport\)\. A frame longer than 200 ms/);
   });
 });

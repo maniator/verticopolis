@@ -165,9 +165,9 @@ export interface FramesRun {
   longTaskMs: number | null;
   /** Sum over long tasks of the part past 50 ms. */
   blockingMs: number | null;
-  /** Command to the first frame drawn after the engine's answer is in the
-   *  read model, ms, one per command answered in the window, and the
-   *  commands still unanswered when it closed. */
+  /** Command to the clock inside the first frame callback after the
+   *  engine's answer is in the read model, ms, one per command answered in
+   *  the window, and the commands still unanswered when it closed. */
   commandToFrameMs: number[];
   commandsUnanswered: number;
   /** Worker host: the counters over the window. */

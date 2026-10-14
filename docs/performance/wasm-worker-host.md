@@ -191,7 +191,8 @@ the throttle while the worker's own time does not.
   shifted down by an amount the run did not record. The rows are in the raw
   files but are not used here, and no correction is applied. The harness now
   reads the clock inside the frame callback and fails a run with a negative
-  sample, so the next run measures this metric correctly.
+  sample, so the next run gives non-negative samples, timed to the frame
+  callback (before the frame is painted).
 
 ## Start-up, download, memory, offline
 
@@ -272,10 +273,11 @@ On a desktop with a GPU, from a clean checkout of this branch:
    `wasm-bindgen-cli` (the commands are in `engine-rs/README.md`), then run
    `npm ci` and `npm run wasm:build`.
 2. Run `npm run perf:worker -- --viewport 1280x720`. It builds the app
-   itself, refuses a dirty tree's numbers as final (the folder is marked
-   `-dirty`), and writes `docs/performance/results/<date>-<commit>-worker/`.
-   About four hours on the container above; a desktop is faster. A stopped
-   run continues with `--resume <that folder>`.
+   itself and writes `docs/performance/results/<date>-<commit>-worker/`. A
+   run from a dirty tree gets a `-dirty` folder and a validation warning, and
+   cannot be resumed. About four hours on the container above; a desktop is
+   faster. A stopped run continues with `--resume <that folder> --viewport
+   1280x720` (repeat the options it started with).
 3. Keep each machine's results in its own folder and its own table. The
    harness records the machine, browser and viewport with every run.
 
