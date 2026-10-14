@@ -14,11 +14,14 @@
  * PW_CHROME only to point a local preview at another browser.
  *
  * Before writing, it checks the atlas against the game's own paint for the
- * sample signatures in `src/render/atlas/samples.ts` and stops on any
- * mismatch, and after packing it checks that every image comes back out of
- * the pages. Writes `<out>/verticopolis-atlas-<label or version>.zip` and a
- * `.sha256` beside it (`verticopolis-atlas-preview.zip` for a `--filter` run,
- * which skips the sample check).
+ * sample signatures in `src/render/atlas/samples.ts` (flat, and through each
+ * room's depth layers) and stops on any mismatch. After packing it checks that
+ * every image comes back out of the pages, that every room's depth layers,
+ * read back from the pages, give back its flat frame at every occupant count,
+ * and that the soft furniture stays within rounding of it. Writes
+ * `<out>/verticopolis-atlas-<label or version>.zip` and a `.sha256` beside it
+ * (`verticopolis-atlas-preview.zip` for a `--filter` run, which skips the
+ * sample check).
  * Nothing it writes is committed. The archive layout and manifest schema are
  * documented in docs/atlas.md.
  */
@@ -28,7 +31,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
 import { bundleBake } from "./atlas-bundle.ts";
-import { buildArchive, checkPages } from "../src/render/atlas/archive";
+import { buildArchive, checkLayers, checkPages, kindsWithoutFurniture, SOFT_DRIFT_LIMIT, softLayerDrift } from "../src/render/atlas/archive";
 import type { BakeResult } from "../src/render/atlas/bake";
 import type { Image } from "../src/render/atlas/pixels";
 
@@ -120,11 +123,15 @@ async function main(): Promise<void> {
       // report a mismatch, or the comparison itself is broken.
       const bad = checks.filter((c) => (c.control ? c.mismatches === 0 : c.mismatches > 0));
       if (bad.length > 0) throw new Error(`atlas does not match the game's paint:\n${JSON.stringify(bad, null, 1)}`);
-      console.log(`pre-flight: ${checks.length} sample paints match the game`);
+      const layeredChecks = checks.filter((c) => c.label.endsWith("(depth layers)")).length;
+      if (layeredChecks === 0) throw new Error("pre-flight: no sample was composed through its depth layers");
+      console.log(`pre-flight: ${checks.length} sample paints match the game (${layeredChecks} through depth layers)`);
     }
     const summary = await page.evaluate((f) => (globalThis as any).__vcAtlas.run(f), filter);
     if (summary.frames === 0) throw new Error(`--filter ${filter} matches no frame`);
     console.log(`baked ${summary.frames} frames, ${summary.animations} animations, ${summary.images} unique images`);
+    const dropped: string[] = summary.softDropped;
+    console.log(`soft furniture: left out of ${dropped.length} layered frames where an occupant step cannot be drawn over it or the soft pass failed${dropped.length > 0 ? `: ${dropped.slice(0, 5).join(", ")}${dropped.length > 5 ? ", ..." : ""}` : ""}`);
     const records = await page.evaluate(() => (globalThis as any).__vcAtlas.records());
     const images: Image[] = [];
     const normals: Image[] = [];
@@ -139,7 +146,7 @@ async function main(): Promise<void> {
         normals.push({ w: g.w, h: g.h, data: decode(g.normal, g.w, g.h, `normal ${id}`) });
       }
     }
-    bakeResult = { images, normals, frames: records.frames, animations: records.animations };
+    bakeResult = { images, normals, frameImages: records.frameImages, frames: records.frames, animations: records.animations };
   } finally {
     await browser.close();
   }
@@ -154,6 +161,25 @@ async function main(): Promise<void> {
   // Every image must come back out of the pages it was packed into.
   const misplaced = checkPages(bakeResult, archive);
   if (misplaced.length > 0) throw new Error(`images do not round-trip through the pages: ${misplaced.slice(0, 10).join(", ")}`);
+  // Every room's shell plus its furniture must give back its flat frame.
+  const split = checkLayers(archive);
+  if (split.length > 0) throw new Error(`depth layers do not compose back to their frames: ${split.slice(0, 10).join(", ")}`);
+  // A shell that still shows the furniture also composes back, so every kind
+  // that splits must have furniture somewhere. That holds across the whole
+  // catalog only, so a --filter preview skips it.
+  const unsplit = filter ? [] : kindsWithoutFurniture(archive.manifest);
+  if (unsplit.length > 0) throw new Error(`depth layers hold no furniture for ${unsplit.join(", ")}: the shell kept it`);
+  const layered = Object.values(archive.manifest.frames).filter((f) => f.layers).length;
+  console.log(`depth layers: ${layered} room frames compose back to their flat frames at every occupant count`);
+  // The soft furniture is close to the flat frame but rounds differently;
+  // report how far it strays, and stop if it strays further than rounding.
+  const drift = softLayerDrift(archive);
+  const share = drift.pixels > 0 ? ((100 * drift.differing) / drift.pixels).toFixed(2) : "0";
+  console.log(`soft furniture: ${drift.frames} frames, ${drift.pictures} pictures; ${share}% of its pixels differ from the flat frame, by at most ${drift.maxDelta} of 255`);
+  // A soft pass that broke everywhere would leave nothing to measure.
+  if (!filter && layered > 0 && drift.frames === 0) throw new Error("no layered frame kept its soft furniture");
+  if (drift.outside > 0) throw new Error(`soft furniture misses ${drift.outside} pixels where the flat frame differs from the shell (first in ${drift.worst})`);
+  if (drift.maxDelta > SOFT_DRIFT_LIMIT) throw new Error(`soft furniture strays ${drift.maxDelta} of 255 from the flat frame in ${drift.worst}, past the limit of ${SOFT_DRIFT_LIMIT}`);
   mkdirSync(outDir, { recursive: true });
   const name = filter ? "verticopolis-atlas-preview.zip" : `verticopolis-atlas-${label ?? pkg.version}.zip`;
   writeFileSync(join(outDir, name), archive.zip);

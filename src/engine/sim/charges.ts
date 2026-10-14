@@ -16,9 +16,10 @@ import type { Transport } from "../types";
  *
  * Refusal reasons are player-facing copy, worded as the web editor shows
  * them. The Rust engine mirrors this file in `engine-rs/src/charges.rs`.
- * The car and span edits report `capacity_changed` from the tower's own
- * `setCars` and `resizeTransport`; {@link removeFacility} reports
- * `facility_removed` with its method.
+ * The car and span edits go through `Simulation.setCars` and
+ * `Simulation.resizeTransport` (`sim/capacity.ts`), which report
+ * `capacity_changed`; {@link removeFacility} reports `facility_removed` with
+ * its method.
  */
 
 /** What a charged command did. `delta` is the signed change it made to the
@@ -69,7 +70,7 @@ export function addCar(sim: Simulation, id: number): ChargeResult {
   if (t.cars >= maxCarsFor(t.kind)) return refuse(CAR_LIMIT);
   const cost = ECON.addCarCost;
   if (sim.money < cost) return refuse(NOT_ENOUGH_MONEY);
-  if (!sim.tower.setCars(id, t.cars + 1)) return refuse(CAR_LIMIT);
+  if (!sim.setCars(id, t.cars + 1)) return refuse(CAR_LIMIT);
   sim.money -= cost;
   return { ok: true, delta: -cost };
 }
@@ -79,7 +80,7 @@ export function addCar(sim: Simulation, id: number): ChargeResult {
 export function removeCar(sim: Simulation, id: number): ChargeResult {
   const t = elevator(sim, id, ONLY_ELEVATOR_CARS);
   if ("ok" in t) return t;
-  if (t.cars <= 1 || !sim.tower.setCars(id, t.cars - 1)) return refuse(LAST_CAR);
+  if (t.cars <= 1 || !sim.setCars(id, t.cars - 1)) return refuse(LAST_CAR);
   const refund = carResaleRefund();
   sim.money += refund;
   return { ok: true, delta: refund };
@@ -118,7 +119,7 @@ export function extendTransport(sim: Simulation, id: number, end: "up" | "down",
     const wanted = end === "up" ? targetFloor > mark.top : targetFloor < mark.bottom;
     return wanted ? { ...refuse(NOT_ENOUGH_MONEY), ...unchanged } : { ok: true, delta: 0, ...unchanged };
   }
-  const res = sim.tower.resizeTransport(id, bill.nb, bill.nt);
+  const res = sim.resizeTransport(id, bill.nb, bill.nt);
   if (!res.ok) return { ok: false, reason: res.reason, delta: 0, ...unchanged };
   const cost = bill.added * perFloor;
   sim.money -= cost;

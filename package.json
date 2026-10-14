@@ -1,6 +1,6 @@
 {
   "name": "verticopolis",
-  "version": "2.29.7",
+  "version": "2.30.1",
   "description": "Verticopolis: a browser-native SimTower clone in TypeScript",
   "license": "MIT",
   "type": "module",
@@ -29,7 +29,7 @@
     "icons": "node scripts/gen-pwa-icons.mjs",
     "og-image": "node scripts/gen-og-image.mjs",
     "build:desktop": "vite build --mode desktop && npm run verify:dist && node scripts/verify-wrapper-seam.ts desktop",
-    "verify:dist": "node scripts/prerender-help.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts && node scripts/verify-assetlinks.ts",
+    "verify:dist": "node scripts/gen-third-party-notices.ts && node scripts/prerender-help.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts && node scripts/verify-assetlinks.ts",
     "build:native": "vite build --mode native && npm run verify:dist && node scripts/verify-wrapper-seam.ts native",
     "gen:icons": "node scripts/gen-icon-paths.ts",
     "atlas": "tsx scripts/export-atlas.ts",

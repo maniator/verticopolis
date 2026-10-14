@@ -309,9 +309,9 @@ impl Simulation {
         self.remove_facility(id, RemovalMethod::Sell).ok
     }
 
-    /// `tower.setCars(id, cars)` with its `capacity_changed`. The TypeScript
-    /// tower emits from its own method; here the binding and the referee call
-    /// this wrapper, since the tower cannot reach the simulation's buffer.
+    /// `tower.setCars(id, cars)` with its `capacity_changed`. Both engines
+    /// emit from this layer (TypeScript `Simulation.setCars`, #906); the
+    /// binding, the referee and the charges call it, and the tower stays silent.
     pub fn set_cars(&mut self, id: i64, cars: i64) -> bool {
         let ok = self.tower.set_cars(id, cars);
         if ok {

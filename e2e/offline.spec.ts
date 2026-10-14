@@ -99,7 +99,11 @@ async function playSaveAndLoad(page: Page): Promise<void> {
 function watch(page: Page): { errors: string[]; failed: string[] } {
   const seen = { errors: [] as string[], failed: [] as string[] };
   page.on("pageerror", (e) => seen.errors.push(e.message));
-  page.on("requestfailed", (r) => seen.failed.push(r.url()));
+  // A request the reload itself cancels (ERR_ABORTED) is the old page going
+  // away; anything else that fails offline is a real network dependency.
+  page.on("requestfailed", (r) => {
+    if (r.failure()?.errorText !== "net::ERR_ABORTED") seen.failed.push(`${r.url()} (${r.failure()?.errorText})`);
+  });
   return seen;
 }
 
@@ -109,7 +113,7 @@ test("an installed game starts the WASM engine offline, and plays, saves and loa
   const seen = watch(page);
   // A cold start with no network: the shell and the engine come from the
   // precache only, and the binary is answered by the service worker.
-  const binary = page.waitForResponse((r) => r.url().includes("engine/verticopolis_engine_bg.wasm"));
+  const binary = page.waitForResponse((r) => r.url().includes("engine/verticopolis_engine_bg.wasm"), { timeout: 30_000 });
   await page.reload();
   expect((await binary).fromServiceWorker(), "the engine binary is served by the service worker").toBe(true);
   await page.waitForFunction(() => !!navigator.serviceWorker.controller);

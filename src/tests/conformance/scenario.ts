@@ -255,7 +255,7 @@ export function tsEngine(sim: Simulation): ScenarioEngine {
     },
     adjustRent: (id, dir) => sim.adjustRent(id, dir),
     setNoRate: (id) => sim.setNoRate(id),
-    setCars: (id, cars) => sim.tower.setCars(id, cars),
+    setCars: (id, cars) => sim.setCars(id, cars),
     ...tsCharges(sim),
     setSchedule: (id, schedule) => sim.tower.setSchedule(id, schedule),
     startFire: () => sim.startFire(),
@@ -269,7 +269,7 @@ export function tsEngine(sim: Simulation): ScenarioEngine {
     autoBridge: () => sim.autoBridge,
     toggleAutoBridge: () => sim.toggleAutoBridge(),
     resizeTransport: (id, bottom, top) => {
-      const r = sim.tower.resizeTransport(id, bottom, top);
+      const r = sim.resizeTransport(id, bottom, top);
       return r.ok ? { ok: true } : { ok: false, reason: r.reason };
     },
     clearStops: (id) => sim.tower.clearStops(id),

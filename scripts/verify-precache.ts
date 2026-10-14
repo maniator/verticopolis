@@ -98,7 +98,7 @@ if (total > PRECACHE_BUDGET_BYTES) {
 // precached, so a partial build (glue without binary) stops the build before
 // it can reach an offline player. A Vercel deploy always builds the engine
 // (scripts/vercel-build.sh), so there a build without one fails too.
-const builtEngine = ENGINE_FILES.some((f) => existsSync(resolve(DIST, f)));
+const builtEngine = [...ENGINE_FILES, "engine/BUILD.json"].some((f) => existsSync(resolve(DIST, f)));
 if (!builtEngine && process.env.VERCEL === "1") fail("a Vercel deploy has no engine package in dist/; scripts/vercel-build.sh should have built it");
 if (builtEngine) {
   const notBuilt = ENGINE_FILES.filter((f) => !existsSync(resolve(DIST, f)));

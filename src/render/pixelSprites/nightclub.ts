@@ -1,6 +1,7 @@
 import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
 import { hash, personStanding, shade, shell, type RoomCtx } from "./common";
+import { layerBreak } from "./layers";
 
 /**
  * Modern Nightclub art: a single dark room lit by colored beams, with a DJ booth,
@@ -55,6 +56,8 @@ export function nightclub(d: RoomCtx, u: Unit, x: number, y: number, w: number, 
     ctx.fillStyle = (k % 2 === 0) ? shade(BEAMS[(k + seed) % BEAMS.length], -10) : "#14101E";
     ctx.fillRect(fx, floorY - 2, 4, 2);
   }
+
+  layerBreak(ctx); // the shell ends; the booth and the crowd follow
 
   // The DJ booth on the right: a raised console with two glowing decks and a DJ.
   const boothX = x + Math.round(w * 0.72);

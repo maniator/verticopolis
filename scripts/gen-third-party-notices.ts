@@ -1,0 +1,227 @@
+/**
+ * Post-build step (#951): write `dist/third-party-notices.txt` from what the
+ * build actually shipped. Every emitted sourcemap lists the sources its file
+ * was built from; the `node_modules` ones are the bundled npm packages, the
+ * service worker's workbox chunk included. Build-tool code that no sourcemap
+ * lists (Vite's preload helper, vite-plugin-pwa's register module) is added
+ * from `INJECTED_CODE`. Serverless `api/` dependencies never reach a browser
+ * bundle, so they never appear here.
+ *
+ * Fails the build (one line, non-zero exit) when no sourcemap is found, a
+ * sourcemap is malformed, shipped JavaScript has no sourcemap (outside a
+ * short allowlist), or a bundled package lacks a name, version, allowed
+ * license id or license text, so an incomplete notices file never ships. Runs
+ * first in `verify:dist`, for every build mode.
+ *
+ * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
+ */
+import { readFileSync, readdirSync, writeFileSync, existsSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve, join, relative } from "node:path";
+import {
+  INJECTED_CODE,
+  byCodePoint,
+  collectPackageDirs,
+  declaredLicense,
+  isLicenseFileName,
+  isLicenseTextFileName,
+  isNoticeFileName,
+  noticeProblem,
+  packageDirFromSource,
+  renderNotices,
+  sourceToPath,
+  type NoticePackage,
+} from "../src/build/thirdPartyNotices.ts";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..").replace(/\\/g, "/");
+const DIST = join(ROOT, "dist").replace(/\\/g, "/");
+const OUT = join(DIST, "third-party-notices.txt");
+
+function fail(msg: string): never {
+  process.stderr.write(`gen-third-party-notices: ${msg}\n`);
+  process.exit(1);
+}
+
+function filesUnder(dir: string, test: (name: string) => boolean): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...filesUnder(p, test));
+    else if (test(entry.name)) out.push(p);
+  }
+  return out;
+}
+
+if (!existsSync(DIST)) fail(`${DIST} does not exist; run the build first`);
+const maps = filesUnder(DIST, (n) => /\.([mc]?js|css)\.map$/.test(n));
+if (maps.length === 0) fail("no sourcemaps in dist; they are needed to list the bundled packages");
+
+// Shipped JavaScript with no sourcemap would carry unlisted code. The only one
+// today is the WASM engine's wasm-bindgen glue; its Rust crates are row
+// `wasm-engine-third-party-notices` (#955).
+const MAPLESS_JS_ALLOWED = new Set(["engine/verticopolis_engine.js"]);
+const mapless = filesUnder(DIST, (n) => /\.[mc]?js$/.test(n))
+  .filter((f) => !existsSync(`${f}.map`))
+  .map((f) => relative(DIST, f).replace(/\\/g, "/"))
+  .filter((f) => !MAPLESS_JS_ALLOWED.has(f));
+if (mapless.length > 0) fail(`no sourcemap for ${mapless.join(", ")}; its bundled packages cannot be listed`);
+
+// Package stylesheets, and package assets emitted from CSS, appear in no
+// sourcemap; the `no-unlisted-package-files` plugin in vite.config.ts stops the
+// build before one can ship.
+
+const sources: string[] = []; // repo-relative, each starting with "/"
+const rawSources: string[] = [];
+for (const map of maps) {
+  // A map whose emitted file is gone (a stale or partial dist) describes code
+  // that does not ship.
+  if (!existsSync(map.slice(0, -".map".length))) fail(`${relative(ROOT, map)} has no emitted file beside it`);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(map, "utf8"));
+  } catch {
+    fail(`${relative(ROOT, map)} is not valid JSON`);
+  }
+  if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as { sources?: unknown }).sources)) {
+    fail(`${relative(ROOT, map)} has no sources array`);
+  }
+  const { sources: mapSources, sourceRoot } = parsed as { sources: unknown[]; sourceRoot?: unknown };
+  if (mapSources.some((x) => typeof x !== "string")) fail(`${relative(ROOT, map)} has a source that is not a string`);
+  // A map that lists nothing is allowed only for a chunk that is known
+  // build-tool code (Vite's modulepreload polyfill).
+  if (mapSources.length === 0) {
+    const code = readFileSync(map.slice(0, -".map".length), "utf8");
+    if (!INJECTED_CODE.some((inj) => inj.wholeChunk && inj.codeMarker && code.includes(inj.codeMarker))) {
+      fail(`${relative(ROOT, map)} lists no sources, so its chunk's packages cannot be listed`);
+    }
+  }
+  for (const s of mapSources) {
+    if (typeof s === "string") rawSources.push(s);
+    // A `\0` id is a bundler helper. One that wraps an absolute file
+    // (`\0/abs/node_modules/p/x.js?commonjs-proxy`) still counts, so strip the
+    // marker and the query; any other (`\0vite/preload-helper.js`) names no file.
+    let id: unknown = s;
+    if (typeof s === "string" && s.startsWith("\0")) {
+      const wrapped = s.slice(1).replace(/\?.*$/, "");
+      id = /^([A-Za-z]:)?[\\/]/.test(wrapped) ? wrapped : null;
+    }
+    const path = sourceToPath(id, dirname(map).replace(/\\/g, "/"), sourceRoot);
+    if (path) {
+      // Packages are read only from the part of the path inside the repo, so a
+      // checkout that itself sits under a node_modules folder is not mistaken
+      // for one, and a path that climbs out of the repo is never attributed
+      // to whatever copy the build host happens to have.
+      const inRepo = path.startsWith(`${ROOT}/`) ? path.slice(ROOT.length) : null;
+      // The only sources allowed outside it are build-tool code that
+      // `INJECTED_CODE` attributes by its source id (workbox-build's template
+      // in a temporary folder, vite-plugin-pwa's virtual module).
+      if (inRepo === null) {
+        const known = typeof s === "string" && INJECTED_CODE.some((inj) => inj.sourcePattern?.test(s));
+        if (!known) fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which is outside the repository`);
+        continue;
+      }
+      // A node_modules path that names no package (a tool cache such as
+      // node_modules/.vite) cannot be attributed.
+      if (inRepo.includes("/node_modules/") && !packageDirFromSource(inRepo)) {
+        fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which is under node_modules but names no package`);
+      }
+      // A stale or corrupt map can name a file that is not there; it must not
+      // stand as evidence that a package ships. Two bundlers write sources one
+      // level off, relative to dist/ itself (workbox-build's temporary
+      // directory and Vite's worker bundles), so a path under dist/ that is
+      // missing is read again from the repository root.
+      // A directory is not a source file, so it identifies nothing that shipped.
+      const isFile = (p: string): boolean => existsSync(p) && statSync(p).isFile();
+      let onDisk = inRepo;
+      if (!isFile(ROOT + onDisk) && onDisk.startsWith("/dist/")) onDisk = onDisk.slice("/dist".length);
+      if (!isFile(ROOT + onDisk)) fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which is not a file`);
+      sources.push(onDisk);
+    }
+    // An id that names no file (a virtual module, a `\0` helper, a URL) could
+    // carry a tool's code; it passes only when `INJECTED_CODE` attributes it.
+    else if (typeof s === "string" && !INJECTED_CODE.some((inj) => inj.sourcePattern?.test(s))) {
+      fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which names no local file; add it to INJECTED_CODE with its package`);
+    }
+  }
+}
+
+// Package directories from the maps; every source was checked on disk above.
+const dirs = new Map<string, string>(); // dir -> how it was found
+for (const found of collectPackageDirs(sources).map((rel) => ROOT + rel)) dirs.set(found, found);
+// Node's lookup: the nearest node_modules/<pkg> from the package that loads it
+// (or the repo root), so a nested copy is the one read.
+function resolvePackage(pkg: string, from?: string): string {
+  let dir = from ? resolvePackage(from) : ROOT;
+  for (;;) {
+    const candidate = join(dir, "node_modules", pkg).replace(/\\/g, "/");
+    if (existsSync(join(candidate, "package.json"))) return candidate;
+    if (dir === ROOT || !dir.startsWith(`${ROOT}/`)) return join(ROOT, "node_modules", pkg).replace(/\\/g, "/");
+    dir = dirname(dir).replace(/\\/g, "/");
+  }
+}
+
+// Build-tool code that no sourcemap lists.
+const shippedJs = filesUnder(DIST, (n) => /\.[mc]?js$/.test(n)).map((f) => readFileSync(f, "utf8"));
+for (const inj of INJECTED_CODE) {
+  const bySource = inj.sourcePattern ? rawSources.some((s) => inj.sourcePattern!.test(s)) : false;
+  const byCode = inj.codeMarker ? shippedJs.some((code) => code.includes(inj.codeMarker!)) : false;
+  if (bySource || byCode) dirs.set(resolvePackage(inj.pkg, inj.from), `injected:${inj.pkg}`);
+}
+
+const packages: NoticePackage[] = [];
+const problems: string[] = [];
+for (const [dir, origin] of dirs) {
+  const manifestPath = join(dir, "package.json");
+  if (!existsSync(manifestPath)) {
+    problems.push(`${relative(ROOT, dir)}: no package.json (from ${origin.startsWith("injected:") ? origin : relative(ROOT, origin)})`);
+    continue;
+  }
+  let manifest: { name?: unknown; version?: unknown; license?: unknown; licenses?: unknown };
+  try {
+    const parsedManifest: unknown = JSON.parse(readFileSync(manifestPath, "utf8"));
+    if (typeof parsedManifest !== "object" || parsedManifest === null) throw new Error("not an object");
+    manifest = parsedManifest;
+  } catch {
+    problems.push(`${relative(ROOT, manifestPath)} is not a valid package.json`);
+    continue;
+  }
+  const files = readdirSync(dir)
+    .filter((n) => isLicenseFileName(n) || isNoticeFileName(n))
+    .filter((n) => {
+      try {
+        return statSync(join(dir, n)).isFile();
+      } catch {
+        problems.push(`${relative(ROOT, join(dir, n))} cannot be read (a broken link?)`);
+        return false;
+      }
+    })
+    .sort(byCodePoint);
+  const texts = new Map<string, string>();
+  for (const n of files) {
+    try {
+      texts.set(n, readFileSync(join(dir, n), "utf8"));
+    } catch {
+      problems.push(`${relative(ROOT, join(dir, n))} cannot be read`);
+    }
+  }
+  if (texts.size < files.length) continue;
+  const pkg = {
+    name: typeof manifest.name === "string" ? manifest.name : undefined,
+    version: typeof manifest.version === "string" ? manifest.version : undefined,
+    license: declaredLicense(manifest),
+    // An empty LICENSE, or a COPYRIGHT line alone, does not count as license text.
+    hasLicenseFile: files.some((n) => isLicenseTextFileName(n) && texts.get(n)!.trim() !== ""),
+    licenseText: files
+      .map((n) => (files.length > 1 ? `--- ${n} ---\n\n` : "") + texts.get(n)!.trimEnd())
+      .join("\n\n"),
+  };
+  const problem = noticeProblem(pkg);
+  if (problem) problems.push(problem);
+  else packages.push({ name: pkg.name!, version: pkg.version!, license: pkg.license!, licenseText: pkg.licenseText });
+}
+
+if (problems.length > 0) fail(problems.join("; "));
+if (packages.length === 0) fail("the build lists no third-party packages; refusing to write an empty notices file");
+
+writeFileSync(OUT, renderNotices(packages));
+console.log(`gen-third-party-notices: ${packages.length} packages -> dist/third-party-notices.txt`);

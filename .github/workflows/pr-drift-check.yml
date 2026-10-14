@@ -474,8 +474,9 @@ jobs:
       # re-triggered CI. Fall back to GITHUB_TOKEN when the secret is unset so forks
       # and secret-less repos still work (they just need the manual re-trigger, the
       # old behavior). This job runs NO PR-head code (only git/jq/cp over downloaded
-      # artifacts), so persisting this token in .git/config never exposes it to
-      # PR-controlled execution.
+      # artifacts), so persisting this token never exposes it to PR-controlled
+      # execution. checkout v6 and later store it in a RUNNER_TEMP credentials
+      # file referenced from .git/config by includeIf.gitdir, not inline.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
