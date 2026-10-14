@@ -78,11 +78,14 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
 
   /** Replace `obj[name]` with a wrapper that runs the original (or
    *  `replace` in its place) and, for a call from outside any other recorded
-   *  call, reports it. */
-  function wrap<T extends object, K extends keyof T & string>(obj: T, name: K, report: (args: unknown[], result: unknown) => ShadowCommand | null, replace?: (args: unknown[]) => unknown): void {
+   *  call, reports it. `prepare` may rewrite the arguments first, so the
+   *  engine and the report read the same values; the engine then sees the
+   *  rewritten value, so it must not rely on an argument's identity. */
+  function wrap<T extends object, K extends keyof T & string>(obj: T, name: K, report: (args: unknown[], result: unknown) => ShadowCommand | null, replace?: (args: unknown[]) => unknown, prepare?: (args: unknown[]) => void): void {
     const original = obj[name] as unknown as AnyFn;
     if (typeof original !== "function") throw new Error(`mirror: ${name} is not a method`);
     const wrapped = function (this: T, ...args: never[]): unknown {
+      prepare?.(args);
       const outer = depth === 0;
       depth++;
       let result: unknown;
@@ -126,6 +129,12 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
   const tower: Tower = sim.tower;
   const n = (v: unknown) => v as number;
   const s = (v: unknown) => v as string;
+  // The charge commands refuse a malformed argument in both engines (#923).
+  // The binding's glue would coerce a non-number into one (ToNumber: "5" is
+  // 5, null is 0) or throw on a non-string, so these relay a non-number as
+  // NaN and a non-string as "", which the binding refuses as TypeScript does.
+  const num = (v: unknown) => (typeof v === "number" ? v : Number.NaN);
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
 
   try {
     if (opts.tick) {
@@ -144,13 +153,26 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
     wrap(sim, "sellAt", ([floor, x]) => ({ op: "sellAt", floor: n(floor), x: n(x) }));
     // The engine-owned charges (#914): the command carries the money move, so
     // the shadow charges or refunds for itself and no setMoney follows.
-    wrap(sim, "addCar", ([id]) => ({ op: "addCar", id: n(id) }));
-    wrap(sim, "removeCar", ([id]) => ({ op: "removeCar", id: n(id) }));
+    wrap(sim, "addCar", ([id]) => ({ op: "addCar", id: num(id) }));
+    wrap(sim, "removeCar", ([id]) => ({ op: "removeCar", id: num(id) }));
     wrap(sim, "extendTransport", ([id, end, targetFloor, hwm]) => {
-      const mark = hwm as { bottom: number; top: number } | undefined;
-      return { op: "extendTransport", id: n(id), end: end as "up" | "down", targetFloor: n(targetFloor), hwm: mark ? { bottom: mark.bottom, top: mark.top } : null };
+      // Any mark but null or undefined is checked, as the engines check it:
+      // a falsy one (0, "") must not relay as "no mark" and bill in Rust.
+      const mark = hwm as { bottom?: unknown; top?: unknown } | null | undefined;
+      const relayed = mark == null ? null : { bottom: num(mark.bottom), top: num(mark.top) };
+      return { op: "extendTransport", id: num(id), end: str(end) as "up" | "down", targetFloor: num(targetFloor), hwm: relayed };
+    }, undefined, (args) => {
+      // Read the mark once, before the call: an accessor answering
+      // differently on a second read would otherwise bill one value in
+      // TypeScript and relay another to Rust. Any mark but null or undefined,
+      // as the engine reads fields off any such value (a function included).
+      const mark = args[3];
+      if (mark != null) {
+        const { bottom, top } = mark as { bottom?: unknown; top?: unknown };
+        args[3] = { bottom, top };
+      }
     });
-    wrap(sim, "removeFacility", ([id, method]) => ({ op: "removeFacility", id: n(id), method: method as "sell" | "bulldoze" }));
+    wrap(sim, "removeFacility", ([id, method]) => ({ op: "removeFacility", id: num(id), method: str(method) as "sell" | "bulldoze" }));
     // The capacity edits at the simulation layer report capacity_changed;
     // the bare tower edits below relay as their silent tower ops (#906).
     wrap(sim, "setCars", ([id, cars]) => ({ op: "setCars", id: n(id), cars: n(cars) }));
