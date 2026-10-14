@@ -5,7 +5,7 @@ import { updatePromptTemplate } from "./templates/updatePrompt";
 import { helpTemplate } from "./templates/help";
 import { isSplashUp } from "../game/interactionState";
 import { compareModalTemplate } from "./templates/compare";
-import { savesTemplate, type SaveScopeCaption } from "./templates/saves";
+import { savesTemplate } from "./templates/saves";
 import { newTowerTemplate } from "./templates/newTower";
 import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./templates/reports";
 import { statsModalTemplate } from "./templates/stats";
@@ -17,9 +17,7 @@ import type { SlotInfo } from "../storage/SaveGame";
 import type { ImportReport } from "../storage/tdtImport";
 import type { ExportReport } from "../storage/tdtExport";
 import type { UpdateInfo } from "../pwa";
-import { routeExternalInWrapper } from "./externalLink";
 import { isInstalledStandalone } from "./standalone";
-import { getPlatform } from "../platform";
 import { trackAppAction } from "../analytics";
 import { engineSuffix } from "../wasmhost/engineLabel";
 
@@ -41,9 +39,8 @@ export { showElevatorScheduleDialog, type ScheduleDialogCtx } from "./uiElevator
 // The title-screen tower picker likewise lives in its own module.
 export { showTowerPicker, type TowerPickerCtx } from "./uiTowerPicker";
 
-// The Settings controller moved to its own module when the desktop privacy
-// switch pushed this file to the readable-size ceiling; re-exported so
-// `UI.showSettings` and the shell's `settings` menu command are unchanged.
+// The Settings controller lives in its own module (readable-size ceiling);
+// re-exported so `UI.showSettings` is unchanged.
 export { showSettings } from "./uiSettings";
 
 // The file-picker entry point lives in its own module so the tower picker can
@@ -57,10 +54,9 @@ export function showStats(ui: UI, body: TemplateResult, handlers: Record<string,
   ui.wireActions(box, handlers);
 }
 
-/** Saves manager: auto-save + numbered slots, plus export/import. The scope
- *  caption is injected by callers that know the storage area (desktop). */
-export function showSaves(ui: UI, slots: SlotInfo[], scope?: SaveScopeCaption): void {
-  const box = ui.openModalTemplate(savesTemplate(slots, scope), { displaceable: true });
+/** Saves manager: auto-save + numbered slots, plus export/import. */
+export function showSaves(ui: UI, slots: SlotInfo[]): void {
+  const box = ui.openModalTemplate(savesTemplate(slots), { displaceable: true });
   box.querySelectorAll<HTMLElement>("[data-save]").forEach((b) =>
     b.addEventListener("click", () => {
       ui.cb.onSaveSlot(Number(b.dataset.save));
@@ -285,23 +281,16 @@ export function showHelp(ui: UI): void {
   // disabled, so a real browser suppresses the click, and onReplayOnboarding
   // also no-ops behind #splash; both make a splash-time trigger a no-op.
   const box = ui.openModalTemplate(helpTemplate(onSplash, version, { onReplay: () => ui.cb.onReplayOnboarding() }, engineSuffix()), { displaceable: true });
-  // Inside a native wrapper the report link routes to the system browser
-  // through the platform port (see routeExternalInWrapper).
-  routeExternalInWrapper(box.querySelector<HTMLAnchorElement>(".help-report a")!);
   // "Open the full help page" is a real <a href="/help#classic-vs-modern"
   // target="_blank">, so a plain browser tab opens the shareable help page
   // (deep-linked to the comparison section) as written. But from an installed
   // standalone PWA a new tab drops to the system browser and loses the session,
   // so there we keep the player in the running sim: swap the navigation for the
   // in-app compare modal, which pauses the tower and shows the same comparison.
-  // Wrapped builds render no anchor at all (helpTemplate withholds it behind
-  // IS_WRAPPED_BUILD, #720), so `fullPage` is null there and this wiring no-ops.
   const fullPage = box.querySelector<HTMLAnchorElement>('a[data-act="open-help"]');
   fullPage?.addEventListener("click", (e) => {
-    // Downgrade in an installed standalone PWA. The isNativeWrapper arm is a
-    // runtime backstop (a shell has no /help route either); with the anchor
-    // withheld from wrapped bundles it should never fire in a real build.
-    if (isInstalledStandalone() || getPlatform().isNativeWrapper) {
+    // Downgrade in an installed standalone PWA.
+    if (isInstalledStandalone()) {
       e.preventDefault();
       showCompare(ui);
     }

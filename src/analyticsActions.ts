@@ -72,10 +72,9 @@ export function trackEmergencyChoice(kind: EmergencyKind, decision: EmergencyDec
 }
 
 /** Clear the once-per-session action latches, so the next call to each `*Once`
- *  tracker reports again. Called from `GameplaySession.startEpoch`, which is both
- *  the test-only session reset and the fresh measurement window a desktop consent
- *  change opens. Outside those, the latches live for the tab, matching the per-tab
- *  analytics session. */
+ *  tracker reports again. Called from `GameplaySession.startEpoch`, the
+ *  test-only session reset. Outside that, the latches live for the tab, matching
+ *  the per-tab analytics session. */
 export function clearActionLatches(): void {
   appActionOnce.clear();
   economyActionOnce.clear();

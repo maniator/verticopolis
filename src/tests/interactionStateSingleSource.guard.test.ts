@@ -104,7 +104,6 @@ const SOURCES: Source[] = [
  *  `mustAppearIn` is the file whose text has to still contain the pattern, so a
  *  rename cannot make the pin match zero files and pass vacuously. */
 const IS_MODAL_OPEN_CALL = /\.isModalOpen\(\)/;
-const LAST_AVAIL_KEY_STATE = /\blastAvailabilityKey\s*[:=]/;
 
 describe("interaction-state single source (issue #716)", () => {
   const files = productionFiles(srcRoot);
@@ -145,22 +144,6 @@ describe("interaction-state single source (issue #716)", () => {
     ).toEqual([]);
   });
 
-  it(`only ${MODULE} owns lastAvailabilityKey state`, () => {
-    // AD-3: the availability dirty-gate moved here from hostCommands. Pin the
-    // STATE (a declaration or assignment), not bare mentions, so a comment
-    // elsewhere referencing the name is fine but a second module holding its own
-    // copy is not. Matches `lastAvailabilityKey:` (typed decl) and
-    // `lastAvailabilityKey =` (assignment); a comment has neither.
-    const offenders = files
-      .filter((f) => LAST_AVAIL_KEY_STATE.test(readFileSync(f, "utf8")))
-      .map((f) => relative(srcRoot, f).replace(/\\/g, "/"))
-      .filter((rel) => rel !== MODULE);
-    expect(
-      offenders,
-      `The availability dirty-gate lives only in ${MODULE} (AD-3). Offenders: ${offenders.join(", ")}`,
-    ).toEqual([]);
-  });
-
   it("the module actually reads every source (guard wired to real content)", () => {
     const module = readFileSync(resolve(srcRoot, MODULE), "utf8");
     const missing = SOURCES.filter((s) => !s.re.test(module)).map((s) => s.what);
@@ -171,16 +154,8 @@ describe("interaction-state single source (issue #716)", () => {
   });
 
   it("the extra pins are wired to real content (so a rename can't vacate them)", () => {
-    // Without this, renaming `lastAvailabilityKey` (or removing every
-    // `isModalOpen` call) would make the pin match zero files and pass while
-    // silently enforcing nothing. Assert each pinned pattern still exists where
-    // it is supposed to: `lastAvailabilityKey` state in the module, an
-    // `isModalOpen` call in an allowed caller.
-    const module = readFileSync(resolve(srcRoot, MODULE), "utf8");
-    expect(
-      LAST_AVAIL_KEY_STATE.test(module),
-      `${MODULE} no longer declares lastAvailabilityKey; the ownership pin is now vacuous. Rename the pin to match.`,
-    ).toBe(true);
+    // Without this, removing every `isModalOpen` call would make the pin match
+    // zero files and pass while silently enforcing nothing.
     const anyModalCaller = files.some((f) => IS_MODAL_OPEN_CALL.test(readFileSync(f, "utf8")));
     expect(
       anyModalCaller,

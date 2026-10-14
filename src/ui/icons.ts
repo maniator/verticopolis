@@ -24,8 +24,8 @@ import { VENDORED_ICON_PATHS } from "./iconPaths.generated";
  * free Pixelarticons set has no matching glyph. Every other icon's path data is
  * generated from the pinned `pixelarticons` dev dependency (by Gerrit Halfmann,
  * https://github.com/halfmage/pixelarticons, MIT) into `iconPaths.generated.ts`
- * and inlined at build time, so the offline PWA and the packaged shells still
- * fetch nothing at runtime. Re-run `scripts/gen-icon-paths.ts` to refresh it.
+ * and inlined at build time, so the offline PWA still fetches nothing at
+ * runtime. Re-run `scripts/gen-icon-paths.ts` to refresh it.
  */
 
 export type IconName =

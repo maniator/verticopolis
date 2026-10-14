@@ -89,9 +89,9 @@ describe("a save of exactly 32 MiB", () => {
     expect(new TextEncoder().encode(jsonOf(file)).length).toBe(CAP);
     expect((await SaveGame.import(file)).tower.towerName).toBe(name);
 
-    const desktop = toTowerFile(json);
-    expect(desktop.ok).toBe(true);
-    if (desktop.ok) expect((await SaveGame.import(desktop.text)).tower.towerName).toBe(name);
+    const reheadered = toTowerFile(json);
+    expect(reheadered.ok).toBe(true);
+    if (reheadered.ok) expect((await SaveGame.import(reheadered.text)).tower.towerName).toBe(name);
   }, 60_000);
 });
 
@@ -115,7 +115,7 @@ describe("a save one byte past 32 MiB", () => {
     expect(stored.corrupt).toBe(true);
 
     await expect(SaveGame.import(TOWER_FILE_MAGIC + "\n" + b64 + "\n")).rejects.toThrow(/too large/);
-    // The desktop store's re-header refuses it too.
+    // The byte-preserving re-header refuses it too.
     expect(toTowerFile(json).ok).toBe(false);
   }, 60_000);
 });
