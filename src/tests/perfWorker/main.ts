@@ -31,10 +31,12 @@ export interface Args {
   out: string | null;
   resume: string | null;
   scenarios: string[] | null;
+  /** The CSS viewport frames render at (`--viewport WxH`). */
+  viewport: { width: number; height: number };
 }
 
 export function parseArgs(argv: readonly string[]): Args {
-  const a: Args = { reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null };
+  const a: Args = { reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, viewport: { ...DEFAULT_VIEWPORT } };
   let repsSet = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -55,8 +57,14 @@ export function parseArgs(argv: readonly string[]): Args {
       a.scenarios = next().split(",").filter(Boolean);
       if (a.scenarios.length === 0) throw new Error("--scenarios needs at least one name");
       if (new Set(a.scenarios).size !== a.scenarios.length) throw new Error("--scenarios names a scenario twice");
+    } else if (arg === "--viewport") {
+      const m = /^(\d+)x(\d+)$/.exec(next());
+      const width = m ? Number(m[1]) : 0;
+      const height = m ? Number(m[2]) : 0;
+      if (width < 320 || height < 240 || width > 7680 || height > 4320) throw new Error("--viewport needs WIDTHxHEIGHT in CSS pixels, from 320x240 to 7680x4320 (for example 1280x720)");
+      a.viewport = { width, height };
     }
-    else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b`);
+    else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --viewport WxH`);
   }
   if (a.quick && !repsSet) a.reps = 2;
   if (a.resume && a.out) throw new Error("--resume continues its own folder; it takes no --out");
@@ -64,6 +72,12 @@ export function parseArgs(argv: readonly string[]): Args {
 }
 
 export const MODES: readonly ModeName[] = ["ts", "wasm", "wasm-frame", "wasm-worker"];
+
+/** A phone-sized CSS viewport. On the 4-CPU container with software WebGL
+ *  the harness was built on, a 1280x720 frame took about 250 ms, past the
+ *  200 ms clamp, so every mode's frames ran almost no simulation. A machine
+ *  with a GPU can pass `--viewport 1280x720`. */
+export const DEFAULT_VIEWPORT = { width: 640, height: 360 } as const;
 
 export function makeConfig(args: Args, scenarios: string[]): WorkerConfig {
   return {
@@ -78,10 +92,7 @@ export function makeConfig(args: Args, scenarios: string[]): WorkerConfig {
     frameWarmMs: args.quick ? 1000 : 2000,
     commandEveryMs: 1000,
     speed: 3,
-    // A phone-sized CSS viewport: at 1280x720 this machine's software
-    // rasterizer drew one frame in about 250 ms, past the 200 ms clamp, so
-    // every mode's frames ran almost no simulation (see LIMITATIONS).
-    viewport: { width: 640, height: 360 },
+    viewport: { ...args.viewport },
     scenarios,
     modes: [...MODES],
     quick: args.quick,
@@ -98,9 +109,9 @@ export function limitations(config: WorkerConfig): string[] {
   "CPU throttling is DevTools emulation of the renderer process. The engine worker runs in the same renderer process, so the 4x rows slow it too; whether emulation throttles a worker thread exactly as it throttles the main thread was not measured.",
   `Hosted rows run ${config.steps} steps of ${config.dt} minutes in batches of ${config.batch} (the frame loop's cap is 4) with no rendering. Wall time includes the worker host's wait for each reply; main-thread time counts the steps, the flushes and the time applying replies, and leaves the worker's own time out (reported apart). The browser's unpacking of each reply (the structured clone of its strings, the full save's included) runs on the main thread before the host sees the reply and is not in the hosted main-thread rows; the frames rows (frame times, long tasks) include it.`,
   "The worker host keeps one batch in flight. A frame that finds a batch still out takes no steps (the frame loop banks its minutes under the 30-minute cap), so on a tower the engine cannot step in real time the worker host simulates fewer minutes per second rather than queueing work; the sim-minutes-per-second row shows it.",
-  "Command latency times a tower rename (relayed by every host, read by nothing in the simulation) to the first frame drawn after the engine's answer is in the read model. The main-thread hosts answer in the call, so their figure is the wait for the next frame. One command is in flight at a time, one per second.",
+  "Command latency times a tower rename (relayed by every host, read by nothing in the simulation) from the call to the clock inside the first frame callback that runs once the engine's answer is in the read model. The main-thread hosts answer in the call, so their figure is the wait for the next frame callback. One command is in flight at a time, one per second. A negative sample fails validation.",
   `Memory is measured after ${config.memorySteps} steps on a freshly loaded page, after a forced GC. The harness keeps the scenario saves it loads from in the page for every mode (the same text in every mode's JS heap rows); its own stashed start and end saves are dropped before the read. WASM linear memory only grows, so it is a high-water mark that includes the boot tower. The worker's JS heap is read through the DevTools target protocol; when that is unavailable the combined row has no worker sample. Process PSS sums the browser's processes (Linux).`,
-  "Frames render at a 640x360 CSS viewport (a common phone size), smaller than perf:compare's 1280x720: on this machine's software rasterizer a 1280x720 frame took about 250 ms, past Excalibur's 200 ms clamp (a longer frame is handed 1 ms of game time), so no mode simulated anything in its frames. Rows with clamped frames still understate the simulation work; the clamped-frame row counts them.",
+  `Frames render at a ${config.viewport.width}x${config.viewport.height} CSS viewport${config.viewport.width === DEFAULT_VIEWPORT.width && config.viewport.height === DEFAULT_VIEWPORT.height ? " (the default, a common phone size), smaller than perf:compare's 1280x720: on the 4-CPU container with software WebGL the harness was built on, a 1280x720 frame took about 250 ms, past Excalibur's 200 ms clamp (a longer frame is handed 1 ms of game time), so no mode simulated anything in its frames" : " (set with --viewport)"}. A frame longer than 200 ms is handed 1 ms of game time, so rows with clamped frames understate the simulation work; the clamped-frame row counts them.`,
   "Message sizes are counted on the way in (frame views, full saves, events, log and pending text at two bytes a character); the way out (steps and commands, a few numbers each) is not measured, so as not to serialize every message twice on the measured thread.",
   "The serialize and deserialize halves of the full save are split only on the worker host (the worker's reply time includes the serialize, the main thread's merge time the parse and merge). The main-thread hosts' read-model sync is split in perf:compare's attribution pass.",
   `Throttles run in a fixed order (${config.throttles.map((t) => `${t}x`).join(" then ")}) in each process. The mode order rotates by repetition (${config.reps} repetitions over ${k} modes: ${firstText}). The throttled cold start throttles before the navigation and again at commit; its CPU probe runs after startup, so a throttle gap at navigation would not show.`,

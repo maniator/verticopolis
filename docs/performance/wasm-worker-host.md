@@ -189,9 +189,9 @@ the throttle while the worker's own time does not.
   is when the frame began, which can come before the command, so the
   main-thread modes came out at about −10 ms and every mode's figure is
   shifted down by an amount the run did not record. The rows are in the raw
-  files but are not used here, and no correction is applied. The harness is
-  being fixed to read the clock inside the frame callback and to fail the run
-  on a negative duration, and this metric is re-measured in a later run.
+  files but are not used here, and no correction is applied. The harness now
+  reads the clock inside the frame callback and fails a run with a negative
+  sample, so the next run measures this metric correctly.
 
 ## Start-up, download, memory, offline
 
@@ -247,7 +247,8 @@ No rayon, atomics, shared memory or simulation change was added.
   every frame, so the FPS rows show how much main-thread time each host
   leaves the renderer. GPU-backed frame rates were not measured. A desktop run at 1280×720
   would test the worker's case better: a GPU frees the main thread and spare
-  cores free the worker. The harness gains a `--viewport` option for that.
+  cores free the worker. `npm run perf:worker -- --viewport 1280x720` runs
+  the frames at that size (see "Running it on another machine").
 - CPU throttling is DevTools emulation of the renderer process, and the
   worker runs in that process, so the 4x rows slow it too. Whether emulation
   throttles a worker thread exactly as it throttles the main thread was not
@@ -263,10 +264,25 @@ No rayon, atomics, shared memory or simulation change was added.
 - The coalesced and worker hosts are experimental and opt-in. The default
   engine is unchanged.
 
+## Running it on another machine
+
+On a desktop with a GPU, from a clean checkout of this branch:
+
+1. Install Rust, the `wasm32-unknown-unknown` target and the pinned
+   `wasm-bindgen-cli` (the commands are in `engine-rs/README.md`), then run
+   `npm ci` and `npm run wasm:build`.
+2. Run `npm run perf:worker -- --viewport 1280x720`. It builds the app
+   itself, refuses a dirty tree's numbers as final (the folder is marked
+   `-dirty`), and writes `docs/performance/results/<date>-<commit>-worker/`.
+   About four hours on the container above; a desktop is faster. A stopped
+   run continues with `--resume <that folder>`.
+3. Keep each machine's results in its own folder and its own table. The
+   harness records the machine, browser and viewport with every run.
+
 ## Incomplete
 
-- Command to visible frame: the rows from this run are invalid (above) and
-  are re-measured after the harness fix.
+- Command to visible frame: the rows from this run are invalid (above). The
+  harness is fixed, and the metric needs a new run.
 - One machine only. No GPU-backed or desktop run.
 
 ## Follow-ups

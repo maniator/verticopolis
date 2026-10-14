@@ -15,7 +15,7 @@ const config = { ...makeConfig(parseArgs(["--reps", "6"]), ["small"]) };
 function run(rep: number, mode: ModeName, scale: number, over: Partial<ModeRun> = {}): ModeRun {
   const hosted = (t: number) => ({ wallMs: 100 * scale * t, mainMs: 50 * scale * t, batchMainP50Ms: 1, batchMainP95Ms: 2 * scale, batchMainMaxMs: 3, startDigest: "s", endDigest: "e", hostErrorsAdded: [],
     worker: mode === "wasm-worker" ? { replies: 180, staleReplies: 0, merges: 6, messagesSent: 200, messagesReceived: 181, bytesReceived: 1000, frameBytes: 1800, mergeBytes: 600, applyMs: 10, mergeMs: 5, workerOpsMs: 40, workerReplyMs: 4 } : null });
-  const frames = { frames: 60, meanFps: 10 / scale, medianMs: 100, p95Ms: 150, p99Ms: 190, onePercentLowFps: 5, simMinutesPerSecond: 50, clampedFrames: 0, longTasks: 3, blockingMs: 20 * scale, commands: 5, commandsUnanswered: 0, commandToFrameP50Ms: 30, commandToFrameP95Ms: 40, hostErrorsAdded: [],
+  const frames = { frames: 60, meanFps: 10 / scale, medianMs: 100, p95Ms: 150, p99Ms: 190, onePercentLowFps: 5, simMinutesPerSecond: 50, clampedFrames: 0, longTasks: 3, blockingMs: 20 * scale, commands: 5, commandsUnanswered: 0, commandToFrameP50Ms: 30, commandToFrameP95Ms: 40, commandToFrameMinMs: 20, hostErrorsAdded: [],
     worker: mode === "wasm-worker" ? { repliesPerSecond: 9, messagesPerSecond: 20, bytesPerSecond: 5000, staleReplies: 0, merges: 2, applyMsPerSecond: 3, commandAckP50Ms: 4, commandAckP95Ms: 6 } : null };
   return {
     rep, mode, order: 0, ok: true, error: null, pageErrors: [], browserVersion: "141", page: null,
@@ -89,7 +89,7 @@ describe("perf:worker analysis", () => {
     const h = summarizeHosted({ steps: 8, wallMs: 10, mainMs: 6, batchMainMs: [1, 2, 3, 4], worker: null, startKey: "a", endKey: "b", hostErrorsAdded: [] }, "s", "e");
     expect(h).toMatchObject({ wallMs: 10, mainMs: 6, batchMainP50Ms: 2.5, batchMainMaxMs: 4, startDigest: "s", endDigest: "e" });
     const f = summarizeFrames({ intervalsMs: [100, 100, 300, 100], wallMs: 600, simMinutes: 30, longTasks: 2, longTaskMs: 400, blockingMs: 300, commandToFrameMs: [10, 30], commandsUnanswered: 0, worker: { replies: 6, staleReplies: 1, merges: 1, messagesSent: 7, messagesReceived: 6, bytesReceived: 600, applyMs: 12, commandAckMs: [4] }, hostErrorsAdded: [] });
-    expect(f).toMatchObject({ frames: 4, clampedFrames: 1, simMinutesPerSecond: 50, commands: 2, commandToFrameP50Ms: 20, blockingMs: 300 });
+    expect(f).toMatchObject({ frames: 4, clampedFrames: 1, simMinutesPerSecond: 50, commands: 2, commandToFrameP50Ms: 20, commandToFrameMinMs: 10, blockingMs: 300 });
     expect(f.worker).toMatchObject({ repliesPerSecond: 10, bytesPerSecond: 1000, applyMsPerSecond: 20, commandAckP50Ms: 4 });
   });
 
@@ -108,6 +108,7 @@ describe("perf:worker analysis", () => {
     expect(md.split("\n")[2]).toMatch(/^> \*\*Snapshot, measured 2026-10-14T10:00:00Z to 2026-10-14T14:00:00Z on commit `abc1234`.*Live numbers: re-run `npm run perf:worker`.*Validation passed/);
     expect(md).toMatch(/\| small \| 1x \| wall time, 720 steps \(ms\) \|/);
     expect(md).toMatch(/0\.50x .* lower/);
+    expect(md).toMatch(/frames at a 640x360 CSS viewport/);
     expect(definitions(config).length).toBeGreaterThan(20);
   });
 
@@ -120,6 +121,16 @@ describe("perf:worker analysis", () => {
     const blocking = ratios(aggregate(config, zeroed), config.modes).find((r) => r.metric.startsWith("main-thread blocking") && r.throttle === "1" && r.mode === "ts" && r.against === "wasm")!;
     expect(blocking.zeroReference).toBe(2);
     expect(blocking.n).toBe(4);
+  });
+
+  it("fails a run whose command became visible before it was sent", () => {
+    const rs = runs();
+    const f1 = rs[0].scenarios.small.frames["1"];
+    rs[0] = { ...rs[0], scenarios: { small: { ...rs[0].scenarios.small, frames: { ...rs[0].scenarios.small.frames, "1": { ...f1, commandToFrameMinMs: -2.5 } } } } };
+    expect(validate(config, rs).errors.join()).toMatch(/1x frames: a command became visible 2\.50 ms before it was sent/);
+    const { commandToFrameMinMs: _drop, ...old } = f1;
+    rs[0] = { ...rs[0], scenarios: { small: { ...rs[0].scenarios.small, frames: { ...rs[0].scenarios.small.frames, "1": old as typeof f1 } } } };
+    expect(validate(config, rs).errors.join()).toMatch(/1x frames: no smallest command latency was recorded/);
   });
 
   it("checks the bare engine runs against the hosted end state", () => {
@@ -187,5 +198,10 @@ describe("perf:worker analysis", () => {
     expect(() => parseArgs(["--reps", "0"])).toThrow(/positive/);
     expect(() => parseArgs(["--resume", "a", "--out", "b"])).toThrow(/takes no --out/);
     expect(() => parseArgs(["--bogus"])).toThrow(/unknown argument/);
+    expect(parseArgs([]).viewport).toEqual({ width: 640, height: 360 });
+    expect(parseArgs(["--viewport", "1280x720"]).viewport).toEqual({ width: 1280, height: 720 });
+    expect(makeConfig(parseArgs(["--viewport", "1280x720"]), ["small"]).viewport).toEqual({ width: 1280, height: 720 });
+    for (const bad of ["1280", "1280x", "x720", "1280X720", "100x100", "9000x720", "1280x720x1"]) expect(() => parseArgs(["--viewport", bad])).toThrow(/WIDTHxHEIGHT/);
+    expect(() => parseArgs(["--viewport"])).toThrow(/needs a value/);
   });
 });

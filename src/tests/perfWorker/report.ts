@@ -37,7 +37,7 @@ export function markdown(res: WorkerResults): string {
   lines.push("");
   lines.push(`- Engine package: ${Object.entries(env.enginePackage).map(([k, v]) => `${k} \`${String(v).slice(0, 16)}\``).join(", ")}; source hash \`${env.engineBuildHash ?? "none"}\``);
   lines.push(`- Machine: ${env.cpuModel}, ${env.logicalCpus} CPUs, ${(env.totalMemoryBytes / 2 ** 30).toFixed(1)} GiB, ${env.os}; Node ${env.node}; Playwright ${env.playwright}; browser ${res.browser.version}`);
-  lines.push(`- Renderer: ${res.runs.find((r) => r.page?.webgl)?.page?.webgl?.renderer ?? "unknown"}; cross-origin isolated: ${res.runs.find((r) => r.page)?.page?.crossOriginIsolated ?? "unknown"}`);
+  lines.push(`- Renderer: ${res.runs.find((r) => r.page?.webgl)?.page?.webgl?.renderer ?? "unknown"}; cross-origin isolated: ${res.runs.find((r) => r.page)?.page?.crossOriginIsolated ?? "unknown"}; frames at a ${res.config.viewport.width}x${res.config.viewport.height} CSS viewport`);
   lines.push(`- ${res.config.reps} repetitions of ${modes.join(", ")}, each in a fresh browser process, order rotated by repetition; throttles ${res.config.throttles.join("x, ")}x`);
   lines.push(`- Scenarios: ${res.scenarios.map((s) => `${s.name} (${s.population} population, \`${s.sha256.slice(0, 12)}\`)`).join(", ")}`);
   lines.push(`- Download (production build, Brotli 11): engine worker chunk ${fmt(res.scripts.worker.brotli, "bytes")} (${fmt(res.scripts.worker.raw, "bytes")} raw); engine package (WASM modes) ${fmt(res.scripts.enginePackage.brotli, "bytes")} (${fmt(res.scripts.enginePackage.raw, "bytes")} raw); all other JavaScript ${fmt(res.scripts.otherJs.brotli, "bytes")}`);

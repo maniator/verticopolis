@@ -264,7 +264,9 @@ export function framesRun(arg: { windowMs: number; warmMs: number; speed: number
       intervals.push(ts - last);
       last = ts;
       if (pending && (!worker || h.stats.ackedSeq >= pending.seq)) {
-        commandToFrameMs.push(ts - pending.t);
+        // The clock now, inside the callback: `ts` is when the frame
+        // began, which can come before a command issued in the same frame.
+        commandToFrameMs.push(performance.now() - pending.t);
         pending = null;
       }
       if (ts - start >= arg.windowMs) done();

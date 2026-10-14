@@ -80,6 +80,8 @@ export interface FramesSummary {
   commandsUnanswered: number;
   commandToFrameP50Ms: number | null;
   commandToFrameP95Ms: number | null;
+  /** The smallest sample, which validation requires to be at least 0. */
+  commandToFrameMinMs: number | null;
   worker: { repliesPerSecond: number; messagesPerSecond: number; bytesPerSecond: number; staleReplies: number; merges: number; applyMsPerSecond: number; commandAckP50Ms: number | null; commandAckP95Ms: number | null } | null;
   hostErrorsAdded: string[];
 }
@@ -173,6 +175,7 @@ export function summarizeFrames(f: Awaited<ReturnType<typeof framesRun>>): Frame
     commandsUnanswered: f.commandsUnanswered,
     commandToFrameP50Ms: p(f.commandToFrameMs, 0.5),
     commandToFrameP95Ms: p(f.commandToFrameMs, 0.95),
+    commandToFrameMinMs: f.commandToFrameMs.length ? Math.min(...f.commandToFrameMs) : null,
     worker: f.worker
       ? {
           repliesPerSecond: f.worker.replies / secs,

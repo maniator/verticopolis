@@ -203,6 +203,10 @@ export function validate(config: WorkerConfig, runs: readonly ModeRun[]): { erro
       for (const [t, f] of Object.entries(sc.frames)) {
         if (f.hostErrorsAdded.length) errors.push(`rep ${r.rep} ${r.mode} ${name} ${t}x frames: host errors ${f.hostErrorsAdded.join("; ")}`);
         if (f.commands === 0) warnings.push(`rep ${r.rep} ${r.mode} ${name} ${t}x frames: no command was timed`);
+        // A command cannot become visible before it was sent: a negative
+        // latency is a timing defect, so the run fails rather than publish it.
+        if (f.commandToFrameMinMs !== undefined && f.commandToFrameMinMs !== null && f.commandToFrameMinMs < 0) errors.push(`rep ${r.rep} ${r.mode} ${name} ${t}x frames: a command became visible ${(-f.commandToFrameMinMs).toFixed(2)} ms before it was sent`);
+        else if (f.commandToFrameMinMs === undefined && f.commands > 0) errors.push(`rep ${r.rep} ${r.mode} ${name} ${t}x frames: no smallest command latency was recorded`);
       }
     }
     if (r.cpuProbe) {
