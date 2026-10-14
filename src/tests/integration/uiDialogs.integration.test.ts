@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { towerCatalog, useTowerCatalogSource } from "../../engine/towerCatalog";
+import { catalogFor } from "../../engine/catalog";
 import { html, type TemplateResult } from "lit-html";
 import { finishModal, MODAL_TITLE_ID } from "../../ui/uiModal";
 import { UI, type UICallbacks } from "../../ui/UI";
@@ -106,6 +108,7 @@ function mountAppDom(): void {
 
 function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks } {
   const cb: UICallbacks = {
+    getCatalog: vi.fn(() => catalogFor("classic")),
     onSelectTool: vi.fn(),
     onSpeed: vi.fn(),
     getSpeed: vi.fn(() => 1),
@@ -3444,5 +3447,43 @@ describe("Help dialog: the 'Open full page' link downgrades to the compare modal
     // Kept in the sim: the compare modal opens (paused) instead of a dead new tab.
     expect(dialog().querySelector("h2")?.textContent).toContain("Classic vs Modern");
     expect(onSpeed).toHaveBeenCalledWith(0);
+  });
+});
+
+describe("the palette and tool card follow the tower's catalog (#921)", () => {
+  it("draws the tool card from getCatalog when a build tool is picked", () => {
+    const base = catalogFor("classic");
+    const marked = { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, name: "Corner Suite", cost: 77_000 } : f)) };
+    const { ui } = makeUI({ getCatalog: () => marked });
+    ui.selectTool({ type: "build", kind: "office" });
+    const card = document.getElementById("tool-info")!.textContent ?? "";
+    expect(card).toContain("Corner Suite");
+    expect(card).toContain("Cost: $77,000");
+  });
+
+  it("redraws names and prices when the tower's catalog source changes, and back", () => {
+    const sim = Simulation.newGame(51, "classic");
+    const { ui } = makeUI({ getCatalog: () => towerCatalog(sim) });
+    ui.update(sim);
+    const office = () => document.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
+    const toolInfo = () => document.getElementById("tool-info")!.textContent ?? "";
+    expect(office().querySelector(".pal-name")?.textContent).toBe("Office");
+    ui.selectTool({ type: "build", kind: "office" });
+    expect(toolInfo()).toContain("Office");
+    // A WASM host points the tower at another engine's catalog.
+    const base = catalogFor("classic");
+    const marked = { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, name: "Corner Suite", cost: 77_000 } : f)) };
+    useTowerCatalogSource(sim, () => marked);
+    ui.update(sim);
+    expect(office().querySelector(".pal-name")?.textContent).toBe("Corner Suite");
+    expect(office().querySelector(".pal-cost")?.textContent).toBe("$77k");
+    expect(office().getAttribute("aria-label")).toBe("Corner Suite, $77k");
+    expect(toolInfo()).toContain("Corner Suite");
+    expect(toolInfo()).toContain("Cost: $77,000");
+    // Let go: back to the tables on the next pump.
+    useTowerCatalogSource(sim, null);
+    ui.update(sim);
+    expect(office().querySelector(".pal-name")?.textContent).toBe("Office");
+    expect(toolInfo()).not.toContain("Corner Suite");
   });
 });

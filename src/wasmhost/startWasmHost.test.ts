@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { catalogFor } from "../engine/catalog";
 import { Simulation } from "../engine/Simulation";
 import type { WasmEngine, WasmModule } from "../dualrun/binding";
 import { FRAME_HEADER } from "./frameView";
@@ -46,7 +47,9 @@ function fakeModule(): WasmModule & { engines: FakeEngine[] } {
       return e as unknown as WasmEngine;
     },
   };
-  return { Engine: Engine as unknown as WasmModule["Engine"], engines };
+  // The host reads the catalog through the binding before it builds an engine.
+  const catalog = (mode: string) => JSON.stringify(catalogFor(mode as "classic" | "modern"));
+  return { Engine: Engine as unknown as WasmModule["Engine"], catalog, engines };
 }
 
 function app(): WasmHostApp & { adopted: Simulation[] } {

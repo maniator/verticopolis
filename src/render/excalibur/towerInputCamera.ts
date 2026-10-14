@@ -1,6 +1,6 @@
 import * as ex from "excalibur";
 import { GRID, isCommercialKind } from "../../engine/facilities";
-import { FACILITIES } from "../../engine/facilitiesData";
+import { findCatalogFacility } from "../../engine/catalogTypes";
 import type { FacilityKind, SerializedView, WeatherKind } from "../../engine/types";
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../engine/types";
 import { clampCameraY, fitZoom } from "../cameraBounds";
@@ -8,6 +8,7 @@ import { stablePointerId } from "../pinchTracker";
 import { FLOOR, TILE } from "../scale";
 import { armLongPress, cancelLongPressOnMove, clearLongPress, finishLongPress } from "./longPress";
 import type { TowerEngine } from "./TowerEngine";
+import { towerCatalog } from "../../engine/towerCatalog";
 
 /**
  * Pointer input, entity picking, camera control and the audio view-focus for
@@ -420,7 +421,7 @@ function censusCrowd(
       if (u.kind !== dominant) continue;
       if (u.floor < bounds.f0 || u.floor > bounds.f1) continue;
       if (u.x + u.width < bounds.t0 || u.x > bounds.t1) continue;
-      const def = FACILITIES[u.kind];
+      const def = findCatalogFacility(towerCatalog(engine.sim), u.kind);
       if (!def) continue; // a kind the catalog no longer knows: skip, never throw
       const unitCap = def.population > 0 ? def.population : (def.attendance ?? 0);
       if (unitCap > 0) {
