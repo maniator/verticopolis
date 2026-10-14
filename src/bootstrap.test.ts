@@ -209,6 +209,17 @@ describe("showEngineFailure", () => {
     expect(document.querySelector("#boot-fallback button")?.textContent).toBe("Reload");
   });
 
+  it("leaves only the message reachable: everything behind it goes inert and loses focus", () => {
+    document.body.innerHTML = `<div id="stage"><button id="quick-save">Quick Save</button></div><div id="splash"></div>`;
+    const button = document.getElementById("quick-save") as HTMLButtonElement;
+    button.focus();
+    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "host", message: "x" } });
+    expect((document.getElementById("stage") as HTMLElement).inert).toBe(true);
+    expect((document.getElementById("splash") as HTMLElement).inert).toBe(true);
+    expect((document.getElementById("boot-fallback-host") as HTMLElement).inert).toBeFalsy();
+    expect(document.activeElement).not.toBe(button);
+  });
+
   it("does nothing for a boot that has no failure", () => {
     showEngineFailure({ build: "wasm-only", engine: "wasm", failure: null });
     expect(document.getElementById("boot-fallback-host")).toBeNull();

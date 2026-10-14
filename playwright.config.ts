@@ -31,7 +31,11 @@ const builtMode = (() => {
   } catch {
     return null; // no build yet: the web server step reports that
   }
-  return (JSON.parse(text) as { engineBuild?: string }).engineBuild ?? "unrecorded";
+  try {
+    return (JSON.parse(text) as { engineBuild?: string } | null)?.engineBuild ?? "unrecorded";
+  } catch {
+    return "unrecorded"; // a corrupt file: rebuild, as the message says
+  }
 })();
 if (builtMode !== null && (builtMode === "wasm-only") !== WASM_ONLY) {
   throw new Error(

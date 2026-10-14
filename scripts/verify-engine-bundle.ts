@@ -27,7 +27,6 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist");
 const ALLOW = join(ROOT, "scripts", "engine-bundle.allow.txt");
 
-
 function fail(msg: string): never {
   console.error(`verify-engine-bundle: ${msg}`);
   process.exit(1);

@@ -91,6 +91,13 @@ export function advanceOwedMinutes(host: { sim: { tick(dtMinutes: number): void;
 }
 
 export function runFrame(app: GameApp, dtMs: number): void {
+  // A wasm-only build stopped on its engine: no engine holds the tower, so
+  // time stops for good (the speed buttons and keys cannot restart it), and
+  // a stopped game samples no frames for the session either.
+  if (isEngineStopped()) {
+    app.accMinutes = 0;
+    return;
+  }
   // Sample the rendered frame-rate for the session_fps signal (#538). noteFrame
   // reads its OWN wall-clock delta (not the `dtMs` the engine passes: that value
   // is spike-clamped to 1ms for any frame over 200ms, which would hide the very
@@ -109,12 +116,6 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // out from under the player, and the update prompt must not let a distracted
   // player lose game-hours at high speed while it waits for their answer.
   if (hasBlockingModal(app)) {
-    app.accMinutes = 0;
-    return;
-  }
-  // A wasm-only build stopped on its engine: no engine holds the tower, so
-  // time stops for good (the speed buttons and keys cannot restart it).
-  if (isEngineStopped()) {
     app.accMinutes = 0;
     return;
   }

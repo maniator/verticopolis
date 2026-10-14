@@ -38,8 +38,10 @@ function imports(file: string): string[] {
 /** Whether a specifier from `file` names `target` (repository-relative, no
  *  extension), whatever relative form or extension it uses. */
 function names(file: string, spec: string, target: string): boolean {
-  if (!spec.startsWith(".")) return false;
-  const resolved = relative(ROOT, resolve(ROOT, file, "..", spec)).split("\\").join("/").replace(/\.[mc]?[jt]sx?$/, "");
+  // Relative to the importer, or root-absolute as Vite resolves "/src/...".
+  if (!spec.startsWith(".") && !spec.startsWith("/")) return false;
+  const base = spec.startsWith("/") ? resolve(ROOT, spec.slice(1)) : resolve(ROOT, file, "..", spec);
+  const resolved = relative(ROOT, base).split("\\").join("/").replace(/\.[mc]?[jt]sx?$/, "");
   return resolved === target;
 }
 

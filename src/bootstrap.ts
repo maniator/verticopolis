@@ -9,6 +9,7 @@ import { engineRequested } from "./wasmhost/engineChoice";
 import { loadWasmEngine, startWasmHost, type WasmHostApp } from "./wasmhost/startWasmHost";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { refreshSplashVersion } from "./wasmhost/engineLabel";
+import { ENGINE_FAILURE_ID } from "./game/interactionState";
 import { engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState } from "./wasmhost/engineBoot";
 
 /**
@@ -110,7 +111,7 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
   if (!state.failure) return;
   const copy = engineFailureCopy(state.failure, online);
   showBootMessage(
-    html`<div id="engine-failure" data-stage=${state.failure.stage}>
+    html`<div id=${ENGINE_FAILURE_ID} data-stage=${state.failure.stage}>
       <p><b>${copy.headline}</b></p>
       <p style="opacity:.8">Reason: ${copy.reason}</p>
       <ul style="text-align:left;margin:0 auto;max-width:36em">
@@ -119,6 +120,14 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
     </div>`,
     true,
   );
+  // Everything behind the message goes inert, so a button that kept focus
+  // cannot be pressed with Enter or Space and the title screen's keys do
+  // nothing: the message and its Reload button are all that is left.
+  for (const el of Array.from(document.body.children)) {
+    if (el.id !== "boot-fallback-host") (el as HTMLElement).inert = true;
+  }
+  const active = document.activeElement as HTMLElement | null;
+  if (active && !document.getElementById("boot-fallback-host")?.contains(active)) active.blur?.();
 }
 
 /** Boot the game once the DOM is ready. `create` builds the app instance (a
@@ -181,10 +190,10 @@ export function bootGame(create: () => BootApp): Promise<void> {
     let bootState: EngineBootState = booted.state;
     publishBootState(bootState);
     // Start the gameplay session clock (foreground time + funnel state) only once
-    // we know the game will actually run: a no-WebGL visitor bails above, and a
-    // wasm-only build whose engine did not load stops just below, so neither
-    // opens a session that would dilute the length signal. Host-gated inside,
-    // like the page-view inject above.
+    // the game can run: a no-WebGL visitor bails above, and a wasm-only build
+    // whose engine did not load stops just below. A wasm-only build that stops
+    // later (a refused tower) has a session, but its frame loop samples nothing
+    // once stopped. Host-gated inside, like the page-view inject above.
     const engineless = bootState.engine === "none" && bootState.failure !== null;
     if (!engineless) startGameplaySession();
     if (engineless && bootState.failure) {
@@ -216,7 +225,10 @@ export function bootGame(create: () => BootApp): Promise<void> {
           // A refused first tower: strict mode reported it through onFatal; a
           // switchable build leaves it on TypeScript, recorded here (#874).
           if (!handle.status.hosted && !bootState.failure) stopForEngine("start", handle.status.errors[handle.status.errors.length - 1] ?? "the host did not take the first tower");
-          hosted = handle.status.hosted;
+          // A switchable build keeps the engine writer and label even when its
+          // first tower stayed on TypeScript: the host follows every later
+          // adopt, so the next tower it holds saves through the engine.
+          hosted = !(__WASM_ONLY__ && bootState.failure);
         } catch (e) {
           stopForEngine("start", e instanceof Error ? e.message : String(e));
           console.error(__WASM_ONLY__ ? "[wasm] did not start, and this build has no other engine:" : "[wasm] did not start; running on the TypeScript engine:", e);
@@ -261,7 +273,9 @@ export function bootGame(create: () => BootApp): Promise<void> {
       // defensively rather than render "undefined"; the original error is still
       // rethrown untouched.
       const message = err instanceof Error ? err.message : String(err);
-      showBootMessage("Something went wrong starting the game: " + message);
+      // A wasm-only build that already stopped on its engine keeps that
+      // message, which carries the reason and the recovery steps.
+      if (!document.getElementById(ENGINE_FAILURE_ID)) showBootMessage("Something went wrong starting the game: " + message);
       throw err;
     }
   };

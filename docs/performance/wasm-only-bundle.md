@@ -84,7 +84,8 @@ What changed:
   switchable build of the same commit, it is 2.5 KiB smaller raw and 0.6 KiB
   smaller Brotli.
 - **One precache entry is gone in both modes:** the dual-run worker
-  (`assets/worker-*.js`, 6,409 bytes raw in the baseline build). The dual run is a developer switch that
+  (`assets/worker-*.js`, 6,409 bytes raw in the baseline build, read from a
+  directory listing of that build rather than from the size script). The dual run is a developer switch that
   bootstrap only reaches in dev serves and `VC_TOOLING=1` builds. Vite still
   emitted its worker for every build, and the precache shipped it to every
   install. Player builds and wasm-only builds now swap in
@@ -120,7 +121,7 @@ does not alter it.
 `scripts/verify-engine-bundle.ts` runs in `postbuild` after every
 `npm run build`, including deploys. It reads every emitted `.js` file's
 sourcemap. A missing map fails the check, except for the engine package's
-two files (the wasm-bindgen glue and binary), which are generated from Rust.
+wasm-bindgen glue, which is generated from Rust.
 It also reads the `precacheAndRoute` manifest in `sw.js` and the mode
 `dist/version.json` records, which must match `VC_ENGINE` in every build. It
 then checks:
@@ -196,9 +197,15 @@ too, before the flip deploys it.
 
 ## Reproduce
 
+The size script and the guard are part of this change, so the baseline is
+built at `d03747d` and measured with the scripts from `fe3c8c9`:
+
 ```sh
-git checkout fe3c8c9   # or d03747d for the baseline
+git worktree add /tmp/base d03747d   # the baseline, built without this change
+(cd /tmp/base && npm ci && npm run wasm:build && npx vite build --outDir /tmp/out-base)
+git checkout fe3c8c9
 npm ci && npm run wasm:build
+npx tsx scripts/engine-bundle-size.ts /tmp/out-base
 npx vite build --outDir /tmp/out-switchable
 VC_ENGINE=wasm npx vite build --outDir /tmp/out-wasm
 npx tsx scripts/engine-bundle-size.ts /tmp/out-switchable
@@ -215,5 +222,6 @@ branch, so it is in the branch history.
 The tables use `npx vite build`, which writes what the deploy serves before
 the postbuild checks run. `npm run build` adds `third-party-notices.txt` and
 the prerendered `/help` page, neither of which is game JavaScript or
-precached. Build the baseline with the same engine package copied into
-`src/public/engine/`, so the two builds differ only in their JavaScript.
+precached. For the published figures the baseline used the same engine
+package as the other two builds (copied into its `src/public/engine/`), so
+the builds differ only in their JavaScript.
