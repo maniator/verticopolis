@@ -205,11 +205,16 @@ describe("gameplay event emission", () => {
     expect(sim.buildTransport("elevatorStandard", 172, 1, 2).ok).toBe(true);
     sim.drainGameplayEvents();
     const shaft = sim.tower.transportAt(1, 172)!;
-    expect(sim.tower.setCars(shaft.id, 3)).toBe(true);
-    expect(sim.tower.setCars(shaft.id, 3)).toBe(false);
-    expect(sim.tower.resizeTransport(shaft.id, 1, 2).ok).toBe(true); // the same span
-    expect(sim.tower.resizeTransport(shaft.id, 1, 3).ok).toBe(true);
+    expect(sim.setCars(shaft.id, 3)).toBe(true);
+    expect(sim.setCars(shaft.id, 3)).toBe(false);
+    expect(sim.resizeTransport(shaft.id, 1, 2).ok).toBe(true); // the same span
+    expect(sim.resizeTransport(shaft.id, 1, 3).ok).toBe(true);
     expect(drain(sim)).toEqual(Array(2).fill({ name: "capacity_changed", payload: { kind: "elevatorStandard" } }));
+    // The tower's own edits stay silent, as the Rust tower's do (#906):
+    // only the simulation layer reports.
+    expect(sim.tower.setCars(shaft.id, 4)).toBe(true);
+    expect(sim.tower.resizeTransport(shaft.id, 1, 2).ok).toBe(true);
+    expect(drain(sim)).toEqual([]);
   });
 
   it("reports every rung a promotion crosses", () => {
