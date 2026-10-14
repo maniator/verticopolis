@@ -295,7 +295,9 @@ state view equals the engine's at every hour of a day on every fixture.
 
 Gameplay events (`conformance/events/catalog.json`, `src/gameplay.rs`) come
 from the engine too: `Engine.drainGameplayEvents()` returns and clears the
-batch as JSON. The instance runs every command as well, so its own buffer
+batch as JSON, and `Engine.gameplayEventsPending()` says how many it holds,
+so the host's typed drain (`src/wasmhost/engineEvents.ts`) counts a batch it
+cannot read as lost. The instance runs every command as well, so its own buffer
 would report each event twice; under the host the instance's
 `drainGameplayEvents` answers with the engine's batch and discards its own,
 and the same test counts that each event arrives once.

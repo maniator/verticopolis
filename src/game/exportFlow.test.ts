@@ -19,7 +19,10 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function fakeUi() {
+/** `downloadStarts` is what each download reports, in call order (default:
+ *  every download starts). A `false` stands in for `UI.downloadFile` having
+ *  already toasted its own failure. */
+function fakeUi(downloadStarts: boolean[] = []) {
   const toasts: { text: string; kind: string }[] = [];
   const downloads: { filename: string; contents: string | Uint8Array }[] = [];
   return {
@@ -29,8 +32,9 @@ function fakeUi() {
       toast: (text: string, kind?: string) => {
         toasts.push({ text, kind: kind ?? "info" });
       },
-      downloadFile: (filename: string, contents: string | Uint8Array): void => {
+      downloadFile: (filename: string, contents: string | Uint8Array): boolean => {
         downloads.push({ filename, contents });
+        return downloadStarts.shift() ?? true;
       },
     },
   };
@@ -44,6 +48,7 @@ const HUNG_TOAST = { text: "The export is not responding. You can try exporting 
 // The size line for the 13-byte payload these tests mock into SaveGame.export
 // ("VCTOWER1\nfake" rounds to 0.0 KB).
 const LIVE_TOAST = { text: "Tower exported (0.0 KB). Check your downloads.", kind: "good" };
+const LATE_TOAST = { text: "The earlier export finished after all (0.0 KB). Check your downloads.", kind: "good" };
 
 beforeEach(() => {
   resetExportFlowForTests();
@@ -70,6 +75,19 @@ describe("export single-flight latch (GH #760)", () => {
     expect(toasts).toHaveLength(1);
     expect(toasts[0]!.kind).toBe("good");
     expect(toasts[0]!.text).toMatch(/^Tower exported \(\d+\.\d KB\)\. Check your downloads\.$/);
+  });
+
+  it("REGRESSION (GH #997): a download that failed gets no success toast, and the latch frees", async () => {
+    vi.spyOn(SaveGame, "export").mockResolvedValue("VCTOWER1\nfake");
+    const { ui, toasts, downloads } = fakeUi([false]);
+    await runExportFlow(flowDeps(ui), () => {});
+    expect(downloads).toHaveLength(1);
+    // UI.downloadFile already toasted the failure; the flow adds nothing.
+    expect(toasts).toEqual([]);
+    // The next export runs and succeeds normally.
+    await runExportFlow(flowDeps(ui), () => {});
+    expect(downloads).toHaveLength(2);
+    expect(toasts).toEqual([LIVE_TOAST]);
   });
 
   it("REGRESSION: a second export while the first is compressing is a quiet no-op", async () => {
@@ -147,7 +165,34 @@ describe("export single-flight latch (GH #760)", () => {
     retry.resolve("VCTOWER1\nfake");
     await second;
     expect(downloads).toHaveLength(2);
-    expect(toasts).toEqual([HUNG_TOAST, LIVE_TOAST, LIVE_TOAST]);
+    expect(toasts).toEqual([HUNG_TOAST, LATE_TOAST, LIVE_TOAST]);
+  });
+
+  it("REGRESSION (GH #997): an export that settles after the watchdog says it finished after all", async () => {
+    vi.useFakeTimers();
+    const slow = deferred<string>();
+    vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise);
+    const { ui, toasts, downloads } = fakeUi();
+    const run = runExportFlow(flowDeps(ui), () => {});
+    await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
+    slow.resolve("VCTOWER1\nfake");
+    await run;
+    expect(downloads).toHaveLength(1);
+    expect(toasts).toEqual([HUNG_TOAST, LATE_TOAST]);
+  });
+
+  it("a late settle whose download fails ends on the failure alone, with no success line", async () => {
+    vi.useFakeTimers();
+    const slow = deferred<string>();
+    vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise);
+    const { ui, toasts, downloads } = fakeUi([false]);
+    const run = runExportFlow(flowDeps(ui), () => {});
+    await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
+    slow.resolve("VCTOWER1\nfake");
+    await run;
+    expect(downloads).toHaveLength(1);
+    // The fake stands in for UI.downloadFile, which has already toasted its failure.
+    expect(toasts).toEqual([HUNG_TOAST]);
   });
 });
 
