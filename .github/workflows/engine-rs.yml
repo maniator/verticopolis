@@ -148,13 +148,15 @@ jobs:
         working-directory: engine-rs
         run: cargo build --locked --lib
 
-      # Every crate test and every scenario of the lock, from a checkout that
-      # holds no web game: the tests and the referee read nothing outside
-      # engine-rs/ and conformance/.
+      # Every crate test, the binding's included (it builds natively), and
+      # every scenario of the lock, from a checkout that holds no web game:
+      # the tests and the referee read nothing outside engine-rs/ and
+      # conformance/.
       - name: The engine's tests and the full referee, without the web game
         working-directory: engine-rs
         run: |
           cargo test --locked
+          cargo test --locked --features wasm
           cargo run --locked --release --bin conformance
 
       - name: The consumer, in place

@@ -68,8 +68,8 @@ jobs:
   #   src/main.ts, styles, index.html), and the save-loading scenes (src/storage/**).
   #   So match all of src/, minus tests (the legacy src/tests/** home and the
   #   colocated *.test.ts files), but re-include the test fixtures
-  #   (src/tests/fixtures/**) and the saved towers (conformance/fixtures/**), so a
-  #   scene that loads one of them recaptures when it changes.
+  #   (src/tests/fixtures/**) and the saved towers (conformance/fixtures/**). No
+  #   scene loads a saved tower today; the rule keeps a future one covered.
   #   Plus the generator, this workflow, the reusable capture, and the visual
   #   specs' harness (engine-parity-visual's inputs). The app version
   #   is deliberately NOT matched: the generator masks it to a fixed placeholder at
