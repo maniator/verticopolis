@@ -31,9 +31,10 @@ async function hostedGame(page: Page): Promise<void> {
   await page.evaluate(() => document.getElementById("splash")?.remove());
 }
 
-/** One online visit that leaves the page controlled by the service worker
- *  with the engine package in its precache, the state an installed game is in. */
-async function install(page: Page): Promise<void> {
+/** The first online visit: it installs the service worker, which precaches
+ *  the shell and the engine package. That visit is not controlled by the
+ *  worker (no clients.claim, by design: updates wait for the player). */
+async function installWorker(page: Page): Promise<void> {
   await page.goto("/");
   // An install that fails (a precache entry that 404s, say) never activates;
   // say so here, with the worker's state, rather than at the test timeout.
@@ -50,16 +51,17 @@ async function install(page: Page): Promise<void> {
     });
     throw new Error(`the service worker never activated: ${JSON.stringify(state)}`);
   }
-  // The first visit installs the worker but is not controlled by it (no
-  // clients.claim, by design: updates wait for the player). Any later visit is.
-  await page.reload();
+}
+
+/** Wait for the worker to control the page, and check the engine glue and
+ *  binary are in its precache. */
+async function expectControlledWithEngine(page: Page): Promise<void> {
   await page.waitForFunction(() => !!navigator.serviceWorker.controller, undefined, { timeout: 30_000 });
   const cached = await page.evaluate(async (files) => {
     const hits = await Promise.all(files.map((f) => caches.match(new URL(f, document.baseURI).href, { ignoreSearch: true })));
     return hits.map((r) => r?.ok ?? false);
   }, ENGINE_FILES);
   expect(cached, "the engine glue and binary are in the service worker's precache").toEqual([true, true]);
-  await hostedGame(page);
 }
 
 /** Advance the clock on the engine, build, save to a slot and load it back. */
@@ -108,17 +110,17 @@ function watch(page: Page): { errors: string[]; failed: string[] } {
   return seen;
 }
 
-test("an installed game starts the WASM engine on an offline reload, and plays, saves and loads", async ({ page, context }) => {
-  await install(page);
+test("an installed game starts the WASM engine on its first reload offline, and plays, saves and loads", async ({ page, context }) => {
+  await installWorker(page);
+  // The first navigation the worker controls happens with no network, so the
+  // shell and the engine come from the precache only and the binary is
+  // answered by the service worker. The reload keeps the browser context.
   await context.setOffline(true);
   const seen = watch(page);
-  // An offline reload in the same browser context: the shell and the engine
-  // come from the precache only, and the binary is answered by the service
-  // worker.
   const binary = page.waitForResponse((r) => r.url().includes("engine/verticopolis_engine_bg.wasm"), { timeout: 30_000 });
   await page.reload();
   expect((await binary).fromServiceWorker(), "the engine binary is served by the service worker").toBe(true);
-  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await expectControlledWithEngine(page);
   await hostedGame(page);
   expect(await page.evaluate(() => navigator.onLine)).toBe(false);
   await playSaveAndLoad(page);
@@ -126,7 +128,10 @@ test("an installed game starts the WASM engine on an offline reload, and plays, 
 });
 
 test("losing the network mid-session keeps the game playing on the WASM engine", async ({ page, context }) => {
-  await install(page);
+  await installWorker(page);
+  await page.reload();
+  await expectControlledWithEngine(page);
+  await hostedGame(page);
   await context.setOffline(true);
   const seen = watch(page);
   // Nudge src/pwa.ts's visibility-driven update check. This test only shows
