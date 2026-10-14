@@ -1,7 +1,6 @@
 import { analyticsAdapter, type EventProps } from "./analyticsAdapter";
 import { APP_VERSION } from "./appVersion";
 import { telemetryHostAllowed } from "./telemetry";
-import { holdWhilePending } from "./desktopConsent";
 
 /**
  * Gameplay analytics core: the typed event vocabulary, the cross-cutting common
@@ -13,7 +12,7 @@ import { holdWhilePending } from "./desktopConsent";
  *
  * Every event goes through the SAME host gate as the page-view inject
  * (`telemetryHostAllowed`) and is best-effort: nothing fires on localhost, the
- * e2e preview server, or the native shell, and a transport hiccup can never
+ * e2e preview server, or any other host, and a transport hiccup can never
  * throw past the caller into the game loop. The vocabulary is deliberately
  * low-volume so a busy session stays well inside the provider's event budget.
  */
@@ -322,26 +321,9 @@ function deliver(name: string, props: EventProps): void {
  * wins on a key collision (the typed vocabulary is never shadowed by an
  * enrichment key).
  *
- * The gate saying no still means nothing is sent. The one thing that changed
- * with the desktop epic is what happens to the event afterward: a desktop build
- * whose first-run notice has not resolved HOLDS it in memory rather than
- * dropping it, so a player who says yes ten seconds into their first launch
- * still reports that first launch instead of starting the record at the click.
- * The hold is bounded and drops its oldest first, so it is that much of a
- * session rather than a guarantee about any one event (see `desktopConsent.ts`).
- * Every other dark surface
- * (localhost, the e2e preview server, the iOS shell, and a desktop player who
- * declined) falls straight through `holdWhilePending` and drops the event
- * exactly as before.
- *
- * The merge happens before the gate so a held event carries the props it had at
- * EMIT time rather than whatever the common props say when the queue flushes.
+ * The gate saying no means nothing is sent.
  */
 export function trackEvent<K extends keyof GameplayEvents>(name: K, props: GameplayEvents[K]): void {
-  const merged: EventProps = { ...commonProps, ...props };
-  if (telemetryHostAllowed()) {
-    deliver(name, merged);
-    return;
-  }
-  holdWhilePending(() => deliver(name, merged));
+  if (!telemetryHostAllowed()) return;
+  deliver(name, { ...commonProps, ...props });
 }

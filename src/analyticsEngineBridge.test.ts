@@ -242,7 +242,7 @@ describe("analytics engine bridge", () => {
     bindEngineBridge(() => source(queue));
     for (let i = 0; i < BRIDGE_SEND_LIMIT; i++) forwardGameplayEvents([star(2)]);
     queue.push(founded(), star(3));
-    gameplaySession.startEpoch(); // a consent change
+    gameplaySession.startEpoch(); // a new measurement window
     expect(queue).toEqual([]);
     expect(engineBridgeStats().discarded).toBe(2);
     vi.mocked(sendToRelay).mockReset();
@@ -311,7 +311,7 @@ describe("analytics engine bridge", () => {
     expect(propsFor("new_game_started")).toEqual([{ mode: "classic" }]);
     expect(propsFor("first_build")).toEqual([{ tool: "lobby" }]);
     expect(engineBridgeStats()).toMatchObject({ rejected: 1, drainFailures: 1 });
-    // A consent flip drops what the engine holds unsent; nothing is folded twice.
+    // A new window drops what the engine holds unsent; nothing is folded twice.
     expect(live.build("lobby", 1, 184).ok).toBe(true);
     gameplaySession.startEpoch();
     drainEngineEvents(live);

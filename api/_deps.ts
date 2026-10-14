@@ -5,29 +5,17 @@ import { ipAddress, waitUntil } from "@vercel/functions";
 import type { IngestDeps } from "../src/analyticsIngest.js";
 
 /**
- * One place for the platform reads both ingest routes bind: the same secrets,
- * the same environment, the same clock, and the same trusted client IP. Both
- * entries (`api/ingest.ts` and `api/ingest/desktop.ts`) import
- * {@link vercelIngestDeps} rather than copying it, so the two routes cannot end
- * up reading the environment differently.
- *
- * This is a shared module rather than a route. Vercel's builder skips any
- * function path containing `/_`, so the leading underscore is what keeps the
- * file from being served as `/api/_deps`. It sits here rather than inside
- * `api/ingest.ts` so that neither route imports the other: a route file doubling
- * as a library would pull the web route's module scope into the desktop
- * function's bundle, and Vercel reads static config from an entrypoint only, so
- * a future `export const config` on `api/ingest.ts` would apply to that route
- * and silently miss the desktop one.
+ * The platform reads the ingest route binds: the secrets, the environment, the
+ * clock, and the trusted client IP. A shared module rather than a route:
+ * Vercel's builder skips any function path containing `/_`, so the leading
+ * underscore keeps the file from being served as `/api/_deps`.
  */
 
 /**
  * Build the injected dependencies for one request.
  *
- * No rate limiter is passed, so each route falls through to the core's module
- * singleton. That singleton is per module instance, and Vercel builds each route
- * under `api/` as its own function, so in production the two routes hold
- * SEPARATE per-IP budgets and posting to both buys two windows. The limiter is
+ * No rate limiter is passed, so the route falls through to the core's module
+ * singleton, which is per function instance. The limiter is
  * best-effort abuse damping rather than a quota; see `RateLimiter` in
  * `src/analyticsIngest.ts`.
  */

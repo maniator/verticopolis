@@ -333,9 +333,9 @@ describe("bootGame", () => {
       throw new Error("kaboom");
     });
 
-    // REJECTS rather than throwing synchronously. Boot became async so a
-    // wrapper shell's save store can resolve before the game constructs, which
-    // moves the rethrow from `error` to `unhandledrejection`; both are bound by
+    // REJECTS rather than throwing synchronously. Boot is async (the WASM
+    // engine can load before the game constructs), which moves the rethrow
+    // from `error` to `unhandledrejection`; both are bound by
     // `installErrorTracking`, which runs as boot's first statement, so the
     // failure is still reported. `bootGame` returns the promise specifically so
     // that is observable here instead of floating.

@@ -23,8 +23,8 @@ import { trackEconomyActionOnce, trackEmergencyChoice } from "./analyticsActions
  *   build the player then undid.
  * - The title backdrop's buffer (`discardOnHandOff`) is drained and thrown
  *   away, so the backdrop's founding is never a new game. So is whatever the
- *   engine still holds when a consent change closes a measurement window: that
- *   play belongs to the closing window, which is discarded unsent.
+ *   engine still holds when a measurement window closes: that play belongs to
+ *   the closing window, which is discarded unsent.
  * - A batch can span two towers: a swap hands the replaced tower's undrained
  *   events on ahead of the new tower's own, so the folds read the batch in
  *   order and only a `tower_founded` re-opens the per-tower funnel.
@@ -205,10 +205,10 @@ export function drainEngineEvents(source: GameplayEventSource | undefined, now =
 }
 
 /** Bind the bridge to the live tower, so the session can fold the engine's
- *  last events before it reports (page hide), and drop them unsent when a
- *  consent change closes the window they belong to (the folds' sends would
- *  otherwise go out under the new answer, and their latches be spent before
- *  the new window re-opens them). Called once at boot. */
+ *  last events before it reports (page hide), and drop them unsent when the
+ *  window they belong to closes (`GameplaySession.startEpoch`, reached only
+ *  from the session reset since #991). Called once at
+ *  boot. */
 export function bindEngineBridge(live: () => GameplayEventSource | undefined): void {
   gameplaySession.setEngineFlush((closing) => {
     if (!closing) {
