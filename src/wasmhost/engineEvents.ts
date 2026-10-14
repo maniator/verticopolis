@@ -11,20 +11,28 @@ export interface EngineBatch {
 /**
  * Drain the engine's gameplay events and parse them (#907). The binding hands
  * the batch over as JSON text and empties its buffer before anyone reads it,
- * so a batch that does not parse is gone either way: it comes back as no
- * events, with `lost` the number the engine held just before the drain, for
- * the caller to add to its drop count. An engine that throws (a trap) still
- * throws. The events are not checked against the catalog here; the analytics
- * bridge does that at egress.
+ * so whatever cannot be read is gone either way. `lost` counts it against the
+ * number the engine held just before the drain: all of them for text that
+ * does not parse or is not a list, and otherwise any the list falls short by,
+ * including entries that are not shaped like an event (an object with a
+ * string `name`), which are left out so they never take a ring slot. An engine
+ * that throws (a trap) still throws. Payloads are not checked against the
+ * catalog here; the analytics bridge does that at egress.
  */
 export function drainEngineBatch(engine: Pick<WasmEngine, "drainGameplayEvents" | "gameplayEventsPending">): EngineBatch {
   const pending = engine.gameplayEventsPending();
   const text = engine.drainGameplayEvents();
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(text);
-    if (Array.isArray(parsed)) return { events: parsed as GameplayEvent[], lost: 0 };
+    parsed = JSON.parse(text);
   } catch {
-    // Unreadable: counted as lost below.
+    return { events: [], lost: pending };
   }
-  return { events: [], lost: pending };
+  if (!Array.isArray(parsed)) return { events: [], lost: pending };
+  const events = parsed.filter(isEventShaped);
+  return { events, lost: Math.max(0, pending - events.length) };
+}
+
+function isEventShaped(entry: unknown): entry is GameplayEvent {
+  return typeof entry === "object" && entry !== null && typeof (entry as { name?: unknown }).name === "string";
 }

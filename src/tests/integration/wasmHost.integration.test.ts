@@ -242,6 +242,27 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     expect(sim.gameplayEventsDropped).toBe(6);
   });
 
+  it("keeps an unreadable batch's loss when the engine traps at detach", () => {
+    const sim = Simulation.newGame(48, "classic");
+    const host = attachWasmHost(sim, wasm());
+    const engine = host.engine as { drainGameplayEvents: () => string };
+    const real = engine.drainGameplayEvents.bind(engine);
+    sim.money = 1e9;
+    sim.drainGameplayEvents(); // the founding
+    for (let x = 170; x < 173; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    engine.drainGameplayEvents = () => real().slice(0, -1);
+    expect(sim.drainGameplayEvents()).toEqual([]); // three lost to an unreadable batch
+    for (let x = 173; x < 175; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    engine.drainGameplayEvents = () => {
+      throw new Error("unreachable executed");
+    };
+    expect(() => host.detach()).toThrow(/unreachable/);
+    // The three counted while hosted, and the two the trap took, estimated
+    // from the read model's copies.
+    expect(sim.drainGameplayEvents()).toEqual([]);
+    expect(sim.gameplayEventsDropped).toBe(5);
+  });
+
   // A paused player builds, then undoes before anything drains: the app swaps
   // in the restored tower and the host follows it. The events the engine
   // still owed reach the restored tower ahead of its own, once; the

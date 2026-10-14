@@ -139,7 +139,7 @@ export class Engine {
     /**
      * How many gameplay events wait for the next drain. A host reads it
      * before draining, so a batch whose text it cannot read is counted as
-     * lost rather than vanishing (the drain empties the buffer either way).
+     * lost (the drain empties the buffer either way).
      */
     gameplayEventsPending(): number;
     /**

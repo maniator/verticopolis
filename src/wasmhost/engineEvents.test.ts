@@ -30,6 +30,12 @@ describe("the typed engine drain", () => {
     expect(drainEngineBatch(engine("{\"name\":\"fire_started\"}", 1))).toEqual({ events: [], lost: 1 });
   });
 
+  it("leaves out entries that are not events and counts any the list falls short by", () => {
+    const good = { name: "fire_started", payload: {} };
+    expect(drainEngineBatch(engine(JSON.stringify([good, 1, null, { payload: {} }]), 4))).toEqual({ events: [good], lost: 3 });
+    expect(drainEngineBatch(engine(JSON.stringify([good]), 3))).toEqual({ events: [good], lost: 2 });
+  });
+
   it("lets an engine that throws throw", () => {
     const trapped = {
       gameplayEventsPending: () => 2,

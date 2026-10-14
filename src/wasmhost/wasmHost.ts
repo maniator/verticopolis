@@ -131,9 +131,10 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
       const handOff = { events: carried, dropped: droppedAtAttach + unreadable + duplicates };
       runEach(
         () => {
-          handOff.dropped += engine.gameplayEventsDropped();
+          const engineDropped = engine.gameplayEventsDropped();
+          handOff.dropped += engineDropped;
           handOff.events = drainHosted();
-          handOff.dropped = droppedSoFar();
+          handOff.dropped = droppedAtAttach + unreadable + engineDropped;
         },
         () => relay.detach(),
         () => useTowerCatalogSource(sim, null),
@@ -234,10 +235,14 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
     // A relay already on the instance (the dual run's mirror, a second
     // host): the engine built for it must not leak, and the instance keeps
     // its own events.
-    runEach(
-      () => shadow.free(),
-      () => sim.gameplayEvents.restore(carried, sim.gameplayEvents.dropped),
-    );
+    try {
+      runEach(
+        () => shadow.free(),
+        () => sim.gameplayEvents.restore(carried, sim.gameplayEvents.dropped),
+      );
+    } catch {
+      // The refusal is the caller's answer; a failure to free behind it is not.
+    }
     throw e;
   }
   const ownSerialize = Object.getOwnPropertyDescriptor(sim, "serialize");

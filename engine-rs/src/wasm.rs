@@ -858,7 +858,7 @@ impl Engine {
 
     /// How many gameplay events wait for the next drain. A host reads it
     /// before draining, so a batch whose text it cannot read is counted as
-    /// lost rather than vanishing (the drain empties the buffer either way).
+    /// lost (the drain empties the buffer either way).
     #[wasm_bindgen(js_name = gameplayEventsPending)]
     pub fn gameplay_events_pending(&self) -> f64 {
         self.sim.gameplay.len() as f64
