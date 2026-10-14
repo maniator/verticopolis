@@ -16,13 +16,14 @@ against a mark it supplies and get floors for free.
 2. The new commands relay through the dual-run mirror and the WASM binding.
 3. `EditorActions` moves onto them and drops its caller-held mark.
 4. A conformance scenario op pins a wiggling drag billed once.
-5. The mark stays out of the save and the hashed views.
+5. The mark stays out of the save and the hashed views (the issue's words;
+   the tests check the save and the state view).
 
 ## What landed
 
 - **TypeScript:** `src/engine/sim/charges.ts` keeps the open gesture in a
   `WeakMap` keyed by the simulation, so it is never serialized, never in
-  the hashed views, and gone with a swapped-in simulation (a load or an
+  the state view, and gone with a swapped-in simulation (a load or an
   undo deserializes a new one). `beginExtend(id)` drops any open gesture,
   then opens one on a whole id naming an elevator and answers true;
   otherwise false. `extendTransport(id, end, targetFloor)` bills past the
@@ -41,11 +42,12 @@ against a mark it supplies and get floors for free.
   drag is on, opens the gesture on the first step (after the undo capture)
   and closes it in `endExtend`. A tower swapped in mid-drag has no gesture,
   so the drag begins a new one on it.
-- **Attach:** `loadCommand` closes any open gesture, since the save the
-  shadow or the WASM host starts from carries none; both engines then bill
-  the next step from the span (a drag in progress at an attach re-bills a
-  regrow, which no UI path reaches: attaches happen at boot or with a new
-  tower).
+- **Attach:** the save a shadow or the WASM host starts from carries no
+  gesture, so `loadCommand` reopens an open one at its shaft's span and the
+  load command names the shaft, which the shadow reopens too. Both engines
+  then bill the rest of a drag in progress from the same mark; floors the
+  drag shrank away before the attach are billed again on a regrow (no UI
+  path attaches mid-drag: attaches come at boot or with a new tower).
 - **Conformance:** `beginExtend` and `endExtend` ops replace `hwmBottom` and
   `hwmTop`, in both runners and the scenario
   `engine-charges-classic`, whose drags are bracketed by them. Every
@@ -99,26 +101,26 @@ against a mark it supplies and get floors for free.
   tier 1 list name the new commands; the story's test claims match the
   tests.
 - Dismissed (7): a selection change mid-drag re-billing (it predates #990;
-  deferred in round 2 as #1014); `beginExtend`'s result
-  unchecked in the editor (it refuses only what `isElevatorKind` already
-  rules out); `endExtend` on the replaced simulation (it has no gesture and
-  no relay); the public Rust field (every `Simulation` field is public to
-  native code, which can set `money` too); a refused `beginExtend` op in
-  the scenario and `endExtend` in the lock (both pinned across engines by
-  `chargeBindingRaw`; the refused-begin half was only pinned in round 2); the backlog row marked done before merge (house
-  style, as in #923); the scenario's mark equivalence (the unchanged lock
-  shows it).
+  deferred in round 2 as #1014); `beginExtend`'s result unchecked in the
+  editor (it refuses only what `isElevatorKind` already rules out);
+  `endExtend` on the replaced simulation (it has no gesture and no relay); the
+  public Rust field (every `Simulation` field is public to native code, which
+  can set `money` too); a refused `beginExtend` op in the scenario and
+  `endExtend` in the lock (both pinned across engines by `chargeBindingRaw`;
+  the refused-begin half was only pinned in round 2); the backlog row marked
+  done before merge (house style, as in #923); the scenario's mark equivalence
+  (the unchanged lock shows it).
 
 ### Round 2 (`/gds-code-review`)
 
-- [x] [Review][Patch] Round 1's `clearSelection` and button closes ended
-  the editor's gesture but not the canvas drag: a selection cleared and
-  restored, or a second finger on the button, during a held drag began a
-  fresh gesture from the span, re-billing paid floors and recapturing undo
-  mid-drag (Edge Case Hunter with a repro) [src/main.ts,
-  src/game/editorActions.ts]: both reverted. The drag lifecycle (a lost
-  pointer-up, a selection change while held) predates #990 and is deferred
-  whole: backlog row `extend-drag-lifecycle`, #1014.
+- [x] [Review][Patch] Round 1's `clearSelection` and button closes ended the
+  editor's gesture but not the canvas drag: a selection cleared and restored,
+  or a second finger on the button, during a held drag began a fresh gesture
+  from the span, re-billing paid floors and recapturing undo mid-drag (Edge
+  Case Hunter with a repro) [src/main.ts, src/game/editorActions.ts]: both
+  reverted. The drag lifecycle (a lost pointer-up, a selection change while
+  held) is deferred whole (its press half is new with #990, see round 3):
+  backlog row `extend-drag-lifecycle`, #1014.
 - [x] [Review][Patch] Round 1 dismissed a refused `beginExtend` op on the
   claim that `chargeBindingRaw` pinned it across engines, but its bad begins
   ran with no gesture open (Blind Hunter) [chargeBindingRaw]: it now opens a
@@ -138,3 +140,38 @@ against a mark it supplies and get floors for free.
   ops (neither engine moves money there, and the unit tests pin it); the
   backlog row and the story status (house style); the scenario's mark
   equivalence (the unchanged lock shows it, and the Auditor traced it).
+
+### Round 3 (`/gds-code-review`)
+
+- [x] [Review][Patch] An attach mid-drag closed the gesture while the
+  editor's drag went on, so every later wiggle of that drag was billed in
+  both engines (Edge Case Hunter with a repro, Blind Hunter, Acceptance
+  Auditor) [src/dualrun/mirror.ts, src/dualrun/shadow.ts,
+  src/dualrun/commands.ts]: `loadCommand` reopens the gesture at its
+  shaft's span and the load command carries the shaft, which the shadow
+  reopens; the dual-run test wiggles after the attach and fails without
+  the shadow's reopen.
+- [x] [Review][Patch] With the round-1 button close reverted, a one-floor
+  press inside a gesture a lost pointer-up left open is a step of it, which
+  is new with #990 (on main the button billed from the span, so a floor
+  the drag had paid for was billed again). Kept as the fairer behavior,
+  pinned by the editor test, and noted on #1014, whose wording no longer
+  says the whole lifecycle predates #990 (Edge Case Hunter, Blind Hunter,
+  Acceptance Auditor).
+- [x] [Review][Patch] The dual-run test's two refused begins ran back to
+  back, so the second hid any gesture the first opened in Rust (Blind
+  Hunter): each is followed by its own billed shrink and regrow.
+- [x] [Review][Patch] The save and state-view checks ran only before any
+  billing inside the gesture (Blind Hunter): a gestured tower now saves and
+  views exactly as a twin billed without one.
+- [x] [Review][Patch] Prose (Acceptance Auditor, Blind Hunter): "hashed
+  views" narrowed to the save and the state view in the story, the backlog
+  row, the Rust test name and the field doc; the attach wording matches the
+  reopen; the raw test calls `endExtend` without a cast.
+- Dismissed (5): the "dropped with the simulation" checks hold by
+  construction (kept as smoke tests; the editor test covers the swap); a
+  re-host outside `loadCommand` (round 2 traced every production attach
+  through it); the shadow not comparing `beginExtend`'s answer (a split
+  shows at the next billed step, which the dual run compares); the public
+  Rust field (round 1); refused begins in the conformance lock (pinned
+  across engines by `chargeBindingRaw` since round 2).

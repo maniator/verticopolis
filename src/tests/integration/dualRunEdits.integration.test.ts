@@ -183,10 +183,14 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     // caller passes is ignored, so an inflated one buys nothing in either.
     const extend = sim.extendTransport as (...a: unknown[]) => ReturnType<typeof sim.extendTransport>;
     expect(extend.call(sim, lift.id, "up", 4, { bottom: 1, top: 50 })).toMatchObject({ ok: true, top: 4, added: 2 });
-    // The refused begins above opened no gesture in either engine: a shrink
-    // and regrow is billed in both.
-    expect(sim.extendTransport(lift.id, "up", 3)).toMatchObject({ ok: true, added: 0 });
-    expect(sim.extendTransport(lift.id, "up", 4)).toMatchObject({ ok: true, added: 1 });
+    // A refused begin opens no gesture in either engine, through the mirror
+    // too (a string id relays as NaN): after each, a shrink and regrow is
+    // billed in both.
+    for (const bad of [loose(String(lift.id)), lift.id + 0.5]) {
+      expect(sim.beginExtend(bad)).toBe(false);
+      expect(sim.extendTransport(lift.id, "up", 3)).toMatchObject({ ok: true, added: 0 });
+      expect(sim.extendTransport(lift.id, "up", 4)).toMatchObject({ ok: true, added: 1 });
+    }
     expect(sim.beginExtend(lift.id)).toBe(true);
     expect(sim.extendTransport(lift.id, "up", 6)).toMatchObject({ ok: true, top: 6, added: 2 });
     expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, top: 5, added: 0 });
@@ -202,9 +206,10 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(report.checkpoints).toBe(2);
   });
 
-  it("a shadow started mid-drag starts in step: the open gesture closes (#990)", () => {
-    // A save holds no gesture, so following a tower closes the live one;
-    // otherwise its next step would be free here and billed in the shadow.
+  it("a shadow started mid-drag starts in step: the gesture reopens at the span in both (#990)", () => {
+    // A save holds no gesture, so following a tower reopens the live one at
+    // its shaft's span and opens the same in the shadow; a shadow without it
+    // would bill the rest of the drag where the live tower does not.
     const sim = Simulation.newGame(9, "classic");
     sim.money = 1e9;
     for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
@@ -215,7 +220,12 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, added: 3 });
     expect(sim.extendTransport(lift.id, "up", 3)).toMatchObject({ ok: true, added: 0 });
     const run = new DualRun().follow(sim);
+    // Floors shrunk away before the attach are past the reopened mark; a
+    // wiggle after it is free in both.
     expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, added: 2 });
+    expect(sim.extendTransport(lift.id, "up", 4)).toMatchObject({ ok: true, added: 0 });
+    expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, added: 0 });
+    sim.endExtend();
     new FrameDriver(sim, 3).run(60);
     const report = run.stop();
     expect(report.divergences).toEqual([]);

@@ -121,6 +121,12 @@ export function beginExtend(sim: Simulation, id: number): boolean {
   return true;
 }
 
+/** The shaft an open extend gesture is on, if any: what a host starting a
+ *  second engine from this tower's save (which holds no gesture) reopens. */
+export function extendGestureId(sim: Simulation): number | undefined {
+  return gestures.get(sim)?.id;
+}
+
 /** Close the open extend gesture, if any (the drag ended). */
 export function endExtend(sim: Simulation): void {
   gestures.delete(sim);

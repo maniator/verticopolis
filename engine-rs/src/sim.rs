@@ -165,8 +165,8 @@ pub struct Simulation {
     /// hashed; see `gameplay.rs`).
     pub gameplay: GameplayEvents,
     /// The open extend gesture (#990) as `(id, bottom, top)`: the shaft and
-    /// the furthest span the gesture has paid for (never saved or hashed;
-    /// see `begin_extend`).
+    /// the furthest span the gesture has paid for (never saved, and not in
+    /// the state view; see `begin_extend`).
     pub extend_gesture: Option<(i64, i64, i64)>,
 }
 

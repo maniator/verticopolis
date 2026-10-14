@@ -762,6 +762,15 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     editor.endExtend();
     sim.extendTransport(lift.id, "up", 5);
     expect(before - sim.money).toBe(4 * ECON.transportFloorCost);
+    // A one-floor press while a drag's gesture is still open (its pointer-up
+    // lost, #1014) is a step of that gesture: a floor the drag already paid
+    // for is not billed twice.
+    editor.extendSelectedTo("up", 6); // paid floor 6
+    editor.extendSelectedTo("up", 5); // shrank back, the gesture still open
+    render(transportEditorTemplate(sim, lift), root);
+    editor.handleEditAction("extendUp", root);
+    expect(lift.top).toBe(6);
+    expect(before - sim.money).toBe(5 * ECON.transportFloorCost);
   });
 
   it("a tower swapped in mid-drag starts a fresh high-water mark, so nothing grows unbilled", () => {

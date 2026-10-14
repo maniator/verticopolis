@@ -14,7 +14,7 @@ import type { FacilityKind } from "../engine/types";
  * a checkpoint's answer, or an error, can be told from a previous tower's.
  */
 export type ShadowCommand =
-  | { op: "load"; gen: number; save: string; markers: BoundaryMarkers }
+  | { op: "load"; gen: number; save: string; markers: BoundaryMarkers; extend?: number | null }
   | { op: "tick"; dt: number }
   | { op: "build"; kind: FacilityKind; floor: number; x: number }
   | { op: "buildTransport"; kind: FacilityKind; x: number; bottom: number; top: number }

@@ -136,7 +136,7 @@ fn a_gesture_bills_only_its_own_shaft_and_never_carries_over() {
 }
 
 #[test]
-fn a_gesture_stays_out_of_the_save_and_the_hashed_views() {
+fn a_gesture_stays_out_of_the_save_and_the_state_view() {
     let (mut sim, _, lift, _) = fixture();
     let (save, view) = (sim.serialize(), crate::scenario::state_view(&sim));
     assert!(sim.begin_extend(lift));

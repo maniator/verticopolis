@@ -129,7 +129,13 @@ describe("extendTransport", () => {
     expect(JSON.stringify(stateView(sim))).toBe(view);
     expect(sim.extendTransport(lift.id, "up", 4).added).toBe(2);
     expect(sim.extendTransport(lift.id, "up", 2).delta).toBe(0);
-    // A load or an undo swaps in a new simulation, which has no gesture open.
+    // Billing inside the gesture saves exactly what billing outside one does.
+    const twin = fixture();
+    expect(twin.sim.extendTransport(twin.lift.id, "up", 4).added).toBe(2);
+    expect(twin.sim.extendTransport(twin.lift.id, "up", 2).delta).toBe(0);
+    expect(JSON.stringify(sim.serialize())).toBe(JSON.stringify(twin.sim.serialize()));
+    expect(JSON.stringify(stateView(sim))).toBe(JSON.stringify(stateView(twin.sim)));
+    // A new simulation (a load, an undo) has no gesture open.
     const loaded = Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())));
     const shaft = loaded.tower.transportById(lift.id)!;
     expect(loaded.extendTransport(shaft.id, "up", 4)).toMatchObject({ added: 2, delta: -2 * per });

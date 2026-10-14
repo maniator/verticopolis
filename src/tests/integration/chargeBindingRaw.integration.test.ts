@@ -183,7 +183,7 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
         { name: "extendTransport in a gesture", ts: (s) => s.extendTransport(lift, "up", 4), rust: (e) => e.extendTransport(lift, "up", 4) },
         { name: "extendTransport back inside the mark", ts: (s) => s.extendTransport(lift, "up", 3), rust: (e) => e.extendTransport(lift, "up", 3) },
         { name: "extendTransport regrown inside the mark", ts: (s) => s.extendTransport(lift, "up", 4), rust: (e) => e.extendTransport(lift, "up", 4) },
-        { name: "endExtend, then a shrink", ts: (s) => (s.endExtend(), s.extendTransport(lift, "up", 3)), rust: (e) => (loose<{ endExtend(): void }>(e).endExtend(), e.extendTransport(lift, "up", 3)) },
+        { name: "endExtend, then a shrink", ts: (s) => (s.endExtend(), s.extendTransport(lift, "up", 3)), rust: (e) => (e.endExtend(), e.extendTransport(lift, "up", 3)) },
         { name: "extendTransport with an inflated caller mark", ts: (s) => extend(s, lift, "up", 5, { bottom: 1, top: 50 }), rust: (e) => loose<string>(extend(e, lift, "up", 5, '{"bottom":1,"top":50}')) },
         { name: "addCar", ts: (s) => s.addCar(lift), rust: (e) => e.addCar(lift) },
         { name: "removeCar", ts: (s) => s.removeCar(lift), rust: (e) => e.removeCar(lift) },
