@@ -54,6 +54,13 @@ describe("gameplay event buffer", () => {
     expect(buf.dropped).toBe(5);
   });
 
+  it("holds as many events as the Rust engine's ring", () => {
+    // The Rust crate's tests read nothing outside engine-rs/ and conformance/
+    // (#980), so this side pins the two capacities together.
+    const rust = readFileSync(resolve(root, "engine-rs/src/gameplay.rs"), "utf8");
+    expect(rust).toContain(`pub const GAMEPLAY_RING_CAP: usize = ${GAMEPLAY_RING_CAP};`);
+  });
+
   it("inherits a replaced tower's owed events and drop count ahead of its own", () => {
     const old = tower();
     expect(old.build("office", 2, 180).ok).toBe(true);
@@ -125,7 +132,7 @@ describe("gameplay event emission", () => {
     const loaded = Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame);
     expect(loaded.drainGameplayEvents()).toEqual([]);
     // A real four-star save, with its milestones, stars, shafts and prices.
-    const file = "src/tests/fixtures/towerone-star4.vctower";
+    const file = "conformance/fixtures/towerone-star4.vctower";
     const raw = decodeVctower(readFileSync(resolve(root, file), "utf8"), file) as SerializedGame;
     expect(Simulation.deserialize(raw).drainGameplayEvents()).toEqual([]);
   });
