@@ -38,11 +38,12 @@ vi.mock("./wasmhost/workerController", async (importOriginal) => {
       if (wasmStub.workerError) throw wasmStub.workerError;
       return { worker: { terminate: vi.fn() }, catalogs: { classic: "{}", modern: "{}" } };
     }),
-    startWorkerHost: vi.fn(() => ({ stop: vi.fn() })),
+    startWorkerHost: vi.fn(() => ({ status: { hosted: true, errors: [] as string[] }, stop: vi.fn() })),
   };
 });
 import { startWasmHost } from "./wasmhost/startWasmHost";
 import { startWorkerHost } from "./wasmhost/workerController";
+import * as pwa from "./pwa";
 import { Simulation } from "./engine/Simulation";
 import { SaveGame } from "./storage/SaveGame";
 import { setEngineWriter } from "./storage/vctowerWriter";
@@ -368,6 +369,8 @@ describe("bootGame", () => {
     wasmStub.requested = "wasm-worker";
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const boot = () => (globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot;
+    vi.mocked(startWorkerHost).mockClear();
+    vi.mocked(startWasmHost).mockClear();
     try {
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
       expect(startWorkerHost).toHaveBeenCalledTimes(1);
@@ -378,6 +381,16 @@ describe("bootGame", () => {
       });
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
       expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "no worker host" } });
+      // A later throw lets the started host go, so the state stops claiming it.
+      vi.spyOn(pwa, "registerPWA").mockImplementationOnce(() => {
+        throw new Error("no service worker");
+      });
+      await expect(bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })))).rejects.toThrow("no service worker");
+      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "no service worker" } });
+      // A refused first tower is not thrown: the host reports it and stays.
+      vi.mocked(startWorkerHost).mockImplementationOnce(() => ({ status: { hosted: false, errors: ["not hosting this tower: it has a crowd"] }, stop: vi.fn() }) as never);
+      await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "not hosting this tower: it has a crowd" } });
       wasmStub.workerError = new Error("the engine worker did not answer ready");
       vi.mocked(startWorkerHost).mockClear();
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
