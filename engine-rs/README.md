@@ -38,6 +38,19 @@ readouts the hashed state never reads (`scheduleOrigins.ts`,
 `scheduleAuthoring.ts`, `traffic.ts`, `sim/fixedStep.ts`, `timePacing.ts`,
 `UndoHistory.ts`, `SimContext.ts`, the rest of `sim/stats.ts`) are not ported.
 
+## Using it from another frontend
+
+[`API.md`](API.md) is the page for a host that is not the web game: how to
+depend on the crate, the calls a frontend makes, and what is stable.
+`consumer/` is a small crate that depends on the engine by path and makes
+those calls; CI builds and runs a copy of it outside the checkout, in the
+Rust container image with no Node.js and a checkout holding only
+`engine-rs/` and `conformance/` (`engine-rs.yml`, job `consumer`), and
+`tests/independence.rs` checks that the library source (the conformance
+harness aside) reaches for no file, clock, console, network, thread or
+process access, compiles in nothing from the web game's tree, and pulls in
+no unreviewed crate.
+
 ## Running
 
 ```sh
@@ -48,6 +61,7 @@ cargo llvm-cov --no-report test && cargo llvm-cov --no-report run --bin conforma
   && cargo llvm-cov report               # what the tests and the referee reach; CI floors lines at 87%
 cargo run --release --bin dump -- starter-classic t+60   # canonical JSON of one checkpoint
 cargo run --release --bin tdt                 # replay every .TDT case against conformance/tdt-cases.json
+(cd consumer && cargo test --locked && cargo run --locked --release)   # the frontend-free host (API.md)
 ```
 
 ## The `.TDT` codec

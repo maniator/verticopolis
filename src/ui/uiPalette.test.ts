@@ -1,4 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
+import { toolInfoFor } from "./templates/toolInfo";
+import { renderToFragment } from "./testing/litTestUtils";
+import { catalogFor } from "../engine/catalog";
 import { buildPalette, selectGroup, syncPaletteTabs } from "./uiPalette";
 import type { Tool, UI } from "./UI";
 
@@ -14,7 +17,7 @@ function stubUI(): { ui: UI; palette: HTMLElement; tabs: HTMLElement; selectTool
   const palette = document.createElement("div");
   const tabs = document.createElement("div");
   const selectTool = vi.fn();
-  const ui = { el: { palette, paletteTabs: tabs }, selectTool } as unknown as UI;
+  const ui = { el: { palette, paletteTabs: tabs }, selectTool, cb: { getCatalog: () => catalogFor("classic") } } as unknown as UI;
   return { ui, palette, tabs, selectTool };
 }
 
@@ -48,6 +51,20 @@ describe("buildPalette", () => {
     expect(office.querySelector<HTMLElement>(".pal-swatch")!.getAttribute("style")).toContain("background:");
     expect(office.querySelector(".pal-cost")?.textContent?.startsWith("$")).toBe(true);
     expect(office.getAttribute("aria-label")).toContain("$");
+  });
+
+  it("reads names and prices from the tower's catalog (#921)", () => {
+    const { ui, palette } = stubUI();
+    const base = catalogFor("classic");
+    const marked = { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, name: "Corner Suite", cost: 77_000 } : f)) };
+    (ui as unknown as { cb: { getCatalog: () => typeof marked } }).cb.getCatalog = () => marked;
+    buildPalette(ui);
+    const office = palette.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
+    expect(office.querySelector(".pal-name")?.textContent).toBe("Corner Suite");
+    expect(office.querySelector(".pal-cost")?.textContent).toBe("$77k");
+    const card = renderToFragment(toolInfoFor(marked, "office")).textContent ?? "";
+    expect(card).toContain("Corner Suite");
+    expect(card).toContain("Cost: $77,000");
   });
 
   it("activates a facility build item on click and on Enter, dispatching selectTool", () => {

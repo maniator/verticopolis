@@ -1,5 +1,6 @@
 import { html, render } from "lit-html";
-import { ALL_KINDS, FACILITIES } from "../engine/facilities";
+import { FACILITIES } from "../engine/facilities";
+import { catalogFacility, type Catalog, type CatalogFacility } from "../engine/catalogTypes";
 import type { FacilityCategory, FacilityKind } from "../engine/types";
 import type { Tool, UI } from "./UI";
 import { shortMoney } from "./format";
@@ -7,8 +8,9 @@ import { iconTemplate } from "./icons";
 
 /**
  * Build-palette construction for {@link UI}, as friend functions taking the UI
- * instance. The palette is built once at construction ({@link buildPalette}); each
- * item routes back through `ui.selectTool`. Lock/afford state is a per-tick class
+ * instance. The palette is built once at construction ({@link buildPalette}) and
+ * its labels are redrawn when the tower's catalog changes ({@link relabelPalette});
+ * each item routes back through `ui.selectTool`. Lock/afford state is a per-tick class
  * scan in `uiStatus`, which also calls {@link syncPaletteTabs} to keep the mobile
  * category tabs (and their "new" pips) in step with what is unlocked.
  *
@@ -30,6 +32,8 @@ const GROUPS: { title: string; cats: FacilityCategory[] }[] = [
 ];
 
 export function buildPalette(ui: UI): void {
+  const catalog = ui.cb.getCatalog();
+  ui.paletteCatalog = catalog;
   // Pinned tools cluster: Inspect + Bulldoze, always visible (never behind a tab).
   const pinned = document.createElement("div");
   pinned.className = "pal-pinned";
@@ -45,10 +49,17 @@ export function buildPalette(ui: UI): void {
     section.className = "pal-group";
     section.dataset.group = group.title;
     section.appendChild(groupTitle(group.title, group.title));
-    const kinds = ALL_KINDS.filter((k) => group.cats.includes(FACILITIES[k].category));
-    const classic = kinds.filter((k) => !FACILITIES[k].modernOnly);
-    const modern = kinds.filter((k) => FACILITIES[k].modernOnly);
-    for (const kind of classic) section.appendChild(facilityButton(ui, kind, group.title));
+    // The catalog lists every kind in the engine's order, both modes' kinds
+    // included, and these fields read the same in both modes, so a palette
+    // built once from the first tower serves a tower of either mode. It is
+    // built before any WASM host attaches, from the TypeScript tables: the
+    // names and prices are redrawn from the tower's catalog by the status pump
+    // (relabelPalette), and the layout (kinds, groups, the Modern sub-band)
+    // relies on the catalog digests holding the two engines' catalogs equal.
+    const kinds = catalog.facilities.filter((f) => group.cats.includes(f.category));
+    const classic = kinds.filter((f) => !f.modernOnly).map((f) => f.key);
+    const modern = kinds.filter((f) => f.modernOnly).map((f) => f.key);
+    for (const kind of classic) section.appendChild(facilityButton(ui, catalog, kind, group.title));
     // Modern venues sit under their own labeled sub-band (the 1.83 Sprite Gallery
     // idea), hidden by the scan when none are unlocked (Classic, or below 3 stars).
     if (modern.length > 0) {
@@ -56,7 +67,7 @@ export function buildPalette(ui: UI): void {
       sub.classList.add("pal-sub");
       sub.dataset.subGroup = group.title;
       section.appendChild(sub);
-      for (const kind of modern) section.appendChild(facilityButton(ui, kind, group.title, true));
+      for (const kind of modern) section.appendChild(facilityButton(ui, catalog, kind, group.title, true));
     }
     groups.appendChild(section);
   }
@@ -194,21 +205,40 @@ function toolButton(ui: UI, type: "inspect" | "bulldoze", label: string, color: 
   return item;
 }
 
-function facilityButton(ui: UI, kind: FacilityKind, group: string, modern = false): HTMLElement {
-  const f = FACILITIES[kind];
+/** A facility button's swatch, name and price, and its spoken label. */
+function labelFacility(item: HTMLElement, kind: FacilityKind, f: CatalogFacility): void {
+  render(
+    html`<span class="pal-swatch" style="background:${FACILITIES[kind].color}"></span><span class="pal-name">${f.name}</span><span class="pal-cost">$${shortMoney(f.cost)}</span>`,
+    item,
+  );
+  item.setAttribute("aria-label", `${f.name}, $${shortMoney(f.cost)}`);
+}
+
+/** Redraw every facility button's name and price from `catalog`: the status
+ *  pump calls this when the tower's catalog changes (a WASM host attached or
+ *  let go, or a tower was swapped in), so the palette never shows another
+ *  engine's values (#921). */
+export function relabelPalette(ui: UI, catalog: Catalog): void {
+  ui.paletteCatalog = catalog;
+  ui.el.palette.querySelectorAll<HTMLElement>(".pal-item[data-kind]").forEach((item) => {
+    const kind = item.dataset.kind as FacilityKind;
+    labelFacility(item, kind, catalogFacility(catalog, kind));
+  });
+}
+
+function facilityButton(ui: UI, catalog: Catalog, kind: FacilityKind, group: string, modern = false): HTMLElement {
+  const f = catalogFacility(catalog, kind);
   const item = document.createElement("div");
   item.className = modern ? "pal-item pal-mod" : "pal-item";
   item.dataset.kind = kind;
   item.dataset.group = group;
-  render(
-    html`<span class="pal-swatch" style="background:${f.color}"></span><span class="pal-name">${f.name}</span><span class="pal-cost">$${shortMoney(f.cost)}</span>`,
-    item,
-  );
+  labelFacility(item, kind, f);
   // Locked facilities are hidden from the palette entirely (parity with the
   // original), so a visible button is never locked, no locked toast path.
   // (A visible button may still be unaffordable; the engine build guard, not
   // this palette, rejects a placement the player can't pay for.)
-  makeActivatable(item, `${f.name}, $${shortMoney(f.cost)}`, () => {
+  // labelFacility wrote the spoken label; makeActivatable keeps it.
+  makeActivatable(item, item.getAttribute("aria-label") ?? f.name, () => {
     ui.selectTool({ type: "build", kind });
   });
   return item;

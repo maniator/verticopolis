@@ -1,0 +1,18 @@
+[package]
+name = "verticopolis-engine-consumer"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.97"
+publish = false
+description = "A frontend-free host of the Verticopolis engine: the smoke test that the crate builds and runs on its own"
+
+# Its own workspace root, so cargo resolves it the way a project outside this
+# repository would: one path dependency on the engine and nothing from the
+# web game (no Node.js, no package.json, no src/).
+[workspace]
+
+[dependencies]
+# Default features only: the `wasm` feature (the JavaScript binding) stays
+# off, and CI checks that wasm-bindgen is not in this tree.
+verticopolis-engine = { path = ".." }
+serde_json = "1.0.151"

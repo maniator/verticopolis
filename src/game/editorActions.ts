@@ -1,10 +1,13 @@
 import type { Simulation } from "../engine/Simulation";
-import { FACILITIES, isElevatorKind, isHotelKind } from "../engine/facilities";
+import { isElevatorKind, isHotelKind } from "../engine/facilities";
+import { catalogFacility } from "../engine/catalogTypes";
+import { priceOptionsFor } from "../ui/catalogPricing";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import type { BuildActions } from "./buildActions";
 import { NOT_ENOUGH_MONEY } from "../engine/sim/charges";
+import { towerCatalog } from "../engine/towerCatalog";
 
 /**
  * The editor-card actions: everything the selected facility's buttons can do
@@ -120,7 +123,7 @@ export class EditorActions {
     };
     this.deps.ui.showElevatorScheduleDialog(
       {
-        title: `Schedule: ${FACILITIES[t.kind].name} (floors ${t.bottom}-${t.top})`,
+        title: `Schedule: ${catalogFacility(towerCatalog(sim), t.kind).name} (floors ${t.bottom}-${t.top})`,
         ux: sim.rules.elevatorScheduleUX(),
         isExpress: t.kind === "elevatorExpress",
         cars: t.cars,
@@ -193,10 +196,11 @@ export class EditorActions {
    *  dialog renders a rung picker or the range editor off the SHAPE of the
    *  mode's price options, never the mode string. */
   private openBatchPricing(kind: FacilityKind): void {
-    const options = this.deps.getSim().rules.priceOptions(kind);
+    const catalog = towerCatalog(this.deps.getSim());
+    const options = priceOptionsFor(catalog, kind);
     if (!options) return;
     this.deps.ui.showBatchPricingDialog(
-      { kind, kindLabel: FACILITIES[kind].name, options },
+      { kind, kindLabel: catalogFacility(catalog, kind).name, options },
       {
         preview: (target, opts) => this.deps.getSim().previewRentBatch(kind, target, opts)!,
         apply: (target, opts) => {
@@ -263,7 +267,7 @@ export class EditorActions {
         // market (charges nothing, blocks move-ins, never evicts). Announced
         // with the pinned strings (ux-pricing-split-editor §1.4 / §5).
         const sel = root.querySelector<HTMLSelectElement>("#ed-rung");
-        const shape = sim.rules.priceOptions(u.kind);
+        const shape = priceOptionsFor(towerCatalog(sim), u.kind);
         if (sel && shape?.shape === "ladder") {
           if (sel.value === "noRate") {
             if (sim.setNoRate(u.id)) {
