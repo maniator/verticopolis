@@ -39,18 +39,26 @@ fn build_result(r: crate::build::BuildResult) -> String {
     outcome(r.ok, r.reason.as_deref())
 }
 
-/// A resize result as `{ ok, reason?, added, floorTilesCreated }`.
+/// A resize result as TypeScript spells it: `{ ok: true, added,
+/// floorTilesCreated }`, or `{ ok: false, reason }` for a refusal (#996).
 fn resize_json(r: crate::tower::ResizeResult) -> String {
-    let mut v = serde_json::json!({
-        "ok": r.ok,
+    if !r.ok {
+        let mut v = serde_json::json!({ "ok": false });
+        if let Some(reason) = r.reason {
+            v["reason"] = Value::String(reason);
+        }
+        return v.to_string();
+    }
+    serde_json::json!({
+        "ok": true,
         "added": r.added,
         "floorTilesCreated": r.floor_tiles_created,
-    });
-    if let Some(reason) = r.reason {
-        v["reason"] = Value::String(reason);
-    }
-    v.to_string()
+    })
+    .to_string()
 }
+
+#[path = "wasm_relay.rs"]
+mod relay;
 
 /// `canBuild`'s answer as the TypeScript spells it: `{ ok, reason?, cost }`.
 fn can_build_json(ok: bool, reason: Option<&str>, cost: f64) -> String {
@@ -438,9 +446,16 @@ impl Engine {
         )))
     }
 
+    /// `sellAt(floor, x)`: whether a facility went. Read raw (#996): a floor
+    /// or column that is not a whole JS number within `Number.isSafeInteger`
+    /// is refused with `false`, never coerced.
     #[wasm_bindgen(js_name = sellAt)]
-    pub fn sell_at(&mut self, floor: i32, x: i32) -> bool {
-        self.sim.sell_at(floor.into(), x.into())
+    pub fn sell_at(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] floor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] x: JsValue,
+    ) -> bool {
+        self.sell_at_checked(floor.as_f64(), x.as_f64())
     }
 
     /// The unit covering a tile, serialized as the save would, or null.
@@ -461,39 +476,67 @@ impl Engine {
             .map(|t| t.serialize().to_string())
     }
 
-    /// `adjustRent(id, dir)`: the new rent, or null when nothing moved.
+    /// `adjustRent(id, dir)`: the new rent, or null when nothing moved. Read
+    /// raw (#996): an id that is not a whole JS number within
+    /// `Number.isSafeInteger`, or a `dir` that is not exactly 1 or -1, is
+    /// refused with null.
     #[wasm_bindgen(js_name = adjustRent)]
-    pub fn adjust_rent(&mut self, id: i32, dir: i32) -> Option<f64> {
-        self.sim.adjust_rent(id.into(), dir.into())
+    pub fn adjust_rent(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] dir: JsValue,
+    ) -> Option<f64> {
+        self.adjust_rent_checked(id.as_f64(), dir.as_f64())
     }
 
+    /// `setNoRate(id)`: whether the unit is now off the market. The id is
+    /// read raw (#996), as for `sellAt`.
     #[wasm_bindgen(js_name = setNoRate)]
-    pub fn set_no_rate(&mut self, id: i32) -> bool {
-        self.sim.set_no_rate(id.into())
+    pub fn set_no_rate(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+    ) -> bool {
+        self.set_no_rate_checked(id.as_f64())
     }
 
     /// `setCars(id, cars)`: the simulation-layer edit, which reports
-    /// `capacity_changed`.
+    /// `capacity_changed`. Read raw (#996): an id or count that is not a
+    /// whole JS number within `Number.isSafeInteger` is refused with `false`.
     #[wasm_bindgen(js_name = setCars)]
-    pub fn set_cars(&mut self, id: i32, cars: i32) -> bool {
-        self.sim.set_cars(id.into(), cars.into())
+    pub fn set_cars(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] cars: JsValue,
+    ) -> bool {
+        self.set_cars_checked(id.as_f64(), cars.as_f64())
     }
 
     /// `tower.setCars(id, cars)`: the bare tower edit, silent in both
     /// engines (#906). Relay-only: the dual-run mirror replays a bare
     /// TypeScript tower edit with it. Player and UI edits use the charge commands
     /// (`addCar`, `removeCar`, `extendTransport`), and
-    /// `towerRelayOps.guard.test.ts` keeps other callers out.
+    /// `towerRelayOps.guard.test.ts` keeps other callers out. Read raw
+    /// (#996), as `setCars`.
     #[wasm_bindgen(js_name = towerSetCars)]
-    pub fn tower_set_cars(&mut self, id: i32, cars: i32) -> bool {
-        self.sim.tower.set_cars(id.into(), cars.into())
+    pub fn tower_set_cars(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] cars: JsValue,
+    ) -> bool {
+        self.tower_set_cars_checked(id.as_f64(), cars.as_f64())
     }
 
-    /// `Tower.setSchedule(id, schedule)` with the schedule as JSON text.
+    /// `Tower.setSchedule(id, schedule)` with the schedule as JSON text. The
+    /// id is read raw (#996): one that is not a whole JS number within
+    /// `Number.isSafeInteger` is refused with `false` before the text is read.
     #[wasm_bindgen(js_name = setSchedule)]
-    pub fn set_schedule(&mut self, id: i32, schedule: &str) -> Result<bool, JsError> {
-        let raw: Value = serde_json::from_str(schedule).map_err(err)?;
-        Ok(self.sim.tower.set_schedule(id.into(), &raw))
+    pub fn set_schedule(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        schedule: &str,
+    ) -> Result<bool, JsError> {
+        self.set_schedule_checked(id.as_f64(), schedule)
+            .map_err(err)
     }
 
     /// `toggleAutoBridge()`: the preference after the flip.
@@ -535,25 +578,31 @@ impl Engine {
     }
 
     /// `resizeTransport(id, bottom, top)`, the simulation-layer edit that
-    /// reports `capacity_changed`: JSON
-    /// `{ ok, reason?, added, floorTilesCreated }`.
+    /// reports `capacity_changed`: JSON `{ ok: true, added,
+    /// floorTilesCreated }` or `{ ok: false, reason }`. Read raw (#996): an
+    /// id or floor that is not a whole JS number within
+    /// `Number.isSafeInteger` is refused with `INVALID_REQUEST`.
     #[wasm_bindgen(js_name = resizeTransport)]
-    pub fn resize_transport(&mut self, id: i32, bottom: i32, top: i32) -> String {
-        let r = self
-            .sim
-            .resize_transport(id.into(), bottom.into(), top.into());
-        resize_json(r)
+    pub fn resize_transport(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bottom: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] top: JsValue,
+    ) -> String {
+        self.resize_checked(id.as_f64(), bottom.as_f64(), top.as_f64())
     }
 
     /// `tower.resizeTransport(id, bottom, top)`, the bare tower edit, silent
-    /// in both engines (#906): the same JSON. Relay-only, as `towerSetCars`.
+    /// in both engines (#906): the same JSON, read raw the same way (#996).
+    /// Relay-only, as `towerSetCars`.
     #[wasm_bindgen(js_name = towerResizeTransport)]
-    pub fn tower_resize_transport(&mut self, id: i32, bottom: i32, top: i32) -> String {
-        let r = self
-            .sim
-            .tower
-            .resize_transport(id.into(), bottom.into(), top.into());
-        resize_json(r)
+    pub fn tower_resize_transport(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bottom: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] top: JsValue,
+    ) -> String {
+        self.tower_resize_checked(id.as_f64(), bottom.as_f64(), top.as_f64())
     }
 
     /// `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
@@ -632,9 +681,18 @@ impl Engine {
         self.sim.tower.remove_transport(id.into()).is_some()
     }
 
+    /// `tower.setStop(id, floor, stop)`: whether the stop is set. Read raw
+    /// (#996): an id or floor that is not a whole JS number within
+    /// `Number.isSafeInteger`, or a `stop` that is not a JS boolean, is
+    /// refused with `false`.
     #[wasm_bindgen(js_name = setStop)]
-    pub fn set_stop(&mut self, id: i32, floor: i32, stop: bool) -> bool {
-        self.sim.tower.set_stop(id.into(), floor.into(), stop)
+    pub fn set_stop(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] floor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "boolean")] stop: JsValue,
+    ) -> bool {
+        self.set_stop_checked(id.as_f64(), floor.as_f64(), stop.as_bool())
     }
 
     #[wasm_bindgen(js_name = setExpressStops)]
