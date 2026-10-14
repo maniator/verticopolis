@@ -310,6 +310,7 @@ describe("analytics engine bridge", () => {
     // the action are left out by the pattern, which looks for the value as code.
     const src = dirname(fileURLToPath(import.meta.url));
     const files = readdirSync(src, { recursive: true, encoding: "utf8" })
+      .map((f) => f.replace(/\\/g, "/")) // Windows joins with backslashes
       .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.endsWith(".d.ts"))
       .filter((f) => f !== "analyticsEngineBridge.ts");
     expect(files).toContain("game/buildActions.ts");
