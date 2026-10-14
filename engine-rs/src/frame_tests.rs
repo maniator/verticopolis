@@ -86,7 +86,7 @@ fn the_named_slots_read_their_values() {
     for (i, a) in values.iter().enumerate() {
         assert!(
             values[i + 1..].iter().all(|b| b != a),
-            "header values must differ to tell their slots apart: {values:?}"
+            "header values must differ to tell their slots apart; if a live count (people, units, shafts) now equals a set value, set that value apart again: {values:?}"
         );
     }
     for (slot, value) in want {
@@ -115,6 +115,10 @@ fn walk_records(sim: &Simulation, v: &[f64]) {
         if i == 0 {
             assert_eq!(p.state, PState::Dwelling);
             let want = [
+                (person::SEED, 2010.0),
+                (person::FLOOR, 2011.0),
+                (person::X, 2012.0),
+                (person::ORIGIN_FLOOR, 2013.0),
                 (person::STAFF, 1.0),
                 (person::STATE, 5.0),
                 (person::FY, 2001.0),
@@ -147,6 +151,7 @@ fn walk_records(sim: &Simulation, v: &[f64]) {
         assert_eq!(r[unit::OCCUPANTS], u.occupants as f64);
         if i == 0 {
             for (slot, value) in [
+                (unit::ID, 3005.0),
                 (unit::STATE, 7.0),
                 (unit::OCCUPANTS, 3001.0),
                 (unit::CUSTOMERS_IN, 3002.0),
@@ -189,6 +194,10 @@ fn walk_records(sim: &Simulation, v: &[f64]) {
 fn set_apart(sim: &mut Simulation) {
     use crate::crowd::PState;
     let p = &mut sim.crowd.people[0];
+    p.seed = 2010;
+    p.floor = 2011;
+    p.x = 2012.0;
+    p.origin_floor = 2013;
     p.staff = true;
     p.state = PState::Dwelling;
     p.fy = 2001.0;
@@ -201,6 +210,7 @@ fn set_apart(sim: &mut Simulation) {
     p.returning = true;
     p.dwell_seconds_left = Some(2006.0);
     let u = &mut sim.tower.units[0];
+    u.id = 3005;
     u.state = crate::tower::UnitState::Infested;
     u.occupants = 3001;
     u.customers_in = Some(3002);

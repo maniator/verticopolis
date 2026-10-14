@@ -61,7 +61,7 @@ cd engine-rs
 cargo test                                  # unit tests (rng, number formatting, hash)
 # The referee and the tools below are the `conformance` feature.
 cargo run --release --features conformance --bin conformance       # replay every scenario against expected.json
-cargo llvm-cov --no-report test && cargo llvm-cov --no-report run --features conformance --bin conformance \
+cargo llvm-cov --no-report test --features conformance && cargo llvm-cov --no-report run --features conformance --bin conformance \
   && cargo llvm-cov report               # what the tests and the referee reach; CI floors lines at 87%
 cargo run --release --features conformance --bin dump -- starter-classic t+60   # canonical JSON of one checkpoint
 cargo run --release --features conformance --bin tdt                 # replay every .TDT case against conformance/tdt-cases.json

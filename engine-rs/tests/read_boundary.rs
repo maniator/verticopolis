@@ -7,12 +7,12 @@ mod scan;
 use scan::{crate_dir, parts, rel, rust_files, Part};
 
 /// Calls that step up a directory without a `..` literal. The guard reports
-/// each one; a file that needs one lists it in [`REFUSED_EXAMPLES`] with why.
+/// each one; a file that needs one lists it in [`REFUSED_EXAMPLES`].
 const CLIMBS_IN_CODE: &[&str] = &[
     ".parent()",
     ".ancestors()",
-    "::parent(",
-    "::ancestors(",
+    "::parent",
+    "::ancestors",
     "ParentDir",
 ];
 

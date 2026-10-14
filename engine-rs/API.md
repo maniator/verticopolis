@@ -75,9 +75,9 @@ from anything but a `.rs` file under `src/` outside `src/bin/`, and fails
 when the engine's or the consumer's `Cargo.lock` names
 a crate nobody reviewed for host access. It also checks that the harness
 modules and every binary sit behind the `conformance` feature.
-`tests/read_boundary.rs` checks that a `..` path in the crate's tests,
-binaries or consumer leads only to `conformance/`, and that none of them
-steps up a directory in code (`.parent()`, `.ancestors()`, `ParentDir`). Both
+`tests/read_boundary.rs` checks every Rust file in the crate and the
+consumer: a `..` path leads only to `conformance/`, and no code steps up a
+directory another way (`parent`, `ancestors`, `ParentDir`). Both
 read source text, so they catch the ordinary spellings; review still owns
 the rest.
 
@@ -103,7 +103,7 @@ tier 2, the harness a host uses to prove conformance.
 | Save | `load::encode_simulation_vctower(&sim, app_version, saved_at_ms)`: the `.vctower` bytes the web game writes. A host that holds the save JSON (`sim.serialize()`) gets the same file from `load::stamp_save(&mut save, app_version, saved_at_ms)` then `load::encode_vctower(&save)` |
 | Load | `load::decode_vctower(text)`, then `load::deserialize(&save)`, then `load::mark_founder_from_loaded_file(&mut sim, &save)`, which marks a file with no build stamp as a founder's tower the way the web game does (skip it and a host drops that status on its next save) |
 | 1994 saves | `import_tdt(bytes, filename)` and `export_tdt(save_json)` |
-| Conformance (tier 2, the `conformance` feature) | `scenario::Scenario::parse` and `scenario::run_scenario(&scenario, suite)`, compared with `expected.json` (as `consumer/` does for every scenario), or `cargo run --features conformance --bin conformance` from this directory for the whole suite. `suite` is the conformance directory under any name (before stage 4 these runners took the repository root, and a root passed now fails to find its fixtures): a scenario names its fixture `conformance/fixtures/...`, and `suite::fixture_path` reads that first step as the suite itself and refuses a name that leaves it |
+| Conformance (tier 2, the `conformance` feature) | `scenario::Scenario::parse` and `scenario::run_scenario(&scenario, suite)`, compared with `expected.json` (as `consumer/` does for every scenario), or `cargo run --features conformance --bin conformance` from this directory for the whole suite. `suite` is the conformance directory under any name (before stage 4 these runners took the repository root; a scenario that starts from a fixture now refuses a root, with a message naming the mistake, and a new-game scenario reads nothing from the suite): a scenario names its fixture `conformance/fixtures/...`, and `suite::fixture_path` reads that first step as the suite itself and refuses a name that leaves it |
 
 Two behaviors a host should know:
 

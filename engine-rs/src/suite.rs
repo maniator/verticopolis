@@ -23,11 +23,15 @@ pub fn fixture_path(suite: &Path, fixture: &str) -> Result<PathBuf, String> {
     }
     fixture
         .strip_prefix("conformance/")
-        .map(Path::new)
+        // The text first: `components()` drops a `.` or an empty step in the
+        // middle of a name, and the rule is that a name has none. A step of
+        // dots alone (empty, `.`, `..`) is refused.
         .filter(|rest| {
-            rest.components().next().is_some()
-                && rest.components().all(|c| matches!(c, Component::Normal(_)))
+            rest.split(['/', '\\'])
+                .all(|step| !step.chars().all(|c| c == '.'))
         })
+        .map(Path::new)
+        .filter(|rest| rest.components().all(|c| matches!(c, Component::Normal(_))))
         .map(|rest| suite.join(rest))
         .ok_or_else(|| {
             format!("{fixture}: a fixture is named conformance/<a path inside the suite>")
@@ -59,6 +63,9 @@ mod tests {
             "conformance/../src/a.vctower",
             "conformance/fixtures/../../a.vctower",
             "conformance/./fixtures/a.vctower",
+            "conformance/fixtures/./a.vctower",
+            "conformance/fixtures//a.vctower",
+            "conformance/fixtures/",
             "conformance//etc/passwd",
             "/conformance/fixtures/a.vctower",
         ] {
