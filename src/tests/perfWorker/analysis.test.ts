@@ -204,7 +204,7 @@ describe("perf:worker analysis", () => {
     expect(makeConfig(parseArgs(["--viewport", "1280x720"]), ["small"]).viewport).toEqual({ width: 1280, height: 720 });
     for (const bad of ["1280", "1280x", "x720", "1280X720", "100x100", "9000x720", "1280x720x1"]) expect(() => parseArgs(["--viewport", bad])).toThrow(/WIDTHxHEIGHT/);
     expect(() => parseArgs(["--viewport"])).toThrow(/needs a value/);
-    expect(limitations(makeConfig(parseArgs([]), ["small"])).join("\n")).toMatch(/640x360 CSS viewport \(the default.*so at that size no mode simulated/);
+    expect(limitations(makeConfig(parseArgs([]), ["small"])).join("\n")).toMatch(/640x360 CSS viewport \(the default.*so at that size the modes simulated almost nothing/);
     expect(limitations(makeConfig(parseArgs(["--viewport", "1280x720"]), ["small"])).join("\n")).toMatch(/1280x720 CSS viewport \(set with --viewport\)\. A frame longer than 200 ms/);
   });
 });

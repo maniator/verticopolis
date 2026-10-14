@@ -4,7 +4,7 @@ import { drainFixedSteps, syncStepMode, type StepDebt } from "../engine/sim/fixe
 import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
 import { tickInstallAffordance } from "./installAffordance";
-import { hasBlockingModal, isEditorBusy, isSplashUp } from "./interactionState";
+import { hasBlockingModal, isEditorBusy, isEngineStopped, isSplashUp } from "./interactionState";
 import { positionPanels } from "./panelAnchoring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
 import { gameplaySession } from "../analytics";
@@ -96,6 +96,15 @@ export function advanceOwedMinutes(host: { sim: { tick(dtMinutes: number): void;
 }
 
 export function runFrame(app: GameApp, dtMs: number): void {
+  // A wasm-only build stopped on its engine: no engine holds the tower, so
+  // time stops for good (the speed buttons and keys cannot restart it), and
+  // a stopped game samples no frames for the session either. Events the
+  // engine emitted before it stopped still reach analytics.
+  if (isEngineStopped()) {
+    drainEngineEvents(app.sim);
+    app.accMinutes = 0;
+    return;
+  }
   // Sample the rendered frame-rate for the session_fps signal (#538). noteFrame
   // reads its OWN wall-clock delta (not the `dtMs` the engine passes: that value
   // is spike-clamped to 1ms for any frame over 200ms, which would hide the very

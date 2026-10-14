@@ -91,7 +91,7 @@ jobs:
 
       # The Rust engine (engine-rs/) builds on the same toolchain engine-rs.yml
       # pins, with the conformance referee compiled in release so an agent can
-      # run `cargo run --release --bin conformance` at once. Each step is
+      # run `cargo run --release --features conformance --bin conformance` at once. Each step is
       # continue-on-error: a toolchain hiccup must not keep the agent from
       # starting on the TypeScript side.
       - name: Rust toolchain (pinned to engine-rs.yml)
@@ -105,4 +105,5 @@ jobs:
         working-directory: engine-rs
         run: |
           cargo build --locked --all-targets
-          cargo build --locked --release --bin conformance --bin dump
+          cargo build --locked --all-targets --features conformance
+          cargo build --locked --release --features conformance --bin conformance --bin dump

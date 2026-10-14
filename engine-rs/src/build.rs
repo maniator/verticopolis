@@ -260,20 +260,64 @@ impl Simulation {
         }
     }
 
-    pub fn build_transport(&mut self, kind: Kind, x: i64, bottom: i64, top: i64) -> BuildResult {
+    /// The dry run `build_transport` makes first: whether a shaft of `kind`
+    /// at `x` spanning `bottom..=top` would be placed, and its full price.
+    /// An elevator costs the catalog `cost` plus `transportFloorCost` for
+    /// each floor past its first; stairs and escalators cost the catalog
+    /// `cost`. Refusals come in `build_transport`'s order (locked, then money,
+    /// then placement) with its reasons, and every answer carries the price
+    /// `build_transport` checks the balance against. That price is the
+    /// shaft's only for a transport kind with `top` above `bottom`: an
+    /// inverted span prices below the base, and a room kind at its own
+    /// price, and both are refused by the placement rules (as the
+    /// TypeScript `buildTransport` refuses them, after the same money check).
+    pub fn can_build_transport(&self, kind: Kind, x: i64, bottom: i64, top: i64) -> CanBuild {
         let f = kind.facility();
-        if !self.is_unlocked(kind) {
-            return BuildResult::fail(format!("{} unlocks at {}★.", f.name, f.min_star));
-        }
-        let span = top - bottom;
+        // Saturating, as are the placement checks, so an out-of-range span
+        // from a native host prices without overflowing: an elevator's price
+        // then outruns any ordinary balance, so the money check refuses it
+        // (failing that, the span rule does), and a fixed-price shaft reaches
+        // the placement rules. Any span the tower can hold is exact.
+        let span = top.saturating_sub(bottom);
         let extra = if kind.is_elevator() {
             span as f64 * crate::charges::TRANSPORT_FLOOR_COST
         } else {
             0.0
         };
-        let total = f.cost + extra;
-        if self.money < total {
-            return BuildResult::fail("Not enough money.");
+        let cost = f.cost + extra;
+        let refuse = |reason: String| CanBuild {
+            ok: false,
+            reason: Some(reason),
+            cost,
+        };
+        if !self.is_unlocked(kind) {
+            return refuse(format!("{} unlocks at {}★.", f.name, f.min_star));
+        }
+        if self.money < cost {
+            return refuse("Not enough money.".into());
+        }
+        let v = self.tower.validate_transport(kind, x, bottom, top);
+        if !v.ok {
+            return CanBuild {
+                ok: false,
+                reason: v.reason,
+                cost,
+            };
+        }
+        CanBuild {
+            ok: true,
+            reason: None,
+            cost,
+        }
+    }
+
+    pub fn build_transport(&mut self, kind: Kind, x: i64, bottom: i64, top: i64) -> BuildResult {
+        let quote = self.can_build_transport(kind, x, bottom, top);
+        if !quote.ok {
+            return BuildResult {
+                ok: false,
+                reason: quote.reason,
+            };
         }
         let res = self.tower.place_transport(kind, x, bottom, top);
         if !res.ok {
@@ -282,7 +326,7 @@ impl Simulation {
                 reason: res.reason,
             };
         }
-        self.money -= total;
+        self.money -= quote.cost;
         self.gameplay.push(GameplayEvent::FacilityPlaced {
             kind,
             floor: top,
@@ -352,22 +396,5 @@ impl Simulation {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::clock::GameMode;
-    use crate::facilities::Kind;
-    use crate::sim::Simulation;
-
-    /// `canBuild` sends every kind that is not a room down the structural
-    /// branch, where a transport is refused by name, as the TypeScript does.
-    #[test]
-    fn can_build_refuses_a_transport_kind_by_name() {
-        let sim = Simulation::new_game(1, GameMode::Classic);
-        let c = sim.can_build(Kind::ElevatorStandard, 1, 180);
-        assert!(!c.ok);
-        assert_eq!(
-            c.reason.as_deref(),
-            Some("Use placeTransport for vertical transport.")
-        );
-        assert_eq!(c.cost, Kind::ElevatorStandard.facility().cost);
-    }
-}
+#[path = "build_tests.rs"]
+mod tests;

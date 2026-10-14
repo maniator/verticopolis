@@ -112,6 +112,20 @@ describe("runFrame freeze path", () => {
     expect(sim.tick).not.toHaveBeenCalled();
   });
 
+  it("stops time for good once a wasm-only build has stopped on its engine, whatever the speed", () => {
+    const { app, raw, sim } = makeApp({ accMinutes: 7 });
+    const stop = document.createElement("div");
+    stop.id = "engine-failure";
+    document.body.appendChild(stop);
+    try {
+      runFrame(app, 1000);
+      expect(raw.accMinutes).toBe(0);
+      expect(sim.tick).not.toHaveBeenCalled();
+    } finally {
+      stop.remove();
+    }
+  });
+
   it("still samples the frame for session_fps before the freeze returns early", () => {
     // noteFrame is a render metric, so it must run on every frame INCLUDING the
     // ones a modal freeze bails out on. This guards the call-ordering: a refactor

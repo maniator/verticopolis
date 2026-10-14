@@ -37,6 +37,16 @@ export function isCrashed(): boolean {
   return !!document.getElementById(CRASH_SCREEN_ID);
 }
 
+/** The engine-failure message's element id (bootstrap.ts renders it). */
+export const ENGINE_FAILURE_ID = "engine-failure";
+
+/** A wasm-only build stopped on its engine (the engine-failure message from
+ *  bootstrap.ts is up): no engine holds the tower, so nothing may advance,
+ *  change or save it. Read like the crash card, from its element. */
+export function isEngineStopped(): boolean {
+  return !!document.getElementById(ENGINE_FAILURE_ID);
+}
+
 /**
  * The title screen is up. This is the single answer to that question for the
  * whole app. `Onboarding` mounts and tears down `#splash` as one operation, so

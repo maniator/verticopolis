@@ -146,7 +146,7 @@ export function loadFixture(file: string): Simulation {
 }
 
 /** Every save under the fixtures directory, so a new one is covered. */
-export const FIXTURES = readdirSync(resolve(REPO_ROOT, "src/tests/fixtures"))
+export const FIXTURES = readdirSync(resolve(REPO_ROOT, "conformance/fixtures"))
   .filter((f) => f.endsWith(".vctower"))
   .sort()
-  .map((f) => `src/tests/fixtures/${f}`);
+  .map((f) => `conformance/fixtures/${f}`);

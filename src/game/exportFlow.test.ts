@@ -19,18 +19,28 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function fakeUi() {
+/** `downloadStarts` is what each download reports, in call order (default:
+ *  every download starts). A `false` stands in for `UI.downloadFile` having
+ *  already toasted its own failure. */
+function fakeUi(downloadStarts: boolean[] = []) {
   const toasts: { text: string; kind: string }[] = [];
+  // What reached the player through sayVisibly (which falls back to a toast in the real UI).
+  const said: { text: string; kind: string }[] = [];
   const downloads: { filename: string; contents: string | Uint8Array }[] = [];
   return {
     toasts,
+    said,
     downloads,
     ui: {
+      sayVisibly: (text: string, kind?: string) => {
+        said.push({ text, kind: kind ?? "bad" });
+      },
       toast: (text: string, kind?: string) => {
         toasts.push({ text, kind: kind ?? "info" });
       },
-      downloadFile: (filename: string, contents: string | Uint8Array): void => {
+      downloadFile: (filename: string, contents: string | Uint8Array): boolean => {
         downloads.push({ filename, contents });
+        return downloadStarts.shift() ?? true;
       },
     },
   };
@@ -44,6 +54,7 @@ const HUNG_TOAST = { text: "The export is not responding. You can try exporting 
 // The size line for the 13-byte payload these tests mock into SaveGame.export
 // ("VCTOWER1\nfake" rounds to 0.0 KB).
 const LIVE_TOAST = { text: "Tower exported (0.0 KB). Check your downloads.", kind: "good" };
+const LATE_TOAST = { text: "The earlier export finished after all (0.0 KB). Check your downloads.", kind: "good" };
 
 beforeEach(() => {
   resetExportFlowForTests();
@@ -70,6 +81,19 @@ describe("export single-flight latch (GH #760)", () => {
     expect(toasts).toHaveLength(1);
     expect(toasts[0]!.kind).toBe("good");
     expect(toasts[0]!.text).toMatch(/^Tower exported \(\d+\.\d KB\)\. Check your downloads\.$/);
+  });
+
+  it("REGRESSION (GH #997): a download that failed gets no success toast, and the latch frees", async () => {
+    vi.spyOn(SaveGame, "export").mockResolvedValue("VCTOWER1\nfake");
+    const { ui, toasts, downloads } = fakeUi([false]);
+    await runExportFlow(flowDeps(ui), () => {});
+    expect(downloads).toHaveLength(1);
+    // UI.downloadFile already toasted the failure; the flow adds nothing.
+    expect(toasts).toEqual([]);
+    // The next export runs and succeeds normally.
+    await runExportFlow(flowDeps(ui), () => {});
+    expect(downloads).toHaveLength(2);
+    expect(toasts).toEqual([LIVE_TOAST]);
   });
 
   it("REGRESSION: a second export while the first is compressing is a quiet no-op", async () => {
@@ -147,13 +171,40 @@ describe("export single-flight latch (GH #760)", () => {
     retry.resolve("VCTOWER1\nfake");
     await second;
     expect(downloads).toHaveLength(2);
-    expect(toasts).toEqual([HUNG_TOAST, LIVE_TOAST, LIVE_TOAST]);
+    expect(toasts).toEqual([HUNG_TOAST, LATE_TOAST, LIVE_TOAST]);
+  });
+
+  it("REGRESSION (GH #997): an export that settles after the watchdog says it finished after all", async () => {
+    vi.useFakeTimers();
+    const slow = deferred<string>();
+    vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise);
+    const { ui, toasts, downloads } = fakeUi();
+    const run = runExportFlow(flowDeps(ui), () => {});
+    await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
+    slow.resolve("VCTOWER1\nfake");
+    await run;
+    expect(downloads).toHaveLength(1);
+    expect(toasts).toEqual([HUNG_TOAST, LATE_TOAST]);
+  });
+
+  it("a late settle whose download fails ends on the failure alone, with no success line", async () => {
+    vi.useFakeTimers();
+    const slow = deferred<string>();
+    vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise);
+    const { ui, toasts, downloads } = fakeUi([false]);
+    const run = runExportFlow(flowDeps(ui), () => {});
+    await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
+    slow.resolve("VCTOWER1\nfake");
+    await run;
+    expect(downloads).toHaveLength(1);
+    // The fake stands in for UI.downloadFile, which has already toasted its failure.
+    expect(toasts).toEqual([HUNG_TOAST]);
   });
 });
 
 describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", () => {
-  it("REGRESSION: a second legacy download while the first is open is a quiet no-op, and the latch frees on settle", async () => {
-    const { ui } = fakeUi();
+  it("REGRESSION: a second legacy download while the first is open runs nothing, and the latch frees on settle", async () => {
+    const { ui, toasts, said } = fakeUi();
     const gate = deferred<void>();
     let downloads = 0;
     const dl = () => {
@@ -161,11 +212,14 @@ describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", (
       return gate.promise;
     };
     const first = runLegacyDownload(ui, dl);
-    // A second legacy export fired while the first is still settling: no second download.
-    await runLegacyDownload(ui, dl);
+    // A second legacy export fired while the first is still settling: no second
+    // download, and no message, since the player's own download is the one running.
+    expect(await runLegacyDownload(ui, dl)).toBe(false);
     expect(downloads).toBe(1);
+    expect(said).toEqual([]);
+    expect(toasts).toEqual([]);
     gate.resolve();
-    await first;
+    expect(await first).toBe(true);
     // Latch freed on settle: the next legacy download runs.
     await runLegacyDownload(ui, () => {
       downloads++;
@@ -174,8 +228,28 @@ describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", (
     expect(downloads).toBe(2);
   });
 
+  it("REGRESSION (GH #1012): a .TDT download clicked while a .vctower export runs says why nothing happened", async () => {
+    const slow = deferred<string>();
+    vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise);
+    const { ui, toasts, said, downloads } = fakeUi();
+    const vctower = runExportFlow(flowDeps(ui), () => {});
+    let legacy = 0;
+    const ran = await runLegacyDownload(ui, () => {
+      legacy++;
+    });
+    expect(ran).toBe(false);
+    expect(legacy).toBe(0);
+    // Through sayVisibly: closing the report dialog can reopen a queued one over a plain toast.
+    expect(said).toEqual([{ text: "Another export is still running. Try again when it finishes.", kind: "info" }]);
+    // The .vctower export that held the latch still finishes and announces itself.
+    slow.resolve("VCTOWER1\nfake");
+    await vctower;
+    expect(downloads).toHaveLength(1);
+    expect(toasts).toEqual([LIVE_TOAST]);
+  });
+
   it("a legacy download and a .vctower export are mutually exclusive on the shared latch", async () => {
-    const { ui, downloads } = fakeUi();
+    const { ui, downloads, said } = fakeUi();
     const gate = deferred<void>();
     let legacy = 0;
     const held = runLegacyDownload(ui, () => {
@@ -187,6 +261,8 @@ describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", (
     await runExportFlow(flowDeps(ui), () => {});
     expect(legacy).toBe(1);
     expect(downloads).toEqual([]);
+    // ...and quietly: the #1012 message is only for a .TDT click.
+    expect(said).toEqual([]);
     gate.resolve();
     await held;
   });

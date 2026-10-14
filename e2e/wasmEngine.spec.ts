@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect } from "@playwright/test";
-import { WASM_PROJECT, expectEngineHosted } from "./helpers";
+import { onWasm, expectEngineHosted } from "./helpers";
 
 // On chromium-wasm every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
@@ -51,7 +51,7 @@ test("the game runs on the WASM engine behind ?engine=wasm", async ({ page }) =>
  * and the two balances agree after every step. A refusal moves neither.
  */
 test("the car, extend and removal commands charge inside the WASM engine", async ({ page }, info) => {
-  test.skip(info.project.name !== WASM_PROJECT, "the hosted engine runs on the chromium-wasm project");
+  test.skip(!onWasm(info.project.name), "the hosted engine runs on the chromium-wasm and chromium-wasm-only projects");
   await page.goto("/?engine=wasm");
   await page.waitForFunction(() => {
     const w = window as unknown as { __vcEngine?: { status: { hosted: boolean } }; game?: { sim: unknown } };
