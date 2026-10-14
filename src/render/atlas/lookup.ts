@@ -2,7 +2,8 @@ import { hasBusinessHours, isOpenAt } from "../../engine/facilities";
 import { subtypeListFor } from "../../engine/retailSubtypes";
 import type { FacilityKind, UnitState } from "../../engine/types";
 import { rand } from "../sprites/common";
-import { LATE_NIGHT_KINDS, OCCUPANT_FREE, PARKING_CAR_COLORS, RECYCLE_BREAKS, RECYCLE_STEPS, isLateHour } from "./catalog";
+import { LATE_NIGHT_KINDS, isLateHour } from "../lateNight";
+import { OCCUPANT_FREE, PARKING_CAR_COLORS, RECYCLE_BREAKS, RECYCLE_STEPS } from "./catalog";
 import { CINEMA_CYCLES, cycleSteps } from "./cycles";
 import { recyclingFillStep } from "./recyclingFill";
 

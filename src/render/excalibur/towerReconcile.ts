@@ -1,6 +1,5 @@
 import * as ex from "excalibur";
 import { Z } from "../depthPlanes";
-import { hasBusinessHours, isOpenAt } from "../../engine/facilities";
 import { catalogFacility } from "../../engine/catalogTypes";
 import { towerCatalog } from "../../engine/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";
@@ -18,6 +17,7 @@ import {
 import { facadeGeometry, type FloorEdge } from "../facadeGeometry";
 import { paintAnimatedUnit } from "../regionPaint";
 import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "../scale";
+import { isDeadParking, roomSignature } from "./roomSignature";
 import { reap } from "./towerCrowd";
 import { dropRegionUnit, markRegionUnit } from "./towerRegions";
 import { syncScenery } from "./towerScenery";
@@ -108,34 +108,17 @@ export function syncScene(engine: TowerEngine): void {
       }
     } else {
       seenR.add(u.id);
-      // The signature must capture every input the room sprite draws from, so
-      // it re-bakes exactly when its look changes. Crucially that includes the
-      // hour-dependent bits, a commercial unit's open/closed shutter and a
-      // condo's late-night "asleep" look, otherwise a shop baked closed at
-      // dawn would wrongly stay shuttered all day until the next lighting flip.
-      let open = "";
-      if (hasBusinessHours(u.kind)) open = isOpenAt(u.kind, engine.d.hour) ? "o" : "c";
-      const lateNight = u.kind === "condo" && (engine.d.hour >= 23 || engine.d.hour < 6) ? "s" : "";
-      // Only mark a SETTLED space dead, a mid-build (or burning) space is
-      // excluded from the set for other reasons and isn't a connectivity fault.
-      const dead =
-        u.kind === "parking" && u.state !== "construction" && u.state !== "fire" && !parkingOK.has(u.id) ? "x" : "";
-      // Hour-bucketed live-display bits: how full the garage is (cars) and how
-      // full the recycling centers are (garbage pile). syncScene already runs
-      // on the hour, so these advance the same cadence as open/lateNight.
-      let liveBits = "";
-      if (u.kind === "parking") liveBits = `:p${Math.round((engine.d.parkingUse ?? 0) * 6)}`;
-      else if (u.kind === "recycling") liveBits = `:r${Math.round((engine.d.recycleFill ?? 0) * 8)}`;
-      // Include `outForMeal` in the cache key: pixelSprites reads visible
-      // occupants via `u.occupants - (u.outForMeal ?? 0)`, so the sprite must
-      // re-raster when the visible dip changes even though canonical
-      // `u.occupants` did not. Without this, an office bakes at t=0 with six
-      // workers and would keep rendering six through the whole meal peak.
-      // `subtype` is in the key because retail variants draw differently and
-      // the inspector's "Change variety" action swaps it at runtime; without
-      // it the reroll would not repaint until another signature bit flips.
-      const sig = `${u.state}:${engine.litState ? 1 : 0}:${u.width}:${u.occupants}:${u.outForMeal ?? 0}:${u.subtype ?? ""}:${open}${lateNight}${dead}${liveBits}`;
-      if (dead === "x") deadNow.add(u.id);
+      const unchained = !parkingOK.has(u.id);
+      // Every input the room sprite draws from, hour-dependent bits included
+      // (see roomSignature), so the room re-bakes exactly when its look changes.
+      const sig = roomSignature(u, {
+        hour: engine.d.hour,
+        lit: engine.litState,
+        unchained,
+        parkingUse: engine.d.parkingUse ?? 0,
+        recycleFill: engine.d.recycleFill ?? 0,
+      });
+      if (isDeadParking(u, unchained)) deadNow.add(u.id);
       const animated = u.state === "fire" || u.state === "construction";
       const wasAnimated = engine.animatedRooms.has(u.id);
       if (animated && !wasAnimated) {

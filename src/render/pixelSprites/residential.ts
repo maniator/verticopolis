@@ -1,5 +1,6 @@
 import type { Unit } from "../../engine/types";
 import { visibleOccupants } from "../../engine/Crowd";
+import { isLateHour } from "../lateNight";
 import { PAL, SKIN, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, shade, vacancy, windowView, type RoomCtx } from "./common";
 import { bevelBox, ceilingCap, curtain, downlights, fill, framedArt, glow, interiorWall, plankFloor } from "./dollhouse";
 import { layerBreak, layerEnd } from "./layers";
@@ -15,10 +16,11 @@ import { CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, SUITE_WALLS } f
  *
  * Every look resolves from the room bake signature only (`u.state`, `d.lit`,
  * `u.width`, `u.occupants`, `u.outForMeal` via `visibleOccupants`, and the
- * condo `lateNight` flag from `d.hour`); none reads `d.anim`, so a static room
- * stays cacheable and repaints exactly when its look changes. Seated occupants
- * map one-to-one to `visibleOccupants(u)`, capped by the layout's seats and
- * filled in seat order: no ghost people. Integer pixel coordinates only.
+ * late-night flag from `d.hour` via `isLateHour`); none reads `d.anim`, so a
+ * static room stays cacheable and repaints exactly when its look changes.
+ * Seated occupants map one-to-one to `visibleOccupants(u)`, capped by the
+ * layout's seats and filled in seat order: no ghost people. Integer pixel
+ * coordinates only.
  */
 
 /** Floor-band height and floor-line Y for a room rect, matching the build's
@@ -167,7 +169,7 @@ export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
   const { ctx } = d;
   if (u.state === "empty") return vacancy(ctx, x, y, w, h, vacancyLabel);
   // Residents are "up" only when home and not asleep in the small hours.
-  const home = visibleOccupants(u) > 0 && !(d.hour >= 23 || d.hour < 6);
+  const home = visibleOccupants(u) > 0 && !isLateHour(d.hour);
   // Geo-seeded variety, geometry first: three true layouts (living, dining with a
   // kitchenette, a study), any of them mirrored, over warm plaster and maple. The
   // standing lamp appears in every layout so the home-glow signal survives.
