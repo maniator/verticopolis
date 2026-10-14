@@ -11,6 +11,7 @@ use crate::econ::rent_of;
 use crate::facilities::Kind;
 use crate::gameplay::batch_json;
 use crate::sim::Simulation;
+pub use crate::snapshot::state_view;
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged, deny_unknown_fields)]
@@ -436,26 +437,6 @@ pub enum RunError {
     Unsupported { index: usize, what: String },
     /// The scenario is wrong for the engine (a build that failed, and so on).
     Failed { index: usize, what: String },
-}
-
-/// The saved game minus prose: log `text` and the pending choice's `message`.
-pub fn state_view(sim: &Simulation) -> Value {
-    let mut v = sim.serialize();
-    if let Some(log) = v.get_mut("log").and_then(Value::as_array_mut) {
-        for e in log {
-            if let Some(o) = e.as_object_mut() {
-                o.remove("text");
-            }
-        }
-    }
-    if let Some(p) = v
-        .get_mut("events")
-        .and_then(|e| e.get_mut("pending"))
-        .and_then(Value::as_object_mut)
-    {
-        p.remove("message");
-    }
-    v
 }
 
 fn start_sim(start: &Start, root: &std::path::Path) -> Result<Simulation, RunError> {
