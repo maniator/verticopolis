@@ -39,8 +39,8 @@ export interface Ratio {
   verdict: "higher" | "lower" | "equivalent" | "inconclusive";
 }
 
-type Pick = (r: ModeRun) => number | null | undefined;
-interface Def { group: Metric["group"]; scenario: string; throttle: string; metric: string; unit: string; better: "lower" | "higher"; pick: Pick }
+type MetricPick = (r: ModeRun) => number | null | undefined;
+interface Def { group: Metric["group"]; scenario: string; throttle: string; metric: string; unit: string; better: "lower" | "higher"; pick: MetricPick }
 
 export function definitions(config: WorkerConfig): Def[] {
   const defs: Def[] = [];
