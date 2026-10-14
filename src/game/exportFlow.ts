@@ -70,15 +70,18 @@ export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simul
     deps.ui.toast("The export is not responding. You can try exporting again.", "bad");
   }, EXPORT_WATCHDOG_MS);
   try {
-    const settling = deps.getSim();
+    let settling = deps.getSim();
     // The worker host's exact save first (a no-op on every other engine),
     // then the live camera, right before the save, or towers export at a
     // stale view.
     await settleEngine(settling);
     // The tower the app holds now (one adopted during the wait is the one
     // the player sees, so it is the one exported).
-    const sim = deps.getSim();
-    if (sim !== settling) await settleEngine(sim);
+    let sim = deps.getSim();
+    for (let tries = 0; sim !== settling && tries < 3; tries++) {
+      await settleEngine(sim);
+      [settling, sim] = [sim, deps.getSim()];
+    }
     stampView(sim);
     const file = await SaveGame.export(sim);
     deps.ui.downloadFile(SaveGame.exportFilename(sim), file);

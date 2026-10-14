@@ -164,7 +164,8 @@ apply reply ◀──── frame (buffer transferred) ─┘
 
 **Stale replies.** A reply whose `seq` is older than the instance's last
 command is refused (#908). Its gameplay events are the engine's and are kept,
-held until the next fresh reply and handed out with it, in order:
+held until the next fresh reply and handed out with it, in order (so during
+a long drag a fire or a star reaches the player when the drag pauses):
 
 - nothing of its state is applied, since it predates a command the instance
   already answered and its crowd and cars may name what the command removed;
@@ -175,8 +176,8 @@ held until the next fresh reply and handed out with it, in order:
 - after `MAX_STALE_STREAK` (4) stale replies in a row the next request waits
   for the frame loop's flush, which sends it with the frame's steps, so the
   clock does not stop while the player drags out a build (a command per
-  round trip); the read model then waits for a reply that includes every
-  command;
+  round trip), unless a settle is waiting, which asks at once; the read
+  model then waits for a reply that includes every command;
 - a camera stamp (`setView`) does not make a reply stale, and a reply that
   includes every op but camera stamps is caught up (its exact save gets the
   latest stamp patched in): a stamp changes nothing the simulation, the
@@ -200,7 +201,8 @@ fan-out, and an event is never handed out twice.
 `serialize` cannot wait for the worker, so:
 
 - It answers with the engine's exact save while the read model is caught up
-  (the last reply included every op sent, and carried a full save). A camera
+  (the last reply included every op sent but camera stamps, and carried a
+  full save). A camera
   stamp (`view`, which the save carries and the simulation never reads) since
   then is patched into it, so a save that stamps the camera first stays exact.
 - Otherwise it answers with the read model's own save. That save has the

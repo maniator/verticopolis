@@ -175,6 +175,18 @@ export function validate(config: WorkerConfig, runs: readonly ModeRun[]): { erro
     if (!r.ok) continue;
     if (r.offline?.error) warnings.push(`rep ${r.rep} ${r.mode}: the offline measurement failed: ${r.offline.error}`);
     else if (r.offline && r.offline.onlineMode !== r.mode) warnings.push(`rep ${r.rep} ${r.mode}: the service-worker visit came up on ${r.offline.onlineMode}, not ${r.mode}`);
+    for (const name of config.scenarios) {
+      const sc = r.scenarios[name];
+      if (!sc) {
+        errors.push(`rep ${r.rep} ${r.mode}: no results for ${name}`);
+        continue;
+      }
+      for (const rate of config.throttles) {
+        if (!sc.hosted[String(rate)]) errors.push(`rep ${r.rep} ${r.mode} ${name}: no ${rate}x hosted run`);
+        if (!sc.frames[String(rate)]) errors.push(`rep ${r.rep} ${r.mode} ${name}: no ${rate}x frames run`);
+        if ((r.mode === "ts" || r.mode === "wasm") && !sc.raw?.[String(rate)]) errors.push(`rep ${r.rep} ${r.mode} ${name}: no ${rate}x bare engine run`);
+      }
+    }
     for (const [name, sc] of Object.entries(r.scenarios)) {
       if (r.mode === "wasm-worker") {
         if (sc.memory.workerWasmBytes === null) warnings.push(`rep ${r.rep} wasm-worker ${name}: the worker's WASM memory was not reported, so its combined memory has no sample`);

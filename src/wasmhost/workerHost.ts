@@ -32,7 +32,8 @@ export type { WorkerHost, WorkerHostOptions, WorkerHostStats } from "./workerSta
  * - A reply that predates one of the instance's commands (its `seq` is
  *   older) is refused, its events aside: its state would undo the command
  *   until the next reply, and its crowd and cars may name what the command
- *   removed. A new request goes out at once.
+ *   removed. A new request goes out at once (after a streak of them, with
+ *   the next frame's steps, so the clock goes on).
  * - The worker drains the engine's gameplay events into every reply and the
  *   instance's `drainGameplayEvents` answers with them, so the one drain the
  *   app has sees each event once.
