@@ -260,20 +260,54 @@ impl Simulation {
         }
     }
 
-    pub fn build_transport(&mut self, kind: Kind, x: i64, bottom: i64, top: i64) -> BuildResult {
+    /// The dry run `build_transport` makes first: whether a shaft of `kind`
+    /// at `x` spanning `bottom..=top` would be placed, and its full price.
+    /// An elevator costs the catalog `cost` plus `transportFloorCost` for
+    /// each floor past its first; stairs and escalators cost the catalog
+    /// `cost`. Refusals come in `build_transport`'s order (locked, then money,
+    /// then placement) with its reasons, and every answer carries that price.
+    pub fn can_build_transport(&self, kind: Kind, x: i64, bottom: i64, top: i64) -> CanBuild {
         let f = kind.facility();
-        if !self.is_unlocked(kind) {
-            return BuildResult::fail(format!("{} unlocks at {}★.", f.name, f.min_star));
-        }
         let span = top - bottom;
         let extra = if kind.is_elevator() {
             span as f64 * crate::charges::TRANSPORT_FLOOR_COST
         } else {
             0.0
         };
-        let total = f.cost + extra;
-        if self.money < total {
-            return BuildResult::fail("Not enough money.");
+        let cost = f.cost + extra;
+        let refuse = |reason: String| CanBuild {
+            ok: false,
+            reason: Some(reason),
+            cost,
+        };
+        if !self.is_unlocked(kind) {
+            return refuse(format!("{} unlocks at {}★.", f.name, f.min_star));
+        }
+        if self.money < cost {
+            return refuse("Not enough money.".into());
+        }
+        let v = self.tower.validate_transport(kind, x, bottom, top);
+        if !v.ok {
+            return CanBuild {
+                ok: false,
+                reason: v.reason,
+                cost,
+            };
+        }
+        CanBuild {
+            ok: true,
+            reason: None,
+            cost,
+        }
+    }
+
+    pub fn build_transport(&mut self, kind: Kind, x: i64, bottom: i64, top: i64) -> BuildResult {
+        let quote = self.can_build_transport(kind, x, bottom, top);
+        if !quote.ok {
+            return BuildResult {
+                ok: false,
+                reason: quote.reason,
+            };
         }
         let res = self.tower.place_transport(kind, x, bottom, top);
         if !res.ok {
@@ -282,7 +316,7 @@ impl Simulation {
                 reason: res.reason,
             };
         }
-        self.money -= total;
+        self.money -= quote.cost;
         self.gameplay.push(GameplayEvent::FacilityPlaced {
             kind,
             floor: top,
@@ -369,5 +403,118 @@ mod tests {
             Some("Use placeTransport for vertical transport.")
         );
         assert_eq!(c.cost, Kind::ElevatorStandard.facility().cost);
+    }
+
+    /// A tower with a lobby on floor 1 and floor tiles on floors 2 and 3 at
+    /// x 100..=111, rated `star`, holding `money`.
+    fn shaft_site(mode: GameMode, star: i64, money: f64) -> Simulation {
+        let mut sim = Simulation::new_game(1, mode);
+        sim.money = 1e9;
+        for x in (100..=111).step_by(Kind::Lobby.facility().width as usize) {
+            assert!(sim.build(Kind::Lobby, 1, x).ok);
+        }
+        for floor in 2..=3 {
+            for x in 100..=111 {
+                assert!(sim.build(Kind::Floor, floor, x).ok);
+            }
+        }
+        sim.star = star;
+        sim.money = money;
+        sim
+    }
+
+    /// `can_build_transport` answers what `build_transport` then does: the
+    /// same verdict and reason, and on success a charge of exactly the
+    /// quoted price, over every transport kind (and one room kind), spans
+    /// that fit, are too short or too tall, positions on and off the lot,
+    /// locked and unlocked, with money flush, exact and one dollar short.
+    #[test]
+    fn the_transport_quote_is_what_the_build_charges() {
+        let kinds = [
+            Kind::ElevatorStandard,
+            Kind::ElevatorService,
+            Kind::ElevatorExpress,
+            Kind::Stairs,
+            Kind::Escalator,
+            Kind::Office,
+        ];
+        let spans = [(1, 2), (1, 3), (2, 3), (3, 3), (3, 2), (1, 40)];
+        let mut placed = 0;
+        let mut refused = std::collections::BTreeSet::new();
+        // Classic at one star (every elevator but the standard one locked)
+        // and Modern at five (all unlocked).
+        for (mode, star) in [(GameMode::Classic, 1), (GameMode::Modern, 5)] {
+            for kind in kinds {
+                for (bottom, top) in spans {
+                    for x in [100, 111, -1] {
+                        let mut price = None;
+                        for short in [None, Some(0.0), Some(1.0)] {
+                            let money = match (short, price) {
+                                (None, _) => 1e9,
+                                (Some(d), Some(p)) => p - d,
+                                (Some(_), None) => unreachable!(),
+                            };
+                            let mut sim = shaft_site(mode, star, money);
+                            let quote = sim.can_build_transport(kind, x, bottom, top);
+                            let p = *price.get_or_insert(quote.cost);
+                            assert_eq!(quote.cost, p);
+                            let built = sim.build_transport(kind, x, bottom, top);
+                            let case =
+                                format!("{mode:?} {star}★ {kind:?} x{x} {bottom}..{top} ${money}");
+                            assert_eq!(built.ok, quote.ok, "{case}");
+                            assert_eq!(built.reason, quote.reason, "{case}");
+                            if quote.ok {
+                                assert_eq!(money - sim.money, p, "{case}");
+                                placed += 1;
+                            } else {
+                                assert_eq!(sim.money, money, "{case}");
+                                refused.insert(quote.reason.unwrap_or_default());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(placed > 0);
+        // The sweep reaches the lock, the money check and the placement rules.
+        for reason in [
+            "Not enough money.",
+            "Transport needs height.",
+            "Off the edge of the lot.",
+            "Not a transport.",
+        ] {
+            assert!(
+                refused.contains(reason),
+                "{reason} not reached: {refused:?}"
+            );
+        }
+        assert!(
+            refused.iter().any(|r| r.contains("unlocks at")),
+            "{refused:?}"
+        );
+    }
+
+    /// An elevator's quote is its catalog price plus the per-floor cost for
+    /// each floor past its first; stairs and escalators pay the catalog price.
+    #[test]
+    fn the_transport_quote_follows_the_catalog() {
+        let c = crate::catalog::catalog(GameMode::Modern);
+        let sim = shaft_site(GameMode::Modern, 5, 1e9);
+        let price = |k: Kind| {
+            c.facilities
+                .iter()
+                .find(|f| f.key == k.as_str())
+                .unwrap()
+                .cost
+        };
+        assert_eq!(
+            sim.can_build_transport(Kind::ElevatorStandard, 100, 1, 5)
+                .cost,
+            price(Kind::ElevatorStandard) + 4.0 * c.economy.transport_floor_cost
+        );
+        assert_eq!(
+            sim.can_build_transport(Kind::Stairs, 100, 1, 2).cost,
+            price(Kind::Stairs)
+        );
     }
 }
