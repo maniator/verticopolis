@@ -42,6 +42,8 @@ function makeApp(parts: FakeParts = {}) {
     selected: parts.selected ?? null,
     inspectAnchor: parts.inspectAnchor ?? null,
     buildRefusalShowing: parts.buildRefusalShowing ?? false,
+    // The tower the catalog handle reads unit heights for (#921).
+    sim: { mode: "classic" },
     selectedUnit: () => parts.unit ?? null,
     selectedTransport: () => parts.transport ?? null,
   };
@@ -209,7 +211,7 @@ describe("selectedScreenRect", () => {
     expect(selectedScreenRect(app)).toBeNull();
   });
 
-  it("computes the rect for a selected unit using facilityFloors for the top edge", () => {
+  it("computes the rect for a selected unit using its catalog height for the top edge", () => {
     const unit = { x: 15, width: 31, floor: 10, kind: "cinema" };
     const { app } = makeApp({ selected: { type: "unit" } as GameApp["selected"], unit });
 

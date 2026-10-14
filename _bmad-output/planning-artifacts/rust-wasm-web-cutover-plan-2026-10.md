@@ -173,7 +173,7 @@ after their baselines and measurement methods are approved.
 | Performance (proposed) | Late-game fixture: Modern tick time no slower than TypeScript (roadmap rule); cold load within +500 ms of the TypeScript build; heap within 1.25x; a 5,000+ population fixture within the TypeScript engine's own `npm run perf` baseline (S13) |
 | Reliability (proposed) | One release on the TypeScript default with the engine instrument (S16's signal): over at least 1,000 engine sessions whose players consented to analytics (proposed minimum), engine fallback in under 0.1% of them, no engine-writer latch-off (#953), and every divergence report triaged to a cause |
 | Rollback | A rehearsal flips the default back with the flag and loads saves written by the engine build |
-| Deployment | S16 done: an old cached shell never runs a newer package, an installed PWA reopens offline with the engine active and today's sounds working (#985), and no deploy serves an engine package whose hash differs from the sources (today `scripts/vercel-build.sh`'s hash guard; with #958 every failed build fails the deploy) |
+| Deployment | S16 done: an old cached shell never runs a newer package, an installed PWA cold-starts offline with the engine active and today's sounds working, with its automated tests green in CI (#985), and no deploy serves an engine package whose hash differs from the sources (since #958, `scripts/vercel-build.sh` builds the package from source on every deploy, so a failed build fails the deploy) |
 | Version identity | About and Copy Diagnostics show the UI version and commit, the active engine with any fallback reason, and the engine's identity record from the binding, including the mismatch and unavailable states (S17, #963) |
 | Coverage | `vite.config.ts` floors and the Rust job's line floor hold |
 | Sign-off | The owner approves with the exception register attached |
@@ -196,20 +196,26 @@ Decided:
 5. **CLAUDE.md moves to `engine-rs` during the cutover.** The line naming
    `src/engine/facilities.ts` as the source of truth for gameplay rules, caps
    and tuning is amended to name `engine-rs` in the flip PR (S15).
+6. **Offline play is a 3.0.0 blocker.** An installed PWA opened online once
+   cold-starts offline with the WASM engine running (no TypeScript fallback),
+   today's sounds playing and saved games loading, with the engine glue,
+   binary and `BUILD.json` cached as one version-matched set (#985, under
+   S16). It blocks the flip until the work has merged and its automated tests
+   pass in CI.
 
 Still open (risks, no decision needed yet):
 
-- **Offline play at the flip.** The owner set the rule (2026-10-13): the
-  installed game reopens offline with the engine and its sounds, a 3.0.0
-  requirement tracked in #985 under S16. 2.30.1 (#993) precaches the engine
-  package with the game shell for every player (owner decision), so an
-  installed game starts the engine offline. Still open on #985: the sounds,
-  the version check for a shell cached before 2.30.1 (its worker never
-  precached the engine, so until it updates it pairs its old shell with
-  whatever engine the network serves), a restart in a fresh browser session,
-  cached engine files checked against `BUILD.json`, the precache coverage
-  rule, an e2e that serves a second deploy, install interruption, and cache
-  eviction.
+- **Offline play at the flip.** Decision 6 sets the rule and #985 tracks the
+  work. 2.30.1 (#993) is a partial slice: it precaches the engine package with
+  the game shell for every player (owner decision), so an installed game
+  reopened in the same browser context starts the engine offline and saves
+  and loads on it. It does not meet decision 6. Still open on #985: a cold
+  start in a fresh browser session, today's sounds offline, recovering a save
+  made online, the engine glue, binary and `BUILD.json` checked as one
+  version-matched set (a shell cached before 2.30.1 never precached the
+  engine, so until it updates it pairs its old shell with whatever engine the
+  network serves), the precache coverage rule, an e2e that serves a second
+  deploy, install interruption, and cache eviction.
 - **Save format bumps.** The copy catalog (row 6) bumps the save version; it
   does not ship in the flip release, so a rollback can still read every save
   (AD-5).
