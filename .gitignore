@@ -44,6 +44,7 @@ determinism-diff/
 
 # Rust engine build output
 engine-rs/target/
+engine-rs/consumer/target/
 engine-rs/pkg/
 # The served engine package (wasm:build writes it; Vercel and CI build it,
 # see scripts/build-engine-wasm.sh and .github/actions/engine-wasm).
