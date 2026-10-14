@@ -29,7 +29,7 @@
     "screenshots": "VC_TOOLING=1 vite build && RUN_SERVER=1 node scripts/screenshots.ts",
     "icons": "node scripts/gen-pwa-icons.mjs",
     "og-image": "node scripts/gen-og-image.mjs",
-    "verify:dist": "node scripts/gen-third-party-notices.ts && node scripts/prerender-help.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts && node scripts/verify-assetlinks.ts",
+    "verify:dist": "node scripts/gen-third-party-notices.ts && node scripts/verify-public-files.ts && node scripts/prerender-help.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts && node scripts/verify-assetlinks.ts",
     "gen:icons": "node scripts/gen-icon-paths.ts",
     "atlas": "tsx scripts/export-atlas.ts",
     "gen:events": "node scripts/gen-gameplay-events.ts",
