@@ -342,7 +342,7 @@ export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): strin
     const soft = layers.soft !== undefined;
     const lists = Object.values(layers.chains ?? {}).flatMap((c) => [c.shell, c.furniture, ...(c.soft ? [c.soft] : []), ...(c.front ? [c.front] : [])]);
     const front = layers.front !== undefined;
-    if (front && (soft || Object.values(layers.chains ?? {}).some((c) => c.front === undefined))) bad.add(name);
+    if ((front && soft) || Object.values(layers.chains ?? {}).some((c) => (c.front !== undefined) !== front)) bad.add(name);
     const oneChain = Object.keys(rec.chains ?? {}).length <= 1;
     if (flat !== depth || !oneChain || lists.some((l) => l[0] !== null) || Object.values(layers.chains ?? {}).some((c) => (c.soft !== undefined) !== soft)) bad.add(name);
   }

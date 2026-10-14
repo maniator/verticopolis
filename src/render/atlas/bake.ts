@@ -344,8 +344,11 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
       // A vehicle splits three ways: the back (the interior seen through its
       // windows), the riders, then the front (the body and frames around
       // them), each what differs from the picture before it.
-      const split3 = job.layers && job.front && r.renderSplit ? r.renderSplit(job.paint, job.w, job.h) : null;
-      if (job.layers && job.front && r.renderSplit && !split3) throw new LayerError("marks no layer break");
+      if (job.front && !job.layers) throw new LayerError("a front picture needs layers");
+      // A renderer that splits for depth must split a vehicle three ways.
+      if (job.front && r.renderShell && !r.renderSplit) throw new LayerError("the renderer cannot split a front picture");
+      const split3 = job.front && r.renderSplit ? r.renderSplit(job.paint, job.w, job.h) : null;
+      if (job.front && r.renderSplit && !split3) throw new LayerError("marks no layer break");
       if (split3) {
         if (Object.keys(job.chains ?? {}).length > 1) throw new LayerError("depth layers need at most one chain");
         const three = (prev: { back: Image; furniture: Image; front: Image } | null, flat: Image, s: { back: Image; mid: Image }) => {

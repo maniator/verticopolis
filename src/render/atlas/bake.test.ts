@@ -490,6 +490,26 @@ describe("a vehicle's front picture", () => {
     const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
     expect(checkLayers(buildArchive(r, info, undefined, 32))).toEqual([]);
   });
+  it("puts the riders, and only the riders, between the interior and the front", () => {
+    const L = f.layers!;
+    const only = (pick: "furniture" | "front") =>
+      composeLayered(r, { ...f, layers: { shell: null, furniture: L[pick] ?? null, chains: { riders: { shell: [null], furniture: L.chains!.riders[pick]! } } } }, { riders: 4 });
+    const red = (img: Image) => Array.from({ length: 6 }, (_, x) => (img.data[x * 4 + 3] ? img.data[x * 4] : 0));
+    expect(red(only("furniture"))).toEqual([0, 200, 200, 200, 200, 0]);
+    expect(red(only("front"))).toEqual([90, 0, 0, 90, 0, 90]);
+  });
+  it("flags front steps without a front, and a front with soft furniture", () => {
+    const info = { version: "1", commit: "x", attribution: "a", licenseText: "" };
+    const a = buildArchive(r, info, undefined, 32);
+    const rec = a.manifest.frames.bus;
+    const orphan = { ...rec, layers: { ...rec.layers!, front: undefined } };
+    const withSoft = { ...rec, layers: { ...rec.layers!, soft: [] } };
+    for (const bad of [orphan, withSoft]) expect(checkLayers({ ...a, manifest: { ...a.manifest, frames: { bus: bad } } })).toEqual(["bus"]);
+  });
+  it("refuses a front without layers, and a depth renderer that cannot split one", () => {
+    expect(() => bake([{ ...job, layers: false }], busFake)).toThrow(/front picture needs layers/);
+    expect(() => bake([job], { ...busFake, renderSplit: undefined, renderShell: () => null })).toThrow(/cannot split a front/);
+  });
   it("refuses a vehicle whose paint marks no break", () => {
     expect(() => bake([{ ...job, paint: solid("3"), chains: undefined }], busFake)).toThrow(/marks no layer break/);
   });

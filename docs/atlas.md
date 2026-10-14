@@ -270,7 +270,7 @@ Pass the visible occupant count itself and clamp it to each list on its own:
 a depth list can run past the chain's `max` when a step changes only pixels
 the flat frame hides (a light behind a desk). A layered frame has at most one
 chain, and its overlays (only the parking space has any) draw after these
-four, in front.
+four (and after a vehicle's front, below), in front.
 Draw anything of your own that belongs between the wall and the furniture
 (walkers, a depth offset) between steps 2 and 3. Any list can be empty (a
 fully transparent picture).
@@ -357,8 +357,8 @@ picture (with `front` steps in their chain), drawn after the furniture:
 
 The shell is the interior seen through the doors or windows, the furniture
 the riders, and the front the vehicle around them: a cab's door frames,
-center seam, FULL bar and lantern, and the train's whole body with its window
-glints, cut away where the saloon windows are. A frontend that sets the
+center seam, FULL bar and lantern, and the train's body, cut away where the
+saloon windows are, with the glints on its window glass. A frontend that sets the
 riders a little behind the front keeps them inside the vehicle. Like the
 furniture, the front holds the flat frame's pixels where they differ from
 what is under them, so a cab's translucent door frames carry the rider color
