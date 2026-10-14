@@ -473,8 +473,11 @@ export function htmlText(html: string): string {
   // The page escapes every <, > and & in its text, so one left over is markup
   // the strip above misread (a ">" in an attribute, an unclosed script) or an
   // entity written without its semicolon.
-  const raw = /[<>]|&(?!(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);)/i.exec(stripped);
-  if (raw) throw new Error(`the toolchain's copyright page has markup htmlText cannot read near: ${JSON.stringify(stripped.slice(Math.max(0, raw.index - 20), raw.index + 20))}`);
+  // A control byte written directly (tab and newline aside) counts too.
+  const isControl = (n: number) => (n < 0x20 && n !== 0x09 && n !== 0x0a) || (n >= 0x7f && n <= 0x9f);
+  let at = /[<>]|&(?!(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);)/i.exec(stripped)?.index;
+  for (let i = 0; at === undefined && i < stripped.length; i++) if (isControl(stripped.charCodeAt(i))) at = i;
+  if (at !== undefined) throw new Error(`the toolchain's copyright page has markup htmlText cannot read near: ${JSON.stringify(stripped.slice(Math.max(0, at - 20), at + 20))}`);
   return stripped
     .replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi, (ref: string, body: string) => {
       if (body[0] !== "#") {

@@ -73,6 +73,8 @@ function standardLibrary(crate: string): NoticePackage & { hasLicenseFile: true 
   const [copyright, ...licenses] = files.map((f) => readFileSync(f, "utf8"));
   const empty = files.filter((_, i) => (i === 0 ? copyright : licenses[i - 1]).trim() === "");
   if (empty.length > 0) throw new Error(`the Rust toolchain's ${empty.join(", ")} is empty; the standard library cannot be attributed`);
+  const notice = htmlText(copyright);
+  if (notice === "") throw new Error(`the Rust toolchain's ${files[0]} has no text; the standard library cannot be attributed`);
   return {
     name: "Rust standard library",
     version,
@@ -80,7 +82,7 @@ function standardLibrary(crate: string): NoticePackage & { hasLicenseFile: true 
     kind: "crate",
     hasLicenseFile: true,
     licenseText: [
-      `--- COPYRIGHT-library ---\n\n${htmlText(copyright)}`,
+      `--- COPYRIGHT-library ---\n\n${notice}`,
       ...licenses.map((text, i) => `--- ${STD_FILES[i + 1].replace(/^licenses\/|\.txt$/g, "")} ---\n\n${text.trimEnd()}`),
     ].join("\n\n"),
   };

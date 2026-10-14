@@ -33,7 +33,9 @@ import { readLicenseFiles } from "./license-files.ts";
 import { ENGINE_THIRD_PARTY } from "./engine-third-party.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..").replace(/\\/g, "/");
-const DIST = join(ROOT, "dist").replace(/\\/g, "/");
+// VC_NOTICES_DIST points the generator at another built tree; its tests use
+// it to run the real script against fixture builds (thirdPartyNoticesEngine.test.ts).
+const DIST = (process.env.VC_NOTICES_DIST ? resolve(process.env.VC_NOTICES_DIST) : join(ROOT, "dist")).replace(/\\/g, "/");
 const OUT = join(DIST, "third-party-notices.txt");
 
 function fail(msg: string): never {

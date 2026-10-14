@@ -51,6 +51,7 @@ context:
 - `scripts/gen-third-party-notices.ts` -- reads the record when the engine ships; the map-less engine glue stays allowed only with it.
 - `engine-rs/Cargo.toml` -- the engine's own `license` field.
 - `src/tests/thirdPartyNotices.test.ts` -- unit coverage.
+- `src/tests/thirdPartyNoticesEngine.test.ts` -- the real notices generator run against fixture builds (`VC_NOTICES_DIST`): a matching record is listed, and a missing, stale, malformed or incomplete one fails the build.
 
 ## Tasks & Acceptance
 
@@ -76,6 +77,7 @@ context:
 - 2026-10-14, review round 4: the walk refuses a `cargo tree` listing that does not name the root crate, and the WASM build refuses an empty crate list, so a misread listing cannot drop every crate; the site build refuses a record with only the standard library; any file under `dist/engine/` requires the record; a crate's `license-file` must sit inside the crate and an unreadable one is a named problem; rustc must be a stable release; an empty toolchain license file is refused; the copyright page's decoder refuses an entity it does not know. Deferred: checking the standard library's license expression against the toolchain's copyright page on a `rust-version` bump (row `third-party-notices-hardening`, #974).
 - 2026-10-14, review round 5: the copyright page decoder works in one pass (an encoded ampersand is decoded once however it is written), strips comments and refuses a numeric reference that is not a printable character; a crate's `license-file` is checked through links; an unreadable crate directory or a `dist/engine` that is not a directory is a named failure; the record and the compile share one feature list.
 - 2026-10-14, review round 6: `cargo tree`'s listing is parsed by a tested pure helper (`cargoTreePackages`); the walk checks every id before narrowing; the copyright page decoder refuses C1 controls and any raw `<`, `>` or semicolon-less `&` left after the tag strip. The earlier entries' `vercel-build.sh` toolchain install and committed-record check were superseded when #958 merged: `scripts/build-engine-wasm.sh` installs `rust-version` at `.0`, and the record is build output.
+- 2026-10-14, review round 7 and the owner's request on #992: CI's engine package checks require the record; `copilot-setup-steps.yml` runs on the attribution code; the copyright page decoder refuses a raw control byte and the standard library entry refuses an empty page; `gen-third-party-notices.ts` takes `VC_NOTICES_DIST` so `thirdPartyNoticesEngine.test.ts` runs the real generator against fixture builds and holds each fail-closed case.
 
 ## Design Notes
 
@@ -85,4 +87,5 @@ The record sits beside the package, so a site build reads it without a Rust tool
 
 **Commands:**
 - `npm run wasm:build && npm run build` -- expected: notices include the crates and the standard library.
-- `npx vitest run src/tests/thirdPartyNotices.test.ts` -- expected: pass.
+- `npx vitest run src/tests/thirdPartyNotices.test.ts src/tests/thirdPartyNoticesEngine.test.ts` -- expected: pass.
+- From a clean clone: `npm ci && npm run wasm:build && npm run build`, then compare the record's crates with the `.rlib` files in `engine-rs/target/wasm32-unknown-unknown/release/deps/` -- expected: identical sets, and every crate plus the standard library in `dist/third-party-notices.txt`.

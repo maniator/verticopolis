@@ -241,6 +241,9 @@ describe("third-party notices (#951)", () => {
     // Markup the strip misreads, and an entity without its semicolon, are refused rather than copied.
     expect(() => htmlText('<a title="x>y">z</a>')).toThrow(/markup/);
     expect(() => htmlText("&copy 2026")).toThrow(/markup/);
+    expect(() => htmlText("a\u001bb")).toThrow(/markup/);
+    expect(() => htmlText("a\u009bb")).toThrow(/markup/);
+    expect(htmlText("a\tb\nc")).toBe("a\tb\nc");
   });
 
   it("labels Rust crates and keeps them apart from npm packages of the same name", () => {
