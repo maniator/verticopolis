@@ -11,7 +11,9 @@ import { drainEngineBatch } from "./engineEvents";
 import { decodeFrame, type FrameView } from "./frameView";
 import { mergeSimulation } from "./merge";
 import { adoptTelemetry, type TelemetryDocument } from "./telemetry";
-import { towerCatalog, useTowerCatalogSource } from "../engine/towerCatalog";
+import { useTowerCatalogSource } from "../engine/towerCatalog";
+import { catalogFor } from "../engine/catalog";
+import type { Catalog, CatalogWorld } from "../engine/catalogTypes";
 
 /**
  * Run a live `Simulation` on the WASM engine (story-engine-wasm-switch).
@@ -52,21 +54,20 @@ export interface WasmHost {
 /** Attach a host to `sim`. Throws, leaving the instance untouched, when the
  *  tower already has a crowd (the engine starts from a save, which carries
  *  none), when a mirror or host is already attached, or when the binding's
- *  catalog cannot be read or states another world. While attached, `towerCatalog(sim)` is the engine's. */
+ *  catalog cannot be read, states another world or lists other facility
+ *  kinds than this build's tables. While attached, `towerCatalog(sim)` is the
+ *  engine's. */
 export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
   // Read the binding's catalogs first, both modes (a Classic tower's
   // patronage readout uses the Modern yardstick): a binding whose catalog this
   // build cannot read refuses the attach before an engine is built.
   const catalogs = { classic: readCatalog(mod, "classic"), modern: readCatalog(mod, "modern") };
-  // The view was sized from the tower's current world and cannot resize: a
-  // binding that states another world is refused here, once, instead of
-  // failing the status pump on every tick after the switch.
-  const world = towerCatalog(sim).world;
-  for (const c of Object.values(catalogs)) {
-    if (c.world.lotWidth !== world.lotWidth || c.world.minFloor !== world.minFloor || c.world.maxFloor !== world.maxFloor) {
-      throw new Error(`the WASM engine's ${c.mode} catalog states a different world from the tower's`);
-    }
-  }
+  // The view was sized from the tables' world and cannot resize, the read
+  // model applies the tables' world rules (the ground floor and its structure,
+  // the lobby interval), and the UI draws only the kinds it has a presentation
+  // for. A binding that states another world or lists other kinds is refused
+  // here, once, instead of failing the status pump after the switch.
+  for (const c of Object.values(catalogs)) refuseForeignCatalog(c);
   const shadow = new ShadowEngine(mod);
   shadow.apply(loadCommand(sim, 0));
   const engine = shadow.handle();
@@ -374,5 +375,28 @@ function syncCars(sim: Simulation, frame: FrameView): void {
     } else {
       delete t.carLoad;
     }
+  }
+}
+
+/** Refuses a binding catalog that states another world, or lists other
+ *  facility kinds, than this build's tables for the same mode: the view was
+ *  sized from that world and the UI has a color and a description only for
+ *  those kinds. The error names the field or the kinds that differ. */
+function refuseForeignCatalog(c: Catalog): void {
+  const own = catalogFor(c.mode);
+  for (const field of Object.keys(own.world) as (keyof CatalogWorld)[]) {
+    if (c.world[field] !== own.world[field]) {
+      throw new Error(`the WASM engine's ${c.mode} catalog states a different world from this build's tables (${field})`);
+    }
+  }
+  // `readCatalog` already refuses a kind listed twice.
+  const keys = c.facilities.map((f) => f.key);
+  const kinds = new Set(own.facilities.map((f) => f.key));
+  const listed = new Set(keys);
+  const extra = keys.filter((k) => !kinds.has(k));
+  const missing = [...kinds].filter((k) => !listed.has(k));
+  if (extra.length > 0 || missing.length > 0) {
+    const parts = [extra.length > 0 ? `unknown ${extra.join(", ")}` : "", missing.length > 0 ? `missing ${missing.join(", ")}` : ""];
+    throw new Error(`the WASM engine's ${c.mode} catalog lists other facility kinds than this build draws (${parts.filter(Boolean).join("; ")})`);
   }
 }
