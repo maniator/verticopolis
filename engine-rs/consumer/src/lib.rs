@@ -17,6 +17,7 @@ use verticopolis_engine::catalog::{catalog, CATALOG_VERSION};
 use verticopolis_engine::charges::ExtendEnd;
 use verticopolis_engine::clock::GameMode;
 use verticopolis_engine::facilities::Kind;
+use verticopolis_engine::frame::{frame_view, log_since, FRAME_HEADER, PERSON_FIXED};
 use verticopolis_engine::gameplay::{
     check_catalog, check_event, RemovalMethod, CATALOG_JSON, GAMEPLAY_RING_CAP,
 };
@@ -25,8 +26,9 @@ use verticopolis_engine::load::{
     mark_founder_from_loaded_file, stamp_save,
 };
 use verticopolis_engine::rent::BatchTarget;
-use verticopolis_engine::scenario::{run_scenario, state_view, Checkpoint, Scenario, Start};
+use verticopolis_engine::scenario::{run_scenario, Checkpoint, Scenario, Start};
 use verticopolis_engine::sim::Simulation;
+use verticopolis_engine::snapshot::state_view;
 use verticopolis_engine::{export_tdt, import_tdt};
 
 /// The seed every run here starts from. Any seed works; a fixed one makes
@@ -152,11 +154,14 @@ pub fn found(seed: u32) -> Result<(Simulation, f64, f64), String> {
         }
         quoted += quote.cost;
     }
-    let r = sim.build_transport(Kind::ElevatorStandard, ELEVATOR_X, 1, 3);
-    if !r.ok {
+    // A shaft is quoted the same way (`can_build_transport`), and the quote
+    // must follow the catalog: the base price plus the per-floor cost for
+    // each floor past the first (`transportFloorCost`).
+    let quote = sim.can_build_transport(Kind::ElevatorStandard, ELEVATOR_X, 1, 3);
+    if !quote.ok {
         return Err(format!(
             "elevator refused: {}",
-            r.reason.unwrap_or_default()
+            quote.reason.unwrap_or_default()
         ));
     }
     let elevator = cat
@@ -164,9 +169,28 @@ pub fn found(seed: u32) -> Result<(Simulation, f64, f64), String> {
         .iter()
         .find(|f| f.key == "elevatorStandard")
         .ok_or("the catalog lists no elevatorStandard")?;
-    // An elevator's price is its base plus the per-floor cost for each floor
-    // past its first (catalog field `transportFloorCost`).
-    quoted += elevator.cost + 2.0 * cat.economy.transport_floor_cost;
+    if quote.cost != elevator.cost + 2.0 * cat.economy.transport_floor_cost {
+        return Err(format!(
+            "the elevator quoted {} against the catalog's {} plus two floors at {}",
+            quote.cost, elevator.cost, cat.economy.transport_floor_cost
+        ));
+    }
+    let before = sim.money;
+    let r = sim.build_transport(Kind::ElevatorStandard, ELEVATOR_X, 1, 3);
+    if !r.ok {
+        return Err(format!(
+            "the elevator quoted ok but the build failed: {}",
+            r.reason.unwrap_or_default()
+        ));
+    }
+    if before - sim.money != quote.cost {
+        return Err(format!(
+            "the elevator quoted {} and charged {}",
+            quote.cost,
+            before - sim.money
+        ));
+    }
+    quoted += quote.cost;
     let spent = start - sim.money;
     Ok((sim, spent, quoted))
 }
@@ -304,21 +328,73 @@ pub fn advance(sim: &mut Simulation, minutes: u32, events: &Value) -> Result<usi
     let mut n = 0;
     for _ in 0..minutes {
         sim.tick(1.0);
-        if sim.gameplay.len() > GAMEPLAY_RING_CAP {
-            return Err("the event buffer outgrew its cap".into());
-        }
         for e in sim.gameplay.drain() {
             check_event(events, &e.to_json())?;
             n += 1;
         }
     }
+    // The buffer holds `GAMEPLAY_RING_CAP` events and counts what a full
+    // buffer pushed out; a host that drains every frame never loses one.
     if sim.gameplay.dropped > 0 {
         return Err(format!(
-            "{} gameplay events were dropped",
+            "{} gameplay events were dropped from a buffer of {GAMEPLAY_RING_CAP}",
             sim.gameplay.dropped
         ));
     }
     Ok(n)
+}
+
+/// Read the per-frame view the way a renderer would (`frame_view`, see
+/// `src/frame.rs` for the layout): the header must agree with the
+/// simulation's own fields, and the person, unit and car records must fill
+/// the rest exactly. Returns the number of people in the frame.
+pub fn read_frame(sim: &Simulation) -> Result<usize, String> {
+    let v = frame_view(sim);
+    let header = v
+        .get(..FRAME_HEADER)
+        .ok_or("the frame is shorter than its header")?;
+    let expect = [
+        (0, sim.clock.minutes, "minutes"),
+        (3, sim.log_seq as f64, "logSeq"),
+        (4, sim.money, "money"),
+        (5, sim.star as f64, "star"),
+        (23, sim.crowd.people.len() as f64, "people"),
+        (24, sim.tower.units.len() as f64, "units"),
+        (25, sim.tower.transports.len() as f64, "transports"),
+    ];
+    for (slot, want, name) in expect {
+        if header[slot] != want {
+            return Err(format!(
+                "frame slot {slot} ({name}) is {}, not {want}",
+                header[slot]
+            ));
+        }
+    }
+    let count = |slot: usize| header[slot] as usize;
+    let mut at = FRAME_HEADER;
+    for _ in 0..count(23) {
+        let fixed = v
+            .get(at..at + PERSON_FIXED)
+            .ok_or("a person record runs off the frame")?;
+        at += PERSON_FIXED + fixed[16] as usize + fixed[17] as usize;
+    }
+    at += 6 * count(24);
+    for _ in 0..count(25) {
+        let cars = *v
+            .get(at + 1)
+            .ok_or("a transport record runs off the frame")? as usize;
+        at += 2 + 3 * cars;
+    }
+    if at != v.len() {
+        return Err(format!("the frame records end at {at} of {}", v.len()));
+    }
+    // The newest log entry is the one numbered `log_seq`.
+    let newest = log_since(sim, sim.log_seq - 1);
+    let entries = newest.as_array().ok_or("log_since is not an array")?;
+    if !sim.log.is_empty() && (entries.len() != 1 || entries[0]["seq"] != sim.log_seq) {
+        return Err(format!("log_since(logSeq - 1) gave {newest}"));
+    }
+    Ok(count(23))
 }
 
 /// Load a `.vctower` file the way the web game does: decode, deserialize,
@@ -390,6 +466,7 @@ pub fn smoke(seed: u32) -> Result<Report, String> {
     }
     // People come and go; at the hour the run ends the tower may be empty,
     // but two working days must have spawned some.
+    read_frame(&sim)?;
     let crowd = sim.crowd.view();
     if crowd["nextId"].as_i64().unwrap_or(0) <= 1 || !crowd["people"].is_array() {
         return Err(format!("no one came in two days: {}", crowd["nextId"]));
@@ -506,6 +583,20 @@ mod tests {
         let a = smoke(SEED).expect("first run");
         let b = smoke(SEED).expect("second run");
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn the_frame_reads_back_with_people_in_the_tower() {
+        let events = event_catalog().unwrap();
+        let (mut sim, _, _) = found(7).unwrap();
+        edit(&mut sim).unwrap();
+        // Through the morning, a frame at a time, until the crowd arrives.
+        let mut most = 0;
+        for _ in 0..480 {
+            advance(&mut sim, 1, &events).unwrap();
+            most = most.max(read_frame(&sim).unwrap());
+        }
+        assert!(most > 0, "no one in the tower all morning");
     }
 
     #[test]

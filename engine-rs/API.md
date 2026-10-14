@@ -55,8 +55,8 @@ console or network, and spawns no thread or process; the host passes in
 bytes, time and its build name. The one exception is a short list of
 conformance harness functions in `scenario.rs` and `tdt/referee.rs`, which
 read the scenario and fixture files they are pointed at and are never
-reached from a running game. The rest of both files, `state_view` included,
-is checked like any other library code.
+reached from a running game. The rest of both files is checked like any
+other library code.
 `tests/independence.rs` scans the library source for those services (by
 path, grouped import, macro and foreign-function block), refuses a build
 script for the engine itself, data (`include_str!`, `include_bytes!`) from
@@ -77,12 +77,13 @@ conformance.
 | --- | --- |
 | Start a game | `sim::Simulation::new_game(seed, GameMode::Classic)`, or `new_game_with(seed, mode, calendar, start_unbridged)` |
 | Advance time | `sim.tick(dt_minutes)`: any `dt`, split into steps that never skip an hour. Same seed, same commands and the same sequence of `dt` give the same game |
-| Quote a placement | `sim.can_build(kind, floor, x)`: `{ ok, reason, cost }`, the dry run `build` makes, with the full price. There is no quote call for a transport yet: an elevator costs the catalog `cost` plus `transportFloorCost` for each floor past its first, and stairs and escalators cost the catalog `cost` |
+| Quote a placement | `sim.can_build(kind, floor, x)`: `{ ok, reason, cost }`, the dry run `build` makes, with the full price. `sim.can_build_transport(kind, x, bottom, top)` is the same for a shaft, the dry run `build_transport` makes: an elevator costs the catalog `cost` plus `transportFloorCost` for each floor past its first, stairs and escalators the catalog `cost` |
 | Player commands | `build`, `build_transport`, `sell_at`, `toggle_auto_bridge` (`build.rs`); `add_car`, `remove_car`, `extend_transport`, `remove_facility` (`charges.rs`), which charge or refund and report the money moved; `adjust_rent`, `set_no_rate`, `price_unit`, `apply_rent_batch` (`rent.rs`); `resolve_choice`, `set_film_policy` (`events.rs`) |
 | Read state | the public fields (`money`, `star`, `clock`, `tower`, `crowd`, `log`, ...) and `population()`; read them, never write them |
+| Read a frame | `frame::frame_view(&sim)`: every value a renderer reads between two structural syncs (clock, money, rating, effects, then one record per person, unit and car) as one flat `Vec<f64>`, laid out in `src/frame.rs` (`FRAME_HEADER`, `PERSON_FIXED`); `frame::log_since(&sim, seq)` returns the log entries numbered after `seq`. The JavaScript binding passes the same frame across as one typed array |
 | Gameplay events | `sim.gameplay.drain()` after each frame; `to_json()` on each event; names and payloads are listed in `conformance/events/catalog.json` (`gameplay::CATALOG_JSON`, checked with `check_event`). The buffer holds `GAMEPLAY_RING_CAP` events and counts any it had to drop in `sim.gameplay.dropped` |
 | Reference data | `catalog::catalog(mode)`: prices, sizes, caps and rules per facility kind, versioned by `CATALOG_VERSION` |
-| Snapshot hash | `canonical::digest(&scenario::state_view(&sim))`: the hashed view the conformance lock pins. `state_view` is tier 1 although it lives in the harness module until stage 2 of #980 moves it |
+| Snapshot hash | `canonical::digest(&snapshot::state_view(&sim))`: the hashed view the conformance lock pins (`scenario::state_view` names the same function) |
 | Save | `load::encode_simulation_vctower(&sim, app_version, saved_at_ms)`: the `.vctower` bytes the web game writes. A host that holds the save JSON (`sim.serialize()`) gets the same file from `load::stamp_save(&mut save, app_version, saved_at_ms)` then `load::encode_vctower(&save)` |
 | Load | `load::decode_vctower(text)`, then `load::deserialize(&save)`, then `load::mark_founder_from_loaded_file(&mut sim, &save)`, which marks a file with no build stamp as a founder's tower the way the web game does (skip it and a host drops that status on its next save) |
 | 1994 saves | `import_tdt(bytes, filename)` and `export_tdt(save_json)` |
@@ -109,8 +110,8 @@ Two behaviors a host should know:
   game at that commit.
 - **Tier 1 above** changes only on purpose, in a pull request that updates
   this page and `consumer/` with it.
-- **The conformance harness** (`scenario`, apart from `state_view`,
-  `tdt::referee` and `src/bin/`) is tier 2: usable to replay the lock, and
+- **The conformance harness** (`scenario`, `tdt::referee` and `src/bin/`)
+  is tier 2: usable to replay the lock, and
   expected to move behind a feature.
 - **Everything else is internal** (tier 3), even where it is `pub`. Modules
   and fields are public so the port reads side by side with the TypeScript
@@ -120,8 +121,7 @@ Two behaviors a host should know:
   without charging; they exist to replay another engine's edits) or writing
   a field skips the rules a command applies, and any of them can change in
   any commit.
-- **Not covered yet** (stages in #980): the per-frame read model
-  (`frame_view`) is only in the WASM binding, the fixtures 15 of the 22
-  scenarios start from live in `src/tests/fixtures/`, and the fixed-step
-  driver the web host uses is TypeScript (#867). There is no quote call for
-  a transport's price.
+- **Not covered yet** (stages in #980): the fixtures 15 of the 22
+  scenarios start from live in `src/tests/fixtures/`, the tiers are stated
+  here and not yet enforced in code, and the fixed-step driver the web host
+  uses is TypeScript (#867).
