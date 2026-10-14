@@ -2,7 +2,7 @@
 
 > **Snapshot, measured 2026-10-14.** Every figure below comes from builds of
 > two commits: `d03747d` (the baseline: `main` at `6b2bb34` with #993 at
-> `c608425` merged in) and `15e71b8` (this change), each built with
+> `c608425` merged in) and `15e71b8` (this change; the review fix after it, a one-line modal gate, adds a few bytes the tables do not include), each built with
 > `npx vite build` and the same engine package from the same Rust sources.
 > It does not refresh. To measure the current tree, run the commands in
 > [Reproduce](#reproduce): `scripts/engine-bundle-size.ts` produces every

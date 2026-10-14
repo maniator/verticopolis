@@ -394,7 +394,7 @@ describe("bootGame", () => {
     try {
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
       expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "not hosting this tower: it has a crowd" } });
-      // The host follows later adopts, so saves keep the engine's writer.
+      // The host follows every later adopt, so saves keep the engine's writer.
       expect(await SaveGame.export(new Simulation(1))).toBe("VCTOWER1\nZW5naW5l\n");
       expect(encodeVctower).toHaveBeenCalledTimes(1);
     } finally {
