@@ -63,10 +63,13 @@ jobs:
       # A tooling build, so an agent that runs `npm run e2e` against this dist
       # gets the `window.game` handle the specs depend on (production builds
       # compile it away).
+      # VC_ALLOW_NO_ENGINE: the engine step above may have failed (it continues
+      # on error), and the agent's build must still succeed without it.
       - name: Build TypeScript project
         run: npm run build
         env:
           VC_TOOLING: "1"
+          VC_ALLOW_NO_ENGINE: "1"
 
       # The Rust engine (engine-rs/) builds on the same toolchain engine-rs.yml
       # pins, with the conformance referee compiled in release so an agent can
