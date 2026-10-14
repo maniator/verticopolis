@@ -331,15 +331,21 @@ export class UI {
   /** Hand the player an exported file as a browser download. Callers decide
    *  the name and contents (see SaveGame.export); raw bytes flow through too,
    *  for the binary .TDT export. Never throws: losing an export silently is
-   *  never acceptable, so every failure lands in the toast below. */
-  downloadFile(filename: string, contents: string | Uint8Array): void {
+   *  never acceptable, so every failure lands in the toast below. Returns
+   *  false when the download call threw, so a caller never follows that
+   *  failure toast with a success line of its own (GH #997). True means only
+   *  that the browser took the request: a download it blocks quietly (a
+   *  sandboxed frame, a site setting) still reads as true. */
+  downloadFile(filename: string, contents: string | Uint8Array): boolean {
     // octet-stream (not application/json, the payload isn't) so the browser
     // downloads our made-up .vctower type instead of trying to display it.
     try {
       downloadFile(filename, contents, "application/octet-stream");
+      return true;
     } catch (err) {
       console.error("[export] download failed:", err);
       this.toast("Couldn't save your tower file. Please try again.", "bad");
+      return false;
     }
   }
 
