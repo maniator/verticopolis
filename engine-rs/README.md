@@ -24,6 +24,7 @@ must reproduce every pinned checkpoint hash (`expected.json`) byte for byte.
 | `scenario.rs`, `bin/conformance.rs`, `bin/dump.rs` | `src/tests/conformance/scenario.ts` |
 | `tdt/` (`byte_reader.rs`, `byte_writer.rs`, `format.rs`, `types.rs`, `tables.rs`, `parse.rs`, `part_merge.rs`, `transports.rs`, `tail.rs`, `stamp.rs`, `pacing.rs`, `import.rs`, `import_report.rs`, `export_tables.rs`, `export_gather.rs`, `export_parking.rs`, `encoder.rs`, `export.rs`, `export_report.rs`), `tdt/referee.rs`, `bin/tdt.rs` | `src/storage/tdt*.ts` (the 1994 `.TDT` importer and exporter; `timePacing.ts` for the frame clock), `src/tests/integration/tdtCases.integration.test.ts` |
 | `catalog.rs` | `catalog.ts`: the reference data a frontend reads (see The catalog) |
+| `frame.rs`, `snapshot.rs` | `src/wasmhost/frameView.ts` decodes the frame; `src/engine/conformanceView.ts` (`stateView`): the per-frame read model and the hashed snapshot a host reads, with or without the binding |
 | `wasm.rs` (feature `wasm`) | the JavaScript binding; `src/tests/conformance/wasmEngine.ts`, `src/dualrun/` and the `.TDT` differential test (`src/tests/conformance/tdtDifferential.ts`, inputs from `src/tests/fixtures/tdtDifferentialInputs.ts`) and the `.vctower` writer test (`src/tests/integration/conformanceWasmVctower.integration.test.ts`) drive it |
 
 Functions keep the names and shape of their TypeScript originals so the two
@@ -254,7 +255,10 @@ and a "Not enough money." refusal carries that same price. Any other refusal
 carries the reason `build` would give and the facility's base price, so
 placement rules the catalog does not list (the Wedding Hall on the top floor,
 the ground-floor concourse, a claimed sky-lobby story, lobby floors) reach a
-frontend through the engine that enforces them.
+frontend through the engine that enforces them. The binding has no
+quote for a shaft yet (backlog row `engine-independence`, #980); a native host
+asks the crate's `Simulation::can_build_transport(kind, x, bottom, top)`, the
+dry run `build_transport` makes first.
 `conformanceWasmCanBuild.integration.test.ts` sweeps every kind over a grid
 of floors and positions on new games and saved towers in both modes (two
 raised to the TOWER rating, so the star-gated rules answer), with bridging on
