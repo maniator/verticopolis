@@ -188,8 +188,10 @@ export const STD_REVIEWED_PARTS: Record<string, { license: string; wasm32: boole
 export function stdLicenseProblems(copyrightHtml: string, stdLicense: string): string[] {
   const parts: { name: string; licenses: string[] }[] = [];
   const problems: string[] = [];
-  const re = /<b>File\/Directory:<\/b>\s*<code>([^<]*)<\/code>|<h3\b[^>]*>([\s\S]*?)<\/h3>|<b>License:<\/b>\s*([^<]*)/giu;
+  // A file entry may list several paths after one label; each is a part.
+  const re = /<b>File\/Directory:<\/b>((?:\s*,?\s*<code>[^<]*<\/code>)+)|<h3\b[^>]*>([\s\S]*?)<\/h3>|<b>License:<\/b>\s*([^<]*)/giu;
   let dirs = 0;
+  let group: { name: string; licenses: string[] }[] = [];
   let h3s = 0;
   let licenses = 0;
   // Commented-out markup is not on the page.
@@ -197,18 +199,22 @@ export function stdLicenseProblems(copyrightHtml: string, stdLicense: string): s
   for (const m of html.matchAll(re)) {
     if (m[1] !== undefined) {
       dirs++;
-      parts.push({ name: m[1].trim(), licenses: [] });
+      group = [...m[1].matchAll(/<code>([^<]*)<\/code>/g)].map((c) => ({ name: c[1].trim(), licenses: [] as string[] }));
+      parts.push(...group);
     }
     else if (m[2] !== undefined) {
       h3s++;
+      group = [];
       const heading = m[2].replace(/<[^>]*>/g, "").replace(/\u{1F4E6}/gu, "").trim();
       // "name-1.2.3", "name-1.2.3-rc.1", "name-1.2.3+build"
       parts.push({ name: heading.replace(/-\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+.*)?$/, ""), licenses: [] });
     } else {
       licenses++;
-      const part = parts[parts.length - 1];
-      if (part) part.licenses.push(m[3].trim());
+      // A grouped file entry's license covers every path in the group.
+      const owners = group.length > 0 ? group : parts.slice(-1);
+      if (owners.length > 0) for (const part of owners) part.licenses.push(m[3].trim());
       else problems.push(`the toolchain's copyright page has a license (${m[3].trim()}) before any part`);
+      group = [];
     }
   }
   if (parts.length === 0) return ["the toolchain's copyright page lists no parts with a license; its layout may have changed"];
@@ -218,7 +224,7 @@ export function stdLicenseProblems(copyrightHtml: string, stdLicense: string): s
   const rawH3s = (html.match(/<h3\b/gi) ?? []).length;
   const rawDirs = (html.match(/File\s*\/\s*Directory/gi) ?? []).length;
   const rawLicenses = (html.match(/<(?:b|strong)>\s*License\b/gi) ?? []).length;
-  if (rawH3s !== h3s || rawDirs !== dirs || rawLicenses !== licenses || licenses !== parts.length) {
+  if (rawH3s !== h3s || rawDirs !== dirs || rawLicenses !== licenses || licenses !== h3s + dirs || parts.some((p) => p.licenses.length !== 1)) {
     problems.push(
       `the toolchain's copyright page has ${rawH3s + rawDirs} parts and ${rawLicenses} license lines, of which ${h3s + dirs} and ${licenses} were read; its layout may have changed`,
     );
@@ -239,6 +245,13 @@ export function stdLicenseProblems(copyrightHtml: string, stdLicense: string): s
   for (const p of parts) {
     if (p.licenses.length === 0) problems.push(`${p.name} has no license line the parse could read`);
     for (const license of p.licenses) {
+      // Only SPDX ids, uppercase AND/OR/WITH, parentheses and the old "/" choice;
+      // anything else (a lowercase "and", "&", prose) is not read as a license.
+      const words = license.split(/[\s()/]+/).filter(Boolean);
+      if (!/^[A-Za-z0-9.+\-()/ ]+$/.test(license) || words.some((w) => /^(and|or|with)$/i.test(w) && !/^(AND|OR|WITH)$/.test(w))) {
+        problems.push(`${p.name} has a license the parse cannot read as SPDX: ${license}`);
+        continue;
+      }
       const reviewed = Object.prototype.hasOwnProperty.call(STD_REVIEWED_PARTS, p.name) ? STD_REVIEWED_PARTS[p.name] : undefined;
       if (reviewed) {
         if (reviewed.license !== license) problems.push(`${p.name} is now ${license} (reviewed as ${reviewed.license})`);

@@ -256,6 +256,11 @@ describe("third-party notices (#951)", () => {
     // Prerelease versions and a parenthesized choice parse; a license is matched as a whole SPDX id.
     expect(stdLicenseProblems(page + dep("newcrate-1.0.0-rc.1", "(MIT OR Apache-2.0)"), LICENSE)).toEqual([]);
     expect(stdLicenseProblems(page, "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib-Acknowledgement").join()).toMatch(/foldhash \(Zlib\) reaches wasm32/);
+    // Every path in a grouped file entry is reviewed, and a license that is not plain SPDX is refused.
+    const grouped = page.replace("<code>library/std/src/sys/sync/mutex/fuchsia.rs</code>", "<code>library/std/src/sys/sync/mutex/fuchsia.rs</code>, <code>library/std/src/sys/alloc/wasm.rs</code>");
+    expect(stdLicenseProblems(grouped, LICENSE).join()).toMatch(/alloc\/wasm\.rs is BSD-2-Clause/);
+    expect(stdLicenseProblems(page + dep("lower-1.0.0", "MIT OR Apache-2.0 and GPL-3.0-only"), LICENSE).join()).toMatch(/cannot read as SPDX/);
+    expect(stdLicenseProblems(page + dep("amp-1.0.0", "MIT OR Apache-2.0 &amp; GPL-3.0-only"), LICENSE).join()).toMatch(/cannot read as SPDX/);
     // A page whose layout changed lists nothing, which is refused rather than passed.
     expect(stdLicenseProblems("<p>no parts</p>", LICENSE).join()).toMatch(/lists no parts/);
   });

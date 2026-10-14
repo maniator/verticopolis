@@ -73,7 +73,7 @@ describe("the notices generator on a build that ships the WASM engine (#955)", (
       ["standard library twice", engineFiles({ sources: "abc", crates: [crate, std, std] }), /more than once/],
       ["a license off the allowlist", engineFiles({ sources: "abc", crates: [{ ...crate, license: "GPL-3.0-only" }, std] }), /not on the allowlist/],
       ["another file beside the package", { ...engineFiles({ sources: "abc", crates: [crate, std] }), "other.wasm": "\0asm" }, /ships other\.wasm/],
-            ["blank license text", engineFiles({ sources: "abc", crates: [{ ...crate, licenseText: " " }, std] }), /no license file/],
+      ["blank license text", engineFiles({ sources: "abc", crates: [{ ...crate, licenseText: " " }, std] }), /no license file/],
     ];
     for (const [name, files, message] of cases) {
       const r = run(build(files));
