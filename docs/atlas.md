@@ -26,8 +26,9 @@ The release flow, for maintainers:
   Publishing is the last step, so it works with GitHub's immutable releases.
   The notes are that version's player notes, read from `CHANGELOG.md` by the
   reader the in-game update prompt uses (every top-level bullet of the
-  section's first list, uncapped); a version with no player notes gets a plain
-  line. The release becomes Latest unless a higher version has already been
+  section's first list, uncapped), each printed as plain text with its
+  Markdown escaped (`releaseNoteLines`), so the page shows a note the way the
+  prompt does; a version with no player notes gets a plain line. The release becomes Latest unless a higher version has already been
   released, so a backport tagged later leaves Latest alone. Two tags pushed
   within the same few minutes can both decide they are Latest; push one at a
   time, or set Latest by hand if that happens.
@@ -202,7 +203,9 @@ reader is `src/render/atlas/lookup.ts`; in short:
    first fill that shows it, so every fill matches the game's paint exactly.
    The older `fill` chain, up to `round(fill * 8)`, follows the game's re-bake
    buckets instead; between its steps a pile can differ by a bag or a gauge
-   pixel. Draw one of the two, never both.
+   pixel. Draw one of the two, never both. An atlas built before
+   `fillExact` existed has only `fill`; fall back to it when the chain is
+   missing.
 5. A cinema draws its `cycles` (see below) after the frame's parts and before
    its occupant steps.
 
@@ -230,7 +233,10 @@ marquee bulbs swap colors 4 times a second (`marquee`, 2 steps) and the
 screen steps through its 5 frames 2.5 times a second (`screen`), so together
 they repeat every 2 seconds. At `t` seconds draw `marquee` step
 `floor(t * 4) % 2` and `screen` step `floor(t * 2.5) % 5` over the frame,
-then the occupant steps, and the room matches the game's paint at that clock.
+then the occupant steps, and the room matches the game's paint at that clock
+(the game's clock never runs negative). The one exception is a clock within
+rounding (about 1e-13 s) of a screen step, where the game adds the room's
+seed before it rounds down and can land on the next step a moment early.
 A closed cinema (its shutter down) carries no cycles. The game itself keeps
 whatever moment its last re-bake caught, so a frontend that animates them
 shows more motion than the game does.
@@ -639,5 +645,5 @@ their depth layers.
 
 ## Not in the atlas yet
 
-Event cameos (Santa, the VIP limo, the thief) are not exported yet (backlog
-row `atlas-event-cameos`).
+Event cameos (Santa, the VIP limo, the thief, the explosion) are not exported
+yet (backlog row `atlas-event-cameos`, issue #1027).

@@ -4,7 +4,10 @@ import { bake, type BakeResult, type Renderer } from "./bake";
 import type { StillJob } from "./catalog";
 import { composeFrame, composeLayered } from "./compose";
 import type { PaintSpec } from "./paint";
-import { blank, sameImage, type Image } from "./pixels";
+import { LayerError, blank, sameImage, type Image } from "./pixels";
+import { blit } from "./raster";
+import type { LayerRef } from "./schema";
+import type { ImageRef } from "./store";
 
 /**
  * Data added to frames that already shipped (an alternative chain, a frame's
@@ -109,6 +112,22 @@ describe("data added to frames that already shipped", () => {
     expect(cycles!.s.steps).toHaveLength(3);
     expect(cycles!.m.steps[0]).toBeNull();
     for (const p of [...chains!.exact.steps, ...cycles!.m.steps, ...cycles!.s.steps]) if (p) expect(p.rect.page).toBeGreaterThanOrEqual(a.pages.length);
+    // Each added step reads back out of the pages as the bake's image.
+    const room = rec(after, "room");
+    const pairs: [LayerRef, ImageRef | null][] = [
+      ...chains!.exact.steps.map((p, i): [LayerRef, ImageRef | null] => [p, room.chains!.exact.steps[i]]),
+      ...Object.entries(cycles!).flatMap(([k, c]) => c.steps.map((p, i): [LayerRef, ImageRef | null] => [p, room.cycles![k].steps[i]])),
+    ];
+    for (const [p, ref] of pairs) {
+      if (!p || !ref) {
+        expect(p).toBe(ref);
+        continue;
+      }
+      expect(ref).toEqual({ id: ref.id, dx: p.dx, dy: p.dy });
+      const fromPage = blank(p.rect.w, p.rect.h);
+      blit(fromPage, b.pages[p.rect.page], p.rect.x, p.rect.y, p.rect.w, p.rect.h, 0, 0);
+      expect(sameImage(fromPage, after.images[ref.id])).toBe(true);
+    }
     expect(b.manifest.frames.other).toEqual(a.manifest.frames.other);
     expect(checkPages(after, b)).toEqual([]);
     expect(checkLayers(b)).toEqual([]);
@@ -122,6 +141,23 @@ describe("data added to frames that already shipped", () => {
   it("leaves out a cycle that never changes the frame", () => {
     const still = bake([{ ...added, cycles: { m: { rate: 4, steps: [spec(0), spec(0)] } }, cycleChecks: [] }], renderer);
     expect(rec(still, "room").cycles).toBeUndefined();
+  });
+
+  it("refuses an alternative whose soft step fails, rather than drop the frame's soft furniture", () => {
+    const soft = (fails: number): Renderer => ({
+      ...renderer,
+      renderSoft: (p, w, h) => {
+        if (p.p === "solid" && p.css.startsWith(`x:${fails}:`)) throw new LayerError("soft pass failed");
+        const img = paintRoom(p, w, h, true);
+        const wall = paintRoom(p, w, h, false);
+        for (let i = 0; i < img.data.length; i += 4) if (img.data[i] === wall.data[i]) img.data.fill(0, i, i + 4);
+        return img;
+      },
+    });
+    const ok = bake([added, other], soft(9));
+    expect(rec(ok, "room").layers!.soft).not.toBeUndefined();
+    expect(rec(ok, "room").layers!.chains!.exact.soft).not.toBeUndefined();
+    expect(() => bake([added, other], soft(3))).toThrow(/room: chain exact step 3: an alternative chain's soft step fails/);
   });
 
   it("splits at most one chain besides its alternatives", () => {

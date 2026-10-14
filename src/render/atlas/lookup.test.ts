@@ -48,6 +48,10 @@ describe("lookupRoom", () => {
     expect(bin(3)).toMatchObject({ chains: { fillExact: RECYCLE_BREAKS.length } });
     expect(bin(-1)).toMatchObject({ chains: { fillExact: 0 } });
     expect(bin(NaN)).toMatchObject({ chains: { fillExact: 0 } });
+    const eighths = (recycleFill: number) => lookupRoom({ kind: "recycling", state: "occupied", occupants: 0, id: 1, width: FACILITIES.recycling.width }, { ...DAY, recycleFill }, 0, { recyclingEighths: true });
+    expect(eighths(0.49)).toMatchObject({ chains: { fill: 4 } });
+    expect(eighths(3)).toMatchObject({ chains: { fill: 8 } });
+    expect(eighths(NaN)).toMatchObject({ chains: { fill: 0 } });
   });
   it("cinema: the marquee and screen steps follow the clock", () => {
     const cinema = (clock: number | undefined, occupants: number) => look({ kind: "cinema", state: "occupied", occupants, id: 1 }, { ...DAY, hour: 14, clock }, 0);

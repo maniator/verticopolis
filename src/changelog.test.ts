@@ -120,9 +120,13 @@ describe("notesForVersion", () => {
   });
 });
 
-/** What a Markdown renderer makes of one release-note bullet, as HTML. */
+/** What a Markdown renderer makes of one release-note bullet, as HTML, with
+ *  the invisible word joiners the escape adds taken out. `marked` follows
+ *  CommonMark and GitHub's Markdown extensions (strikethrough, tables, bare
+ *  `www.` links); the links GitHub adds to plain text afterwards (mentions,
+ *  references, emoji) are checked by the joiners' placement below. */
 function rendered(line: string): string {
-  return marked.parse(line, { async: false });
+  return marked.parse(line, { async: false }).replace(/\u2060/g, "");
 }
 
 /** The HTML a bullet holding exactly `text` renders to: one list item with the
@@ -166,6 +170,18 @@ describe("releaseNoteLines", () => {
 
   it("is empty for a version with no player notes", () => {
     expect(releaseNoteLines(CHANGELOG, "9.9.9")).toEqual([]);
+  });
+
+  it("splits the plain text GitHub would link with an invisible joiner", () => {
+    const J = "\u2060";
+    expect(escapeMarkdown("Thanks @maniator for #12 :tada:")).toBe(`Thanks @${J}maniator for \\#${J}12 :${J}tada:`);
+    expect(escapeMarkdown("See www.example.com or https://example.com")).toBe(`See www${J}.example.com or https:${J}//example.com`);
+    expect(escapeMarkdown("Built from 1a2b3c4d5e")).toBe(`Built from 1a2b${J}3c4d5e`);
+    for (const text of ["Thanks @maniator for #12 :tada:", "See www.example.com or https://example.com", "mail me@example.com"]) {
+      expect(rendered(`- ${escapeMarkdown(text)}`), text).toBe(literalBullet(text));
+    }
+    // Words that only look like hex, and short hex, stay whole.
+    expect(escapeMarkdown("A decade of cafe 1a2b")).toBe("A decade of cafe 1a2b");
   });
 
   it("leaves plain prose as it reads", () => {

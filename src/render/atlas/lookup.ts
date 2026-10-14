@@ -2,7 +2,7 @@ import { hasBusinessHours, isOpenAt } from "../../engine/facilities";
 import { subtypeListFor } from "../../engine/retailSubtypes";
 import type { FacilityKind, UnitState } from "../../engine/types";
 import { rand } from "../sprites/common";
-import { LATE_NIGHT_KINDS, OCCUPANT_FREE, PARKING_CAR_COLORS, RECYCLE_BREAKS, isLateHour } from "./catalog";
+import { LATE_NIGHT_KINDS, OCCUPANT_FREE, PARKING_CAR_COLORS, RECYCLE_BREAKS, RECYCLE_STEPS, isLateHour } from "./catalog";
 import { CINEMA_CYCLES, cycleSteps } from "./cycles";
 import { recyclingFillStep } from "./recyclingFill";
 
@@ -44,7 +44,13 @@ export type Lookup =
   | { animation: string }
   | { frame: string; chains: Record<string, number>; overlays: string[]; cycles?: Record<string, number> };
 
-export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number): Lookup {
+/** Reader choices. `recyclingEighths` reads a recycling center through its
+ *  `fill` eighths (the game's re-bake buckets) instead of the exact chain. */
+export interface LookupOptions {
+  recyclingEighths?: boolean;
+}
+
+export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number, opts: LookupOptions = {}): Lookup {
   if (u.state === "fire" || u.state === "construction") return { animation: `${u.state}/${u.kind}` };
   let hours = "always";
   if (hasBusinessHours(u.kind)) hours = isOpenAt(u.kind, s.hour) ? "open" : "closed";
@@ -61,6 +67,7 @@ export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number): Lookup {
     return { frame: stem, chains: {}, overlays };
   }
   if (u.kind === "recycling") {
+    if (opts.recyclingEighths) return { frame: stem, chains: { fill: Math.round(Math.max(0, Math.min(1, finite(s.recycleFill))) * RECYCLE_STEPS) }, overlays: [] };
     // The exact chain, drawn instead of the eighths ('fill', which is
     // round(fill * 8)): every fill matches the game's paint.
     return { frame: stem, chains: { fillExact: recyclingFillStep(RECYCLE_BREAKS, s.recycleFill) }, overlays: [] };

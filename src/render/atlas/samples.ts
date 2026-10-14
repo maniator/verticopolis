@@ -20,6 +20,9 @@ export interface Sample {
   variant: number;
   /** For fire and construction: which loop frame to compare. */
   frame?: number;
+  /** Read a recycling center through its `fill` eighths instead of the
+   *  exact chain (`LookupOptions.recyclingEighths`). */
+  eighths?: boolean;
 }
 
 
@@ -80,7 +83,8 @@ export const SAMPLES: Sample[] = [
   s("parking empty", { kind: "parking", id: 9 }, DAY),
   s("parking with a car", { kind: "parking", id: 12 }, { ...DAY, parkingUse: 1 }, 1),
   s("parking dead", { kind: "parking", id: 12 }, { ...DAY, parkingUse: 1, dead: true }, 2),
-  s("recycling half full", { kind: "recycling" }, { ...DAY, recycleFill: 4 / 8 }),
+  { ...s("recycling half full, through the eighths", { kind: "recycling" }, { ...DAY, recycleFill: 4 / 8 }), eighths: true },
+  { ...s("recycling full, through the eighths", { kind: "recycling" }, { ...DAY, recycleFill: 1 }, 2), eighths: true },
   s("recycling full", { kind: "recycling" }, { ...DAY, recycleFill: 1 }, 2),
   s("recycling between eighths", { kind: "recycling" }, { ...DAY, recycleFill: 0.37 }, 1),
   s("recycling just past amber", { kind: "recycling" }, { ...NIGHT, recycleFill: 0.7000000000000001 }, 3),

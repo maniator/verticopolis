@@ -167,7 +167,8 @@ describe("the cinema's marquee and screen cycles", () => {
           expect(cycleSteps(CINEMA_CYCLES, (s as UnitPaint).anim)).toEqual(want);
         });
       }
-      expect(j.cycleChecks).toHaveLength(j.chains ? 20 : 10);
+      const top = (j.chains?.occupants.steps.length ?? 1) - 1;
+      expect(j.cycleChecks).toHaveLength(j.chains ? 20 + top - 1 : 10);
     }
     expect(roomJobs().some((j) => j.type === "still" && !j.name.startsWith("room/cinema/") && j.cycles)).toBe(false);
   });

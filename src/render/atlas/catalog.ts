@@ -232,7 +232,8 @@ function roomStills(kind: FacilityKind, stem: string, w: number, h: number, base
 /** The cinema's marquee and screen loops on a frame baked at clock 0. Each
  *  cycle's picture `k` is painted at a clock that shows step `k` of it and
  *  step 0 of the other, and the bake checks every pairing of the two (with
- *  no one seated, and with the chain's full house) against the paint. */
+ *  no one seated, and with the chain's full house), and every count in
+ *  between at one pairing, against the paint. */
 function withCinemaCycles(job: StillJob): StillJob {
   const at = (spec: PaintSpec, clock: number): PaintSpec => ({ ...(spec as UnitPaint), anim: clock });
   const clock = (want: Record<string, number>): number => {
@@ -256,6 +257,11 @@ function withCinemaCycles(job: StillJob): StillJob {
         cycleChecks.push({ at: want, chains: { [chain[0]]: top }, paint: at(chain[1].steps[top], clock(want)) });
       }
     }
+  }
+  // Every count in between, at one pairing with neither cycle at step 0.
+  if (chain) {
+    const want = { [mk]: 1, [sk]: 3 };
+    for (let n = 1; n < chain[1].steps.length - 1; n++) cycleChecks.push({ at: want, chains: { [chain[0]]: n }, paint: at(chain[1].steps[n], clock(want)) });
   }
   return { ...job, cycles, cycleChecks };
 }

@@ -349,6 +349,9 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
                 prevSoft = softK;
               } catch (e) {
                 if (!(e instanceof LayerError)) throw e;
+                // An alternative came after the frame shipped: letting it drop
+                // the frame's soft furniture would change older data.
+                if (chain.alternativeTo) throw new LayerError(`chain ${key} step ${k}: an alternative chain's soft step fails (${e.message})`);
                 softOk = false;
               }
             }
@@ -380,6 +383,12 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
   // images after those.
   const frameImages = store.images.length;
   added.finish(frameImages, layerStore.own.images.length);
+  // The added flat references are final now; keep them plain like the rest.
+  const plain = (ref: ImageRef | null): ImageRef | null => (ref ? { id: ref.id, dx: ref.dx, dy: ref.dy } : null);
+  for (const f of frames) {
+    for (const c of Object.values(f.chains ?? {})) if (c.alternativeTo) c.steps = c.steps.map(plain);
+    for (const c of Object.values(f.cycles ?? {})) c.steps = c.steps.map(plain);
+  }
   const resolve = (ref: PendingRef | null): ImageRef | null => (ref ? { id: ref.own ? ref.id + frameImages : ref.id, dx: ref.dx, dy: ref.dy } : null);
   for (const { frame, layers: p } of pending) {
     const layers: BakedLayers = { shell: resolve(p.shell), furniture: resolve(p.furniture) };

@@ -88,7 +88,7 @@ export function verifySample(doc: Document, jobs: readonly Job[], renderer: Rend
     pendingIncome: 0,
     label: "",
   };
-  const found = lookupRoom(unit, sample.scene, sample.variant);
+  const found = lookupRoom(unit, sample.scene, sample.variant, { recyclingEighths: sample.eighths });
   const jobName = "animation" in found ? found.animation : found.frame;
   const job = jobs.find((j) => j.name === jobName);
   if (!job) throw new Error(`no job ${jobName}`);
