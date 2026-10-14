@@ -618,7 +618,7 @@ impl Tower {
         if !(MIN_FLOOR..=MAX_FLOOR).contains(&floor) {
             return PlaceResult::fail("Outside the buildable range.");
         }
-        if x < 0 || x + f.width > LOT_WIDTH {
+        if x < 0 || x.saturating_add(f.width) > LOT_WIDTH {
             return PlaceResult::fail("Off the edge of the lot.");
         }
         if f.transport {
@@ -687,7 +687,7 @@ impl Tower {
         if !(MIN_FLOOR..=MAX_FLOOR).contains(&floor) {
             return PlaceResult::fail("Outside the buildable range.");
         }
-        if x < 0 || x + f.width > LOT_WIDTH {
+        if x < 0 || x.saturating_add(f.width) > LOT_WIDTH {
             return PlaceResult::fail("Off the edge of the lot.");
         }
         if kind == Kind::Lobby && !is_lobby_floor(floor) {

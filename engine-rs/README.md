@@ -250,9 +250,10 @@ and a "Not enough money." refusal carries that same price. Any other refusal
 carries the reason `build` would give and the facility's base price, so
 placement rules the catalog does not list (the Wedding Hall on the top floor,
 the ground-floor concourse, a claimed sky-lobby story, lobby floors) reach a
-frontend through the engine that enforces them. The binding has no quote for a shaft yet; a native host asks
-the crate's `Simulation::can_build_transport(kind, x, bottom, top)`, the dry run
-`build_transport` makes first.
+frontend through the engine that enforces them. The binding has no
+quote for a shaft yet (backlog row `engine-independence`, #980); a native host
+asks the crate's `Simulation::can_build_transport(kind, x, bottom, top)`, the
+dry run `build_transport` makes first.
 `conformanceWasmCanBuild.integration.test.ts` sweeps every kind over a grid
 of floors and positions on new games and saved towers in both modes (two
 raised to the TOWER rating, so the star-gated rules answer), with bridging on

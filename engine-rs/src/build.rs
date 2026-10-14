@@ -515,6 +515,19 @@ mod tests {
         assert!(q.reason.unwrap().contains("can span at most"));
         let q = sim.can_build_transport(Kind::Stairs, 100, i64::MIN, i64::MAX);
         assert!(q.reason.unwrap().contains("links exactly two floors"));
+        // Spans of a valid length at both ends of the range reach the rest
+        // of the placement rules, which refuse them for want of floors.
+        for (bottom, top) in [(i64::MIN, i64::MIN + 1), (i64::MAX - 1, i64::MAX)] {
+            assert!(!sim.can_build_transport(Kind::Stairs, 100, bottom, top).ok);
+            assert!(
+                !sim.can_build_transport(Kind::ElevatorStandard, 100, bottom, top)
+                    .ok
+            );
+        }
+        // The structural branch with bridging off checks the lot edge too.
+        sim.auto_bridge = false;
+        let q = sim.can_build(Kind::Floor, 2, i64::MAX);
+        assert_eq!(q.reason.as_deref(), Some("Off the edge of the lot."));
         assert!(!sim.build_transport(Kind::Stairs, i64::MAX, 1, 2).ok);
     }
 
