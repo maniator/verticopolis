@@ -3,15 +3,15 @@ import type { Simulation } from "../engine/Simulation";
 import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN } from "../engine/Simulation";
 import { SERVED_RECOVERY } from "../engine/sim/constants";
 import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
-import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind } from "../engine/facilities";
+import { isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind } from "../engine/facilities";
+import { catalogFacility, type Catalog } from "../engine/catalogTypes";
 import { isRentalKind } from "../engine/residentialRentals";
 import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";
 import { reachesLobby } from "../engine/sim/gripe";
 import { gripeLineText, wontLeaseText } from "./gripeCopy";
-import { ECON } from "../engine/econConfig";
-import { subtypeListFor } from "../engine/retailSubtypes";
 import { isOperational, isPresent, VACATE_REASON_TEXT } from "../engine/types";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
+import { towerCatalog } from "../engine/towerCatalog";
 
 // The "Main gripe" phrasing lives in gripeCopy.ts (its own leaf: the
 // unmet-demand copy branches on live coverage, and this file sits against the
@@ -70,6 +70,7 @@ const OVER_BUILT_SHARE = 0.5;
  *  party consult (Samus, Cloud, Sally, 2026-07-09); see the spec's Player-Facing
  *  Copy section for the canonical strings. */
 export function retailStatsLines(
+  yardstick: Catalog,
   kind: FacilityKind,
   patronageToday: number | undefined,
   patronageYest: number | undefined,
@@ -79,16 +80,15 @@ export function retailStatsLines(
   demandShare?: number,
   advice = false,
 ): TemplateResult[] {
-  const spend = ECON.retailSpendPerCustomer[kind];
-  // Deliberately the tuned Modern-table figure in BOTH modes (#572 review):
+  // `yardstick` is the Modern catalog in BOTH modes, deliberately (#572 review):
   // the verdict baseline means "an average good day", and Classic's seam
   // headline is the 1994 sold-out ceiling, several times that. Scoring against
   // the ceiling would read most healthy Classic venues as red forever, so the
   // verdict keeps the pre-#572 yardstick (identical verdicts for pool-limited
   // towers, better ones where the new ceilings let a venue earn more) until
   // the verdict-band calibration in the recorded playtest pass.
-  const daily = ECON.dailyTrafficIncome[kind];
-  if (spend === undefined || spend <= 0 || daily === undefined) return [];
+  const { spendPerCustomer: spend, dailyIncome: daily } = catalogFacility(yardstick, kind);
+  if (spend === null || spend <= 0 || daily === null) return [];
   // The reference is an "average good day": a venue at full local demand, well
   // placed, on a dry day. `daily / spend` is the raw ceiling where every hourly
   // multiplier is 1, but the foot-traffic factor averages TRAFFIC_FACTOR_MEAN
@@ -183,9 +183,9 @@ export function retailStatsLines(
  * connectivity signal for a zero-population service kind (keep it). One source,
  * so the editor and the diagnostics can never disagree on which kinds carry it.
  */
-export function hasAccessDiagnostic(u: Unit): boolean {
-  const f = FACILITIES[u.kind];
-  return f.population > 0 || ECON.dailyTrafficIncome[u.kind] !== undefined;
+export function hasAccessDiagnostic(catalog: Catalog, u: Unit): boolean {
+  const f = catalogFacility(catalog, u.kind);
+  return f.population > 0 || f.dailyIncome !== null;
 }
 
 /** The access line, worst condition first. Segment-aware (#647): a unit can sit
@@ -243,7 +243,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // connected only by a stair/escalator climb longer than the budget is served
   // yet not reachably-close, and no commuter ever comes. (In Modern, served
   // always equals reachable, so this middle state is Classic-only.)
-  if (hasAccessDiagnostic(u)) lines.push(accessLine(sim, u));
+  if (hasAccessDiagnostic(towerCatalog(sim), u)) lines.push(accessLine(sim, u));
   // No Rate (off-market) legibility: a chosen setting, so plain ink, neither
   // --good nor --bad. The occupied line states the census fact out loud on
   // purpose (free tenants still count is canon, the 1994 cheap-rent lever
@@ -450,15 +450,14 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // fields) still gets it, reading "just opened" until it trades. Only a gutted
   // / on-fire / mid-build venue is skipped, via the isOperational gate.
   if (
-    subtypeListFor(u.kind) !== null &&
-    isOperational(u) &&
-    ECON.dailyTrafficIncome[u.kind] !== undefined &&
-    ECON.retailSpendPerCustomer[u.kind] !== undefined
+    catalogFacility(towerCatalog(sim), u.kind).spendPerCustomer !== null &&
+    isOperational(u)
   ) {
     const demandMap = sim.demandMap();
     const demandFraction = demandMap.fractionByUnit.get(u.id);
     lines.push(
       ...retailStatsLines(
+        towerCatalog(sim, "modern"),
         u.kind,
         u.patronageToday,
         u.patronageYest,
