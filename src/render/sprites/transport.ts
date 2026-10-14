@@ -369,8 +369,7 @@ export function drawCar(
   }
   // The cab is the back; its riders are the furniture, and the door frames,
   // the center seam, the FULL bar and the lantern drawn over them are the
-  // front (depth
-  // layers, `pixelSprites/layers.ts`).
+  // front (depth layers, `pixelSprites/layers.ts`).
   layerBreak(ctx);
   // Riders stand on the cab floor as the 17px rider silhouette, packed tighter
   // as the car fills so a crowded cab reads at a glance. `riders` is the car's
