@@ -370,9 +370,11 @@ they cover. The service cab's kick plate and the express cab's livery band
 run along the cab floor on the shell, behind the riders, as the game draws
 them: the riders' legs and contact shadows cross every row of the band, and a
 band split partway along would tear where the layers part. No rider reaches
-the cab's side frames. A frame with a front has no `soft` picture. The street
-cars and the garbage truck show no one inside and are drawn flat;
-`data.depth` names the plane each draws on.
+the right side frame; the first rider's contact shadow meets the left frame
+column, which the door frame over it (front) carries as the shadow color. A
+frame with a front has no `soft` picture. The street cars and the garbage
+truck show no one inside and are drawn flat; `data.depth` names the plane
+each draws on.
 
 The layers' own images are packed on pages after the frame images', so a
 frontend that ignores `layers` reads the same frames, parts and pages as before

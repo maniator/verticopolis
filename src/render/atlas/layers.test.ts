@@ -185,7 +185,8 @@ describe("the cab floor band", () => {
         // ...and none of them paints over the band but the frames and the seam.
         expect(front.filter((r) => r.y + r.h > cab.h - 5 && !frames(r)), cab.name).toEqual([]);
         for (const r of riders) {
-          // No rider reaches the side frames (the right door frame is at w - 3).
+          // No rider reaches the right side frame (its door frame is at w - 3);
+          // the first rider's contact shadow does meet the left one at x 2.
           expect(r.x + r.w, cab.name).toBeLessThanOrEqual(cab.w - 3);
           if (r.x >= cab.w - 2 || r.x + r.w <= 2) continue; // beside the band
           for (const row of bandRows) if (row >= r.y && row < r.y + r.h) covered.add(row);
