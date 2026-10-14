@@ -48,7 +48,7 @@ context:
 - `src/build/thirdPartyNotices.ts` -- pure helpers; gains a package kind for rendering and `Unicode-3.0` on the allowlist.
 - `src/build/rustNotices.ts` -- pure helpers for the engine: the crate walk over `cargo metadata` (narrowed by the `cargo tree` listing), the record check, the copyright page decoder and the standard library's reviewed parts.
 - `.github/actions/engine-wasm/action.yml`, `.github/actions/engine-wasm-download/action.yml`, `.github/workflows/engine-rs.yml`, `.github/workflows/copilot-setup-steps.yml` -- the package cache key and path filters cover the attribution code, and both package checks require the record.
-- `engine-rs/README.md` -- the local build's toolchain pin; `CHANGELOG.md` -- the 2.30.1 heading (no player line).
+- `engine-rs/README.md` -- the local build's toolchain pin; `CHANGELOG.md` -- the 2.31.1 heading (no player line).
 - `scripts/gen-third-party-notices.ts` -- reads the record when the engine ships; the map-less engine glue stays allowed only with it.
 - `engine-rs/Cargo.toml` -- the engine's own `license` field.
 - `src/tests/thirdPartyNotices.test.ts` -- unit coverage.

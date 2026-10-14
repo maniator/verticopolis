@@ -134,13 +134,11 @@ describe("third-party notices (#951)", () => {
     expect(isNoticeFileName("notices.js")).toBe(false);
   });
 
-  it("hides the About licenses link when asked (wrapped builds) and honors a custom href", () => {
+  it("always shows the About licenses link and honors a custom href", () => {
     const host = document.createElement("div");
-    render(helpAboutBody("1.0.0", "", false), host);
-    expect(host.querySelector('a[href*="third-party-notices"]')).toBeNull();
     render(helpAboutBody("1.0.0"), host);
     expect(host.querySelector("a")?.getAttribute("href")).toBe("third-party-notices.txt");
-    render(helpAboutBody("1.0.0", "", true, "/third-party-notices.txt"), host);
+    render(helpAboutBody("1.0.0", "", "/third-party-notices.txt"), host);
     expect(host.querySelector("a")?.getAttribute("href")).toBe("/third-party-notices.txt");
   });
 

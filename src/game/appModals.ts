@@ -3,10 +3,6 @@ import type { Simulation } from "../engine/Simulation";
 import { SaveGame, saveFailureMessage } from "../storage/SaveGame";
 import { canCallExterminator, statsTemplate } from "../ui/templates/stats";
 import { trackAppAction } from "../analytics";
-import { IS_WRAPPED_BUILD } from "../platform";
-import { noteTowerOriginForSlot, storeReadDegraded } from "./desktopSaveStore";
-import { deleteSlotRouted, persistManualSave, slotDeletePending } from "./manualSavePersist";
-import { saveScopeCaption } from "./desktopScopeCaption";
 
 /**
  * The tower-statistics modal, its exterminator action, and the manual save-slot
@@ -81,39 +77,18 @@ function confirmExterminate(app: GameApp): void {
 
 export function showSaves(app: GameApp): void {
   trackAppAction("saves_open"); // saves manager modal opening
-  // The scope caption is DATA from the shell's own scope label (the D2
-  // labeling ruling: rendered from data, never a constant), so only a
-  // wrapped build can have one; the fold keeps the desktop modules out of a
-  // browser bundle.
-  app.ui.showSaves(SaveGame.listSlots(), IS_WRAPPED_BUILD ? saveScopeCaption() : undefined);
+  app.ui.showSaves(SaveGame.listSlots());
 }
 
 /** Save the live tower into a manual slot, stamping the live camera view. */
 export function saveToSlot(app: GameApp, slot: number): void {
   try {
-    // Same degraded-session refusal as Quick Save, inside the try so it
-    // reaches the same honest toast. A localStorage write in a degraded
-    // session would be overwritten by the next boot's successful hydration.
-    if (IS_WRAPPED_BUILD && storeReadDegraded()) {
-      throw new Error("Saved towers could not be read this session, so saving is paused. Restart to try again.");
-    }
-    // A slot with a store delete still in flight is refused: a save landing
-    // between the delete's dispatch and its answer would be unlinked by the
-    // pending delete right after "Saved to slot N" toasted.
-    if (IS_WRAPPED_BUILD && slotDeletePending(slot)) {
-      throw new Error(`Slot ${slot} is still being deleted. Try again in a moment.`);
-    }
     // Manual slots carry the view too: stamp the live camera the same way
     // SaveLoad does for the autosave and exports. Inside the try on purpose:
     // a disposed or context-lost engine can throw from viewState() too, and
     // that failure must reach the same honest toast, not the click handler.
     app.sim.view = app.engine.viewState();
-    // Same routing contract as Quick Save (see SaveLoad.save): store on a
-    // hydrated desktop session, SaveGame's localStorage write otherwise, and
-    // a store failure throws into the honest toast below.
-    if (!(IS_WRAPPED_BUILD && persistManualSave(app.sim, slot) === "stored")) {
-      SaveGame.saveSlot(slot, app.sim);
-    }
+    SaveGame.saveSlot(slot, app.sim);
   } catch (err) {
     // Same contract as Quick Save: a manual save must never fail silently or
     // toast success on a failed write (the throw would otherwise escape the
@@ -130,10 +105,6 @@ export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
   const loaded = slot === "auto" ? SaveGame.load() : SaveGame.loadSlot(slot);
   if (loaded) {
     app.adoptSim(loaded);
-    // AFTER adoption, matching importGame's stated rule: a load that fails to
-    // adopt must leave the live tower's origin untouched, or the still-live
-    // previous tower autosaves toward a scope it never came from.
-    if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(slot);
     trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
     app.ui.toast("Tower loaded.", "good");
   } else {
@@ -156,12 +127,7 @@ export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
  */
 export function showTowerPicker(app: GameApp, onAdopted?: () => void): void {
   trackAppAction("splash_load_open"); // distinct from the in-game manager's saves_open
-  // Same caption injection as showSaves, and the same fold; the value is
-  // spread conditionally so the optional property is absent rather than
-  // explicitly undefined (exactOptionalPropertyTypes).
-  const scope = IS_WRAPPED_BUILD ? saveScopeCaption() : undefined;
   app.ui.showTowerPicker({
-    ...(scope ? { scope } : {}),
     getSlots: () => {
       try {
         return { slots: SaveGame.listSlots(), storageBlocked: false };
@@ -209,23 +175,12 @@ export function loadFromSplash(app: GameApp, slot: number | "auto"): boolean {
   }
   if (!loaded) return false;
   app.adoptSim(loaded);
-  // Same origin note as loadFromSlot, and in the same AFTER-adoption position:
-  // the two are the same operation from different screens.
-  if (IS_WRAPPED_BUILD) noteTowerOriginForSlot(slot);
   trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
   return true;
 }
 
 export function deleteSlot(app: GameApp, slot: number): void {
-  if (IS_WRAPPED_BUILD) {
-    // Cache row goes now, store record in the background; a store refusal
-    // restores the cache, toasts, and re-renders the saves list (see
-    // deleteSlotRouted). The optimistic toast below is honest either way:
-    // the failure path SAYS the restore happened.
-    deleteSlotRouted(slot, app.ui, () => showSaves(app));
-  } else {
-    SaveGame.deleteSlot(slot);
-  }
+  SaveGame.deleteSlot(slot);
   trackAppAction("delete_save"); // slot cleared
   app.ui.toast(`Deleted slot ${slot}.`, "info");
 }

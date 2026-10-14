@@ -45,7 +45,7 @@ A pain, measured. On 2026-08-05 the production `$exception` stream went to zero 
 
 - Not a synthetic uptime or availability monitor. The canary answers "is error reporting alive," not "is the site up."
 - Not a replacement for the real error stream, and not a source of error-rate metrics. Its only information content is presence or absence.
-- Does not cover the desktop or Android shells' telemetry, which reach a different ingest route (`api/ingest/desktop.ts`).
+- Does not cover the desktop shell's telemetry route, which was retired 2026-10-14 with the wrapper builds (#991).
 - Does not attempt to canary the typed `crash` gameplay path. Forcing a synthetic WebGL context loss would corrupt the crash dashboards this spec exists to protect.
 
 ## Success signal
