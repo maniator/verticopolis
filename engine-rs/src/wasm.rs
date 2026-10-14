@@ -84,15 +84,28 @@ fn extend_json(r: &crate::charges::ExtendResult) -> Value {
 /// field must be written as a JSON integer within `Number.isSafeInteger`'s
 /// range: a number written with a fraction or an exponent (`2.0`, `1e3`,
 /// `9007199254740990.5`, which an `f64` would round to a whole number) is
-/// refused rather than rounded.
+/// refused rather than rounded. The commands read marks through
+/// [`parse_mark`]; this is its field rule alone, for the tests.
+#[cfg(test)]
 fn parse_hwm(text: &str) -> Option<(i64, i64)> {
+    parse_mark(text).flatten()
+}
+
+/// A mark's text read once: `Some(None)` for the JSON `null` (no mark, as
+/// `JSON.stringify(null)` writes it), `Some(Some(..))` for a well-formed
+/// mark (whole-number fields written as JSON integers within
+/// `Number.isSafeInteger`'s range), and `None` for anything else.
+fn parse_mark(text: &str) -> Option<Option<(i64, i64)>> {
     let v: Value = serde_json::from_str(text).ok()?;
+    if v.is_null() {
+        return Some(None);
+    }
     let field = |name: &str| {
         v.get(name)
             .and_then(Value::as_i64)
             .filter(|n| n.unsigned_abs() <= 9_007_199_254_740_991)
     };
-    Some((field("bottom")?, field("top")?))
+    Some(Some((field("bottom")?, field("top")?)))
 }
 
 /// The refusal JSON for a malformed charge command (#923).
@@ -145,10 +158,7 @@ impl Engine {
         let id_whole = id.and_then(whole);
         let hwm = match mark {
             RawMark::Absent => Some(None),
-            RawMark::Text(text) if matches!(serde_json::from_str(&text), Ok(Value::Null)) => {
-                Some(None)
-            }
-            RawMark::Text(text) => parse_hwm(&text).map(Some),
+            RawMark::Text(text) => parse_mark(&text),
             RawMark::Bad => None,
         };
         let end = end.as_deref().and_then(ExtendEnd::parse);
@@ -570,7 +580,9 @@ impl Engine {
     /// `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
     /// as JSON `{ bottom, top }` text, or null, undefined or the text `null`
     /// for none: JSON `{ ok, reason?, delta, bottom, top, added }`, the floors
-    /// billed past the mark. Every argument is read raw (#923): an id or floor
+    /// billed past the mark. Write the mark with `JSON.stringify`: each field
+    /// must be a JSON integer, so a float spelling such as `2.0`, `1e1` or
+    /// `-0` is refused. Every argument is read raw (#923): an id or floor
     /// that is not a whole JS number, an `end` that is not exactly `"up"` or
     /// `"down"`, or a mark that is not that text (an object included) is
     /// refused with `INVALID_REQUEST` and the shaft's ends as they stand.
@@ -1250,6 +1262,7 @@ mod tests {
         sim.money = 1_000_000.0;
         let mut e = Engine { sim };
         let before = e.serialize();
+        e.sim.gameplay.drain();
         let refused = |text: String| -> Value {
             let v: Value = serde_json::from_str(&text).unwrap();
             assert_eq!(v["ok"], false, "{text}");
@@ -1306,6 +1319,10 @@ mod tests {
             e.serialize(),
             before,
             "a refusal moved the tower or the money"
+        );
+        assert!(
+            e.sim.gameplay.drain().is_empty(),
+            "a refusal emitted an event"
         );
         // A well-formed call still lands.
         let ok: Value = serde_json::from_str(&e.add_car_checked(id)).unwrap();

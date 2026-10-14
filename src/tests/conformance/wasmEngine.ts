@@ -93,8 +93,8 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
     adjustRent: (id, dir) => live().adjustRent(i32(id, "id"), dir) ?? null,
     setNoRate: (id) => live().setNoRate(i32(id, "id")),
     setCars: (id, cars) => live().setCars(i32(id, "id"), i32(cars, "cars")),
-    // The charge commands take ids and floors as floats and refuse a
-    // malformed one themselves (#923), so they pass through unchecked.
+    // The charge commands read their arguments raw and refuse a malformed
+    // one themselves (#923), so they pass through unchecked.
     addCar: (id) => charge(live().addCar(id)),
     removeCar: (id) => charge(live().removeCar(id)),
     extendTransport: (id, end, targetFloor, hwm) =>

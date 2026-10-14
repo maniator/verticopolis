@@ -55,10 +55,10 @@ engines.
   `{ bottom, top }` through `JSON.stringify`, which writes none of these.
 - **Mirror:** the charge commands relay a non-number id, floor or mark field
   as NaN and a non-string `end` or `method` as an empty string, and check
-  any mark but null or undefined, so the binding only ever sees values it
-  refuses the way TypeScript does (round 1). It reads any mark but null or undefined
-  once, before the call, and hands the engine and the relay that copy
-  (rounds 5 and 6).
+  any mark but null or undefined, so a malformed value reaches the binding
+  only in a form it refuses the way TypeScript does (round 1). The mirror
+  reads such a mark once, before the call, and hands the engine and the
+  relay that copy (rounds 5 and 6).
 - **AC4:** already closed by #914, which widens the mark to the current span.
   A TypeScript test now pins it.
 - **AC5, owner decision (2026-10-13):** the confinement stays as #950's
@@ -74,10 +74,12 @@ engines.
   - A dual-run test that sends malformed commands through the mirror and
     checks that both engines stay in step.
   - `chargeBindingRaw.integration.test.ts` (in `npm run test:wasm` and the
-    Rust engine workflow's paths): 121 malformed calls straight into the
+    Rust engine workflow's paths): 122 malformed calls straight into the
     glue, each checked for no throw, the TypeScript refusal, an equal answer
-    and an unchanged state in both engines; 19 accepted edge values (ids
-    that name nothing, floors and marks at ±(2^53 - 1)) must get the same
+    and an unchanged state in both engines; 27 accepted edge values (ids
+    that name nothing, among them the shaft's id plus or minus 2^32, which
+    the old `i32` truncation aliased to the shaft; floors and marks at
+    ±(2^53 - 1)) must get the same
     answer from both; no gameplay event from either; then
     well-formed calls must land with equal answers, states and events.
 - **#958:** that PR removed the checked-in WASM package
@@ -239,3 +241,37 @@ engines.
 - Dismissed (1): a mark getter that throws makes TypeScript throw rather
   than refuse (the caller's own exception surfaces, as from any JavaScript
   call, and the mirror relays nothing).
+
+### Round 7 (confirming pass)
+
+- Edge Case Hunter: clean (21 probes of the copied mark, from primitives
+  and proxies to getters that run other commands; the one split it found,
+  a getter writing an unwatched transport field, is the mirror's general
+  limit and not this change's).
+- [x] [Review][Patch] Nothing pinned that an id cannot alias another, and no
+  mark carried Infinity (Acceptance Auditor) [chargeBindingRaw]: the shaft's
+  id plus or minus 2^32 joins the accepted edges in all four commands, and
+  an Infinity top joins the malformed marks.
+- [x] [Review][Patch] A second frontend writing marks with a float spelling
+  learns the integers-only rule only from this story (Blind Hunter)
+  [engine-rs/src/wasm.rs]: the binding's `extendTransport` doc states it.
+- [x] [Review][Patch] The mark text was parsed twice, for `null` and for the
+  fields (Blind Hunter): `parse_mark` reads it once.
+- [x] [Review][Patch] Test gaps (Blind Hunter): the TypeScript unit test
+  bills a shifting mark on a real extension and pins TypeScript taking a
+  `-0` mark field; the native Rust test checks a refusal emits no event; the
+  dual-run test asserts the ends and floors a shifting mark bills.
+- [x] [Review][Patch] The conformance adapter's comment still said "floats"
+  (Acceptance Auditor); the story's mirror bullet read awkwardly: both fixed.
+- Dismissed (7): the free relay ops (`towerSetCars`, `towerResizeTransport`)
+  reachable by a second frontend (AC5's owner decision; #990 closes the
+  caller-mark side); `ShadowCommand` typing NaN and `""` as valid (the shadow
+  only forwards them to a binding that refuses them); the checkpoint count
+  and the case counts as pinned numbers (they guard against a silent drop,
+  and each carries its reason); the raw test's loose engine type (the
+  generated `.d.ts` is checked for staleness in CI, and the test calls with
+  values the types forbid); a generic refusal reaching a player (no UI path
+  sends a malformed command, and the text would flag the bug if one did);
+  accepting zero-fraction floats in a mark (they cannot be told from a
+  rounded fraction once parsed, so the rule stays integers only and is now
+  documented on the binding).

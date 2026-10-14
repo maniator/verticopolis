@@ -186,7 +186,7 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(sim.extendTransport(lift.id, "up", 6, shifting)).toMatchObject({ ok: true, top: 6, added: 4 });
     let readsB = 0;
     const halving = { get bottom() { return readsB++ === 0 ? 1 : 0.5; }, top: 6 };
-    expect(sim.extendTransport(lift.id, "up", 7, halving)).toMatchObject({ ok: true, top: 7 });
+    expect(sim.extendTransport(lift.id, "up", 7, halving)).toMatchObject({ ok: true, bottom: 1, top: 7, added: 1 });
     let readsC = 0; // a callable mark carries fields too
     const callable = Object.assign(() => undefined, { bottom: 1 });
     Object.defineProperty(callable, "top", { get: () => (readsC++ === 0 ? 7 : 2.5) });

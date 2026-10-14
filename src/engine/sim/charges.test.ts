@@ -296,7 +296,19 @@ describe("malformed requests (#923)", () => {
     expect(sim.extendTransport(lift.id, "up", 1, shifty).ok).toBe(true); // a no-op inside the mark
     expect(reads).toBe(1);
     expect(JSON.stringify(sim.serialize())).toBe(before);
+    // A mark answering 2, then 5, on a real extension: billed on the first
+    // read, four floors, never on the second.
+    let topReads = 0;
+    const shifting = { bottom: 1, get top() { return topReads++ === 0 ? 2 : 5; } };
+    expect(sim.extendTransport(lift.id, "up", 6, shifting)).toMatchObject({ ok: true, top: 6, added: 4, delta: -4 * ECON.transportFloorCost });
+    expect(topReads).toBe(1);
+    sim.drainGameplayEvents();
     expect(sim.drainGameplayEvents()).toEqual([]);
+  });
+
+  it("takes a -0 mark field as 0, which the binding's JSON-integer mark refuses (#923)", () => {
+    const { sim, lift } = fixture();
+    expect(sim.extendTransport(lift.id, "up", 3, { bottom: -0, top: 2 })).toMatchObject({ ok: true, top: 3, added: 1 });
   });
 
   it("widens a mark narrower than the shaft, so no standing floor is billed again", () => {

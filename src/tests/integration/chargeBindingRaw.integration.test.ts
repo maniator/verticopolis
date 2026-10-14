@@ -106,6 +106,7 @@ function cases(lift: number, office: number, stairs: number): Call[] {
     ["a fractional top", { bottom: 1, top: 2.5 }, '{"bottom":1,"top":2.5}'],
     ["a top past 2^53", { bottom: 1, top: 2 ** 53 }, '{"bottom":1,"top":9007199254740992}'],
     ["a bottom past -2^53", { bottom: -(2 ** 53), top: 2 }, '{"bottom":-9007199254740992,"top":2}'],
+    ["an Infinity top", { bottom: 1, top: Infinity }, JSON.stringify({ bottom: 1, top: Infinity })],
     ["a string bottom", { bottom: "1", top: 2 }, '{"bottom":"1","top":2}'],
     ["a NaN bottom, stringified", { bottom: Number.NaN, top: 2 }, JSON.stringify({ bottom: Number.NaN, top: 2 })],
     ["a NaN bottom, written raw", { bottom: Number.NaN, top: 2 }, '{"bottom":NaN,"top":2}'],
@@ -132,7 +133,10 @@ function acceptedEdges(lift: number): Call[] {
     { name: "extendTransport(down to -(2^53 - 1))", ts: (s) => s.extendTransport(lift, "down", -max), rust: (e) => e.extendTransport(lift, "down", -max) },
     { name: "extendTransport(a mark of ±(2^53 - 1))", ts: (s) => s.extendTransport(lift, "up", max, { bottom: -max, top: max }), rust: (e) => e.extendTransport(lift, "up", max, JSON.stringify({ bottom: -max, top: max })) },
   ];
-  for (const [what, id] of [["-0", -0], ["-1", -1], ["2^53 - 1", Number.MAX_SAFE_INTEGER], ["-(2^53 - 1)", -Number.MAX_SAFE_INTEGER]] as const) {
+  // The shaft's id plus or minus 2^32 named the shaft itself when the binding
+  // truncated to i32; now each names nothing, in both engines.
+  const aliases = [["the id + 2^32", lift + 2 ** 32], ["the id - 2^32", lift - 2 ** 32]] as const;
+  for (const [what, id] of [["-0", -0], ["-1", -1], ["2^53 - 1", Number.MAX_SAFE_INTEGER], ["-(2^53 - 1)", -Number.MAX_SAFE_INTEGER], ...aliases] as const) {
     list.push({ name: `addCar(${what})`, ts: (s) => s.addCar(id), rust: (e) => e.addCar(id) });
     list.push({ name: `removeCar(${what})`, ts: (s) => s.removeCar(id), rust: (e) => e.removeCar(id) });
     list.push({ name: `removeFacility(${what}, sell)`, ts: (s) => s.removeFacility(id, "sell"), rust: (e) => e.removeFacility(id, "sell") });
@@ -165,10 +169,10 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
         }
       };
       const list = cases(lift, office, stairs);
-      expect(list).toHaveLength(121);
+      expect(list).toHaveLength(122);
       run(list, true);
       const edges = acceptedEdges(lift);
-      expect(edges).toHaveLength(19);
+      expect(edges).toHaveLength(27);
       run(edges, false);
       expect(drained(sim, engine), "a refusal emitted an event").toEqual({ ts: [], rust: [] });
 
