@@ -1,5 +1,5 @@
 import type { Simulation } from "../engine/Simulation";
-import { FACILITIES } from "../engine/facilities";
+import { catalogFacility } from "../engine/catalogTypes";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
@@ -7,6 +7,7 @@ import type { AudioEngine } from "../audio/Audio";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
 import { groundFloorStructureKind } from "../engine/tower/towerTopology";
 import { trackEconomyAction } from "../analytics";
+import { towerCatalog } from "../engine/towerCatalog";
 
 /**
  * The money boundary of the game shell: every gesture that buys, paints, or
@@ -75,7 +76,8 @@ export class BuildActions {
   transportReason(kind: FacilityKind, x: number, bottom: number, top: number): string {
     const sim = this.deps.getSim();
     if (!sim.isUnlocked(kind)) {
-      return `${FACILITIES[kind].name} unlocks at ${FACILITIES[kind].minStar}★.`;
+      const f = catalogFacility(towerCatalog(sim), kind);
+      return `${f.name} unlocks at ${f.minStar}★.`;
     }
     const v = sim.tower.validateTransport(kind, x, bottom, top);
     return v.reason ?? "A shaft can't go here. Leave a clear column through built floors.";
@@ -115,7 +117,7 @@ export class BuildActions {
     // coercion helper so the rule has one source of truth.
     if (placed > 0 && groundFloorStructureKind(kind, floor) !== kind) {
       this.deps.ui.toast(
-        `The ground floor is a lobby, so a lobby ($${FACILITIES.lobby.cost.toLocaleString()}/tile) went here.`,
+        `The ground floor is a lobby, so a lobby ($${catalogFacility(towerCatalog(sim), "lobby").cost.toLocaleString()}/tile) went here.`,
         "info",
       );
     }
@@ -134,7 +136,7 @@ export class BuildActions {
         this.deps.ui.toast(edge, "bad");
         return { placed, reason: edge };
       }
-      if (alreadyAll) return { placed, reason: `${FACILITIES[kind].name} already built here` };
+      if (alreadyAll) return { placed, reason: `${catalogFacility(towerCatalog(sim), kind).name} already built here` };
     }
     return { placed, reason };
   }
@@ -155,7 +157,7 @@ export class BuildActions {
     // the right edge left-shifts to fit instead of silently failing off-lot.
     // Loud, like the desktop press it mirrors: a tap deserves the build sfx
     // and the refusal toast. Drag steps stay quiet in paintFloorRun.
-    const seedX = snapX(kind, tile);
+    const seedX = snapX(towerCatalog(this.deps.getSim()), kind, tile);
     this.tryBuild(kind, floor, seedX);
     this.paint = { tile: seedX, floor };
   }
@@ -174,7 +176,7 @@ export class BuildActions {
       // For width-1 floor/lobby this is identical to clampTile.
       // Record the SNAPPED anchor (what was actually placed), so a later drag-run
       // extends from the placed unit, not an off-lot raw tile near the edge.
-      const seedX = snapX(kind, tile);
+      const seedX = snapX(towerCatalog(this.deps.getSim()), kind, tile);
       this.tryBuild(kind, floor, seedX, true);
       this.paint = { tile: seedX, floor };
       return;
@@ -182,13 +184,13 @@ export class BuildActions {
     for (const x of dragRunTiles(this.paint.tile, tile)) {
       // snapX each column so a WIDE unit near the right edge still lands on-lot
       // (its footprint would otherwise run off; width-1 floor/lobby is unchanged).
-      this.tryBuild(kind, floor, snapX(kind, x), true);
+      this.tryBuild(kind, floor, snapX(towerCatalog(this.deps.getSim()), kind, x), true);
     }
     // Record the SNAPPED anchor (what actually landed), not the raw pointer tile:
     // for a wide kind near the right edge snapX left-shifts the placement, so a
     // raw anchor would make the next drag step recompute from an off-lot column
     // and misfire. Identical to `tile` for width-1 floor/lobby.
-    this.paint = { tile: snapX(kind, tile), floor };
+    this.paint = { tile: snapX(towerCatalog(this.deps.getSim()), kind, tile), floor };
   }
 
   /**

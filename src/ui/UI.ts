@@ -1,4 +1,4 @@
-import { FACILITIES, isCommercialKind } from "../engine/facilities";
+import type { Catalog } from "../engine/catalogTypes";
 import type { Simulation, LogEntry } from "../engine/Simulation";
 import type { SlotInfo } from "../storage/SaveGame";
 import type { ExportReport } from "../storage/tdtExport";
@@ -11,7 +11,7 @@ import { downloadFile } from "./downloadFile";
 import { render, type TemplateResult } from "lit-html";
 import { iconElement } from "./icons";
 import { mountToolbarIcons } from "./uiToolbarIcons";
-import { toolInfoTemplate, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO } from "./templates/toolInfo";
+import { toolInfoFor, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO } from "./templates/toolInfo";
 import * as dialogs from "./uiDialogs";
 import * as panels from "./uiPanels";
 import * as status from "./uiStatus";
@@ -22,6 +22,8 @@ import { finishModal } from "./uiModal";
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
 
 export interface UICallbacks {
+  /** The live tower's catalog (#921), re-read per call. */
+  getCatalog(): Catalog;
   onSelectTool(tool: Tool): void;
   onSpeed(speed: number): void;
   /** The live game-speed index, so a dialog can pause and restore the tower. */
@@ -121,6 +123,8 @@ export class UI {
    *  affordability bitmask last applied to the DOM. The ~6 Hz pump rescans only
    *  when this changes. @internal friend-module access (uiStatus). */
   paletteScanKey: string | null = null;
+  /** The catalog the palette labels show (#921). @internal (uiPalette, uiStatus) */
+  paletteCatalog: Catalog | null = null;
 
   constructor(cb: UICallbacks) {
     this.cb = cb;
@@ -207,13 +211,7 @@ export class UI {
     document.querySelectorAll(".pal-item").forEach((x) => x.classList.remove("active"));
     if (tool.type === "build") {
       document.querySelector(`.pal-item[data-kind="${tool.kind}"]`)?.classList.add("active");
-      const f = FACILITIES[tool.kind];
-      // The Floor tool lays a lobby on the ground floor (level 1), so surface the
-      // lobby price on its info card. See groundFloorStructureKind.
-      render(
-        toolInfoTemplate(f, isCommercialKind(tool.kind), tool.kind === "floor" ? FACILITIES.lobby.cost : undefined),
-        this.el.toolInfo,
-      );
+      render(toolInfoFor(this.cb.getCatalog(), tool.kind), this.el.toolInfo);
     } else {
       document.querySelector(`.pal-item[data-tool="${tool.type}"]`)?.classList.add("active");
       render(tool.type === "bulldoze" ? BULLDOZE_TOOL_INFO : INSPECT_TOOL_INFO, this.el.toolInfo);

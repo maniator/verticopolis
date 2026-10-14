@@ -351,4 +351,18 @@ describe("facilityDiagnostics: No Rate legibility (ux-pricing-split-editor §2.2
     const texts = [...render(facilityDiagnostics(sim, unit)).querySelectorAll("div")].map((d) => d.textContent ?? "");
     expect(texts.some((t) => t.includes("No Rate"))).toBe(false);
   });
+
+  // Owner decision on #921: a Classic venue's verdict keeps the Modern
+  // yardstick (#572). A shop's Modern baseline is 2,500 / 20 x 0.8 = 100
+  // customers, so 95 yesterday reads as booming; Classic's own ceiling
+  // (20,000 / 20 x 0.8 = 800) would read it as very few.
+  it("scores a Classic shop against the Modern yardstick", () => {
+    const { sim, unit } = simWith("shop");
+    expect(sim.mode).toBe("classic");
+    unit.patronageYest = 95;
+    unit.patronageToday = 40;
+    const text = render(facilityDiagnostics(sim, unit)).textContent ?? "";
+    expect(text).toContain("Business is booming.");
+    expect(text).not.toContain("Very few customers.");
+  });
 });
