@@ -27,7 +27,9 @@ export type ShadowCommand =
   | { op: "towerSetCars"; id: number; cars: number }
   | { op: "addCar"; id: number }
   | { op: "removeCar"; id: number }
-  | { op: "extendTransport"; id: number; end: "up" | "down"; targetFloor: number; hwm: { bottom: number; top: number } | null }
+  | { op: "beginExtend"; id: number }
+  | { op: "extendTransport"; id: number; end: "up" | "down"; targetFloor: number }
+  | { op: "endExtend" }
   | { op: "removeFacility"; id: number; method: "sell" | "bulldoze" }
   | { op: "setSchedule"; id: number; schedule: unknown }
   | { op: "setStop"; id: number; floor: number; stop: boolean }

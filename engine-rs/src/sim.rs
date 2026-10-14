@@ -164,6 +164,10 @@ pub struct Simulation {
     /// The gameplay events since the host last drained (never saved or
     /// hashed; see `gameplay.rs`).
     pub gameplay: GameplayEvents,
+    /// The open extend gesture (#990) as `(id, bottom, top)`: the shaft and
+    /// the furthest span the gesture has paid for (never saved or hashed;
+    /// see `begin_extend`).
+    pub extend_gesture: Option<(i64, i64, i64)>,
 }
 
 impl Simulation {
@@ -235,6 +239,7 @@ impl Simulation {
             reach_memo: (-1, HashMap::new()),
             view: None,
             gameplay: GameplayEvents::default(),
+            extend_gesture: None,
         }
     }
 

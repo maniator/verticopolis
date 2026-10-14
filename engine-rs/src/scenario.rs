@@ -92,12 +92,12 @@ pub enum Command {
         end: String,
         #[serde(rename = "targetFloor")]
         target_floor: i64,
-        #[serde(rename = "hwmBottom")]
-        hwm_bottom: Option<i64>,
-        #[serde(rename = "hwmTop")]
-        hwm_top: Option<i64>,
         reason: Option<String>,
     },
+    #[serde(rename = "beginExtend")]
+    BeginExtend { floor: i64, x: i64 },
+    #[serde(rename = "endExtend")]
+    EndExtend,
     #[serde(rename = "removeFacility")]
     RemoveFacility {
         floor: i64,
@@ -302,10 +302,10 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
             ("x", "int"),
             ("end", "end"),
             ("targetFloor", "int"),
-            ("hwmBottom", "int?"),
-            ("hwmTop", "int?"),
             ("reason", "str?"),
         ],
+        "beginExtend" => &AT,
+        "endExtend" => &[],
         "removeFacility" => &[
             ("floor", "int"),
             ("x", "int"),
@@ -391,11 +391,6 @@ fn check_scenario(s: &Value) -> Result<(), String> {
         check_fields(&where_, c, spec, &["op"])?;
         if op == Some("buildRow") && c["from"].as_i64() > c["to"].as_i64() {
             return Err(format!("{where_}: buildRow from must not be past to"));
-        }
-        if op == Some("extendTransport")
-            && c.get("hwmBottom").is_some() != c.get("hwmTop").is_some()
-        {
-            return Err(format!("{where_}: hwmBottom and hwmTop go together"));
         }
     }
     Ok(())
@@ -833,16 +828,13 @@ fn run_scenario_inner(
                     x,
                     end,
                     target_floor,
-                    hwm_bottom,
-                    hwm_top,
                     reason,
                 } => {
                     let id = transport_id_at(&sim, *floor, *x).map_err(failed)?;
                     let side = crate::charges::ExtendEnd::parse(end)
                         .ok_or_else(|| failed(format!("unknown end {end}")))?;
-                    let hwm = hwm_bottom.zip(*hwm_top);
                     let before = sim.money;
-                    let r = sim.extend_transport(id, side, *target_floor, hwm);
+                    let r = sim.extend_transport(id, side, *target_floor);
                     expect_charge(
                         &r.charge,
                         reason,
@@ -947,6 +939,17 @@ fn run_scenario_inner(
                     )
                     .map_err(failed)?;
                 }
+                Command::BeginExtend { floor, x } => {
+                    let id = transport_id_at(&sim, *floor, *x).map_err(failed)?;
+                    expect_ok(
+                        sim.begin_extend(id),
+                        false,
+                        "beginExtend",
+                        Some("no elevator there"),
+                    )
+                    .map_err(failed)?;
+                }
+                Command::EndExtend => sim.end_extend(),
                 Command::BombThreat => sim.bomb_threat(),
                 Command::EvaluateStar => sim.evaluate_star(),
                 Command::ToggleAutoBridge => {
@@ -1318,7 +1321,7 @@ mod tests {
             ),
             (
                 r#"{"op":"extendTransport","floor":1,"x":4,"end":"up","targetFloor":3,"hwmTop":3}"#,
-                "hwmBottom and hwmTop go together",
+                "unknown field hwmTop",
             ),
             (
                 r#"{"op":"removeFacility","floor":1,"x":4,"method":"burn"}"#,

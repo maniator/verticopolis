@@ -185,17 +185,32 @@ impl Simulation {
         ChargeResult::paid(refund)
     }
 
-    /// `extendTransport(id, end, targetFloor, hwm?)`: move one end of an
-    /// elevator, billing each floor past the gesture's high-water mark and
-    /// growing only as far as the balance pays. `hwm` is `(bottom, top)`,
-    /// widened to the current span; `None` is the current span.
-    pub fn extend_transport(
-        &mut self,
-        id: i64,
-        end: ExtendEnd,
-        target_floor: i64,
-        hwm: Option<(i64, i64)>,
-    ) -> ExtendResult {
+    /// `beginExtend(id)`: open an extend gesture on an elevator, its
+    /// high-water mark starting at the shaft's current span. Any gesture
+    /// already open is dropped first. False, with no gesture open, when `id`
+    /// names no elevator.
+    pub fn begin_extend(&mut self, id: i64) -> bool {
+        self.extend_gesture = None;
+        match self.elevator(id, ONLY_ELEVATOR_EXTEND) {
+            Ok((_, _, bottom, top)) => {
+                self.extend_gesture = Some((id, bottom, top));
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    /// `endExtend()`: close the open extend gesture, if any.
+    pub fn end_extend(&mut self) {
+        self.extend_gesture = None;
+    }
+
+    /// `extendTransport(id, end, targetFloor)`: move one end of an elevator,
+    /// billing each floor past the high-water mark and growing only as far as
+    /// the balance pays. The mark is the open gesture's when `begin_extend`
+    /// opened one on this shaft, the current span otherwise, and never
+    /// reaches inside the current span.
+    pub fn extend_transport(&mut self, id: i64, end: ExtendEnd, target_floor: i64) -> ExtendResult {
         let (_, _, bottom, top) = match self.elevator(id, ONLY_ELEVATOR_EXTEND) {
             Ok(t) => t,
             Err(charge) => {
@@ -211,7 +226,11 @@ impl Simulation {
                 };
             }
         };
-        let (hb, ht) = hwm.unwrap_or((bottom, top));
+        let gesture = self
+            .extend_gesture
+            .filter(|&(gid, _, _)| gid == id)
+            .map(|(_, b, t)| (b, t));
+        let (hb, ht) = gesture.unwrap_or((bottom, top));
         let mark = (hb.min(bottom), ht.max(top));
         let (nb, nt, added) = extend_bill(
             (bottom, top),
@@ -248,6 +267,9 @@ impl Simulation {
         }
         let cost = added as f64 * TRANSPORT_FLOOR_COST;
         self.money -= cost;
+        if gesture.is_some() {
+            self.extend_gesture = Some((id, mark.0.min(nb), mark.1.max(nt)));
+        }
         ExtendResult {
             charge: ChargeResult::paid(if cost == 0.0 { 0.0 } else { -cost }),
             bottom: nb,

@@ -158,7 +158,9 @@ Commands run in order. Units and shafts are named by a tile they cover
 | `setCars` | `floor`, `x`, `cars` | Set the car count of the shaft at that tile. |
 | `addCar` | `floor`, `x`, `reason?` | Buy a car for the elevator at that tile through the engine's charge (`addCar`). |
 | `removeCar` | `floor`, `x`, `reason?` | Sell a car back for half the add-car cost (`removeCar`). |
-| `extendTransport` | `floor`, `x`, `end`, `targetFloor`, `hwmBottom?`, `hwmTop?`, `reason?` | Move the `up` or `down` end of the elevator at that tile to `targetFloor`, billed per floor past the high-water mark and clamped to the budget (`extendTransport`). `hwmBottom` and `hwmTop` go together; without them the mark is the shaft's current span. |
+| `beginExtend` | `floor`, `x` | Open an extend gesture on the elevator at that tile (`beginExtend`, #990): the engine holds its high-water mark, starting at the shaft's current span. It must open. |
+| `extendTransport` | `floor`, `x`, `end`, `targetFloor`, `reason?` | Move the `up` or `down` end of the elevator at that tile to `targetFloor`, billed per floor past the high-water mark and clamped to the budget (`extendTransport`). The mark is the open gesture's on that shaft, or the shaft's current span when none is open. |
+| `endExtend` | (none) | Close the open extend gesture (`endExtend`). |
 | `removeFacility` | `floor`, `x`, `method`, `shaft?`, `reason?` | `sell` or `bulldoze` the unit at that tile (the shaft with `shaft: true`) through the engine's removal command, which pays the refund (`removeFacility`). |
 | `setSchedule` | `floor`, `x`, `schedule` | Author the elevator schedule of the shaft at that tile (`Tower.setSchedule`), hardened the way a loaded one is; `{}` clears it. An error on a shaft that is not an elevator. |
 | `startFire` | | Start a fire at once: `EventSystem.startFire`, with no hourly roll and no fire-rescue choice. |

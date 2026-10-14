@@ -40,17 +40,18 @@ export interface EditorActionsDeps {
 }
 
 export class EditorActions {
-  /** High-water mark of a shaft's extent during an extend-arrow drag, so a
-   *  back-and-forth wiggle is only charged for floors genuinely added. The
-   *  engine bills against this mark as given, so it is bound to the sim it was
-   *  taken on: a tower swapped in mid-drag (a load, an undo) starts a new one. */
-  private extendHwm: { id: number; top: number; bottom: number; sim: Simulation } | null = null;
+  /** The shaft and sim of the extend-arrow drag in progress. The engine holds
+   *  the gesture's high-water mark (`Simulation.beginExtend`, #990), so a
+   *  back-and-forth wiggle is billed once; a tower swapped in mid-drag (a load,
+   *  an undo) has no gesture open, so the drag begins a new one on it. */
+  private extendDrag: { id: number; sim: Simulation } | null = null;
 
   constructor(private readonly deps: EditorActionsDeps) {}
 
-  /** Drop the extend high-water mark (the extend-arrow drag ended). */
+  /** Close the extend gesture (the extend-arrow drag ended). */
   endExtend(): void {
-    this.extendHwm = null;
+    this.extendDrag?.sim.endExtend();
+    this.extendDrag = null;
   }
 
   /** Open the per-shaft elevator Schedule dialog for the selected elevator
@@ -175,18 +176,17 @@ export class EditorActions {
     const t = this.deps.selectedTransport();
     if (!t || !isElevatorKind(t.kind)) return; // only lifts have extend handles / billing
     const sim = this.deps.getSim();
-    if (!this.extendHwm || this.extendHwm.id !== t.id || this.extendHwm.sim !== sim) {
-      this.extendHwm = { id: t.id, top: t.top, bottom: t.bottom, sim };
+    if (!this.extendDrag || this.extendDrag.id !== t.id || this.extendDrag.sim !== sim) {
+      this.extendDrag = { id: t.id, sim };
+      sim.beginExtend(t.id);
       this.deps.captureUndo("Extend");
     }
     const before = { bottom: t.bottom, top: t.top };
-    const res = sim.extendTransport(t.id, end, targetFloor, { bottom: this.extendHwm.bottom, top: this.extendHwm.top });
+    const res = sim.extendTransport(t.id, end, targetFloor);
     // A blocked or broke step (cap reached, no structure, another shaft in the
     // way, no money left) is silent so a drag doesn't spam toasts; the shaft
     // simply stops growing.
     if (!res.ok || (res.bottom === before.bottom && res.top === before.top)) return;
-    this.extendHwm.top = Math.max(this.extendHwm.top, res.top);
-    this.extendHwm.bottom = Math.min(this.extendHwm.bottom, res.bottom);
     this.deps.audio.sfx(res.added > 0 ? "build" : "click");
     this.deps.refreshEditor();
   }

@@ -50,8 +50,8 @@ export const ONLY_ELEVATOR_EXTEND = "Only elevators can be extended.";
 export const CAR_LIMIT = "This elevator has all the cars it can hold.";
 export const LAST_CAR = "An elevator needs at least one car.";
 export const FACILITY_GONE = "That facility is gone.";
-/** The one refusal for a malformed command (#923): an id, floor or mark that
- *  is not a whole number, or an `end` or `method` the command does not know.
+/** The one refusal for a malformed command (#923): an id or floor that is
+ *  not a whole number, or an `end` or `method` the command does not know.
  *  The web never sends one; a second frontend or a relay might. */
 export const INVALID_REQUEST = "That request is not valid.";
 
@@ -98,15 +98,43 @@ export function removeCar(sim: Simulation, id: number): ChargeResult {
   return { ok: true, delta: refund };
 }
 
+/** The open extend gesture per simulation (#990): the shaft it is on and the
+ *  furthest span the gesture has paid for. The engine holds it, so a caller
+ *  cannot bill against a mark it supplies. It is not part of the save or the
+ *  hashed views, and a swapped-in simulation (a load, an undo) has none. */
+const gestures = new WeakMap<Simulation, { id: number; bottom: number; top: number }>();
+
+/**
+ * Open an extend gesture on an elevator (an extend-arrow drag starting): its
+ * high-water mark starts at the shaft's current span, and each
+ * {@link extendTransport} on that shaft until {@link endExtend} bills only the
+ * floors past it. Any gesture already open is dropped first, so a new gesture
+ * never inherits an old one's mark. False, with no gesture open, when `id` is
+ * not a whole number or names no elevator.
+ */
+export function beginExtend(sim: Simulation, id: number): boolean {
+  gestures.delete(sim);
+  if (!whole(id)) return false;
+  const t = elevator(sim, id, ONLY_ELEVATOR_EXTEND);
+  if ("ok" in t) return false;
+  gestures.set(sim, { id, bottom: t.bottom, top: t.top });
+  return true;
+}
+
+/** Close the open extend gesture, if any (the drag ended). */
+export function endExtend(sim: Simulation): void {
+  gestures.delete(sim);
+}
+
 /**
  * Move one end of an elevator to `targetFloor`, billing
- * `ECON.transportFloorCost` for each floor past the gesture's high-water
- * mark and growing only as far as the balance pays for ({@link extendBill}).
- * Shrinking is free and refunds nothing. `hwm` is the furthest extent the
- * current gesture has already paid for (a drag that wiggles out and back is
- * billed once); omitted, it is the shaft's current span, so a one-floor
- * button press bills one floor. It is widened to the current span, so no
- * floor that already stands is billed again.
+ * `ECON.transportFloorCost` for each floor past the high-water mark and
+ * growing only as far as the balance pays for ({@link extendBill}). Shrinking
+ * is free and refunds nothing. The mark is the open gesture's when
+ * {@link beginExtend} opened one on this shaft (a drag that wiggles out and
+ * back is billed once), and the shaft's current span otherwise (a one-floor
+ * button press bills one floor). It never reaches inside the current span, so
+ * no floor that already stands is billed again.
  *
  * Any floor laid behind the shaft by the extension is part of the per-floor
  * price (see `Tower.resizeTransport`). Refused with "Not enough money." when
@@ -114,15 +142,12 @@ export function removeCar(sim: Simulation, id: number): ChargeResult {
  * floor of it, and with the tower's reason when the new span does not fit.
  * A request that changes nothing succeeds with nothing billed. A request the
  * budget pays only part of succeeds as far as it got: read the ends from the
- * result, not from the request. A malformed request (an id, floor or mark
- * that is not a whole number, or an unknown `end`) is refused with
+ * result, not from the request. A malformed request (an id or floor that is
+ * not a whole number, or an unknown `end`) is refused with
  * {@link INVALID_REQUEST} before anything moves.
  */
-export function extendTransport(sim: Simulation, id: number, end: "up" | "down", targetFloor: number, hwm?: { bottom: number; top: number } | null): ExtendResult {
-  // Read the mark once: a getter that answers differently on a second read
-  // must not pass the check and then bill against another value.
-  const given = hwm == null ? null : { bottom: hwm.bottom, top: hwm.top };
-  if (!whole(id) || !isEnd(end) || !whole(targetFloor) || (given != null && (!whole(given.bottom) || !whole(given.top)))) {
+export function extendTransport(sim: Simulation, id: number, end: "up" | "down", targetFloor: number): ExtendResult {
+  if (!whole(id) || !isEnd(end) || !whole(targetFloor)) {
     const cur = whole(id) ? sim.tower.transportById(id) : undefined;
     return { ...refuse(INVALID_REQUEST), bottom: cur?.bottom ?? 0, top: cur?.top ?? 0, added: 0 };
   }
@@ -132,7 +157,9 @@ export function extendTransport(sim: Simulation, id: number, end: "up" | "down",
     const cur = sim.tower.transportById(id);
     return { ...t, bottom: cur?.bottom ?? 0, top: cur?.top ?? 0, added: 0 };
   }
-  const mark = { bottom: Math.min(given?.bottom ?? t.bottom, t.bottom), top: Math.max(given?.top ?? t.top, t.top) };
+  const held = gestures.get(sim);
+  const gesture = held?.id === id ? held : undefined;
+  const mark = { bottom: Math.min(gesture?.bottom ?? t.bottom, t.bottom), top: Math.max(gesture?.top ?? t.top, t.top) };
   const perFloor = ECON.transportFloorCost;
   const bill = extendBill({ bottom: t.bottom, top: t.top }, mark, end, targetFloor, sim.money, perFloor);
   const unchanged = { bottom: t.bottom, top: t.top, added: 0 };
@@ -144,6 +171,10 @@ export function extendTransport(sim: Simulation, id: number, end: "up" | "down",
   if (!res.ok) return { ok: false, reason: res.reason, delta: 0, ...unchanged };
   const cost = bill.added * perFloor;
   sim.money -= cost;
+  if (gesture) {
+    gesture.bottom = Math.min(mark.bottom, bill.nb);
+    gesture.top = Math.max(mark.top, bill.nt);
+  }
   return { ok: true, delta: cost === 0 ? 0 : -cost, bottom: bill.nb, top: bill.nt, added: bill.added };
 }
 

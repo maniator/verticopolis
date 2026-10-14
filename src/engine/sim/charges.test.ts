@@ -82,19 +82,51 @@ describe("extendTransport", () => {
     expect(sim.money).toBe(1_000_000 - per);
   });
 
-  it("bills a drag only past its high-water mark, so a wiggle is billed once", () => {
+  it("bills a gesture only past its engine-held mark, so a wiggle is billed once (#990)", () => {
     const { sim, lift } = fixture();
-    const hwm = { bottom: 1, top: 2 };
-    expect(sim.extendTransport(lift.id, "up", 4, hwm).added).toBe(2);
-    hwm.top = 4;
-    expect(sim.extendTransport(lift.id, "up", 3, hwm).delta).toBe(0); // back down: free
-    expect(sim.extendTransport(lift.id, "up", 4, hwm)).toEqual({ ok: true, delta: 0, bottom: 1, top: 4, added: 0 }); // regrow within the mark
+    expect(sim.beginExtend(lift.id)).toBe(true);
+    expect(sim.extendTransport(lift.id, "up", 4).added).toBe(2);
+    expect(sim.extendTransport(lift.id, "up", 3).delta).toBe(0); // back down: free
+    expect(sim.extendTransport(lift.id, "up", 4)).toEqual({ ok: true, delta: 0, bottom: 1, top: 4, added: 0 }); // regrow within the mark
     expect(sim.money).toBe(1_000_000 - 2 * per);
+    // Once the gesture closes, the mark is the span again.
+    sim.endExtend();
+    expect(sim.extendTransport(lift.id, "up", 3).delta).toBe(0);
+    expect(sim.extendTransport(lift.id, "up", 4)).toEqual({ ok: true, delta: -per, bottom: 1, top: 4, added: 1 });
   });
 
-  it("never bills a standing floor again, whatever mark the caller passes", () => {
+  it("opens a gesture only on an elevator, on its own shaft, starting at the span (#990)", () => {
+    const { sim, lift, office, stairs } = fixture();
+    expect(sim.beginExtend(stairs.id)).toBe(false);
+    expect(sim.beginExtend(office.id)).toBe(false);
+    expect(sim.beginExtend(99_999)).toBe(false);
+    // A gesture on the lift bills another elevator from that one's own span.
+    expect(sim.beginExtend(lift.id)).toBe(true);
+    expect(sim.extendTransport(lift.id, "up", 4).added).toBe(2);
+    expect(sim.buildTransport("elevatorStandard", 14, 1, 2).ok).toBe(true);
+    const other = sim.tower.transportAt(1, 14)!;
+    expect(sim.extendTransport(other.id, "up", 3)).toMatchObject({ added: 1, delta: -per });
+    // A failed begin drops the open gesture: the shrink-and-regrow is billed.
+    expect(sim.extendTransport(lift.id, "up", 3).delta).toBe(0);
+    expect(sim.beginExtend(stairs.id)).toBe(false);
+    expect(sim.extendTransport(lift.id, "up", 4)).toMatchObject({ added: 1, delta: -per });
+    // A new gesture starts at the shaft's span, never an old gesture's mark.
+    expect(sim.extendTransport(lift.id, "up", 2).delta).toBe(0);
+    expect(sim.beginExtend(lift.id)).toBe(true);
+    expect(sim.extendTransport(lift.id, "up", 3)).toMatchObject({ added: 1, delta: -per });
+  });
+
+  it("keeps the gesture out of the save and drops it with the simulation (#990)", () => {
     const { sim, lift } = fixture();
-    expect(sim.extendTransport(lift.id, "up", 3, { bottom: 1, top: 1 })).toEqual({ ok: true, delta: -per, bottom: 1, top: 3, added: 1 });
+    const before = JSON.stringify(sim.serialize());
+    expect(sim.beginExtend(lift.id)).toBe(true);
+    expect(JSON.stringify(sim.serialize())).toBe(before);
+    expect(sim.extendTransport(lift.id, "up", 4).added).toBe(2);
+    expect(sim.extendTransport(lift.id, "up", 2).delta).toBe(0);
+    // A load or an undo swaps in a new simulation, which has no gesture open.
+    const loaded = Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())));
+    const shaft = loaded.tower.transportById(lift.id)!;
+    expect(loaded.extendTransport(shaft.id, "up", 4)).toMatchObject({ added: 2, delta: -2 * per });
   });
 
   it("grows only as far as the budget pays, and refuses when it pays for none", () => {
@@ -124,11 +156,10 @@ describe("extendTransport", () => {
     expect(sim.buildTransport("elevatorStandard", 14, 3, 4).ok).toBe(true);
     const shaft = sim.tower.transportAt(3, 14)!;
     const start = sim.money;
-    const hwm = { bottom: 3, top: 4 };
-    expect(sim.extendTransport(shaft.id, "down", 1, hwm)).toEqual({ ok: true, delta: -2 * per, bottom: 1, top: 4, added: 2 });
-    hwm.bottom = 1;
-    expect(sim.extendTransport(shaft.id, "down", 2, hwm)).toEqual({ ok: true, delta: 0, bottom: 2, top: 4, added: 0 });
-    expect(sim.extendTransport(shaft.id, "down", 1, hwm)).toEqual({ ok: true, delta: 0, bottom: 1, top: 4, added: 0 });
+    expect(sim.beginExtend(shaft.id)).toBe(true);
+    expect(sim.extendTransport(shaft.id, "down", 1)).toEqual({ ok: true, delta: -2 * per, bottom: 1, top: 4, added: 2 });
+    expect(sim.extendTransport(shaft.id, "down", 2)).toEqual({ ok: true, delta: 0, bottom: 2, top: 4, added: 0 });
+    expect(sim.extendTransport(shaft.id, "down", 1)).toEqual({ ok: true, delta: 0, bottom: 1, top: 4, added: 0 });
     // A down target above the shaft shrinks it to one floor tall, never past it.
     expect(sim.extendTransport(shaft.id, "down", 6)).toEqual({ ok: true, delta: 0, bottom: 3, top: 4, added: 0 });
     expect(sim.money).toBe(start - 2 * per);
@@ -268,7 +299,6 @@ describe("malformed requests (#923)", () => {
     expect(sim.extendTransport(lift.id, "up", 3.5)).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
     expect(sim.extendTransport(lift.id, "up", Number.NaN)).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
     expect(sim.extendTransport(lift.id, "left" as "up", 3)).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
-    expect(sim.extendTransport(lift.id, "up", 3, { bottom: 1, top: Number.NaN })).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
     expect(sim.extendTransport(lift.id + 0.5, "up", 3)).toEqual({ ...refused, bottom: 0, top: 0, added: 0 });
     expect(sim.removeFacility(office.id, "burn" as "sell")).toEqual(refused);
     expect(sim.removeFacility(office.id, "Sell" as "sell")).toEqual(refused);
@@ -286,37 +316,16 @@ describe("malformed requests (#923)", () => {
       expect(sim.extendTransport(lift.id, raw(word), 3)).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
       expect(sim.removeFacility(office.id, raw(word))).toEqual(refused);
     }
-    for (const mark of [0, "", false, "{\"bottom\":1,\"top\":2}", { bottom: "1", top: 2 }, { bottom: 1 }]) {
-      expect(sim.extendTransport(lift.id, "up", 3, raw(mark))).toEqual({ ...refused, bottom: 1, top: 2, added: 0 });
-    }
+    for (const id of [lift.id + 0.5, Number.NaN, "12", null, undefined, true]) expect(sim.beginExtend(raw(id))).toBe(false);
     expect(raw<(...a: unknown[]) => unknown>(sim.addCar).call(sim)).toEqual(refused);
     expect(raw<(...a: unknown[]) => unknown>(sim.removeFacility).call(sim, office.id)).toEqual(refused);
-    let reads = 0; // a mark that answers 1, then 0.5: checked and billed on one read
-    const shifty = { get bottom() { return reads++ === 0 ? 1 : 0.5; }, top: 2 };
-    expect(sim.extendTransport(lift.id, "up", 1, shifty).ok).toBe(true); // a no-op inside the mark
-    expect(reads).toBe(1);
     expect(JSON.stringify(sim.serialize())).toBe(before);
     expect(sim.drainGameplayEvents()).toEqual([]); // no refusal emitted one
-    // A mark answering 2, then 5, on a real extension: billed on the first
-    // read, four floors, never on the second.
-    let topReads = 0;
-    const shifting = { bottom: 1, get top() { return topReads++ === 0 ? 2 : 5; } };
-    expect(sim.extendTransport(lift.id, "up", 6, shifting)).toMatchObject({ ok: true, top: 6, added: 4, delta: -4 * ECON.transportFloorCost });
-    expect(topReads).toBe(1);
   });
 
-  it("takes a -0 mark field as 0 (the binding's mark text refuses it; see chargeBindingRaw)", () => {
+  it("ignores a caller's mark: an inflated one buys no free floors (#990)", () => {
     const { sim, lift } = fixture();
-    expect(sim.extendTransport(lift.id, "up", 3, { bottom: -0, top: 2 })).toMatchObject({ ok: true, top: 3, added: 1 });
-  });
-
-  it("widens a mark narrower than the shaft, so no standing floor is billed again", () => {
-    const { sim, lift } = fixture();
-    expect(sim.extendTransport(lift.id, "up", 4).ok).toBe(true); // shaft 1..4
-    const money = sim.money;
-    // A caller's stale mark of 1..2 must not bill floors 3 and 4 again.
-    const r = sim.extendTransport(lift.id, "up", 5, { bottom: 1, top: 2 });
-    expect(r).toMatchObject({ ok: true, top: 5, added: 1, delta: -ECON.transportFloorCost });
-    expect(sim.money).toBe(money - ECON.transportFloorCost);
+    const extend = sim.extendTransport as (...a: unknown[]) => ReturnType<Simulation["extendTransport"]>;
+    expect(extend.call(sim, lift.id, "up", 4, { bottom: 1, top: 50 })).toMatchObject({ ok: true, top: 4, added: 2, delta: -2 * ECON.transportFloorCost });
   });
 });
