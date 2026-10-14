@@ -49,8 +49,8 @@ on:
   # path filter here would leave a PR that touches none of these files
   # waiting on a check that never starts. The changes job below applies the
   # same list instead, and the jobs skip (which counts as passing) only when
-  # the filter succeeded and found no engine file. Keep the list in step
-  # with the push paths above.
+  # the filter succeeded and found no engine file. The two lists must match;
+  # src/tests/engineRsPaths.guard.test.ts fails when they differ.
   pull_request:
     branches: [main]
 
