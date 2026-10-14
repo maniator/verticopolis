@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import { catalogFor } from "../../engine/catalog";
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES, GRID, isFixedSpanTransport } from "../../engine/facilities";
 import { ECON, rentOf, carResaleRefund, resaleRefund } from "../../engine/econConfig";
@@ -13,6 +14,8 @@ import { SaveLoad } from "../../game/saveLoad";
 import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
 import { render, type TemplateResult } from "lit-html";
+
+const CAT = catalogFor("classic");
 
 /** The src/game/ controllers extracted from the GameApp class run against the
  *  real (headless) Simulation with minimal fake ui/audio ports — these tests
@@ -550,12 +553,12 @@ describe("KeyboardPlay (commit announcements)", () => {
         return { what: "paint", ok: r.placed > 0, reason: r.reason };
       }
       if (isFixedSpanTransport(kind)) {
-        const r = build.tryBuildTransport(kind, snapX(kind, tile), floor, floor + 1);
+        const r = build.tryBuildTransport(kind, snapX(CAT, kind, tile), floor, floor + 1);
         return { what: "flight", ok: r.ok, reason: r.reason };
       }
       if (FACILITIES[kind].transport) return null;
       const before = sim.tower.units.length;
-      build.tryBuild(kind, floor, snapX(kind, tile));
+      build.tryBuild(kind, floor, snapX(CAT, kind, tile));
       return { what: "room", ok: sim.tower.units.length > before };
     };
     const fakeEngine = {
@@ -588,10 +591,10 @@ describe("KeyboardPlay (commit announcements)", () => {
     tool = { type: "build", kind: "floor" };
     keyboard.commitCursor(); // paints on floor 3 support? no — floor 2 already built…
     // …so the honest line is the "already built here" reason, verbatim.
-    expect(last(announced)).toBe(announceForPlacement({ what: "paint", ok: false, reason: "Floor already built here" }, "floor", 2));
+    expect(last(announced)).toBe(announceForPlacement({ what: "paint", ok: false, reason: "Floor already built here" }, CAT, "floor", 2));
     keyboard.moveCursor(0, 1); // floor 3: fresh tiles above the strip
     keyboard.commitCursor();
-    expect(last(announced)).toBe(announceForPlacement({ what: "paint", ok: true }, "floor", 3));
+    expect(last(announced)).toBe(announceForPlacement({ what: "paint", ok: true }, CAT, "floor", 3));
     expect(last(announced)).toBe("Placed Floor on floor 3");
   });
 
@@ -599,7 +602,7 @@ describe("KeyboardPlay (commit announcements)", () => {
     keyboard.moveCursor(0, 0); // (mid, 1)
     tool = { type: "build", kind: "stairs" };
     keyboard.commitCursor();
-    expect(last(announced)).toBe(announceForPlacement({ what: "flight", ok: true, reason: "" }, "stairs", 1));
+    expect(last(announced)).toBe(announceForPlacement({ what: "flight", ok: true, reason: "" }, CAT, "stairs", 1));
     expect(last(announced)).toBe(`${FACILITIES.stairs.name} built, floors 1 to 2`);
   });
 
@@ -608,7 +611,7 @@ describe("KeyboardPlay (commit announcements)", () => {
     keyboard.moveCursor(0, 1); // (mid, 2) — on the built floor strip
     tool = { type: "build", kind: "office" };
     keyboard.commitCursor();
-    expect(last(announced)).toBe(announceForPlacement({ what: "room", ok: true }, "office", 2));
+    expect(last(announced)).toBe(announceForPlacement({ what: "room", ok: true }, CAT, "office", 2));
     expect(last(announced)).toBe("Placed Office");
   });
 

@@ -4,11 +4,13 @@ import type { Person } from "../engine/crowd/person";
 import type { LogEntry } from "../engine/types";
 import type { GameplayEvent } from "../engine/gameplayEvents";
 import type { WasmEngine, WasmModule } from "../dualrun/binding";
+import { readCatalog } from "../dualrun/catalog";
 import { loadCommand, relayCommands } from "../dualrun/mirror";
 import { ShadowEngine } from "../dualrun/shadow";
 import { decodeFrame, type FrameView } from "./frameView";
 import { mergeSimulation } from "./merge";
 import { adoptTelemetry, type TelemetryDocument } from "./telemetry";
+import { useTowerCatalogSource } from "../engine/towerCatalog";
 
 /**
  * Run a live `Simulation` on the WASM engine (story-engine-wasm-switch).
@@ -48,8 +50,13 @@ export interface WasmHost {
 
 /** Attach a host to `sim`. Throws, leaving the instance untouched, when the
  *  tower already has a crowd (the engine starts from a save, which carries
- *  none) or when a mirror or host is already attached. */
+ *  none), when a mirror or host is already attached, or when the binding's
+ *  catalog cannot be read. While attached, `towerCatalog(sim)` is the engine's. */
 export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
+  // Read the binding's catalogs first, both modes (a Classic tower's
+  // patronage readout uses the Modern yardstick): a binding whose catalog this
+  // build cannot read refuses the attach before an engine is built.
+  const catalogs = { classic: readCatalog(mod, "classic"), modern: readCatalog(mod, "modern") };
   const shadow = new ShadowEngine(mod);
   shadow.apply(loadCommand(sim, 0));
   const engine = shadow.handle();
@@ -117,6 +124,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
           relay.detach();
         } finally {
           try {
+            useTowerCatalogSource(sim, null);
             restoreOwn(sim, "serialize", ownSerialize);
             restoreOwn(sim, "drainGameplayEvents", ownDrain);
             restoreOwn(sim, "gameplayEventsDropped", ownDropped);
@@ -234,6 +242,8 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
   const drainOverride = (): GameplayEvent[] => (detached ? sim.gameplayEvents.drain() : drainHosted());
   Object.defineProperty(sim, "drainGameplayEvents", { value: drainOverride, configurable: true, writable: true });
   Object.defineProperty(sim, "gameplayEventsDropped", { get: () => droppedAtAttach + engine.gameplayEventsDropped(), configurable: true });
+  // Prices, sizes and build rules come from the engine that runs the tower.
+  useTowerCatalogSource(sim, (mode) => catalogs[mode]);
   return host;
 }
 

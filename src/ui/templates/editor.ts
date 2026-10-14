@@ -4,20 +4,20 @@ import type { Simulation } from "../../engine/Simulation";
 import type { Transport, Unit } from "../../engine/types";
 import { isOperational, isTenanted } from "../../engine/types";
 import {
-  FACILITIES,
   isCommercialKind,
-  isElevatorKind,
   isHotelKind,
   isOpenAt,
-  maxCarsFor,
   residentCount,
 } from "../../engine/facilities";
 import { householdPrice, ladderRungFor } from "../../engine/gameRules";
-import { rentConfig, rentOf, resaleRefund } from "../../engine/econConfig";
+import { rentOf } from "../../engine/econConfig";
+import { catalogFacility } from "../../engine/catalogTypes";
+import { priceOptionsFor } from "../catalogPricing";
 import { isRentalKind } from "../../engine/residentialRentals";
 import { facilityDiagnostics, hasAccessDiagnostic, transportDiagnostics } from "../../game/facilityDiagnostics";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
 import { floorTag } from "../format";
+import { towerCatalog } from "../../engine/towerCatalog";
 
 /**
  * The editor card bodies (E6-S1), pure functions of (sim, entity, mobile).
@@ -66,10 +66,10 @@ const editorShell = (
   html`${keyed(key, html`${titleBar(name)}<div class="ed-stats kv">${rows}</div>${diagnostics}${actions}`)}`;
 
 export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): TemplateResult {
-  const f = FACILITIES[u.kind];
+  const f = catalogFacility(towerCatalog(sim), u.kind);
   const floorLabel = u.floor >= 1 ? `Floor ${u.floor}` : `Basement ${1 - u.floor}`;
   const canRename = u.kind === "office" || u.kind === "condo";
-  const rcfg = rentConfig(u.kind);
+  const rcfg = f.rent;
   const rows: TemplateResult[] = [kv("Location", floorLabel), kv("Status", u.state, "status")];
   // Commercial venues show their LIVE customer count (that is what they
   // contribute to the population census); "(closed)" only for a tenanted venue
@@ -87,7 +87,7 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
   // line, so the plain Yes/No row would duplicate it: drop it there. But keep
   // it for a zero-population service kind (security/medical/housekeeping/metro),
   // whose diagnostics emit NO access line, so its connectivity still shows.
-  if (!mobile || !hasAccessDiagnostic(u)) {
+  if (!mobile || !hasAccessDiagnostic(towerCatalog(sim), u)) {
     const served = sim.tower.isFloorServed(u.floor);
     // The third state (#370): the floor is CONNECTED to the lobby (served) yet no
     // commuter completes the trip, so "Yes" would lie. Reachability is uncapped
@@ -96,7 +96,7 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
     // commuters/visitors read it (hasAccessDiagnostic, the same predicate the
     // diagnostics line uses); zero-population service kinds keep plain Yes/No.
     // "No route" echoes the inspector sentence and the stats footnote.
-    const cutOff = served && hasAccessDiagnostic(u) && !sim.floorReachable(u.floor);
+    const cutOff = served && hasAccessDiagnostic(towerCatalog(sim), u) && !sim.floorReachable(u.floor);
     let text = "Yes";
     if (!served) text = "No";
     else if (cutOff) text = "No route";
@@ -135,7 +135,7 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
     rows.push(kv("Scrap value", "$0"));
     rows.push(kv("⚠", "Gutted: bulldoze and rebuild."));
   } else {
-    rows.push(kv("Resale value", `$${resaleRefund(f.kind).toLocaleString()}`));
+    rows.push(kv("Resale value", `$${f.resaleRefund.toLocaleString()}`));
   }
 
   const actions: TemplateResult[] = [];
@@ -154,7 +154,7 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
   // nudge steppers. A SOLD condo is price-locked: the ladder shows the picker
   // DISABLED at the locked rung (the design system's "show why a thing cannot
   // be pressed"); the band keeps today's hidden-row behavior.
-  const priceShape = sim.rules.priceOptions(u.kind);
+  const priceShape = priceOptionsFor(towerCatalog(sim), u.kind);
   if (priceShape?.shape === "ladder") {
     const locked = u.kind === "condo" && u.everOccupied;
     const current: RungChoice = u.noRate ? "noRate" : ladderRungFor(priceShape.rungs, rentOf(u)).level;
@@ -218,9 +218,10 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
 }
 
 export function transportEditorTemplate(sim: Simulation, t: Transport, mobile = false): TemplateResult {
-  const f = FACILITIES[t.kind];
-  const isEl = isElevatorKind(t.kind);
-  const maxCars = maxCarsFor(t.kind);
+  const f = catalogFacility(towerCatalog(sim), t.kind);
+  // The catalog lists a car limit for elevators and no other kind.
+  const maxCars = f.maxCars;
+  const isEl = maxCars !== null;
   const rows: TemplateResult[] = [
     kv("Serves floors", `${floorTag(t.bottom)} – ${floorTag(t.top)}`, "serves"),
     kv("Height", `${t.top - t.bottom + 1} floors`, "height"),
@@ -243,7 +244,7 @@ export function transportEditorTemplate(sim: Simulation, t: Transport, mobile = 
     }
     rows.push(kv("Stops", stops, "stops"));
   }
-  rows.push(kv("Resale value", `$${resaleRefund(f.kind).toLocaleString()}`));
+  rows.push(kv("Resale value", `$${f.resaleRefund.toLocaleString()}`));
 
   const actions: TemplateResult[] = [];
   if (isEl) {

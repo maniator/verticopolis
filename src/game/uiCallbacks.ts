@@ -6,6 +6,7 @@ import type { AudioEngine } from "../audio/Audio";
 import type { SaveLoad } from "./saveLoad";
 import type { EditorActions } from "./editorActions";
 import type { InspectorController } from "./inspector";
+import { towerCatalog } from "../engine/towerCatalog";
 
 /**
  * The narrow slice of `GameApp` that {@link createUICallbacks} wires the UI to.
@@ -73,6 +74,7 @@ export interface GameAppPorts {
  */
 export function createUICallbacks(app: GameAppPorts): UICallbacks {
   return {
+    getCatalog: () => towerCatalog(app.getSim()),
     onSelectTool: (tool) => app.handleSelectTool(tool),
     onSpeed: (speed) => app.setSpeed(speed),
     getSpeed: () => app.getSpeed(),

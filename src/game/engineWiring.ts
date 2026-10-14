@@ -1,11 +1,12 @@
 import type { GameApp } from "../main";
 import { TowerEngine } from "../render/excalibur/TowerEngine";
-import { FACILITIES, isFixedSpanTransport } from "../engine/facilities";
+import { catalogFacility } from "../engine/catalogTypes";
 import { snapX } from "../ui/placement";
 import { classifyGesture, isPaintKind } from "./gesture";
 import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors, clearBuildRefusal } from "./buildPreview";
 import { runFrame, SPEEDS } from "./frameLoop";
 import { applyReducedMotion } from "./audioPrefs";
+import { towerCatalog } from "../engine/towerCatalog";
 
 /**
  * Engine wiring and post-context-loss engine rebuild, split out of the `GameApp`
@@ -26,7 +27,7 @@ export function wireEngine(app: GameApp): void {
   // also zooms). Before this, a floor/lobby/parking drag only ever panned on
   // touch, so mobile couldn't paint a run at all. On mouse the pan key
   // (Space or Shift, resolved in towerInputCamera) pans with any tool armed.
-  app.engine.classifyDown = (button, touch, panKey) => classifyGesture(app.tool, button, touch, panKey);
+  app.engine.classifyDown = (button, touch, panKey) => classifyGesture(towerCatalog(app.sim), app.tool, button, touch, panKey);
 
   // A press-without-drag: select (inspect) or, on touch, run the tool. The
   // picked entity resolves transports by collider hit-test and units by the
@@ -42,7 +43,7 @@ export function wireEngine(app: GameApp): void {
       return;
     }
     if (!touch) return; // mouse pan-taps with a build/bulldoze tool do nothing
-    app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${FACILITIES[app.tool.kind].name}`);
+    app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(towerCatalog(app.sim), app.tool.kind).name}`);
     if (app.tool.type === "bulldoze") app.build.bulldozePicked(picked);
     else if (app.tool.type === "build") {
       // Touch taps land here for every simple placement, including the
@@ -63,7 +64,7 @@ export function wireEngine(app: GameApp): void {
     app.buildAnchor = null;
     app.build.clearPaint();
     if (app.tool.type === "bulldoze" || app.tool.type === "build") {
-      app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${FACILITIES[app.tool.kind].name}`);
+      app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(towerCatalog(app.sim), app.tool.kind).name}`);
     }
     if (app.tool.type === "bulldoze") {
       app.build.bulldozePicked(picked);
@@ -81,7 +82,7 @@ export function wireEngine(app: GameApp): void {
         app.buildAnchor = { tile, floor, oTile: tile, oFloor: floor, lifting: false };
         updateBuildPreview(app, tile, floor, false); // false: red ghost carries validity, no DOM reason card on touch
       } else if (placeSimpleBuild(app, app.tool.kind, tile, floor) === null) {
-        app.transportStart = { x: snapX(app.tool.kind, tile), floor };
+        app.transportStart = { x: snapX(towerCatalog(app.sim), app.tool.kind, tile), floor };
       }
     }
   };
@@ -146,7 +147,7 @@ export function wireEngine(app: GameApp): void {
     // escalators already placed on the DOWN event, and their hover ghost
     // also lives in transportPreview, treating it as a drag commit here
     // would double-place on every desktop click.
-    if (app.tool.type === "build" && isTransportTool(app) && !isFixedSpanTransport(app.tool.kind)) {
+    if (app.tool.type === "build" && isTransportTool(app) && !catalogFacility(towerCatalog(app.sim), app.tool.kind).fixedSpan) {
       const tp = app.engine.transportPreview;
       if (tp) {
         // The helper explains failures (invalid spot, not enough money)
@@ -155,7 +156,7 @@ export function wireEngine(app: GameApp): void {
         app.engine.transportPreview = null;
       } else if (app.transportStart) {
         // Pressed without dragging, teach the drag-to-size gesture.
-        app.ui.toast(`Drag up or down to set the ${FACILITIES[app.tool.kind].name.toLowerCase()}'s height.`, "info");
+        app.ui.toast(`Drag up or down to set the ${catalogFacility(towerCatalog(app.sim), app.tool.kind).name.toLowerCase()}'s height.`, "info");
       }
     }
     app.transportStart = null;

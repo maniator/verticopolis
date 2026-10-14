@@ -1,6 +1,6 @@
 import type { Tool } from "../ui/UI";
 import type { FacilityKind } from "../engine/types";
-import { FACILITIES, isFixedSpanTransport } from "../engine/facilities";
+import { catalogFacility, type Catalog } from "../engine/catalogTypes";
 
 /**
  * Build tools that lay a contiguous RUN by dragging — the original's floor tool.
@@ -38,6 +38,7 @@ export function isPaintKind(kind: FacilityKind): boolean {
  * that lets a mouse pan while any build tool is armed.
  */
 export function classifyGesture(
+  catalog: Catalog,
   tool: Tool,
   button: number,
   touch: boolean,
@@ -49,12 +50,12 @@ export function classifyGesture(
   // in scope (a `const build = tool.type === "build"` alias only narrows under TS's
   // aliased-discriminant analysis — this form doesn't lean on it).
   const dragSized =
-    tool.type === "build" && !!FACILITIES[tool.kind].transport && !isFixedSpanTransport(tool.kind);
+    tool.type === "build" && catalogFacility(catalog, tool.kind).transport && !catalogFacility(catalog, tool.kind).fixedSpan;
   const paint = tool.type === "build" && isPaintKind(tool.kind);
   // A room build (anything buildable that isn't transport or a paint strip) owns
   // the one-finger touch drag too, so it can preview an offset ghost and place on
   // release. A fixed-span flight (transport, but not drag-sized) still pans + taps.
-  const room = tool.type === "build" && !FACILITIES[tool.kind].transport && !isPaintKind(tool.kind);
+  const room = tool.type === "build" && !catalogFacility(catalog, tool.kind).transport && !isPaintKind(tool.kind);
   if (touch && !dragSized && !paint && !room) return "pan";
   return "action";
 }

@@ -1,4 +1,8 @@
-import { FACILITIES, GRID } from "../engine/facilities";
+// The lot geometry (GRID) moves to the catalog's `world` in #921 part 2, as
+// one piece with the renderer's geometry reads. Facility widths and names
+// come from the catalog already.
+import { GRID } from "../engine/facilities";
+import { catalogFacility, type Catalog } from "../engine/catalogTypes";
 import { groundFloorStructureKind } from "../engine/tower/towerTopology";
 import type { FacilityKind } from "../engine/types";
 
@@ -29,8 +33,8 @@ export function isOffLot(tile: number): boolean {
 /** The placement column for `kind` at `tile`: shifted left just enough that
  *  the facility's full width stays inside the lot, so a wide room dropped
  *  near the right edge places instead of failing. */
-export function snapX(kind: FacilityKind, tile: number): number {
-  const w = FACILITIES[kind].width;
+export function snapX(catalog: Catalog, kind: FacilityKind, tile: number): number {
+  const w = catalogFacility(catalog, kind).width;
   return Math.max(0, Math.min(GRID.width - w, tile));
 }
 
@@ -94,11 +98,11 @@ export type PlaceOutcome =
  *  facility and where it landed; failure prefers the engine's reason (e.g.
  *  "Not enough money." or "Floor already built here") and falls back to a
  *  generic can't-place line when the engine didn't say why. */
-export function announceForPlacement(placed: PlaceOutcome, kind: FacilityKind, floor: number): string {
+export function announceForPlacement(placed: PlaceOutcome, catalog: Catalog, kind: FacilityKind, floor: number): string {
   // Ground floor is lobby-only: the Floor tool on floor 1 lays a lobby, so the
   // spoken line must name a lobby too, matching the visual toast (a screen-reader
   // user was otherwise told "Floor" for a lobby that was built).
-  const name = FACILITIES[groundFloorStructureKind(kind, floor)].name;
+  const name = catalogFacility(catalog, groundFloorStructureKind(kind, floor)).name;
   if (placed.what === "paint") {
     if (placed.ok) return `Placed ${name} on floor ${floor}`;
     return placed.reason ?? `Can't place ${name} here`;

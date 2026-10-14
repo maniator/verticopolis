@@ -1,8 +1,8 @@
 /**
- * The catalog's shape: the types a frontend reads the catalog through, and the
- * shape version. Kept free of the engine's tables (type-only imports) so a
- * frontend that reads the catalog from the WASM binding never bundles the
- * TypeScript engine. `catalog.ts` builds a catalog of this shape;
+ * The catalog's shape: the types a frontend reads the catalog through, the
+ * shape version, and the lookup by kind ({@link catalogFacility}). Kept free
+ * of the engine's tables (type-only imports) so a frontend that reads the
+ * catalog from the WASM binding never bundles the TypeScript engine. `catalog.ts` builds a catalog of this shape;
  * `engine-rs/src/catalog.rs` serializes the same one.
  */
 import type { CalendarKind } from "./calendar";
@@ -210,3 +210,23 @@ export interface CatalogFacility {
   readonly upkeepMonthly: number | null;
 }
 
+const facilityIndex = new WeakMap<Catalog, ReadonlyMap<FacilityKind, CatalogFacility>>();
+
+/** The catalog entry for `kind`, or undefined when the catalog lists no such
+ *  kind (a kind from another build, or a damaged save). */
+export function findCatalogFacility(catalog: Catalog, kind: FacilityKind): CatalogFacility | undefined {
+  let index = facilityIndex.get(catalog);
+  if (!index) {
+    index = new Map(catalog.facilities.map((f) => [f.key, f]));
+    facilityIndex.set(catalog, index);
+  }
+  return index.get(kind);
+}
+
+/** The catalog entry for `kind`. Throws when the catalog lists no such kind,
+ *  which only a damaged catalog or a kind from another build can cause. */
+export function catalogFacility(catalog: Catalog, kind: FacilityKind): CatalogFacility {
+  const f = findCatalogFacility(catalog, kind);
+  if (!f) throw new Error(`the ${catalog.mode} catalog lists no facility "${kind}"`);
+  return f;
+}

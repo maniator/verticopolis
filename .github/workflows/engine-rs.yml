@@ -26,6 +26,7 @@ on:
       - "src/dualrun/**"
       - "src/wasmhost/**"
       - "src/tests/integration/wasmHost.integration.test.ts"
+      - "src/tests/integration/wasmHostCatalog.integration.test.ts"
       - "e2e/wasmEngine.spec.ts"
       - "src/game/frameLoop.ts"
       - "src/tests/integration/loaderCases.integration.test.ts"
@@ -62,6 +63,7 @@ on:
       - "src/dualrun/**"
       - "src/wasmhost/**"
       - "src/tests/integration/wasmHost.integration.test.ts"
+      - "src/tests/integration/wasmHostCatalog.integration.test.ts"
       - "e2e/wasmEngine.spec.ts"
       - "src/game/frameLoop.ts"
       - "src/tests/integration/loaderCases.integration.test.ts"
@@ -84,6 +86,92 @@ permissions:
   contents: read
 
 jobs:
+  # A host outside the web game. The job runs in the official Rust image
+  # (pinned by digest), which has the toolchain and git and no Node.js, so
+  # nothing on the runner is changed or removed. The checkout holds only
+  # engine-rs/ and conformance/. engine-rs/consumer/ is then copied out of
+  # the checkout and built there against the engine by an absolute path, the
+  # way a crate in its own repository would depend on a local clone, and it
+  # lints, tests, runs the smoke and replays every scenario that starts from
+  # a new game (API.md). What this proves and what it does not: the engine
+  # builds and runs with no web game and no Node.js, from a crate outside
+  # the tree; it does not prove a packaged or registry release, which needs
+  # the conformance files inside the crate first (#893). The scenarios that
+  # start from a save fixture need src/tests/fixtures/ until stage 3 of #980.
+  consumer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    container:
+      # rust:1.97.0-bookworm, the toolchain the engine pins (rust-version).
+      image: rust:1.97.0-bookworm@sha256:8fa55b2f3ddf97471ab6a767bfa3f37e6bad0986ba823e75fea57e2a2a5c3073
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /engine-rs/
+            /conformance/
+
+      - name: Only the engine and the conformance suite are checked out
+        run: |
+          top="$(ls -A | grep -vx '.git' | sort | tr '\n' ' ')"
+          if [ "$top" != "conformance engine-rs " ]; then
+            echo "the checkout holds: $top"; exit 1
+          fi
+          test -f engine-rs/Cargo.toml
+          test -f conformance/expected.json
+
+      # The Actions runner mounts its own Node.js under /__e for JavaScript
+      # actions such as checkout; it is not on PATH, and the image has none.
+      - name: Node.js is unreachable
+        run: |
+          for n in node nodejs npm npx corepack yarn pnpm bun; do
+            if command -v "$n"; then echo "$n is on PATH"; exit 1; fi
+          done
+          if find /usr /opt /bin /sbin /root /home -xdev \( -name node -o -name nodejs \) -type f 2>/dev/null | grep .; then
+            echo "the image holds Node.js"; exit 1
+          fi
+
+      - name: Rust toolchain
+        run: |
+          rustup show active-toolchain | grep -q '^1\.97\.0'
+          rustup component add rustfmt clippy
+
+      - name: The engine library builds alone
+        working-directory: engine-rs
+        run: cargo build --locked --lib
+
+      - name: The consumer, in place
+        working-directory: engine-rs/consumer
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          # The JavaScript binding is a feature a native host never turns on,
+          # and no browser crate or getrandom is in the tree. Normal and
+          # build dependencies on every target count; the tree is captured
+          # first so a cargo failure fails the step.
+          tree="$(cargo tree --locked -e normal,build --target all --prefix none)"
+          test -n "$tree"
+          if grep -E '^(wasm-bindgen|js-sys|web-sys|getrandom) ' <<<"$tree"; then
+            echo "a browser or host crate reached a native host's tree"; exit 1
+          fi
+
+      - name: The consumer, as a crate outside the checkout
+        run: |
+          ws="$PWD"
+          host="$RUNNER_TEMP/host"
+          mkdir -p "$host"
+          cp -R engine-rs/consumer/Cargo.toml engine-rs/consumer/Cargo.lock engine-rs/consumer/src "$host/"
+          sed -i "s|^verticopolis-engine = { path = \"..\" }|verticopolis-engine = { path = \"$ws/engine-rs\" }|" "$host/Cargo.toml"
+          grep -qx "verticopolis-engine = { path = \"$ws/engine-rs\" }" "$host/Cargo.toml"
+          cd "$host"
+          VC_CONFORMANCE="$ws/conformance" cargo test --locked
+          cargo run --locked --release -- "$ws/conformance"
+
   engine-rs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
