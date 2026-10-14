@@ -150,7 +150,7 @@ describe("worker host round 2 (fake engine)", () => {
     h.detach();
   });
 
-  it("drops a timed-out settle's waiter", async () => {
+  it("ends a settle that never gets an answer at the host's own cap", async () => {
     const mod = fakeModule();
     const sent: ToWorker[] = [];
     const core = new EngineWorkerCore(mod, () => {});

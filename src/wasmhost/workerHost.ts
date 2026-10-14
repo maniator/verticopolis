@@ -130,6 +130,8 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   let engineMinutes = sim.clock.minutes;
   const minutesAtAttach = sim.clock.minutes;
   const commandTimes = new Map<number, number>();
+  /** When a stale reply first included a command (its ack). */
+  const ackedAt = new Map<number, number>();
   let waiters: (() => void)[] = [];
   // The read model's cursors, as the main-thread host keeps them.
   let engineLogSeq = 0;
@@ -221,6 +223,12 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     lastFresh = fresh;
     if (!fresh) {
       stats.staleReplies++;
+      // The commands this reply includes are acknowledged now, though not
+      // yet visible.
+      for (const [s] of commandTimes) {
+        if (s > r.seq) break;
+        if (!ackedAt.has(s)) ackedAt.set(s, t0);
+      }
       staleStreak++;
       for (const e of events) held.push(e);
       if (r.merge) needMerge = true;
@@ -234,14 +242,6 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       if (staleStreak < MAX_STALE_STREAK || waiters.length > 0) requestFrame();
       return;
     }
-    // Every command so far is in this reply: the read model's copies of
-    // their events are the engine's, which arrive now, after any held ones.
-    for (const e of held) carried.push(e);
-    for (const e of events) carried.push(e);
-    held = [];
-    sim.gameplayEvents.drain();
-    staleStreak = 0;
-    engineMinutes = h.minutes;
     relay.suppress(() => {
       if (r.merge) {
         const t = now();
@@ -267,6 +267,17 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       }
       applyRecords(sim, r.view, h);
     });
+    // Applied: every command so far is in the read model, so its copies of
+    // their events give way to the engine's, which arrive now, after any
+    // held ones, and the engine's minute is the read model's. (A reply that
+    // throws above is fatal before any of this, so a fallback gives its
+    // steps back and hands out none of its events.)
+    for (const e of held) carried.push(e);
+    for (const e of events) carried.push(e);
+    held = [];
+    sim.gameplayEvents.drain();
+    staleStreak = 0;
+    engineMinutes = h.minutes;
     // Caught up: every op but camera stamps is in this reply.
     const caughtUp = r.seq >= lastStateSeq;
     if (caughtUp && h.minutes !== sim.clock.minutes) {
@@ -280,10 +291,11 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     const t1 = now();
     for (const [s, sent] of commandTimes) {
       if (s > r.seq) break;
-      pushSample(stats.commandAckMs, t0 - sent);
+      pushSample(stats.commandAckMs, (ackedAt.get(s) ?? t0) - sent);
       pushSample(stats.commandVisibleMs, t1 - sent);
       stats.commandsAcked++;
       commandTimes.delete(s);
+      ackedAt.delete(s);
     }
     stats.applyMs += t1 - t0;
     if (waiters.length > 0) {
