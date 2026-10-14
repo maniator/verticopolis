@@ -13,6 +13,7 @@ on:
       - scripts/engine-third-party.ts
       - scripts/license-files.ts
       - src/build/thirdPartyNotices.ts
+      - src/build/rustNotices.ts
       - src/wasmhost/packageHash.ts
   pull_request:
     paths:
@@ -23,6 +24,7 @@ on:
       - scripts/engine-third-party.ts
       - scripts/license-files.ts
       - src/build/thirdPartyNotices.ts
+      - src/build/rustNotices.ts
       - src/wasmhost/packageHash.ts
 
 # Least privilege at the workflow level too (the job below restates it): setup

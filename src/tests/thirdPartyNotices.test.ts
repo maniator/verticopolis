@@ -5,9 +5,6 @@ import { render } from "lit-html";
 import {
   INJECTED_CODE,
   collectPackageDirs,
-  cargoTreePackages,
-  engineRecordPackages,
-  htmlText,
   declaredLicense,
   isAllowedLicense,
   isLicenseFileName,
@@ -17,11 +14,10 @@ import {
   packageDirFromSource,
   packageNameFromDir,
   renderNotices,
-  shippedCrates,
   sourceToPath,
-  type CargoMetadata,
   type NoticePackage,
 } from "../build/thirdPartyNotices";
+import { cargoTreePackages, engineRecordPackages, htmlText, shippedCrates, stdLicenseProblems, type CargoMetadata } from "../build/rustNotices";
 import { helpAboutBody } from "../ui/templates/helpContent";
 
 describe("third-party notices (#951)", () => {
@@ -226,6 +222,32 @@ describe("third-party notices (#951)", () => {
     const listing = "engine v1.0.0 (/r/engine)\nserde v1.0.0\nserde_derive v1.0.0 (proc-macro)\nserde v1.0.0 (*)\n\n";
     expect([...cargoTreePackages(listing)]).toEqual(["engine v1.0.0", "serde v1.0.0", "serde_derive v1.0.0"]);
     expect(shippedCrates(meta, cargoTreePackages(listing)).map((p) => p.name)).toEqual(["serde"]);
+  });
+
+  it("holds the standard library's license to a reviewed list of its parts (#974)", () => {
+    const LICENSE = "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib";
+    const dir = (path: string, license: string) => `<p><b>File/Directory:</b> <code>${path}</code></p><p><b>License:</b> ${license}</p>`;
+    const dep = (name: string, license: string) => `<h3>📦 ${name}</h3><p><b>License:</b> ${license}</p>`;
+    const page = [
+      dir(".", "Apache-2.0 OR MIT"),
+      dir("library/core/src/unicode/unicode_data.rs", "Unicode-3.0"),
+      dir("library/std/src/sys/sync/mutex/fuchsia.rs", "BSD-2-Clause AND (Apache-2.0 OR MIT)"),
+      dep("dlmalloc-0.2.13", "MIT/Apache-2.0"),
+      dep("foldhash-0.2.0", "Zlib"),
+      dep("fortanix-sgx-abi-0.6.1", "MPL-2.0"),
+      dep("r-efi-5.3.0", "MIT OR Apache-2.0 OR LGPL-2.1-or-later"),
+      dep("wasip3-0.6.0+wasi-0.3.0-rc-2026-03-15", "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"),
+      dep("vex-sdk-0.27.1", "MIT"),
+    ].join("\n");
+    expect(stdLicenseProblems(page, LICENSE)).toEqual([]);
+    // A new part under a license that offers neither MIT nor Apache-2.0 waits for a review.
+    expect(stdLicenseProblems(page + dep("newcrate-1.0.0", "BSD-3-Clause"), LICENSE).join()).toMatch(/newcrate is BSD-3-Clause, which is not reviewed/);
+    expect(stdLicenseProblems(page + dir("library/std/src/new.rs", "MIT AND BSD-2-Clause"), LICENSE).join()).toMatch(/new\.rs is MIT AND BSD-2-Clause/);
+    // A reviewed part that changes license, or a wasm32 part the entry leaves out.
+    expect(stdLicenseProblems(page.replace("MPL-2.0", "GPL-2.0-only"), LICENSE).join()).toMatch(/fortanix-sgx-abi is now GPL-2\.0-only/);
+    expect(stdLicenseProblems(page, "(MIT OR Apache-2.0) AND Unicode-3.0").join()).toMatch(/foldhash \(Zlib\) reaches wasm32/);
+    // A page whose layout changed lists nothing, which is refused rather than passed.
+    expect(stdLicenseProblems("<p>no parts</p>", LICENSE).join()).toMatch(/lists no parts/);
   });
 
   it("decodes the toolchain's copyright page and refuses an entity it does not know", () => {

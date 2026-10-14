@@ -45,7 +45,8 @@ context:
 - `scripts/wasm-build.ts` -- writes `src/public/engine/` and its `BUILD.json`; gains the notices record.
 - `scripts/engine-third-party.ts` -- runs `cargo metadata` and `cargo tree -e normal`, reads each crate's license files, adds the standard library, checks the toolchain.
 - `scripts/license-files.ts` -- license-file reading shared by both generators.
-- `src/build/thirdPartyNotices.ts` -- pure helpers; gains the crate walk over `cargo metadata` (narrowed by the `cargo tree` listing), the record check, the copyright page decoder and a package kind for rendering.
+- `src/build/thirdPartyNotices.ts` -- pure helpers; gains a package kind for rendering and `Unicode-3.0` on the allowlist.
+- `src/build/rustNotices.ts` -- pure helpers for the engine: the crate walk over `cargo metadata` (narrowed by the `cargo tree` listing), the record check, the copyright page decoder and the standard library's reviewed parts.
 - `.github/actions/engine-wasm/action.yml`, `.github/workflows/engine-rs.yml` -- the package cache key and the engine job's path filters cover the attribution code.
 - `engine-rs/README.md` -- the local build's toolchain pin; `CHANGELOG.md` -- the 2.30.1 heading (no player line).
 - `scripts/gen-third-party-notices.ts` -- reads the record when the engine ships; the map-less engine glue stays allowed only with it.
@@ -78,6 +79,7 @@ context:
 - 2026-10-14, review round 5: the copyright page decoder works in one pass (an encoded ampersand is decoded once however it is written), strips comments and refuses a numeric reference that is not a printable character; a crate's `license-file` is checked through links; an unreadable crate directory or a `dist/engine` that is not a directory is a named failure; the record and the compile share one feature list.
 - 2026-10-14, review round 6: `cargo tree`'s listing is parsed by a tested pure helper (`cargoTreePackages`); the walk checks every id before narrowing; the copyright page decoder refuses C1 controls and any raw `<`, `>` or semicolon-less `&` left after the tag strip. The earlier entries' `vercel-build.sh` toolchain install and committed-record check were superseded when #958 merged: `scripts/build-engine-wasm.sh` installs `rust-version` at `.0`, and the record is build output.
 - 2026-10-14, review round 7 and the owner's request on #992: CI's engine package checks require the record; `copilot-setup-steps.yml` runs on the attribution code; the copyright page decoder refuses a raw control byte and the standard library entry refuses an empty page; `gen-third-party-notices.ts` takes `VC_NOTICES_DIST` so `thirdPartyNoticesEngine.test.ts` runs the real generator against fixture builds and holds each fail-closed case.
+- 2026-10-14, the owner's review of the merged head: the standard library check deferred to #974 lands here. `stdLicenseProblems` reads every part the toolchain's copyright page lists with its license; a part whose license offers neither MIT nor Apache-2.0 must be in `STD_REVIEWED_PARTS` with that license (Unicode-3.0 and Zlib reach wasm32; the SGX ABI's MPL-2.0 and the Fuchsia mutex's BSD-2-Clause do not), a reviewed wasm32 part's license must be in the entry's, and the page must carry foldhash's Zlib notice. A toolchain that adds or relicenses a part fails `wasm:build` until it is reviewed.
 
 ## Design Notes
 

@@ -34,7 +34,7 @@ runs:
       shell: bash
       run: |
         src=$(node --input-type=module -e 'import { engineSourceHash } from "./src/wasmhost/packageHash.ts"; process.stdout.write(engineSourceHash("engine-rs"))')
-        scripts=$({ cat scripts/wasm-build.ts scripts/engine-third-party.ts scripts/license-files.ts src/build/thirdPartyNotices.ts scripts/build-engine-wasm.sh .github/actions/engine-wasm/action.yml; node -p 'require("./package.json").scripts["wasm:build"]'; } | sha256sum | cut -c1-16)
+        scripts=$({ cat scripts/wasm-build.ts scripts/engine-third-party.ts scripts/license-files.ts src/build/thirdPartyNotices.ts src/build/rustNotices.ts scripts/build-engine-wasm.sh .github/actions/engine-wasm/action.yml; node -p 'require("./package.json").scripts["wasm:build"]'; } | sha256sum | cut -c1-16)
         echo "sources=$src" >> "$GITHUB_OUTPUT"
         echo "key=engine-wasm-v1-$src-$scripts" >> "$GITHUB_OUTPUT"
 

@@ -22,13 +22,13 @@ import {
   INJECTED_CODE,
   collectPackageDirs,
   declaredLicense,
-  engineRecordPackages,
   noticeProblem,
   packageDirFromSource,
   renderNotices,
   sourceToPath,
   type NoticePackage,
 } from "../src/build/thirdPartyNotices.ts";
+import { engineRecordPackages } from "../src/build/rustNotices.ts";
 import { readLicenseFiles } from "./license-files.ts";
 import { ENGINE_THIRD_PARTY } from "./engine-third-party.ts";
 
