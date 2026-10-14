@@ -265,10 +265,17 @@ impl Simulation {
     /// An elevator costs the catalog `cost` plus `transportFloorCost` for
     /// each floor past its first; stairs and escalators cost the catalog
     /// `cost`. Refusals come in `build_transport`'s order (locked, then money,
-    /// then placement) with its reasons, and every answer carries that price.
+    /// then placement) with its reasons, and every answer carries the price
+    /// `build_transport` checks the balance against. That price is the
+    /// shaft's only for a transport kind with `top` above `bottom`: an
+    /// inverted span prices below the base, and a room kind at its own
+    /// price, and both are refused by the placement rules (as the
+    /// TypeScript `buildTransport` refuses them, after the same money check).
     pub fn can_build_transport(&self, kind: Kind, x: i64, bottom: i64, top: i64) -> CanBuild {
         let f = kind.facility();
-        let span = top - bottom;
+        // Saturating, so a host's out-of-range drag input is refused rather
+        // than overflowing; any span the tower can hold is exact.
+        let span = top.saturating_sub(bottom);
         let extra = if kind.is_elevator() {
             span as f64 * crate::charges::TRANSPORT_FLOOR_COST
         } else {

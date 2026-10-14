@@ -371,28 +371,60 @@ pub fn read_frame(sim: &Simulation) -> Result<usize, String> {
         }
     }
     let count = |slot: usize| header[slot] as usize;
+    // Walk the records against the simulation they came from: each person's
+    // id and route lengths, each unit's id, each shaft's id and car count.
+    let short = || "a record runs off the frame".to_string();
+    let slice = |at: usize, n: usize| {
+        at.checked_add(n)
+            .and_then(|end| v.get(at..end))
+            .ok_or_else(short)
+    };
     let mut at = FRAME_HEADER;
-    for _ in 0..count(23) {
-        let fixed = v
-            .get(at..at + PERSON_FIXED)
-            .ok_or("a person record runs off the frame")?;
-        at += PERSON_FIXED + fixed[16] as usize + fixed[17] as usize;
+    for p in &sim.crowd.people {
+        let fixed = slice(at, PERSON_FIXED)?;
+        let want = [p.id as f64, p.floors.len() as f64, p.shafts.len() as f64];
+        if [fixed[0], fixed[16], fixed[17]] != want {
+            return Err(format!(
+                "person record at {at} reads {:?}, not {want:?}",
+                [fixed[0], fixed[16], fixed[17]]
+            ));
+        }
+        at += PERSON_FIXED + p.floors.len() + p.shafts.len();
     }
-    at += 6 * count(24);
-    for _ in 0..count(25) {
-        let cars = *v
-            .get(at + 1)
-            .ok_or("a transport record runs off the frame")? as usize;
-        at += 2 + 3 * cars;
+    for u in &sim.tower.units {
+        if slice(at, 6)?[0] != u.id as f64 {
+            return Err(format!("unit record at {at} is not unit {}", u.id));
+        }
+        at += 6;
+    }
+    for t in &sim.tower.transports {
+        let head = slice(at, 2)?;
+        if head != [t.id as f64, t.cars as f64] {
+            return Err(format!(
+                "shaft record at {at} reads {head:?}, not [{}, {}]",
+                t.id, t.cars
+            ));
+        }
+        at += 2 + 3 * t.cars as usize;
     }
     if at != v.len() {
         return Err(format!("the frame records end at {at} of {}", v.len()));
     }
-    // The newest log entry is the one numbered `log_seq`.
-    let newest = log_since(sim, sim.log_seq - 1);
-    let entries = newest.as_array().ok_or("log_since is not an array")?;
-    if !sim.log.is_empty() && (entries.len() != 1 || entries[0]["seq"] != sim.log_seq) {
-        return Err(format!("log_since(logSeq - 1) gave {newest}"));
+    // The log ring is numbered back from `log_seq`: the newest entry is
+    // `log_seq`, every entry is after a number below the ring, none after
+    // `log_seq` itself.
+    let entries = |seq: i64| -> Result<Vec<Value>, String> {
+        log_since(sim, seq)
+            .as_array()
+            .cloned()
+            .ok_or_else(|| "log_since is not an array".to_string())
+    };
+    let newest = entries(sim.log_seq - 1)?;
+    if !sim.log.is_empty() && (newest.len() != 1 || newest[0]["seq"] != sim.log_seq) {
+        return Err(format!("log_since(logSeq - 1) gave {newest:?}"));
+    }
+    if entries(i64::MIN)?.len() != sim.log.len() || !entries(sim.log_seq)?.is_empty() {
+        return Err("log_since does not number the ring back from logSeq".into());
     }
     Ok(count(23))
 }
@@ -464,9 +496,9 @@ pub fn smoke(seed: u32) -> Result<Report, String> {
             sim.log.len()
         ));
     }
+    read_frame(&sim)?;
     // People come and go; at the hour the run ends the tower may be empty,
     // but two working days must have spawned some.
-    read_frame(&sim)?;
     let crowd = sim.crowd.view();
     if crowd["nextId"].as_i64().unwrap_or(0) <= 1 || !crowd["people"].is_array() {
         return Err(format!("no one came in two days: {}", crowd["nextId"]));

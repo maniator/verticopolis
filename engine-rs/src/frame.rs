@@ -13,8 +13,10 @@ pub const FRAME_HEADER: usize = 26;
 /// Fixed slots of a person record, before its route (`floors` then `shafts`).
 pub const PERSON_FIXED: usize = 18;
 
-/// The routine code for a routine `frame_view` has no code for; the
-/// TypeScript decoder rejects it.
+/// The routine code for a routine `frame_view` has no code for. The
+/// TypeScript decoder rejects it, and a native decoder should too: it means
+/// the engine gained a routine this layout has not named yet (a debug build
+/// of the engine stops on it first).
 pub const UNKNOWN_ROUTINE: f64 = 255.0;
 
 /// The per-frame read model: every value the web host reads from the

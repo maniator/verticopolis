@@ -710,7 +710,7 @@ mod tests {
     #[test]
     fn the_buffer_never_reaches_the_save_or_the_hashed_views() {
         use crate::canonical::canonical_json;
-        use crate::scenario::state_view;
+        use crate::snapshot::state_view;
         let mut sim = Simulation::new_game(9, GameMode::Modern);
         sim.gameplay.drain();
         let save = sim.serialize().to_string();
