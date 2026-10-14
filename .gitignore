@@ -17,9 +17,6 @@ coverage/
 !src/engine/gameplayEvents.d.ts
 *.js
 !dist/*.js
-# The served engine package's loader (wasm:build writes it; see
-# src/wasmhost/packageHash.test.ts for the freshness guard).
-!src/public/engine/*.js
 !eslint.config.js
 !vite.config.ts
 !vite-env.d.ts
@@ -49,3 +46,6 @@ determinism-diff/
 engine-rs/target/
 engine-rs/consumer/target/
 engine-rs/pkg/
+# The served engine package (wasm:build writes it; Vercel and CI build it,
+# see scripts/build-engine-wasm.sh and .github/actions/engine-wasm).
+src/public/engine/
