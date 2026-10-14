@@ -215,6 +215,32 @@ flowchart TD
     Sim -. snapshot .-> Undo["UndoHistory<br/>(in-memory)"]
 ```
 
+## Engine build modes
+
+The simulation runs on one of two engines: the TypeScript engine in
+`src/engine/` or the Rust engine (`engine-rs/`) compiled to WASM and hosted by
+`src/wasmhost/`. While hosted, the TypeScript `Simulation` the app holds is a
+read model the host refreshes from the engine every frame. A build picks how
+the two relate:
+
+- **Switchable** (the default, `VC_ENGINE` unset): the TypeScript engine runs
+  unless `?engine=wasm` or `vc.engine` asks for WASM, and a package that fails
+  to load leaves the game on TypeScript.
+- **Wasm-only** (`VC_ENGINE=wasm`): the WASM engine is the only engine.
+  `bootstrap.ts` always loads it, the `__WASM_ONLY__` define compiles away
+  the engine switch and the dual run, and a `resolve.alias` in
+  `vite.config.ts` swaps the TypeScript step loop for
+  `src/wasmhost/stepLoopAbsent.ts`. A package that fails to load, or a tower
+  the host refuses, stops the game with the message in
+  `src/wasmhost/engineBoot.ts`. `window.__vcEngineBoot` names the build, the
+  engine and any failure.
+
+`scripts/verify-engine-bundle.ts` checks each mode from the emitted
+sourcemaps after every build. The rest of the TypeScript engine still ships
+in a wasm-only build, because the read model, the command path and the save
+loader use it; [the bundle report](docs/performance/wasm-only-bundle.md)
+measures it and names the cutover items that remove it.
+
 ## Where to go next
 
 - **[CONTRIBUTING.md](./CONTRIBUTING.md)** — the contributor guide: dev setup,

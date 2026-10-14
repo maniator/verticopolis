@@ -95,7 +95,16 @@ Verticopolis has **two test tiers**:
     build ships a silent TypeScript fallback. Without a Rust toolchain, run
     `VC_ALLOW_NO_ENGINE=1 npm run build` for a deliberate TypeScript-only
     build. A stale local build fails the unit test that checks its source
-    hash. CI restores it from the
+    hash. `VC_ENGINE=wasm npm run build` makes the wasm-only build the 3.0.0
+    flip will deploy: the WASM engine is the only engine, `?engine=` and
+    `vc.engine` are ignored, the TypeScript step loop is swapped out, and an
+    engine that cannot start stops the game with a message instead of
+    falling back. Its postbuild check (`scripts/verify-engine-bundle.ts`)
+    reads the emitted sourcemaps and fails when a TypeScript engine module
+    that `scripts/engine-bundle.allow.txt` does not list ships, or when a
+    listed one no longer does (delete its line: the list only shrinks). The
+    default build is unchanged (`VC_ENGINE` unset, or `switchable`). See
+    `docs/performance/wasm-only-bundle.md` for what still ships and why. CI restores it from the
     Actions cache, keyed on the engine's source hash, and builds it once per
     engine change (`.github/actions/engine-wasm`); Vercel builds it on every
     deploy through `scripts/vercel-build.sh`. Until the Rust engine is the default,
@@ -137,6 +146,10 @@ Verticopolis has **two test tiers**:
   and `VC_TOOLING=1` builds; a production build compiles it away so shipped
   sessions carry no console handle into the sim. Run it with `npm run e2e`
   after a tooling build (`VC_TOOLING=1 npm run build`).
+  `PW_WASM_ONLY=1 npx playwright test --grep-invert @perf` runs the suite on
+  a wasm-only tooling build (`VC_ENGINE=wasm VC_TOOLING=1 npm run build`),
+  with `e2e/wasmOnly.spec.ts` covering its boot, failures and offline start;
+  CI runs it as the `e2e-wasm-only` job.
   Specs cover boot/integration, milestones, a full win, and visual baselines.
   See [`playwright.config.ts`](./playwright.config.ts) for how visual baselines
   are minted by CI (local runs smoke the flows but skip pixel comparison unless
