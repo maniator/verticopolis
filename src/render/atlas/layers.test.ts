@@ -120,6 +120,33 @@ describe("depth-layer marks on the cabs and the metro train", () => {
   });
 });
 
+describe("the vehicles' draw order", () => {
+  it("draws each vehicle's body and frames after its riders, so they stand in front", () => {
+    // Fill colors by phase: before the break, between the marks, after the end.
+    const phases = (spec: PaintSpec, w: number, h: number) => {
+      const out: string[][] = [[], [], []];
+      let phase = 0;
+      const ctx = sinkCtx();
+      let fill = "";
+      Object.defineProperty(ctx, "fillStyle", { set: (v: string) => (fill = v), get: () => fill });
+      (ctx as unknown as { fillRect: () => void }).fillRect = () => out[phase].push(fill);
+      withLayerHook({ shellEnd: () => (phase = 1), furnitureEnd: () => (phase = 2) }, () => paint(ctx, spec, w, h));
+      return out;
+    };
+    const train = vehicleJobs().find((j): j is StillJob => j.name === "vehicle/metrotrain/headlight")!;
+    const [tb, tm, tf] = phases(train.paint, train.w, train.h);
+    expect(tb.every((c) => c === "#2A3440")).toBe(true); // only the interior behind the riders
+    expect(tm.length).toBeGreaterThan(0);
+    expect(tm).not.toContain("#C6CCD4");
+    expect(tf).toContain("#C6CCD4"); // the body comes after
+    const cab = transportJobs().find((j): j is StillJob => j.type === "still" && j.name.startsWith("car/") && j.front === true)!;
+    const [, cm, cf] = phases(cab.chains!.riders.steps[4], cab.w, cab.h);
+    expect(cm.length).toBeGreaterThan(0);
+    expect(cm.some((c) => c.startsWith("rgba(40,44,54"))).toBe(false);
+    expect(cf.some((c) => c.startsWith("rgba(40,44,54"))).toBe(true); // the door frames
+  });
+});
+
 describe("the recycling center's depth split", () => {
   it("paints its curb and gauge as shell art among the furniture", () => {
     const job = roomJobs().find((j): j is StillJob => j.type === "still" && (j.paint as UnitPaint).kind === "recycling" && j.layers === true && j.chains !== undefined);

@@ -3,7 +3,7 @@ import { roomJobs, type Job } from "./catalog";
 import { facadeJobs, peopleJobs, skyJobs, structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
 import { paint, type PaintSpec } from "./paint";
 import { sceneryJobs } from "./scenery";
-import type { Image } from "./pixels";
+import { LayerError, type Image } from "./pixels";
 import { shellMarks } from "./shellMarks";
 import { withLayerHook } from "../pixelSprites/layers";
 import { SAMPLES, type Sample } from "./samples";
@@ -116,6 +116,10 @@ export function canvasRenderer(doc: Document): Renderer {
       const marks = shellMarks(
         () => copyPixels(back, canvas),
         () => copyPixels(mid, canvas),
+        // No vehicle draws shell art among its riders; it would land on them.
+        () => {
+          throw new LayerError("layerShell in a vehicle's paint");
+        },
       );
       withLayerHook(marks.hook, () => paint(ctx, spec, w, h));
       const split = marks.finish();

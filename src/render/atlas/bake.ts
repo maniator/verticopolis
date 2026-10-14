@@ -358,6 +358,9 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
           return { back: s.back, furniture, front };
         };
         let prev = three(null, base, split3);
+        // A vehicle's front is never empty (its frames or body); one would mean
+        // its paint ends the furniture after drawing them.
+        if (trim(prev.front) === null) throw new LayerError("a vehicle with an empty front");
         const layers: PendingLayers = { shell: layerStore.shell(prev.back), furniture: layerStore.piece(trim(prev.furniture), base), front: layerStore.piece(trim(prev.front), base) };
         for (const [key, chain] of Object.entries(job.chains ?? {})) {
           const renders = chainRenders[key];

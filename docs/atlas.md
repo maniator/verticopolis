@@ -230,6 +230,9 @@ entrance frame, below) carries an optional `layers` field next to its
 }
 ```
 
+A cab or the train carries `front` (and `front` chain steps) in place of
+`soft`; see below.
+
 - `shell` is the room with its furniture and seated people taken out: the
   ceiling, back wall, windows, wall art and floor band, plus whatever the game
   draws over the room after its furniture, such as the night scrim (on an
@@ -576,15 +579,16 @@ would not compose back to the game's pixels. A unit test rebuilds every frame
 and layer from the packed pages through the manifest.
 
 A room frame with depth layers is also composed through its depth split (the
-shell and its occupant steps, then the furniture and its occupant steps) and
+shell and its occupant steps, then the furniture and its occupant steps, then
+a vehicle's front and its steps) and
 held to the same paint. After
 packing, the export rebuilds every layered frame from the pages through the
-manifest, shell then furniture with their occupant steps at every occupant
-count, and requires its flat frame's pixels. It also measures how far the soft
-furniture drifts from the flat frame, prints the share of pixels and the
-largest channel difference, and refuses an atlas whose soft furniture strays
-past the limit, misses a pixel of the furniture, or (in a full export) is
-missing from every frame.
+manifest, shell then furniture (then a vehicle's front) with their steps at
+every occupant count, and requires its flat frame's pixels. It also measures
+how far the soft furniture drifts from the flat frame, prints the share of
+pixels and the largest channel difference, and refuses an atlas whose soft
+furniture strays past the limit, misses a pixel of the furniture, or (in a
+full export) is missing from every frame.
 
 The same check covers the other families (`verifyExtras.ts`): a whole express
 and standard shaft rebuilt from their floor pieces (skip floor included), cabs

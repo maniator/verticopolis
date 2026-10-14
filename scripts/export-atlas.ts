@@ -193,6 +193,12 @@ async function main(): Promise<void> {
     .filter(([name, f]) => !f.layers || (f.layers.furniture.length === 0 && !name.endsWith(lastVariant)))
     .map(([name]) => name);
   if (bareLobby.length > 0) throw new Error(`lobby frames without depth furniture: ${bareLobby.slice(0, 10).join(", ")}`);
+  // The cabs and the train carry their riders inside: each has a front.
+  const openVehicles = Object.entries(archive.manifest.frames)
+    .filter(([name]) => name.startsWith("car/") || name.startsWith("vehicle/metrotrain/"))
+    .filter(([, f]) => !f.layers?.front || f.layers.front.length === 0)
+    .map(([name]) => name);
+  if (openVehicles.length > 0) throw new Error(`vehicle frames without a front: ${openVehicles.slice(0, 10).join(", ")}`);
   const layered = Object.values(archive.manifest.frames).filter((f) => f.layers).length;
   console.log(`depth layers: ${layered} frames (rooms at every occupant count, lobby tiles, entrances, cabs and the metro train) compose back to their flat frames`);
   // The soft furniture is close to the flat frame but rounds differently;

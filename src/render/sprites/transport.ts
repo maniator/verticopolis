@@ -366,8 +366,8 @@ export function drawCar(
     ctx.fillStyle = shade(accent, 120);
     ctx.fillRect(2, floorH - 5, cw - 4, 1);
   }
-  // The cab is the shell; its riders are the furniture, and the door frames,
-  // the FULL bar and the lantern drawn over them stay on the shell (depth
+  // The cab is the back; its riders are the furniture, and the door frames,
+  // the FULL bar and the lantern drawn over them are the front (depth
   // layers, `pixelSprites/layers.ts`).
   layerBreak(ctx);
   // Riders stand on the cab floor as the 17px rider silhouette, packed tighter
