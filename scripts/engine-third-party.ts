@@ -18,7 +18,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, relative, isAbsolute, sep } from "node:path";
-import { htmlText, noticeProblem, shippedCrates, type CargoMetadata, type NoticePackage } from "../src/build/thirdPartyNotices.ts";
+import { cargoTreePackages, htmlText, noticeProblem, shippedCrates, type CargoMetadata, type NoticePackage } from "../src/build/thirdPartyNotices.ts";
 import { readLicenseFiles } from "./license-files.ts";
 
 /** The record's file name inside the package directory. */
@@ -97,14 +97,11 @@ export function engineThirdParty(crate: string, features: string): (NoticePackag
   ) as CargoMetadata;
   const out: (NoticePackage & { hasLicenseFile: true })[] = [];
   const problems: string[] = [];
-  const linked = new Set(
+  const linked = cargoTreePackages(
     execFileSync("cargo", ["tree", "--locked", "-e", "normal", "--target", "wasm32-unknown-unknown", "--features", features, "--prefix", "none", "--format", "{p}"], {
       cwd: crate,
       encoding: "utf8",
-    })
-      .split("\n")
-      .map((line) => line.replace(/ \(.*$/, "").trim())
-      .filter(Boolean),
+    }),
   );
   const crates = shippedCrates(meta, linked);
   if (crates.length === 0) throw new Error("cargo tree and cargo metadata agree on no crate the WASM engine compiles in; check their output");

@@ -5,6 +5,7 @@ import { render } from "lit-html";
 import {
   INJECTED_CODE,
   collectPackageDirs,
+  cargoTreePackages,
   engineRecordPackages,
   htmlText,
   declaredLicense,
@@ -221,6 +222,10 @@ describe("third-party notices (#951)", () => {
     // A listing that does not name the root was misread, and would drop every crate.
     expect(() => shippedCrates(meta, new Set(["serde v1.0.0"]))).toThrow(/root crate/);
     expect(() => shippedCrates(meta, new Set())).toThrow(/root crate/);
+    // What cargo tree prints: the root with its path, repeats marked (*), proc-macros marked.
+    const listing = "engine v1.0.0 (/r/engine)\nserde v1.0.0\nserde_derive v1.0.0 (proc-macro)\nserde v1.0.0 (*)\n\n";
+    expect([...cargoTreePackages(listing)]).toEqual(["engine v1.0.0", "serde v1.0.0", "serde_derive v1.0.0"]);
+    expect(shippedCrates(meta, cargoTreePackages(listing)).map((p) => p.name)).toEqual(["serde"]);
   });
 
   it("decodes the toolchain's copyright page and refuses an entity it does not know", () => {
@@ -232,6 +237,10 @@ describe("third-party notices (#951)", () => {
     expect(() => htmlText("a&#0;b")).toThrow(/not a character/);
     expect(() => htmlText("&#xD800;")).toThrow(/not a character/);
     expect(htmlText("<!-- a > b -->kept")).toBe("kept");
+    expect(() => htmlText("a&#x9b;b")).toThrow(/not a character/);
+    // Markup the strip misreads, and an entity without its semicolon, are refused rather than copied.
+    expect(() => htmlText('<a title="x>y">z</a>')).toThrow(/markup/);
+    expect(() => htmlText("&copy 2026")).toThrow(/markup/);
   });
 
   it("labels Rust crates and keeps them apart from npm packages of the same name", () => {

@@ -397,20 +397,31 @@ export function shippedCrates(meta: CargoMetadata, linked?: ReadonlySet<string>)
   }
   seen.delete(root);
   return [...seen]
-    // `cargo metadata` unifies features across every build of the workspace
-    // (tests included), so it can name an optional dependency this build
-    // never compiles; `linked` (from `cargo tree` for the same target and
-    // features, as "name vX.Y.Z") narrows the walk to what is compiled.
-    .filter((id) => {
-      const p = byId.get(id);
-      return !linked || (p !== undefined && linked.has(`${p.name} v${p.version}`));
-    })
     .map((id) => {
       const p = byId.get(id);
       if (!p) throw new Error(`cargo metadata's resolve graph names ${id}, which it does not describe`);
       return p;
     })
+    // `cargo metadata` unifies features across every build of the workspace
+    // (tests included), so it can name an optional dependency this build
+    // never compiles; `linked` (from `cargo tree` for the same target and
+    // features, as "name vX.Y.Z") narrows the walk to what is compiled.
+    .filter((p) => !linked || linked.has(`${p.name} v${p.version}`))
     .sort((a, b) => byCodePoint(a.name, b.name) || byVersion(a.version, b.version));
+}
+
+/**
+ * The packages a `cargo tree --prefix none --format {p}` listing names, as
+ * "name vX.Y.Z" (#955): the source cargo appends ("(/path)", "(registry ...)",
+ * "(proc-macro)") and its repeat mark "(*)" are dropped.
+ */
+export function cargoTreePackages(listing: string): Set<string> {
+  return new Set(
+    listing
+      .split("\n")
+      .map((line) => line.replace(/ \(.*$/, "").trim())
+      .filter(Boolean),
+  );
 }
 
 /**
@@ -454,11 +465,17 @@ const HTML_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot
  * markup or control bytes into the notices.
  */
 export function htmlText(html: string): string {
-  return html
+  const stripped = html
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, "")
     .replace(/<\/(p|h[1-6]|li|div|tr|pre|ul|ol|table)>|<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<[^>]+>/g, "");
+  // The page escapes every <, > and & in its text, so one left over is markup
+  // the strip above misread (a ">" in an attribute, an unclosed script) or an
+  // entity written without its semicolon.
+  const raw = /[<>]|&(?!(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);)/i.exec(stripped);
+  if (raw) throw new Error(`the toolchain's copyright page has markup htmlText cannot read near: ${JSON.stringify(stripped.slice(Math.max(0, raw.index - 20), raw.index + 20))}`);
+  return stripped
     .replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi, (ref: string, body: string) => {
       if (body[0] !== "#") {
         const named = HTML_ENTITIES[body.toLowerCase()];
@@ -466,8 +483,8 @@ export function htmlText(html: string): string {
         return named;
       }
       const cp = body[1].toLowerCase() === "x" ? parseInt(body.slice(2), 16) : Number(body.slice(1));
-      // Printable characters only: no NUL or other C0 control (tab and newline aside), no lone surrogate.
-      const ok = (cp >= 0x20 || cp === 0x09 || cp === 0x0a) && cp <= 0x10ffff && !(cp >= 0xd800 && cp <= 0xdfff);
+      // Printable characters only: no C0 or C1 control (tab and newline aside), no DEL, no lone surrogate.
+      const ok = (cp >= 0x20 || cp === 0x09 || cp === 0x0a) && !(cp >= 0x7f && cp <= 0x9f) && cp <= 0x10ffff && !(cp >= 0xd800 && cp <= 0xdfff);
       if (!ok) throw new Error(`the toolchain's copyright page has a numeric reference that is not a character: ${ref}`);
       return String.fromCodePoint(cp);
     })
