@@ -20,10 +20,11 @@
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { copyFileSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { engineSourceHash } from "../src/wasmhost/packageHash.ts";
+import { ENGINE_BUILD_RECORD, ENGINE_GLUE, ENGINE_PACKAGE, ENGINE_WASM } from "../src/wasmhost/engineAssets.ts";
 import { ENGINE_THIRD_PARTY, checkToolchain, engineThirdParty } from "./engine-third-party.ts";
 import { checkCatalog, renderGameplayEventRules, renderGameplayEventsDts } from "../src/engine/gameplayCatalog.ts";
 
@@ -93,21 +94,33 @@ if (which === "engine") {
   const web = resolve(crate, "../src/public/engine");
   rmSync(web, { recursive: true, force: true });
   run("wasm-bindgen", ["--target", "web", "--out-dir", web, wasm]);
-  for (const f of ["verticopolis_engine.js", "verticopolis_engine_bg.wasm"]) {
+  for (const f of [ENGINE_GLUE, ENGINE_WASM]) {
     if (!existsSync(resolve(web, f))) throw new Error(`wasm-bindgen did not write src/public/engine/${f}`);
   }
   // The web target's own declaration is not needed next to the served files.
   rmSync(resolve(web, "verticopolis_engine.d.ts"), { force: true });
   rmSync(resolve(web, "verticopolis_engine_bg.wasm.d.ts"), { force: true });
   const sources = engineSourceHash(crate);
-  writeFileSync(resolve(web, "BUILD.json"), `${JSON.stringify({ sources }, null, 2)}\n`);
+  writeFileSync(resolve(web, ENGINE_BUILD_RECORD), `${JSON.stringify({ sources }, null, 2)}\n`);
   // The crates and the standard library compiled into the package, with
   // their licenses, so the site's notices can list them without a Rust
   // toolchain (#955).
   // The record also names the .wasm it describes, so the site build can tell a
   // record from another build of the same sources (or a .wasm copied in).
-  const wasmSha = createHash("sha256").update(readFileSync(resolve(web, "verticopolis_engine_bg.wasm"))).digest("hex");
+  const wasmSha = createHash("sha256").update(readFileSync(resolve(web, ENGINE_WASM))).digest("hex");
   writeFileSync(resolve(web, ENGINE_THIRD_PARTY), `${JSON.stringify({ sources, wasm: wasmSha, crates: engineRecord }, null, 2)}\n`);
+  // Every file left in the package must be listed in engineAssets.ts, which
+  // says whether the game fetches it at run time (and so whether the service
+  // worker must precache it, #985). A new file from wasm-bindgen (a
+  // `snippets/` folder, say) or from this script stops the build here.
+  const listed = new Set(ENGINE_PACKAGE.map((f) => f.name));
+  const written = readdirSync(web, { recursive: true, withFileTypes: true })
+    .filter((e) => !e.isDirectory())
+    .map((e) => relative(web, resolve(e.parentPath, e.name)).split("\\").join("/"));
+  const unlisted = written.filter((f) => !listed.has(f));
+  if (unlisted.length > 0) throw new Error(`src/public/engine/ holds files src/wasmhost/engineAssets.ts does not list; add each with whether the game fetches it at run time: ${unlisted.join(", ")}`);
+  const absent = [...listed].filter((f) => !written.includes(f));
+  if (absent.length > 0) throw new Error(`src/wasmhost/engineAssets.ts lists files the build did not write to src/public/engine/: ${absent.join(", ")}`);
   // The class declaration is the same for both targets; the Node copy is the
   // committed one (`src/dualrun/binding.ts` types against it).
   copyFileSync(resolve(crate, "pkg/verticopolis_engine.d.ts"), resolve(crate, "../src/dualrun/engine.d.ts"));
