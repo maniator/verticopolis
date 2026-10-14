@@ -623,9 +623,10 @@ shell and its occupant steps, then its cycles, then the furniture and its
 occupant steps, then a vehicle's front and its steps) and held to the same
 paint. The samples include recycling fills between the eighths and cinemas at
 clocks other than 0. The bake also recomposes every cinema frame at each
-pairing of its marquee and screen steps, empty and at its full house, flat and
-through its depth layers, and requires the game's paint at a clock that shows
-that pairing; a unit test holds that the recycling and cinema art read their
+pairing of its marquee and screen steps, empty and at its full house (and at
+every count in between at one pairing), flat and through its exact depth
+layers (not the soft furniture, which only approximates the frame), and
+requires the game's paint at a clock that shows that pairing; a unit test holds that the recycling and cinema art read their
 fill and clock only through the breaks and cycles the atlas carries. After packing,
 the export rebuilds every layered frame from the pages through the
 manifest, shell then furniture (then a vehicle's front) with their steps at

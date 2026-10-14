@@ -108,7 +108,7 @@ const JOIN = "\u2060";
  *
  * GitHub also links some plain text after it renders the Markdown, where a
  * backslash no longer helps: `@name` mentions (which notify that person),
- * `#123` references, `:emoji:` codes, bare `www.` and `https://` addresses and
+ * `#123` and `GH-123` references, `:emoji:` codes, bare `www.` and `https://` addresses and
  * commit hashes. Each of those gets an invisible word joiner (U+2060) inside
  * it, so the page shows the same characters without the link.
  */
@@ -116,7 +116,8 @@ export function escapeMarkdown(text: string): string {
   return text
     .replace(/[\\`*_[\]<>~|&$#]/g, "\\$&")
     .replace(/^[-+]|^(\d+)([.)])/, (m, num?: string, mark?: string) => (num === undefined ? `\\${m}` : `${num}\\${mark}`))
-    .replace(/([@#])(?=[\p{L}\p{N}_])|(:)(?=[\p{L}/])/gu, `$1$2${JOIN}`)
+    .replace(/([@#])(?=[\p{L}\p{N}_])|(:)(?=[\p{L}/]|[\p{N}+_-][\w+-]*:)/gu, `$1$2${JOIN}`)
+    .replace(/\b(GH-)(?=\d)/gi, `$1${JOIN}`)
     .replace(/\b(www)(?=\.)/gi, `$1${JOIN}`)
     .replace(/\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])([0-9a-f]{4})(?=[0-9a-f]{3,}\b)/gi, `$1${JOIN}`);
 }

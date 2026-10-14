@@ -160,6 +160,11 @@ describe("data added to frames that already shipped", () => {
     expect(() => bake([added, other], soft(3))).toThrow(/room: chain exact step 3: an alternative chain's soft step fails/);
   });
 
+  it("refuses an alternative chain on a vehicle", () => {
+    const split: Renderer = { ...renderer, renderSplit: (p, w, h) => ({ back: paintRoom(p, w, h, false), mid: paintRoom(p, w, h, true) }) };
+    expect(() => bake([{ ...added, front: true, cycles: undefined, cycleChecks: [] }], split)).toThrow(/room: a vehicle cannot carry an alternative chain/);
+  });
+
   it("splits at most one chain besides its alternatives", () => {
     const two = { ...added, chains: { ...added.chains, more: { input: "more", steps: [spec(0), spec(1)] } } };
     expect(() => bake([two], renderer)).toThrow(/depth layers need at most one chain/);
@@ -173,5 +178,10 @@ describe("data added to frames that already shipped", () => {
     room.chains!.exact.alternativeTo = "people";
     room.chains!.people.alternativeTo = "exact";
     expect(checkLayers(b)).toContain("room");
+    // Also on a frame without depth layers.
+    const flat = b.manifest.frames.other;
+    flat.layers = undefined;
+    flat.chains = { lone: { input: "lone", max: 0, steps: [null], alternativeTo: "nope" } };
+    expect(checkLayers(b)).toContain("other");
   });
 });

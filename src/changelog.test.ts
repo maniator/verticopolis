@@ -177,6 +177,8 @@ describe("releaseNoteLines", () => {
     expect(escapeMarkdown("Thanks @maniator for #12 :tada:")).toBe(`Thanks @${J}maniator for \\#${J}12 :${J}tada:`);
     expect(escapeMarkdown("See www.example.com or https://example.com")).toBe(`See www${J}.example.com or https:${J}//example.com`);
     expect(escapeMarkdown("Built from 1a2b3c4d5e")).toBe(`Built from 1a2b${J}3c4d5e`);
+    expect(escapeMarkdown("Thumbs :+1: and :100: for GH-12")).toBe(`Thumbs :${J}+1: and :${J}100: for GH-${J}12`);
+    expect(escapeMarkdown("Opens at 3:00 and 10:30")).toBe("Opens at 3:00 and 10:30");
     for (const text of ["Thanks @maniator for #12 :tada:", "See www.example.com or https://example.com", "mail me@example.com"]) {
       expect(rendered(`- ${escapeMarkdown(text)}`), text).toBe(literalBullet(text));
     }

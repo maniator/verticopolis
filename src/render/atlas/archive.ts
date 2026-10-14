@@ -336,7 +336,8 @@ function eachLayeredPicture(
   }
 }
 
-/** Names of the frames whose depth layers break the manifest's rules (chain
+/** Names of the frames whose chains name a missing alternative, or whose
+ *  depth layers break the manifest's rules (chain
  *  keys, at most one chain besides its alternatives, a null step 0, soft steps exactly
  *  where there is soft furniture) or, read back out of the packed pages
  *  through the manifest the way a frontend reads them, do not give back the
@@ -348,6 +349,11 @@ export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): strin
   // depth split (and no split lacks its chain), each list starts with a null
   // step 0, and soft furniture comes with soft steps for its chain.
   for (const [name, rec] of Object.entries(archive.manifest.frames)) {
+    // An alternative chain, on any frame, names a chain the frame has that is
+    // not one itself.
+    const chains = rec.chains ?? {};
+    const alternativesOk = Object.values(chains).every((c) => c.alternativeTo === undefined || (Object.prototype.hasOwnProperty.call(chains, c.alternativeTo) && chains[c.alternativeTo].alternativeTo === undefined));
+    if (!alternativesOk) bad.add(name);
     const layers = rec.layers;
     if (!layers) continue;
     const flat = JSON.stringify(Object.keys(rec.chains ?? {}).sort());
@@ -356,10 +362,7 @@ export function checkLayers(archive: Pick<Archive, "manifest" | "pages">): strin
     const lists = Object.values(layers.chains ?? {}).flatMap((c) => [c.shell, c.furniture, ...(c.soft ? [c.soft] : []), ...(c.front ? [c.front] : [])]);
     const front = layers.front !== undefined;
     if ((front && soft) || Object.values(layers.chains ?? {}).some((c) => (c.front !== undefined) !== front)) bad.add(name);
-    // An alternative chain names a chain the frame has that is not one itself.
-    const chains = rec.chains ?? {};
     const primary = Object.values(chains).filter((c) => c.alternativeTo === undefined);
-    const alternativesOk = Object.values(chains).every((c) => c.alternativeTo === undefined || (Object.prototype.hasOwnProperty.call(chains, c.alternativeTo) && chains[c.alternativeTo].alternativeTo === undefined));
     const oneChain = primary.length <= 1 && alternativesOk && (primary.length > 0 || Object.keys(chains).length === 0);
     if (flat !== depth || !oneChain || lists.some((l) => l[0] !== null) || Object.values(layers.chains ?? {}).some((c) => (c.soft !== undefined) !== soft)) bad.add(name);
   }

@@ -280,6 +280,9 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
       if (job.front && r.renderSplit && !split3) throw new LayerError("marks no layer break");
       if (split3) {
         if (primaryChains(job) > 1) throw new LayerError("depth layers need at most one chain");
+        // The three-way split walks one chain from the base; an alternative
+        // would start from the first chain's last step.
+        if (Object.values(job.chains ?? {}).some((c) => c.alternativeTo)) throw new LayerError("a vehicle cannot carry an alternative chain");
         const three = (prev: { back: Image; furniture: Image; front: Image } | null, flat: Image, s: { back: Image; mid: Image }) => {
           const furniture = furniturePicture(prev?.furniture ?? null, s.mid, s.back);
           const front = furniturePicture(prev?.front ?? null, flat, s.mid);
