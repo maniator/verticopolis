@@ -6,22 +6,15 @@
 mod scan;
 use scan::{crate_dir, parts, rel, rust_files, Part};
 
-/// Calls that step up a directory without a `..` literal. The guard reports
-/// each one; a file that needs one lists it in [`REFUSED_EXAMPLES`].
-const CLIMBS_IN_CODE: &[&str] = &[
-    ".parent()",
-    ".ancestors()",
-    "::parent",
-    "::ancestors",
-    "ParentDir",
-];
-
 /// Where a path literal climbs out of the crate, it is a `..` step on the way
 /// to the conformance suite and nowhere else: `"../conformance/..."`, or a
 /// bare `".."` joined straight onto `"conformance"`. Every Rust file under
 /// `src/`, `tests/` and `consumer/src/` counts (the two scanner files
-/// themselves aside, whose examples climb on purpose), so the crate's tests and the referee read only `engine-rs/` and `conformance/` (the sparse CI job
-/// proves the same by running them from a checkout that holds nothing else).
+/// themselves aside, whose examples climb on purpose), so the crate's tests
+/// and the referee read only `engine-rs/` and `conformance/`. A path that
+/// steps up another way (`Path::parent`, `ancestors`, `ParentDir`) is not
+/// read here; the sparse CI job, which runs everything from a checkout that
+/// holds nothing else, is the proof for those.
 fn climbs_outside_the_suite(src: &str) -> Vec<String> {
     let parts = parts(src);
     let squeezed_after = |at: usize| -> String {
@@ -32,31 +25,6 @@ fn climbs_outside_the_suite(src: &str) -> Vec<String> {
             .collect()
     };
     let mut found = Vec::new();
-    // A path can also climb in code, with no `..` literal at all.
-    let kept: Vec<(usize, char)> = src
-        .char_indices()
-        .filter(|(at, c)| parts[*at] == Part::Code && !c.is_whitespace())
-        .collect();
-    let code: String = kept.iter().map(|(_, c)| c).collect();
-    let name_char = |c: char| c.is_alphanumeric() || c == '_';
-    for step in CLIMBS_IN_CODE {
-        // A spelling that ends in a name counts only where the name ends, so
-        // `::parent` matches `Path::parent` and not `Foo::parent_id`. The end
-        // is read in the source, where whitespace, a comment or a literal
-        // also ends a name (`Path::parent as fn(..)`).
-        let ends_in_name = step.ends_with(name_char);
-        let hit = code.match_indices(step).any(|(at, _)| {
-            if !ends_in_name {
-                return true;
-            }
-            let last = code[..at + step.len()].chars().count() - 1;
-            let (src_at, c) = kept[last];
-            !src[src_at + c.len_utf8()..].starts_with(name_char)
-        });
-        if hit {
-            found.push(step.to_string());
-        }
-    }
     let mut i = 0;
     while i < parts.len() {
         if parts[i] != Part::Literal {
@@ -94,11 +62,10 @@ fn climbs_outside_the_suite(src: &str) -> Vec<String> {
 }
 
 /// Climbs that are never read: fixture names the suite's own tests expect
-/// `suite::fixture_path` to refuse, and the scanner's own path normalizer.
+/// `suite::fixture_path` to refuse.
 const REFUSED_EXAMPLES: &[(&str, &str)] = &[
     ("src/suite.rs", "conformance/../src/a.vctower"),
     ("src/suite.rs", "conformance/fixtures/../../a.vctower"),
-    ("tests/scan/mod.rs", "ParentDir"),
 ];
 
 #[test]
@@ -140,22 +107,13 @@ fn the_climb_check_reads_each_spelling() {
         let e = dir.join("../../src/tests/fixtures/x.vctower");
         let f = dir.join("../conformance/../src");
         let g = dir.join("..");
-        let h = "a/../b"; // a comment may say .parent() freely
-        let k = dir.parent().unwrap().join("src");
-        let l = Path::new(".").ancestors().nth(2);
-        let m = p.and_then(Path::parent);
-        let n = Some(p).map(Path::ancestors);
-        let o = Foo::parent_id(x) + Bar::ancestors_seen;
+        let h = "a/../b";
         let i = concat!(env!("X"), "/../conformance/a.json");
         let j = concat!(env!("X"), "/../src/a.ts");
     "#;
     assert_eq!(
         climbs_outside_the_suite(src),
         [
-            ".parent()",
-            ".ancestors()",
-            "::parent",
-            "::ancestors",
             "..",
             "../../src/tests/fixtures/x.vctower",
             "../conformance/../src",
@@ -164,14 +122,4 @@ fn the_climb_check_reads_each_spelling() {
             "/../src/a.ts"
         ]
     );
-    // The end of a name is read in the source, not in the squeezed code.
-    assert_eq!(
-        climbs_outside_the_suite("let q = Path::parent as fn(&Path) -> Option<&Path>;"),
-        ["::parent"]
-    );
-    assert_eq!(
-        climbs_outside_the_suite("let a = Path::ancestors /* all */ (p);"),
-        ["::ancestors"]
-    );
-    assert!(climbs_outside_the_suite("let b = Foo::parent_id;").is_empty());
 }

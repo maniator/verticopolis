@@ -77,10 +77,10 @@ a crate nobody reviewed for host access. It also checks that the harness
 modules and every binary sit behind the `conformance` feature.
 `tests/read_boundary.rs` checks the Rust files under `src/`, `tests/` and
 `consumer/src/` (the two scanner files themselves aside, whose examples
-climb on purpose): a `..` path leads only to `conformance/`, and no code
-steps up a directory another way (`parent`, `ancestors`, `ParentDir`). Both
-read source text, so they catch the ordinary spellings; review still owns
-the rest.
+climb on purpose): a `..` path leads only to `conformance/`. Both read
+source text, so they catch the ordinary spellings; review still owns the
+rest, and the sparse CI job is the proof for a path that steps up another
+way (`Path::parent`, `ancestors`).
 
 ## The host API
 
