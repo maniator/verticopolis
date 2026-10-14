@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.31.3
+
+- Studio and apartment residents now go to bed at 11 PM and get up at 6 AM on time.
+
 ## 2.31.2
 
 ## 2.31.1
