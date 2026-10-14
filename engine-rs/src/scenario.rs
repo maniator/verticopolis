@@ -2,9 +2,6 @@
 //! Commands the engine cannot run yet stop the scenario with
 //! `RunError::Unsupported`, so the referee can report how far the port gets.
 
-use serde::Deserialize;
-use serde_json::Value;
-
 use crate::canonical::digest;
 use crate::clock::GameMode;
 use crate::econ::rent_of;
@@ -12,6 +9,9 @@ use crate::facilities::Kind;
 use crate::gameplay::batch_json;
 use crate::sim::Simulation;
 pub use crate::snapshot::state_view;
+use crate::suite::fixture_path;
+use serde::Deserialize;
+use serde_json::Value;
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged, deny_unknown_fields)]
@@ -450,9 +450,8 @@ fn start_sim(start: &Start, suite: &std::path::Path) -> Result<Simulation, RunEr
         }
         Start::Fixture { fixture, mode } => {
             let failed = |what: String| RunError::Failed { index: 0, what };
-            let path = crate::suite::fixture_path(suite, fixture).map_err(failed)?;
-            let text =
-                std::fs::read_to_string(path).map_err(|e| failed(format!("{fixture}: {e}")))?;
+            let text = std::fs::read_to_string(fixture_path(suite, fixture).map_err(failed)?)
+                .map_err(|e| failed(format!("{fixture}: {e}")))?;
             let mut raw = crate::load::decode_vctower(&text)
                 .map_err(|e| failed(format!("{fixture}: {e}")))?;
             if let Some(m) = mode {
@@ -566,9 +565,8 @@ pub struct Run {
     pub error: Option<RunError>,
 }
 
-/// Run a scenario, collecting checkpoints until it finishes or the port
-/// cannot continue. `suite` is the conformance directory a fixture start
-/// reads from (see [`crate::suite::fixture_path`]).
+/// Run a scenario from the conformance directory `suite` ([`fixture_path`]),
+/// collecting checkpoints until it finishes or the port cannot continue.
 pub fn run_scenario(s: &Scenario, suite: &std::path::Path) -> Run {
     run_scenario_inner(s, suite, None).0
 }

@@ -1,13 +1,13 @@
 //! A host of the Verticopolis engine with no frontend. It depends on the
 //! engine the way a project outside this repository would (one path
-//! dependency, default features, no Node.js) and drives it through the
-//! surface `engine-rs/API.md` documents: start a game, run commands, advance
-//! time, read state and events, save, load, and replay a conformance
-//! scenario. CI builds and runs it from a checkout that holds no web game
+//! dependency with the `conformance` feature, no Node.js) and drives it
+//! through the surface `engine-rs/API.md` documents: start a game, run
+//! commands, advance time, read state and events, save, load, and replay a
+//! conformance scenario. CI builds and runs it from a checkout that holds no web game
 //! (`.github/workflows/engine-rs.yml`, job `consumer`).
 //!
 //! It checks the integration. The rules belong to the conformance referee
-//! (`cargo run --bin conformance`).
+//! (`cargo run --features conformance --bin conformance`).
 
 use std::path::Path;
 
@@ -17,10 +17,7 @@ use verticopolis_engine::catalog::{catalog, CATALOG_VERSION};
 use verticopolis_engine::charges::ExtendEnd;
 use verticopolis_engine::clock::GameMode;
 use verticopolis_engine::facilities::Kind;
-use verticopolis_engine::frame::{
-    frame_view, header, log_since, person, CAR_RECORD, FRAME_HEADER, PERSON_FIXED, TRANSPORT_FIXED,
-    UNIT_RECORD, UNKNOWN_ROUTINE,
-};
+use verticopolis_engine::frame::*;
 use verticopolis_engine::gameplay::{
     check_catalog, check_event, RemovalMethod, CATALOG_JSON, GAMEPLAY_RING_CAP,
 };
@@ -355,31 +352,26 @@ pub fn advance(sim: &mut Simulation, minutes: u32, events: &Value) -> Result<usi
 /// the rest exactly. Returns the number of people in the frame.
 pub fn read_frame(sim: &Simulation) -> Result<usize, String> {
     let v = frame_view(sim);
-    let header = v
+    let head = v
         .get(..FRAME_HEADER)
         .ok_or("the frame is shorter than its header")?;
+    use header::*;
+    let (people, units) = (sim.crowd.people.len(), sim.tower.units.len());
     let expect = [
-        (header::MINUTES, sim.clock.minutes, "minutes"),
-        (header::LOG_SEQ, sim.log_seq as f64, "logSeq"),
-        (header::MONEY, sim.money, "money"),
-        (header::STAR, sim.star as f64, "star"),
-        (header::PEOPLE, sim.crowd.people.len() as f64, "people"),
-        (header::UNITS, sim.tower.units.len() as f64, "units"),
-        (
-            header::TRANSPORTS,
-            sim.tower.transports.len() as f64,
-            "transports",
-        ),
+        (MINUTES, sim.clock.minutes, "minutes"),
+        (LOG_SEQ, sim.log_seq as f64, "logSeq"),
+        (MONEY, sim.money, "money"),
+        (STAR, sim.star as f64, "star"),
+        (PEOPLE, people as f64, "people"),
+        (UNITS, units as f64, "units"),
+        (TRANSPORTS, sim.tower.transports.len() as f64, "transports"),
     ];
     for (slot, want, name) in expect {
-        if header[slot] != want {
-            return Err(format!(
-                "frame slot {slot} ({name}) is {}, not {want}",
-                header[slot]
-            ));
+        if head[slot] != want {
+            let got = head[slot];
+            return Err(format!("frame slot {slot} ({name}) is {got}, not {want}"));
         }
     }
-    let count = |slot: usize| header[slot] as usize;
     // Walk the records against the simulation they came from: each person's
     // id and route lengths, each unit's id, each shaft's id and car count.
     let short = || "a record runs off the frame".to_string();
@@ -393,33 +385,29 @@ pub fn read_frame(sim: &Simulation) -> Result<usize, String> {
         let fixed = slice(at, PERSON_FIXED)?;
         let want = [p.id as f64, p.floors.len() as f64, p.shafts.len() as f64];
         if fixed[person::ROUTINE] == UNKNOWN_ROUTINE {
+            let id = p.id;
             return Err(format!(
-                "person {} has a routine the frame has no code for",
-                p.id
+                "person {id} has a routine the frame has no code for"
             ));
         }
-        let got = [
-            fixed[person::ID],
-            fixed[person::FLOOR_COUNT],
-            fixed[person::SHAFT_COUNT],
-        ];
+        let got = [person::ID, person::FLOOR_COUNT, person::SHAFT_COUNT].map(|i| fixed[i]);
         if got != want {
             return Err(format!("person record at {at} reads {got:?}, not {want:?}"));
         }
         at += PERSON_FIXED + p.floors.len() + p.shafts.len();
     }
     for u in &sim.tower.units {
-        if slice(at, UNIT_RECORD)?[0] != u.id as f64 {
+        if slice(at, UNIT_RECORD)?[unit::ID] != u.id as f64 {
             return Err(format!("unit record at {at} is not unit {}", u.id));
         }
         at += UNIT_RECORD;
     }
     for t in &sim.tower.transports {
-        let head = slice(at, TRANSPORT_FIXED)?;
-        if head != [t.id as f64, t.cars as f64] {
+        let r = slice(at, TRANSPORT_FIXED)?;
+        if [r[transport::ID], r[transport::CARS]] != [t.id as f64, t.cars as f64] {
+            let (id, cars) = (t.id, t.cars);
             return Err(format!(
-                "shaft record at {at} reads {head:?}, not [{}, {}]",
-                t.id, t.cars
+                "shaft record at {at} reads {r:?}, not [{id}, {cars}]"
             ));
         }
         at += TRANSPORT_FIXED + CAR_RECORD * t.cars as usize;
@@ -443,7 +431,7 @@ pub fn read_frame(sim: &Simulation) -> Result<usize, String> {
     if entries(i64::MIN)?.len() != sim.log.len() || !entries(sim.log_seq)?.is_empty() {
         return Err("log_since does not number the ring back from logSeq".into());
     }
-    Ok(count(header::PEOPLE))
+    Ok(people)
 }
 
 /// Load a `.vctower` file the way the web game does: decode, deserialize,

@@ -62,16 +62,29 @@ mod tests {
     #[test]
     fn every_fixture_the_lock_names_is_in_the_suite() {
         let suite = Path::new(env!("CARGO_MANIFEST_DIR")).join("../conformance");
-        let mut names = Vec::new();
-        let mut texts = vec![std::fs::read_to_string(suite.join("tdt-cases.json")).unwrap()];
-        for entry in std::fs::read_dir(suite.join("scenarios")).unwrap() {
-            texts.push(std::fs::read_to_string(entry.unwrap().path()).unwrap());
-        }
-        for text in &texts {
-            for part in text.split("\"fixture\"").skip(1) {
-                let name = part.split('"').nth(1).unwrap();
-                names.push(name.to_string());
+        // Every string-valued `fixture` field, wherever it sits in a file.
+        fn fixtures(v: &serde_json::Value, out: &mut Vec<String>) {
+            match v {
+                serde_json::Value::Object(map) => {
+                    for (key, value) in map {
+                        match (key.as_str(), value) {
+                            ("fixture", serde_json::Value::String(name)) => out.push(name.clone()),
+                            _ => fixtures(value, out),
+                        }
+                    }
+                }
+                serde_json::Value::Array(items) => items.iter().for_each(|i| fixtures(i, out)),
+                _ => {}
             }
+        }
+        let mut names = Vec::new();
+        let mut files = vec![suite.join("tdt-cases.json")];
+        for entry in std::fs::read_dir(suite.join("scenarios")).unwrap() {
+            files.push(entry.unwrap().path());
+        }
+        for file in files {
+            let text = std::fs::read_to_string(&file).unwrap();
+            fixtures(&serde_json::from_str(&text).unwrap(), &mut names);
         }
         assert!(names.len() >= 15, "found only {names:?}");
         for name in names {

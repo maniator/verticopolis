@@ -8,7 +8,7 @@
 //!
 //! Test code (`#[cfg(test)]` items and the files they pull in with `#[path]`)
 //! and the binaries under `src/bin/` may read files: they are the referee and
-//! its tools. A few named functions in two harness modules may read files
+//! its tools. A few named functions in three harness modules may read files
 //! too (see [`MAY_READ_FILES`]).
 
 use std::path::Path;
@@ -38,6 +38,8 @@ const MAY_READ_FILES: &[(&str, &[&str])] = &[
         "src/tdt/referee.rs",
         &["fixture_save", "replay_export", "replay_all", "read_lock"],
     ),
+    // `fixture_path` reads no file: it builds the path the two above open,
+    // and the scan counts any `std::path` use as file access.
     ("src/suite.rs", &["fixture_path"]),
 ];
 
@@ -651,23 +653,34 @@ fn the_harness_is_an_optional_feature() {
             "{file} is compiled only for the tests or with the conformance feature"
         );
     }
+    // Each `[[bin]]` table, read up to the next table header, by its path.
     let toml = std::fs::read_to_string(crate_dir().join("Cargo.toml")).expect("Cargo.toml");
-    let bins = toml.split("[[bin]]").skip(1).collect::<Vec<_>>();
-    let on_disk = std::fs::read_dir(crate_dir().join("src/bin"))
-        .expect("src/bin")
-        .count();
-    assert_eq!(
-        bins.len(),
-        on_disk,
-        "every binary is declared in Cargo.toml"
-    );
-    for bin in bins {
+    let mut declared = Vec::new();
+    for table in toml.split("\n[").filter(|t| t.starts_with("[bin]]")) {
+        let keys: Vec<String> = table.lines().map(|l| l.replace(' ', "")).collect();
+        let path = keys
+            .iter()
+            .find_map(|k| k.strip_prefix("path=\""))
+            .map(|p| p.trim_end_matches('"').to_string())
+            .unwrap_or_else(|| panic!("a [[bin]] without a path: {table}"));
         assert!(
-            bin.lines()
-                .any(|l| l.replace(' ', "") == "required-features=[\"conformance\"]"),
-            "every binary requires the conformance feature: {bin}"
+            keys.iter()
+                .any(|k| k == "required-features=[\"conformance\"]"),
+            "{path} requires the conformance feature"
         );
+        declared.push(path);
     }
+    let mut on_disk: Vec<String> = std::fs::read_dir(crate_dir().join("src/bin"))
+        .expect("src/bin")
+        .map(|e| rel(&e.expect("entry").path()))
+        .filter(|p| p.ends_with(".rs"))
+        .collect();
+    declared.sort();
+    on_disk.sort();
+    assert_eq!(declared, on_disk, "every binary is declared in Cargo.toml");
+    // Cargo would build `src/main.rs` as a binary of its own, outside the
+    // tables above.
+    assert!(!crate_dir().join("src/main.rs").exists());
 }
 
 /// The files a library source compiles in: the path of every `include!`,

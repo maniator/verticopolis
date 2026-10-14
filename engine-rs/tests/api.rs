@@ -2,8 +2,8 @@
 //! named here, so renaming or removing one fails this test's build until
 //! `API.md` and `consumer/` follow. The test builds with default features,
 //! so tier 1 also stays reachable without the `conformance` harness or the
-//! `wasm` binding. It pins names, not behavior: the consumer and the lock
-//! own behavior.
+//! `wasm` binding. It pins names; the consumer and the lock own
+//! behavior.
 
 use verticopolis_engine::canonical::digest;
 use verticopolis_engine::catalog::{catalog, CATALOG_VERSION};
