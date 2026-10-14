@@ -7,11 +7,94 @@ use serde_json::Value;
 
 use crate::sim::Simulation;
 
+/// The header slots of the frame view by name, so a native decoder reads
+/// `v[header::MONEY]` instead of a bare index. A group of values starts at
+/// its named slot: `EXPLOSION_FX` is seq, floor, x; `THIEF_FX` is seq,
+/// caught, floor; `TREASURE_FX` is seq, floor, x; `EVENT_COUNTS` is fires,
+/// firesGutRooms, bombs. [`frame_view`] describes each value.
+pub mod header {
+    pub const MINUTES: usize = 0;
+    pub const TOWER_REVISION: usize = 1;
+    pub const MEAL_OVERLAY_REVISION: usize = 2;
+    pub const LOG_SEQ: usize = 3;
+    pub const MONEY: usize = 4;
+    pub const STAR: usize = 5;
+    pub const WEATHER: usize = 6;
+    pub const SANTA_FX_SEQ: usize = 7;
+    pub const EXPLOSION_FX: usize = 8;
+    pub const THIEF_FX: usize = 11;
+    pub const TREASURE_FX: usize = 14;
+    pub const VIP_FX_SEQ: usize = 17;
+    pub const EVENT_COUNTS: usize = 18;
+    pub const PENDING_CHOICE: usize = 21;
+    pub const ON_HOUR_RUNS: usize = 22;
+    pub const PEOPLE: usize = 23;
+    pub const UNITS: usize = 24;
+    pub const TRANSPORTS: usize = 25;
+}
+
+/// The fixed slots of a person record by name, counted from the record's
+/// start. The route follows them: `FLOOR_COUNT` floors, then `SHAFT_COUNT`
+/// shafts.
+pub mod person {
+    pub const ID: usize = 0;
+    pub const SEED: usize = 1;
+    pub const STAFF: usize = 2;
+    pub const STATE: usize = 3;
+    pub const FLOOR: usize = 4;
+    pub const X: usize = 5;
+    pub const FY: usize = 6;
+    pub const WAIT: usize = 7;
+    pub const ORIGIN_FLOOR: usize = 8;
+    pub const ORIGIN_UNIT_ID: usize = 9;
+    pub const VENUE_UNIT_ID: usize = 10;
+    pub const MEAL_VENUE_ID: usize = 11;
+    pub const COUNTED_HOTEL_GUEST: usize = 12;
+    pub const ROUTINE: usize = 13;
+    pub const RETURNING: usize = 14;
+    pub const DWELL_SECONDS_LEFT: usize = 15;
+    pub const FLOOR_COUNT: usize = 16;
+    pub const SHAFT_COUNT: usize = 17;
+}
+
 /// Fixed header slots of the frame view, before the three variable sections.
-pub const FRAME_HEADER: usize = 26;
+pub const FRAME_HEADER: usize = header::TRANSPORTS + 1;
 
 /// Fixed slots of a person record, before its route (`floors` then `shafts`).
-pub const PERSON_FIXED: usize = 18;
+pub const PERSON_FIXED: usize = person::SHAFT_COUNT + 1;
+
+/// The slots of a unit record by name.
+pub mod unit {
+    pub const ID: usize = 0;
+    pub const STATE: usize = 1;
+    pub const OCCUPANTS: usize = 2;
+    pub const CUSTOMERS_IN: usize = 3;
+    pub const HOTEL_CUSTOMERS_IN: usize = 4;
+    pub const OUT_FOR_MEAL: usize = 5;
+}
+
+/// The slots of a transport record by name: `ID` and `CARS`, then `CARS`
+/// car records of [`CAR_RECORD`] slots, each laid out as [`car`].
+pub mod transport {
+    pub const ID: usize = 0;
+    pub const CARS: usize = 1;
+}
+
+/// The slots of one car in a transport record, counted from the car's start.
+pub mod car {
+    pub const POSITION: usize = 0;
+    pub const LOAD: usize = 1;
+    pub const DIRECTION: usize = 2;
+}
+
+/// Slots of a unit record.
+pub const UNIT_RECORD: usize = unit::OUT_FOR_MEAL + 1;
+
+/// Slots of a transport record before its cars.
+pub const TRANSPORT_FIXED: usize = transport::CARS + 1;
+
+/// Slots of each car in a transport record.
+pub const CAR_RECORD: usize = car::DIRECTION + 1;
 
 /// The routine code for a routine `frame_view` has no code for. The
 /// TypeScript decoder rejects it, and a native decoder should too: it means
@@ -58,10 +141,10 @@ pub fn frame_view(sim: &Simulation) -> Vec<f64> {
                 .iter()
                 .map(|p| PERSON_FIXED + p.floors.len() + p.shafts.len())
                 .sum::<usize>()
-            + units.len() * 6
+            + units.len() * UNIT_RECORD
             + transports
                 .iter()
-                .map(|t| 2 + 3 * t.cars as usize)
+                .map(|t| TRANSPORT_FIXED + CAR_RECORD * t.cars as usize)
                 .sum::<usize>(),
     );
     let fx = &sim.fx;
@@ -209,3 +292,7 @@ pub fn log_since(sim: &Simulation, seq: i64) -> Value {
             .collect(),
     )
 }
+
+#[cfg(test)]
+#[path = "frame_tests.rs"]
+mod tests;

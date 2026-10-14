@@ -104,17 +104,19 @@ pub fn replay_import(case: &ImportCase) -> Verdict {
 }
 
 /// The export menu's path for a fixture: decode, load and re-serialize.
-fn fixture_save(repo_root: &Path, fixture: &str) -> Result<Value, String> {
-    let text = std::fs::read_to_string(repo_root.join(fixture))
-        .map_err(|e| format!("cannot read {fixture}: {e}"))?;
+fn fixture_save(suite: &Path, fixture: &str) -> Result<Value, String> {
+    let path = crate::suite::fixture_path(suite, fixture)?;
+    let text = std::fs::read_to_string(path).map_err(|e| format!("cannot read {fixture}: {e}"))?;
     let raw = decode_vctower(&text)?;
     let sim = deserialize(&raw)?;
     Ok(sim.serialize())
 }
 
-pub fn replay_export(case: &ExportCase, lock: &Lock, repo_root: &Path) -> Verdict {
+/// Replay one export case; `suite` is the conformance directory its fixture
+/// is read from (see [`crate::suite::fixture_path`]).
+pub fn replay_export(case: &ExportCase, lock: &Lock, suite: &Path) -> Verdict {
     let save = if let Some(fixture) = &case.fixture {
-        fixture_save(repo_root, fixture)?
+        fixture_save(suite, fixture)?
     } else if let Some(base) = &case.base {
         let base_case = lock
             .export
@@ -162,7 +164,7 @@ pub fn replay_export(case: &ExportCase, lock: &Lock, repo_root: &Path) -> Verdic
 
 /// Every case's verdict in lock order, each run under `catch_unwind` so a
 /// panic reads as that case's failure.
-pub fn replay_all(lock: &Lock, repo_root: &Path) -> Vec<(String, Verdict)> {
+pub fn replay_all(lock: &Lock, suite: &Path) -> Vec<(String, Verdict)> {
     let guard = |f: &dyn Fn() -> Verdict| -> Verdict {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).unwrap_or_else(|p| {
             let msg = p
@@ -178,10 +180,7 @@ pub fn replay_all(lock: &Lock, repo_root: &Path) -> Vec<(String, Verdict)> {
         out.push((case.id.clone(), guard(&|| replay_import(case))));
     }
     for case in &lock.export {
-        out.push((
-            case.id.clone(),
-            guard(&|| replay_export(case, lock, repo_root)),
-        ));
+        out.push((case.id.clone(), guard(&|| replay_export(case, lock, suite))));
     }
     out
 }
@@ -201,13 +200,15 @@ mod tests {
     /// message so one run names every divergent case.
     #[test]
     fn every_tdt_case_matches_the_lock() {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-        let lock = read_lock(&root.join("conformance").join("tdt-cases.json")).expect("lock");
+        let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("conformance");
+        let lock = read_lock(&suite.join("tdt-cases.json")).expect("lock");
         assert!(
             !lock.import.is_empty() && !lock.export.is_empty(),
             "the lock holds no cases"
         );
-        let failures: Vec<String> = replay_all(&lock, &root)
+        let failures: Vec<String> = replay_all(&lock, &suite)
             .into_iter()
             .filter_map(|(id, v)| v.err().map(|e| format!("{id}: {e}")))
             .collect();

@@ -18,7 +18,7 @@ describe("the small scenario", () => {
   // synthetic tower replaces it. docs/performance/ts-vs-wasm.md quotes these
   // figures, so a crowd change that fails this test means updating the doc.
   it("moves a real crowd where split-tower.vctower barely moves one", () => {
-    const split = crowdPeakOverADay(Simulation.deserialize(loadFixtureSave("src/tests/fixtures/split-tower.vctower")));
+    const split = crowdPeakOverADay(Simulation.deserialize(loadFixtureSave("conformance/fixtures/split-tower.vctower")));
     const small = crowdPeakOverADay(buildSmallTower());
     expect(split).toEqual({ peak: 25, end: 0 });
     expect(small.peak).toBe(140);

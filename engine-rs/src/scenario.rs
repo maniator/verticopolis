@@ -2,9 +2,6 @@
 //! Commands the engine cannot run yet stop the scenario with
 //! `RunError::Unsupported`, so the referee can report how far the port gets.
 
-use serde::Deserialize;
-use serde_json::Value;
-
 use crate::canonical::digest;
 use crate::clock::GameMode;
 use crate::econ::rent_of;
@@ -12,6 +9,9 @@ use crate::facilities::Kind;
 use crate::gameplay::batch_json;
 use crate::sim::Simulation;
 pub use crate::snapshot::state_view;
+use crate::suite::fixture_path;
+use serde::Deserialize;
+use serde_json::Value;
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged, deny_unknown_fields)]
@@ -439,7 +439,7 @@ pub enum RunError {
     Failed { index: usize, what: String },
 }
 
-fn start_sim(start: &Start, root: &std::path::Path) -> Result<Simulation, RunError> {
+fn start_sim(start: &Start, suite: &std::path::Path) -> Result<Simulation, RunError> {
     match start {
         Start::NewGame { new_game } => {
             let mode = GameMode::parse(&new_game.mode).ok_or_else(|| RunError::Failed {
@@ -450,7 +450,7 @@ fn start_sim(start: &Start, root: &std::path::Path) -> Result<Simulation, RunErr
         }
         Start::Fixture { fixture, mode } => {
             let failed = |what: String| RunError::Failed { index: 0, what };
-            let text = std::fs::read_to_string(root.join(fixture))
+            let text = std::fs::read_to_string(fixture_path(suite, fixture).map_err(failed)?)
                 .map_err(|e| failed(format!("{fixture}: {e}")))?;
             let mut raw = crate::load::decode_vctower(&text)
                 .map_err(|e| failed(format!("{fixture}: {e}")))?;
@@ -565,20 +565,20 @@ pub struct Run {
     pub error: Option<RunError>,
 }
 
-/// Run a scenario, collecting checkpoints until it finishes or the port
-/// cannot continue.
-pub fn run_scenario(s: &Scenario, root: &std::path::Path) -> Run {
-    run_scenario_inner(s, root, None).0
+/// Run a scenario from the conformance directory `suite` ([`fixture_path`]),
+/// collecting checkpoints until it finishes or the port cannot continue.
+pub fn run_scenario(s: &Scenario, suite: &std::path::Path) -> Run {
+    run_scenario_inner(s, suite, None).0
 }
 
 /// Run a scenario up to (and including) the checkpoint `label`, returning
 /// the live engine at that point.
 pub fn run_scenario_until(
     s: &Scenario,
-    root: &std::path::Path,
+    suite: &std::path::Path,
     label: &str,
 ) -> Result<Simulation, String> {
-    let (run, sim) = run_scenario_inner(s, root, Some(label));
+    let (run, sim) = run_scenario_inner(s, suite, Some(label));
     match (sim, run.error) {
         (Some(sim), _) => Ok(sim),
         (None, Some(RunError::Failed { index, what })) => {
@@ -593,11 +593,11 @@ pub fn run_scenario_until(
 
 fn run_scenario_inner(
     s: &Scenario,
-    root: &std::path::Path,
+    suite: &std::path::Path,
     stop_at: Option<&str>,
 ) -> (Run, Option<Simulation>) {
     let mut out = Vec::new();
-    let mut sim = match start_sim(&s.start, root) {
+    let mut sim = match start_sim(&s.start, suite) {
         Ok(sim) => sim,
         Err(e) => {
             return (

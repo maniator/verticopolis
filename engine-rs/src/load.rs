@@ -2184,7 +2184,7 @@ mod vctower_encode {
     /// Every `.vctower` the web game wrote that the repository keeps, read as
     /// an import reads it.
     fn web_fixtures() -> Vec<(String, Value)> {
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../src/tests/fixtures");
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../conformance/fixtures");
         let mut paths: Vec<_> = std::fs::read_dir(dir)
             .expect("fixtures directory")
             .map(|e| e.expect("entry").path())

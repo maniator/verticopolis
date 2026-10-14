@@ -3,6 +3,7 @@
 use crate::clock::GameMode;
 use crate::facilities::Kind;
 use crate::sim::Simulation;
+use crate::tower::Tower;
 
 /// `canBuild` sends every kind that is not a room down the structural
 /// branch, where a transport is refused by name, as the TypeScript does.
@@ -173,5 +174,142 @@ fn the_transport_quote_follows_the_catalog() {
     assert_eq!(
         sim.can_build_transport(Kind::Stairs, 100, 1, 2).cost,
         price(Kind::Stairs)
+    );
+}
+
+/// A structural tile far off the lot or outside the floor range has no bridge
+/// plan (#1003): the plan used to scan one tile at a time back to the lot,
+/// and an extreme coordinate overflowed. The answer is the refusal it always
+/// was, and on the lot the plan is unchanged.
+#[test]
+fn a_structural_tile_far_off_the_lot_has_no_bridge_and_is_refused_at_once() {
+    let mut sim = shaft_site(GameMode::Modern, 5, 1e9);
+    assert!(sim.auto_bridge);
+    let started = std::time::Instant::now();
+    for kind in [Kind::Floor, Kind::Lobby] {
+        // Nearest the lot first, so a regression fails on a cheap case before
+        // it reaches the slow ones.
+        for x in [
+            crate::facilities::LOT_WIDTH,
+            -1,
+            i64::from(i32::MAX),
+            i64::from(i32::MIN),
+            i64::MAX,
+            i64::MIN,
+        ] {
+            for floor in [1, 2, -1] {
+                let q = sim.can_build(kind, floor, x);
+                assert!(!q.ok, "{kind:?} @ {floor},{x}");
+                assert_eq!(q.reason.as_deref(), Some("Off the edge of the lot."));
+                assert!(sim.tower.bridge_fill_plan(kind, floor, x, 1, 1).is_empty());
+            }
+        }
+        for floor in [
+            i64::MAX,
+            i64::MIN,
+            crate::facilities::MAX_FLOOR + 1,
+            crate::facilities::MIN_FLOOR - 1,
+        ] {
+            assert!(sim
+                .tower
+                .bridge_fill_plan(kind, floor, 100, 1, 1)
+                .is_empty());
+            let q = sim.can_build(kind, floor, 100);
+            assert_eq!(q.reason.as_deref(), Some("Outside the buildable range."));
+        }
+    }
+    assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    // Each case below seeds a neighbor the old scan would have bridged to,
+    // in a tower of its own, so the empty plan comes from the bound alone.
+    // A floor tile below the lowest basement.
+    let (low, top) = (
+        crate::facilities::MIN_FLOOR - 1,
+        crate::facilities::MAX_FLOOR,
+    );
+    let mut t = Tower::new();
+    t.struct_kind.insert((low, 97), Kind::Floor);
+    assert!(t.bridge_fill_plan(Kind::Floor, low, 100, 1, 1).is_empty());
+    // A floor tile above the top floor, resting on structure.
+    let mut t = Tower::new();
+    t.struct_kind.insert((top + 1, 97), Kind::Floor);
+    for x in 98..=99 {
+        t.structure.insert((top, x), 0);
+    }
+    assert!(t
+        .bridge_fill_plan(Kind::Floor, top + 1, 100, 1, 1)
+        .is_empty());
+    // A room whose footprint runs past the lot edge by one tile.
+    let lot = crate::facilities::LOT_WIDTH;
+    let office = Kind::Office.facility().width;
+    let ox = lot - office + 1;
+    let q = sim.can_build(Kind::Office, 2, ox);
+    assert_eq!(q.reason.as_deref(), Some("Off the edge of the lot."));
+    let mut t = Tower::new();
+    t.struct_kind.insert((2, ox - 3), Kind::Floor);
+    for x in ox - 2..ox {
+        t.structure.insert((1, x), 0);
+    }
+    assert!(t
+        .bridge_fill_plan(Kind::Office, 2, ox, office, 1)
+        .is_empty());
+    // A two-story room whose top story would sit above the top floor.
+    let q = sim.can_build(Kind::Cinema, top, 100);
+    assert_eq!(
+        q.reason.as_deref(),
+        Some("Not enough floors above for this facility.")
+    );
+    let cinema = Kind::Cinema.facility().width;
+    let mut t = Tower::new();
+    t.struct_kind.insert((top, 97), Kind::Floor);
+    for x in 98..=99 {
+        t.structure.insert((top - 1, x), 0);
+    }
+    assert!(t
+        .bridge_fill_plan(Kind::Cinema, top, 100, cinema, 2)
+        .is_empty());
+    // On the lot the plan is unchanged: the lobby strip covers 100..=111, so
+    // a lobby at 120 bridges exactly 112..=119, laid outward from the strip.
+    let plan = sim.tower.bridge_fill_plan(Kind::Lobby, 1, 120, 1, 1);
+    assert_eq!(plan, (112..=119).map(|x| (1, x)).collect::<Vec<_>>());
+    sim.auto_bridge = false;
+    assert!(!sim.can_build(Kind::Floor, 2, i64::MAX).ok);
+}
+
+/// The off-lot guard leaves every in-range footprint alone: a bridge is still
+/// planned at the first and last column and at the lowest and top floors.
+#[test]
+fn a_bridge_is_still_planned_at_each_bound() {
+    let at = |fl: i64, x: i64, kind: Kind, support: bool| {
+        let mut t = Tower::new();
+        t.struct_kind.insert((fl, x), kind);
+        if support {
+            for g in [x - 2, x - 1, x + 1, x + 2] {
+                t.structure.insert((fl - 1, g), 0);
+            }
+        }
+        t
+    };
+    let xs = |plan: Vec<(i64, i64)>| plan.into_iter().map(|(_, x)| x).collect::<Vec<_>>();
+    let last = crate::facilities::LOT_WIDTH - 1;
+    let (min, max) = (crate::facilities::MIN_FLOOR, crate::facilities::MAX_FLOOR);
+    // The first column, bridging right to a lobby two tiles away.
+    let t = at(1, 3, Kind::Lobby, false);
+    assert_eq!(xs(t.bridge_fill_plan(Kind::Lobby, 1, 0, 1, 1)), [2, 1]);
+    // The last column, bridging left to a lobby two tiles away.
+    let t = at(1, last - 3, Kind::Lobby, false);
+    assert_eq!(
+        xs(t.bridge_fill_plan(Kind::Lobby, 1, last, 1, 1)),
+        [last - 2, last - 1]
+    );
+    // The lowest basement and the top floor.
+    let t = at(min, 97, Kind::Floor, false);
+    assert_eq!(
+        xs(t.bridge_fill_plan(Kind::Floor, min, 100, 1, 1)),
+        [98, 99]
+    );
+    let t = at(max, 97, Kind::Floor, true);
+    assert_eq!(
+        xs(t.bridge_fill_plan(Kind::Floor, max, 100, 1, 1)),
+        [98, 99]
     );
 }

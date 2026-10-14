@@ -48,20 +48,23 @@ those calls; CI builds and runs a copy of it outside the checkout, in the
 Rust container image with no Node.js and a checkout holding only
 `engine-rs/` and `conformance/` (`engine-rs.yml`, job `consumer`), and
 `tests/independence.rs` checks that the library source (the conformance
-harness aside) reaches for no file, clock, console, network, thread or
-process access, compiles in nothing from the web game's tree, and pulls in
-no unreviewed crate.
+harness aside, which is behind the `conformance` feature) reaches for no
+file, clock, console, network, thread or process access, compiles in
+nothing from the web game's tree, and pulls in no unreviewed crate.
+`tests/read_boundary.rs` keeps the tests and binaries reading only
+`engine-rs/` and `conformance/`, and `tests/api.rs` names the host API.
 
 ## Running
 
 ```sh
 cd engine-rs
 cargo test                                  # unit tests (rng, number formatting, hash)
-cargo run --release --bin conformance       # replay every scenario against expected.json
-cargo llvm-cov --no-report test && cargo llvm-cov --no-report run --bin conformance \
+# The referee and the tools below are the `conformance` feature.
+cargo run --release --features conformance --bin conformance       # replay every scenario against expected.json
+cargo llvm-cov --no-report test --features conformance && cargo llvm-cov --no-report run --features conformance --bin conformance \
   && cargo llvm-cov report               # what the tests and the referee reach; CI floors lines at 87%
-cargo run --release --bin dump -- starter-classic t+60   # canonical JSON of one checkpoint
-cargo run --release --bin tdt                 # replay every .TDT case against conformance/tdt-cases.json
+cargo run --release --features conformance --bin dump -- starter-classic t+60   # canonical JSON of one checkpoint
+cargo run --release --features conformance --bin tdt                 # replay every .TDT case against conformance/tdt-cases.json
 (cd consumer && cargo test --locked && cargo run --locked --release)   # the frontend-free host (API.md)
 ```
 
@@ -77,7 +80,7 @@ serialized game (what `Simulation::serialize` writes). Its referee is
 `VC_CONFORMANCE_UPDATE=1` switch as the scenario lock): every synthetic
 `.TDT` case is pinned by the canonical-JSON hash of the save the TypeScript
 importer produces and its warnings, every export case by the SHA-256 of the
-bytes the TypeScript exporter writes. `cargo run --release --bin tdt` prints
+bytes the TypeScript exporter writes. `cargo run --release --features conformance --bin tdt` prints
 one line per case and exits non-zero on any mismatch; `cargo test` replays
 the same table. The engine never depends on the module.
 
@@ -133,7 +136,7 @@ engine's key order, which every reader takes, and a string holding half a
 surrogate pair is written as U+FFFD where `JSON.stringify` writes the escape
 (the web game repairs such strings on load and on input, so its saves hold
 none). The Rust tests in `load.rs`
-round-trip every web-written fixture in `src/tests/fixtures/`, and
+round-trip every web-written fixture in `conformance/fixtures/`, and
 `src/tests/integration/conformanceWasmVctower.integration.test.ts` (part of
 `npm run test:wasm`) loads each fixture in the web game, writes it with the
 engine, checks the file against `SaveGame.export`'s and `toTowerFile`'s
@@ -325,5 +328,5 @@ this side, `stateView` on the TypeScript side) to find the field.
 
 A simulation change lands in both engines in the same pull request, with the
 regenerated `conformance/expected.json` (see `conformance/README.md`). CI runs
-the referee on every change to `engine-rs/`, `conformance/` or the save
-fixtures (`.github/workflows/engine-rs.yml`).
+the referee on every change to `engine-rs/` or `conformance/`, the save
+fixtures in `conformance/fixtures/` included (`.github/workflows/engine-rs.yml`).

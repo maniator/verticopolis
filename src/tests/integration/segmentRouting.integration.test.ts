@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { inflateSync } from "fflate";
-import splitTowerFile from "../fixtures/split-tower.vctower?raw";
+import splitTowerFile from "../../../conformance/fixtures/split-tower.vctower?raw";
 import { Tower } from "../../engine/Tower";
 import { Crowd } from "../../engine/Crowd";
 import { Simulation } from "../../engine/Simulation";

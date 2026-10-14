@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { inflateSync } from "fflate";
 // A real Modern save, inlined as a string (vite ?raw) so the test needs no node fs.
-import towerFile from "../fixtures/split-tower.vctower?raw";
+import towerFile from "../../../conformance/fixtures/split-tower.vctower?raw";
 import { Simulation } from "../../engine/Simulation";
 import { drainFixedSteps, quantumFor } from "../../engine/sim/fixedStep";
 import { paceFactor } from "../../engine/timePacing";
