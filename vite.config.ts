@@ -284,12 +284,12 @@ export default defineConfig({
         // new worker's whole manifest or none of it, activates it through
         // src/pwa.ts's save-then-reload or once every tab of the old version
         // has closed, and deletes
-        // the old version's entries, so from 2.31.1 on a page the worker
+        // the old version's entries, so from 2.32.0 on a page the worker
         // controls runs the shell and engine its install fetched together.
         // Not covered here, and tracked on #985 (the cutover plan's S16
         // version check): a page no worker controls yet (a first visit) fetches them
         // separately; an install that overlaps a deploy can store the engine's
-        // unhashed files from the newer build; and a worker from before 2.31.1
+        // unhashed files from the newer build; and a worker from before 2.32.0
         // never precached the engine at all. The
         // cost is about 430 KB compressed per install, paid by every player
         // (owner decision, 2026-10-13: the engine becomes the default at 3.0).
