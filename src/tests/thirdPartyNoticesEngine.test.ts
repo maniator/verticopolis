@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -17,11 +18,11 @@ const crate = { name: "serde", version: "1.0.229", license: "MIT OR Apache-2.0",
 const std = { name: "Rust standard library", version: "1.97.0", license: "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib", licenseText: "std text", hasLicenseFile: true, kind: "crate" };
 
 /** A built tree: one bundle of the game's own code, plus the engine package as given. */
-function build(engine: Record<string, string | object> | null): string {
+function build(engine: Record<string, string | object> | null, sources = [join(ROOT, "src/main.ts")]): string {
   const dist = mkdtempSync(join(tmpdir(), "vc-notices-"));
   dirs.push(dist);
   writeFileSync(join(dist, "app.js"), "export {};\n");
-  writeFileSync(join(dist, "app.js.map"), JSON.stringify({ version: 3, sources: [join(ROOT, "src/main.ts")], mappings: "" }));
+  writeFileSync(join(dist, "app.js.map"), JSON.stringify({ version: 3, sources, mappings: "" }));
   if (engine) {
     mkdirSync(join(dist, "engine"));
     for (const [file, body] of Object.entries(engine)) writeFileSync(join(dist, "engine", file), typeof body === "string" ? body : JSON.stringify(body));
@@ -40,11 +41,14 @@ function run(dist: string): { status: number | null; stderr: string; notices: st
   return { status: r.status, stderr: r.stderr, notices };
 }
 
-const engineFiles = (record: string | object | null, sources = "abc"): Record<string, string | object> => ({
+const WASM = "\0asm";
+const WASM_SHA = createHash("sha256").update(WASM).digest("hex");
+/** The engine package files; an object record gets the shipped .wasm's hash unless it names one. */
+const engineFiles = (record: string | object | null, sources = "abc", wasm = WASM): Record<string, string | object> => ({
   "verticopolis_engine.js": "module.exports = {};\n",
-  "verticopolis_engine_bg.wasm": "\0asm",
+  "verticopolis_engine_bg.wasm": wasm,
   "BUILD.json": { sources },
-  "THIRD-PARTY.json": record ?? "",
+  "THIRD-PARTY.json": record !== null && typeof record === "object" ? { wasm: WASM_SHA, ...record } : (record ?? ""),
 });
 
 describe("the notices generator on a build that ships the WASM engine (#955)", () => {
@@ -61,9 +65,12 @@ describe("the notices generator on a build that ships the WASM engine (#955)", (
       ["no record", (({ "THIRD-PARTY.json": _, ...rest }) => rest)(engineFiles(null)), /THIRD-PARTY\.json is missing or not valid JSON/],
       ["no BUILD.json", (({ "BUILD.json": _, ...rest }) => rest)(engineFiles({ sources: "abc", crates: [crate, std] })), /BUILD\.json is missing or not valid JSON/],
       ["record from another build", engineFiles({ sources: "old", crates: [crate, std] }), /source hash differs from BUILD\.json/],
+      ["a .wasm from another build", engineFiles({ sources: "abc", crates: [crate, std] }, "abc", "\0asm-other"), /SHA-256 differs/],
       ["invalid JSON", engineFiles("{ not json"), /THIRD-PARTY\.json is missing or not valid JSON/],
       ["no standard library", engineFiles({ sources: "abc", crates: [crate] }), /does not list the Rust standard library/],
       ["standard library alone", engineFiles({ sources: "abc", crates: [std] }), /no crate besides the Rust standard library/],
+      ["standard library with another license", engineFiles({ sources: "abc", crates: [crate, { ...std, license: "MIT" }] }), /declares MIT, not/],
+      ["standard library twice", engineFiles({ sources: "abc", crates: [crate, std, std] }), /more than once/],
       ["a license off the allowlist", engineFiles({ sources: "abc", crates: [{ ...crate, license: "GPL-3.0-only" }, std] }), /not on the allowlist/],
       ["blank license text", engineFiles({ sources: "abc", crates: [{ ...crate, licenseText: " " }, std] }), /no license file/],
     ];
@@ -80,11 +87,11 @@ describe("the notices generator on a build that ships the WASM engine (#955)", (
     expect(r.stderr).toMatch(/missing or not valid JSON/);
   });
 
-  it("needs no record when no engine ships", () => {
-    const r = run(build(null));
-    // Only the game's own code: nothing third-party to list, which the generator refuses rather than write an empty file.
-    expect(r.status).toBe(1);
-    expect(r.stderr).toMatch(/lists no third-party packages/);
-    expect(r.stderr).not.toMatch(/THIRD-PARTY|engine/);
+  it("needs no record when no engine ships, and lists the npm packages as before", () => {
+    const r = run(build(null, [join(ROOT, "src/main.ts"), join(ROOT, "node_modules/lit-html/lit-html.js")]));
+    expect(r.stderr).toBe("");
+    expect(r.status).toBe(0);
+    expect(r.notices).toMatch(/^lit-html@\S+$/m);
+    expect(r.notices).not.toContain("(Rust, in the WASM engine)");
   });
 });

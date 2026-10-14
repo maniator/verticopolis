@@ -19,6 +19,7 @@
  * `cargo install wasm-bindgen-cli --locked --version <pinned>`).
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -103,7 +104,10 @@ if (which === "engine") {
   // The crates and the standard library compiled into the package, with
   // their licenses, so the site's notices can list them without a Rust
   // toolchain (#955).
-  writeFileSync(resolve(web, ENGINE_THIRD_PARTY), `${JSON.stringify({ sources, crates: engineRecord }, null, 2)}\n`);
+  // The record also names the .wasm it describes, so the site build can tell a
+  // record from another build of the same sources (or a .wasm copied in).
+  const wasmSha = createHash("sha256").update(readFileSync(resolve(web, "verticopolis_engine_bg.wasm"))).digest("hex");
+  writeFileSync(resolve(web, ENGINE_THIRD_PARTY), `${JSON.stringify({ sources, wasm: wasmSha, crates: engineRecord }, null, 2)}\n`);
   // The class declaration is the same for both targets; the Node copy is the
   // committed one (`src/dualrun/binding.ts` types against it).
   copyFileSync(resolve(crate, "pkg/verticopolis_engine.d.ts"), resolve(crate, "../src/dualrun/engine.d.ts"));

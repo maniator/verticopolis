@@ -7,16 +7,22 @@
  * from `INJECTED_CODE`. Serverless `api/` dependencies never reach a browser
  * bundle, so they never appear here.
  *
+ * When anything ships under `dist/engine/`, the WASM engine's Rust crates and
+ * the Rust standard library come from the record its build wrote beside it
+ * (`THIRD-PARTY.json`, #955), which must match the package's `BUILD.json`.
+ *
  * Fails the build (one line, non-zero exit) when no sourcemap is found, a
  * sourcemap is malformed, shipped JavaScript has no sourcemap (outside a
- * short allowlist), or a bundled package lacks a name, version, allowed
- * license id or license text, so an incomplete notices file never ships. Runs
+ * short allowlist), a bundled package or recorded crate lacks a name,
+ * version, allowed license id or license text, or the engine ships without a
+ * valid, matching record, so an incomplete notices file never ships. Runs
  * first in `verify:dist`, for every build mode.
  *
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */
 import { readFileSync, readdirSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import { dirname, resolve, join, relative } from "node:path";
 import {
   INJECTED_CODE,
@@ -28,14 +34,16 @@ import {
   sourceToPath,
   type NoticePackage,
 } from "../src/build/thirdPartyNotices.ts";
-import { engineRecordPackages } from "../src/build/rustNotices.ts";
+import { ENGINE_THIRD_PARTY, engineRecordPackages } from "../src/build/rustNotices.ts";
 import { readLicenseFiles } from "./license-files.ts";
-import { ENGINE_THIRD_PARTY } from "./engine-third-party.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..").replace(/\\/g, "/");
 // VC_NOTICES_DIST points the generator at another built tree; its tests use
 // it to run the real script against fixture builds (thirdPartyNoticesEngine.test.ts).
-const DIST = (process.env.VC_NOTICES_DIST ? resolve(process.env.VC_NOTICES_DIST) : join(ROOT, "dist")).replace(/\\/g, "/");
+// Honored only under vitest, so a stray variable in a real build cannot send
+// the notices to another tree.
+const DIST_OVERRIDE = process.env.VITEST ? process.env.VC_NOTICES_DIST : undefined;
+const DIST = (DIST_OVERRIDE ? resolve(DIST_OVERRIDE) : join(ROOT, "dist")).replace(/\\/g, "/");
 const OUT = join(DIST, "third-party-notices.txt");
 
 function fail(msg: string): never {
@@ -219,7 +227,9 @@ if (existsSync(engineDir) && (!statSync(engineDir).isDirectory() || readdirSync(
     }
   };
   const build = read(join(DIST, "engine", "BUILD.json")) as { sources?: unknown } | null;
-  const engine = engineRecordPackages(read(recordPath), build?.sources);
+  const wasmPath = join(DIST, "engine", "verticopolis_engine_bg.wasm");
+  const wasm = existsSync(wasmPath) ? createHash("sha256").update(readFileSync(wasmPath)).digest("hex") : null;
+  const engine = engineRecordPackages(read(recordPath), { sources: build?.sources, wasm });
   problems.push(...engine.problems.map((p) => `${relative(ROOT, recordPath)}: ${p}`));
   packages.push(...engine.packages);
 }
@@ -228,4 +238,4 @@ if (problems.length > 0) fail(problems.join("; "));
 if (packages.length === 0) fail("the build lists no third-party packages; refusing to write an empty notices file");
 
 writeFileSync(OUT, renderNotices(packages));
-console.log(`gen-third-party-notices: ${packages.length} packages -> dist/third-party-notices.txt`);
+console.log(`gen-third-party-notices: ${packages.length} packages -> ${relative(ROOT, OUT)}`);

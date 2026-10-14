@@ -10,6 +10,13 @@
  */
 import { byCodePoint, byVersion, noticeProblem, type NoticePackage } from "./thirdPartyNotices.ts";
 
+/** The record's file name inside the engine package. */
+export const ENGINE_THIRD_PARTY = "THIRD-PARTY.json";
+
+/** The standard library entry's name and license for wasm32 (see `STD_REVIEWED_PARTS`). */
+export const STD_NAME = "Rust standard library";
+export const STD_LICENSE = "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib";
+
 /** The parts of `cargo metadata --format-version 1` the crate walk reads. */
 export interface CargoMetadata {
   packages: ReadonlyArray<{ id: string; name: string; version: string; license?: string | null; license_file?: string | null; manifest_path: string; targets: ReadonlyArray<{ kind: readonly string[] }> }>;
@@ -78,18 +85,21 @@ export function cargoTreePackages(listing: string): Set<string> {
 
 /**
  * The packages in the engine's third-party record (`THIRD-PARTY.json`, which
- * `npm run wasm:build` writes beside the WASM package, #955), checked the way
+ * every engine build writes beside the WASM package, #955), checked the way
  * npm packages are, plus every reason the record cannot be trusted. The
- * record must name the same source hash as the package's own `BUILD.json`,
- * so a record left over from another build of the engine is refused.
+ * record must name the package's own `BUILD.json` source hash and the SHA-256
+ * of the `.wasm` that ships beside it, so a record left over from another
+ * build, or a `.wasm` copied in from one, is refused.
  */
-export function engineRecordPackages(record: unknown, buildSources: unknown): { packages: NoticePackage[]; problems: string[] } {
+export function engineRecordPackages(record: unknown, shipped: { sources: unknown; wasm: string | null }): { packages: NoticePackage[]; problems: string[] } {
   const problems: string[] = [];
   const packages: NoticePackage[] = [];
-  const r = (typeof record === "object" && record !== null ? record : {}) as { sources?: unknown; crates?: unknown };
-  if (typeof r.sources !== "string" || r.sources === "" || r.sources !== buildSources) {
+  const r = (typeof record === "object" && record !== null ? record : {}) as { sources?: unknown; wasm?: unknown; crates?: unknown };
+  if (typeof r.sources !== "string" || r.sources === "" || r.sources !== shipped.sources) {
     problems.push("the record was not written by the build of the engine that ships (its source hash differs from BUILD.json)");
-  }
+  }  if (shipped.wasm === null) problems.push("the engine package ships no verticopolis_engine_bg.wasm");
+  else if (r.wasm !== shipped.wasm) problems.push("the record was not written for the .wasm that ships (its SHA-256 differs)");
+
   if (!Array.isArray(r.crates) || r.crates.length === 0) return { packages, problems: [...problems, "the record lists no crates"] };
   for (const entry of r.crates as unknown[]) {
     const e = (typeof entry === "object" && entry !== null ? entry : {}) as Record<string, unknown>;
@@ -101,8 +111,11 @@ export function engineRecordPackages(record: unknown, buildSources: unknown): { 
     if (problem) problems.push(problem);
     else packages.push({ name: crate.name!, version: crate.version!, license: crate.license!, licenseText: crate.licenseText!, kind: "crate" });
   }
-  if (!packages.some((p) => p.name === "Rust standard library")) problems.push("the record does not list the Rust standard library");
-  if (!packages.some((p) => p.name !== "Rust standard library")) problems.push("the record lists no crate besides the Rust standard library");
+  const std = packages.filter((p) => p.name === STD_NAME);
+  if (std.length === 0) problems.push("the record does not list the Rust standard library");
+  else if (std.length > 1) problems.push("the record lists the Rust standard library more than once");
+  else if (std[0].license !== STD_LICENSE) problems.push(`the record's Rust standard library declares ${std[0].license}, not ${STD_LICENSE}`);
+  if (!packages.some((p) => p.name !== STD_NAME)) problems.push("the record lists no crate besides the Rust standard library");
   return { packages, problems };
 }
 
@@ -118,6 +131,7 @@ const HTML_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot
  */
 export function htmlText(html: string): string {
   const stripped = html
+    .replace(/\r\n?/g, "\n")
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, "")
     .replace(/<\/(p|h[1-6]|li|div|tr|pre|ul|ol|table)>|<br\s*\/?>/gi, "\n")
@@ -133,7 +147,7 @@ export function htmlText(html: string): string {
   return stripped
     .replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi, (ref: string, body: string) => {
       if (body[0] !== "#") {
-        const named = HTML_ENTITIES[body.toLowerCase()];
+        const named = HTML_ENTITIES[body];
         if (named === undefined) throw new Error(`the toolchain's copyright page has an entity htmlText does not decode: ${ref}`);
         return named;
       }
@@ -171,31 +185,55 @@ export const STD_REVIEWED_PARTS: Record<string, { license: string; wasm32: boole
  * part therefore fails until someone reviews it.
  */
 export function stdLicenseProblems(copyrightHtml: string, stdLicense: string): string[] {
-  const parts: { name: string; license: string }[] = [];
-  const re = /<b>File\/Directory:<\/b>\s*<code>([^<]*)<\/code>|<h3>\s*(?:\u{1F4E6}\s*)?([^<]*?)\s*<\/h3>|<b>License:<\/b>\s*([^<]*)/gu;
-  let name: string | null = null;
+  const parts: { name: string; licenses: string[] }[] = [];
+  const problems: string[] = [];
+  const re = /<b>File\/Directory:<\/b>\s*<code>([^<]*)<\/code>|<h3\b[^>]*>([\s\S]*?)<\/h3>|<b>License:<\/b>\s*([^<]*)/gu;
+  let h3s = 0;
+  let licenses = 0;
   for (const m of copyrightHtml.matchAll(re)) {
-    if (m[1] !== undefined) name = m[1].trim();
-    else if (m[2] !== undefined) name = m[2].replace(/-\d[^-]*(?:\+.*)?$/, "").trim();
-    else if (name !== null) {
-      parts.push({ name, license: m[3].trim() });
-      name = null;
+    if (m[1] !== undefined) parts.push({ name: m[1].trim(), licenses: [] });
+    else if (m[2] !== undefined) {
+      h3s++;
+      const heading = m[2].replace(/<[^>]*>/g, "").replace(/\u{1F4E6}/gu, "").trim();
+      // "name-1.2.3", "name-1.2.3-rc.1", "name-1.2.3+build"
+      parts.push({ name: heading.replace(/-\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+.*)?$/, ""), licenses: [] });
+    } else {
+      licenses++;
+      const part = parts[parts.length - 1];
+      if (part) part.licenses.push(m[3].trim());
+      else problems.push(`the toolchain's copyright page has a license (${m[3].trim()}) before any part`);
     }
   }
   if (parts.length === 0) return ["the toolchain's copyright page lists no parts with a license; its layout may have changed"];
-  const problems: string[] = [];
+  // Every heading and every "License:" on the page must be one this parse
+  // read, so a relabeled or restyled part fails rather than slipping past.
+  const rawH3s = (copyrightHtml.match(/<h3\b/g) ?? []).length;
+  const rawLicenses = (copyrightHtml.match(/License\s*(?:<\/\w+>\s*)?:/g) ?? []).length;
+  if (rawH3s !== h3s || rawLicenses !== licenses) {
+    problems.push(`the toolchain's copyright page has ${rawH3s} parts and ${rawLicenses} license lines, of which ${h3s} and ${licenses} were read; its layout may have changed`);
+  }
+  // A part reviewed as reaching wasm32 must still be listed, or the review no
+  // longer describes this toolchain.
+  for (const [name, reviewed] of Object.entries(STD_REVIEWED_PARTS)) {
+    if (reviewed.wasm32 && !parts.some((p) => p.name === name)) problems.push(`${name} (${reviewed.why}) is no longer listed; review the standard library's parts again`);
+  }
+  const tokens = new Set(stdLicense.split(/[\s()]+/).filter(Boolean));
   const offersMitOrApache = (license: string) =>
     license
+      .replace(/^\((.*)\)$/, "$1")
       .replace(/\//g, " OR ")
       .split(/\s+OR\s+/)
       .some((alt) => alt === "MIT" || alt === "Apache-2.0");
   for (const p of parts) {
-    const reviewed = STD_REVIEWED_PARTS[p.name];
-    if (reviewed) {
-      if (reviewed.license !== p.license) problems.push(`${p.name} is now ${p.license} (reviewed as ${reviewed.license})`);
-      else if (reviewed.wasm32 && !stdLicense.includes(reviewed.license)) problems.push(`${p.name} (${p.license}) reaches wasm32 but the entry's license leaves it out`);
-    } else if (/\bAND\b/.test(p.license) || !offersMitOrApache(p.license)) {
-      problems.push(`${p.name} is ${p.license}, which is not reviewed; decide whether it reaches wasm32 and add it to STD_REVIEWED_PARTS`);
+    if (p.licenses.length === 0) problems.push(`${p.name} has no license line the parse could read`);
+    for (const license of p.licenses) {
+      const reviewed = STD_REVIEWED_PARTS[p.name];
+      if (reviewed) {
+        if (reviewed.license !== license) problems.push(`${p.name} is now ${license} (reviewed as ${reviewed.license})`);
+        else if (reviewed.wasm32 && !tokens.has(reviewed.license)) problems.push(`${p.name} (${license}) reaches wasm32 but the entry's license leaves it out`);
+      } else if (/\bAND\b/.test(license) || !offersMitOrApache(license)) {
+        problems.push(`${p.name} is ${license}, which is not reviewed; decide whether it reaches wasm32 and add it to STD_REVIEWED_PARTS`);
+      }
     }
   }
   return problems;

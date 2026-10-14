@@ -19,11 +19,10 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, relative, isAbsolute, sep } from "node:path";
 import { noticeProblem, type NoticePackage } from "../src/build/thirdPartyNotices.ts";
-import { cargoTreePackages, htmlText, shippedCrates, stdLicenseProblems, type CargoMetadata } from "../src/build/rustNotices.ts";
+import { ENGINE_THIRD_PARTY, STD_LICENSE, STD_NAME, cargoTreePackages, htmlText, shippedCrates, stdLicenseProblems, type CargoMetadata } from "../src/build/rustNotices.ts";
 import { readLicenseFiles } from "./license-files.ts";
 
-/** The record's file name inside the package directory. */
-export const ENGINE_THIRD_PARTY = "THIRD-PARTY.json";
+export { ENGINE_THIRD_PARTY };
 
 /** Where the toolchain keeps the standard library's copyright notice and license texts (the rustup layout). */
 function toolchainDocs(crate: string): { version: string; files: string[] } {
@@ -48,7 +47,6 @@ function toolchainDocs(crate: string): { version: string; files: string[] } {
  * the build until the list and this license are reviewed again.
  */
 const STD_FILES = ["COPYRIGHT-library.html", "licenses/MIT.txt", "licenses/Apache-2.0.txt", "licenses/Unicode-3.0.txt"];
-const STD_LICENSE = "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib";
 
 /**
  * Refuse a toolchain the record cannot be built from, before any compiling:
@@ -81,10 +79,16 @@ function standardLibrary(crate: string): NoticePackage & { hasLicenseFile: true 
   if (reviewed.length > 0) throw new Error(`the standard library's license needs a review for this toolchain: ${reviewed.join("; ")}`);
   const notice = htmlText(copyright);
   if (notice === "") throw new Error(`the Rust toolchain's ${files[0]} has no text; the standard library cannot be attributed`);
-  // Zlib (foldhash) has no license file in the toolchain; its text is the notice the page carries.
-  if (!notice.includes("This software is provided 'as-is'")) throw new Error(`the Rust toolchain's ${files[0]} no longer carries foldhash's Zlib notice; the standard library cannot be attributed`);
+  // Zlib (foldhash) has no license file in the toolchain; its text is the
+  // notice the page carries in foldhash's own section.
+  const start = notice.indexOf("\u{1F4E6} foldhash-");
+  const next = notice.indexOf("\u{1F4E6}", start + 1);
+  const foldhash = start < 0 ? "" : notice.slice(start, next < 0 ? undefined : next);
+  if (!foldhash.includes("This software is provided 'as-is'")) {
+    throw new Error(`the Rust toolchain's ${files[0]} no longer carries foldhash's Zlib notice; the standard library cannot be attributed`);
+  }
   return {
-    name: "Rust standard library",
+    name: STD_NAME,
     version,
     license: STD_LICENSE,
     kind: "crate",

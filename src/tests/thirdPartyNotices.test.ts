@@ -246,6 +246,16 @@ describe("third-party notices (#951)", () => {
     // A reviewed part that changes license, or a wasm32 part the entry leaves out.
     expect(stdLicenseProblems(page.replace("MPL-2.0", "GPL-2.0-only"), LICENSE).join()).toMatch(/fortanix-sgx-abi is now GPL-2\.0-only/);
     expect(stdLicenseProblems(page, "(MIT OR Apache-2.0) AND Unicode-3.0").join()).toMatch(/foldhash \(Zlib\) reaches wasm32/);
+    // A heading with attributes or markup still parses, and every license line under a part is checked.
+    expect(stdLicenseProblems(page.replace("<h3>📦 fortanix-sgx-abi-0.6.1</h3>", '<h3 id="x">📦 <a href="#">fortanix-sgx-abi-0.6.1</a></h3>').replace("MPL-2.0", "GPL-3.0-only"), LICENSE).join()).toMatch(/fortanix-sgx-abi is now GPL-3\.0-only/);
+    expect(stdLicenseProblems(page.replace("<b>License:</b> MPL-2.0", "<b>License:</b> MPL-2.0</p><p><b>License:</b> GPL-3.0-only"), LICENSE).join()).toMatch(/is now GPL-3\.0-only/);
+    // A relabeled license line, or a part with none, fails instead of being skipped.
+    expect(stdLicenseProblems(page.replace("<b>License:</b> MPL-2.0", "<b>License</b>: GPL-3.0-only"), LICENSE).join()).toMatch(/layout may have changed/);
+    // A reviewed wasm32 part that is no longer listed asks for a new review.
+    expect(stdLicenseProblems(page.replace(dep("foldhash-0.2.0", "Zlib"), ""), LICENSE).join()).toMatch(/foldhash .* is no longer listed/);
+    // Prerelease versions and a parenthesized choice parse; a license is matched as a whole SPDX id.
+    expect(stdLicenseProblems(page + dep("newcrate-1.0.0-rc.1", "(MIT OR Apache-2.0)"), LICENSE)).toEqual([]);
+    expect(stdLicenseProblems(page, "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib-Acknowledgement").join()).toMatch(/foldhash \(Zlib\) reaches wasm32/);
     // A page whose layout changed lists nothing, which is refused rather than passed.
     expect(stdLicenseProblems("<p>no parts</p>", LICENSE).join()).toMatch(/lists no parts/);
   });
@@ -283,22 +293,26 @@ describe("third-party notices (#951)", () => {
   it("trusts the engine's record only when it matches the package and every crate checks out", () => {
     const good = { name: "serde", version: "1.0.229", license: "MIT OR Apache-2.0", licenseText: "MIT text", hasLicenseFile: true, kind: "crate" };
     const std = { name: "Rust standard library", version: "1.97.0", license: "(MIT OR Apache-2.0) AND Unicode-3.0 AND Zlib", licenseText: "std text", hasLicenseFile: true, kind: "crate" };
-    const ok = engineRecordPackages({ sources: "abc", crates: [good, std] }, "abc");
+    const shipped = { sources: "abc", wasm: "w" };
+    // A record for another .wasm, or a package that ships none.
+    expect(engineRecordPackages({ sources: "abc", wasm: "other", crates: [good, std] }, shipped).problems.join()).toMatch(/SHA-256 differs/);
+    expect(engineRecordPackages({ sources: "abc", wasm: "w", crates: [good, std] }, { sources: "abc", wasm: null }).problems.join()).toMatch(/ships no verticopolis_engine_bg\.wasm/);
+    const ok = engineRecordPackages({ sources: "abc", wasm: "w", crates: [good, std] }, shipped);
     expect(ok.problems).toEqual([]);
     expect(ok.packages[0]).toEqual({ name: "serde", version: "1.0.229", license: "MIT OR Apache-2.0", licenseText: "MIT text", kind: "crate" });
     // The standard library is always linked, so a record without it is refused.
-    expect(engineRecordPackages({ sources: "abc", crates: [good] }, "abc").problems.join()).toMatch(/Rust standard library/);
+    expect(engineRecordPackages({ sources: "abc", wasm: "w", crates: [good] }, shipped).problems.join()).toMatch(/Rust standard library/);
     // Nor is one with only the standard library: the engine always compiles in crates.
-    expect(engineRecordPackages({ sources: "abc", crates: [std] }, "abc").problems.join()).toMatch(/no crate besides/);
+    expect(engineRecordPackages({ sources: "abc", wasm: "w", crates: [std] }, shipped).problems.join()).toMatch(/no crate besides/);
     // A record from another build of the engine.
-    expect(engineRecordPackages({ sources: "old", crates: [good, std] }, "abc").problems.join()).toMatch(/source hash differs/);
-    expect(engineRecordPackages({ crates: [good, std] }, undefined).problems.join()).toMatch(/source hash differs/);
+    expect(engineRecordPackages({ sources: "old", wasm: "w", crates: [good, std] }, shipped).problems.join()).toMatch(/source hash differs/);
+    expect(engineRecordPackages({ wasm: "w", crates: [good, std] }, { sources: undefined, wasm: "w" }).problems.join()).toMatch(/source hash differs/);
     // Missing, empty or malformed records.
     for (const bad of [null, [], { sources: "abc" }, { sources: "abc", crates: [] }]) {
-      expect(engineRecordPackages(bad, "abc").problems.length).toBeGreaterThan(0);
+      expect(engineRecordPackages(bad, shipped).problems.length).toBeGreaterThan(0);
     }
     // Each crate is held to the same checks as an npm package.
-    const check = (entry: object) => engineRecordPackages({ sources: "abc", crates: [{ ...good, ...entry }, std] }, "abc").problems.join();
+    const check = (entry: object) => engineRecordPackages({ sources: "abc", wasm: "w", crates: [{ ...good, ...entry }, std] }, shipped).problems.join();
     expect(check({ license: "GPL-3.0-only" })).toMatch(/not on the allowlist/);
     expect(check({ hasLicenseFile: false })).toMatch(/no license file/);
     expect(check({ licenseText: " " })).toMatch(/no license file/);
