@@ -32,6 +32,8 @@ Two points of the issue's fix shape land differently, on purpose:
   buffer object back after `mergeSimulation`, which needs no restore. Only
   the refused attach and the detach did.
 
+The changes:
+
 - `src/wasmhost/engineEvents.ts`: `drainEngineBatch(engine)` reads the
   binding's pending count, drains, and parses. A batch it cannot read (bad
   JSON, or JSON that is not a list) comes back as no events with `lost` set to
@@ -50,7 +52,10 @@ Two points of the issue's fix shape land differently, on purpose:
 - The detach is one flat list of steps, each run even after an earlier one
   throws, with the first error thrown at the end (`runEach`). It reads the
   engine's drop count once. A refused attach still throws its own reason when
-  freeing the engine behind it also fails. That keeps the
+  freeing the engine behind it also fails.
+- The host's drain reads the engine before it empties the read model's
+  copies, so a drain that traps while hosted leaves them for the detach to
+  count. That keeps the
   old guarantee (the instance is always let go, the engine always freed) and
   closes a gap: before, a throw from `useTowerCatalogSource` skipped the
   property restores and the buffer hand-back in the same block.
@@ -70,5 +75,6 @@ version bump.
   engine, an unreadable batch while hosted is counted in
   `gameplayEventsDropped`, the next batch reads again, and an unreadable batch
   at detach leaves the count on the instance, and an unreadable batch
-  followed by a trapped detach keeps both losses. The existing host tests are
+  followed by a trapped detach keeps both losses, and a drain that traps
+  while hosted is counted once the host lets go. The existing host tests are
   unchanged and pass.

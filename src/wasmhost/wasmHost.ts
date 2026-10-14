@@ -98,8 +98,10 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule): WasmHost {
   // Events lost to a batch the host could not read (#907).
   let unreadable = 0;
   const drainHosted = (): GameplayEvent[] => {
-    sim.gameplayEvents.drain();
+    // The engine first: when it traps, the read model's copies stay for the
+    // detach to count what the trap took.
     const batch = drainEngineBatch(engine);
+    sim.gameplayEvents.drain();
     unreadable += batch.lost;
     const out = [...carried, ...batch.events];
     carried = [];
