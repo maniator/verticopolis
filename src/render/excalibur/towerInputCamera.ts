@@ -1,6 +1,7 @@
 import * as ex from "excalibur";
-import { GRID, isCommercialKind } from "../../engine/facilities";
-import { FACILITIES } from "../../engine/facilitiesData";
+import { isCommercialKind } from "../../engine/facilities";
+import { viewWorld } from "../../presentation/viewWorld";
+import { findCatalogFacility } from "../../engine/catalogTypes";
 import type { FacilityKind, SerializedView, WeatherKind } from "../../engine/types";
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../engine/types";
 import { clampCameraY, fitZoom } from "../cameraBounds";
@@ -8,6 +9,7 @@ import { stablePointerId } from "../pinchTracker";
 import { FLOOR, TILE } from "../scale";
 import { armLongPress, cancelLongPressOnMove, clearLongPress, finishLongPress } from "./longPress";
 import type { TowerEngine } from "./TowerEngine";
+import { towerCatalog } from "../../engine/towerCatalog";
 
 /**
  * Pointer input, entity picking, camera control and the audio view-focus for
@@ -339,16 +341,15 @@ export function clampGestureZoom(engine: TowerEngine, z: number): number {
   return Number.isFinite(z) ? Math.max(effectiveLo, Math.min(MAX_ZOOM, z)) : effectiveLo;
 }
 function clamp(engine: TowerEngine): void {
-  const x = Math.max(0, Math.min(GRID.width * TILE, engine.cam.pos.x));
-  // Zoom-aware vertical clamp: bound the visible top/bottom edges (not just
-  // the center) so panning/zooming out never exposes empty void below the
-  // deepest buildable basement. See {@link clampCameraY}.
-  const y = clampCameraY(engine.cam.pos.y, engine.viewHeight, engine.cam.zoom, FLOOR, GRID.minFloor, GRID.maxFloor);
+  const x = Math.max(0, Math.min(viewWorld().lotWidth * TILE, engine.cam.pos.x));
+  // Zoom-aware vertical clamp on the visible top/bottom edges, so zooming out
+  // never shows void below the deepest basement. See {@link clampCameraY}.
+  const y = clampCameraY(engine.cam.pos.y, engine.viewHeight, engine.cam.zoom, FLOOR, viewWorld().minFloor, viewWorld().maxFloor);
   engine.cam.pos = ex.vec(x, y);
 }
 export function center(engine: TowerEngine): void {
   const hi = engine.sim.tower.highestFloor;
-  engine.cam.pos = ex.vec((GRID.width / 2) * TILE, -(Math.max(6, hi) / 2) * FLOOR);
+  engine.cam.pos = ex.vec((viewWorld().lotWidth / 2) * TILE, -(Math.max(6, hi) / 2) * FLOOR);
 }
 
 /** The live camera as save-file cargo: center in grid units plus zoom (the exact
@@ -420,7 +421,7 @@ function censusCrowd(
       if (u.kind !== dominant) continue;
       if (u.floor < bounds.f0 || u.floor > bounds.f1) continue;
       if (u.x + u.width < bounds.t0 || u.x > bounds.t1) continue;
-      const def = FACILITIES[u.kind];
+      const def = findCatalogFacility(towerCatalog(engine.sim), u.kind);
       if (!def) continue; // a kind the catalog no longer knows: skip, never throw
       const unitCap = def.population > 0 ? def.population : (def.attendance ?? 0);
       if (unitCap > 0) {

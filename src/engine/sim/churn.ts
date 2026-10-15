@@ -20,6 +20,7 @@ import { VACATE_NOTICE_MINUTES } from "./constants";
 import { buildSatisfactionContext, wouldEvictFreshTenant, type SatisfactionContext } from "./satisfactionStep";
 import { foldOriginDemand } from "./demand";
 import { bindingTransportClassAt, type CongestionBindingClass } from "./gripe";
+import { roomUnits } from "../tower/rooms";
 
 /** Vacate, move-in, subtype churn for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -139,7 +140,7 @@ export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
   }
   sim.emit(
     buyback > 0
-      ? `The owner left ${FACILITIES[u.kind].name} on ${sim.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}). You bought it back for $${buyback.toLocaleString()}.${buybackNote}`
+      ? `The owner left ${FACILITIES[u.kind].name} on ${sim.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}). You bought it back for $${buyback.toLocaleString("en-US")}.${buybackNote}`
       : `A tenant left ${FACILITIES[u.kind].name} on ${sim.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}).`,
     "bad",
   );
@@ -188,7 +189,7 @@ export function attemptMoveIns(sim: Simulation): void {
     sim.moveIn(unit);
     if (satCtx?.demandMap) foldOriginDemand(satCtx.demandMap, sim, unit);
   };
-  for (const u of sim.tower.units) {
+  for (const u of roomUnits(sim.tower)) {
     if (u.state !== "empty") continue;
     // Off-market ("No Rate"): the unit is deliberately not for rent/sale, so it
     // attracts no tenants and never seats one at $0 (which would stamp rent 0,
@@ -393,7 +394,7 @@ export function moveIn(sim: Simulation, u: Unit): void {
     sim.recordMoney("condos", price);
     sim.moveInsToday.condos++;
     const who = residents ? ` to a household of ${residents}` : "";
-    sim.emit(`Condominium on ${sim.floorLabel(u.floor)} sold${who} for $${price.toLocaleString()}.`, "money");
+    sim.emit(`Condominium on ${sim.floorLabel(u.floor)} sold${who} for $${price.toLocaleString("en-US")}.`, "money");
   }
   if (u.kind === "office") {
     u.everOccupied = true;

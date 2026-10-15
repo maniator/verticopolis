@@ -10,6 +10,7 @@ import type { FacilityKind, Unit } from "../types";
 
 import { isOperational, isTenanted } from "../types";
 import { HK_MAIDS_PER_UNIT, HK_NOMINAL_ROOMS_PER_MAID } from "../economy/housekeeping";
+import { roomUnits } from "../tower/rooms";
 
 /** Recycling / parking / staff / stranded advisories for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -56,7 +57,7 @@ export function parkingDemand(sim: Simulation): { officePop: number; offices: nu
   }
   let officePop = 0;
   let suites = 0;
-  for (const u of sim.tower.units) {
+  for (const u of roomUnits(sim.tower)) {
     if (u.kind === "office" && isTenanted(u)) officePop += FACILITIES.office.population;
     else if (u.kind === "hotelSuite" && isOperational(u)) suites++;
   }
@@ -163,7 +164,7 @@ export function callExterminator(sim: Simulation): ExterminatorResult {
   // infested rooms (the dueDay itself persists, so the treatment still lands).
   sim.exterminationRoomIds = ids;
   sim.emit(
-    `🧹 Exterminator booked for ${rooms} infested room(s): $${cost.toLocaleString()} charged. The rooms clear tomorrow.`,
+    `🧹 Exterminator booked for ${rooms} infested room(s): $${cost.toLocaleString("en-US")} charged. The rooms clear tomorrow.`,
     "money",
   );
   return { ok: true, cost, rooms };
@@ -247,7 +248,7 @@ export function nudgeServiceShortfalls(sim: Simulation): void {
     const pop = sim.tower.totalPopulation();
     const need = Math.ceil(pop / RECYCLING_POP_PER_CENTER);
     sim.emit(
-      `♻️ Garbage is piling up: ${pop.toLocaleString()} population needs ${need} Recycling Center${need === 1 ? "" : "s"} (you have ${sim.recyclingCenters()}). 4★ requires demand met.`,
+      `♻️ Garbage is piling up: ${pop.toLocaleString("en-US")} population needs ${need} Recycling Center${need === 1 ? "" : "s"} (you have ${sim.recyclingCenters()}). 4★ requires demand met.`,
       "info",
     );
   }

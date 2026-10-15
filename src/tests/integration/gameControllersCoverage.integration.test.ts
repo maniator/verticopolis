@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../../engine/Simulation";
-import { FACILITIES, GRID, maxCarsFor, facilityFloors } from "../../engine/facilities";
+import { FACILITIES, GRID, maxCarsFor } from "../../engine/facilities";
 import { ECON, rentOf, resaleRefund } from "../../engine/econConfig";
 import type { PriceOptions } from "../../engine/gameRules";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
@@ -21,7 +21,6 @@ import { EditorActions } from "../../game/editorActions";
 import { SaveLoad } from "../../game/saveLoad";
 import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
-import { gameplaySession } from "../../analytics";
 
 /** Coverage companion to gameControllers.integration.test.ts: the same harness idioms
  *  (recording fakes, fixture placements asserted with .ok, real Simulation)
@@ -64,7 +63,7 @@ function fakes() {
       sayVisibly: vi.fn(),
       downloadFile: (filename: string, contents: string | Uint8Array) => {
         downloads.push({ filename, contents });
-        return Promise.resolve();
+        return true;
       },
       showImportReport: (report: ImportReport, cb: { onOpen: () => void }) => {
         importReports.push({ report, open: cb.onOpen });
@@ -730,7 +729,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(last(f.toasts)).toEqual({ text: "Transport shafts cannot overlap.", kind: "bad" });
   });
 
-  it("extendSelectedTo bills only floors past the drag's high-water mark; wiggles re-bill nothing", () => {
+  it("extendSelectedTo bills only floors past the drag's engine-held mark; wiggles re-bill nothing", () => {
     sel = { type: "transport", id: lift.id };
     const before = sim.money;
     editor.extendSelectedTo("up", 4); // 1..2 → 1..4: two new floors billed
@@ -741,7 +740,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(lift.top).toBe(3);
     expect(before - sim.money).toBe(2 * ECON.transportFloorCost);
     expect(last(f.sfx)).toBe("click");
-    editor.extendSelectedTo("up", 4); // …and regrowing within the hwm re-bills nothing
+    editor.extendSelectedTo("up", 4); // …and regrowing within the mark re-bills nothing
     expect(lift.top).toBe(4);
     expect(before - sim.money).toBe(2 * ECON.transportFloorCost);
     editor.extendSelectedTo("up", 4); // no change at all: silent early return
@@ -750,13 +749,43 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(undo.captures).toEqual(["Extend"]); // ONE capture for the whole drag
     // endExtend closes the gesture: the next drag re-captures. Floor 5 is open
     // sky, but the extend now auto-lays the floor behind it (rests on floor 4),
-    // so the shaft grows to 5 and bills the one new floor past the fresh hwm.
+    // so the shaft grows to 5 and bills the one new floor past the fresh mark.
     editor.endExtend();
     editor.extendSelectedTo("up", 5);
     expect(lift.top).toBe(5);
     expect(before - sim.money).toBe(3 * ECON.transportFloorCost);
     expect(undo.captures).toEqual(["Extend", "Extend"]);
     for (let i = 0; i < 4; i++) expect(sim.tower.structureKindAt(5, 58 + i)).toBe("floor");
+    // The engine holds the mark (#990): the drag opened a gesture on the sim,
+    // and endExtend closed it, so a shrink and regrow after it bills again.
+    editor.extendSelectedTo("up", 4);
+    editor.endExtend();
+    sim.extendTransport(lift.id, "up", 5);
+    expect(before - sim.money).toBe(4 * ECON.transportFloorCost);
+    // A one-floor press while a drag's gesture is still open (its pointer-up
+    // lost, #1014) is a step of that gesture: a floor the drag already paid
+    // for is not billed twice.
+    editor.extendSelectedTo("up", 6); // paid floor 6
+    editor.extendSelectedTo("up", 5); // shrank back, the gesture still open
+    render(transportEditorTemplate(sim, lift), root);
+    editor.handleEditAction("extendUp", root);
+    expect(lift.top).toBe(6);
+    expect(before - sim.money).toBe(5 * ECON.transportFloorCost);
+  });
+
+  it("a tower swapped in mid-drag starts a fresh high-water mark, so nothing grows unbilled", () => {
+    sel = { type: "transport", id: lift.id };
+    editor.extendSelectedTo("up", 4); // the old tower's drag reaches floor 4
+    expect(lift.top).toBe(4);
+    // A load or an undo adopts a copy of the tower from before the drag; the
+    // shaft keeps its id but stands at 1..2 again.
+    const snapshot = Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())));
+    expect(snapshot.tower.resizeTransport(lift.id, 1, 2).ok).toBe(true);
+    sim = snapshot;
+    const before = sim.money;
+    editor.extendSelectedTo("up", 4); // the stale mark (top 4) must not make this free
+    expect(sim.tower.transportById(lift.id)!.top).toBe(4);
+    expect(before - sim.money).toBe(2 * ECON.transportFloorCost);
   });
 
   it("extendSelectedTo guards: no selection, a unit, and a stairway (no extend handles) all bail", () => {
@@ -915,13 +944,13 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
   });
 
   it("exportGame toasts the failure instead of swallowing it (main.ts fires it with `void`)", async () => {
-    // Simulate a browser that can't compress: SaveGame.export rejects, and the
+    // Simulate a save too large to export: SaveGame.export rejects, and the
     // controller must surface that as a toast, not download nothing in silence.
-    const spy = vi.spyOn(SaveGame, "export").mockRejectedValueOnce(new Error("This browser is too old to create tower files. Try a current browser."));
+    const spy = vi.spyOn(SaveGame, "export").mockRejectedValueOnce(new Error("This tower's save data is larger than 32 MB, the most a save can hold."));
     await saveLoad.exportGame();
     expect(f.downloads).toHaveLength(0);
     expect(f.toasts).toEqual([
-      { text: "Export failed: This browser is too old to create tower files. Try a current browser.", kind: "bad" },
+      { text: "Export failed: This tower's save data is larger than 32 MB, the most a save can hold.", kind: "bad" },
     ]);
     spy.mockRestore();
   });
@@ -1286,28 +1315,6 @@ describe("InspectorController (stale-pick hygiene)", () => {
   });
 });
 
-describe("build-depth telemetry: multi-story peak floor", () => {
-  it("reports the top occupied story of a multi-story room, not its base floor", () => {
-    // Stub the implementation so the assertion pins the call-site arguments
-    // without mutating the shared gameplaySession singleton across tests.
-    const noteBuild = vi.spyOn(gameplaySession, "noteBuild").mockImplementation(() => {});
-    // Stub the sim so the build always succeeds: this pins WHAT FLOOR the call
-    // site reports for the session peak, not the engine's placement rules.
-    const build = new BuildActions({
-      getSim: () => ({ build: () => ({ ok: true }) }) as unknown as Simulation,
-      ui: { toast: () => {} },
-      audio: { sfx: () => {} },
-      selectedId: () => null,
-      clearSelection: () => {},
-    });
-    expect(facilityFloors("metro")).toBeGreaterThan(1); // a genuinely multi-story kind
-    build.tryBuild("metro", -8, 0); // placed at its deep-basement base
-    // Peak is the top story reached (base + height - 1), not the base floor.
-    expect(noteBuild).toHaveBeenCalledWith("metro", -8 + facilityFloors("metro") - 1);
-    noteBuild.mockRestore();
-  });
-});
-
 describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => {
   const mid = Math.floor(GRID.width / 2);
   let sim: Simulation;
@@ -1407,10 +1414,6 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
   });
 
   it("elevator two-press flow: first Enter anchors and announces, second builds the span", () => {
-    // The drag-sized keyboard shaft builds via getSim() directly, so it must
-    // still count toward build-depth telemetry like the mouse path does. Stub
-    // the impl so the spy doesn't mutate the shared gameplaySession singleton.
-    const noteBuild = vi.spyOn(gameplaySession, "noteBuild").mockImplementation(() => {});
     tool = { type: "build", kind: "elevatorStandard" };
     keyboard.moveCursor(0, 0); // (mid, 1)
     keyboard.commitCursor(); // anchor
@@ -1434,9 +1437,9 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     expect(last(f.sfx)).toBe("build");
     expect(last(announced)).toBe(`${FACILITIES.elevatorStandard.name} built, floors 1 to 2`);
     expect(engine.transportPreview).toBeNull();
-    // The built shaft was counted for depth, with its top floor as the reach.
-    expect(noteBuild).toHaveBeenCalledWith("elevatorStandard", 2);
-    noteBuild.mockRestore();
+    // The engine reports the shaft for build depth, with its top floor as the
+    // reach, whichever input built it.
+    expect(sim.drainGameplayEvents()).toContainEqual({ name: "facility_placed", payload: { kind: "elevatorStandard", floor: 2, count: 1 } });
     // Both presses bracket undo like any other gesture.
     expect(undoLog).toEqual([
       "capture:Build Standard Elevator",

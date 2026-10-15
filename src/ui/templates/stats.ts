@@ -5,6 +5,7 @@ import { LEDGER_CATS, LEDGER_LABELS } from "../../engine/Ledger";
 import { residentCount } from "../../engine/facilities";
 import { isPresent } from "../../engine/types";
 import { floorTag } from "../format";
+import { towerCatalog } from "../../engine/towerCatalog";
 
 /**
  * The Tower Statistics dialog body as a lit template. It was authored to match
@@ -35,7 +36,7 @@ export function statsModalTemplate(body: TemplateResult): TemplateResult {
  *  `wireActions` throws if it binds a handler to a button that was not rendered. */
 export function canCallExterminator(sim: Simulation): boolean {
   return (
-    sim.rules.infestationRecovery() !== null &&
+    towerCatalog(sim).economy.exterminator !== null &&
     sim.exterminationDueDay === undefined &&
     sim.housekeepingCoverage().infested > 0
   );
@@ -65,7 +66,7 @@ export function statsTemplate(sim: Simulation): TemplateResult {
   const hkShort =
     hk.rooms > 0 &&
     (hk.infested > 0 || hk.outOfReach > 0 || (hkReport?.leftover ?? 0) > 0 || hk.dailyCapacity < hk.rooms);
-  const extermRecovery = sim.rules.infestationRecovery();
+  const extermRecovery = towerCatalog(sim).economy.exterminator;
   const extermPending = sim.exterminationDueDay !== undefined;
   const extermCost = extermRecovery ? extermRecovery.calloutFee + extermRecovery.perRoomFee * hk.infested : 0;
   const recyclingCap = sim.recyclingCapacity();
@@ -129,7 +130,7 @@ export function statsTemplate(sim: Simulation): TemplateResult {
         }
         ${
           hk.infested > 0
-            ? html`<span class="k">Infested</span><span class="v" style="color:var(--bad)">${fmt(hk.infested)} (${sim.rules.infestationRecovery() ? "exterminate or bulldoze" : "bulldoze to clear"})</span>`
+            ? html`<span class="k">Infested</span><span class="v" style="color:var(--bad)">${fmt(hk.infested)} (${extermRecovery ? "exterminate or bulldoze" : "bulldoze to clear"})</span>`
             : nothing
         }
         <span class="k">Shops / Food</span><span class="v">${s.shops} / ${s.restaurants}</span>

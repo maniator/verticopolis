@@ -41,7 +41,7 @@ export function helpPageTemplate(): TemplateResult {
         ${s.body()}${s.id === "classic-vs-modern" ? compareFigures() : nothing}
       </section>`,
     )}
-    <section id="about" class="help-section"><h2>About</h2>${helpAboutBody(APP_VERSION)}</section>
+    <section id="about" class="help-section"><h2>About</h2>${helpAboutBody(APP_VERSION, "", "/third-party-notices.txt")}</section>
     <section id="privacy" class="help-section"><h2>Privacy</h2>${helpPrivacyBody()}</section>
     <section class="help-section">${helpReportBlock("h2")}</section>
   `;

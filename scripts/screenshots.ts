@@ -38,7 +38,9 @@
  * Env knobs: RUN_SERVER=1 spawns its own `vite preview`; ONLY=milestones,tablet
  * re-shoots just those scene ids; BASE_URL / PORT / PW_CHROME override targets;
  * SHOTS_DIR relocates the output gallery (used by the determinism guard to render
- * two independent legs into separate roots concurrently).
+ * two independent legs into separate roots concurrently); VC_SHOT_ENGINE=wasm
+ * renders the game scenes with the WASM engine hosting the tower (see
+ * screenshot-engine.ts; the drift check's engine leg, never committed).
  *
  * TypeScript runs natively on Node ≥ 22.18 (type-stripping): no build step, no
  * extra dep. Keep every module here ERASABLE (type annotations / interfaces /
@@ -50,7 +52,9 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
 import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
+import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
+import { SHOT_ENGINE, SETTLE_AFTER_SETUP, HOSTED_FIX, beginSettleStep, checkHosted, checkSettleList, hostedSnapshot, seedEngineChoice, settleUnlessSettled } from "./screenshot-engine.ts";
 import { resolveOnlyFilter } from "../src/tests/screenshotOnlyFilter.ts";
 
 // ---- Runner -----------------------------------------------------------------
@@ -120,11 +124,30 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     );
   }
   try {
-    if (shot.clock !== undefined) await page.evaluate(pgSetClock, shot.clock);
+    if (shot.clock !== undefined) {
+      const before = await hostedSnapshot(page);
+      await page.evaluate(pgSetClock, shot.clock);
+      await checkHosted(page, `after the ${shot.name} clock pin`, before, HOSTED_FIX.clock);
+    }
     // Always drive the overlay dropdown (default "") so a prior shot's overlay
     // never bleeds into the next, so every shot gets a clean map state.
     await page.evaluate(pgSetOverlay, shot.overlay ?? "");
-    if (shot.setup) await shot.setup(page);
+    const keepDialogs = shot.keepDialogs ?? (!!shot.crop && shot.crop.includes("modal"));
+    // A phaseWatch shot is watched from before setup through the capture
+    // (screenshot-phase-check.ts, #762 / #843).
+    if (shot.phaseWatch) await armPhaseWatch(page, keepDialogs);
+    if (shot.setup) {
+      const settles = SETTLE_AFTER_SETUP.has(`${scene.id}/${shot.name}`);
+      const where = `after the ${shot.name} setup`;
+      if (settles) {
+        await beginSettleStep(page, `before the ${shot.name} setup`);
+      }
+      const before = settles ? null : await hostedSnapshot(page);
+      await shot.setup(page);
+      if (settles) await settleUnlessSettled(page, where, false);
+      else await checkHosted(page, where, before, HOSTED_FIX.setup);
+    }
+    if (shot.phaseWatch) await markPhaseTarget(page);
     if (shot.frame) {
       await page.evaluate(pgFrame, { tile: shot.frame.tile ?? null, floor: shot.frame.floor, zoom: shot.frame.zoom });
     }
@@ -133,7 +156,6 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     // stray toasts / event dialogs the running sim may have popped during the
     // settle, unless this shot is deliberately showing a modal.
     await page.evaluate(pgRefreshUi);
-    const keepDialogs = shot.keepDialogs ?? (!!shot.crop && shot.crop.includes("modal"));
     await page.evaluate(pgClearTransients, keepDialogs);
     // Mask the app version to a fixed placeholder so a routine version bump does
     // not churn the splash/help pixels (the shipped app still shows the real one).
@@ -141,12 +163,15 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     await page.waitForTimeout(80);
     // animations: "disabled" freezes CSS animation (the splash star twinkle,
     // the onboarding pulse) at a fixed phase so DOM chrome is byte-stable too.
+    const capturePath = shot.phaseWatch ? phaseCapturePath(path, outDir) : path;
     if (shot.crop) {
-      await page.locator(shot.crop).screenshot({ path, animations: "disabled" });
+      await page.locator(shot.crop).screenshot({ path: capturePath, animations: "disabled" });
     } else {
-      await page.screenshot({ path, fullPage: !!shot.fullPage, animations: "disabled" });
+      await page.screenshot({ path: capturePath, fullPage: !!shot.fullPage, animations: "disabled" });
     }
+    if (shot.phaseWatch) await judgeAndPromote(page, capturePath, path);
   } finally {
+    if (shot.phaseWatch) await stopPhaseWatch(page);
     // Always restore the scene viewport, even if the shot threw, so one failed
     // shot can't cascade a wrong size into the rest of the scene.
     if (shot.viewport) await page.setViewportSize(baseVp);
@@ -222,6 +247,7 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       });
     }
     if (scene.initScript) await page.addInitScript(scene.initScript);
+    await seedEngineChoice(page);
     await page.goto(scene.route ? `${BASE}/${scene.route}` : BASE, { waitUntil: "networkidle" });
     // Scrollbars are hidden for every capture, because they were the LAST
     // wall-clock leak (#762). The stepped TestClock pins page time, but a
@@ -318,8 +344,10 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
         throw new Error("test-clock adoption failed on the game page");
       }
       if (!scene.keepSplash) await page.evaluate(pgDismissSplash);
+      await beginSettleStep(page, "before the scene build");
       if (scene.build) await page.evaluate(scene.build);
       if (scene.assertUnits) await assertReady(page, scene.assertUnits);
+      await settleUnlessSettled(page, "after the scene build", true);
     }
     for (const shot of scene.shots) {
       try {
@@ -363,6 +391,7 @@ async function main(): Promise<void> {
   // "render all", the ordinary env-var-off convention; the unit tests pin
   // both readings. Partially-unmatched entries warn but still render the
   // matched remainder.
+  checkSettleList(SCENES);
   const { selected, unmatched } = resolveOnlyFilter(
     SCENES.map((sc) => sc.id),
     process.env.ONLY,
@@ -377,6 +406,7 @@ async function main(): Promise<void> {
     console.warn(`ONLY entries matched no scene and are ignored: ${unmatched.join(", ")}`);
   }
   const scenes = SCENES.filter((sc) => selected.includes(sc.id));
+  console.log(`engine: ${SHOT_ENGINE === "wasm" ? "WASM (hosted)" : "TypeScript"}`);
 
   let server: ChildProcess | null = null;
   if (process.env.RUN_SERVER) {
@@ -405,7 +435,24 @@ async function main(): Promise<void> {
   // captures against a stale build).
   let browser: Browser | undefined;
   try {
-    browser = await chromium.launch({ executablePath: EXECUTABLE });
+    // Compositor flags added for #762 by PR #871. Its evidence held (the only
+    // differing pixels in 27c-elevator-schedule-unsaved were the dialog's two
+    // sticky layers, a subpixel text phase apart) but its cause did not hold.
+    // The race happens before the scroll: a composited layer keeps the
+    // subpixel phase of its first raster, and 27c's dialog moved by a
+    // fraction of a pixel after a first render that CI load decided whether
+    // to make. Measured with these flags on, 8 of 24 renders still took the
+    // raster that differs from the committed PNG. The fix lives in the 27c
+    // scene (scripts/scenes/schedule.ts), and takeShot guards that shot with
+    // the dialog phase watch (Shot.phaseWatch; other dialog shots are #889).
+    // The flags stay because every committed PNG was minted with them on, so
+    // dropping them is a gallery-wide pixel change of its own: running every
+    // compositor stage to completion before a draw (the flag Chromium's own
+    // pixel tests use), no checker imaging, no off-main-thread animation.
+    browser = await chromium.launch({
+      executablePath: EXECUTABLE,
+      args: ["--run-all-compositor-stages-before-draw", "--disable-checker-imaging", "--disable-threaded-animation"],
+    });
     for (const scene of scenes) {
       // A scene's setup (game wait / build / assertReady) can throw; keep it from
       // aborting the whole run. Record every shot in the scene as failed (so its

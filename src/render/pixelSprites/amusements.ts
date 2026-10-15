@@ -1,6 +1,7 @@
 import type { Unit } from "../../engine/types";
 import { busyStations, castShadow, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { artRow, authoredWidth } from "./artScale";
+import { layerBreak, layerEnd } from "./layers";
 
 /**
  * Modern Amusements art: an arcade / games hall with four attraction types
@@ -231,6 +232,7 @@ export function amusements(d: RoomCtx, u: Unit, x: number, y: number, w: number,
   const look = (u.subtype !== undefined && AMUSEMENTS_LOOKS[u.subtype]) || AMUSEMENTS_DEFAULT;
   const floorY = shell(ctx, x, y, w, h, look.wall, look.floor);
   const top = marquee(ctx, x, y, w, look.neon, d.lit);
+  layerBreak(ctx); // the shell ends; the attraction follows
   const occ = roomOccupants(u);
   const seed = figureSeed(u);
   // The room's authored width comes from its TILES, not its pixels, so a row's
@@ -250,6 +252,8 @@ export function amusements(d: RoomCtx, u: Unit, x: number, y: number, w: number,
       drawGolf(ctx, x, floorY, w, aw, look, occ, seed);
       break;
   }
+  // The furniture ends here: the glow wash covers the whole upper wall.
+  layerEnd(ctx);
   // A warm marquee glow wash near the top when the hall is lit at night.
   if (d.lit) {
     ctx.fillStyle = "rgba(255,220,140,0.06)";

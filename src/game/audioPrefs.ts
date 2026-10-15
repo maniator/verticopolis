@@ -61,6 +61,7 @@ export function toggleReducedMotion(app: GameApp): boolean {
 /** Toggle the steady-clock pref and return the new steady state. */
 export function toggleSteadyClock(app: GameApp): boolean {
   app.prefs.steadyClock = !app.prefs.steadyClock;
+  app.accMinutes = 0; // minutes owed under the old pacing never replay under the new one
   savePrefs(app.prefs);
   trackAppAction("steady_clock", app.prefs.steadyClock ? "on" : "off"); // new steady state
   return app.prefs.steadyClock;

@@ -13,13 +13,13 @@ import { RNG } from "./rng";
 export class EventSystem {
   /** Ids of units currently ablaze (a fire emergency in progress). */
   private active = new Set<number>();
-  /** Cumulative emergency tallies for this tower instance, for the shell's
-   *  session analytics ONLY: fire outbreaks ignited, rooms gutted BY FIRE
-   *  (not by a bomb), and bomb detonations. Plain integers the shell reads;
-   *  the engine never reports them itself (it imports no analytics). Not part
-   *  of save state, so a loaded tower restarts them at zero (the shell's
-   *  session accumulator banks a departing tower's tallies, so a session that
-   *  changes towers still sums every tower it played). */
+  /** Cumulative emergency tallies for this tower instance: fire outbreaks
+   *  ignited, rooms gutted BY FIRE (not by a bomb), and bomb detonations. Not
+   *  part of save state, so a loaded tower restarts them at zero. Session
+   *  analytics no longer read them: since #873 phase 2 the analytics bridge
+   *  folds the gameplay events (`fire_started`, `fire_gutted`,
+   *  `bomb_detonated`) instead, and the tallies wait to be retired in both
+   *  engines (backlog `retire-emergency-counters`). */
   private firesStartedCount = 0;
   private firesGutRoomsCount = 0;
   private bombsDetonatedCount = 0;
@@ -86,7 +86,7 @@ export class EventSystem {
   maybeRandomEvent(): void {
     // A choice the player left unanswered defaults (fire keeps burning / the
     // tower is searched) so the game can't stall waiting on a modal.
-    if (this.pending) this.resolveChoice("decline");
+    if (this.pending) this.resolveChoice("decline", "timeout");
     // An ongoing fire is fought (or spreads) every day until it's out.
     this.processFires();
     // Seasonal / visitor events roll on their own RNG, independent of the
@@ -107,7 +107,7 @@ export class EventSystem {
         this.pending = {
           kind: "fireRescue",
           cost,
-          message: `🚒 Fire rescue available for $${cost.toLocaleString()}. Pay to stop the spread and save the tower now, or decline and fight it the slow way. Either way the rooms already ablaze burn down to gutted shells you'll rebuild; the fee just limits how far the fire spreads.`,
+          message: `🚒 Fire rescue available for $${cost.toLocaleString("en-US")}. Pay to stop the spread and save the tower now, or decline and fight it the slow way. Either way the rooms already ablaze burn down to gutted shells you'll rebuild; the fee just limits how far the fire spreads.`,
         };
         this.sim.emit(this.pending.message, "bad");
         // Telegraph the free defense to a player who hasn't built one yet. Use
@@ -138,17 +138,22 @@ export class EventSystem {
   }
 
   /** Resolve the open player choice. `accept` pays (fire rescue / bomb ransom);
-   * `decline` lets the fire burn on / has Security search for the bomb. */
-  resolveChoice(option: "accept" | "decline"): void {
+   * `decline` lets the fire burn on / has Security search for the bomb.
+   * `source` says who answered: the player, or the daily roll's auto-decline. */
+  resolveChoice(option: "accept" | "decline", source: "player" | "timeout" = "player"): void {
     const p = this.pending;
     if (!p) return;
     this.pending = null;
+    // What takes effect: an accept the tower cannot afford is a decline.
+    // One test drives both the event and the branches below.
+    const paid = option === "accept" && this.sim.money >= p.cost;
+    this.sim.gameplayEvents?.push("emergency_resolved", { kind: p.kind, decision: paid ? "accept" : "decline", source });
     if (p.kind === "fireRescue") {
-      if (option === "accept" && this.sim.money >= p.cost) {
+      if (paid) {
         this.sim.money -= p.cost;
         this.extinguishAll();
         this.sim.emit(
-          `🚒 Fire-rescue crews saved the tower for $${p.cost.toLocaleString()}. The rooms that were ablaze are gutted. Bulldoze and rebuild them.`,
+          `🚒 Fire-rescue crews saved the tower for $${p.cost.toLocaleString("en-US")}. The rooms that were ablaze are gutted. Bulldoze and rebuild them.`,
           "money",
         );
       }
@@ -156,9 +161,9 @@ export class EventSystem {
       return;
     }
     // bombThreat
-    if (option === "accept" && this.sim.money >= p.cost) {
+    if (paid) {
       this.sim.money -= p.cost;
-      this.sim.emit(`💣 You paid the $${p.cost.toLocaleString()} ransom; the threat passed quietly.`, "money");
+      this.sim.emit(`💣 You paid the $${p.cost.toLocaleString("en-US")} ransom; the threat passed quietly.`, "money");
     } else {
       this.bombThreat(); // search: Security defuses it, else it detonates (~5 floors)
     }
@@ -192,20 +197,36 @@ export class EventSystem {
   /** End every active fire (the paid rescue outcome). The fee halts the spread
    *  and ends the panic — it does NOT un-burn: rooms that were ablaze are gutted. */
   private extinguishAll(): void {
+    let gutted = 0;
     for (const id of [...this.active]) {
       const u = this.sim.tower.getUnit(id);
       if (u && u.state === "fire") {
         this.gut(u);
         this.firesGutRoomsCount++; // a room lost to fire (the paid-rescue outcome)
+        gutted++;
       }
     }
     this.active.clear();
+    this.noteGutted(gutted);
   }
 
-  /** Cumulative emergency tallies for this tower instance (analytics only, read
-   *  by the shell; see the counter fields). */
+  /** `fire_gutted` for one step that gutted `rooms` (none for zero). */
+  private noteGutted(rooms: number): void {
+    if (rooms > 0) this.sim.gameplayEvents?.push("fire_gutted", { rooms });
+  }
+
+  /** Cumulative emergency tallies for this tower instance (see the counter
+   *  fields). */
   get counts(): { fires: number; firesGutRooms: number; bombs: number } {
     return { fires: this.firesStartedCount, firesGutRooms: this.firesGutRoomsCount, bombs: this.bombsDetonatedCount };
+  }
+
+  /** Take the tallies from an engine that ran the events elsewhere (the
+   *  WASM host mirroring its engine's counts into this read model). */
+  adoptCounts(c: { fires: number; firesGutRooms: number; bombs: number }): void {
+    this.firesStartedCount = c.fires;
+    this.firesGutRoomsCount = c.firesGutRooms;
+    this.bombsDetonatedCount = c.bombs;
   }
 
   /**
@@ -262,6 +283,7 @@ export class EventSystem {
     // A new fire outbreak. A blaze SPREADING to neighbors (spreadFireTo) is the
     // same fire, not a new one, so only the initial ignition is tallied.
     this.firesStartedCount++;
+    this.sim.gameplayEvents?.push("fire_started", {});
     this.sim.emit(`🔥 Fire broke out in ${FACILITIES[u.kind].name} on ${this.sim.floorLabel(u.floor)}!`, "bad");
   }
 
@@ -331,6 +353,7 @@ export class EventSystem {
    */
   private processFires(): void {
     if (this.active.size === 0) return;
+    let gutted = 0;
     for (const id of [...this.active]) {
       const u = this.sim.tower.getUnit(id);
       if (!u || u.state !== "fire") {
@@ -344,6 +367,7 @@ export class EventSystem {
         // gutted shell the player must bulldoze and rebuild (canon; no repair).
         this.gut(u);
         this.firesGutRoomsCount++; // a room lost to fire (the contained-burndown outcome)
+        gutted++;
         this.active.delete(id);
         this.sim.emit(
           `🔥 The ${FACILITIES[u.kind].name} on ${this.sim.floorLabel(u.floor)} burned down. Only a gutted shell remains. Bulldoze the rubble and rebuild.`,
@@ -358,6 +382,7 @@ export class EventSystem {
         this.spreadFireTo(this.roomAbove(u));
       }
     }
+    this.noteGutted(gutted);
     // An active emergency rattles everyone still in the building.
     if (this.active.size > 0) {
       for (const u of this.sim.tower.units) {
@@ -406,7 +431,7 @@ export class EventSystem {
     }
     const loss = 5_000 + this.extra.int(0, 20_000);
     this.sim.money -= loss;
-    this.sim.emit(`🕵️ A thief slipped through the tower and made off with $${loss.toLocaleString()}. Build Security.`, "bad");
+    this.sim.emit(`🕵️ A thief slipped through the tower and made off with $${loss.toLocaleString("en-US")}. Build Security.`, "bad");
     this.sim.triggerThief?.(false, floor); // got away with the loot (cosmetic)
   }
 
@@ -432,7 +457,7 @@ export class EventSystem {
     if (this.sim.hasAny("security")) {
       const cost = 2_000 + this.sim.rng.int(0, 3_000);
       this.sim.money -= cost;
-      this.sim.emit(`💣 A bomb threat was called in. Security swept the tower and found nothing. The evacuation cost $${cost.toLocaleString()}.`, "info");
+      this.sim.emit(`💣 A bomb threat was called in. Security swept the tower and found nothing. The evacuation cost $${cost.toLocaleString("en-US")}.`, "info");
       return;
     }
     const fine = 15_000 + this.sim.rng.int(0, 15_000);
@@ -466,6 +491,7 @@ export class EventSystem {
         }
       }
     }
-    this.sim.emit(`💣 A bomb detonated with no security to stop it. ${destroyed} room(s) across ~5 floors were gutted, plus a $${fine.toLocaleString()} fine. Build Security!`, "bad");
+    this.sim.gameplayEvents?.push("bomb_detonated", { rooms: destroyed });
+    this.sim.emit(`💣 A bomb detonated with no security to stop it. ${destroyed} room(s) across ~5 floors were gutted, plus a $${fine.toLocaleString("en-US")} fine. Build Security!`, "bad");
   }
 }

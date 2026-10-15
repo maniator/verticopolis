@@ -149,9 +149,9 @@ export interface SpawnFloors {
    *  breakfast or fastFood+cinema for late-night without a per-tick filter
    *  over units). */
   venuesByKind: Partial<Record<FacilityKind, number[]>>;
-  /** Snapshot of unit lists by floor, built in {@link spawnFloors} once per
-   *  outer step so outbound meal spawns can sample candidates without
-   *  re-scanning the full `tower.units` array each time. */
+  /** Snapshot of room lists by floor (no floor or lobby tiles), built in
+   *  {@link spawnFloors} once per outer step so outbound meal spawns can sample
+   *  candidates without re-scanning the full `tower.units` array each time. */
   unitsByFloor: Map<number, Unit[]>;
   /** Operational metro stations (capped at 1 per tower). Kept as units rather
    *  than floors: commuter spawns stamp their origin/destination x inside the

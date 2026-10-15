@@ -2,9 +2,11 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import type { Simulation } from "../../engine/Simulation";
 import type { Transport, Unit } from "../../engine/types";
 import { isTenanted } from "../../engine/types";
-import { FACILITIES, isCommercialKind, isElevatorKind, isOpenAt, residentCount } from "../../engine/facilities";
+import { isCommercialKind, isElevatorKind, isOpenAt, residentCount } from "../../engine/facilities";
+import { catalogFacility } from "../../engine/catalogTypes";
 import { facilityDiagnostics, transportDiagnostics } from "../../game/facilityDiagnostics";
 import { floorTag } from "../format";
+import { towerCatalog } from "../../engine/towerCatalog";
 
 /**
  * The hover inspector card bodies (E6-S2), pure functions of (sim, entity),
@@ -44,7 +46,7 @@ function statusTextFor(u: Unit): string {
 }
 
 export function unitInspectorTemplate(sim: Simulation, u: Unit): TemplateResult {
-  const f = FACILITIES[u.kind];
+  const f = catalogFacility(towerCatalog(sim), u.kind);
   const statusText = statusTextFor(u);
   // Canon retail variant (§7): a shop / fastFood / restaurant with a subtype
   // titles as its specific name ("Chinese Cafe"), not the generic kind name.
@@ -63,7 +65,7 @@ export function unitInspectorTemplate(sim: Simulation, u: Unit): TemplateResult 
   // house must never inspect as empty while the audience is visibly seated.
   const closed = isTenanted(u) && !isOpenAt(u.kind, sim.clock.hour);
   let peopleLine: TemplateResult | typeof nothing = nothing;
-  if ((isCommercialKind(u.kind) && f.population > 0) || f.attendance !== undefined)
+  if ((isCommercialKind(u.kind) && f.population > 0) || f.attendance !== null)
     peopleLine = html`<div>Customers: ${u.customersIn ?? 0}${closed ? " (closed)" : ""}</div>`;
   else if (f.population) peopleLine = html`<div>Occupants: ${u.occupants}/${residentCount(u)}</div>`;
   return html`<h4 class="win-title">${title}</h4><div>${labelIsExtra ? html`${u.label}<br />` : nothing}${
@@ -72,7 +74,7 @@ export function unitInspectorTemplate(sim: Simulation, u: Unit): TemplateResult 
 }
 
 export function transportInspectorTemplate(sim: Simulation, t: Transport): TemplateResult {
-  const f = FACILITIES[t.kind];
+  const f = catalogFacility(towerCatalog(sim), t.kind);
   // Passenger elevators report how full their cars run on average (staff-only
   // service elevators carry no passenger load, so they show none). Shared
   // with the mobile transport editor via transportDiagnostics.

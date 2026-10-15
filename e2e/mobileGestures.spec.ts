@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { FLOOR } from "../src/render/scale";
+import { expectEngineHosted } from "./helpers";
+
+// On chromium-wasm every test must end with its tower still on the engine.
+test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
  * Regression coverage for the mobile multi-touch bugs fixed in 1.18.2: pinch
@@ -88,7 +92,7 @@ test.describe("mobile multi-touch gestures: pinch survives any finger lift order
       // below place their offices on top of.
       const x0 = Math.floor(g.grid.width / 2) - 20;
       for (let i = 0; i < 40; i++) {
-        const r = g.sim.tower.place("lobby", 1, x0 + i);
+        const r = g.sim.build("lobby", 1, x0 + i);
         if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
       }
     });
@@ -194,7 +198,7 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
       // tap below needs beneath it.
       const x0 = Math.floor(g.grid.width / 2) - 20;
       for (let i = 0; i < 40; i++) {
-        const r = g.sim.tower.place("lobby", 1, x0 + i);
+        const r = g.sim.build("lobby", 1, x0 + i);
         if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
       }
     });
@@ -303,8 +307,8 @@ test.describe("mobile pinch: zoom out frames the whole tower", () => {
       return Boolean(g?.sim && g.engine && canvas && canvas.width > 0 && canvas.height > 0);
     });
 
-    // Freeze time, fund, and build an 82-floor tower straight through the Tower
-    // API: a ground lobby plus a single supported column of floors up to 82. The
+    // Freeze time, fund, and build an 82-floor tower through relayed sim.build
+    // calls: a ground lobby plus a single supported column of floors up to 82. The
     // dynamic zoom floor only needs the tower's built floor extent, which this
     // gives us without hand-placing a whole city.
     const top = await page.evaluate(() => {
@@ -313,11 +317,16 @@ test.describe("mobile pinch: zoom out frames the whole tower", () => {
       document.getElementById("splash")?.remove();
       g.speed = 0;
       g.sim.money = 1e9;
-      const t = g.sim.tower;
       const x = Math.floor(g.grid.width / 2);
-      t.place("lobby", 1, x);
-      for (let f = 2; f <= 82; f++) t.place("floor", f, x);
-      return t.highestFloor as number;
+      const ok = (r: { ok: boolean; reason?: string }, what: string) => {
+        if (!r.ok) throw new Error(`${what}: ${r.reason ?? "refused"}`);
+      };
+      ok(g.sim.build("lobby", 1, x), "ground lobby");
+      for (let f = 2; f <= 82; f++) ok(g.sim.build("floor", f, x), `floor ${f}`);
+      // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__vcEngine?.current()?.syncStructure();
+      return g.sim.tower.highestFloor as number;
     });
     expect(top).toBe(82);
 

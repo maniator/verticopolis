@@ -2,9 +2,18 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { markFounderFromLoadedFile } from "../engine/sim/founderStatus";
 import { SaveGame } from "./SaveGame";
-import { fromBase64, inflateCapped, STORE_MAGIC, TOWER_FILE_MAGIC } from "./saveCompression";
-import { fromTowerFile, toTowerFile } from "./saveMigration";
-import { PRE_2_0_SAVE, storeValue } from "./saveMigration.fixture";
+import { deflateSync } from "fflate";
+import { fromBase64, inflateCapped, STORE_MAGIC, toBase64, TOWER_FILE_MAGIC } from "./saveCompression";
+import { fromTowerFile, toTowerFile } from "./towerFileCodec";
+
+/** A tower as an OLD build wrote it: no appVersion, plus the two fields
+ *  `SaveGame.import` insists on. */
+const PRE_2_0_SAVE = { minutes: 4321, units: [{ t: "office" }], towerName: "Old Guard", money: 500 };
+
+/** Packs a value exactly as `SaveGame.saveTo` writes it into localStorage. */
+function storeValue(obj: unknown): string {
+  return STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(obj)), { level: 1 }));
+}
 
 /**
  * The reverse converter, which is the byte-fidelity core of the read path.
@@ -100,9 +109,9 @@ describe("Founder survives the reverse trip", () => {
 /**
  * The cross-codec direction nothing has ever exercised.
  *
- * The migration proved fflate's `deflateSync` output decodes through
- * `DecompressionStream`. Hydration needs the OTHER direction: a desktop
- * autosave is written by `SaveGame.export`, which packs with
+ * `towerFileCodec.test.ts` proves fflate's `deflateSync` output decodes
+ * through `DecompressionStream`. This pins the OTHER direction: a `.vctower`
+ * is written by `SaveGame.export`, which packs with
  * `CompressionStream`, and hydration then hands that payload to `readSlot`,
  * which unpacks with fflate's `inflateCapped`. Both are raw deflate, so it
  * should hold, and it is the path every desktop-written tower takes home.

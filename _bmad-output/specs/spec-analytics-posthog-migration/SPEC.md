@@ -19,7 +19,7 @@ The full-repository-audit (2026-07-21) opened D-1 (issue #542): stay on Vercel W
 ## Capabilities
 
 - **CAP-1: One-file analytics adapter seam**
-  - **intent:** the vendor and transport live in exactly one adapter module; the typed event vocabulary (`game_started`, `first_build`, `tool_used`, `star_reached`, `boot`, `crash`, `update`, plus the session-depth events) and every call site are unchanged; a provider swap is a one-file diff.
+  - **intent:** the vendor and transport live in exactly one adapter module; the typed event vocabulary (`new_game_started`, renamed from `game_started` on 2026-09-14, plus `first_build`, `tool_used`, `star_reached`, `boot`, `crash`, `update`, plus the session-depth events) and every call site are unchanged; a provider swap is a one-file diff.
   - **success:** grep finds no `@vercel/analytics` or PostHog import outside the single adapter; a stub adapter drives the whole vocabulary in tests; switching transports touches exactly one file.
 
 - **CAP-2: Cookieless PostHog transport via a same-origin serverless relay (no posthog-js SDK)**
@@ -27,7 +27,7 @@ The full-repository-audit (2026-07-21) opened D-1 (issue #542): stay on Vercel W
   - **success:** the shipped bundle contains no PostHog SDK and no project key; a network trace shows events posting to the same origin, never a PostHog domain; no cookie, no `localStorage` id, and no id persisted across sessions is set; events in one play session share a session-scoped id (kept in `sessionStorage` so a mid-play reload does not fragment the session) while a new tab starts fresh; disabling the transport degrades to best-effort no-throw.
 
 - **CAP-3: Event enrichment that pays off with per-session correlation**
-  - **intent:** add the platform dimension (`web` / `twa` / `ios`) as an event prop, resolving AUD-036; model the first-tower funnel (`game_started` then `first_build` then `star_reached(2)`) as a real funnel; keep the on-device `returning` signal derived off the onboarding-seen flag (cookieless has no cross-session id, so `returning` stays an anonymous on-device bucket); and unlock the per-tool and per-session splits the Vercel report could not compute.
+  - **intent:** add the platform dimension (`web` / `twa` / `ios`) as an event prop, resolving AUD-036; model the first-tower funnel (a new game, then `first_build`, then `star_reached(2)`) as a real funnel, where the new-game step is a PostHog action spanning `new_game_started` and the pre-rename `game_started` so history and cached clients still count; keep the on-device `returning` signal derived off the onboarding-seen flag (cookieless has no cross-session id, so `returning` stays an anonymous on-device bucket); and unlock the per-tool and per-session splits the Vercel report could not compute.
   - **success:** PostHog shows a platform breakdown, the three-step funnel with real drop rates, returning-versus-new by depth, and per-tool per-session distributions.
 
 - **CAP-4: Report re-target and tooling retirement**

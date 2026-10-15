@@ -1,10 +1,12 @@
 import type { Unit } from "../../engine/types";
 import { visibleOccupants } from "../../engine/Crowd";
+import { isLateHour } from "../lateNight";
 import { PAL, SKIN, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, shade, vacancy, windowView, type RoomCtx } from "./common";
 import { artRow, authoredWidth, screenLength } from "./artScale";
 import { bevelBox, ceilingCap, curtain, downlights, fill, framedArt, glow, interiorWall, plankFloor } from "./dollhouse";
-import { CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, SUITE_WALLS } from "./residential.looks";
+import { layerBreak, layerEnd } from "./layers";
 import { ROACH_AMBER, ROACH_CHESTNUT, drawRoach } from "./residential.roaches";
+import { CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, SUITE_WALLS } from "./residential.looks";
 
 /**
  * Residential and lodging room art: office, condo, and the three hotel grades,
@@ -15,10 +17,11 @@ import { ROACH_AMBER, ROACH_CHESTNUT, drawRoach } from "./residential.roaches";
  *
  * Every look resolves from the room bake signature only (`u.state`, `d.lit`,
  * `u.width`, `u.occupants`, `u.outForMeal` via `visibleOccupants`, and the
- * condo `lateNight` flag from `d.hour`); none reads `d.anim`, so a static room
- * stays cacheable and repaints exactly when its look changes. Seated occupants
- * map one-to-one to `visibleOccupants(u)`, capped by the layout's seats and
- * filled in seat order: no ghost people. Integer pixel coordinates only.
+ * late-night flag from `d.hour` via `isLateHour`); none reads `d.anim`, so a
+ * static room stays cacheable and repaints exactly when its look changes.
+ * Seated occupants map one-to-one to `visibleOccupants(u)`, capped by the
+ * layout's seats and filled in seat order: no ghost people. Integer pixel
+ * coordinates only.
  */
 
 /** Floor-band height and floor-line Y for a room rect, matching the build's
@@ -95,6 +98,7 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
       const spines = ["#8C3A32", "#3E5A8C", "#B08A3E", "#4A7A4A", "#7A5A9E"];
       for (let k = 0; k < 5; k++) fill(ctx, bsX + 2 + k * 3, y + 8, 2, 5, spines[k]);
     }
+    layerBreak(ctx); // the shell ends; furniture and staff follow
     if (layout === 3) {
       // Meeting room: one long table with a laptop and papers, high-back chairs
       // both sides, seated staff up to the chair count, a corner plant.
@@ -196,7 +200,7 @@ export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
   const { ctx } = d;
   if (u.state === "empty") return vacancy(ctx, x, y, w, h, vacancyLabel);
   // Residents are "up" only when home and not asleep in the small hours.
-  const home = visibleOccupants(u) > 0 && !(d.hour >= 23 || d.hour < 6);
+  const home = visibleOccupants(u) > 0 && !isLateHour(d.hour);
   // Geo-seeded variety, geometry first: three true layouts (living, dining with a
   // kitchenette, a study), any of them mirrored, over warm plaster and maple. The
   // standing lamp appears in every layout so the home-glow signal survives.
@@ -234,6 +238,7 @@ export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
     windowView(ctx, winX, winTop, winW, winH, d.lit, geoVariant(u, 5, 997));
     curtain(ctx, winX - 1, winTop, winH, "#9A6E7A");
     curtain(ctx, winX + winW + 2, winTop, winH, "#9A6E7A");
+    layerBreak(ctx); // the shell ends; furniture and residents follow
     if (layout === 3) {
       // Dining: kitchenette on the wall, a set table with a candle, two seated
       // diners when home, a sideboard, the standing lamp.
@@ -394,6 +399,7 @@ export function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
     const winX = x + (w > 80 ? w - 20 : w - 13);
     windowView(ctx, winX, winTop, winW, winH, asleep || d.lit, winSeed);
     curtain(ctx, winX - 2, winTop, winH, asleep ? "#2E2A44" : "#B08A6A");
+    layerBreak(ctx); // the shell ends; the beds and the suite's sitting area follow
     if (grade === 3) {
       bevelBox(ctx, x + 5, floorY - 8, suiteSofaW, 8, "#7C5A6A"); // sitting sofa
       fill(ctx, x + 5, floorY - 11, suiteSofaW, 3, "#8C6A7A");
@@ -431,6 +437,9 @@ export function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
   // out. A DIRTY room gets a single amber warning roach. All draw here, outside
   // the mirror wrapper, so a flipped room reads identically; flips off the unit
   // id give scatter variety without per-frame motion (rooms are cached sprites).
+  // The furniture ends here: the grime wash, the roaches and the "z" draw
+  // after the furniture ends, so the atlas's depth layers put them on the shell.
+  layerEnd(ctx);
   if (infested) {
     const fv = (n: number): number => (geoVariant(u, 30 + n, 2) === 1 ? 1 : -1);
     fill(ctx, x, y, w, h, "#5A6828", 0.2); // grime wash

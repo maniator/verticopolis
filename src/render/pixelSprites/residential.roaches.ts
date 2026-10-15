@@ -1,13 +1,13 @@
 /**
- * The hotel cockroach decal (owner-approved redesign, 2026-07-16), split out of
- * `residential.ts` so the room-draw code has room under the 500-line ceiling
- * without touching this art (mirrors the `residential.looks.ts` pattern).
- * A pure move: the palettes and the three draw helpers are unchanged.
+ * The hotel's cockroach decals (a dirty room's warning roach, an infested
+ * room's swarm), drawn by `hotel()` in `residential.ts`. Split out of
+ * `residential.ts` for the 500-line ceiling.
  */
 
-/** Cockroach decal palettes. Chestnut for a full infestation (dark and obvious,
- *  but clearly a roach); warmer amber for the single dirty-room warning. The
- *  pale `rim` keeps them legible over any wall tint. */
+/** Cockroach decal palettes (owner-approved redesign, 2026-07-16). Chestnut for
+ *  a full infestation (dark and obvious, but clearly a roach); warmer amber for
+ *  the single dirty-room warning. The pale `rim` keeps them legible over any
+ *  wall tint. */
 export const ROACH_CHESTNUT = { dark: "#2A1A0E", head: "#1E1208", collar: "#6A4A28", rim: "#EFE7D2", sheen: "#7A5230", seam: "#140C05", leg: "#160E05" };
 export const ROACH_AMBER = { dark: "#4A331A", head: "#341F0E", collar: "#7A5A30", rim: "#EFE7D2", sheen: "#8A6A3A", seam: "#241608", leg: "#241608" };
 export type RoachPalette = typeof ROACH_CHESTNUT;
@@ -15,7 +15,7 @@ export type RoachPalette = typeof ROACH_CHESTNUT;
 /** A crisp filled pixel ellipse (integer scanlines, no anti-aliasing). Radii are
  *  floored to 1 so a degenerate call (`ry <= 0`) can never divide by zero into a
  *  NaN rect; every current caller already passes `rx, ry >= 2`. */
-function roachOval(ctx: CanvasRenderingContext2D, cx: number, cy: number, rx: number, ry: number, color: string, alpha = 1): void {
+export function roachOval(ctx: CanvasRenderingContext2D, cx: number, cy: number, rx: number, ry: number, color: string, alpha = 1): void {
   rx = Math.max(1, rx);
   ry = Math.max(1, ry);
   const prevAlpha = ctx.globalAlpha; // restore the caller's alpha, don't assume 1
@@ -31,7 +31,7 @@ function roachOval(ctx: CanvasRenderingContext2D, cx: number, cy: number, rx: nu
 }
 
 /** A crisp pixel line (Bresenham) for legs and antennae. */
-function roachLine(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, color: string): void {
+export function roachLine(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, color: string): void {
   x0 = Math.round(x0);
   y0 = Math.round(y0);
   x1 = Math.round(x1);

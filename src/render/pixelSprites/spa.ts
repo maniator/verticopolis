@@ -1,5 +1,6 @@
 import type { Unit } from "../../engine/types";
 import { busyStations, hash, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
+import { layerBreak } from "./layers";
 
 /**
  * Modern Spa art: a calm, warm wellness room with a steaming hot tub, a row of
@@ -35,6 +36,8 @@ export function spa(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: num
   // A warm accent band along the top of the back wall, the spa's calm signature.
   ctx.fillStyle = shade(WALL, 22);
   ctx.fillRect(x, y + 3, w, 2);
+
+  layerBreak(ctx); // the shell ends; the tub, tables, plants and guests follow
 
   // The hot tub on the left: a raised stone rim with steaming water, plus a few
   // rising steam wisps so the scene reads warm even when empty.

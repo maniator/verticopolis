@@ -1,6 +1,10 @@
 import type { HeatmapMode } from "../../engine/Simulation";
-import { GRID, facilityFloors, isElevatorKind } from "../../engine/facilities";
-import type { Transport, Unit } from "../../engine/types";
+import { RAIN } from "../sprites/sky";
+import { isElevatorKind } from "../../engine/facilities";
+import { catalogFacility } from "../../engine/catalogTypes";
+import { towerCatalog } from "../../engine/towerCatalog";
+import { viewWorld } from "../../presentation/viewWorld";
+import type { Transport } from "../../engine/types";
 import { drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";
 import { FLOOR, TILE } from "../scale";
 import type { ScreenRect } from "./towerInputCamera";
@@ -171,7 +175,7 @@ function renderVip(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   if (engine.vipStart === null) return;
   const p = (engine.d.anim - engine.vipStart) / VIP_VISIT_SECONDS;
   if (p < 0 || p > 1) return;
-  const centerSx = engine.worldToScreenX(GRID.width / 2);
+  const centerSx = engine.worldToScreenX(viewWorld().lotWidth / 2);
   const groundSy = engine.worldToScreenY(1) + FLOOR * engine.cam.zoom * 0.5;
   const off = engine.viewWidth * 0.6;
   // The limo faces right, so it drives rightward: in from the left, hold, out
@@ -315,16 +319,16 @@ function drawRain(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   const H = engine.viewHeight;
   const t = engine.d.anim;
   // A faint overcast tint over the whole scene.
-  ctx.fillStyle = "rgba(34,40,56,0.16)";
+  ctx.fillStyle = RAIN.tint;
   ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = "rgba(200,214,236,0.45)";
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = RAIN.stroke;
+  ctx.lineWidth = RAIN.lineWidth;
   ctx.beginPath();
-  for (let i = 0; i < 140; i++) {
-    const x = ((i * 2654435761) >>> 0) % W;
-    const y = (((i * 37) % H) + t * 320) % H;
+  for (let i = 0; i < RAIN.count; i++) {
+    const x = ((i * RAIN.xMul) >>> 0) % W;
+    const y = (((i * RAIN.yStep) % H) + t * RAIN.speed) % H;
     ctx.moveTo(x, y);
-    ctx.lineTo(x - 3, y + 9);
+    ctx.lineTo(x + RAIN.dx, y + RAIN.dy);
   }
   ctx.stroke();
 }
@@ -353,10 +357,11 @@ function strokeSelection(ctx: CanvasRenderingContext2D, sx: number, sy: number, 
 function drawPreview(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   if (engine.preview) {
     const p = engine.preview;
-    const hgt = facilityFloors(p.kind);
+    const f = catalogFacility(towerCatalog(engine.sim), p.kind);
+    const hgt = f.floors;
     // Floor/lobby tools lay a multi-tile brush strip; `span` (when set) is the
     // real footprint so the shadow matches what a click actually places.
-    const w = p.span ?? engine.sim.tower.facilityOf({ kind: p.kind } as Unit).width;
+    const w = p.span ?? f.width;
     const sx = engine.worldToScreenX(p.x);
     const sy = engine.worldToScreenY(p.floor + hgt - 1);
     const sw = w * TILE * engine.cam.zoom;
@@ -365,7 +370,7 @@ function drawPreview(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   }
   if (engine.transportPreview) {
     const p = engine.transportPreview;
-    const w = engine.sim.tower.facilityOf({ kind: p.kind } as Unit).width;
+    const w = catalogFacility(towerCatalog(engine.sim), p.kind).width;
     const sx = engine.worldToScreenX(p.x);
     const sy = engine.worldToScreenY(p.top);
     const sw = w * TILE * engine.cam.zoom;
@@ -379,7 +384,7 @@ function drawSelection(engine: TowerEngine, ctx: CanvasRenderingContext2D): void
   if (engine.selectedId == null) return;
   const u = engine.sim.tower.getUnit(engine.selectedId);
   if (u) {
-    const hgt = facilityFloors(u.kind);
+    const hgt = catalogFacility(towerCatalog(engine.sim), u.kind).floors;
     const sx = engine.worldToScreenX(u.x);
     const sy = engine.worldToScreenY(u.floor + hgt - 1);
     strokeSelection(ctx, sx, sy, u.width * TILE * engine.cam.zoom, hgt * FLOOR * engine.cam.zoom);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { catalogFor } from "../engine/catalog";
 import { GRID } from "../engine/facilities";
 import {
   STRUCTURE_BRUSH,
@@ -9,6 +10,8 @@ import {
   snapX,
   stepCursor,
 } from "./placement";
+
+const CAT = catalogFor("classic");
 
 /** The placement helpers are pure functions of (kind, tile, floor) since the
  *  module split — these tests pin the geometry every gesture path (mouse,
@@ -25,16 +28,16 @@ describe("placement helpers", () => {
 
   it("snapX shifts a placement left so the facility fits the lot", () => {
     // Interior columns pass through untouched.
-    expect(snapX("office", 100)).toBe(100);
+    expect(snapX(CAT, "office", 100)).toBe(100);
     // A wide room near the right edge snaps to the last column it fits at
     // (office is 9 tiles wide), instead of failing the placement.
-    expect(snapX("office", GRID.width - 1)).toBe(GRID.width - 9);
-    expect(snapX("office", GRID.width - 9)).toBe(GRID.width - 9);
+    expect(snapX(CAT, "office", GRID.width - 1)).toBe(GRID.width - 9);
+    expect(snapX(CAT, "office", GRID.width - 9)).toBe(GRID.width - 9);
     // One-tile structures can reach the very last column.
-    expect(snapX("floor", GRID.width - 1)).toBe(GRID.width - 1);
+    expect(snapX(CAT, "floor", GRID.width - 1)).toBe(GRID.width - 1);
     // Off-lot input clamps at both ends.
-    expect(snapX("office", -5)).toBe(0);
-    expect(snapX("floor", GRID.width + 50)).toBe(GRID.width - 1);
+    expect(snapX(CAT, "office", -5)).toBe(0);
+    expect(snapX(CAT, "floor", GRID.width + 50)).toBe(GRID.width - 1);
   });
 
   it("brushTiles paints a fixed-size strip centered on the cursor", () => {
@@ -81,30 +84,30 @@ describe("placement helpers", () => {
   });
 
   it("announces paint outcomes, preferring the engine's reason", () => {
-    expect(announceForPlacement({ what: "paint", ok: true }, "floor", 5)).toBe("Placed Floor on floor 5");
+    expect(announceForPlacement({ what: "paint", ok: true }, CAT, "floor", 5)).toBe("Placed Floor on floor 5");
     // A refusal reason (no support, no money) passes through verbatim…
-    expect(announceForPlacement({ what: "paint", ok: false, reason: "Not enough money." }, "floor", 5)).toBe(
+    expect(announceForPlacement({ what: "paint", ok: false, reason: "Not enough money." }, CAT, "floor", 5)).toBe(
       "Not enough money.",
     );
     // …including the already-built diagnosis paintBrush synthesizes.
     expect(
-      announceForPlacement({ what: "paint", ok: false, reason: "Lobby already built here" }, "lobby", 1),
+      announceForPlacement({ what: "paint", ok: false, reason: "Lobby already built here" }, CAT, "lobby", 1),
     ).toBe("Lobby already built here");
     // No reason at all still yields a spoken line, never silence.
-    expect(announceForPlacement({ what: "paint", ok: false }, "lobby", 1)).toBe("Can't place Lobby here");
+    expect(announceForPlacement({ what: "paint", ok: false }, CAT, "lobby", 1)).toBe("Can't place Lobby here");
   });
 
   it("announces flight outcomes with the two-floor span", () => {
-    expect(announceForPlacement({ what: "flight", ok: true, reason: "" }, "stairs", 3)).toBe(
+    expect(announceForPlacement({ what: "flight", ok: true, reason: "" }, CAT, "stairs", 3)).toBe(
       "Stairway built, floors 3 to 4",
     );
     expect(
-      announceForPlacement({ what: "flight", ok: false, reason: "Escalator unlocks at 2★." }, "escalator", 3),
+      announceForPlacement({ what: "flight", ok: false, reason: "Escalator unlocks at 2★." }, CAT, "escalator", 3),
     ).toBe("Escalator unlocks at 2★.");
   });
 
   it("announces room outcomes", () => {
-    expect(announceForPlacement({ what: "room", ok: true }, "office", 2)).toBe("Placed Office");
-    expect(announceForPlacement({ what: "room", ok: false }, "office", 2)).toBe("Can't place Office here");
+    expect(announceForPlacement({ what: "room", ok: true }, CAT, "office", 2)).toBe("Placed Office");
+    expect(announceForPlacement({ what: "room", ok: false }, CAT, "office", 2)).toBe("Can't place Office here");
   });
 });

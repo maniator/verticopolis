@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { buildToStar } from "./helpers";
+import { buildToStar, expectEngineHosted, tsOnlyOnWasm } from "./helpers";
+
+// On chromium-wasm every test must end with its tower still on the engine.
+test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
  * Region composition wiring (CAP-2 of the mobile render-perf spec): settled
@@ -11,6 +14,7 @@ import { buildToStar } from "./helpers";
  * (the tower-scene baselines); this spec pins the mechanism.
  */
 test("regions compose settled rooms, animate fires privately, and drain on budget", async ({ page }) => {
+  tsOnlyOnWasm("it toggles one office between fire and empty in place to pin the per-sync region move; no relayed command douses a fire, and a load would rebuild every region instead");
   await page.goto("/");
   await page.waitForFunction(() => Boolean((window as any).game?.sim && (window as any).game?.ui));
   await page.evaluate(buildToStar, 2);

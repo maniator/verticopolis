@@ -62,6 +62,13 @@ export interface Shot {
   // their settle draws every frame. See pgStepNoDraw for the coupling.
   drawSettle?: boolean;
   keepDialogs?: boolean; // this shot INTENTIONALLY shows a modal, so don't clear it
+  // Arm the dialog phase watch (pgWatchModalPhase) before `setup` and fail the
+  // shot when the staged dialog or its sticky layers rendered at more than one
+  // subpixel phase between their first frame and the capture (#762, #843).
+  // A tripwire: it fails the runs where such a move landed after a rendered
+  // frame, so a staging regression shows as named failures on some runs.
+  // For a shot whose dialog changes size while it is being staged.
+  phaseWatch?: boolean;
   setup?: (page: Page) => Promise<void>; // escape hatch for one-off staging
 }
 

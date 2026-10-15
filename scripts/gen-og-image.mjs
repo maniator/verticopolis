@@ -19,6 +19,7 @@
  *   node scripts/gen-og-image.mjs                 # host (uses Playwright's browser)
  *   PW_CHROME=... node scripts/gen-og-image.mjs   # explicit browser (docker/CI)
  */
+// copies-package: none
 import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";

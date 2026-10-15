@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
 import { Simulation } from "../../engine/Simulation";
 import { Clock } from "../../engine/Clock";
 import { visibleOccupants, CROWD_SECONDS_PER_MINUTE, EAT_SECONDS_MIN, EAT_SECONDS_MAX } from "../../engine/Crowd";
@@ -452,7 +453,7 @@ describe("venue customer capacity: customersIn never exceeds the catalog populat
     expect(peak).toBeGreaterThan(0);
   });
 
-  it("an en-route eater arriving at a just-filled venue eats uncounted (arrival clamp)", () => {
+  itTypeScriptOnly("stamps customersIn on the instance mid-run; the frame sync restores the engine's tally every tick")("an en-route eater arriving at a just-filled venue eats uncounted (arrival clamp)", () => {
     const sim = officeAndFastFood();
     setHour(sim, 12);
     const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
@@ -478,7 +479,7 @@ describe("venue customer capacity: customersIn never exceeds the catalog populat
     expect(traveler!.venueUnitId).toBeUndefined();
   });
 
-  it("a full venue attracts no new meal trips (spawn-side filter)", () => {
+  itTypeScriptOnly("stamps customersIn before the first tick; the save does not carry the live tally, so the engine starts from an empty venue")("a full venue attracts no new meal trips (spawn-side filter)", () => {
     const sim = officeAndFastFood();
     const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
     ff.customersIn = FACILITIES.fastFood.population; // full before lunch begins

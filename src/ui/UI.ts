@@ -1,18 +1,17 @@
-import { FACILITIES, isCommercialKind } from "../engine/facilities";
+import type { Catalog } from "../engine/catalogTypes";
 import type { Simulation, LogEntry } from "../engine/Simulation";
 import type { SlotInfo } from "../storage/SaveGame";
-import type { SaveScopeCaption } from "./templates/saves";
 import type { ExportReport } from "../storage/tdtExport";
 import type { ImportReport } from "../storage/tdtImport";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { ElevatorSchedule } from "../engine/elevatorSchedule";
 import type { CalendarKind } from "../engine/calendar";
 import type { UpdateInfo } from "../pwa";
-import { getPlatform } from "../platform";
+import { downloadFile } from "./downloadFile";
 import { render, type TemplateResult } from "lit-html";
 import { iconElement } from "./icons";
 import { mountToolbarIcons } from "./uiToolbarIcons";
-import { toolInfoTemplate, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO } from "./templates/toolInfo";
+import { toolInfoFor, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO } from "./templates/toolInfo";
 import * as dialogs from "./uiDialogs";
 import * as panels from "./uiPanels";
 import * as status from "./uiStatus";
@@ -23,6 +22,8 @@ import { finishModal } from "./uiModal";
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
 
 export interface UICallbacks {
+  /** The live tower's catalog (#921), re-read per call. */
+  getCatalog(): Catalog;
   onSelectTool(tool: Tool): void;
   onSpeed(speed: number): void;
   /** The live game-speed index, so a dialog can pause and restore the tower. */
@@ -122,6 +123,8 @@ export class UI {
    *  affordability bitmask last applied to the DOM. The ~6 Hz pump rescans only
    *  when this changes. @internal friend-module access (uiStatus). */
   paletteScanKey: string | null = null;
+  /** The catalog the palette labels show (#921). @internal (uiPalette, uiStatus) */
+  paletteCatalog: Catalog | null = null;
 
   constructor(cb: UICallbacks) {
     this.cb = cb;
@@ -152,10 +155,7 @@ export class UI {
 
   /** Open the New Tower picker over a live tower. The toolbar always has one to
    *  abandon, so the picker shows its fold-in abandon warning and the mode
-   *  choice and the confirm are one step. Named rather than inlined in the
-   *  button handler because a native shell menu reaches the same command
-   *  through `src/game/hostCommands.ts`, and both callers must land on one code
-   *  path (a second copy of these options is how the two would drift). */
+   *  choice and the confirm are one step. */
   promptNewTower(): void {
     this.newTowerModal({ hasSave: true, onFound: (mode, cal, manual) => this.cb.onNew(mode, cal, manual) });
   }
@@ -211,13 +211,7 @@ export class UI {
     document.querySelectorAll(".pal-item").forEach((x) => x.classList.remove("active"));
     if (tool.type === "build") {
       document.querySelector(`.pal-item[data-kind="${tool.kind}"]`)?.classList.add("active");
-      const f = FACILITIES[tool.kind];
-      // The Floor tool lays a lobby on the ground floor (level 1), so surface the
-      // lobby price on its info card. See groundFloorStructureKind.
-      render(
-        toolInfoTemplate(f, isCommercialKind(tool.kind), tool.kind === "floor" ? FACILITIES.lobby.cost : undefined),
-        this.el.toolInfo,
-      );
+      render(toolInfoFor(this.cb.getCatalog(), tool.kind), this.el.toolInfo);
     } else {
       document.querySelector(`.pal-item[data-tool="${tool.type}"]`)?.classList.add("active");
       render(tool.type === "bulldoze" ? BULLDOZE_TOOL_INFO : INSPECT_TOOL_INFO, this.el.toolInfo);
@@ -334,37 +328,24 @@ export class UI {
     this.el.audioToggle.setAttribute("aria-pressed", String(muted));
   }
 
-  /** Hand the player an exported file. Routed through the platform port so a
-   *  native wrapper can deliver it its own way (share sheet); the browser port
-   *  keeps the pre-port blob-anchor download exactly. Callers decide the name and
-   *  contents (see SaveGame.export); raw bytes flow through too, for the binary
-   *  .TDT export. The type mirrors the platform port's saveFile seam (a
-   *  cross-repo contract), which is why it is narrower than BlobPart.
-   *
-   *  Returns a promise that settles when the port's saveFile does and never
-   *  rejects (every failure lands in the toast below). The export flow awaits
-   *  it on a wrapped session so its single-flight latch spans the shell's save
-   *  dialog (GH #773). Every other caller may ignore it: the call itself stays
-   *  synchronous, and the browser port resolves right after its anchor click. */
-  downloadFile(filename: string, contents: string | Uint8Array): Promise<void> {
+  /** Hand the player an exported file as a browser download. Callers decide
+   *  the name and contents (see SaveGame.export); raw bytes flow through too,
+   *  for the binary .TDT export. Never throws: losing an export silently is
+   *  never acceptable, so every failure lands in the toast below. Returns
+   *  false when the download call threw, so a caller never follows that
+   *  failure toast with a success line of its own (GH #997). True means only
+   *  that the browser took the request: a download it blocks quietly (a
+   *  sandboxed frame, a site setting) still reads as true. */
+  downloadFile(filename: string, contents: string | Uint8Array): boolean {
     // octet-stream (not application/json, the payload isn't) so the browser
     // downloads our made-up .vctower type instead of trying to display it.
-    //
-    // Every failure shape a broken wrapper can produce (sync throw, non-Promise
-    // return, rejection) must reach the same toast, because losing an export
-    // silently is never acceptable. Dead code in the browser (its saveFile never
-    // throws or rejects); a native shell rejects only on real failure, and cancel
-    // resolves, so the toast never fires for it. The call itself stays
-    // synchronous: deferring it would delay the browser download.
-    const fail = (err: unknown) => {
-      console.error("[platform] saveFile failed:", err);
-      this.toast("Couldn't save your tower file. Please try again.", "bad");
-    };
     try {
-      return Promise.resolve(getPlatform().saveFile(filename, contents, "application/octet-stream")).catch(fail);
+      downloadFile(filename, contents, "application/octet-stream");
+      return true;
     } catch (err) {
-      fail(err);
-      return Promise.resolve();
+      console.error("[export] download failed:", err);
+      this.toast("Couldn't save your tower file. Please try again.", "bad");
+      return false;
     }
   }
 
@@ -426,8 +407,8 @@ export class UI {
     dialogs.showStats(this, body, handlers);
   }
 
-  showSaves(slots: SlotInfo[], scope?: SaveScopeCaption): void {
-    dialogs.showSaves(this, slots, scope);
+  showSaves(slots: SlotInfo[]): void {
+    dialogs.showSaves(this, slots);
   }
 
   showTowerPicker(ctx: dialogs.TowerPickerCtx): void {

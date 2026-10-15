@@ -1,6 +1,7 @@
 import type { Unit } from "../../engine/types";
 import { busyStations, castShadow, personSeated, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { artRow, authoredWidth } from "./artScale";
+import { layerBreak } from "./layers";
 
 /**
  * Modern Fitness Club art: a members' gym in one of five formats (a weight
@@ -170,6 +171,7 @@ export function fitnessClub(d: RoomCtx, u: Unit, x: number, y: number, w: number
   const look = (u.subtype !== undefined && FITNESS_LOOKS[u.subtype]) || FITNESS_DEFAULT;
   const floorY = shell(ctx, x, y, w, h, look.wall, look.floor);
   const top = mirrorStrip(ctx, x, y, w, look.wall, look.accent, d.lit);
+  layerBreak(ctx); // the shell ends; the equipment and members follow
   const occ = roomOccupants(u);
   const seed = figureSeed(u);
   // The room's authored width comes from its TILES, not its pixels, so a row's

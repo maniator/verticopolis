@@ -1,7 +1,9 @@
 import type { Unit } from "../../../engine/types";
 import { ceilingFixture, personHiVis, personSeated, personStanding, roomGlow, SKIN } from "../../pixelSprites/common";
+import { layerBreak, layerEnd, layerShell } from "../../pixelSprites/layers";
 import { rand, serviceLabel, type DrawCtx } from "../common";
 import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./serviceKit";
+import { RECYCLING_DECK, RECYCLING_GAUGE_ROWS, RECYCLING_GAUGE_TOP, RECYCLING_PILE_PITCH, RECYCLING_PILE_X0, RECYCLING_REF_H, RECYCLING_REF_W, recyclingLook } from "./recyclingLook";
 
 /**
  * In-tower service and utility facilities: security, the clinic, housekeeping,
@@ -41,18 +43,24 @@ export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: num
       Fu(mx + 1, my + 1, 6, 1, "#2A4A3A");
     }
   }
-  // Console desk with a seated guard behind it.
-  box(F, 58, fy - 8, 26, 8, "#2A3550");
-  F(58, fy - 8, 26, 1, "#3E4A66");
-  personSeated(ctx, sx(66), sy(fy - 8), (Math.round(x) * 3 + 5) | 0);
-  // Brass badge shield, key rack, and the red alarm light.
-  F(60, fy - 14, 6, 6, "#D8B05A");
-  F(62, fy - 13, 2, 4, "#8A6A2A");
+  // The key rack and the red alarm light hang on the wall. They sit clear of
+  // the console, the guard and the badge, so drawing them first changes no
+  // pixel and keeps them on the shell.
   F(78, 8, 8, 5, "#5A4A36");
   for (let k = 0; k < 4; k++) Fu(79 + k * 2, 13, 1, 2, "#D8B05A"); // key rack pins, one object repeated
   F(W - 8, 7, 4, 4, "#E85D5D");
   glow(F, W - 6, 9, "#FF6B6B");
-  // A warm ceiling light over the console keys on the lit (evening) state.
+  layerBreak(ctx); // the shell ends; the console, guard and badge follow
+  // Console desk with a seated guard behind it.
+  box(F, 58, fy - 8, 26, 8, "#2A3550");
+  F(58, fy - 8, 26, 1, "#3E4A66");
+  personSeated(ctx, sx(66), sy(fy - 8), (Math.round(x) * 3 + 5) | 0);
+  // Brass badge shield.
+  F(60, fy - 14, 6, 6, "#D8B05A");
+  F(62, fy - 13, 2, 4, "#8A6A2A");
+  // A warm ceiling light over the console keys on the lit (evening) state. It
+  // belongs to the shell but draws last, so it follows the furniture's end.
+  layerEnd(ctx);
   ceilingFixture(ctx, x, y, w, d.lit);
 }
 
@@ -76,6 +84,7 @@ export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: numb
   F(6, 8, 14, 14, "#F4F0EC");
   F(10, 10, 6, 10, "#D6342F");
   F(7, 13, 12, 4, "#D6342F");
+  layerBreak(ctx); // the shell ends; the beds, equipment and staff follow
   // First curtained exam bed with a resting patient head, blanket, and rail.
   box(F, 28, fy - 9, 26, 9, "#DCE2E8");
   F(28, fy - 9, 26, 1, "#F0F4F8");
@@ -133,6 +142,7 @@ export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h:
   const fy = RH - 6;
   wallp(F, 0, 0, W, fy, "#D8D0BE", false);
   floorb(F, 0, fy, W, 6, "#B7AE98");
+  layerBreak(ctx); // the shell ends; the shelf, cart, mop and housekeeper follow
   // Linen shelf with folded white and blue linens.
   box(F, 4, 6, 30, fy - 8, "#9A8468");
   const linens = ["#F4F0EC", "#CFE0FF", "#F4F0EC", "#E8D8C0"];
@@ -159,6 +169,7 @@ export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h:
   F(W - 20, fy - 11, 12, 3, "#F4F0EC");
   // Standing housekeeper by the cart (the teal cart carries the uniform read).
   personStanding(ctx, sx(38), sy(fy), (Math.round(x) * 3 + 3) | 0);
+  layerEnd(ctx); // the ceiling light belongs to the shell but draws last
   ceilingFixture(ctx, x, y, w, d.lit);
 }
 
@@ -166,12 +177,12 @@ export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h:
 
 export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
-  const RW = 220;
-  const RH = 88;
+  const RW = RECYCLING_REF_W;
+  const RH = RECYCLING_REF_H;
   const { F, Fu, sx, sy } = refMap(ctx, x, y, w, h, RW, RH);
   const W = RW;
   const H = RH;
-  const deck = H - 7;
+  const deck = RECYCLING_DECK;
   // Concrete hall: walls, roof ribs, girders, and a service pipe. The full-width
   // bands stay on the edge-derived fill so they meet without a seam; the ribs,
   // studs and pipe brackets are repeated objects and take the uniform one.
@@ -202,6 +213,10 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   // Overhead sorting sign.
   box(F, 92, 5, 70, 10, "#2A6E3A");
   for (let i = 0; i < 11; i++) Fu(96 + i * 6, 8, 3, 4, "#DCE8C0"); // sign letters
+  // The shell ends; the machines, the day's pile and the plant hand are the
+  // furniture. The curb and the wall gauge draw later in the routine but are
+  // the hall's own, so they go on the shell (layerShell).
+  layerBreak(ctx);
   // Conveyor belt carrying baled recyclables (no reserved red bale).
   const by = deck - 24;
   F(26, by, 120, 6, "#3A3E44");
@@ -262,40 +277,41 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
     Fu(gx2 + 2, deck - 6, 2, 2, "#FFFFFF", 0.28);
   }
   // Painted deck curb with hazard stripes.
-  F(0, deck, W, 7, "#4A4A44");
-  F(0, deck, W, 1, "#5E5E56");
-  for (let i = 0; i < W; i += 6) {
-    Fu(i, deck + 1, 3, 2, "#D8B23A");
-    Fu(i + 3, deck + 1, 3, 2, "#2A2418");
-  }
-  F(20, deck + 3, W - 40, 1, "#000000", 0.2);
+  layerShell(ctx, () => {
+    F(0, deck, W, 7, "#4A4A44");
+    F(0, deck, W, 1, "#5E5E56");
+    for (let i = 0; i < W; i += 6) {
+      Fu(i, deck + 1, 3, 2, "#D8B23A");
+      Fu(i + 3, deck + 1, 3, 2, "#2A2418");
+    }
+    F(20, deck + 3, W - 40, 1, "#000000", 0.2);
+  });
   // Live behavior: the day's waste piles up until the morning truck. The pile
   // grows rightward and stacks a second row past half full. `d.recycleFill` is
-  // a prepared input, so no scan runs here.
-  const rawFill = d.recycleFill ?? 0;
-  const fill = Number.isFinite(rawFill) ? Math.max(0, Math.min(1, rawFill)) : 0;
-  const pileX0 = 28;
-  const pileMax = W - 70;
-  const slots = Math.floor((pileMax - pileX0) / 7);
-  const bags = Math.round(fill * slots);
+  // a prepared input, so no scan runs here; the art reads it only through
+  // `recyclingLook`, which the sprite atlas steps through.
+  const look = recyclingLook(d.recycleFill);
+  const bags = look.bags;
   for (let i = 0; i < bags; i++) {
-    const bx = pileX0 + i * 7;
+    const bx = RECYCLING_PILE_X0 + i * RECYCLING_PILE_PITCH;
     const jit = Math.floor(rand((u.id * 31 + i) | 0) * 3);
     F(bx, deck - 6 - jit, 6, 6 + jit, i % 3 === 2 ? "#4a5a3a" : "#3a4232");
     Fu(bx + 2, deck - 7 - jit, 2, 2, "#FFFFFF", 0.35);
-    if (fill > 0.5 && i % 2 === 0 && i < bags - 1) F(bx + 3, deck - 11 - jit, 6, 5, "#2f3628");
+    if (look.stacked && i % 2 === 0 && i < bags - 1) F(bx + 3, deck - 11 - jit, 6, 5, "#2f3628");
   }
   // Live wall gauge: green, then amber past 0.7, then red with the FULL cue at
   // capacity. The FULL red is a deliberate state cue, not decoration.
-  const gY = 14;
-  const gH = deck - 18;
-  F(W - 6, gY, 4, gH, "#1B2A14");
+  const gY = RECYCLING_GAUGE_TOP;
+  const gH = RECYCLING_GAUGE_ROWS;
   let gauge = "#6bd47a";
-  if (fill >= 1) gauge = "#d6342f";
-  else if (fill > 0.7) gauge = "#e0a94e";
-  const gaugeH = Math.round(gH * fill);
-  F(W - 5, gY + gH - gaugeH, 2, gaugeH, gauge);
-  if (fill >= 1) serviceLabel(ctx, "FULL", sx(W - 34), y, "#ffd2c8", 44, w);
+  if (look.full) gauge = "#d6342f";
+  else if (look.amber) gauge = "#e0a94e";
+  const gaugeH = look.gaugeRows;
+  layerShell(ctx, () => {
+    F(W - 6, gY, 4, gH, "#1B2A14");
+    F(W - 5, gY + gH - gaugeH, 2, gaugeH, gauge);
+    if (look.full) serviceLabel(ctx, "FULL", sx(W - 34), y, "#ffd2c8", 44, w);
+  });
   // The vested plant hand (shared hi-vis build with a hardhat), drawn last so
   // the worker stands in front of the pile.
   personHiVis(ctx, sx(84), sy(deck), (u.id * 7 + 3) | 0);
@@ -418,6 +434,7 @@ export function drawMetro(d: DrawCtx, x: number, y: number, w: number, h: number
   f(24, 44, 32, 1, "#E8C14A");
   f(24, 48, 38, 1, "#6bd47a");
   for (let i = 0; i < 6; i++) f(26 + i * 7, 40, 2, 2, "#F4F0E4");
+  layerBreak(ctx); // the shell ends; the benches, vending machines and bins follow
   // Deck furniture on the far platform: wooden benches, a vending machine on
   // a longer cadence, and a bin. The train slides in FRONT of these.
   for (let bx = 110; bx < W - 24; bx += 100) {
@@ -436,6 +453,9 @@ export function drawMetro(d: DrawCtx, x: number, y: number, w: number, h: number
     f(tx, deckY - 6, 6, 6, "#4E5A50");
     f(tx + 1, deckY - 6, 4, 1, "#2E3A30");
   }
+  // The furniture ends here: the exit stairs, the deck and the trough are
+  // structure drawn over it, so the depth layers put them on the shell.
+  layerEnd(ctx);
   // WAY OUT at the right end: green sign over stair steps rising out of frame.
   const ex = W - 46;
   box(f, ex, 30, 26, 10, "#3E7E4E");
