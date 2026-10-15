@@ -146,9 +146,14 @@ describe("worker host (fake engine)", () => {
     expect(stamped.money).toBe(exact.money);
     expect(stamped.view).toEqual({ x: 1, y: 2, zoom: 3 });
     expect(r.host.stats.approximateSaves).toBe(0);
+    const atReply = r.sim.clock.minutes;
     r.sim.tick(1);
-    r.sim.serialize();
+    const approx = r.sim.serialize() as { minutes: number };
     expect(r.host.stats.approximateSaves).toBe(1);
+    // Its clock is the state's own (the last fresh reply's), not the frame
+    // loop's, which already counts the step not yet answered (#1018).
+    expect(r.sim.clock.minutes).toBe(atReply + 1);
+    expect(approx.minutes).toBe(atReply);
     r.host.detach();
   });
 

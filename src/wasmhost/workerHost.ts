@@ -451,7 +451,14 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       const e = exactSave();
       if (!e) {
         stats.approximateSaves++;
-        return Simulation.prototype.serialize.call(sim);
+        // The read model's state is the engine's at the last fresh reply,
+        // plus the commands since; its clock already counts the steps still
+        // in flight. The save takes the state's own minute, so a tower
+        // loaded from it runs those steps again, an hour or day pass among
+        // them, instead of starting past a boundary that never ran.
+        const data = Simulation.prototype.serialize.call(sim);
+        data.minutes = engineMinutes;
+        return data;
       }
       const data = JSON.parse(e.save) as Record<string, unknown>;
       if (e.view) {

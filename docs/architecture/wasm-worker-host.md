@@ -205,9 +205,13 @@ fan-out, and an event is never handed out twice.
   full save). A camera
   stamp (`view`, which the save carries and the simulation never reads) since
   then is patched into it, so a save that stamps the camera first stays exact.
-- Otherwise it answers with the read model's own save. That save has the
-  structure and money of the last sync, and the internals as of the last
-  merge.
+- Otherwise it answers with the read model's own save. Once caught up, the
+  read model holds exactly the engine's state (the integration tests compare
+  the two saves field by field), so this save is the engine's state at the
+  last fresh reply plus the player's commands since. The steps still in
+  flight are not in it, so it carries that reply's minute rather than the
+  frame loop's clock: a tower loaded from it runs those steps again, an hour
+  or day pass among them (#1018).
 - `settle()` asks for an exact save and resolves when it has one.
   - The autosave and the `.vctower` export call it through `settleEngine`,
     with a 2-second cap so a hung worker cannot hold a save (the host drops
@@ -218,8 +222,10 @@ fan-out, and an event is never handed out twice.
     saves, the undo snapshot, the crash report, the pre-update flush and the
     TDT export. They
     get whichever save is current, and the host counts the ones that were
-    the read model's (`stats.approximateSaves`). That is a known gap of the
-    experimental host (backlog `wasm-worker-sync-serialize`, #1018).
+    the read model's (`stats.approximateSaves`).
+    `src/tests/integration/wasmWorkerSaves.integration.test.ts` takes them
+    with steps in flight on the real package and loads each into a fresh
+    engine and into TypeScript, with every command kept.
 
 ### Errors, recovery and lifecycle
 
