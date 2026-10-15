@@ -1,6 +1,7 @@
 import type { FacilityKind, Unit, UnitState } from "../engine/types";
 import { hasBusinessHours, isOpenAt } from "../engine/facilities";
 import { facilityColor } from "../presentation/facilityPresentation";
+import { isLateHour } from "./lateNight";
 import { POPULATED, closedShutter, noticeBadge, type RoomCtx } from "./pixelSprites/common";
 import { layerEnd } from "./pixelSprites/layers";
 import { condo, hotel, office } from "./pixelSprites/residential";
@@ -137,8 +138,10 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
   // the room after it, so the atlas's depth layers put them on the shell.
   layerEnd(ctx);
   // Lights out at night: an empty home/workplace, or a condo whose residents
-  // are asleep in the small hours.
-  const lateNight = d.hour >= 23 || d.hour < 6;
+  // are asleep in the small hours. The asleep scrim is the condo's only; studios
+  // and apartments hide their residents late at night without it. Whether
+  // they should dim too is backlog row rental-asleep-scrim (GH #1025).
+  const lateNight = isLateHour(d.hour);
   const emptyAtNight = d.lit && u.occupants <= 0 && POPULATED.has(u.kind);
   const asleepHome = u.kind === "condo" && u.occupants > 0 && lateNight;
   if ((emptyAtNight || asleepHome) && u.state !== "empty" && u.state !== "construction") {

@@ -36,6 +36,9 @@ on:
       - "src/tests/fixtures/tdtImportCases.ts"
       - "src/tests/fixtures/tdtExportCases.ts"
       - "scripts/wasm-build.ts"
+      - "scripts/build-engine-wasm.sh"
+      - "scripts/gen-gameplay-events.ts"
+      - ".github/actions/engine-wasm/**"
       - "scripts/engine-third-party.ts"
       - "scripts/license-files.ts"
       - "src/build/thirdPartyNotices.ts"
@@ -45,49 +48,100 @@ on:
       - ".nvmrc"
       - "vite.config.ts"
       - ".github/workflows/engine-rs.yml"
+  # Every PR runs this workflow, because engine-rs is a required check: a
+  # path filter here would leave a PR that touches none of these files
+  # waiting on a check that never starts. The changes job below applies the
+  # same list instead, and the jobs skip (which counts as passing) only when
+  # the filter succeeded and found no engine file. The two lists must match;
+  # src/tests/engineRsPaths.guard.test.ts fails when they differ.
   pull_request:
     branches: [main]
-    paths:
-      - "engine-rs/**"
-      - "conformance/**"
-      - "src/engine/**"
-      - "src/storage/**"
-      - "src/tests/conformance/**"
-      - "src/tests/integration/conformance.integration.test.ts"
-      - "src/tests/integration/conformanceWasm.integration.test.ts"
-      - "src/tests/integration/conformanceWasmTdt.integration.test.ts"
-      - "src/tests/integration/conformanceWasmCanBuild.integration.test.ts"
-      - "src/tests/integration/conformanceWasmVctower.integration.test.ts"
-      - "src/tests/integration/dualRunDay.integration.test.ts"
-      - "src/tests/integration/dualRunEdits.integration.test.ts"
-      - "src/tests/integration/chargeBindingRaw.integration.test.ts"
-      - "src/tests/dualrun/**"
-      - "src/dualrun/**"
-      - "src/wasmhost/**"
-      - "src/tests/integration/wasmHost.integration.test.ts"
-      - "src/tests/integration/wasmHostCatalog.integration.test.ts"
-      - "e2e/wasmEngine.spec.ts"
-      - "src/game/frameLoop.ts"
-      - "src/tests/integration/loaderCases.integration.test.ts"
-      - "src/tests/integration/tdtCases.integration.test.ts"
-      - "src/tests/fixtures/tdtBuilder.ts"
-      - "src/tests/fixtures/tdtImportCases.ts"
-      - "src/tests/fixtures/tdtExportCases.ts"
-      - "scripts/wasm-build.ts"
-      - "scripts/engine-third-party.ts"
-      - "scripts/license-files.ts"
-      - "src/build/thirdPartyNotices.ts"
-      - "src/build/rustNotices.ts"
-      - "package.json"
-      - "package-lock.json"
-      - ".nvmrc"
-      - "vite.config.ts"
-      - ".github/workflows/engine-rs.yml"
 
 permissions:
   contents: read
 
 jobs:
+  # Whether this change touches the engine. Pushes to main only fire on
+  # the push paths above, so they always run; a PR runs the jobs below
+  # when one of these files changed or when this filter cannot decide.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      engine: ${{ steps.filter.outputs.engine }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "engine=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A missing sha or a failed diff fails this job, which runs the
+          # engine checks below (they skip only on a successful "false").
+          [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] || { echo "::error::missing PR shas"; exit 1; }
+          # --no-renames lists both sides of a move, so a file moved out of an
+          # engine path still counts. The three-dot form diffs from the merge
+          # base, as the paths filter did, so engine changes that landed on
+          # main after the branch split do not count as this PR's.
+          # -z keeps every path unquoted, so a name with a quote, tab,
+          # backslash or newline still matches its pattern.
+          list="$RUNNER_TEMP/changed-files"
+          git diff -z --no-renames --name-only "$BASE_SHA...$HEAD_SHA" > "$list" || exit 1
+          engine=false
+          while IFS= read -r -d '' f; do
+            [ -z "$f" ] && continue
+            case "$f" in engine-rs/*) engine=true ;; esac
+            case "$f" in conformance/*) engine=true ;; esac
+            case "$f" in src/engine/*) engine=true ;; esac
+            case "$f" in src/storage/*) engine=true ;; esac
+            case "$f" in src/tests/conformance/*) engine=true ;; esac
+            case "$f" in src/tests/integration/conformance.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/conformanceWasm.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/conformanceWasmTdt.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/conformanceWasmCanBuild.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/conformanceWasmVctower.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/dualRunDay.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/dualRunEdits.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/chargeBindingRaw.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/dualrun/*) engine=true ;; esac
+            case "$f" in src/dualrun/*) engine=true ;; esac
+            case "$f" in src/wasmhost/*) engine=true ;; esac
+            case "$f" in src/tests/integration/wasmHost.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/wasmHostCatalog.integration.test.ts) engine=true ;; esac
+            case "$f" in e2e/wasmEngine.spec.ts) engine=true ;; esac
+            case "$f" in src/game/frameLoop.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/loaderCases.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/tdtCases.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/fixtures/tdtBuilder.ts) engine=true ;; esac
+            case "$f" in src/tests/fixtures/tdtImportCases.ts) engine=true ;; esac
+            case "$f" in src/tests/fixtures/tdtExportCases.ts) engine=true ;; esac
+            case "$f" in scripts/wasm-build.ts) engine=true ;; esac
+            case "$f" in scripts/build-engine-wasm.sh) engine=true ;; esac
+            case "$f" in scripts/gen-gameplay-events.ts) engine=true ;; esac
+            case "$f" in .github/actions/engine-wasm/*) engine=true ;; esac
+            case "$f" in scripts/engine-third-party.ts) engine=true ;; esac
+            case "$f" in scripts/license-files.ts) engine=true ;; esac
+            case "$f" in src/build/thirdPartyNotices.ts) engine=true ;; esac
+            case "$f" in src/build/rustNotices.ts) engine=true ;; esac
+            case "$f" in package.json) engine=true ;; esac
+            case "$f" in package-lock.json) engine=true ;; esac
+            case "$f" in .nvmrc) engine=true ;; esac
+            case "$f" in vite.config.ts) engine=true ;; esac
+            case "$f" in .github/workflows/engine-rs.yml) engine=true ;; esac
+          done < "$list"
+          echo "engine=$engine" >> "$GITHUB_OUTPUT"
+
   # A host outside the web game. The job runs in the official Rust image
   # (pinned by digest), which has the toolchain and git and no Node.js, so
   # nothing on the runner is changed or removed. The checkout holds only
@@ -102,6 +156,12 @@ jobs:
   # prove a packaged or registry release, which needs the conformance files
   # inside the crate first (#893).
   consumer:
+    needs: changes
+    # Fail closed: run unless the filter succeeded and found no engine file.
+    # always() rather than !cancelled(): a skipped required job counts as
+    # passed, so a run cancelled before this job starts must not skip it.
+    # Its last step fails the job if the run was cancelled.
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -194,9 +254,21 @@ jobs:
           VC_CONFORMANCE="$suite" cargo test --locked
           cargo run --locked --release -- "$suite"
 
-  engine-rs:
+      # A cancelled run can skip every step above and still leave the job
+      # green, which would pass the required check unchecked. Fail instead.
+      - name: Fail a cancelled run
+        if: ${{ cancelled() }}
+        run: exit 1
+
+  rust:
+    needs: changes
+    # Fail closed: run unless the filter succeeded and found no engine file.
+    # always() rather than !cancelled(): a run cancelled before this job
+    # starts must not skip it. Its last step fails the job if the run was
+    # cancelled.
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: engine-rs
@@ -232,37 +304,6 @@ jobs:
       - name: Conformance
         run: cargo run --locked --release --features conformance --bin conformance
 
-      # The referee again, through the WASM binding from Node: the same
-      # TypeScript runner replays every scenario on the module wasm-bindgen
-      # generates (story-engine-wasm-binding), and the dual run's day gate
-      # (story-engine-dual-run) compares both engines every hour for a day on
-      # every fixture at each game speed. The CLI version must match the
-      # crate version Cargo.toml pins, so the pin is read from there and
-      # scripts/wasm-build.ts checks the match. The CLI is compiled from
-      # source here (a few minutes); the job's timeout allows for it.
-      - name: WASM binding
-        run: |
-          pin="$(grep -m1 -oP '^wasm-bindgen = \{ version = "=\K[0-9.]+' Cargo.toml)"
-          test -n "$pin"
-          cargo install wasm-bindgen-cli --locked --version "$pin"
-      - name: Use Node.js (from .nvmrc)
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
-      - name: Conformance through the binding
-        working-directory: .
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-          # A missing package fails the suite here instead of skipping it.
-          VC_REQUIRE_WASM: "1"
-        run: |
-          npm ci
-          npm run wasm:build
-          # The checked-in declarations have to be the ones this build wrote.
-          test -z "$(git status --porcelain -- src/dualrun/engine.d.ts src/engine/gameplayEvents.d.ts src/engine/gameplayEventRules.ts)" || { echo "src/dualrun/engine.d.ts, src/engine/gameplayEvents.d.ts or src/engine/gameplayEventRules.ts is stale or untracked: run npm run wasm:build and commit them"; exit 1; }
-          npm run test:wasm
-
       # Coverage of the unit tests plus the referee, with a line floor that
       # only ratchets up as scenarios land (80.58% at the first measurement,
       # 84.47% after the first scenario slice, 88.7% with the full library; the
@@ -276,3 +317,99 @@ jobs:
           cargo llvm-cov --no-report --locked test --features conformance
           cargo llvm-cov --no-report --locked run --features conformance --bin conformance
           cargo llvm-cov report --fail-under-lines 87
+
+      # A cancelled run can skip every step above and still leave the job
+      # green, which would pass the required check unchecked. Fail instead.
+      - name: Fail a cancelled run
+        if: ${{ cancelled() }}
+        run: exit 1
+
+  # The referee again, through the WASM binding from Node: the same
+  # TypeScript runner replays every scenario on the module wasm-bindgen
+  # generates (story-engine-wasm-binding), and the dual run's day gate
+  # (story-engine-dual-run) compares both engines every hour for a day on
+  # every fixture at each game speed. This is the one job here that needs
+  # Node.js, so the Rust jobs above carry no Node.js setup at all. The
+  # package comes from .github/actions/engine-wasm: restored from the cache
+  # the other workflows share when the Rust sources are unchanged, and built
+  # on a miss with the prebuilt wasm-bindgen CLI at the version Cargo.toml
+  # pins, checked against its recorded hash (scripts/build-engine-wasm.sh;
+  # scripts/wasm-build.ts checks the version).
+  wasm-binding:
+    needs: changes
+    # Fail closed, as the rust job above.
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    runs-on: ubuntu-latest
+    # A cache miss compiles the crate for wasm32 (a few minutes, with the
+    # prebuilt CLI); anything near this is a hang.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: npm ci
+
+      - uses: ./.github/actions/engine-wasm
+
+      # The checked-in declarations have to be the ones the package's build
+      # wrote. The action checks the package was built from this tree's
+      # sources, so its declaration is the build's own, cached or not
+      # (scripts/wasm-build.ts copies it to src/dualrun/engine.d.ts byte for
+      # byte, and on a cache miss has just done so). The gameplay event files
+      # come from the event catalog through npm run gen:events.
+      - name: The declarations match the build
+        run: |
+          test -f engine-rs/pkg/verticopolis_engine.d.ts || { echo "the engine package has no engine-rs/pkg/verticopolis_engine.d.ts"; exit 1; }
+          cmp engine-rs/pkg/verticopolis_engine.d.ts src/dualrun/engine.d.ts || { echo "src/dualrun/engine.d.ts is stale: run npm run wasm:build and commit it"; exit 1; }
+          npm run gen:events
+          test -z "$(git status --porcelain -- src/dualrun/engine.d.ts src/engine/gameplayEvents.d.ts src/engine/gameplayEventRules.ts)" || { echo "src/dualrun/engine.d.ts, src/engine/gameplayEvents.d.ts or src/engine/gameplayEventRules.ts is stale or untracked: run npm run wasm:build (or npm run gen:events for the two event files) and commit them"; exit 1; }
+
+      - name: Conformance through the binding
+        env:
+          # A missing package fails the suite here instead of skipping it.
+          VC_REQUIRE_WASM: "1"
+        run: npm run test:wasm
+
+      - name: Fail a cancelled run
+        if: ${{ cancelled() }}
+        run: exit 1
+
+  # The check branch protection requires on main. It always runs and
+  # passes in two cases only: the changes filter succeeded and found no
+  # engine file (the three engine jobs above skipped on purpose), or all
+  # three passed. Anything else (a failure, a cancellation, a skip the
+  # filter did not ask for) fails it, so the binding's checks and the
+  # Node-free consumer gate a merge alongside the Rust job.
+  engine-rs:
+    needs: [changes, consumer, rust, wasm-binding]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every engine job passed, or the change touches no engine file
+        env:
+          FILTER: ${{ needs.changes.result }}
+          ENGINE: ${{ needs.changes.outputs.engine }}
+          CONSUMER: ${{ needs.consumer.result }}
+          RUST: ${{ needs.rust.result }}
+          BINDING: ${{ needs.wasm-binding.result }}
+        run: |
+          echo "changes: $FILTER (engine=$ENGINE), consumer: $CONSUMER, rust: $RUST, wasm-binding: $BINDING"
+          if [ "$FILTER" = success ] && [ "$ENGINE" = false ] && [ "$CONSUMER" = skipped ] && [ "$RUST" = skipped ] && [ "$BINDING" = skipped ]; then
+            exit 0
+          fi
+          test "$CONSUMER" = success && test "$RUST" = success && test "$BINDING" = success
+
+      - name: Fail a cancelled run
+        if: ${{ cancelled() }}
+        run: exit 1
