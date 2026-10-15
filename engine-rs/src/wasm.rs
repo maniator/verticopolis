@@ -88,52 +88,12 @@ fn extend_json(r: &crate::charges::ExtendResult) -> Value {
     v
 }
 
-/// A high-water mark as JSON `{ bottom, top }` text, whole floors; `None`
-/// for anything else, which the command refuses as malformed (#923). Each
-/// field must be written as a JSON integer within `Number.isSafeInteger`'s
-/// range: a number written with a fraction or an exponent (`2.0`, `1e3`,
-/// `9007199254740990.5`, which an `f64` would round to a whole number) is
-/// refused rather than rounded. The commands read marks through
-/// [`parse_mark`], which takes the text `null` as no mark; this is its field
-/// rule alone, for the tests, so `null` is `None` here too.
-#[cfg(test)]
-fn parse_hwm(text: &str) -> Option<(i64, i64)> {
-    parse_mark(text).flatten()
-}
-
-/// A mark's text read once: `Some(None)` for the JSON `null` (no mark, as
-/// `JSON.stringify(null)` writes it), `Some(Some(..))` for a well-formed
-/// mark (whole-number fields written as JSON integers within
-/// `Number.isSafeInteger`'s range), and `None` for anything else.
-fn parse_mark(text: &str) -> Option<Option<(i64, i64)>> {
-    let v: Value = serde_json::from_str(text).ok()?;
-    if v.is_null() {
-        return Some(None);
-    }
-    let field = |name: &str| {
-        v.get(name)
-            .and_then(Value::as_i64)
-            .filter(|n| n.unsigned_abs() <= 9_007_199_254_740_991)
-    };
-    Some(Some((field("bottom")?, field("top")?)))
-}
-
 /// The refusal JSON for a malformed charge command (#923).
 fn invalid_charge() -> String {
     charge_json(&crate::charges::ChargeResult::refuse(
         crate::charges::INVALID_REQUEST,
     ))
     .to_string()
-}
-
-/// A charge command's high-water mark as the binding received it (#923):
-/// absent (null, undefined or the JSON text `null`), JSON text, or anything
-/// else, which is refused. A mark passed as an object rather than its JSON
-/// text is refused too: TypeScript takes the object, the binding its text.
-pub(crate) enum RawMark {
-    Absent,
-    Text(String),
-    Bad,
 }
 
 /// The charge commands behind the binding, on arguments already read off
@@ -157,25 +117,29 @@ impl Engine {
         }
     }
 
+    /// `beginExtend`: a malformed id opens no gesture and drops any open
+    /// one, as TypeScript's does.
+    pub(crate) fn begin_extend_checked(&mut self, id: Option<f64>) -> bool {
+        match id.and_then(crate::charges::whole) {
+            Some(id) => self.sim.begin_extend(id),
+            None => {
+                self.sim.end_extend();
+                false
+            }
+        }
+    }
+
     pub(crate) fn extend_checked(
         &mut self,
         id: Option<f64>,
         end: Option<String>,
         target_floor: Option<f64>,
-        mark: RawMark,
     ) -> String {
         use crate::charges::{whole, ChargeResult, ExtendEnd, ExtendResult, INVALID_REQUEST};
         let id_whole = id.and_then(whole);
-        let hwm = match mark {
-            RawMark::Absent => Some(None),
-            RawMark::Text(text) => parse_mark(&text),
-            RawMark::Bad => None,
-        };
         let end = end.as_deref().and_then(ExtendEnd::parse);
-        let r = match (id_whole, end, target_floor.and_then(whole), hwm) {
-            (Some(id), Some(end), Some(target), Some(hwm)) => {
-                self.sim.extend_transport(id, end, target, hwm)
-            }
+        let r = match (id_whole, end, target_floor.and_then(whole)) {
+            (Some(id), Some(end), Some(target)) => self.sim.extend_transport(id, end, target),
             _ => {
                 let (bottom, top) = id_whole
                     .and_then(|id| self.sim.tower.get_transport(id))
@@ -258,6 +222,19 @@ fn apply_markers(sim: &mut Simulation, text: &str) -> Result<(), String> {
     sim.last_day = field("lastDay")?;
     sim.last_quarter = field("lastQuarter")?;
     sim.last_month = field("lastMonth")?;
+    // The live engine's open extend gesture (#990); absent or null is none.
+    match v.get("extendGesture") {
+        None | Some(Value::Null) => sim.end_extend(),
+        Some(g) => {
+            let part = |name: &str| -> Result<i64, String> {
+                g.get(name)
+                    .and_then(Value::as_f64)
+                    .and_then(crate::charges::whole)
+                    .ok_or_else(|| format!("markers: extendGesture.{name} must be a whole number"))
+            };
+            sim.restore_extend(part("id")?, part("bottom")?, part("top")?);
+        }
+    }
     Ok(())
 }
 
@@ -327,10 +304,11 @@ impl Engine {
     /// (`load::parse_save_json`). Nothing else the import path does (the
     /// founder mark) runs.
     /// `markers`, when given, is JSON `{ lastHour, lastDay, lastQuarter,
-    /// lastMonth }`: the live engine's boundary markers, which a save does
-    /// not carry (a load rebuilds them from the clock, a founded game keeps
-    /// them unset until the first boundary), so a shadow can start exactly
-    /// where the live engine stands.
+    /// lastMonth, extendGesture? }`: the live engine's boundary markers and
+    /// open extend gesture `{ id, bottom, top }` (#990), which a save does
+    /// not carry (a load rebuilds the markers from the clock, a founded game
+    /// keeps them unset until the first boundary, and a load has no
+    /// gesture), so a shadow can start exactly where the live engine stands.
     #[wasm_bindgen(js_name = fromSave)]
     pub fn from_save(text: &str, markers: Option<String>) -> Result<Engine, JsError> {
         let raw = crate::load::parse_save_json(text.as_bytes()).map_err(err)?;
@@ -628,33 +606,39 @@ impl Engine {
         self.remove_car_checked(id.as_f64())
     }
 
-    /// `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
-    /// as JSON `{ bottom, top }` text, or null, undefined or the text `null`
-    /// for none: JSON `{ ok, reason?, delta, bottom, top, added }`, the floors
-    /// billed past the mark. Write the mark with `JSON.stringify` on
-    /// `{ bottom, top }` alone: the engine's JSON reader refuses the whole
-    /// text if any key holds a lone surrogate escape. Each field must be a
-    /// whole number within `Number.isSafeInteger`'s range, written as digits
-    /// with an optional leading minus, no fraction or exponent (`2.0` and
-    /// `1e1` are refused), and not `-0`, which the reader takes as a float.
-    /// Every argument is read raw (#923): an id or floor
-    /// that is not a whole JS number, an `end` that is not exactly `"up"` or
-    /// `"down"`, or a mark that is not that text (an object included) is
-    /// refused with `INVALID_REQUEST` and the shaft's ends as they stand.
+    /// `beginExtend(id)`: open an extend gesture on an elevator (#990), its
+    /// high-water mark starting at the shaft's span; any open gesture is
+    /// dropped first. False, with no gesture open, when `id` is not a whole
+    /// JS number or names no elevator. The id is read raw, as for `addCar`.
+    #[wasm_bindgen(js_name = beginExtend)]
+    pub fn begin_extend(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+    ) -> bool {
+        self.begin_extend_checked(id.as_f64())
+    }
+
+    /// `endExtend()`: close the open extend gesture, if any.
+    #[wasm_bindgen(js_name = endExtend)]
+    pub fn end_extend(&mut self) {
+        self.sim.end_extend();
+    }
+
+    /// `extendTransport(id, end, targetFloor)`: JSON `{ ok, reason?, delta,
+    /// bottom, top, added }`, the floors billed past the high-water mark: the
+    /// open gesture's when `beginExtend` opened one on this shaft, the
+    /// shaft's span otherwise. Every argument is read raw (#923): an id or
+    /// floor that is not a whole JS number, or an `end` that is not exactly
+    /// `"up"` or `"down"`, is refused with `INVALID_REQUEST` and the shaft's
+    /// ends as they stand.
     #[wasm_bindgen(js_name = extendTransport)]
     pub fn extend_transport(
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
         #[wasm_bindgen(unchecked_param_type = "\"up\" | \"down\"")] end: JsValue,
         #[wasm_bindgen(unchecked_param_type = "number")] target_floor: JsValue,
-        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] hwm: JsValue,
     ) -> String {
-        let mark = if hwm.is_null() || hwm.is_undefined() {
-            RawMark::Absent
-        } else {
-            hwm.as_string().map_or(RawMark::Bad, RawMark::Text)
-        };
-        self.extend_checked(id.as_f64(), end.as_string(), target_floor.as_f64(), mark)
+        self.extend_checked(id.as_f64(), end.as_string(), target_floor.as_f64())
     }
 
     /// `removeFacility(id, method)`: the player's sell or bulldoze of a unit
@@ -1101,25 +1085,6 @@ mod tests {
             Some(RemovalMethod::Bulldoze)
         );
         assert_eq!(RemovalMethod::parse("burn"), None);
-        assert_eq!(parse_hwm(r#"{"bottom":-2,"top":30}"#), Some((-2, 30)));
-        assert_eq!(parse_hwm(r#"{"bottom":1.5,"top":3}"#), None);
-        // Exact JSON integers only: an f64 would round these to whole floors.
-        assert_eq!(parse_hwm(r#"{"bottom":1,"top":9007199254740990.5}"#), None);
-        assert_eq!(parse_hwm(r#"{"bottom":1,"top":2.0}"#), None);
-        assert_eq!(parse_hwm(r#"{"bottom":1,"top":1e1}"#), None);
-        assert_eq!(parse_hwm(r#"{"bottom":1,"top":9007199254740992}"#), None);
-        assert_eq!(
-            parse_hwm(r#"{"bottom":-9007199254740991,"top":9007199254740991}"#),
-            Some((-9_007_199_254_740_991, 9_007_199_254_740_991))
-        );
-        assert_eq!(parse_hwm(r#"{"top":3}"#), None);
-        assert_eq!(parse_hwm("not json"), None);
-        // The text null is no mark; malformed text is no answer at all.
-        assert_eq!(parse_mark("null"), Some(None));
-        assert_eq!(parse_mark(" null "), Some(None));
-        assert_eq!(parse_mark("not json"), None);
-        assert_eq!(parse_mark(r#"{"bottom":1}"#), None);
-        assert_eq!(parse_mark(r#"{"bottom":1,"top":2}"#), Some(Some((1, 2))));
     }
 
     /// A malformed charge command (#923) is refused with one reason and moves
@@ -1161,35 +1126,32 @@ mod tests {
         refused(e.remove_car_checked(Some(f64::INFINITY)));
         refused(e.remove_car_checked(Some(f64::NEG_INFINITY)));
         refused(e.add_car_checked(Some(9_007_199_254_740_992.0))); // 2^53: past Number.isSafeInteger
-        refused(e.extend_checked(id, Some("UP".into()), Some(3.0), RawMark::Absent)); // exact match
+        refused(e.extend_checked(id, Some("UP".into()), Some(3.0))); // exact match
         refused(e.remove_facility_checked(id, Some("Sell".into())));
-        let v = refused(e.extend_checked(id, Some("sideways".into()), Some(3.0), RawMark::Absent));
+        let v = refused(e.extend_checked(id, Some("sideways".into()), Some(3.0)));
         assert_eq!(
             (v["bottom"].as_i64(), v["top"].as_i64()),
             (Some(1), Some(2))
         );
-        let v = refused(e.extend_checked(id, None, Some(3.0), RawMark::Absent)); // a non-string end
+        let v = refused(e.extend_checked(id, None, Some(3.0))); // a non-string end
         assert_eq!(
             (v["bottom"].as_i64(), v["top"].as_i64()),
             (Some(1), Some(2))
         );
-        refused(e.extend_checked(id, up(), Some(3.5), RawMark::Absent));
-        refused(e.extend_checked(id, up(), Some(f64::NAN), RawMark::Absent));
-        refused(e.extend_checked(id, up(), None, RawMark::Absent));
-        let v = refused(e.extend_checked(near, up(), Some(3.0), RawMark::Absent));
+        refused(e.extend_checked(id, up(), Some(3.5)));
+        refused(e.extend_checked(id, up(), Some(f64::NAN)));
+        refused(e.extend_checked(id, up(), None));
+        let v = refused(e.extend_checked(near, up(), Some(3.0)));
         assert_eq!(
             (v["bottom"].as_i64(), v["top"].as_i64()),
             (Some(0), Some(0))
         );
-        let bad = |t: &str| RawMark::Text(t.to_string());
-        refused(e.extend_checked(id, up(), Some(3.0), bad(r#"{"bottom":1,"top":2.5}"#)));
-        refused(e.extend_checked(id, up(), Some(3.0), bad(r#"{"bottom":"1","top":2}"#)));
-        refused(e.extend_checked(id, up(), Some(3.0), bad(r#"{"bottom":null,"top":2}"#)));
-        refused(e.extend_checked(id, up(), Some(3.0), bad("[1,2]")));
-        refused(e.extend_checked(id, up(), Some(3.0), bad("not json")));
-        refused(e.extend_checked(id, up(), Some(3.0), bad("")));
-        refused(e.extend_checked(id, up(), Some(3.0), bad(r#"{"bottom":1,"top":2.0}"#)));
-        refused(e.extend_checked(id, up(), Some(3.0), RawMark::Bad)); // a mark that is not text
+        // A malformed beginExtend opens no gesture and drops the open one.
+        assert!(e.begin_extend_checked(id));
+        assert!(!e.begin_extend_checked(None));
+        assert_eq!(e.sim.extend_gesture, None);
+        assert!(!e.begin_extend_checked(near));
+        assert!(!e.begin_extend_checked(Some(f64::NAN)));
         refused(e.remove_facility_checked(id, Some("burn".into())));
         refused(e.remove_facility_checked(id, None));
         refused(e.remove_facility_checked(near, Some("sell".into())));
@@ -1206,13 +1168,14 @@ mod tests {
         // A well-formed call still lands.
         let ok: Value = serde_json::from_str(&e.add_car_checked(id)).unwrap();
         assert_eq!(ok["ok"], true);
-        // The JSON text `null` is no mark, as TypeScript's null is.
-        let ok: Value =
-            serde_json::from_str(&e.extend_checked(id, up(), Some(3.0), bad(" null "))).unwrap();
-        assert_eq!(
-            (ok["ok"].as_bool(), ok["top"].as_i64()),
-            (Some(true), Some(3))
-        );
+        // A gesture opened through the binding bills a wiggle once.
+        assert!(e.begin_extend_checked(id));
+        let at = |e: &mut Engine, floor: f64| -> Value {
+            serde_json::from_str(&e.extend_checked(id, up(), Some(floor))).unwrap()
+        };
+        assert_eq!(at(&mut e, 3.0)["added"].as_i64(), Some(1));
+        assert_eq!(at(&mut e, 2.0)["added"].as_i64(), Some(0));
+        assert_eq!(at(&mut e, 3.0)["added"].as_i64(), Some(0));
     }
 
     #[test]
@@ -1397,6 +1360,47 @@ mod tests {
         assert!(apply_markers(&mut sim, "[]")
             .unwrap_err()
             .contains("lastHour"));
+    }
+
+    /// The live engine's open extend gesture rides with the markers (#990):
+    /// restored as given on an elevator, dropped on anything else, refused
+    /// when malformed.
+    #[test]
+    fn markers_carry_the_open_extend_gesture() {
+        use crate::facilities::Kind;
+        let mut sim = Simulation::new_game(1, GameMode::Classic);
+        for x in 10..40 {
+            assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+            assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+        }
+        sim.money = 1_000_000.0;
+        assert!(sim.build_transport(Kind::ElevatorStandard, 10, 1, 2).ok);
+        let lift = sim.tower.transport_at(1, 10).unwrap().id;
+        let base = r#""lastHour":7,"lastDay":0,"lastQuarter":-1,"lastMonth":-1"#;
+        let with = |g: &str| format!("{{{base},\"extendGesture\":{g}}}");
+        apply_markers(
+            &mut sim,
+            &with(&format!(r#"{{"id":{lift},"bottom":1,"top":5}}"#)),
+        )
+        .expect("a gesture lands");
+        assert_eq!(sim.extend_gesture, Some((lift, 1, 5)));
+        apply_markers(&mut sim, &with("null")).expect("no gesture lands");
+        assert_eq!(sim.extend_gesture, None, "null is no gesture");
+        apply_markers(
+            &mut sim,
+            &with(&format!(r#"{{"id":{lift},"bottom":1,"top":5}}"#)),
+        )
+        .expect("a gesture lands again");
+        apply_markers(&mut sim, &format!("{{{base}}}")).expect("an absent gesture lands");
+        assert_eq!(sim.extend_gesture, None, "absent is no gesture");
+        apply_markers(&mut sim, &with(r#"{"id":99999,"bottom":1,"top":5}"#))
+            .expect("a gone shaft is no gesture");
+        assert_eq!(sim.extend_gesture, None);
+        assert!(
+            apply_markers(&mut sim, &with(r#"{"id":1.5,"bottom":1,"top":5}"#))
+                .unwrap_err()
+                .contains("extendGesture.id")
+        );
     }
 
     #[test]
