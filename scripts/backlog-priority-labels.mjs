@@ -21,9 +21,9 @@
  * Usage: `node scripts/backlog-priority-labels.mjs [--dry-run]`. It talks to
  * GitHub through the `gh` CLI, which GitHub's runners ship with: the workflow
  * passes the job token as `GH_TOKEN`, and locally your `gh auth login` session
- * works. `GITHUB_REPOSITORY` (`owner/name`) picks the repository and defaults
- * to `maniator/verticopolis`, whose issues the backlog cites. `--dry-run`
- * prints the plan and changes nothing.
+ * works. It targets `maniator/verticopolis`, whose issues the backlog cites
+ * (in Actions, the job's `GITHUB_REPOSITORY`, which the workflow guards).
+ * `--dry-run` prints the plan and changes nothing.
  *
  * Plain dependency-free JS so the workflow runs it with no install step. The
  * pure helpers are typed in backlog-priority-labels.d.mts for the unit test.
@@ -133,7 +133,7 @@ export function ghCli() {
               : err.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"
                 ? "printed more output than expected"
                 : err.killed
-                  ? "timed out after a minute (a write may still have landed; the next run checks)"
+                  ? `timed out after a minute${args[0] === "api" ? " (the write may still have landed; the next run checks)" : ""}`
                   : String(stderr).trim() || err.message;
           const what = args.filter((a) => !a.startsWith("-")).slice(0, 3);
           const e = new Error(`gh ${what.join(" ")}: ${why}`);
@@ -311,8 +311,11 @@ export async function run({
 async function main() {
   const gh = ghCli();
   // The backlog's issue numbers belong to this repository, so a local run
-  // targets it too, whatever checkout or fork the shell is in.
-  const repo = process.env.GITHUB_REPOSITORY || "maniator/verticopolis";
+  // targets it whatever checkout, fork or codespace the shell is in. Only an
+  // Actions run reads GITHUB_REPOSITORY, which the job guards to this repo.
+  const repo =
+    (process.env.GITHUB_ACTIONS === "true" && process.env.GITHUB_REPOSITORY) ||
+    "maniator/verticopolis";
   const backlog = resolve(
     dirname(fileURLToPath(import.meta.url)),
     "../_bmad-output/implementation-artifacts/backlog.md",
