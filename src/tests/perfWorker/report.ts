@@ -40,16 +40,17 @@ const slices = (xs: readonly Slice[], top: number): string => {
  *  save is made of, and how much of it each merge changed. */
 export function readModelSection(shapes: readonly ReadModelShape[]): string[] {
   if (!shapes.length) return [];
-  const lines = ["## read model", "", "Measured once per scenario on the TypeScript engine in Node (see the limitations). Shares are of the whole save in JSON characters. A merge is counted where the worker host merges; \"changed\" is units present in both saves whose records differ, as a share of the units present.", ""];
-  lines.push("| scenario | save | units | top-level keys | unit kinds | merges | units changed per merge, median / max | units touched per merge, median / max | unit fields changed | top-level keys changed |");
-  lines.push(`|${"---|".repeat(10)}`);
+  const lines = ["## read model", "", "Measured once per scenario on the TypeScript engine in Node (see the limitations). Shares are of the whole save in JSON characters. A merge is counted where the worker host merges; \"changed\" is units present in both saves whose records differ, as a share of the units present; \"outside the frame\" counts the changed units whose changed fields are all ones the frame view's unit record does not carry.", ""];
+  lines.push("| scenario | save | units | top-level keys | unit kinds | merges | units changed per merge, median / max | units touched per merge, median / max | changed outside the frame, median / max | unit fields changed | top-level keys changed |");
+  lines.push(`|${"---|".repeat(11)}`);
   for (const s of shapes) {
     const c = s.composition;
     const unitKeys = [...new Set(s.merges.flatMap((m) => m.unitKeys))].sort();
     const topKeys = [...new Set(s.merges.flatMap((m) => m.topKeys))].sort();
     const share = s.changedShare ? `${pct(s.changedShare.median)} / ${pct(s.changedShare.max)}` : "n/a";
     const touched = s.touched ? `${s.touched.median} / ${s.touched.max}` : "n/a";
-    lines.push(`| ${s.scenario} | ${c.totalChars.toLocaleString("en-US")} chars | ${c.units.toLocaleString("en-US")} | ${slices(c.keys, 4)} | ${slices(c.unitKinds, 4)} | ${s.merges.length} | ${share} | ${touched} | ${unitKeys.join(", ") || "none"} | ${topKeys.join(", ") || "none"} |`);
+    const outside = s.outsideFrame ? `${s.outsideFrame.median} / ${s.outsideFrame.max}` : "n/a";
+    lines.push(`| ${s.scenario} | ${c.totalChars.toLocaleString("en-US")} chars | ${c.units.toLocaleString("en-US")} | ${slices(c.keys, 4)} | ${slices(c.unitKinds, 4)} | ${s.merges.length} | ${share} | ${touched} | ${outside} | ${unitKeys.join(", ") || "none"} | ${topKeys.join(", ") || "none"} |`);
   }
   lines.push("");
   return lines;

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { csvField, limitations, loadWorkerCheckpoint, makeConfig, metricsCsv, parseArgs, ratiosCsv, scriptSizes } from "./main";
 import { markdown, readModelMarkdown, readModelSection } from "./report";
-import { churn, composition, measureReadModel, spread, summarizeMerges, type MergePass } from "./readModel";
+import { FRAME_UNIT_FIELDS, churn, composition, measureReadModel, spread, summarizeMerges, type MergePass } from "./readModel";
 import { buildSmallTower } from "../perfCompare/scenarios";
 import { modeOrder, summarizeFrames, summarizeHosted, type ModeRun } from "./runner";
 import type { ModeName } from "./pageWorker";
@@ -233,16 +233,19 @@ describe("perf:worker read model shape", () => {
   it("counts units changed, added and removed by id, and names the fields and keys that moved", () => {
     const before = save([{ id: 1, kind: "floor" }, { id: 2, kind: "office", state: "vacant", sat: 0.5 }, { id: 3, kind: "condo" }], { minutes: 0 });
     const after = save([{ id: 2, kind: "office", state: "occupied", sat: 0.5 }, { id: 1, kind: "floor" }, { id: 4, kind: "shop" }], { minutes: 60 });
-    expect(churn(before, after)).toEqual({ changed: 1, added: 1, removed: 1, total: 3, unitKeys: ["state"], topKeys: ["minutes", "units"] });
+    expect(churn(before, after)).toEqual({ changed: 1, added: 1, removed: 1, total: 3, outsideFrame: 0, unitKeys: ["state"], topKeys: ["minutes", "units"] });
+    // A change only in fields the frame view does not carry needs a merge.
+    expect(churn(before, save([{ id: 1, kind: "floor" }, { id: 2, kind: "office", state: "vacant", sat: 0.7 }, { id: 3, kind: "condo", occupants: 2 }], { minutes: 0 }))).toMatchObject({ changed: 2, outsideFrame: 1, unitKeys: ["occupants", "sat"] });
+    expect(FRAME_UNIT_FIELDS).toEqual(["state", "occupants", "customersIn", "hotelCustomersIn", "outForMeal"]);
     // Reordering alone is not a unit change, but it is a units-key change.
     expect(churn(before, save([{ id: 3, kind: "condo" }, { id: 1, kind: "floor" }, { id: 2, kind: "office", state: "vacant", sat: 0.5 }], { minutes: 0 }))).toMatchObject({ changed: 0, added: 0, removed: 0, topKeys: ["units"] });
     expect(() => churn(save([{ id: 1 }, { id: 1 }]), save([]))).toThrow(/appears twice/);
   });
 
   it("summarizes merges as the share of units changed and the units touched", () => {
-    const pass = (changed: number, total: number, added = 0): MergePass => ({ step: 4, reason: "hour", changed, added, removed: 0, total, unitKeys: [], topKeys: [] });
-    expect(summarizeMerges([pass(10, 100), pass(0, 100, 3), pass(50, 200)])).toEqual({ changedShare: { median: 0.1, max: 0.25 }, touched: { median: 10, max: 50 } });
-    expect(summarizeMerges([])).toEqual({ changedShare: null, touched: null });
+    const pass = (changed: number, total: number, added = 0): MergePass => ({ step: 4, reason: "hour", changed, added, removed: 0, total, outsideFrame: changed > 20 ? 7 : 1, unitKeys: [], topKeys: [] });
+    expect(summarizeMerges([pass(10, 100), pass(0, 100, 3), pass(50, 200)])).toEqual({ changedShare: { median: 0.1, max: 0.25 }, touched: { median: 10, max: 50 }, outsideFrame: { median: 1, max: 7 } });
+    expect(summarizeMerges([])).toEqual({ changedShare: null, touched: null, outsideFrame: null });
     expect(spread([4, 1, 3, 2])).toEqual({ median: 2.5, max: 4 });
   });
 
@@ -264,6 +267,7 @@ describe("perf:worker read model shape", () => {
     expect(md).toMatch(/^## read model/);
     expect(md).toContain(`| small | ${shape.composition.totalChars.toLocaleString("en-US")} chars | ${shape.composition.units.toLocaleString("en-US")} | units `);
     expect(md).toContain(`| ${shape.merges.length} |`);
+    for (const m of shape.merges) expect(m.outsideFrame).toBeLessThanOrEqual(m.changed);
     expect(readModelSection([])).toEqual([]);
     const report = readModelMarkdown({ schema: 1, generatedAt: "2026-10-15T12:00:00Z", commit: "abcdef0123", dirty: false, appVersion: "2.34.1", node: "v22.22.0", config: { ...opts, quick: false }, scenarios: [{ name: "small", sha256: "a".repeat(64) }], readModel: [shape], limitations: ["one"] });
     expect(report.split("\n")[2]).toMatch(/^> \*\*Snapshot, measured 2026-10-15T12:00:00Z on commit `abcdef0`.*Live numbers: re-run `npm run perf:worker -- --read-model`/);

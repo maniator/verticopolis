@@ -1,5 +1,6 @@
 import { Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../engine/serializedGame";
+import type { UnitRecord } from "../../wasmhost/frameView";
 import { quantile } from "../perfCompare/stats";
 
 /**
@@ -42,6 +43,10 @@ export interface Churn {
   removed: number;
   /** Units in the later save. */
   total: number;
+  /** Changed units whose differing fields are all outside the frame
+   *  view's unit record (`FRAME_UNIT_FIELDS`), so the frame cannot carry
+   *  the change and only a merge does. */
+  outsideFrame: number;
   /** The unit fields that differed on a changed unit, sorted. */
   unitKeys: string[];
   /** The top-level keys whose values differed, `units` included, sorted. */
@@ -68,7 +73,15 @@ export interface ReadModelShape {
   changedShare: { median: number; max: number } | null;
   /** Over `merges`: units changed, added or removed per merge. */
   touched: { median: number; max: number } | null;
+  /** Over `merges`: changed units the frame view cannot carry. */
+  outsideFrame: { median: number; max: number } | null;
 }
+
+/** The fields of the frame view's per-unit record besides its id
+ *  (`UnitRecord`, `src/wasmhost/frameView.ts`); the record type makes the
+ *  list exhaustive. */
+const FRAME_FIELDS: Record<Exclude<keyof UnitRecord, "id">, true> = { state: true, occupants: true, customersIn: true, hotelCustomersIn: true, outForMeal: true };
+export const FRAME_UNIT_FIELDS: readonly string[] = Object.keys(FRAME_FIELDS);
 
 const size = (v: unknown): number => JSON.stringify(v)?.length ?? 0;
 const sortBySize = (a: Slice, b: Slice): number => b.chars - a.chars || a.name.localeCompare(b.name);
@@ -110,6 +123,7 @@ export function churn(before: string, after: string): Churn {
   const ub = index(b);
   let changed = 0;
   let added = 0;
+  let outsideFrame = 0;
   const unitKeys = new Set<string>();
   for (const [id, u] of ub) {
     const prev = ua.get(id);
@@ -119,12 +133,14 @@ export function churn(before: string, after: string): Churn {
     }
     if (JSON.stringify(prev) === JSON.stringify(u)) continue;
     changed++;
-    for (const k of new Set([...Object.keys(prev), ...Object.keys(u)])) if (JSON.stringify(prev[k]) !== JSON.stringify(u[k])) unitKeys.add(k);
+    const differs = [...new Set([...Object.keys(prev), ...Object.keys(u)])].filter((k) => JSON.stringify(prev[k]) !== JSON.stringify(u[k]));
+    for (const k of differs) unitKeys.add(k);
+    if (!differs.some((k) => FRAME_UNIT_FIELDS.includes(k))) outsideFrame++;
   }
   let removed = 0;
   for (const id of ua.keys()) if (!ub.has(id)) removed++;
   const topKeys = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k]));
-  return { changed, added, removed, total: ub.size, unitKeys: [...unitKeys].sort(), topKeys: topKeys.sort() };
+  return { changed, added, removed, total: ub.size, outsideFrame, unitKeys: [...unitKeys].sort(), topKeys: topKeys.sort() };
 }
 
 /** Median and max of a list, or null when it is empty. */
@@ -135,10 +151,11 @@ export function spread(xs: readonly number[]): { median: number; max: number } |
 }
 
 /** Summaries over a scenario's merges. */
-export function summarizeMerges(merges: readonly MergePass[]): Pick<ReadModelShape, "changedShare" | "touched"> {
+export function summarizeMerges(merges: readonly MergePass[]): Pick<ReadModelShape, "changedShare" | "touched" | "outsideFrame"> {
   return {
     changedShare: spread(merges.map((m) => (m.total ? m.changed / m.total : 0))),
     touched: spread(merges.map((m) => m.changed + m.added + m.removed)),
+    outsideFrame: spread(merges.map((m) => m.outsideFrame)),
   };
 }
 
