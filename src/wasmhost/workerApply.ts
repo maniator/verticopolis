@@ -1,7 +1,7 @@
 import { Simulation } from "../engine/Simulation";
 import type { FrameHeader } from "./frameView";
 import { mergeSimulation } from "./merge";
-import { adoptTelemetry, type TelemetryDocument } from "./telemetry";
+import { adoptTelemetry, isTelemetryDocument, type TelemetryDocument } from "./telemetry";
 import type { MergePayload } from "./workerProtocol";
 
 /**
@@ -17,20 +17,46 @@ export interface ParsedMerge {
   housekeeping: { cleaned: number; leftover: number } | null;
 }
 
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
 export function parseMerge(m: MergePayload): ParsedMerge {
-  const fresh = Simulation.deserialize(JSON.parse(m.save));
-  const telemetry = JSON.parse(m.telemetry) as TelemetryDocument;
-  if (!telemetry || !Array.isArray(telemetry.util) || !Array.isArray(telemetry.hourly) || !Array.isArray(telemetry.origins)) throw new Error("merge: the telemetry is not the engine's shape");
+  const save = JSON.parse(m.save) as unknown;
+  // The load path repairs a bad save to defaults; a merge must fail instead.
+  if (!isRecord(save) || !Array.isArray(save.units) || !Array.isArray(save.transports) || typeof save.minutes !== "number") throw new Error("merge: the save is not the engine's shape");
+  const fresh = Simulation.deserialize(save as unknown as Parameters<typeof Simulation.deserialize>[0]);
+  const telemetry = JSON.parse(m.telemetry) as unknown;
+  if (!isTelemetryDocument(telemetry)) throw new Error("merge: the telemetry is not the engine's shape");
   const housekeeping = m.housekeeping ? (JSON.parse(m.housekeeping) as { cleaned: number; leftover: number }) : null;
   if (housekeeping && (typeof housekeeping.cleaned !== "number" || typeof housekeeping.leftover !== "number")) throw new Error("merge: the housekeeping report is not the engine's shape");
   return { fresh, telemetry, housekeeping };
 }
 
-/** A JSON array from a reply, or an error naming the part. */
-export function parseArray<T>(text: string, what: string): T[] {
+/** A JSON array from a reply whose every item passes `isItem`, or an error
+ *  naming the part. */
+export function parseArray<T>(text: string, what: string, isItem: (v: unknown) => boolean): T[] {
   const v = JSON.parse(text) as unknown;
   if (!Array.isArray(v)) throw new Error(`reply: the ${what} is not a list`);
+  if (!v.every(isItem)) throw new Error(`reply: an item in the ${what} is not the engine's shape`);
   return v as T[];
+}
+
+/** A gameplay event as the engine sends it: a name and a payload object. */
+export const isEventItem = (v: unknown): boolean => isRecord(v) && typeof v.name === "string" && isRecord(v.payload);
+
+/** A log entry as the engine sends it. */
+export const isLogItem = (v: unknown): boolean => isRecord(v) && typeof v.minute === "number" && typeof v.text === "string" && typeof v.kind === "string";
+
+/** The pending choice a reply carries when its header says one is open. */
+export function parsePending<T>(text: string): T {
+  const v = JSON.parse(text) as unknown;
+  if (!isRecord(v)) throw new Error("reply: the pending choice is not the engine's shape");
+  return v as T;
+}
+
+/** The engine's dropped-event count. */
+export function parseCount(n: unknown, what: string): number {
+  if (typeof n !== "number" || !Number.isFinite(n) || n < 0) throw new Error(`reply: the ${what} is not a count`);
+  return n;
 }
 
 /** Merge the engine's full save into the read model, keeping the
