@@ -223,9 +223,16 @@ fan-out, and an event is never handed out twice.
     TDT export. They
     get whichever save is current, and the host counts the ones that were
     the read model's (`stats.approximateSaves`).
-    `src/tests/integration/wasmWorkerSaves.integration.test.ts` takes them
-    with steps in flight on the real package and loads each into a fresh
-    engine and into TypeScript, with every command kept.
+    A save taken with steps in flight carries the last fresh reply's minute,
+    so a tower loaded from it runs those steps again, an hour or day pass
+    among them. `src/tests/integration/wasmWorkerSaves.integration.test.ts`
+    calls `serialize()` (what every one of these callers calls) with steps in
+    flight on the real package. It checks the minute, the tower name and
+    money set mid-flight, that the hour pass among the in-flight steps runs
+    once on the loaded tower, and that each save loads and steps on a fresh
+    engine and on TypeScript. What stays approximate is the order: a command
+    made mid-flight lands before the in-flight steps it followed on the
+    engine (#1053).
 
 ### Errors, recovery and lifecycle
 
@@ -326,7 +333,15 @@ fan-out, and an event is never handed out twice.
     and a malformed reply;
   - a refused load before any step;
   - `settle`, and its timeout.
+- `src/tests/integration/wasmWorkerSaves.integration.test.ts` takes
+  synchronous saves with steps in flight on the real package (see "Saves").
+- The lifecycle file also covers a crash with a batch in flight and a command
+  no reply has included: the clock rolls back to the applied minute, the
+  command and its event are kept once, and the saved tower loads on a fresh
+  worker.
 - The headless units run on a fake engine: `workerHost.test.ts`,
+  `workerHostEdges.test.ts` (among others, a fresh reply that does not parse
+  or is not the engine's shape fails before any write),
   `workerController.test.ts`, `wasmHostFrame.test.ts` and
   `frameApply.test.ts`.
 - `e2e/wasmWorker.spec.ts` (chromium-wasm) runs in a real browser:
