@@ -62,6 +62,13 @@ export interface MergePass extends Churn {
   reason: "hour" | "revision" | "both";
 }
 
+/** A per-merge figure over a run's merges. */
+export interface Spread {
+  median: number;
+  mean: number;
+  max: number;
+}
+
 export interface ReadModelShape {
   scenario: string;
   steps: number;
@@ -72,14 +79,14 @@ export interface ReadModelShape {
   merges: MergePass[];
   /** Over `merges`: the units changed per merge as a share of the units
    *  then present (0 to 1). Null with no merge. */
-  changedShare: { median: number; max: number } | null;
+  changedShare: Spread | null;
   /** Over `merges`: units changed, added or removed per merge. */
-  touched: { median: number; max: number } | null;
+  touched: Spread | null;
   /** Over `merges`: units changed per merge, as counts. */
-  changedCount: { median: number; max: number } | null;
+  changedCount: Spread | null;
   /** Over `merges`: changed units with a field the frame view does not
    *  carry. */
-  outsideFrame: { median: number; max: number } | null;
+  outsideFrame: Spread | null;
 }
 
 /** The fields of the frame view's per-unit record besides its id
@@ -150,11 +157,11 @@ export function churn(before: string, after: string): Churn {
   return { changed, added, removed, total: ub.size, outsideFrame, unitKeys: [...unitKeys].sort(), topKeys: topKeys.sort() };
 }
 
-/** Median and max of a list, or null when it is empty. */
-export function spread(xs: readonly number[]): { median: number; max: number } | null {
+/** Median, mean and max of a list, or null when it is empty. */
+export function spread(xs: readonly number[]): Spread | null {
   if (xs.length === 0) return null;
   const sorted = [...xs].sort((x, y) => x - y);
-  return { median: quantile(sorted, 0.5), max: sorted[sorted.length - 1] };
+  return { median: quantile(sorted, 0.5), mean: sorted.reduce((a, x) => a + x, 0) / sorted.length, max: sorted[sorted.length - 1] };
 }
 
 /** Summaries over a scenario's merges. */

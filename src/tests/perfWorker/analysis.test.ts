@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { csvField, limitations, loadWorkerCheckpoint, makeConfig, metricsCsv, parseArgs, ratiosCsv, scriptSizes } from "./main";
-import { markdown, pct, readModelMarkdown, readModelSection, slices } from "./report";
+import { markdown, num, pct, readModelMarkdown, readModelSection, slices } from "./report";
 import { Simulation } from "../../engine/Simulation";
 import { serializeUnit } from "../../engine/sim/coerce";
 import { FRAME_UNIT_FIELDS, churn, composition, measureReadModel, spread, summarizeMerges, type MergePass } from "./readModel";
@@ -254,13 +254,17 @@ describe("perf:worker read model shape", () => {
 
   it("summarizes merges as the share of units changed and the units touched", () => {
     const pass = (changed: number, total: number, added = 0): MergePass => ({ step: 4, reason: "hour", changed, added, removed: 0, total, outsideFrame: changed > 20 ? 7 : 1, unitKeys: [], topKeys: [] });
-    expect(summarizeMerges([pass(10, 100), pass(0, 100, 3), pass(50, 200)])).toEqual({ changedShare: { median: 0.1, max: 0.25 }, touched: { median: 10, max: 50 }, changedCount: { median: 10, max: 50 }, outsideFrame: { median: 1, max: 7 } });
+    const sum = summarizeMerges([pass(10, 100), pass(0, 100, 3), pass(50, 200)]);
+    expect(sum.changedShare).toMatchObject({ median: 0.1, max: 0.25 });
+    expect(sum.changedShare!.mean).toBeCloseTo(0.35 / 3, 12);
+    expect(sum).toMatchObject({ touched: { median: 10, mean: 21, max: 50 }, changedCount: { median: 10, mean: 20, max: 50 }, outsideFrame: { median: 1, mean: 3, max: 7 } });
     expect(summarizeMerges([])).toEqual({ changedShare: null, touched: null, changedCount: null, outsideFrame: null });
     // The report's shares: tiny ones are bounded, small ones get two decimals, the rest one.
     expect([pct(0), pct(0.00005), pct(0.0005), pct(0.25)]).toEqual(["0.0%", "<0.01%", "0.05%", "25.0%"]);
     const sl = (name: string, count: number, share: number) => ({ name, count, chars: 0, share });
     expect(slices([sl("units", 1, 0.9), sl("floor", 1200, 0.05), sl("a", 1, 0.03), sl("b", 1, 0.02)], 2)).toBe("units 90.0%, floor (1,200) 5.0%, 2 more 5.0%");
-    expect(spread([4, 1, 3, 2])).toEqual({ median: 2.5, max: 4 });
+    expect(spread([4, 1, 3, 2])).toEqual({ median: 2.5, mean: 2.5, max: 4 });
+    expect([num(2888), num(673.9166), num(0.5)]).toEqual(["2,888", "673.9", "0.5"]);
   });
 
   it("merges where the worker host would, once a batch, and repeats exactly", () => {

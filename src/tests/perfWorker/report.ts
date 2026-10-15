@@ -1,7 +1,7 @@
 import type { Metric, Ratio } from "./analysis";
 import type { ReadModelResults, WorkerResults } from "./main";
 import type { ModeName } from "./pageWorker";
-import type { ReadModelShape, Slice } from "./readModel";
+import type { ReadModelShape, Slice, Spread } from "./readModel";
 
 /** report.md for a `perf:worker` run: the snapshot header, the medians per
  *  mode with their intervals, and the paired ratios against the shipped
@@ -28,6 +28,8 @@ const ratioCell = (r: Ratio | undefined): string => {
   return `${r.ratio.toFixed(2)}x${ci} ${r.verdict}${r.zeroReference ? ` (${r.zeroReference} zero)` : ""}`;
 };
 
+/** A count, or a mean of counts, to one decimal when it is not whole. */
+export const num = (v: number): string => (Number.isInteger(v) ? v.toLocaleString("en-US") : v.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
 export const pct = (share: number): string => (share > 0 && share < 0.0001 ? "<0.01%" : `${(share * 100).toFixed(share < 0.001 && share > 0 ? 2 : 1)}%`);
 export const slices = (xs: readonly Slice[], top: number): string => {
   const shown = xs.slice(0, top).map((s) => `${s.name}${s.count > 1 ? ` (${s.count.toLocaleString("en-US")})` : ""} ${pct(s.share)}`);
@@ -40,18 +42,18 @@ export const slices = (xs: readonly Slice[], top: number): string => {
  *  save is made of, and how much of it each merge changed. */
 export function readModelSection(shapes: readonly ReadModelShape[]): string[] {
   if (!shapes.length) return [];
-  const lines = ["## read model", "", "Measured once per scenario on the TypeScript engine in Node (see the limitations). Shares are of the whole save in JSON characters. A merge is counted where the worker host merges; \"changed\" is units present in both saves whose records differ, as a share of the units present, with the counts in brackets; \"outside the frame\" counts the changed units with at least one changed field the frame view's unit record does not carry. Merges are by reason (hour pass, revision or both).", ""];
-  lines.push("| scenario | save | units | top-level keys | unit kinds | merges | units changed per merge, median / max | units touched per merge, median / max | changed outside the frame, median / max | unit fields changed | top-level keys changed |");
-  lines.push(`|${"---|".repeat(11)}`);
+  const lines = ["## read model", "", "Measured once per scenario on the TypeScript engine in Node (see the limitations). Shares are of the whole save in JSON characters. A merge is counted where the worker host merges; \"changed\" is units present in both saves whose records differ, as a share of the units present and as counts; \"outside the frame\" counts the changed units with at least one changed field the frame view's unit record does not carry. Merges are by reason (hour pass, revision or both).", ""];
+  lines.push("| scenario | save | units | top-level keys | unit kinds | merges | share of units changed per merge, median / max | units changed per merge, median / mean / max | units touched per merge, median / mean / max | changed outside the frame, median / mean / max | unit fields changed | top-level keys changed |");
+  lines.push(`|${"---|".repeat(12)}`);
   for (const s of shapes) {
     const c = s.composition;
     const unitKeys = [...new Set(s.merges.flatMap((m) => m.unitKeys))].sort();
     const topKeys = [...new Set(s.merges.flatMap((m) => m.topKeys))].sort();
-    const share = s.changedShare && s.changedCount ? `${pct(s.changedShare.median)} / ${pct(s.changedShare.max)} (${s.changedCount.median} / ${s.changedCount.max})` : "n/a";
+    const three = (x: Spread | null): string => (x ? `${num(x.median)} / ${num(x.mean)} / ${num(x.max)}` : "n/a");
+    const share = s.changedShare ? `${pct(s.changedShare.median)} / ${pct(s.changedShare.max)}` : "n/a";
     const reasons = (["hour", "revision", "both"] as const).map((r) => [r, s.merges.filter((m) => m.reason === r).length] as const).filter(([, n]) => n > 0);
-    const touched = s.touched ? `${s.touched.median} / ${s.touched.max}` : "n/a";
-    const outside = s.outsideFrame ? `${s.outsideFrame.median} / ${s.outsideFrame.max}` : "n/a";
-    lines.push(`| ${s.scenario} | ${c.totalChars.toLocaleString("en-US")} chars | ${c.units.toLocaleString("en-US")} | ${slices(c.keys, 4)} | ${slices(c.unitKinds, 4)} | ${s.merges.length}${reasons.length ? ` (${reasons.map(([r, n]) => `${n} ${r}`).join(", ")})` : ""} | ${share} | ${touched} | ${outside} | ${unitKeys.join(", ") || "none"} | ${topKeys.join(", ") || "none"} |`);
+
+    lines.push(`| ${s.scenario} | ${c.totalChars.toLocaleString("en-US")} chars | ${c.units.toLocaleString("en-US")} | ${slices(c.keys, 4)} | ${slices(c.unitKinds, 4)} | ${s.merges.length}${reasons.length ? ` (${reasons.map(([r, n]) => `${n} ${r}`).join(", ")})` : ""} | ${share} | ${three(s.changedCount)} | ${three(s.touched)} | ${three(s.outsideFrame)} | ${unitKeys.join(", ") || "none"} | ${topKeys.join(", ") || "none"} |`);
   }
   lines.push("");
   return lines;
