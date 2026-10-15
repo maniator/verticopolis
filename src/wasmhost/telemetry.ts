@@ -15,6 +15,21 @@ export interface TelemetryDocument {
   origins: [number, { weekday: [number, number][][]; weekend: [number, number][][] }][];
 }
 
+const isNum = (v: unknown): v is number => typeof v === "number";
+const isPairs = (v: unknown): boolean => Array.isArray(v) && v.every((p) => Array.isArray(p) && p.length === 2 && isNum(p[0]) && isNum(p[1]));
+const isDays = (v: unknown, slot: (x: unknown) => boolean): boolean =>
+  typeof v === "object" && v !== null && Array.isArray((v as HourlyByDay).weekday) && Array.isArray((v as HourlyByDay).weekend) &&
+  (v as { weekday: unknown[] }).weekday.every(slot) && (v as { weekend: unknown[] }).weekend.every(slot);
+const isEntries = (v: unknown, value: (x: unknown) => boolean): boolean => Array.isArray(v) && v.every((e) => Array.isArray(e) && e.length === 2 && isNum(e[0]) && value(e[1]));
+
+/** Whether a parsed document is the engine's shape all the way down, so
+ *  adopting it cannot throw part way through. */
+export function isTelemetryDocument(v: unknown): v is TelemetryDocument {
+  if (typeof v !== "object" || v === null) return false;
+  const d = v as Record<string, unknown>;
+  return isEntries(d.util, isNum) && isEntries(d.hourly, (x) => isDays(x, isNum)) && isEntries(d.origins, (x) => isDays(x, isPairs));
+}
+
 /** The instance's telemetry in the engine's shape. */
 export function telemetryDocument(sim: Simulation): TelemetryDocument {
   const slots = (ring: Map<number, number>[]) => ring.map((slot) => [...slot]);

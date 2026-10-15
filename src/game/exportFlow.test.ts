@@ -282,3 +282,30 @@ describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", (
     expect(ran).toBe(true);
   });
 });
+
+describe("runExportFlow with an engine host that settles", () => {
+  afterEach(() => {
+    resetExportFlowForTests();
+  });
+
+  it("settles first, then exports the tower the app holds after the wait", async () => {
+    const { setStepGate } = await import("../wasmhost/stepGate");
+    const { ui, downloads } = fakeUi();
+    const first = Simulation.newGame(7);
+    const second = Simulation.newGame(8);
+    second.tower.towerName = "Adopted During The Wait";
+    let held = first;
+    const settled: Simulation[] = [];
+    // The first tower's settle adopts the second, as a load during the wait would.
+    setStepGate(first, { canStep: () => true, flush: () => {}, settle: async () => { settled.push(first); held = second; } });
+    setStepGate(second, { canStep: () => true, flush: () => {}, settle: async () => { settled.push(second); } });
+    const stamped: Simulation[] = [];
+    await runExportFlow({ getSim: () => held, ui }, (sim) => stamped.push(sim));
+    expect(settled).toEqual([first, second]);
+    expect(stamped).toEqual([second]);
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0].filename).toMatch(/adopted-during-the-wait/);
+    setStepGate(first, null);
+    setStepGate(second, null);
+  });
+});
