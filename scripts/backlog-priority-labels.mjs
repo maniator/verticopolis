@@ -18,13 +18,17 @@
  * Rows that cite an issue that is not open are listed as warnings: the backlog's
  * rule says to true those rows up.
  *
- * Usage: `node scripts/backlog-priority-labels.mjs [--dry-run]`, with
- * `GITHUB_TOKEN` and `GITHUB_REPOSITORY` (`owner/name`) in the environment.
- * `--dry-run` prints the plan and changes nothing.
+ * Usage: `node scripts/backlog-priority-labels.mjs [--dry-run]`. It talks to
+ * GitHub through the `gh` CLI, which GitHub's runners ship with: the workflow
+ * passes the job token as `GH_TOKEN`, and locally your `gh auth login` session
+ * works. `GITHUB_REPOSITORY` (`owner/name`) picks the repository and defaults
+ * to `maniator/verticopolis`, whose issues the backlog cites. `--dry-run`
+ * prints the plan and changes nothing.
  *
  * Plain dependency-free JS so the workflow runs it with no install step. The
  * pure helpers are typed in backlog-priority-labels.d.mts for the unit test.
  */
+import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -101,110 +105,89 @@ export function citedButNotOpen(priorities, openIssues) {
     .sort((a, b) => a - b);
 }
 
-/** How long GitHub asks a rate-limited caller to wait, in seconds, or null
- *  when the response is not a rate limit. `Retry-After` may be seconds or an
- *  HTTP date; a primary limit sends `x-ratelimit-remaining: 0` with the reset
- *  time instead. */
-export function retryWaitSeconds(res, now = Date.now()) {
-  const after = res.headers.get("retry-after");
-  if (after !== null) {
-    const secs = Number(after);
-    if (Number.isFinite(secs)) return Math.max(secs, 1);
-    const at = Date.parse(after);
-    if (Number.isFinite(at)) return Math.max(Math.ceil((at - now) / 1000), 1);
-  }
-  if (res.headers.get("x-ratelimit-remaining") === "0") {
-    const reset = Number(res.headers.get("x-ratelimit-reset"));
-    if (Number.isFinite(reset) && reset > 0)
-      return Math.max(Math.ceil(reset - now / 1000), 1);
-  }
-  return null;
-}
+/** What gh prints when GitHub refuses a call because of a rate limit: the
+ *  primary and secondary limit messages, a bare 429 (`gh api` ends each error
+ *  with the HTTP status), and the GraphQL wording for mutations sent too fast.
+ *  gh passes GitHub's own message through, so this follows GitHub's wording. */
+const RATE_LIMITED =
+  /rate limit|HTTP 429|submitted too quickly|abuse detection/i;
 
-/** Seconds to wait before retrying a rate-limited response, or null. A
- *  secondary limit can arrive as a 429, or a 403 that says so in its body,
- *  with neither timing header; GitHub's advice is then to wait a minute. */
-async function rateLimitWait(res) {
-  if (res.status !== 403 && res.status !== 429) return null;
-  const wait = retryWaitSeconds(res);
-  if (wait !== null) return wait;
-  // A 429 is always a rate limit; with no timing header GitHub's advice is to
-  // wait at least a minute. A 403 is one only when its body says so.
-  if (res.status === 429) return 60;
-  const text = await res.clone().text();
-  return /secondary rate limit/i.test(text) ? 60 : null;
-}
-
-/** A REST client for `api.github.com`. Each call times out after 30 seconds,
- *  and a rate-limited call (403 or 429; see retryWaitSeconds) waits up to a
- *  minute and retries once. A failed call throws an Error carrying the HTTP `status`. Removing a
- *  label the issue no longer has is already the state we want, so that 404 is
- *  not an error. */
-export function githubClient(
-  token,
-  { sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {},
-) {
-  const once = (method, path, body) =>
-    fetch(`https://api.github.com${path}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        ...(body ? { "Content-Type": "application/json" } : {}),
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(30_000),
-    });
-  return async (method, path, body) => {
-    let res = await once(method, path, body);
-    let limited = await rateLimitWait(res);
-    if (limited !== null && limited <= 60) {
-      await sleep(limited * 1000);
-      res = await once(method, path, body);
-      limited = await rateLimitWait(res);
-    }
-    if (method === "DELETE" && res.status === 404) return null;
-    if (!res.ok) {
-      const err = new Error(
-        `${method} ${path}: HTTP ${res.status} ${await res.text()}`,
+/** Runs the GitHub CLI and resolves to its stdout. `gh` brings the auth
+ *  (`GH_TOKEN` in the workflow, a `gh auth login` session locally), the
+ *  pagination and the HTTP plumbing. A failed call rejects with an Error whose
+ *  message carries gh's stderr; `rateLimited` is set when that stderr says
+ *  GitHub refused the call because of a rate limit. Each call times out after
+ *  a minute. */
+export function ghCli() {
+  return (args) =>
+    new Promise((resolvePromise, reject) => {
+      execFile(
+        "gh",
+        args,
+        { maxBuffer: 64 * 1024 * 1024, timeout: 60_000 },
+        (err, stdout, stderr) => {
+          if (!err) return resolvePromise(stdout);
+          const why =
+            err.code === "ENOENT"
+              ? "the gh CLI is not on PATH; install it from https://cli.github.com"
+              : err.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"
+                ? "printed more output than expected"
+                : err.killed
+                  ? "timed out after a minute (a write may still have landed; the next run checks)"
+                  : String(stderr).trim() || err.message;
+          const what = args.filter((a) => !a.startsWith("-")).slice(0, 3);
+          const e = new Error(`gh ${what.join(" ")}: ${why}`);
+          e.rateLimited = RATE_LIMITED.test(why);
+          reject(e);
+        },
       );
-      err.status = res.status;
-      // Still limited after one wait, or asked to wait past a minute: the
-      // caller stops writing rather than spend the job's time on refusals.
-      err.rateLimited = limited !== null;
-      throw err;
-    }
-    return res.status === 204 ? null : res.json();
-  };
+    });
 }
 
-async function openIssueLabels(request, repo) {
-  const out = new Map();
-  for (let page = 1; ; page++) {
-    const batch = await request(
-      "GET",
-      `/repos/${repo}/issues?state=open&per_page=100&page=${page}`,
+/** gh's list commands stop quietly at `--limit`, so a list that fills it is
+ *  treated as cut short. */
+const LIST_LIMIT = 10_000;
+
+async function ghList(gh, args) {
+  const items = JSON.parse(await gh([...args, "--limit", String(LIST_LIMIT)]));
+  if (items.length >= LIST_LIMIT)
+    throw new Error(
+      `gh ${args.slice(0, 2).join(" ")} returned ${items.length} items, the --limit; raise LIST_LIMIT`,
     );
-    for (const i of batch)
-      if (!i.pull_request)
-        out.set(
-          i.number,
-          i.labels.map((l) => l.name),
-        );
-    if (batch.length < 100) return out;
-  }
+  return items;
 }
 
-/** One sync. `request(method, path, body)` talks to GitHub; `pauseMs` spaces
- *  every write out so a large first run stays under GitHub's secondary rate
- *  limit. Returns what it did; `ok` is false when any row or issue failed. */
+/** Open issues to their label names. `gh issue list` returns issues only,
+ *  never pull requests. */
+async function openIssueLabels(gh, repo) {
+  const issues = await ghList(gh, [
+    "issue",
+    "list",
+    "--repo",
+    repo,
+    "--state",
+    "open",
+    "--json",
+    "number,labels",
+  ]);
+  return new Map(issues.map((i) => [i.number, i.labels.map((l) => l.name)]));
+}
+
+const message = (err) => (err instanceof Error ? err.message : String(err));
+
+/** One sync. `gh(args)` runs the GitHub CLI and resolves to its stdout;
+ *  `pauseMs` spaces every write out so a large first run stays under GitHub's
+ *  secondary rate limit. A write refused for rate waits `limitWaitMs` (GitHub
+ *  asks for at least a minute) and retries once; refused again, the run stops
+ *  writing. Returns what it did; `ok` is false when any row or issue failed. */
 export async function run({
   markdown,
   repo,
-  request,
+  gh,
   dryRun = false,
   pauseMs = 1000,
+  limitWaitMs = 60_000,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
   log = console.log,
 }) {
   const { priorities, errors } = parseBacklogPriorities(markdown);
@@ -214,21 +197,31 @@ export async function run({
       log("no open backlog row cites an issue; nothing to sync");
     return { ok: errors.length === 0, plan: [], failures: [], errors };
   }
-  // A missing P label would be recreated by the add call with GitHub's default
-  // color, quietly forking the taxonomy. Refuse to write instead.
-  for (const p of PRIORITY_LABELS) {
-    try {
-      await request("GET", `/repos/${repo}/labels/${p}`);
-    } catch (err) {
-      const why =
-        err?.status === 404
-          ? `label ${p} does not exist in ${repo}; run the Sync labels workflow first`
-          : `could not check label ${p}: ${err instanceof Error ? err.message : err}`;
-      log(`error: ${why}`);
-      return { ok: false, plan: [], failures: [], errors: [...errors, why] };
-    }
+  const stop = (why) => {
+    log(`error: ${why}`);
+    return { ok: false, plan: [], failures: [], errors: [...errors, why] };
+  };
+  // gh refuses to add a label the repository lacks, so a missing P label would
+  // fail every issue one by one. Check once and stop with a clear reason.
+  let missing;
+  try {
+    const labels = (
+      await ghList(gh, ["label", "list", "--repo", repo, "--json", "name"])
+    ).map((l) => l.name);
+    missing = PRIORITY_LABELS.filter((p) => !labels.includes(p));
+  } catch (err) {
+    return stop(`could not list labels: ${message(err)}`);
   }
-  const open = await openIssueLabels(request, repo);
+  if (missing.length)
+    return stop(
+      `${missing.length > 1 ? "labels" : "label"} ${missing.join(", ")} missing from ${repo}; run the Sync labels workflow first`,
+    );
+  let open;
+  try {
+    open = await openIssueLabels(gh, repo);
+  } catch (err) {
+    return stop(`could not list open issues: ${message(err)}`);
+  }
   const stale = citedButNotOpen(priorities, open);
   // A `::warning::` line becomes an annotation on the workflow run's summary.
   if (stale.length)
@@ -240,15 +233,25 @@ export async function run({
     `${priorities.size} row-cited issues, ${plan.length} to relabel${dryRun ? " (dry run)" : ""}`,
   );
   const failures = [];
-  const write = async (method, path, body) => {
+  // Writes go through `gh api` to the REST endpoints: one request per label,
+  // where `gh issue edit` spends several GraphQL requests on each edit and
+  // could run a large first sync into the token's hourly budget.
+  const write = async (args) => {
     try {
-      await request(method, path, body);
+      try {
+        await gh(args);
+      } catch (err) {
+        if (!err?.rateLimited) throw err;
+        log(`${args[3]}: rate limited; waiting, then retrying once`);
+        await sleep(limitWaitMs);
+        await gh(args);
+      }
     } finally {
-      // Pace failed writes too, so one rate-limit refusal does not turn into
-      // a burst of them.
-      if (pauseMs > 0) await new Promise((r) => setTimeout(r, pauseMs));
+      // Pace failed writes too, so one refusal does not turn into a burst.
+      if (pauseMs > 0) await sleep(pauseMs);
     }
   };
+  const labelsPath = (issue) => `repos/${repo}/issues/${issue}/labels`;
   for (const c of plan) {
     log(
       `#${c.issue}: ${[c.add && `+${c.add}`, ...c.remove.map((l) => `-${l}`)].filter(Boolean).join(" ")}`,
@@ -258,17 +261,35 @@ export async function run({
       // Add first, so a failure partway leaves an extra label for the next run
       // to clear, never an issue with no P label at all.
       if (c.add)
-        await write("POST", `/repos/${repo}/issues/${c.issue}/labels`, {
-          labels: [c.add],
-        });
-      for (const l of c.remove)
-        await write(
-          "DELETE",
-          `/repos/${repo}/issues/${c.issue}/labels/${encodeURIComponent(l)}`,
-        );
+        await write([
+          "api",
+          "--method",
+          "POST",
+          labelsPath(c.issue),
+          "--silent",
+          "-f",
+          `labels[]=${c.add}`,
+        ]);
+      for (const l of c.remove) {
+        try {
+          await write([
+            "api",
+            "--method",
+            "DELETE",
+            `${labelsPath(c.issue)}/${encodeURIComponent(l)}`,
+            "--silent",
+          ]);
+        } catch (err) {
+          // The label is already off the issue: the state we want. `gh api`
+          // prints GitHub's message and the status; any other 404 (a missing
+          // issue, lost access) stays a failure.
+          if (!/Label does not exist \(HTTP 404\)/.test(message(err)))
+            throw err;
+        }
+      }
     } catch (err) {
       failures.push(c.issue);
-      log(`error: #${c.issue}: ${err instanceof Error ? err.message : err}`);
+      log(`error: #${c.issue}: ${message(err)}`);
       if (err?.rateLimited) {
         const skipped = plan.slice(plan.indexOf(c) + 1).map((x) => x.issue);
         failures.push(...skipped);
@@ -288,10 +309,10 @@ export async function run({
 }
 
 async function main() {
-  const token = process.env.GITHUB_TOKEN;
-  const repo = process.env.GITHUB_REPOSITORY;
-  if (!token || !repo)
-    throw new Error("GITHUB_TOKEN and GITHUB_REPOSITORY must be set");
+  const gh = ghCli();
+  // The backlog's issue numbers belong to this repository, so a local run
+  // targets it too, whatever checkout or fork the shell is in.
+  const repo = process.env.GITHUB_REPOSITORY || "maniator/verticopolis";
   const backlog = resolve(
     dirname(fileURLToPath(import.meta.url)),
     "../_bmad-output/implementation-artifacts/backlog.md",
@@ -299,7 +320,7 @@ async function main() {
   const result = await run({
     markdown: readFileSync(backlog, "utf8"),
     repo,
-    request: githubClient(token),
+    gh,
     dryRun: process.argv.includes("--dry-run"),
   });
   if (!result.ok) process.exit(1);

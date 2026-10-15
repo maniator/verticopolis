@@ -15,8 +15,10 @@ name: Backlog priority labels
 # never on pull_request or pull_request_target (a fork could otherwise write
 # labels by editing the backlog in a PR), never for a manual run started on
 # another branch, and never on a fork's own schedule. It runs the repository's
-# own script with Node and no install step, so no third-party package runs with
-# the token.
+# own script with Node and no install step. The script makes its GitHub calls
+# through the `gh` CLI that GitHub preinstalls on its hosted runners, so the
+# token reaches only our script, Node and GitHub's own CLI (its version follows
+# the runner image).
 
 on:
   push:
@@ -29,6 +31,11 @@ on:
     # Mondays at 13:07 UTC.
     - cron: "7 13 * * 1"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print the plan without changing any label"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -42,7 +49,8 @@ jobs:
   sync:
     if: github.repository == 'maniator/verticopolis' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # A full relabel of every row-cited issue is about 400 paced writes.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,8 +61,14 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
+      # gh is preinstalled on GitHub-hosted runners and reads the job token
+      # from GH_TOKEN; the script passes the repository explicitly, so no git
+      # remote or `gh auth login` is involved.
+      - name: Show the gh version
+        run: gh --version
+
       - name: Sync P labels from the backlog
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: node scripts/backlog-priority-labels.mjs
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: node scripts/backlog-priority-labels.mjs $DRY_RUN

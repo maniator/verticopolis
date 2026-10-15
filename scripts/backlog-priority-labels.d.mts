@@ -32,30 +32,26 @@ export declare function citedButNotOpen(
   openIssues: ReadonlyMap<number, readonly string[]>,
 ): number[];
 
-/** `request(method, path, body)` against the GitHub REST API. */
-export type Request = (
-  method: string,
-  path: string,
-  body?: unknown,
-) => Promise<unknown>;
+/** Runs the GitHub CLI with `args` and resolves to its stdout. A failed call
+ *  rejects with a GhError. */
+export type Gh = (args: string[]) => Promise<string>;
 
-/** Seconds GitHub asks a rate-limited caller to wait, or null. */
-export declare function retryWaitSeconds(
-  res: { headers: { get(name: string): string | null } },
-  now?: number,
-): number | null;
+/** A failed gh call; `rateLimited` is true when GitHub refused it because of
+ *  a rate limit. */
+export interface GhError extends Error {
+  rateLimited: boolean;
+}
 
-export declare function githubClient(
-  token: string,
-  options?: { sleep?: (ms: number) => Promise<void> },
-): Request;
+export declare function ghCli(): Gh;
 
 export declare function run(options: {
   markdown: string;
   repo: string;
-  request: Request;
+  gh: Gh;
   dryRun?: boolean;
   pauseMs?: number;
+  limitWaitMs?: number;
+  sleep?: (ms: number) => Promise<void>;
   log?: (line: string) => void;
 }): Promise<{
   ok: boolean;
