@@ -202,7 +202,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     stats.workerReplyMs += r.workMs.reply;
     stats.workerMemoryBytes = r.memoryBytes;
     if (r.merge) {
-      const bytes = 2 * (r.merge.save.length + r.merge.telemetry.length + (r.merge.housekeeping?.length ?? 0) + r.merge.commute.length);
+      const bytes = 2 * (r.merge.save.length + r.merge.telemetry.length + (r.merge.housekeeping?.length ?? 0) + (r.merge.commute?.length ?? 0));
       stats.mergeBytes += bytes;
       stats.bytesReceived += bytes;
     }

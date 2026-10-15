@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import type { GameMode } from "../../engine/types";
-import { onWasmParityProject } from "./typescriptOnly";
+import { atEngineFrameCadence, onWasmParityProject, refreshFromEngine } from "./typescriptOnly";
 
 const MID = Math.floor(GRID.width / 2);
 
@@ -47,6 +47,25 @@ function placeHotel(sim: Simulation, x: number) {
  * projects load the setup file, so the plain projects skip this.
  */
 describe.skipIf(!onWasmParityProject())("the WASM parity setup", () => {
+  it("refuses a cadence request after the test's first hosted tick", () => {
+    const sim = Simulation.newGame(5, "modern");
+    sim.tick(1);
+    expect(() => atEngineFrameCadence("too late")).toThrow(/before the test's first tick/);
+    expect(() => atEngineFrameCadence(" ")).toThrow(/needs the reason/);
+  });
+
+  it("skips the merge per tick at the host's own cadence, and a refresh needs no re-host", async () => {
+    const { parityStats } = await import("./wasmHostSetup");
+    atEngineFrameCadence("this pin counts the setup's merges");
+    const sim = Simulation.newGame(5, "modern");
+    const { merges, rehosts } = parityStats;
+    for (let i = 0; i < 10; i++) sim.tick(1);
+    expect(parityStats.merges, "no merge per tick").toBe(merges);
+    refreshFromEngine(sim);
+    sim.tick(1);
+    expect(parityStats.rehosts, "the refresh moved the sync marks with it").toBe(rehosts);
+  });
+
   it("hosts a Classic tower with an off-ladder rent once and logs one rent-snap bulletin", async () => {
     const { parityStats } = await import("./wasmHostSetup");
     const sim = Simulation.newGame(3, "classic");

@@ -152,7 +152,7 @@ simulations again. A test that never ticks and never calls
 `callExterminator` is never hosted; it exercises the TypeScript command
 surface only, and the table counts it as such.
 
-No CI job runs the parity projects yet. Adding `test:wasm:parity` to
+(Superseded by slice 3, which added a CI job of its own.) No CI job runs the parity projects yet. Adding `test:wasm:parity` to
 `test:wasm` (which CI runs) waits until both projects pass.
 
 ### The cost (measured on this machine, one worker)
@@ -239,7 +239,7 @@ twins are `conformanceWasm` and the Rust replay test).
   structural snapshot in #868 is the fix; until then those five run only
   under the hour cadence.
 
-### Test-mapping table (after review round 2)
+### Test-mapping table (after review round 2, rows updated in slice 3)
 
 Buckets: (a) engine divergence, (b) read-model gap, (c) TypeScript-only,
 (d) un-relayed write after the crowd exists, (cost) merge-per-tick
@@ -261,7 +261,7 @@ repeats.
 | `economyDepth.integration.test.ts` | 0/8 (5 marked) | c | `simModel = "v1"` (the sampled model is not in the save and not ported) |
 | `elevatorStats.integration.test.ts` | 0/3 | fixed | `elevatorUtil` comes from the engine since the 2026-10-10 telemetry fix |
 | `faqComplete.integration.test.ts` | 0/26 (2 marked) | d, c | `sim.weather = "rain"` before the ticks: no save carries the weather (a load recomputes it from the day) and the frame sync writes the engine's weather onto the instance on attach and every tick (the test fails unmarked); the cinema booking test sets `simModel = "v1"` |
-| `fixedStep.integration.test.ts` | 0/6 | cost, fixed | runs at the host's own cadence through `atEngineFrameCadence` (slice 3): the fixture is ticked frame by frame and only the final save, the engine's own while hosted, is compared |
+| `fixedStep.integration.test.ts` | 0/6 | cost, fixed | all six at the host's own cadence (`atEngineFrameCadence`, slice 3): the fixture is ticked frame by frame and only the final save, the engine's own while hosted, is compared |
 | `goldenMaster.integration.test.ts` | 0/7 (2 marked) | c | the pinned TypeScript save hash; the engine's golden master is row 4's gate |
 | `hotelLateCheckout.integration.test.ts` | 0/19 (1 marked) | d | the understaffed test runs `economy.hotelCheckout()` on the instance mid-run (the checkout pass is the engine's own hourly step) and swaps the clock to each afternoon hour after the crowd exists; the Modern deferred-guests test lost its mark in review round 2 (its `hotelCheckout()` runs before the first tick, so the engine starts from that state) |
 | `housekeepingLegibility.integration.test.ts` | 0/6 | fixed | the housekeeping report comes from the engine since the 2026-10-10 telemetry fix |
@@ -280,13 +280,16 @@ repeats.
 | `venueAttendance.integration.test.ts` | 0/21 | fixed | reads `mealVenueId`, which the frame carries now |
 | `venueOrigins.integration.test.ts` | 0/9 | fixed | reads `mealVenueId` and `originUnitId`, which the frame carries now |
 | `src/engine/aquaticCenter.test.ts` (unit) | 0/6 | fixed | reads `mealVenueId`, which the frame carries now |
-| `src/engine/rentalCrowd.test.ts` (unit) | 0/5 | cost, fixed | its three day-long minute-tick runs read the crowd, which the frame carries, and run at the host's own cadence through `atEngineFrameCadence` (slice 3) |
-| `src/engine/tower/rooms.test.ts` (unit) | 0/8 | cost, fixed | 360 ticks on a 12,000-unit fixture asserting the census, which reads the unit states the frame carries; runs at the host's own cadence through `atEngineFrameCadence` (slice 3) |
+| `src/engine/rentalCrowd.test.ts` (unit) | 0/5 | cost, fixed | three tests at the host's own cadence (`atEngineFrameCadence`, slice 3): day-long minute-tick runs that read the crowd, which the frame carries |
+| `src/engine/tower/rooms.test.ts` (unit) | 0/8 | cost, fixed | one test at the host's own cadence (`atEngineFrameCadence`, slice 3), which calls `refreshFromEngine` before each assertion: 360 ticks on a 12,000-unit fixture, with a merge before each census check |
 | `conformance.integration.test.ts` (left out) | 23 | c | the TypeScript side of the referee and the scenario lock writer; its engine twin is `conformanceWasm` |
 | `loaderCases.integration.test.ts` (left out) | 1 | c | the loader-case lock writer; the Rust test replays the lock |
 | `dualRunDay`, `dualRunEdits`, `wasmHost` (left out) | 18 | c | attach a mirror or a host themselves |
 | `wasmHostTelemetry`, `wasmHostLogText` (left out) | 4 | c | drive the TypeScript engine and their own engine side by side |
-| `wasmHostAnalyticsBridge`, `wasmWorkerHost`, `wasmWorkerLifecycle`, `wasmWorkerSaves` (left out, slice 3) | 13 | c | start their own host, in process or on the worker; a second host on the instance is refused, and the lifecycle suite's fallback hands a crowded instance back to the TypeScript engine |
+| `wasmHostAnalyticsBridge`, `wasmWorkerHost`, `wasmWorkerLifecycle`, `wasmWorkerSaves` (left out, slice 3) | 29 | c | start their own host, in process or on the worker; a second host on the instance is refused, and the lifecycle suite's fallback hands a crowded instance back to the TypeScript engine |
+| `conformanceWasmTdt`, `conformanceWasmCanBuild`, `conformanceWasmVctower` (left out) | 51 | c | drive the binding directly, as `conformanceWasm` does |
+| `wasmHostCatalog` (left out) | 10 | c | starts its own host to read the engine's catalog |
+| `perfCompare/*.integration.test.ts` (left out) | 0 | c | the engine comparison's checks run each engine themselves (#972); no file matches the pattern today |
 | `conformanceWasm.integration.test.ts` (left out) | 21 | c | drives the binding directly |
 | `src/dualrun/mirror.test.ts` (left out) | 10 | c | attaches the relay itself |
 | `src/dualrun/dualRun.test.ts` (left out) | 6 | c | attaches the dual run's relay itself |
@@ -399,6 +402,8 @@ bucket (d) test is relayed or marked. The parity projects want the machine
 to themselves: a run under load times out tests that pass alone.
 
 ### Next slice
+
+(Slice 3 at the end of this story closes these, by its own route.)
 
 1. The structural snapshot (#868) for the merge-per-tick timeouts
    (`fixedStep`, `rooms`, `rentalCrowd`), and the getters the save does not
@@ -990,11 +995,19 @@ this slice closes the rest and puts the projects in CI.
   tick. It calls `atEngineFrameCadence(reason)` (beside
   `itTypeScriptOnly` in `src/tests/parity/typescriptOnly.ts`) and runs at
   the host's own cadence, a merge on an hour pass or a tower edit, as the
-  game does; the setup resets the request after each test. The reason is
-  required, and the table repeats it: `fixedStep` (all six),
+  game does. The call goes in the test body before its first hosted tick
+  (a later call, or one outside a test, throws, so a host never changes
+  cadence partway through a run), and the setup clears it after each test.
+  The opt-in also narrows what the setup checks: with no merge per tick,
+  the full compare runs only when the revision or the fingerprint moves, as
+  under `VC_WASM_SYNC=hour`. The reason is required, and the table repeats
+  it word for word: `fixedStep` (all six),
   `rooms` (the census on the 12,000-unit fixture) and `rentalCrowd` (its
-  three day-long runs). The parity projects also take a 120 s test
-  timeout, since every hosted tick syncs the engine's frame.
+  three day-long runs). A test at that cadence that asserts on state the
+  frame does not carry calls `refreshFromEngine(sim)` first, which merges
+  the engine's save into the instance: `rooms` does before each census
+  check, since the census reads `residents`. The parity projects also take
+  a 120 s test timeout, since every hosted tick syncs the engine's frame.
 - **The worker-host suites.** `wasmWorkerHost`, `wasmWorkerLifecycle`,
   `wasmWorkerSaves` and `wasmHostAnalyticsBridge` start their own host, so
   they sit outside `integrationWasm` with the other host suites (the
@@ -1013,7 +1026,8 @@ this slice closes the rest and puts the projects in CI.
 | `unitWasm` | 250 | 2764 | 0 | 0 | 97 s |
 
 The 39 skips are the 38 `itTypeScriptOnly` marks (24 in bucket (c), 14 in
-bucket (d), all in the table) plus one pre-existing skip. The (b) bucket is
+bucket (d), all in the table) plus one pre-existing skip. These figures are
+from a local run; the `test-wasm-parity` job is the live check. The (b) bucket is
 empty, as are (a) and the cost timeouts.
 
 ### What is left for #878

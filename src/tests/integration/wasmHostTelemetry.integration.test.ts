@@ -97,6 +97,7 @@ describe.skipIf(!hasWasmPackage())("elevator telemetry on both engines", () => {
       // The rings a schedule dialog holds while it is open: the first shaft's,
       // taken once and read again after every later hour.
       let held: { id: number; hourly: object; origins: object } | null = null;
+      let heldCommute: ReadonlyMap<number, number> | undefined;
       for (let h = 0; h < 12; h++) {
         driver.run(60);
         host.syncStructure();
@@ -104,6 +105,9 @@ describe.skipIf(!hasWasmPackage())("elevator telemetry on both engines", () => {
         expect(telemetryDocument(sim), `hour ${h}`).toEqual(doc);
         expect(sim.economy.housekeepingReport(), `hour ${h} housekeeping`).toEqual(JSON.parse(host.engine.housekeepingReport() ?? "null"));
         expect(commuteRows(sim), `hour ${h} commute stress`).toEqual(JSON.parse(host.engine.commuteStress()));
+        // The map a reader holds is the live one, filled in place.
+        heldCommute ??= sim.crowd.commuteStressByFloor;
+        expect(sim.crowd.commuteStressByFloor, `hour ${h}: the held commute map is the live one`).toBe(heldCommute);
         if (!held && doc.hourly.length > 0) {
           const id = doc.hourly[0][0];
           held = { id, hourly: sim.elevatorHourlyLoad(id)!, origins: sim.elevatorOriginLoad(id)! };

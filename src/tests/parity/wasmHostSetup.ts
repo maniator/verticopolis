@@ -10,7 +10,7 @@ import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { LOG_RING_CAP } from "../../engine/sim/constants";
 import { coerceLog } from "../../engine/sim/coerce";
 import type { LogEntry } from "../../engine/types";
-import { WASM_PARITY_FLAG, frameCadenceRequested, clearFrameCadence } from "./typescriptOnly";
+import { WASM_PARITY_FLAG, REFRESH_HOOK, frameCadenceRequested, clearFrameCadence, noteHostedTick } from "./typescriptOnly";
 
 /**
  * The setup file of the `integrationWasm` and `unitWasm` vitest projects
@@ -97,6 +97,7 @@ export class WasmParityError extends Error {
 
 if (!hasWasmPackage()) throw new Error("the WASM parity projects need engine-rs/pkg/; run npm run wasm:build");
 (globalThis as Record<string, unknown>)[WASM_PARITY_FLAG] = true;
+(globalThis as Record<string, unknown>)[REFRESH_HOOK] = (sim: Simulation) => { const e = hosted.get(sim); if (!e) return; e.host.syncStructure(); e.revision = sim.tower.revision; e.fingerprint = fingerprint(sim); };
 
 const ENV_SYNC_MODE: "tick" | "hour" = process.env.VC_WASM_SYNC === "hour" ? "hour" : "tick";
 /** The cadence in force: the switch's, or the host's own for a test that
@@ -421,8 +422,8 @@ function compareOrRehost(sim: Simulation, entry: Hosting): Hosting {
     // Between merges the instance is behind the engine, so its save is stale
     // and a restart from it would rewind the engine.
     throw new WasmParityError(
-      `the instance's state departs from the engine's at ${d?.path ?? "?"} after the first tick under the hour cadence, which cannot re-host after a tick (the instance's save is behind the engine between merges): ` +
-        "make the edit before the first tick, or run the test in tick mode",
+      `the instance's state departs from the engine's at ${d?.path ?? "?"} after the first tick under the hour cadence (VC_WASM_SYNC=hour, or atEngineFrameCadence in the test), which cannot re-host after a tick (the instance's save is behind the engine between merges): ` +
+        "make the edit before the first tick, or run the test in tick mode (drop its atEngineFrameCadence call)",
     );
   }
   if (process.env.VC_PARITY_TRACE) {
@@ -442,6 +443,7 @@ function hostedTick(sim: Simulation, dt: number): void {
   entry = compareOrRehost(sim, entry);
   entry.relayTick(dt);
   entry.ticked = true;
+  noteHostedTick();
   parityStats.ticks++;
   if (syncMode() === "tick") {
     entry.host.syncStructure();

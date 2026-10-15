@@ -146,9 +146,11 @@ export class Crowd {
 
   /** @internal Replace the commute-stress EMA with the engine's rows
    *  (`[floor, seconds]`), which the WASM host reads at each merge since no
-   *  save carries them. */
+   *  save carries them. Filled in place, so a reader holding the map sees
+   *  each merge. */
   adoptCommuteStress(rows: readonly (readonly [number, number])[]): void {
-    this.commuteWaitByFloor = new Map(rows.map(([f, w]) => [f, w]));
+    this.commuteWaitByFloor.clear();
+    for (const [f, w] of rows) this.commuteWaitByFloor.set(f, w);
   }
 
   /**

@@ -1,7 +1,7 @@
 import { Simulation } from "../engine/Simulation";
 import type { FrameHeader } from "./frameView";
 import { mergeSimulation } from "./merge";
-import { adoptTelemetry, isTelemetryDocument, type TelemetryDocument } from "./telemetry";
+import { adoptTelemetry, isTelemetryDocument, parseCommuteStress, type TelemetryDocument } from "./telemetry";
 import type { MergePayload } from "./workerProtocol";
 
 /**
@@ -33,11 +33,6 @@ export function parseMerge(m: MergePayload): ParsedMerge {
   return { fresh, telemetry, housekeeping, commute };
 }
 
-/** The engine's `commuteStress()` rows (`[floor, seconds]`), or an error
- *  when the text is not that shape. */
-export function parseCommuteStress(text: string): [number, number][] {
-  return parseArray<[number, number]>(text, "commute stress", (v) => Array.isArray(v) && v.length === 2 && v.every((n) => typeof n === "number" && Number.isFinite(n)));
-}
 
 /** A JSON array from a reply whose every item passes `isItem`, or an error
  *  naming the part. */
