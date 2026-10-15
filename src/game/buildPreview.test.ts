@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { catalogFor } from "../engine/catalog";
 import { Simulation } from "../engine/Simulation";
 import { FACILITIES } from "../engine/facilities";
 import { snapX, brushTiles } from "../ui/placement";
@@ -14,6 +15,8 @@ import {
   clearBuildRefusal,
   touchBuildLiftFloors,
 } from "./buildPreview";
+
+const CAT = catalogFor("classic");
 
 /**
  * Colocated unit tests for the build-preview / placement / pick-resolution
@@ -119,7 +122,7 @@ describe("placeSimpleBuild", () => {
     const tryBuildTransport = vi.fn(() => ({ ok: true, reason: "" }));
     const { app } = makeApp(sim, buildTool("stairs"), { build: { tryBuildTransport } });
     expect(placeSimpleBuild(app, "stairs", 14, 3)).toEqual({ what: "flight", ok: true, reason: "" });
-    expect(tryBuildTransport).toHaveBeenCalledWith("stairs", snapX("stairs", 14), 3, 4);
+    expect(tryBuildTransport).toHaveBeenCalledWith("stairs", snapX(CAT, "stairs", 14), 3, 4);
   });
 
   it("room: reports ok from the tower unit-count delta", () => {
@@ -132,7 +135,7 @@ describe("placeSimpleBuild", () => {
     const out = placeSimpleBuild(app, "office", 21, 2);
     expect(out).toEqual({ what: "room", ok: true });
     expect(sim.tower.units.length).toBe(before0 + 1);
-    expect(tryBuild).toHaveBeenCalledWith("office", 2, snapX("office", 21));
+    expect(tryBuild).toHaveBeenCalledWith("office", 2, snapX(CAT, "office", 21));
   });
 
   it("null: a drag-sized shaft is left to the caller's anchor gesture", () => {
@@ -180,7 +183,7 @@ describe("updateBuildPreview", () => {
   it("fixed-span transport: sets the two-floor transportPreview with real validity, clears preview", () => {
     const { sim } = fixture();
     const { app, raw } = makeApp(sim, buildTool("stairs"));
-    const x = snapX("stairs", 14);
+    const x = snapX(CAT, "stairs", 14);
     const expectedValid = sim.isUnlocked("stairs") && sim.tower.placeTransportDryRun("stairs", x, 3, 4);
     updateBuildPreview(app, 14, 3);
     expect(raw.engine.transportPreview).toEqual({ kind: "stairs", x, bottom: 3, top: 4, valid: expectedValid });
@@ -190,7 +193,7 @@ describe("updateBuildPreview", () => {
   it("drag-sized transport: sets a single-floor preview keyed to unlock, clears transportPreview", () => {
     const { sim } = fixture();
     const { app, raw } = makeApp(sim, buildTool("elevatorStandard"));
-    const x = snapX("elevatorStandard", 14);
+    const x = snapX(CAT, "elevatorStandard", 14);
     updateBuildPreview(app, 14, 2);
     expect(raw.engine.preview).toEqual({ kind: "elevatorStandard", floor: 2, x, valid: sim.isUnlocked("elevatorStandard") });
     expect(raw.engine.transportPreview).toBeNull();
@@ -259,7 +262,7 @@ describe("updateBuildPreview", () => {
   it("room (Classic): a valid cell previews valid with no reason and no refusal card", () => {
     const { sim } = fixture("classic");
     const { app, raw, showInspector } = makeApp(sim, buildTool("office"));
-    const x = snapX("office", 21);
+    const x = snapX(CAT, "office", 21);
     updateBuildPreview(app, 21, 2); // floor-2 strip supports an office here
     expect(raw.engine.preview).toEqual({ kind: "office", floor: 2, x, valid: true, reason: undefined });
     expect(raw.buildRefusalShowing).toBe(false);
@@ -270,7 +273,7 @@ describe("updateBuildPreview", () => {
     const { sim } = fixture("modern");
     const { app, raw, showInspector } = makeApp(sim, buildTool("office"));
     // Floor 6 has no structure, so canBuild refuses and Modern shows why.
-    const can = sim.canBuild("office", 6, snapX("office", 21));
+    const can = sim.canBuild("office", 6, snapX(CAT, "office", 21));
     expect(can.ok).toBe(false);
     updateBuildPreview(app, 21, 6);
     const preview = raw.engine.preview as { valid: boolean; reason?: string };
@@ -278,8 +281,8 @@ describe("updateBuildPreview", () => {
     expect(preview.reason).toBe(can.reason);
     expect(raw.buildRefusalShowing).toBe(true);
     expect(raw.inspectAnchor).toEqual({
-      x: snapX("office", 21) + Math.floor(FACILITIES.office.width / 2),
-      left: snapX("office", 21) + Math.floor(FACILITIES.office.width / 2),
+      x: snapX(CAT, "office", 21) + Math.floor(FACILITIES.office.width / 2),
+      left: snapX(CAT, "office", 21) + Math.floor(FACILITIES.office.width / 2),
       floor: 6,
     });
     expect(showInspector).toHaveBeenCalledWith(expect.anything());

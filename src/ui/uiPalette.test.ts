@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { buildPalette, selectGroup, syncPaletteTabs } from "./uiPalette";
+import { toolInfoFor } from "./templates/toolInfo";
+import { renderToFragment } from "./testing/litTestUtils";
+import { catalogFor } from "../engine/catalog";
+import { buildPalette, relabelPalette, selectGroup, syncPaletteTabs } from "./uiPalette";
 import type { Tool, UI } from "./UI";
 
 /**
@@ -14,7 +17,7 @@ function stubUI(): { ui: UI; palette: HTMLElement; tabs: HTMLElement; selectTool
   const palette = document.createElement("div");
   const tabs = document.createElement("div");
   const selectTool = vi.fn();
-  const ui = { el: { palette, paletteTabs: tabs }, selectTool } as unknown as UI;
+  const ui = { el: { palette, paletteTabs: tabs }, selectTool, cb: { getCatalog: () => catalogFor("classic") } } as unknown as UI;
   return { ui, palette, tabs, selectTool };
 }
 
@@ -48,6 +51,20 @@ describe("buildPalette", () => {
     expect(office.querySelector<HTMLElement>(".pal-swatch")!.getAttribute("style")).toContain("background:");
     expect(office.querySelector(".pal-cost")?.textContent?.startsWith("$")).toBe(true);
     expect(office.getAttribute("aria-label")).toContain("$");
+  });
+
+  it("reads names and prices from the tower's catalog (#921)", () => {
+    const { ui, palette } = stubUI();
+    const base = catalogFor("classic");
+    const marked = { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, name: "Corner Suite", cost: 77_000 } : f)) };
+    (ui as unknown as { cb: { getCatalog: () => typeof marked } }).cb.getCatalog = () => marked;
+    buildPalette(ui);
+    const office = palette.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
+    expect(office.querySelector(".pal-name")?.textContent).toBe("Corner Suite");
+    expect(office.querySelector(".pal-cost")?.textContent).toBe("$77k");
+    const card = renderToFragment(toolInfoFor(marked, "office")).textContent ?? "";
+    expect(card).toContain("Corner Suite");
+    expect(card).toContain("Cost: $77,000");
   });
 
   it("activates a facility build item on click and on Enter, dispatching selectTool", () => {
@@ -155,5 +172,42 @@ describe("category tabs", () => {
     const selected = tabs.querySelector<HTMLElement>('.pal-tab[aria-selected="true"]')!;
     expect(selected.hidden).toBe(false);
     expect(selected.getAttribute("data-group")).not.toBe("Leisure");
+  });
+});
+
+describe("relabelPalette (#921)", () => {
+  it("keeps the buttons when the layout is the same, and rebuilds them when it differs", () => {
+    const { ui, palette, tabs } = stubUI();
+    const base = catalogFor("classic");
+    (ui as unknown as { tool: Tool; paletteScanKey: string | null }).tool = { type: "build", kind: "office" };
+    (ui as unknown as { paletteScanKey: string | null }).paletteScanKey = "scanned";
+    buildPalette(ui);
+    selectGroup(ui, "Commercial");
+    const office = palette.querySelector('.pal-item[data-kind="office"]');
+    // Same layout, new prices: the same nodes are relabeled.
+    relabelPalette(ui, { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, cost: 12_345 } : f)) });
+    expect(palette.querySelector('.pal-item[data-kind="office"]')).toBe(office);
+    expect(office?.querySelector(".pal-cost")?.textContent).toContain("12");
+    expect((ui as unknown as { paletteScanKey: string | null }).paletteScanKey).toBe("scanned");
+    // A catalog that moves the office to another group lays the palette out
+    // differently: the buttons are rebuilt, the open tab and the active tool
+    // survive, and the lock scan is asked to run again.
+    const moved = { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, category: "service" as const } : f)) };
+    // Onboarding has pulsed the office, and the keyboard sits on it.
+    document.body.appendChild(palette);
+    office!.classList.add("tt-pulse");
+    (office as HTMLElement).focus();
+    relabelPalette(ui, moved);
+    const rebuilt = palette.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
+    expect(rebuilt).not.toBe(office);
+    expect(rebuilt.dataset.group).toBe("Services");
+    expect(rebuilt.classList.contains("active")).toBe(true);
+    expect(palette.querySelectorAll('.pal-item[data-kind="office"]')).toHaveLength(1);
+    expect(tabs.querySelector('.pal-tab[aria-selected="true"]')?.getAttribute("data-group")).toBe("Commercial");
+    expect((ui as unknown as { paletteScanKey: string | null }).paletteScanKey).toBeNull();
+    expect(ui.paletteCatalog).toBe(moved);
+    expect(rebuilt.classList.contains("tt-pulse")).toBe(true);
+    expect(document.activeElement).toBe(rebuilt);
+    palette.remove();
   });
 });

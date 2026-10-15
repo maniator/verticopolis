@@ -1,5 +1,5 @@
 import type { FacilityKind, Unit } from "../../engine/types";
-import { GRID } from "../../engine/facilities";
+import { viewWorld } from "../../presentation/viewWorld";
 
 /**
  * Shared primitives for the dollhouse room art: the signature palette, the
@@ -101,7 +101,7 @@ export function hash(seed: number): number {
  *  inheriting correlated picks. */
 export function geoVariant(u: Pick<Unit, "kind" | "floor" | "x">, axis: number, n: number): number {
   const kindSalt = (u.kind.length * 7919 + u.kind.charCodeAt(0) * 31) | 0;
-  return Math.floor(hash(kindSalt + (u.floor - GRID.minFloor) * GRID.width + u.x + axis * 104729) * n);
+  return Math.floor(hash(kindSalt + (u.floor - viewWorld().minFloor) * viewWorld().lotWidth + u.x + axis * 104729) * n);
 }
 
 /** Run `draw` mirrored horizontally inside the room rect when `flip` is set:
@@ -158,7 +158,7 @@ export function person(ctx: CanvasRenderingContext2D, x: number, footY: number, 
 export type PersonBuild = "seated" | "standing" | "walker" | "rider" | "hiVis";
 export type Mood = "content" | "impatient" | "fedUp";
 
-interface BuildSpec {
+export interface BuildSpec {
   head: number;
   torso: number;
   legs: number;
@@ -168,7 +168,7 @@ interface BuildSpec {
 
 /** Finalized geometry per build (owner-approved). Totals: seated 15, standing
  *  18, walker 24, rider 17, hi-vis 22 pixels tall. */
-const BUILDS: Record<PersonBuild, BuildSpec> = {
+export const BUILDS: Record<PersonBuild, BuildSpec> = {
   seated: { head: 5, torso: 10, legs: 0, width: 6 },
   standing: { head: 5, torso: 9, legs: 4, width: 6 },
   walker: { head: 5, torso: 13, legs: 6, width: 7 },

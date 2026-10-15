@@ -7,6 +7,7 @@ import { isOperational, isPresent } from "../types";
 
 import { HeatmapMode, congestionSeverity, HeatCell } from "./constants";
 import { emptyOriginRings, foldOrigins } from "../scheduleOrigins";
+import { roomUnits } from "../tower/rooms";
 
 /** Congestion, heatmap, elevator utilization for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -160,7 +161,7 @@ function buildSpatialCongestion(sim: Simulation): {
 
   const popByFloor = new Map<number, number>();
   let metro = 0;
-  for (const u of sim.tower.units) {
+  for (const u of roomUnits(sim.tower)) {
     if (u.kind === "metro" && isOperational(u)) metro++;
     if (isPresent(u)) {
       // censusCount, not residentCount: a commercial venue stresses its floor

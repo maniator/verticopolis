@@ -33,14 +33,14 @@ describe("gameplay analytics events", () => {
     setVisibility("visible");
   });
 
-  it("reports game_started, star_reached with their props on a deployed host", () => {
+  it("reports new_game_started, star_reached with their props on a deployed host", () => {
     gameplaySession.noteNewGame("modern");
     gameplaySession.noteStar(3);
-    expect(sendToRelay).toHaveBeenNthCalledWith(1, "game_started", { mode: "modern" });
+    expect(sendToRelay).toHaveBeenNthCalledWith(1, "new_game_started", { mode: "modern" });
     expect(sendToRelay).toHaveBeenNthCalledWith(2, "star_reached", { star: 3 });
   });
 
-  it("fires no event on a non-deployed host (localhost, e2e preview, native shell)", () => {
+  it("fires no event on a non-deployed host (localhost, e2e preview)", () => {
     window.location.href = localhost;
     gameplaySession.noteNewGame("classic");
     gameplaySession.noteBuild("floor");
@@ -111,7 +111,7 @@ describe("gameplay analytics events", () => {
     gameplaySession.noteNewGame("modern"); // founding tower B resets the latch
     gameplaySession.noteBuild("office"); // first build of tower B fires again
     expect(sendToRelay).toHaveBeenNthCalledWith(1, "first_build", { tool: "floor" });
-    expect(sendToRelay).toHaveBeenNthCalledWith(2, "game_started", { mode: "modern" });
+    expect(sendToRelay).toHaveBeenNthCalledWith(2, "new_game_started", { mode: "modern" });
     expect(sendToRelay).toHaveBeenNthCalledWith(3, "first_build", { tool: "office" });
   });
 
@@ -159,7 +159,7 @@ describe("common event enrichment (S4)", () => {
     setCommonProps({ platform: "twa", returning: true, tenure: "d7-29", recency: "7d" });
     gameplaySession.noteNewGame("modern");
     gameplaySession.noteStar(3);
-    expect(sendToRelay).toHaveBeenNthCalledWith(1, "game_started", {
+    expect(sendToRelay).toHaveBeenNthCalledWith(1, "new_game_started", {
       platform: "twa",
       returning: true,
       tenure: "d7-29",
@@ -180,11 +180,11 @@ describe("common event enrichment (S4)", () => {
     // props are spread last.
     setCommonProps({ mode: "should-be-overridden" });
     gameplaySession.noteNewGame("classic");
-    expect(sendToRelay).toHaveBeenCalledWith("game_started", { mode: "classic" });
+    expect(sendToRelay).toHaveBeenCalledWith("new_game_started", { mode: "classic" });
   });
 
   it("clears the common props on reset, so a later event carries none", () => {
-    setCommonProps({ platform: "ios" });
+    setCommonProps({ platform: "twa" });
     gameplaySession.reset();
     gameplaySession.noteStar(2);
     expect(sendToRelay).toHaveBeenCalledWith("star_reached", { star: 2 });
@@ -212,7 +212,7 @@ describe("gameplay session length", () => {
     gameplaySession.end();
     gameplaySession.end(); // a second signal must not double-count
     expect(sendToRelay).toHaveBeenCalledTimes(1);
-    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 5 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 5, final: false });
   });
 
   it("does not report a session that never began", () => {
@@ -229,8 +229,8 @@ describe("gameplay session length", () => {
     gameplaySession.begin(); // resumed after 7s hidden (not counted)
     vi.setSystemTime(12000);
     gameplaySession.end(); // hidden again: 3s + 2s foreground
-    expect(sendToRelay).toHaveBeenNthCalledWith(1, "session_end", { seconds: 3 });
-    expect(sendToRelay).toHaveBeenNthCalledWith(2, "session_end", { seconds: 5 });
+    expect(sendToRelay).toHaveBeenNthCalledWith(1, "session_end", { seconds: 3, final: false });
+    expect(sendToRelay).toHaveBeenNthCalledWith(2, "session_end", { seconds: 5, final: false });
   });
 
   it("begin is idempotent so the clock is not reset mid-session", () => {
@@ -240,7 +240,7 @@ describe("gameplay session length", () => {
     gameplaySession.begin(); // ignored: the session already started at 0
     vi.setSystemTime(8000);
     gameplaySession.end();
-    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 8 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 8, final: false });
   });
 
   it("emits build volume, peak floor, and per-tool depth at session end", () => {
@@ -261,7 +261,7 @@ describe("gameplay session length", () => {
     gameplaySession.begin();
     vi.setSystemTime(3000);
     gameplaySession.end();
-    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 3 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 3, final: false });
     expect(sendToRelay).not.toHaveBeenCalledWith("session_builds", expect.anything());
     expect(sendToRelay).not.toHaveBeenCalledWith("tool_session_uses", expect.anything());
   });
@@ -335,7 +335,7 @@ describe("startGameplaySession wiring", () => {
     vi.setSystemTime(3000);
     setVisibility("hidden");
     document.dispatchEvent(new Event("visibilitychange"));
-    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 3 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 3, final: false });
   });
 
   it("does not count time before the page first becomes visible", () => {
@@ -349,7 +349,7 @@ describe("startGameplaySession wiring", () => {
     vi.setSystemTime(8000);
     setVisibility("hidden"); // leaves at 8s: only 3s of foreground play
     document.dispatchEvent(new Event("visibilitychange"));
-    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 3 });
+    expect(sendToRelay).toHaveBeenCalledWith("session_end", { seconds: 3, final: false });
   });
 
   it("ignores a visibilitychange that is not to hidden", () => {
@@ -368,11 +368,11 @@ describe("startGameplaySession wiring", () => {
  * events someone happened to remember.
  */
 const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
-  game_started: { mode: "modern" },
+  new_game_started: { mode: "modern" },
   first_build: { tool: "office" },
   tool_used: { tool: "lobby" },
   star_reached: { star: 3 },
-  session_end: { seconds: 42 },
+  session_end: { seconds: 42, final: true },
   boot: { reason: "continue", version: "1.0.0", mode: "modern", star: 2, floors: 10, population: 90 },
   crash: {
     kind: "webgl-context-lost",
@@ -397,7 +397,7 @@ const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
 
 describe("the platform and distribution-channel dimensions ride every event", () => {
   // The common props are MODULE state, so a suite that installs a boot set and
-  // walks away stamps `platform: "desktop"` on every event of every describe
+  // walks away stamps `platform: "twa"` on every event of every describe
   // added below this one. Captured and restored rather than cleared, so this
   // block stays honest about what it found even if the file grows a suite above
   // it that installs its own set.
@@ -418,13 +418,12 @@ describe("the platform and distribution-channel dimensions ride every event", ()
   it("stamps both dimensions on every event in the vocabulary", () => {
     // Assembled through the real bootCommonProps rather than a hand-written
     // literal, so dropping the channel from the assembled set fails here too,
-    // not only in the enrichment suite. A desktop/steam session is the case
-    // worth naming: it is the one where the two dimensions differ, so neither
-    // can be inferred from the other downstream.
+    // not only in the enrichment suite. A TWA session is the case worth naming:
+    // it is the one that differs from the default.
     setCommonProps(
       bootCommonProps({
-        platform: "desktop",
-        distributionChannel: "steam",
+        platform: "twa",
+        distributionChannel: "twa",
         version: "9.9.9",
         onboarded: true,
         tenureDay: 3,
@@ -442,8 +441,8 @@ describe("the platform and distribution-channel dimensions ride every event", ()
     for (const [i, name] of names.entries()) {
       const [sentName, props] = vi.mocked(sendToRelay).mock.calls[i];
       expect(sentName).toBe(name);
-      expect(props.platform, `${name} lost the platform dimension`).toBe("desktop");
-      expect(props.distribution_channel, `${name} lost the distribution-channel dimension`).toBe("steam");
+      expect(props.platform, `${name} lost the platform dimension`).toBe("twa");
+      expect(props.distribution_channel, `${name} lost the distribution-channel dimension`).toBe("twa");
     }
   });
 });
@@ -452,7 +451,7 @@ describe("no suite leaves its common props installed", () => {
   // A tripwire, deliberately last in the file. The common props are module
   // state that every event in every later suite would inherit, and the leak is
   // invisible while the suite that installs them happens to be the last one:
-  // the next describe someone appends silently gets `platform: "desktop"` on
+  // the next describe someone appends silently gets `platform: "twa"` on
   // every event and no failure says why. This fails the moment a suite above
   // stops restoring what it found.
   it("leaves the module-level common props empty for whatever runs next", () => {

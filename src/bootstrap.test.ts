@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { hasWebGL, showBootMessage, bootGame, hideBootCover } from "./bootstrap";
+import { hasWebGL, showBootMessage, bootGame, hideBootCover, showEngineFailure } from "./bootstrap";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import { inject as injectWebAnalytics } from "@vercel/analytics";
 
@@ -9,6 +9,25 @@ vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 // Mock `virtual:pwa-register` (Vite virtual module via bootstrap.ts/pwa.ts) so the import resolves on Windows too (as pwa.test.ts does).
 vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
+// The WASM engine switch: the request and the package load are stubbed so the
+// fallback (package fails to load, the game boots on the TypeScript engine)
+// can be asserted without a package.
+const wasmStub = vi.hoisted(() => ({ requested: "ts" as "ts" | "wasm", loadError: null as Error | null, module: null as unknown }));
+vi.mock("./wasmhost/engineChoice", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./wasmhost/engineChoice")>();
+  return { ...real, engineRequested: () => wasmStub.requested };
+});
+vi.mock("./wasmhost/startWasmHost", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./wasmhost/startWasmHost")>();
+  return {
+    ...real,
+    loadWasmEngine: vi.fn(async () => {
+      if (wasmStub.module) return wasmStub.module;
+      throw wasmStub.loadError ?? new Error("no package in this test");
+    }),
+    startWasmHost: vi.fn(() => ({ status: { engine: "wasm", starts: 1, hosted: true, errors: [] }, current: () => null, stop: () => {} })),
+  };
+});
 
 /** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */
 function stubWebGL(): void {
@@ -162,6 +181,65 @@ describe("showBootMessage", () => {
   });
 });
 
+describe("showEngineFailure", () => {
+  beforeEach(() => {
+    document.body.innerHTML = `<div id="stage"></div>`;
+  });
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("stops the game with the stage, the reason, the steps to try and a Reload button", () => {
+    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "load", message: "CompileError: <b>bad</b>" } }, false);
+    const box = document.getElementById("engine-failure")!;
+    expect(box.dataset.stage).toBe("load");
+    expect(box.textContent).toContain("could not start");
+    // The reason is text, never markup.
+    expect(box.textContent).toContain("Reason: CompileError: <b>bad</b>");
+    expect(box.querySelector("b b")).toBeNull();
+    expect([...box.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
+      expect.stringMatching(/^Reload the page/),
+      expect.stringMatching(/^You appear to be offline/),
+      expect.stringMatching(/^If it keeps happening/),
+    ]);
+    expect(document.querySelector("#boot-fallback button")?.textContent).toBe("Reload");
+    // The stop announces itself to assistive technology.
+    expect(box.getAttribute("role")).toBe("alert");
+    expect(box.getAttribute("aria-live")).toBe("assertive");
+  });
+
+  it("leaves only the message reachable: everything behind it goes inert and focus moves to Reload", async () => {
+    document.body.innerHTML = `<div id="stage"><button id="quick-save">Quick Save</button></div><div id="splash"></div>`;
+    const button = document.getElementById("quick-save") as HTMLButtonElement;
+    button.focus();
+    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "host", message: "x" } });
+    expect((document.getElementById("stage") as HTMLElement).inert).toBe(true);
+    expect((document.getElementById("splash") as HTMLElement).inert).toBe(true);
+    expect((document.getElementById("boot-fallback-host") as HTMLElement).inert).toBeFalsy();
+    expect(document.activeElement).not.toBe(button);
+    // Focus lands on Reload, the one control left.
+    expect(document.activeElement).toBe(document.querySelector("#boot-fallback button"));
+    // A surface mounted after the stop goes inert too.
+    const late = document.createElement("div");
+    document.body.appendChild(late);
+    await Promise.resolve();
+    expect(late.inert).toBe(true);
+  });
+
+  it("closes an open modal dialog, which would otherwise cover the Reload button", () => {
+    document.body.innerHTML = `<div id="stage"></div><dialog id="modal"></dialog>`;
+    const dialog = document.getElementById("modal") as HTMLDialogElement;
+    dialog.showModal();
+    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "host", message: "x" } });
+    expect(dialog.open).toBe(false);
+  });
+
+  it("does nothing for a boot that has no failure", () => {
+    showEngineFailure({ build: "wasm-only", engine: "wasm", failure: null });
+    expect(document.getElementById("boot-fallback-host")).toBeNull();
+  });
+});
+
 describe("hideBootCover", () => {
   afterEach(() => {
     document.body.innerHTML = "";
@@ -253,9 +331,9 @@ describe("bootGame", () => {
       throw new Error("kaboom");
     });
 
-    // REJECTS rather than throwing synchronously. Boot became async so a
-    // wrapper shell's save store can resolve before the game constructs, which
-    // moves the rethrow from `error` to `unhandledrejection`; both are bound by
+    // REJECTS rather than throwing synchronously. Boot is async (the WASM
+    // engine can load before the game constructs), which moves the rethrow
+    // from `error` to `unhandledrejection`; both are bound by
     // `installErrorTracking`, which runs as boot's first statement, so the
     // failure is still reported. `bootGame` returns the promise specifically so
     // that is observable here instead of floating.

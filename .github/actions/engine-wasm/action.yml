@@ -1,0 +1,92 @@
+name: Engine WASM package
+description: >-
+  Put the Rust engine's WASM package (src/public/engine/ and engine-rs/pkg/)
+  in the workspace. The package is build output and is not checked in. It is
+  restored from the Actions cache, keyed on the hash of the Rust sources it is
+  built from, and built (then cached) on a miss, so an engine change is
+  compiled once and every later job and workflow reuses it. With
+  artifact-name set, the browser package (src/public/engine/ only) is also
+  uploaded as a run artifact for the jobs in a container (the pinned
+  Playwright image has no Rust toolchain or C linker), which download it with
+  .github/actions/engine-wasm-download. The Node package (engine-rs/pkg/)
+  stays out of the artifact: with it present, npm test would also run the
+  WASM suites engine-rs.yml owns.
+  Needs a checkout and Node (the .nvmrc version) set up first, and a runner
+  with a C linker (ubuntu-latest).
+
+inputs:
+  artifact-name:
+    description: The run artifact to upload the package as; empty uploads nothing.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # The key covers everything the package is built from: the whole crate
+    # (Cargo.toml carries the rust-version and wasm-bindgen pins), the event
+    # catalog and every file the sources include (engineSourceHash, the same
+    # hash BUILD.json records; see its comment for what it does not model),
+    # plus the scripts that build it and write its third-party record (#955)
+    # with every module they import (the package's file list and the event
+    # catalog renderer among them, so a change to what the build checks
+    # rebuilds instead of restoring a package the old checks passed), the
+    # npm script that runs them and this action (a change to what it
+    # caches).
+    - id: key
+      shell: bash
+      run: |
+        src=$(node --input-type=module -e 'import { engineSourceHash } from "./src/wasmhost/packageHash.ts"; process.stdout.write(engineSourceHash("engine-rs"))')
+        scripts=$({ cat scripts/wasm-build.ts scripts/engine-third-party.ts scripts/license-files.ts src/build/thirdPartyNotices.ts src/build/rustNotices.ts src/wasmhost/packageHash.ts src/wasmhost/engineAssets.ts src/wasmhost/enginePackageNames.ts src/engine/gameplayCatalog.ts scripts/build-engine-wasm.sh .github/actions/engine-wasm/action.yml; node -p 'require("./package.json").scripts["wasm:build"]'; } | sha256sum | cut -c1-16)
+        echo "sources=$src" >> "$GITHUB_OUTPUT"
+        echo "key=engine-wasm-v1-$src-$scripts" >> "$GITHUB_OUTPUT"
+
+    - id: cache
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: |
+          src/public/engine
+          engine-rs/pkg
+        key: ${{ steps.key.outputs.key }}
+
+    - name: Build the package (cache miss)
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: bash scripts/build-engine-wasm.sh
+
+    # A package built from other sources must never be cached or served under
+    # this key.
+    - name: Check the package matches the sources
+      shell: bash
+      env:
+        SOURCES: ${{ steps.key.outputs.sources }}
+      run: |
+        built=$(node -p 'require("./src/public/engine/BUILD.json").sources')
+        if [ "$built" != "$SOURCES" ]; then
+          echo "::error::src/public/engine/BUILD.json names sources $built, but the tree's Rust sources hash to $SOURCES"
+          exit 1
+        fi
+        for f in src/public/engine/verticopolis_engine.js src/public/engine/verticopolis_engine_bg.wasm src/public/engine/THIRD-PARTY.json engine-rs/pkg/verticopolis_engine.js engine-rs/pkg/verticopolis_engine_bg.wasm engine-rs/pkg/package.json; do
+          test -f "$f" || { echo "::error::$f is missing from the engine package"; exit 1; }
+        done
+
+    - name: Cache the package
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: |
+          src/public/engine
+          engine-rs/pkg
+        key: ${{ steps.key.outputs.key }}
+
+    - name: Upload the package for this run's container jobs
+      if: inputs.artifact-name != ''
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: src/public/engine/
+        if-no-files-found: error
+        # A re-run of the uploading job replaces the artifact instead of
+        # failing on the name; a week covers re-running a downstream job alone.
+        overwrite: true
+        retention-days: 7

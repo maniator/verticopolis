@@ -1,6 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES, GRID, TOWER_POPULATION } from "../../engine/facilities";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
+
+/** The parity projects skip these (story-engine-test-parity, #878). */
+const V1_MODEL = "sets simModel = \"v1\", the sampled model the engine never ported and the save does not carry";
 
 /**
  * End-to-end "can you actually win?" tests covering the original SimTower
@@ -58,7 +62,7 @@ describe("Gameplay parity: rating progression & the TOWER win", () => {
     expect(sim.star).toBe(3); // Security unlocks 3★ at this population
   });
 
-  it("reaches the TOWER rating via population, Wedding Hall, metro and the VIP", () => {
+  itTypeScriptOnly(V1_MODEL)("reaches the TOWER rating via population, Wedding Hall, metro and the VIP", () => {
     // Enough office floors for the population, with structure up to floor 100.
     const officeTop = 1 + Math.ceil(TOWER_POPULATION / (perFloor * FACILITIES.office.population));
     const { sim, topFloor } = buildTower(officeTop, GRID.maxFloor);

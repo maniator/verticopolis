@@ -14,6 +14,12 @@ name: Update visual baselines
 # The bot pushes with GITHUB_TOKEN, which never triggers workflows, so the
 # baseline commit itself gets no CI run, push (or rebase) once more after
 # pulling it to get a green check on the final head.
+#
+# After the mint, the `engine-parity` job runs the same visual tests with the
+# WASM engine hosting the tower (the chromium-wasm project with
+# PW_WASM_VISUAL=1) against the baselines the mint left on the branch tip, and
+# fails on any pixel difference, naming each differing shot. It never mints or
+# commits: the baselines stay the TypeScript engine's until the 3.0.0 flip.
 
 on:
   push:
@@ -49,7 +55,7 @@ jobs:
     outputs:
       image: ${{ steps.pin.outputs.image }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - id: pin
@@ -57,8 +63,31 @@ jobs:
           ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
           echo "image=mcr.microsoft.com/playwright:v${ver}-jammy" >> "$GITHUB_OUTPUT"
 
+  # The Rust engine's WASM package is build output, not checked in. Restore it
+  # from the Actions cache (or build and cache it) for the branch tip the jobs
+  # below check out, and hand it to them: their container has no Rust toolchain.
+  engine-wasm:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[update-baselines]')
+    runs-on: ubuntu-latest
+    # A cache miss compiles the crate (a few minutes); anything near this is a hang.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - uses: ./.github/actions/engine-wasm
+        with:
+          artifact-name: engine-wasm
+
   update:
-    needs: resolve-image
+    needs: [resolve-image, engine-wasm]
     runs-on: ubuntu-latest
     # Earns write: it pushes the refreshed baselines. The write token is only
     # ever exposed to the credentialed push step below, never to the steps
@@ -75,12 +104,15 @@ jobs:
       # this run is queued behind the sibling screenshots run, the tip already has
       # that run's commit, so the push here fast-forwards. Full history (depth 0)
       # also lets the rebase-retry below reconcile cleanly if anything did land.
-      # persist-credentials: false keeps the token out of .git/config: this job
-      # runs whatever the branch contains (npm ci, the build, Playwright), and a
-      # malicious dependency postinstall must not be able to read a write token
-      # off disk. Same pattern screenshot-capture.yml documents; the push step
-      # below authenticates explicitly instead.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # persist-credentials: false keeps the token off disk: this job runs
+      # whatever the branch contains (npm ci, the build, Playwright), and a
+      # malicious dependency postinstall must not be able to read a write
+      # token. checkout v6 and later keep a persisted token in a RUNNER_TEMP
+      # credentials file referenced by includeIf.gitdir rather than inline in
+      # .git/config, so an audit should read that file, not the config. Same pattern
+      # screenshot-capture.yml documents; the push step below authenticates
+      # explicitly instead.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
@@ -94,12 +126,16 @@ jobs:
       # The image ships Node 20; install the repo's pinned Node over it (keeping
       # the image's browsers).
       - name: Use Node.js (from .nvmrc)
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
 
       - name: Install dependencies
         run: npm ci
+
+      - uses: ./.github/actions/engine-wasm-download
+        with:
+          artifact-name: engine-wasm
 
       # A tooling build: the visual specs drive the app through `window.game`,
       # which only VC_TOOLING=1 builds publish (production builds compile it
@@ -159,3 +195,78 @@ jobs:
           done
           echo "could not push refreshed baselines after retries" >&2
           exit 1
+
+  # The engine leg. A separate job rather than a matrix entry on `update` so it
+  # holds a read-only token: it only compares, never pushes.
+  engine-parity:
+    needs: [resolve-image, engine-wasm, update]
+    # Compare even when the mint failed (against the tip as it stands), so the
+    # engine result is never silently skipped on a mint run.
+    if: ${{ !cancelled() && needs.resolve-image.result == 'success' && needs.engine-wasm.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: ${{ needs.resolve-image.outputs.image }}
+    steps:
+      # The branch tip after the mint job, so the comparison reads the
+      # baselines that job just pushed (or the unchanged ones).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: ./.github/actions/engine-wasm-download
+        with:
+          artifact-name: engine-wasm
+
+      - name: Build
+        run: npm run build
+        env:
+          VC_TOOLING: "1"
+
+      # PW_WASM_VISUAL makes playwright.config.ts compare pixels (on CI or off)
+      # and turns snapshot writing off.
+      - name: Compare the WASM engine's render with the committed baselines
+        run: npx playwright test e2e/visual.spec.ts --project=chromium-wasm
+        env:
+          PW_WASM_VISUAL: "1"
+
+      - name: Name the first differing shot
+        if: failure()
+        env:
+          MINT: ${{ needs.update.result }}
+        run: |
+          if [ "$MINT" != "success" ]; then
+            echo "::error::the mint did not succeed ($MINT), so these differences are against the old baselines and may be the TypeScript render's own change; re-run after a successful mint."
+            exit 0
+          fi
+          # Pixel failures leave a *-diff.png in their result folder, and a spec
+          # with no committed baseline leaves only an *-actual.png; anything else
+          # (a hosting guard, a timeout) failed before it compared.
+          diff="$(find test-results -name '*-diff.png' 2>/dev/null | sort | head -1)"
+          actual="$(find test-results -name '*-actual.png' 2>/dev/null | sort | head -1)"
+          if [ -n "$diff" ]; then
+            echo "::error::engine parity: the first shot that differs on the WASM engine is $(basename "$diff" -diff.png) ($(basename "$(dirname "$diff")")); compared with the baselines this run just minted; report it as a parity finding"
+          elif [ -n "$actual" ]; then
+            echo "::error::no baseline for $(basename "$actual" -actual.png) even after this run's mint; the TypeScript project skipped the spec or its snapshot path differs"
+          else
+            echo "::error::a visual spec failed on the WASM engine without a pixel diff (setup, hosting, or a timeout): $(ls test-results 2>/dev/null | head -1)"
+          fi
+          exit 0
+
+      - name: Upload the engine's visual diffs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-visual-engine-diffs
+          path: test-results/
+          if-no-files-found: ignore

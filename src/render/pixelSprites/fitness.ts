@@ -1,6 +1,7 @@
 import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
 import { castShadow, hash, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
+import { layerBreak } from "./layers";
 
 /**
  * Modern Fitness Club art: a members' gym in one of five formats (a weight
@@ -155,6 +156,7 @@ export function fitnessClub(d: RoomCtx, u: Unit, x: number, y: number, w: number
   const look = (u.subtype !== undefined && FITNESS_LOOKS[u.subtype]) || FITNESS_DEFAULT;
   const floorY = shell(ctx, x, y, w, h, look.wall, look.floor);
   const top = mirrorStrip(ctx, x, y, w, look.wall, look.accent, d.lit);
+  layerBreak(ctx); // the shell ends; the equipment and members follow
   const occ = visibleOccupants(u);
   const seed = figureSeed(u);
   switch (look.format) {

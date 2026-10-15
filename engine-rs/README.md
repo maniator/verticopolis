@@ -1,0 +1,332 @@
+# Verticopolis engine in Rust
+
+`engine-rs/` is a port of the simulation in `src/engine/` to Rust. It exists
+so the same game can run under hosts the TypeScript engine cannot reach (a
+native desktop client, a WASM module) while staying one simulation.
+
+Frontends may differ. Simulations may not. The referee for that rule is the
+conformance suite in `../conformance/`: the port replays every scenario and
+must reproduce every pinned checkpoint hash (`expected.json`) byte for byte.
+
+## Layout
+
+| Rust | TypeScript original |
+| --- | --- |
+| `rng.rs`, `jsmath.rs`, `canonical.rs` | `rng.ts`, JavaScript number semantics, the conformance hash |
+| `clock.rs`, `rules.rs`, `facilities.rs`, `econ.rs` | `Clock.ts`, `calendar.ts`, `ruleSets.ts`, `gameRules.ts`, `facilitiesData.ts`, `facilities.ts`, `facilityCaps.ts`, `facilityPredicates.ts`, `residentialRentals.ts`, `retailSubtypes.ts`, `tower/towerTopology.ts`, `econConfig.ts`, `pricing.ts`, `sim/constants.ts` |
+| `tower.rs`, `tower_query.rs`, `schedule.rs` | `Tower.ts`, `tower/*.ts`, `census.ts`, `elevatorSchedule.ts` |
+| `build.rs`, `rent.rs`, `charges.rs` (`charges_tests.rs`) | `sim/build.ts`, `sim/rent.ts`, `sim/charges.ts` (`sim/charges.test.ts`) |
+| `dispatch.rs` | `ElevatorDispatch.ts` |
+| `crowd/` | `Crowd.ts`, `crowd/*.ts` |
+| `sim_loop.rs`, `presence.rs`, `satisfaction.rs`, `demand.rs`, `churn.rs`, `star.rs`, `services.rs` | `sim/loop.ts`, `sim/presence.ts`, `sim/congestion.ts`, `sim/satisfaction*.ts`, `sim/gripe.ts`, `sim/demand.ts`, `sim/churn.ts`, `households.ts`, `sim/star.ts`, `milestones.ts`, `sim/services.ts`, `sim/events.ts` |
+| `economy.rs`, `housekeeping.rs`, `ledger.rs`, `events.rs` | `EconomySystem.ts`, `economy/*.ts`, `Ledger.ts`, `EventSystem.ts` |
+| `sim.rs`, `load.rs` | `Simulation.ts`, `sim/stats.ts` (`recordMoney`, `emit`), `sim/serialization.ts`, `sim/coerce.ts`, `sim/deserializeGuards.ts`, `sim/founderStatus.ts`, `saveMigration.ts`, `migrations/*.ts`, `storage/vctowerContainer.ts`, the `.vctower` framing and `stamp` of `storage/SaveGame.ts` |
+| `scenario.rs`, `bin/conformance.rs`, `bin/dump.rs` | `src/tests/conformance/scenario.ts` |
+| `tdt/` (`byte_reader.rs`, `byte_writer.rs`, `format.rs`, `types.rs`, `tables.rs`, `parse.rs`, `part_merge.rs`, `transports.rs`, `tail.rs`, `stamp.rs`, `pacing.rs`, `import.rs`, `import_report.rs`, `export_tables.rs`, `export_gather.rs`, `export_parking.rs`, `encoder.rs`, `export.rs`, `export_report.rs`), `tdt/referee.rs`, `bin/tdt.rs` | `src/storage/tdt*.ts` (the 1994 `.TDT` importer and exporter; `timePacing.ts` for the frame clock), `src/tests/integration/tdtCases.integration.test.ts` |
+| `catalog.rs` | `catalog.ts`: the reference data a frontend reads (see The catalog) |
+| `frame.rs`, `snapshot.rs` | `src/wasmhost/frameView.ts` decodes the frame; `src/engine/conformanceView.ts` (`stateView`): the per-frame read model and the hashed snapshot a host reads, with or without the binding |
+| `wasm.rs` (feature `wasm`) | the JavaScript binding; `src/tests/conformance/wasmEngine.ts`, `src/dualrun/` and the `.TDT` differential test (`src/tests/conformance/tdtDifferential.ts`, inputs from `src/tests/fixtures/tdtDifferentialInputs.ts`) and the `.vctower` writer test (`src/tests/integration/conformanceWasmVctower.integration.test.ts`) drive it |
+
+Functions keep the names and shape of their TypeScript originals so the two
+can be read side by side. Where JavaScript semantics matter for the hash
+(`Math.round`, `Number#toString`, Mulberry32 on wrapping 32-bit integers,
+insertion-ordered maps and sets) the Rust spells them out rather than
+reaching for the nearest standard-library call.
+
+Player-facing prose (log text, event messages) is not part of the conformance
+contract and is not word for word identical yet. Host plumbing and UI-only
+readouts the hashed state never reads (`scheduleOrigins.ts`,
+`scheduleAuthoring.ts`, `traffic.ts`, `sim/fixedStep.ts`, `timePacing.ts`,
+`UndoHistory.ts`, `SimContext.ts`, the rest of `sim/stats.ts`) are not ported.
+
+## Using it from another frontend
+
+[`API.md`](API.md) is the page for a host that is not the web game: how to
+depend on the crate, the calls a frontend makes, and what is stable.
+`consumer/` is a small crate that depends on the engine by path and makes
+those calls; CI builds and runs a copy of it outside the checkout, in the
+Rust container image with no Node.js and a checkout holding only
+`engine-rs/` and `conformance/` (`engine-rs.yml`, job `consumer`), and
+`tests/independence.rs` checks that the library source (the conformance
+harness aside, which is behind the `conformance` feature) reaches for no
+file, clock, console, network, thread or process access, compiles in
+nothing from the web game's tree, and pulls in no unreviewed crate.
+`tests/read_boundary.rs` keeps the tests and binaries reading only
+`engine-rs/` and `conformance/`, and `tests/api.rs` names the host API.
+
+## Running
+
+```sh
+cd engine-rs
+cargo test                                  # unit tests (rng, number formatting, hash)
+# The referee and the tools below are the `conformance` feature.
+cargo run --release --features conformance --bin conformance       # replay every scenario against expected.json
+cargo llvm-cov --no-report test --features conformance && cargo llvm-cov --no-report run --features conformance --bin conformance \
+  && cargo llvm-cov report               # what the tests and the referee reach; CI floors lines at 87%
+cargo run --release --features conformance --bin dump -- starter-classic t+60   # canonical JSON of one checkpoint
+cargo run --release --features conformance --bin tdt                 # replay every .TDT case against conformance/tdt-cases.json
+(cd consumer && cargo test --locked && cargo run --locked --release)   # the frontend-free host (API.md)
+```
+
+## The `.TDT` codec
+
+`src/tdt/` reads and writes the 1994 SimTower save format the way
+`src/storage/tdt*.ts` does: `import_tdt(bytes, filename)` gives the
+serialized game as JSON (what `load::deserialize` takes) plus the binary
+walk's warnings, and `export_tdt(save_json)` gives the file bytes for a
+serialized game (what `Simulation::serialize` writes). Its referee is
+`conformance/tdt-cases.json`, generated by
+`src/tests/integration/tdtCases.integration.test.ts` (same
+`VC_CONFORMANCE_UPDATE=1` switch as the scenario lock): every synthetic
+`.TDT` case is pinned by the canonical-JSON hash of the save the TypeScript
+importer produces and its warnings, every export case by the SHA-256 of the
+bytes the TypeScript exporter writes. `cargo run --release --features conformance --bin tdt` prints
+one line per case and exits non-zero on any mismatch; `cargo test` replays
+the same table. The engine never depends on the module.
+
+Beyond the pinned table, `npm run test:wasm` runs the differential test
+`src/tests/integration/conformanceWasmTdt.integration.test.ts` (its side
+runners and bookkeeping in `src/tests/conformance/tdtDifferential.ts`, its
+input builders in `src/tests/fixtures/tdtDifferentialInputs.ts`): both codecs
+import and export the same seeded inputs (round trips of fixtures, lock
+saves, edge saves and played towers, NaN and forged values in numeric
+fields, and mutated `.TDT` files) and must answer the same. `VC_TDT_DIFF_N`
+scales it, `VC_TDT_DIFF_SEED` moves its seed, `VC_TDT_DIFF_OUT` dumps each
+divergence's input, `VC_TDT_DIFF_REPORT=1` prints the tally and
+`VC_TDT_DIFF_KNOWN=1` adds the inputs known to diverge today; the test's
+header says what each one covers.
+
+The import and export fidelity reports (what was mapped, dropped or
+approximated) are not ported yet; the tallies they read from are.
+
+## The `.vctower` container
+
+`load::decode_vctower(text)` reads the web game's save file (the
+`VCTOWER1` magic, then base64 of a raw-deflated JSON save) and
+`load::encode_vctower(&save)` writes one, so a host that is not the web
+game can write saves the web game opens. The encoder takes a serialized
+game as a `serde_json::Value` (what `Simulation::serialize` returns), writes
+it as given and returns the file bytes, or refuses a save too large to
+read back (see the limits below). A save written as a player's tower
+needs the stamp `SaveGame.export` adds: `load::stamp_save(&mut save,
+app_version, saved_at_ms)` sets `appVersion` and `savedAt`, and
+`load::encode_simulation_vctower(&sim, app_version, saved_at_ms)` serializes,
+stamps and encodes a running game in one call. The engine does no file IO
+and has no clock, so the host passes the build name and the time. The stamp
+refuses a save the web import would refuse (no numeric `minutes` or no
+`units` list), a time no JavaScript `Date` holds, and a build name the web
+game reads as before 2.0, since a save stamped so, or not stamped at all,
+loads as a founder's tower. A save still holding an older stamp that reads
+as a founder's keeps that status as `founder: true`. A save with no stamp
+looks like a fresh serialization, so load an unstamped file before writing
+it again.
+
+For the same serialized save, stamp and time, the file is the one the web
+game writes, byte for byte: the magic, a newline, one line of padded
+standard base64, a newline, around raw DEFLATE of the save's JSON. The JSON
+is `JSON.stringify`'s text (`canonical::js_json`: keys in insertion order,
+which serde_json's `preserve_order` keeps, with array-index keys first, as
+in any JavaScript object), so a save parsed from the web game's JSON keeps
+its key order. The compressor is `src/fflate.rs`, a line-for-line port of
+fflate 0.8.3 `deflateSync` at level 1, the compressor every web writer uses
+(`SaveGame.export`, `packSync`, `toTowerFile`). It is pinned by reference
+vectors fflate wrote; change it only together with the fflate version in
+`package-lock.json`. A save built by the engine's own `serialize` has the
+engine's key order, which every reader takes, and a string holding half a
+surrogate pair is written as U+FFFD where `JSON.stringify` writes the escape
+(the web game repairs such strings on load and on input, so its saves hold
+none). The Rust tests in `load.rs`
+round-trip every web-written fixture in `conformance/fixtures/`, and
+`src/tests/integration/conformanceWasmVctower.integration.test.ts` (part of
+`npm run test:wasm`) loads each fixture in the web game, writes it with the
+engine, checks the file against `SaveGame.export`'s and `toTowerFile`'s
+byte for byte, reads it back through `decodeVctower`, `fromTowerFile` and
+`SaveGame.import`, and checks the Founder status and the loaded state's
+hash. The same file runs a randomized differential of the compressor
+against fflate.
+
+When the WASM engine runs (`?engine=wasm`), the web game writes its own
+saves through this writer: `SaveGame.export` and `SaveGame.packSync` hand
+the stamped save JSON to `encodeVctower` (`src/storage/vctowerWriter.ts`),
+and fall back to the TypeScript writer if the engine throws or writes no
+`.vctower` file. A save past 8 MiB skips the engine, which would parse and
+re-print it on the main thread. The timer autosave (`saveToAsync`, which compresses off
+the main thread) and the desktop store's `toTowerFile` re-header keep their
+own writers. The same test file checks that a file written that way is the
+one the web game writes on its own.
+
+Two limits apply to every save the engine reads or writes as JSON text.
+A JavaScript string can hold half of a surrogate pair (a tower name cut
+through an emoji, since the rename box counts UTF-16 units), which
+`JSON.stringify` writes as a `\udxxx` escape that a Rust string cannot
+hold. `load::parse_save_json` reads each such escape as U+FFFD, the
+character `TextEncoder` substitutes for an unpaired surrogate, and every
+engine entry point that takes save JSON goes through it: `decode_vctower`,
+`fromSave`, `encodeVctower` and `exportTdt`. Such a save loads in the
+engine with U+FFFD where the half character was, and the web
+game repairs the same way: `parseSaveJson` (`src/storage/saveCompression.ts`)
+on every save text it reads, and `wellFormed` where a name is set (the
+tower-name callback and `Tower.setLabel`), so both engines hold one tower. And the
+encoder refuses a save whose JSON is longer than 32 MiB, the cap every
+reader holds to (`decode_vctower`, and on the web `inflateCapped` and
+`SaveGame.import`; the web writers check it too, through `encodeSaveJson`),
+since that file would only fail to load.
+
+## The WASM binding
+
+The crate also builds as a WebAssembly module for JavaScript hosts. The
+binding (`src/wasm.rs`, behind the `wasm` cargo feature) exports one class,
+`Engine`, with constructors for a new game, a serialized save and a
+`.vctower` text, and methods for ticking, the build and edit commands, the
+events, the tile queries, the readouts a runner checks (`mode`, `money`,
+`setMoney`, `fires`), `serialize` and the two hashed views with their
+digests, plus three free functions: two for the 1994 save format,
+`importTdt(bytes, filename)` (JSON text `{ save, warnings }`) and
+`exportTdt(saveJson)` (the file bytes), and `encodeVctower(saveJson,
+appVersion, savedAtMs)`, the stamped `.vctower` text for a serialized game.
+Structured values cross as JSON text; integers cross as 32-bit
+values (`i32`, and `u32` for the seed and the fire count), which the
+generated TypeScript sees as `number`. Beside the class, the free function
+`catalog(mode)` returns the catalog (below) as canonical JSON.
+Nothing in the binding simulates anything.
+
+`wasm:build` runs only on the release `rust-version` names, at `.0`
+(1.97.0 today), because the package's `THIRD-PARTY.json` attributes the
+standard library that release links (#955). On another toolchain, install
+that release and build with `RUSTUP_TOOLCHAIN=1.97.0 npm run wasm:build`.
+
+```sh
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --locked --version 0.2.129   # the version Cargo.toml pins
+npm run wasm:build          # cargo rustc (cdylib) for wasm32 + wasm-bindgen into engine-rs/pkg/
+npm run test:wasm           # every scenario through the binding, the dual run's day gate, the .TDT differential test and the .vctower writer test (fails without the package)
+```
+
+`engine-rs/pkg/` is build output and is not checked in, except for the
+declaration wasm-bindgen writes, copied to `src/dualrun/engine.d.ts`:
+`src/dualrun/binding.ts` types the adapters against it, so a method added
+or renamed in `wasm.rs` reaches TypeScript as a type change, and the
+`engine-rs.yml` job fails when the checked-in copy is stale (rebuild and
+commit it with the Rust change). The WASM suite
+(`src/tests/integration/conformanceWasm.integration.test.ts`) skips itself
+when the package is missing, so `npm test` stays green without a Rust
+toolchain; CI builds the package and runs the suite in `engine-rs.yml` with
+`VC_REQUIRE_WASM=1`, under which a missing package fails the run. Rebuild
+the package after any change to the Rust source; the suite replays whatever
+was built last.
+
+## The catalog
+
+`catalog::catalog(mode)` is the reference data every frontend draws a build
+menu, a price label or a placement ghost from, read out of the engine's own
+tables and resolved for one mode so a frontend never applies a rule itself:
+the world geometry (lot width, floor range, ground floor, lobby interval),
+the economy constants a UI shows (starting money, the add-car cost and its
+refund, the per-floor transport cost, upkeep and bookings, the exterminator
+fees where the mode has them, whether bridging can be switched off, and the
+calendars the mode runs with the factor each applies to the monthly and
+quarterly figures, since a canon calendar charges a tenth of a monthly
+figure every three days), the
+pooled caps, and per facility kind its key, name, category, size, cost, star
+gate, population, attendance, flags, whether the mode can build it, build
+minutes, resale refund, build cap and pool, transport span, cars and car
+capacity, subtypes, rent configuration (the Classic ladder with No Rate or
+the Modern band, and when it is collected), daily income, spend per customer
+and service upkeep.
+A value a kind does not have is present as `null`, and the shape carries
+a `version` that moves when a field is added, renamed or removed.
+
+The WASM binding returns the same JSON from `catalog(mode)`, typed by
+`Catalog` in `src/engine/catalogTypes.ts` and read through `readCatalog` in
+`src/dualrun/catalog.ts`, which refuses a reply whose shape is not `Catalog`
+(a missing or mistyped field, a negative price, a pool or ground floor
+structure naming no listed kind). The TypeScript engine builds the same catalog from
+its own tables (`catalogFor`), and `conformance/catalog-digests.json` pins
+each mode's canonical hash: the TypeScript run writes it
+(`catalog.integration.test.ts`, regenerated with the conformance switch),
+and a crate test, the referee binary and the WASM suite check against it,
+so the two engines cannot quote a different price or size while both exist (each also has a test that the prices it quotes are the ones its build and sell paths charge, and the TypeScript one charges a maintenance period against the quoted car and service upkeep).
+Presentation (display copy beyond the name, icons, pixel sizes, colors)
+stays with the frontend.
+
+The catalog gives a kind's base price. The price of one placement also
+depends on the tower: the floor tiles laid under a room and, with bridging
+on, the gap tiles bridged to the tower. The binding answers it with
+`canBuild(kind, floor, x)`, the same dry run `build` makes first, as JSON
+`{ ok, reason?, cost }`. When the placement fits, `cost` is its full price,
+and a "Not enough money." refusal carries that same price. Any other refusal
+carries the reason `build` would give and the facility's base price, so
+placement rules the catalog does not list (the Wedding Hall on the top floor,
+the ground-floor concourse, a claimed sky-lobby story, lobby floors) reach a
+frontend through the engine that enforces them. The binding has no
+quote for a shaft yet (backlog row `engine-independence`, #980); a native host
+asks the crate's `Simulation::can_build_transport(kind, x, bottom, top)`, the
+dry run `build_transport` makes first.
+`conformanceWasmCanBuild.integration.test.ts` sweeps every kind over a grid
+of floors and positions on new games and saved towers in both modes (two
+raised to the TOWER rating, so the star-gated rules answer), with bridging on
+and off where the mode allows it and money flush, short and exactly at a
+price, and requires the Rust answer to equal the TypeScript one. The build
+paths in both engines charge the same constants the catalog quotes: the
+transport per-floor cost, and the lobby and floor tile prices from the
+facility table.
+
+## The switch
+
+Behind `?engine=wasm` (or `localStorage.setItem("vc.engine", "wasm")`,
+`?engine=ts` to override) the web game runs on the WASM engine
+(story-engine-wasm-switch): the engine alone ticks, and the `Simulation`
+instance the app holds becomes a read model of it, refreshed every frame
+from `Engine.frameView()` (one flat number array) and, on every hour pass or
+tower revision, from the engine's save, merged in place so the renderer's
+object references hold. Host commands still run on the instance (the caller
+gets the TypeScript answer) and relay to the engine. `window.__vcEngine`
+says which engine runs. The browser package is served from `src/public/engine/`
+with a `BUILD.json` naming the Rust sources' hash. It is build output and is
+not checked in: the Vercel build (`scripts/vercel-build.sh`) builds it on
+every deploy, and CI restores it from the Actions cache keyed on that hash,
+building it only when the engine changed (`.github/actions/engine-wasm`; jobs
+in the Playwright container download it as a run artifact). Every build, on
+Vercel or on a CI cache miss, installs the pinned toolchain through
+`scripts/build-engine-wasm.sh`. A unit test fails
+when a local package is stale. The gate is
+`src/tests/integration/wasmHost.integration.test.ts`: the instance's own
+state view equals the engine's at every hour of a day on every fixture.
+
+Gameplay events (`conformance/events/catalog.json`, `src/gameplay.rs`) come
+from the engine too: `Engine.drainGameplayEvents()` returns and clears the
+batch as JSON, and `Engine.gameplayEventsPending()` says how many it holds,
+so the host's typed drain (`src/wasmhost/engineEvents.ts`) counts a batch it
+cannot read as lost. The instance runs every command as well, so its own buffer
+would report each event twice; under the host the instance's
+`drainGameplayEvents` answers with the engine's batch and discards its own,
+and the same test counts that each event arrives once.
+
+## The dual run
+
+The binding's second consumer is the dual run (story-engine-dual-run): the
+web game, behind a developer switch, runs the WASM engine in a worker beside
+the live TypeScript engine, mirrors every command to it and compares the two
+hashed views at every hour. Switch it on under `npm run dev` with
+`?dualrun=1` (or `localStorage.setItem("vc.dualrun", "1")`) after
+`npm run wasm:build`, which also writes the browser package to
+`src/public/engine/`; the first divergence prints in the console with the
+JSON path where the views depart. The same mirror and shadow run in Node as
+the gate, a full day on every fixture at each game speed through the frame
+loop's own step math: `npm run test:wasm` (the `dualRun*` suites; the same
+command runs `conformanceWasmTdt`, the `.TDT` differential test, whose
+`VC_TDT_DIFF_*` switches are described in the `.TDT` section above, and
+`conformanceWasmVctower`, the `.vctower` writer test).
+
+The referee prints one line per scenario: `ok`, the first divergent
+checkpoint with both hashes, or the first command the port cannot run. It
+exits non-zero unless every scenario matches. When a checkpoint diverges,
+compare the two engines' canonical JSON for that label (the `dump` binary on
+this side, `stateView` on the TypeScript side) to find the field.
+
+## Keeping the two engines together
+
+A simulation change lands in both engines in the same pull request, with the
+regenerated `conformance/expected.json` (see `conformance/README.md`). CI runs
+the referee on every change to `engine-rs/` or `conformance/`, the save
+fixtures in `conformance/fixtures/` included (`.github/workflows/engine-rs.yml`).

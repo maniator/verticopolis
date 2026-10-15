@@ -1,7 +1,10 @@
 import type { Unit } from "../../engine/types";
 import { visibleOccupants } from "../../engine/Crowd";
+import { isLateHour } from "../lateNight";
 import { PAL, SKIN, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, shade, vacancy, windowView, type RoomCtx } from "./common";
 import { bevelBox, ceilingCap, curtain, downlights, fill, framedArt, glow, interiorWall, plankFloor } from "./dollhouse";
+import { layerBreak, layerEnd } from "./layers";
+import { ROACH_AMBER, ROACH_CHESTNUT, drawRoach } from "./residential.roaches";
 import { CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, SUITE_WALLS } from "./residential.looks";
 
 /**
@@ -13,10 +16,11 @@ import { CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, SUITE_WALLS } f
  *
  * Every look resolves from the room bake signature only (`u.state`, `d.lit`,
  * `u.width`, `u.occupants`, `u.outForMeal` via `visibleOccupants`, and the
- * condo `lateNight` flag from `d.hour`); none reads `d.anim`, so a static room
- * stays cacheable and repaints exactly when its look changes. Seated occupants
- * map one-to-one to `visibleOccupants(u)`, capped by the layout's seats and
- * filled in seat order: no ghost people. Integer pixel coordinates only.
+ * late-night flag from `d.hour` via `isLateHour`); none reads `d.anim`, so a
+ * static room stays cacheable and repaints exactly when its look changes.
+ * Seated occupants map one-to-one to `visibleOccupants(u)`, capped by the
+ * layout's seats and filled in seat order: no ghost people. Integer pixel
+ * coordinates only.
  */
 
 /** Floor-band height and floor-line Y for a room rect, matching the build's
@@ -93,6 +97,7 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
       const spines = ["#8C3A32", "#3E5A8C", "#B08A3E", "#4A7A4A", "#7A5A9E"];
       for (let k = 0; k < 5; k++) fill(ctx, bsX + 2 + k * 3, y + 8, 2, 5, spines[k]);
     }
+    layerBreak(ctx); // the shell ends; furniture and staff follow
     if (layout === 3) {
       // Meeting room: one long table with a laptop and papers, high-back chairs
       // both sides, seated staff up to the chair count, a corner plant.
@@ -164,7 +169,7 @@ export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
   const { ctx } = d;
   if (u.state === "empty") return vacancy(ctx, x, y, w, h, vacancyLabel);
   // Residents are "up" only when home and not asleep in the small hours.
-  const home = visibleOccupants(u) > 0 && !(d.hour >= 23 || d.hour < 6);
+  const home = visibleOccupants(u) > 0 && !isLateHour(d.hour);
   // Geo-seeded variety, geometry first: three true layouts (living, dining with a
   // kitchenette, a study), any of them mirrored, over warm plaster and maple. The
   // standing lamp appears in every layout so the home-glow signal survives.
@@ -202,6 +207,7 @@ export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
     windowView(ctx, winX, winTop, winW, winH, d.lit, geoVariant(u, 5, 997));
     curtain(ctx, winX - 1, winTop, winH, "#9A6E7A");
     curtain(ctx, winX + winW + 2, winTop, winH, "#9A6E7A");
+    layerBreak(ctx); // the shell ends; furniture and residents follow
     if (layout === 3) {
       // Dining: kitchenette on the wall, a set table with a candle, two seated
       // diners when home, a sideboard, the standing lamp.
@@ -285,81 +291,6 @@ export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
 
 // ---- Hotel --------------------------------------------------------------
 
-/** Cockroach decal palettes (owner-approved redesign, 2026-07-16). Chestnut for
- *  a full infestation (dark and obvious, but clearly a roach); warmer amber for
- *  the single dirty-room warning. The pale `rim` keeps them legible over any
- *  wall tint. */
-const ROACH_CHESTNUT = { dark: "#2A1A0E", head: "#1E1208", collar: "#6A4A28", rim: "#EFE7D2", sheen: "#7A5230", seam: "#140C05", leg: "#160E05" };
-const ROACH_AMBER = { dark: "#4A331A", head: "#341F0E", collar: "#7A5A30", rim: "#EFE7D2", sheen: "#8A6A3A", seam: "#241608", leg: "#241608" };
-type RoachPalette = typeof ROACH_CHESTNUT;
-
-/** A crisp filled pixel ellipse (integer scanlines, no anti-aliasing). Radii are
- *  floored to 1 so a degenerate call (`ry <= 0`) can never divide by zero into a
- *  NaN rect; every current caller already passes `rx, ry >= 2`. */
-function roachOval(ctx: CanvasRenderingContext2D, cx: number, cy: number, rx: number, ry: number, color: string, alpha = 1): void {
-  rx = Math.max(1, rx);
-  ry = Math.max(1, ry);
-  const prevAlpha = ctx.globalAlpha; // restore the caller's alpha, don't assume 1
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
-  for (let iy = -ry; iy <= ry; iy++) {
-    const t = 1 - (iy * iy) / (ry * ry);
-    if (t < 0) continue;
-    const hw = Math.round(rx * Math.sqrt(t));
-    ctx.fillRect(Math.round(cx - hw), Math.round(cy + iy), hw * 2 + 1, 1);
-  }
-  ctx.globalAlpha = prevAlpha;
-}
-
-/** A crisp pixel line (Bresenham) for legs and antennae. */
-function roachLine(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, color: string): void {
-  x0 = Math.round(x0);
-  y0 = Math.round(y0);
-  x1 = Math.round(x1);
-  y1 = Math.round(y1);
-  const dx = Math.abs(x1 - x0);
-  const dy = Math.abs(y1 - y0);
-  const sx = x0 < x1 ? 1 : -1;
-  const sy = y0 < y1 ? 1 : -1;
-  let e = dx - dy;
-  ctx.fillStyle = color;
-  for (;;) {
-    ctx.fillRect(x0, y0, 1, 1);
-    if (x0 === x1 && y0 === y1) break;
-    const e2 = 2 * e;
-    if (e2 > -dy) { e -= dy; x0 += sx; }
-    if (e2 < dx) { e += dx; y0 += sy; }
-  }
-}
-
-/** One cockroach decal, big and unmistakable, drawn crisp and axis-aligned so it
- *  stays pixel art. `fx`/`fy` (each +/-1) flip it for scatter variety; `L` is the
- *  body length in pixels. Ported from the owner-approved redesign preview. */
-function drawRoach(ctx: CanvasRenderingContext2D, cx: number, cy: number, L: number, fx: number, fy: number, pal: RoachPalette): void {
-  cx = Math.round(cx);
-  cy = Math.round(cy);
-  const rx = Math.round(L * 0.34);
-  const ry = Math.round(L * 0.5);
-  const X = (dx: number): number => cx + fx * dx;
-  const Y = (dy: number): number => cy + fy * dy;
-  // six legs, splayed out and back
-  for (const s of [-1, 1]) for (const ay of [-0.16, 0.08, 0.3]) {
-    roachLine(ctx, X(s * rx * 0.65), Y(ay * L), X(s * (rx + L * 0.34)), Y(ay * L + L * 0.16), pal.leg);
-  }
-  // two antennae sweeping forward from the head
-  for (const s of [-1, 1]) roachLine(ctx, X(s), Y(-ry * 0.9), X(s * (rx + L * 0.18)), Y(-ry - L * 0.34), pal.leg);
-  // pale rim, then the body, so it separates from any wall color
-  roachOval(ctx, cx, Y(ry * 0.06), rx + 1, ry + 1, pal.rim, 0.95);
-  roachOval(ctx, cx, Y(ry * 0.06), rx, ry, pal.dark);
-  // head shield + a pale collar edge, a domed sheen, and a center wing seam
-  roachOval(ctx, cx, Y(-ry * 0.6), Math.round(rx * 0.85), Math.round(ry * 0.34), pal.head);
-  ctx.fillStyle = pal.collar;
-  ctx.fillRect(cx - Math.round(rx * 0.6), Math.round(Y(-ry * 0.86)), Math.round(rx * 1.2), 1);
-  roachOval(ctx, cx, Y(ry * 0.05), Math.max(1, Math.round(rx * 0.3)), Math.round(ry * 0.6), pal.sheen, 0.85);
-  ctx.fillStyle = pal.seam;
-  ctx.fillRect(cx, cy - Math.round(ry * 0.2), 1, Math.round(ry * 0.95));
-}
-
 export function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number, grade: number): void {
   const { ctx } = d;
   const asleep = u.state === "asleep";
@@ -437,6 +368,7 @@ export function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
     const winX = x + (w > 80 ? w - 20 : w - 13);
     windowView(ctx, winX, winTop, winW, winH, asleep || d.lit, winSeed);
     curtain(ctx, winX - 2, winTop, winH, asleep ? "#2E2A44" : "#B08A6A");
+    layerBreak(ctx); // the shell ends; the beds and the suite's sitting area follow
     if (grade === 3) {
       bevelBox(ctx, x + 5, floorY - 8, suiteSofaW, 8, "#7C5A6A"); // sitting sofa
       fill(ctx, x + 5, floorY - 11, suiteSofaW, 3, "#8C6A7A");
@@ -474,6 +406,9 @@ export function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
   // out. A DIRTY room gets a single amber warning roach. All draw here, outside
   // the mirror wrapper, so a flipped room reads identically; flips off the unit
   // id give scatter variety without per-frame motion (rooms are cached sprites).
+  // The furniture ends here: the grime wash, the roaches and the "z" draw
+  // after the furniture ends, so the atlas's depth layers put them on the shell.
+  layerEnd(ctx);
   if (infested) {
     const fv = (n: number): number => (geoVariant(u, 30 + n, 2) === 1 ? 1 : -1);
     fill(ctx, x, y, w, h, "#5A6828", 0.2); // grime wash

@@ -5,7 +5,7 @@ name: PR screenshot drift-check
 # capture (screenshot-capture.yml) to render the gallery. This is the SOLE path
 # that regenerates the committed gallery: there is no separate marker-push
 # workflow anymore (update-screenshots.yml was retired once drift became a hard
-# gate here, so every gallery refresh flows through a PR). Two separate signals:
+# gate here, so every gallery refresh flows through a PR). Three separate signals:
 #
 #   1. HARD FAIL: the reusable `capture` renders every shard TWICE and fails if the
 #      two renders differ (nondeterminism, the exact leak PR #188 chased). If it
@@ -17,6 +17,13 @@ name: PR screenshot drift-check
 #      approving the `commit-on-approval` job, which regenerates and commits the
 #      gallery straight to the PR branch in the SAME run: no marker push, no second
 #      run. Fork PRs cannot run that job, so they are exempt from the drift gate.
+#
+#   3. ENGINE PARITY: `capture-wasm` renders the same scenes with the WASM engine
+#      hosting the tower, and `engine-parity` fails when that render differs from
+#      this run's TypeScript render, naming the first differing shot;
+#      `engine-parity-visual` runs the visual specs on the engine against the
+#      committed baselines. Both are separate checks from `drift-gate` (which
+#      stays on the TypeScript engine's gallery) and never commit anything.
 #
 # PREREQUISITE: the `screenshot-approval` Environment must exist with a required
 # reviewer (repo Settings -> Environments). Without a required reviewer the gate
@@ -60,9 +67,11 @@ jobs:
   #   guard watches), the render path (src/render/**), DOM chrome (src/ui/**,
   #   src/main.ts, styles, index.html), and the save-loading scenes (src/storage/**).
   #   So match all of src/, minus tests (the legacy src/tests/** home and the
-  #   colocated *.test.ts files), but re-include the fixtures the screenshot scenes
-  #   load (the migration scene reads a real save under src/tests/fixtures/**).
-  #   Plus the generator, this workflow, and the reusable capture. The app version
+  #   colocated *.test.ts files), but re-include the test fixtures
+  #   (src/tests/fixtures/**) and the saved towers (conformance/fixtures/**). No
+  #   scene loads a saved tower today; the rule keeps a future one covered.
+  #   Plus the generator, this workflow, the reusable capture, and the visual
+  #   specs' harness (engine-parity-visual's inputs). The app version
   #   is deliberately NOT matched: the generator masks it to a fixed placeholder at
   #   capture time (pgMaskVersion), so a package.json/vite.config.ts version bump no
   #   longer changes committed pixels; matching them would fire the capture on every
@@ -79,7 +88,7 @@ jobs:
     outputs:
       render: ${{ steps.filter.outputs.render }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -97,11 +106,37 @@ jobs:
             case "$f" in src/*) sign=+ ;; esac
             case "$f" in src/tests/*) sign=- ;; esac
             case "$f" in src/tests/fixtures/*) sign=+ ;; esac
+            case "$f" in conformance/fixtures/*) sign=+ ;; esac
+            # Generator logic that lives beside its unit test (the ONLY filter,
+            # the dialog phase watch) runs in every capture. The test files
+            # themselves fall back out on the *.test.ts rule below, which only
+            # works because it comes AFTER this one (last match wins).
+            case "$f" in src/tests/screenshot*.ts) sign=+ ;; esac
             case "$f" in src/*.test.ts) sign=- ;; esac
             case "$f" in scripts/screenshots.ts) sign=+ ;; esac
             case "$f" in scripts/screenshot-*.ts) sign=+ ;; esac
+            # The scene manifest (scripts/screenshot-scenes.ts concatenates these).
+            case "$f" in scripts/scenes/*) sign=+ ;; esac
             case "$f" in .github/workflows/pr-drift-check.yml) sign=+ ;; esac
             case "$f" in .github/workflows/screenshot-capture.yml) sign=+ ;; esac
+            # The Rust engine and the build of its WASM package: the engine legs
+            # (capture-wasm, engine-parity, engine-parity-visual) render on it.
+            # The package is build output, so an engine change no longer shows
+            # up as a src/public/engine/ change; its inputs count instead.
+            # The engine's inputs that can reach the package: the crate but its
+            # Markdown, and conformance/events/, the gameplay event catalog the
+            # engine compiles in (include_str! in engine-rs/src/gameplay.rs).
+            # engineSourceHash also covers the conformance files that only the
+            # engine's tests include; they never reach the package.
+            case "$f" in engine-rs/*|conformance/events/*) sign=+ ;; esac
+            case "$f" in engine-rs/*.md|conformance/events/*.md) sign=- ;; esac
+            case "$f" in scripts/wasm-build.ts|scripts/build-engine-wasm.sh|.github/actions/engine-wasm/*|.github/actions/engine-wasm-download/*) sign=+ ;; esac
+            # The visual specs and their harness: engine-parity-visual is the only
+            # job that runs visual.spec.ts on chromium-wasm (PW_WASM_VISUAL=1), so a
+            # change to the spec, its helpers, its baselines or the Playwright
+            # config must reach it.
+            case "$f" in e2e/visual.spec.ts|e2e/helpers.ts|playwright.config.ts) sign=+ ;; esac
+            case "$f" in e2e/visual.spec.ts-snapshots/*) sign=+ ;; esac
             # The pinned Playwright/browser + font versions come from the lockfile, and
             # a bump there can shift antialiasing across the WHOLE committed gallery.
             # This filter used to exclude the lockfile to avoid a capture on every
@@ -129,6 +164,195 @@ jobs:
     permissions:
       contents: read
 
+  # The engine leg (story-engine-test-parity AC3): the same scenes, rendered with
+  # the WASM engine hosting the tower (VC_SHOT_ENGINE=wasm), through the same
+  # sharded twice-render determinism guard. Its own job rather than a matrix
+  # entry on `capture`, so a parity difference never fails `capture` and with it
+  # the required drift-gate: the committed gallery stays the TypeScript
+  # engine's until the 3.0.0 flip, and this leg only reports against it.
+  capture-wasm:
+    needs: changes
+    if: needs.changes.outputs.render == 'true'
+    uses: ./.github/workflows/screenshot-capture.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha }}
+      engine: wasm
+    permissions:
+      contents: read
+
+  # The engine parity check: the WASM render must match this run's TypeScript
+  # render byte for byte (no threshold). Comparing the two renders of the same
+  # head keeps a PR that legitimately changes rendering from reading as an
+  # engine difference while its gallery waits on commit-on-approval; on a
+  # same-repo PR with drift-gate green, the TypeScript render is the committed
+  # gallery. A
+  # difference fails this job, names the first differing shot, and lists the
+  # rest. It never commits: the WASM shards stay downloadable as the
+  # engine-wasm-shots-* artifacts. It runs when the WASM capture failed too,
+  # since that leg uploads whatever rendered (a scene that failed on the engine
+  # is a missing image here, and its shard is named).
+  engine-parity:
+    needs: [changes, capture, capture-wasm]
+    if: ${{ !cancelled() && needs.changes.outputs.render == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SHARDS_JSON: ${{ needs.capture.outputs.shards }}
+      CAPTURE: ${{ needs.capture.result }}
+    steps:
+      - name: Download both engines' shard artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: /tmp/dl
+          pattern: "*shots-*"
+
+      - name: Compare the WASM render with the TypeScript render
+        run: |
+          if [ "$CAPTURE" != "success" ]; then
+            echo "::error::the TypeScript capture did not succeed ($CAPTURE), so there is no render to compare the engine against; see drift-gate."
+            exit 1
+          fi
+          if [ -z "$SHARDS_JSON" ] || [ "$(echo "$SHARDS_JSON" | jq 'length')" -lt 1 ]; then
+            echo "::error::no shard list from the capture; cannot compare the engines."
+            exit 1
+          fi
+          ts=/tmp/ts; wasm=/tmp/wasm
+          mkdir -p "$ts" "$wasm"
+          missing=""; failed=""; present=0
+          for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
+            if [ ! -f "/tmp/dl/shots-$shard/.shard-complete" ]; then
+              echo "::error::the TypeScript render of shard $shard is missing from this run's artifacts; cannot compare it."
+              exit 1
+            fi
+            w="/tmp/dl/engine-wasm-shots-$shard"
+            # A shard with no WASM render is reported on its own, and its shots
+            # stay out of the comparison so they never read as engine differences.
+            if [ ! -f "$w/.shard-complete" ]; then missing="$missing $shard"; continue; fi
+            present=$((present + 1))
+            [ -d "/tmp/dl/shots-$shard/shots" ] && cp -a "/tmp/dl/shots-$shard/shots/." "$ts/"
+            [ -f "$w/.render-failed" ] && failed="$failed $shard ($(cat "$w/.render-failed"))"
+            [ -d "$w/shots" ] && cp -a "$w/shots/." "$wasm/"
+          done
+          compared=$(cd "$ts" && find . -name '*.png' | wc -l)
+          if [ "$compared" -lt 1 ] && [ "$present" -gt 0 ]; then
+            echo "::error::the TypeScript render holds no images; the artifact layout is not what this job expects."
+            exit 1
+          fi
+          if [ -n "$missing" ]; then
+            echo "::error::no WASM render was uploaded for shard(s):$missing; the engine leg failed before it rendered (see capture-wasm). The other shards are compared below."
+            failed="$failed$missing (no render)"
+          fi
+          changed="$(
+            { (cd "$ts" && find . -name '*.png'); (cd "$wasm" && find . -name '*.png'); } | sort -u | while read -r f; do
+              if [ ! -f "$wasm/$f" ]; then echo "missing on WASM  ${f#./}"
+              elif [ ! -f "$ts/$f" ]; then echo "only on WASM     ${f#./}"
+              elif ! cmp -s "$ts/$f" "$wasm/$f"; then echo "pixels differ    ${f#./}"
+              fi
+            done
+          )"
+          if [ -n "$failed" ]; then
+            echo "::warning::the WASM capture failed in shard(s):$failed (a scene error or a nondeterministic render, see capture-wasm); those shards' results below are not a clean parity reading."
+          fi
+          if [ -z "$changed" ] && [ -z "$failed" ]; then
+            echo "The WASM engine renders all $compared shots byte for byte as the TypeScript engine does." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ -z "$changed" ]; then
+            if [ "$compared" -lt 1 ]; then
+              echo "No shots were compared: the WASM capture failed in shard(s):$failed." | tee -a "$GITHUB_STEP_SUMMARY"
+            else
+              echo "Every compared shot matches, but the WASM capture failed in shard(s):$failed." | tee -a "$GITHUB_STEP_SUMMARY"
+            fi
+            exit 1
+          fi
+          n=$(echo "$changed" | wc -l | tr -d ' ')
+          echo "::error::engine parity: $n shot(s) differ between the engines; the first is: $(echo "$changed" | head -1)"
+          {
+            echo "### Engine parity: $n shot(s) differ on the WASM engine"
+            echo
+            echo "Each is a parity finding to report. This leg never commits; the WASM renders are in the engine-wasm-shots-* artifacts of this run."
+            [ -z "$failed" ] || echo "The WASM capture failed in shard(s):$failed."
+            echo
+            echo '```'
+            echo "$changed"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "$changed"
+          exit 1
+
+  # The visual baselines on the engine, on every render-affecting PR: the
+  # visual specs run on chromium-wasm (PW_WASM_VISUAL=1) in the pinned image
+  # against the committed baselines, and any pixel difference fails this job.
+  # It never mints. The image tag comes from the WASM capture's resolve step;
+  # without one the job fails to start rather than skipping.
+  engine-parity-visual:
+    needs: [changes, capture-wasm]
+    if: ${{ !cancelled() && needs.changes.outputs.render == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: ${{ needs.capture-wasm.outputs.image }}
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The engine's WASM package is build output, not checked in; the WASM
+      # capture's resolve job restored or built it for this same head.
+      - uses: ./.github/actions/engine-wasm-download
+        with:
+          artifact-name: engine-wasm-package
+
+      - name: Build
+        run: npm run build
+        env:
+          VC_TOOLING: "1"
+
+      # PW_WASM_VISUAL makes playwright.config.ts compare pixels (on CI or off)
+      # and turns snapshot writing off.
+      - name: Compare the WASM engine's render with the committed baselines
+        run: npx playwright test e2e/visual.spec.ts --project=chromium-wasm
+        env:
+          PW_WASM_VISUAL: "1"
+
+      - name: Name the first differing shot
+        if: failure()
+        run: |
+          # Pixel failures leave a *-diff.png in their result folder, and a spec
+          # with no committed baseline leaves only an *-actual.png; anything else
+          # (a hosting guard, a timeout) failed before it compared.
+          diff="$(find test-results -name '*-diff.png' 2>/dev/null | sort | head -1)"
+          actual="$(find test-results -name '*-actual.png' 2>/dev/null | sort | head -1)"
+          if [ -n "$diff" ]; then
+            echo "::error::engine parity: the first shot that differs on the WASM engine is $(basename "$diff" -diff.png) ($(basename "$(dirname "$diff")")); if this PR changes rendering, mint the baselines first, then re-run"
+          elif [ -n "$actual" ]; then
+            echo "::error::no committed baseline for $(basename "$actual" -actual.png); the TypeScript baselines must be minted first"
+          else
+            echo "::error::a visual spec failed on the WASM engine without a pixel diff (setup, hosting, or a timeout): $(ls test-results 2>/dev/null | head -1)"
+          fi
+          exit 0
+
+      - name: Upload the engine's visual diffs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-visual-engine-diffs
+          path: test-results/
+          if-no-files-found: ignore
+
   # Signal 2's detector: assemble the verified run over the PR's committed gallery
   # and record whether anything changed (has_drift), WITHOUT committing. Posts a
   # best-effort advisory comment. Never fails on drift.
@@ -144,14 +368,14 @@ jobs:
     env:
       SHARDS_JSON: ${{ needs.capture.outputs.shards }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Download the shard artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: /tmp/dl
           pattern: shots-*
@@ -197,7 +421,7 @@ jobs:
       - name: Advisory sticky comment
         if: ${{ !cancelled() && steps.drift.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const marker = '<!-- screenshot-drift-check -->';
@@ -252,16 +476,17 @@ jobs:
       # re-triggered CI. Fall back to GITHUB_TOKEN when the secret is unset so forks
       # and secret-less repos still work (they just need the manual re-trigger, the
       # old behavior). This job runs NO PR-head code (only git/jq/cp over downloaded
-      # artifacts), so persisting this token in .git/config never exposes it to
-      # PR-controlled execution.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # artifacts), so persisting this token never exposes it to PR-controlled
+      # execution. checkout v6 and later store it in a RUNNER_TEMP credentials
+      # file referenced from .git/config by includeIf.gitdir, not inline.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           token: ${{ secrets.SCREENSHOT_COMMIT_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Download the shard artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: /tmp/dl
           pattern: shots-*

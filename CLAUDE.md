@@ -27,7 +27,9 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   gates are **not** a substitute for the review skill, and "the diff is tiny" is
   not an exemption.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
-  `npm test`, `npm run build`. All four must be green.
+  `npm test`, `npm run build`. All four must be green. The build needs the
+  engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a
+  deliberate TypeScript-only build; see CONTRIBUTING.md.
 - **American English everywhere;** keep `src/engine/` free of DOM/rendering.
 - **No em-dashes in prose** (player-facing copy, docs, comments, commit and PR
   text) in anything new you write. Use commas, colons, parentheses, or separate
@@ -38,6 +40,18 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
+- **Rust follows the same source rules.** The engine port in `engine-rs/` is held to
+  the same conventions as the TypeScript, with no grandfathered comments:
+  American English, no em-dashes (`src/tests/rustProse.guard.test.ts` keeps the
+  Rust sources at zero), and the 500-line file ceiling that
+  `src/tests/fileSize.guard.test.ts` enforces on `src/` and `scripts/` (it scans
+  `.rs` files too, inline `#[cfg(test)]` modules included; today's oversized
+  Rust files sit on the same shrink-only ratchet, `src/tests/fileSize.ratchet.txt`).
+  The other gates have Rust counterparts: lint and typecheck map to `cargo fmt
+  --check` and `cargo clippy -D warnings` (`engine-rs.yml`), and the engine
+  boundary rules to `engine-rs/tests/independence.rs`, which keeps the simulation
+  free of host access (files, network, console, clock; a few named referee
+  functions may read fixtures) and the JavaScript binding inside `src/wasm.rs`.
 - **Bump `package.json` `version` on any player-facing change**, keyed to "would a
   player notice anything different?": **major** for a save/compat break or a
   headline milestone, **minor** as the default for anything a player notices,
@@ -53,7 +67,8 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   `mcr.microsoft.com/playwright:v<lockfile-playwright-version>-jammy` the workflow
   resolves), running `npm ci && VC_TOOLING=1 npm run build && RUN_SERVER=1 node
   scripts/screenshots.ts` in it (`VC_TOOLING=1` publishes the `window.game`
-  handle the scenes drive; a plain production build compiles it away). Output
+  handle the scenes drive; a plain production build compiles it away). Build
+  the engine package on the host first, since the image has no Rust toolchain. Output
   from the pinned image is equivalent to CI's and may be committed. There is no `[update-screenshots]` marker workflow
   anymore (retired once drift became a hard gate on the PR); every gallery refresh
   flows through a PR. Mint `e2e/visual.spec.ts-snapshots` only via
@@ -122,6 +137,30 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   forever or merge on your own. Note on the PR that the reviewers were down and
   how many rounds ran. Re-request Copilot/Codex and hold merge as usual the
   moment they are back.
+- **A published analytics number is either computed by a governed definition,
+  or by reviewed code that a test binds to one.** What is banned is the third
+  case: a measure improvised in a session and published. A readout may narrate,
+  interpret, argue and recommend, all the things a dashboard is bad at, but its
+  arithmetic has to come from somewhere that would catch it being wrong. The
+  governed sources are the **Verticopolis: Gameplay Analytics** dashboard, the
+  `session_lengths` view, its saved insights, and the PostHog data catalog;
+  check the catalog first. `scripts/posthog-report.mjs` is the worked example of
+  the second clause: it computes its own HogQL, and that is fine, because it
+  documents what it measures and where it is a lower bound, and
+  `src/posthog-report.test.ts` pins its page-life walk against the view's copy
+  so the two cannot drift. Improvising is how a published readout came to report
+  211 sessions at a median of 86s when the real figures were 132 and 42s: it
+  counted `session_end` rows, which re-fire on every tab-hide. A doc comment,
+  the view, the dashboard and the saved insights all carried that correction
+  already, and prose did not stop the query running. If no governed definition
+  covers the measure and you are not writing tested code, say so in the readout
+  and propose a metric rather than quietly inventing a number.
+- **A published snapshot says so, at the top.** Anything dated and not
+  refreshing carries its window above the figures rather than in a footer, with
+  a pointer to wherever the live number lives: the dashboard when it carries
+  that figure, otherwise the script and the test that produce it, since a
+  governed definition is not always a dashboard tile. A date a reader meets
+  after believing the number is too late.
 
 ## Canon reference (don't re-derive from memory)
 

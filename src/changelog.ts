@@ -34,6 +34,10 @@ function plainText(tokens: Token[] | undefined): string {
   let out = "";
   for (const t of tokens) {
     if (t.type === "list" || t.type === "html" || t.type === "image" || t.type === "code") continue;
+    if (t.type === "br") {
+      out += " "; // a hard line break must not glue two words together
+      continue;
+    }
     if ("tokens" in t && t.tokens && t.tokens.length) out += plainText(t.tokens);
     else if ("text" in t && typeof t.text === "string") out += t.text;
   }
@@ -61,9 +65,15 @@ function headingNamesVersion(text: string, version: string): boolean {
  * detection is structural rather than regex-guessed. Returns the first list's
  * top-level items (nested sub-bullets ignored), each trimmed and capped to
  * {@link MAX_NOTE_LEN}, at most {@link MAX_NOTES}, or `[]` when the version has no
- * section or no bullets (an internal build with no player notes).
+ * section or no bullets (an internal build with no player notes). `caps`
+ * defaults to the update prompt's limits; the release workflow passes
+ * `Infinity` for both so a release page carries every top-level bullet whole.
  */
-export function notesForVersion(changelog: string, version: string): string[] {
+export function notesForVersion(
+  changelog: string,
+  version: string,
+  caps: { maxNotes: number; maxLen: number } = { maxNotes: MAX_NOTES, maxLen: MAX_NOTE_LEN },
+): string[] {
   let inSection = false;
   for (const tok of marked.lexer(changelog)) {
     if (tok.type === "heading" && tok.depth === 2) {
@@ -76,8 +86,8 @@ export function notesForVersion(changelog: string, version: string): string[] {
       for (const item of tok.items) {
         const text = plainText(item.tokens).trim();
         if (!text) continue;
-        notes.push(text.length > MAX_NOTE_LEN ? text.slice(0, MAX_NOTE_LEN) : text);
-        if (notes.length >= MAX_NOTES) break;
+        notes.push(text.length > caps.maxLen ? text.slice(0, caps.maxLen) : text);
+        if (notes.length >= caps.maxNotes) break;
       }
       return notes;
     }

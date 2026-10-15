@@ -211,8 +211,6 @@ export interface Facility {
   minStar: number;
   /** Population this facility contributes when fully occupied. */
   population: number;
-  /** Hex color used by the procedural sprite renderer. */
-  color: string;
   /** Modern-only content: a facility the 1994 game never had. Gated out of
    *  Classic entirely (unbuildable, hidden from the Classic palette), so a
    *  Classic tower stays pixel-faithful. Absent (falsy) for every canon kind. */
@@ -232,7 +230,6 @@ export interface Facility {
    *  census (the kind's `population` stays 0, keeping `censusCount`'s
    *  commercial gate closed). Design tuning, not a canon figure. */
   attendance?: number;
-  description: string;
 }
 
 /** A placed facility instance in the tower. */

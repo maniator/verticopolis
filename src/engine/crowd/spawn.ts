@@ -24,6 +24,7 @@ import { add, makePerson, venueHasRoom } from "./trips";
 import { pushVenueVisitOptions } from "./visits";
 import { pushRoutineOptions } from "./routines";
 import { metroArrival, metroDeparture } from "./venueTrips";
+import { roomUnits } from "../tower/rooms";
 
 // Re-exported so existing importers (motion.ts, tests) keep their historical entry point; the
 // primitives now live in the `trips.ts` leaf.
@@ -73,7 +74,10 @@ export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
     const set = venuesByKindSet[kind] ?? (venuesByKindSet[kind] = new Set());
     set.add(floor);
   };
-  for (const u of tower.units) {
+  // Structure tiles (floor, lobby) land in no kind bin below. They used to fill unitsByFloor too, but
+  // every reader of it filters by a room kind and treats a missing floor as empty, so walking only the
+  // rooms gives the same results in the same order at a fraction of the cost.
+  for (const u of roomUnits(tower)) {
     const floorUnits = unitsByFloor.get(u.floor);
     if (floorUnits) floorUnits.push(u);
     else unitsByFloor.set(u.floor, [u]);

@@ -1,0 +1,282 @@
+import { catalogFor } from "../../engine/catalog";
+import type { WeatherKind } from "../../engine/types";
+import { FLOOR, TILE } from "../scale";
+import {
+  APRON_PAD_TILES,
+  GROUND,
+  groundBelowFloors,
+  PLANT_CLEAR_TILES,
+  PLANT_RULE,
+  PLANT_SIZE,
+  sceneryPieces,
+  SKYLINE_BANDS,
+  skylineOverscanTiles,
+  STRIP_ABOVE,
+  STRIP_BELOW,
+  type PieceRect,
+} from "../sceneryLayout";
+import {
+  PAVE_JOINT_EVERY,
+  PLANT_PAINT,
+  drawBush,
+  drawForecourt,
+  drawFountain,
+  drawPlanter,
+  drawPlazaLamp,
+  drawRoad,
+  drawRoundabout,
+  drawSidewalk,
+  drawStreetLamp,
+  drawStripTile,
+  drawTree,
+  grassLook,
+} from "../excalibur/towerSceneryDraw";
+import type { AnimJob, Job, Keys, StillJob } from "./catalog";
+import type { PaintSpec } from "./paint";
+import { Z } from "../depthPlanes";
+import { CLOUD_COUNT, CLOUD_DRIFT, RAIN, SUN_ARC, cloudMotion, cloudSeed } from "../sprites/sky";
+import { SKY_COLUMNS } from "./catalogExtras";
+
+/**
+ * The world outside the tower (`excalibur/towerScenery.ts`): the plaza's
+ * roundabout, fountain and lamps, the street lamp with its "375 ST" sign, the
+ * forecourt planter, the lot's trees and bushes, and the ground pieces. Every
+ * frame is painted by the game's own scenery painters, and {@link sceneryData}
+ * publishes the game's own placement table (`sceneryPieces` in `sceneryLayout.ts`),
+ * so a frontend can rebuild the scene.
+ */
+
+export type ScenerySpec =
+  | { p: "scenery"; piece: "roundabout" | "planter" | "bush" | "sidewalk" | "forecourt" }
+  | { p: "scenery"; piece: "fountain"; t: number }
+  | { p: "scenery"; piece: "plazaLamp" | "streetLamp"; a: number }
+  | { p: "scenery"; piece: "tree"; seed: number }
+  | { p: "scenery"; piece: "road"; phase: number }
+  | { p: "scenery"; piece: "strip"; tile: number; paved: boolean };
+
+/** Paint a scenery piece into a canvas `w` x `h`. */
+export function paintScenery(ctx: CanvasRenderingContext2D, s: ScenerySpec, w: number, h: number): void {
+  switch (s.piece) {
+    case "roundabout":
+      return drawRoundabout(ctx, w);
+    case "fountain":
+      return drawFountain(ctx, w, h, s.t);
+    case "plazaLamp":
+      return drawPlazaLamp(ctx, w, h, s.a);
+    case "streetLamp":
+      return drawStreetLamp(ctx, w, h, s.a);
+    case "planter":
+      return drawPlanter(ctx, w, h);
+    case "tree":
+      return drawTree(ctx, w, h, s.seed);
+    case "bush":
+      return drawBush(ctx, w, h);
+    case "sidewalk":
+      return drawSidewalk(ctx, w);
+    case "forecourt":
+      return drawForecourt(ctx, w);
+    case "road":
+      return drawRoad(ctx, w, s.phase);
+    case "strip":
+      return drawStripTile(ctx, 0, s.tile, s.paved);
+  }
+}
+
+/** The world the atlas publishes: the Modern catalog's lot and floors (both
+ *  engines' catalogs state the same world, and the game binds it per tower). */
+const WORLD = catalogFor("modern").world;
+const PIECES = sceneryPieces(WORLD);
+
+const size = (r: PieceRect) => ({ w: r.w, h: r.h });
+
+/** Frame sizes: the fixed pieces as the game sizes them, plants at their base
+ *  size, and the ground tiles one period of their pattern. A strip tile is one
+ *  column wider than a lot tile, as the game paints it. */
+const SIZE = {
+  roundabout: size(PIECES.roundabout),
+  fountain: size(PIECES.fountain),
+  plazaLamp: size(PIECES.plazaLamps[0]),
+  streetLamp: size(PIECES.streetLamp),
+  planter: size(PIECES.planter),
+  tree: { w: PLANT_SIZE.tree.tiles * TILE, h: Math.round(FLOOR * PLANT_SIZE.tree.floors) },
+  bush: { w: PLANT_SIZE.bush.tiles * TILE, h: Math.round(FLOOR * PLANT_SIZE.bush.floors) },
+  sidewalk: { w: TILE, h: PIECES.sidewalk.h },
+  forecourt: { w: 2 * TILE, h: PIECES.forecourt.h },
+  road: { w: 4 * TILE, h: PIECES.rightRoad.h },
+  strip: { w: TILE + 1, h: STRIP_ABOVE + STRIP_BELOW },
+};
+
+/** The lamp brightness steps baked (the game fades continuously). */
+export const LAMP_STEPS = [0, 25, 50, 75, 100];
+/** Fountain frames: the water's motions share no period, so this samples one
+ *  stretch close to a loop. */
+export const FOUNTAIN_FRAMES = 24;
+export const FOUNTAIN_DT = 0.1;
+/** Tree variants baked (the game seeds each tree by the tower and its spot). */
+export const TREE_VARIANTS = 8;
+
+/** The grass frame name for a lot tile. */
+export function grassName(tile: number): string {
+  const g = grassLook(tile);
+  return `s${g.shade}/${g.tuft ? "tuft" : "flat"}`;
+}
+
+/** A lot tile showing each grass look, for the bake. */
+function grassSamples(): Map<string, number> {
+  const grass = new Map<string, number>();
+  for (let t = 0; t < WORLD.lotWidth && grass.size < 6; t++) if (!grass.has(grassName(t))) grass.set(grassName(t), t);
+  return grass;
+}
+
+function still(name: string, sz: { w: number; h: number }, paint: ScenerySpec, keys: Keys): StillJob {
+  // The scenery joined the atlas after its first release, so its images pack
+  // on pages of their own and leave the older pages as they were.
+  return { type: "still", name, w: sz.w, h: sz.h, anchor: { x: 0, y: 0 }, keys: { kind: "scenery", ...keys }, paint, ownPages: true };
+}
+
+/** Every scenery frame. */
+export function sceneryJobs(): Job[] {
+  const jobs: Job[] = [
+    still("scenery/roundabout", SIZE.roundabout, { p: "scenery", piece: "roundabout" }, { piece: "roundabout" }),
+    still("scenery/planter", SIZE.planter, { p: "scenery", piece: "planter" }, { piece: "planter" }),
+    still("scenery/bush", SIZE.bush, { p: "scenery", piece: "bush" }, { piece: "bush" }),
+    still("scenery/ground/sidewalk", SIZE.sidewalk, { p: "scenery", piece: "sidewalk" }, { piece: "sidewalk" }),
+    still("scenery/ground/forecourt", SIZE.forecourt, { p: "scenery", piece: "forecourt" }, { piece: "forecourt" }),
+    still("scenery/ground/road", SIZE.road, { p: "scenery", piece: "road", phase: 4 }, { piece: "road" }),
+  ];
+  for (const pct of LAMP_STEPS) {
+    jobs.push(still(`scenery/plaza-lamp/a${pct}`, SIZE.plazaLamp, { p: "scenery", piece: "plazaLamp", a: pct / 100 }, { piece: "plazaLamp", lamp: pct }));
+    jobs.push(still(`scenery/street-lamp/a${pct}`, SIZE.streetLamp, { p: "scenery", piece: "streetLamp", a: pct / 100 }, { piece: "streetLamp", lamp: pct }));
+  }
+  for (let v = 0; v < TREE_VARIANTS; v++) jobs.push(still(`scenery/tree/v${v}`, SIZE.tree, { p: "scenery", piece: "tree", seed: v }, { piece: "tree", variant: v }));
+  for (const [name, tile] of grassSamples()) {
+    const g = grassLook(tile);
+    jobs.push(still(`scenery/ground/grass/${name}`, SIZE.strip, { p: "scenery", piece: "strip", tile, paved: false }, { piece: "grass", shade: g.shade, tuft: g.tuft }));
+  }
+  for (const joint of [false, true]) {
+    jobs.push(still(`scenery/ground/pave/${joint ? "joint" : "plain"}`, SIZE.strip, { p: "scenery", piece: "strip", tile: joint ? 0 : 1, paved: true }, { piece: "pave", joint }));
+  }
+  const fountain: AnimJob = {
+    type: "anim",
+    name: "scenery/fountain",
+    ...SIZE.fountain,
+    anchor: { x: 0, y: 0 },
+    keys: { kind: "scenery", piece: "fountain" },
+    dt: FOUNTAIN_DT,
+    loop: true,
+    ownPages: true,
+    frames: Array.from({ length: FOUNTAIN_FRAMES }, (_, i): ScenerySpec => ({ p: "scenery", piece: "fountain", t: i * FOUNTAIN_DT })),
+  };
+  jobs.push(fountain);
+  return jobs;
+}
+
+const at = (r: PieceRect) => ({ x: r.x, y: r.y });
+
+/** Where the game places each piece (see docs/atlas.md, "The world outside
+ *  the tower"), back to front. */
+export function sceneryData() {
+  return {
+    tileW: TILE,
+    floorH: FLOOR,
+    lotTiles: WORLD.lotWidth,
+    ground: {
+      // Solid fills: the dirt from the ground line down, and the ground line
+      // centered on y 0, both across `lots` lot widths centered on the lot.
+      dirt: { color: GROUND.dirt, x: -((GROUND.lots - 1) / 2) * WORLD.lotWidth * TILE, w: GROUND.lots * WORLD.lotWidth * TILE, y: 0, h: groundBelowFloors(WORLD) * FLOOR },
+      line: { color: GROUND.line, y: -GROUND.lineH / 2, h: GROUND.lineH },
+      strip: {
+        y: -STRIP_ABOVE,
+        tileW: TILE,
+        apronPadTiles: APRON_PAD_TILES,
+        jointEvery: PAVE_JOINT_EVERY,
+        grass: Array.from({ length: WORLD.lotWidth }, (_, t) => grassName(t)),
+      },
+      runs: [
+        { frame: "scenery/ground/sidewalk", ...PIECES.plazaSidewalk, tileOriginX: PIECES.plazaSidewalk.x },
+        // The roundabout shares the ground's plane: one copy, before the road.
+        { frame: "scenery/roundabout", ...PIECES.roundabout, tileOriginX: PIECES.roundabout.x },
+        // The game's last road segment runs one column on, over the roundabout's
+        // first column.
+        { frame: "scenery/ground/road", ...PIECES.leftRoad, w: PIECES.leftRoad.w + 1, tileOriginX: 0 },
+        { frame: "scenery/ground/forecourt", ...PIECES.forecourt, tileOriginX: PIECES.forecourt.x },
+        { frame: "scenery/ground/sidewalk", ...PIECES.sidewalk, tileOriginX: PIECES.sidewalk.x },
+        { frame: "scenery/ground/road", ...PIECES.rightRoad, tileOriginX: PIECES.rightRoad.x },
+      ],
+    },
+    props: [
+      { frame: "scenery/fountain", ...at(PIECES.fountain) },
+      ...PIECES.plazaLamps.map((r) => ({ frame: "scenery/plaza-lamp", ...at(r) })),
+      { frame: "scenery/street-lamp", ...at(PIECES.streetLamp) },
+      { frame: "scenery/planter", ...at(PIECES.planter) },
+    ],
+    // The skyline and the plants are seeded by the tower's founding seed
+    // (`hash01` and the rules below; docs/atlas.md spells them out).
+    skyline: {
+      overscanTiles: skylineOverscanTiles(WORLD),
+      bands: SKYLINE_BANDS.map((b) => ({ ...b, frame: `sky/skyline/${b.depth === 0 ? "far" : "near"}` })),
+    },
+    plants: {
+      rule: PLANT_RULE,
+      size: PLANT_SIZE,
+      // A plant's canvas is centered on its tile's left edge, and its bottom
+      // edge (exclusive) sits at bottomY.
+      bottomY: -STRIP_ABOVE + 2,
+      clearTiles: PLANT_CLEAR_TILES,
+      treeVariants: TREE_VARIANTS,
+      paint: PLANT_PAINT,
+    },
+    lamp: { steps: LAMP_STEPS, fadeIn: [18, 20], fadeOut: [5, 7] },
+  };
+}
+
+/** The sky's background, the sun's arc, the clouds' drift and the rain
+ *  (`towerScene.ts`, `towerOverlay.ts`), in the game's own terms, all drawn in
+ *  screen space, sized to the view. */
+export function skyData() {
+  return {
+    // The view's background is data.skyColors[floor(hour) * columnsPerHour],
+    // the color of the whole game hour; the sun or moon draws over it, then
+    // the clouds.
+    background: { columnsPerHour: SKY_COLUMNS / 24 },
+    sun: { ...SUN_ARC, day: "sky/sun", night: "sky/moon" },
+    clouds: {
+      ...CLOUD_DRIFT,
+      // The engine's weather to the cloud frames it shows (clear shows none).
+      weathers: { cloudy: "overcast", rain: "rain" } satisfies Record<Exclude<WeatherKind, "clear">, Extract<PaintSpec, { p: "cloud" }>["weather"]>,
+      list: Array.from({ length: CLOUD_COUNT }, (_, i) => ({ frame: i, ...cloudMotion(cloudSeed(i)) })),
+    },
+    // Drawn over the whole view, in front of the world, on rainy days.
+    rain: RAIN,
+  };
+}
+
+/** The frame families on each of the game's draw planes ({@link Z}). */
+const PLANE_FRAMES: Record<keyof typeof Z, string[]> = {
+  sky: ["sky/gradient", "sky/sun", "sky/moon", "sky/cloud"],
+  skylineFar: ["sky/skyline/far"],
+  skylineNear: ["sky/skyline/near"],
+  dirt: [],
+  groundLine: [],
+  strip: ["scenery/ground/grass", "scenery/ground/pave"],
+  groundEdge: ["scenery/ground/sidewalk", "scenery/ground/road", "scenery/roundabout", "scenery/ground/forecourt"],
+  plant: ["scenery/fountain", "scenery/plaza-lamp", "scenery/street-lamp", "scenery/planter", "scenery/tree", "scenery/bush"],
+  hang: ["facade/escape", "facade/awning", "facade/crane"],
+  structure: ["structure/floor", "structure/lobby", "structure/entrance"],
+  room: ["room"],
+  walker: ["person/walker"],
+  animatedRoom: ["fire", "construction"],
+  streetCar: ["vehicle/streetcar"],
+  vehicle: ["vehicle/metrotrain", "vehicle/garbagetruck"],
+  transport: ["shaft", "transport/stairs", "transport/escalator"],
+  cab: ["car"],
+  crowd: ["person/walker"],
+  overlay: [],
+};
+
+/** The game's draw planes, back to front, with the families drawn on each. */
+export function depthData() {
+  return (Object.keys(Z) as (keyof typeof Z)[])
+    .map((plane) => ({ plane, z: Z[plane], frames: PLANE_FRAMES[plane] }))
+    .sort((a, b) => a.z - b.z);
+}

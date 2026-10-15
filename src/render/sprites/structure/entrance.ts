@@ -1,5 +1,6 @@
 import type { DrawCtx } from "../common";
 import { personSeated } from "../../pixelSprites/common";
+import { layerBreak } from "../../pixelSprites/layers";
 
 /**
  * The ground-floor grand and service entrance facades: the wide two-tile grand
@@ -104,6 +105,9 @@ function drawGrandHotelBody(d: DrawCtx, R: Filler, W: number, h: number): void {
   R(0, fy, W, h - fy, "#8A8478");
   R(dcx - 5, fy, 10, h - fy, "#9A2E38");
   R(dcx - 5, fy, 10, 1, "#B84450"); // carpet edge highlight
+  // The facade is the shell; the palm, the reception and the doorman stand in
+  // front of it (depth layers, `pixelSprites/layers.ts`).
+  layerBreak(d.ctx);
   // Right potted palm flanking the doors (the left flank carries the reception).
   palm(R, W - 4, fy);
 }
@@ -241,6 +245,8 @@ export function drawGrandCompact(d: DrawCtx, x: number, y: number, w: number, h:
   R(0, fy, w, h - fy, "#8A8478");
   R(lc - 3, fy, 7, h - fy, "#9A2E38");
   R(lc - 3, fy, 7, 1, "#B84450");
+  // The facade is the shell; the palm and the doorman stand in front of it.
+  layerBreak(ctx);
   // One compact potted palm tucked at the far left, sized to fit the tile so it
   // is not clipped off the left edge.
   R(0, fy - 3, 3, 3, "#5C4A38"); // pot (cols 0..2)
@@ -328,6 +334,8 @@ export function drawServiceEntrance(ctx: CanvasRenderingContext2D, x: number, y:
   ctx.fillRect(plateL, plateT + plateH - 1, plateW, 1);
   ctx.fillStyle = "#5c4a1e"; // etched "lettering"
   ctx.fillRect(plateL + 1, plateT + 2, plateW - 2, 1);
+  // The door and its plate are the shell; the plant stands in front of them.
+  layerBreak(ctx);
   // Potted plant beside the door: brass/copper pot with a green shrub, the
   // same shrub language the sky-lobby planter uses so plants read as one
   // family across the concourse. Sits on the polished floor above the carpet.

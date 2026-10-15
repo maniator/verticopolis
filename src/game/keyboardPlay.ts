@@ -1,12 +1,12 @@
 import type { Simulation } from "../engine/Simulation";
-import { FACILITIES } from "../engine/facilities";
+import { catalogFacility } from "../engine/catalogTypes";
 import type { FacilityKind } from "../engine/types";
 import type { Picked, TowerEngine } from "../render/excalibur/TowerEngine";
 import type { Tool, UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import { announceForPlacement, snapX, stepCursor, type PlaceOutcome } from "../ui/placement";
 import type { BuildActions } from "./buildActions";
-import { gameplaySession } from "../analytics";
+import { towerCatalog } from "../engine/towerCatalog";
 
 /**
  * Keyboard play (F50–52): the virtual build cursor moved with arrows/WASD,
@@ -107,7 +107,7 @@ export class KeyboardPlay {
     if (!c) return;
     const loc = c.floor >= 1 ? `floor ${c.floor}` : `basement ${1 - c.floor}`;
     const here = this.deps.pickedAt(c.floor, c.tile);
-    this.deps.announce(`Cursor: ${loc}, column ${c.tile}. ${here ? FACILITIES[here.kind].name : "Empty"}.`);
+    this.deps.announce(`Cursor: ${loc}, column ${c.tile}. ${here ? catalogFacility(towerCatalog(this.deps.getSim()), here.kind).name : "Empty"}.`);
   }
 
   commitCursor(): void {
@@ -120,7 +120,7 @@ export class KeyboardPlay {
     if (tool.type === "inspect") {
       const p = this.deps.pickedAt(c.floor, c.tile);
       this.deps.selectPicked(p);
-      this.deps.announce(p ? `Selected ${FACILITIES[p.kind].name}` : "Nothing to inspect here");
+      this.deps.announce(p ? `Selected ${catalogFacility(towerCatalog(this.deps.getSim()), p.kind).name}` : "Nothing to inspect here");
       return;
     }
     if (tool.type === "bulldoze") {
@@ -132,18 +132,18 @@ export class KeyboardPlay {
     // Undo parity with the mouse path (onActionDown captures, onActionUp
     // commits): without this, Ctrl+Z fused a keyboard build into the previous
     // mouse gesture and keyboard builds were never individually undoable.
-    this.deps.captureUndo(`Build ${FACILITIES[kind].name}`);
+    this.deps.captureUndo(`Build ${catalogFacility(towerCatalog(this.deps.getSim()), kind).name}`);
     const placed = this.deps.placeSimpleBuild(kind, c.tile, c.floor);
     if (placed) {
-      this.deps.announce(announceForPlacement(placed, kind, c.floor));
+      this.deps.announce(announceForPlacement(placed, towerCatalog(this.deps.getSim()), kind, c.floor));
       this.refreshCursorPreview();
     } else if (this.deps.isTransportTool()) {
       if (!this.kbAnchor) {
         // Snap the anchor column like the mouse path, so a wide shaft near the
         // right edge places instead of failing.
-        this.kbAnchor = { tile: snapX(kind, c.tile), floor: c.floor };
+        this.kbAnchor = { tile: snapX(towerCatalog(this.deps.getSim()), kind, c.tile), floor: c.floor };
         this.refreshCursorPreview();
-        this.deps.announce(`${FACILITIES[kind].name} anchored at floor ${c.floor}. Move to the other end and press Enter.`);
+        this.deps.announce(`${catalogFacility(towerCatalog(this.deps.getSim()), kind).name} anchored at floor ${c.floor}. Move to the other end and press Enter.`);
       } else {
         const bottom = Math.min(this.kbAnchor.floor, c.floor);
         const top = Math.max(this.kbAnchor.floor, c.floor);
@@ -151,12 +151,8 @@ export class KeyboardPlay {
         this.kbAnchor = null;
         this.deps.engine().transportPreview = null;
         if (res.ok) {
-          // This drag-sized shaft builds via getSim() directly, not through
-          // BuildActions, so count it for build-depth telemetry the same way
-          // tryBuildTransport does (top is the shaft's reach for the peak).
-          gameplaySession.noteBuild(kind, top);
           this.deps.audio.sfx("build");
-          this.deps.announce(`${FACILITIES[kind].name} built, floors ${bottom} to ${top}`);
+          this.deps.announce(`${catalogFacility(towerCatalog(this.deps.getSim()), kind).name} built, floors ${bottom} to ${top}`);
         } else {
           this.deps.audio.sfx("error");
           if (res.reason) this.deps.ui.toast(res.reason, "bad");
@@ -176,7 +172,7 @@ export class KeyboardPlay {
       this.deps.announce("Nothing to bulldoze here");
       return;
     }
-    const name = FACILITIES[p.kind].name;
+    const name = catalogFacility(towerCatalog(this.deps.getSim()), p.kind).name;
     this.deps.captureUndo("Bulldoze");
     this.deps.build.bulldozePicked(p);
     this.deps.commitUndo();

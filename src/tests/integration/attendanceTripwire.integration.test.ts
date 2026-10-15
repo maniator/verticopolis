@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename, dirname, resolve } from "node:path";
@@ -139,7 +140,7 @@ describe("attendance tally tripwire", () => {
     expect(finishBody.match(donePattern)).not.toBeNull();
   });
 
-  it("tallies reconcile against live people across a full mixed day", () => {
+  itTypeScriptOnly("jumps the clock after the crowd exists (setClock to day 1, 18:00); no command relays a clock write")("tallies reconcile against live people across a full mixed day", () => {
     const sim = mixedTower();
     // Lunch window through the evening attendance window: meal round trips,
     // office matinees, hotel mingles, and street visitors all fire.
@@ -184,7 +185,7 @@ describe("attendance tally tripwire", () => {
     reconcile(sim);
   });
 
-  it("mid-stay despawn paths keep the balance: bulldozed origin and severed return", () => {
+  itTypeScriptOnly("jumps the clock after the crowd exists; no command relays a clock write")("mid-stay despawn paths keep the balance: bulldozed origin and severed return", () => {
     const sim = mixedTower();
     setClock(sim, 18);
     const hall = sim.tower.units.find((u) => u.kind === "partyHall" && u.floor === 2)!;
@@ -292,7 +293,7 @@ describe("mid-visit teardown paths (issue #302 scenario walk)", () => {
     return { sim, hall };
   }
 
-  it("bulldozing the venue mid-visit: the tally dies with the unit and a rebuilt unit takes no ghost decrement", () => {
+  itTypeScriptOnly("rebuilds the venue through an un-relayed sim.tower.place(\"fastFood\", ...) and jumps the clock after the crowd exists; no command relays either")("bulldozing the venue mid-visit: the tally dies with the unit and a rebuilt unit takes no ghost decrement", () => {
     const { sim, hall } = withCountedAttendees();
     const hallFloor = hall.floor;
     const hallX = hall.x;
@@ -332,7 +333,7 @@ describe("mid-visit teardown paths (issue #302 scenario walk)", () => {
     reconcile(sim);
   });
 
-  it("a fire mid-visit guts the venue through the real event system without touching the tally", () => {
+  itTypeScriptOnly("drives the event system directly (a unit set on fire, events.restore, events.pending) mid-run")("a fire mid-visit guts the venue through the real event system without touching the tally", () => {
     const { sim, hall } = withCountedAttendees();
     // Ignite through the engine's own mid-fire re-arm path (the exact shape
     // deserialize uses to restore a save taken during a blaze): the unit

@@ -13,6 +13,66 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.34.1
+
+- Studio and apartment residents now go to bed at 11 PM and get up at 6 AM on time.
+
+## 2.34.0
+
+- Downloading a legacy .TDT file while another export is still running now says so and asks you to try again when it finishes.
+
+## 2.33.0
+
+- When saving an exported tower file fails, the game now shows only the failure message, without a second one claiming the export worked.
+- An export that finishes after a "not responding" warning now says it finished after all.
+
+## 2.32.0
+
+- On the opt-in WASM engine, an installed game reopened in the same browser session now starts on that engine with no connection, instead of quietly switching back to the default one. Starting offline in a fresh browser session is still to come.
+
+## 2.31.2
+
+## 2.31.1
+
+## 2.31.0
+
+- Help's Privacy section is shorter: it now describes only the game you play in your browser, with the same anonymous, cookie-free counts as before.
+
+## 2.30.0
+
+- Help's About section now links to the licenses of the open-source software the game is built with.
+
+## 2.29.6
+
+- An exported tower file is now the same in every browser, and exporting no longer needs the browser's compression support.
+
+## 2.29.5
+
+- A tower or room name cut through an emoji (the name box had room for only part of it) now loads the same on the default engine as on the opt-in WASM engine, with a placeholder mark where the half character was.
+
+## 2.29.4
+
+- On the opt-in WASM engine, rooms redraw the moment workers step out for lunch or guests arrive at a venue, instead of up to an hour later.
+
+## 2.29.3
+
+- On the opt-in WASM engine, the elevator Schedule dialog shows its demand curve and advice again, and the Tower Statistics show elevator loads and how many hotel rooms went unserved yesterday.
+- Dollar amounts and counts in the event log now read the same on both engines, with thousands separators and the right plurals ("1 clinic", "3 Recycling Centers"), in every browser language.
+
+## 2.29.2
+
+- On the opt-in WASM engine, the notices for a condo sale, a condo buy-back and a tenant leaving now read the same as on the default engine.
+
+## 2.29.1
+
+- The game can run on the new Rust engine: open it with `?engine=wasm` and the version line on the title screen, Settings, and Help reads "WASM engine" while it does. Nothing changes unless you ask for it.
+
+## 2.29.0
+
+## 2.28.0
+
+## 2.27.0
+
 ## 2.25.2
 
 - Elevator floor numbers now scale with the zoom level instead of looking oversized when zoomed out, and they no longer flicker as elevator cars pass a floor.
