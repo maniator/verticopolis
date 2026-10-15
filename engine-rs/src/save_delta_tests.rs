@@ -1,6 +1,8 @@
 //! Tests for `save_delta.rs`: a delta carries exactly the units whose save
 //! form moved, and patching it onto the last full save gives the new one.
 use super::*;
+use crate::canonical::digest;
+use crate::snapshot::state_view;
 
 /// A scenario of the lock run up to one of its checkpoints.
 fn at(id: &str, label: &str) -> Simulation {
@@ -95,8 +97,10 @@ fn a_delta_leaves_the_simulation_as_it_was() {
     m.full(&sim);
     sim.tick(60.0);
     let before = sim.serialize();
+    let hash = digest(&state_view(&sim));
     m.delta(&mut sim).unwrap();
     assert_eq!(sim.serialize(), before);
+    assert_eq!(digest(&state_view(&sim)), hash, "the conformance hash");
 }
 
 #[test]

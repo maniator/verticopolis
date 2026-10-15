@@ -81,8 +81,9 @@ export interface LoadedReply {
 }
 
 /** The full-save half of a frame, sent when the tower's revision moved
- *  since the last one sent, when asked for, or when the engine cannot
- *  describe an hour pass as a delta. */
+ *  since the last one sent, when asked for, or on an hour pass a delta
+ *  cannot carry (the engine cannot describe it, or a command ran since the
+ *  last sync). */
 export interface MergePayload {
   save: string;
   telemetry: string;

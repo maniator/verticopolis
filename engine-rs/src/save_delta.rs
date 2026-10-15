@@ -38,14 +38,18 @@ impl SaveMirror {
     /// the same serialization.
     pub fn full(&mut self, sim: &Simulation) -> String {
         let save = sim.serialize();
-        self.units.clear();
+        self.clear();
+        // The save writes every unit in tower order; pair them only when the
+        // counts agree, or leave the mirror unprimed (no delta, full saves).
         if let Some(units) = save.get("units").and_then(Value::as_array) {
-            self.units.reserve(units.len());
-            for (unit, saved) in sim.tower.units.iter().zip(units) {
-                self.units.push((unit.clone(), saved.to_string()));
+            if units.len() == sim.tower.units.len() {
+                self.units.reserve(units.len());
+                for (unit, saved) in sim.tower.units.iter().zip(units) {
+                    self.units.push((unit.clone(), saved.to_string()));
+                }
+                self.primed = true;
             }
         }
-        self.primed = true;
         save.to_string()
     }
 

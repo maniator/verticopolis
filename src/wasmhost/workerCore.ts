@@ -9,9 +9,11 @@ import type { FromWorker, OpsMessage, ToWorker } from "./workerProtocol";
  * the order they arrive, and answers each frame request with the frame view
  * (its buffer transferred), the gameplay events drained since the last
  * reply, the log entries the main thread lacks, the pending choice, and the
- * full save only when the tower's revision moved since the last one it sent
- * (or when asked). When only the hour pass moved it sends the engine's delta
- * against the last save or delta sent instead (#1045).
+ * save half: the full save when the tower's revision moved since the last
+ * one it sent or when asked, and on an hour pass the engine's delta against
+ * the last save or delta sent (#1045), or the full save when no delta can
+ * carry it (units added, removed or reordered, or a command since the last
+ * sync).
  */
 export type Post = (msg: FromWorker, transfer?: Transferable[]) => void;
 

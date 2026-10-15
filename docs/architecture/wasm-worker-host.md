@@ -134,8 +134,9 @@ apply reply ◀──── frame (buffer transferred) ─┘
   - `events` is the one drain of the engine's gameplay events since the
     last reply.
   - `log` holds the entries after the request's cursor.
-  - `merge` is the full save. It is sent only when the revision moved since
-    the last one sent, or when the request asks for it.
+  - `merge` is the full save. It is sent when the revision moved since the
+    last one sent, when the request asks for it, or on an hour pass the
+    delta below cannot carry (the cases are listed with it).
   - `delta` replaces it when only the hour pass moved (#1045): the engine's
     `saveDelta()` text, holding the unit records whose save form changed
     since the last save or delta sent and every other top-level key of the
