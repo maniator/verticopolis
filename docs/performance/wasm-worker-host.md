@@ -39,6 +39,9 @@ The earlier TypeScript-against-WASM baseline is [`ts-vs-wasm.md`](ts-vs-wasm.md)
 - **Commands are acknowledged in about one round trip.** The worker host's
   command-to-ack median is 55 to 60 ms at 1x and 131 to 162 ms at 4x. The
   main-thread hosts answer in the call.
+- **A desktop with a GPU shows the same order** (see "Desktop runs (GPU)"):
+  the worker host is the best WASM host and still behind TypeScript, and the
+  hourly merge is most of the gap.
 - **No cost found in startup, memory or offline.** Start-up is within noise
   of the other modes, the worker adds 2.6 KiB (Brotli) of script, memory is
   1.01x the main-thread WASM host's, and an offline reload comes back on the
@@ -265,6 +268,70 @@ No rayon, atomics, shared memory or simulation change was added.
 - The coalesced and worker hosts are experimental and opt-in. The default
   engine is unchanged.
 
+## Desktop runs (GPU)
+
+> **Snapshot, measured 2026-10-15 on commit `e25ec01` (app 2.34.1), on a
+> desktop: AMD Ryzen 5 5600X, NVIDIA RTX 3060 (ANGLE D3D11), Windows, full
+> Chromium 149.** Two runs, identical except for the viewport, both with
+> validation passed:
+> [`results/2026-10-15-e25ec01c-worker-1280x720/`](results/2026-10-15-e25ec01c-worker-1280x720/)
+> at 1280x720 (14:55 to 16:44 UTC) and
+> [`results/2026-10-15-e25ec01-worker/`](results/2026-10-15-e25ec01-worker/)
+> at 640x360 (16:45 to 18:33 UTC). These figures are from that machine only.
+> They are not mixed with the container run above, which is a different
+> machine, commit and renderer. The live numbers come from re-running
+> `npm run perf:worker` on that machine.
+
+The command rows here are valid; the harness fix landed before these runs.
+They measure the time until the engine acknowledges a command, which is what
+"command to visible frame" counts on the worker host. #1048 renames the row
+and adds a read-model frame row.
+
+Large tower (17,322 people), 1x, medians of 10. Each cell is 1280x720 / 640x360:
+
+| Metric | TypeScript | WASM (shipped) | WASM (coalesced) | Worker host |
+| --- | ---: | ---: | ---: | ---: |
+| Mean FPS | 69.1 / 69.2 | 45.1 / 45.5 | 50.7 / 51.6 | 58.2 / 58.6 |
+| 1% low FPS | 48.7 / 54.7 | 6.75 / 6.81 | 7.04 / 7.22 | 9.41 / 9.82 |
+| Frame time p99 (ms) | 15.5 / 15.5 | 141 / 135 | 134 / 134 | 89.5 / 89.2 |
+| Long-task blocking past 50 ms (ms) | 0 / 0 | 2,833 / 2,826 | 2,754 / 2,682 | 1,317 / 1,295 |
+| Main-thread time, 720 hosted steps (ms) | 692 / 693 | 6,784 / 6,567 | 4,519 / 4,455 | 2,585 / 2,592 |
+| Wall time, 720 hosted steps (ms) | 692 / 693 | 6,785 / 6,568 | 4,519 / 4,455 | 4,510 / 4,506 |
+| Command to engine ack, median (ms) | 13.7 / 13.3 | 22.8 / 20.0 | 11.2 / 10.1 | 138 / 51.9 |
+
+Medium tower (3,240 people), 1x, same layout:
+
+| Metric | TypeScript | WASM (shipped) | WASM (coalesced) | Worker host |
+| --- | ---: | ---: | ---: | ---: |
+| Mean FPS | 68.9 / 69.0 | 63.7 / 64.2 | 64.2 / 64.7 | 67.1 / 67.6 |
+| 1% low FPS | 58.9 / 59.3 | 21.4 / 22.2 | 21.5 / 22.3 | 29.1 / 30.6 |
+| Frame time p99 (ms) | 15.5 / 15.4 | 44.7 / 44.5 | 44.6 / 44.5 | 29.6 / 29.5 |
+| Main-thread time, 720 hosted steps (ms) | 690 / 696 | 2,154 / 2,123 | 1,489 / 1,477 | 803 / 797 |
+
+What the desktop runs add:
+
+- **The worker host is the best WASM host on a GPU too, and TypeScript is
+  still ahead.** On the large tower at 1x the worker host draws 58.2 fps mean
+  against TypeScript's 69.1, and its 1% low is 9.41 against 48.7.
+- **The viewport barely matters.** A quarter of the pixels moves the worker
+  host's rows by about 1% (main-thread time 2,585 against 2,592 ms, p99 89.5
+  against 89.2 ms). On this machine the gap is the host's own work, not
+  rendering.
+- **The hourly merge is the gap.** Merging the full save costs the worker
+  host's main thread 2,207 ms of its 2,585 ms (1280x720) on the large tower at
+  1x, and the p99 frame (89.5 ms) is about one merge. #1045 removes it.
+- **Engine ack spreads widely on the large tower.** The median is 138 ms at
+  1280x720 and 51.9 ms at 640x360, with a 95% interval of 17.4 to 139 ms on
+  the second run. It reads as a command waiting behind a save the worker is
+  serializing; #1048 will measure that directly.
+- **At 4x on the large tower** the worker host draws 18.9 fps mean
+  (TypeScript 41.8) at 1280x720, and 23.8 (TypeScript 53.2) at 640x360.
+
+The plan to close the gap is tracked in order as #1048 (cost split), #1045
+(hourly merge to a revisioned delta), #1049 (changed-only unit records in the
+frame), #1050 (structural edits as deltas) and #1051 (the Rust engine's
+bare-step gap).
+
 ## Running it on another machine
 
 On a desktop with a GPU, from a clean checkout of this branch:
@@ -283,13 +350,16 @@ On a desktop with a GPU, from a clean checkout of this branch:
 
 ## Incomplete
 
-- Command to visible frame: the rows from this run are invalid (above). The
-  harness is fixed, and the metric needs a new run.
-- One machine only. No GPU-backed or desktop run.
+- Command to visible frame: the container run's rows are invalid (above). The
+  desktop runs measure it with the fixed harness, but on the worker host the
+  row counts the engine's ack. What the player sees (the read model shows a
+  command at once) has no row yet; #1048 adds one.
+- No CPU-only desktop run. The desktop runs used the GPU.
 
 ## Follow-ups
 
-- #1045: the hourly full-save merge on the worker host's main thread.
+- #1048, #1045, #1049, #1050, #1051: the worker host speed plan, in order
+  (see "Desktop runs (GPU)").
 - #1018 (fixed in PR #1030): a synchronous save taken with steps in flight carried the frame loop's clock; it now carries its state's own minute.
 - #1019: the engine log after an engine-refused command.
 - #1020: two step-host edges the worker host review found.
