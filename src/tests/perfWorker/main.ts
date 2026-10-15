@@ -136,7 +136,9 @@ export function readModelLimitations(config: WorkerConfig): string[] {
 }
 
 function sh(cmd: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env): void {
-  execFileSync(cmd, args, { cwd, stdio: "inherit", env });
+  // On Windows npm and npx are .cmd scripts, which Node runs only through a
+  // shell. The arguments here are fixed words, so nothing needs quoting.
+  execFileSync(cmd, args, { cwd, stdio: "inherit", env, shell: process.platform === "win32" });
 }
 
 interface Size { raw: number; brotli: number }

@@ -26,7 +26,10 @@ ships are still in the shipped JavaScript (the module counts come from the
 guard's `VC_ENGINE_REPORT`; see [Reproduce](#reproduce)). Since the snapshot, `main`
 added `src/engine/request.ts`, the argument check the instance's commands
 share (#996); the guard flagged it in the wasm-only build, and it is listed
-with that reason, so the branch tip ships 86 of 88. They come to 171,642 minified bytes
+with that reason, so the branch tip ships 86 of 88. The worker host's delta
+(#1045) then split the record coercion out of `serialization.ts` into
+`src/engine/sim/deserializeRecords.ts`, which ships for the same reason, so
+the count is 87 of 89 with no code added. They come to 171,642 minified bytes
 (12.2% of the game's JavaScript). Brotli-compressed on their own, they are
 about 47.2 KiB. The step loop (`src/engine/sim/loop.ts`) and
 `economy/rentalIncome.ts`, which only the loop used, are gone. The engine's
