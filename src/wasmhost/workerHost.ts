@@ -240,13 +240,13 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     }
     // Read everything the reply carries before any write (the events were
     // read above, with the frame view): one that does not parse, or is not
-    // the engine's shape, is fatal with the read model as the last reply left it, so the
-    // fallback's clock (rolled back to that reply's minute) and its state
-    // agree.
+    // the engine's shape, is fatal with the read model as the last reply
+    // left it, so the fallback's clock (rolled back to that reply's minute)
+    // and its state agree.
     const tParse = now();
     const merge = r.merge ? parseMerge(r.merge) : null;
     const parseMs = now() - tParse;
-    const pending = h.pending && r.pending && r.pending !== JSON.stringify(sim.events.pending) ? (JSON.parse(r.pending) as typeof sim.events.pending) : undefined;
+    const pending = h.pending && r.pending ? (JSON.parse(r.pending) as typeof sim.events.pending) : undefined;
     const log = r.log !== null ? parseArray<LogEntry>(r.log, "log") : null;
     relay.suppress(() => {
       if (merge) {
@@ -264,7 +264,8 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
         // The pending choice, also when one replaced another between
         // replies (the batching widens that window).
         if (!h.pending) sim.events.pending = null;
-        else if (pending !== undefined) sim.events.pending = pending;
+        // Compared after the merge, which can set its own copy.
+        else if (pending !== undefined && r.pending !== JSON.stringify(sim.events.pending)) sim.events.pending = pending;
         if (log !== null) appendEngineLog(sim, log, sim.logSeq - simLogSeqAtSync);
         engineLogSeq = h.logSeq;
         simLogSeqAtSync = sim.logSeq;
@@ -461,9 +462,10 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
         stats.approximateSaves++;
         // The read model's state is as of the last fresh reply (its internals
         // as of the last merge, which every hour pass carries), plus the
-        // commands since; its clock already counts the steps still in flight. The save takes the state's own minute, so a tower
-        // loaded from it runs those steps again, an hour or day pass among
-        // them, instead of starting past a boundary that never ran.
+        // commands since; its clock already counts the steps still in
+        // flight. The save takes the state's own minute, so a tower loaded
+        // from it runs those steps again, an hour or day pass among them,
+        // instead of starting past a boundary that never ran.
         const data = Simulation.prototype.serialize.call(sim);
         data.minutes = engineMinutes;
         return data;
