@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.35.0
+
+- The Sprite Gallery now shows every room, shaft, and elevator at the same proportions as your tower.
+
 ## 2.34.1
 
 - Studio and apartment residents now go to bed at 11 PM and get up at 6 AM on time.
