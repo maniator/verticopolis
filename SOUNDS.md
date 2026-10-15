@@ -19,12 +19,16 @@ This doc describes `main` as of 2026-10-15. Numbers quoted from the source
 (gains, rates, frequencies) are a snapshot; the source files named in each
 section are the live values.
 
+When sources disagree, this is the order: the code in `src/audio/` and
+`src/game/` is the truth about what plays today; the SPEC is the truth about
+the intended note data; the audio plan is the truth about ownership and what
+gets built next. This doc only summarizes them.
+
 ## The goal
 
-The 1994 original's soundscape was dynamic in a specific way. Rather than cues
-attached to events, it was a building you could hear: sounds arrived at their
-own rates, layered without coordinating, and changed with the hour and with
-where you were looking.
+The 1994 original's soundscape was dynamic in a specific way. It was a
+building you could hear: sounds arrived at their own rates, layered without
+coordinating, and changed with the hour and with where you were looking.
 
 - **Probability.** An elevator arrival sometimes made a sound and sometimes
   stayed quiet. That is most of why it never became tiring; a cue that fires on
@@ -44,8 +48,10 @@ sound, ask whether it thickens that soundscape or merely announces an event.
   at all: Excalibur draws the tower and nothing more. No `ex.Sound`, no audio
   `Loader`, no per-cue asset files.
 - Almost nothing is sampled. The only files that ship are
-  `src/public/audio/voice-talk.mp3` and `voice-laughs.mp3`, seeds the crowd
-  layer chops into murmur. Everything else is generated at runtime.
+  `src/public/audio/voice-talk.mp3` and `voice-laughs.mp3`: gibberish talk and
+  laughter the owner recorded (provenance and license in `ASSETS-LICENSE.md`),
+  which the crowd layer chops into murmur. Everything else is generated at
+  runtime.
 - The music and action cues are transcriptions of the owner's own recordings
   (hums, chest hits, taps, a bloop, a ping). New cues should speak in that
   voice rather than introduce a fresh instrument.
@@ -82,8 +88,8 @@ sound, ask whether it thickens that soundscape or merely announces an event.
   The **Ambience** slider. Two nodes because rain stays dry while the rest
   shares the reverb.
 - **`sfxBus`** carries the action jingles. The **Effects** slider.
-- **`master`** sits under all of them at gain `0.35`; the topbar button mutes
-  there.
+- **`master`** is downstream of all of them (directly, or through the shared
+  reverb) at gain `0.35`; mute ramps it to zero.
 
 A `bedFilter` lowpass on the ambient path opens as the camera zooms in, so
 distance muffles the building's life. Music bypasses it. Percussion feeds the
@@ -97,8 +103,9 @@ read back from the facade so prefs never store junk.
 
 ## Lifecycle
 
-Browsers refuse to make noise before a gesture, and Tone.js is ~230 kB, so both
-are handled together. `GameApp` (`src/main.ts`) builds the facade at boot with
+Browsers refuse to make noise before a gesture, and the Tone.js chunk is
+large (about 230 kB minified, per the audio plan's audit), so both are handled
+together. `GameApp` (`src/main.ts`) builds the facade at boot with
 nothing heavy loaded. The first real gesture calls `start()`, which
 feature-detects `AudioContext` (so tests and unsupported environments never
 fetch the chunk), then dynamically imports `ToneAudioEngine`. Once the engine
@@ -111,13 +118,22 @@ it that way: `scripts/verify-precache.ts` (part of `npm run build`) fails when
 the audio chunk or any file in `AUDIO_RUNTIME_FILES` is missing from the
 manifest, `src/audio/audioAssets.test.ts` fails when a sound file ships or the
 source names one without listing it, and `e2e/offline.spec.ts` plays today's
-sounds from the cache with the network off.
+sounds from the cache with the network off. `verify-precache.ts` also fails
+the build when the whole precache passes its budget
+(`PRECACHE_BUDGET_BYTES`, 4 MiB today), so a new sound file has to fit.
 
-A `generation` counter guards the load window, so a `dispose()` or superseding
-`start()` mid-flight cannot resurrect a torn-down engine.
+While the chunk loads, a second `start()` returns early. A `generation`
+counter guards the load window, so a `dispose()` mid-flight cannot resurrect a
+torn-down engine.
 
 `setProgram("splash" | "game")` picks the track; the splash theme crossfades to
 the in-game bed on entry.
+
+Known runtime behavior, from the audio plan's audit: pausing the game keeps
+music and ambience playing; a blocking modal freezes ambience updates; there
+is no `visibilitychange` handling, so a hidden tab keeps playing; and the app
+never calls `dispose()`, so the crowd's `humSwell` gain is never released. The
+last two are `web-audio-lifecycle-a11y` (#973).
 
 ## The cue vocabulary
 
@@ -128,7 +144,7 @@ the in-game bed on entry.
 | `build` | One bloop swooping 520 Hz down to 180 Hz | `buildActions.ts`, `editorActions.ts`, `keyboardPlay.ts` |
 | `click` | A small, quick high bloop | `editorActions.ts` |
 | `sell` | Two falling bloops | `buildActions.ts`, `editorActions.ts` |
-| `error` | A slow, sighing double bloop | Every refusal path, paired with its toast; also `frameLoop.ts` when the emergency choice modal opens |
+| `error` | A slow, sighing double bloop | Most player-initiated refusals in `buildActions.ts`, `editorActions.ts`, and `keyboardPlay.ts` (drag paths and a few edge refusals stay quiet); also `frameLoop.ts` when the emergency choice modal opens |
 | `promote` | The splash theme's peak turn on the ping bell | `frameLoop.ts`: a star promotion (2 to 5 stars) and the win dialog |
 | `notify` | A single ping on G4 | The onboarding step chime (wired in `appBoot.ts`) |
 | `money` | An ascending four-note arpeggio | **Nothing. Defined and uncalled.** |
@@ -138,11 +154,13 @@ until "a later pass." The cash ding below sketches one possible use.
 
 ## Where cues come from
 
-Today the `src/game/` call sites decide every cue in one of three ways:
+Today the `src/game/` call sites decide every cue in one of four ways:
 
 - **The player's own action.** `buildActions.ts`, `editorActions.ts`, and
   `keyboardPlay.ts` play `build`, `sell`, `click`, or `error` from the command
   result, so the cue lands on the input frame and covers refusals.
+- **UI only.** The onboarding step chime (`notify`, wired in `appBoot.ts`),
+  mute, and the program change. These stay in the frontend for good.
 - **Polled simulation state.** `frameLoop.ts` plays `promote` when `sim.star`
   rises, `promote` again when `sim.evaluatedTower` opens the win dialog, and
   `error` when `sim.pendingChoice` opens the emergency modal.
@@ -158,13 +176,15 @@ analytics bridge (`src/analyticsEngineBridge.ts`) is its only caller. **Never
 call it from audio code**: a second caller would steal the batch from
 analytics.
 
-The audio plan changes this in stages, each its own backlog row and issue:
+The audio plan changes this in stages, each its own backlog row and issue.
+The first two matter most here:
 
-1. `gameplay-event-hub` (#964): a host-level hub owns the one drain and hands
-   the same batch to every consumer, analytics first.
-2. `web-audio-engine-events` (#965): an audio router on the hub plays
-   `promote` from `star_reached` and retires the `sim.star` poll. The win and
-   emergency cues stay on their dialogs. No audible change.
+- **Stage 1**, `gameplay-event-hub` (#964): a host-level hub owns the one
+  drain and hands the same read-only batch to every consumer, with a
+  throwing consumer isolated from the others.
+- **Stage 2**, `web-audio-engine-events` (#965): an audio router on the hub
+  plays `promote` from `star_reached` and retires the `sim.star` poll. The
+  win and emergency cues stay on their dialogs. No audible change.
 
 Until those land, new gameplay-driven cues have nowhere correct to hook in.
 Rules the plan fixes for every cue, now and later:
@@ -231,32 +251,48 @@ changes what fires.
 `ping` and `thud` are pitched tones; `burst` is a noise hit whose frequency
 column is a filter cutoff. Attack defaults to 0.004 s (a tick); longer is a
 swish. "Companion" is the `pair` field: a second hit at that ratio, delay, and
-relative gain.
+relative gain. A cluster of N hits has N - 1 short gaps and then the pause, and
+the per-minute figures count it that way.
 
 | Scene | Kind | Freq (Hz) | Dur (s) | Gain | Attack | Firing at full activity | Companion | Gate | What it is |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| office | burst | 750–900 | 0.012 | 0.02–0.04 | 0.004 | 4–12 hits @ ~0.13 s, then ~2.7 s pause (**~128/min**) | | workday | Typist one |
-| office | burst | 750–900 | 0.012 | 0.02–0.04 | 0.004 | 4–12 hits @ ~0.14 s, then ~3.5 s pause (**~105/min**) | | workday | Typist two |
+| office | burst | 750–900 | 0.012 | 0.02–0.04 | 0.004 | 4–12 hits @ ~0.13 s, then ~2.7 s pause (**~133/min**) | | workday | Typist one |
+| office | burst | 750–900 | 0.012 | 0.02–0.04 | 0.004 | 4–12 hits @ ~0.14 s, then ~3.5 s pause (**~108/min**) | | workday | Typist two |
 | office | burst | 650–750 | 0.35 | 0.03–0.05 | 0.08 | ~6.0 s gap (**~10/min**) | | workday | Page turn |
 | condo | ping | 1150–1350 | 0.18 | 0.05–0.08 | 0.004 | ~8.0 s gap (**~7.5/min**) | | condoDay | Dish clink |
 | condo | thud | 90–100 | 0.3 | 0.10–0.16 | 0.004 | ~12.0 s gap (**~5/min**) | | condoDay | Cupboard thud |
-| hotel | thud | 64–76 | 0.12 | 0.05–0.09 | 0.004 | 5–9 hits @ ~0.47 s, then ~14 s pause (**~24/min**) | | always | Cart wheel bumps |
+| hotel | thud | 64–76 | 0.12 | 0.05–0.09 | 0.004 | 5–9 hits @ ~0.47 s, then ~14 s pause (**~25/min**) | | always | Cart wheel bumps |
 | hotel | thud | 105–115 | 0.35 | 0.14–0.20 | 0.004 | ~13.5 s gap (**~4.4/min**) | ×0.636, +0.02 s, 0.8 | always | Door close |
 | restaurant | ping | 850–1250 | 0.2 | 0.05–0.13 | 0.004 | ~2.1 s gap (**~29/min**) | ×1.5, +0.06 s, 0.7 | attendance | Glass tinkle |
 | restaurant | thud | 150–210 | 0.18 | 0.06–0.10 | 0.006 | ~6.0 s gap (**~10/min**) | | attendance | Set-down |
 | restaurant | burst | 360–420 | 0.4 | 0.06–0.10 | 0.12 | ~8.5 s gap (**~7.1/min**) | | attendance | Chair scrape |
-| fastFood | burst | 1300–1800 | 0.06 | 0.05–0.10 | 0.012 | 2–4 hits @ ~0.14 s, then ~1.5 s pause (**~95/min**) | | attendance | Tray / wrapper |
+| fastFood | burst | 1300–1800 | 0.06 | 0.05–0.10 | 0.012 | 2–4 hits @ ~0.14 s, then ~1.5 s pause (**~102/min**) | | attendance | Tray / wrapper |
 | fastFood | ping | 900–1400 | 0.15 | 0.05–0.08 | 0.004 | ~2.2 s gap (**~27/min**) | ×1.33, +0.11 s, 0.7 | attendance | Register tone |
 | fastFood | thud | 120–170 | 0.2 | 0.05–0.08 | 0.006 | ~5.0 s gap (**~12/min**) | | attendance | Set-down |
 | shop | burst | 1050–1150 | 0.42 | 0.04–0.07 | 0.1 | ~3.6 s gap (**~17/min**) | | attendance | Browse rustle |
 | outside | ping | 1300–1550 | 0.09 | 0.05–0.07 | 0.004 | ~5.3 s gap (**~11/min**) | ×1.25, +0.11 s, 0.7 | always | **Bird chirp** |
 | outside | ping | 365–375 | 0.35 | 0.07–0.09 | 0.004 | ~20.0 s gap (**~3/min**) | ×1.26, +0 s, 0.8 | always | Distant car horn |
 
-`lobby`, `cinema`, `partyHall`, and `metro` have no elements: murmur and, for
-the last three, a composed program instead.
+`lobby`, `cinema`, `partyHall`, and `metro` have no elements in this table.
+The last three run a composed program from `toneCrowdPrograms.ts` instead,
+while the venue is live:
 
-Look at the bird row twice. It fires about eleven times a minute whenever you
-are looking outside, **at any hour**, because its gate is `always`.
+- **Party hall:** the band plays a 124 BPM remix of the splash hook, and the
+  crowd layer adds the owner's laughs (every 18 to 40 s) and voice-bent whoops
+  (every 22 to 46 s).
+- **Cinema:** a sparse plucked score under muffled dialogue, with a riser into
+  a boom every 8 to 14 s.
+- **Metro:** a scripted train arrival and departure about every 55 s (jittered
+  by up to 20 percent), over a low rumble.
+
+Under every scene sits the room-tone bed (pink noise behind a steep lowpass,
+set per scene in `SCENES`), and rain joins on the dry path when the weather
+calls for it.
+
+Look at the bird row twice. Outside, it chirps whenever you are looking,
+**at any hour**, because its gate is `always`: about eleven times a minute
+with a full street, and still about four a minute at the street's 0.35 crowd
+floor.
 
 ### Murmur
 
@@ -291,7 +327,10 @@ RMS so squeals and shouts are never sampled. Everything else is synthesized.
 
 ### Gate curves
 
-`hourActivity(gate, hour)` in full. This is the entire time-of-day model today.
+`hourActivity(gate, hour)` sampled at the hours where it changes. Between
+the listed hours it ramps linearly (`workday` from 8 to 9 and 17 to 19,
+`condoDay` from 15 to 17 and 21 to 23) or holds. This is the entire
+time-of-day model today.
 
 | Hour | 0 | 3 | 6 | 7 | 8 | 9 | 12 | 15 | 17 | 18 | 19 | 21 | 22 | 23 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -308,8 +347,8 @@ night.** Adding those two is the dawn/dusk work below.
 
 ## Playing a clip instead of a tone
 
-**A proposal, not scheduled.** No backlog row covers clip-backed elements, and
-the audio plan puts existing fidelity first: a new or replacement sound waits
+**This section is a proposal with no schedule.** No backlog row covers
+clip-backed elements, and the audio plan puts existing fidelity first: a new or replacement sound waits
 for the initial audio gate (see "Where cues come from") and an owner audition.
 
 Synthesized elements are a starting point. A real recording can beat a
@@ -317,8 +356,10 @@ filtered sine for anything environmental, so some of these may become
 recordings. The playback machinery already exists and is more general than its
 current use.
 
-`CrowdVoices.emit` (a private method in `toneCrowdVoices.ts`) is, under the
-voice-specific methods wrapped around it, a complete one-shot sample player:
+Inside `toneCrowdVoices.ts`, the private method `CrowdVoices.emit` already
+does everything a one-shot sample player needs. It is internal today: the
+public surface is `phrase`, `laugh`, and `whoop`, so a clip player would add a
+new public method on `CrowdVoices` that calls it.
 
 ```ts
 emit(buffer, gainNode, { rate, offset, wallDur, fade })
@@ -331,7 +372,7 @@ to `track()`, which reaps it on `onended` with a timer backstop. Loading is
 missing seed leaves the layer tone-only rather than throwing.
 
 So a clip-backed element needs little new plumbing: a way to declare itself,
-a loader for more files, and a public method that wraps `emit`.
+a loader for more files, and that new public method.
 
 ### The shape
 
@@ -370,7 +411,11 @@ const rate = Math.pow(2, semi / 12);
 ```
 
 **Playback rate changes length as well as pitch.** A chirp pitched down a
-fourth is a third longer. For short environmental one-shots that is usually
+fourth is a third longer. `emit`'s `wallDur` is wall-clock time, so a region
+`[start, end]` played at `rate` needs `wallDur = (end - start) / rate`;
+passing the region's own length cuts a pitched-down clip short and lets a
+pitched-up one run into the next variant (`phrase` does the same conversion
+the other way round). For short environmental one-shots that is usually
 what you want, and it is why ±3 semitones sounds natural while ±12 sounds like
 a broken tape. Pitch without a length change means `Tone.PitchShift`, far too
 expensive per firing. `pair` reinterprets cleanly: `ratio` multiplies playback
@@ -403,8 +448,9 @@ rate rather than frequency, so the bird's second chirp stays a higher echo.
    degradation for silence.
 7. **Update the element table above** to show the clip file.
 
-The render harness does not cover clips (it mirrors the synth path), and the
-crowd data tests pin the element specs, so a new field means updating them.
+The crowd data tests (`toneCrowdData.test.ts`) pin the element specs, so a new
+field means updating them, and the offline render tool (#969) would need to
+cover clips too.
 
 ### Encoding
 
@@ -450,9 +496,10 @@ hardware or in a replay.
 - **Never draw from the simulation's RNG.** Sound is presentation and the
   seeded streams are part of save determinism. Vary with the `pseudo` hash
   seeded on things that already move. Never `Math.random`, never `sim.rng`.
-- **No bloop ramps below 160 Hz.** The owner could not hear lower floors on
-  phone or laptop speakers across two audition rounds. Deep cues add quiet
-  octave and twelfth partials so small speakers reconstruct the pitch.
+- **No bloop ramps below 160 Hz.** The owner tested on phone and laptop
+  speakers and could not hear lower floors (the audibility rule in
+  `toneVoices.ts`). Deep cues add quiet octave and twelfth partials so small
+  speakers reconstruct the pitch.
 - **Guard retriggers.** `ERROR_HOLDOFF` is the model: a 0.65 s window keyed to
   the voice set by `WeakMap`, with an explicit check for a rewound Tone clock.
 - **Keep the pure modules pure.** `toneScenes.ts` and `toneTracks.ts` carry no
@@ -480,9 +527,21 @@ hardware or in a replay.
 5. If it is optional for the player, gate it at the call site in `src/game/`.
    Mute and the three volumes are the only policy the engine knows about.
 
+Before any of that, check that the sound may be added at all:
+
+- **It is original.** Owner-recorded or synthesized in the project's code,
+  per the short version above.
+- **It can wait for the gate.** A new composition lands only after the
+  initial audio gate (stages 1 and 2 of the audio plan), and only after the
+  owner has auditioned it.
+- **It is player-facing.** A new or changed cue bumps `package.json`
+  `version` (minor, with the lockfile via `npm version`), and its deep review
+  is `/gds-code-review` (see `CLAUDE.md`).
+
 ## Idea: the cash ding
 
-**An idea, not scheduled.** No backlog row or issue covers it yet, and as a
+**This is an idea with no schedule.** No backlog row or issue covers it yet,
+and as a
 new composition it waits for the initial audio gate. One transaction rings
 once; several arriving together ring as a cluster that differs every time, so
 a big payday never becomes one louder ding.
@@ -609,9 +668,9 @@ it muffled. The joke was hearing a shootout through the floor.
 tie retail floors to the money loop texturally. Gated on `attendance`, which
 the scene already uses.
 
-This is a *different sound* from the cash ding: the ding is feedback about your
-money, the register is the building sounding like itself. Both can exist; only
-the ding gets a preference.
+The register and the cash ding would be two separate sounds: the ding is
+feedback about your money, the register is the building sounding like
+itself. Both can exist; only the ding gets a preference.
 
 ### More office activity
 
@@ -642,372 +701,27 @@ looking elsewhere. Read the plan's mapping table before proposing another.
 
 ## Hearing the current sounds
 
-Tweaked a recipe and want to hear it? The script below is an **interim, local
-listening aid**: it is not checked in, no test or CI job runs it, and nothing
-stops it drifting from the source. The checked-in replacement is planned as
-`audio-offline-render` (#969, audio plan stage 4), a tool that renders the real
-graph under `Tone.Offline` to files with a manifest. Once that lands, use it
-and drop this script.
+There is no checked-in way to render the sounds to a file yet. The planned
+tool is `audio-offline-render` (#969, audio plan stage 4): it renders the real
+graph under `Tone.Offline` in headless Chromium to files (the programs, venue
+programs, beds per scene, and jingles) with a manifest, and the outputs stay
+out of the repository. Until it lands, listen in the running game (`npm run
+dev`), zoomed in on the scene you changed.
 
-Until then, save the script outside the repo, then run it **from the repo
-root**:
+An earlier draft of this doc carried a local render script. It was dropped
+because nothing tested it and it re-implemented the crowd layer's synths, so
+it could drift from the game unnoticed. The lessons from it are worth carrying
+into #969:
 
-```
-node ~/render-cues.mjs                 # writes to $TMPDIR/verticopolis-cues.wav
-node ~/render-cues.mjs ~/cues.wav      # or name the file
-```
-
-It covers the seven action cues, the two percussion voices, and **every ambient
-element from the tables above**, in that order, with one-second gaps: about 80
-seconds. It prints a timestamp and true level per sound, so you can seek to
-what you changed:
-
-```
-/tmp/verticopolis-cues.wav
-listening boost: cues x1.94, ambient x22.9  (dBFS below is the TRUE level at the master, before that boost)
-     0.00s    -8.6 dBFS  sfx: build
-     1.34s   -13.5 dBFS  sfx: click
-     2.62s    -8.6 dBFS  sfx: sell
-     4.08s    -6.7 dBFS  sfx: error
-     5.83s   -14.7 dBFS  sfx: promote
-     8.87s   -13.5 dBFS  sfx: notify
-    10.91s   -16.3 dBFS  sfx: money
-    12.33s   -19.9 dBFS  perc: thump (x3)
-    14.47s   -26.2 dBFS  perc: tap (x3)
-    16.52s   -58.4 dBFS  office: typist 1
-    19.20s   -58.9 dBFS  office: typist 2
-    21.79s   -54.0 dBFS  office: page turn
-    26.05s   -41.4 dBFS  condo: dish clink
-    30.31s   -33.4 dBFS  condo: cupboard thud
-    34.67s   -36.9 dBFS  hotel: cart wheel bumps
-    39.99s   -28.1 dBFS  hotel: door close
-    44.43s   -35.7 dBFS  restaurant: glass tinkle
-    48.77s   -36.0 dBFS  restaurant: set-down
-    53.05s   -51.8 dBFS  restaurant: chair scrape
-    57.38s   -51.2 dBFS  fastFood: tray / wrapper
-    58.96s   -39.7 dBFS  fastFood: register tone
-    63.31s   -37.9 dBFS  fastFood: set-down
-    67.59s   -52.0 dBFS  shop: browse rustle
-    71.88s   -40.8 dBFS  outside: bird chirp
-    76.21s   -34.8 dBFS  outside: distant car horn
-```
-
-No new dependencies: `playwright` is a dev dependency and `esbuild` arrives
-through Vite and tsx, so `npm ci` installs both. Chromium is a separate
-download (`npx playwright install chromium`), and the script falls back to any
-Chromium already in Playwright's cache. Rendering runs in Chromium's
-`OfflineAudioContext`, which is pure computation (no sound card, no realtime
-wait). The whole sample takes a few seconds.
-
-Those timings are for orientation only; no test pins them. The pitched `ping` and `thud`
-rows reproduce exactly run to run, but `burst` rows are pink noise, which is
-not deterministic, so their level moves a few dB and the silence trim shifts
-their start slightly. Everything after a burst therefore drifts by a fraction
-of a second between runs. Do not diff two listings and conclude a recipe
-changed; check a `ping` or `thud` row, which will be identical if nothing did.
-
-**Two things the sample is not.** The spacing inside an ambient sample is a
-presentation choice: five hits about 0.7 s apart so you hear timbre and pitch
-spread. Real rates are in the table and some are far slower (the horn's gap is
-~20 s). Cluster elements are the exception and keep their real intra-cluster
-gap, since that stutter is the character of typing. Judge timbre from the
-sample and rate from the table.
-
-And levels are boosted **per group**. Office typing sits around −58 dBFS at the
-master against the error cue's −7, a 50 dB gap. That is correct in game
-and useless in a sample, where one constant would leave the ambient half
-inaudible. So cues and ambient normalize separately: balance *within* a group
-is exactly what the engine produces, and the printed dBFS carries the
-relationship *between* them.
-
-**Things it has to get right**, all learned the hard way:
-
-- **Render through the master gain (`0.35`)** or `build`, `sell`, and `error`
-  clip, which will fool you into thinking a recipe is too hot.
-- **Normalize per group, never per item.** Per-item flattens exactly the
-  information you are listening for.
-- **Trim silence per sound before joining**, or the gaps are not the second
-  they claim and every later timestamp drifts.
-
-Percussion and ambient elements render dry; their real paths pass the shared
-reverb and, for ambient, the camera-driven `bedFilter`. Omitting the filter is
-deliberate. The sfx cues are exact, since that path is dry by design.
-
-Murmur is not included: talkers are runtime grains from the seed mp3s, so it is
-voices rather than a recipe you would tune here.
-
-One structural note: the harness reproduces `CrowdLayer`'s private
-`fireElement` rather than calling it (same synths, volumes, gain multipliers,
-and `pseudo` draws), because offline rendering has no timers, so hit times are
-laid out explicitly. Change the synth definitions in `toneCrowd.ts` and you
-must change them here too, or the sample quietly stops matching the game.
-
-<details>
-<summary><code>render-cues.mjs</code></summary>
-
-```js
-/**
- * Render every default cue recipe and every ambient element to one WAV.
- * Run from the repo root:  node render-cues.mjs [outfile.wav]
- */
-import { createRequire } from "node:module";
-import { writeFileSync, readdirSync, existsSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-
-const REPO = process.cwd();
-const OUT = process.argv[2] ?? join(tmpdir(), "verticopolis-cues.wav");
-const require = createRequire(join(REPO, "package.json"));
-const { chromium } = require("playwright");
-const esbuild = require("esbuild");
-
-if (!existsSync(join(REPO, "src/audio/toneVoices.ts"))) {
-  console.error("Run this from the repo root (no src/audio/toneVoices.ts here).");
-  process.exit(1);
-}
-
-/* The harness itself, bundled from memory so this stays one file. */
-const ENTRY = `
-import * as Tone from "tone";
-import { createSfxVoices, playSfx } from "./toneVoices";
-import { createPercussion } from "./tonePercussion";
-import { midiToFreq } from "./toneScenes";
-import { CROWD_SCENES, pseudo } from "./toneCrowdData";
-
-const SR = 44100, RENDER_S = 4, GAP_S = 1.0, TAIL_S = 0.12, FLOOR = 0.0006;
-/** ToneAudioEngine's master gain. Render without it and the bloops clip. */
-const MASTER = 0.35;
-/** CrowdLayer's own master at full activity and full zoom-in detail:
- *  LAYER_LEVEL(0.5) * (0.38 + 0.62*detail) * sqrt(activity), with both at 1. */
-const CROWD_MASTER = 0.5;
-const CUES = ["build", "click", "sell", "error", "promote", "notify", "money"];
-
-/** Plain-language labels for the element rows, in CROWD_SCENES order. */
-const ELEMENT_LABELS = {
-  office: ["typist 1", "typist 2", "page turn"],
-  condo: ["dish clink", "cupboard thud"],
-  hotel: ["cart wheel bumps", "door close"],
-  restaurant: ["glass tinkle", "set-down", "chair scrape"],
-  fastFood: ["tray / wrapper", "register tone", "set-down"],
-  shop: ["browse rustle"],
-  outside: ["bird chirp", "distant car horn"],
-};
-/** Hits per element sample, and the spacing between them. This is a
- *  PRESENTATION choice and differs from the real firing rate: a car horn
- *  every 20 s makes an unusable sample. Cluster elements keep their real intra-cluster gap,
- *  which is the whole character of typing. */
-const SAMPLE_HITS = 5;
-const SAMPLE_GAP_S = 0.7;
-
-function trim(d) {
-  let s = 0; while (s < d.length && Math.abs(d[s]) < FLOOR) s++;
-  let e = d.length - 1; while (e > s && Math.abs(d[e]) < FLOOR) e--;
-  return s >= e ? new Float32Array(0) : d.slice(s, Math.min(d.length, e + Math.round(TAIL_S * SR)));
-}
-
-async function renderSfx(name) {
-  const buf = await Tone.Offline(() => {
-    const master = new Tone.Gain(MASTER).toDestination();
-    // sfxBus at a default Effects level of 1, deliberately dry (no reverb send).
-    playSfx(createSfxVoices(new Tone.Gain(1).connect(master)), name);
-  }, RENDER_S);
-  return trim(buf.getChannelData(0));
-}
-
-async function renderPerc(which) {
-  const buf = await Tone.Offline(() => {
-    const master = new Tone.Gain(MASTER).toDestination();
-    // Approximate: the real percussion path also passes the shared reverb.
-    const perc = createPercussion(new Tone.Gain(1).connect(master), 0.8);
-    const midi = which === "thump" ? 42 : 66;
-    const voice = which === "thump" ? perc.thump : perc.tap;
-    for (let i = 0; i < 3; i++) voice.triggerAttackRelease(midiToFreq(midi), 0.2, i * 0.4, 0.9);
-  }, RENDER_S);
-  return trim(buf.getChannelData(0));
-}
-
-/**
- * One ambient element, mirroring CrowdLayer's private fireElement: same three
- * synths, same volumes, same gain multipliers, same pseudo-hash draws for
- * frequency and gain. What it cannot mirror is the setTimeout firing loop
- * (offline rendering has no timers), so hit times are laid out explicitly.
- */
-async function renderElement(scene, index) {
-  const el = CROWD_SCENES[scene].elements[index];
-  // Cluster elements keep their real gap; everything else gets readable spacing.
-  const hits = el.cluster ? el.cluster.max : SAMPLE_HITS;
-  const step = el.cluster ? el.rateMin + el.rateVar / 2 : SAMPLE_GAP_S;
-  const dur = 0.4 + hits * step + el.dur + 1.2;
-  let tick = index * 7919 + scene.length * 104729;
-
-  const buf = await Tone.Offline(() => {
-    const master = new Tone.Gain(MASTER).toDestination();
-    // CrowdLayer: master -> toneGain(0.8) -> the three element synths. The
-    // camera-driven bedFilter is deliberately omitted (it changes level and
-    // brightness, never what fires).
-    const toneGain = new Tone.Gain(0.8).connect(new Tone.Gain(CROWD_MASTER).connect(master));
-    const ping = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "sine" },
-      envelope: { attack: 0.004, decay: 0.12, sustain: 0, release: 0.08 },
-    }).connect(toneGain);
-    ping.volume.value = -10; ping.maxPolyphony = 8;
-    const thud = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "sine" },
-      envelope: { attack: 0.006, decay: 0.09, sustain: 0, release: 0.08 },
-    }).connect(toneGain);
-    thud.volume.value = -8; thud.maxPolyphony = 8;
-    const noiseFilter = new Tone.Filter({ type: "lowpass", frequency: 900, rolloff: -48 }).connect(toneGain);
-    const noise = new Tone.NoiseSynth({
-      noise: { type: "pink" },
-      envelope: { attack: 0.004, decay: 0.1, sustain: 0 },
-    }).connect(noiseFilter);
-    noise.volume.value = -16;
-
-    const attack = el.attack ?? 0.004;
-    // fireElement sets the envelope per firing; within one element it is
-    // constant, so hoisting it out of the loop changes nothing.
-    if (el.kind === "burst") {
-      noise.set({ envelope: { attack, decay: Math.max(0.05, el.dur - attack), sustain: 0 } });
-    } else {
-      (el.kind === "ping" ? ping : thud).set({
-        envelope: { attack, decay: Math.max(0.06, el.dur - attack), sustain: 0 },
-      });
-    }
-
-    for (let i = 0; i < hits; i++) {
-      const at = 0.2 + i * step;
-      const freq = el.freqMin + (el.freqMax - el.freqMin) * pseudo(tick++ * 40503 + 5);
-      const gain = el.gainMin + (el.gainMax - el.gainMin) * pseudo(tick++ * 22695477 + 9);
-      if (el.kind === "burst") {
-        noiseFilter.frequency.rampTo(freq, 0.02, at);
-        noise.triggerAttackRelease(el.dur, at + 0.02, gain * 4);
-        continue;
-      }
-      const synth = el.kind === "ping" ? ping : thud;
-      synth.triggerAttackRelease(freq, el.dur, at, gain * 3);
-      if (el.pair) {
-        synth.triggerAttackRelease(freq * el.pair.ratio, el.dur, at + el.pair.delayS, gain * 3 * el.pair.gainScale);
-      }
-    }
-  }, dur);
-  return trim(buf.getChannelData(0));
-}
-
-function encodeWav(s, rate) {
-  const bytes = s.length * 2, ab = new ArrayBuffer(44 + bytes), dv = new DataView(ab);
-  const str = (o, t) => { for (let i = 0; i < t.length; i++) dv.setUint8(o + i, t.charCodeAt(i)); };
-  str(0, "RIFF"); dv.setUint32(4, 36 + bytes, true); str(8, "WAVE"); str(12, "fmt ");
-  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
-  dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true);
-  dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
-  str(36, "data"); dv.setUint32(40, bytes, true);
-  for (let i = 0; i < s.length; i++) {
-    const v = Math.max(-1, Math.min(1, s[i]));
-    dv.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true);
-  }
-  let bin = ""; const u8 = new Uint8Array(ab);
-  for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]);
-  return btoa(bin);
-}
-
-const peakOf = (d) => { let p = 0; for (const v of d) p = Math.max(p, Math.abs(v)); return p; };
-const dbOf = (p) => 20 * Math.log10(p || 1e-9);
-
-globalThis.__renderCues = async () => {
-  const parts = [];
-  for (const n of CUES) parts.push({ group: "cue", name: "sfx: " + n, data: await renderSfx(n) });
-  parts.push({ group: "cue", name: "perc: thump (x3)", data: await renderPerc("thump") });
-  parts.push({ group: "cue", name: "perc: tap (x3)", data: await renderPerc("tap") });
-  // Ambient elements last, in CROWD_SCENES order.
-  for (const scene of Object.keys(CROWD_SCENES)) {
-    const els = CROWD_SCENES[scene].elements;
-    for (let i = 0; i < els.length; i++) {
-      const label = ELEMENT_LABELS[scene]?.[i] ?? "element " + i;
-      parts.push({ group: "ambient", name: scene + ": " + label, data: await renderElement(scene, i) });
-    }
-  }
-
-  // TWO normalization groups. The action cues and the ambient elements are
-  // ~50 dB apart at the master (office typing renders around -58 dBFS against
-  // the error cue's -7), which is correct in game and useless in a
-  // listening sample: one constant across the file leaves the whole ambient
-  // half inaudible. Normalizing each group separately keeps the balance WITHIN
-  // each group exactly as the engine mixes it, and the per-item dBFS printed
-  // below carries the cross-group relationship as a number instead.
-  const boosts = {};
-  for (const g of ["cue", "ambient"]) {
-    const p = Math.max(...parts.filter((x) => x.group === g).map((x) => peakOf(x.data)), 0);
-    boosts[g] = p > 0 ? 0.9 / p : 1;
-  }
-
-  const gap = Math.round(GAP_S * SR);
-  const out = new Float32Array(parts.reduce((n, p) => n + p.data.length, 0) + gap * (parts.length - 1));
-  const cues = []; let at = 0;
-  parts.forEach((p, i) => {
-    cues.push({ name: p.name, startS: at / SR, db: dbOf(peakOf(p.data)), group: p.group });
-    const k = boosts[p.group];
-    for (let j = 0; j < p.data.length; j++) out[at + j] = p.data[j] * k;
-    at += p.data.length;
-    if (i < parts.length - 1) at += gap;
-  });
-  return { wav: encodeWav(out, SR), cues, boosts };
-};
-`;
-
-const bundle = await esbuild.build({
-  stdin: { contents: ENTRY, resolveDir: join(REPO, "src/audio"), loader: "ts" },
-  bundle: true,
-  format: "iife",
-  platform: "browser",
-  target: "es2022",
-  absWorkingDir: REPO,
-  write: false,
-  logLevel: "warning",
-});
-
-/** Playwright's expected browser build can trail what is installed; fall back to
- *  any Chromium already in the cache rather than forcing a fresh download. */
-function installedChromium() {
-  const root = join(process.env.HOME ?? "", ".cache/ms-playwright");
-  if (!existsSync(root)) return undefined;
-  const dirs = readdirSync(root).filter((d) => d.startsWith("chromium-")).sort();
-  for (const d of dirs.reverse()) {
-    for (const rel of ["chrome-linux64/chrome", "chrome-linux/chrome", "chrome-mac/Chromium.app/Contents/MacOS/Chromium"]) {
-      const p = join(root, d, rel);
-      if (existsSync(p)) return p;
-    }
-  }
-  return undefined;
-}
-
-let browser;
-try {
-  browser = await chromium.launch();
-} catch {
-  const executablePath = installedChromium();
-  if (!executablePath) throw new Error("No Chromium found. Run: npx playwright install chromium");
-  browser = await chromium.launch({ executablePath });
-}
-
-const page = await browser.newPage();
-page.on("pageerror", (e) => console.error("[page]", e.message));
-await page.setContent("<!doctype html><title>cues</title>");
-await page.addScriptTag({ content: bundle.outputFiles[0].text });
-const result = await page.evaluate(() => globalThis.__renderCues());
-await browser.close();
-
-writeFileSync(resolve(OUT), Buffer.from(result.wav, "base64"));
-console.log(resolve(OUT));
-console.log(
-  `listening boost: cues x${result.boosts.cue.toFixed(2)}, ambient x${result.boosts.ambient.toFixed(1)}` +
-    `  (dBFS below is the TRUE level at the master, before that boost)`,
-);
-for (const c of result.cues) {
-  console.log(`  ${c.startS.toFixed(2).padStart(7)}s  ${c.db.toFixed(1).padStart(6)} dBFS  ${c.name}`);
-}
-```
-
-</details>
-
-To extend it, add to `CUES` (any `SfxName`) or add a `render*` function beside
-the three that exist.
+- **Render through the master gain (`0.35`)** or `build`, `sell`, and
+  `error` clip, which makes a recipe sound hotter than it is.
+- **Normalize per group (cues, ambience), never per item.** At the master,
+  office typing sits around 50 dB below the `error` cue. That is right in
+  game and inaudible in a sample, and per-item normalizing would flatten the
+  balance you are listening for.
+- **Trim silence per sound before joining**, or every later timestamp
+  drifts.
+- **`burst` elements are pink noise**, so their level varies a few dB run to
+  run; compare a `ping` or `thud` render to tell whether a recipe changed.
+- **Lay out the sample for listening.** A horn every 20 s makes an unusable
+  sample, so space hits for timbre and judge rates from the tables above.
