@@ -152,8 +152,8 @@ simulations again. A test that never ticks and never calls
 `callExterminator` is never hosted; it exercises the TypeScript command
 surface only, and the table counts it as such.
 
-(Superseded by slice 3, which added a CI job of its own.) No CI job runs the parity projects yet. Adding `test:wasm:parity` to
-`test:wasm` (which CI runs) waits until both projects pass.
+No CI job ran the parity projects at this point. (Slice 3 added a CI job
+of its own instead of folding `test:wasm:parity` into `test:wasm`.)
 
 ### The cost (measured on this machine, one worker)
 
@@ -250,6 +250,9 @@ through `itTypeScriptOnly`, which the parity projects skip under the test's
 name suffixed with `[TypeScript-only: <reason>]`, the reason this table
 repeats.
 
+For a row marked "(left out)" the Fails column counts the file's tests,
+since none of them runs on the parity projects.
+
 | Test file | Fails | Bucket | Reason |
 | --- | --- | --- | --- |
 | `attendanceTripwire.integration.test.ts` | 0/12 (4 marked) | d | four marked: three jump the clock after the crowd exists (one of them also rebuilds the venue through an un-relayed `tower.place` mid-run), one drives the event system directly (`events.restore`, `events.pending`) mid-run; the other eight pass on the engine, five of them reading the routing fields slice 2 added |
@@ -280,7 +283,7 @@ repeats.
 | `venueAttendance.integration.test.ts` | 0/21 | fixed | reads `mealVenueId`, which the frame carries now |
 | `venueOrigins.integration.test.ts` | 0/9 | fixed | reads `mealVenueId` and `originUnitId`, which the frame carries now |
 | `src/engine/aquaticCenter.test.ts` (unit) | 0/6 | fixed | reads `mealVenueId`, which the frame carries now |
-| `src/engine/rentalCrowd.test.ts` (unit) | 0/5 | cost, fixed | three tests at the host's own cadence (`atEngineFrameCadence`, slice 3): day-long minute-tick runs that read the crowd, which the frame carries |
+| `src/engine/rentalCrowd.test.ts` (unit) | 0/5 | cost, fixed | three tests at the host's own cadence (`atEngineFrameCadence`, slice 3): minute-tick runs of one to three days that read the crowd, which the frame carries |
 | `src/engine/tower/rooms.test.ts` (unit) | 0/8 | cost, fixed | one test at the host's own cadence (`atEngineFrameCadence`, slice 3), which calls `refreshFromEngine` before each assertion: 360 ticks on a 12,000-unit fixture, with a merge before each census check |
 | `conformance.integration.test.ts` (left out) | 23 | c | the TypeScript side of the referee and the scenario lock writer; its engine twin is `conformanceWasm` |
 | `loaderCases.integration.test.ts` (left out) | 1 | c | the loader-case lock writer; the Rust test replays the lock |
@@ -289,7 +292,7 @@ repeats.
 | `wasmHostAnalyticsBridge`, `wasmWorkerHost`, `wasmWorkerLifecycle`, `wasmWorkerSaves` (left out, slice 3) | 29 | c | start their own host, in process or on the worker; a second host on the instance is refused, and the lifecycle suite's fallback hands a crowded instance back to the TypeScript engine |
 | `conformanceWasmTdt`, `conformanceWasmCanBuild`, `conformanceWasmVctower` (left out) | 51 | c | drive the binding directly, as `conformanceWasm` does |
 | `wasmHostCatalog` (left out) | 10 | c | starts its own host to read the engine's catalog |
-| `perfCompare/*.integration.test.ts` (left out) | 0 | c | the engine comparison's checks run each engine themselves (#972); no file matches the pattern today |
+| `perfCompare/*.integration.test.ts` (left out) | 6 | c | the engine comparison's checks (`page`, `scenarios`) run each engine themselves (#972) |
 | `conformanceWasm.integration.test.ts` (left out) | 21 | c | drives the binding directly |
 | `src/dualrun/mirror.test.ts` (left out) | 10 | c | attaches the relay itself |
 | `src/dualrun/dualRun.test.ts` (left out) | 6 | c | attaches the dual run's relay itself |
@@ -403,7 +406,7 @@ to themselves: a run under load times out tests that pass alone.
 
 ### Next slice
 
-(Slice 3 at the end of this story closes these, by its own route.)
+(Slice 3 at the end of this story took another route: item 1's timeouts run at the host's own cadence instead of waiting on the structural snapshot, item 2 is a CI job of its own, and the (b) getters are filled. Item 3 landed in the e2e and gallery slice.)
 
 1. The structural snapshot (#868) for the merge-per-tick timeouts
    (`fixedStep`, `rooms`, `rentalCrowd`), and the getters the save does not
@@ -1014,9 +1017,13 @@ this slice closes the rest and puts the projects in CI.
   lifecycle suite's fallback failed by name, an instance with a crowd).
 - **CI.** `test.yml` runs both projects on every PR as
   `test-wasm-parity` (one job per project, after `engine-wasm` fills the
-  package cache). It runs in `test.yml` and not in `engine-rs.yml` because
-  the parity projects run every suite, so a change anywhere in `src/` can
-  break them, and `engine-rs.yml` runs only on engine paths.
+  package cache). The job lives in `test.yml` because the parity projects
+  run every suite, so a change anywhere in `src/` can break them, while
+  `engine-rs.yml` runs only on engine paths. It is not a required check
+  yet; that is the owner's call.
+- **The setup's own pins.** `wasmHostSetup.integration.test.ts` calls
+  `atEngineFrameCadence` in one of its pins to test the opt-in itself; it
+  is the setup's test and has no row in the table.
 
 ### The runs (2026-10-15, this machine, four cores)
 
@@ -1026,13 +1033,19 @@ this slice closes the rest and puts the projects in CI.
 | `unitWasm` | 250 | 2794 | 0 | 0 | 116 s |
 
 The 39 skips are the 38 `itTypeScriptOnly` marks (24 in bucket (c), 14 in
-bucket (d), all in the table) plus one pre-existing skip. These figures are
+bucket (d), all in the table) plus one pre-existing skip (the opt-in
+hour-cost bench, `hourCost.bench.integration.test.ts`); the round 2 run's
+other four pre-existing skips no longer run in this project.
+The unit project's file count grew with main (205 files then, 250 now). These figures are
 from a local run; the `test-wasm-parity` job is the live check. The (b) bucket is
 empty, as are (a) and the cost timeouts.
 
 ### What is left for #878
 
-The vitest half (AC1) and the table (AC4) are done, and AC2 and AC3 landed
-in the e2e and gallery slice. The issue's last gate is the CI half of AC3
-at the flip (the committed gallery and the minted baselines coming from
-the WASM engine), which the 3.0.0 switch (#945) does.
+The vitest half (AC1) and the table (AC4) are done once the
+`test-wasm-parity` job is green on this slice's PR, and AC2 and AC3 landed
+in the e2e and gallery slice. Two items stay open: making
+`test-wasm-parity` a required check (the owner's call; until then a red run
+does not block a merge), and the CI half of AC3 at the flip (the committed
+gallery and the minted baselines coming from the WASM engine), which the
+3.0.0 switch (#945) does.

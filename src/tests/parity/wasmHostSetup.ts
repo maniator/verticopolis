@@ -97,7 +97,7 @@ export class WasmParityError extends Error {
 
 if (!hasWasmPackage()) throw new Error("the WASM parity projects need engine-rs/pkg/; run npm run wasm:build");
 (globalThis as Record<string, unknown>)[WASM_PARITY_FLAG] = true;
-(globalThis as Record<string, unknown>)[REFRESH_HOOK] = (sim: Simulation) => { const e = hosted.get(sim); if (!e) return; e.host.syncStructure(); e.revision = sim.tower.revision; e.fingerprint = fingerprint(sim); };
+(globalThis as Record<string, unknown>)[REFRESH_HOOK] = (sim: Simulation) => { const was = hosted.get(sim); if (!was) return; const e = compareOrRehost(sim, was); e.host.syncStructure(); parityStats.merges++; e.revision = sim.tower.revision; e.fingerprint = fingerprint(sim); };
 
 const ENV_SYNC_MODE: "tick" | "hour" = process.env.VC_WASM_SYNC === "hour" ? "hour" : "tick";
 /** The cadence in force: the switch's, or the host's own for a test that

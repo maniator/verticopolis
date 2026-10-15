@@ -50,7 +50,7 @@ describe.skipIf(!onWasmParityProject())("the WASM parity setup", () => {
   it("refuses a cadence request after the test's first hosted tick", () => {
     const sim = Simulation.newGame(5, "modern");
     sim.tick(1);
-    expect(() => atEngineFrameCadence("too late")).toThrow(/before the test's first tick/);
+    expect(() => atEngineFrameCadence("too late")).toThrow(/must be called before the test's first tick/);
     expect(() => atEngineFrameCadence(" ")).toThrow(/needs the reason/);
   });
 
@@ -62,6 +62,7 @@ describe.skipIf(!onWasmParityProject())("the WASM parity setup", () => {
     for (let i = 0; i < 10; i++) sim.tick(1);
     expect(parityStats.merges, "no merge per tick").toBe(merges);
     refreshFromEngine(sim);
+    expect(parityStats.merges, "the refresh merged once").toBe(merges + 1);
     sim.tick(1);
     expect(parityStats.rehosts, "the refresh moved the sync marks with it").toBe(rehosts);
   });

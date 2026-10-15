@@ -33,7 +33,6 @@ export function parseMerge(m: MergePayload): ParsedMerge {
   return { fresh, telemetry, housekeeping, commute };
 }
 
-
 /** A JSON array from a reply whose every item passes `isItem`, or an error
  *  naming the part. */
 export function parseArray<T>(text: string, what: string, isItem: (v: unknown) => boolean): T[] {

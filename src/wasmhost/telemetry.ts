@@ -97,7 +97,12 @@ export function adoptTelemetry(sim: Simulation, doc: TelemetryDocument): void {
  *  an error when the text is not that shape: every row a whole floor and a
  *  finite average, each floor once. */
 export function parseCommuteStress(text: unknown): [number, number][] {
-  const v = typeof text === "string" ? (JSON.parse(text) as unknown) : undefined;
+  let v: unknown;
+  try {
+    v = typeof text === "string" ? JSON.parse(text) : undefined;
+  } catch {
+    v = undefined;
+  }
   const row = (r: unknown): r is [number, number] => Array.isArray(r) && r.length === 2 && Number.isInteger(r[0]) && typeof r[1] === "number" && Number.isFinite(r[1]);
   if (!Array.isArray(v) || !v.every(row) || new Set(v.map((r) => r[0])).size !== v.length) throw new Error("merge: the commute stress is not the engine's shape");
   return v;

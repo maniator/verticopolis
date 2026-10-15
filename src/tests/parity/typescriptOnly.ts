@@ -53,8 +53,8 @@ export function atEngineFrameCadence(reason: string): void {
   if (!onWasmParityProject()) return;
   // The request lasts one test and has to come before its first hosted
   // tick, so a host never changes cadence partway through a run.
-  if (expect.getState().currentTestName === undefined) throw new Error("atEngineFrameCadence is called inside a test body (the setup clears it after each test)");
-  if ((globalThis as Record<string, unknown>)[TICKED_FLAG] === true) throw new Error("atEngineFrameCadence is called before the test's first tick");
+  if (expect.getState().currentTestName === undefined) throw new Error("atEngineFrameCadence must be called inside a test (the setup clears it after each test)");
+  if ((globalThis as Record<string, unknown>)[TICKED_FLAG] === true) throw new Error("atEngineFrameCadence must be called before the test's first tick");
   (globalThis as Record<string, unknown>)[FRAME_CADENCE_FLAG] = true;
 }
 
@@ -65,8 +65,9 @@ export function frameCadenceRequested(): boolean {
 
 /** Merge the engine's full save into a hosted instance now, for a test at
  *  the host's own cadence that asserts on state the frame does not carry
- *  (a unit's `residents`, say). Does nothing off the parity projects or
- *  on an instance that is not hosted. */
+ *  (a unit's `residents`, say). The setup's compare runs first, so an edit
+ *  the relay did not carry is still named. Does nothing off the parity
+ *  projects or on an instance that is not hosted. */
 export function refreshFromEngine(sim: object): void {
   const hook = (globalThis as Record<string, unknown>)[REFRESH_HOOK];
   if (typeof hook === "function") (hook as (sim: object) => void)(sim);

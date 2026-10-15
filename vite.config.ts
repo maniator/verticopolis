@@ -249,6 +249,7 @@ function wasmParityProjects() {
         exclude: [...configDefaults.exclude, "**/*.integration.test.ts", "**/dualrun/mirror.test.ts", "**/dualrun/dualRun.test.ts"],
         setupFiles,
         testTimeout,
+        hookTimeout: testTimeout,
       },
     },
     {
@@ -259,6 +260,7 @@ function wasmParityProjects() {
         exclude: [...configDefaults.exclude, ...typescriptSide],
         setupFiles,
         testTimeout,
+        hookTimeout: testTimeout,
       },
     },
   ];
