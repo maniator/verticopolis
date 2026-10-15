@@ -52,6 +52,13 @@ it on only to prove conformance, as `consumer/` does:
 verticopolis-engine = { git = "https://github.com/maniator/verticopolis", rev = "<sha>", features = ["conformance"] }
 ```
 
+The JavaScript binding's exports carry tiers of their own, separate from
+the crate tiers on this page: player commands, restores and reads, and the
+relay, test and seed ops that skip the charge rules. The table is
+`src/dualrun/exportTiers.ts`; a new export picks a tier there, and
+`src/tests/bindingExportTiers.guard.test.ts` keeps the third tier out of the
+game's UI (#946).
+
 The build needs the Rust toolchain in `Cargo.toml` (`rust-version`) and
 the `engine-rs/` and `conformance/` directories (the event catalog is
 compiled in from there). It needs no Node.js, no npm and nothing else from
