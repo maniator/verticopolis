@@ -150,10 +150,11 @@ apply reply ◀──── frame (buffer transferred) ─┘
     asks for a full save. The load primes the mirror, so the first hour pass
     is a delta too; when the engine read the save into something other than
     what the main thread sent, the first reply carries a full save instead.
-    An hour pass after a command (a camera stamp aside) also sends the full
-    save: the read model ran the command on its own, and a command the engine
-    answered differently in its result alone leaves a unit the engine never
-    changes, which no delta would correct. Units moved in place (a changed
+    An hour pass after a command (a camera stamp or a log line aside, such
+    as the frame loop's meal-rush bulletins) also sends the full save: the
+    read model ran the command on its own, and a command the engine answered
+    differently in its result alone leaves a unit the engine never changes,
+    which no delta would correct. Units moved in place (a changed
     floor, x or width) count as a layout change and ask for a full save too.
 - `error {gen?, seq?, fatal, message}`: `fatal` for a refused load, a gap in
   the sequence, a step the engine failed on or a reply that could not be

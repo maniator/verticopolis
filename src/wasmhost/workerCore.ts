@@ -17,6 +17,11 @@ import type { FromWorker, OpsMessage, ToWorker } from "./workerProtocol";
  */
 export type Post = (msg: FromWorker, transfer?: Transferable[]) => void;
 
+/** Ops that change no unit and cannot be refused: a camera stamp and a log
+ *  line (the frame loop's meal-rush bulletins send one three times a day,
+ *  with no player in it). The hour pass after them can still be a delta. */
+const NO_UNIT_EFFECT: ReadonlySet<string> = new Set(["setView", "emit"]);
+
 /** Refused ops reported per tower before the rest are dropped (a trapped
  *  engine fails every op after the first). A fatal error is always sent. */
 export const MAX_ERRORS_PER_TOWER = 20;
@@ -31,7 +36,7 @@ export class EngineWorkerCore {
   private sentHourRuns = Number.NaN;
   /** The last full save or delta sent (#1045): the next delta's base. */
   private sync = 0;
-  /** A command (a camera stamp aside) ran since the last save sent. The
+  /** A command (a camera stamp or a log line aside) ran since the last save sent. The
    *  read model ran it too, on its own; a command the engine answered
    *  differently (a refusal it reports only in its result) leaves a unit
    *  the engine never changes, which no delta would correct, so the next
@@ -122,7 +127,7 @@ export class EngineWorkerCore {
         }
         continue;
       }
-      if (op.cmd.op !== "setView") this.commandSinceSync = true;
+      if (!NO_UNIT_EFFECT.has(op.cmd.op)) this.commandSinceSync = true;
       try {
         this.shadow.apply(op.cmd);
       } catch (e) {

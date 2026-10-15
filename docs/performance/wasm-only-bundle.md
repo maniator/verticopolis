@@ -29,7 +29,8 @@ share (#996); the guard flagged it in the wasm-only build, and it is listed
 with that reason, so the branch tip ships 86 of 88. The worker host's delta
 (#1045) then split the record coercion out of `serialization.ts` into
 `src/engine/sim/deserializeRecords.ts`, which ships for the same reason, so
-the count is 87 of 89 with no code added. They come to 171,642 minified bytes
+the count is 87 of 89 (the code moved rather than grew; the byte figures
+that follow are the snapshot's). They come to 171,642 minified bytes
 (12.2% of the game's JavaScript). Brotli-compressed on their own, they are
 about 47.2 KiB. The step loop (`src/engine/sim/loop.ts`) and
 `economy/rentalIncome.ts`, which only the loop used, are gone. The engine's

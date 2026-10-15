@@ -59,15 +59,16 @@ describe("the worker host's hourly delta", () => {
     r.host.detach();
   });
 
-  it("sends the hour pass after a command as a full save, and a camera stamp alone as a delta", async () => {
+  it("sends the hour pass after a command as a full save, and after a camera stamp or a log line as a delta", async () => {
     const r = rig();
     await r.settleTasks();
     r.sim.view = { tile: 1, floor: 2, zoom: 1 };
+    r.sim.emit("Lunch rush", "info");
     r.sim.tick(60);
     r.gate().flush();
     await r.settleTasks();
     expect(last(frames(r.toHost))!.delta).not.toBeNull();
-    r.sim.emit("a note", "info");
+    r.sim.money = r.sim.money + 1000;
     r.sim.tick(1);
     r.gate().flush();
     await r.settleTasks();
