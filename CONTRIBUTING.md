@@ -349,7 +349,8 @@ diagrams). The prose conventions below are the source of truth.
 - **`src/audio/`, `src/storage/`**: sound and save/load, independent of
   rendering. The audio engine splits into the live orchestrator
   (`ToneAudioEngine`), its scene/pitch data and math (`toneScenes`), and the
-  melody/accent/jingle synthesis (`toneVoices`).
+  melody/accent/jingle synthesis (`toneVoices`). **[SOUNDS.md](./SOUNDS.md)**
+  maps every audio module, cue, and ambient element, and how to add one.
 - **`src/main.ts`**: the composition root that wires input, engine, and the
   game loop together.
 
