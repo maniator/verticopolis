@@ -27,14 +27,17 @@ runs:
     # (Cargo.toml carries the rust-version and wasm-bindgen pins), the event
     # catalog and every file the sources include (engineSourceHash, the same
     # hash BUILD.json records; see its comment for what it does not model),
-    # plus the scripts that build it and write its third-party record (#955),
-    # the npm script that runs them and this action (a change to what it
+    # plus the scripts that build it and write its third-party record (#955)
+    # with every module they import (the package's file list and the event
+    # catalog renderer among them, so a change to what the build checks
+    # rebuilds instead of restoring a package the old checks passed), the
+    # npm script that runs them and this action (a change to what it
     # caches).
     - id: key
       shell: bash
       run: |
         src=$(node --input-type=module -e 'import { engineSourceHash } from "./src/wasmhost/packageHash.ts"; process.stdout.write(engineSourceHash("engine-rs"))')
-        scripts=$({ cat scripts/wasm-build.ts scripts/engine-third-party.ts scripts/license-files.ts src/build/thirdPartyNotices.ts src/build/rustNotices.ts scripts/build-engine-wasm.sh .github/actions/engine-wasm/action.yml; node -p 'require("./package.json").scripts["wasm:build"]'; } | sha256sum | cut -c1-16)
+        scripts=$({ cat scripts/wasm-build.ts scripts/engine-third-party.ts scripts/license-files.ts src/build/thirdPartyNotices.ts src/build/rustNotices.ts src/wasmhost/packageHash.ts src/wasmhost/engineAssets.ts src/wasmhost/enginePackageNames.ts src/engine/gameplayCatalog.ts scripts/build-engine-wasm.sh .github/actions/engine-wasm/action.yml; node -p 'require("./package.json").scripts["wasm:build"]'; } | sha256sum | cut -c1-16)
         echo "sources=$src" >> "$GITHUB_OUTPUT"
         echo "key=engine-wasm-v1-$src-$scripts" >> "$GITHUB_OUTPUT"
 
