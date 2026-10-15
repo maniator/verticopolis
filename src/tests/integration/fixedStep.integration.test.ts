@@ -93,6 +93,7 @@ describe("engine fixed time step: the tower is the same at any frame rate", () =
   }
 
   it("a host too slow for the step budget falls behind on the same step sequence", () => {
+    atEngineFrameCadence("the fixture is ticked frame by frame and only the final save, the engine's own while hosted, is compared");
     // 12 Hz at the fastest speed owes more per frame than the step budget
     // covers, so its debt hits the host's 30-minute catch-up cap and the excess
     // is dropped. It must still take exactly the steps a 60 Hz host takes, just
@@ -107,6 +108,7 @@ describe("engine fixed time step: the tower is the same at any frame rate", () =
   });
 
   it("the frame-rate-derived stepping it replaces did diverge (why this exists)", () => {
+    atEngineFrameCadence("the fixture is ticked frame by frame and only the final save, the engine's own while hosted, is compared");
     // The pre-fixed-step host loop: step min(20, acc) with acc carrying the
     // fractional frame-derived minutes. Same save, same owed total, two
     // monitor rates: the step sequences differ, and so does the tower.

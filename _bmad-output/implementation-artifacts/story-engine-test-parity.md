@@ -1,6 +1,6 @@
 ---
 story: engine-test-parity
-status: in progress
+status: review
 depends_on: engine-wasm-switch
 ---
 
@@ -254,17 +254,17 @@ repeats.
 | --- | --- | --- | --- |
 | `attendanceTripwire.integration.test.ts` | 0/12 (4 marked) | d | four marked: three jump the clock after the crowd exists (one of them also rebuilds the venue through an un-relayed `tower.place` mid-run), one drives the event system directly (`events.restore`, `events.pending`) mid-run; the other eight pass on the engine, five of them reading the routing fields slice 2 added |
 | `cockroachInfestation.integration.test.ts` | 0/14 | fixed | the booking is relayed: `callExterminator` hosts the instance ahead of the first tick (see slice 2) |
-| `commuteStress.integration.test.ts` | 2/9 | b | `crowd.commuteStressByFloor`, a live accumulator no save carries (#868) |
+| `commuteStress.integration.test.ts` | 0/9 | fixed | `crowd.commuteStressByFloor` comes from the engine at every merge (`Engine.commuteStress()`, slice 3) |
 | `condoModes.integration.test.ts` | 0/28 (2 marked) | d | the condo is built through `sim.build` (the Classic ladder's Average rung, $150,000, on every engine), its construction finished by ticking past `completeAt`, and the No Rate flag set through `sim.setNoRate`; the two load-clamp tests forge prices on a placed condo that never ticks; two stay TypeScript-only: the re-list test writes `condo.rent = 240_000` after the sale while the crowd is still empty, so the next tick re-hosts (minute 720 under `VC_PARITY_TRACE`) and that load snaps the off-ladder 240,000 onto the Classic ladder, so the buy-back charges the snapped $200,000; and the unpriced band default of a `tower.place`d condo on a never-loaded tower (the load snaps it onto the ladder) |
 | `demographicRoutines.integration.test.ts` | 0/11 | fixed | reads `routine` and `originUnitId`, which the frame carries now |
 | `condoRelocation.integration.test.ts` | 0/8 (6 marked) | c | `simModel = "v1"` in the shared fixture (one monthly roll per tick) |
 | `economyDepth.integration.test.ts` | 0/8 (5 marked) | c | `simModel = "v1"` (the sampled model is not in the save and not ported) |
-| `elevatorStats.integration.test.ts` | 1/3 | b | `elevatorStats()` reads `elevatorUtil`, which the engine does not fill (#868) |
+| `elevatorStats.integration.test.ts` | 0/3 | fixed | `elevatorUtil` comes from the engine since the 2026-10-10 telemetry fix |
 | `faqComplete.integration.test.ts` | 0/26 (2 marked) | d, c | `sim.weather = "rain"` before the ticks: no save carries the weather (a load recomputes it from the day) and the frame sync writes the engine's weather onto the instance on attach and every tick (the test fails unmarked); the cinema booking test sets `simModel = "v1"` |
-| `fixedStep.integration.test.ts` | 4/6 alone, 5/6 under load | cost | frame-sized ticks on a fixture save with a merge per tick (passes under `VC_WASM_SYNC=hour`) |
+| `fixedStep.integration.test.ts` | 0/6 | cost, fixed | runs at the host's own cadence through `atEngineFrameCadence` (slice 3): the fixture is ticked frame by frame and only the final save, the engine's own while hosted, is compared |
 | `goldenMaster.integration.test.ts` | 0/7 (2 marked) | c | the pinned TypeScript save hash; the engine's golden master is row 4's gate |
 | `hotelLateCheckout.integration.test.ts` | 0/19 (1 marked) | d | the understaffed test runs `economy.hotelCheckout()` on the instance mid-run (the checkout pass is the engine's own hourly step) and swaps the clock to each afternoon hour after the crowd exists; the Modern deferred-guests test lost its mark in review round 2 (its `hotelCheckout()` runs before the first tick, so the engine starts from that state) |
-| `housekeepingLegibility.integration.test.ts` | 1/6 | b | `economy.housekeepingReport()` (#868) |
+| `housekeepingLegibility.integration.test.ts` | 0/6 | fixed | the housekeeping report comes from the engine since the 2026-10-10 telemetry fix |
 | `housekeepingMaids.integration.test.ts` | 0/10 | fixed | the noon dispatch is reached by ticking to it (`tickToNoonDispatch`) in place of a clock write plus `dispatchHousekeepers()` |
 | `legibility.integration.test.ts` | 0/16 | fixed | the shortcut elevator and the late condo go through `sim.buildTransport` and `sim.build`; the shell test gives its `construction` unit a `completeAt` (see the advisory note in slice 2) |
 | `mealCadence.integration.test.ts` | 0/40 | fixed | reads `floors`, which the frame carries now |
@@ -280,12 +280,13 @@ repeats.
 | `venueAttendance.integration.test.ts` | 0/21 | fixed | reads `mealVenueId`, which the frame carries now |
 | `venueOrigins.integration.test.ts` | 0/9 | fixed | reads `mealVenueId` and `originUnitId`, which the frame carries now |
 | `src/engine/aquaticCenter.test.ts` (unit) | 0/6 | fixed | reads `mealVenueId`, which the frame carries now |
-| `src/engine/rentalCrowd.test.ts` (unit) | 1/5 alone, 3/5 under load | cost | three day-long minute-tick runs (4,320 merges) on a six-floor tower against the 30 s timeout, 66 s alone (passes under `VC_WASM_SYNC=hour`); the routing fields it reads are carried now |
-| `src/engine/tower/rooms.test.ts` (unit) | 1/8 | cost | 360 ticks on a 12,000-unit fixture with a merge per tick (passes under `VC_WASM_SYNC=hour`) |
+| `src/engine/rentalCrowd.test.ts` (unit) | 0/5 | cost, fixed | its three day-long minute-tick runs read the crowd, which the frame carries, and run at the host's own cadence through `atEngineFrameCadence` (slice 3) |
+| `src/engine/tower/rooms.test.ts` (unit) | 0/8 | cost, fixed | 360 ticks on a 12,000-unit fixture asserting the census, which reads the unit states the frame carries; runs at the host's own cadence through `atEngineFrameCadence` (slice 3) |
 | `conformance.integration.test.ts` (left out) | 23 | c | the TypeScript side of the referee and the scenario lock writer; its engine twin is `conformanceWasm` |
 | `loaderCases.integration.test.ts` (left out) | 1 | c | the loader-case lock writer; the Rust test replays the lock |
 | `dualRunDay`, `dualRunEdits`, `wasmHost` (left out) | 18 | c | attach a mirror or a host themselves |
 | `wasmHostTelemetry`, `wasmHostLogText` (left out) | 4 | c | drive the TypeScript engine and their own engine side by side |
+| `wasmHostAnalyticsBridge`, `wasmWorkerHost`, `wasmWorkerLifecycle`, `wasmWorkerSaves` (left out, slice 3) | 13 | c | start their own host, in process or on the worker; a second host on the instance is refused, and the lifecycle suite's fallback hands a crowded instance back to the TypeScript engine |
 | `conformanceWasm.integration.test.ts` (left out) | 21 | c | drives the binding directly |
 | `src/dualrun/mirror.test.ts` (left out) | 10 | c | attaches the relay itself |
 | `src/dualrun/dualRun.test.ts` (left out) | 6 | c | attaches the dual run's relay itself |
@@ -963,3 +964,61 @@ change; `/bmad-code-review` then ran three on the scripts.
 After each code round the pinned image rendered both legs again: 91 of 91
 shots the same on both legs every time, and the same as the committed
 gallery from the round-1 refresh on.
+
+
+## Slice 3: green on both engines, and in CI (2026-10-15)
+
+What was left after review round 2 was the #868 read-model list and the
+merge-per-tick timeouts. Most of the list had landed with the engine's
+telemetry fix on 2026-10-10 (`elevatorUtil`, the housekeeping report);
+this slice closes the rest and puts the projects in CI.
+
+- **The commute-stress averages.** The engine already kept them
+  (`Crowd::record_commute`, the same fold and alpha as the TypeScript
+  engine); nothing read them out. `Engine.commuteStress()` returns
+  `[[floor, seconds], ...]` by floor (`Crowd::commute_stress_json`, with a
+  Rust unit test), and both hosts adopt the rows at every merge
+  (`Crowd.adoptCommuteStress`; the worker carries them in the merge payload
+  as `commute`, shape-checked with the rest of the reply).
+  `wasmHostTelemetry.integration.test.ts` now compares them with the
+  TypeScript engine hour by hour on every fixture, and they agree exactly.
+  Nothing in the game reads the averages yet (#502 will), so this changes
+  no player-visible behavior.
+- **The cost bucket.** A test that reads only what the frame carries every
+  tick (the people, the clock, the unit states and counters) or the
+  engine's own save at the end does not need a full merge after every
+  tick. It calls `atEngineFrameCadence(reason)` (beside
+  `itTypeScriptOnly` in `src/tests/parity/typescriptOnly.ts`) and runs at
+  the host's own cadence, a merge on an hour pass or a tower edit, as the
+  game does; the setup resets the request after each test. The reason is
+  required, and the table repeats it: `fixedStep` (all six),
+  `rooms` (the census on the 12,000-unit fixture) and `rentalCrowd` (its
+  three day-long runs). The parity projects also take a 120 s test
+  timeout, since every hosted tick syncs the engine's frame.
+- **The worker-host suites.** `wasmWorkerHost`, `wasmWorkerLifecycle`,
+  `wasmWorkerSaves` and `wasmHostAnalyticsBridge` start their own host, so
+  they sit outside `integrationWasm` with the other host suites (the
+  lifecycle suite's fallback failed by name, an instance with a crowd).
+- **CI.** `test.yml` runs both projects on every PR as
+  `test-wasm-parity` (one job per project, after `engine-wasm` fills the
+  package cache). It runs in `test.yml` and not in `engine-rs.yml` because
+  the parity projects run every suite, so a change anywhere in `src/` can
+  break them, and `engine-rs.yml` runs only on engine paths.
+
+### The runs (2026-10-15, this machine, four cores)
+
+| Project | Files | Pass | Fail | Skip | Wall time |
+| --- | --- | --- | --- | --- | --- |
+| `integrationWasm` | 92 | 1680 | 0 | 39 | 165 s |
+| `unitWasm` | 250 | 2764 | 0 | 0 | 97 s |
+
+The 39 skips are the 38 `itTypeScriptOnly` marks (24 in bucket (c), 14 in
+bucket (d), all in the table) plus one pre-existing skip. The (b) bucket is
+empty, as are (a) and the cost timeouts.
+
+### What is left for #878
+
+The vitest half (AC1) and the table (AC4) are done, and AC2 and AC3 landed
+in the e2e and gallery slice. The issue's last gate is the CI half of AC3
+at the flip (the committed gallery and the minted baselines coming from
+the WASM engine), which the 3.0.0 switch (#945) does.

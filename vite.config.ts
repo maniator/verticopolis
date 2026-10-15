@@ -235,6 +235,9 @@ function wasmParityProjects() {
     "**/wasmWorkerSaves.integration.test.ts",
   ];
   const setupFiles = ["src/tests/viewWorldSetup.ts", "src/tests/parity/wasmHostSetup.ts"];
+  // Every hosted tick also syncs the engine's frame (and in tick mode merges
+  // its save), so a fixture-driven test runs several times slower here.
+  const testTimeout = 120_000;
   return [
     {
       extends: true,
@@ -245,6 +248,7 @@ function wasmParityProjects() {
         // themselves.
         exclude: [...configDefaults.exclude, "**/*.integration.test.ts", "**/dualrun/mirror.test.ts", "**/dualrun/dualRun.test.ts"],
         setupFiles,
+        testTimeout,
       },
     },
     {
@@ -254,6 +258,7 @@ function wasmParityProjects() {
         include: ["src/**/*.integration.test.ts"],
         exclude: [...configDefaults.exclude, ...typescriptSide],
         setupFiles,
+        testTimeout,
       },
     },
   ];
