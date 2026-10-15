@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { rand } from "../sprites/common";
 import { FACILITIES } from "../../engine/facilities";
+import { RECYCLE_BREAKS } from "./catalog";
 import { lookupRoom, lookupShaft, type LiveScene, type LiveUnit } from "./lookup";
 
 /** Look up a unit at its catalog width. */
@@ -39,9 +40,25 @@ describe("lookupRoom", () => {
     const half = { ...DAY, parkingUse: rand(12 * 31) - 1e-9 };
     expect(look({ kind: "parking", state: "occupied", occupants: 0, id: 12 }, half, 0)).toMatchObject({ overlays: [] });
   });
-  it("recycling: the fill in eighths, clamped", () => {
-    expect(look({ kind: "recycling", state: "occupied", occupants: 0, id: 1 }, { ...DAY, recycleFill: 0.49 }, 0)).toMatchObject({ chains: { fill: 4 } });
-    expect(look({ kind: "recycling", state: "occupied", occupants: 0, id: 1 }, { ...DAY, recycleFill: 3 }, 0)).toMatchObject({ chains: { fill: 8 } });
+  it("recycling: the exact chain counts the breaks at or below the fill, clamped", () => {
+    const bin = (recycleFill: number) => look({ kind: "recycling", state: "occupied", occupants: 0, id: 1 }, { ...DAY, recycleFill }, 0);
+    expect(bin(0)).toMatchObject({ chains: { fillExact: 0 } });
+    expect(bin(RECYCLE_BREAKS[0])).toMatchObject({ chains: { fillExact: 1 } });
+    expect(bin(0.5)).toMatchObject({ chains: { fillExact: RECYCLE_BREAKS.indexOf(0.5) + 1 } });
+    expect(bin(3)).toMatchObject({ chains: { fillExact: RECYCLE_BREAKS.length } });
+    expect(bin(-1)).toMatchObject({ chains: { fillExact: 0 } });
+    expect(bin(NaN)).toMatchObject({ chains: { fillExact: 0 } });
+    const eighths = (recycleFill: number) => lookupRoom({ kind: "recycling", state: "occupied", occupants: 0, id: 1, width: FACILITIES.recycling.width }, { ...DAY, recycleFill }, 0, { recyclingEighths: true });
+    expect(eighths(0.49)).toMatchObject({ chains: { fill: 4 } });
+    expect(eighths(3)).toMatchObject({ chains: { fill: 8 } });
+    expect(eighths(NaN)).toMatchObject({ chains: { fill: 0 } });
+  });
+  it("cinema: the marquee and screen steps follow the clock", () => {
+    const cinema = (clock: number | undefined, occupants: number) => look({ kind: "cinema", state: "occupied", occupants, id: 1 }, { ...DAY, hour: 14, clock }, 0);
+    expect(cinema(undefined, 0)).toMatchObject({ frame: expect.stringMatching(/\/away$/), cycles: { marquee: 0, screen: 0 } });
+    expect(cinema(1.3, 5)).toMatchObject({ chains: { occupants: 5 }, cycles: { marquee: 1, screen: 3 } });
+    expect(cinema(7.65, 5)).toMatchObject({ cycles: { marquee: 0, screen: 4 } });
+    expect(look({ kind: "office", state: "occupied", occupants: 1, id: 1 }, { ...DAY, clock: 1.3 }, 0)).not.toHaveProperty("cycles");
   });
   it("reads corrupt or fractional counts the way the art can draw them", () => {
     expect(look({ kind: "office", state: "occupied", occupants: 4.7, outForMeal: 1, id: 1 }, DAY, 0)).toMatchObject({ chains: { occupants: 4 } });
