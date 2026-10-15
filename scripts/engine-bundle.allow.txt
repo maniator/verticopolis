@@ -1,0 +1,136 @@
+# TypeScript engine modules a wasm-only build (VC_ENGINE=wasm) still ships.
+#
+# scripts/verify-engine-bundle.ts reads every emitted sourcemap after the
+# build and fails when the wasm-only bundle carries a src/engine/ module this
+# list does not name, or when a listed module no longer ships. The list only
+# shrinks: delete a line when its module leaves the bundle, and add one only
+# with a reviewed reason the module has to ship.
+#
+# Why these ship today. The WASM engine alone advances time: the host
+# replaces `tick` on every tower it holds, and the TypeScript step loop
+# (src/engine/sim/loop.ts) is swapped out of this build. But the app is still
+# built around a TypeScript `Simulation` instance:
+#   1. It is the read model. The UI, renderer, audio and analytics read
+#      `app.sim`, which the host refreshes from the engine's frame view and
+#      full save (src/wasmhost/wasmHost.ts, mergeSimulation). Replacing it with
+#      an engine-owned snapshot is #868 (cutover AD-4).
+#   2. Every player command still runs on the instance first and is relayed
+#      to the engine (cutover AD-1, before the 3.0.0 flip).
+#   3. Loads and undo restores parse saves with `Simulation.deserialize` and
+#      its migrations before the engine boots from them (cutover AD-8).
+#   4. A bundler keeps a class's methods whole, so the classes the read model
+#      constructs (Crowd, EconomySystem, EventSystem, ElevatorDispatch, Tower)
+#      carry their step-time code even though nothing calls it here.
+#   5. Reference data and rules the UI reads (catalog, prices, caps) move to
+#      the engine's catalog through #921.
+#   6. The host-side step driver (fixedStep, timePacing) feeds the engine's
+#      tick; it moves into the crate with #867 (cutover AD-2).
+# The measured breakdown and the follow-up plan are in
+# docs/performance/wasm-only-bundle.md.
+
+# The Simulation and the classes it holds
+src/engine/Simulation.ts
+src/engine/Clock.ts
+src/engine/Crowd.ts
+src/engine/EconomySystem.ts
+src/engine/ElevatorDispatch.ts
+src/engine/EventSystem.ts
+src/engine/Ledger.ts
+src/engine/Tower.ts
+src/engine/UndoHistory.ts
+
+# Simulation friend modules (commands, reads, the save codec)
+src/engine/sim/build.ts
+src/engine/sim/capacity.ts
+src/engine/sim/charges.ts
+src/engine/sim/churn.ts
+src/engine/sim/coerce.ts
+src/engine/sim/congestion.ts
+src/engine/sim/constants.ts
+src/engine/sim/demand.ts
+src/engine/sim/deserializeGuards.ts
+src/engine/sim/events.ts
+src/engine/sim/founderStatus.ts
+src/engine/sim/gripe.ts
+src/engine/sim/presence.ts
+src/engine/sim/rent.ts
+src/engine/sim/satisfaction.ts
+src/engine/sim/satisfactionStep.ts
+src/engine/sim/serialization.ts
+src/engine/sim/services.ts
+src/engine/sim/star.ts
+src/engine/sim/stats.ts
+
+# The argument check the commands above share (#923, #996); commands still
+# run on the instance first (#954)
+src/engine/request.ts
+
+# The host-side step driver (AD-2, #867)
+src/engine/sim/fixedStep.ts
+src/engine/timePacing.ts
+
+# The crowd model
+src/engine/crowd/landing.ts
+src/engine/crowd/meals.ts
+src/engine/crowd/motion.ts
+src/engine/crowd/person.ts
+src/engine/crowd/routines.ts
+src/engine/crowd/routing.ts
+src/engine/crowd/segmentGraph.ts
+src/engine/crowd/shaftBanks.ts
+src/engine/crowd/spawn.ts
+src/engine/crowd/trips.ts
+src/engine/crowd/venueTrips.ts
+src/engine/crowd/visits.ts
+src/engine/crowd/walk.ts
+
+# The tower model
+src/engine/tower/expressStops.ts
+src/engine/tower/placement.ts
+src/engine/tower/rooms.ts
+src/engine/tower/routing.ts
+src/engine/tower/segments.ts
+src/engine/tower/towerTopology.ts
+src/engine/tower/transport.ts
+
+# Economy
+src/engine/economy/housekeeping.ts
+
+# Save migrations (AD-8)
+src/engine/saveMigration.ts
+src/engine/migrations/v1tov2.ts
+src/engine/migrations/v4tov5.ts
+src/engine/migrations/v5tov6.ts
+src/engine/migrations/v6tov7.ts
+
+# Reference data, rules and catalog reads (#921)
+src/engine/calendar.ts
+src/engine/catalog.ts
+src/engine/catalogTypes.ts
+src/engine/econConfig.ts
+src/engine/elevatorSchedule.ts
+src/engine/facilitiesData.ts
+src/engine/facilityCaps.ts
+src/engine/facilityPredicates.ts
+src/engine/gameRules.ts
+src/engine/households.ts
+src/engine/milestones.ts
+src/engine/pricing.ts
+src/engine/residentialRentals.ts
+src/engine/retailSubtypes.ts
+src/engine/ruleSets.ts
+src/engine/scheduleAuthoring.ts
+src/engine/scheduleOrigins.ts
+src/engine/towerCatalog.ts
+src/engine/traffic.ts
+
+# Shared utilities and event plumbing
+src/engine/canonicalJson.ts
+src/engine/census.ts
+src/engine/conformanceView.ts
+src/engine/gameplayCatalog.ts
+src/engine/gameplayEventBuffer.ts
+src/engine/gameplayEventRules.ts
+src/engine/rng.ts
+src/engine/types.ts
+src/engine/wellFormed.ts

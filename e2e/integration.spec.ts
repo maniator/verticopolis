@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { buildToStar, engineSave, expectEngineHosted, fitCamera, WASM_PROJECT } from "./helpers";
+import { buildToStar, engineSave, expectEngineHosted, fitCamera, onWasm } from "./helpers";
 
 // On chromium-wasm every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
@@ -108,7 +108,7 @@ test.describe("app integration — main.ts + TowerEngine boot/render boundary", 
       return Boolean(g?.sim?.pendingChoice) && Boolean(document.getElementById("splash"));
     });
     await expectEngineHosted(page);
-    if (test.info().project.name === WASM_PROJECT) {
+    if (onWasm(test.info().project.name)) {
       expect((await engineSave(page))?.events?.pending).toMatchObject({ kind: "bombThreat", cost: 300_000 });
     }
 
