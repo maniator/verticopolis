@@ -6,7 +6,7 @@ import type { FacilityKind } from "../../engine/types";
 import { withLayerHook } from "../pixelSprites/layers";
 import { roomJobs, roomKinds, type StillJob } from "./catalog";
 import { LOBBY_VARIANTS } from "../sprites";
-import { structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
+import { legacyShaftJobs, structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
 import { paint, type PaintSpec, type UnitPaint } from "./paint";
 
 /** A 2D context that accepts every call (the pixels are checked in a real
@@ -101,7 +101,7 @@ describe("depth-layer marks on the lobby", () => {
 
 describe("depth-layer marks on the cabs and the metro train", () => {
   it("breaks every cab and train frame once, at every rider count, and ends the cab's riders", () => {
-    const jobs = [...transportJobs(), ...vehicleJobs()].filter((j): j is StillJob => j.type === "still" && j.layers === true);
+    const jobs = [...transportJobs(), ...legacyShaftJobs(), ...vehicleJobs()].filter((j): j is StillJob => j.type === "still" && j.layers === true);
     const names = jobs.map((j) => j.name);
     expect(names.some((n) => n.startsWith("car/"))).toBe(true);
     expect(names.filter((n) => n.startsWith("vehicle/metrotrain/"))).toHaveLength(2);
@@ -141,7 +141,7 @@ describe("the vehicles' draw order", () => {
     expect(tm).not.toContain("#C6CCD4");
     expect(tf).toContain("#C6CCD4"); // the body comes after
     // Every cab kind, arrow and FULL state, at its fullest.
-    const cabs = transportJobs().filter((j): j is StillJob => j.type === "still" && j.name.startsWith("car/"));
+    const cabs = [...transportJobs(), ...legacyShaftJobs()].filter((j): j is StillJob => j.type === "still" && j.name.startsWith("car/"));
     expect(cabs.length).toBeGreaterThan(0);
     for (const cab of cabs) {
       const steps = cab.chains!.riders.steps;
