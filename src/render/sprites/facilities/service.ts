@@ -3,6 +3,7 @@ import { ceilingFixture, personHiVis, personSeated, personStanding, roomGlow, SK
 import { layerBreak, layerEnd, layerShell } from "../../pixelSprites/layers";
 import { rand, serviceLabel, type DrawCtx } from "../common";
 import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./serviceKit";
+import { RECYCLING_DECK, RECYCLING_GAUGE_ROWS, RECYCLING_GAUGE_TOP, RECYCLING_PILE_PITCH, RECYCLING_PILE_X0, RECYCLING_REF_H, RECYCLING_REF_W, recyclingLook } from "./recyclingLook";
 
 /**
  * In-tower service and utility facilities: security, the clinic, housekeeping,
@@ -176,12 +177,12 @@ export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h:
 
 export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
-  const RW = 220;
-  const RH = 88;
+  const RW = RECYCLING_REF_W;
+  const RH = RECYCLING_REF_H;
   const { F, Fu, sx, sy } = refMap(ctx, x, y, w, h, RW, RH);
   const W = RW;
   const H = RH;
-  const deck = H - 7;
+  const deck = RECYCLING_DECK;
   // Concrete hall: walls, roof ribs, girders, and a service pipe. The full-width
   // bands stay on the edge-derived fill so they meet without a seam; the ribs,
   // studs and pipe brackets are repeated objects and take the uniform one.
@@ -287,32 +288,29 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   });
   // Live behavior: the day's waste piles up until the morning truck. The pile
   // grows rightward and stacks a second row past half full. `d.recycleFill` is
-  // a prepared input, so no scan runs here.
-  const rawFill = d.recycleFill ?? 0;
-  const fill = Number.isFinite(rawFill) ? Math.max(0, Math.min(1, rawFill)) : 0;
-  const pileX0 = 28;
-  const pileMax = W - 70;
-  const slots = Math.floor((pileMax - pileX0) / 7);
-  const bags = Math.round(fill * slots);
+  // a prepared input, so no scan runs here; the art reads it only through
+  // `recyclingLook`, which the sprite atlas steps through.
+  const look = recyclingLook(d.recycleFill);
+  const bags = look.bags;
   for (let i = 0; i < bags; i++) {
-    const bx = pileX0 + i * 7;
+    const bx = RECYCLING_PILE_X0 + i * RECYCLING_PILE_PITCH;
     const jit = Math.floor(rand((u.id * 31 + i) | 0) * 3);
     F(bx, deck - 6 - jit, 6, 6 + jit, i % 3 === 2 ? "#4a5a3a" : "#3a4232");
     Fu(bx + 2, deck - 7 - jit, 2, 2, "#FFFFFF", 0.35);
-    if (fill > 0.5 && i % 2 === 0 && i < bags - 1) F(bx + 3, deck - 11 - jit, 6, 5, "#2f3628");
+    if (look.stacked && i % 2 === 0 && i < bags - 1) F(bx + 3, deck - 11 - jit, 6, 5, "#2f3628");
   }
   // Live wall gauge: green, then amber past 0.7, then red with the FULL cue at
   // capacity. The FULL red is a deliberate state cue, not decoration.
-  const gY = 14;
-  const gH = deck - 18;
+  const gY = RECYCLING_GAUGE_TOP;
+  const gH = RECYCLING_GAUGE_ROWS;
   let gauge = "#6bd47a";
-  if (fill >= 1) gauge = "#d6342f";
-  else if (fill > 0.7) gauge = "#e0a94e";
-  const gaugeH = Math.round(gH * fill);
+  if (look.full) gauge = "#d6342f";
+  else if (look.amber) gauge = "#e0a94e";
+  const gaugeH = look.gaugeRows;
   layerShell(ctx, () => {
     F(W - 6, gY, 4, gH, "#1B2A14");
     F(W - 5, gY + gH - gaugeH, 2, gaugeH, gauge);
-    if (fill >= 1) serviceLabel(ctx, "FULL", sx(W - 34), y, "#ffd2c8", 44, w);
+    if (look.full) serviceLabel(ctx, "FULL", sx(W - 34), y, "#ffd2c8", 44, w);
   });
   // The vested plant hand (shared hi-vis build with a hardhat), drawn last so
   // the worker stands in front of the pile.

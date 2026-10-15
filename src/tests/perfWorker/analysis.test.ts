@@ -3,8 +3,12 @@ import { aggregate, definitions, ratios, validate } from "./analysis";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { csvField, limitations, loadWorkerCheckpoint, makeConfig, metricsCsv, parseArgs, ratiosCsv, scriptSizes } from "./main";
-import { markdown } from "./report";
+import { csvField, limitations, readModelLimitations, loadWorkerCheckpoint, makeConfig, metricsCsv, parseArgs, ratiosCsv, scriptSizes } from "./main";
+import { markdown, num, pct, readModelMarkdown, readModelSection, slices } from "./report";
+import { Simulation } from "../../engine/Simulation";
+import { serializeUnit } from "../../engine/sim/coerce";
+import { FRAME_UNIT_FIELDS, churn, composition, measureReadModel, spread, summarizeMerges, type MergePass } from "./readModel";
+import { buildSmallTower } from "../perfCompare/scenarios";
 import { modeOrder, summarizeFrames, summarizeHosted, type ModeRun } from "./runner";
 import type { ModeName } from "./pageWorker";
 
@@ -206,5 +210,91 @@ describe("perf:worker analysis", () => {
     expect(() => parseArgs(["--viewport"])).toThrow(/needs a value/);
     expect(limitations(makeConfig(parseArgs([]), ["small"])).join("\n")).toMatch(/640x360 CSS viewport \(the default.*so at that size the modes simulated almost nothing/);
     expect(limitations(makeConfig(parseArgs(["--viewport", "1280x720"]), ["small"])).join("\n")).toMatch(/1280x720 CSS viewport \(set with --viewport\)\. A frame longer than 200 ms/);
+  });
+});
+
+describe("perf:worker read model shape", () => {
+  const save = (units: object[], extra: object = {}) => JSON.stringify({ money: 5, units, ...extra });
+
+  it("splits a save by top-level key and by unit kind, as shares of the whole", () => {
+    const units = [{ id: 1, kind: "floor" }, { id: 2, kind: "floor" }, { id: 3, kind: "office", rent: 1000 }];
+    const text = save(units, { log: ["a"] });
+    const c = composition(text);
+    expect(c.totalChars).toBe(text.length);
+    expect(c.units).toBe(3);
+    expect(c.keys.map((k) => k.name)).toEqual(["units", "log", "money"]);
+    expect(c.keys[0].chars).toBe(JSON.stringify(units).length);
+    expect(c.keys[0].share).toBeCloseTo(JSON.stringify(units).length / text.length, 12);
+    const floor = c.unitKinds.find((k) => k.name === "floor")!;
+    expect(floor).toMatchObject({ count: 2, chars: 2 * JSON.stringify(units[0]).length });
+    // Kinds sum to the units key less its brackets and commas.
+    expect(c.unitKinds.reduce((a, k) => a + k.chars, 0)).toBe(c.keys[0].chars - 2 - (units.length - 1));
+    expect(c.unitKinds[0].name).toBe("floor");
+  });
+
+  it("counts units changed, added and removed by id, and names the fields and keys that moved", () => {
+    const before = save([{ id: 1, kind: "floor" }, { id: 2, kind: "office", state: "vacant", sat: 0.5 }, { id: 3, kind: "condo" }], { minutes: 0 });
+    const after = save([{ id: 2, kind: "office", state: "occupied", sat: 0.5 }, { id: 1, kind: "floor" }, { id: 4, kind: "shop" }], { minutes: 60 });
+    expect(churn(before, after)).toEqual({ changed: 1, added: 1, removed: 1, total: 3, outsideFrame: 0, unitKeys: ["state"], topKeys: ["minutes", "units"] });
+    // A change only in fields the frame view does not carry needs a merge.
+    expect(churn(before, save([{ id: 1, kind: "floor" }, { id: 2, kind: "office", state: "vacant", sat: 0.7 }, { id: 3, kind: "condo", occupants: 2 }], { minutes: 0 }))).toMatchObject({ changed: 2, outsideFrame: 1, unitKeys: ["occupants", "sat"] });
+    // A unit with a frame field and another field changed still needs the merge.
+    expect(churn(before, save([{ id: 1, kind: "floor" }, { id: 2, kind: "office", state: "occupied", sat: 0.9 }, { id: 3, kind: "condo" }], { minutes: 0 }))).toMatchObject({ changed: 1, outsideFrame: 1 });
+    // A record whose keys only moved is no change.
+    expect(churn(before, save([{ kind: "floor", id: 1 }, { id: 2, kind: "office", sat: 0.5, state: "vacant" }, { id: 3, kind: "condo" }], { minutes: 0 }))).toMatchObject({ changed: 0, outsideFrame: 0, unitKeys: [] });
+    expect(FRAME_UNIT_FIELDS).toEqual(["state", "occupants", "customersIn", "hotelCustomersIn", "outForMeal"]);
+    // A save carries state and occupants of those, under the same names, and drops the visit counters.
+    const office = buildSmallTower().tower.units.find((u) => u.kind === "office")!;
+    const saved = serializeUnit({ ...office, state: "occupied", occupants: 3, customersIn: 2, hotelCustomersIn: 1, outForMeal: 1 });
+    expect(FRAME_UNIT_FIELDS.filter((k) => k in saved)).toEqual(["state", "occupants"]);
+    // Reordering alone is not a unit change, but it is a units-key change.
+    expect(churn(before, save([{ id: 3, kind: "condo" }, { id: 1, kind: "floor" }, { id: 2, kind: "office", state: "vacant", sat: 0.5 }], { minutes: 0 }))).toMatchObject({ changed: 0, added: 0, removed: 0, topKeys: ["units"] });
+    expect(() => churn(save([{ id: 1 }, { id: 1 }]), save([]))).toThrow(/appears twice/);
+  });
+
+  it("summarizes merges as the share of units changed and the units touched", () => {
+    const pass = (changed: number, total: number, added = 0): MergePass => ({ step: 4, reason: "hour", changed, added, removed: 0, total, outsideFrame: changed > 20 ? 7 : 1, unitKeys: [], topKeys: [] });
+    const sum = summarizeMerges([pass(10, 100), pass(0, 100, 3), pass(50, 200)]);
+    expect(sum.changedShare).toMatchObject({ median: 0.1, max: 0.25 });
+    expect(sum.changedShare!.mean).toBeCloseTo(0.35 / 3, 12);
+    expect(sum).toMatchObject({ touched: { median: 10, mean: 21, max: 50 }, changedCount: { median: 10, mean: 20, max: 50 }, outsideFrame: { median: 1, mean: 3, max: 7 } });
+    expect(summarizeMerges([])).toEqual({ changedShare: null, touched: null, changedCount: null, outsideFrame: null });
+    // The report's shares: tiny ones are bounded, small ones get two decimals, the rest one.
+    expect([pct(0), pct(0.00005), pct(0.0005), pct(0.25)]).toEqual(["0.0%", "<0.01%", "0.05%", "25.0%"]);
+    const sl = (name: string, count: number, share: number) => ({ name, count, chars: 0, share });
+    expect(slices([sl("units", 1, 0.9), sl("floor", 1200, 0.05), sl("a", 1, 0.03), sl("b", 1, 0.02)], 2)).toBe("units 90.0%, floor (1,200) 5.0%, 2 more 5.0%");
+    expect(spread([4, 1, 3, 2])).toEqual({ median: 2.5, mean: 2.5, max: 4 });
+    expect([num(2888), num(673.9166), num(0.5)]).toEqual(["2,888", "673.9", "0.5"]);
+  });
+
+  it("merges where the worker host would, once a batch, and repeats exactly", () => {
+    const tower = { name: "small", save: JSON.stringify(buildSmallTower().serialize()) };
+    const opts = { steps: 62, dt: 2, batch: 4 };
+    const shape = measureReadModel(tower, opts);
+    expect(shape.merges.length).toBeGreaterThanOrEqual(1);
+    for (const m of shape.merges) {
+      expect(m.step % opts.batch === 0 || m.step === opts.steps).toBe(true);
+      expect(m.reason).not.toBe("revision");
+      expect(m.topKeys).toContain("minutes");
+    }
+    expect(shape.composition.units).toBe(JSON.parse(tower.save).units.length);
+    expect(shape.composition.unitKinds.find((k) => k.name === "floor")!.count).toBeGreaterThan(0);
+    expect(shape.changedShare!.max).toBeGreaterThan(0);
+    expect(measureReadModel(tower, opts)).toEqual(shape);
+    const md = readModelSection([shape]).join("\n");
+    expect(md).toMatch(/^## read model/);
+    expect(md).toContain(`| small | ${shape.composition.totalChars.toLocaleString("en-US")} chars | ${shape.composition.units.toLocaleString("en-US")} | units `);
+    for (const m of shape.merges) expect(m.outsideFrame).toBeLessThanOrEqual(m.changed);
+    expect(md).toContain(`| ${shape.merges.length} (${shape.merges.length} hour) |`);
+    // The first merge compares against the loaded save itself.
+    expect(shape.composition.totalChars).toBe(JSON.stringify(Simulation.deserialize(JSON.parse(tower.save)).serialize()).length);
+    expect(readModelSection([])).toEqual([]);
+    const report = readModelMarkdown({ schema: 1, generatedAt: "2026-10-15T12:00:00Z", commit: "abcdef0123", dirty: false, appVersion: "2.34.1", node: "v22.22.0", config: { ...opts, quick: false }, scenarios: [{ name: "small", sha256: "a".repeat(64) }], readModel: [shape], limitations: ["one"] });
+    expect(report.split("\n")[2]).toMatch(/^> \*\*Snapshot, measured 2026-10-15T12:00:00Z on commit `abcdef0`.*Live numbers: re-run `npm run perf:worker -- --read-model`/);
+    expect(report).toContain("- one");
+    expect(parseArgs(["--read-model"]).readModelOnly).toBe(true);
+    for (const extra of [["--resume", "x"], ["--skip-build"], ["--reps", "3"], ["--viewport", "1280x720"]]) expect(() => parseArgs(["--read-model", ...extra])).toThrow(/takes no --resume, --skip-build, --reps or --viewport/);
+    expect(parseArgs(["--read-model", "--quick", "--scenarios", "small"]).readModelOnly).toBe(true);
+    expect(readModelLimitations(makeConfig(parseArgs(["--read-model"]), ["small"]))).toEqual([expect.stringMatching(/^The read model section is measured in Node on the TypeScript engine.*720 steps in batches of 4/)]);
   });
 });

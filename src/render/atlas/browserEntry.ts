@@ -206,7 +206,9 @@ const api: AtlasPage = {
   },
   records() {
     if (!result) throw new Error("run() first");
-    return { frameImages: result.frameImages, groups: result.groups, frames: result.frames, animations: result.animations };
+    // Everything but the pixels, so a new field of the result reaches Node.
+    const { images: _images, normals: _normals, ...records } = result;
+    return records;
   },
   images(from, maxBytes) {
     if (!result) throw new Error("run() first");

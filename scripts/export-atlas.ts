@@ -161,7 +161,7 @@ async function main(): Promise<void> {
         normals.push({ w: g.w, h: g.h, data: decode(g.normal, g.w, g.h, `normal ${id}`) });
       }
     }
-    bakeResult = { images, normals, frameImages: records.frameImages, groups: records.groups, frames: records.frames, animations: records.animations };
+    bakeResult = { ...records, images, normals };
   } finally {
     await browser.close();
   }

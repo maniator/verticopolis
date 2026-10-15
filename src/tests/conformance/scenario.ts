@@ -169,7 +169,6 @@ export function loadScenario(file: string): Scenario {
     if (typeof op !== "string" || !own(OPS, op)) throw new Error(`${where}: unknown op ${JSON.stringify(op)}`);
     check(where, c, OPS[op as Command["op"]], ["op"]);
     if (c.op === "buildRow" && c.from > c.to) throw new Error(`${where}: buildRow from must not be past to`);
-    if (c.op === "extendTransport" && (c.hwmBottom === undefined) !== (c.hwmTop === undefined)) throw new Error(`${where}: hwmBottom and hwmTop go together`);
   });
   return s;
 }
@@ -370,7 +369,7 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
       expectOk(e.setCars(t.id, c.cars) && transportAt(e, c).cars === c.cars, false, `setCars ${c.cars} @ ${c.floor},${c.x}`);
       break;
     }
-    case "addCar": case "removeCar": case "extendTransport": case "removeFacility": applyCharge(e, c); break;
+    case "addCar": case "removeCar": case "beginExtend": case "extendTransport": case "endExtend": case "removeFacility": applyCharge(e, c); break;
     case "startFire": {
       const before = e.fires();
       e.startFire();

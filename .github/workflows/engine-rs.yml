@@ -204,6 +204,20 @@ jobs:
           rustup show active-toolchain | grep -q '^1\.97\.0'
           rustup component add rustfmt clippy
 
+      # The cargo registry and the compiled dependencies, keyed on the
+      # installed toolchains, each Cargo.lock and the job. Only a run on main
+      # saves, so a pull request reads main's cache and never writes one of
+      # its own. Old dependency builds are kept across lockfile bumps; bump
+      # prefix-key to start the cache over when it grows.
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          prefix-key: v1-rust
+          workspaces: |
+            engine-rs -> target
+            engine-rs/consumer -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
       # Default features: no binding and no conformance harness, the
       # library a host that only plays the game links.
       - name: The engine library builds alone
@@ -284,6 +298,21 @@ jobs:
           rustup toolchain install 1.97.0 --profile minimal --component rustfmt,clippy
           rustup default 1.97.0
           rustup target add wasm32-unknown-unknown
+          # The image's own stable toolchain is unused here, and the cache
+          # key hashes every installed toolchain, so an image update would
+          # otherwise miss the cache on every pull request.
+          rustup toolchain uninstall stable || true
+
+      # The cargo registry and the compiled dependencies, keyed on the
+      # installed toolchains, Cargo.lock and the job. Only a run on main
+      # saves, so a pull request reads main's cache and never writes one of
+      # its own. Bump prefix-key to start the cache over when it grows.
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          prefix-key: v1-rust
+          workspaces: engine-rs -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Format
         run: cargo fmt --check
@@ -304,6 +333,16 @@ jobs:
       - name: Conformance
         run: cargo run --locked --release --features conformance --bin conformance
 
+      # The prebuilt cargo-llvm-cov release, checked against the hash the
+      # action's manifest records, in place of a compile from source. With
+      # no fallback, a version the manifest lacks fails the step instead of
+      # installing another way.
+      - name: cargo-llvm-cov
+        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        with:
+          tool: cargo-llvm-cov@0.9.1
+          fallback: none
+
       # Coverage of the unit tests plus the referee, with a line floor that
       # only ratchets up as scenarios land (80.58% at the first measurement,
       # 84.47% after the first scenario slice, 88.7% with the full library; the
@@ -313,7 +352,7 @@ jobs:
       - name: Coverage
         run: |
           rustup component add llvm-tools-preview
-          cargo install cargo-llvm-cov --locked --version 0.9.1
+          cargo llvm-cov --version | grep -qw '0\.9\.1'
           cargo llvm-cov --no-report --locked test --features conformance
           cargo llvm-cov --no-report --locked run --features conformance --bin conformance
           cargo llvm-cov report --fail-under-lines 87
