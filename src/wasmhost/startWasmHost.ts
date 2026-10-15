@@ -1,14 +1,17 @@
 import type { Simulation } from "../engine/Simulation";
 import { checkBinding, type WasmModule } from "../dualrun/binding";
 import { attachWasmHost, type WasmHost } from "./wasmHost";
+import { ENGINE_DIR, ENGINE_GLUE } from "./enginePackageNames";
 
 /**
  * The app side of the WASM switch: load the browser package, host the
  * current tower on it, and follow every later `adoptSim` (a load, a new
  * game, an undo restore) onto a fresh engine. The state is published on
  * `window.__vcEngine` for tooling and for a tester to confirm which engine
- * runs. A tower the host cannot start from is reported and left on the
- * TypeScript engine, so the switch never takes the game down.
+ * runs. In a switchable build a tower the host cannot start from is reported
+ * and left on the TypeScript engine, so the switch never takes the game down.
+ * In a wasm-only build (`strict`) there is no TypeScript engine to leave it
+ * on: the refusal is reported the same way and `onFatal` stops the game.
  */
 export interface WasmHostStatus {
   engine: "wasm";
@@ -35,9 +38,10 @@ export interface WasmHostHandle {
 
 /** Where the built package lives: `src/public/engine/`, served beside the app
  *  (see scripts/wasm-build.ts). Resolved against the page, so a relocated
- *  deployment finds it under its own base. */
+ *  deployment finds it under its own base. Every file the package loads at
+ *  run time is listed in engineAssets.ts, which the precache check reads. */
 export function enginePackageUrl(base = import.meta.env.BASE_URL, href = globalThis.location?.href ?? "http://localhost/"): string {
-  return new URL(`${base}engine/verticopolis_engine.js`, href).href;
+  return new URL(`${base}${ENGINE_DIR}${ENGINE_GLUE}`, href).href;
 }
 
 /** Load and initialize the browser package. */
@@ -47,9 +51,18 @@ export async function loadWasmEngine(url = enginePackageUrl()): Promise<WasmModu
   return checkBinding(mod);
 }
 
-export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Console, "info" | "error"> = console): WasmHostHandle {
+export interface WasmHostOptions {
+  /** A wasm-only build: a tower the host refuses is fatal, never left on the
+   *  TypeScript engine. */
+  strict?: boolean;
+  /** Called once, in strict mode, with the reason the host could not hold a tower. */
+  onFatal?: (message: string) => void;
+}
+
+export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Console, "info" | "error"> = console, opts: WasmHostOptions = {}): WasmHostHandle {
   const status: WasmHostStatus = { engine: "wasm", starts: 0, hosted: false, errors: [] };
   let host: WasmHost | null = null;
+  let fatal = false;
   const noteError = (message: string) => {
     if (status.errors.length >= 50) return;
     status.errors.push(message);
@@ -76,7 +89,17 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
       status.hosted = true;
       log.info(`[wasm] tower ${status.starts} runs on the WASM engine`);
     } catch (e) {
-      noteError(`not hosting this tower: ${e instanceof Error ? e.message : String(e)}`);
+      const message = `not hosting this tower: ${e instanceof Error ? e.message : String(e)}`;
+      noteError(message);
+      if (opts.strict && !fatal) {
+        fatal = true;
+        // The stop is reported, never thrown into the adopt that caused it.
+        try {
+          opts.onFatal?.(message);
+        } catch (err) {
+          log.error(`[wasm] stopping the game failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
     }
   };
   follow(app.sim);

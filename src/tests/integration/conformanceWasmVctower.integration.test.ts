@@ -33,7 +33,7 @@ import { decodeVctower } from "../../storage/vctowerContainer";
 import { tsEngine } from "../conformance/scenario";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 
-const FIXTURES = resolve(__dirname, "../fixtures");
+const FIXTURES = resolve(__dirname, "../../../conformance/fixtures");
 const fixtures = readdirSync(FIXTURES)
   .filter((f) => f.endsWith(".vctower"))
   .sort();

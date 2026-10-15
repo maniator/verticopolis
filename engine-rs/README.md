@@ -24,6 +24,7 @@ must reproduce every pinned checkpoint hash (`expected.json`) byte for byte.
 | `scenario.rs`, `bin/conformance.rs`, `bin/dump.rs` | `src/tests/conformance/scenario.ts` |
 | `tdt/` (`byte_reader.rs`, `byte_writer.rs`, `format.rs`, `types.rs`, `tables.rs`, `parse.rs`, `part_merge.rs`, `transports.rs`, `tail.rs`, `stamp.rs`, `pacing.rs`, `import.rs`, `import_report.rs`, `export_tables.rs`, `export_gather.rs`, `export_parking.rs`, `encoder.rs`, `export.rs`, `export_report.rs`), `tdt/referee.rs`, `bin/tdt.rs` | `src/storage/tdt*.ts` (the 1994 `.TDT` importer and exporter; `timePacing.ts` for the frame clock), `src/tests/integration/tdtCases.integration.test.ts` |
 | `catalog.rs` | `catalog.ts`: the reference data a frontend reads (see The catalog) |
+| `frame.rs`, `snapshot.rs` | `src/wasmhost/frameView.ts` decodes the frame; `src/engine/conformanceView.ts` (`stateView`): the per-frame read model and the hashed snapshot a host reads, with or without the binding |
 | `wasm.rs` (feature `wasm`) | the JavaScript binding; `src/tests/conformance/wasmEngine.ts`, `src/dualrun/` and the `.TDT` differential test (`src/tests/conformance/tdtDifferential.ts`, inputs from `src/tests/fixtures/tdtDifferentialInputs.ts`) and the `.vctower` writer test (`src/tests/integration/conformanceWasmVctower.integration.test.ts`) drive it |
 
 Functions keep the names and shape of their TypeScript originals so the two
@@ -47,20 +48,23 @@ those calls; CI builds and runs a copy of it outside the checkout, in the
 Rust container image with no Node.js and a checkout holding only
 `engine-rs/` and `conformance/` (`engine-rs.yml`, job `consumer`), and
 `tests/independence.rs` checks that the library source (the conformance
-harness aside) reaches for no file, clock, console, network, thread or
-process access, compiles in nothing from the web game's tree, and pulls in
-no unreviewed crate.
+harness aside, which is behind the `conformance` feature) reaches for no
+file, clock, console, network, thread or process access, compiles in
+nothing from the web game's tree, and pulls in no unreviewed crate.
+`tests/read_boundary.rs` keeps the tests and binaries reading only
+`engine-rs/` and `conformance/`, and `tests/api.rs` names the host API.
 
 ## Running
 
 ```sh
 cd engine-rs
 cargo test                                  # unit tests (rng, number formatting, hash)
-cargo run --release --bin conformance       # replay every scenario against expected.json
-cargo llvm-cov --no-report test && cargo llvm-cov --no-report run --bin conformance \
+# The referee and the tools below are the `conformance` feature.
+cargo run --release --features conformance --bin conformance       # replay every scenario against expected.json
+cargo llvm-cov --no-report test --features conformance && cargo llvm-cov --no-report run --features conformance --bin conformance \
   && cargo llvm-cov report               # what the tests and the referee reach; CI floors lines at 87%
-cargo run --release --bin dump -- starter-classic t+60   # canonical JSON of one checkpoint
-cargo run --release --bin tdt                 # replay every .TDT case against conformance/tdt-cases.json
+cargo run --release --features conformance --bin dump -- starter-classic t+60   # canonical JSON of one checkpoint
+cargo run --release --features conformance --bin tdt                 # replay every .TDT case against conformance/tdt-cases.json
 (cd consumer && cargo test --locked && cargo run --locked --release)   # the frontend-free host (API.md)
 ```
 
@@ -76,7 +80,7 @@ serialized game (what `Simulation::serialize` writes). Its referee is
 `VC_CONFORMANCE_UPDATE=1` switch as the scenario lock): every synthetic
 `.TDT` case is pinned by the canonical-JSON hash of the save the TypeScript
 importer produces and its warnings, every export case by the SHA-256 of the
-bytes the TypeScript exporter writes. `cargo run --release --bin tdt` prints
+bytes the TypeScript exporter writes. `cargo run --release --features conformance --bin tdt` prints
 one line per case and exits non-zero on any mismatch; `cargo test` replays
 the same table. The engine never depends on the module.
 
@@ -132,7 +136,7 @@ engine's key order, which every reader takes, and a string holding half a
 surrogate pair is written as U+FFFD where `JSON.stringify` writes the escape
 (the web game repairs such strings on load and on input, so its saves hold
 none). The Rust tests in `load.rs`
-round-trip every web-written fixture in `src/tests/fixtures/`, and
+round-trip every web-written fixture in `conformance/fixtures/`, and
 `src/tests/integration/conformanceWasmVctower.integration.test.ts` (part of
 `npm run test:wasm`) loads each fixture in the web game, writes it with the
 engine, checks the file against `SaveGame.export`'s and `toTowerFile`'s
@@ -254,7 +258,10 @@ and a "Not enough money." refusal carries that same price. Any other refusal
 carries the reason `build` would give and the facility's base price, so
 placement rules the catalog does not list (the Wedding Hall on the top floor,
 the ground-floor concourse, a claimed sky-lobby story, lobby floors) reach a
-frontend through the engine that enforces them.
+frontend through the engine that enforces them. The binding has no
+quote for a shaft yet (backlog row `engine-independence`, #980); a native host
+asks the crate's `Simulation::can_build_transport(kind, x, bottom, top)`, the
+dry run `build_transport` makes first.
 `conformanceWasmCanBuild.integration.test.ts` sweeps every kind over a grid
 of floors and positions on new games and saved towers in both modes (two
 raised to the TOWER rating, so the star-gated rules answer), with bridging on
@@ -321,5 +328,5 @@ this side, `stateView` on the TypeScript side) to find the field.
 
 A simulation change lands in both engines in the same pull request, with the
 regenerated `conformance/expected.json` (see `conformance/README.md`). CI runs
-the referee on every change to `engine-rs/`, `conformance/` or the save
-fixtures (`.github/workflows/engine-rs.yml`).
+the referee on every change to `engine-rs/` or `conformance/`, the save
+fixtures in `conformance/fixtures/` included (`.github/workflows/engine-rs.yml`).

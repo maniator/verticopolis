@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { inflateSync } from "fflate";
 // The real v1 save, inlined as a string (vite ?raw) so the test needs no node fs.
-import towerFile from "../fixtures/towerone_6.vctower?raw";
+import towerFile from "../../../conformance/fixtures/towerone_6.vctower?raw";
 import { Simulation } from "../../engine/Simulation";
 import { SAVE_VERSION, floatingStructureCount, reflowV1toV2 } from "../../engine/saveMigration";
 import { FACILITIES, facilityFloors } from "../../engine/facilities";

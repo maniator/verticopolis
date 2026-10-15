@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { GameApp } from "../main";
 import {
   isCrashed,
+  isEngineStopped,
   isSplashUp,
   isDialogOpen,
   hasBlockingModal,
@@ -34,6 +35,12 @@ describe("interactionState reads", () => {
     expect(isCrashed()).toBe(false);
     mount(CRASH_SCREEN_ID);
     expect(isCrashed()).toBe(true);
+  });
+
+  it("isEngineStopped reflects the wasm-only engine-failure message", () => {
+    expect(isEngineStopped()).toBe(false);
+    mount("engine-failure");
+    expect(isEngineStopped()).toBe(true);
   });
 
   it("isSplashUp reflects the #splash element", () => {
