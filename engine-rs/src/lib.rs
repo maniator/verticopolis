@@ -35,6 +35,7 @@ pub mod rent;
 pub mod rng;
 pub mod rules;
 pub mod satisfaction;
+pub mod save_delta;
 // The conformance harness reads the suite's files, so a host links it only
 // with the `conformance` feature (tier 2 in API.md). The crate's unit tests
 // always have it; a test under `tests/` needs the feature like any host.
