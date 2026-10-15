@@ -176,13 +176,13 @@ const HOST_LOOP = (Object.keys(BINDING_EXPORT_TIERS) as BindingExport[]).filter(
 const CALLS_HOST_LOOP = callsAny(HOST_LOOP.filter((name) => !SHARED_LOOP_NAMES.includes(name)));
 /** A write to `.money`, through parentheses and a non-null assertion too
  *  (`(sim.money) += c`, `sim.money! -= c`, `(sim.money)++`); `sim.money != x`
- *  and `if (sim.money) ++n` stay reads. */
+ *  and `if (sim.money) ++n` stay reads, and so does an arrow's `(b = sim.money) =>`. */
 const OP = String.raw`(?:\*\*|<<|>>>|>>|&&|\|\||\?\?|[-+*/%&|^])`;
 const WRITES_MONEY = new RegExp(
   [
-    String.raw`\.\s*money\s*\)*\s*${OP}?=(?!=)`,
+    String.raw`\.\s*money\s*\)*\s*${OP}?=(?![=>])`,
     String.raw`\.\s*money(?:\s*(?:\+\+|--)|(?:\s*\))+(?:\+\+|--))`,
-    String.raw`\.\s*money\s*!(?:\s*\)*\s*${OP}=|\s*\)*\s+=(?!=)|(?:\s*\))*(?:\+\+|--))`,
+    String.raw`\.\s*money\s*!(?:\s*\)*\s*${OP}=|\s*\)*\s+=(?![=>])|(?:\s*\))*(?:\+\+|--))`,
     String.raw`(?:\+\+|--)\s*\(*\s*[\w$.]*\.money\b`,
   ].join("|"),
 );
@@ -341,7 +341,7 @@ describe("WASM binding export tiers", () => {
       for (const hit of ["sim.money = 5", "app.sim.money += cost", "sim.money -= 1", "sim.money++", "--sim.money", "s.money*=2", "sim.money ??= 0", "sim.money ||= 1", "sim.money |= 0", "sim.money <<= 1", "++(sim.money)", "(sim.money) += cost", "(sim.money)++", "sim.money! -= cost", "sim.money! = 5", "(sim.money!) = 5"]) {
         expect(offense(hit, WRITES_MONEY), hit).not.toBeNull();
       }
-      for (const miss of ["const m = sim.money", "if (sim.money === 0)", "sim.money == x", "sim.money >= cost", "sim.money <= cost", "sim.money !== x", "sim.money != x", "sim.money! !== x", "(sim.money) === 0", "if (sim.money) ++n;", "if (!this.money) --budget;", "if (a.money!) ++n;", "(a.money!) == 0", "moneyLabel = 1", "sim.money ?? 0", "sim.money || 0"]) {
+      for (const miss of ["const m = sim.money", "if (sim.money === 0)", "sim.money == x", "sim.money >= cost", "sim.money <= cost", "sim.money !== x", "sim.money != x", "sim.money! !== x", "(sim.money) === 0", "if (sim.money) ++n;", "if (!this.money) --budget;", "if (a.money!) ++n;", "(a.money!) == 0", "moneyLabel = 1", "sim.money ?? 0", "sim.money || 0", "const canAfford = (budget = app.sim.money) => budget >= cost;", "(budget = sim.money!) => budget", "type Fn = (m: typeof sim.money) => void;"]) {
         expect(offense(miss, WRITES_MONEY), miss).toBeNull();
       }
       for (const hit of ['import type { WasmEngine } from "../dualrun/binding";', 'import { Engine } from "../../dualrun/engine.js";', 'await import("../dualrun/binding")', 'require("../dualrun/engine")', 'import type { Engine } from "../dualrun/engine.d.ts";', "await import(`../dualrun/binding`)", 'import "../dualrun/binding.js";', 'import { E } from "dualrun/engine";']) {
