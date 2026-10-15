@@ -1,3 +1,4 @@
+import { settleEngine } from "../wasmhost/stepGate";
 import { Simulation } from "../engine/Simulation";
 import type { GameMode, SerializedView } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
@@ -158,6 +159,17 @@ export class SaveLoad {
         const sim = this.deps.getSim();
         // Re-stamp per iteration: the camera may have moved while the
         // previous async compression was in flight.
+        // The experimental worker host answers `serialize` from the engine
+        // only once its read model has caught up; wait for that here, where
+        // waiting costs nothing (no-op on every other engine). The camera is
+        // stamped after the wait, so the save carries where it is now.
+        await settleEngine(sim);
+        // A tower adopted during the wait is not the one to write: go round
+        // again with the tower the app holds now.
+        if (this.deps.getSim() !== sim) {
+          this.autosaveQueued = true;
+          continue;
+        }
         this.stampView(sim);
         await SaveGame.saveAsync(sim);
       } while (this.autosaveQueued);

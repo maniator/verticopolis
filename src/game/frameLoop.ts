@@ -9,6 +9,7 @@ import { positionPanels } from "./panelAnchoring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
 import { gameplaySession } from "../analytics";
 import { drainEngineEvents } from "../analyticsEngineBridge";
+import { stepGate } from "../wasmhost/stepGate";
 
 /**
  * The per-frame simulation + throttled UI/audio refresh, split out of the
@@ -74,7 +75,7 @@ export function applySpeed(app: GameApp, s: number): void {
  *  frame (at speed 0 it is nothing, so a pause never spends carried time).
  *  The write-back sits in `finally` so a step that throws (the frame-error
  *  guard catches it) never re-owes the steps that already ran. */
-export function advanceOwedMinutes(host: { sim: { tick(dtMinutes: number): void; clock: { minuteOfDay: number } }; accMinutes: number }, debt: StepDebt, dtMs: number, minutesPerSecond: number, steadyClock: boolean): void {
+export function advanceOwedMinutes(host: { sim: { tick(dtMinutes: number): void; clock: { minuteOfDay: number } }; accMinutes: number }, debt: StepDebt, dtMs: number, minutesPerSecond: number, steadyClock: boolean, step = true): void {
   debt.minutes = host.accMinutes;
   syncStepMode(debt, minutesPerSecond, steadyClock);
   host.accMinutes = debt.minutes;
@@ -83,6 +84,10 @@ export function advanceOwedMinutes(host: { sim: { tick(dtMinutes: number): void;
   if (!Number.isFinite(host.accMinutes)) host.accMinutes = 0;
   if (host.accMinutes > MAX_CATCHUP_MINUTES) host.accMinutes = MAX_CATCHUP_MINUTES;
   debt.minutes = host.accMinutes;
+  // A host still busy with its last batch (the experimental worker host,
+  // see wasmhost/stepGate) owes this frame's minutes under the same cap and
+  // steps them on a later frame.
+  if (!step) return;
   try {
     drainFixedSteps(host.sim, debt, minutesPerSecond, { steadyClock });
   } finally {
@@ -131,7 +136,14 @@ export function runFrame(app: GameApp, dtMs: number): void {
   const debt = stepDebts.get(app) ?? { minutes: 0 };
   stepDebts.set(app, debt);
   const minutesBeforeTicks = app.sim.clock.minutes;
-  advanceOwedMinutes(app, debt, dtMs, minutesPerSecond, steadyClock);
+  // An experimental engine host that syncs once per frame registers a gate:
+  // it may hold the steps back while its last batch is in flight, and it
+  // brings the read model up to date (or sends the batch) once the steps
+  // ran. Without one (the TypeScript engine, the default WASM host) this is
+  // the same frame as before.
+  const gate = stepGate(app.sim);
+  advanceOwedMinutes(app, debt, dtMs, minutesPerSecond, steadyClock, gate ? gate.canStep() : true);
+  gate?.flush();
   emitMealRushes(app, minutesBeforeTicks);
 
   // Throttle the comparatively expensive DOM/audio updates (~6Hz) so a busy
