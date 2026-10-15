@@ -6,8 +6,9 @@ import type { LiveScene, LiveUnit } from "./lookup";
  * export's own pre-flight both compose these from the atlas and require an
  * exact match with the web's paint (`verify.ts`). Each covers a branch of the
  * signature: presence and meals, hours, late night, subtypes (known, legacy
- * and unknown), venues, the garage overlays, recycling fill, and the
- * animated states.
+ * and unknown), venues, the cinema's marquee and screen cycles, the garage
+ * overlays, recycling fill (the exact chain, between the eighths too), and
+ * the animated states.
  */
 
 export interface Sample {
@@ -19,6 +20,9 @@ export interface Sample {
   variant: number;
   /** For fire and construction: which loop frame to compare. */
   frame?: number;
+  /** Read a recycling center through its `fill` eighths instead of the
+   *  exact chain (`LookupOptions.recyclingEighths`). */
+  eighths?: boolean;
 }
 
 
@@ -59,6 +63,8 @@ export const SAMPLES: Sample[] = [
   s("shop closed at night", { kind: "shop", subtype: "Pet Store", occupants: 1 }, NIGHT, 2),
   s("food hall", { kind: "foodHall", subtype: "Ramen Bar", occupants: 9 }, DAY, 3),
   s("cinema matinee", { kind: "cinema", occupants: 12 }, { ...DAY, hour: 14 }),
+  s("cinema evening show mid-cycle", { kind: "cinema", occupants: 25 }, { ...NIGHT, clock: 1.3 }, 1),
+  s("cinema between shows late in the cycle", { kind: "cinema" }, { ...DAY, hour: 15, clock: 7.65 }, 3),
   s("party hall", { kind: "partyHall", occupants: 18 }, NIGHT, 1),
   s("wedding hall", { kind: "weddingHall", occupants: 10 }, DAY, 2),
   s("aquatic center", { kind: "aquaticCenter", occupants: 6 }, DAY, 3),
@@ -77,8 +83,12 @@ export const SAMPLES: Sample[] = [
   s("parking empty", { kind: "parking", id: 9 }, DAY),
   s("parking with a car", { kind: "parking", id: 12 }, { ...DAY, parkingUse: 1 }, 1),
   s("parking dead", { kind: "parking", id: 12 }, { ...DAY, parkingUse: 1, dead: true }, 2),
-  s("recycling half full", { kind: "recycling" }, { ...DAY, recycleFill: 4 / 8 }),
+  { ...s("recycling half full, through the eighths", { kind: "recycling" }, { ...DAY, recycleFill: 4 / 8 }), eighths: true },
+  { ...s("recycling full, through the eighths", { kind: "recycling" }, { ...DAY, recycleFill: 1 }, 2), eighths: true },
   s("recycling full", { kind: "recycling" }, { ...DAY, recycleFill: 1 }, 2),
+  s("recycling between eighths", { kind: "recycling" }, { ...DAY, recycleFill: 0.37 }, 1),
+  s("recycling just past amber", { kind: "recycling" }, { ...NIGHT, recycleFill: 0.7000000000000001 }, 3),
+  s("recycling one gauge row", { kind: "recycling" }, { ...DAY, recycleFill: 0.01 }),
   s("metro", { kind: "metro" }, DAY),
   s("office gutted", { kind: "office", state: "gutted" }, DAY),
   s("office on fire", { kind: "office", state: "fire" }, DAY, 0, 5),

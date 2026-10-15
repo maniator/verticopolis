@@ -4,14 +4,26 @@ import { blank, over, type Image } from "./pixels";
 import { TILE } from "../scale";
 
 /**
- * Composition the way a frontend does it: a frame's image, then the chain
- * steps up to the requested count, then the named overlays, each drawn
- * source-over at its offset. Works on a bake result; the archive test checks
+ * Composition the way a frontend does it: a frame's image, then its cycles at
+ * the requested steps, then the chain steps up to the requested count, then
+ * the named overlays, each drawn source-over at its offset. Works on a bake result; the archive test checks
  * that the packed pages plus the manifest give back the same pixels.
  */
 
 function place(dst: Image, bake: Pick<BakeResult, "images">, ref: ImageRef | null): void {
   if (ref) over(dst, bake.images[ref.id], ref.dx, ref.dy);
+}
+
+/** Draw `rec`'s cycles at the steps `cycles` names. A cycle the frame does not
+ *  carry draws nothing (the bake leaves out a cycle that never changes the
+ *  frame); an unknown step throws. */
+function drawCycles(out: Image, bake: Pick<BakeResult, "images">, rec: BakedFrame, cycles: Record<string, number>): void {
+  for (const [key, k] of Object.entries(cycles)) {
+    const cycle = rec.cycles?.[key];
+    if (!cycle) continue;
+    if (!(Number.isInteger(k) && k >= 0 && k < cycle.steps.length)) throw new Error(`${rec.name} cycle ${key} has no step ${k}`);
+    place(out, bake, cycle.steps[k]);
+  }
 }
 
 /** Draw `rec`'s chain steps up to `chains` and its named `overlays` onto `out`. */
@@ -33,15 +45,17 @@ export function composeFrame(
   rec: BakedFrame,
   chains: Record<string, number> = {},
   overlays: readonly string[] = [],
+  cycles: Record<string, number> = {},
 ): Image {
   const out = blank(rec.w, rec.h);
   place(out, bake, rec.image);
+  drawCycles(out, bake, rec, cycles);
   drawRuntime(out, bake, rec, chains, overlays);
   return out;
 }
 
 /** Compose `rec` the way a frontend drawing with depth does: the shell and
- *  its chain's shell steps, then the furniture (or, with `soft`, the soft
+ *  its chain's shell steps, then its cycles, then the furniture (or, with `soft`, the soft
  *  furniture) and its chain's furniture (or soft) steps, then a vehicle's front
  *  and its steps, each source-over. Named overlays (a parking space's car or
  *  dead mark) draw last. Throws for a frame without depth layers. */
@@ -51,6 +65,7 @@ export function composeLayered(
   chains: Record<string, number> = {},
   overlays: readonly string[] = [],
   soft = false,
+  cycles: Record<string, number> = {},
 ): Image {
   const layers = rec.layers;
   if (!layers) throw new Error(`${rec.name} has no depth layers`);
@@ -62,6 +77,7 @@ export function composeLayered(
   };
   place(out, bake, layers.shell);
   for (const [key, n] of Object.entries(chains)) stepsOf(key, n, layers.chains?.[key]?.shell);
+  drawCycles(out, bake, rec, cycles);
   place(out, bake, soft ? (layers.soft ?? null) : layers.furniture);
   for (const [key, n] of Object.entries(chains)) stepsOf(key, n, soft ? layers.chains?.[key]?.soft : layers.chains?.[key]?.furniture);
   if (layers.front !== undefined) {
@@ -78,7 +94,7 @@ export function composeLookup(bake: Pick<BakeResult, "images" | "frames">, found
   const name = "animation" in found ? `${found.animation}/${frameIndex}` : found.frame;
   const rec = bake.frames.find((f) => f.name === name);
   if (!rec) throw new Error(`no frame ${name}`);
-  const image = "animation" in found ? composeFrame(bake, rec) : composeFrame(bake, rec, found.chains, found.overlays);
+  const image = "animation" in found ? composeFrame(bake, rec) : composeFrame(bake, rec, found.chains, found.overlays, found.cycles);
   return { name, image: found.stretchTo === undefined ? image : stretch(image, found.stretchTo * TILE) };
 }
 

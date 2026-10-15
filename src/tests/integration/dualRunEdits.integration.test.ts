@@ -60,14 +60,15 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     const grown = sim.resizeTransport(shaft.id, 30, 47);
     expect(grown.ok).toBe(true);
     sim.money -= 5000;
-    // A billed drag: out two floors, back one (free), out again within the mark.
-    const hwm = { bottom: shaft.bottom, top: shaft.top };
+    // A billed drag: out two floors, back one (free), out again within the
+    // engine-held mark (#990), which the shadow opens and closes in step.
     const start = shaft.top;
-    const out = sim.extendTransport(shaft.id, "up", start + 2, hwm);
+    expect(sim.beginExtend(shaft.id)).toBe(true);
+    const out = sim.extendTransport(shaft.id, "up", start + 2);
     expect(out).toMatchObject({ ok: true, top: start + 2, added: 2, delta: -2 * ECON.transportFloorCost });
-    hwm.top = Math.max(hwm.top, out.top);
-    expect(sim.extendTransport(shaft.id, "up", out.top - 1, hwm)).toMatchObject({ ok: true, top: start + 1, delta: 0 });
-    expect(sim.extendTransport(shaft.id, "up", out.top, hwm)).toMatchObject({ ok: true, top: start + 2, added: 0, delta: 0 });
+    expect(sim.extendTransport(shaft.id, "up", out.top - 1)).toMatchObject({ ok: true, top: start + 1, delta: 0 });
+    expect(sim.extendTransport(shaft.id, "up", out.top)).toMatchObject({ ok: true, top: start + 2, added: 0, delta: 0 });
+    sim.endExtend();
     const money = sim.money;
     sim.money = 0; // a broke press is refused in both engines
     expect(sim.extendTransport(shaft.id, "up", shaft.top + 1).reason).toBe("Not enough money.");
@@ -158,7 +159,6 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(sim.removeCar(Number.NaN)).toEqual(refused);
     expect(sim.extendTransport(lift.id, "up", 3.5)).toMatchObject(refused);
     expect(sim.extendTransport(lift.id, "sideways" as "up", 3)).toMatchObject({ ...refused, bottom: 1, top: 2 });
-    expect(sim.extendTransport(lift.id, "up", 3, { bottom: 1, top: 2.5 })).toMatchObject(refused);
     expect(sim.removeFacility(lift.id, "burn" as "sell")).toEqual(refused);
     expect(sim.removeFacility(lift.id - 0.5, "sell")).toEqual(refused);
     // Non-numbers and non-strings: the binding would coerce or throw on
@@ -170,32 +170,72 @@ describe.skipIf(!hasWasmPackage())("dual run: player edits are mirrored", () => 
     expect(sim.extendTransport(lift.id, "up", loose("3"))).toMatchObject(refused);
     expect(sim.extendTransport(lift.id, loose(null) as unknown as "up", 3)).toMatchObject(refused);
     expect(sim.extendTransport(lift.id, loose(5) as unknown as "up", 3)).toMatchObject(refused);
-    expect(sim.extendTransport(lift.id, "up", 3, loose(0) as unknown as { bottom: number; top: number })).toMatchObject(refused);
-    expect(sim.extendTransport(lift.id, "up", 3, { bottom: loose("1"), top: 2 })).toMatchObject(refused);
+    expect(sim.beginExtend(loose(String(lift.id)))).toBe(false);
+    expect(sim.beginExtend(lift.id + 0.5)).toBe(false);
     expect(sim.removeFacility(lift.id, loose(null) as unknown as "sell")).toEqual(refused);
     expect(sim.removeFacility(lift.id, loose(7) as unknown as "sell")).toEqual(refused);
     const live = () => sim.tower.transportById(lift.id)!;
     expect(live().cars).toBe(1);
     expect(live().top).toBe(2);
     expect(sim.addCar(lift.id).ok).toBe(true); // a well-formed call still lands
-    // A mark whose fields answer differently on a second read: the mirror
-    // reads it once, before the call, so both engines bill the same floors.
-    // The first read never reaches past the shaft, so no floor goes free.
-    let reads = 0;
-    const shifting = { bottom: 1, get top() { return reads++ === 0 ? 2 : 5; } };
-    expect(sim.extendTransport(lift.id, "up", 6, shifting)).toMatchObject({ ok: true, bottom: 1, top: 6, added: 4 });
-    let readsB = 0;
-    const halving = { get bottom() { return readsB++ === 0 ? 1 : 0.5; }, top: 6 };
-    expect(sim.extendTransport(lift.id, "up", 7, halving)).toMatchObject({ ok: true, bottom: 1, top: 7, added: 1 });
-    let readsC = 0; // a callable mark carries fields too
-    const callable = Object.assign(() => undefined, { bottom: 1 });
-    Object.defineProperty(callable, "top", { get: () => (readsC++ === 0 ? 7 : 2.5) });
-    expect(sim.extendTransport(lift.id, "up", 8, loose(callable) as unknown as { bottom: number; top: number })).toMatchObject({ ok: true, bottom: 1, top: 8, added: 1 });
+    // The gesture mark is engine-held in both (#990): a wiggle inside it is
+    // free, and once it closes a shrink and regrow is billed. A mark the
+    // caller passes is ignored, so an inflated one buys nothing in either.
+    const extend = sim.extendTransport as (...a: unknown[]) => ReturnType<typeof sim.extendTransport>;
+    expect(extend.call(sim, lift.id, "up", 4, { bottom: 1, top: 50 })).toMatchObject({ ok: true, top: 4, added: 2 });
+    // A refused begin opens no gesture in either engine, through the mirror
+    // too (a string id relays as NaN): after each, a shrink and regrow is
+    // billed in both.
+    for (const bad of [loose(String(lift.id)), lift.id + 0.5]) {
+      expect(sim.beginExtend(bad)).toBe(false);
+      expect(sim.extendTransport(lift.id, "up", 3)).toMatchObject({ ok: true, added: 0 });
+      expect(sim.extendTransport(lift.id, "up", 4)).toMatchObject({ ok: true, added: 1 });
+    }
+    expect(sim.beginExtend(lift.id)).toBe(true);
+    expect(sim.extendTransport(lift.id, "up", 6)).toMatchObject({ ok: true, top: 6, added: 2 });
+    expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, top: 5, added: 0 });
+    expect(sim.extendTransport(lift.id, "up", 6)).toMatchObject({ ok: true, top: 6, added: 0 });
+    // A refused begin with a gesture open drops it in both engines: the
+    // shrink and regrow after it is billed.
+    expect(sim.beginExtend(loose(String(lift.id)))).toBe(false);
+    expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, top: 5, added: 0 });
+    expect(sim.extendTransport(lift.id, "up", 6)).toMatchObject({ ok: true, top: 6, added: 1 });
+    expect(sim.beginExtend(lift.id)).toBe(true);
+    sim.endExtend();
+    expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, top: 5, added: 0 });
+    expect(sim.extendTransport(lift.id, "up", 6)).toMatchObject({ ok: true, top: 6, added: 1 });
     new FrameDriver(sim, 3).run(60);
     const report = run.stop();
     expect(report.divergences).toEqual([]);
     expect(report.eventDivergences).toEqual([]);
     // 60 frames at speed 3 from the founding hour: its pass, then 8:00.
+    expect(report.checkpoints).toBe(2);
+  });
+
+  it("a shadow started mid-drag takes over the open gesture's mark (#990)", () => {
+    // A save holds no gesture, so it rides with the boundary markers: the
+    // shadow restores the same mark, and floors the drag paid for before the
+    // attach regrow free in both, as they would with no shadow at all.
+    const sim = Simulation.newGame(9, "classic");
+    sim.money = 1e9;
+    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    for (let x = 170; x < 200; x++) expect(sim.build("floor", 2, x).ok).toBe(true);
+    expect(sim.buildTransport("elevatorStandard", 172, 1, 2).ok).toBe(true);
+    const lift = sim.tower.transportAt(1, 172)!;
+    expect(sim.beginExtend(lift.id)).toBe(true);
+    expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, added: 3 });
+    expect(sim.extendTransport(lift.id, "up", 3)).toMatchObject({ ok: true, added: 0 });
+    const run = new DualRun().follow(sim);
+    expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, added: 0 });
+    expect(sim.extendTransport(lift.id, "up", 6)).toMatchObject({ ok: true, added: 1 });
+    expect(sim.extendTransport(lift.id, "up", 4)).toMatchObject({ ok: true, added: 0 });
+    expect(sim.extendTransport(lift.id, "up", 6)).toMatchObject({ ok: true, added: 0 });
+    sim.endExtend();
+    expect(sim.extendTransport(lift.id, "up", 5)).toMatchObject({ ok: true, added: 0 });
+    expect(sim.extendTransport(lift.id, "up", 6)).toMatchObject({ ok: true, added: 1 });
+    new FrameDriver(sim, 3).run(60);
+    const report = run.stop();
+    expect(report.divergences).toEqual([]);
     expect(report.checkpoints).toBe(2);
   });
 
