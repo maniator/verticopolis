@@ -8,3 +8,7 @@ declare const __APP_SHA__: string;
  *  and perf pipelines). Gates the `window.game` handle: a production build
  *  compiles the publish away entirely (see bootstrap.ts). */
 declare const __TOOLING_BUILD__: boolean;
+/** True only in a wasm-only build (`VC_ENGINE=wasm`): the Rust/WASM engine is
+ *  the only engine, with no runtime switch and no TypeScript fallback (see
+ *  src/build/engineBundle.ts and bootstrap.ts). */
+declare const __WASM_ONLY__: boolean;

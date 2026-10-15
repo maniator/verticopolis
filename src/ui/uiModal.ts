@@ -1,3 +1,5 @@
+import { isEngineStopped } from "../game/interactionState";
+
 /**
  * The shared window grammar every modal is finished with: title-bar skinning,
  * the accessible-name wiring, the ✕, and the dismissal handlers. Extracted from
@@ -26,7 +28,8 @@ export interface ModalDeps {
  *  {@link MODAL_TITLE_ID} and point the dialog's `aria-labelledby` at that SPAN
  *  (never at the h2 itself, since the h2 also ends up holding the ✕ below;
  *  labeling the h2 would fold the ✕'s own accessible name, "Close", into the
- *  announced title), show the dialog, then append the win-style ✕ into the h2
+ *  announced title), show the dialog (unless a wasm-only engine-failure
+ *  message is up; see the gate below), then append the win-style ✕ into the h2
  *  as a sibling of the span so it stays excluded from the accessible name.
  *  Cleared when a modal renders no top-level h2, so the reference is never
  *  left dangling. The ✕ routes through the dialog's cancel path (same as Esc)
@@ -55,7 +58,10 @@ export function finishModal(dialog: HTMLDialogElement, box: HTMLElement, deps: M
   } else {
     dialog.removeAttribute("aria-labelledby");
   }
-  if (!dialog.open) dialog.showModal();
+  // Behind a wasm-only engine-failure message a late modal (an import
+  // report that finished after the stop) would sit in the top layer and
+  // cover the message's Reload button, so it never opens there.
+  if (!dialog.open && !isEngineStopped()) dialog.showModal();
   if (h2 && !h2.querySelector(".modal-x")) {
     h2.appendChild(
       deps.titleBarClose("modal-x btn xs", () => dialog.dispatchEvent(new Event("cancel", { cancelable: true }))),
