@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { GRID } from "../engine/facilities";
 import { FLOOR, TILE } from "./scale";
 import {
-  REGION_COLS,
+  regionCols,
   REGION_FLOORS,
-  REGION_ROWS,
+  regionRows,
   REGION_TILES,
   regionCol,
   regionKey,
@@ -29,8 +29,8 @@ describe("region dimensions", () => {
   });
 
   it("the grid bounds the whole lot, basements included", () => {
-    expect(REGION_COLS * REGION_TILES).toBeGreaterThanOrEqual(GRID.width);
-    expect(REGION_ROWS * REGION_FLOORS).toBeGreaterThanOrEqual(GRID.maxFloor - GRID.minFloor + 1);
+    expect(regionCols() * REGION_TILES).toBeGreaterThanOrEqual(GRID.width);
+    expect(regionRows() * REGION_FLOORS).toBeGreaterThanOrEqual(GRID.maxFloor - GRID.minFloor + 1);
   });
 });
 
@@ -68,16 +68,16 @@ describe("footprint to region mapping", () => {
   });
 
   it("the extreme lot corners stay inside the key space", () => {
-    expect(regionCol(GRID.width - 1)).toBe(REGION_COLS - 1);
-    expect(regionRow(GRID.maxFloor)).toBe(REGION_ROWS - 1);
+    expect(regionCol(GRID.width - 1)).toBe(regionCols() - 1);
+    expect(regionRow(GRID.maxFloor)).toBe(regionRows() - 1);
     // Top-right-most legal 9-tile footprint hits exactly the last key.
-    expect(regionsOf(GRID.maxFloor, GRID.width - 9, 9, 1)).toEqual([REGION_COLS * REGION_ROWS - 1]);
+    expect(regionsOf(GRID.maxFloor, GRID.width - 9, 9, 1)).toEqual([regionCols() * regionRows() - 1]);
   });
 
   it("a full-lot-width footprint (the metro) spans every column exactly once", () => {
     const keys = regionsOf(GRID.minFloor, 0, GRID.width, 3);
-    expect(keys).toHaveLength(REGION_COLS);
-    expect(new Set(keys).size).toBe(REGION_COLS);
+    expect(keys).toHaveLength(regionCols());
+    expect(new Set(keys).size).toBe(regionCols());
   });
 
   it("every emitted key stays below COLS * ROWS even for off-lot inputs", () => {
@@ -89,7 +89,7 @@ describe("footprint to region mapping", () => {
     ]) {
       for (const k of keys) {
         expect(k).toBeGreaterThanOrEqual(0);
-        expect(k).toBeLessThan(REGION_COLS * REGION_ROWS);
+        expect(k).toBeLessThan(regionCols() * regionRows());
       }
     }
   });
@@ -97,14 +97,14 @@ describe("footprint to region mapping", () => {
 
 describe("region rects", () => {
   it("a rect's floors and tiles round-trip through the mapping", () => {
-    for (const key of [0, regionKey(3, 2), regionKey(REGION_COLS - 1, REGION_ROWS - 1)]) {
+    for (const key of [0, regionKey(3, 2), regionKey(regionCols() - 1, regionRows() - 1)]) {
       const r = regionRect(key);
       expect(r.w).toBe(REGION_TILES * TILE);
       expect(r.h).toBe(REGION_FLOORS * FLOOR);
       // The tile at the rect's left edge maps back to this region's column,
       // and the floors at the vertical extremes map back to its row.
-      const col = key % REGION_COLS;
-      const row = Math.floor(key / REGION_COLS);
+      const col = key % regionCols();
+      const row = Math.floor(key / regionCols());
       expect(regionCol(r.x / TILE)).toBe(col);
       const topFloor = -r.y / FLOOR;
       const bottomFloor = topFloor - REGION_FLOORS + 1;

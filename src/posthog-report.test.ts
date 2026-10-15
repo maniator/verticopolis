@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 // The PostHog report generator is a dependency-free Node script (see
 // scripts/posthog-report.mjs). Its pure helpers (the HogQL query builders and
 // the response normalizers) are exported so they can be pinned here without a
@@ -8,6 +11,7 @@ import {
   lit,
   buildTotalsQuery,
   buildDepthQuery,
+  buildSessionDepthQuery,
   buildBreakdownQuery,
   buildFilteredCountQuery,
   rowsToObjects,
@@ -86,6 +90,67 @@ describe("HogQL query builders", () => {
     expect(q).toContain("event = 'session_end'");
     expect(q).toContain("toFloat(properties.seconds) IS NOT NULL");
     expect(q).toContain("INTERVAL 336 HOUR");
+  });
+
+  it("per-session depth query collapses each session to one value before the percentiles", () => {
+    // session_end re-fires per tab-hide with a cumulative value, so its
+    // percentiles have to run over one length per session, not per row.
+    const q = buildSessionDepthQuery("session_end", "seconds", 336);
+    expect(q).toContain("GROUP BY distinct_id");
+    expect(q).toContain("quantile(0.5)(v)");
+    expect(q).toContain("quantile(0.9)(v)");
+    expect(q).toContain("quantile(0.95)(v)");
+    expect(q).toContain("event = 'session_end'");
+    expect(q).toContain("toFloat(properties.seconds) IS NOT NULL");
+    expect(q).toContain("INTERVAL 336 HOUR");
+    expect(q).toContain("count() AS n"); // sessions, not rows
+    // Reading the raw property in the percentile is the bug this builder fixes.
+    expect(q).not.toContain("quantile(0.5)(toFloat(properties.seconds))");
+  });
+
+  it("keeps the page-life walk identical to the dashboard view's copy of it", () => {
+    // The walk is the one genuinely subtle expression in this change and it lives
+    // in TWO places: the session_lengths view in scripts/posthog-dashboard.mjs and
+    // the builder here. Neither can be executed from a unit test (both are HogQL
+    // that only ClickHouse runs), so what is guarded instead is the thing that
+    // would actually go wrong: the two drifting apart, leaving the dashboard and
+    // the report quietly computing session length two different ways.
+    const dashboardPath = resolve(dirname(fileURLToPath(import.meta.url)), "../scripts/posthog-dashboard.mjs");
+    const dashboard = readFileSync(dashboardPath, "utf8");
+    // Whitespace is collapsed on both sides before matching, so re-wrapping or
+    // re-indenting either copy is not drift and does not fail this. What must not
+    // change is the tokens and operators. Without this the guard cries wolf on a
+    // formatting pass, and a guard that cries wolf gets deleted.
+    const collapse = (text: string): string => text.replace(/\s+/g, " ");
+    const walk = /arraySum\(arrayMap\(\(x, i\) -> if\(i = length\((\w+)\) OR \1\[i \+ 1\] < x, x, 0\), \1, arrayEnumerate\(\1\)\)\)/;
+
+    const viewWalk = walk.exec(collapse(dashboard));
+    expect(viewWalk, "the view's page-life walk should be findable in the dashboard script").not.toBeNull();
+
+    const queryWalk = walk.exec(collapse(buildSessionDepthQuery("session_end", "seconds", 720)));
+    expect(queryWalk, "the builder's page-life walk should have the same shape").not.toBeNull();
+
+    // Identical once the array alias is normalized: the view calls it `readings`
+    // and the builder calls it `r`, and nothing else may differ. Word-bounded,
+    // because a one-letter alias otherwise matches inside `array` and friends.
+    const normalize = (m: RegExpExecArray): string => m[0].replace(new RegExp(`\\b${m[1]}\\b`, "g"), "ARR");
+    expect(normalize(queryWalk!)).toBe(normalize(viewWalk!));
+  });
+
+  it("per-session depth query sums page lives rather than taking a plain max", () => {
+    // The session id survives a same-tab reload on purpose, so one distinct_id
+    // covers several page lives whose clocks each restart at 0. A plain max would
+    // report only the longest life and lose the rest.
+    const q = buildSessionDepthQuery("session_end", "seconds", 720);
+    expect(q).toContain("arraySum(");
+    expect(q).toContain("arrayEnumerate(r)");
+    // The peak walk: a reading followed by a smaller one ends a page life, as
+    // does the last reading.
+    expect(q).toContain("i = length(r) OR r[i + 1] < x");
+    // Readings must be in time order for the walk to mean anything.
+    expect(q).toContain("arraySort(t -> t.1, groupArray(tuple(timestamp,");
+    // A plain max per session is exactly what this builder must NOT do.
+    expect(q).not.toContain("max(toFloat(properties.seconds)) AS v");
   });
 
   it("breakdown query groups by the property and counts sessions per group", () => {

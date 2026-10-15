@@ -2,6 +2,7 @@ import type { Tower } from "./Tower";
 import type { ElevatorCalls } from "./Crowd";
 import { attendanceCap, isElevatorKind, isStaffOnlyTransport, transportCarCapacity } from "./facilities";
 import { activeCarCount, dwellMinutesFor, homeFloorFor, waitingResponseFor } from "./elevatorSchedule";
+import { roomUnits } from "./tower/rooms";
 
 /** The clock signal dispatch needs to read a per-shaft schedule: which day-type
  *  row is live and which of its 24 hours applies. A shaft with no schedule ignores
@@ -274,7 +275,8 @@ export class ElevatorDispatch {
     // (the set is revision-memoized in tower/routing.ts) trims the flat
     // minute tick as well as the hourly sweep.
     const servedSet = tower.servedFloors();
-    for (const u of tower.units) {
+    // Structure tiles hold no occupants (zeroed on load), so only rooms can add demand here.
+    for (const u of roomUnits(tower)) {
       // Attendance venues (cinema / party hall / wedding hall): `occupants`
       // mirrors the individually-routed visitors, and those people already
       // place REAL hall and cab calls through Crowd.elevatorCalls. Feeding

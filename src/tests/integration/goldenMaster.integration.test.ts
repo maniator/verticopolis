@@ -3,6 +3,10 @@ import { createHash } from "node:crypto";
 import { Simulation } from "../../engine/Simulation";
 import type { FacilityKind, GameMode } from "../../engine/types";
 import { ensureStarterLobby } from "../fixtures/towerFixtures";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
+
+/** The parity projects skip these (story-engine-test-parity, #878). */
+const TS_SAVE_HASH = "pins the hash of the TypeScript serializer's save bytes; while hosted serialize() answers with the engine's save, and the engine's golden master is row 4's gate";
 
 /**
  * Golden-master determinism net for the large-file split refactor.
@@ -112,7 +116,7 @@ describe("golden master: Simulation serialize() is byte-stable across refactors"
     expect(stableStringify(twice)).toEqual(stableStringify(once));
   });
 
-  it("matches the pinned state hash (a pure refactor must not change it)", () => {
+  itTypeScriptOnly(TS_SAVE_HASH)("matches the pinned state hash (a pure refactor must not change it)", () => {
     const hash = createHash("sha256").update(stableStringify(runFixedScenario().serialize())).digest("hex");
     expect(hash).toEqual(PINNED_STATE_HASH);
   });
@@ -145,7 +149,7 @@ describe("golden master (modern): Simulation serialize() is byte-stable across r
     expect(modernHash).not.toEqual(classicHash);
   });
 
-  it("matches the pinned Modern state hash (a pure refactor must not change it)", () => {
+  itTypeScriptOnly(TS_SAVE_HASH)("matches the pinned Modern state hash (a pure refactor must not change it)", () => {
     const hash = createHash("sha256").update(stableStringify(runFixedScenario("modern").serialize())).digest("hex");
     expect(hash).toEqual(PINNED_MODERN_STATE_HASH);
   });

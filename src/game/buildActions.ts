@@ -1,13 +1,11 @@
 import type { Simulation } from "../engine/Simulation";
-import { FACILITIES, facilityFloors } from "../engine/facilities";
-import { resaleRefund } from "../engine/econConfig";
+import { catalogBuildKind, catalogFacility } from "../engine/catalogTypes";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
-import { groundFloorStructureKind } from "../engine/tower/towerTopology";
-import { gameplaySession, trackEconomyAction } from "../analytics";
+import { towerCatalog } from "../engine/towerCatalog";
 
 /**
  * The money boundary of the game shell: every gesture that buys, paints, or
@@ -48,9 +46,6 @@ export class BuildActions {
   tryBuild(kind: FacilityKind, floor: number, x: number, quiet = false): void {
     const res = this.deps.getSim().build(kind, floor, x);
     if (res.ok) {
-      // Report the TOP occupied story for the session peak: a multi-story room
-      // (cinema, party hall) reaches floor + its height - 1, not just its base.
-      gameplaySession.noteBuild(kind, floor + facilityFloors(kind) - 1); // funnel + depth
       if (!quiet) this.deps.audio.sfx("build");
     } else if (!quiet && res.reason) {
       this.deps.audio.sfx("error");
@@ -69,7 +64,6 @@ export class BuildActions {
     top: number,
   ): { ok: boolean; reason: string } {
     const res = this.deps.getSim().buildTransport(kind, x, bottom, top);
-    if (res.ok) gameplaySession.noteBuild(kind, top); // a shaft counts too; top is its reach
     this.deps.audio.sfx(res.ok ? "build" : "error");
     const reason = res.reason ?? this.transportReason(kind, x, bottom, top);
     if (!res.ok) this.deps.ui.toast(reason, "bad");
@@ -80,7 +74,8 @@ export class BuildActions {
   transportReason(kind: FacilityKind, x: number, bottom: number, top: number): string {
     const sim = this.deps.getSim();
     if (!sim.isUnlocked(kind)) {
-      return `${FACILITIES[kind].name} unlocks at ${FACILITIES[kind].minStar}★.`;
+      const f = catalogFacility(towerCatalog(sim), kind);
+      return `${f.name} unlocks at ${f.minStar}★.`;
     }
     const v = sim.tower.validateTransport(kind, x, bottom, top);
     return v.reason ?? "A shaft can't go here. Leave a clear column through built floors.";
@@ -113,15 +108,18 @@ export class BuildActions {
         }
       }
     }
-    if (placed > 0) gameplaySession.noteBuild(kind, floor, placed); // brush lays `placed` tiles
     // Ground floor is lobby-only: the Floor tool on floor 1 auto-converts to a
     // lobby (permanent, and pricier than a floor tile), so confirm what happened
     // once per gesture. The preview already showed a lobby ghost and the lobby
     // price; this is the belt-and-braces spoken confirmation. Keyed off the
-    // coercion helper so the rule has one source of truth.
-    if (placed > 0 && groundFloorStructureKind(kind, floor) !== kind) {
+    // catalog's ground-floor rule (catalogBuildKind), the same rule the preview
+    // and the tool card use.
+    const catalog = towerCatalog(sim);
+    const laid = catalogBuildKind(catalog, kind, floor);
+    if (placed > 0 && laid !== kind) {
+      const f = catalogFacility(catalog, laid);
       this.deps.ui.toast(
-        `The ground floor is a lobby, so a lobby ($${FACILITIES.lobby.cost.toLocaleString()}/tile) went here.`,
+        `The ground floor is a ${f.name.toLowerCase()}, so a ${f.name.toLowerCase()} ($${f.cost.toLocaleString()}/tile) went here.`,
         "info",
       );
     }
@@ -140,7 +138,7 @@ export class BuildActions {
         this.deps.ui.toast(edge, "bad");
         return { placed, reason: edge };
       }
-      if (alreadyAll) return { placed, reason: `${FACILITIES[kind].name} already built here` };
+      if (alreadyAll) return { placed, reason: `${catalogFacility(towerCatalog(sim), kind).name} already built here` };
     }
     return { placed, reason };
   }
@@ -161,7 +159,7 @@ export class BuildActions {
     // the right edge left-shifts to fit instead of silently failing off-lot.
     // Loud, like the desktop press it mirrors: a tap deserves the build sfx
     // and the refusal toast. Drag steps stay quiet in paintFloorRun.
-    const seedX = snapX(kind, tile);
+    const seedX = snapX(towerCatalog(this.deps.getSim()), kind, tile);
     this.tryBuild(kind, floor, seedX);
     this.paint = { tile: seedX, floor };
   }
@@ -180,7 +178,7 @@ export class BuildActions {
       // For width-1 floor/lobby this is identical to clampTile.
       // Record the SNAPPED anchor (what was actually placed), so a later drag-run
       // extends from the placed unit, not an off-lot raw tile near the edge.
-      const seedX = snapX(kind, tile);
+      const seedX = snapX(towerCatalog(this.deps.getSim()), kind, tile);
       this.tryBuild(kind, floor, seedX, true);
       this.paint = { tile: seedX, floor };
       return;
@@ -188,60 +186,43 @@ export class BuildActions {
     for (const x of dragRunTiles(this.paint.tile, tile)) {
       // snapX each column so a WIDE unit near the right edge still lands on-lot
       // (its footprint would otherwise run off; width-1 floor/lobby is unchanged).
-      this.tryBuild(kind, floor, snapX(kind, x), true);
+      this.tryBuild(kind, floor, snapX(towerCatalog(this.deps.getSim()), kind, x), true);
     }
     // Record the SNAPPED anchor (what actually landed), not the raw pointer tile:
     // for a wide kind near the right edge snapX left-shifts the placement, so a
     // raw anchor would make the next drag step recompute from an off-lot column
     // and misfire. Identical to `tile` for width-1 floor/lobby.
-    this.paint = { tile: snapX(kind, tile), floor };
+    this.paint = { tile: snapX(towerCatalog(this.deps.getSim()), kind, tile), floor };
   }
 
   /**
-   * Shared player-removal gauntlet: burning and load-bearing units refuse —
-   * with an error toast unless `quiet` (drag steps stay silent, like build
-   * drags). Removes with the usual refund and returns true on success.
+   * Shared player-removal path: the engine's `removeFacility` refuses a
+   * burning unit or load-bearing structure (with an error toast unless
+   * `quiet`; drag steps stay silent, like build drags) and pays the refund.
+   * Returns true on success.
    */
   tryRemoveUnit(u: Unit, verb: "sell" | "bulldoze", quiet = false): boolean {
-    const sim = this.deps.getSim();
-    const blocked =
-      u.state === "fire"
-        ? `You can't ${verb} a burning unit. Call fire rescue or let it burn out.`
-        : sim.tower.removalReason(u.id);
-    if (blocked) {
-      if (!quiet) {
+    const res = this.deps.getSim().removeFacility(u.id, verb);
+    if (!res.ok) {
+      if (!quiet && res.reason) {
         this.deps.audio.sfx("error");
-        this.deps.ui.toast(blocked, "bad");
+        this.deps.ui.toast(res.reason, "bad");
       }
       return false;
     }
-    sim.tower.removeUnit(u.id);
-    // A gutted shell has no salvage value; everything else refunds half.
-    sim.money += u.state === "gutted" ? 0 : resaleRefund(u.kind);
-    // A real player removal (the sole choke point for the bulldoze tool and the
-    // editor Sell); `verb` is the sell-vs-bulldoze detail. Per-action: a drag
-    // sweep is many genuine removals, each its own demolish.
-    trackEconomyAction("demolish", verb);
+    // The engine reports the removal (`facility_removed`, with `verb` as its
+    // method), and the analytics bridge sends it as `demolish`.
     return true;
   }
 
-  /** Tear out a shaft and pay its resale — the ONE refund path shared by the
-   *  editor's Sell and the bulldozer, so the payout can't drift. `verb` is the
-   *  sell-vs-bulldoze telemetry detail (the caller's gesture). */
-  removeTransportWithRefund(t: Transport, verb: "sell" | "bulldoze"): void {
-    const sim = this.deps.getSim();
-    sim.tower.removeTransport(t.id);
-    sim.money += resaleRefund(t.kind);
-    trackEconomyAction("demolish", verb);
-  }
-
-  /** Charge guard for editor actions: false (with error sfx + toast) if the
-   *  player can't pay. */
-  canAfford(cost: number): boolean {
-    if (this.deps.getSim().money >= cost) return true;
-    this.deps.audio.sfx("error");
-    this.deps.ui.toast("Not enough money.", "bad");
-    return false;
+  /** Tear out a shaft through the engine's `removeFacility`, which pays its
+   *  resale: the ONE refund path shared by the editor's Sell and the
+   *  bulldozer. `verb` is the sell-vs-bulldoze telemetry detail (the
+   *  caller's gesture), which the engine reports as the removal's method.
+   *  False when the engine refused (the shaft is already gone), so the caller
+   *  plays no sale. */
+  removeTransportWithRefund(t: Transport, verb: "sell" | "bulldoze"): boolean {
+    return this.deps.getSim().removeFacility(t.id, verb).ok;
   }
 
   /** Bulldoze whatever Excalibur reported under the pointer, with a refund.
@@ -257,7 +238,7 @@ export class BuildActions {
     } else {
       const t = sim.tower.getTransport(p.id);
       if (!t) return;
-      this.removeTransportWithRefund(t, "bulldoze");
+      if (!this.removeTransportWithRefund(t, "bulldoze")) return;
     }
     this.deps.audio.sfx("sell");
     if (this.deps.selectedId() === p.id) this.deps.clearSelection();

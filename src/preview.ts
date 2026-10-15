@@ -3,6 +3,12 @@ import type { FacilityKind, Unit, UnitState } from "./engine/types";
 import { fitAtGameScale } from "./render/catalogScale";
 import { FLOOR, TILE } from "./render/scale";
 import { drawRoom, type RoomCtx } from "./render/pixelSprites";
+import { catalogFor } from "./engine/catalog";
+import { bindViewWorld } from "./presentation/viewWorld";
+
+// A tooling page draws sprites without a tower, so it binds the Modern
+// catalog's world for the view (the lot geometry the sprites hash on).
+bindViewWorld(catalogFor("modern").world);
 
 interface Entry {
   label: string;

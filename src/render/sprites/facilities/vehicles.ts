@@ -1,4 +1,5 @@
 import { rand } from "../common";
+import { layerBreak, layerEnd } from "../../pixelSprites/layers";
 
 /**
  * The moving actors: the garbage truck, the parking-ramp sedans, and the
@@ -140,11 +141,47 @@ export function drawMetroTrain(ctx: CanvasRenderingContext2D, w: number, headlig
   const stripeY = H - 22; // red livery band
   const bandY = Math.round(H * 0.22); // window band top
   const bandH = Math.round(H * 0.3);
+  // The cars (a remainder too short to read as a car paints nothing: no stub
+  // bodies, no stray roof pods, the consist just ends at the previous car)
+  // and their window slots, interrupted by a sliding door pair every third.
+  const cars: { cx: number; cw: number; slots: { wx: number; door: boolean; s: number }[] }[] = [];
   for (let cx = 0; cx < w; cx += METRO_CAR_W) {
     const cw = Math.min(METRO_CAR_W, w - cx) - 4; // 4px coupling gap per car
-    // A remainder too short to read as a car paints nothing (no stub bodies,
-    // no stray roof pods): the consist just ends at the previous car.
     if (cw < 24) break;
+    const carIdx = Math.floor(cx / METRO_CAR_W);
+    const slots: { wx: number; door: boolean; s: number }[] = [];
+    for (let wx = cx + 10; wx + 12 < cx + cw; wx += 24) {
+      const slotIdx = Math.floor((wx - cx - 10) / 24);
+      slots.push({ wx, door: slotIdx % 3 === 2, s: carIdx * 31 + slotIdx });
+    }
+    cars.push({ cx, cw, slots });
+  }
+  const windows = cars.flatMap((c) => c.slots.filter((sl) => !sl.door));
+  // The riders sit inside the cars: first the dark interior seen through each
+  // saloon window, then the riders, then the body around them, which never
+  // paints inside a window (the depth split's back, furniture and front).
+  // The clip keeps the body's pixels exactly as before at whole-pixel scales
+  // (the game draws the train at 1x); a fractional scale would soften the
+  // window edges.
+  ctx.fillStyle = "#2A3440"; // saloon glass
+  for (const { wx } of windows) ctx.fillRect(wx, bandY, 12, bandH);
+  layerBreak(ctx);
+  // Roughly two-thirds of windows carry a rider (sometimes two), seeded from
+  // car + slot alone so the cached bake never needs new inputs.
+  for (const { wx, s } of windows) {
+    if (rand(s) < 0.7) {
+      rider(ctx, wx + 1, bandY, rand(s + 1) < 0.4, s);
+      if (rand(s + 2) < 0.35) rider(ctx, wx + 7, bandY, false, s + 11);
+    }
+  }
+  layerEnd(ctx);
+  ctx.save();
+  ctx.beginPath();
+  // An outer rect well past the train, so only the window edges cut.
+  ctx.rect(-H, -H, w + 2 * H, 3 * H);
+  for (const { wx } of windows) ctx.rect(wx, bandY, 12, bandH);
+  ctx.clip("evenodd");
+  for (const { cx, cw, slots } of cars) {
     // Car body: silver shell with a lit roof edge and a shaded lower flank.
     ctx.fillStyle = "#C6CCD4";
     ctx.fillRect(cx, 2, cw, skirtY - 2);
@@ -163,33 +200,16 @@ export function drawMetroTrain(ctx: CanvasRenderingContext2D, w: number, headlig
     ctx.fillRect(cx + Math.max(10, cw >> 1) - 10, 0, Math.min(20, cw - 4), 2);
     ctx.fillStyle = "#7E8894";
     ctx.fillRect(cx + 4, 1, cw - 8, 1);
-    // Window band, interrupted by sliding door pairs; saloon windows carry the
-    // party-ratified riders, drawn between the glass and the glint.
-    const carIdx = Math.floor(cx / METRO_CAR_W);
-    for (let wx = cx + 10; wx + 12 < cx + cw; wx += 24) {
-      const slotIdx = Math.floor((wx - cx - 10) / 24);
-      if (slotIdx % 3 === 2) {
-        // Door pair: two leaves over the stripe, center seam, tall door windows.
-        ctx.fillStyle = "#B4BCC6";
-        ctx.fillRect(wx, bandY - 2, 12, skirtY - bandY);
-        ctx.fillStyle = "#16181C"; // center seam
-        ctx.fillRect(wx + 5, bandY - 2, 1, skirtY - bandY);
-        ctx.fillStyle = "#2A3440"; // door windows
-        ctx.fillRect(wx + 1, bandY, 3, bandH - 2);
-        ctx.fillRect(wx + 7, bandY, 3, bandH - 2);
-      } else {
-        ctx.fillStyle = "#2A3440"; // saloon glass
-        ctx.fillRect(wx, bandY, 12, bandH);
-        // Roughly two-thirds of windows carry a rider (sometimes two), seeded
-        // from car + slot alone so the cached bake never needs new inputs.
-        const s = carIdx * 31 + slotIdx;
-        if (rand(s) < 0.7) {
-          rider(ctx, wx + 1, bandY, rand(s + 1) < 0.4, s);
-          if (rand(s + 2) < 0.35) rider(ctx, wx + 7, bandY, false, s + 11);
-        }
-        ctx.fillStyle = "#9FC0E0"; // glass glint, unconditionally on top
-        ctx.fillRect(wx, bandY, 4, 2);
-      }
+    // Door pairs: two leaves over the stripe, center seam, tall door windows.
+    for (const { wx, door } of slots) {
+      if (!door) continue;
+      ctx.fillStyle = "#B4BCC6";
+      ctx.fillRect(wx, bandY - 2, 12, skirtY - bandY);
+      ctx.fillStyle = "#16181C"; // center seam
+      ctx.fillRect(wx + 5, bandY - 2, 1, skirtY - bandY);
+      ctx.fillStyle = "#2A3440"; // door windows
+      ctx.fillRect(wx + 1, bandY, 3, bandH - 2);
+      ctx.fillRect(wx + 7, bandY, 3, bandH - 2);
     }
     // Undercarriage skirt and two bogies (wheel trucks) per car.
     ctx.fillStyle = "#1A2028";
@@ -223,4 +243,7 @@ export function drawMetroTrain(ctx: CanvasRenderingContext2D, w: number, headlig
   ctx.fillRect(w - 5, 6, 4, 3);
   ctx.fillStyle = headlightOn ? "#FFE27A" : "#9FC0E0"; // headlight, keyed on state
   ctx.fillRect(w - 3, stripeY - 6, 3, 4);
+  ctx.restore();
+  ctx.fillStyle = "#9FC0E0"; // glass glints, on the window in front of the riders
+  for (const { wx } of windows) ctx.fillRect(wx, bandY, 4, 2);
 }

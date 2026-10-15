@@ -1,6 +1,7 @@
 import type { Simulation } from "../Simulation";
 
 import { TOWER_POPULATION } from "../facilities";
+import { noteStars } from "./star";
 
 /** Random events, VIP, fires, choices for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -46,9 +47,10 @@ export function maybeVipStay(sim: Simulation): void {
  *  directly on a deterministic population (without the crowd sim in the loop). */
 export function checkVip(sim: Simulation): void {
   if (sim.evaluatedTower || sim.vipVisitDay < 0) return;
-  // If the Wedding Hall is gone before the inspection (sold via ANY path,
-  // the editor and bulldoze tool call tower.removeUnit directly, not sellAt),
-  // cancel the pending visit so it can't keep re-failing and spamming the log.
+  // If the Wedding Hall is gone before the inspection, cancel the pending
+  // visit so it can't keep re-failing and spamming the log. The player's
+  // removals (`removeFacility`, `sellAt`) already cancel it; this catches a
+  // save loaded with a stale visit day and a raw `tower.removeUnit` in a test.
   if (!sim.tower.builtWeddingHall) {
     sim.vipVisitDay = -1;
     return;
@@ -64,8 +66,10 @@ export function checkVip(sim: Simulation): void {
     sim.hasOperational("metro") && // re-checked: selling the metro after 5★ must not allow the win
     pop >= TOWER_POPULATION;
   if (ok) {
+    const from = sim.star;
     sim.star = 6;
     sim.evaluatedTower = true;
+    noteStars(sim, from);
     sim.emit("The VIP was impressed! Your building is now a TOWER. You win!", "good");
   } else {
     sim.emit("The VIP was unimpressed. Grow your population and amenities, then rebuild interest.", "bad");

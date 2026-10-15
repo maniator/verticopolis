@@ -1,0 +1,61 @@
+[package]
+name = "verticopolis-engine"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.97"
+license = "MIT"
+publish = false
+description = "The Verticopolis simulation engine, ported from src/engine and checked against conformance/"
+# Every binary is declared below with the conformance feature it needs; none
+# is found by its path alone (tests/independence.rs holds this).
+autobins = false
+
+[lib]
+name = "verticopolis_engine"
+path = "src/lib.rs"
+# An rlib for the referee and the tests; scripts/wasm-build.ts asks for the
+# cdylib the WASM binding needs with `cargo rustc --crate-type cdylib`, so the
+# native build links nothing extra.
+
+[[bin]]
+name = "conformance"
+path = "src/bin/conformance.rs"
+required-features = ["conformance"]
+
+[[bin]]
+name = "dump"
+path = "src/bin/dump.rs"
+required-features = ["conformance"]
+
+[[bin]]
+name = "fuzz"
+path = "src/bin/fuzz.rs"
+required-features = ["conformance"]
+
+[[bin]]
+name = "tdt"
+path = "src/bin/tdt.rs"
+required-features = ["conformance"]
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.151", features = ["float_roundtrip", "preserve_order"] }
+sha2 = "0.11.0"
+ryu = "1.0.22"
+indexmap = "2.12.0"
+flate2 = "1.1.5"
+base64 = "0.22.1"
+# The JavaScript binding, built only for wasm32 with `--features wasm`; the
+# CLI that generates the glue must be the same version (see engine-rs/README).
+wasm-bindgen = { version = "=0.2.129", optional = true }
+
+[features]
+wasm = ["dep:wasm-bindgen"]
+# The conformance harness (tier 2 in API.md): the scenario runner, the .TDT
+# referee and the binaries, which read the suite's files. Off by default, so a
+# host links no file reads; the referee and a host that replays the lock turn
+# it on (`cargo run --features conformance --bin conformance`).
+conformance = []
+
+[profile.release]
+debug = 1

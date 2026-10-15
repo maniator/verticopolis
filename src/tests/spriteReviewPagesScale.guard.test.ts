@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
-import { FACILITIES, GRID } from "../engine/facilities";
+import { FACILITIES } from "../engine/facilities";
+import { viewWorld } from "../presentation/viewWorld";
 import { FLOOR, TILE } from "../render/scale";
 import type { Transport, Unit } from "../engine/types";
 
@@ -89,7 +90,7 @@ const floorsOf = (u: Unit): number => FACILITIES[u.kind].floors ?? 1;
  *  width it is handed, so the gallery deliberately fills the cell width and takes
  *  only the height from the scale; its box is the one that cannot be checked for
  *  aspect. */
-const isFullLot = (u: Unit): boolean => FACILITIES[u.kind].width >= GRID.width;
+const isFullLot = (u: Unit): boolean => FACILITIES[u.kind].width >= viewWorld().lotWidth;
 
 let priorGetContext: PropertyDescriptor | undefined;
 let priorClientWidth: PropertyDescriptor | undefined;

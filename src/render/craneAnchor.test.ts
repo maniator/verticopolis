@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { craneAnchorTile } from "./sprites";
 import { facadeGeometry } from "./facadeGeometry";
+import { catalogFor } from "../engine/catalog";
 import type { FacilityKind, Unit } from "../engine/types";
+
+const MODERN = catalogFor("modern");
 
 /**
  * The rooftop crane perches at {@link craneAnchorTile} along the top floor.
@@ -70,7 +73,7 @@ describe("facadeGeometry → crane anchor (integration)", () => {
   it("anchors over built structure, never the gap, on a split top floor", () => {
     // The reported save's top row (57): two blocks with a wide empty gap.
     const units = [...tiles(57, 104, 148), ...tiles(57, 204, 216)];
-    const { edges, topTiles } = facadeGeometry(units, 57);
+    const { edges, topTiles } = facadeGeometry(units, 57, MODERN);
 
     // Escape-stair edges still span the whole silhouette (min tile … right edge).
     expect(edges.get(57)).toEqual({ min: 104, max: 217 });
@@ -85,7 +88,7 @@ describe("facadeGeometry → crane anchor (integration)", () => {
   it("counts a multi-floor room's upper story on the top row", () => {
     // A 2-floor cinema based on floor 56 also occupies floor 57 (tiles 100..123).
     const units = tiles(56, 100, 100, "cinema", 24);
-    const { topTiles } = facadeGeometry(units, 57);
+    const { topTiles } = facadeGeometry(units, 57, MODERN);
     expect(topTiles.size).toBe(24);
     expect(topTiles.has(100)).toBe(true);
     expect(topTiles.has(123)).toBe(true);
@@ -98,7 +101,7 @@ describe("facadeGeometry → crane anchor (integration)", () => {
     // Basement-only lot: highestFloor reports 1, but nothing is built at/above
     // floor 1, so topTiles is empty and syncCrane shows no crane.
     const units = tiles(-2, 5, 12);
-    const { topTiles } = facadeGeometry(units, 1);
+    const { topTiles } = facadeGeometry(units, 1, MODERN);
     expect(topTiles.size).toBe(0);
   });
 });

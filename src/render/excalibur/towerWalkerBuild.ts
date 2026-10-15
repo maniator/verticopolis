@@ -1,7 +1,9 @@
 import * as ex from "excalibur";
+import { Z } from "../depthPlanes";
 import { coveredUpperStories, lotCovered, lobbyLaneSpan } from "./towerCrowdLayout";
 import { FLOOR } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
+import { towerCatalog } from "../../engine/towerCatalog";
 
 /**
  * Construction of the ambient walker population: the structural runs a tower's
@@ -39,7 +41,7 @@ function oneSpot(floor: number, tileX: number): WalkerSpot {
 
 
 export function buildWalkers(engine: TowerEngine): void {
-  const coveredRows = coveredUpperStories(engine.sim.tower.units);
+  const coveredRows = coveredUpperStories(engine.sim.tower.units, towerCatalog(engine.sim));
   const byFloor = new Map<number, Map<number, "floor" | "lobby">>();
   for (const u of engine.sim.tower.units) {
     if (u.kind === "floor" || u.kind === "lobby") {
@@ -148,7 +150,7 @@ function spawnWalker(
 ): void {
   const gfx = engine.personGfx[Math.abs(seed) % engine.personGfx.length];
   // Actor bounds track the baked canvas footprint (see reconcileCrowd).
-  const a = new ex.Actor({ pos: ex.vec(x0w, y0w), width: gfx.width, height: gfx.height, anchor: ex.vec(0.5, 1), z: 0.4 });
+  const a = new ex.Actor({ pos: ex.vec(x0w, y0w), width: gfx.width, height: gfx.height, anchor: ex.vec(0.5, 1), z: Z.walker });
   a.graphics.use(gfx);
   engine.engine.add(a);
   engine.walkers.push({

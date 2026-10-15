@@ -4,6 +4,10 @@ import { GRID } from "../../engine/facilities";
 import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
 import { ECON } from "../../engine/econConfig";
 import type { GameMode } from "../../engine/types";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
+
+/** The parity projects skip these (story-engine-test-parity, #878). */
+const V1_MODEL = "sets simModel = \"v1\", the sampled model the engine never ported and the save does not carry";
 
 /**
  * Household-aware condo departures (Modern only). A sold Modern condo's family
@@ -70,7 +74,7 @@ describe("GameRules.condoRelocationChance", () => {
 });
 
 describe("condo relocation is Modern-only and rides the buy-back", () => {
-  it("Modern: a happy sold condo eventually relocates (and the buy-back is charged)", () => {
+  itTypeScriptOnly(V1_MODEL)("Modern: a happy sold condo eventually relocates (and the buy-back is charged)", () => {
     const { sim, condo } = towerWithSoldCondo("modern", 5); // max flight risk
     const before = sim.money;
     // Capture the notice log the first month it fires (the log is a bounded ring,
@@ -90,7 +94,7 @@ describe("condo relocation is Modern-only and rides the buy-back", () => {
     expect(sim.money).toBeLessThan(before); // the reclaim (buy-back) was charged
   });
 
-  it("Classic: a sold condo never relocates over decades (stays 1994-sticky)", () => {
+  itTypeScriptOnly(V1_MODEL)("Classic: a sold condo never relocates over decades (stays 1994-sticky)", () => {
     const { sim, condo } = towerWithSoldCondo("classic", 3);
     for (let m = 0; m < 360; m++) {
       sim.tick(MONTH);
@@ -102,7 +106,7 @@ describe("condo relocation is Modern-only and rides the buy-back", () => {
     expect(condo.everOccupied).toBe(true);
   });
 
-  it("Classic never draws the relocation roll from the RNG (Modern does)", () => {
+  itTypeScriptOnly(V1_MODEL)("Classic never draws the relocation roll from the RNG (Modern does)", () => {
     // Same seed, same single sold condo, one month. The only per-month RNG
     // difference is the relocation roll: Modern draws it (chance > 0), Classic
     // short-circuits before the draw (chance 0), so after one month the two
@@ -116,7 +120,7 @@ describe("condo relocation is Modern-only and rides the buy-back", () => {
     expect(classic.rng.seed).not.toBe(modern.rng.seed); // Modern consumed the extra draw
   });
 
-  it("Modern is deterministic: the same seed relocates on the same month", () => {
+  itTypeScriptOnly(V1_MODEL)("Modern is deterministic: the same seed relocates on the same month", () => {
     const monthOf = (): number => {
       const { sim, condo } = towerWithSoldCondo("modern", 5);
       for (let m = 0; m < 360; m++) {
@@ -132,7 +136,7 @@ describe("condo relocation is Modern-only and rides the buy-back", () => {
 });
 
 describe("a relocation notice is non-rescindable (a life event)", () => {
-  it("a fully satisfied Modern condo on a relocation notice still leaves", () => {
+  itTypeScriptOnly(V1_MODEL)("a fully satisfied Modern condo on a relocation notice still leaves", () => {
     const { sim, condo } = towerWithSoldCondo("modern", 4);
     condo.state = "vacating";
     condo.vacateReason = "relocation";
@@ -144,7 +148,7 @@ describe("a relocation notice is non-rescindable (a life event)", () => {
     expect(sim.money).toBeLessThan(before); // bought back on departure
   });
 
-  it("a neglect notice at full satisfaction DOES rescind (contrast)", () => {
+  itTypeScriptOnly(V1_MODEL)("a neglect notice at full satisfaction DOES rescind (contrast)", () => {
     const { sim, condo } = towerWithSoldCondo("modern", 4);
     condo.state = "vacating";
     condo.vacateReason = "access";

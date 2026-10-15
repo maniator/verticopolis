@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { showCrashScreen } from "../../ui/crashScreen";
 import type { CrashScreenOptions } from "../../ui/crashScreen";
+import { downloadFile } from "../../ui/downloadFile";
+
+vi.mock("../../ui/downloadFile", () => ({ downloadFile: vi.fn() }));
 
 /** The player-facing wording contract for the crash card. The save-status
  *  flags are computed in SaveLoad (covered by gameControllersCoverage); this
@@ -25,6 +28,7 @@ function show(overrides: Partial<CrashScreenOptions> = {}, save: Partial<CrashSc
 
 afterEach(() => {
   document.getElementById("crash-screen")?.remove();
+  vi.mocked(downloadFile).mockReset();
 });
 
 describe("crash screen wording and wiring", () => {
@@ -81,6 +85,32 @@ describe("crash screen wording and wiring", () => {
     expect(document.activeElement).toBe(reload);
     reload.click();
     expect(opts.onReload).toHaveBeenCalledTimes(1);
+  });
+
+  it("Download hands the browser a crash-report zip and says where to find it", async () => {
+    const { card } = show();
+    const btn = card.querySelector<HTMLButtonElement>('[data-act="download"]')!;
+    btn.click();
+    expect(btn.disabled, "disabled while packing so a double tap cannot race").toBe(true);
+    await vi.waitFor(() => expect(downloadFile).toHaveBeenCalledTimes(1));
+    const [filename, bytes, mime] = vi.mocked(downloadFile).mock.calls[0]!;
+    expect(filename).toMatch(/\.zip$/);
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(mime).toBe("application/zip");
+    await vi.waitFor(() => expect(card.querySelector(".crash-status")!.textContent).toContain("Check your downloads"));
+    expect(btn.disabled).toBe(false);
+  });
+
+  it("a failed download says so and re-enables the button", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(downloadFile).mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    const { card } = show();
+    const btn = card.querySelector<HTMLButtonElement>('[data-act="download"]')!;
+    btn.click();
+    await vi.waitFor(() => expect(card.querySelector(".crash-status")!.textContent).toContain("couldn't be saved"));
+    expect(btn.disabled).toBe(false);
   });
 
   it("a second call never stacks a second card", () => {

@@ -114,7 +114,7 @@ describe("analytics adapter seam", () => {
     // Every event in the typed vocabulary reached the stub, in the order fired.
     expect(names).toEqual([
       "boot",
-      "game_started",
+      "new_game_started",
       "first_build",
       "tool_used",
       "star_reached",
@@ -127,13 +127,13 @@ describe("analytics adapter seam", () => {
     ]);
     // Props ride through untouched (spot-check across the vocabulary).
     const byName = new Map(stub.events);
-    expect(byName.get("game_started")).toEqual({ mode: "modern" });
+    expect(byName.get("new_game_started")).toEqual({ mode: "modern" });
     expect(byName.get("first_build")).toEqual({ tool: "office" });
     expect(byName.get("star_reached")).toEqual({ star: 3 });
     expect(byName.get("session_builds")).toEqual({ builds: 2 });
     expect(byName.get("session_peak_floors")).toEqual({ floors: 5 });
     expect(byName.get("tool_session_uses")).toEqual({ tool: "office", uses: 2 });
-    expect(byName.get("session_end")).toEqual({ seconds: 5 });
+    expect(byName.get("session_end")).toEqual({ seconds: 5, final: false });
     // The whole point of the seam: swapping the adapter took the transport out.
     expect(sendToRelay).not.toHaveBeenCalled();
   });

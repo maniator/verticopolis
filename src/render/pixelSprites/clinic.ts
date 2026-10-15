@@ -1,6 +1,7 @@
 import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
 import { castShadow, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
+import { layerBreak } from "./layers";
 
 /**
  * Modern Clinic art: a small health clinic in one of five practices (dental,
@@ -183,6 +184,7 @@ export function clinic(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   const look = (u.subtype !== undefined && CLINIC_LOOKS[u.subtype]) || CLINIC_DEFAULT;
   const floorY = shell(ctx, x, y, w, h, look.wall, look.floor);
   const top = clinicalBand(ctx, x, y, w, look.accent);
+  layerBreak(ctx); // the shell ends; the practice's equipment and patients follow
   const occ = visibleOccupants(u);
   const seed = figureSeed(u);
   switch (look.practice) {

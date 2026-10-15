@@ -1,5 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
-import { facilityFloors } from "../engine/facilities";
+import { catalogFacility } from "../engine/catalogTypes";
+import { towerCatalog } from "../engine/towerCatalog";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import { unitInspectorTemplate, transportInspectorTemplate } from "../ui/templates/inspector";
@@ -63,7 +64,7 @@ export class InspectorController {
         this.hide();
         return;
       }
-      this.deps.setAnchor({ x: u.x + u.width, left: u.x, floor: u.floor + facilityFloors(u.kind) - 1 });
+      this.deps.setAnchor({ x: u.x + u.width, left: u.x, floor: u.floor + catalogFacility(towerCatalog(sim), u.kind).floors - 1 });
       this.inspectTarget = { type: p.type, id: p.id };
       // The card body (title/label/status/census/diagnostics/satisfaction) is
       // the lit template in ui/templates/inspector.ts (E6-S2); the access

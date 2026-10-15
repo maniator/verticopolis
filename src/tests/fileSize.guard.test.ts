@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve, relative } from "node:path";
+import { dirname, resolve } from "node:path";
+import { SKIPPED_PATHS, repoRel, sourceFiles } from "./guardFiles";
 
 /**
  * Shift-left guard: no code file grows past the readable ceiling.
@@ -9,8 +10,10 @@ import { dirname, resolve, relative } from "node:path";
  * Oversized files hide the review gates this project depends on (sub-quadratic
  * hot paths, canon-cap fidelity, a DOM-free engine): nobody can hold a
  * 2,900-line god-object in their head, so regressions ride in under green
- * gates. This test walks `src/` and `scripts/` and fails any TypeScript file
- * over {@link MAX_LINES} lines.
+ * gates. This test walks `src/` and `scripts/` for TypeScript and `engine-rs/`
+ * for Rust (the engine port follows the same source rules), and fails any code
+ * file over {@link MAX_LINES} lines. A Rust file's inline `#[cfg(test)]` module
+ * counts toward its file, the same as a TypeScript file's.
  *
  * The exemption set lives in `fileSize.ratchet.txt` (one path per line), NOT in
  * this file. That keeps it a ratchet, not a permanent exemption: it lists the
@@ -24,10 +27,14 @@ import { dirname, resolve, relative } from "node:path";
 const MAX_LINES = 500;
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, "..", "..");
 
-/** Directories under the repo root whose `.ts`/`.tsx` files are guarded. */
-const SCANNED_DIRS = ["src", "scripts"];
+/** Directories under the repo root whose code files are guarded, with the
+ *  extensions each one holds. */
+const SCANNED_DIRS: { dir: string; exts: readonly string[] }[] = [
+  { dir: "src", exts: [".ts", ".tsx"] },
+  { dir: "scripts", exts: [".ts", ".tsx"] },
+  { dir: "engine-rs", exts: [".rs"] },
+];
 
 /**
  * Files still awaiting a split, read from `fileSize.ratchet.txt`. Blank lines
@@ -53,29 +60,20 @@ function lineCount(absPath: string): number {
   return n;
 }
 
-function walk(absDir: string, out: string[]): void {
-  for (const entry of readdirSync(absDir)) {
-    const abs = resolve(absDir, entry);
-    const st = statSync(abs);
-    if (st.isDirectory()) {
-      if (entry === "node_modules" || entry === "dist" || entry === ".git") continue;
-      walk(abs, out);
-    } else if (entry.endsWith(".ts") || entry.endsWith(".tsx")) {
-      out.push(abs);
-    }
-  }
-}
-
 function scanFiles(): { rel: string; lines: number }[] {
-  const abs: string[] = [];
-  for (const dir of SCANNED_DIRS) walk(resolve(repoRoot, dir), abs);
-  return abs
-    .map((p) => ({ rel: relative(repoRoot, p).split("\\").join("/"), lines: lineCount(p) }))
+  return SCANNED_DIRS.flatMap(({ dir, exts }) => sourceFiles(dir, exts))
+    .map((p) => ({ rel: repoRel(p), lines: lineCount(p) }))
     .sort((a, b) => a.rel.localeCompare(b.rel));
 }
 
 describe("file-size guard", () => {
   const files = scanFiles();
+
+  it("scans the Rust engine as well as the TypeScript", () => {
+    // A guard that silently stopped finding .rs files would pass forever.
+    expect(files.some((f) => f.rel.startsWith("engine-rs/src/") && f.rel.endsWith(".rs"))).toBe(true);
+    expect(files.some((f) => [...SKIPPED_PATHS].some((skip) => f.rel.startsWith(`${skip}/`)))).toBe(false);
+  });
 
   it("no un-exempted code file exceeds the line ceiling", () => {
     const offenders = files
