@@ -43,6 +43,20 @@ export class FakeEngine {
     const data = JSON.parse(this.save) as Record<string, unknown>;
     return JSON.stringify({ ...data, minutes: this.minutes, money: this.money });
   }
+  serializeForSync(): string {
+    this.calls.push("serializeForSync");
+    return this.serialize();
+  }
+  /** The delta's shape with no unit records: the fake has no units of its
+   *  own to change. `noDelta` makes it answer nothing, as the engine does
+   *  when its units were added, removed or reordered. */
+  noDelta = false;
+  saveDelta(): string | undefined {
+    this.calls.push("saveDelta");
+    if (this.noDelta) return undefined;
+    const { units: _units, ...rest } = JSON.parse(this.serialize()) as Record<string, unknown>;
+    return JSON.stringify({ units: [], rest });
+  }
   tick(dt: number): void {
     this.check("tick");
     this.minutes += dt;
@@ -56,6 +70,11 @@ export class FakeEngine {
     this.check("emit");
     this.calls.push(`emit ${text}`);
     this.logSeq++;
+  }
+  /** A camera stamp: recorded, and like the engine's, no revision move. */
+  setView(...args: unknown[]): void {
+    this.check("setView");
+    this.calls.push(`setView ${JSON.stringify(args)}`);
   }
   free(): void { this.freed = true; }
   pendingChoice(): string | undefined { return this.pending; }

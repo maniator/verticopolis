@@ -80,12 +80,29 @@ export interface LoadedReply {
   view: Float64Array;
 }
 
-/** The full-save half of a frame, sent when the tower's revision or the
- *  engine's hour pass moved since the last one sent, or when asked for. */
+/** The full-save half of a frame, sent when the tower's revision moved
+ *  since the last one sent, when asked for, or when the engine cannot
+ *  describe an hour pass as a delta. */
 export interface MergePayload {
   save: string;
   telemetry: string;
   housekeeping: string | null;
+  /** This save's number in the tower's sync sequence (#1045): every full
+   *  save and every delta the worker sends takes the next one. */
+  sync: number;
+}
+
+/** The hourly half of a frame when only the hour pass moved (#1045): the
+ *  engine's `saveDelta` text (the changed unit records and the save's other
+ *  keys), taken against the save or delta numbered `base`. The main thread
+ *  applies it only when `base` is the last one it applied, and asks for a
+ *  full save otherwise. */
+export interface DeltaPayload {
+  delta: string;
+  telemetry: string;
+  housekeeping: string | null;
+  base: number;
+  sync: number;
 }
 
 /** The answer to a frame request. `view` is the engine's frame view, its
@@ -106,7 +123,9 @@ export interface FrameReply {
   log: string | null;
   pending: string | null;
   merge: MergePayload | null;
-  workMs: { ops: number; reply: number };
+  /** Set instead of `merge` when only the hour pass moved. */
+  delta: DeltaPayload | null;
+  workMs: { ops: number; reply: number; save: number };
   /** The worker's WASM linear memory, when the entry point can read it. */
   memoryBytes: number | null;
 }

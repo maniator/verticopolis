@@ -9,8 +9,9 @@ import type { FromWorker, OpsMessage, ToWorker } from "./workerProtocol";
  * the order they arrive, and answers each frame request with the frame view
  * (its buffer transferred), the gameplay events drained since the last
  * reply, the log entries the main thread lacks, the pending choice, and the
- * full save only when the tower's revision or the hour pass moved since the
- * last one it sent (or when asked).
+ * full save only when the tower's revision moved since the last one it sent
+ * (or when asked). When only the hour pass moved it sends the engine's delta
+ * against the last save or delta sent instead (#1045).
  */
 export type Post = (msg: FromWorker, transfer?: Transferable[]) => void;
 
@@ -26,6 +27,14 @@ export class EngineWorkerCore {
   private seq = 0;
   private sentRevision = Number.NaN;
   private sentHourRuns = Number.NaN;
+  /** The last full save or delta sent (#1045): the next delta's base. */
+  private sync = 0;
+  /** A command (a camera stamp aside) ran since the last save sent. The
+   *  read model ran it too, on its own; a command the engine answered
+   *  differently (a refusal it reports only in its result) leaves a unit
+   *  the engine never changes, which no delta would correct, so the next
+   *  hour pass sends the full save instead, as every hour pass did before. */
+  private commandSinceSync = false;
   private errors = 0;
 
   /** `memoryBytes` reads the engine's linear memory size, for the
@@ -68,13 +77,21 @@ export class EngineWorkerCore {
     this.errors = 0;
     this.sentRevision = Number.NaN;
     this.sentHourRuns = Number.NaN;
+    this.sync = 0;
+    this.commandSinceSync = false;
     try {
       this.shadow.apply({ op: "load", gen, save, markers });
       const engine = this.shadow.handle();
       // The first frame's state is the save the main thread sent, so the
-      // first full save goes out only when something moves.
+      // first full save goes out only when the layout moves. That save is
+      // also the base of the first delta (sync 0), which the engine's
+      // mirror takes from its own serialization of the loaded tower. When
+      // the engine read the save into anything else (a repair or migration
+      // the read model did not make), the first reply sends a full save
+      // instead.
+      const loaded = engine.serializeForSync();
       const view = engine.frameView();
-      this.sentRevision = view[1];
+      this.sentRevision = sameJson(JSON.parse(loaded), JSON.parse(save)) ? view[1] : Number.NaN;
       this.sentHourRuns = view[22];
       this.post({ type: "loaded", gen, view }, [view.buffer]);
     } catch (e) {
@@ -103,6 +120,7 @@ export class EngineWorkerCore {
         }
         continue;
       }
+      if (op.cmd.op !== "setView") this.commandSinceSync = true;
       try {
         this.shadow.apply(op.cmd);
       } catch (e) {
@@ -119,11 +137,25 @@ export class EngineWorkerCore {
       const logSeq = view[3];
       const pending = view[21] === 1 ? engine.pendingChoice() ?? null : null;
       let merge = null;
-      if (msg.request.merge || revision !== this.sentRevision || hourRuns !== this.sentHourRuns) {
-        merge = { save: engine.serialize(), telemetry: engine.elevatorTelemetry(), housekeeping: engine.housekeepingReport() ?? null };
+      let delta = null;
+      const full = msg.request.merge || revision !== this.sentRevision;
+      const tSave = now();
+      if (full || hourRuns !== this.sentHourRuns) {
+        // A delta only for an hour pass on an unchanged layout; the engine
+        // answers nothing when it cannot describe the change, and the full
+        // save goes instead.
+        const text = full || this.commandSinceSync ? undefined : engine.saveDelta();
+        const telemetry = engine.elevatorTelemetry();
+        const housekeeping = engine.housekeepingReport() ?? null;
+        const base = this.sync;
+        this.sync++;
+        if (text === undefined) merge = { save: engine.serializeForSync(), telemetry, housekeeping, sync: this.sync };
+        else delta = { delta: text, telemetry, housekeeping, base, sync: this.sync };
         this.sentRevision = revision;
         this.sentHourRuns = hourRuns;
+        this.commandSinceSync = false;
       }
+      const tSaved = now();
       const events = engine.drainGameplayEvents();
       const reply: FromWorker = {
         type: "frame",
@@ -136,7 +168,8 @@ export class EngineWorkerCore {
         log: logSeq !== msg.request.logSeq ? engine.logSince(msg.request.logSeq) : null,
         pending,
         merge,
-        workMs: { ops: t1 - t0, reply: now() - t1 },
+        delta,
+        workMs: { ops: t1 - t0, reply: now() - t1, save: tSaved - tSave },
         memoryBytes: this.memoryBytes(),
       };
       this.post(reply, [view.buffer]);
@@ -161,6 +194,24 @@ export class EngineWorkerCore {
     this.shadow.free();
     this.post({ type: "error", gen: this.gen, seq, fatal: true, message: text });
   }
+}
+
+/** Whether two parsed JSON values are equal, key order aside. */
+export function sameJson(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (!sameJson(a[i], b[i])) return false;
+    return true;
+  }
+  if (Array.isArray(b)) return false;
+  const ra = a as Record<string, unknown>;
+  const rb = b as Record<string, unknown>;
+  const keys = Object.keys(ra);
+  if (keys.length !== Object.keys(rb).length) return false;
+  for (const k of keys) if (!(k in rb) || !sameJson(ra[k], rb[k])) return false;
+  return true;
 }
 
 function message(e: unknown): string {

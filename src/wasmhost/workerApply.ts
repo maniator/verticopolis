@@ -1,8 +1,11 @@
 import { Simulation } from "../engine/Simulation";
 import type { FrameHeader } from "./frameView";
-import { mergeSimulation } from "./merge";
+import { mergeSimulation, mergeSimulationDelta, type DeltaRecords } from "./merge";
+import { coerceTransportRecord, coerceUnitRecord, snapUnitRent } from "../engine/sim/deserializeRecords";
+import { isFacilityKind } from "../engine/facilities";
+import type { SerializedGame, Unit } from "../engine/types";
 import { adoptTelemetry, isTelemetryDocument, type TelemetryDocument } from "./telemetry";
-import type { MergePayload } from "./workerProtocol";
+import type { DeltaPayload, MergePayload } from "./workerProtocol";
 
 /**
  * The worker host's read-model writes, apart from its message handling:
@@ -29,6 +32,52 @@ export function parseMerge(m: MergePayload): ParsedMerge {
   const housekeeping = m.housekeeping ? (JSON.parse(m.housekeeping) as { cleaned: number; leftover: number }) : null;
   if (housekeeping && (typeof housekeeping.cleaned !== "number" || typeof housekeeping.leftover !== "number")) throw new Error("merge: the housekeeping report is not the engine's shape");
   return { fresh, telemetry, housekeeping };
+}
+
+/** A delta payload (#1045), read in full before any write. Throws when it
+ *  is not the engine's shape (fatal, like a bad merge). Returns null when it
+ *  is well formed but does not fit the read model: a unit it names is not
+ *  held, or the transports are not the ones held, in order. The host then
+ *  asks for a full save instead. */
+export interface ParsedDelta {
+  records: DeltaRecords;
+  telemetry: TelemetryDocument;
+  housekeeping: { cleaned: number; leftover: number } | null;
+}
+
+export function parseDelta(sim: Simulation, m: DeltaPayload): ParsedDelta | null {
+  const delta = JSON.parse(m.delta) as unknown;
+  if (!isRecord(delta) || !Array.isArray(delta.units) || !isRecord(delta.rest)) throw new Error("delta: the delta is not the engine's shape");
+  const rest = delta.rest;
+  if ("units" in rest || !Array.isArray(rest.transports) || typeof rest.minutes !== "number") throw new Error("delta: the save's remainder is not the engine's shape");
+  const units: unknown[] = delta.units;
+  const transports: unknown[] = rest.transports;
+  const isEntity = (v: unknown): v is { id: number; kind: string } => isRecord(v) && typeof v.id === "number" && typeof v.kind === "string" && isFacilityKind(v.kind);
+  if (!units.every(isEntity) || !transports.every(isEntity)) throw new Error("delta: a record is not the engine's shape");
+  const tower = sim.tower;
+  if (transports.length !== tower.transports.length) return null;
+  for (let i = 0; i < transports.length; i++) if (transports[i].id !== tower.transports[i].id) return null;
+  for (const u of units) if (tower.byId.get(u.id)?.kind !== u.kind) return null;
+  const fresh = Simulation.deserialize({ ...(rest as unknown as SerializedGame), units: [], transports: [] });
+  // The milestones are the engine's list as saved: the load-time adoption
+  // above ran on a tower with no units, so it is not the tower's.
+  fresh.achievedMilestones = new Set(Array.isArray(rest.milestones) ? rest.milestones.filter((m): m is string => typeof m === "string") : []);
+  const coerced: Unit[] = [];
+  for (const u of units) {
+    const unit = coerceUnitRecord(fresh, u as SerializedGame["units"][number]);
+    snapUnitRent(fresh, unit);
+    // A unit that moved is a layout change, which a delta never carries
+    // (the tower's caches read layout by revision): ask for a full save.
+    const held = tower.byId.get(unit.id)!;
+    if (unit.floor !== held.floor || unit.x !== held.x || unit.width !== held.width) return null;
+    coerced.push(unit);
+  }
+  const records: DeltaRecords = { rest: fresh, units: coerced, transports: transports.map((t) => coerceTransportRecord(t as SerializedGame["transports"][number])) };
+  const telemetry = JSON.parse(m.telemetry) as unknown;
+  if (!isTelemetryDocument(telemetry)) throw new Error("delta: the telemetry is not the engine's shape");
+  const housekeeping = m.housekeeping ? (JSON.parse(m.housekeeping) as { cleaned: number; leftover: number }) : null;
+  if (housekeeping && (typeof housekeeping.cleaned !== "number" || typeof housekeeping.leftover !== "number")) throw new Error("delta: the housekeeping report is not the engine's shape");
+  return { records, telemetry, housekeeping };
 }
 
 /** A JSON array from a reply whose every item passes `isItem`, or an error
@@ -78,6 +127,23 @@ export function mergeSave(sim: Simulation, m: ParsedMerge, h: FrameHeader): void
   }
   adoptTelemetry(sim, m.telemetry);
   sim.economy.adoptHousekeepingReport(m.housekeeping);
+}
+
+/** Patch the read model with a parsed delta, keeping what `mergeSave`
+ *  keeps (the frame loop's clock, the event buffer, the camera view). */
+export function mergeDelta(sim: Simulation, d: ParsedDelta, h: FrameHeader): void {
+  const buffer = sim.gameplayEvents;
+  const minutes = sim.clock.minutes;
+  const view = sim.view;
+  try {
+    mergeSimulationDelta(sim, d.records, { revision: h.revision, mealOverlayRevision: sim.tower.mealOverlayRevision });
+  } finally {
+    sim.gameplayEvents = buffer;
+    sim.clock.minutes = minutes;
+    sim.view = view;
+  }
+  adoptTelemetry(sim, d.telemetry);
+  sim.economy.adoptHousekeepingReport(d.housekeeping);
 }
 
 /** The header fields a fresh reply sets, as the main-thread host sets them. */
