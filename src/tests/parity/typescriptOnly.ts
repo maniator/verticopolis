@@ -46,8 +46,11 @@ export const REFRESH_HOOK = "__vcWasmParityRefresh";
  *  or the engine's own save at the end, and ticks too often for a full merge
  *  after every tick (a fixture save, or a day of minute ticks). On the parity
  *  projects the test then runs at the host's own cadence, a merge on an hour
- *  pass or a tower edit, as the game does; elsewhere it does nothing. The
- *  reason is required, and the story's test-mapping table repeats it. */
+ *  pass or a tower edit, as the game does; elsewhere it does nothing. Make
+ *  every tower edit before the first tick: after it, the instance lags the
+ *  engine between merges, and the compare a revision move runs reads that
+ *  lag as a divergence. The reason is required, and the story's
+ *  test-mapping table repeats it. */
 export function atEngineFrameCadence(reason: string): void {
   if (!reason.trim()) throw new Error("atEngineFrameCadence needs the reason the test reads only what the frame carries");
   if (!onWasmParityProject()) return;

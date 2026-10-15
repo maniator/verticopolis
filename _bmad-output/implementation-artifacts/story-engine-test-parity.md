@@ -1003,7 +1003,9 @@ this slice closes the rest and puts the projects in CI.
   cadence partway through a run), and the setup clears it after each test.
   The opt-in also narrows what the setup checks: with no merge per tick,
   the full compare runs only when the revision or the fingerprint moves, as
-  under `VC_WASM_SYNC=hour`. The reason is required, and the table repeats
+  under `VC_WASM_SYNC=hour`, so such a test makes every tower edit before
+  its first tick (after it, the instance lags the engine between merges,
+  and a compare would read the lag as a divergence). The reason is required, and the table repeats
   it word for word: `fixedStep` (all six),
   `rooms` (the census on the 12,000-unit fixture) and `rentalCrowd` (its
   three day-long runs). A test at that cadence that asserts on state the
