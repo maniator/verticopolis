@@ -10,7 +10,7 @@ import { decodeHeader } from "./frameView";
 import { SETTLE_TIMEOUT_MS, setStepGate } from "./stepGate";
 import { refuseForeignCatalog } from "./wasmHost";
 import type { FrameReply, FrameRequest, Op, ToWorker } from "./workerProtocol";
-import { applyHeaderFields, mergeSave, parseArray, parseMerge, restoreOwn, structuredCloneOf } from "./workerApply";
+import { applyHeaderFields, isEventItem, isLogItem, mergeSave, parseArray, parseCount, parseMerge, parsePending, restoreOwn, structuredCloneOf } from "./workerApply";
 import { LATENCY_SAMPLES, newWorkerHostStats, pushSample, type WorkerHost, type WorkerHostOptions } from "./workerStats";
 
 export type { WorkerHost, WorkerHostOptions, WorkerHostStats } from "./workerStats";
@@ -208,8 +208,8 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     }
     const h = decodeHeader(r.view);
     checkRecords(r.view, h);
-    const events = parseArray<GameplayEvent>(r.events, "event batch");
-    droppedEngine = r.dropped;
+    const events = parseArray<GameplayEvent>(r.events, "event batch", isEventItem);
+    const dropped = parseCount(r.dropped, "dropped-event count");
     // A reply that includes every command the instance ran. One that does
     // not is refused (#908) except for its events: its state predates a
     // command the instance already answered, and its crowd and cars may name
@@ -226,6 +226,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
         if (!ackedAt.has(s)) ackedAt.set(s, t0);
       }
       staleStreak++;
+      droppedEngine = dropped;
       for (const e of events) held.push(e);
       if (r.merge) needMerge = true;
       stats.applyMs += now() - t0;
@@ -238,16 +239,16 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       if (staleStreak < MAX_STALE_STREAK || waiters.length > 0) requestFrame();
       return;
     }
-    // Read everything the reply carries before any write (the events were
-    // read above, with the frame view): one that does not parse, or is not
-    // the engine's shape, is fatal with the read model as the last reply
-    // left it, so the fallback's clock (rolled back to that reply's minute)
-    // and its state agree.
+    // Read everything the reply carries before any write (the events and
+    // drop count were read above): one that does not parse, or is not the
+    // engine's shape, is fatal with the read model as the last reply left
+    // it, so the fallback's clock (rolled back to that minute) and state agree.
     const tParse = now();
     const merge = r.merge ? parseMerge(r.merge) : null;
     const parseMs = now() - tParse;
-    const pending = h.pending && r.pending ? (JSON.parse(r.pending) as typeof sim.events.pending) : undefined;
-    const log = r.log !== null ? parseArray<LogEntry>(r.log, "log") : null;
+    const pending = h.pending && r.pending ? parsePending<NonNullable<typeof sim.events.pending>>(r.pending) : undefined;
+    const log = r.log !== null ? parseArray<LogEntry>(r.log, "log", isLogItem) : null;
+    droppedEngine = dropped;
     relay.suppress(() => {
       if (merge) {
         const t = now();
@@ -262,9 +263,9 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       {
         applyHeaderFields(sim, h);
         // The pending choice, also when one replaced another between
-        // replies (the batching widens that window).
+        // replies (the batching widens that window), compared after the
+        // merge, which can set its own copy.
         if (!h.pending) sim.events.pending = null;
-        // Compared after the merge, which can set its own copy.
         else if (pending !== undefined && r.pending !== JSON.stringify(sim.events.pending)) sim.events.pending = pending;
         if (log !== null) appendEngineLog(sim, log, sim.logSeq - simLogSeqAtSync);
         engineLogSeq = h.logSeq;

@@ -213,6 +213,49 @@ describe("worker host round 2 (fake engine)", () => {
     h2.detach();
   });
 
+  it("refuses a fresh reply whose items parse but are not the engine's shape, before any write", () => {
+    const mod = fakeModule();
+    const core = new EngineWorkerCore(mod, () => {});
+    const other = Simulation.newGame(4, "classic");
+    other.tower.towerName = "From the bad reply";
+    const otherSave = JSON.stringify(other.serialize());
+    const cases: { name: string; pending?: boolean; reply: Record<string, unknown>; error: RegExp }[] = [
+      { name: "a log entry that is no entry", reply: { log: "[null]" }, error: /an item in the log/ },
+      { name: "an event that is no event", reply: { events: "[1]" }, error: /an item in the event batch/ },
+      { name: "a drop count that is no count", reply: { dropped: "x" }, error: /dropped-event count/ },
+      { name: "a pending choice that is no choice", pending: true, reply: { pending: "5" }, error: /pending choice/ },
+      { name: "telemetry rows of the wrong shape", reply: { merge: { save: otherSave, telemetry: '{"util":[5],"hourly":[],"origins":[]}', housekeeping: null } }, error: /telemetry/ },
+      { name: "a save that parses but is no save", reply: { merge: { save: "{}", telemetry: '{"util":[],"hourly":[],"origins":[]}', housekeeping: null } }, error: /the save is not/ },
+    ];
+    for (const [i, c] of cases.entries()) {
+      const sim = Simulation.newGame(4, "classic");
+      const sent: ToWorker[] = [];
+      const fatal: string[] = [];
+      const gen = 10 + i;
+      const h = attachWorkerHost(sim, { gen, catalogs: core.catalogs(), send: (m) => sent.push(m), onFatal: (m) => fatal.push(m), onError: () => {} });
+      const loaded = new Float64Array(26);
+      loaded[0] = sim.clock.minutes;
+      loaded[4] = sim.money;
+      h.receive({ type: "loaded", gen, view: loaded });
+      const minutes = sim.clock.minutes;
+      const money = sim.money;
+      const name = sim.tower.towerName;
+      sim.tick(1);
+      h.flush();
+      const req = (last(sent) as Extract<ToWorker, { type: "ops" }>).request!.req;
+      const view = new Float64Array(26);
+      view[0] = minutes + 1;
+      view[4] = money + 12_345;
+      if (c.pending) view[21] = 1;
+      h.receive({ type: "frame", gen, req, seq: 1, view, events: "[]", dropped: 0, log: null, pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null, ...c.reply } as never);
+      expect(fatal.join(), c.name).toMatch(c.error);
+      expect(sim.money, c.name).toBe(money);
+      expect(sim.tower.towerName, c.name).toBe(name);
+      h.detach();
+      expect(sim.clock.minutes, c.name).toBe(minutes);
+    }
+  });
+
   it("ends a settle that never gets an answer at the host's own cap", async () => {
     const mod = fakeModule();
     const sent: ToWorker[] = [];

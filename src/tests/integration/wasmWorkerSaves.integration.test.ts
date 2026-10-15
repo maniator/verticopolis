@@ -62,6 +62,12 @@ describe.skipIf(!hasWasmPackage())("synchronous saves on the worker host while s
           } finally {
             engine.free();
           }
+          // The in-flight minutes run again on load: when they cross an hour,
+          // that hour pass runs once on the loaded tower.
+          const runs = tower.onHourRuns;
+          tower.tick(pending);
+          expect(tower.clock.minutes).toBeCloseTo(sim.clock.minutes, 9);
+          expect(tower.onHourRuns - runs).toBe(Math.floor(sim.clock.minutes / 60) - Math.floor(save.minutes / 60));
           for (let i = 0; i < 60; i++) tower.tick(2);
           taken++;
         }
