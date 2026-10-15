@@ -4,7 +4,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { csvField, limitations, loadWorkerCheckpoint, makeConfig, metricsCsv, parseArgs, ratiosCsv, scriptSizes } from "./main";
-import { markdown } from "./report";
+import { markdown, readModelMarkdown, readModelSection } from "./report";
+import { churn, composition, measureReadModel, spread, summarizeMerges, type MergePass } from "./readModel";
+import { buildSmallTower } from "../perfCompare/scenarios";
 import { modeOrder, summarizeFrames, summarizeHosted, type ModeRun } from "./runner";
 import type { ModeName } from "./pageWorker";
 
@@ -206,5 +208,67 @@ describe("perf:worker analysis", () => {
     expect(() => parseArgs(["--viewport"])).toThrow(/needs a value/);
     expect(limitations(makeConfig(parseArgs([]), ["small"])).join("\n")).toMatch(/640x360 CSS viewport \(the default.*so at that size the modes simulated almost nothing/);
     expect(limitations(makeConfig(parseArgs(["--viewport", "1280x720"]), ["small"])).join("\n")).toMatch(/1280x720 CSS viewport \(set with --viewport\)\. A frame longer than 200 ms/);
+  });
+});
+
+describe("perf:worker read model shape", () => {
+  const save = (units: object[], extra: object = {}) => JSON.stringify({ money: 5, units, ...extra });
+
+  it("splits a save by top-level key and by unit kind, as shares of the whole", () => {
+    const units = [{ id: 1, kind: "floor" }, { id: 2, kind: "floor" }, { id: 3, kind: "office", rent: 1000 }];
+    const text = save(units, { log: ["a"] });
+    const c = composition(text);
+    expect(c.totalChars).toBe(text.length);
+    expect(c.units).toBe(3);
+    expect(c.keys.map((k) => k.name)).toEqual(["units", "log", "money"]);
+    expect(c.keys[0].chars).toBe(JSON.stringify(units).length);
+    expect(c.keys[0].share).toBeCloseTo(JSON.stringify(units).length / text.length, 12);
+    const floor = c.unitKinds.find((k) => k.name === "floor")!;
+    expect(floor).toMatchObject({ count: 2, chars: 2 * JSON.stringify(units[0]).length });
+    // Kinds sum to the units key less its brackets and commas.
+    expect(c.unitKinds.reduce((a, k) => a + k.chars, 0)).toBe(c.keys[0].chars - 2 - (units.length - 1));
+    expect(c.unitKinds[0].name).toBe("floor");
+  });
+
+  it("counts units changed, added and removed by id, and names the fields and keys that moved", () => {
+    const before = save([{ id: 1, kind: "floor" }, { id: 2, kind: "office", state: "vacant", sat: 0.5 }, { id: 3, kind: "condo" }], { minutes: 0 });
+    const after = save([{ id: 2, kind: "office", state: "occupied", sat: 0.5 }, { id: 1, kind: "floor" }, { id: 4, kind: "shop" }], { minutes: 60 });
+    expect(churn(before, after)).toEqual({ changed: 1, added: 1, removed: 1, total: 3, unitKeys: ["state"], topKeys: ["minutes", "units"] });
+    // Reordering alone is not a unit change, but it is a units-key change.
+    expect(churn(before, save([{ id: 3, kind: "condo" }, { id: 1, kind: "floor" }, { id: 2, kind: "office", state: "vacant", sat: 0.5 }], { minutes: 0 }))).toMatchObject({ changed: 0, added: 0, removed: 0, topKeys: ["units"] });
+    expect(() => churn(save([{ id: 1 }, { id: 1 }]), save([]))).toThrow(/appears twice/);
+  });
+
+  it("summarizes merges as the share of units changed and the units touched", () => {
+    const pass = (changed: number, total: number, added = 0): MergePass => ({ step: 4, reason: "hour", changed, added, removed: 0, total, unitKeys: [], topKeys: [] });
+    expect(summarizeMerges([pass(10, 100), pass(0, 100, 3), pass(50, 200)])).toEqual({ changedShare: { median: 0.1, max: 0.25 }, touched: { median: 10, max: 50 } });
+    expect(summarizeMerges([])).toEqual({ changedShare: null, touched: null });
+    expect(spread([4, 1, 3, 2])).toEqual({ median: 2.5, max: 4 });
+  });
+
+  it("merges where the worker host would, once a batch, and repeats exactly", () => {
+    const tower = { name: "small", save: JSON.stringify(buildSmallTower().serialize()) };
+    const opts = { steps: 62, dt: 2, batch: 4, warmSteps: 2 };
+    const shape = measureReadModel(tower, opts);
+    expect(shape.merges.length).toBeGreaterThanOrEqual(1);
+    for (const m of shape.merges) {
+      expect(m.step % opts.batch === 0 || m.step === opts.steps).toBe(true);
+      expect(m.reason).not.toBe("revision");
+      expect(m.topKeys).toContain("minutes");
+    }
+    expect(shape.composition.units).toBe(JSON.parse(tower.save).units.length);
+    expect(shape.composition.unitKinds.find((k) => k.name === "floor")!.count).toBeGreaterThan(0);
+    expect(shape.changedShare!.max).toBeGreaterThan(0);
+    expect(measureReadModel(tower, opts)).toEqual(shape);
+    const md = readModelSection([shape]).join("\n");
+    expect(md).toMatch(/^## read model/);
+    expect(md).toContain(`| small | ${shape.composition.totalChars.toLocaleString("en-US")} chars | ${shape.composition.units.toLocaleString("en-US")} | units `);
+    expect(md).toContain(`| ${shape.merges.length} |`);
+    expect(readModelSection([])).toEqual([]);
+    const report = readModelMarkdown({ schema: 1, generatedAt: "2026-10-15T12:00:00Z", commit: "abcdef0123", dirty: false, appVersion: "2.34.1", node: "v22.22.0", config: { ...opts, quick: false }, scenarios: [{ name: "small", sha256: "a".repeat(64) }], readModel: [shape], limitations: ["one"] });
+    expect(report.split("\n")[2]).toMatch(/^> \*\*Snapshot, measured 2026-10-15T12:00:00Z on commit `abcdef0`.*Live numbers: re-run `npm run perf:worker -- --read-model`/);
+    expect(report).toContain("- one");
+    expect(parseArgs(["--read-model"]).readModelOnly).toBe(true);
+    expect(() => parseArgs(["--read-model", "--skip-build"])).toThrow(/takes no --resume or --skip-build/);
   });
 });

@@ -1,6 +1,7 @@
 import type { Metric, Ratio } from "./analysis";
-import type { WorkerResults } from "./main";
+import type { ReadModelResults, WorkerResults } from "./main";
 import type { ModeName } from "./pageWorker";
+import type { ReadModelShape, Slice } from "./readModel";
 
 /** report.md for a `perf:worker` run: the snapshot header, the medians per
  *  mode with their intervals, and the paired ratios against the shipped
@@ -26,6 +27,33 @@ const ratioCell = (r: Ratio | undefined): string => {
   const ci = r.ciLow !== null && r.ciHigh !== null ? ` [${r.ciLow.toFixed(2)}, ${r.ciHigh.toFixed(2)}]` : "";
   return `${r.ratio.toFixed(2)}x${ci} ${r.verdict}${r.zeroReference ? ` (${r.zeroReference} zero)` : ""}`;
 };
+
+const pct = (share: number): string => (share > 0 && share < 0.0001 ? "<0.01%" : `${(share * 100).toFixed(share < 0.001 && share > 0 ? 2 : 1)}%`);
+const slices = (xs: readonly Slice[], top: number): string => {
+  const shown = xs.slice(0, top).map((s) => `${s.name}${s.count > 1 ? ` (${s.count.toLocaleString("en-US")})` : ""} ${pct(s.share)}`);
+  const rest = xs.slice(top);
+  if (rest.length) shown.push(`${rest.length} more ${pct(rest.reduce((a, s) => a + s.share, 0))}`);
+  return shown.join(", ");
+};
+
+/** The read model's shape per scenario (readModel.ts): what the merged
+ *  save is made of, and how much of it each merge changed. */
+export function readModelSection(shapes: readonly ReadModelShape[]): string[] {
+  if (!shapes.length) return [];
+  const lines = ["## read model", "", "Measured once per scenario on the TypeScript engine in Node (see the limitations). Shares are of the whole save in JSON characters. A merge is counted where the worker host merges; \"changed\" is units present in both saves whose records differ, as a share of the units present.", ""];
+  lines.push("| scenario | save | units | top-level keys | unit kinds | merges | units changed per merge, median / max | units touched per merge, median / max | unit fields changed | top-level keys changed |");
+  lines.push(`|${"---|".repeat(10)}`);
+  for (const s of shapes) {
+    const c = s.composition;
+    const unitKeys = [...new Set(s.merges.flatMap((m) => m.unitKeys))].sort();
+    const topKeys = [...new Set(s.merges.flatMap((m) => m.topKeys))].sort();
+    const share = s.changedShare ? `${pct(s.changedShare.median)} / ${pct(s.changedShare.max)}` : "n/a";
+    const touched = s.touched ? `${s.touched.median} / ${s.touched.max}` : "n/a";
+    lines.push(`| ${s.scenario} | ${c.totalChars.toLocaleString("en-US")} chars | ${c.units.toLocaleString("en-US")} | ${slices(c.keys, 4)} | ${slices(c.unitKinds, 4)} | ${s.merges.length} | ${share} | ${touched} | ${unitKeys.join(", ") || "none"} | ${topKeys.join(", ") || "none"} |`);
+  }
+  lines.push("");
+  return lines;
+}
 
 export function markdown(res: WorkerResults): string {
   const modes = res.config.modes;
@@ -63,6 +91,7 @@ export function markdown(res: WorkerResults): string {
     }
     lines.push("");
   }
+  lines.push(...readModelSection(res.readModel ?? []));
   lines.push("## Offline restart");
   lines.push("");
   for (const mode of modes) {
@@ -78,6 +107,22 @@ export function markdown(res: WorkerResults): string {
   lines.push("");
   lines.push("## Limitations");
   lines.push("");
+  for (const l of res.limitations) lines.push(`- ${l}`);
+  lines.push("");
+  return lines.join("\n");
+}
+
+/** report.md for `perf:worker --read-model`: the snapshot header, then the
+ *  read model section and its limitation. */
+export function readModelMarkdown(res: ReadModelResults): string {
+  const lines = ["# Read model shape (npm run perf:worker -- --read-model)", ""];
+  lines.push(`> **Snapshot, measured ${res.generatedAt} on commit \`${res.commit.slice(0, 7)}\` (app ${res.appVersion})${res.dirty ? ", dirty tree" : ""}, Node ${res.node}.** Live numbers: re-run \`npm run perf:worker -- --read-model\` (src/tests/perfWorker/readModel.ts, its arithmetic pinned by src/tests/perfWorker/analysis.test.ts).`);
+  lines.push("");
+  lines.push(`- ${res.config.warmSteps} warm steps, then ${res.config.steps} steps of ${res.config.dt} minutes in batches of ${res.config.batch}${res.config.quick ? " (quick)" : ""}`);
+  lines.push(`- Scenarios: ${res.scenarios.map((s) => `${s.name} (\`${s.sha256.slice(0, 12)}\`)`).join(", ")}`);
+  lines.push("");
+  lines.push(...readModelSection(res.readModel));
+  lines.push("## Limitations", "");
   for (const l of res.limitations) lines.push(`- ${l}`);
   lines.push("");
   return lines.join("\n");
