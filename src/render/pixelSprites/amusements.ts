@@ -102,7 +102,12 @@ function drawArcade(ctx: CanvasRenderingContext2D, x: number, floorY: number, w:
     ctx.fillStyle = look.neon; // control-panel light strip
     ctx.fillRect(cx + 1, cabY + Math.round(cabH * 0.62), cabW - 2, 1);
     castShadow(ctx, cx, floorY, cabW);
-    // A player at the cabinets the occupancy fills, scattered by the hash.
+  });
+  // A player at the cabinets the occupancy fills, scattered by the hash. Drawn
+  // after every cabinet: a player stands at a cabinet's right edge and reaches
+  // into the gap, so where the row compresses the next cabinet would otherwise
+  // paint over part of them.
+  spots.forEach((cx, i) => {
     if (busy.has(i)) personStanding(ctx, cx + cabW - 2, floorY, seed + i * 7);
   });
 }
@@ -144,7 +149,7 @@ function drawClaw(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   // hold the player who stands at the last machine's edge.
   const spots = artRow(aw - 3 - 5 - macW, x + 3, x + w - 5 - macW, macW + gap, 1, macW);
   const busy = busyStations(spots.length, occ, seed * 23);
-  spots.forEach((mx, i) => {
+  spots.forEach((mx) => {
     ctx.fillStyle = shade(look.neon, -30); // machine frame
     ctx.fillRect(mx, macY, macW, macH);
     const glassY = macY + 4;
@@ -164,6 +169,9 @@ function drawClaw(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
     ctx.fillStyle = look.neon; // prize-chute glow
     ctx.fillRect(mx + 1, macY + macH - 3, macW - 2, 1);
     castShadow(ctx, mx, floorY, macW);
+  });
+  // Players after every machine, for the same reason as the arcade's.
+  spots.forEach((mx, i) => {
     if (busy.has(i)) personStanding(ctx, mx + macW - 2, floorY, seed + i * 5);
   });
 }
@@ -210,7 +218,8 @@ function drawGolf(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   // authored tile and stepped at the current one: read off the pixel width, the
   // bay lost a standing spot when the tile narrowed. The start clearance stays
   // in screen pixels because what it clears (the golfer and the putter) is
-  // fixed-size art, and a bay too short for a watcher gets none.
+  // fixed-size art. A bay whose screen run is gone (`x + w - 7` left of
+  // `x + 32`) gets no watcher; one with any run at all gets at least one.
   if (occ > 0) {
     personStanding(ctx, x + 6, floorY, seed);
     ctx.fillStyle = "#D8D0B8"; // putter
@@ -218,9 +227,8 @@ function drawGolf(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
     ctx.fillRect(x + 15, floorY - 3, 1, 3);
   }
   const spots = artRow(aw - 32 - 7, x + 32, x + w - 7, 12, 1, 6);
-  // Floored to match every other row: a forged fractional count must not round
-  // a watcher into existence.
-  const watchers = Math.min(Math.max(0, Math.floor(occ) - 1), spots.length);
+  // `occ` is already whole (`roomOccupants`), and the golfer is one of them.
+  const watchers = Math.min(Math.max(0, occ - 1), spots.length);
   for (let i = 0; i < watchers; i++) personStanding(ctx, spots[i], floorY, seed + (i + 1) * 9);
 }
 

@@ -282,7 +282,7 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
   // `pixelSprites/roomCapacity.test.ts`, next to the rest of the bay's capacity
   // coverage, where they now run at the bay's real rect. The rects in this file
   // are still the retired 11px tile (132 by 44 and friends); that is a sweep of
-  // its own, recorded in the backlog's deferral inbox.
+  // its own, tracked as the backlog row `sprites-test-retired-tile` (#830).
 });
 
 describe("service facilities — reserved colors, integer pixels, and state cues", () => {

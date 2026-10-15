@@ -44,13 +44,6 @@ export function authoredWidth(tiles: number): number {
   return tiles * ART_TILE;
 }
 
-/** A screen length restated at the authored tile. Valid only for a length in
- *  WORLD pixels; for a room's own width prefer `authoredWidth`, which does not
- *  care what scale the caller draws at. */
-export function artUnits(screenLength: number): number {
-  return (screenLength * ART_TILE) / TILE;
-}
-
 /** An authored length restated on screen. Fractional on purpose: callers round
  *  the finished coordinate, so a row keeps an even pitch instead of collecting a
  *  rounding error at every step. */

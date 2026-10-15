@@ -78,6 +78,33 @@ export function hash(seed: number): number {
 }
 
 /**
+ * A room's occupancy as its art has to read it: whole people.
+ *
+ * `visibleOccupants` is the people system's canonical figure and can arrive
+ * fractional from a forged save, because nothing upstream rounds it. Art cannot
+ * draw four fifths of a person, so it has to pick a whole number, and a room
+ * that draws one gated figure as well as a row (a barber's seated client, a
+ * spa's tub guest, a golfer, the staff who appear because the room is open) has
+ * to pick it in one place or the two halves disagree.
+ *
+ * The rule is the one every other room's `i < n` figure loop already follows,
+ * and the one the atlas reader (`atlas/lookup.ts`) uses to pick a baked crowd:
+ * round UP. Rounding down here while the atlas rounds up would show a native
+ * frontend one more person than the web for the same room. A count that is not
+ * finite reads as nobody, and a corrupt `outForMeal` reads as nobody out, again
+ * as the atlas reads them. `roomOccupants.test.ts` holds the two in step.
+ *
+ * Used by the room kinds whose crowds the #813 fix rewired. The others read
+ * `visibleOccupants` directly and reach the same whole number through their
+ * loops.
+ */
+export function roomOccupants(u: { occupants: number; outForMeal?: number }): number {
+  const occupants = Number.isFinite(u.occupants) ? u.occupants : 0;
+  const out = u.outForMeal !== undefined && Number.isFinite(u.outForMeal) ? u.outForMeal : 0;
+  return Math.ceil(visibleOccupants({ occupants, outForMeal: out }));
+}
+
+/**
  * Which of a room's `stations` (stools, dance-floor spots, machines, mats,
  * bikes, places on a mat) have someone at them: a stable pseudo-random subset of
  * exactly `min(people, stations)` of them.
@@ -95,28 +122,9 @@ export function hash(seed: number): number {
  * whole row and is still a pure function of the room's own seed, which is what
  * lets these rooms bake to a cached sprite.
  */
-/**
- * A room's occupancy as its art has to read it: whole people.
- *
- * `visibleOccupants` is the people system's canonical figure and stays
- * fractional, because the live census sums it. Art cannot draw four fifths of a
- * person, so every row already floors it, and a room that ALSO draws one gated
- * figure (a barber's seated client, a spa's tub guest, a golfer, the staff who
- * appear because the room is open) has to floor it at the same place or the two
- * halves disagree: at a forged 0.5 the rows correctly draw nobody while the
- * gate draws a whole person, which is a fraction rounded into a figure through
- * the door those rows shut.
- *
- * Used by the room kinds whose crowds this pass rewired. The others still read
- * `visibleOccupants` directly, which is the older behavior, not a decision.
- */
-export function roomOccupants(u: { occupants: number; outForMeal?: number }): number {
-  return Math.floor(visibleOccupants(u));
-}
-
 export function busyStations(stations: number, people: number, seed: number): Set<number> {
-  // Floored so a forged save carrying a fractional count rounds the same way
-  // here as a plain counting loop would.
+  // Floored so a nonsense count can never claim a station it does not fill.
+  // Every caller hands in a whole number from `roomOccupants` already.
   const want = Math.max(0, Math.min(Math.floor(people), stations));
   if (!(want > 0)) return new Set(); // nobody here, or a nonsense count
   const ranked = Array.from({ length: stations }, (_, i) => i);

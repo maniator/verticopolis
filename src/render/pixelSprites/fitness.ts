@@ -86,9 +86,8 @@ function drawYoga(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   // them went undrawn. A class fills its mats from the front by design, which is
   // why this row counts in order rather than scattering like the others: every
   // mat is drawn either way, so an empty mat still reads as an empty mat.
-  // Floored, so a forged save carrying a fractional count cannot round a member
-  // into existence here when the other rows would round one away.
-  const members = Math.max(0, Math.floor(occ));
+  // `occ` is already whole (`roomOccupants`), rounded the way every row reads it.
+  const members = Math.max(0, occ);
   artRow(aw - 5 - 14, x + 5, x + w - 14, 12, 1, 9).forEach((mx, i) => {
     ctx.fillStyle = i % 2 === 0 ? look.accent : shade(look.accent, 30); // rolled/laid mats
     ctx.fillRect(mx, floorY - 2, 9, 2);

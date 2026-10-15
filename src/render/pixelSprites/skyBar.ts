@@ -21,6 +21,8 @@ const SKY = "#0e1526"; // night sky through the window
 const COUNTER = "#3a2418"; // warm wood bar
 const BOTTLE = ["#e0b040", "#c85050", "#50b0c0", "#a060c0"]; // backlit bottles
 const WINDOW_LIGHT = ["#f0d070", "#f0a850", "#d0d0f0"]; // distant city windows
+/** The counter's inset from each wall, shared by its drawn width and its authored one. */
+const BAR_INSET = 3;
 
 /** A stable per-room seed from GEOGRAPHY (floor, x), so the crowd, bottles, and
  *  skyline survive a save/export/import (which renumbers `u.id`). */
@@ -62,8 +64,8 @@ export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   layerBreak(ctx); // the shell ends; the bar and the patrons follow
 
   // The bar counter along the floor line, with a row of backlit bottles behind it.
-  const barX = x + 3;
-  const barW = w - 6;
+  const barX = x + BAR_INSET;
+  const barW = w - 2 * BAR_INSET;
   ctx.fillStyle = COUNTER;
   ctx.fillRect(barX, floorY - 4, barW, 4);
   ctx.fillStyle = shade(COUNTER, 26); // polished edge
@@ -78,10 +80,8 @@ export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   // off the counter's pixel width it lost two stools when the tile narrowed, and
   // two patrons who were at the bar went undrawn with them. The counter's own
   // authored width is named rather than folded into the row's margins so the
-  // two lengths read as what they are. It restates `barW`'s 3px insets in the
-  // authored scale rather than deriving them, so moving `barW` means moving
-  // this too.
-  const counterArtW = authoredWidth(u.width) - 6;
+  // two lengths read as what they are, and it shares `barW`'s inset.
+  const counterArtW = authoredWidth(u.width) - 2 * BAR_INSET;
   const stools = artRow(counterArtW - 3 - 9, barX + 3, barX + barW - 9, 7, 1, 6);
   // Which stools are taken: the occupancy says how many, the seed says which.
   // The old loop counted a hash-skipped stool against the occupancy as if
@@ -93,12 +93,14 @@ export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   // together than a figure is wide, so a patron partly overlapping him is
   // inherent here and always was. Sharing a patron's exact column is not, since
   // the two then read as one person rather than two, so he takes the next column
-  // along. Only an OCCUPIED stool is dodged (an empty one has nobody to be
-  // confused with), and the walk is bounded by the row it steps through.
+  // along. He dodges EVERY stool, taken or not, so where he stands depends on
+  // the room alone: the atlas bakes a crowd by adding patrons one at a time,
+  // and a bartender who stepped aside only once a stool filled would move
+  // between two of those steps. The walk is bounded by the row it steps through.
   if (occ > 0) {
-    const heads = new Set(stools.filter((_, i) => taken.has(i)));
+    const heads = new Set(stools);
     let bartX = barX + Math.round(barW / 2) - 3;
-    for (let step = 0; step < stools.length && heads.has(bartX); step++) bartX++;
+    for (let step = 0; step <= stools.length && heads.has(bartX); step++) bartX++;
     personStanding(ctx, bartX, floorY - 6, seed + 2);
   }
   stools.forEach((sx, i) => {

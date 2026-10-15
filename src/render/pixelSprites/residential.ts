@@ -1,7 +1,7 @@
 import type { Unit } from "../../engine/types";
 import { visibleOccupants } from "../../engine/Crowd";
 import { isLateHour } from "../lateNight";
-import { PAL, SKIN, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, shade, vacancy, windowView, type RoomCtx } from "./common";
+import { PAL, SKIN, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, roomOccupants, shade, vacancy, windowView, type RoomCtx } from "./common";
 import { artRow, authoredWidth, screenLength } from "./artScale";
 import { bevelBox, ceilingCap, curtain, downlights, fill, framedArt, glow, interiorWall, plankFloor } from "./dollhouse";
 import { layerBreak, layerEnd } from "./layers";
@@ -62,7 +62,7 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   // mirrored, over warm cream walls and olive carpet. Occupancy stays readable
   // in every layout: seats map to the people actually present.
   const wall = OFFICE_WALLS[geoVariant(u, 0, OFFICE_WALLS.length)];
-  const filled = Math.max(0, visibleOccupants(u));
+  const filled = roomOccupants(u); // whole people, rounded as the atlas reads them
   const layout = geoVariant(u, 3, 5); // 0-2 cubicle row (anchor weight), 3 meeting, 4 executive
   const flip = geoVariant(u, 4, 2) === 1;
   const { floorH, floorY } = floorMetrics(y, h);
@@ -102,13 +102,12 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
     if (layout === 3) {
       // Meeting room: one long table with a laptop and papers, high-back chairs
       // both sides, seated staff up to the chair count, a corner plant.
-      // The table is worked out in authored units and then brought back to
-      // screen. Its 60px ceiling is a fixed art literal that did not shrink with
-      // the tile, so sizing the table on screen and counting its chairs in
-      // authored units would credit a capped table with 66 authored pixels and
-      // seat a sixth worker the room was never drawn to hold.
+      // The table is drawn at its screen size, capped at its authored 60px,
+      // which is fixed art and keeps its size. Its chairs are counted from the
+      // table's AUTHORED length under that same cap, so a capped table seats
+      // the five it was drawn for and never a sixth.
       const atw = Math.min(Math.round(authoredWidth(u.width) * 0.6), 60);
-      const tw = Math.round(screenLength(atw));
+      const tw = Math.min(Math.round(w * 0.6), 60);
       const tx = x + Math.round((w - tw) / 2);
       fill(ctx, tx, floorY, tw, 1, "#000000", 0.16);
       bevelBox(ctx, tx, floorY - 7, tw, 4, PAL.walnut);
@@ -120,7 +119,9 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
       // chair when the tile narrowed, and the fifth worker present went undrawn
       // with it. A table too short for a chair seats none, which is what the
       // per-chair fit check used to do.
-      const chairs = artRow(atw - 3 - 6, tx + 3, tx + tw - 6, 11, 1, 6);
+      // The minimum step is a chair's drawn width (7px from `sx - 1`), so two
+      // chairs never draw through each other.
+      const chairs = artRow(atw - 3 - 6, tx + 3, tx + tw - 6, 11, 1, 7);
       const seated = Math.min(filled, chairs.length);
       chairs.forEach((sx, i) => {
         fill(ctx, sx - 1, floorY - 12, 7, 5, "#3A3F4A"); // high-back chair
@@ -171,9 +172,15 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
       // where the bank would otherwise run out through the far wall. That leaves
       // the fit check below as a backstop for the single-desk case, which has no
       // pitch to compress.
+      // The count is also held to what the screen run can space at a desk's own
+      // 18px width, so a room drawn far narrower than its tiles (a corrupt or
+      // huge `u.width`, or a preview box) never stacks desks or walks them out
+      // past the left wall, and a width that is not a number seats one desk.
       const start = x + 7;
       const last = x + w - 2 - 18; // the furthest a desk can start and still fit
-      const count = Math.max(1, Math.floor((authoredWidth(u.width) - 12) / 22));
+      const authored = Math.floor((authoredWidth(u.width) - 12) / 22);
+      const fits = last > start ? Math.floor((last - start) / 18) + 1 : 1;
+      const count = Math.max(1, Math.min(Number.isFinite(authored) ? authored : 1, fits));
       const slot = count > 1 ? Math.min(22, (last - start) / (count - 1)) : 22;
       const plantDesk = geoVariant(u, 2, count);
       const seated = Math.min(count, filled);

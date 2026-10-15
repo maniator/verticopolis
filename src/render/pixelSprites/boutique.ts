@@ -266,9 +266,8 @@ export function boutiqueBay(d: RoomCtx, u: Unit, x: number, y: number, w: number
   // occupancy rule forbids in the other direction.
   const seatedClient = occ > 0 && (look.trade === "barber" || look.trade === "tattoo") ? 1 : 0;
   const spots = artRow(authoredWidth(u.width) - 7 - 3, x + w - 7, x + 3, 7, -1, 6);
-  // Floored to match every other row: a forged fractional count must not round
-  // a customer into existence.
-  const browsing = Math.min(Math.max(0, Math.floor(occ) - seatedClient), spots.length);
+  // `occ` is already whole (`roomOccupants`).
+  const browsing = Math.min(Math.max(0, occ - seatedClient), spots.length);
   for (let i = 0; i < browsing; i++) {
     personStanding(ctx, spots[i], floorY, seed + i * 11);
   }
