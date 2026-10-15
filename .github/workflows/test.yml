@@ -72,8 +72,13 @@ jobs:
       - name: Run tests
         run: npm run test:coverage -- --run
 
+      # This job only proves the bundle builds, with no engine package (the e2e
+      # job below builds with one), so it opts out of the engine requirement
+      # scripts/verify-precache.ts puts on every build.
       - name: Build
         run: npm run build
+        env:
+          VC_ALLOW_NO_ENGINE: "1"
 
   # Resolve the Playwright container tag from the repo's own Playwright version so
   # the e2e job's browser can never drift from the one baselines were minted with
@@ -165,5 +170,77 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-visual-diffs
+          path: test-results/
+          if-no-files-found: ignore
+
+  # The wasm-only build (VC_ENGINE=wasm; src/build/engineBundle.ts), the one
+  # the 3.0.0 flip deploys: the Rust/WASM engine is the only engine, with no
+  # runtime switch, no TypeScript step loop and no fallback. Its postbuild
+  # guard (scripts/verify-engine-bundle.ts) reads the emitted sourcemaps and
+  # the precache; this job also proves that guard fails when app code imports
+  # the TypeScript step loop, then runs the whole e2e suite on the build.
+  e2e-wasm-only:
+    needs: [resolve-image, engine-wasm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: ${{ needs.resolve-image.outputs.image }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: ./.github/actions/engine-wasm-download
+        with:
+          artifact-name: engine-wasm
+
+      # The player build, exactly as a deploy would make it, with every
+      # postbuild check (the engine bundle guard among them).
+      - name: Build (wasm-only, player)
+        run: npm run build
+        env:
+          VC_ENGINE: wasm
+
+      # A legacy import from app code (the alias only covers Simulation.ts's
+      # own import) must fail the build with the guard's message.
+      - name: The bundle guard catches a TypeScript step loop import
+        shell: bash
+        run: |
+          cp src/bootstrap.ts "$RUNNER_TEMP/bootstrap.ts"
+          # Put the file back however the step ends; the next build step then
+          # rebuilds dist/ from the real source.
+          trap 'cp "$RUNNER_TEMP/bootstrap.ts" src/bootstrap.ts' EXIT
+          printf 'import { tick as legacyTick } from "./engine/sim/loop";\n(globalThis as unknown as { legacyTick?: unknown }).legacyTick = legacyTick;\n' >> src/bootstrap.ts
+          if VC_ENGINE=wasm npm run build > canary.log 2>&1; then
+            cat canary.log
+            echo "::error::the wasm-only build passed with the TypeScript step loop imported; scripts/verify-engine-bundle.ts missed it"
+            exit 1
+          fi
+          grep -F "carries the TypeScript step loop (src/engine/sim/loop.ts) in a wasm-only build" canary.log
+
+      - name: Build (wasm-only, tooling)
+        run: npm run build
+        env:
+          VC_ENGINE: wasm
+          VC_TOOLING: "1"
+
+      - name: Run end-to-end tests on the wasm-only build
+        run: npx playwright test --grep-invert @perf
+        env:
+          PW_WASM_ONLY: "1"
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-wasm-only-results
           path: test-results/
           if-no-files-found: ignore

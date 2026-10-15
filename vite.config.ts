@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
 import { notesForVersion } from "./src/changelog";
+import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
+import { parseEngineBuild, type EngineBuild } from "./src/build/engineBundle";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
 
@@ -40,6 +42,49 @@ function toolingBuild(): boolean {
   return on;
 }
 
+/** The engine build mode (`VC_ENGINE`; see src/build/engineBundle.ts). A
+ *  wasm-only build ships the Rust/WASM engine as the only engine: no runtime
+ *  switch, no TypeScript step loop, no fallback. The value is validated, and
+ *  `VC_ENGINE` is refused under Vitest, whose suites pick their engine with
+ *  `VC_REQUIRE_WASM` and need the TypeScript step loop the alias below removes. */
+function engineBuild(): EngineBuild {
+  const mode = parseEngineBuild(process.env.VC_ENGINE);
+  if (process.env.VITEST && process.env.VC_ENGINE) {
+    throw new Error("VC_ENGINE selects a build mode and does not apply to Vitest; unset it (the WASM test lanes use VC_REQUIRE_WASM=1).");
+  }
+  if (mode === "wasm-only") console.warn("[build] VC_ENGINE=wasm: a wasm-only build (no TypeScript step loop, no fallback).");
+  return mode;
+}
+
+const ENGINE_BUILD = engineBuild();
+const TOOLING_BUILD = toolingBuild();
+
+/**
+ * Module swaps that keep engine-specific code out of a bundle that cannot use
+ * it. Plain `resolve.alias` entries match an import specifier's text from any
+ * importer, so src/build/engineAliases.test.ts pins that exactly one file uses
+ * each specifier and that no other specifier reaches the real module, and
+ * `scripts/verify-engine-bundle.ts` proves from the emitted sourcemaps that
+ * the swapped module did not ship. The step-loop swap applies to a dev serve
+ * with `VC_ENGINE=wasm` too, so that serve behaves like the wasm-only build.
+ *   - wasm-only builds: `Simulation.ts`'s step loop becomes a stand-in that
+ *     throws, since the WASM host replaces `tick` on every tower it holds.
+ *   - every build that is neither a dev serve nor a tooling build, and every
+ *     wasm-only build: the dual run becomes an inert stand-in. Its call in
+ *     bootstrap.ts is compiled away there already, but Vite still emitted (and
+ *     the precache still shipped) its Web Worker.
+ */
+function engineAliases(command: "build" | "serve"): { find: RegExp; replacement: string }[] {
+  const aliases: { find: RegExp; replacement: string }[] = [];
+  if (ENGINE_BUILD === "wasm-only") {
+    aliases.push({ find: /^\.\/sim\/loop$/, replacement: resolve(__dirname, "src/wasmhost/stepLoopAbsent.ts") });
+  }
+  if (ENGINE_BUILD === "wasm-only" || (command === "build" && !TOOLING_BUILD)) {
+    aliases.push({ find: /^\.\/dualrun\/dualRun$/, replacement: resolve(__dirname, "src/dualrun/dualRunAbsent.ts") });
+  }
+  return aliases;
+}
+
 /** Short git SHA of the build, or "unknown" outside a checkout. */
 function gitShortSha(): string {
   try {
@@ -68,7 +113,7 @@ function emitVersionJson(): Plugin {
       this.emitFile({
         type: "asset",
         fileName: "version.json",
-        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes() }),
+        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes(), engineBuild: ENGINE_BUILD }),
       });
     },
   };
@@ -79,29 +124,31 @@ function emitVersionJson(): Plugin {
  * records (#951), so `scripts/gen-third-party-notices.ts` could not list it:
  * a package stylesheet (Vite writes no CSS sourcemap), whether imported from
  * JavaScript or inlined by a CSS `@import`, and a package asset such as a font
- * or image from a CSS `url()`, whether emitted as a file or inlined.
+ * or image from a CSS `url()`, whether emitted as a file or inlined. What
+ * counts as a package file comes from `isPackagePath`, the same test the
+ * generator uses.
  */
-const PACKAGE_STYLESHEET = /[\\/]node_modules[\\/].*\.(css|less|sass|scss|styl|stylus|pcss|postcss|sss)(\?|$)/;
-const PACKAGE_FILE = /(^|[\\/])node_modules[\\/]/;
-const PACKAGE_CODE = /\.[mc]?[jt]sx?(\?|$)/;
+const CODE = /\.[mc]?[jt]sx?$/;
 function noUnlistedPackageFiles(): Plugin {
   const refuse = (what: string): string => `${what}: the third-party notices cannot list this package file (see #951)`;
   return {
     name: "no-unlisted-package-files",
     apply: "build",
     transform(_code, id) {
-      if (PACKAGE_STYLESHEET.test(id)) this.error(refuse(id));
+      // A stylesheet's extension can also sit in the query (a component's
+      // `?type=style&lang.css` block), so the whole id is checked too.
+      if (isPackagePath(id, PACKAGE_STYLESHEET) || (isPackagePath(id) && PACKAGE_STYLESHEET.test(id))) this.error(refuse(id));
     },
     generateBundle(_options, bundle) {
       // A CSS @import, or a small image or font inlined as a data URL, never
       // reaches `transform` or the bundle as its own file; the build's watch
       // list still names it. Package JavaScript is listed by its sourcemap;
       // package JSON is inlined without one, so it is refused like an asset.
-      const inlined = this.getWatchFiles().filter((f) => PACKAGE_FILE.test(f) && !PACKAGE_CODE.test(f));
+      const inlined = this.getWatchFiles().filter((f) => isPackagePath(f) && !isPackagePath(f, CODE));
       if (inlined.length > 0) this.error(refuse(inlined.join(", ")));
       for (const file of Object.values(bundle)) {
         if (file.type !== "asset") continue;
-        const fromPackage = (file.originalFileNames ?? []).filter((n) => PACKAGE_FILE.test(n));
+        const fromPackage = (file.originalFileNames ?? []).filter((n) => isPackagePath(n));
         if (fromPackage.length > 0) this.error(refuse(`${file.fileName} (from ${fromPackage.join(", ")})`));
       }
     },
@@ -207,8 +254,9 @@ function wasmParityProjects() {
   ];
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   root: "src",
+  resolve: { alias: engineAliases(command) },
   base: "./",
   // Compile-time app version, shown on the splash. (package.json isn't importable
   // in the browser bundle.)
@@ -227,7 +275,11 @@ export default defineConfig({
     // variable: the gate also accepts `import.meta.env.DEV`. The value is
     // validated by `toolingBuild()` above; scripts/verify-game-handle.ts
     // asserts the resulting dist matches the mode on every `npm run build`.
-    __TOOLING_BUILD__: JSON.stringify(toolingBuild()),
+    __TOOLING_BUILD__: JSON.stringify(TOOLING_BUILD),
+    // The engine build mode (see `engineBuild` above). True compiles away the
+    // runtime engine switch, the TypeScript fallback and the dual run in
+    // bootstrap.ts; scripts/verify-engine-bundle.ts checks the result.
+    __WASM_ONLY__: JSON.stringify(ENGINE_BUILD === "wasm-only"),
   },
   plugins: [
     emitVersionJson(),
@@ -278,7 +330,39 @@ export default defineConfig({
       workbox: {
         // Precache the game shell only. The dev/tooling entry points and their
         // chunks are excluded so an install ships just the game.
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3}"],
+        //
+        // The shell includes the WASM engine package (`engine/`, its glue and
+        // `.wasm`, built on every deploy by scripts/build-engine-wasm.sh), so
+        // an installed game starts the engine offline (#945). One precache
+        // version holds the shell and the engine together: Workbox installs a
+        // new worker's whole manifest or none of it, activates it through
+        // src/pwa.ts's save-then-reload or once every tab of the old version
+        // has closed, and deletes
+        // the old version's entries, so from 2.32.0 on a page the worker
+        // controls runs the shell and engine its install fetched together.
+        // Not covered here, and tracked on #985 (the cutover plan's S16
+        // version check): a page no worker controls yet (a first visit) fetches them
+        // separately; an install that overlaps a deploy can store the engine's
+        // unhashed files from the newer build; and a worker from before 2.32.0
+        // never precached the engine at all. The
+        // cost is about 430 KB compressed per install, paid by every player
+        // (owner decision, 2026-10-13: the engine becomes the default at 3.0).
+        // Which engine files the game fetches at run time is recorded in
+        // src/wasmhost/engineAssets.ts: the glue and the `.wasm` are fetched,
+        // while `engine/BUILD.json` and `engine/THIRD-PARTY.json` are read only
+        // at build and test time. Both stay out because the pattern matches no
+        // `.json` at all, and it should stay that way: a blanket `json` would
+        // also sweep in THIRD-PARTY.json (about 0.6 MB), `version.json` (the
+        // update check, which must come from the network) and any later data
+        // file. If the game starts reading a `.json` at run time (BUILD.json
+        // for #985's package check, or audio data for #968), mark it in
+        // engineAssets.ts or audioAssets.ts and add that one file to this
+        // list by its own path (for example "engine/BUILD.json").
+        // scripts/verify-precache.ts fails the build when a run-time engine
+        // or audio file is missing from the manifest, when a build-only
+        // engine file is in it, and when the package holds a file the list
+        // does not classify.
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3,wasm}"],
         // og-image.png is the social/crawler share card, not part of the game
         // shell, so keep it out of the offline precache. `help.html` and its own
         // page entry chunk (`help-*.js`) are excluded too (see the note below),
@@ -294,7 +378,7 @@ export default defineConfig({
         // the game shell: the PWA needs nothing that large, so it stays out
         // of every web player's offline precache (a review catch on the PR
         // that added it).
-        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png", "**/engine/**"],
+        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png"],
         navigateFallback: "index.html",
         // Keep the non-game pages and the real static files out of the app-shell
         // fallback, letting them fall through to the network rather than the game
@@ -338,6 +422,9 @@ export default defineConfig({
           /help/,
           /preview/,
           /version\.json$/,
+          // The engine package's own files (its BUILD.json above all) are
+          // documents; a navigation to one must reach the file itself.
+          /\/engine\//,
           /robots\.txt$/,
           /sitemap\.xml$/,
           /third-party-notices\.txt(\?.*)?$/,
@@ -557,4 +644,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

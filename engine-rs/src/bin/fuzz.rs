@@ -42,7 +42,9 @@ fn main() {
             std::process::exit(2);
         }),
     };
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+    let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("conformance");
     // The generator's stream is separate from the game's own seed, so the
     // command sequence does not replay the simulation's random draws.
     let mut rng = Rng::new(seed ^ 0x9e37_79b9);
@@ -78,7 +80,7 @@ fn main() {
     let run = |commands: &[Value]| {
         let text = serde_json::to_string(&scenario_value(commands)).unwrap();
         let s = Scenario::parse(&text).expect("the fuzzer only emits valid commands");
-        run_scenario(&s, &repo_root)
+        run_scenario(&s, &suite)
     };
     let mut kept = 0;
     while kept < budget {

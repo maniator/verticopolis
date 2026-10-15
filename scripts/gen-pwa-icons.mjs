@@ -14,6 +14,7 @@
  *   node scripts/gen-pwa-icons.mjs                 # host
  *   PW_CHROME=... node scripts/gen-pwa-icons.mjs   # docker/CI
  */
+// copies-package: none
 import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";

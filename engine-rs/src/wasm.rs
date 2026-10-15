@@ -8,8 +8,9 @@ use wasm_bindgen::prelude::*;
 use crate::canonical::{canonical_json, digest};
 use crate::clock::GameMode;
 use crate::facilities::Kind;
-use crate::scenario::state_view;
+pub use crate::frame::{frame_view, log_since, FRAME_HEADER, PERSON_FIXED, UNKNOWN_ROUTINE};
 use crate::sim::Simulation;
+use crate::snapshot::state_view;
 
 /// Every failure crosses as a JavaScript error with its message; the helpers
 /// below carry plain strings so they can be tested natively, and the methods
@@ -39,18 +40,26 @@ fn build_result(r: crate::build::BuildResult) -> String {
     outcome(r.ok, r.reason.as_deref())
 }
 
-/// A resize result as `{ ok, reason?, added, floorTilesCreated }`.
+/// A resize result as TypeScript spells it: `{ ok: true, added,
+/// floorTilesCreated }`, or `{ ok: false, reason }` for a refusal (#996).
 fn resize_json(r: crate::tower::ResizeResult) -> String {
-    let mut v = serde_json::json!({
-        "ok": r.ok,
+    if !r.ok {
+        let mut v = serde_json::json!({ "ok": false });
+        if let Some(reason) = r.reason {
+            v["reason"] = Value::String(reason);
+        }
+        return v.to_string();
+    }
+    serde_json::json!({
+        "ok": true,
         "added": r.added,
         "floorTilesCreated": r.floor_tiles_created,
-    });
-    if let Some(reason) = r.reason {
-        v["reason"] = Value::String(reason);
-    }
-    v.to_string()
+    })
+    .to_string()
 }
+
+#[path = "wasm_relay.rs"]
+mod relay;
 
 /// `canBuild`'s answer as the TypeScript spells it: `{ ok, reason?, cost }`.
 fn can_build_json(ok: bool, reason: Option<&str>, cost: f64) -> String {
@@ -438,9 +447,16 @@ impl Engine {
         )))
     }
 
+    /// `sellAt(floor, x)`: whether a facility went. Read raw (#996): a floor
+    /// or column that is not a whole JS number within `Number.isSafeInteger`
+    /// is refused with `false`, never coerced.
     #[wasm_bindgen(js_name = sellAt)]
-    pub fn sell_at(&mut self, floor: i32, x: i32) -> bool {
-        self.sim.sell_at(floor.into(), x.into())
+    pub fn sell_at(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] floor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] x: JsValue,
+    ) -> bool {
+        self.sell_at_checked(floor.as_f64(), x.as_f64())
     }
 
     /// The unit covering a tile, serialized as the save would, or null.
@@ -461,39 +477,67 @@ impl Engine {
             .map(|t| t.serialize().to_string())
     }
 
-    /// `adjustRent(id, dir)`: the new rent, or null when nothing moved.
+    /// `adjustRent(id, dir)`: the new rent, or null when nothing moved. Read
+    /// raw (#996): an id that is not a whole JS number within
+    /// `Number.isSafeInteger`, or a `dir` that is not exactly 1 or -1, is
+    /// refused with null.
     #[wasm_bindgen(js_name = adjustRent)]
-    pub fn adjust_rent(&mut self, id: i32, dir: i32) -> Option<f64> {
-        self.sim.adjust_rent(id.into(), dir.into())
+    pub fn adjust_rent(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] dir: JsValue,
+    ) -> Option<f64> {
+        self.adjust_rent_checked(id.as_f64(), dir.as_f64())
     }
 
+    /// `setNoRate(id)`: whether the unit is now off the market. The id is
+    /// read raw (#996), as for `sellAt`.
     #[wasm_bindgen(js_name = setNoRate)]
-    pub fn set_no_rate(&mut self, id: i32) -> bool {
-        self.sim.set_no_rate(id.into())
+    pub fn set_no_rate(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+    ) -> bool {
+        self.set_no_rate_checked(id.as_f64())
     }
 
     /// `setCars(id, cars)`: the simulation-layer edit, which reports
-    /// `capacity_changed`.
+    /// `capacity_changed`. Read raw (#996): an id or count that is not a
+    /// whole JS number within `Number.isSafeInteger` is refused with `false`.
     #[wasm_bindgen(js_name = setCars)]
-    pub fn set_cars(&mut self, id: i32, cars: i32) -> bool {
-        self.sim.set_cars(id.into(), cars.into())
+    pub fn set_cars(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] cars: JsValue,
+    ) -> bool {
+        self.set_cars_checked(id.as_f64(), cars.as_f64())
     }
 
     /// `tower.setCars(id, cars)`: the bare tower edit, silent in both
     /// engines (#906). Relay-only: the dual-run mirror replays a bare
     /// TypeScript tower edit with it. Player and UI edits use the charge commands
     /// (`addCar`, `removeCar`, `extendTransport`), and
-    /// `towerRelayOps.guard.test.ts` keeps other callers out.
+    /// `towerRelayOps.guard.test.ts` keeps other callers out. Read raw
+    /// (#996), as `setCars`.
     #[wasm_bindgen(js_name = towerSetCars)]
-    pub fn tower_set_cars(&mut self, id: i32, cars: i32) -> bool {
-        self.sim.tower.set_cars(id.into(), cars.into())
+    pub fn tower_set_cars(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] cars: JsValue,
+    ) -> bool {
+        self.tower_set_cars_checked(id.as_f64(), cars.as_f64())
     }
 
-    /// `Tower.setSchedule(id, schedule)` with the schedule as JSON text.
+    /// `Tower.setSchedule(id, schedule)` with the schedule as JSON text. The
+    /// id is read raw (#996): one that is not a whole JS number within
+    /// `Number.isSafeInteger` is refused with `false` before the text is read.
     #[wasm_bindgen(js_name = setSchedule)]
-    pub fn set_schedule(&mut self, id: i32, schedule: &str) -> Result<bool, JsError> {
-        let raw: Value = serde_json::from_str(schedule).map_err(err)?;
-        Ok(self.sim.tower.set_schedule(id.into(), &raw))
+    pub fn set_schedule(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        schedule: &str,
+    ) -> Result<bool, JsError> {
+        self.set_schedule_checked(id.as_f64(), schedule)
+            .map_err(err)
     }
 
     /// `toggleAutoBridge()`: the preference after the flip.
@@ -535,25 +579,31 @@ impl Engine {
     }
 
     /// `resizeTransport(id, bottom, top)`, the simulation-layer edit that
-    /// reports `capacity_changed`: JSON
-    /// `{ ok, reason?, added, floorTilesCreated }`.
+    /// reports `capacity_changed`: JSON `{ ok: true, added,
+    /// floorTilesCreated }` or `{ ok: false, reason }`. Read raw (#996): an
+    /// id or floor that is not a whole JS number within
+    /// `Number.isSafeInteger` is refused with `INVALID_REQUEST`.
     #[wasm_bindgen(js_name = resizeTransport)]
-    pub fn resize_transport(&mut self, id: i32, bottom: i32, top: i32) -> String {
-        let r = self
-            .sim
-            .resize_transport(id.into(), bottom.into(), top.into());
-        resize_json(r)
+    pub fn resize_transport(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bottom: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] top: JsValue,
+    ) -> String {
+        self.resize_checked(id.as_f64(), bottom.as_f64(), top.as_f64())
     }
 
     /// `tower.resizeTransport(id, bottom, top)`, the bare tower edit, silent
-    /// in both engines (#906): the same JSON. Relay-only, as `towerSetCars`.
+    /// in both engines (#906): the same JSON, read raw the same way (#996).
+    /// Relay-only, as `towerSetCars`.
     #[wasm_bindgen(js_name = towerResizeTransport)]
-    pub fn tower_resize_transport(&mut self, id: i32, bottom: i32, top: i32) -> String {
-        let r = self
-            .sim
-            .tower
-            .resize_transport(id.into(), bottom.into(), top.into());
-        resize_json(r)
+    pub fn tower_resize_transport(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bottom: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] top: JsValue,
+    ) -> String {
+        self.tower_resize_checked(id.as_f64(), bottom.as_f64(), top.as_f64())
     }
 
     /// `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
@@ -632,9 +682,18 @@ impl Engine {
         self.sim.tower.remove_transport(id.into()).is_some()
     }
 
+    /// `tower.setStop(id, floor, stop)`: whether the stop is set. Read raw
+    /// (#996): an id or floor that is not a whole JS number within
+    /// `Number.isSafeInteger`, or a `stop` that is not a JS boolean, is
+    /// refused with `false`.
     #[wasm_bindgen(js_name = setStop)]
-    pub fn set_stop(&mut self, id: i32, floor: i32, stop: bool) -> bool {
-        self.sim.tower.set_stop(id.into(), floor.into(), stop)
+    pub fn set_stop(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] floor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "boolean")] stop: JsValue,
+    ) -> bool {
+        self.set_stop_checked(id.as_f64(), floor.as_f64(), stop.as_bool())
     }
 
     #[wasm_bindgen(js_name = setExpressStops)]
@@ -856,211 +915,20 @@ impl Engine {
         crate::gameplay::batch_json(&self.sim.gameplay.drain()).to_string()
     }
 
+    /// How many gameplay events wait for the next drain. A host reads it
+    /// before draining, so a batch whose text it cannot read is counted as
+    /// lost (the drain empties the buffer either way).
+    #[wasm_bindgen(js_name = gameplayEventsPending)]
+    pub fn gameplay_events_pending(&self) -> f64 {
+        self.sim.gameplay.len() as f64
+    }
+
     /// How many gameplay events a full buffer has pushed out since this
     /// engine was made (a host that drains every frame never sees one).
     #[wasm_bindgen(js_name = gameplayEventsDropped)]
     pub fn gameplay_events_dropped(&self) -> f64 {
         self.sim.gameplay.dropped as f64
     }
-}
-
-/// Fixed header slots of the frame view, before the three variable sections.
-pub const FRAME_HEADER: usize = 26;
-
-/// Fixed slots of a person record, before its route (`floors` then `shafts`).
-pub const PERSON_FIXED: usize = 18;
-
-/// The routine code for a routine `frame_view` has no code for; the
-/// TypeScript decoder rejects it.
-pub const UNKNOWN_ROUTINE: f64 = 255.0;
-
-/// The per-frame read model: every value the web host reads from the
-/// simulation between two structural syncs, flat so it crosses the WASM
-/// boundary as one typed array.
-///
-/// Header (`FRAME_HEADER` slots): 0 minutes, 1 tower revision, 2 meal
-/// overlay revision, 3 logSeq, 4 money, 5 star, 6 weather (0 clear, 1 cloudy,
-/// 2 rain), 7 santaFxSeq, 8..10 explosionFx (seq, floor, x), 11..13 thiefFx
-/// (seq, caught, floor), 14..16 treasureFx (seq, floor, x), 17 vipFxSeq,
-/// 18..20 event counts (fires, firesGutRooms, bombs), 21 a pending choice
-/// (0 or 1), 22 onHourRuns, 23 people count, 24 unit count, 25 transport
-/// count.
-///
-/// Then `people count` records of `PERSON_FIXED + floors + shafts`: id, seed,
-/// staff (0 or 1), state (the `PersonState` index), floor, x, fy, wait, then
-/// the routing slice the suites read: originFloor (always present, so -1 is
-/// a real basement floor), originUnitId, venueUnitId, mealVenueId (each -1
-/// when absent), countedHotelGuest (0 or 1), routine
-/// (0 none, 1 schoolRun, 2 salesCall, 255 a routine with no code yet, which
-/// the decoder rejects), returning (0 or 1), dwellSecondsLeft
-/// (NaN when absent: a drained timer stays negative on the person through
-/// the return leg, so no number is free), the floors count, the shafts
-/// count, then the route's floors and its shafts. Then `unit count` records
-/// of 6: id, state (the `UnitState` index), occupants, customersIn,
-/// hotelCustomersIn, outForMeal (an absent counter is -1). Then
-/// `transport count` records of `2 + 3 * cars`: id, cars, then per car
-/// position, load (-1 when the shaft keeps none), direction.
-pub fn frame_view(sim: &Simulation) -> Vec<f64> {
-    use crate::crowd::PState;
-    use crate::sim_loop::Weather;
-    use crate::tower::UnitState;
-    let people = &sim.crowd.people;
-    let units = &sim.tower.units;
-    let transports = &sim.tower.transports;
-    let mut v = Vec::with_capacity(
-        FRAME_HEADER
-            + people
-                .iter()
-                .map(|p| PERSON_FIXED + p.floors.len() + p.shafts.len())
-                .sum::<usize>()
-            + units.len() * 6
-            + transports
-                .iter()
-                .map(|t| 2 + 3 * t.cars as usize)
-                .sum::<usize>(),
-    );
-    let fx = &sim.fx;
-    v.extend_from_slice(&[
-        sim.clock.minutes,
-        sim.tower.revision as f64,
-        sim.tower.meal_overlay_revision as f64,
-        sim.log_seq as f64,
-        sim.money,
-        sim.star as f64,
-        match sim.weather {
-            Weather::Clear => 0.0,
-            Weather::Cloudy => 1.0,
-            Weather::Rain => 2.0,
-        },
-        fx.santa_seq as f64,
-        fx.explosion.seq as f64,
-        fx.explosion.floor as f64,
-        fx.explosion.x,
-        fx.thief.seq as f64,
-        if fx.thief.caught { 1.0 } else { 0.0 },
-        fx.thief.floor as f64,
-        fx.treasure.seq as f64,
-        fx.treasure.floor as f64,
-        fx.treasure.x,
-        fx.vip_seq as f64,
-        sim.events.fires_started as f64,
-        sim.events.fires_gut_rooms as f64,
-        sim.events.bombs_detonated as f64,
-        if sim.events.pending.is_some() {
-            1.0
-        } else {
-            0.0
-        },
-        sim.on_hour_runs as f64,
-        people.len() as f64,
-        units.len() as f64,
-        transports.len() as f64,
-    ]);
-    debug_assert_eq!(v.len(), FRAME_HEADER);
-    for p in people {
-        let state = match p.state {
-            PState::ToShaft => 0.0,
-            PState::Waiting => 1.0,
-            PState::Riding => 2.0,
-            PState::Climbing => 3.0,
-            PState::ToDest => 4.0,
-            PState::Dwelling => 5.0,
-            PState::Done => 6.0,
-        };
-        let id = |v: Option<i64>| v.map_or(-1.0, |n| n as f64);
-        let flag = |b: bool| if b { 1.0 } else { 0.0 };
-        let routine = match p.routine {
-            None => 0.0,
-            Some("schoolRun") => 1.0,
-            Some("salesCall") => 2.0,
-            // The routines are engine-set literals; a new one must be added
-            // here and to `ROUTINES` in frameView.ts. Until then it crosses
-            // as a code the decoder rejects by name, so a release build
-            // fails loudly where a debug build fails here.
-            Some(other) => {
-                debug_assert!(false, "routine {other} has no frame code");
-                UNKNOWN_ROUTINE
-            }
-        };
-        v.extend_from_slice(&[
-            p.id as f64,
-            p.seed as f64,
-            flag(p.staff),
-            state,
-            p.floor as f64,
-            p.x,
-            p.fy,
-            p.wait,
-            p.origin_floor as f64,
-            id(p.origin_unit_id),
-            id(p.venue_unit_id),
-            id(p.meal_venue_id),
-            flag(p.counted_hotel_guest),
-            routine,
-            flag(p.returning),
-            p.dwell_seconds_left.unwrap_or(f64::NAN),
-            p.floors.len() as f64,
-            p.shafts.len() as f64,
-        ]);
-        v.extend(p.floors.iter().map(|f| *f as f64));
-        v.extend(p.shafts.iter().map(|s| *s as f64));
-    }
-    let counter = |c: Option<i64>| c.map_or(-1.0, |n| n as f64);
-    for u in units {
-        let state = match u.state {
-            UnitState::Construction => 0.0,
-            UnitState::Empty => 1.0,
-            UnitState::Occupied => 2.0,
-            UnitState::MovingIn => 3.0,
-            UnitState::Vacating => 4.0,
-            UnitState::Asleep => 5.0,
-            UnitState::Dirty => 6.0,
-            UnitState::Infested => 7.0,
-            UnitState::Fire => 8.0,
-            UnitState::Gutted => 9.0,
-        };
-        v.extend_from_slice(&[
-            u.id as f64,
-            state,
-            u.occupants as f64,
-            counter(u.customers_in),
-            counter(u.hotel_customers_in),
-            counter(u.out_for_meal),
-        ]);
-    }
-    for t in transports {
-        v.push(t.id as f64);
-        v.push(t.cars as f64);
-        for i in 0..t.cars as usize {
-            v.push(t.car_positions.get(i).copied().unwrap_or(0.0));
-            v.push(
-                t.car_load
-                    .as_ref()
-                    .and_then(|l| l.get(i).copied())
-                    .unwrap_or(-1.0),
-            );
-            v.push(t.car_dir.get(i).copied().unwrap_or(0) as f64);
-        }
-    }
-    v
-}
-
-/// The log entries numbered after `seq`, oldest first. The ring's entries
-/// are numbered from `log_seq` backwards, so the last entry is `log_seq`.
-pub fn log_since(sim: &Simulation, seq: i64) -> Value {
-    let len = sim.log.len() as i64;
-    let first = sim.log_seq - len + 1;
-    Value::Array(
-        sim.log
-            .iter()
-            .enumerate()
-            .map(|(i, e)| (first + i as i64, e))
-            .filter(|(n, _)| *n > seq)
-            .map(|(n, e)| {
-                serde_json::json!({ "seq": n, "minute": e.minute, "text": e.text, "kind": e.kind.as_str() })
-            })
-            .collect(),
-    )
 }
 
 /// `importTdt(bytes, filename)`: a 1994 `.TDT` file as JSON text
@@ -1138,8 +1006,8 @@ mod tests {
     fn the_tdt_binding_answers_from_the_lock() {
         use crate::canonical::digest;
         use crate::tdt::referee::{inflate, read_lock, sha256_hex};
-        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-        let lock = read_lock(&root.join("conformance").join("tdt-cases.json")).expect("lock");
+        let suite = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../conformance");
+        let lock = read_lock(&suite.join("tdt-cases.json")).expect("lock");
         let mut parsed = 0;
         for case in lock.import.iter().filter(|c| c.expected.is_some()) {
             let Ok(json) = import_tdt(&inflate(&case.bytes).expect("bytes"), &case.filename) else {
@@ -1352,7 +1220,7 @@ mod tests {
         // A real tower, so the view carries people, every unit kind and cars.
         let text = std::fs::read_to_string(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../src/tests/fixtures/towerone-star4.vctower"
+            "/../conformance/fixtures/towerone-star4.vctower"
         ))
         .expect("fixture");
         let raw = crate::load::decode_vctower(&text).expect("decodes");

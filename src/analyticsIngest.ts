@@ -39,11 +39,15 @@
  * keeps an ordinary page on a named host out, and that is all the filter does.
  *
  * What bounds abuse is the per-IP rate limiter (best-effort and per instance;
- * see {@link RateLimiter}) and the 8 KiB body cap (read from `content-length`,
- * so a chunked request omitting the header is not bounded by it). A forged
+ * see {@link RateLimiter}), the 8 KiB body cap, which bounds the bytes
+ * actually read rather than trusting a declared `content-length`, and the
+ * five-second read deadline, which bounds how long a slow body can hold the
+ * function open (408). A forged
  * post's blast radius is anonymous noise in the dataset: no key, no cookie, no
- * response body. The route forwards `platform` and `distribution_channel`
- * exactly as the client sent them, so a forged body can choose both.
+ * response body. `platform` and `distribution_channel` pass only when they
+ * carry a label from the client's closed set ({@link INGEST_PLATFORM_LABELS});
+ * any other value is rewritten to `"unknown"`, so a forged body cannot add a
+ * value to either dimension (GH #788). It can still pick one of the real labels.
  */
 
 import { defaultRateLimiter, RateLimiter } from "./analyticsRateLimit.js";
@@ -97,6 +101,79 @@ export interface IngestDeps {
  *  props, so this is generous while rejecting an oversized POST before it is
  *  parsed. Vercel's platform body limit is the outer backstop. */
 export const MAX_BODY_BYTES = 8_192;
+
+/** How long the whole body read may take, in milliseconds. An event post is a
+ *  few hundred bytes, so five seconds is far past any honest client; a body
+ *  that is still arriving then is a slow drip holding the function open
+ *  (GH #1010). */
+export const READ_DEADLINE_MS = 5_000;
+
+/** Thrown by {@link readCappedText} when the body is still arriving at the
+ *  deadline. The handler answers it with 408. */
+export class ReadDeadlineError extends Error {
+  constructor() {
+    super("request body read passed its deadline");
+    this.name = "ReadDeadlineError";
+  }
+}
+
+/**
+ * Read a request body as text, giving up as soon as it passes `max` bytes.
+ *
+ * The declared `content-length` is only a cheap early reject: a chunked POST
+ * omits it, and nothing makes a client tell the truth in it (GH #789). This
+ * counts the bytes as they stream in and cancels the read at the first chunk
+ * that passes the cap, so at most the cap plus one platform chunk is held,
+ * however long the body is. Returns `null` when the cap was passed.
+ *
+ * The byte cap bounds memory. To bound time as well, the whole read runs against
+ * `deadlineMs`: a body still arriving then is cancelled and the read throws
+ * {@link ReadDeadlineError} (GH #1010). A request with no body reads as empty
+ * text. Decoding matches `Request.json()`: UTF-8, with a leading byte-order
+ * mark dropped.
+ */
+export async function readCappedText(
+  request: Request,
+  max: number,
+  deadlineMs: number = READ_DEADLINE_MS,
+): Promise<string | null> {
+  const stream = request.body;
+  if (!stream) return "";
+  const reader = stream.getReader();
+  // Not awaited anywhere: a source whose cancel never settles must not hold
+  // the answer.
+  const release = (): void => void reader.cancel().catch(() => {});
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new ReadDeadlineError()), deadlineMs);
+  });
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await Promise.race([reader.read(), deadline]);
+      if (done) break;
+      total += value.byteLength;
+      if (total > max) {
+        release();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } catch (err) {
+    release();
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
 
 /** Normalize the configured host: strip surrounding whitespace (env vars often
  *  pick it up from a copy/paste) and every trailing slash, so `${host}/capture/`
@@ -158,6 +235,36 @@ export function originAllowed(origin: string | null, environment: string | undef
 }
 
 /**
+ * The closed set of `platform` and `distribution_channel` labels the route
+ * forwards. It restates `PLATFORM_LABELS` from `analyticsEnrichment.ts`
+ * because this module stays free of the client tree; a test pins the two
+ * together so they cannot drift.
+ */
+export const INGEST_PLATFORM_LABELS: readonly string[] = ["web", "twa"];
+
+/** The value a label outside {@link INGEST_PLATFORM_LABELS} is rewritten to. */
+export const INGEST_PLATFORM_FALLBACK = "unknown";
+
+/** The client dimensions held to {@link INGEST_PLATFORM_LABELS}. */
+const CLOSED_DIMENSIONS = ["platform", "distribution_channel"] as const;
+
+/**
+ * Hold each closed dimension the client sent to the known labels. An absent
+ * dimension stays absent; a present one outside the set (any string or a
+ * non-string) becomes {@link INGEST_PLATFORM_FALLBACK}.
+ */
+function closedDimensions(props: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of CLOSED_DIMENSIONS) {
+    if (!Object.prototype.hasOwnProperty.call(props, key)) continue;
+    const value = props[key];
+    out[key] =
+      typeof value === "string" && INGEST_PLATFORM_LABELS.includes(value) ? value : INGEST_PLATFORM_FALLBACK;
+  }
+  return out;
+}
+
+/**
  * Build the PostHog capture body from the client payload. Every server-authored
  * field (`distinct_id`, `$process_person_profile`, `$geoip_disable`,
  * `environment`) is written AFTER the client property spread, so a crafted client
@@ -165,9 +272,10 @@ export function originAllowed(origin: string | null, environment: string | undef
  * no-person-profile posture, re-enable GeoIP, or mislabel its environment. Junk
  * shapes are neutralized here too (a non-object `properties` is dropped, an empty
  * or non-string `session` falls back to the anonymous bucket, a non-ISO `ts` is
- * omitted so PostHog defaults the time). The `api_key` is deliberately not added
- * here; the handler adds it only at the forward so the key never passes through
- * this pure builder.
+ * omitted so PostHog defaults the time, and a `platform` or
+ * `distribution_channel` outside the closed set becomes `"unknown"`). The
+ * `api_key` is deliberately not added here; the handler adds it only at the
+ * forward so the key never passes through this pure builder.
  *
  * `$geoip_disable: true` is deliberate. We never forward the player's IP (raw IP
  * is a spec non-goal), so the only IP PostHog would see is the relay's own egress
@@ -188,6 +296,7 @@ export function buildCaptureBody(
     ...(hasValidTs ? { timestamp: body.ts as string } : {}),
     properties: {
       ...props,
+      ...closedDimensions(props),
       distinct_id: session,
       $process_person_profile: false,
       $geoip_disable: true,
@@ -200,7 +309,7 @@ export function buildCaptureBody(
  * Handle one request to the relay (`POST /api/ingest`), the browser's
  * same-origin path, bound by `api/ingest.ts`. See the module comment for the
  * full contract. Pure apart from the injected `deps`, so every branch (405 /
- * 403 / 204 no-op / 429 / 413 / 400 / forward) is unit-testable.
+ * 403 / 204 no-op / 429 / 413 / 408 / 400 / forward) is unit-testable.
  */
 export async function handleIngest(request: Request, deps: IngestDeps): Promise<Response> {
   if (request.method !== "POST") return new Response(null, { status: 405 });
@@ -219,18 +328,27 @@ export async function handleIngest(request: Request, deps: IngestDeps): Promise<
   const limiter = deps.rateLimiter ?? defaultRateLimiter;
   if (!limiter.allow(deps.clientIp, deps.now())) return new Response(null, { status: 429 });
 
-  // Reject an oversized body before buffering it into memory.
+  // Reject a declared-oversized body before reading anything. This is only the
+  // cheap path: the read below enforces the cap on the bytes themselves.
   const contentLength = Number(request.headers.get("content-length"));
   if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
     return new Response(null, { status: 413 });
   }
 
+  let text: string | null;
+  try {
+    text = await readCappedText(request, MAX_BODY_BYTES);
+  } catch (err) {
+    return new Response(null, { status: err instanceof ReadDeadlineError ? 408 : 400 });
+  }
+  if (text === null) return new Response(null, { status: 413 });
+
   let body: IngestBody;
   try {
-    // `Request.json()` parses the body TEXT and ignores the `content-type`
-    // header, which is what makes `navigator.sendBeacon` work: with a string it
-    // sends `text/plain`.
-    body = (await request.json()) as IngestBody;
+    // The body TEXT is parsed whatever the `content-type` header says, which is
+    // what makes `navigator.sendBeacon` work: with a string it sends
+    // `text/plain`.
+    body = JSON.parse(text) as IngestBody;
   } catch {
     return new Response(null, { status: 400 });
   }

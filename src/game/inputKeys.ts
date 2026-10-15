@@ -1,5 +1,5 @@
 import type { GameApp } from "../main";
-import { isCrashed, isSplashUp, isDialogOpen } from "./interactionState";
+import { isCrashed, isEngineStopped, isSplashUp, isDialogOpen } from "./interactionState";
 import { flushPrefsSave } from "./audioPrefs";
 
 /**
@@ -36,7 +36,7 @@ export function bindKeys(app: GameApp): void {
     // must not silently mutate the sim behind the card. Checked before the
     // undo/redo block below, which deliberately runs ahead of the #modal
     // guard and would otherwise stay live.
-    if (isCrashed()) return;
+    if (isCrashed() || isEngineStopped()) return;
     // Undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or +Y), handled BEFORE the
     // modifier bail below so it isn't swallowed; yielded to a focused field that
     // keeps its own undo history (INPUT/TEXTAREA/contentEditable, e.g. the rename
@@ -117,7 +117,7 @@ export function bindKeys(app: GameApp): void {
   // card is ignored WITHOUT removing the listeners, so the first real gesture
   // still unlocks audio; this holds no matter how the card is later dismissed.
   const kick = () => {
-    if (isCrashed()) return;
+    if (isCrashed() || isEngineStopped()) return;
     app.audio.start();
     window.removeEventListener("pointerdown", kick);
     window.removeEventListener("keydown", kick);

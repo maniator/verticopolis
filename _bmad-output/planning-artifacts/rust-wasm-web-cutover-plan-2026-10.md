@@ -205,8 +205,27 @@ Decided:
 
 Still open (risks, no decision needed yet):
 
-- **Offline play at the flip.** The engine package is left out of the
-  offline precache today; decision 6 sets the rule and #985 tracks the work.
+- **Offline play at the flip.** Decision 6 sets the rule and #985 tracks the
+  work. 2.32.0 (#993) is a partial slice: it precaches the engine package with
+  the game shell for every player (owner decision), so an installed game
+  reopened in the same browser context starts the engine offline and saves
+  and loads on it. It does not meet decision 6. Today's sounds offline in the
+  same browser context are covered by #1004's test. `e2e/offlineColdStart.spec.ts`
+  covers a cold start in a fresh browser session after one online visit (the
+  engine with no fallback, the clock, today's sounds, no failed request, with
+  the service worker's network cut as well as the page's) and a tower saved
+  online that loads, runs, saves and reloads offline. Still open on #985: the
+  engine glue, binary and `BUILD.json` checked as one
+  version-matched set (a shell cached before 2.32.0 never precached the
+  engine, so until it updates it pairs its old shell with whatever engine the
+  network serves), the precache coverage rule for the engine files (the audio
+  files are guarded since #1004; the engine side is in flight on
+  `claude/precache-coverage-985`), an e2e that serves a second deploy and
+  checks old engine caches are removed after the upgrade, install
+  interruption, a cold first visit with no cache (it shows the expected
+  message instead of a broken page), cache eviction, and cutting the service worker's network in
+  `e2e/offline.spec.ts` too (Playwright's offline mode cuts only the page's,
+  so a precache miss there is fetched quietly).
 - **Save format bumps.** The copy catalog (row 6) bumps the save version; it
   does not ship in the flip release, so a rollback can still read every save
   (AD-5).

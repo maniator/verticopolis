@@ -72,7 +72,7 @@ Verticopolis has **two test tiers**:
 
     **Two engines, one simulation.** `engine-rs/` is a Rust port of
     `src/engine/`, held to the same lock by its own referee
-    (`cargo run --release --bin conformance`, and again through the WASM
+    (`cargo run --release --features conformance --bin conformance`, and again through the WASM
     binding from Node with `npm run wasm:build && npm run test:wasm`, which
     also runs the dual run's day gate: both engines driven by the frame
     loop's own step math and compared every hour, and the `.TDT` codec's
@@ -90,11 +90,28 @@ Verticopolis has **two test tiers**:
     on x86_64 Linux (it installs the pinned toolchain) or `npm run wasm:build`
     once the toolchain in engine-rs/README.md is installed. `npm run e2e`
     needs it too, since its `chromium-wasm` project runs every spec on the
-    WASM engine. A stale local build fails the unit test that checks its
-    source hash. CI restores it from the
+    WASM engine, and so does `npm run build`: its precache check
+    (`scripts/verify-precache.ts`) refuses a build without the engine, so no
+    build ships a silent TypeScript fallback. Without a Rust toolchain, run
+    `VC_ALLOW_NO_ENGINE=1 npm run build` for a deliberate TypeScript-only
+    build. A stale local build fails the unit test that checks its source
+    hash. CI restores it from the
     Actions cache, keyed on the engine's source hash, and builds it once per
     engine change (`.github/actions/engine-wasm`); Vercel builds it on every
-    deploy through `scripts/vercel-build.sh`. Until the Rust engine is the default,
+    deploy through `scripts/vercel-build.sh`. `VC_ENGINE=wasm npm run build` makes the wasm-only build the 3.0.0
+    flip will deploy: the WASM engine is the only engine, `?engine=` and
+    `vc.engine` are ignored, the TypeScript step loop is swapped out, and an
+    engine that cannot start stops the game with a message instead of
+    falling back. Its postbuild check (`scripts/verify-engine-bundle.ts`)
+    reads the emitted sourcemaps and fails when a TypeScript engine module
+    that `scripts/engine-bundle.allow.txt` does not list ships, or when a
+    listed one no longer does (delete its line: the list only shrinks). The
+    default build (`VC_ENGINE` unset, or `switchable`) keeps both engines;
+    like every player build, it no longer ships the dual-run worker, which
+    only dev serves and `VC_TOOLING=1` builds use. `VC_ENGINE` applies to
+    builds and dev serves only: with it exported, `npm test` refuses to start
+    (the WASM test lanes use `VC_REQUIRE_WASM=1`). See
+    `docs/performance/wasm-only-bundle.md` for what still ships and why. Until the Rust engine is the default,
     every simulation change lands in both engines in one PR with
     the regenerated lock, and a PR that changes `src/engine/` without touching
     `engine-rs/` says why (a UI readout, prose, a transient the hash never
@@ -111,7 +128,7 @@ Verticopolis has **two test tiers**:
     `conformance/loader-cases.json` (`loaderCases.integration.test.ts` writes
     it, a Rust test replays it), and the `.TDT` codec by
     `conformance/tdt-cases.json` (`tdtCases.integration.test.ts` writes it,
-    `cargo run --release --bin tdt` and a Rust test replay it). A nightly differential fuzzer
+    `cargo run --release --features conformance --bin tdt` and a Rust test replay it). A nightly differential fuzzer
     (`engine-fuzz.yml`) runs seeded random scenarios through both engines; a
     divergence it finds is pinned as a named scenario in the fix PR.
 
@@ -133,6 +150,10 @@ Verticopolis has **two test tiers**:
   and `VC_TOOLING=1` builds; a production build compiles it away so shipped
   sessions carry no console handle into the sim. Run it with `npm run e2e`
   after a tooling build (`VC_TOOLING=1 npm run build`).
+  `PW_WASM_ONLY=1 npx playwright test --grep-invert @perf` runs the suite on
+  a wasm-only tooling build (`VC_ENGINE=wasm VC_TOOLING=1 npm run build`),
+  with `e2e/wasmOnly.spec.ts` covering its boot, failures and offline start;
+  CI runs it as the `e2e-wasm-only` job.
   Specs cover boot/integration, milestones, a full win, and visual baselines.
   See [`playwright.config.ts`](./playwright.config.ts) for how visual baselines
   are minted by CI (local runs smoke the flows but skip pixel comparison unless
@@ -201,7 +222,9 @@ For the exact twice-render determinism check used by the drift workflow, replace
 node scripts/screenshot-determinism-check.ts --all
 ```
 
-To regenerate `e2e/visual.spec.ts-snapshots` in the same pinned image:
+To regenerate `e2e/visual.spec.ts-snapshots` in the same pinned image (its
+`npm run build` needs the engine package, and the image has no Rust toolchain,
+so build `src/public/engine/` on the host first; see the engine note above):
 
 ```bash
 docker run --rm --ipc=host \

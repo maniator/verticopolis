@@ -54,6 +54,29 @@ describe("gameplay event buffer", () => {
     expect(buf.dropped).toBe(5);
   });
 
+  it("holds as many events as the Rust engine's ring", () => {
+    // The Rust crate's tests read nothing outside engine-rs/ and conformance/
+    // (#980), so this side pins the two capacities together.
+    const rust = readFileSync(resolve(root, "engine-rs/src/gameplay.rs"), "utf8");
+    const declared = /\bconst GAMEPLAY_RING_CAP\s*:\s*usize\s*=\s*([\d_]+)\s*;/.exec(rust)?.[1];
+    expect(declared?.replace(/_/g, "")).toBe(String(GAMEPLAY_RING_CAP));
+  });
+
+  it("restores a handed-back batch and its drop count in place of what it held", () => {
+    const buf = new GameplayEventBuffer();
+    buf.push("star_reached", { star: 2 }); // discarded by the restore
+    buf.dropped = 9;
+    const batch = [{ name: "fire_started", payload: {} }, { name: "star_reached", payload: { star: 3 } }] as const;
+    buf.restore([...batch], 4);
+    expect(buf.dropped).toBe(4);
+    expect(buf.drain()).toEqual(batch);
+    // A batch longer than the ring keeps the newest and counts the rest.
+    const long = Array.from({ length: GAMEPLAY_RING_CAP + 2 }, (_, i) => ({ name: "star_reached" as const, payload: { star: i } }));
+    buf.restore(long, 1);
+    expect(buf.dropped).toBe(3);
+    expect(buf.drain()[0]).toEqual({ name: "star_reached", payload: { star: 2 } });
+  });
+
   it("inherits a replaced tower's owed events and drop count ahead of its own", () => {
     const old = tower();
     expect(old.build("office", 2, 180).ok).toBe(true);
@@ -125,7 +148,7 @@ describe("gameplay event emission", () => {
     const loaded = Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame);
     expect(loaded.drainGameplayEvents()).toEqual([]);
     // A real four-star save, with its milestones, stars, shafts and prices.
-    const file = "src/tests/fixtures/towerone-star4.vctower";
+    const file = "conformance/fixtures/towerone-star4.vctower";
     const raw = decodeVctower(readFileSync(resolve(root, file), "utf8"), file) as SerializedGame;
     expect(Simulation.deserialize(raw).drainGameplayEvents()).toEqual([]);
   });

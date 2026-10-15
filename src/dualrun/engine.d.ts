@@ -18,7 +18,10 @@ export class Engine {
      */
     addCar(id: number): string;
     /**
-     * `adjustRent(id, dir)`: the new rent, or null when nothing moved.
+     * `adjustRent(id, dir)`: the new rent, or null when nothing moved. Read
+     * raw (#996): an id that is not a whole JS number within
+     * `Number.isSafeInteger`, or a `dir` that is not exactly 1 or -1, is
+     * refused with null.
      */
     adjustRent(id: number, dir: number): number | undefined;
     /**
@@ -137,6 +140,12 @@ export class Engine {
      */
     gameplayEventsDropped(): number;
     /**
+     * How many gameplay events wait for the next drain. A host reads it
+     * before draining, so a batch whose text it cannot read is counted as
+     * lost (the drain empties the buffer either way).
+     */
+    gameplayEventsPending(): number;
+    /**
      * `economy.housekeepingReport()`: yesterday's shift result as JSON
      * `{ cleaned, leftover }`, or nothing (`undefined`) before the first
      * morning checkout.
@@ -197,8 +206,10 @@ export class Engine {
     rerollSubtype(id: number): string | undefined;
     /**
      * `resizeTransport(id, bottom, top)`, the simulation-layer edit that
-     * reports `capacity_changed`: JSON
-     * `{ ok, reason?, added, floorTilesCreated }`.
+     * reports `capacity_changed`: JSON `{ ok: true, added,
+     * floorTilesCreated }` or `{ ok: false, reason }`. Read raw (#996): an
+     * id or floor that is not a whole JS number within
+     * `Number.isSafeInteger` is refused with `INVALID_REQUEST`.
      */
     resizeTransport(id: number, bottom: number, top: number): string;
     /**
@@ -217,6 +228,11 @@ export class Engine {
      * still owe its first passes, and this keeps them owed.
      */
     seedLoopMemos(last_hour: number, last_day: number, last_month: number, last_quarter: number): void;
+    /**
+     * `sellAt(floor, x)`: whether a facility went. Read raw (#996): a floor
+     * or column that is not a whole JS number within `Number.isSafeInteger`
+     * is refused with `false`, never coerced.
+     */
     sellAt(floor: number, x: number): boolean;
     /**
      * `serialize()` as JSON text.
@@ -228,7 +244,8 @@ export class Engine {
     setAutoBridge(value: boolean): void;
     /**
      * `setCars(id, cars)`: the simulation-layer edit, which reports
-     * `capacity_changed`.
+     * `capacity_changed`. Read raw (#996): an id or count that is not a
+     * whole JS number within `Number.isSafeInteger` is refused with `false`.
      */
     setCars(id: number, cars: number): boolean;
     setExpressStops(id: number): void;
@@ -241,11 +258,23 @@ export class Engine {
      */
     setLabel(id: number, label: string): boolean;
     setMoney(amount: number): void;
+    /**
+     * `setNoRate(id)`: whether the unit is now off the market. The id is
+     * read raw (#996), as for `sellAt`.
+     */
     setNoRate(id: number): boolean;
     /**
-     * `Tower.setSchedule(id, schedule)` with the schedule as JSON text.
+     * `Tower.setSchedule(id, schedule)` with the schedule as JSON text. The
+     * id is read raw (#996): one that is not a whole JS number within
+     * `Number.isSafeInteger` is refused with `false` before the text is read.
      */
     setSchedule(id: number, schedule: string): boolean;
+    /**
+     * `tower.setStop(id, floor, stop)`: whether the stop is set. Read raw
+     * (#996): an id or floor that is not a whole JS number within
+     * `Number.isSafeInteger`, or a `stop` that is not a JS boolean, is
+     * refused with `false`.
+     */
     setStop(id: number, floor: number, stop: boolean): boolean;
     /**
      * `tower.towerName = name`; null clears it, as the host's `undefined`
@@ -272,7 +301,8 @@ export class Engine {
     toggleAutoBridge(): boolean;
     /**
      * `tower.resizeTransport(id, bottom, top)`, the bare tower edit, silent
-     * in both engines (#906): the same JSON. Relay-only, as `towerSetCars`.
+     * in both engines (#906): the same JSON, read raw the same way (#996).
+     * Relay-only, as `towerSetCars`.
      */
     towerResizeTransport(id: number, bottom: number, top: number): string;
     /**
@@ -280,7 +310,8 @@ export class Engine {
      * engines (#906). Relay-only: the dual-run mirror replays a bare
      * TypeScript tower edit with it. Player and UI edits use the charge commands
      * (`addCar`, `removeCar`, `extendTransport`), and
-     * `towerRelayOps.guard.test.ts` keeps other callers out.
+     * `towerRelayOps.guard.test.ts` keeps other callers out. Read raw
+     * (#996), as `setCars`.
      */
     towerSetCars(id: number, cars: number): boolean;
     /**

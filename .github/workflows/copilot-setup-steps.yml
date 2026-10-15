@@ -65,8 +65,21 @@ jobs:
       # Rust steps below: the TypeScript side must still start (without the
       # package, npm test skips the package's hash test).
       - name: Engine WASM package
+        id: engine
         continue-on-error: true
         uses: ./.github/actions/engine-wasm
+
+      # Only when the engine step failed: the opt-in lets this build and the
+      # agent's own later builds go without the engine (CONTRIBUTING.md). With
+      # the engine in place, builds keep the strict check.
+      - name: Allow builds without the engine (engine step failed)
+        if: steps.engine.outcome == 'failure'
+        # A step that failed partway can leave part of the package, which the
+        # build refuses even with the opt-in, and a Node package (engine-rs/pkg)
+        # that would run the WASM test suites against a failed build; clear both.
+        run: |
+          rm -rf src/public/engine engine-rs/pkg
+          echo "VC_ALLOW_NO_ENGINE=1" >> "$GITHUB_ENV"
 
       # A tooling build, so an agent that runs `npm run e2e` against this dist
       # gets the `window.game` handle the specs depend on (production builds
@@ -78,7 +91,7 @@ jobs:
 
       # The Rust engine (engine-rs/) builds on the same toolchain engine-rs.yml
       # pins, with the conformance referee compiled in release so an agent can
-      # run `cargo run --release --bin conformance` at once. Each step is
+      # run `cargo run --release --features conformance --bin conformance` at once. Each step is
       # continue-on-error: a toolchain hiccup must not keep the agent from
       # starting on the TypeScript side.
       - name: Rust toolchain (pinned to engine-rs.yml)
@@ -92,4 +105,5 @@ jobs:
         working-directory: engine-rs
         run: |
           cargo build --locked --all-targets
-          cargo build --locked --release --bin conformance --bin dump
+          cargo build --locked --all-targets --features conformance
+          cargo build --locked --release --features conformance --bin conformance --bin dump

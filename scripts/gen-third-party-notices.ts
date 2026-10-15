@@ -15,11 +15,19 @@
  * sourcemap is malformed, shipped JavaScript has no sourcemap (outside a
  * short allowlist), a bundled package or recorded crate lacks a name,
  * version, allowed license id or license text, or the engine ships without a
- * valid, matching record, so an incomplete notices file never ships. Runs
- * first in `verify:dist`, for every build mode.
+ * valid, matching record, so an incomplete notices file never ships. It also
+ * fails when package.json links a local package (a `file:`, `link:`,
+ * `portal:` or `workspace:` spec, a bare local path, the same in its
+ * overrides or resolutions, or a `workspaces` field), when either lockfile
+ * installs a package as a link, or when `node_modules` holds a link at any
+ * depth, since a linked package's code would read as our own.
+ * Runs first in `verify:dist`, for every build mode.
  *
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */
+// The license texts it gathers are the notices themselves, so it copies no
+// package content into code or assets.
+// copies-package: none
 import { readFileSync, readdirSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
@@ -28,13 +36,20 @@ import {
   INJECTED_CODE,
   collectPackageDirs,
   declaredLicense,
+  isKnownOutsideRepoSource,
+  isPackagePath,
+  isWholeInjectedChunk,
+  linkedDependencyProblems,
+  lockfileLinkProblems,
   noticeProblem,
   packageDirFromSource,
   renderNotices,
   sourceToPath,
   type NoticePackage,
 } from "../src/build/thirdPartyNotices.ts";
+import { installedLinkProblems } from "../src/build/installedLinks.ts";
 import { ENGINE_THIRD_PARTY, engineRecordPackages } from "../src/build/rustNotices.ts";
+import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../src/wasmhost/enginePackageNames.ts";
 import { readLicenseFiles } from "./license-files.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..").replace(/\\/g, "/");
@@ -61,6 +76,37 @@ function filesUnder(dir: string, test: (name: string) => boolean): string[] {
   return out;
 }
 
+// A linked package (a file:, link:, portal: or workspace: spec, or a bare local path) can sit inside the repository
+// outside node_modules, where its sources would read as the game's own code.
+let rootManifest: unknown;
+try {
+  rootManifest = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+} catch {
+  fail("package.json is missing or not valid JSON, so its dependencies cannot be checked for linked packages");
+}
+const linked = typeof rootManifest === "object" && rootManifest !== null ? linkedDependencyProblems(rootManifest as Record<string, unknown>) : ["package.json is not an object"];
+// What is installed can differ from what is declared (a hand-made symlink, an
+// unsaved npm link), so the installed tree is checked too.
+const nodeModules = join(ROOT, "node_modules");
+linked.push(...installedLinkProblems(nodeModules));
+const hiddenLock = join(nodeModules, ".package-lock.json");
+if (existsSync(hiddenLock)) {
+  try {
+    linked.push(...lockfileLinkProblems(JSON.parse(readFileSync(hiddenLock, "utf8")), "node_modules/.package-lock.json"));
+  } catch {
+    fail("node_modules/.package-lock.json is not valid JSON, so the installed tree cannot be checked for linked packages");
+  }
+}
+const lockPath = join(ROOT, "package-lock.json");
+if (existsSync(lockPath)) {
+  try {
+    linked.push(...lockfileLinkProblems(JSON.parse(readFileSync(lockPath, "utf8"))));
+  } catch {
+    fail("package-lock.json is not valid JSON, so it cannot be checked for linked packages");
+  }
+}
+if (linked.length > 0) fail(`${linked.join("; ")}; the notices cannot attribute a linked package's code`);
+
 if (!existsSync(DIST)) fail(`${DIST} does not exist; run the build first`);
 const maps = filesUnder(DIST, (n) => /\.([mc]?js|css)\.map$/.test(n));
 if (maps.length === 0) fail("no sourcemaps in dist; they are needed to list the bundled packages");
@@ -68,8 +114,8 @@ if (maps.length === 0) fail("no sourcemaps in dist; they are needed to list the 
 // Shipped JavaScript with no sourcemap would carry unlisted code. The only one
 // is the WASM engine's wasm-bindgen glue, which is attributed instead by the
 // record its build writes beside it (read below, #955).
-const ENGINE_GLUE = "engine/verticopolis_engine.js";
-const MAPLESS_JS_ALLOWED = new Set([ENGINE_GLUE]);
+const ENGINE_GLUE_PATH = ENGINE_DIR + ENGINE_GLUE;
+const MAPLESS_JS_ALLOWED = new Set([ENGINE_GLUE_PATH]);
 const mapless = filesUnder(DIST, (n) => /\.[mc]?js$/.test(n))
   .filter((f) => !existsSync(`${f}.map`))
   .map((f) => relative(DIST, f).replace(/\\/g, "/"))
@@ -98,10 +144,10 @@ for (const map of maps) {
   const { sources: mapSources, sourceRoot } = parsed as { sources: unknown[]; sourceRoot?: unknown };
   if (mapSources.some((x) => typeof x !== "string")) fail(`${relative(ROOT, map)} has a source that is not a string`);
   // A map that lists nothing is allowed only for a chunk that is known
-  // build-tool code (Vite's modulepreload polyfill).
+  // build-tool code and nothing else (Vite's modulepreload polyfill).
   if (mapSources.length === 0) {
     const code = readFileSync(map.slice(0, -".map".length), "utf8");
-    if (!INJECTED_CODE.some((inj) => inj.wholeChunk && inj.codeMarker && code.includes(inj.codeMarker))) {
+    if (!INJECTED_CODE.some((inj) => inj.wholeChunk && inj.codeMarker && isWholeInjectedChunk(code, inj.codeMarker))) {
       fail(`${relative(ROOT, map)} lists no sources, so its chunk's packages cannot be listed`);
     }
   }
@@ -122,17 +168,17 @@ for (const map of maps) {
       // for one, and a path that climbs out of the repo is never attributed
       // to whatever copy the build host happens to have.
       const inRepo = path.startsWith(`${ROOT}/`) ? path.slice(ROOT.length) : null;
-      // The only sources allowed outside it are build-tool code that
-      // `INJECTED_CODE` attributes by its source id (workbox-build's template
-      // in a temporary folder, vite-plugin-pwa's virtual module).
+      // The only sources allowed outside it are build-tool code that an
+      // `INJECTED_CODE` entry marked `outsideRepo` attributes by its source id
+      // (workbox-build's template in a temporary folder, vite-plugin-pwa's
+      // virtual module).
       if (inRepo === null) {
-        const known = typeof s === "string" && INJECTED_CODE.some((inj) => inj.sourcePattern?.test(s));
-        if (!known) fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which is outside the repository`);
+        if (typeof s !== "string" || !isKnownOutsideRepoSource(s)) fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which is outside the repository`);
         continue;
       }
       // A node_modules path that names no package (a tool cache such as
       // node_modules/.vite) cannot be attributed.
-      if (inRepo.includes("/node_modules/") && !packageDirFromSource(inRepo)) {
+      if (isPackagePath(inRepo) && !packageDirFromSource(inRepo)) {
         fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which is under node_modules but names no package`);
       }
       // A stale or corrupt map can name a file that is not there; it must not
@@ -148,8 +194,9 @@ for (const map of maps) {
       sources.push(onDisk);
     }
     // An id that names no file (a virtual module, a `\0` helper, a URL) could
-    // carry a tool's code; it passes only when `INJECTED_CODE` attributes it.
-    else if (typeof s === "string" && !INJECTED_CODE.some((inj) => inj.sourcePattern?.test(s))) {
+    // carry a tool's code; it passes only when an `INJECTED_CODE` entry marked
+    // for ids outside the repository attributes it.
+    else if (typeof s === "string" && !isKnownOutsideRepoSource(s)) {
       fail(`${relative(ROOT, map)} lists ${JSON.stringify(s)}, which names no local file; add it to INJECTED_CODE with its package`);
     }
   }
@@ -217,7 +264,7 @@ for (const [dir, origin] of dirs) {
 // without one: any file under dist/engine/ (the glue, the .wasm, or both)
 // requires it.
 const engineDir = join(DIST, "engine");
-const ENGINE_FILES = new Set(["verticopolis_engine.js", "verticopolis_engine_bg.wasm", "BUILD.json", ENGINE_THIRD_PARTY]);
+const ENGINE_FILES = new Set([ENGINE_GLUE, ENGINE_WASM, ENGINE_BUILD_RECORD, ENGINE_THIRD_PARTY]);
 if (existsSync(engineDir) && (!statSync(engineDir).isDirectory() || readdirSync(engineDir).length > 0)) {
   const recordPath = join(DIST, "engine", ENGINE_THIRD_PARTY);
   const read = (path: string): unknown => {

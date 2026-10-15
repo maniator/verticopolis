@@ -82,6 +82,60 @@ describe.skipIf(!hasWasmPackage())("a hosted tower reads the engine's catalog (#
     expect(towerCatalog(sim)).toEqual(catalogFor("modern"));
   });
 
+  it("refuses a binding that differs in any one world field the read model applies", () => {
+    // The preview and the build apply the tables' ground-floor rule, so a
+    // binding with another ground floor would quote one price and charge another.
+    const own = catalogFor("modern").world;
+    const other = catalogFor("modern").facilities.find((f) => f.key !== own.groundFloorStructure)!.key;
+    const changes = (Object.keys(own) as (keyof typeof own)[]).map((field): [keyof typeof own, unknown] => {
+      const value = own[field];
+      return [field, typeof value === "number" ? value + 1 : other];
+    });
+    expect(changes.map(([field]) => field).sort()).toEqual(["groundFloor", "groundFloorStructure", "lobbyInterval", "lotWidth", "maxFloor", "minFloor"]);
+    for (const [field, value] of changes) {
+      const sim = Simulation.newGame(46, "modern");
+      const { mod, built } = countingModule((text) => editCatalog(text, (c) => {
+        c.world[field] = value;
+      }));
+      expect(() => attachWasmHost(sim, mod)).toThrow(`states a different world from this build's tables (${field})`);
+      expect(built()).toBe(0);
+      expect(towerCatalog(sim)).toEqual(catalogFor("modern"));
+    }
+  });
+
+  it("refuses a binding that lists a facility kind this build cannot draw, drops one or lists one twice", () => {
+    // A kind no pool lists and the world does not name, so the catalog reader
+    // accepts the first three edits and the attach guard is what refuses them.
+    // The reader itself refuses a repeated kind; the case pins that it never
+    // reaches the host either.
+    const own = catalogFor("modern");
+    const pooled = new Set(own.pools.flatMap((p) => p.kinds));
+    const free = own.facilities.find((f) => !pooled.has(f.key) && f.key !== own.world.groundFloorStructure)!.key;
+    const cases: [string, (c: EditableCatalog) => void, RegExp][] = [
+      ["added", (c) => void c.facilities.push({ ...c.facilities.find((f) => f.key === free)!, key: "spaceport" }), /unknown spaceport\)/],
+      ["renamed", (c) => void (c.facilities.find((f) => f.key === free)!.key = "spaceport"), new RegExp(`unknown spaceport; missing ${free}\\)`)],
+      ["dropped", (c) => void (c.facilities = c.facilities.filter((f) => f.key !== free)), new RegExp(`missing ${free}\\)`)],
+      ["repeated", (c) => void c.facilities.push({ ...c.facilities.find((f) => f.key === free)! }), new RegExp(`${free} is listed twice`)],
+    ];
+    for (const [, edit, message] of cases) {
+      const sim = Simulation.newGame(47, "modern");
+      const { mod, built } = countingModule((text) => editCatalog(text, edit));
+      expect(() => attachWasmHost(sim, mod)).toThrow(message);
+      expect(built()).toBe(0);
+      expect(towerCatalog(sim)).toEqual(catalogFor("modern"));
+    }
+  });
+
+  it("checks the other mode's catalog too: a Classic tower refuses a binding whose Modern world differs", () => {
+    const sim = Simulation.newGame(48, "classic");
+    const { mod, built } = countingModule((text) => editCatalog(text, (c) => {
+      c.world.lobbyInterval = (c.world.lobbyInterval as number) + 1;
+    }));
+    expect(() => attachWasmHost(sim, mod)).toThrow("modern catalog states a different world from this build's tables (lobbyInterval)");
+    expect(built()).toBe(0);
+    expect(towerCatalog(sim)).toEqual(catalogFor("classic"));
+  });
+
   it("refuses a binding whose other mode's catalog is unreadable, so no render meets it later", () => {
     // A Classic tower reads the Modern catalog too (its patronage yardstick),
     // so both modes are checked at attach.
@@ -93,7 +147,7 @@ describe.skipIf(!hasWasmPackage())("a hosted tower reads the engine's catalog (#
   });
 
   it("leaves the tables in place when it refuses a tower whose crowd already exists", () => {
-    const sim = loadFixture("src/tests/fixtures/towerone-star4.vctower");
+    const sim = loadFixture("conformance/fixtures/towerone-star4.vctower");
     sim.tick(60);
     expect(sim.crowd.people.length).toBeGreaterThan(0);
     const { mod, asked, built } = countingModule();
@@ -122,3 +176,14 @@ describe.skipIf(!hasWasmPackage())("a hosted tower reads the engine's catalog (#
     expect(asked.length).toBe(before);
   });
 });
+
+type EditableCatalog = { mode: string; world: Record<string, unknown>; facilities: { key: string }[] };
+
+/** Edits the Modern catalog's JSON (the binding answers both modes through
+ *  the same export), leaving the Classic one as the engine wrote it. */
+function editCatalog(text: string, edit: (c: EditableCatalog) => void): string {
+  const c = JSON.parse(text) as EditableCatalog;
+  if (c.mode !== "modern") return text;
+  edit(c);
+  return JSON.stringify(c);
+}

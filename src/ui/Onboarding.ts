@@ -1,7 +1,7 @@
 import { html, nothing, render as litRender } from "lit-html";
 import type { Simulation } from "../engine/Simulation";
 import { splashTemplate, type SplashHandlers } from "./splashTemplate";
-import { isDialogOpen } from "../game/interactionState";
+import { isDialogOpen, isEngineStopped } from "../game/interactionState";
 import { iconElement } from "./icons";
 
 /**
@@ -304,7 +304,8 @@ export class OnboardingController {
       if (e.target === el) safeDismiss();
     });
     this.splashKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") safeDismiss();
+      // Behind a wasm-only engine-failure message the title screen stays put.
+      if (e.key === "Escape" && !isEngineStopped()) safeDismiss();
     };
     document.addEventListener("keydown", this.splashKey);
   }

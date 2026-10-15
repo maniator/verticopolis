@@ -95,7 +95,7 @@ function describeSave(name: Scenario["name"], description: string, data: Seriali
 export function buildScenarios(): Scenario[] {
   return [
     describeSave("small", "synthetic 15-floor tower (scripts: buildSmallTower)", buildSmallTower().serialize()),
-    describeSave("medium", "player fixture src/tests/fixtures/sixseven_2.vctower", loadFixtureSave("src/tests/fixtures/sixseven_2.vctower")),
+    describeSave("medium", "player fixture conformance/fixtures/sixseven_2.vctower", loadFixtureSave("conformance/fixtures/sixseven_2.vctower")),
     describeSave("large", "Tier-1 win tower (src/tests/fixtures/winningTower.ts)", buildLargeTower().serialize()),
   ];
 }

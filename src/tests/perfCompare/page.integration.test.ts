@@ -30,7 +30,7 @@ describe("digestStashed", () => {
   });
 
   it("equals it for a player fixture with a pending choice and log prose", async () => {
-    const sim = Simulation.deserialize(loadFixtureSave("src/tests/fixtures/sixseven_2.vctower"));
+    const sim = Simulation.deserialize(loadFixtureSave("conformance/fixtures/sixseven_2.vctower"));
     sim.events.pending = { kind: "bomb", message: "Pay $1,000?", cost: 1000 } as unknown as typeof sim.events.pending;
     sim.log.push({ minute: 1, text: "prose that stays out", kind: "info" } as (typeof sim.log)[number]);
     const save = JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame;
