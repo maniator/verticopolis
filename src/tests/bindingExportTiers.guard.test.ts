@@ -30,7 +30,10 @@ import { repoRoot, repoRel, sourceFiles } from "./guardFiles";
  *    alone has (`frameView`, `logSince`, ...) or imports the binding's
  *    declaration (`dualrun/binding` or `dualrun/engine`). `tick`,
  *    `drainGameplayEvents` and `free` share their names with the TypeScript
- *    instance and the renderer, so only the import half covers them: the boot (`src/bootstrap.ts`) holds
+ *    instance and the renderer, so for them the guard fails on a call through
+ *    something named `engine` (`handle.current()?.engine.tick(dt)`) and on
+ *    any use of the global host handle `__vcEngine`, and the import check
+ *    covers the rest: the boot (`src/bootstrap.ts`) holds
  *    the loaded module through `wasmhost/startWasmHost` and hands it straight
  *    to the host.
  *
@@ -38,7 +41,8 @@ import { repoRoot, repoRel, sourceFiles } from "./guardFiles";
  * (`x.setCars(`, `x.setCars?.(`, `x.setCars.call(`, `x.money = `,
  * `x.money ??= `, `++x.money`). A computed member (`x["setCars"]`), a
  * destructured method or target (`const { setCars } = x`,
- * `({ a: x.money } = o)`), a write split across lines and a write through
+ * `({ a: x.money } = o)`), a cast receiver (`(engine as E).tick()`), a write
+ * split across lines, an inline block comment inside a write and a write through
  * `Object.assign` are out of their reach, as with the other source guards.
  */
 
@@ -170,7 +174,25 @@ const TIER3 = exportsInTier(3);
 const CALLS_TIER3 = callsAny(TIER3);
 const HOST_LOOP = (Object.keys(BINDING_EXPORT_TIERS) as BindingExport[]).filter((name) => BINDING_EXPORT_TIERS[name].tier === 2 && "hostLoop" in BINDING_EXPORT_TIERS[name]);
 const CALLS_HOST_LOOP = callsAny(HOST_LOOP.filter((name) => !SHARED_LOOP_NAMES.includes(name)));
-const WRITES_MONEY = /\.\s*money\s*(?:(?:\*\*|<<|>>>|>>|&&|\|\||\?\?|[-+*/%&|^])?=(?!=)|\+\+|--)|(?:\+\+|--)\s*\(?\s*[\w$.]*\.money\b/;
+/** A write to `.money`, through parentheses and a non-null assertion too
+ *  (`(sim.money) += c`, `sim.money! -= c`, `(sim.money)++`); `sim.money != x`
+ *  and `if (sim.money) ++n` stay reads. */
+const OP = String.raw`(?:\*\*|<<|>>>|>>|&&|\|\||\?\?|[-+*/%&|^])`;
+const WRITES_MONEY = new RegExp(
+  [
+    String.raw`\.\s*money\s*\)*\s*${OP}?=(?!=)`,
+    String.raw`\.\s*money(?:\s*(?:\+\+|--)|(?:\s*\))+(?:\+\+|--))`,
+    String.raw`\.\s*money\s*!(?:\s*\)*\s*${OP}=|\s*\)*\s+=(?!=)|(?:\s*\))*(?:\+\+|--))`,
+    String.raw`(?:\+\+|--)\s*\(*\s*[\w$.]*\.money\b`,
+  ].join("|"),
+);
+/** A shared-name host-loop op called on something named `engine`
+ *  (`host.engine.tick(dt)`, `handle.current()?.engine.free()`), in the call
+ *  shapes `callsAny` reads, or the global host handle, which reaches the same
+ *  binding without an import. */
+const REACHES_ENGINE_LOOP = new RegExp(
+  String.raw`(?<![\w$])engine\s*[?!]?\.\s*(?:${SHARED_LOOP_NAMES.join("|")})\s*(?:!|\?\.|<[^>()]*>)?\s*(?:\(|\??\.\s*(?:call|apply|bind)\s*\()|(?<![\w$])__vcEngine\b`,
+);
 const IMPORTS_BINDING = /(?:from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)["'`](?:[^"'`]*\/)?dualrun\/(?:binding|engine)(?:\.d)?(?:\.[cm]?[jt]s)?["'`]/;
 
 /** The first offending line of a file, or null. */
@@ -285,7 +307,8 @@ describe("WASM binding export tiers", () => {
 
     it("no scanned source calls a host-loop op the binding alone has", () => {
       const offenders = files.filter((file) => !allowed(file)).flatMap((file) => {
-        const hit = offense(read(file), CALLS_HOST_LOOP);
+        const text = read(file);
+        const hit = offense(text, CALLS_HOST_LOOP) ?? offense(text, REACHES_ENGINE_LOOP);
         return hit ? [`${file}: ${hit}`] : [];
       });
       expect(offenders, `the host loop (${HOST_LOOP.join(", ")}) belongs to src/wasmhost/, the dual run and tests`).toEqual([]);
@@ -315,10 +338,10 @@ describe("WASM binding export tiers", () => {
       for (const miss of ["sim.addCar(id)", "sim.setCarsLabel(id)", "// sim.setCars(id, 2)", "/* sim.startFire() */", "kind === \"bombThreat\"", "run(); // sim.setCars(id, 2) is relay-only"]) {
         expect(offense(miss, CALLS_TIER3), miss).toBeNull();
       }
-      for (const hit of ["sim.money = 5", "app.sim.money += cost", "sim.money -= 1", "sim.money++", "--sim.money", "s.money*=2", "sim.money ??= 0", "sim.money ||= 1", "sim.money |= 0", "sim.money <<= 1", "++(sim.money)"]) {
+      for (const hit of ["sim.money = 5", "app.sim.money += cost", "sim.money -= 1", "sim.money++", "--sim.money", "s.money*=2", "sim.money ??= 0", "sim.money ||= 1", "sim.money |= 0", "sim.money <<= 1", "++(sim.money)", "(sim.money) += cost", "(sim.money)++", "sim.money! -= cost", "sim.money! = 5", "(sim.money!) = 5"]) {
         expect(offense(hit, WRITES_MONEY), hit).not.toBeNull();
       }
-      for (const miss of ["const m = sim.money", "if (sim.money === 0)", "sim.money == x", "sim.money >= cost", "sim.money <= cost", "sim.money !== x", "moneyLabel = 1", "sim.money ?? 0", "sim.money || 0"]) {
+      for (const miss of ["const m = sim.money", "if (sim.money === 0)", "sim.money == x", "sim.money >= cost", "sim.money <= cost", "sim.money !== x", "sim.money != x", "sim.money! !== x", "(sim.money) === 0", "if (sim.money) ++n;", "if (!this.money) --budget;", "if (a.money!) ++n;", "(a.money!) == 0", "moneyLabel = 1", "sim.money ?? 0", "sim.money || 0"]) {
         expect(offense(miss, WRITES_MONEY), miss).toBeNull();
       }
       for (const hit of ['import type { WasmEngine } from "../dualrun/binding";', 'import { Engine } from "../../dualrun/engine.js";', 'await import("../dualrun/binding")', 'require("../dualrun/engine")', 'import type { Engine } from "../dualrun/engine.d.ts";', "await import(`../dualrun/binding`)", 'import "../dualrun/binding.js";', 'import { E } from "dualrun/engine";']) {
@@ -326,6 +349,10 @@ describe("WASM binding export tiers", () => {
       }
       for (const hit of ["e.frameView()", "e.logSince(3)", "e.gameplayEventsPending()"]) expect(offense(hit, CALLS_HOST_LOOP), hit).not.toBeNull();
       for (const miss of ["app.onboarding.tick()", "this.tick(elapsed)", "sim.tick(dt)", "handle.free()", "source.drainGameplayEvents()"]) expect(offense(miss, CALLS_HOST_LOOP), miss).toBeNull();
+      for (const hit of ["handle.current()?.engine.tick(5)", "host.engine.drainGameplayEvents()", "this.engine?.free()", "engine.tick(dt)", "engine.tick.call(e, 1)", "engine.tick<number>(1)", "const h = globalThis.__vcEngine;"]) {
+        expect(offense(hit, REACHES_ENGINE_LOOP), hit).not.toBeNull();
+      }
+      for (const miss of ["this.engine.currentScene", "towerEngine.tick(1)", "app.onboarding.tick()", "g.__vcEngineBoot = state", "$engine.tick()"]) expect(offense(miss, REACHES_ENGINE_LOOP), miss).toBeNull();
       for (const miss of ['import { x } from "../dualrun/engineX";', 'import { y } from "../engine/Simulation";', 'import { z } from "../dualrun/dualRun";']) {
         expect(offense(miss, IMPORTS_BINDING), miss).toBeNull();
       }
