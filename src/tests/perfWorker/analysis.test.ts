@@ -3,7 +3,7 @@ import { aggregate, definitions, ratios, validate } from "./analysis";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { csvField, limitations, loadWorkerCheckpoint, makeConfig, metricsCsv, parseArgs, ratiosCsv, scriptSizes } from "./main";
+import { csvField, limitations, readModelLimitations, loadWorkerCheckpoint, makeConfig, metricsCsv, parseArgs, ratiosCsv, scriptSizes } from "./main";
 import { markdown, num, pct, readModelMarkdown, readModelSection, slices } from "./report";
 import { Simulation } from "../../engine/Simulation";
 import { serializeUnit } from "../../engine/sim/coerce";
@@ -293,7 +293,8 @@ describe("perf:worker read model shape", () => {
     expect(report.split("\n")[2]).toMatch(/^> \*\*Snapshot, measured 2026-10-15T12:00:00Z on commit `abcdef0`.*Live numbers: re-run `npm run perf:worker -- --read-model`/);
     expect(report).toContain("- one");
     expect(parseArgs(["--read-model"]).readModelOnly).toBe(true);
-    for (const extra of [["--skip-build"], ["--reps", "3"], ["--viewport", "1280x720"]]) expect(() => parseArgs(["--read-model", ...extra])).toThrow(/takes no --resume, --skip-build, --reps or --viewport/);
+    for (const extra of [["--resume", "x"], ["--skip-build"], ["--reps", "3"], ["--viewport", "1280x720"]]) expect(() => parseArgs(["--read-model", ...extra])).toThrow(/takes no --resume, --skip-build, --reps or --viewport/);
     expect(parseArgs(["--read-model", "--quick", "--scenarios", "small"]).readModelOnly).toBe(true);
+    expect(readModelLimitations(makeConfig(parseArgs(["--read-model"]), ["small"]))).toEqual([expect.stringMatching(/^The read model section is measured in Node on the TypeScript engine.*720 steps in batches of 4/)]);
   });
 });

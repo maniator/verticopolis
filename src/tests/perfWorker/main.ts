@@ -128,6 +128,13 @@ export function limitations(config: WorkerConfig): string[] {
   ];
 }
 
+/** The limitations a `--read-model` report carries: the read model line. */
+export function readModelLimitations(config: WorkerConfig): string[] {
+  const lines = limitations(config).filter((l) => l.startsWith("The read model section"));
+  if (lines.length !== 1) throw new Error(`expected one read model limitation, found ${lines.length}`);
+  return lines;
+}
+
 function sh(cmd: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env): void {
   execFileSync(cmd, args, { cwd, stdio: "inherit", env });
 }
@@ -384,7 +391,7 @@ async function readModelMain(args: Args, repo: string): Promise<number> {
     config: { steps: config.steps, dt: config.dt, batch: config.batch, quick: config.quick },
     scenarios: scenarios.map((s) => ({ name: s.name, sha256: s.sha256 })),
     readModel,
-    limitations: limitations(config).filter((l) => l.startsWith("The read model section")),
+    limitations: readModelLimitations(config),
   };
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "read-model.json"), JSON.stringify(res, null, 1) + "\n");
