@@ -57,6 +57,9 @@ export interface WasmHostOptions {
   strict?: boolean;
   /** Called once, in strict mode, with the reason the host could not hold a tower. */
   onFatal?: (message: string) => void;
+  /** When the read model follows the engine (`attachWasmHost`'s option):
+   *  "step" (the default) or the experimental "frame" (`?engine=wasm-frame`). */
+  sync?: "step" | "frame";
 }
 
 export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Console, "info" | "error"> = console, opts: WasmHostOptions = {}): WasmHostHandle {
@@ -84,7 +87,7 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
   const follow = (sim: Simulation) => {
     release();
     try {
-      host = attachWasmHost(sim, mod);
+      host = attachWasmHost(sim, mod, { sync: opts.sync });
       status.starts++;
       status.hosted = true;
       log.info(`[wasm] tower ${status.starts} runs on the WASM engine`);

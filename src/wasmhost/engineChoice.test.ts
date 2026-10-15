@@ -14,6 +14,13 @@ describe("engineRequested", () => {
     expect(engineRequested({ search: "?engine=ts" }, storage("wasm"))).toBe("ts");
     expect(engineRequested({ search: "?engine=rust" }, storage(null))).toBe("ts");
   });
+  it("picks the experimental hosts only when asked by name", () => {
+    expect(engineRequested({ search: "?engine=wasm-worker" }, storage(null))).toBe("wasm-worker");
+    expect(engineRequested({ search: "?engine=wasm-frame" }, storage("wasm"))).toBe("wasm-frame");
+    expect(engineRequested({ search: "" }, storage("wasm-worker"))).toBe("wasm-worker");
+    expect(engineRequested({ search: "?engine=ts" }, storage("wasm-worker"))).toBe("ts");
+    expect(engineRequested({ search: "?engine=worker" }, storage(null))).toBe("ts");
+  });
   it("treats a throwing storage as unset", () => {
     expect(engineRequested({ search: "" }, { getItem: () => { throw new Error("blocked"); } })).toBe("ts");
   });

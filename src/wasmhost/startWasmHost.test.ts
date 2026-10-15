@@ -69,6 +69,18 @@ function app(): WasmHostApp & { adopted: Simulation[] } {
 const quiet = () => ({ info: vi.fn(), error: vi.fn() });
 
 describe("startWasmHost", () => {
+  it("hosts with the sync mode it is given, and every adopted tower with the same one", () => {
+    const a = app();
+    const handle = startWasmHost(a, fakeModule(), quiet(), { sync: "frame" });
+    expect(handle.current()?.sync).toBe("frame");
+    a.adoptSim(Simulation.newGame(2, "classic"));
+    expect(handle.current()?.sync).toBe("frame");
+    handle.stop();
+    const plain = startWasmHost(app(), fakeModule(), quiet());
+    expect(plain.current()?.sync).toBe("step");
+    plain.stop();
+  });
+
   it("hosts the current tower and every adopted one, and publishes its status", () => {
     const mod = fakeModule();
     const a = app();

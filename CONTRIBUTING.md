@@ -293,6 +293,9 @@ e2e specs (e.g. `e2e/integration.spec.ts` boots it in a real browser):
 - **`src/dualrun/worker.ts`**: the dual run's Web Worker entry, which loads
   the WASM package by URL; the controller it serves is measured against a
   worker stand-in.
+- **`src/wasmhost/engineWorker.ts`**: the experimental worker host's Web
+  Worker entry, the browser glue around `EngineWorkerCore`, which is measured
+  in Node against the real package and a fake engine.
 - **`src/render/atlas/browserEntry.ts`, `verify.ts`, `verifyExtras.ts`**: the
   sprite atlas bake's browser half (the page API the export drives and the
   pixel checks), which reads pixels back from a live canvas. The pipeline they
