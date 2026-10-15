@@ -227,7 +227,8 @@ fan-out, and an event is never handed out twice.
 - Otherwise it answers with the read model's own save: the state of the
   last fresh reply plus the player's commands since, with the internals the
   frame does not carry (the RNG, `satisfaction`, the dispatch memos) as of
-  the last merge or delta, one of which every hour pass carries. The steps still in flight
+  the last merge or delta applied (an hour pass brings one, or asks for a
+  full save the next reply brings). The steps still in flight
   are not in it, so it carries that reply's minute instead of the frame
   loop's clock, and a tower loaded from it runs those steps again, an hour
   or day pass among them (#1018).

@@ -39,6 +39,9 @@ export function countSaveBytes(stats: WorkerHostStats, r: FrameReply): void {
  *  not fit the read model (the caller then asks for a full save). */
 export function readSaveSync(sim: Simulation, r: FrameReply, appliedSync: number): SaveSync | null {
   const t = now();
+  for (const n of [r.merge?.sync, r.delta?.base, r.delta?.sync]) {
+    if (n !== undefined && !Number.isSafeInteger(n)) throw new Error(`save sync: bad sequence number ${String(n)}`);
+  }
   if (r.merge) return { kind: "merge", parsed: parseMerge(r.merge), sync: r.merge.sync, parseMs: now() - t };
   if (!r.delta || r.delta.base !== appliedSync) return null;
   const parsed = parseDelta(sim, r.delta);

@@ -95,7 +95,7 @@ export function definitions(config: WorkerConfig): Def[] {
       // The hourly deltas that replace most merges (#1045). Runs recorded
       // before them carry no delta counters, which read as no sample.
       add({ group: "traffic", scenario: sc, throttle: t, metric: `hourly deltas, ${steps} steps (hosted)`, unit: "count", better: "higher", pick: (r) => h(r)?.worker?.deltas });
-      add({ group: "traffic", scenario: sc, throttle: t, metric: "bytes per hourly delta (hosted)", unit: "bytes", better: "lower", pick: (r) => (h(r)?.worker?.deltas ? h(r)!.worker!.deltaBytes! / h(r)!.worker!.deltas! : null) });
+      add({ group: "traffic", scenario: sc, throttle: t, metric: "bytes per hourly delta (hosted)", unit: "bytes", better: "lower", pick: (r) => { const w = h(r)?.worker; return w?.deltas && w.deltaBytes !== undefined ? w.deltaBytes / w.deltas : null; } });
       add({ group: "traffic", scenario: sc, throttle: t, metric: `main-thread delta time, ${steps} steps (hosted)`, unit: "ms", better: "lower", pick: (r) => h(r)?.worker?.deltaMs });
       add({ group: "traffic", scenario: sc, throttle: t, metric: `worker save time (full saves and deltas), ${steps} steps (hosted)`, unit: "ms", better: "lower", pick: (r) => h(r)?.worker?.workerSaveMs });
     }

@@ -135,6 +135,20 @@ describe("the worker host's hourly delta", () => {
     r.host.detach();
   });
 
+  it("is fatal on a sync number that is not an integer", async () => {
+    const r = rig();
+    await r.settleTasks();
+    r.sim.tick(1);
+    r.gate().flush();
+    const req = (last(r.toWorker) as Extract<ToWorker, { type: "ops" }>).request!.req;
+    const view = r.engine().frameView();
+    view[0] = r.sim.clock.minutes;
+    const delta = JSON.stringify({ units: [], rest: JSON.parse(r.engine().serialize()) as unknown });
+    r.host.receive({ type: "frame", gen: 1, req, seq: 1, view, events: "[]", dropped: 0, log: null, pending: null, merge: null, delta: { delta, telemetry: "{}", housekeeping: null, base: 0, sync: Number.NaN }, workMs: { ops: 0, reply: 0, save: 0 }, memoryBytes: null });
+    expect(r.fatal).toEqual([expect.stringMatching(/bad sequence number NaN/)]);
+    r.host.detach();
+  });
+
   it("reads a delta that names a unit or transports the read model does not hold as not fitting", () => {
     const sim = Simulation.newGame(7, "classic");
     sim.money = 1e9;
