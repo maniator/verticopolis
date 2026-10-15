@@ -1,12 +1,12 @@
 import type { GameApp } from "../main";
 import type { FacilityKind } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
-import { FACILITIES, isFixedSpanTransport } from "../engine/facilities";
-import { groundFloorStructureKind } from "../engine/tower/towerTopology";
+import { catalogBuildKind, catalogFacility } from "../engine/catalogTypes";
 import { brushTiles, snapX, type PlaceOutcome } from "../ui/placement";
 import { buildRefusalTemplate } from "../ui/templates/inspector";
 import { isPaintKind } from "./gesture";
 import { FLOOR } from "../render/scale";
+import { towerCatalog } from "../engine/towerCatalog";
 
 /**
  * How far above the touch point a room's placement ghost floats, in SCREEN pixels
@@ -64,18 +64,18 @@ export function placeSimpleBuild(app: GameApp, kind: FacilityKind, tile: number,
     const r = app.build.paintBrush(kind, tile, floor);
     return { what: "paint", ok: r.placed > 0, reason: r.reason };
   }
-  if (isFixedSpanTransport(kind)) {
-    const r = app.build.tryBuildTransport(kind, snapX(kind, tile), floor, floor + 1);
+  if (catalogFacility(towerCatalog(app.sim), kind).fixedSpan) {
+    const r = app.build.tryBuildTransport(kind, snapX(towerCatalog(app.sim), kind, tile), floor, floor + 1);
     return { what: "flight", ok: r.ok, reason: r.reason };
   }
   if (isTransportTool(app)) return null;
   const before = app.sim.tower.units.length;
-  app.build.tryBuild(kind, floor, snapX(kind, tile));
+  app.build.tryBuild(kind, floor, snapX(towerCatalog(app.sim), kind, tile));
   return { what: "room", ok: app.sim.tower.units.length > before };
 }
 
 export function isTransportTool(app: GameApp): boolean {
-  return app.tool.type === "build" && !!FACILITIES[app.tool.kind].transport;
+  return app.tool.type === "build" && catalogFacility(towerCatalog(app.sim), app.tool.kind).transport;
 }
 
 /** Whether the active tool drag-paints a run (floor/lobby/parking), see
@@ -93,8 +93,8 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
   }
   const kind = app.tool.kind;
   if (isTransportTool(app)) {
-    const x = snapX(kind, tile);
-    if (isFixedSpanTransport(kind)) {
+    const x = snapX(towerCatalog(app.sim), kind, tile);
+    if (catalogFacility(towerCatalog(app.sim), kind).fixedSpan) {
       // Stairs/escalators place as a fixed two-floor unit on tap, so the
       // ghost shows the real footprint and the real validity.
       const valid = app.sim.isUnlocked(kind) && app.sim.tower.placeTransportDryRun(kind, x, floor, floor + 1);
@@ -113,8 +113,8 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const span = tiles[tiles.length - 1] - left + 1;
     // Ground floor is lobby-only: the Floor tool on floor 1 lays a lobby, so the
     // ghost must PREVIEW a lobby rather than spring a permanent 10x charge.
-    const ghostKind = groundFloorStructureKind(kind, floor);
-    const can = app.sim.canBuild(ghostKind, floor, snapX(kind, tile));
+    const ghostKind = catalogBuildKind(towerCatalog(app.sim), kind, floor);
+    const can = app.sim.canBuild(ghostKind, floor, snapX(towerCatalog(app.sim), kind, tile));
     // Whole-brush affordability, not a single tile: the ghost spans the entire
     // brush and paintBrush charges per tile, so a single-tile check would show an
     // all-green strip and then partial-build (permanent lobby on floor 1). Count
@@ -125,7 +125,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     // reach existing structure; the rest of the brush is contiguous, so price it
     // per tile. Dedupe first: brushTiles clamps to the lot edge and can repeat a
     // column. This also tightens the plain Floor/Lobby brush above ground.
-    const perTile = FACILITIES[ghostKind].cost;
+    const perTile = catalogFacility(towerCatalog(app.sim), ghostKind).cost;
     const laid = [...new Set(tiles)].filter((tx) => {
       const at = app.sim.tower.structureKindAt(floor, tx);
       return ghostKind === "lobby" ? at !== "lobby" : at === undefined;
@@ -140,7 +140,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     if (showReasonCard) updateBuildRefusal(app, reason, floor, left + Math.floor(span / 2));
     else clearBuildRefusal(app);
   } else {
-    const x = snapX(kind, tile);
+    const x = snapX(towerCatalog(app.sim), kind, tile);
     // Rooms auto-lay their own floor, so validity comes from canBuild (which
     // accounts for the floor tiles and their cost), not raw canPlace.
     const can = app.sim.canBuild(kind, floor, x);
@@ -149,7 +149,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const reason = !can.ok && app.sim.rules.showsPreviewReason ? can.reason : undefined;
     app.engine.preview = { kind, floor, x, valid: can.ok, reason };
     app.engine.transportPreview = null;
-    if (showReasonCard) updateBuildRefusal(app, reason, floor, x + Math.floor(FACILITIES[kind].width / 2));
+    if (showReasonCard) updateBuildRefusal(app, reason, floor, x + Math.floor(catalogFacility(towerCatalog(app.sim), kind).width / 2));
     else clearBuildRefusal(app);
   }
 }

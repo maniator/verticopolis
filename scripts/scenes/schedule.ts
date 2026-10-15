@@ -14,16 +14,80 @@
 import { type Scene, PHONE } from "../screenshot-env.ts";
 import { buildScheduleTowerModern, buildScheduleTowerClassic } from "../screenshot-builders.ts";
 
-/** Select a shaft by kind and open its Schedule dialog off the editor card. */
-async function openScheduleDialog(page: import("playwright").Page, kind: string): Promise<void> {
-  await page.evaluate((k) => {
-    const g = (window as any).game;
-    const shaft = g.sim.tower.transports.find((t: any) => t.kind === k);
-    if (!shaft) throw new Error(`schedule tower has no ${k} to select`);
-    g.selected = { type: "transport", id: shaft.id };
-    g.engine.selectedId = shaft.id;
-    g.refreshEditor();
-  }, kind);
+/** Select a shaft by kind and open its Schedule dialog off the editor card.
+ *
+ *  With `stageUnsaved`, the same task also edits the working copy, presses
+ *  Esc, and scrolls the dialog to its middle, so the dialog's first frame is
+ *  already the armed, unsaved-changes state 27c captures. That has to be ONE
+ *  task (one `page.evaluate`, no awaits between the steps): the edit shrinks
+ *  the dialog from 560px to 548.34px wide, moving it from x=360 to x=365.83,
+ *  and its composited sticky layers (title bar, grid head) keep the subpixel
+ *  phase of their first raster. With the steps split across round trips,
+ *  whether a frame rendered between the open and the edit was a race under
+ *  CI load, and the sticky text came out at either phase: the intermittent
+ *  27c determinism failure (#762, #843). Measured in the pinned image, 24
+ *  renders each, counting renders whose sticky text differs from the
+ *  committed PNG: split, 8; with a frame forced between the steps, 24; in one
+ *  task, 0 (every render matched the committed bytes). Rendering only happens
+ *  between tasks, so in one task the dialog's first frame is its final
+ *  geometry. The scroll joins the task for the same reason: it pins the grid
+ *  head, and a head first rendered unpinned at another phase is the same
+ *  hazard. The shot sets `phaseWatch`, so a run where any of this stops
+ *  being true fails with the cause named. */
+async function openScheduleDialog(page: import("playwright").Page, kind: string, stageUnsaved = false): Promise<void> {
+  await page.evaluate(
+    ({ k, stage }) => {
+      const g = (window as any).game;
+      const shaft = g.sim.tower.transports.find((t: any) => t.kind === k);
+      if (!shaft) throw new Error(`schedule tower has no ${k} to select`);
+      g.selected = { type: "transport", id: shaft.id };
+      g.engine.selectedId = shaft.id;
+      g.refreshEditor();
+      if (!stage) return;
+      // The staged path checks each step right away, with no waits: one task
+      // is the whole point, so it relies on the editor, the dialog and the
+      // guard all mounting synchronously (lit renders do). If one ever
+      // defers, this throws on every run and names the step.
+      const open = document.querySelector('#editor [data-edit="schedule"]') as HTMLElement | null;
+      if (!open) throw new Error("the editor rendered no Schedule button");
+      // A dialog an earlier shot left open (keepDialogs) still holds a box, so
+      // the mount check below must see a NEW one, or a dead button would pass.
+      const before = document.querySelector("#modal .modal-box");
+      open.click();
+      const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
+      if (!box || box === before || !box.querySelector(".es-body")) throw new Error("the schedule dialog did not mount");
+      // Dirty the working copy through a real control: a preset click routes
+      // through onPreset, which lands in after() and sets the dirty flag
+      // exactly as a player's edit would.
+      const preset = box.querySelector(".es-presets .btn") as HTMLElement | null;
+      if (!preset) throw new Error("the schedule dialog rendered no preset control to edit");
+      preset.click();
+      // Esc routes to the same handler every dismissal does; it arms the guard
+      // and holds the dialog open.
+      document.getElementById("modal")?.dispatchEvent(new Event("cancel", { cancelable: true }));
+      const warn = box.querySelector(".modal-warn") as HTMLElement | null;
+      const strip = box.querySelector(":scope > .modal-actions") as HTMLElement | null;
+      if (!warn || !strip) throw new Error("the unsaved-changes warning did not mount");
+      // The warning shows whenever the copy is dirty; the Esc is what this
+      // shot is about, so check the guard actually armed: the warning turns
+      // into an alert and Cancel asks to discard.
+      const close = strip.querySelector('[data-act="close"]');
+      if (warn.getAttribute("role") !== "alert" || close?.textContent?.trim() !== "Discard changes?") {
+        throw new Error("the Esc did not arm the discard guard");
+      }
+      // Mid-scroll, with the same below-the-fold floor as the 27b shot.
+      box.scrollTop = Math.floor((box.scrollHeight - box.clientHeight) / 2);
+      const left = box.scrollHeight - box.clientHeight - box.scrollTop;
+      if (left <= strip.offsetHeight) throw new Error("too little of the dialog is below the fold for the pin to be doing anything");
+      // The whole point is that the warning is ON SCREEN while the player is
+      // somewhere in the middle of a long dialog.
+      const r = warn.getBoundingClientRect();
+      const b = box.getBoundingClientRect();
+      if (r.bottom > b.bottom + 1 || r.top < b.top) throw new Error("the unsaved-changes warning is not visible in the scrollport");
+    },
+    { k: kind, stage: stageUnsaved },
+  );
+  if (stageUnsaved) return;
   await page.waitForSelector('#editor [data-edit="schedule"]', { timeout: 4000 });
   await page.evaluate(() => (document.querySelector('#editor [data-edit="schedule"]') as HTMLElement | null)?.click());
   await page.waitForSelector("#modal .es-body", { timeout: 4000 });
@@ -93,38 +157,12 @@ export const SCHEDULE_SCENES: Scene[] = [
         name: "27c-elevator-schedule-unsaved",
         crop: "#modal .modal-box",
         keepDialogs: true,
+        // The edit resizes this dialog while it is staged; the runner fails
+        // the shot unless it rendered at one subpixel phase throughout.
+        phaseWatch: true,
         setup: async (page) => {
-          await openScheduleDialog(page, "elevatorStandard");
-          // Dirty the working copy through a real control, not by poking state:
-          // a preset click routes through onPreset, which lands in after() and
-          // sets the dirty flag exactly as a player's edit would.
-          await page.evaluate(() => {
-            const preset = document.querySelector("#modal .es-presets .btn") as HTMLElement | null;
-            if (!preset) throw new Error("the schedule dialog rendered no preset control to edit");
-            preset.click();
-          });
-          // Esc routes to the same handler every dismissal does; it arms the
-          // guard and holds the dialog open.
-          await page.evaluate(() => {
-            const dlg = document.getElementById("modal") as HTMLDialogElement | null;
-            dlg?.dispatchEvent(new Event("cancel", { cancelable: true }));
-          });
-          await page.waitForSelector("#modal .modal-warn", { timeout: 4000 });
-          await page.evaluate(() => {
-            const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
-            const warn = document.querySelector("#modal .modal-warn") as HTMLElement | null;
-            const strip = document.querySelector("#modal .modal-box > .modal-actions") as HTMLElement | null;
-            if (!box || !warn || !strip) throw new Error("the armed schedule dialog did not mount");
-            // Mid-scroll, with the same below-the-fold floor as the shot above.
-            box.scrollTop = Math.floor((box.scrollHeight - box.clientHeight) / 2);
-            const left = box.scrollHeight - box.clientHeight - box.scrollTop;
-            if (left <= strip.offsetHeight) throw new Error("too little of the dialog is below the fold for the pin to be doing anything");
-            // The whole point is that the warning is ON SCREEN while the player
-            // is somewhere in the middle of a long dialog.
-            const r = warn.getBoundingClientRect();
-            const b = box.getBoundingClientRect();
-            if (r.bottom > b.bottom + 1 || r.top < b.top) throw new Error("the unsaved-changes warning is not visible in the scrollport");
-          });
+          // Open, edit, arm and scroll in one task (see openScheduleDialog).
+          await openScheduleDialog(page, "elevatorStandard", true);
         },
         wait: 300,
       },

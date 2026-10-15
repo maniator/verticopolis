@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { towerCatalog } from "../engine/towerCatalog";
 import { createUICallbacks, type GameAppPorts } from "./uiCallbacks";
 import type { Simulation } from "../engine/Simulation";
 
@@ -110,6 +111,18 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(cb.getMode()).toBe("classic");
     current = { mode: "modern" } as unknown as Simulation;
     expect(cb.getMode()).toBe("modern");
+  });
+
+  it("getCatalog reads the live tower's catalog per call (#921)", () => {
+    let current = { mode: "classic" } as unknown as Simulation;
+    const { ports } = makePorts();
+    ports.getSim = vi.fn(() => current);
+    const cb = createUICallbacks(ports);
+    expect(cb.getCatalog()).toBe(towerCatalog(current));
+    expect(cb.getCatalog().mode).toBe("classic");
+    current = { mode: "modern" } as unknown as Simulation;
+    expect(cb.getCatalog()).toBe(towerCatalog(current));
+    expect(cb.getCatalog().mode).toBe("modern");
   });
 
   it("audio: toggle, mute state, volume set and read", () => {

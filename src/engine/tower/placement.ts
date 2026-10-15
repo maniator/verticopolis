@@ -304,6 +304,11 @@ export function bridgeFillPlan(tower: Tower, kind: FacilityKind, floor: number, 
   // (elevators/stairs) never carry a horizontal substrate, so they never
   // bridge.
   if (FACILITIES[kind].transport) return [];
+  // A footprint off the lot or outside the floor range has no bridge: every
+  // caller refuses it on those rules before the plan can count, so skipping
+  // the scan changes no answer, and an x far off the lot no longer scans one
+  // tile at a time back to it (#1003).
+  if (x < 0 || x + width > GRID.width || floor < GRID.minFloor || floor + hgt - 1 > GRID.maxFloor) return [];
   const substrate: "floor" | "lobby" = kind === "lobby" ? "lobby" : "floor";
   // Columns this plan will floor on each story, so a story can rest on the
   // bridge the story below it lays (see the stacked-cinema note above).

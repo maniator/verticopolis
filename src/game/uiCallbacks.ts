@@ -1,10 +1,12 @@
 import { trackAppAction } from "../analytics";
+import { wellFormed } from "../engine/wellFormed";
 import type { UICallbacks, Tool } from "../ui/UI";
 import type { Simulation } from "../engine/Simulation";
 import type { AudioEngine } from "../audio/Audio";
 import type { SaveLoad } from "./saveLoad";
 import type { EditorActions } from "./editorActions";
 import type { InspectorController } from "./inspector";
+import { towerCatalog } from "../engine/towerCatalog";
 
 /**
  * The narrow slice of `GameApp` that {@link createUICallbacks} wires the UI to.
@@ -72,6 +74,7 @@ export interface GameAppPorts {
  */
 export function createUICallbacks(app: GameAppPorts): UICallbacks {
   return {
+    getCatalog: () => towerCatalog(app.getSim()),
     onSelectTool: (tool) => app.handleSelectTool(tool),
     onSpeed: (speed) => app.setSpeed(speed),
     getSpeed: () => app.getSpeed(),
@@ -118,7 +121,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
       trackAppAction("replay_onboarding");
       app.replayOnboarding();
     },
-    onRenameTower: (name) => app.renameTower(name),
+    onRenameTower: (name) => app.renameTower(wellFormed(name)),
     onShowStats: () => {
       trackAppAction("stats_open"); // the user open; the exterminator refresh reopens showStats directly
       app.showStats();

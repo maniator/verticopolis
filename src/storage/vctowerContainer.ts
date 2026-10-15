@@ -1,4 +1,4 @@
-import { SaveTooLargeError, inflateCapped } from "./saveCompression";
+import { SaveTooLargeError, inflateCapped, parseSaveJson } from "./saveCompression";
 
 /**
  * Synchronous decode of the `.vctower` container (magic, then base64 of DEFLATE
@@ -52,7 +52,7 @@ export function decodeVctower(text: string, label = "vctower"): unknown {
   if (/^VCTOWER1/.test(trimmed)) {
     try {
       const b64 = trimmed.slice("VCTOWER1".length).replace(/\s+/g, "");
-      return JSON.parse(
+      return parseSaveJson(
         new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(Buffer.from(b64, "base64"))),
       );
     } catch (e) {

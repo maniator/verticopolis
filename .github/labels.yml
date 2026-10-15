@@ -14,12 +14,14 @@
 #   type        — what kind of thing the issue is (mutually exclusive-ish)
 #   mode        — which game mode it touches (Classic = 1994-faithful, Modern = opt-in layer)
 #   state       — where it is in triage
+#   area        - which subsystem it touches (an issue may carry more than one)
 #   contributor — signals aimed at people looking for something to work on
 #
-# Adding AREA labels (engine, render, audio, economy, transport, pwa, save-load):
-#   Don't create these up front. Add an area label only once a subsystem has
-#   ~3+ open issues, so the tracker never carries empty labels or naming drift
-#   (e.g. "elevator" vs "elevators" vs "lifts"). When you do, add it here first.
+# Adding AREA labels:
+#   Add a new area label only once a subsystem has ~3+ open issues, so the
+#   tracker never carries empty labels or naming drift (e.g. "elevator" vs
+#   "elevators" vs "lifts"). When you do, add it here first. The first set
+#   below was added on 2026-10-15, when every open issue was sorted into them.
 
 labels:
   # --- type ---
@@ -55,6 +57,50 @@ labels:
     color: "d4c5f9"
     description: Awaiting a reproduction
 
+  # --- area ---
+  - name: engine
+    color: "c5def5"
+    description: "The TypeScript simulation: tenants, demand, stars, events"
+  - name: engine-rs
+    color: "c5def5"
+    description: "The Rust engine crate, its binding and the conformance lock"
+  - name: wasm
+    color: "c5def5"
+    description: "The web's WASM host and worker, and the 3.0.0 cutover"
+  - name: economy
+    color: "c5def5"
+    description: "Rent, fees, prices, maintenance and money"
+  - name: transport
+    color: "c5def5"
+    description: "Elevators, stairs, escalators, walkways and routing"
+  - name: render
+    color: "c5def5"
+    description: "Sprites, art, canvas drawing and visual effects"
+  - name: ui
+    color: "c5def5"
+    description: "Dialogs, panels, input, toasts and the build palette"
+  - name: accessibility
+    color: "c5def5"
+    description: "Screen readers, keyboard navigation and other barriers"
+  - name: audio
+    color: "c5def5"
+    description: "Sound effects, music and the audio engine"
+  - name: analytics
+    color: "c5def5"
+    description: "Product analytics, telemetry and the analytics report"
+  - name: save-load
+    color: "c5def5"
+    description: "Saves, autosave, stashes, migrations and .vctower files"
+  - name: tdt
+    color: "c5def5"
+    description: "1994 TDT import and export"
+  - name: pwa
+    color: "c5def5"
+    description: "Install, offline, service worker and the update flow"
+  - name: tooling
+    color: "c5def5"
+    description: "CI, tests, screenshots, perf scripts and agent scaffolding"
+
   # --- contributor ---
   - name: good first issue
     color: "7057ff"
@@ -75,5 +121,19 @@ labels:
 #   gh label create modern        -c 1d76db -d "Affects Modern (opt-in) towers" --force
 #   gh label create needs-triage  -c fbca04 -d "Not yet reviewed by a maintainer" --force
 #   gh label create needs-repro   -c d4c5f9 -d "Awaiting a reproduction" --force
+#   gh label create engine        -c c5def5 -d "The TypeScript simulation: tenants, demand, stars, events" --force
+#   gh label create engine-rs     -c c5def5 -d "The Rust engine crate, its binding and the conformance lock" --force
+#   gh label create wasm          -c c5def5 -d "The web's WASM host and worker, and the 3.0.0 cutover" --force
+#   gh label create economy       -c c5def5 -d "Rent, fees, prices, maintenance and money" --force
+#   gh label create transport     -c c5def5 -d "Elevators, stairs, escalators, walkways and routing" --force
+#   gh label create render        -c c5def5 -d "Sprites, art, canvas drawing and visual effects" --force
+#   gh label create ui            -c c5def5 -d "Dialogs, panels, input, toasts and the build palette" --force
+#   gh label create accessibility -c c5def5 -d "Screen readers, keyboard navigation and other barriers" --force
+#   gh label create audio         -c c5def5 -d "Sound effects, music and the audio engine" --force
+#   gh label create analytics     -c c5def5 -d "Product analytics, telemetry and the analytics report" --force
+#   gh label create save-load     -c c5def5 -d "Saves, autosave, stashes, migrations and .vctower files" --force
+#   gh label create tdt           -c c5def5 -d "1994 TDT import and export" --force
+#   gh label create pwa           -c c5def5 -d "Install, offline, service worker and the update flow" --force
+#   gh label create tooling       -c c5def5 -d "CI, tests, screenshots, perf scripts and agent scaffolding" --force
 #   gh label create "good first issue" -c 7057ff -d "Good entry point for newcomers" --force
 #   gh label create "help wanted" -c 008672 -d "Maintainer would welcome help on this" --force

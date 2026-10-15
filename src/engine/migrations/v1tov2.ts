@@ -346,7 +346,7 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
             floor: f,
             x: tx,
             width: 1,
-            state: "occupied",
+            state: "empty",
             satisfaction: 1,
             occupants: 0,
             everOccupied: false,

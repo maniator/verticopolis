@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
-import { buildToStar } from "./helpers";
+import { buildToStar, tsOnlyOnWasm } from "./helpers";
 import { benchmarkUiUpdate, measureSimSpeed, checkNodeIdentity } from "./perf-harness";
 import { aboveFloor, withinCeiling } from "../src/tests/perfBudget";
 
@@ -77,6 +77,7 @@ test.describe("E5-S0 perf gate @perf", () => {
   test.setTimeout(180_000);
 
   test("ui.update cost, end-to-end speed, and node identity clear the committed baseline @perf", async ({ page }) => {
+    tsOnlyOnWasm("e2e/perf/baseline.json was measured on the TypeScript engine, so the WASM engine has no baseline to clear yet");
     await page.goto("/");
     await page.waitForFunction(() => {
       const g = (window as unknown as { game?: { sim?: unknown; ui?: unknown } }).game;

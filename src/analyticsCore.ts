@@ -1,7 +1,6 @@
 import { analyticsAdapter, type EventProps } from "./analyticsAdapter";
 import { APP_VERSION } from "./appVersion";
 import { telemetryHostAllowed } from "./telemetry";
-import { holdWhilePending } from "./desktopConsent";
 
 /**
  * Gameplay analytics core: the typed event vocabulary, the cross-cutting common
@@ -13,7 +12,7 @@ import { holdWhilePending } from "./desktopConsent";
  *
  * Every event goes through the SAME host gate as the page-view inject
  * (`telemetryHostAllowed`) and is best-effort: nothing fires on localhost, the
- * e2e preview server, or the native shell, and a transport hiccup can never
+ * e2e preview server, or any other host, and a transport hiccup can never
  * throw past the caller into the game loop. The vocabulary is deliberately
  * low-volume so a busy session stays well inside the provider's event budget.
  */
@@ -25,22 +24,85 @@ import { holdWhilePending } from "./desktopConsent";
  */
 export interface GameplayEvents {
   /** A fresh tower was founded (the funnel's entry point). `mode` is the
-   *  rule-set: "classic" or "modern". */
-  game_started: { mode: string };
+   *  rule-set: "classic" or "modern".
+   *
+   *  Named for what it counts. It fires ONLY on founding, so a returning player
+   *  who opens a save never emits it: this counts new towers, and reading it as
+   *  a session or games-played denominator understates the real figure (a week
+   *  that read 82 here carried 123 `first_build`s). The resumed half of that
+   *  picture is `boot` with `reason` "continue" or "recovery". It was called
+   *  `game_started` until 2026-09-14, a name that read like a session counter
+   *  and was repeatedly taken for one. */
+  new_game_started: { mode: string };
   /** The first facility placed in the current tower (the funnel's "did they
    *  build anything" step). Fires once per tower: for a founded tower it follows
-   *  that tower's `game_started` (the latch re-opens in `noteNewGame`); for the
-   *  boot tower that a continued save opens on, it fires with no preceding
-   *  `game_started`. `tool` is the facility/transport kind that broke the ice. */
+   *  that tower's `new_game_started` (the latch re-opens in `noteNewGame`); for
+   *  the boot tower that a continued save opens on, it fires with no preceding
+   *  `new_game_started`. `tool` is the facility/transport kind that broke the ice.
+   *
+   *  Since 2.29.5 the engine's events, through
+   *  `analyticsEngineBridge.ts` (#873 phase 2), drive `new_game_started`,
+   *  `first_build`, the session build and depth summaries, `star_reached`,
+   *  `session_emergencies`, `emergency_choice`, `price_tune` and
+   *  `capacity_tune`; the rest of this vocabulary stays with the shell. `tool` is the
+   *  kind the engine PLACED rather than the tool held: the Floor tool on the
+   *  ground floor lays a lobby and now reports `lobby`, here and in the
+   *  `tool_session_uses` mix. Builds made from any input, the editor included,
+   *  count here and in the session depth events. */
   first_build: { tool: string };
   /** A tool was selected, reported once per distinct tool so the event captures
    *  the session's tool mix without a row per click. */
   tool_used: { tool: string };
   /** The tower crossed into a new star rating (2 through 6): progression depth,
-   *  the clearest "how far do players get" signal. */
+   *  the clearest "how far do players get" signal. One row per rung crossed:
+   *  before the engine bridge (through 2.29.4) a 6 Hz poll sent only the higher
+   *  rung when two promotions landed between polls. */
   star_reached: { star: number };
-  /** The tab was hidden or unloaded: session length in whole seconds. */
-  session_end: { seconds: number };
+  /** The tab was hidden or unloaded: cumulative foreground session length in
+   *  whole seconds, plus whether the emission came from `pagehide`.
+   *
+   *  READ THIS BEFORE QUERYING IT. Two separate things make the obvious reads
+   *  wrong, and the `session_lengths` saved view in PostHog exists so the
+   *  correction is written once. Use that view; the dashboard tiles do.
+   *
+   *  1. It RE-FIRES on every tab-hide with a growing `seconds`, because the
+   *     terminal `pagehide` is not reliably delivered (a hard mobile kill drops
+   *     it) and a session that only ever reported at its close would often report
+   *     nothing at all. So one session contributes several rows, and a long
+   *     session contributes more of them than a short one. Counting rows
+   *     overcounts sessions (measured 3.6x), and an event-level percentile over
+   *     `seconds` is weighted by the very thing it measures (a 545s median
+   *     against a real 91s).
+   *  2. The per-tab session id lives in `sessionStorage` and DELIBERATELY
+   *     survives a same-tab reload (see `analyticsRelay.ts`), so an "Update now"
+   *     reload or a WebGL crash-recovery reload keeps one `distinct_id` while
+   *     this clock restarts at 0. One `distinct_id` therefore covers several page
+   *     lives, and `max(seconds)` would report only the longest of them. A
+   *     session's length is the SUM of each page life's final reading. The 15%
+   *     figure below is the DIFFERENCE the two readings make, not a share of any
+   *     session: against the boot-partitioned total, a plain `max` loses about
+   *     15%, this sum recovers about 13 of those points, and the loss lands on
+   *     the update and crash-recovery cohort specifically. The sum is itself a
+   *     lower bound: a life is detected by the reading DROPPING, so a reload
+   *     whose second life reaches the first's length or beyond is invisible
+   *     (equal counts as invisible too, which is the likelier half for short
+   *     repeatable lives such as a crash loop). It sees 77 of the 129 reloads in
+   *     a recent 919 sessions, and the boot-partitioned sum that would catch the
+   *     rest is only about 2% higher in total.
+   *
+   *  So: count sessions as distinct `distinct_id`s, never as a row count, and
+   *  take a length as the sum of per-page-life peaks rather than a plain `max`.
+   *
+   *  `final` marks an emission made from `pagehide`. It is best-effort in the
+   *  same way `pagehide` is (a session killed outright has no such row), and it
+   *  is not unique at any level: a `distinct_id` covers several page lives, and a
+   *  single page life can emit it more than once, because a bfcache entry fires
+   *  `pagehide` and a later real close whose `seconds` has grown clears the
+   *  ordinary dedup on its own. So do not use it to pick a session's length, to
+   *  count sessions, or to delimit page lives. It answers the coarse question
+   *  "did any pagehide arrive", which is the measure of how much work the
+   *  re-emission fallback is doing. */
+  session_end: { seconds: number; final: boolean };
   /** One snapshot per boot: why the session started (`reason`), the build it
    *  runs (`version`), and the standing state of the tower it opened. Unlike the
    *  delta events, this captures a returning player's established tower even when
@@ -113,12 +175,25 @@ export interface GameplayEvents {
    *  `tool_used`; this is the removal + tuning side those never saw). `detail`
    *  carries the small extra dimension `demolish` needs (sell vs bulldoze).
    *  Cookieless: closed enums and per-session behavior, never an identity, never
-   *  a currency amount. */
+   *  a currency amount.
+   *
+   *  Since 2.29.5, `price_tune` and `capacity_tune` latch on
+   *  the engine's report of a real change (`pricing_changed`,
+   *  `capacity_changed`): a rent nudge already at its limit no longer counts,
+   *  and shrinking a shaft now does. Since 2.31.2,
+   *  `demolish` comes from the engine's `facility_removed` (#873): one per
+   *  removal the bulldozer or the editor's Sell makes (the engine's `sellAt`
+   *  emits it too, and no player path calls that), with `detail` the method,
+   *  sent at the next frame's drain, at most 40 per page in each
+   *  one-minute window. */
   economy_action: { action: EconomyActionName; detail?: string };
   /** The player answered an in-game emergency prompt (pay for rescue, or gamble
    *  the containment / bomb search). Per occurrence, so the accept/decline split
    *  is visible per emergency kind. Only a real click emits: a timed-out
-   *  auto-decline is the absence of a choice, not a decline, and reports nothing. */
+   *  auto-decline is the absence of a choice, not a decline, and reports nothing.
+   *  Since 2.29.5 `decision` is what took effect, from the
+   *  engine's `emergency_resolved`: an accept the tower could not pay for is a
+   *  decline (through 2.29.4 it reported the button pressed). */
   emergency_choice: { kind: EmergencyKind; decision: EmergencyDecision };
   /** Per-session summary of the SIMULATION-fired emergency activity: how many fire
    *  outbreaks ignited, how many rooms they gutted, and how many bombs detonated.
@@ -251,26 +326,9 @@ function deliver(name: string, props: EventProps): void {
  * wins on a key collision (the typed vocabulary is never shadowed by an
  * enrichment key).
  *
- * The gate saying no still means nothing is sent. The one thing that changed
- * with the desktop epic is what happens to the event afterward: a desktop build
- * whose first-run notice has not resolved HOLDS it in memory rather than
- * dropping it, so a player who says yes ten seconds into their first launch
- * still reports that first launch instead of starting the record at the click.
- * The hold is bounded and drops its oldest first, so it is that much of a
- * session rather than a guarantee about any one event (see `desktopConsent.ts`).
- * Every other dark surface
- * (localhost, the e2e preview server, the iOS shell, and a desktop player who
- * declined) falls straight through `holdWhilePending` and drops the event
- * exactly as before.
- *
- * The merge happens before the gate so a held event carries the props it had at
- * EMIT time rather than whatever the common props say when the queue flushes.
+ * The gate saying no means nothing is sent.
  */
 export function trackEvent<K extends keyof GameplayEvents>(name: K, props: GameplayEvents[K]): void {
-  const merged: EventProps = { ...commonProps, ...props };
-  if (telemetryHostAllowed()) {
-    deliver(name, merged);
-    return;
-  }
-  holdWhilePending(() => deliver(name, merged));
+  if (!telemetryHostAllowed()) return;
+  deliver(name, { ...commonProps, ...props });
 }

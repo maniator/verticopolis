@@ -14,6 +14,7 @@ import {
   buildStatsTower,
   buildTabletTower,
   pgClearTransients,
+  pgSetClock,
   pgSetOverlay,
   pgStep,
   pgStepNoDraw,
@@ -65,13 +66,7 @@ export const FEATURE_SCENES: Scene[] = [
         setup: async (page) => {
           // Advance to mid-afternoon so the recycling center has filled with the
           // day's garbage (emptied only by the morning truck).
-          await page.evaluate(() => {
-            const g = (window as any).game;
-            const c = g.sim.clock;
-            let delta = 15 * 60 - c.minuteOfDay;
-            if (delta < 0) delta += 1440;
-            c.advance(delta);
-          });
+          await page.evaluate(pgSetClock, 15);
           await page.evaluate(() => {
             const g = (window as any).game;
             const rec = g.sim.tower.units.find((u: any) => u.kind === "recycling");

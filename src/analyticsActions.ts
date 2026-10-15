@@ -63,17 +63,18 @@ export function trackEconomyActionOnce(action: EconomyActionName, detail?: strin
 }
 
 /** Report the player's answer to an emergency prompt (see `emergency_choice`).
- *  Called only from the choice callback (a real click), so a timed-out
- *  auto-decline never reaches here. Host-gated and never-throw. */
+ *  Called only by the analytics bridge, for the engine's `emergency_resolved`
+ *  with source `player`, carrying the decision that took effect; a timed-out
+ *  auto-decline (source `timeout`) never reaches here. Host-gated and
+ *  never-throw. */
 export function trackEmergencyChoice(kind: EmergencyKind, decision: EmergencyDecision): void {
   trackEvent("emergency_choice", { kind, decision });
 }
 
 /** Clear the once-per-session action latches, so the next call to each `*Once`
- *  tracker reports again. Called from `GameplaySession.startEpoch`, which is both
- *  the test-only session reset and the fresh measurement window a desktop consent
- *  change opens. Outside those, the latches live for the tab, matching the per-tab
- *  analytics session. */
+ *  tracker reports again. Called from `GameplaySession.startEpoch`, the
+ *  test-only session reset. Outside that, the latches live for the tab, matching
+ *  the per-tab analytics session. */
 export function clearActionLatches(): void {
   appActionOnce.clear();
   economyActionOnce.clear();

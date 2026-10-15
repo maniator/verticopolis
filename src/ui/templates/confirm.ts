@@ -56,9 +56,7 @@ export type InstallHelpVariant = "ios" | "browser";
  * native install sheet is available, never auto-shown. The `ios` variant covers
  * iOS Safari (no beforeinstallprompt, no programmatic install); the `browser`
  * variant covers any other not-standalone browser session that reaches the splash
- * install button without a captured install event. Wrapped builds never reach it:
- * they show no install surface, and its copy describes a browser menu their shells
- * do not have. Copy leads with the outcome, not the
+ * install button without a captured install event. Copy leads with the outcome, not the
  * mechanism; the word "PWA" never appears.
  */
 export function installHelpTemplate(onClose: () => void, variant: InstallHelpVariant = "ios"): TemplateResult {

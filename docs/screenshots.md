@@ -103,6 +103,21 @@ which would overlap and gap a floor), and a pre-capture sweep clears stray toast
 continues; the tail prints a per-directory count and a non-zero exit on any
 failure.
 
+Both engine legs load the tower at the same points
+(`scripts/screenshot-engine.ts`): before a ticking builder's ticks, once a
+scene is ready (unless its builder already settled before its ticks), and after
+the setups listed in `SETTLE_AFTER_SETUP`. A load
+prices an unpriced Classic room on its ladder, adopts the milestones the tower
+already meets without a bulletin line, and starts the crowd fresh, so a scene
+shows what a loaded tower shows. A new shot setup that edits the tower in place
+(a unit's state, a placed room) rather than through a game command belongs in
+`SETTLE_AFTER_SETUP`; otherwise the WASM leg fails it by name when the edit
+touches a field its hosted check compares (the clock, the star, a unit's place,
+state, occupancy, rent or label, a transport), and any other in-place edit shows
+up as a pixel difference between the legs. A builder that
+ticks calls `window.__vcShotHandoff()` before its ticks, as `buildStatsTower`
+does.
+
 ### Mode-forked shots: the `-classic` / `-modern` suffix
 
 Most of the game renders identically under the Classic and Modern rule-sets, so

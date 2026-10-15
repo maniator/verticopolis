@@ -268,7 +268,6 @@ export class TowerEngine {
   personGfx: ex.Canvas[] = [];
   personGfxRed!: ex.Canvas;
   personGfxStaff!: ex.Canvas;
-
   /** @internal friend-module access (towerScene make* / towerOverlay draw). */
   overlay!: ex.ScreenElement;
   overlayCanvas!: ex.Canvas;
@@ -277,6 +276,7 @@ export class TowerEngine {
 
   constructor(canvas: HTMLCanvasElement, sim: Simulation) {
     this.sim = sim;
+    scene.bindSceneWorld(sim);
     this.engine = new ex.Engine({
       canvasElement: canvas,
       displayMode: ex.DisplayMode.FillContainer,

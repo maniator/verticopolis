@@ -41,6 +41,14 @@ export function pgClearTransients(keepDialogs: boolean): void {
 export function pgMaskVersion(): void {
   document.querySelectorAll<HTMLElement>(".splash-version, .app-version").forEach((el) => {
     el.textContent = "vX.Y.Z";
+    // The engine label (" · WASM engine", src/wasmhost/engineLabel.ts) follows
+    // the Settings and Help version span as a sibling text node (lit puts a
+    // marker comment between them). It names the engine for a tester and is
+    // masked with the version, so the engine leg of the drift check compares
+    // the game's pixels. Absent on the TypeScript engine.
+    for (const n of el.parentElement?.childNodes ?? []) {
+      if (n.nodeType === Node.TEXT_NODE && n.textContent?.includes(" · WASM engine")) n.textContent = n.textContent.replace(" · WASM engine", "");
+    }
   });
 }
 
@@ -260,11 +268,34 @@ export function pgFillRow(kind: string, floor: number, x0: number, x1: number, s
   }
 }
 
-/** Set the in-game clock to a whole hour without advancing days. */
+/** Move the in-game clock forward to `hour` (a fraction counts minutes, so 8.5
+ *  is 08:30), into the next day when the clock is already past that time.
+ *
+ *  The clock moves and nothing runs: whatever pass the move skips is owed and
+ *  runs on the next tick. On the WASM leg (the live sim is the instance the
+ *  engine host attached to, which carries the host's own `serialize`) a write
+ *  on the read model would be overwritten from the engine, so the engine's own
+ *  clock moves the same way (`advanceClock`, the counterpart of
+ *  `clock.advance`) beside the read model's. The crowd, the
+ *  latches and the owed passes stay as they are on both legs. */
 export function pgSetClock(hour: number): void {
-  const c = (window as unknown as { game: any }).game.sim.clock;
+  const g = (window as unknown as { game: any }).game;
+  const c = g.sim.clock;
   let delta = hour * 60 - c.minuteOfDay;
   if (delta < 0) delta += 1440;
+  const vc = (window as unknown as { __vcEngine?: { status?: { hosted?: boolean }; current?: () => any } }).__vcEngine;
+  const hosted = Boolean(vc?.status?.hosted) && Object.prototype.hasOwnProperty.call(g.sim, "serialize");
+  if (!hosted) {
+    c.advance(delta);
+    return;
+  }
+  if (delta === 0) return;
+  const host = vc?.current?.();
+  if (!host) throw new Error("the WASM engine reports a hosted tower but no host holds it");
+  // The same move on both: no merge, so a presentation pin a scene made on
+  // the read model (a staged satisfaction spread) stays as the TypeScript
+  // leg keeps it.
+  host.engine.advanceClock(delta);
   c.advance(delta);
 }
 
@@ -283,3 +314,10 @@ export function pgFrame(arg: { tile: number | null; floor: number; zoom: number 
   const tile = arg.tile ?? Math.floor(g.grid.width / 2);
   g.engine.setCamera(tile, arg.floor, arg.zoom);
 }
+
+// The dialog phase watch (pgWatchModalPhase, pgMarkModalPhaseTarget,
+// pgStopModalPhaseWatch; #762 / #843) lives under src/tests so its contract
+// test can import it, the same arrangement as screenshotOnlyFilter.ts. Each
+// function is self-contained in the same serialized sense as everything in
+// this file.
+export { pgMarkModalPhaseTarget, pgStopModalPhaseWatch, pgWatchModalPhase } from "../src/tests/screenshotPhaseWatch.ts";

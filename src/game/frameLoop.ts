@@ -1,14 +1,15 @@
 import type { GameApp } from "../main";
 import { paceFactor } from "../engine/timePacing";
+import { drainFixedSteps, syncStepMode, type StepDebt } from "../engine/sim/fixedStep";
 import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
 import { tickInstallAffordance } from "./installAffordance";
-import { tickHostCommands } from "./hostCommands";
-import { hasBlockingModal, isEditorBusy, isSplashUp } from "./interactionState";
-import { IS_WRAPPED_BUILD } from "../platform";
+import { hasBlockingModal, isEditorBusy, isEngineStopped, isSplashUp } from "./interactionState";
 import { positionPanels } from "./panelAnchoring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
-import { gameplaySession, trackEmergencyChoice } from "../analytics";
+import { gameplaySession } from "../analytics";
+import { drainEngineEvents } from "../analyticsEngineBridge";
+import { stepGate } from "../wasmhost/stepGate";
 
 /**
  * The per-frame simulation + throttled UI/audio refresh, split out of the
@@ -27,11 +28,83 @@ export const SPEEDS = [0, 10, 30, 120];
  *  time accrues debt every frame; without a cap each frame does more work than
  *  the last until frames run seconds long (see the clamp in runFrame). 30
  *  minutes is 15 ideal frames of fastest-speed debt (2 sim-minutes per 60fps
- *  frame), generous headroom for hitches, while keeping the largest single
- *  frame's sim work bounded near two 20-minute tick chunks. */
-const MAX_CATCHUP_MINUTES = 30;
+ *  frame), generous headroom for hitches. The engine's step budget
+ *  (`MAX_STEPS_PER_FRAME` in engine/sim/fixedStep) bounds the work in one
+ *  frame; this cap bounds the debt carried between frames, so it is where a
+ *  device that cannot keep up drops time and falls behind. */
+export const MAX_CATCHUP_MINUTES = 30;
+
+/** Each app's step debt record, which carries the speed and pacing mode its
+ *  minutes were owed under so the engine can drop them on a change. The
+ *  minutes themselves live in `app.accMinutes` (reset by `adoptSim`, and on a
+ *  speed or steady-clock change by `applySpeed` and `toggleSteadyClock`). */
+const stepDebts = new WeakMap<GameApp, StepDebt>();
+
+/** Apply the player's speed choice. A change drops the step carry here, at the
+ *  seam, so a change undone before the next frame (fastest, pause, fastest)
+ *  still never replays minutes owed under the earlier choice: the frame loop's
+ *  own mode check only sees the speed each frame runs at. */
+export function applySpeed(app: GameApp, s: number): void {
+  if (s !== app.speed) app.accMinutes = 0;
+  app.speed = s;
+}
+
+/** One frame's worth of simulation: add the minutes a frame of `dtMs` owes at
+ *  `minutesPerSecond` under the pacing curve (or the steady clock), carried in
+ *  `host.accMinutes`, and drain them through the engine's fixed step. This is
+ *  the whole of how the web host advances the engine, kept apart so the dual
+ *  run's day gate drives the engine through the same code.
+ *
+ *  Minutes owed under one speed or pacing mode must not replay under another
+ *  (the engine sizes its step from both), so the engine drops the carry when
+ *  either changes, before this frame's minutes are added. A non-finite dtMs
+ *  (a NaN/Infinity timestamp delta from a hung or restored frame source)
+ *  would poison accMinutes to NaN, and NaN fails every comparison, so the sim
+ *  would stop ticking FOREVER with no recovery: reset to 0 and skip this
+ *  frame's catch-up; the next finite frame resumes. The catch-up debt is
+ *  capped: owed minutes grow with real frame time, so on a device that can't
+ *  simulate the fastest speed in real time every frame would carry ever more
+ *  sim work, stretching frames toward seconds of sustained CPU+GPU load, the
+ *  profile under which Android reclaims the WebGL context (the Pixel 8a
+ *  "random crash"). Dropping the excess trades clock accuracy for survival:
+ *  the game visibly runs slower than the speed button promises on hardware
+ *  that can't keep up, and a tab restored from the background resumes with a
+ *  bounded catch-up instead of replaying the whole absence. The engine cuts
+ *  the owed minutes into quanta sized from its own clock, so the tower comes
+ *  out the same at any frame rate; what it leaves owed carries to the next
+ *  frame (at speed 0 it is nothing, so a pause never spends carried time).
+ *  The write-back sits in `finally` so a step that throws (the frame-error
+ *  guard catches it) never re-owes the steps that already ran. */
+export function advanceOwedMinutes(host: { sim: { tick(dtMinutes: number): void; clock: { minuteOfDay: number } }; accMinutes: number }, debt: StepDebt, dtMs: number, minutesPerSecond: number, steadyClock: boolean, step = true): void {
+  debt.minutes = host.accMinutes;
+  syncStepMode(debt, minutesPerSecond, steadyClock);
+  host.accMinutes = debt.minutes;
+  const pace = steadyClock ? 1 : paceFactor(host.sim.clock.minuteOfDay);
+  host.accMinutes += (dtMs / 1000) * minutesPerSecond * pace;
+  if (!Number.isFinite(host.accMinutes)) host.accMinutes = 0;
+  if (host.accMinutes > MAX_CATCHUP_MINUTES) host.accMinutes = MAX_CATCHUP_MINUTES;
+  debt.minutes = host.accMinutes;
+  // A host still busy with its last batch (the experimental worker host,
+  // see wasmhost/stepGate) owes this frame's minutes under the same cap and
+  // steps them on a later frame.
+  if (!step) return;
+  try {
+    drainFixedSteps(host.sim, debt, minutesPerSecond, { steadyClock });
+  } finally {
+    host.accMinutes = debt.minutes;
+  }
+}
 
 export function runFrame(app: GameApp, dtMs: number): void {
+  // A wasm-only build stopped on its engine: no engine holds the tower, so
+  // time stops for good (the speed buttons and keys cannot restart it), and
+  // a stopped game samples no frames for the session either. Events the
+  // engine emitted before it stopped still reach analytics.
+  if (isEngineStopped()) {
+    drainEngineEvents(app.sim);
+    app.accMinutes = 0;
+    return;
+  }
   // Sample the rendered frame-rate for the session_fps signal (#538). noteFrame
   // reads its OWN wall-clock delta (not the `dtMs` the engine passes: that value
   // is spike-clamped to 1ms for any frame over 200ms, which would hide the very
@@ -40,25 +113,17 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // modal freeze returns early on below (fps is a render metric, not a sim-tick
   // one).
   gameplaySession.noteFrame();
+  // Fold the engine's gameplay events into analytics (#873 phase 2): builds,
+  // stars, emergencies and their answers, pricing and capacity. Drained every
+  // frame and ahead of the modal freeze below, so an emergency answered in a
+  // modal reports on the next frame rather than when the freeze lifts.
+  drainEngineEvents(app.sim);
   // While a blocking modal is open, freeze time so nothing changes under it:
   // an emergency choice (canon: the modal pauses the game) must not auto-resolve
   // out from under the player, and the update prompt must not let a distracted
   // player lose game-hours at high speed while it waits for their answer.
   if (hasBlockingModal(app)) {
     app.accMinutes = 0;
-    // Push availability before bailing. A blocking dialog is the state in which
-    // EVERY host command is refused, so it is the state the shell most needs to
-    // hear about; returning first left the menu fully enabled exactly when
-    // nothing could run.
-    //
-    // NOT a no-op after the first frame, which an earlier version of this comment
-    // claimed. This branch runs at FULL frame rate rather than at the 160 ms pump
-    // cadence the other call site sits behind, and the dirty gate only skips the
-    // cross-process push, not the recomputation. What makes it acceptable is that
-    // the recomputation is now one `readInteractionState` (two element lookups,
-    // two flag reads, one `isEditorBusy`) rather than one per command. It does
-    // nothing at all without a wrapper shell.
-    if (IS_WRAPPED_BUILD) tickHostCommands();
     return;
   }
   const minutesPerSecond = SPEEDS[app.speed] ?? 0;
@@ -67,31 +132,18 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // player opted out. Presentation-only: the sim still ticks uniform minutes,
   // and paceFactor is normalized so a full day costs the same real time, so
   // the speed buttons keep their meaning.
-  const pace = app.prefs.steadyClock ? 1 : paceFactor(app.sim.clock.minuteOfDay);
-  app.accMinutes += (dtMs / 1000) * minutesPerSecond * pace;
-  // A non-finite dtMs (a NaN/Infinity timestamp delta from a hung or restored
-  // frame source) would poison accMinutes to NaN, and NaN fails every
-  // comparison below, so the sim would stop ticking FOREVER with no recovery.
-  // Reset to 0 and skip this frame's catch-up; the next finite frame resumes.
-  if (!Number.isFinite(app.accMinutes)) app.accMinutes = 0;
-  // Cap the catch-up debt. Owed minutes grow with real frame time, so on a
-  // device that can't simulate the fastest speed in real time every frame
-  // would carry ever more sim work, stretching frames toward seconds of
-  // sustained CPU+GPU load, the profile under which Android reclaims the
-  // WebGL context (the Pixel 8a "random crash"). Dropping the excess trades
-  // clock accuracy for survival: the game visibly runs slower than the
-  // speed button promises on hardware that can't keep up, and a tab restored
-  // from the background resumes with one bounded step instead of replaying
-  // the whole absence.
-  if (app.accMinutes > MAX_CATCHUP_MINUTES) app.accMinutes = MAX_CATCHUP_MINUTES;
-  // Step the simulation in small chunks so hourly/daily boundaries fire.
+  const steadyClock = app.prefs.steadyClock === true;
+  const debt = stepDebts.get(app) ?? { minutes: 0 };
+  stepDebts.set(app, debt);
   const minutesBeforeTicks = app.sim.clock.minutes;
-  let guard = 0;
-  while (app.accMinutes >= 1 && guard++ < 2000) {
-    const step = Math.min(20, app.accMinutes);
-    app.sim.tick(step);
-    app.accMinutes -= step;
-  }
+  // An experimental engine host that syncs once per frame registers a gate:
+  // it may hold the steps back while its last batch is in flight, and it
+  // brings the read model up to date (or sends the batch) once the steps
+  // ran. Without one (the TypeScript engine, the default WASM host) this is
+  // the same frame as before.
+  const gate = stepGate(app.sim);
+  advanceOwedMinutes(app, debt, dtMs, minutesPerSecond, steadyClock, gate ? gate.canStep() : true);
+  gate?.flush();
   emitMealRushes(app, minutesBeforeTicks);
 
   // Throttle the comparatively expensive DOM/audio updates (~6Hz) so a busy
@@ -103,17 +155,8 @@ export function runFrame(app: GameApp, dtMs: number): void {
     app.ui.update(app.sim);
     updateTraffic(app);
     app.onboarding.tick(); // advance the first-run checklist on real progress (no-op when inactive)
-    // Sample the tower's cumulative emergency counters for the session_emergencies
-    // summary (#611). The engine (EventSystem) owns the counts as plain integers
-    // and imports no analytics; the shell reads them off the public getter here
-    // (Simulation stays at its line ceiling, so no delegator is added), and the
-    // session accumulator banks a departing tower's tallies across a new game.
-    // Cheap: three ints on the throttled (~6Hz) path, so a fire's occurrence is
-    // captured without the engine ever reporting it.
-    const ec = app.sim.events.counts;
-    gameplaySession.noteEmergencyCounts(ec.fires, ec.firesGutRooms, ec.bombs);
+    gameplaySession.notePlaying(); // this session played: it reports session_emergencies
     tickInstallAffordance(app); // surface the install chip once the play-gate trips (self-terminating)
-    if (IS_WRAPPED_BUILD) tickHostCommands(); // gray out shell menu items the game would refuse
     // Keep the open editor's live stats fresh. Refresh now patches only the
     // volatile cells in place (never the buttons or rename input), so this is
     // safe while renaming; the pointer guard still skips the rare full rebuild
@@ -121,10 +164,10 @@ export function runFrame(app: GameApp, dtMs: number): void {
     if (app.selected && app.ui.isEditorOpen() && !isEditorBusy(app)) {
       app.refreshEditor();
     }
-    // A jingle on every star promotion (2★–5★), not just the TOWER win.
+    // A jingle on every star promotion (2★–5★), not just the TOWER win. The
+    // analytics side is the engine's star_reached, through the bridge.
     if (app.sim.star > app.lastStar) {
       app.lastStar = app.sim.star;
-      gameplaySession.noteStar(app.sim.star); // progression depth signal
       if (app.sim.star < 6) app.audio.sfx("promote");
     }
     // Auto-surfaced modals must never stack over the boot/return splash. A
@@ -143,12 +186,10 @@ export function runFrame(app: GameApp, dtMs: number): void {
       app.shownChoice = true;
       app.audio.sfx("error");
       app.ui.showEventChoice(pc.message, `$${pc.cost.toLocaleString()}`, (opt) => {
-        // The player answered (accept/decline). Only this click path reaches the
-        // telemetry; a timed-out auto-decline resolves in the sim without the
-        // modal callback, so it never emits (the absence of a choice, not a
-        // decline). `pc.kind` is stable while the modal is up (the freeze guard
-        // stops the sim ticking the choice away).
-        trackEmergencyChoice(pc.kind, opt);
+        // The player answered (accept/decline). The engine reports the
+        // resolution (emergency_resolved, source player) and the bridge sends
+        // emergency_choice from it; a timed-out auto-decline carries source
+        // timeout and reports nothing.
         app.sim.resolveChoice(opt);
         app.shownChoice = false;
       });

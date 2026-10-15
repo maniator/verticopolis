@@ -1,4 +1,8 @@
 import { test, expect } from "@playwright/test";
+import { expectEngineHosted } from "./helpers";
+
+// On chromium-wasm every test must end with its tower still on the engine.
+test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -8,7 +12,10 @@ import { test, expect } from "@playwright/test";
  * BuildActions a click routes through) in the BUILT app fills the floor gap to
  * its neighbor, charges for the bridge tiles, and refuses an unaffordable run.
  * This proves the feature survives bundling and the main.ts <-> engine <-> sim
- * wiring, not just the headless vitest fixture. It complements the exhaustive
+ * wiring, not just the headless vitest fixture. The concourse goes down through
+ * relayed `sim.build` calls and each check reads the tower back from the engine
+ * first, so on the `chromium-wasm` project the assertions are about the WASM
+ * engine's tower. It complements the exhaustive
  * integration coverage in src/tests/integration/simulation.integration.test.ts.
  */
 test.describe("auto-floor bridge between modules (e2e)", () => {
@@ -37,18 +44,22 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       // Classic founds an empty lot now; lay the 40-tile concourse this
       // scenario used to inherit from the founding seed.
       for (let i = 0; i < 40; i++) {
-        const r = t.place("lobby", 1, x0 + i);
+        const r = s.build("lobby", 1, x0 + i);
         if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
       }
       // Drive the real build controller (what a click calls), quietly to keep the
       // no-error assertion clean, not sim.build directly.
       g.build.tryBuild("office", 2, x0, true); // A: [x0, x0+9)
+      // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
+      (window as any).__vcEngine?.current()?.syncStructure();
       const gapBare = t.structureKindAt(2, x0 + 11); // still empty before B
       // Read the quoted cost from the sim itself, not a hard-coded catalog value,
       // so a future balance tweak doesn't rot this test.
       const quotedForB = s.canBuild("office", 2, x0 + 15).cost;
       const moneyBeforeB = s.money;
       g.build.tryBuild("office", 2, x0 + 15, true); // B: [x0+15, x0+24)
+      // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
+      (window as any).__vcEngine?.current()?.syncStructure();
       const gap: (string | undefined)[] = [];
       for (let i = 9; i < 15; i++) gap.push(t.structureKindAt(2, x0 + i));
       return {
@@ -93,13 +104,15 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       // Classic founds an empty lot now; lay the 40-tile concourse this
       // scenario used to inherit from the founding seed.
       for (let i = 0; i < 40; i++) {
-        const r = t.place("lobby", 1, x0 + i);
+        const r = s.build("lobby", 1, x0 + i);
         if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
       }
       g.build.tryBuild("office", 2, x0, true); // neighbor A
       const cost = s.canBuild("office", 2, x0 + 15).cost; // office + own floors + bridge
       s.money = cost - 1; // one dollar short of the whole run
       g.build.tryBuild("office", 2, x0 + 15, true);
+      // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
+      (window as any).__vcEngine?.current()?.syncStructure();
       return {
         placed: Boolean(t.unitAt(2, x0 + 15)),
         gapFilled: t.structureKindAt(2, x0 + 11) !== undefined,
@@ -132,12 +145,14 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       // scenario used to inherit from the founding seed.
       // The concourse [x0, x0+40).
       for (let i = 0; i < 40; i++) {
-        const r = t.place("lobby", 1, x0 + i);
+        const r = s.build("lobby", 1, x0 + i);
         if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
       }
       // Drop a lobby past the concourse edge with a gap; the bridge is what lets a
       // ground tile that would otherwise float land connected.
       g.build.tryBuild("lobby", 1, x0 + 45, true);
+      // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
+      (window as any).__vcEngine?.current()?.syncStructure();
       const kinds: (string | undefined)[] = [];
       for (let i = 40; i <= 45; i++) kinds.push(t.structureKindAt(1, x0 + i));
       return { kinds };
@@ -167,16 +182,25 @@ test.describe("sky-lobby canon (e2e)", () => {
       // Classic founds an empty lot now; lay the 40-tile concourse this
       // scenario used to inherit from the founding seed.
       for (let i = 0; i < 40; i++) {
-        const r = t.place("lobby", 1, x0 + i);
+        const r = s.build("lobby", 1, x0 + i);
         if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
       }
       // Build a support column up through floor 14 so floor 15 has support below.
-      for (let f = 2; f <= 14; f++) for (let i = 0; i < 40; i++) t.place("floor", f, x0 + i);
+      for (let f = 2; f <= 14; f++) {
+        for (let i = 0; i < 40; i++) {
+          const r = s.build("floor", f, x0 + i);
+          if (!r.ok) throw new Error(`support floor ${f} at x=${x0 + i}: ${r.reason ?? "refused"}`);
+        }
+      }
       // Claim floor 15 by placing a lobby there (goes through the real gesture).
       g.build.tryBuild("lobby", 15, x0 + 20, true);
+      // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
+      (window as any).__vcEngine?.current()?.syncStructure();
       const claimed = t.floorHasLobby(15);
       // Now try to drop a plain floor tile elsewhere on floor 15.
       g.build.tryBuild("floor", 15, x0 + 5, true);
+      // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
+      (window as any).__vcEngine?.current()?.syncStructure();
       const kindAfterFloorAttempt = t.structureKindAt(15, x0 + 5);
       return { claimed, kindAtLobby: t.structureKindAt(15, x0 + 20), kindAfterFloorAttempt };
     });
@@ -206,13 +230,15 @@ test.describe("sky-lobby canon (e2e)", () => {
       // Classic founds an empty lot now; lay the 40-tile concourse this
       // scenario used to inherit from the founding seed.
       for (let i = 0; i < 40; i++) {
-        const r = t.place("lobby", 1, x0 + i);
+        const r = s.build("lobby", 1, x0 + i);
         if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
       }
       // The concourse has a lobby at (1, x0).
       const lobby = t.unitAt(1, x0);
       const kindBefore = lobby?.kind;
       const removed = g.build.tryRemoveUnit(lobby, "bulldoze");
+      // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
+      (window as any).__vcEngine?.current()?.syncStructure();
       const kindAfter = t.unitAt(1, x0)?.kind;
       return { kindBefore, removed, kindAfter };
     });

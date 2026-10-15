@@ -101,9 +101,15 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
   },
 ];
 
-/** The About section body (attribution + the interpolated app version). */
-export function helpAboutBody(version: string): TemplateResult {
-  return html`<p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br />Verticopolis <span class="app-version">v${version}</span></p>`;
+/** The About section body (attribution, the interpolated app version and a
+ *  link to the third-party license notices the build generates,
+ *  `scripts/gen-third-party-notices.ts`, #951). The in-game modal uses the
+ *  default relative href, which resolves against the game page's own URL (the
+ *  site root on the web, where the file sits beside `index.html`); the `/help`
+ *  page passes the root-relative one so a trailing slash on its URL cannot
+ *  move the link. */
+export function helpAboutBody(version: string, engine = "", licensesHref = "third-party-notices.txt"): TemplateResult {
+  return html`<p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br />Verticopolis <span class="app-version">v${version}</span>${engine}</p><p class="help-licenses"><a href=${licensesHref} target="_blank" rel="noopener noreferrer">Third-party licenses<span class="visually-hidden"> (opens in a new tab)</span></a></p>`;
 }
 
 /** The Privacy section body, shared by the in-game Help modal and the standalone
@@ -115,77 +121,18 @@ export function helpAboutBody(version: string): TemplateResult {
  *  personal data or durable identifier; if any of that posture changes, this copy
  *  must change in the same PR.
  *
- *  Two sentences were rewritten for the desktop build (issue #781), and the
- *  reasons are worth keeping: the old text said counts go "through our own site",
- *  which read as a same-origin promise that a packaged app posting across the
- *  internet does not keep; and it said there is no consent banner "because there
- *  is nothing here to consent to", which stopped being true the moment one
- *  edition started asking. The crash-report caveat was also moved out of the
- *  middle of a long sentence into its own paragraph, because it is the one place
- *  free text can travel and it should not have to be hunted for.
- *
- *  Every claim in here is an IDENTITY claim, and that is deliberate. The
- *  replacement for the consent-banner sentence briefly said "nothing is kept
- *  about you to consent to", which is a data claim and a false one: the
- *  transparency note two paragraphs down describes a session-scoped id in
- *  `sessionStorage` and an on-device returning bucket, both of them kept. What
- *  is true, and what this copy says instead, is that none of it identifies you
- *  or points back to you across visits. Keep any future edit on that side of the
- *  line.
- *
- *  ## TWO edition-conditionals, and they point opposite ways. Keep both.
- *
- *  One body serves both editions (the two surfaces' containment tests depend on
- *  there being exactly one), so wherever the editions genuinely differ this copy
- *  names the rule for both instead of describing whichever edition the author
- *  had in mind. There are two such places, and because they cut in OPPOSITE
- *  directions, an editor who notices only one of them will read the other as
- *  redundant hedging and flatten it. They are not redundant:
- *
- *  1. A packaged edition sends gameplay counts a browser does not have to send
- *     across the internet, because it runs from the player's own machine rather
- *     than from a page we serve. That is the third paragraph's "would" wording.
- *  2. A browser sends page-visit counts and page performance metrics a packaged
- *     edition never sends. `injectVercelTelemetry` (`telemetry.ts`) returns on
- *     `isWrappedMode` BEFORE it consults consent, because `/_vercel/*` resolves
- *     to a path on the shell's app protocol and 404s there. Granting desktop
- *     consent opens the gameplay events and does nothing for this pair. That is
- *     the first paragraph's "a packaged edition sends neither".
- *
- *  Point 2 was an overstatement rather than an understatement (the old clause
- *  told a packaged player we collect two metric classes we never collect), but
- *  it still had a real cost: a player could decline over a metric class that
- *  does not exist on their edition.
- *
- *  ## Why the packaged-edition sentences are conditional (party ruling)
- *
- *  This body ships in the WEB build and is read by players who can only play in
- *  a browser, so it states the RULE rather than a product. An earlier draft
- *  described the desktop app in the present tense, which was false twice over:
- *  no desktop artifact existed that a reader could obtain, and the shell
- *  canceled the ingest request anyway (`onBeforeRequest` allowed only
- *  `app://game`, and the injected CSP was `connect-src 'self'`), so the counts
- *  it claimed were crossing the internet were not being sent at all. A privacy
- *  disclosure that misdescribes where data goes is the one thing this copy
- *  exists to get right, so the wording was made true today, true when a
- *  packaged edition ships, and an announcement of nothing.
- *
- *  REVERT TRIGGER, and it is a distribution event rather than a code event:
- *  flip "Today Verticopolis runs in your browser, and that is the only edition
- *  you can play" and the conditional "would" sentences back to the present
- *  tense the first time a desktop artifact is handed to ANYONE outside this
- *  repository, playtest builds included. Merging a stage does not make the
- *  sentence false; handing somebody a binary does. The first-run notice
- *  (`templates/desktopAnalytics.ts`) and the Settings Privacy row stay in the
- *  present tense either way, because both render only on a packaged build,
- *  where the present tense is already correct. */
+ *  Every claim in here is an IDENTITY claim, and that is deliberate: the
+ *  transparency note describes a session-scoped id in `sessionStorage` and an
+ *  on-device returning bucket, both of them kept. What is true, and what this
+ *  copy says, is that none of it identifies you or points back to you across
+ *  visits. Keep any future edit on that side of the line. */
 export function helpPrivacyBody(): TemplateResult {
   return html`<p style="color:var(--muted)">
       Verticopolis keeps a small, anonymous read on how the game is going: whether new players place their first
       facility, how far towers climb the star ladder, which tools get used, and whether returning players get further
       than first-timers. Those signals are worked out on your own device and sent as coarse, anonymous counts to our
-      own site, with no cookie and nothing that could point back to you across visits. In a browser, the page we serve
-      also sends anonymous page-visit counts and page performance metrics; a packaged edition sends neither.
+      own site, with no cookie and nothing that could point back to you across visits. The page also sends anonymous
+      page-visit counts and page performance metrics.
     </p>
     <p style="color:var(--muted)">
       Crash reports are the one place your own words can travel. They carry the technical details of the error and the
@@ -194,20 +141,14 @@ export function helpPrivacyBody(): TemplateResult {
     </p>
     <p style="color:var(--muted)">
       There are no accounts and no ads: the game never asks for your name or email, keeps no profile, and nothing
-      recognizes you from one day to the next. Today Verticopolis runs in your browser, and that is the only edition
-      you can play. In a browser there is no consent banner, because nothing that identifies you is kept. A packaged
-      edition would be different: it runs from your own machine rather than from a page we serve, so its counts would
-      have to travel across the internet to our site. Any edition we package that way asks on the first launch, before
-      it counts anything, and the switch then lives in Settings, under Privacy. Saves live in your own storage and
-      leave your device only when you export them. The counts help decide what to improve; they are never sold or
-      shared.
+      recognizes you from one day to the next. There is no consent banner, because nothing that identifies you is kept.
+      Saves live in your own storage and leave your device only when you export them. The counts help decide what to
+      improve; they are never sold or shared.
     </p>`;
 }
 
 /** The "Found a bug?" report call to action (heading + blurb + external link).
- *  The wrapping `<p>` keeps `class="help-report"` so the modal controller's
- *  `.help-report a` selector finds the link and routes it through the platform
- *  wrapper (`routeExternalInWrapper`).
+ *  The wrapping `<p>` keeps `class="help-report"` for its styling.
  *
  *  The heading level is caller-chosen so each surface keeps a consistent document
  *  outline without forking the prose: the modal uses `h3` (matching its

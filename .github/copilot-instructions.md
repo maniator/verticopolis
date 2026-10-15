@@ -46,7 +46,7 @@ deterministic and testable. Rendering and UI read engine state; they don't drive
 
 ```bash
 npm run dev          # Vite dev server
-npm run build        # production build to dist/
+npm run build        # production build to dist/ (needs the engine package; see below)
 npm test             # Vitest suite
 npm run typecheck    # tsc --noEmit
 npm run lint         # eslint
@@ -58,6 +58,13 @@ npm run screenshots  # build + headless screenshot capture into docs/screenshots
 ```bash
 npm run typecheck && npm run lint && npm test && npm run build
 ```
+
+`npm run build` refuses a build without the WASM engine package
+(`src/public/engine/`, built by `npm run wasm:build`). When the setup steps
+could not build it, they set `VC_ALLOW_NO_ENGINE=1` for the setup build. If
+your own `npm run build` stops for the missing engine, run it as
+`VC_ALLOW_NO_ENGINE=1 npm run build` (a deliberate TypeScript-only build);
+see CONTRIBUTING.md.
 
 CI (`.github/workflows/test.yml`) runs all of the above on every PR. When you push
 new commits to a PR, **re-request a Copilot review**. Copilot reviews are one-shot
@@ -93,26 +100,15 @@ don't claim a skill was invoked:
   so it stays reliably searchable as confirmation this overlay was applied, even
   if a template or postamble appends text after it.
 
-> **Maintainer note: why there is no `.github/skills` review skill.** Copilot
-> code review *can* load agent skills from `.github/skills/`, but this repo
-> commits the full BMGD/BMAD skill library under `.claude/skills/` and
-> `.agents/skills/` (~515 files each). Copilot's skill loader has a ~508-file
-> budget those trees blow past, so it drops **all** base-branch skills for safety.
-> A `.github/skills/code-review` skill can't load here. The reviewer's run log
-> states it outright:
->
-> ```
-> [skills] Materialization aborted (convention .claude/skills has 515 files,
->   exceeds remaining MAX_SKILL_FILE_COUNT budget (508)); dropping all
->   base-branch skills for safety.
-> [skills] session=github/copilot-code-review ... configuredDirectories=0
-> [skills] session=github/copilot-code-review SDK reported 0 skills loaded
-> ```
->
-> This overlay is the mechanism by design; don't re-add a review skill expecting
-> it to load. (Investigated 2026-07-06: verticopolis ships both the `bmad-*` and
-> `gds-*` families, ~515 files per convention; a bmad-only install lands ~256,
-> under budget.)
+> **Maintainer note on agent skills.** Copilot code review loads this repo's
+> skills from `.agents/skills/` (the run log for #861 on 2026-10-08 reports
+> `catalogEntries=89`, and the reviewer invoked `gds-code-review` and
+> `bmad-code-review` from there). An earlier note here said the loader's
+> file budget dropped every skill; that was true on 2026-07-06 and is not
+> anymore. `.github/skills/engine-parity-review/SKILL.md` adds the
+> repo-specific checklist for a change on the TypeScript and Rust engine
+> seam (the two-engine rule, the lock, the loader table, the canon caps);
+> the overlay above stays the review method either way.
 
 ## Code review
 
@@ -152,6 +148,16 @@ agents, convened as a party for larger changes.
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
 - Match the surrounding code's formatting, naming, and comment density.
+- **A published analytics number comes from a governed definition, or from
+  reviewed code that a test binds to one.** What is banned is improvising a
+  measure in a session and publishing it. The governed sources are the
+  "Verticopolis: Gameplay Analytics" dashboard, the `session_lengths` view, its
+  saved insights, and the PostHog data catalog; check the catalog first.
+  `scripts/posthog-report.mjs` is the worked example of the second clause: it
+  writes its own HogQL, and `src/posthog-report.test.ts` pins its page-life walk
+  against the view's copy so the two cannot drift. A published snapshot states
+  its window above the figures, not in a footer. Full rule and the incident
+  behind it: [`CLAUDE.md`](../CLAUDE.md) non-negotiables.
 - Adding a facility/room type? Start in `src/engine/facilities.ts`, then thread it
   through rendering and UI. Don't special-case it in the render layer.
 

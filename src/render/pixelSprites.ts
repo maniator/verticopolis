@@ -1,6 +1,9 @@
 import type { FacilityKind, Unit, UnitState } from "../engine/types";
-import { FACILITIES, hasBusinessHours, isOpenAt } from "../engine/facilities";
+import { hasBusinessHours, isOpenAt } from "../engine/facilities";
+import { facilityColor } from "../presentation/facilityPresentation";
+import { isLateHour } from "./lateNight";
 import { POPULATED, closedShutter, noticeBadge, type RoomCtx } from "./pixelSprites/common";
+import { layerEnd } from "./pixelSprites/layers";
 import { condo, hotel, office } from "./pixelSprites/residential";
 import { rentalApartment, rentalStudio } from "./pixelSprites/residentialRentalSprites";
 import { cinema, fastFood, foodHall, restaurant } from "./pixelSprites/food";
@@ -44,7 +47,7 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
     u.state !== "construction" &&
     !isOpenAt(u.kind, d.hour)
   ) {
-    closedShutter(d, x, y, w, h, FACILITIES[u.kind].color);
+    closedShutter(d, x, y, w, h, facilityColor(u.kind));
     return;
   }
   switch (u.kind) {
@@ -131,9 +134,14 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
       ctx.fillStyle = "#3a3f4a";
       ctx.fillRect(x, y, w, h);
   }
+  // The furniture ends here: the night scrim and the notice badge draw over
+  // the room after it, so the atlas's depth layers put them on the shell.
+  layerEnd(ctx);
   // Lights out at night: an empty home/workplace, or a condo whose residents
-  // are asleep in the small hours.
-  const lateNight = d.hour >= 23 || d.hour < 6;
+  // are asleep in the small hours. The asleep scrim is the condo's only; studios
+  // and apartments hide their residents late at night without it. Whether
+  // they should dim too is backlog row rental-asleep-scrim (GH #1025).
+  const lateNight = isLateHour(d.hour);
   const emptyAtNight = d.lit && u.occupants <= 0 && POPULATED.has(u.kind);
   const asleepHome = u.kind === "condo" && u.occupants > 0 && lateNight;
   if ((emptyAtNight || asleepHome) && u.state !== "empty" && u.state !== "construction") {

@@ -1,4 +1,5 @@
 import type { Unit } from "../../../engine/types";
+import { layerBreak, layerEnd } from "../../pixelSprites/layers";
 import { ACCENTS, rand, shade, type DrawCtx } from "../common";
 import { box, floorb, refMap } from "./serviceKit";
 import { FLOOR, TILE } from "../../scale";
@@ -35,6 +36,9 @@ export function drawParking(d: DrawCtx, u: Unit, x: number, y: number, w: number
   F(4, 2, 1, fy - 2, "#4E535B");
   F(9, fy - 16, 1, 15, "#DCDCD0", 0.5);
   F(W - 4, fy - 16, 1, 15, "#DCDCD0", 0.5);
+  // The deck is the shell; the car parked in front of it is the furniture, and
+  // the P sign hangs on the wall (depth layers, `pixelSprites/layers.ts`).
+  layerBreak(ctx);
   // A single car, centered, shown only when this space actually holds one and
   // is not dead. `parkingUse` and `parkingDead` are prepared inputs; a stable
   // per-space roll versus the tower-wide usage fraction fills the same spaces
@@ -54,12 +58,30 @@ export function drawParking(d: DrawCtx, u: Unit, x: number, y: number, w: number
     F(cx + cw - 2, fy - 8, 2, 2, "#FFE27A");
     F(cx + 2, fy + 2, cw - 4, 1, "#000000", 0.25);
   }
+  layerEnd(ctx);
   // Blue P sign.
   F(W - 12, 8, 9, 9, "#2A5AA8");
   F(W - 10, 10, 2, 5, "#FFFFFF");
   F(W - 10, 10, 4, 1, "#FFFFFF");
   F(W - 7, 11, 1, 2, "#FFFFFF");
   F(W - 10, 12, 3, 1, "#FFFFFF");
+}
+
+/** The dead-parking "red X" (canon: an unchained space draws no relief), the
+ *  same strokes the per-unit bake drew, at the unit's region-relative rect. */
+export function drawDeadParkingX(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
+  // Dark under-stroke so the X reads as a SHAPE independent of hue
+  // (color-blind cue), then the red X on top.
+  for (const [style, wd] of [["#111", 4] as const, ["#C24A3A", 2] as const]) {
+    ctx.strokeStyle = style;
+    ctx.lineWidth = wd;
+    ctx.beginPath();
+    ctx.moveTo(x + 2, y + 2);
+    ctx.lineTo(x + w - 2, y + h - 2);
+    ctx.moveTo(x + w - 2, y + 2);
+    ctx.lineTo(x + 2, y + h - 2);
+    ctx.stroke();
+  }
 }
 
 // ---- Parking ramp -----------------------------------------------------------
@@ -161,6 +183,9 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: Unit, x: numbe
   F(W - 7, 33, 7, 5, "#6E6A62");
   F(W - 5, 36, 4, 4, "#16181C");
   F(W - 4, 36, 2, 1, "#6A6E76");
+  // The ramp structure is the shell; the car parked at its foot is the
+  // furniture (depth layers, `pixelSprites/layers.ts`).
+  layerBreak(ctx);
   // Primary parked car at the ramp foot (side view, wheels on the deck). Body
   // width drives the wheelbase, so the two wheels keep equal end margins.
   const carX = 122;

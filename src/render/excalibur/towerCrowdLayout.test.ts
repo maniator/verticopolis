@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { coveredUpperStories, lotCovered, lobbyLaneSpan } from "./towerCrowdLayout";
 import type { Unit } from "../../engine/types";
+import { catalogFor } from "../../engine/catalog";
+
+const MODERN = catalogFor("modern");
 
 /**
  * Pure layout math for the ambient-walker builder: the multi-floor-facility
@@ -14,27 +17,27 @@ const unit = (kind: string, floor: number, x: number, width: number) =>
 
 describe("coveredUpperStories marks the upper floors of multi-floor facilities", () => {
   it("returns no rows when every unit is single-story", () => {
-    const rows = coveredUpperStories([unit("office", 3, 10, 6), unit("floor", 3, 16, 1)]);
+    const rows = coveredUpperStories([unit("office", 3, 10, 6), unit("floor", 3, 16, 1)], MODERN);
     expect(rows.size).toBe(0);
   });
 
   it("covers the upper story of a two-floor facility, not its base", () => {
     // recycling spans 2 floors: base at -1, upper story at 0.
-    const rows = coveredUpperStories([unit("recycling", -1, 112, 20)]);
+    const rows = coveredUpperStories([unit("recycling", -1, 112, 20)], MODERN);
     expect(rows.has(-1)).toBe(false); // base story keeps its walkers
     expect(rows.get(0)).toEqual([[112, 132]]);
   });
 
   it("covers every non-base story of a three-floor facility", () => {
     // metro spans 3 floors: base at -7, upper stories at -6 and -5.
-    const rows = coveredUpperStories([unit("metro", -7, 0, 34)]);
+    const rows = coveredUpperStories([unit("metro", -7, 0, 34)], MODERN);
     expect(rows.has(-7)).toBe(false);
     expect(rows.get(-6)).toEqual([[0, 34]]);
     expect(rows.get(-5)).toEqual([[0, 34]]);
   });
 
   it("accumulates spans from several facilities sharing a covered row", () => {
-    const rows = coveredUpperStories([unit("recycling", -1, 10, 20), unit("cinema", -1, 60, 31)]);
+    const rows = coveredUpperStories([unit("recycling", -1, 10, 20), unit("cinema", -1, 60, 31)], MODERN);
     expect(rows.get(0)).toEqual([[10, 30], [60, 91]]);
   });
 });

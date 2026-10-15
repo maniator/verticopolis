@@ -4,7 +4,8 @@ import type { DrawCtx } from "../common";
 import { TILE, FLOOR } from "../../scale";
 import { refMap } from "./serviceKit";
 import { drawParking, drawParkingRamp } from "./garage";
-import { drawSecurity, drawMedical, drawHousekeeping, drawRecycling } from "./service";
+import { drawSecurity, drawMedical, drawHousekeeping } from "./service";
+import { drawRecycling } from "./recycling";
 
 /**
  * The service sprites were once authored in a reference space (TILE 11 by

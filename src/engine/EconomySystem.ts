@@ -10,14 +10,15 @@ import { ledgerCatFor, type LedgerCat } from "./Ledger";
 import { subtypeListFor } from "./retailSubtypes";
 import { Housekeeping } from "./economy/housekeeping";
 import { computeDemandMap, unitReachable } from "./sim/demand";
+import { roomUnits } from "./tower/rooms";
 
 /** The lease kinds `collectRent` collects quarterly, and the money-log line each
  *  emits (its ledger category comes from `ledgerCatFor`). A kind absent here pays
  *  no lease. Office is canon; the Fitness Club and Clinic are Modern-only. */
 const LEASE_MESSAGE: Partial<Record<FacilityKind, (amt: number, n: number) => string>> = {
-  office: (a, n) => `Quarterly office rent collected: $${a.toLocaleString()} (${n} offices).`,
-  fitnessClub: (a, n) => `Fitness Club membership dues collected: $${a.toLocaleString()} (${n} club${n > 1 ? "s" : ""}).`,
-  clinic: (a, n) => `Clinic lease collected: $${a.toLocaleString()} (${n} clinic${n > 1 ? "s" : ""}).`,
+  office: (a, n) => `Quarterly office rent collected: $${a.toLocaleString("en-US")} (${n} offices).`,
+  fitnessClub: (a, n) => `Fitness Club membership dues collected: $${a.toLocaleString("en-US")} (${n} club${n > 1 ? "s" : ""}).`,
+  clinic: (a, n) => `Clinic lease collected: $${a.toLocaleString("en-US")} (${n} clinic${n > 1 ? "s" : ""}).`,
 };
 
 /** Canon "commercial must be near a lobby": a shop/food venue more than this many
@@ -161,7 +162,7 @@ export class EconomySystem {
     // venue below. Draws no RNG, so the seeded economy stream is unperturbed.
     const rules = this.sim.rules ?? MODERN_RULES;
     const isWeekend = this.sim.clock.isWeekend;
-    for (const u of this.sim.tower.units) {
+    for (const u of roomUnits(this.sim.tower)) {
       // Mode headline (#572); the demand map reads the same seam, so the income anchor and the pool capacity always match.
       const daily = rules.commercialDailyIncome(u.kind);
       if (daily === undefined) continue;
@@ -358,7 +359,7 @@ export class EconomySystem {
     if (revenue > 0) {
       this.sim.money += revenue;
       this.sim.recordMoney?.("hotels", revenue);
-      this.sim.emit(`Hotel guests checked out: $${revenue.toLocaleString()} earned overnight.`, "money");
+      this.sim.emit(`Hotel guests checked out: $${revenue.toLocaleString("en-US")} earned overnight.`, "money");
     }
     // Fresh shift after the checkouts: each crew re-seeds with full capacity on
     // its first dispatch today (also how crews built mid-shift join the day).
@@ -387,7 +388,7 @@ export class EconomySystem {
     if (revenue > 0) {
       this.sim.money += revenue;
       this.sim.recordMoney?.("hotels", revenue);
-      this.sim.emit(`Late hotel checkouts: $${revenue.toLocaleString()} earned.`, "money");
+      this.sim.emit(`Late hotel checkouts: $${revenue.toLocaleString("en-US")} earned.`, "money");
     }
   }
 
@@ -410,6 +411,8 @@ export class EconomySystem {
   housekeepingReport(): { cleaned: number; leftover: number } | null {
     return this.housekeeping.report();
   }
+  /** See {@link Housekeeping.adoptReport}. */
+  adoptHousekeepingReport(r: { cleaned: number; leftover: number } | null): void { this.housekeeping.adoptReport(r); }
 
   /** Monthly upkeep for elevator cars and staffed service facilities. */
   payMaintenance(): void {
@@ -490,7 +493,7 @@ export class EconomySystem {
       // "Monthly maintenance paid" string (byte-identical). Canon has no month (a
       // year is 12 days), so it drops the word rather than lie.
       const monthly = this.sim.clock.calendar.maintPeriodDays === REAL_WORLD.maintPeriodDays;
-      this.sim.emit(`${monthly ? "Monthly maintenance" : "Maintenance"} paid: $${cost.toLocaleString()}.`, "money");
+      this.sim.emit(`${monthly ? "Monthly maintenance" : "Maintenance"} paid: $${cost.toLocaleString("en-US")}.`, "money");
     }
   }
 }

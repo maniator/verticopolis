@@ -63,6 +63,81 @@ Verticopolis has **two test tiers**:
     on filename, so a `*.integration.test.ts` anywhere under `src/` runs in this
     tier and never in unit, and the pair covers every test with no gap.
     `npm run test:integration` runs only these.
+    The engine conformance suite runs in this tier: scripted scenarios in
+    `conformance/` whose checkpoint hashes are pinned in
+    `conformance/expected.json` and checked by
+    `conformance.integration.test.ts`. A moved hash is a simulation change:
+    regenerate the lock only on purpose, in the same PR. See
+    [conformance/README.md](./conformance/README.md).
+
+    **Two engines, one simulation.** `engine-rs/` is a Rust port of
+    `src/engine/`, held to the same lock by its own referee
+    (`cargo run --release --features conformance --bin conformance`, and again through the WASM
+    binding from Node with `npm run wasm:build && npm run test:wasm`, which
+    also runs the dual run's day gate: both engines driven by the frame
+    loop's own step math and compared every hour, and the `.TDT` codec's
+    differential test, `conformanceWasmTdt.integration.test.ts`, which runs
+    both codecs on seeded inputs, with its side runners in
+    `src/tests/conformance/tdtDifferential.ts` and its input builders in
+    `src/tests/fixtures/tdtDifferentialInputs.ts`; its `VC_TDT_DIFF_*`
+    switches are listed in its header). The same command runs the `.vctower`
+    writer's test, `conformanceWasmVctower.integration.test.ts`, which writes
+    every fixture with the engine and reads it back through the web game's
+    readers. The game runs on the WASM engine behind `?engine=wasm` (the
+    TypeScript engine stays the default). The served package
+    (`src/public/engine/`) is build output and is not checked in: build it
+    locally to use `?engine=wasm`, with `bash scripts/build-engine-wasm.sh`
+    on x86_64 Linux (it installs the pinned toolchain) or `npm run wasm:build`
+    once the toolchain in engine-rs/README.md is installed. `npm run e2e`
+    needs it too, since its `chromium-wasm` project runs every spec on the
+    WASM engine, and so does `npm run build`: its precache check
+    (`scripts/verify-precache.ts`) refuses a build without the engine, so no
+    build ships a silent TypeScript fallback. Without a Rust toolchain, run
+    `VC_ALLOW_NO_ENGINE=1 npm run build` for a deliberate TypeScript-only
+    build. A stale local build fails the unit test that checks its source
+    hash. CI restores it from the
+    Actions cache, keyed on the engine's source hash, and builds it once per
+    engine change (`.github/actions/engine-wasm`); Vercel builds it on every
+    deploy through `scripts/vercel-build.sh`. `VC_ENGINE=wasm npm run build` makes the wasm-only build the 3.0.0
+    flip will deploy: the WASM engine is the only engine, `?engine=` and
+    `vc.engine` are ignored, the TypeScript step loop is swapped out, and an
+    engine that cannot start stops the game with a message instead of
+    falling back. Its postbuild check (`scripts/verify-engine-bundle.ts`)
+    reads the emitted sourcemaps and fails when a TypeScript engine module
+    that `scripts/engine-bundle.allow.txt` does not list ships, or when a
+    listed one no longer does (delete its line: the list only shrinks). The
+    default build (`VC_ENGINE` unset, or `switchable`) keeps both engines;
+    like every player build, it no longer ships the dual-run worker, which
+    only dev serves and `VC_TOOLING=1` builds use. `VC_ENGINE` applies to
+    builds and dev serves only: with it exported, `npm test` refuses to start
+    (the WASM test lanes use `VC_REQUIRE_WASM=1`). See
+    `docs/performance/wasm-only-bundle.md` for what still ships and why. Until the Rust engine is the default,
+    every simulation change lands in both engines in one PR with
+    the regenerated lock, and a PR that changes `src/engine/` without touching
+    `engine-rs/` says why (a UI readout, prose, a transient the hash never
+    sees). An engine PR that adds a branch adds a scenario that reaches it;
+    the Rust job's coverage step (`cargo llvm-cov`, line floor in
+    `engine-rs.yml`) is how review checks that, and the floor only moves up.
+    The catalog every frontend reads (prices, sizes and build rules,
+    `src/engine/catalog.ts` and `engine-rs/src/catalog.rs`) is pinned the
+    same way by `conformance/catalog-digests.json`
+    (`catalog.integration.test.ts` writes it with the same regeneration
+    switch; a Rust test, the referee and the WASM suite check it), so a
+    changed price or size moves that digest in the PR that changes it.
+    Forged-save handling is pinned the same way by
+    `conformance/loader-cases.json` (`loaderCases.integration.test.ts` writes
+    it, a Rust test replays it), and the `.TDT` codec by
+    `conformance/tdt-cases.json` (`tdtCases.integration.test.ts` writes it,
+    `cargo run --release --features conformance --bin tdt` and a Rust test replay it). A nightly differential fuzzer
+    (`engine-fuzz.yml`) runs seeded random scenarios through both engines; a
+    divergence it finds is pinned as a named scenario in the fix PR.
+
+    **The vitest tiers on the WASM engine.** `npm run test:wasm:parity` runs
+    the `integrationWasm` and `unitWasm` projects, whose setup file hosts
+    every `Simulation` a test ticks on the engine
+    (story-engine-test-parity, #878). A test that cannot run there is marked
+    with `itTypeScriptOnly(reason)`, and the story's test-mapping table names
+    each one with the same reason. No CI job runs these projects yet.
 
   `npm test` (`vitest run`) runs **both** projects and is the CI gate. Coverage
   stays a single root-level measurement across both projects (see Coverage
@@ -75,6 +150,10 @@ Verticopolis has **two test tiers**:
   and `VC_TOOLING=1` builds; a production build compiles it away so shipped
   sessions carry no console handle into the sim. Run it with `npm run e2e`
   after a tooling build (`VC_TOOLING=1 npm run build`).
+  `PW_WASM_ONLY=1 npx playwright test --grep-invert @perf` runs the suite on
+  a wasm-only tooling build (`VC_ENGINE=wasm VC_TOOLING=1 npm run build`),
+  with `e2e/wasmOnly.spec.ts` covering its boot, failures and offline start;
+  CI runs it as the `e2e-wasm-only` job.
   Specs cover boot/integration, milestones, a full win, and visual baselines.
   See [`playwright.config.ts`](./playwright.config.ts) for how visual baselines
   are minted by CI (local runs smoke the flows but skip pixel comparison unless
@@ -143,7 +222,9 @@ For the exact twice-render determinism check used by the drift workflow, replace
 node scripts/screenshot-determinism-check.ts --all
 ```
 
-To regenerate `e2e/visual.spec.ts-snapshots` in the same pinned image:
+To regenerate `e2e/visual.spec.ts-snapshots` in the same pinned image (its
+`npm run build` needs the engine package, and the image has no Rust toolchain,
+so build `src/public/engine/` on the host first; see the engine note above):
 
 ```bash
 docker run --rm --ipc=host \
@@ -173,6 +254,16 @@ A plain host `npm run screenshots` is still preview-only because host Chromium
 and font rasterization may differ from the pinned image. See
 [`docs/screenshots.md`](./docs/screenshots.md) for the workflow details.
 
+Both checks run on two engines. The committed gallery and baselines are the
+TypeScript engine's, and engine legs render the same scenes with the WASM engine
+hosting the tower (`VC_SHOT_ENGINE=wasm` for `scripts/screenshots.ts`,
+`PW_WASM_VISUAL=1 npx playwright test e2e/visual.spec.ts --project=chromium-wasm`
+for the baselines): `pr-drift-check` compares the engine's gallery with the same
+run's TypeScript render (`engine-parity`) and the engine's visual specs with the
+committed baselines (`engine-parity-visual`), and `update-visual-baselines`
+repeats the visual comparison after a mint. Any pixel difference fails the leg
+as an engine parity finding to report; the engine legs never commit or mint.
+
 ### Coverage floors
 
 Coverage is enforced as a **ratchet**, not a vanity number. It can't rot below
@@ -199,6 +290,17 @@ e2e specs (e.g. `e2e/integration.spec.ts` boots it in a real browser):
   `TowerEngine`, so `new GameApp()` can't run under happy-dom. Its testable
   *logic* lives in the measured `src/game/*` controllers.
 - **`src/render/excalibur/**`**: the Excalibur/WebGL engine wrapper.
+- **`src/dualrun/worker.ts`**: the dual run's Web Worker entry, which loads
+  the WASM package by URL; the controller it serves is measured against a
+  worker stand-in.
+- **`src/wasmhost/engineWorker.ts`**: the experimental worker host's Web
+  Worker entry, the browser glue around `EngineWorkerCore`, which is measured
+  in Node against the real package and a fake engine.
+- **`src/render/atlas/browserEntry.ts`, `verify.ts`, `verifyExtras.ts`**: the
+  sprite atlas bake's browser half (the page API the export drives and the
+  pixel checks), which reads pixels back from a live canvas. The pipeline they
+  call (bake, compose, lookup, archive) is measured in its own modules, and
+  `e2e/atlas.spec.ts` runs them end to end.
 
 Also excluded are non-product tooling entry points that are build/dev plumbing,
 not game logic: the gallery/preview pages (`src/gallery.ts`,
@@ -284,6 +386,18 @@ Bump it with `npm version <patch|minor> --no-git-tag-version`, not by hand-editi
 `package.json` alone: that also updates **`package-lock.json`**, which must move in
 lockstep (a stale lockfile breaks `npm ci` and misreports the build). A CI guard,
 `src/tests/versionLockSync.test.ts`, fails the moment the two drift.
+
+A version becomes a GitHub release only when a maintainer tags it. After the
+bump merges, tag that merge commit on `main` with `v<version>` and push the tag
+(`git tag v2.30.0 <commit> && git push origin v2.30.0`). The tag runs
+`.github/workflows/atlas-release.yml`, which publishes the release with the
+version's player notes and the sprite atlas (docs/atlas.md). Not every
+bump needs a tag; tag the versions a frontend on the open engine should pin.
+Only commits that contain the atlas exporter can get an atlas. A tag push runs
+the workflow file as it is at the tagged commit. A manual run (Actions, "Sprite
+atlas release", with the tag as input) uses the copy on the branch or tag it
+runs from: it builds and publishes when the tag has no published release, and only
+audits when it does.
 
 **Bump `version` in the same PR as any player-facing change.** The tier is keyed
 to one question: would a player notice anything different?
@@ -408,6 +522,18 @@ alone.
   emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
+- **Rust follows the same source rules.** The engine port in `engine-rs/` is held to
+  the same conventions as the TypeScript, with no grandfathered comments:
+  American English, no em-dashes (`src/tests/rustProse.guard.test.ts` keeps the
+  Rust sources at zero), and the 500-line file ceiling that
+  `src/tests/fileSize.guard.test.ts` enforces on `src/` and `scripts/` (it scans
+  `.rs` files too, inline `#[cfg(test)]` modules included; today's oversized
+  Rust files sit on the same shrink-only ratchet, `src/tests/fileSize.ratchet.txt`).
+  The other gates have Rust counterparts: lint and typecheck map to `cargo fmt
+  --check` and `cargo clippy -D warnings` (`engine-rs.yml`), and the engine
+  boundary rules to `engine-rs/tests/independence.rs`, which keeps the simulation
+  free of host access (files, network, console, clock; a few named referee
+  functions may read fixtures) and the JavaScript binding inside `src/wasm.rs`.
 - **Keep `src/engine/` free of DOM/rendering** so the simulation stays
   deterministic and unit-testable.
 - **Show visual/gameplay changes with real screenshots** in the PR's

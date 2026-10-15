@@ -8,10 +8,11 @@
  * Only the icons that have a pixelarticons equivalent live here. The custom
  * hand-drawn glyphs (mute, bomb, bulldoze, warning, pause, speed1..3, help)
  * stay in `src/ui/icons.ts`. The paths are inlined into the bundle at build
- * time, so nothing is fetched at runtime (the offline PWA and the packaged
- * shells stay self-contained). `src/ui/iconPaths.generated.test.ts` checks the
+ * time, so nothing is fetched at runtime (the offline PWA stays
+ * self-contained). `src/ui/iconPaths.generated.test.ts` checks the
  * committed output still matches the installed package.
  */
+// copies-package: pixelarticons -> src/ui/iconPaths.generated.ts
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";

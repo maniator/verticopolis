@@ -1,9 +1,8 @@
 import type { Simulation } from "../engine/Simulation";
-import { getPlatform } from "../platform";
+import { downloadFile } from "./downloadFile";
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl } from "../game/crashReport";
 import type { CrashDescription, FrameErrorEntry } from "../game/crashReport";
 import { escapeHtml } from "./escape";
-import { routeExternalInWrapper } from "./externalLink";
 
 /**
  * The full-screen crash card. Shown when the game can no longer draw (the GPU
@@ -108,25 +107,21 @@ export function showCrashScreen(opts: CrashScreenOptions): void {
         frameErrors: opts.frameErrors,
       });
       const { filename, bytes } = await buildCrashReportZip(sim, details);
-      await getPlatform().saveFile(filename, bytes, "application/zip");
-      // No "downloaded!" claim: a native wrapper's share sheet RESOLVES on
-      // cancel too (the platform contract), so like the export flow this
-      // points at the downloads folder instead of asserting success.
+      downloadFile(filename, bytes, "application/zip");
+      // Like the export flow, this points at the downloads folder rather than
+      // asserting success: the browser owns the download from here.
       status.textContent = "Crash report ready. Check your downloads, then attach the zip to your bug report.";
       downloadBtn.disabled = false;
     })().catch((err) => {
       // Keep the diagnostic trail: this is the one feature whose whole point
       // is preserving evidence. The neutral wording covers both halves of the
-      // pipeline (zip build and the platform file save).
+      // pipeline (zip build and the download).
       console.error("[crash-report] packing or saving failed:", err);
       status.textContent = "The crash report couldn't be saved. You can still reload; your tower's save state is described above.";
       downloadBtn.disabled = false;
     });
   });
   dialog.querySelector<HTMLButtonElement>('[data-act="reload"]')!.addEventListener("click", () => opts.onReload());
-  // Inside a native wrapper the bug-report link routes to the system browser
-  // through the platform port (same treatment as the Help dialog's link).
-  routeExternalInWrapper(dialog.querySelector<HTMLAnchorElement>('[data-act="report"]')!);
   // showModal honors the autofocus above; the explicit call covers the
   // no-dialog-support fallback so focus still lands in the card.
   dialog.querySelector<HTMLButtonElement>('[data-act="reload"]')!.focus();

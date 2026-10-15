@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
 import { notesForVersion } from "./src/changelog";
+import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
+import { parseEngineBuild, type EngineBuild } from "./src/build/engineBundle";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
 
@@ -40,6 +42,49 @@ function toolingBuild(): boolean {
   return on;
 }
 
+/** The engine build mode (`VC_ENGINE`; see src/build/engineBundle.ts). A
+ *  wasm-only build ships the Rust/WASM engine as the only engine: no runtime
+ *  switch, no TypeScript step loop, no fallback. The value is validated, and
+ *  `VC_ENGINE` is refused under Vitest, whose suites pick their engine with
+ *  `VC_REQUIRE_WASM` and need the TypeScript step loop the alias below removes. */
+function engineBuild(): EngineBuild {
+  const mode = parseEngineBuild(process.env.VC_ENGINE);
+  if (process.env.VITEST && process.env.VC_ENGINE) {
+    throw new Error("VC_ENGINE selects a build mode and does not apply to Vitest; unset it (the WASM test lanes use VC_REQUIRE_WASM=1).");
+  }
+  if (mode === "wasm-only") console.warn("[build] VC_ENGINE=wasm: a wasm-only build (no TypeScript step loop, no fallback).");
+  return mode;
+}
+
+const ENGINE_BUILD = engineBuild();
+const TOOLING_BUILD = toolingBuild();
+
+/**
+ * Module swaps that keep engine-specific code out of a bundle that cannot use
+ * it. Plain `resolve.alias` entries match an import specifier's text from any
+ * importer, so src/build/engineAliases.test.ts pins that exactly one file uses
+ * each specifier and that no other specifier reaches the real module, and
+ * `scripts/verify-engine-bundle.ts` proves from the emitted sourcemaps that
+ * the swapped module did not ship. The step-loop swap applies to a dev serve
+ * with `VC_ENGINE=wasm` too, so that serve behaves like the wasm-only build.
+ *   - wasm-only builds: `Simulation.ts`'s step loop becomes a stand-in that
+ *     throws, since the WASM host replaces `tick` on every tower it holds.
+ *   - every build that is neither a dev serve nor a tooling build, and every
+ *     wasm-only build: the dual run becomes an inert stand-in. Its call in
+ *     bootstrap.ts is compiled away there already, but Vite still emitted (and
+ *     the precache still shipped) its Web Worker.
+ */
+function engineAliases(command: "build" | "serve"): { find: RegExp; replacement: string }[] {
+  const aliases: { find: RegExp; replacement: string }[] = [];
+  if (ENGINE_BUILD === "wasm-only") {
+    aliases.push({ find: /^\.\/sim\/loop$/, replacement: resolve(__dirname, "src/wasmhost/stepLoopAbsent.ts") });
+  }
+  if (ENGINE_BUILD === "wasm-only" || (command === "build" && !TOOLING_BUILD)) {
+    aliases.push({ find: /^\.\/dualrun\/dualRun$/, replacement: resolve(__dirname, "src/dualrun/dualRunAbsent.ts") });
+  }
+  return aliases;
+}
+
 /** Short git SHA of the build, or "unknown" outside a checkout. */
 function gitShortSha(): string {
   try {
@@ -68,8 +113,44 @@ function emitVersionJson(): Plugin {
       this.emitFile({
         type: "asset",
         fileName: "version.json",
-        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes() }),
+        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes(), engineBuild: ENGINE_BUILD }),
       });
+    },
+  };
+}
+
+/**
+ * Stops the build when a package file reaches `dist/` by a road no sourcemap
+ * records (#951), so `scripts/gen-third-party-notices.ts` could not list it:
+ * a package stylesheet (Vite writes no CSS sourcemap), whether imported from
+ * JavaScript or inlined by a CSS `@import`, and a package asset such as a font
+ * or image from a CSS `url()`, whether emitted as a file or inlined. What
+ * counts as a package file comes from `isPackagePath`, the same test the
+ * generator uses.
+ */
+const CODE = /\.[mc]?[jt]sx?$/;
+function noUnlistedPackageFiles(): Plugin {
+  const refuse = (what: string): string => `${what}: the third-party notices cannot list this package file (see #951)`;
+  return {
+    name: "no-unlisted-package-files",
+    apply: "build",
+    transform(_code, id) {
+      // A stylesheet's extension can also sit in the query (a component's
+      // `?type=style&lang.css` block), so the whole id is checked too.
+      if (isPackagePath(id, PACKAGE_STYLESHEET) || (isPackagePath(id) && PACKAGE_STYLESHEET.test(id))) this.error(refuse(id));
+    },
+    generateBundle(_options, bundle) {
+      // A CSS @import, or a small image or font inlined as a data URL, never
+      // reaches `transform` or the bundle as its own file; the build's watch
+      // list still names it. Package JavaScript is listed by its sourcemap;
+      // package JSON is inlined without one, so it is refused like an asset.
+      const inlined = this.getWatchFiles().filter((f) => isPackagePath(f) && !isPackagePath(f, CODE));
+      if (inlined.length > 0) this.error(refuse(inlined.join(", ")));
+      for (const file of Object.values(bundle)) {
+        if (file.type !== "asset") continue;
+        const fromPackage = (file.originalFileNames ?? []).filter((n) => isPackagePath(n));
+        if (fromPackage.length > 0) this.error(refuse(`${file.fileName} (from ${fromPackage.join(", ")})`));
+      }
     },
   };
 }
@@ -128,8 +209,54 @@ function sharedHead(): Plugin {
   };
 }
 
-export default defineConfig({
+/** The vitest projects that run the suites on the WASM engine; see the
+ *  `projects` list below. Empty unless `VC_REQUIRE_WASM=1`. */
+function wasmParityProjects() {
+  if (process.env.VC_REQUIRE_WASM !== "1") return [];
+  const typescriptSide = [
+    "**/conformance.integration.test.ts",
+    "**/conformanceWasm.integration.test.ts",
+    "**/conformanceWasmTdt.integration.test.ts",
+    "**/conformanceWasmCanBuild.integration.test.ts",
+    "**/conformanceWasmVctower.integration.test.ts",
+    "**/dualRunDay.integration.test.ts",
+    "**/dualRunEdits.integration.test.ts",
+    "**/loaderCases.integration.test.ts",
+    // The engine comparison's own checks run each engine themselves (#972).
+    "**/perfCompare/*.integration.test.ts",
+    "**/wasmHost.integration.test.ts",
+    "**/wasmHostCatalog.integration.test.ts",
+    "**/wasmHostLogText.integration.test.ts",
+    "**/wasmHostTelemetry.integration.test.ts",
+  ];
+  const setupFiles = ["src/tests/viewWorldSetup.ts", "src/tests/parity/wasmHostSetup.ts"];
+  return [
+    {
+      extends: true,
+      test: {
+        name: "unitWasm",
+        include: ["src/**/*.test.ts"],
+        // The mirror's and the dual run's own unit tests attach a relay
+        // themselves.
+        exclude: [...configDefaults.exclude, "**/*.integration.test.ts", "**/dualrun/mirror.test.ts", "**/dualrun/dualRun.test.ts"],
+        setupFiles,
+      },
+    },
+    {
+      extends: true,
+      test: {
+        name: "integrationWasm",
+        include: ["src/**/*.integration.test.ts"],
+        exclude: [...configDefaults.exclude, ...typescriptSide],
+        setupFiles,
+      },
+    },
+  ];
+}
+
+export default defineConfig(({ command }) => ({
   root: "src",
+  resolve: { alias: engineAliases(command) },
   base: "./",
   // Compile-time app version, shown on the splash. (package.json isn't importable
   // in the browser bundle.)
@@ -141,17 +268,22 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkgVersion),
     __APP_SHA__: JSON.stringify(gitShortSha()),
     // `window.game` gate. Only the tooling pipelines (e2e, screenshots, perf)
-    // build with VC_TOOLING=1; every other build, the Vercel deploy and the
-    // mobile wrappers included, gets `false` here and the publish in
+    // build with VC_TOOLING=1; every other build, the Vercel deploy
+    // included, gets `false` here and the publish in
     // bootstrap.ts is dead-code-eliminated out of the bundle, so a shipped
     // session has no console handle into the sim. Dev serves don't need the
     // variable: the gate also accepts `import.meta.env.DEV`. The value is
     // validated by `toolingBuild()` above; scripts/verify-game-handle.ts
     // asserts the resulting dist matches the mode on every `npm run build`.
-    __TOOLING_BUILD__: JSON.stringify(toolingBuild()),
+    __TOOLING_BUILD__: JSON.stringify(TOOLING_BUILD),
+    // The engine build mode (see `engineBuild` above). True compiles away the
+    // runtime engine switch, the TypeScript fallback and the dual run in
+    // bootstrap.ts; scripts/verify-engine-bundle.ts checks the result.
+    __WASM_ONLY__: JSON.stringify(ENGINE_BUILD === "wasm-only"),
   },
   plugins: [
     emitVersionJson(),
+    noUnlistedPackageFiles(),
     sharedHead(),
     // Installable PWA via Workbox (vite-plugin-pwa) — no hand-rolled service
     // worker. Registration is NOT auto-injected (`injectRegister: false`);
@@ -198,7 +330,39 @@ export default defineConfig({
       workbox: {
         // Precache the game shell only. The dev/tooling entry points and their
         // chunks are excluded so an install ships just the game.
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3}"],
+        //
+        // The shell includes the WASM engine package (`engine/`, its glue and
+        // `.wasm`, built on every deploy by scripts/build-engine-wasm.sh), so
+        // an installed game starts the engine offline (#945). One precache
+        // version holds the shell and the engine together: Workbox installs a
+        // new worker's whole manifest or none of it, activates it through
+        // src/pwa.ts's save-then-reload or once every tab of the old version
+        // has closed, and deletes
+        // the old version's entries, so from 2.32.0 on a page the worker
+        // controls runs the shell and engine its install fetched together.
+        // Not covered here, and tracked on #985 (the cutover plan's S16
+        // version check): a page no worker controls yet (a first visit) fetches them
+        // separately; an install that overlaps a deploy can store the engine's
+        // unhashed files from the newer build; and a worker from before 2.32.0
+        // never precached the engine at all. The
+        // cost is about 430 KB compressed per install, paid by every player
+        // (owner decision, 2026-10-13: the engine becomes the default at 3.0).
+        // Which engine files the game fetches at run time is recorded in
+        // src/wasmhost/engineAssets.ts: the glue and the `.wasm` are fetched,
+        // while `engine/BUILD.json` and `engine/THIRD-PARTY.json` are read only
+        // at build and test time. Both stay out because the pattern matches no
+        // `.json` at all, and it should stay that way: a blanket `json` would
+        // also sweep in THIRD-PARTY.json (about 0.6 MB), `version.json` (the
+        // update check, which must come from the network) and any later data
+        // file. If the game starts reading a `.json` at run time (BUILD.json
+        // for #985's package check, or audio data for #968), mark it in
+        // engineAssets.ts or audioAssets.ts and add that one file to this
+        // list by its own path (for example "engine/BUILD.json").
+        // scripts/verify-precache.ts fails the build when a run-time engine
+        // or audio file is missing from the manifest, when a build-only
+        // engine file is in it, and when the package holds a file the list
+        // does not classify.
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3,wasm}"],
         // og-image.png is the social/crawler share card, not part of the game
         // shell, so keep it out of the offline precache. `help.html` and its own
         // page entry chunk (`help-*.js`) are excluded too (see the note below),
@@ -250,13 +414,20 @@ export default defineConfig({
         // Asset Links verifier fetches server-side and never meets a service
         // worker, so this changes nothing for verification itself; it is what
         // makes checking the file by hand tell the truth.
+        // `third-party-notices.txt` (#951, written after each build) is the
+        // same kind of document, so a navigation to it, query string or not,
+        // reaches the file itself.
         navigateFallbackDenylist: [
           /gallery/,
           /help/,
           /preview/,
           /version\.json$/,
+          // The engine package's own files (its BUILD.json above all) are
+          // documents; a navigation to one must reach the file itself.
+          /\/engine\//,
           /robots\.txt$/,
           /sitemap\.xml$/,
+          /third-party-notices\.txt(\?.*)?$/,
           /og-image\.png$/,
           // No trailing slash: a bare `/.well-known` navigation should reach the
           // host's own 404 rather than the game shell, same as the file below it.
@@ -339,6 +510,7 @@ export default defineConfig({
         test: {
           name: "unit",
           include: ["src/**/*.test.ts"],
+          setupFiles: ["src/tests/viewWorldSetup.ts"],
           // Setting `exclude` on a project REPLACES Vitest's built-in defaults
           // (node_modules, dist, etc.), so spread them back in before adding our
           // own. The `include` is scoped to `src/**` today so nothing vendored is
@@ -353,8 +525,20 @@ export default defineConfig({
         test: {
           name: "integration",
           include: ["src/**/*.integration.test.ts"],
+          setupFiles: ["src/tests/viewWorldSetup.ts"],
         },
       },
+      // The parity projects (story-engine-test-parity, #878): the same two
+      // tiers, with every `Simulation` a test ticks hosted on the WASM engine
+      // by the setup file. They exist only under `VC_REQUIRE_WASM=1` (the
+      // switch `npm run test:wasm` sets), so `npm test` and the coverage
+      // gate run the TypeScript tiers exactly as before; `npm run
+      // test:wasm:parity` runs them. The suites that attach a mirror or a
+      // host themselves (the dual run, the host fidelity gate) and the
+      // TypeScript side of the referee (the scenario and loader-case lock
+      // writers, whose engine twins are `conformanceWasm` and the Rust
+      // replay) are left out; see the story's test-mapping table.
+      ...wasmParityProjects(),
     ],
     coverage: {
       provider: "v8",
@@ -378,8 +562,7 @@ export default defineConfig({
         // Colocated test FIXTURES, same reasoning as the line above. A shared
         // fixture is test-only code that happens not to match `*.test.ts`, so
         // without this it would be scored as app source and move the floors for a
-        // file no player runs. `src/game/hostCommands.fixture.ts` is the first of
-        // these, created when its suite outgrew the 500-line ceiling and split.
+        // file no player runs.
         "**/*.fixture.ts",
         // Fixtures and any non-`.test.ts` helpers under the integration tree.
         "src/tests/**",
@@ -412,6 +595,23 @@ export default defineConfig({
         "src/render/excalibur/TowerEngine.ts",
         "src/render/excalibur/towerScene.ts",
         "src/render/excalibur/towerReconcile.ts",
+        // The dual run's worker entry: it loads the WASM package by URL in a
+        // Web Worker, neither of which exists under happy-dom; it is
+        // exercised by hand under `npm run dev`. The controller, the mirror,
+        // the shadow engine and the command vocabulary are measured and
+        // tested in Node (the controller against a worker stand-in).
+        "src/dualrun/worker.ts",
+        // The engine worker's entry point, for the same reason: the glue
+        // around EngineWorkerCore, which is measured and tested in Node.
+        "src/wasmhost/engineWorker.ts",
+        // The atlas bake's browser half: the page API the export script
+        // drives and the pixel checks, all of which read pixels back from a
+        // live canvas (getImageData). The pipeline they call (bake, compose,
+        // lookup, archive) is measured in its own modules; the e2e
+        // comparison spec runs these end to end.
+        "src/render/atlas/browserEntry.ts",
+        "src/render/atlas/verify.ts",
+        "src/render/atlas/verifyExtras.ts",
       ],
       // Enforced floors (a ratchet, not a vanity ceiling). Global floor holds the
       // logic layers; per-file globs stop a weak painter/synth file hiding behind
@@ -447,4 +647,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

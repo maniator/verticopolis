@@ -8,7 +8,7 @@ import { vercelIngestDeps } from "./_deps.js";
  * Same-origin PostHog capture relay (spec CAP-2). Vercel serves this file at
  * `POST /api/ingest`. It is a thin binding: the environment wiring (the
  * server-side secrets, `VERCEL_ENV`, the clock, the trusted client IP) comes
- * from `api/_deps.ts`, shared with the desktop route, and the request goes to
+ * from `api/_deps.ts`, and the request goes to
  * the pure core in `src/analyticsIngest.ts`, which carries the whole contract
  * and its tests.
  *

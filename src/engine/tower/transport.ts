@@ -3,6 +3,7 @@ import { FACILITIES, GRID, isElevatorKind, isFixedSpanTransport, isStaffOnlyTran
 import type { FacilityKind, PlaceResult, Transport, Unit } from "../types";
 import { isStructural, isSkyLobbyFloor, NEEDS_FLOORS, SHAFT_OVERLAP } from "./towerTopology";
 import { coerceSchedule, snapHomesToStops } from "../elevatorSchedule";
+import { INVALID_REQUEST, whole } from "../request";
 
 /** Transport CRUD, stops, and resize (friend functions of {@link Tower}). */
 
@@ -182,8 +183,9 @@ export function layShaftFloors(tower: Tower, floors: number[], x: number, width:
  *  auto-lays plain floor behind it (the 1994 extend-past-structure behavior)
  *  rather than refusing. `floorTilesCreated` counts the width-1 floor units
  *  laid (a 4-wide shaft growing one story lays 4), not stories, so the caller
- *  can size any structure charge exactly. */
+ *  can size any structure charge exactly. A non-whole id or floor is refused (#996). */
 export function resizeTransport(tower: Tower, id: number, newBottom: number, newTop: number): PlaceResult & { added?: number; floorTilesCreated?: number } {
+  if (!whole(id) || !whole(newBottom) || !whole(newTop)) return { ok: false, reason: INVALID_REQUEST };
   const t = tower.transportById(id);
   if (!t) return { ok: false, reason: "No such transport." };
   if (newTop <= newBottom) return { ok: false, reason: "Transport needs height." };
@@ -277,12 +279,14 @@ export function resizeTransport(tower: Tower, id: number, newBottom: number, new
   return { ok: true, added: newTop - newBottom + 1 - before, floorTilesCreated: createdFloors.length };
 }
 
-/** Change the number of elevator cars (1..max for that elevator type). */
+/** Set an elevator's car count (1..max for its type); false on a non-whole id or count (#996). */
 export function setCars(tower: Tower, id: number, cars: number): boolean {
-  const t = tower.transportById(id);
+  const t = whole(id) && whole(cars) ? tower.transportById(id) : undefined;
   if (!t || !isElevatorKind(t.kind)) return false;
   cars = Math.max(1, Math.min(maxCarsFor(t.kind), cars));
   if (cars === t.cars) return false;
+  // carLoad keeps one entry per car, as load pads it: left short, the next
+  // dispatch pass would zero every car's riders while a saved copy kept them.
   if (cars > t.cars) {
     for (let i = t.cars; i < cars; i++) {
       t.carPositions.push(t.bottom);
@@ -292,6 +296,7 @@ export function setCars(tower: Tower, id: number, cars: number): boolean {
     t.carPositions.length = cars;
     t.carDir.length = cars;
   }
+  if (t.carLoad) t.carLoad = Array.from({ length: cars }, (_, i) => t.carLoad![i] ?? 0);
   t.cars = cars;
   // Re-harden an authored schedule against the new car count (#305): a fleet
   // shrink clamps rows and truncates homes past the last remaining car.
@@ -303,9 +308,9 @@ export function setCars(tower: Tower, id: number, cars: number): boolean {
 /** Write an authored per-shaft schedule (#305 Phase 3), hardened through
  *  `coerceSchedule` against the live cars and span so it can never carry a count
  *  above the fleet or a home off the shaft. Bumps `revision` so routing and stop
- *  caches invalidate (arch §3). Returns false for a non-elevator id. */
+ *  caches invalidate (arch §3). False for a non-elevator or non-whole id (#996). */
 export function setSchedule(tower: Tower, id: number, raw: unknown): boolean {
-  const t = tower.transportById(id);
+  const t = whole(id) ? tower.transportById(id) : undefined;
   if (!t || !isElevatorKind(t.kind)) return false;
   tower.revision++; // before the snap: stopsOf caches by revision
   t.schedule = coerceSchedule(raw, t.cars, t.bottom, t.top);
@@ -363,10 +368,11 @@ export function nearestBuildableLobbySlot(tower: Tower, floor: number): number |
  * Toggle whether a transport stops at a floor (express configuration).
  * Endpoints are always stops, a shaft's bottom and top can't be skipped, or
  * it would be disconnected from itself, so a request to skip an endpoint is
- * silently ignored regardless of `stop`.
+ * silently ignored regardless of `stop`. A non-whole id or floor, or a `stop`
+ * that is not a boolean, is refused (#996).
  */
 export function setStop(tower: Tower, id: number, floor: number, stop: boolean): boolean {
-  const t = tower.transportById(id);
+  const t = whole(id) && whole(floor) && typeof stop === "boolean" ? tower.transportById(id) : undefined;
   if (!t || floor < t.bottom || floor > t.top) return false;
   // Endpoints are always stops (a shaft can't disconnect from itself); the
   // request was valid and the endpoint is already stopping, so report success.

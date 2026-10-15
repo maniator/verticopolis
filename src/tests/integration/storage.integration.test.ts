@@ -6,6 +6,7 @@ import { SaveGame } from "../../storage/SaveGame";
 import { toBase64, deflate } from "../../storage/saveCompression";
 import { FACILITIES, GRID } from "../../engine/facilities";
 import { UNIT_CAP } from "../../engine/sim/deserializeGuards";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
 
 describe("SaveGame", () => {
   beforeEach(() => localStorage.clear());
@@ -24,7 +25,7 @@ describe("SaveGame", () => {
     return sim;
   }
 
-  it("persists the pending VIP inspection day across save/load", () => {
+  itTypeScriptOnly("writes vipVisitDay on the instance after the ticks and reads serialize(), which is the engine's save while hosted")("persists the pending VIP inspection day across save/load", () => {
     const sim = sampleGame();
     // Simulate a Wedding Hall having scheduled the VIP a few days out.
     (sim as unknown as { vipVisitDay: number }).vipVisitDay = sim.clock.day + 3;
@@ -33,7 +34,7 @@ describe("SaveGame", () => {
     expect((loaded as unknown as { vipVisitDay: number }).vipVisitDay).toBe(expected);
   });
 
-  it("persists the VIP visit counter, hardens forged values, and adopts visits for legacy saves", () => {
+  itTypeScriptOnly("writes vipVisits and vipFavorable on the instance after the ticks and reads serialize(), which is the engine's save while hosted")("persists the VIP visit counter, hardens forged values, and adopts visits for legacy saves", () => {
     const sim = sampleGame();
     sim.vipVisits = 3;
     sim.vipFavorable = true;
@@ -76,7 +77,7 @@ describe("SaveGame", () => {
     expect(Number.isFinite(u.occupants)).toBe(true);
   });
 
-  it("coerces forged top-level scalars (star, money, clock) from a tampered save to sane bounded values", () => {
+  itTypeScriptOnly("writes star on the instance after the ticks and reads serialize(), which is the engine's save while hosted")("coerces forged top-level scalars (star, money, clock) from a tampered save to sane bounded values", () => {
     const sim = sampleGame();
     sim.star = 3;
     sim.money = 1_234_567;
@@ -863,10 +864,12 @@ describe("SaveGame", () => {
   });
 
   it("rejects a decompression bomb with a 'too large' message, not 'damaged'", async () => {
-    // Build a legitimate deflate-raw stream whose OUTPUT is just past the 64MB
-    // cap, from a tiny compressed input — i.e. a real bomb, not corrupt bytes
-    // (those land on the 'damaged' path instead). 65MB of zeros packs to a few KB.
-    const huge = new Uint8Array(65 * 1024 * 1024); // all zeros → highly compressible
+    // Build a legitimate deflate-raw stream whose OUTPUT is just past the 32MB
+    // cap every save reader shares (MAX_SAVE_INFLATED_BYTES), from a tiny
+    // compressed input: a real bomb (corrupt bytes land on the 'damaged'
+    // path instead). 33MB of zeros packs to a few KB, and sits in the
+    // band the import used to accept at a 64MB cap while the store refused it.
+    const huge = new Uint8Array(33 * 1024 * 1024); // all zeros, highly compressible
     const cs: GenericTransformStream = new CompressionStream("deflate-raw");
     const packed = new Uint8Array(
       await new Response(
@@ -885,12 +888,11 @@ describe("SaveGame", () => {
   });
 
   describe("when the browser lacks the compression API", () => {
-    // deflate-raw is a 2022+ browser feature; on an older browser the export
-    // and the import of a compressed file must fail with an honest "your
-    // browser is too old" message, not a silent failure and not "this file
-    // is damaged" (which would blame a perfectly good save). Each direction is
-    // probed separately: export needs only the encoder, import only the
-    // decoder, so a browser missing one direction still gets the other.
+    // deflate-raw is a 2022+ browser feature; on an older browser the import
+    // of a compressed file must fail with an honest "your browser is too old"
+    // message, not a silent failure and not "this file is damaged" (which
+    // would blame a perfectly good save). Import needs only the decoder;
+    // export compresses with fflate, so it needs neither direction.
     afterEach(() => vi.unstubAllGlobals());
     const broken = class {
       constructor() {
@@ -900,9 +902,12 @@ describe("SaveGame", () => {
     const breakEncode = () => vi.stubGlobal("CompressionStream", broken);
     const breakDecode = () => vi.stubGlobal("DecompressionStream", broken);
 
-    it("export reports the browser is too old, not a generic failure", async () => {
+    it("export works without the compression API", async () => {
       breakEncode();
-      await expect(SaveGame.export(sampleGame())).rejects.toThrow(/too old to create/);
+      breakDecode();
+      const file = await SaveGame.export(sampleGame());
+      vi.unstubAllGlobals();
+      expect((await SaveGame.import(file)).money).toBe(sampleGame().money);
     });
 
     it("importing a compressed file reports the browser is too old, not 'damaged'", async () => {
@@ -962,7 +967,7 @@ describe("SaveGame", () => {
     expect(loaded.serialize().version).toBe(SAVE_VERSION);
   });
 
-  it("migrates a v3 save up the ladder (venue-census bump): re-stamps version, tower intact", () => {
+  itTypeScriptOnly("compares the units JSON bytes of the engine's save (the hosted serialize()) with the TypeScript serializer's, which orders a unit's keys differently")("migrates a v3 save up the ladder (venue-census bump): re-stamps version, tower intact", () => {
     // v3 -> v4 is additive/no-op data-wise: the meal-customer census reads a
     // transient overlay that is never serialized, so a v3 save is already valid
     // v4 data. The migration only re-stamps the version; the tower round-trips
@@ -1081,7 +1086,7 @@ describe("SaveGame", () => {
       expect((await importWith(sampleGame(), "2.4.1")).founder).toBe(false);
     });
 
-    it("keeps Founder on an imported 2.0+ save that carries the earned flag", async () => {
+    itTypeScriptOnly("writes founder on the instance after the ticks and reads serialize(), which is the engine's save while hosted")("keeps Founder on an imported 2.0+ save that carries the earned flag", async () => {
       const sim = sampleGame();
       sim.founder = true; // a pre-2.0 tower re-saved in 2.0: stamp is 2.x but the flag persists
       expect((await importWith(sim, "2.4.1")).founder).toBe(true);

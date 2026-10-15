@@ -32,41 +32,22 @@
  * `properties`, `$process_person_profile`) were verified against PostHog's
  * current capture API docs at implementation time.
  *
- * TWO ROUTES, ONE PIPELINE. {@link handleIngest} serves the web relay at
- * `POST /api/ingest`; {@link handleDesktopIngest} serves the packaged Electron
- * build at `POST /api/ingest/desktop`. They share every step above (the method
- * check, the secrets no-op, the per-IP rate-limit check, the 8 KiB body cap, the
- * parse and validation, the background forward, and every response shape) and
- * differ in exactly two places: which `Origin` values they accept
- * ({@link originAllowed} vs {@link desktopOriginAllowed}), and the two extra
- * server-authored properties the desktop route stamps
- * ({@link buildDesktopCaptureBody}). Anything else added to the path applies to
- * both, so the two cannot drift. What they share is CODE. The rate-limit STATE
- * is per module instance, and Vercel builds each route under `api/` as its own
- * function, so the deployed routes hold separate per-IP budgets: posting to both
- * buys two windows.
- *
- * BOTH ROUTES ARE UNAUTHENTICATED PUBLIC ENDPOINTS, and their origin filters are
+ * THE ROUTE IS AN UNAUTHENTICATED PUBLIC ENDPOINT, and its origin filter is
  * functional rather than a security boundary. There is no token and no session,
- * and an absent `Origin` header passes on both, so the web route is already
- * postable by anyone with `curl` today and the desktop route is no different.
- * The check also buys less than it may read. A browser does attach its true
- * `Origin` to a cross-origin POST, which keeps an ordinary page on a named host
- * out, but a sandboxed iframe's true origin IS the literal "null", which
- * {@link desktopOriginAllowed} accepts, and the parse below ignores
- * `content-type`, so a `text/plain` POST is a simple request that never
- * preflights. Any site can therefore drive its visitors' browsers into the
- * desktop route. That is accepted: the endpoint is meant to be unauthenticated,
- * and the filter keeps casual traffic out rather than saying who called.
+ * and an absent `Origin` header passes, so the route is postable by anyone with
+ * `curl`. A browser does attach its true `Origin` to a cross-origin POST, which
+ * keeps an ordinary page on a named host out, and that is all the filter does.
  *
  * What bounds abuse is the per-IP rate limiter (best-effort and per instance;
- * see {@link RateLimiter}) and the 8 KiB body cap (read from `content-length`,
- * so a chunked request omitting the header is not bounded by it). A forged
+ * see {@link RateLimiter}), the 8 KiB body cap, which bounds the bytes
+ * actually read rather than trusting a declared `content-length`, and the
+ * five-second read deadline, which bounds how long a slow body can hold the
+ * function open (408). A forged
  * post's blast radius is anonymous noise in the dataset: no key, no cookie, no
- * response body. On the DESKTOP route a forged body also cannot choose its own
- * `platform` or `distribution_channel`; on the WEB route it can, since that
- * route forwards those two exactly as the client sent them (see
- * {@link buildDesktopCaptureBody}).
+ * response body. `platform` and `distribution_channel` pass only when they
+ * carry a label from the client's closed set ({@link INGEST_PLATFORM_LABELS});
+ * any other value is rewritten to `"unknown"`, so a forged body cannot add a
+ * value to either dimension (GH #788). It can still pick one of the real labels.
  */
 
 import { defaultRateLimiter, RateLimiter } from "./analyticsRateLimit.js";
@@ -121,6 +102,79 @@ export interface IngestDeps {
  *  parsed. Vercel's platform body limit is the outer backstop. */
 export const MAX_BODY_BYTES = 8_192;
 
+/** How long the whole body read may take, in milliseconds. An event post is a
+ *  few hundred bytes, so five seconds is far past any honest client; a body
+ *  that is still arriving then is a slow drip holding the function open
+ *  (GH #1010). */
+export const READ_DEADLINE_MS = 5_000;
+
+/** Thrown by {@link readCappedText} when the body is still arriving at the
+ *  deadline. The handler answers it with 408. */
+export class ReadDeadlineError extends Error {
+  constructor() {
+    super("request body read passed its deadline");
+    this.name = "ReadDeadlineError";
+  }
+}
+
+/**
+ * Read a request body as text, giving up as soon as it passes `max` bytes.
+ *
+ * The declared `content-length` is only a cheap early reject: a chunked POST
+ * omits it, and nothing makes a client tell the truth in it (GH #789). This
+ * counts the bytes as they stream in and cancels the read at the first chunk
+ * that passes the cap, so at most the cap plus one platform chunk is held,
+ * however long the body is. Returns `null` when the cap was passed.
+ *
+ * The byte cap bounds memory. To bound time as well, the whole read runs against
+ * `deadlineMs`: a body still arriving then is cancelled and the read throws
+ * {@link ReadDeadlineError} (GH #1010). A request with no body reads as empty
+ * text. Decoding matches `Request.json()`: UTF-8, with a leading byte-order
+ * mark dropped.
+ */
+export async function readCappedText(
+  request: Request,
+  max: number,
+  deadlineMs: number = READ_DEADLINE_MS,
+): Promise<string | null> {
+  const stream = request.body;
+  if (!stream) return "";
+  const reader = stream.getReader();
+  // Not awaited anywhere: a source whose cancel never settles must not hold
+  // the answer.
+  const release = (): void => void reader.cancel().catch(() => {});
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new ReadDeadlineError()), deadlineMs);
+  });
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await Promise.race([reader.read(), deadline]);
+      if (done) break;
+      total += value.byteLength;
+      if (total > max) {
+        release();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } catch (err) {
+    release();
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 /** Normalize the configured host: strip surrounding whitespace (env vars often
  *  pick it up from a copy/paste) and every trailing slash, so `${host}/capture/`
  *  is a valid, non-doubled URL rather than a silently dropped forward. */
@@ -159,13 +213,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * client-side gate that decides where the browser emits). Change the two together:
  * the client emits from there, the server accepts here, and a drift silently drops
  * events (client dark, or a 403 on a same-origin beacon).
- *
- * The desktop surface is a THIRD pair on that same rule, kept beside this one
- * rather than inside it: the desktop client's ingest URL constant (the client
- * half, landing in a later stage of the desktop epic) and
- * {@link desktopOriginAllowed} (the server half). Each pair moves together, and
- * neither pair may be folded into the other: this function must keep refusing
- * the shell's origin, so widening the desktop route can never widen the web one.
  */
 export function originAllowed(origin: string | null, environment: string | undefined): boolean {
   if (!origin) return true;
@@ -187,68 +234,34 @@ export function originAllowed(origin: string | null, environment: string | undef
   return false;
 }
 
-/** The origin a packaged desktop build serves the game from: the privileged
- *  custom scheme the Electron shell registers in its main process. Exact string,
- *  no host set and no suffix matching, because there is exactly one such build. */
-export const DESKTOP_ORIGIN = "app://game";
+/**
+ * The closed set of `platform` and `distribution_channel` labels the route
+ * forwards. It restates `PLATFORM_LABELS` from `analyticsEnrichment.ts`
+ * because this module stays free of the client tree; a test pins the two
+ * together so they cannot drift.
+ */
+export const INGEST_PLATFORM_LABELS: readonly string[] = ["web", "twa"];
 
-/** What a browser engine sends when the origin is opaque. A custom scheme is not
- *  on the standard list, so Chromium may serialize the shell's origin this way,
- *  and a `no-cors` post from the shell can land here too. It says nothing about
- *  who sent the request; see the note on the predicate below. */
-const OPAQUE_ORIGIN = "null";
+/** The value a label outside {@link INGEST_PLATFORM_LABELS} is rewritten to. */
+export const INGEST_PLATFORM_FALLBACK = "unknown";
+
+/** The client dimensions held to {@link INGEST_PLATFORM_LABELS}. */
+const CLOSED_DIMENSIONS = ["platform", "distribution_channel"] as const;
 
 /**
- * Origin guard for the desktop route. Deliberately SEPARATE from
- * {@link originAllowed} and never folded into it: the web route must keep
- * refusing the shell's origin, and this route must keep refusing every web host,
- * so widening one can never quietly widen the other. Three accepted forms and
- * nothing else:
- *   - {@link DESKTOP_ORIGIN}, the shell's own origin;
- *   - {@link OPAQUE_ORIGIN}, the literal "null" an opaque origin serializes to;
- *   - an absent header, which cannot be checked at all.
- * An empty string is refused: no client sends one, and an empty header is not an
- * absent header.
- *
- * Environment-independent on purpose (no `VERCEL_ENV` argument): the shell's
- * origin is the same string in every deployment, so there is nothing here that
- * could be got wrong per environment.
- *
- * Like the web guard, this is a functional filter and not a security boundary
- * (see the module comment). The "null" form is not evidence of a desktop client
- * (a sandboxed iframe and a `file://` page serialize the same way), and the
- * absent form cannot be evidence of anything. Accepting "null" is what makes a
- * hostile page's sandboxed iframe a valid caller here, so do not read this check
- * as protection against a cross-site POST. It keeps out an ordinary page on a
- * named host, whose real `Origin` the browser attaches, and that is all.
+ * Hold each closed dimension the client sent to the known labels. An absent
+ * dimension stays absent; a present one outside the set (any string or a
+ * non-string) becomes {@link INGEST_PLATFORM_FALLBACK}.
  */
-export function desktopOriginAllowed(origin: string | null): boolean {
-  return origin === null || origin === DESKTOP_ORIGIN || origin === OPAQUE_ORIGIN;
-}
-
-/**
- * The storefronts the desktop route accepts on the wire. A packaged build is
- * stamped for exactly one of them at package time, and the value reaches us
- * through an untrusted client body, so anything else reports `unknown`.
- *
- * This restates the accepted pair from `resolveDistributionChannel` in
- * `analyticsEnrichment.ts` rather than importing it: this module compiles into
- * the Vercel function and stays free of the client tree (the platform seam, the
- * DOM). `analyticsIngestDesktop.test.ts` pins the two copies against each other,
- * so a storefront added to the client vocabulary without being taught here fails
- * there rather than arriving as `unknown` for every session of that build.
- */
-export const DESKTOP_DISTRIBUTION_CHANNELS = ["steam", "itch"] as const;
-
-/** A validated `distribution_channel` for the desktop route: one of
- *  {@link DESKTOP_DISTRIBUTION_CHANNELS}, or `unknown` for everything else. */
-export type DesktopDistributionChannel = (typeof DESKTOP_DISTRIBUTION_CHANNELS)[number] | "unknown";
-
-/** Validate a client-supplied channel. A near miss (`"STEAM"`, a stray space), a
- *  non-string, and an absent value all read as `unknown` rather than passing
- *  through, so the dimension only ever holds values this server named. */
-function desktopDistributionChannel(value: unknown): DesktopDistributionChannel {
-  return DESKTOP_DISTRIBUTION_CHANNELS.find((channel) => channel === value) ?? "unknown";
+function closedDimensions(props: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of CLOSED_DIMENSIONS) {
+    if (!Object.prototype.hasOwnProperty.call(props, key)) continue;
+    const value = props[key];
+    out[key] =
+      typeof value === "string" && INGEST_PLATFORM_LABELS.includes(value) ? value : INGEST_PLATFORM_FALLBACK;
+  }
+  return out;
 }
 
 /**
@@ -259,9 +272,10 @@ function desktopDistributionChannel(value: unknown): DesktopDistributionChannel 
  * no-person-profile posture, re-enable GeoIP, or mislabel its environment. Junk
  * shapes are neutralized here too (a non-object `properties` is dropped, an empty
  * or non-string `session` falls back to the anonymous bucket, a non-ISO `ts` is
- * omitted so PostHog defaults the time). The `api_key` is deliberately not added
- * here; the handler adds it only at the forward so the key never passes through
- * this pure builder.
+ * omitted so PostHog defaults the time, and a `platform` or
+ * `distribution_channel` outside the closed set becomes `"unknown"`). The
+ * `api_key` is deliberately not added here; the handler adds it only at the
+ * forward so the key never passes through this pure builder.
  *
  * `$geoip_disable: true` is deliberate. We never forward the player's IP (raw IP
  * is a spec non-goal), so the only IP PostHog would see is the relay's own egress
@@ -282,6 +296,7 @@ export function buildCaptureBody(
     ...(hasValidTs ? { timestamp: body.ts as string } : {}),
     properties: {
       ...props,
+      ...closedDimensions(props),
       distinct_id: session,
       $process_person_profile: false,
       $geoip_disable: true,
@@ -291,78 +306,16 @@ export function buildCaptureBody(
 }
 
 /**
- * The desktop route's capture body: {@link buildCaptureBody}'s result plus the
- * two dimensions this route authors itself. Both are written AFTER the client
- * property spread the shared builder already applied, in the same position as
- * `distinct_id` and the rest, so a body posted TO THIS ROUTE cannot label itself
- * a web session or invent a storefront.
- *
- * THAT HOLDS ON `/api/ingest/desktop` AND NOWHERE ELSE. The web route shares
- * this module's pipeline but not this builder: it forwards whatever `platform`
- * and `distribution_channel` the client sent, and it accepts an absent `Origin`,
- * so a bare `curl -X POST /api/ingest` with no `Origin` header and a body naming
- * `platform: "desktop"` and `distribution_channel: "steam"` lands a fabricated
- * Steam desktop session (`analyticsIngestDesktop.test.ts` pins that
- * pass-through). These two are authoritative for desktop-route traffic only, so
- * the dataset cannot read `platform: "desktop"` as proof of where an event came
- * from until the web route validates the pair too. Tracked as GH #788.
- *
- * `platform` is fixed rather than validated: only a desktop build has any reason
- * to post here, so there is nothing for the client to say. `distribution_channel`
- * IS validated, because the shell stamps it at package time and the server cannot
- * know which of the two it is; an unrecognized value has to read as `unknown`
- * rather than as itself.
+ * Handle one request to the relay (`POST /api/ingest`), the browser's
+ * same-origin path, bound by `api/ingest.ts`. See the module comment for the
+ * full contract. Pure apart from the injected `deps`, so every branch (405 /
+ * 403 / 204 no-op / 429 / 413 / 408 / 400 / forward) is unit-testable.
  */
-export function buildDesktopCaptureBody(
-  body: IngestBody & { event: string },
-  environment: string | undefined,
-): CaptureBody {
-  const base = buildCaptureBody(body, environment);
-  return {
-    ...base,
-    properties: {
-      ...base.properties,
-      platform: "desktop",
-      distribution_channel: desktopDistributionChannel(base.properties.distribution_channel),
-    },
-  };
-}
-
-/** The two pieces that differ between the web relay and the desktop relay.
- *  Everything else on the path is shared by {@link handleIngestRoute}. */
-interface IngestRoute {
-  /** Which `Origin` values this route accepts; anything else gets a 403. */
-  readonly acceptOrigin: (origin: string | null, environment: string | undefined) => boolean;
-  /** Builds the capture body, including any route-specific server-authored
-   *  properties. Runs after validation, so `event` is already a non-empty
-   *  string and `properties` is already known to be a plain object or absent. */
-  readonly buildBody: (body: IngestBody & { event: string }, environment: string | undefined) => CaptureBody;
-}
-
-/** The web relay: our own hosts only, no extra server-authored properties. */
-const WEB_ROUTE: IngestRoute = { acceptOrigin: originAllowed, buildBody: buildCaptureBody };
-
-/** The desktop relay. The origin predicate takes no environment, so it is
- *  adapted here rather than being given an argument it would have to ignore. */
-const DESKTOP_ROUTE: IngestRoute = {
-  acceptOrigin: (origin) => desktopOriginAllowed(origin),
-  buildBody: buildDesktopCaptureBody,
-};
-
-/**
- * Handle one ingest request on `route`. See the module comment for the full
- * contract. Pure apart from the injected `deps`, so every branch (405 / 403 /
- * 204 no-op / 429 / 413 / 400 / forward) is unit-testable.
- */
-async function handleIngestRoute(request: Request, deps: IngestDeps, route: IngestRoute): Promise<Response> {
+export async function handleIngest(request: Request, deps: IngestDeps): Promise<Response> {
   if (request.method !== "POST") return new Response(null, { status: 405 });
 
-  // Reject a foreign Origin before doing any work. Each route defines "foreign"
-  // through its own origin predicate: `originAllowed` for the web route,
-  // `desktopOriginAllowed` for the desktop one. They are deliberately separate,
-  // since the origins a browser presents and the ones a packaged shell presents
-  // have nothing in common.
-  if (!route.acceptOrigin(request.headers.get("origin"), deps.environment)) {
+  // Reject a foreign Origin before doing any work.
+  if (!originAllowed(request.headers.get("origin"), deps.environment)) {
     return new Response(null, { status: 403 });
   }
 
@@ -375,19 +328,27 @@ async function handleIngestRoute(request: Request, deps: IngestDeps, route: Inge
   const limiter = deps.rateLimiter ?? defaultRateLimiter;
   if (!limiter.allow(deps.clientIp, deps.now())) return new Response(null, { status: 429 });
 
-  // Reject an oversized body before buffering it into memory.
+  // Reject a declared-oversized body before reading anything. This is only the
+  // cheap path: the read below enforces the cap on the bytes themselves.
   const contentLength = Number(request.headers.get("content-length"));
   if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
     return new Response(null, { status: 413 });
   }
 
+  let text: string | null;
+  try {
+    text = await readCappedText(request, MAX_BODY_BYTES);
+  } catch (err) {
+    return new Response(null, { status: err instanceof ReadDeadlineError ? 408 : 400 });
+  }
+  if (text === null) return new Response(null, { status: 413 });
+
   let body: IngestBody;
   try {
-    // `Request.json()` parses the body TEXT and ignores the `content-type`
-    // header, which is what makes both transports work: `navigator.sendBeacon`
-    // with a string sends `text/plain`, and a `no-cors` fetch (the desktop
-    // fallback) cannot set a JSON content type at all.
-    body = (await request.json()) as IngestBody;
+    // The body TEXT is parsed whatever the `content-type` header says, which is
+    // what makes `navigator.sendBeacon` work: with a string it sends
+    // `text/plain`.
+    body = JSON.parse(text) as IngestBody;
   } catch {
     return new Response(null, { status: 400 });
   }
@@ -398,7 +359,7 @@ async function handleIngestRoute(request: Request, deps: IngestDeps, route: Inge
     return new Response(null, { status: 400 });
   }
 
-  const captureBody = route.buildBody({ ...body, event }, deps.environment);
+  const captureBody = buildCaptureBody({ ...body, event }, deps.environment);
   // Non-blocking: return 204 now, let the forward settle in the background. The
   // key is added only here, server-side. The whole forward is wrapped so nothing
   // on it (a synchronous `fetch` throw on a malformed host, a `waitUntil` hiccup)
@@ -428,21 +389,4 @@ async function handleIngestRoute(request: Request, deps: IngestDeps, route: Inge
     /* best-effort: a forward that cannot even be dispatched is dropped silently */
   }
   return new Response(null, { status: 204 });
-}
-
-/** Handle one request to the web relay (`POST /api/ingest`), the browser's
- *  same-origin path. Bound by `api/ingest.ts`. */
-export function handleIngest(request: Request, deps: IngestDeps): Promise<Response> {
-  return handleIngestRoute(request, deps, WEB_ROUTE);
-}
-
-/** Handle one request to the desktop relay (`POST /api/ingest/desktop`), the
- *  packaged Electron build's cross-origin path. Bound by
- *  `api/ingest/desktop.ts`. Same pipeline and same response shapes as
- *  {@link handleIngest}. Both handlers read `deps.rateLimiter` and both fall
- *  back to the same module singleton, so one injected limiter counts both
- *  routes' hits; deployed, each route is its own function with its own module
- *  instance, so their real budgets are separate. */
-export function handleDesktopIngest(request: Request, deps: IngestDeps): Promise<Response> {
-  return handleIngestRoute(request, deps, DESKTOP_ROUTE);
 }

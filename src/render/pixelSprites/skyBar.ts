@@ -1,6 +1,7 @@
 import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
 import { hash, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
+import { layerBreak } from "./layers";
 
 /**
  * Modern Sky Bar art: a warm rooftop cocktail lounge at dusk, its back wall a big
@@ -57,6 +58,8 @@ export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   ctx.fillStyle = shade(WALL, 30);
   ctx.fillRect(x + 2, winTop, w - 4, 1);
   ctx.fillRect(x + 2, winBot, w - 4, 1);
+
+  layerBreak(ctx); // the shell ends; the bar and the patrons follow
 
   // The bar counter along the floor line, with a row of backlit bottles behind it.
   const barX = x + 3;

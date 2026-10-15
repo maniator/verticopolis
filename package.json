@@ -1,6 +1,6 @@
 {
   "name": "verticopolis",
-  "version": "2.26.0",
+  "version": "2.35.0",
   "description": "Verticopolis: a browser-native SimTower clone in TypeScript",
   "license": "MIT",
   "type": "module",
@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "postbuild": "npm run verify:dist && node scripts/verify-wrapper-seam.ts browser",
+    "postbuild": "npm run verify:dist",
     "preview": "vite preview --port 4173",
     "typecheck": "tsc --noEmit && tsc -p api/tsconfig.json",
     "watch": "tsc --watch",
@@ -23,15 +23,20 @@
     "e2e": "playwright test --grep-invert @perf",
     "perf": "playwright test --grep @perf",
     "perf:capture": "PERF_CAPTURE=1 playwright test --grep @perf",
+    "perf:compare": "tsx scripts/perf-compare.ts",
+    "perf:worker": "tsx scripts/perf-worker.ts",
     "lint": "eslint src api --ext .ts,.tsx",
     "lint:fix": "eslint src api --ext .ts,.tsx --fix",
     "screenshots": "VC_TOOLING=1 vite build && RUN_SERVER=1 node scripts/screenshots.ts",
     "icons": "node scripts/gen-pwa-icons.mjs",
     "og-image": "node scripts/gen-og-image.mjs",
-    "build:desktop": "vite build --mode desktop && npm run verify:dist && node scripts/verify-wrapper-seam.ts desktop",
-    "verify:dist": "node scripts/prerender-help.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts && node scripts/verify-assetlinks.ts",
-    "build:native": "vite build --mode native && npm run verify:dist && node scripts/verify-wrapper-seam.ts native",
-    "gen:icons": "node scripts/gen-icon-paths.ts"
+    "verify:dist": "node scripts/gen-third-party-notices.ts && node scripts/verify-public-files.ts && node scripts/prerender-help.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts && node scripts/verify-engine-bundle.ts && node scripts/verify-assetlinks.ts",
+    "gen:icons": "node scripts/gen-icon-paths.ts",
+    "atlas": "tsx scripts/export-atlas.ts",
+    "gen:events": "node scripts/gen-gameplay-events.ts",
+    "wasm:build": "node scripts/wasm-build.ts",
+    "test:wasm": "VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm dualRun wasmHost wasmWorker chargeBindingRaw",
+    "test:wasm:parity": "VC_REQUIRE_WASM=1 vitest run --project integrationWasm --project unitWasm"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
@@ -52,7 +57,7 @@
     "typescript-eslint": "^8.54.0",
     "vite": "^7.3.1",
     "vite-plugin-pwa": "^1.3.0",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.11"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

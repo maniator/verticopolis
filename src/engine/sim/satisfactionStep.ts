@@ -15,6 +15,7 @@ import {
   VACATE_RESCIND,
 } from "./constants";
 import { CLASSIC_HOUSEHOLD } from "../households";
+import { roomUnits } from "../tower/rooms";
 
 /**
  * The PURE per-unit satisfaction step, extracted verbatim from
@@ -94,7 +95,7 @@ export function buildSatisfactionContext(sim: Simulation, neutralizeCongestion =
   const nightclubFloors: number[] = [];
   const spaFloors: number[] = [];
   const daycareFloors: number[] = [];
-  for (const c of sim.tower.units) {
+  for (const c of roomUnits(sim.tower)) {
     if (c.kind === "fitnessClub" && isTenanted(c) && servedSet.has(c.floor)) clubFloors.push(c.floor);
     else if (c.kind === "nightclub" && isOperational(c) && servedSet.has(c.floor)) nightclubFloors.push(c.floor);
     else if (c.kind === "spa" && isOperational(c) && servedSet.has(c.floor)) spaFloors.push(c.floor);

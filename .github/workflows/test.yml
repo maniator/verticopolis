@@ -23,14 +23,39 @@ permissions:
   contents: read
 
 jobs:
+  # The Rust engine's WASM package (src/public/engine/, engine-rs/pkg/) is build
+  # output and is not checked in. This job restores it from the Actions cache,
+  # keyed on the engine's source hash, or builds and caches it on a miss (an
+  # engine change), then hands it to the e2e job as a run artifact: e2e serves
+  # it to the chromium-wasm project, and its container has no Rust toolchain to
+  # build it. The test job needs no package (its hash test skips without one),
+  # so lint, typecheck and the unit tests never wait on a Rust build.
+  engine-wasm:
+    runs-on: ubuntu-latest
+    # A cache miss compiles the crate (a few minutes); anything near this is a hang.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - uses: ./.github/actions/engine-wasm
+        with:
+          artifact-name: engine-wasm
+
   test:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Use Node.js (from .nvmrc)
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
           cache: "npm"
@@ -47,8 +72,13 @@ jobs:
       - name: Run tests
         run: npm run test:coverage -- --run
 
+      # This job only proves the bundle builds, with no engine package (the e2e
+      # job below builds with one), so it opts out of the engine requirement
+      # scripts/verify-precache.ts puts on every build.
       - name: Build
         run: npm run build
+        env:
+          VC_ALLOW_NO_ENGINE: "1"
 
   # Resolve the Playwright container tag from the repo's own Playwright version so
   # the e2e job's browser can never drift from the one baselines were minted with
@@ -61,7 +91,7 @@ jobs:
     outputs:
       image: ${{ steps.pin.outputs.image }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: pin
         run: |
           ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
@@ -74,7 +104,7 @@ jobs:
   # so the baselines it compares against are minted against the identical renderer. Kept
   # in its own job so the container pull never slows the fast lint/test lane.
   e2e:
-    needs: resolve-image
+    needs: [resolve-image, engine-wasm]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -82,17 +112,23 @@ jobs:
       image: ${{ needs.resolve-image.outputs.image }}
 
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # The image ships Node 20; install the repo's pinned Node over it (keeping
       # the image's browsers) so every job runs the same Node the tests expect.
       - name: Use Node.js (from .nvmrc)
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
 
       - name: Install dependencies
         run: npm ci
+
+      # The engine's WASM package is build output, not checked in; the
+      # engine-wasm job restored it from the cache (or built it) and uploaded it.
+      - uses: ./.github/actions/engine-wasm-download
+        with:
+          artifact-name: engine-wasm
 
       # A tooling build: e2e drives the app through `window.game`, which only
       # VC_TOOLING=1 builds publish (production builds compile it away).
@@ -119,7 +155,7 @@ jobs:
       # pipeline may regenerate), and this uploads that per-run set.
       - name: Upload milestone screenshots
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: milestone-screenshots
           path: e2e/output/milestones/
@@ -131,8 +167,80 @@ jobs:
       # without rerunning locally.
       - name: Upload visual diffs on failure
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-visual-diffs
+          path: test-results/
+          if-no-files-found: ignore
+
+  # The wasm-only build (VC_ENGINE=wasm; src/build/engineBundle.ts), the one
+  # the 3.0.0 flip deploys: the Rust/WASM engine is the only engine, with no
+  # runtime switch, no TypeScript step loop and no fallback. Its postbuild
+  # guard (scripts/verify-engine-bundle.ts) reads the emitted sourcemaps and
+  # the precache; this job also proves that guard fails when app code imports
+  # the TypeScript step loop, then runs the whole e2e suite on the build.
+  e2e-wasm-only:
+    needs: [resolve-image, engine-wasm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: ${{ needs.resolve-image.outputs.image }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: ./.github/actions/engine-wasm-download
+        with:
+          artifact-name: engine-wasm
+
+      # The player build, exactly as a deploy would make it, with every
+      # postbuild check (the engine bundle guard among them).
+      - name: Build (wasm-only, player)
+        run: npm run build
+        env:
+          VC_ENGINE: wasm
+
+      # A legacy import from app code (the alias only covers Simulation.ts's
+      # own import) must fail the build with the guard's message.
+      - name: The bundle guard catches a TypeScript step loop import
+        shell: bash
+        run: |
+          cp src/bootstrap.ts "$RUNNER_TEMP/bootstrap.ts"
+          # Put the file back however the step ends; the next build step then
+          # rebuilds dist/ from the real source.
+          trap 'cp "$RUNNER_TEMP/bootstrap.ts" src/bootstrap.ts' EXIT
+          printf 'import { tick as legacyTick } from "./engine/sim/loop";\n(globalThis as unknown as { legacyTick?: unknown }).legacyTick = legacyTick;\n' >> src/bootstrap.ts
+          if VC_ENGINE=wasm npm run build > canary.log 2>&1; then
+            cat canary.log
+            echo "::error::the wasm-only build passed with the TypeScript step loop imported; scripts/verify-engine-bundle.ts missed it"
+            exit 1
+          fi
+          grep -F "carries the TypeScript step loop (src/engine/sim/loop.ts) in a wasm-only build" canary.log
+
+      - name: Build (wasm-only, tooling)
+        run: npm run build
+        env:
+          VC_ENGINE: wasm
+          VC_TOOLING: "1"
+
+      - name: Run end-to-end tests on the wasm-only build
+        run: npx playwright test --grep-invert @perf
+        env:
+          PW_WASM_ONLY: "1"
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-wasm-only-results
           path: test-results/
           if-no-files-found: ignore
