@@ -150,6 +150,54 @@ describe("worker host round 2 (fake engine)", () => {
     h.detach();
   });
 
+  it("leaves the read model untouched by a fresh reply it cannot read, so the fallback sees the last applied state", () => {
+    const mod = fakeModule();
+    const core = new EngineWorkerCore(mod, () => {});
+    const sim = Simulation.newGame(4, "classic");
+    const sent: ToWorker[] = [];
+    const fatal: string[] = [];
+    const h = attachWorkerHost(sim, { gen: 1, catalogs: core.catalogs(), send: (m) => sent.push(m), onFatal: (m) => fatal.push(m), onError: () => {} });
+    const loaded = new Float64Array(26);
+    loaded[0] = sim.clock.minutes;
+    loaded[4] = sim.money;
+    h.receive({ type: "loaded", gen: 1, view: loaded });
+    const minutes = sim.clock.minutes;
+    const money = sim.money;
+    sim.tick(1);
+    h.flush();
+    const req = (last(sent) as Extract<ToWorker, { type: "ops" }>).request!.req;
+    // A well-formed frame view that moves the money, with a log that is not
+    // JSON: nothing of it may land before the failure.
+    const view = new Float64Array(26);
+    view[0] = minutes + 1;
+    view[4] = money + 12_345;
+    h.receive({ type: "frame", gen: 1, req, seq: 1, view, events: "[]", dropped: 0, log: "{not json", pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    expect(fatal.length).toBe(1);
+    expect(sim.money).toBe(money);
+    h.detach();
+    // The fallback rolls the clock back to the last applied minute.
+    expect(sim.clock.minutes).toBe(minutes);
+    expect(sim.money).toBe(money);
+
+    // The same for a merge whose save reads but whose telemetry does not:
+    // the save's structure must not land either.
+    const merged = Simulation.newGame(4, "classic");
+    const sent2: ToWorker[] = [];
+    const fatal2: string[] = [];
+    const h2 = attachWorkerHost(merged, { gen: 2, catalogs: core.catalogs(), send: (m) => sent2.push(m), onFatal: (m) => fatal2.push(m), onError: () => {} });
+    h2.receive({ type: "loaded", gen: 2, view: loaded });
+    merged.tick(1);
+    h2.flush();
+    const req2 = (last(sent2) as Extract<ToWorker, { type: "ops" }>).request!.req;
+    const other = Simulation.newGame(4, "classic");
+    other.tower.towerName = "From the bad merge";
+    h2.receive({ type: "frame", gen: 2, req: req2, seq: 1, view, events: "[]", dropped: 0, log: null, pending: null, merge: { save: JSON.stringify(other.serialize()), telemetry: "{not json", housekeeping: null }, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    expect(fatal2.length).toBe(1);
+    expect(merged.tower.towerName).not.toBe("From the bad merge");
+    expect(merged.money).toBe(money);
+    h2.detach();
+  });
+
   it("ends a settle that never gets an answer at the host's own cap", async () => {
     const mod = fakeModule();
     const sent: ToWorker[] = [];

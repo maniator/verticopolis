@@ -10,7 +10,7 @@ import { decodeHeader } from "./frameView";
 import { SETTLE_TIMEOUT_MS, setStepGate } from "./stepGate";
 import { refuseForeignCatalog } from "./wasmHost";
 import type { FrameReply, FrameRequest, Op, ToWorker } from "./workerProtocol";
-import { applyHeaderFields, mergeSave, restoreOwn, structuredCloneOf } from "./workerApply";
+import { applyHeaderFields, mergeSave, parseMerge, restoreOwn, structuredCloneOf } from "./workerApply";
 import { LATENCY_SAMPLES, newWorkerHostStats, pushSample, type WorkerHost, type WorkerHostOptions } from "./workerStats";
 
 export type { WorkerHost, WorkerHostOptions, WorkerHostStats } from "./workerStats";
@@ -238,12 +238,21 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       if (staleStreak < MAX_STALE_STREAK || waiters.length > 0) requestFrame();
       return;
     }
+    // Read everything the reply carries before any write: one that does not
+    // parse is fatal with the read model as the last reply left it, so the
+    // fallback's clock (rolled back to that reply's minute) and its state
+    // agree.
+    const tParse = now();
+    const merge = r.merge ? parseMerge(r.merge) : null;
+    const parseMs = now() - tParse;
+    const pending = h.pending && r.pending && r.pending !== JSON.stringify(sim.events.pending) ? (JSON.parse(r.pending) as typeof sim.events.pending) : undefined;
+    const log = r.log !== null ? (JSON.parse(r.log) as LogEntry[]) : null;
     relay.suppress(() => {
-      if (r.merge) {
+      if (merge) {
         const t = now();
-        mergeSave(sim, r.merge, h);
+        mergeSave(sim, merge, h);
         stats.merges++;
-        stats.mergeMs += now() - t;
+        stats.mergeMs += now() - t + parseMs;
       }
       if (h.mealOverlayRevision !== engineMealRev) {
         engineMealRev = h.mealOverlayRevision;
@@ -254,10 +263,8 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
         // The pending choice, also when one replaced another between
         // replies (the batching widens that window).
         if (!h.pending) sim.events.pending = null;
-        else if (r.pending && r.pending !== JSON.stringify(sim.events.pending)) sim.events.pending = JSON.parse(r.pending) as typeof sim.events.pending;
-        if (r.log !== null) {
-          appendEngineLog(sim, JSON.parse(r.log) as LogEntry[], sim.logSeq - simLogSeqAtSync);
-        }
+        else if (pending !== undefined) sim.events.pending = pending;
+        if (log !== null) appendEngineLog(sim, log, sim.logSeq - simLogSeqAtSync);
         engineLogSeq = h.logSeq;
         simLogSeqAtSync = sim.logSeq;
       }

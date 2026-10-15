@@ -133,6 +133,46 @@ describe.skipIf(!hasWasmPackage())("worker host lifecycle", () => {
     expect(second.worker.terminated).toBe(true);
   }, 120_000);
 
+  it("a crash with a batch in flight and a command no reply has included falls back with the state's own clock, the command and its one event", async () => {
+    const worker = spawned(wasm());
+    const a = app(Simulation.newGame(7, "classic"));
+    const handle = startWorkerHost(a, worker, () => Promise.reject(new Error("no restart")), quiet);
+    await until(() => handle.current()?.loaded() ?? false, "load");
+    await script(driven(handle, a), 8);
+    const sim = a.sim;
+    sim.drainGameplayEvents();
+    const applied = sim.clock.minutes;
+    // A batch goes out, then a build no reply includes yet; the worker
+    // crashes before answering.
+    sim.tick(2);
+    sim.tick(2);
+    stepGate(sim)!.flush();
+    expect(stepGate(sim)!.canStep(), "a batch in flight").toBe(false);
+    expect(sim.build("lobby", 1, 170).ok).toBe(true);
+    const money = sim.money;
+    worker.worker.crash("boom");
+    expect(handle.status.hosted).toBe(false);
+    // The steps no reply confirmed are given back; the build stays, with
+    // its event handed out once.
+    expect(sim.clock.minutes).toBe(applied);
+    expect(sim.money).toBe(money);
+    expect(sim.tower.units.some((u) => u.kind === "lobby" && u.floor === 1 && u.x === 170)).toBe(true);
+    expect(sim.drainGameplayEvents().filter((e) => e.name === "facility_placed")).toHaveLength(1);
+    expect(sim.drainGameplayEvents()).toEqual([]);
+    // TypeScript runs it on, and its save loads into a fresh engine.
+    for (let i = 0; i < 30; i++) sim.tick(2);
+    const back = Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())));
+    expect(back.tower.units.length).toBe(sim.tower.units.length);
+    const fresh = spawned(wasm());
+    const b = app(back);
+    const again = startWorkerHost(b, fresh, () => Promise.reject(new Error("no restart")), quiet);
+    await until(() => again.current()?.loaded() ?? false, "the fresh worker to load the saved tower");
+    await script(driven(again, b), 8);
+    expect(again.status.errors).toEqual([]);
+    again.stop();
+    handle.stop();
+  }, 120_000);
+
   it("survives ten crashes in a row, each tower on a fresh worker, terminating every broken one", async () => {
     const workers: TestWorker[] = [];
     const make = () => {
