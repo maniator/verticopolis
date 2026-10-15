@@ -140,6 +140,34 @@ describe("service sprites survive a non-identity reference map", () => {
     },
   );
 
+  it("pins the grid the references are authored on", () => {
+    // The bounds guard above only fails when the grid SHRINKS: if TILE or FLOOR
+    // grows, the derived canvas grows with it and the authored rects still fit,
+    // so the art would sit in the top-left of a bigger room unnoticed. Either
+    // direction means the six references need re-authoring, so pin the grid.
+    expect([TILE, FLOOR]).toEqual([10, 45]);
+  });
+
+  it.each([
+    ["a full lot and a full plant", 1, 1],
+    ["a half-full plant", 1, 0.6],
+  ] as const)("keeps every rect inside its canvas with %s", (_label, parkingUse, recycleFill) => {
+    // The default state draws no parked car, no pile and an empty gauge, so
+    // those branches need their own pass under the same bounds guard.
+    for (const sp of SPRITES) {
+      const r = recorder();
+      const state = (c: CanvasRenderingContext2D) => ({ ...dc(c), parkingUse, recycleFill });
+      const w = sp.tiles * TILE;
+      const h = sp.floors * FLOOR;
+      if (sp.name === "parking") drawParking(state(r.ctx), UNIT, 0, 0, w, h);
+      else if (sp.name === "recycling") drawRecycling(state(r.ctx), UNIT, 0, 0, w, h);
+      else continue;
+      const outside = r.rects.filter((q) => q.x < 0 || q.y < 0 || q.x + q.w > w || q.y + q.h > h);
+      expect(outside.map((q) => `${sp.name} ${q.x},${q.y} ${q.w}x${q.h} ${q.c}`)).toEqual([]);
+      expect(r.rects.length).toBeGreaterThan(paint(sp, w, h).length);
+    }
+  });
+
   it("paints identically through both fills at the authored footprint", () => {
     // The proof that the uniform fill corrected the MAP rather than redrawing
     // art. At identity the two sizing rules must agree exactly, and every sprite

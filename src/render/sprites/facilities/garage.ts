@@ -6,16 +6,18 @@ import { FLOOR, TILE } from "../../scale";
 
 /**
  * The basement garage kinds: a single parking space and the parking ramp.
- * Both are ported from their Figma reference build scripts
- * (`page-01-parking-medical-security.build.js`, `page-01-parking-ramp.build.js`)
- * through the shared `refMap` scaler. Placement is engine truth (`basement:true`
+ * Both were first ported from their Figma reference build scripts
+ * (`page-01-parking-medical-security.build.js`, `page-01-parking-ramp.build.js`),
+ * which are drawn on the retired 11 by 44 grid; since the re-author this
+ * TypeScript is the canonical art, drawn through the shared `refMap` scaler. Placement is engine truth (`basement:true`
  * and the ramp chain); the render only reflects it.
  *
  * The references were re-authored onto the live TILE 10 by FLOOR 45 grid, so
- * `RW`/`RH` equal the on-screen footprint and `refMap` is the identity. Keep them
- * that way: a reference that drifts off the shipped size resamples every rect,
- * and a resampled repeat (stall lines, car wheels, ceiling joists) loses its even
- * pitch.
+ * `RW`/`RH` equal the shipped footprint and, drawn at that footprint, `refMap`
+ * is the identity. Keep them that way: a reference that drifts off the shipped
+ * size resamples every rect, and a resampled repeat (stall lines, car wheels,
+ * ceiling joists) loses its even pitch. Previews that draw at another size
+ * (/gallery) still resample.
  */
 
 // ---- Parking spaces ---------------------------------------------------------
@@ -47,8 +49,9 @@ export function drawParking(d: DrawCtx, u: Unit, x: number, y: number, w: number
   const use = Number.isFinite(rawUse) ? rawUse : 0;
   if (rand((u.id * 31) | 0) < use) {
     const body = ACCENTS[u.id % ACCENTS.length];
-    // Every part of the car is placed off `cx`/`cw` so the two windows and the
-    // two wheels stay evenly spaced whatever the body width becomes.
+    // The body, roof, wheels, lamp and shadow are placed off `cx`/`cw`, so the
+    // two wheels keep equal end margins whatever the body width becomes; the
+    // two windows sit on their own fixed pitch from `cx`.
     const cx = 13;
     const cw = 24;
     box(F, cx, fy - 9, cw, 7, body);
@@ -202,7 +205,7 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: Unit, x: numbe
   F(carX + 5, 28, carW - 10, 1, "#7E9EC0");
   F(carX + 6, 29, carW - 12, 3, "#AEBFD4");
   // A 2px center post splits the windscreen into two panes of equal width.
-  F(carX + 9, 29, 2, 3, "#5D7FA6");
+  F(carX + carW / 2 - 1, 29, 2, 3, "#5D7FA6");
   F(carX, 36, 1, 1, "#E7D9A6");
   F(carX + carW, 36, 1, 1, "#C98A3A");
   void u;
