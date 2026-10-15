@@ -347,8 +347,9 @@ diagrams). The prose conventions below are the source of truth.
   controllers (`uiDialogs`), the editor/inspector panels (`uiPanels`), the
   status/log pump (`uiStatus`), and the palette build (`uiPalette`).
 - **`src/audio/`, `src/storage/`**: sound and save/load, independent of
-  rendering. Audio is a boot-time facade (`Audio`) that lazy-loads the live
-  orchestrator (`ToneAudioEngine`), which drives the scene data and math
+  rendering. Audio is a boot-time facade (`AudioEngine` in `Audio.ts`) that
+  lazy-loads the live orchestrator (`ToneAudioEngine`), which drives the
+  scene data and math
   (`toneScenes`), the composed music (`toneTracks`), the action jingles
   (`toneVoices`), percussion (`tonePercussion`), rain (`toneRain`), and the
   crowd and venue ambience (`toneCrowd*`); `audioAssets` lists the files it
@@ -564,7 +565,7 @@ alone.
 | `src/render/` | Canvas rendering and pixel-art sprites (`sprites.ts`, `sprites/**`, `pixelSprites.ts`). Reads engine state, never mutates it. |
 | `src/render/excalibur/` | The Excalibur/WebGL engine wrapper (unit-exempt, e2e-covered). |
 | `src/ui/` | DOM controls: palette, status bar, native `<dialog>` modals. The `UI` shell delegates to friend-modules: `templates/` (lit-html bodies), `uiDialogs`, `uiPanels`, `uiStatus`, `uiPalette`. |
-| `src/audio/` | Sound, independent of rendering: the `Audio` facade, `ToneAudioEngine` (orchestrator), `toneScenes` (data/math), `toneTracks` (music), `toneVoices` (jingles), `tonePercussion`, `toneRain`, the `toneCrowd*` ambience modules, and `audioAssets`. See [SOUNDS.md](./SOUNDS.md). |
+| `src/audio/` | Sound, independent of rendering: the `AudioEngine` facade (`Audio.ts`), `ToneAudioEngine` (orchestrator), `toneScenes` (data/math), `toneTracks` (music), `toneVoices` (jingles), `tonePercussion`, `toneRain`, the `toneCrowd*` ambience modules, and `audioAssets`. See [SOUNDS.md](./SOUNDS.md). |
 | `src/storage/` | Save/load, `.vctower` tower-file import/export. |
 | `src/main.ts` | Composition root: wires input, engine, and the game loop. |
 | `src/tests/` | Vitest fixtures and integration suites (`*.integration.test.ts`); unit tests colocate next to their source. |
