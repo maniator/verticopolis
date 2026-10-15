@@ -3,8 +3,10 @@ import { subtypeListFor } from "../../engine/retailSubtypes";
 import type { FacilityKind, UnitState } from "../../engine/types";
 import { rand } from "../sprites/common";
 import { LATE_NIGHT_KINDS, isLateHour } from "../lateNight";
-import { OCCUPANT_FREE, PARKING_CAR_COLORS, RECYCLE_STEPS } from "./catalog";
+import { OCCUPANT_FREE, PARKING_CAR_COLORS, RECYCLE_BREAKS, RECYCLE_STEPS } from "./catalog";
 import { LEGACY_SHAFT_WIDTHS } from "./catalogExtras";
+import { CINEMA_CYCLES, cycleSteps } from "./cycles";
+import { recyclingFillStep } from "./recyclingFill";
 
 /**
  * The reference reader: how a frontend maps a live unit and scene to atlas
@@ -36,6 +38,9 @@ export interface LiveScene {
   recycleFill: number;
   /** This parking space is not chained to a ramp. */
   dead: boolean;
+  /** Seconds on the game's animation clock, for the cinema's marquee and
+   *  screen (absent: 0, the moment the atlas bakes). */
+  clock?: number;
 }
 
 /** `stretchTo`, when present, is the room's real width in tiles: its frame or
@@ -46,20 +51,26 @@ export interface LiveScene {
  *  at its real width. */
 export type Lookup =
   | { animation: string; stretchTo?: number }
-  | { frame: string; chains: Record<string, number>; overlays: string[]; stretchTo?: number };
+  | { frame: string; chains: Record<string, number>; overlays: string[]; cycles?: Record<string, number>; stretchTo?: number };
 
-export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number): Lookup {
+/** Reader choices. `recyclingEighths` reads a recycling center through its
+ *  `fill` eighths (the game's re-bake buckets) instead of the exact chain. */
+export interface LookupOptions {
+  recyclingEighths?: boolean;
+}
+
+export function lookupRoom(u: LiveUnit, s: LiveScene, variant: number, opts: LookupOptions = {}): Lookup {
   // An unknown kind names its own width and no stretch (its frame is missing
   // either way); a corrupt width (not finite, or under one tile) reads as the
   // catalog's.
   const cat = FACILITIES[u.kind]?.width;
-  if (cat === undefined) return lookupAtCatalogWidth(u, s, variant, u.width);
+  if (cat === undefined) return lookupAtCatalogWidth(u, s, variant, u.width, opts);
   const width = Number.isFinite(u.width) && Math.round(u.width) >= 1 ? Math.round(u.width) : cat;
-  const found = lookupAtCatalogWidth(u, s, variant, cat);
+  const found = lookupAtCatalogWidth(u, s, variant, cat, opts);
   return width === cat ? found : { ...found, stretchTo: width };
 }
 
-function lookupAtCatalogWidth(u: LiveUnit, s: LiveScene, variant: number, width: number): Lookup {
+function lookupAtCatalogWidth(u: LiveUnit, s: LiveScene, variant: number, width: number, opts: LookupOptions): Lookup {
   if (u.state === "fire" || u.state === "construction") return { animation: `${u.state}/${u.kind}` };
   let hours = "always";
   if (hasBusinessHours(u.kind)) hours = isOpenAt(u.kind, s.hour) ? "open" : "closed";
@@ -76,16 +87,20 @@ function lookupAtCatalogWidth(u: LiveUnit, s: LiveScene, variant: number, width:
     return { frame: stem, chains: {}, overlays };
   }
   if (u.kind === "recycling") {
-    const fill = Math.max(0, Math.min(1, finite(s.recycleFill)));
-    return { frame: stem, chains: { fill: Math.round(fill * RECYCLE_STEPS) }, overlays: [] };
+    if (opts.recyclingEighths) return { frame: stem, chains: { fill: Math.round(Math.max(0, Math.min(1, finite(s.recycleFill))) * RECYCLE_STEPS) }, overlays: [] };
+    // The exact chain, drawn instead of the eighths ('fill', which is
+    // round(fill * 8)): every fill matches the game's paint.
+    return { frame: stem, chains: { fillExact: recyclingFillStep(RECYCLE_BREAKS, s.recycleFill) }, overlays: [] };
   }
   if (OCCUPANT_FREE.has(u.kind)) return { frame: stem, chains: {}, overlays: [] };
   const occupants = finite(u.occupants);
-  if (occupants <= 0) return { frame: `${stem}/away`, chains: {}, overlays: [] };
+  // The cinema's marquee and screen follow the animation clock.
+  const cycles = u.kind === "cinema" ? { cycles: cycleSteps(CINEMA_CYCLES, s.clock ?? 0) } : {};
+  if (occupants <= 0) return { frame: `${stem}/away`, chains: {}, overlays: [], ...cycles };
   // Whole figures only. The art's figure loops run `i < n`, so a fractional
   // count (a forged save) paints like the next whole one: round up.
   const visible = Math.ceil(Math.max(0, occupants - finite(u.outForMeal ?? 0)));
-  return { frame: `${stem}/home`, chains: { occupants: visible }, overlays: [] };
+  return { frame: `${stem}/home`, chains: { occupants: visible }, overlays: [], ...cycles };
 }
 
 /** A count or fraction from the engine, with a corrupt value read as 0. */

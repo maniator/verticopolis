@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { notesForVersion } from "./changelog";
+import { marked } from "marked";
+import { escapeMarkdown, notesForVersion, releaseNoteLines } from "./changelog";
 import { MAX_NOTES, MAX_NOTE_LEN } from "./pwaUpdateInfo";
 
 /**
@@ -116,5 +117,78 @@ describe("notesForVersion", () => {
 
   it("turns a hard line break inside a bullet into a space", () => {
     expect(notesForVersion("## 1.0.0\n- line one  \n  line two\n", "1.0.0")).toEqual(["line one line two"]);
+  });
+});
+
+/** What a Markdown renderer makes of one release-note bullet, as HTML, with
+ *  the invisible word joiners the escape adds taken out. `marked` follows
+ *  CommonMark and GitHub's Markdown extensions (strikethrough, tables, bare
+ *  `www.` links); the links GitHub adds to plain text afterwards (mentions,
+ *  references, emoji) are checked by the joiners' placement below. */
+function rendered(line: string): string {
+  return marked.parse(line, { async: false }).replace(/\u2060/g, "");
+}
+
+/** The HTML a bullet holding exactly `text` renders to: one list item with the
+ *  text escaped for HTML and no other markup. */
+function literalBullet(text: string): string {
+  const html = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  return `<ul>\n<li>${html}</li>\n</ul>\n`;
+}
+
+describe("releaseNoteLines", () => {
+  const TRICKY = [
+    "## 2.0.0",
+    "",
+    "- An escaped \\*star\\* and \\_under\\_ stay literal.",
+    "- A code span `<Tower />` and another `_x_` and `**y**`.",
+    "- Ampersands &amp; entities like &copy; stay as typed, and a `|` pipe | too.",
+    "- Dollars $5 and $6, `~~not struck~~`, `[a link](u)` and `# not a heading`.",
+    "- `1. not a list` and `- not a list` or `+ either`.",
+    "- `\\` a backslash.",
+    "",
+  ].join("\n");
+
+  it("prints one bullet per note, escaped so the page shows the plain text", () => {
+    const notes = notesForVersion(TRICKY, "2.0.0", { maxNotes: Infinity, maxLen: Infinity });
+    const lines = releaseNoteLines(TRICKY, "2.0.0");
+    expect(notes[0]).toBe("An escaped *star* and _under_ stay literal.");
+    expect(notes[1]).toBe("A code span <Tower /> and another _x_ and **y**.");
+    expect(lines).toHaveLength(6);
+    lines.forEach((line, i) => expect(rendered(line), line).toBe(literalBullet(notes[i])));
+  });
+
+  it("escapes a note that starts like a list, a rule, a heading or a quote", () => {
+    for (const text of ["- dash", "+ plus", "1. one", "12) twelve", "---", "***", "___", "# hash", "> quote", "1.5x faster"]) {
+      expect(rendered(`- ${escapeMarkdown(text)}`), text).toBe(literalBullet(text));
+    }
+  });
+
+  it("collapses a note's whitespace to one line", () => {
+    expect(releaseNoteLines("## 3.0.0\n\n- First line  \n  second line\n", "3.0.0")).toEqual(["- First line second line"]);
+  });
+
+  it("is empty for a version with no player notes", () => {
+    expect(releaseNoteLines(CHANGELOG, "9.9.9")).toEqual([]);
+  });
+
+  it("splits the plain text GitHub would link with an invisible joiner", () => {
+    const J = "\u2060";
+    expect(escapeMarkdown("Thanks @maniator for #12 :tada:")).toBe(`Thanks @${J}maniator for \\#${J}12 :${J}tada:`);
+    expect(escapeMarkdown("See www.example.com or https://example.com")).toBe(`See www${J}.example.com or https:${J}//example.com`);
+    expect(escapeMarkdown("Built from 1a2b3c4d5e")).toBe(`Built from 1a2b${J}3c4d5e`);
+    expect(escapeMarkdown("Thumbs :+1: and :100: for GH-12")).toBe(`Thumbs :${J}+1: and :${J}100: for GH-${J}12`);
+    expect(escapeMarkdown("Opens at 3:00 and 10:30")).toBe("Opens at 3:00 and 10:30");
+    expect(escapeMarkdown("Won :1st_place_medal:")).toBe(`Won :${J}1st\\_place\\_medal:`);
+    for (const text of ["Thanks @maniator for #12 :tada:", "See www.example.com or https://example.com", "mail me@example.com"]) {
+      expect(rendered(`- ${escapeMarkdown(text)}`), text).toBe(literalBullet(text));
+    }
+    // Words that only look like hex, and short hex, stay whole.
+    expect(escapeMarkdown("A decade of cafe 1a2b")).toBe("A decade of cafe 1a2b");
+  });
+
+  it("leaves plain prose as it reads", () => {
+    const prose = "Elevators pick up riders faster, at 3:00 p.m. (mostly).";
+    expect(escapeMarkdown(prose)).toBe(prose);
   });
 });

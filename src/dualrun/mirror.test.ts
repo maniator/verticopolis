@@ -144,13 +144,27 @@ describe("attachMirror", () => {
     const sim = Simulation.newGame(2, "classic");
     const load = loadCommand(sim, 3);
     expect(load.gen).toBe(3);
-    expect(load.markers).toEqual({ lastHour: -1, lastDay: 0, lastQuarter: -1, lastMonth: -1 });
+    expect(load.markers).toEqual({ lastHour: -1, lastDay: 0, lastQuarter: -1, lastMonth: -1, extendGesture: null });
     const cmds: ShadowCommand[] = [];
     const detach = attachMirror(sim, (c) => cmds.push(c), 3);
     sim.tick(1);
     expect(cmds.find((c) => c.op === "checkpoint")).toMatchObject({ gen: 3 });
     detach();
     expect(loadCommand(sim, 4).markers.lastHour).toBe(7);
+  });
+
+  it("hands an open extend gesture over with the markers, leaving the tower's own alone (#990)", () => {
+    const sim = Simulation.newGame(2, "classic");
+    sim.money = 1e9;
+    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    for (let x = 170; x < 200; x++) expect(sim.build("floor", 2, x).ok).toBe(true);
+    expect(sim.buildTransport("elevatorStandard", 172, 1, 2).ok).toBe(true);
+    const lift = sim.tower.transportAt(1, 172)!;
+    expect(sim.beginExtend(lift.id)).toBe(true);
+    expect(sim.extendTransport(lift.id, "up", 5).added).toBe(3);
+    expect(sim.extendTransport(lift.id, "up", 3).added).toBe(0);
+    expect(loadCommand(sim, 1).markers.extendGesture).toEqual({ id: lift.id, bottom: 1, top: 5 });
+    expect(sim.extendTransport(lift.id, "up", 5).added).toBe(0); // the live gesture is untouched
   });
 
   it("refuses to start a shadow once the tower has a crowd", () => {

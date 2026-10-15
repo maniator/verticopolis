@@ -109,13 +109,15 @@ jobs:
       # The release notes are this version's player notes, picked out of
       # CHANGELOG.md by the game's own reader (src/changelog.ts), the one the
       # update prompt uses, without the prompt's three-line and length caps.
+      # Each note is plain text, so releaseNoteLines escapes its Markdown
+      # characters and the page shows it as the prompt does.
       # A version with no player notes (an internal build) gets a plain line.
       - name: Write the release notes
         env:
           TAG: ${{ needs.resolve.outputs.tag }}
         run: |
           mkdir -p release
-          VERSION="${TAG#v}" npx tsx -e 'import { readFileSync } from "node:fs"; import { notesForVersion } from "./src/changelog.ts"; for (const n of notesForVersion(readFileSync("CHANGELOG.md", "utf8"), process.env.VERSION ?? "", { maxNotes: Infinity, maxLen: Infinity })) console.log(`- ${n.replace(/\s+/g, " ")}`);' > release/notes.md
+          VERSION="${TAG#v}" npx tsx -e 'import { readFileSync } from "node:fs"; import { releaseNoteLines } from "./src/changelog.ts"; for (const line of releaseNoteLines(readFileSync("CHANGELOG.md", "utf8"), process.env.VERSION ?? "")) console.log(line);' > release/notes.md
           if ! grep -q '[^[:space:]]' release/notes.md; then
             echo "::notice::CHANGELOG.md has no player notes for ${TAG#v}; the release notes are a plain line."
             echo "Verticopolis ${TAG}." > release/notes.md
