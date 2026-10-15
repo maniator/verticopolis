@@ -64,6 +64,7 @@ export class FakeEngine {
   }
   elevatorTelemetry(): string { return '{"util":[],"hourly":[],"origins":[]}'; }
   housekeepingReport(): string | undefined { return undefined; }
+  commuteStress(): string { return "[]"; }
   drainGameplayEvents(): string {
     const out = JSON.stringify(this.owed);
     this.owed = [];

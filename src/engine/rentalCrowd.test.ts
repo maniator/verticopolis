@@ -6,6 +6,7 @@ import { visibleOccupants } from "./crowd/person";
 import { isTenanted } from "./types";
 import { isRentalKind as isRental } from "./residentialRentals";
 import type { GameMode } from "./types";
+import { atEngineFrameCadence } from "../tests/parity/typescriptOnly";
 
 /**
  * Modern rental living, the CROWD half: a leased rental has to put real travelers in
@@ -40,6 +41,7 @@ function servedTower(mode: GameMode = "modern"): Simulation {
 
 describe("Modern rental living: residents are real tower traffic", () => {
   it("a leased rental puts people in the tower, like a condo does", () => {
+    atEngineFrameCadence("day-long minute-tick runs that read the crowd, which the frame carries");
     // The residents count for population and stars and the census charges their
     // floor for elevator congestion, so if they never spawn as travelers the
     // tower bills a crowd it never renders. Measured against the condo, which is
@@ -78,6 +80,7 @@ describe("Modern rental living: residents are real tower traffic", () => {
   });
 
   it("rental floors do not cannibalize the condos' meal trips (#683)", () => {
+    atEngineFrameCadence("day-long minute-tick runs that read the crowd, which the frame carries");
     // Rentals bin into `condoFloors` so they share the condo meal cadence, but every
     // per-unit filter downstream used to match only `condo`. `spawnMealOutbound` picks
     // a floor UNIFORMLY from that pool and then filters the picked floor's units: land
@@ -156,6 +159,7 @@ describe("Modern rental living: residents are real tower traffic", () => {
   });
 
   it("an Apartment-only tower actually runs the school run (#683 consumer half)", () => {
+    atEngineFrameCadence("day-long minute-tick runs that read the crowd, which the frame carries");
     // The bin is only half the fix: `spawnSchoolDeparture` filters the picked floor's
     // units too, and that filter used to match condos alone. With an Apartment-only
     // tower the floor is picked and the filter yields nothing, so the option is spent

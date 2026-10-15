@@ -6,6 +6,7 @@ import { Simulation } from "../../engine/Simulation";
 import { drainFixedSteps, quantumFor } from "../../engine/sim/fixedStep";
 import { paceFactor } from "../../engine/timePacing";
 import type { SerializedGame } from "../../engine/types";
+import { atEngineFrameCadence } from "../parity/typescriptOnly";
 
 /** Decode a `.vctower` container (magic line + base64 deflate-raw JSON). */
 function decodeVctower(text: string): SerializedGame {
@@ -77,6 +78,7 @@ describe("engine fixed time step: the tower is the same at any frame rate", () =
   ] as const;
   for (const [label, rate, steadyClock] of cases) {
     it(`${label}: 30, 60, 144 Hz and a jittery frame source end byte-identical`, () => {
+      atEngineFrameCadence("the fixture is ticked frame by frame and only the final save, the engine's own while hosted, is compared");
       const runs = [steady(30), steady(60), steady(144), jittery()].map((f) => play(rate, f, steadyClock));
       for (const r of runs) {
         // Nothing was dropped: every run stepped the whole owed day.

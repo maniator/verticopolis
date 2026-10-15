@@ -120,7 +120,7 @@ export class EngineWorkerCore {
       const pending = view[21] === 1 ? engine.pendingChoice() ?? null : null;
       let merge = null;
       if (msg.request.merge || revision !== this.sentRevision || hourRuns !== this.sentHourRuns) {
-        merge = { save: engine.serialize(), telemetry: engine.elevatorTelemetry(), housekeeping: engine.housekeepingReport() ?? null };
+        merge = { save: engine.serialize(), telemetry: engine.elevatorTelemetry(), housekeeping: engine.housekeepingReport() ?? null, commute: engine.commuteStress() };
         this.sentRevision = revision;
         this.sentHourRuns = hourRuns;
       }

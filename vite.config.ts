@@ -228,6 +228,11 @@ function wasmParityProjects() {
     "**/wasmHostCatalog.integration.test.ts",
     "**/wasmHostLogText.integration.test.ts",
     "**/wasmHostTelemetry.integration.test.ts",
+    // These start their own host (in process, or the worker's).
+    "**/wasmHostAnalyticsBridge.integration.test.ts",
+    "**/wasmWorkerHost.integration.test.ts",
+    "**/wasmWorkerLifecycle.integration.test.ts",
+    "**/wasmWorkerSaves.integration.test.ts",
   ];
   const setupFiles = ["src/tests/viewWorldSetup.ts", "src/tests/parity/wasmHostSetup.ts"];
   return [

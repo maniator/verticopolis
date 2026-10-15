@@ -13,6 +13,7 @@ import { appendEngineLog, applyRecords, checkRecords } from "./frameApply";
 import { setStepGate } from "./stepGate";
 import { mergeSimulation } from "./merge";
 import { adoptTelemetry, type TelemetryDocument } from "./telemetry";
+import { parseCommuteStress } from "./workerApply";
 import { useTowerCatalogSource } from "../engine/towerCatalog";
 import { catalogFor } from "../engine/catalog";
 import type { Catalog, CatalogWorld } from "../engine/catalogTypes";
@@ -205,6 +206,9 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     // likewise left out of the save (the stats screen and diagnostics read it).
     const hk = engine.housekeepingReport();
     sim.economy.adoptHousekeepingReport(hk ? (JSON.parse(hk) as { cleaned: number; leftover: number }) : null);
+    // The per-origin commute-stress averages, live crowd state no save
+    // carries either.
+    sim.crowd.adoptCommuteStress(parseCommuteStress(engine.commuteStress()));
     lastRevision = frame.header.revision;
     host.merges++;
   };

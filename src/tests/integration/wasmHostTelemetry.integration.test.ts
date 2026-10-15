@@ -14,7 +14,8 @@ import type { WasmEngine } from "../../dualrun/binding";
 /**
  * The hourly elevator telemetry on both engines (#868): the demand curves the
  * schedule dialog reads, the utilization average and the boarding-origin
- * rings, and yesterday's housekeeping result the stats screen reads. The save
+ * rings, yesterday's housekeeping result the stats screen reads, and the
+ * crowd's per-origin commute-stress averages (#514). The save
  * never carries them, so the conformance view leaves them out; this suite
  * compares them directly, hour by hour, and checks that the WASM host's read
  * model shows the engine's.
@@ -32,7 +33,11 @@ interface Seen {
   weekday: boolean;
   weekend: boolean;
   housekeeping: boolean;
+  commute: boolean;
 }
+
+/** The instance's commute-stress averages in the engine's row order. */
+const commuteRows = (sim: Simulation) => [...sim.crowd.commuteStressByFloor.entries()].sort((a, b) => a[0] - b[0]);
 
 /** Tick both engines an hour at a time, comparing after each hour. */
 function compareHours(sim: Simulation, engine: WasmEngine, hours: number, seen: Seen, label: string): void {
@@ -43,6 +48,9 @@ function compareHours(sim: Simulation, engine: WasmEngine, hours: number, seen: 
     expect(engineTelemetry(engine.elevatorTelemetry()), `${label} hour ${h}`).toEqual(doc);
     const hk = sim.economy.housekeepingReport();
     expect(JSON.parse(engine.housekeepingReport() ?? "null"), `${label} hour ${h} housekeeping`).toEqual(hk);
+    const commute = commuteRows(sim);
+    expect(JSON.parse(engine.commuteStress()), `${label} hour ${h} commute stress`).toEqual(commute);
+    seen.commute ||= commute.length > 0;
     seen.weekday ||= warmed(doc, "weekday");
     seen.weekend ||= warmed(doc, "weekend");
     seen.housekeeping ||= hk !== null && (hk.cleaned > 0 || hk.leftover > 0);
@@ -75,10 +83,10 @@ function run(fixture: string, seen: Seen): void {
 
 describe.skipIf(!hasWasmPackage())("elevator telemetry on both engines", () => {
   it("every fixture, hour by hour, through a weekday and a weekend", () => {
-    const seen: Seen = { weekday: false, weekend: false, housekeeping: false };
+    const seen: Seen = { weekday: false, weekend: false, housekeeping: false, commute: false };
     for (const fixture of FIXTURES) run(fixture, seen);
     // Real values were compared, never only empty stores.
-    expect(seen).toEqual({ weekday: true, weekend: true, housekeeping: true });
+    expect(seen).toEqual({ weekday: true, weekend: true, housekeeping: true, commute: true });
   }, 300_000);
 
   it("the hosted read model shows the engine's telemetry after each hour, in the objects a reader holds", () => {
@@ -95,6 +103,7 @@ describe.skipIf(!hasWasmPackage())("elevator telemetry on both engines", () => {
         const doc = engineTelemetry(host.engine.elevatorTelemetry());
         expect(telemetryDocument(sim), `hour ${h}`).toEqual(doc);
         expect(sim.economy.housekeepingReport(), `hour ${h} housekeeping`).toEqual(JSON.parse(host.engine.housekeepingReport() ?? "null"));
+        expect(commuteRows(sim), `hour ${h} commute stress`).toEqual(JSON.parse(host.engine.commuteStress()));
         if (!held && doc.hourly.length > 0) {
           const id = doc.hourly[0][0];
           held = { id, hourly: sim.elevatorHourlyLoad(id)!, origins: sim.elevatorOriginLoad(id)! };

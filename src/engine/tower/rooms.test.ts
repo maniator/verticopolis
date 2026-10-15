@@ -4,6 +4,7 @@ import { roomUnits } from "./rooms";
 import type { FacilityKind } from "../types";
 import { isStructural } from "./towerTopology";
 import { ensureStarterLobby, layTile, placeUnit, MID } from "../../tests/fixtures/towerFixtures";
+import { atEngineFrameCadence } from "../../tests/parity/typescriptOnly";
 
 function towerWithRooms(): Simulation {
   const sim = Simulation.newGame(7, "classic");
@@ -99,6 +100,7 @@ describe("roomUnits", () => {
 
 describe("roomUnits on a real tower", () => {
   it("leaves the census unchanged: totalPopulation equals a full scan of every unit", async () => {
+    atEngineFrameCadence("360 ticks on a 12,000-unit fixture, asserting the census, which reads the unit states the frame carries");
     const { inflateSync } = await import("fflate");
     const { default: text } = await import("../../../conformance/fixtures/sixseven_2.vctower?raw");
     const { censusCount } = await import("../facilities");

@@ -35,3 +35,27 @@ export function itTypeScriptOnly(reason: string): (name: string, fn: () => void 
     it(name, fn, timeout);
   };
 }
+
+const FRAME_CADENCE_FLAG = "__vcWasmParityFrameCadence";
+
+/** Called at the top of a test that reads only what the engine's frame
+ *  carries every tick (the people, the clock, the unit states and counters)
+ *  or the engine's own save at the end, and ticks too often for a full merge
+ *  after every tick (a fixture save, or a day of minute ticks). On the parity
+ *  projects the test then runs at the host's own cadence, a merge on an hour
+ *  pass or a tower edit, as the game does; elsewhere it does nothing. The
+ *  reason is required, and the story's test-mapping table repeats it. */
+export function atEngineFrameCadence(reason: string): void {
+  if (!reason.trim()) throw new Error("atEngineFrameCadence needs the reason the test reads only what the frame carries");
+  if (onWasmParityProject()) (globalThis as Record<string, unknown>)[FRAME_CADENCE_FLAG] = true;
+}
+
+/** Whether the running test asked for the host's own cadence. */
+export function frameCadenceRequested(): boolean {
+  return (globalThis as Record<string, unknown>)[FRAME_CADENCE_FLAG] === true;
+}
+
+/** Drop the request; `wasmHostSetup.ts` calls it after each test. */
+export function clearFrameCadence(): void {
+  delete (globalThis as Record<string, unknown>)[FRAME_CADENCE_FLAG];
+}

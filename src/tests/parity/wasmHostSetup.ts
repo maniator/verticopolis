@@ -10,7 +10,7 @@ import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
 import { LOG_RING_CAP } from "../../engine/sim/constants";
 import { coerceLog } from "../../engine/sim/coerce";
 import type { LogEntry } from "../../engine/types";
-import { WASM_PARITY_FLAG } from "./typescriptOnly";
+import { WASM_PARITY_FLAG, frameCadenceRequested, clearFrameCadence } from "./typescriptOnly";
 
 /**
  * The setup file of the `integrationWasm` and `unitWasm` vitest projects
@@ -70,7 +70,7 @@ import { WASM_PARITY_FLAG } from "./typescriptOnly";
  *   between tests, ticked on the TypeScript engine after its release);
  * - an exterminator booking the save cannot carry: booked room ids on the
  *   instance at attach, and any pending booking at a re-host (#902);
- * - a re-host after the first tick under `VC_WASM_SYNC=hour`, where the
+ * - a re-host after the first tick under the hour cadence, where the
  *   instance is behind the engine between merges and its save would rewind
  *   the engine.
  *
@@ -78,8 +78,9 @@ import { WASM_PARITY_FLAG } from "./typescriptOnly";
  * plus the frame sync), and in tick mode the engine's full save is then
  * merged into the instance (`host.syncStructure`), so an assertion between
  * hours reads the state the engine holds after that tick.
- * `VC_WASM_SYNC=hour` keeps the host's own cadence (frame sync per tick,
- * merge on an hour pass or a revision change) for a cost comparison.
+ * The hour cadence keeps the host's own (frame sync per tick, merge on an
+ * hour pass or a revision change): `VC_WASM_SYNC=hour` sets it for a run, and
+ * `atEngineFrameCadence` for one test that reads only what the frame carries.
  *
  * Every host is detached after each test (all of them, even when one
  * release throws), so the engines are freed and the instances are plain
@@ -97,7 +98,10 @@ export class WasmParityError extends Error {
 if (!hasWasmPackage()) throw new Error("the WASM parity projects need engine-rs/pkg/; run npm run wasm:build");
 (globalThis as Record<string, unknown>)[WASM_PARITY_FLAG] = true;
 
-const SYNC_MODE: "tick" | "hour" = process.env.VC_WASM_SYNC === "hour" ? "hour" : "tick";
+const ENV_SYNC_MODE: "tick" | "hour" = process.env.VC_WASM_SYNC === "hour" ? "hour" : "tick";
+/** The cadence in force: the switch's, or the host's own for a test that
+ *  asked for it through `atEngineFrameCadence` (reset after each test). */
+const syncMode = (): "tick" | "hour" => (frameCadenceRequested() ? "hour" : ENV_SYNC_MODE);
 
 interface Hosting {
   host: WasmHost;
@@ -375,7 +379,7 @@ function compareOrRehost(sim: Simulation, entry: Hosting): Hosting {
   // "occupied"`, a clock swap) shows in the cheap fingerprint, and the full
   // compare runs then too.
   const crowdEmpty = sim.crowd.people.length === 0;
-  if (sim.tower.revision === entry.revision && !(SYNC_MODE === "tick" && crowdEmpty) && fingerprint(sim) === entry.fingerprint) return entry;
+  if (sim.tower.revision === entry.revision && !(syncMode() === "tick" && crowdEmpty) && fingerprint(sim) === entry.fingerprint) return entry;
   const own = ownStateView(sim);
   const engine = entry.host.engine.stateView();
   if (own === engine) return entry;
@@ -413,11 +417,11 @@ function compareOrRehost(sim: Simulation, entry: Hosting): Hosting {
         "make the edit before the callExterminator call, or relay it",
     );
   }
-  if (SYNC_MODE === "hour" && entry.ticked) {
+  if (syncMode() === "hour" && entry.ticked) {
     // Between merges the instance is behind the engine, so its save is stale
     // and a restart from it would rewind the engine.
     throw new WasmParityError(
-      `the instance's state departs from the engine's at ${d?.path ?? "?"} after the first tick under VC_WASM_SYNC=hour, which cannot re-host after a tick (the instance's save is behind the engine between merges): ` +
+      `the instance's state departs from the engine's at ${d?.path ?? "?"} after the first tick under the hour cadence, which cannot re-host after a tick (the instance's save is behind the engine between merges): ` +
         "make the edit before the first tick, or run the test in tick mode",
     );
   }
@@ -439,7 +443,7 @@ function hostedTick(sim: Simulation, dt: number): void {
   entry.relayTick(dt);
   entry.ticked = true;
   parityStats.ticks++;
-  if (SYNC_MODE === "tick") {
+  if (syncMode() === "tick") {
     entry.host.syncStructure();
     parityStats.merges++;
   }
@@ -476,6 +480,7 @@ Simulation.prototype.callExterminator = function (this: Simulation): ReturnType<
 };
 
 afterEach(() => {
+  clearFrameCadence();
   // Every host is released even when one release throws, so no engine
   // leaks into the next test.
   const errors: unknown[] = [];
