@@ -92,6 +92,12 @@ export function definitions(config: WorkerConfig): Def[] {
       add({ group: "traffic", scenario: sc, throttle: t, metric: `full-save merges, ${steps} steps (hosted)`, unit: "count", better: "lower", pick: (r) => h(r)?.worker?.merges });
       add({ group: "traffic", scenario: sc, throttle: t, metric: `worker engine time, ${steps} steps (hosted)`, unit: "ms", better: "lower", pick: (r) => (h(r)?.worker ? h(r)!.worker!.workerOpsMs + h(r)!.worker!.workerReplyMs : null) });
       add({ group: "traffic", scenario: sc, throttle: t, metric: `main-thread merge time, ${steps} steps (hosted)`, unit: "ms", better: "lower", pick: (r) => h(r)?.worker?.mergeMs });
+      // The hourly deltas that replace most merges (#1045). Runs recorded
+      // before them carry no delta counters, which read as no sample.
+      add({ group: "traffic", scenario: sc, throttle: t, metric: `hourly deltas, ${steps} steps (hosted)`, unit: "count", better: "higher", pick: (r) => h(r)?.worker?.deltas });
+      add({ group: "traffic", scenario: sc, throttle: t, metric: "bytes per hourly delta (hosted)", unit: "bytes", better: "lower", pick: (r) => (h(r)?.worker?.deltas ? h(r)!.worker!.deltaBytes! / h(r)!.worker!.deltas! : null) });
+      add({ group: "traffic", scenario: sc, throttle: t, metric: `main-thread delta time, ${steps} steps (hosted)`, unit: "ms", better: "lower", pick: (r) => h(r)?.worker?.deltaMs });
+      add({ group: "traffic", scenario: sc, throttle: t, metric: `worker save time (full saves and deltas), ${steps} steps (hosted)`, unit: "ms", better: "lower", pick: (r) => h(r)?.worker?.workerSaveMs });
     }
   }
   return defs;

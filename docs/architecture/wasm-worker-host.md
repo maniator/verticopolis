@@ -128,14 +128,32 @@ apply reply ◀──── frame (buffer transferred) ─┘
 - `ready {catalogs}`: the catalogs' text, so the main thread never loads a
   second copy of the engine.
 - `loaded {gen, view}`
-- `frame {gen, req, seq, view, events, dropped, log, pending, merge?, workMs, memoryBytes}`
+- `frame {gen, req, seq, view, events, dropped, log, pending, merge?, delta?, workMs, memoryBytes}`
   - `seq` is the last op the reply includes.
   - `view`'s buffer is transferred, not copied.
   - `events` is the one drain of the engine's gameplay events since the
     last reply.
   - `log` holds the entries after the request's cursor.
-  - `merge` is the full save. It is sent only when the revision or the hour
-    pass moved since the last one sent, or when the request asks for it.
+  - `merge` is the full save. It is sent only when the revision moved since
+    the last one sent, or when the request asks for it.
+  - `delta` replaces it when only the hour pass moved (#1045): the engine's
+    `saveDelta()` text, holding the unit records whose save form changed
+    since the last save or delta sent and every other top-level key of the
+    save (the transports among them). The engine keeps a mirror of the units
+    as last sent, and a unit equal to its copy is never serialized again.
+    Every full save and delta takes the next number in the tower's sync
+    sequence (`sync`), and a delta names the one it was taken against
+    (`base`). The main thread patches the changed records onto the objects it
+    holds (`mergeSimulationDelta`) only when `base` is the last one it
+    applied; otherwise, or when the delta names a unit it does not hold, it
+    asks for a full save. The load primes the mirror, so the first hour pass
+    is a delta too; when the engine read the save into something other than
+    what the main thread sent, the first reply carries a full save instead.
+    An hour pass after a command (a camera stamp aside) also sends the full
+    save: the read model ran the command on its own, and a command the engine
+    answered differently in its result alone leaves a unit the engine never
+    changes, which no delta would correct. Units moved in place (a changed
+    floor, x or width) count as a layout change and ask for a full save too.
 - `error {gen?, seq?, fatal, message}`: `fatal` for a refused load, a gap in
   the sequence, a step the engine failed on or a reply that could not be
   built (the worker frees the engine and the main thread lets the tower go);
@@ -208,7 +226,7 @@ fan-out, and an event is never handed out twice.
 - Otherwise it answers with the read model's own save: the state of the
   last fresh reply plus the player's commands since, with the internals the
   frame does not carry (the RNG, `satisfaction`, the dispatch memos) as of
-  the last merge, which every hour pass carries. The steps still in flight
+  the last merge or delta, one of which every hour pass carries. The steps still in flight
   are not in it, so it carries that reply's minute instead of the frame
   loop's clock, and a tower loaded from it runs those steps again, an hour
   or day pass among them (#1018).
