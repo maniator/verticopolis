@@ -52,8 +52,11 @@ export function parseDelta(sim: Simulation, m: DeltaPayload): ParsedDelta | null
   if ("units" in rest || !Array.isArray(rest.transports) || typeof rest.minutes !== "number") throw new Error("delta: the save's remainder is not the engine's shape");
   const units: unknown[] = delta.units;
   const transports: unknown[] = rest.transports;
-  const isEntity = (v: unknown): v is { id: number; kind: string } => isRecord(v) && typeof v.id === "number" && typeof v.kind === "string" && isFacilityKind(v.kind);
+  const isEntity = (v: unknown): v is { id: number; kind: string } => isRecord(v) && typeof v.id === "number" && typeof v.kind === "string";
   if (!units.every(isEntity) || !transports.every(isEntity)) throw new Error("delta: a record is not the engine's shape");
+  // A kind this build does not know: the full save's load drops it, so ask
+  // for that rather than fail on it.
+  if (![...units, ...transports].every((v) => isFacilityKind(v.kind))) return null;
   const tower = sim.tower;
   if (transports.length !== tower.transports.length) return null;
   for (let i = 0; i < transports.length; i++) if (transports[i].id !== tower.transports[i].id) return null;

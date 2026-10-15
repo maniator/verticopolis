@@ -159,6 +159,7 @@ describe("the worker host's hourly delta", () => {
     expect(parseDelta(sim, payload([units[0]], rest))?.records.units.length).toBe(1);
     expect(parseDelta(sim, payload([{ ...units[0], id: 99_999 }], rest))).toBeNull();
     expect(parseDelta(sim, payload([{ ...units[0], kind: "office" }], rest))).toBeNull();
+    expect(parseDelta(sim, payload([{ ...units[0], kind: "spaceport" }], rest)), "a kind this build does not know").toBeNull();
     expect(parseDelta(sim, payload([], { ...rest, transports: [{ id: 5, kind: "stairs" }] }))).toBeNull();
     expect(() => parseDelta(sim, payload([], { ...rest, units: [] }))).toThrow(/remainder/);
     expect(() => parseDelta(sim, payload([{ id: "x" }], rest))).toThrow(/record/);
