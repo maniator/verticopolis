@@ -81,35 +81,117 @@ fn extend_bills_per_floor_past_the_mark_and_shrinks_free() {
     let (mut sim, _, lift, _) = fixture();
     let per = TRANSPORT_FLOOR_COST;
     assert_eq!(
-        sim.extend_transport(lift, ExtendEnd::Up, 3, None),
+        sim.extend_transport(lift, ExtendEnd::Up, 3),
         extended(ChargeResult::paid(-per), 1, 3, 1)
     );
     assert_eq!(
-        sim.extend_transport(lift, ExtendEnd::Up, 2, None),
+        sim.extend_transport(lift, ExtendEnd::Up, 2),
         extended(ChargeResult::paid(0.0), 1, 2, 0)
     );
-    // A drag: two floors past the mark, back down free, regrow free.
+    // A drag: two floors past the gesture's mark, back down free, regrow free.
+    assert!(sim.begin_extend(lift));
+    assert_eq!(sim.extend_transport(lift, ExtendEnd::Up, 4).added, 2);
     assert_eq!(
-        sim.extend_transport(lift, ExtendEnd::Up, 4, Some((1, 2)))
-            .added,
-        2
-    );
-    assert_eq!(
-        sim.extend_transport(lift, ExtendEnd::Up, 3, Some((1, 4))),
+        sim.extend_transport(lift, ExtendEnd::Up, 3),
         extended(ChargeResult::paid(0.0), 1, 3, 0)
     );
     assert_eq!(
-        sim.extend_transport(lift, ExtendEnd::Up, 4, Some((1, 4))),
+        sim.extend_transport(lift, ExtendEnd::Up, 4),
         extended(ChargeResult::paid(0.0), 1, 4, 0)
     );
     assert_eq!(sim.money, 1_000_000.0 - 3.0 * per);
+    // Once the gesture ends, the mark is the span again: a shrink and a
+    // regrow bills the regrown floor.
+    sim.end_extend();
+    assert_eq!(sim.extend_transport(lift, ExtendEnd::Up, 3).added, 0);
+    assert_eq!(
+        sim.extend_transport(lift, ExtendEnd::Up, 4),
+        extended(ChargeResult::paid(-per), 1, 4, 1)
+    );
+}
+
+#[test]
+fn a_gesture_bills_only_its_own_shaft_and_never_carries_over() {
+    let (mut sim, _, lift, stairs) = fixture();
+    let per = TRANSPORT_FLOOR_COST;
+    // Stairs open no gesture, and a refused begin drops the open one.
+    assert!(sim.begin_extend(lift));
+    assert!(!sim.begin_extend(stairs));
+    assert_eq!(sim.extend_gesture, None);
+    assert!(!sim.begin_extend(99_999));
+    // A gesture's mark is its shaft's: another elevator bills from its span.
+    assert!(sim.begin_extend(lift));
+    assert_eq!(sim.extend_transport(lift, ExtendEnd::Up, 4).added, 2);
+    assert!(sim.build_transport(Kind::ElevatorStandard, 14, 1, 2).ok);
+    let other = sim.tower.transport_at(1, 14).unwrap().id;
+    assert_eq!(sim.extend_transport(other, ExtendEnd::Up, 3).added, 1);
+    // A new gesture on the first shaft starts at its span, not the old mark.
+    assert_eq!(sim.extend_transport(lift, ExtendEnd::Up, 2).added, 0);
+    assert!(sim.begin_extend(lift));
+    assert_eq!(sim.extend_gesture, Some((lift, 1, 2)));
+    assert_eq!(
+        sim.extend_transport(lift, ExtendEnd::Up, 3),
+        extended(ChargeResult::paid(-per), 1, 3, 1)
+    );
+}
+
+#[test]
+fn a_gesture_stays_out_of_the_save_and_the_state_view() {
+    let (mut sim, _, lift, _) = fixture();
+    let (save, view) = (sim.serialize(), crate::scenario::state_view(&sim));
+    assert!(sim.begin_extend(lift));
+    assert_eq!(sim.serialize(), save);
+    assert_eq!(crate::scenario::state_view(&sim), view);
+    // Billing inside the gesture saves exactly what billing outside one does.
+    assert_eq!(sim.extend_transport(lift, ExtendEnd::Up, 4).added, 2);
+    assert_eq!(sim.extend_transport(lift, ExtendEnd::Up, 2).added, 0);
+    let (mut twin, _, twin_lift, _) = fixture();
+    assert_eq!(twin.extend_transport(twin_lift, ExtendEnd::Up, 4).added, 2);
+    assert_eq!(twin.extend_transport(twin_lift, ExtendEnd::Up, 2).added, 0);
+    assert_eq!(sim.serialize(), twin.serialize());
+    assert_eq!(
+        crate::scenario::state_view(&sim),
+        crate::scenario::state_view(&twin)
+    );
+    // A load builds a new simulation, which has no gesture open.
+    let loaded = crate::load::deserialize(&sim.serialize()).unwrap();
+    assert_eq!(loaded.extend_gesture, None);
+}
+
+#[test]
+fn another_shaft_wiggling_during_a_gesture_is_billed_every_time() {
+    let (mut sim, _, lift, _) = fixture();
+    assert!(sim.build_transport(Kind::ElevatorStandard, 14, 1, 2).ok);
+    let other = sim.tower.transport_at(1, 14).unwrap().id;
+    assert!(sim.begin_extend(lift));
+    assert_eq!(sim.extend_transport(other, ExtendEnd::Up, 3).added, 1);
+    assert_eq!(sim.extend_transport(other, ExtendEnd::Up, 2).added, 0);
+    assert_eq!(sim.extend_transport(other, ExtendEnd::Up, 3).added, 1);
+    // The gesture stays on its own shaft, untouched.
+    assert_eq!(sim.extend_gesture, Some((lift, 1, 2)));
+}
+
+#[test]
+fn a_gesture_widens_to_a_span_grown_outside_it() {
+    let (mut sim, _, lift, _) = fixture();
+    assert!(sim.begin_extend(lift));
+    // Grown for free outside the gesture: those floors stand, so the next
+    // step bills only the floor past them.
+    assert!(sim.resize_transport(lift, 1, 3).ok);
+    assert_eq!(
+        sim.extend_transport(lift, ExtendEnd::Up, 4),
+        extended(ChargeResult::paid(-TRANSPORT_FLOOR_COST), 1, 4, 1)
+    );
 }
 
 #[test]
 fn extend_never_rebills_a_standing_floor() {
     let (mut sim, _, lift, _) = fixture();
+    // The gesture's mark starts at the span, so its first floor is the only
+    // one billed: the two standing floors are not.
+    assert!(sim.begin_extend(lift));
     assert_eq!(
-        sim.extend_transport(lift, ExtendEnd::Up, 3, Some((1, 1))),
+        sim.extend_transport(lift, ExtendEnd::Up, 3),
         extended(ChargeResult::paid(-TRANSPORT_FLOOR_COST), 1, 3, 1)
     );
 }
@@ -120,16 +202,16 @@ fn extend_grows_as_far_as_the_budget_pays_then_refuses() {
     let per = TRANSPORT_FLOOR_COST;
     sim.money = per * 1.5;
     assert_eq!(
-        sim.extend_transport(lift, ExtendEnd::Up, 4, None),
+        sim.extend_transport(lift, ExtendEnd::Up, 4),
         extended(ChargeResult::paid(-per), 1, 3, 1)
     );
     assert_eq!(
-        sim.extend_transport(lift, ExtendEnd::Up, 4, None),
+        sim.extend_transport(lift, ExtendEnd::Up, 4),
         extended(refused(NOT_ENOUGH_MONEY), 1, 3, 0)
     );
     sim.money = -10_000.0;
     assert_eq!(
-        sim.extend_transport(lift, ExtendEnd::Up, 4, None),
+        sim.extend_transport(lift, ExtendEnd::Up, 4),
         extended(refused(NOT_ENOUGH_MONEY), 1, 3, 0)
     );
     assert_eq!(sim.tower.get_transport(lift).unwrap().top, 3);
@@ -140,7 +222,7 @@ fn extend_refuses_with_the_towers_reason_and_charges_nothing() {
     let (mut sim, _, lift, stairs) = fixture();
     assert!(sim.build_transport(Kind::ElevatorStandard, 10, 3, 4).ok);
     let money = sim.money;
-    let r = sim.extend_transport(lift, ExtendEnd::Up, 3, None);
+    let r = sim.extend_transport(lift, ExtendEnd::Up, 3);
     assert!(!r.charge.ok);
     assert_eq!(
         r.charge.reason.as_deref(),
@@ -149,11 +231,11 @@ fn extend_refuses_with_the_towers_reason_and_charges_nothing() {
     assert_eq!((r.charge.delta, r.bottom, r.top, r.added), (0.0, 1, 2, 0));
     assert_eq!(sim.money, money);
     assert_eq!(
-        sim.extend_transport(stairs, ExtendEnd::Up, 3, None),
+        sim.extend_transport(stairs, ExtendEnd::Up, 3),
         extended(refused(ONLY_ELEVATOR_EXTEND), 1, 2, 0)
     );
     assert_eq!(
-        sim.extend_transport(99_999, ExtendEnd::Down, 0, None),
+        sim.extend_transport(99_999, ExtendEnd::Down, 0),
         extended(refused(ELEVATOR_GONE), 0, 0, 0)
     );
 }
@@ -280,31 +362,33 @@ fn extend_bills_the_down_end_the_same_way() {
     assert!(sim.build_transport(Kind::ElevatorStandard, 14, 3, 4).ok);
     let shaft = sim.tower.transport_at(3, 14).unwrap().id;
     let start = sim.money;
+    assert!(sim.begin_extend(shaft));
     assert_eq!(
-        sim.extend_transport(shaft, ExtendEnd::Down, 1, Some((3, 4))),
+        sim.extend_transport(shaft, ExtendEnd::Down, 1),
         extended(ChargeResult::paid(-2.0 * per), 1, 4, 2)
     );
     assert_eq!(
-        sim.extend_transport(shaft, ExtendEnd::Down, 2, Some((1, 4))),
+        sim.extend_transport(shaft, ExtendEnd::Down, 2),
         extended(ChargeResult::paid(0.0), 2, 4, 0)
     );
     assert_eq!(
-        sim.extend_transport(shaft, ExtendEnd::Down, 1, Some((1, 4))),
+        sim.extend_transport(shaft, ExtendEnd::Down, 1),
         extended(ChargeResult::paid(0.0), 1, 4, 0)
     );
     // A down target above the shaft shrinks it to one floor tall.
     assert_eq!(
-        sim.extend_transport(shaft, ExtendEnd::Down, 6, None),
+        sim.extend_transport(shaft, ExtendEnd::Down, 6),
         extended(ChargeResult::paid(0.0), 3, 4, 0)
     );
     assert_eq!(sim.money, start - 2.0 * per);
+    sim.end_extend();
     sim.money = per * 1.5;
     assert_eq!(
-        sim.extend_transport(shaft, ExtendEnd::Down, 1, None),
+        sim.extend_transport(shaft, ExtendEnd::Down, 1),
         extended(ChargeResult::paid(-per), 2, 4, 1)
     );
     assert_eq!(
-        sim.extend_transport(shaft, ExtendEnd::Down, 1, None),
+        sim.extend_transport(shaft, ExtendEnd::Down, 1),
         extended(refused(NOT_ENOUGH_MONEY), 2, 4, 0)
     );
 }
@@ -359,7 +443,7 @@ fn paid_edits_report_capacity_changed_and_refusals_report_nothing() {
     };
     assert!(sim.add_car(lift).ok);
     assert!(sim.remove_car(lift).ok);
-    assert!(sim.extend_transport(lift, ExtendEnd::Up, 3, None).charge.ok);
+    assert!(sim.extend_transport(lift, ExtendEnd::Up, 3).charge.ok);
     assert_eq!(
         sim.gameplay.drain(),
         vec![capacity.clone(), capacity.clone(), capacity]
@@ -367,7 +451,7 @@ fn paid_edits_report_capacity_changed_and_refusals_report_nothing() {
     sim.money = 0.0;
     assert!(!sim.add_car(lift).ok);
     assert!(!sim.remove_car(lift).ok);
-    assert!(!sim.extend_transport(lift, ExtendEnd::Up, 4, None).charge.ok);
+    assert!(!sim.extend_transport(lift, ExtendEnd::Up, 4).charge.ok);
     assert!(sim.gameplay.drain().is_empty());
 }
 

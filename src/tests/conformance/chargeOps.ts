@@ -7,12 +7,16 @@ import type { At, Outcome, ScenarioEngine, Spec } from "./scenario";
  * when the scenario names a `reason`, be refused with exactly that copy, so
  * both engines' refusal wording is pinned along with their money. Either
  * way the balance must move by exactly the `delta` the command reports.
+ * `beginExtend` and `endExtend` open and close the engine-held gesture mark
+ * a drag of `extendTransport` bills against (#990); `beginExtend` must open.
  */
 
 export type ChargeCommand =
   | ({ op: "addCar"; reason?: string } & At)
   | ({ op: "removeCar"; reason?: string } & At)
-  | ({ op: "extendTransport"; end: "up" | "down"; targetFloor: number; hwmBottom?: number; hwmTop?: number; reason?: string } & At)
+  | ({ op: "beginExtend" } & At)
+  | ({ op: "extendTransport"; end: "up" | "down"; targetFloor: number; reason?: string } & At)
+  | { op: "endExtend" }
   | ({ op: "removeFacility"; method: "sell" | "bulldoze"; shaft?: boolean; reason?: string } & At);
 
 const AT = { floor: "int", x: "int" } as const;
@@ -20,7 +24,9 @@ const AT = { floor: "int", x: "int" } as const;
 export const CHARGE_OPS: Record<ChargeCommand["op"], Spec> = {
   addCar: { ...AT, reason: "str?" },
   removeCar: { ...AT, reason: "str?" },
-  extendTransport: { ...AT, end: "end", targetFloor: "int", hwmBottom: "int?", hwmTop: "int?", reason: "str?" },
+  beginExtend: { ...AT },
+  extendTransport: { ...AT, end: "end", targetFloor: "int", reason: "str?" },
+  endExtend: {},
   removeFacility: { ...AT, method: "method", shaft: "bool?", reason: "str?" },
 };
 
@@ -32,7 +38,9 @@ export interface ChargeOutcome extends Outcome { delta: number }
 export interface ChargeEngine {
   addCar(id: number): ChargeOutcome;
   removeCar(id: number): ChargeOutcome;
-  extendTransport(id: number, end: "up" | "down", targetFloor: number, hwm: { bottom: number; top: number } | null): ChargeOutcome;
+  beginExtend(id: number): boolean;
+  extendTransport(id: number, end: "up" | "down", targetFloor: number): ChargeOutcome;
+  endExtend(): void;
   removeFacility(id: number, method: "sell" | "bulldoze"): ChargeOutcome;
 }
 
@@ -44,7 +52,9 @@ export function tsCharges(sim: Simulation): ChargeEngine {
   return {
     addCar: (id) => chargeOf(sim.addCar(id)),
     removeCar: (id) => chargeOf(sim.removeCar(id)),
-    extendTransport: (id, end, targetFloor, hwm) => chargeOf(sim.extendTransport(id, end, targetFloor, hwm ?? undefined)),
+    beginExtend: (id) => sim.beginExtend(id),
+    extendTransport: (id, end, targetFloor) => chargeOf(sim.extendTransport(id, end, targetFloor)),
+    endExtend: () => sim.endExtend(),
     removeFacility: (id, method) => chargeOf(sim.removeFacility(id, method)),
   };
 }
@@ -58,13 +68,18 @@ function expectCharge(r: Outcome, reason: string | undefined, what: string): voi
   if (r.reason !== reason) throw new Error(`${what} failed with ${r.reason ?? "no reason"}, expected ${reason}`);
 }
 
-function idAt(e: ScenarioEngine, c: ChargeCommand, shaft: boolean): number {
+function idAt(e: ScenarioEngine, c: At, shaft: boolean): number {
   const found = shaft ? e.transportAt(c.floor, c.x) : e.unitAt(c.floor, c.x);
   if (!found) throw new Error(`no ${shaft ? "transport" : "unit"} at floor ${c.floor}, x ${c.x}`);
   return found.id;
 }
 
 export function applyCharge(e: ScenarioEngine, c: ChargeCommand): void {
+  if (c.op === "endExtend") return e.endExtend();
+  if (c.op === "beginExtend") {
+    if (!e.beginExtend(idAt(e, c, true))) throw new Error(`beginExtend @ ${c.floor},${c.x} failed: no elevator there`);
+    return;
+  }
   const at = `@ ${c.floor},${c.x}`;
   const before = e.money();
   const r = run(e, c);
@@ -75,14 +90,11 @@ export function applyCharge(e: ScenarioEngine, c: ChargeCommand): void {
   expectCharge(r, c.reason, `${c.op} ${at}`);
 }
 
-function run(e: ScenarioEngine, c: ChargeCommand): ChargeOutcome {
+function run(e: ScenarioEngine, c: Exclude<ChargeCommand, { op: "beginExtend" | "endExtend" }>): ChargeOutcome {
   switch (c.op) {
     case "addCar": return e.addCar(idAt(e, c, true));
     case "removeCar": return e.removeCar(idAt(e, c, true));
-    case "extendTransport": {
-      const hwm = c.hwmBottom !== undefined && c.hwmTop !== undefined ? { bottom: c.hwmBottom, top: c.hwmTop } : null;
-      return e.extendTransport(idAt(e, c, true), c.end, c.targetFloor, hwm);
-    }
+    case "extendTransport": return e.extendTransport(idAt(e, c, true), c.end, c.targetFloor);
     case "removeFacility": return e.removeFacility(idAt(e, c, c.shaft ?? false), c.method);
   }
 }

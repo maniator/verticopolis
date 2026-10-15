@@ -41,6 +41,13 @@ export class Engine {
      * `sim.autoBridge`.
      */
     autoBridge(): boolean;
+    /**
+     * `beginExtend(id)`: open an extend gesture on an elevator (#990), its
+     * high-water mark starting at the shaft's span; any open gesture is
+     * dropped first. False, with no gesture open, when `id` is not a whole
+     * JS number or names no elevator. The id is read raw, as for `addCar`.
+     */
+    beginExtend(id: number): boolean;
     bombThreat(): void;
     /**
      * `buildTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`.
@@ -95,23 +102,21 @@ export class Engine {
      * `sim.emit(text, kind)`: a log entry at the engine's clock.
      */
     emit(text: string, kind: string): void;
+    /**
+     * `endExtend()`: close the open extend gesture, if any.
+     */
+    endExtend(): void;
     evaluateStar(): void;
     /**
-     * `extendTransport(id, end, targetFloor, hwm?)` with the high-water mark
-     * as JSON `{ bottom, top }` text, or null, undefined or the text `null`
-     * for none: JSON `{ ok, reason?, delta, bottom, top, added }`, the floors
-     * billed past the mark. Write the mark with `JSON.stringify` on
-     * `{ bottom, top }` alone: the engine's JSON reader refuses the whole
-     * text if any key holds a lone surrogate escape. Each field must be a
-     * whole number within `Number.isSafeInteger`'s range, written as digits
-     * with an optional leading minus, no fraction or exponent (`2.0` and
-     * `1e1` are refused), and not `-0`, which the reader takes as a float.
-     * Every argument is read raw (#923): an id or floor
-     * that is not a whole JS number, an `end` that is not exactly `"up"` or
-     * `"down"`, or a mark that is not that text (an object included) is
-     * refused with `INVALID_REQUEST` and the shaft's ends as they stand.
+     * `extendTransport(id, end, targetFloor)`: JSON `{ ok, reason?, delta,
+     * bottom, top, added }`, the floors billed past the high-water mark: the
+     * open gesture's when `beginExtend` opened one on this shaft, the
+     * shaft's span otherwise. Every argument is read raw (#923): an id or
+     * floor that is not a whole JS number, or an `end` that is not exactly
+     * `"up"` or `"down"`, is refused with `INVALID_REQUEST` and the shaft's
+     * ends as they stand.
      */
-    extendTransport(id: number, end: "up" | "down", target_floor: number, hwm?: string | null): string;
+    extendTransport(id: number, end: "up" | "down", target_floor: number): string;
     /**
      * The number of units on fire.
      */
@@ -128,10 +133,11 @@ export class Engine {
      * (`load::parse_save_json`). Nothing else the import path does (the
      * founder mark) runs.
      * `markers`, when given, is JSON `{ lastHour, lastDay, lastQuarter,
-     * lastMonth }`: the live engine's boundary markers, which a save does
-     * not carry (a load rebuilds them from the clock, a founded game keeps
-     * them unset until the first boundary), so a shadow can start exactly
-     * where the live engine stands.
+     * lastMonth, extendGesture? }`: the live engine's boundary markers and
+     * open extend gesture `{ id, bottom, top }` (#990), which a save does
+     * not carry (a load rebuilds the markers from the clock, a founded game
+     * keeps them unset until the first boundary, and a load has no
+     * gesture), so a shadow can start exactly where the live engine stands.
      */
     static fromSave(text: string, markers?: string | null): Engine;
     /**

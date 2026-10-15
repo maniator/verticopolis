@@ -6,6 +6,7 @@
  *
  *   npm run perf:worker                      # 10 reps, 1x and 4x, all scenarios
  *   npm run perf:worker -- --quick           # 2 short reps, a smoke test
+ *   npm run perf:worker -- --read-model      # the read model shape only, in Node
  */
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

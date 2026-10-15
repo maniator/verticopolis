@@ -722,11 +722,7 @@ mod tests {
             assert!(sim.remove_car(shaft).ok);
             assert_eq!(sim.money - before, c.economy.car_resale_refund);
             let before = sim.money;
-            assert!(
-                sim.extend_transport(shaft, ExtendEnd::Up, 5, None)
-                    .charge
-                    .ok
-            );
+            assert!(sim.extend_transport(shaft, ExtendEnd::Up, 5).charge.ok);
             assert_eq!(before - sim.money, c.economy.transport_floor_cost);
         }
     }
