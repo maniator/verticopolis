@@ -244,14 +244,15 @@ twins are `conformanceWasm` and the Rust replay test).
 Buckets: (a) engine divergence, (b) read-model gap, (c) TypeScript-only,
 (d) un-relayed write after the crowd exists, (cost) merge-per-tick
 timeout, (fixed) a slice 1 row that passes now. Counts are failing tests
-out of the file's total under `integrationWasm` (merge per tick) or
-`unitWasm`; "(n marked)" counts the tests the file keeps TypeScript-only
+out of the file's total under `integrationWasm` (merge per tick, except
+the rows marked `atEngineFrameCadence`, which run at the host's own
+cadence) or `unitWasm`; "(n marked)" counts the tests the file keeps TypeScript-only
 through `itTypeScriptOnly`, which the parity projects skip under the test's
 name suffixed with `[TypeScript-only: <reason>]`, the reason this table
 repeats.
 
-For a row marked "(left out)" the Fails column counts the file's tests,
-since none of them runs on the parity projects.
+For a row marked "(left out)" the Fails column counts the file's tests
+(as of slice 3), since none of them runs on the parity projects.
 
 | Test file | Fails | Bucket | Reason |
 | --- | --- | --- | --- |
@@ -285,15 +286,15 @@ since none of them runs on the parity projects.
 | `src/engine/aquaticCenter.test.ts` (unit) | 0/6 | fixed | reads `mealVenueId`, which the frame carries now |
 | `src/engine/rentalCrowd.test.ts` (unit) | 0/5 | cost, fixed | three tests at the host's own cadence (`atEngineFrameCadence`, slice 3): minute-tick runs of one to three days that read the crowd, which the frame carries |
 | `src/engine/tower/rooms.test.ts` (unit) | 0/8 | cost, fixed | one test at the host's own cadence (`atEngineFrameCadence`, slice 3), which calls `refreshFromEngine` before each assertion: 360 ticks on a 12,000-unit fixture, with a merge before each census check |
-| `conformance.integration.test.ts` (left out) | 23 | c | the TypeScript side of the referee and the scenario lock writer; its engine twin is `conformanceWasm` |
+| `conformance.integration.test.ts` (left out) | 24 | c | the TypeScript side of the referee and the scenario lock writer; its engine twin is `conformanceWasm` |
 | `loaderCases.integration.test.ts` (left out) | 1 | c | the loader-case lock writer; the Rust test replays the lock |
-| `dualRunDay`, `dualRunEdits`, `wasmHost` (left out) | 18 | c | attach a mirror or a host themselves |
+| `dualRunDay`, `dualRunEdits`, `wasmHost` (left out) | 53 | c | attach a mirror or a host themselves |
 | `wasmHostTelemetry`, `wasmHostLogText` (left out) | 4 | c | drive the TypeScript engine and their own engine side by side |
 | `wasmHostAnalyticsBridge`, `wasmWorkerHost`, `wasmWorkerLifecycle`, `wasmWorkerSaves` (left out, slice 3) | 29 | c | start their own host, in process or on the worker; a second host on the instance is refused, and the lifecycle suite's fallback hands a crowded instance back to the TypeScript engine |
 | `conformanceWasmTdt`, `conformanceWasmCanBuild`, `conformanceWasmVctower` (left out) | 51 | c | drive the binding directly, as `conformanceWasm` does |
 | `wasmHostCatalog` (left out) | 10 | c | starts its own host to read the engine's catalog |
 | `perfCompare/*.integration.test.ts` (left out) | 6 | c | the engine comparison's checks (`page`, `scenarios`) run each engine themselves (#972) |
-| `conformanceWasm.integration.test.ts` (left out) | 21 | c | drives the binding directly |
+| `conformanceWasm.integration.test.ts` (left out) | 26 | c | drives the binding directly through its own engine instances (the raw binding suites that build no host of their own, `chargeBindingRaw` and the like, stay in the project and pass) |
 | `src/dualrun/mirror.test.ts` (left out) | 10 | c | attaches the relay itself |
 | `src/dualrun/dualRun.test.ts` (left out) | 6 | c | attaches the dual run's relay itself |
 | `e2e/regions.spec.ts` (Playwright, `chromium-wasm`) | skipped (1 test) | c | toggles a unit between fire and empty in place; see the e2e slice |
@@ -1032,13 +1033,13 @@ this slice closes the rest and puts the projects in CI.
 | Project | Files | Pass | Fail | Skip | Wall time |
 | --- | --- | --- | --- | --- | --- |
 | `integrationWasm` | 92 | 1682 | 0 | 39 | 180 s |
-| `unitWasm` | 250 | 2794 | 0 | 0 | 116 s |
+| `unitWasm` | 252 | 2794 | 0 | 0 | 116 s |
 
 The 39 skips are the 38 `itTypeScriptOnly` marks (24 in bucket (c), 14 in
 bucket (d), all in the table) plus one pre-existing skip (the opt-in
 hour-cost bench, `hourCost.bench.integration.test.ts`); the round 2 run's
 other four pre-existing skips no longer run in this project.
-The unit project's file count grew with main (205 files then, 250 now). These figures are
+The unit project's file count grew with main (205 files then, 252 now). These figures are
 from a local run; the `test-wasm-parity` job is the live check. The (b) bucket is
 empty, as are (a) and the cost timeouts.
 
