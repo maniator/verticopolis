@@ -11,7 +11,8 @@ import { startServer } from "../perfCompare/server";
 import { aggregate, ratios, validate, type Metric, type Ratio } from "./analysis";
 import type { ModeName } from "./pageWorker";
 import { modeOrder, runMode, type ModeRun, type WorkerConfig } from "./runner";
-import { markdown } from "./report";
+import { markdown, readModelMarkdown } from "./report";
+import { measureReadModel, type ReadModelShape } from "./readModel";
 
 /**
  * `npm run perf:worker`: the engine-host comparison (TypeScript, the shipped
@@ -33,11 +34,15 @@ export interface Args {
   scenarios: string[] | null;
   /** The CSS viewport frames render at (`--viewport WxH`). */
   viewport: { width: number; height: number };
+  /** `--read-model`: only the read model's shape (readModel.ts), in Node,
+   *  with no build and no browser. */
+  readModelOnly: boolean;
 }
 
 export function parseArgs(argv: readonly string[]): Args {
-  const a: Args = { reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, viewport: { ...DEFAULT_VIEWPORT } };
+  const a: Args = { reps: 10, quick: false, skipBuild: false, readModelOnly: false, out: null, resume: null, scenarios: null, viewport: { ...DEFAULT_VIEWPORT } };
   let repsSet = false;
+  let viewportSet = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const next = (): string => {
@@ -46,6 +51,7 @@ export function parseArgs(argv: readonly string[]): Args {
       return v;
     };
     if (arg === "--quick") a.quick = true;
+    else if (arg === "--read-model") a.readModelOnly = true;
     else if (arg === "--skip-build") a.skipBuild = true;
     else if (arg === "--reps") {
       a.reps = Number(next());
@@ -63,11 +69,13 @@ export function parseArgs(argv: readonly string[]): Args {
       const height = m ? Number(m[2]) : 0;
       if (width < 320 || height < 240 || width > 7680 || height > 4320) throw new Error("--viewport needs WIDTHxHEIGHT in CSS pixels, from 320x240 to 7680x4320 (for example 1280x720)");
       a.viewport = { width, height };
+      viewportSet = true;
     }
-    else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --viewport WxH`);
+    else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --viewport WxH, --read-model`);
   }
   if (a.quick && !repsSet) a.reps = 2;
   if (a.resume && a.out) throw new Error("--resume continues its own folder; it takes no --out");
+  if (a.readModelOnly && (a.resume || a.skipBuild || repsSet || viewportSet)) throw new Error("--read-model runs no build and no browser; it takes no --resume, --skip-build, --reps or --viewport");
   return a;
 }
 
@@ -115,8 +123,16 @@ export function limitations(config: WorkerConfig): string[] {
   "Message sizes are counted on the way in (frame views, full saves, events, log and pending text at two bytes a character); the way out (steps and commands, a few numbers each) is not measured, so as not to serialize every message twice on the measured thread.",
   "The serialize and deserialize halves of the full save are split only on the worker host (the worker's reply time includes the serialize, the main thread's merge time the parse and merge). The main-thread hosts' read-model sync is split in perf:compare's attribution pass.",
   `Throttles run in a fixed order (${config.throttles.map((t) => `${t}x`).join(" then ")}) in each process. The mode order rotates by repetition (${config.reps} repetitions over ${k} modes: ${firstText}). The throttled cold start throttles before the navigation and again at commit; its CPU probe runs after startup, so a throttle gap at navigation would not show.`,
+  `The read model section is measured in Node on the TypeScript engine, not in the browser: each scenario loads its save fresh, as the timed hosted run does after its throwaway warm-up, then runs the hosted rows' ${config.steps} steps in batches of ${config.batch}, and a merge is counted after each batch where the worker host merges by its own rule (the hour-pass counter or the tower revision moved). The merges a host forces after a stale reply or for a settle are left out. Sizes are JSON characters of each value. The WASM engine reaches the same end state (the hosted end-state digests), but its intermediate saves were not compared.`,
   "Audio was not started in these frames (measured in perf:compare). The coalesced and worker hosts are experimental and opt-in; the shipped default is unchanged.",
   ];
+}
+
+/** The limitations a `--read-model` report carries: the read model line. */
+export function readModelLimitations(config: WorkerConfig): string[] {
+  const lines = limitations(config).filter((l) => l.startsWith("The read model section"));
+  if (lines.length !== 1) throw new Error(`expected one read model limitation, found ${lines.length}`);
+  return lines;
 }
 
 function sh(cmd: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env): void {
@@ -169,6 +185,9 @@ export interface WorkerResults {
   runs: ModeRun[];
   metrics: Metric[];
   ratios: Ratio[];
+  /** The read model's shape per scenario (readModel.ts); absent from
+   *  results written before it was measured. */
+  readModel?: ReadModelShape[];
   validation: { ok: boolean; errors: string[]; warnings: string[] };
   limitations: string[];
 }
@@ -190,6 +209,7 @@ export function ratiosCsv(rs: readonly Ratio[]): string {
 
 export async function main(argv: readonly string[], repo: string): Promise<number> {
   const args = parseArgs(argv);
+  if (args.readModelOnly) return readModelMain(args, repo);
   const started = new Date().toISOString();
   const log = (line: string) => process.stderr.write(`${line}\n`);
   const dist = join(repo, "dist");
@@ -234,6 +254,13 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     writeFileSync(join(out, "checkpoint.json"), JSON.stringify({ ...meta, startedAt }, null, 1) + "\n");
     writeFileSync(join(out, "runs.jsonl"), "");
   }
+  // Deterministic counts on the TypeScript engine, cheap next to the
+  // browser runs, so a resumed run measures them again rather than
+  // checkpointing them.
+  const readModel = scenarios.map((s) => {
+    log(`perf:worker: read model shape, ${s.name}`);
+    return measureReadModel(s, { steps: config.steps, dt: config.dt, batch: config.batch });
+  });
   log(`perf:worker: measuring ${environment.commit}${environment.dirty ? " (dirty)" : ""}, ${config.reps} reps of ${config.modes.join(", ")}`);
   const server = await startServer(distPerf);
   try {
@@ -267,6 +294,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     runs,
     metrics,
     ratios: ratios(metrics, config.modes),
+    readModel,
     validation: { ok: v.errors.length === 0, ...v },
     limitations: limitations(config),
   };
@@ -321,4 +349,53 @@ export function loadWorkerCheckpoint(dir: string, expected: Record<string, unkno
   });
   const runs = all.filter((r) => r.ok);
   return { runs, startedAt: saved.startedAt, retried: all.length - runs.length };
+}
+
+export interface ReadModelResults {
+  schema: 1;
+  generatedAt: string;
+  commit: string;
+  dirty: boolean;
+  appVersion: string;
+  node: string;
+  config: Pick<WorkerConfig, "steps" | "dt" | "batch" | "quick">;
+  scenarios: { name: string; sha256: string }[];
+  readModel: ReadModelShape[];
+  limitations: string[];
+}
+
+/** `npm run perf:worker -- --read-model`: the read model section alone, on
+ *  the hosted rows' steps, in Node in a few seconds. Writes read-model.json
+ *  and report.md to its own results folder. */
+async function readModelMain(args: Args, repo: string): Promise<number> {
+  const log = (line: string) => process.stderr.write(`${line}\n`);
+  const tree = buildTree(repo);
+  const all = buildScenarios();
+  const scenarios = args.scenarios ? all.filter((s) => args.scenarios!.includes(s.name)) : all;
+  if (args.scenarios && scenarios.length !== args.scenarios.length) throw new Error(`unknown scenario in ${args.scenarios.join(",")}`);
+  const config = makeConfig(args, scenarios.map((s) => s.name));
+  const generatedAt = new Date().toISOString();
+  const out = args.out ? resolve(repo, args.out) : resolve(repo, "docs/performance/results", `${generatedAt.slice(0, 10)}-${tree.commit.slice(0, 7)}-read-model${args.quick ? "-quick" : ""}${tree.dirty ? "-dirty" : ""}`);
+  if (existsSync(out)) throw new Error(`${out} already exists; results are never overwritten`);
+  const readModel = scenarios.map((s) => {
+    log(`perf:worker: read model shape, ${s.name}`);
+    return measureReadModel(s, { steps: config.steps, dt: config.dt, batch: config.batch });
+  });
+  const res: ReadModelResults = {
+    schema: 1,
+    generatedAt,
+    commit: tree.commit,
+    dirty: tree.dirty,
+    appVersion: (JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { version: string }).version,
+    node: process.version,
+    config: { steps: config.steps, dt: config.dt, batch: config.batch, quick: config.quick },
+    scenarios: scenarios.map((s) => ({ name: s.name, sha256: s.sha256 })),
+    readModel,
+    limitations: readModelLimitations(config),
+  };
+  mkdirSync(out, { recursive: true });
+  writeFileSync(join(out, "read-model.json"), JSON.stringify(res, null, 1) + "\n");
+  writeFileSync(join(out, "report.md"), readModelMarkdown(res));
+  log(`perf:worker: wrote ${out}`);
+  return 0;
 }

@@ -98,7 +98,8 @@ host; nothing in `src/ui` calls the binding directly.
   only by the host (`src/wasmhost/` and `src/game/frameLoop.ts`), the dual
   run (`src/dualrun/`) and tests. Tier 1, player commands, is the only tier `src/ui` and
   `src/game` may reach: `build`, `buildTransport`, `sellAt`, `addCar`,
-  `removeCar`, `extendTransport`, `removeFacility`, the rent and policy
+  `removeCar`, `beginExtend`, `extendTransport`, `endExtend`,
+  `removeFacility`, the rent and policy
   commands (`adjustRent`, `setNoRate`, `priceUnit`, `applyRentBatch`,
   `setFilmPolicy`, `rerollSubtype`), the stop and schedule commands,
   `callExterminator`, `resolveChoice`, the preferences (`setView`,

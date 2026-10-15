@@ -9,18 +9,20 @@ import { FLOOR, TILE } from "../../scale";
  * and the metro station. (The recycling center lives in `recycling.ts`, the
  * basement garage in `garage.ts`, and the moving actors in `vehicles.ts`.)
  *
- * Each look is ported from its Figma reference build script
+ * Each look was first ported from its Figma reference build script
  * (`_bmad-output/implementation-artifacts/pixelart-figma/build-scripts/`,
- * page 01) through the shared `refMap` scaler, so the tower cross-section reads
+ * page 01, drawn on the retired 11 by 44 grid); since the re-author this
+ * TypeScript is the canonical art, drawn through the shared `refMap` scaler, so the tower cross-section reads
  * as the warm, lived-in dollhouse the art direction calls for. Figures are the
  * shared finalized `person()` builds, never hand-rolled. Reserved state colors
  * are never reused for decoration. These are staffed amenities: they always
  * draw their interior, never a lease or vacancy card.
  *
  * The references were re-authored onto the live TILE 10 by FLOOR 45 grid, so
- * `RW`/`RH` equal the on-screen footprint and `refMap` is the identity. Keep it
- * that way: off the shipped size every rect resamples, and a resampled repeat
- * (the monitor wall, the sign letters, the bottle rows) loses its even pitch.
+ * `RW`/`RH` equal the shipped footprint and, drawn at that footprint, `refMap`
+ * is the identity. Keep it that way: off the shipped size every rect resamples,
+ * and a resampled repeat (the monitor wall, the linen, the bottle rows) loses
+ * its even pitch. Previews that draw at another size (/gallery) still resample.
  */
 
 // ---- Security ---------------------------------------------------------------
@@ -89,8 +91,8 @@ export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: numb
     F(lx, 2, 9, 2, lamp);
     glow(F, lx + 4, 5, lamp);
   }
-  // Red cross sign. Both bars are centered on the panel, so the cross reads
-  // square rather than leaning a pixel.
+  // Red cross sign. Both bars are centered on the panel, so the cross sits
+  // straight rather than leaning a pixel.
   F(5, 8, 13, 13, "#F4F0EC");
   F(9, 10, 5, 9, "#D6342F");
   F(6, 12, 11, 5, "#D6342F");
@@ -125,8 +127,8 @@ export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: numb
   whiteCoat(ctx, nurseX, foot);
   personStanding(ctx, doctorX, foot, (Math.round(x) * 2 + 7) | 0);
   whiteCoat(ctx, doctorX, foot);
-  // Stocked supply cabinet, sized so the five bottle pitches clear both walls
-  // by the same margin.
+  // Stocked supply cabinet, sized so the five bottle columns sit flush against
+  // both bevels, the same at each end.
   const cabX = 95, cabW = 21;
   box(F, cabX, fy - 16, cabW, 16, "#F4F4F0");
   const bottles = ["#9FD0C8", "#E8C9A0", "#5db4e8", "#F4A0A0", "#DcE8C0"];
@@ -178,7 +180,8 @@ export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h:
   F(60, fy - 16, 5, 3, "#E8E0B0");
   box(F, 60, fy - 6, 6, 6, "#F4C020");
   F(60, fy - 6, 6, 2, "#CFE0FF", 0.6);
-  // Towel rack: four bars on a 3px pitch cut the carcass into five equal reveals.
+  // Towel rack: four bars on a 3px pitch leave 2px reveals between them and
+  // 2px inside each end, the carcass bevel included.
   const rackX = W - 20, rackW = 14;
   box(F, rackX, fy - 9, rackW, 9, "#B8A47E");
   for (let k = 0; k < 4; k++) F(rackX + 2 + k * 3, fy - 9, 1, 9, "#9A8460");

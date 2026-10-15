@@ -2,6 +2,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { Tower } from "../engine/Tower";
 import { canonicalJson } from "../engine/canonicalJson";
 import { crowdView, stateView } from "../engine/conformanceView";
+import { extendGesture } from "../engine/sim/charges";
 import type { ShadowCommand } from "./commands";
 
 /**
@@ -26,14 +27,17 @@ type AnyFn = (...args: never[]) => unknown;
  *  boundary markers, under the generation given. A save carries no crowd, so
  *  the shadow can only start from a tower whose crowd is still empty (a game
  *  just founded or just loaded); anything later would diverge in the crowd
- *  view at the first hour by construction, so it is refused here. */
+ *  view at the first hour by construction, so it is refused here. A save
+ *  carries no extend gesture either (#990), so the open one rides with the
+ *  markers and the shadow restores it: both bill the rest of a drag in
+ *  progress against the same mark. */
 export function loadCommand(sim: Simulation, gen: number): Extract<ShadowCommand, { op: "load" }> {
   if (sim.crowd.people.length > 0) throw new Error("mirror: the shadow must start before the tower's crowd exists (right after founding or loading)");
   return {
     op: "load",
     gen,
     save: JSON.stringify(sim.serialize()),
-    markers: { lastHour: sim.lastHour, lastDay: sim.lastDay, lastQuarter: sim.lastQuarter, lastMonth: sim.lastMonth },
+    markers: { lastHour: sim.lastHour, lastDay: sim.lastDay, lastQuarter: sim.lastQuarter, lastMonth: sim.lastMonth, extendGesture: extendGesture(sim) ?? null },
   };
 }
 
@@ -78,14 +82,11 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
 
   /** Replace `obj[name]` with a wrapper that runs the original (or
    *  `replace` in its place) and, for a call from outside any other recorded
-   *  call, reports it. `prepare` may rewrite the arguments first, so the
-   *  engine and the report read the same values; the engine then sees the
-   *  rewritten value, so it must not rely on an argument's identity. */
-  function wrap<T extends object, K extends keyof T & string>(obj: T, name: K, report: (args: unknown[], result: unknown) => ShadowCommand | null, replace?: (args: unknown[]) => unknown, prepare?: (args: unknown[]) => void): void {
+   *  call, reports it. */
+  function wrap<T extends object, K extends keyof T & string>(obj: T, name: K, report: (args: unknown[], result: unknown) => ShadowCommand | null, replace?: (args: unknown[]) => unknown): void {
     const original = obj[name] as unknown as AnyFn;
     if (typeof original !== "function") throw new Error(`mirror: ${name} is not a method`);
     const wrapped = function (this: T, ...args: never[]): unknown {
-      prepare?.(args);
       const outer = depth === 0;
       depth++;
       let result: unknown;
@@ -157,23 +158,11 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
     // the shadow charges or refunds for itself and no setMoney follows.
     wrap(sim, "addCar", ([id]) => ({ op: "addCar", id: num(id) }));
     wrap(sim, "removeCar", ([id]) => ({ op: "removeCar", id: num(id) }));
-    wrap(sim, "extendTransport", ([id, end, targetFloor, hwm]) => {
-      // Any mark but null or undefined is checked, as the engines check it:
-      // a falsy one (0, "") must not relay as "no mark" and bill in Rust.
-      const mark = hwm as { bottom?: unknown; top?: unknown } | null | undefined;
-      const relayed = mark == null ? null : { bottom: num(mark.bottom), top: num(mark.top) };
-      return { op: "extendTransport", id: num(id), end: str(end) as "up" | "down", targetFloor: num(targetFloor), hwm: relayed };
-    }, undefined, (args) => {
-      // Read the mark once, before the call: an accessor answering
-      // differently on a second read would otherwise bill one value in
-      // TypeScript and relay another to Rust. Any mark but null or undefined,
-      // as the engine reads fields off any such value (a function included).
-      const mark = args[3];
-      if (mark != null) {
-        const { bottom, top } = mark as { bottom?: unknown; top?: unknown };
-        args[3] = { bottom, top };
-      }
-    });
+    // The extend gesture's mark is engine-held (#990): the shadow opens and
+    // closes its own as these relay, and bills against it as TypeScript does.
+    wrap(sim, "beginExtend", ([id]) => ({ op: "beginExtend", id: num(id) }));
+    wrap(sim, "extendTransport", ([id, end, targetFloor]) => ({ op: "extendTransport", id: num(id), end: str(end) as "up" | "down", targetFloor: num(targetFloor) }));
+    wrap(sim, "endExtend", () => ({ op: "endExtend" }));
     wrap(sim, "removeFacility", ([id, method]) => ({ op: "removeFacility", id: num(id), method: str(method) as "sell" | "bulldoze" }));
     // The capacity edits at the simulation layer report capacity_changed;
     // the bare tower edits below relay as their silent tower ops (#906).

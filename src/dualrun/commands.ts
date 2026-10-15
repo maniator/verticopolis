@@ -27,7 +27,9 @@ export type ShadowCommand =
   | { op: "towerSetCars"; id: number; cars: number }
   | { op: "addCar"; id: number }
   | { op: "removeCar"; id: number }
-  | { op: "extendTransport"; id: number; end: "up" | "down"; targetFloor: number; hwm: { bottom: number; top: number } | null }
+  | { op: "beginExtend"; id: number }
+  | { op: "extendTransport"; id: number; end: "up" | "down"; targetFloor: number }
+  | { op: "endExtend" }
   | { op: "removeFacility"; id: number; method: "sell" | "bulldoze" }
   | { op: "setSchedule"; id: number; schedule: unknown }
   /** `stop` is null when the live call passed a non-boolean (#996). */
@@ -64,6 +66,8 @@ export interface BoundaryMarkers {
   lastDay: number;
   lastQuarter: number;
   lastMonth: number;
+  /** The open extend gesture (#990), which a save does not carry either. */
+  extendGesture?: { id: number; bottom: number; top: number } | null;
 }
 
 /** Where a shadow's state first departs from the live engine's. */

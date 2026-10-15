@@ -3,30 +3,33 @@ import { personHiVis } from "../../pixelSprites/common";
 import { layerBreak, layerShell } from "../../pixelSprites/layers";
 import { rand, serviceLabel, type DrawCtx } from "../common";
 import { box, glow, refMap } from "./serviceKit";
-import { FLOOR, TILE } from "../../scale";
+import { RECYCLING_DECK, RECYCLING_GAUGE_ROWS, RECYCLING_GAUGE_TOP, RECYCLING_PILE_PITCH, RECYCLING_PILE_X0, RECYCLING_REF_H, RECYCLING_REF_W, recyclingLook } from "./recyclingLook";
 
 /**
- * The recycling center, ported from its Figma reference build script
+ * The recycling center, first ported from its Figma reference build script
  * (`_bmad-output/implementation-artifacts/pixelart-figma/build-scripts/`,
- * page 01) through the shared `refMap` scaler. It sits apart from the other
+ * page 01, drawn on the retired 11 by 44 grid); since the re-author this
+ * TypeScript is the canonical art, drawn through the shared `refMap` scaler. It sits apart from the other
  * service rooms in `service.ts` only to keep both files under the line ceiling.
  *
- * The reference is authored on the live TILE 10 by FLOOR 45 grid, so `RW`/`RH`
- * equal the on-screen footprint and `refMap` is the identity. Keep it that way:
- * off the shipped size every rect resamples, and a resampled repeat (the sign
- * letters, the belt bales, the hazard tape) loses its even pitch.
+ * The reference is authored on the live TILE 10 by FLOOR 45 grid
+ * (`recyclingLook.ts` holds its size and the fill geometry), so `RW`/`RH` equal
+ * the shipped footprint and, drawn at that footprint, `refMap` is the identity.
+ * Keep it that way: off the shipped size every rect resamples, and a resampled
+ * repeat (the sign letters, the belt bales, the hazard tape) loses its even
+ * pitch. Previews that draw at another size (/gallery) still resample.
  */
 
 // ---- Recycling --------------------------------------------------------------
 
 export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
-  const RW = 20 * TILE;
-  const RH = 2 * FLOOR;
+  const RW = RECYCLING_REF_W;
+  const RH = RECYCLING_REF_H;
   const { F, Fu, sx, sy } = refMap(ctx, x, y, w, h, RW, RH);
   const W = RW;
   const H = RH;
-  const deck = H - 7;
+  const deck = RECYCLING_DECK;
   // Concrete hall: walls, roof ribs, girders, and a service pipe. The full-width
   // bands stay on the edge-derived fill so they meet without a seam; the ribs,
   // studs and pipe brackets are repeated objects and take the uniform one. The
@@ -39,7 +42,8 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   for (let px = 6; px < W; px += ribPitch) Fu(px, 12, 1, 1, "#8A8A80");
   F(0, 3, W, 2, "#7A8088");
   F(0, 3, W, 1, "#9AA0A8");
-  // Bracket run on the ribs' derived pitch; a restated 14 ran lopsided.
+  // Pipe brackets on a pitch tied to the ribs' (1.4 ribs, 28px), so both move
+  // together. The run leaves a wider margin at the right wall than the left.
   const bracketPitch = ribPitch * 1.4, brackets = Math.floor((W - 12) / bracketPitch) + 1;
   for (let b = 0; b < brackets; b++) Fu(Math.round(6 + b * bracketPitch), 2, 2, 4, "#5A6068");
   F(0, 7, W, 3, "#565C64");
@@ -144,32 +148,29 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   });
   // Live behavior: the day's waste piles up until the morning truck. The pile
   // grows rightward and stacks a second row past half full. `d.recycleFill` is
-  // a prepared input, so no scan runs here.
-  const rawFill = d.recycleFill ?? 0;
-  const fill = Number.isFinite(rawFill) ? Math.max(0, Math.min(1, rawFill)) : 0;
-  const pileX0 = 25;
-  const pileMax = W - 64;
-  const slots = Math.floor((pileMax - pileX0) / 7);
-  const bags = Math.round(fill * slots);
+  // a prepared input, so no scan runs here; the art reads it only through
+  // `recyclingLook`, which the sprite atlas steps through.
+  const look = recyclingLook(d.recycleFill);
+  const bags = look.bags;
   for (let i = 0; i < bags; i++) {
-    const bx = pileX0 + i * 7;
+    const bx = RECYCLING_PILE_X0 + i * RECYCLING_PILE_PITCH;
     const jit = Math.floor(rand((u.id * 31 + i) | 0) * 3);
     F(bx, deck - 6 - jit, 6, 6 + jit, i % 3 === 2 ? "#4a5a3a" : "#3a4232");
     Fu(bx + 2, deck - 7 - jit, 2, 2, "#FFFFFF", 0.35);
-    if (fill > 0.5 && i % 2 === 0 && i < bags - 1) F(bx + 3, deck - 11 - jit, 6, 5, "#2f3628");
+    if (look.stacked && i % 2 === 0 && i < bags - 1) F(bx + 3, deck - 11 - jit, 6, 5, "#2f3628");
   }
   // Live wall gauge: green, then amber past 0.7, then red with the FULL cue at
   // capacity. The FULL red is a deliberate state cue, not decoration.
-  const gY = 14;
-  const gH = deck - 18;
+  const gY = RECYCLING_GAUGE_TOP;
+  const gH = RECYCLING_GAUGE_ROWS;
   let gauge = "#6bd47a";
-  if (fill >= 1) gauge = "#d6342f";
-  else if (fill > 0.7) gauge = "#e0a94e";
-  const gaugeH = Math.round(gH * fill);
+  if (look.full) gauge = "#d6342f";
+  else if (look.amber) gauge = "#e0a94e";
+  const gaugeH = look.gaugeRows;
   layerShell(ctx, () => {
     F(W - 6, gY, 4, gH, "#1B2A14");
     F(W - 5, gY + gH - gaugeH, 2, gaugeH, gauge);
-    if (fill >= 1) serviceLabel(ctx, "FULL", sx(W - 31), y, "#ffd2c8", 44, w);
+    if (look.full) serviceLabel(ctx, "FULL", sx(W - 31), y, "#ffd2c8", 44, w);
   });
   // The vested plant hand (shared hi-vis build with a hardhat), drawn last so
   // the worker stands in front of the pile.
