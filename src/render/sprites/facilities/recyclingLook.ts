@@ -20,8 +20,17 @@ export const RECYCLING_DECK = RECYCLING_REF_H - 7;
 /** The pile's first bag column and the pitch between bags. */
 export const RECYCLING_PILE_X0 = 25;
 export const RECYCLING_PILE_PITCH = 7;
-/** How many bags the pile holds when full. */
-export const RECYCLING_PILE_SLOTS = Math.floor((RECYCLING_REF_W - 64 - RECYCLING_PILE_X0) / RECYCLING_PILE_PITCH);
+/** A bag is 6 wide, so one pitch leaves a 1px gap to the next. */
+export const RECYCLING_BAG_W = 6;
+/** The baler's left edge, and the five compacted cubes that wait left of it
+ *  (6 wide, the first 4px clear of the baler); the leftmost cube starts at
+ *  `RECYCLING_CUBES_X`. */
+export const RECYCLING_BALER_X = RECYCLING_REF_W - 47;
+export const RECYCLING_CUBE_W = 6;
+export const RECYCLING_CUBES_X = RECYCLING_BALER_X - 4 - 4 * RECYCLING_CUBE_W;
+/** How many bags the pile holds when full: as many as fit before the
+ *  compacted cubes, so the last bag never half covers one. */
+export const RECYCLING_PILE_SLOTS = Math.floor((RECYCLING_CUBES_X - RECYCLING_BAG_W - RECYCLING_PILE_X0) / RECYCLING_PILE_PITCH) + 1;
 /** The wall gauge's top row and its height in rows. */
 export const RECYCLING_GAUGE_TOP = 14;
 export const RECYCLING_GAUGE_ROWS = RECYCLING_DECK - 18;

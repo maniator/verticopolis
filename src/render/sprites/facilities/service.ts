@@ -1,8 +1,8 @@
 import { ceilingFixture, personSeated, personStanding, roomGlow, SKIN } from "../../pixelSprites/common";
 import { layerBreak, layerEnd } from "../../pixelSprites/layers";
 import type { DrawCtx } from "../common";
-import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./serviceKit";
 import { FLOOR, TILE } from "../../scale";
+import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./serviceKit";
 
 /**
  * In-tower service and utility facilities: security, the clinic, housekeeping,
@@ -11,15 +11,16 @@ import { FLOOR, TILE } from "../../scale";
  *
  * Each look was first ported from its Figma reference build script
  * (`_bmad-output/implementation-artifacts/pixelart-figma/build-scripts/`,
- * page 01, drawn on the retired 11 by 44 grid); since the re-author this
- * TypeScript is the canonical art, drawn through the shared `refMap` scaler, so the tower cross-section reads
- * as the warm, lived-in dollhouse the art direction calls for. Figures are the
+ * page 01, drawn on the retired 11 by 44 grid). Since the re-authoring, this
+ * TypeScript is the canonical art, drawn through the shared `refMap` scaler,
+ * so the tower cross-section reads as the warm, lived-in dollhouse the art
+ * direction calls for. Figures are the
  * shared finalized `person()` builds, never hand-rolled. Reserved state colors
  * are never reused for decoration. These are staffed amenities: they always
  * draw their interior, never a lease or vacancy card.
  *
- * The references were re-authored onto the live TILE 10 by FLOOR 45 grid, so
- * `RW`/`RH` equal the shipped footprint and, drawn at that footprint, `refMap`
+ * The security, clinic and housekeeping references were re-authored onto the
+ * live TILE 10 by FLOOR 45 grid, so `RW`/`RH` equal the shipped footprint and, drawn at that footprint, `refMap`
  * is the identity. Keep it that way: off the shipped size every rect resamples,
  * and a resampled repeat (the monitor wall, the linen, the bottle rows) loses
  * its even pitch. Previews that draw at another size (/gallery) still resample.
@@ -65,7 +66,7 @@ export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: num
   const deskX = 53, deskW = 24;
   box(F, deskX, fy - 8, deskW, 8, "#2A3550");
   F(deskX, fy - 8, deskW, 1, "#3E4A66");
-  personSeated(ctx, sx(deskX + 7), sy(fy - 8), (Math.round(x) * 3 + 5) | 0);
+  personSeated(ctx, sx(deskX + 8), sy(fy - 8), (Math.round(x) * 3 + 5) | 0);
   // Brass badge shield.
   F(deskX + 2, fy - 14, 6, 6, "#D8B05A");
   F(deskX + 4, fy - 13, 2, 4, "#8A6A2A");
@@ -91,10 +92,10 @@ export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: numb
     F(lx, 2, 9, 2, lamp);
     glow(F, lx + 4, 5, lamp);
   }
-  // Red cross sign. Both bars are centered on the panel, so the cross sits
-  // straight rather than leaning a pixel.
+  // Red cross sign. Both bars are centered on the panel and all four arms
+  // reach 3px past the crossing, so the cross sits straight and even.
   F(5, 8, 13, 13, "#F4F0EC");
-  F(9, 10, 5, 9, "#D6342F");
+  F(9, 9, 5, 11, "#D6342F");
   F(6, 12, 11, 5, "#D6342F");
   layerBreak(ctx); // the shell ends; the beds, equipment and staff follow
   // First curtained exam bed with a resting patient head, blanket, and rail.
@@ -175,7 +176,9 @@ export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h:
   for (let k = 0; k < 2; k++) F(cartX + 12 + k * 3, fy - 13, 2, 3, k ? "#5db4e8" : "#E85D5D");
   F(cartX, fy - 2, 2, 2, "#1A1D24");
   F(cartX + cartW - 2, fy - 2, 2, 2, "#1A1D24");
-  // Mop and bucket.
+  // Mop and bucket. The towel rack drawn next covers them entirely, as it did
+  // before the re-authoring; the approved composition keeps that on purpose,
+  // since revealing them would add an object to the room.
   F(62, fy - 14, 1, 12, "#8A5A30");
   F(60, fy - 16, 5, 3, "#E8E0B0");
   box(F, 60, fy - 6, 6, 6, "#F4C020");

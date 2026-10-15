@@ -1,16 +1,17 @@
 import type { Unit } from "../../../engine/types";
 import { layerBreak, layerEnd } from "../../pixelSprites/layers";
 import { ACCENTS, rand, shade, type DrawCtx } from "../common";
-import { box, floorb, refMap } from "./serviceKit";
 import { FLOOR, TILE } from "../../scale";
+import { box, floorb, refMap } from "./serviceKit";
 
 /**
  * The basement garage kinds: a single parking space and the parking ramp.
  * Both were first ported from their Figma reference build scripts
  * (`page-01-parking-medical-security.build.js`, `page-01-parking-ramp.build.js`),
- * which are drawn on the retired 11 by 44 grid; since the re-author this
- * TypeScript is the canonical art, drawn through the shared `refMap` scaler. Placement is engine truth (`basement:true`
- * and the ramp chain); the render only reflects it.
+ * which are drawn on the retired 11 by 44 grid. Since the re-authoring, this
+ * TypeScript is the canonical art, drawn through the shared `refMap` scaler.
+ * Placement is engine truth (`basement:true` and the ramp chain); the render
+ * only reflects it.
  *
  * The references were re-authored onto the live TILE 10 by FLOOR 45 grid, so
  * `RW`/`RH` equal the shipped footprint and, drawn at that footprint, `refMap`
@@ -41,7 +42,7 @@ export function drawParking(d: DrawCtx, u: Unit, x: number, y: number, w: number
   // The deck is the shell; the car parked in front of it is the furniture, and
   // the P sign hangs on the wall (depth layers, `pixelSprites/layers.ts`).
   layerBreak(ctx);
-  // A single car, centered, shown only when this space actually holds one and
+  // A single car, shown only when this space actually holds one and
   // is not dead. `parkingUse` and `parkingDead` are prepared inputs; a stable
   // per-space roll versus the tower-wide usage fraction fills the same spaces
   // first as the lot loads, and a dead (unchained) space never shows a car.
@@ -122,12 +123,14 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: Unit, x: numbe
   F(pipeX, 8, pipeW, 1, "#4A525C");
   for (let k = 0; k < 4; k++) F(36 + k * 29, 4, 1, 2, "#34383E");
   F(84, 10, 61, 1, "#5B6470");
-  // Under-ramp void and support column.
+  // Under-ramp void and support column. The column's top follows the slab's
+  // near edge, so it meets the slab instead of stopping a pixel under it. At
+  // the foot the near edge reaches the floor and the void closes to nothing.
   for (let px = rampX0; px <= rampX1; px++) {
     const ne = nearEdge(px);
-    F(px, ne, 1, ground - ne, "#2A2E34");
+    if (ne < ground) F(px, ne, 1, ground - ne, "#2A2E34");
   }
-  F(61, 32, 5, ground - 32, "#3A3E46");
+  for (let px = 61; px < 66; px++) F(px, nearEdge(px), 1, ground - nearEdge(px), "#3A3E46");
   // Road surface with light and dark edge rails.
   for (let px = rampX0; px <= rampX1; px++) {
     const fe = farEdge(px);

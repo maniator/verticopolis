@@ -81,14 +81,14 @@ function paint(sp: (typeof SPRITES)[number], w: number, h: number) {
 
 describe("service sprites survive a non-identity reference map", () => {
   it.each(SPRITES.map((s) => [s.name, s] as const))(
-    "%s keeps every rect inside its own canvas at the shipped scale",
+    "%s keeps every filled rect inside its own canvas at the shipped scale",
     (_name, sp) => {
-      // The real protection against #812 re-opening. The references are authored
-      // on the CURRENT grid, so if TILE or FLOOR moves again the coordinates stay
-      // put while the canvas changes size, and rects fall off the edge. Deriving
-      // RW/RH from the world constants makes refMap keep hitting identity, which
-      // would otherwise hide that silently: the map would stop resampling and the
-      // art would simply be wrong. This is what fails loudly and says re-author.
+      // The references are authored on the CURRENT grid, and RW/RH derive from
+      // the world constants, so refMap keeps hitting identity even if the grid
+      // moves; the art would then be wrong without anything resampling. The
+      // grid pin below is what fails first on such a move. This guard is the
+      // second line: no authored rect may fall off the canvas. It records
+      // fillRect only, so text (the recycling FULL label) is outside it.
       const w = sp.tiles * TILE;
       const h = sp.floors * FLOOR;
       const outside = paint(sp, w, h).filter((r) => r.x < 0 || r.y < 0 || r.x + r.w > w || r.y + r.h > h);
@@ -128,6 +128,23 @@ describe("service sprites survive a non-identity reference map", () => {
     expect(new Set(fam.map((r) => `${r.w}x${r.h}`)).size).toBe(1);
   });
 
+  // The linen and the bottles share their tones with other objects in the same
+  // room (the cart's towels, the rack's towel), so these pick them by color
+  // AND by the shelf or cabinet they sit in, and check count, size and pitch.
+  it.each([
+    // name, sprite index, colors, region [x0, x1), copies, size, column pitch
+    ["housekeeping linen", 4, ["#F4F0EC", "#CFE0FF", "#E8D8C0"], [4, 31], 12, "5x5", 6],
+    ["medical bottles", 3, ["#9FD0C8", "#E8C9A0", "#5DB4E8", "#F4A0A0", "#DCE8C0"], [95, 116], 10, "3x4", 4],
+  ] as const)("%s renders every copy at one size on one pitch", (_name, idx, colors, [x0, x1], copies, size, pitch) => {
+    const sp = SPRITES[idx];
+    const rects = paint(sp, sp.tiles * TILE, sp.floors * FLOOR);
+    const fam = rects.filter((r) => (colors as readonly string[]).includes(r.c.toUpperCase()) && r.x >= x0 && r.x + r.w <= x1 && r.w > 1 && r.h > 1);
+    expect(fam.length).toBe(copies);
+    expect(new Set(fam.map((r) => `${r.w}x${r.h}`))).toEqual(new Set([size]));
+    const xs = [...new Set(fam.map((r) => r.x))].sort((a, b) => a - b);
+    expect(new Set(xs.slice(1).map((x, i) => x - xs[i]))).toEqual(new Set([pitch]));
+  });
+
   it.each(SPRITES.map((s) => [s.name, s] as const))(
     "%s draws the same rect count at the shipped scale as at the retired one",
     (_name, sp) => {
@@ -151,7 +168,7 @@ describe("service sprites survive a non-identity reference map", () => {
   it.each([
     ["a full lot and a full plant", 1, 1],
     ["a half-full plant", 1, 0.6],
-  ] as const)("keeps every rect inside its canvas with %s", (_label, parkingUse, recycleFill) => {
+  ] as const)("keeps every filled rect inside its canvas with %s", (_label, parkingUse, recycleFill) => {
     // The default state draws no parked car, no pile and an empty gauge, so
     // those branches need their own pass under the same bounds guard.
     for (const sp of SPRITES) {

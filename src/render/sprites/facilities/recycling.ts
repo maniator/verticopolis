@@ -3,14 +3,15 @@ import { personHiVis } from "../../pixelSprites/common";
 import { layerBreak, layerShell } from "../../pixelSprites/layers";
 import { rand, serviceLabel, type DrawCtx } from "../common";
 import { box, glow, refMap } from "./serviceKit";
-import { RECYCLING_DECK, RECYCLING_GAUGE_ROWS, RECYCLING_GAUGE_TOP, RECYCLING_PILE_PITCH, RECYCLING_PILE_X0, RECYCLING_REF_H, RECYCLING_REF_W, recyclingLook } from "./recyclingLook";
+import { RECYCLING_BAG_W, RECYCLING_BALER_X, RECYCLING_CUBE_W, RECYCLING_DECK, RECYCLING_GAUGE_ROWS, RECYCLING_GAUGE_TOP, RECYCLING_PILE_PITCH, RECYCLING_PILE_X0, RECYCLING_REF_H, RECYCLING_REF_W, recyclingLook } from "./recyclingLook";
 
 /**
  * The recycling center, first ported from its Figma reference build script
  * (`_bmad-output/implementation-artifacts/pixelart-figma/build-scripts/`,
- * page 01, drawn on the retired 11 by 44 grid); since the re-author this
- * TypeScript is the canonical art, drawn through the shared `refMap` scaler. It sits apart from the other
- * service rooms in `service.ts` only to keep both files under the line ceiling.
+ * page 01, drawn on the retired 11 by 44 grid). Since the re-authoring, this
+ * TypeScript is the canonical art, drawn through the shared `refMap` scaler.
+ * It sits apart from the other service rooms in `service.ts` only to keep
+ * both files under the line ceiling.
  *
  * The reference is authored on the live TILE 10 by FLOOR 45 grid
  * (`recyclingLook.ts` holds its size and the fill geometry), so `RW`/`RH` equal
@@ -21,6 +22,9 @@ import { RECYCLING_DECK, RECYCLING_GAUGE_ROWS, RECYCLING_GAUGE_TOP, RECYCLING_PI
  */
 
 // ---- Recycling --------------------------------------------------------------
+
+/** Rooms drawn narrower than this (in screen px) leave the FULL label off. */
+const FULL_LABEL_MIN_W = 44;
 
 export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
@@ -42,9 +46,9 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   for (let px = 6; px < W; px += ribPitch) Fu(px, 12, 1, 1, "#8A8A80");
   F(0, 3, W, 2, "#7A8088");
   F(0, 3, W, 1, "#9AA0A8");
-  // Pipe brackets on a pitch tied to the ribs' (1.4 ribs, 28px), so both move
-  // together. The run leaves a wider margin at the right wall than the left.
-  const bracketPitch = ribPitch * 1.4, brackets = Math.floor((W - 12) / bracketPitch) + 1;
+  // Pipe brackets on a 28px pitch from x 6. The run leaves a wider margin at
+  // the right wall than the left.
+  const bracketPitch = 28, brackets = Math.floor((W - 12) / bracketPitch) + 1;
   for (let b = 0; b < brackets; b++) Fu(Math.round(6 + b * bracketPitch), 2, 2, 4, "#5A6068");
   F(0, 7, W, 3, "#565C64");
   F(0, 7, W, 1, "#6A727A");
@@ -91,7 +95,7 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   // so each pair sits centered in the plate that carries it.
   // Width stops at the gauge channel (W - 6) so the gauge cannot paint over the
   // baler's right bevel and flatten it.
-  const cx = W - 47, balerW = W - 6 - cx - 1;
+  const cx = RECYCLING_BALER_X, balerW = W - 6 - cx - 1;
   box(F, cx, by - 18, balerW, deck - (by - 18), "#7E828A");
   F(cx + 2, by - 16, 18, 14, "#5A5E66");
   F(cx + 2, by - 16, 18, 1, "#3A3E44");
@@ -129,10 +133,12 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
       F(bx2 + 8, by2, 1, 7, "#7A5A38");
     }
   }
-  // Compacted cubes waiting by the baler.
+  // Compacted cubes waiting by the baler. The pile stops short of them
+  // (`RECYCLING_CUBES_X` in recyclingLook.ts), so a full pile never half
+  // covers a cube.
   for (let i = 0; i < 5; i++) {
-    const gx2 = cx - 4 - i * 6;
-    Fu(gx2, deck - 5, 6, 5, i % 2 ? "#3A4232" : "#2F3628");
+    const gx2 = cx - 4 - i * RECYCLING_CUBE_W;
+    Fu(gx2, deck - 5, RECYCLING_CUBE_W, 5, i % 2 ? "#3A4232" : "#2F3628");
     Fu(gx2 + 2, deck - 6, 2, 2, "#FFFFFF", 0.28);
   }
   // Painted deck curb. The 4px stripe unit divides the hall exactly, so the
@@ -155,7 +161,7 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   for (let i = 0; i < bags; i++) {
     const bx = RECYCLING_PILE_X0 + i * RECYCLING_PILE_PITCH;
     const jit = Math.floor(rand((u.id * 31 + i) | 0) * 3);
-    F(bx, deck - 6 - jit, 6, 6 + jit, i % 3 === 2 ? "#4a5a3a" : "#3a4232");
+    F(bx, deck - 6 - jit, RECYCLING_BAG_W, 6 + jit, i % 3 === 2 ? "#4a5a3a" : "#3a4232");
     Fu(bx + 2, deck - 7 - jit, 2, 2, "#FFFFFF", 0.35);
     if (look.stacked && i % 2 === 0 && i < bags - 1) F(bx + 3, deck - 11 - jit, 6, 5, "#2f3628");
   }
@@ -170,7 +176,9 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   layerShell(ctx, () => {
     F(W - 6, gY, 4, gH, "#1B2A14");
     F(W - 5, gY + gH - gaugeH, 2, gaugeH, gauge);
-    if (look.full) serviceLabel(ctx, "FULL", sx(W - 31), y, "#ffd2c8", 44, w);
+    // serviceLabel's last-but-one argument is the narrowest room (in screen
+    // px) that still shows the label, not a floor height.
+    if (look.full) serviceLabel(ctx, "FULL", sx(W - 31), y, "#ffd2c8", FULL_LABEL_MIN_W, w);
   });
   // The vested plant hand (shared hi-vis build with a hardhat), drawn last so
   // the worker stands in front of the pile.
