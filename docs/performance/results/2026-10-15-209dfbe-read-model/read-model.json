@@ -1,7 +1,7 @@
 {
  "schema": 1,
- "generatedAt": "2026-10-15T20:47:12.480Z",
- "commit": "4c1a74af50454f2c38fbb99a92de71c3b189fc31",
+ "generatedAt": "2026-10-15T20:52:39.023Z",
+ "commit": "209dfbea2b6cf5508ef6500b6729681195773163",
  "dirty": false,
  "appVersion": "2.34.1",
  "node": "v22.22.0",
@@ -235,6 +235,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 34,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -257,6 +258,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 34,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -279,6 +281,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 34,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -301,6 +304,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 34,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -323,6 +327,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 34,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -345,6 +350,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 27,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -368,6 +374,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 8,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -391,6 +398,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 34,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -413,6 +421,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 34,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -435,6 +444,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 34,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -457,6 +467,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 33,
      "unitKeys": [
       "occupants",
       "satisfaction"
@@ -474,6 +485,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 33,
      "unitKeys": [
       "satisfaction"
      ],
@@ -490,6 +502,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 34,
      "unitKeys": [
       "patronageToday",
       "patronageYest",
@@ -513,6 +526,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 33,
      "unitKeys": [
       "satisfaction"
      ],
@@ -529,6 +543,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 33,
      "unitKeys": [
       "satisfaction"
      ],
@@ -545,6 +560,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 33,
      "unitKeys": [
       "satisfaction"
      ],
@@ -561,6 +577,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 33,
      "unitKeys": [
       "satisfaction"
      ],
@@ -577,6 +594,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 33,
      "unitKeys": [
       "satisfaction"
      ],
@@ -593,6 +611,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 26,
      "unitKeys": [
       "occupants",
       "satisfaction"
@@ -610,6 +629,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 33,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -633,6 +653,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 8,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -656,6 +677,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 34,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -678,6 +700,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 34,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -700,6 +723,7 @@
      "added": 0,
      "removed": 0,
      "total": 2240,
+     "outsideFrame": 34,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -723,6 +747,10 @@
    "touched": {
     "median": 34,
     "max": 112
+   },
+   "outsideFrame": {
+    "median": 33.5,
+    "max": 34
    }
   },
   {
@@ -1005,6 +1033,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 1,
      "unitKeys": [
       "satisfaction"
      ],
@@ -1021,6 +1050,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 1,
      "unitKeys": [
       "satisfaction"
      ],
@@ -1037,6 +1067,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 1,
      "unitKeys": [
       "satisfaction"
      ],
@@ -1053,6 +1084,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes",
@@ -1066,6 +1098,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes",
@@ -1079,6 +1112,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 0,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -1101,6 +1135,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 6,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -1125,6 +1160,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 6,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -1146,6 +1182,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 6,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -1168,6 +1205,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 14,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -1190,6 +1228,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 19,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -1211,6 +1250,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 19,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -1233,6 +1273,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 15,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -1256,6 +1297,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 15,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -1278,6 +1320,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 15,
      "unitKeys": [
       "patronageToday",
       "pendingIncome",
@@ -1299,6 +1342,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 15,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -1322,6 +1366,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 20,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -1345,6 +1390,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 20,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -1368,6 +1414,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 20,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -1391,6 +1438,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 12,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -1413,6 +1461,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 6,
      "unitKeys": [
       "occupants",
       "patronageToday",
@@ -1435,6 +1484,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 1,
      "unitKeys": [
       "occupants",
       "pendingIncome"
@@ -1455,6 +1505,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 19,
      "unitKeys": [
       "patronageToday",
       "patronageYest",
@@ -1480,6 +1531,7 @@
      "added": 0,
      "removed": 0,
      "total": 12062,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes",
@@ -1494,6 +1546,10 @@
    "touched": {
     "median": 17,
     "max": 258
+   },
+   "outsideFrame": {
+    "median": 9,
+    "max": 20
    }
   },
   {
@@ -1722,6 +1778,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 70,
      "unitKeys": [
       "satisfaction",
       "state",
@@ -1742,6 +1799,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 70,
      "unitKeys": [
       "satisfaction"
      ],
@@ -1758,6 +1816,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 70,
      "unitKeys": [
       "satisfaction"
      ],
@@ -1774,6 +1833,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 42,
      "unitKeys": [
       "satisfaction",
       "state",
@@ -1794,6 +1854,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 42,
      "unitKeys": [
       "satisfaction"
      ],
@@ -1810,6 +1871,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [
       "satisfaction",
       "state",
@@ -1830,6 +1892,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [
       "occupants"
      ],
@@ -1846,6 +1909,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes",
@@ -1859,6 +1923,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes",
@@ -1872,6 +1937,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes",
@@ -1885,6 +1951,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes",
@@ -1898,6 +1965,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes"
@@ -1910,6 +1978,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [
       "state"
      ],
@@ -1929,6 +1998,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes"
@@ -1941,6 +2011,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes"
@@ -1953,6 +2024,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes"
@@ -1965,6 +2037,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes"
@@ -1977,6 +2050,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes"
@@ -1989,6 +2063,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes"
@@ -2001,6 +2076,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes",
@@ -2014,6 +2090,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 2,
      "unitKeys": [
       "dirtyDays",
       "occupants"
@@ -2032,6 +2109,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes",
@@ -2046,6 +2124,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes",
@@ -2059,6 +2138,7 @@
      "added": 0,
      "removed": 0,
      "total": 43358,
+     "outsideFrame": 0,
      "unitKeys": [],
      "topKeys": [
       "minutes",
@@ -2073,6 +2153,10 @@
    "touched": {
     "median": 0,
     "max": 2887
+   },
+   "outsideFrame": {
+    "median": 0,
+    "max": 70
    }
   }
  ],

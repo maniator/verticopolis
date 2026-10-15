@@ -1,6 +1,6 @@
 # Party transcript: incremental read model (2026-10-15)
 
-> **Record of the 2026-10-15 party, kept as said.** The save-shape and churn figures quoted below as a "scratch" measurement were one-off and are superseded by the governed rows in `docs/performance/results/2026-10-15-4c1a74a-read-model/` (`npm run perf:worker -- --read-model`); the design and its reasoning live in `docs/architecture/read-model-deltas.md`.
+> **Record of the 2026-10-15 party, kept as said.** The save-shape and churn figures quoted below as a "scratch" measurement were one-off and are superseded by the governed rows in `docs/performance/results/2026-10-15-209dfbe-read-model/` (`npm run perf:worker -- --read-model`); the design and its reasoning live in `docs/architecture/read-model-deltas.md`.
 
 Room: 🏗️ Cloud Dragonborn (game architect), 🎮 Link Freeman (game dev), 🎨 Sally (UX, carrying the perf-feel brief). Session mode. Evidence on the table: `docs/performance/results/2026-10-15-e25ec01c-worker-1280x720/report.md` and its 640x360 twin (Ryzen 5 5600X, RTX 3060, commit e25ec01), `src/wasmhost/*`, `engine-rs/src/frame.rs`, plus a scratch measurement of the three scenario saves (TypeScript engine, not a harness row).
 

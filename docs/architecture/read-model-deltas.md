@@ -1,8 +1,8 @@
 # Research: an incremental engine read model
 
-> **Snapshot, written 2026-10-15 from three result folders, none of them refreshing.** Timings: the perf:worker runs on commit `e25ec01` (app 2.34.1), Ryzen 5 5600X, RTX 3060, in `docs/performance/results/2026-10-15-e25ec01c-worker-1280x720/` and `docs/performance/results/2026-10-15-e25ec01-worker/` (640x360). Save shape and churn: `docs/performance/results/2026-10-15-4c1a74a-read-model/` (commit `4c1a74a`, app 2.34.1, Node 22.22.0, TypeScript engine). Live numbers: re-run `npm run perf:worker` for the timings and `npm run perf:worker -- --read-model` for the shape (both in `src/tests/perfWorker/`, arithmetic pinned by `src/tests/perfWorker/analysis.test.ts`). Figures marked **(derived)** are computed here from a code layout, not read off a row.
+> **Snapshot, written 2026-10-15 from three result folders, none of them refreshing.** Timings: the perf:worker runs on commit `e25ec01` (app 2.34.1), Ryzen 5 5600X, RTX 3060, in `docs/performance/results/2026-10-15-e25ec01c-worker-1280x720/` and `docs/performance/results/2026-10-15-e25ec01-worker/` (640x360). Save shape and churn: `docs/performance/results/2026-10-15-209dfbe-read-model/` (commit `209dfbe`, app 2.34.1, Node 22.22.0, TypeScript engine). Live numbers: re-run `npm run perf:worker` for the timings and `npm run perf:worker -- --read-model` for the shape (both in `src/tests/perfWorker/`, arithmetic pinned by `src/tests/perfWorker/analysis.test.ts`). Figures marked **(derived)** are computed here from a code layout, not read off a row.
 
-Status: research and recommendation. The only code it brought is the read model section of the perf harness (`src/tests/perfWorker/readModel.ts`). Vetted by a BMGD party (game architect, game dev, UX/perf); the transcript is `_bmad-output/party-mode/read-model-deltas-party-2026-10-15.md`. It feeds backlog row `engine-rs-binding-read-model` (#868), which already names "a structural snapshot instead of a save deserialization" and "typed arrays over WASM memory" as open items, and the implementation is backlog row `engine-rs-read-model-deltas` (#1054).
+Status: research and recommendation. The only code it brought is the read model section of the perf harness (`src/tests/perfWorker/readModel.ts`). Vetted by a BMGD party (game architect, game dev, UX/perf); the transcript is `_bmad-output/party-mode/read-model-deltas-party-2026-10-15.md`. It feeds backlog row `engine-rs-binding-read-model` (#868), which already names "a structural snapshot instead of a save deserialization" and "typed arrays over WASM memory" as open items. The implementation is tracked as the worker host speed plan (section 7): #1048, #1045, #1049, #1050 and #1051.
 
 ## 1. The finding in one paragraph
 
@@ -35,7 +35,7 @@ The engine keeps, per consumer, what it last sent, and emits only what differs.
 - **Frame channel (second step).** Unit records in the frame view become "changed since last reply" with the total unit count kept in the header for checking. People and cars stay whole until a row says otherwise (dwelling people are the only static ones).
 - **Keyframes.** The cache resets and a full payload goes out on load, a refused op (the existing `fail()` path), a fatal and restart, a tower swap, and any `merge: true` request (`settle`, exact saves). A delta is always relative to a keyframe the consumer acknowledged; a sequence number on each delta lets the main thread refuse a gap and ask for a keyframe.
 - **Cost.** Engine-rs: a last-sent cache (about 2 MiB for frame unit records plus the per-unit save bytes or a hash of them at large; check the memory rows) and a compare pass, sub-millisecond for 43k fixed-width records. Protocol: a versioned delta message and a keyframe flag. TypeScript: `merge.ts` gains a delta apply beside the full merge, used by all three WASM hosts.
-- **Fidelity.** Correct by construction for content: there is no field list to forget, because it compares outputs, not writes. Risks: (1) the cache must stay out of the save, `state_view` and the conformance digest, or ts and wasm stop agreeing; (2) applying a raw record could skip a normalization `Simulation.deserialize` does, so the apply must reuse the per-unit decode; (3) the revision-keyed caches stop being reset every hour (they reset today as a side effect of `mergeTower`), which #868 already wants made deliberate; (4) synchronous `serialize` callers get the read model's save more often, since replies stop carrying a full save. That is sound only if the delta carries every save key, `seed` included; the async paths keep using `settle` and stay exact.
+- **Fidelity.** Correct by construction for content: there is no field list to forget, because it compares outputs, not writes. Risks: (1) the cache must stay out of the save, `state_view` and the conformance digest, or ts and wasm stop agreeing; (2) applying a raw record could skip a normalization `Simulation.deserialize` does, so the apply must reuse the per-unit decode; (3) the revision-keyed caches stop being reset every hour (they reset today as a side effect of `mergeTower`), which #868 already wants made deliberate; (4) synchronous `serialize` callers get the read model's save more often, since replies stop carrying a full save. That is sound only if the delta carries every save key, `seed` included; the async paths keep using `settle` and stay exact; (5) the worker reply path now parses and shape-checks everything a reply carries before writing any of it (`workerApply.ts`, PR #1030), and a delta has to join that rule: read and check it whole, then apply.
 
 ### B. Engine-tracked versioned slices (the #868 "structural snapshot")
 
@@ -56,7 +56,7 @@ Adopt **A**, save channel first, frame-view unit records second, with one "chang
 
 The save shape and churn are governed rows now (`npm run perf:worker -- --read-model`, section 6); size the design from them, and add the delta rows section 6 still lists as it lands.
 
-Scope note: this is separate from the five-step optimization plan on PR #1030 and does not depend on it, but a step there that touches `merge.ts`, `workerApply.ts` or `frame_view` should be sequenced against it.
+Design A is what the worker host speed plan builds (section 7): the save half is #1045 and the frame half is #1049. Their issues set the acceptance bars and the rule that change detection must prove a net saving; this doc is the research behind them.
 
 ## 5. The rows that would prove it
 
@@ -86,14 +86,26 @@ The frames rows are the acceptance bar, not the hosted rows alone, because the h
 - **Keyframe chaos.** Dropped or reordered delta (sequence gap) leads to a keyframe request, never a silent apply.
 - **Harness rows (governed by `analysis.test.ts`):** save composition by top-level key and by unit kind; units changed per merge; delta bytes per hour pass; delta apply time; keyframes per run. The first two landed with this doc as the read model section (appendix); the delta rows land with the implementation.
 
+## 7. The tracked plan
+
+The worker host speed plan carries this research as issues; each issue body lists the sequence and its acceptance rows.
+
+1. #1048: split the worker host's costs in perf:worker. The read model rows this doc cites (save composition by key and unit kind, units changed per merge, and changed units the frame cannot carry) are part of it.
+2. #1045: replace the hourly full-save merge with a revisioned delta (design A, save channel).
+3. #1049: send only changed unit records in the per-reply frame (design A, frame channel). On the large tower 40,083 of the 43,358 units are `floor` tiles, which bears on its change-detection choice: most records never change, so a skip that is cheap per static record matters more than a fast compare.
+4. #1050: carry structural edits in the delta instead of a full-save merge.
+5. #1051: close the Rust engine's bare-step gap, alongside steps 2 to 4.
+
+One open question for #1045 and #1049: the one-off probe in #1045 (WASM package) counted 674 units changed per hour pass on the large tower, 554 of them outside the frame's fields, while the read model rows (TypeScript engine, the hosted rows' warm steps and batches) give a median of 0 and a maximum of 2,887 changed, and at most 70 outside the frame. The two measurements differ in engine, start point and summary, so they are not yet comparable; #1048's committed probe on the WASM engine should settle which shape the delta is sized for.
+
 ## Appendix: the read model rows
 
-From `docs/performance/results/2026-10-15-4c1a74a-read-model/report.md` (`npm run perf:worker -- --read-model`, `src/tests/perfWorker/readModel.ts`). Each scenario loads its save in Node on the TypeScript engine, runs the hosted rows' 120 warm steps, then their 720 steps of 2 minutes in batches of 4, and counts a merge after each batch where the worker host would merge (the hour-pass counter or the tower revision moved). It counted 24 merges in each scenario, all on hour passes, the same count as the hosted rows' full-save merges. Sizes are JSON characters. A unit "changed" when it is in both saves and its record differs; shares are of the units present.
+From `docs/performance/results/2026-10-15-209dfbe-read-model/report.md` (`npm run perf:worker -- --read-model`, `src/tests/perfWorker/readModel.ts`). Each scenario loads its save in Node on the TypeScript engine, runs the hosted rows' 120 warm steps, then their 720 steps of 2 minutes in batches of 4, and counts a merge after each batch where the worker host would merge (the hour-pass counter or the tower revision moved). It counted 24 merges in each scenario, all on hour passes, the same count as the hosted rows' full-save merges. Sizes are JSON characters. A unit "changed" when it is in both saves and its record differs; shares are of the units present. "Outside the frame" counts changed units whose changed fields are all ones the frame view's unit record (`UnitRecord`: state, occupants and the three visit counters) does not carry, so only a merge delivers them.
 
-| Scenario | Save chars | Units | `floor` units (share of save) | `units` key share | Units changed per merge, median / max | Unit fields that changed |
-|---|---|---|---|---|---|---|
-| small | 114,553 | 2,240 | 1,960 (75.3%) | 98.9% | 1.5% / 5.0% (34 / 112) | `occupants`, `patronageToday`, `patronageYest`, `pendingIncome`, `profitToday`, `profitYest`, `satisfaction` |
-| medium | 649,169 | 12,062 | 10,129 (70.1%) | 96.7% | 0.1% / 2.1% (17 / 258) | the small list plus `state` |
-| large | 2,336,909 | 43,358 | 40,083 (77.9%) | 99.9% | 0.0% / 6.7% (0 / 2,887) | `dirtyDays`, `occupants`, `satisfaction`, `state`, `vacateAt`, `vacateReason` |
+| Scenario | Save chars | Units | `floor` units (share of save) | `units` key share | Units changed per merge, median / max | Changed outside the frame, median / max | Unit fields that changed |
+|---|---|---|---|---|---|---|---|
+| small | 114,553 | 2,240 | 1,960 (75.3%) | 98.9% | 1.5% / 5.0% (34 / 112) | 33.5 / 34 | `occupants`, `patronageToday`, `patronageYest`, `pendingIncome`, `profitToday`, `profitYest`, `satisfaction` |
+| medium | 649,169 | 12,062 | 10,129 (70.1%) | 96.7% | 0.1% / 2.1% (17 / 258) | 9 / 20 | the small list plus `state` |
+| large | 2,336,909 | 43,358 | 40,083 (77.9%) | 99.9% | 0.0% / 6.7% (0 / 2,887) | 0 / 70 | `dirtyDays`, `occupants`, `satisfaction`, `state`, `vacateAt`, `vacateReason` |
 
 Top-level keys that changed across the merges: small `events`, `ledger`, `minutes`, `money`, `seed`, `transports`, `units`; medium those plus `lastQuarterMoney` and `log`; large `events`, `ledger`, `log`, `minutes`, `seed`, `transports`, `units`. No merge added or removed a unit. The WASM engine reaches the same end state (the hosted end-state digests agree), but its intermediate saves were not compared. The timings the scratch pass took (parse plus deserialize per save) are not governed and are left out; the hosted merge-time row covers that cost.
