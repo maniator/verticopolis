@@ -1,7 +1,8 @@
 # Design: version-consistent engine caching (#985, criterion 5)
 
 - **Date:** 2026-10-15
-- **Status:** DESIGN, awaiting owner sign-off before implementation.
+- **Status:** APPROVED for implementation (Web Game Room party GO and owner
+  decisions, 2026-10-15; see section 10).
 - **Issue:** #985, acceptance criterion 5 ("Version-consistent engine
   caching"). #985 stays open; this document covers one criterion of it.
 - **Plan:** cutover story S16 and the Deployment gate row
@@ -479,7 +480,7 @@ with the A-then-B fetcher covers its logic.
   each build checks only against itself. No runtime switch disables the
   check (open question 5).
 
-## 9. Open questions for the owner
+## 9. Open questions for the owner (decided in section 10)
 
 1. **`BUILD.json` at run time.** The AC names it as part of the precached
    set; the byte digests compiled into the shell already decide the verdict,
@@ -507,3 +508,34 @@ with the A-then-B fetcher covers its logic.
 6. **Which id #963 shows as "the build".** The binary can embed `sources`
    but cannot know its own byte digest. This design shows both: `package`
    for "is this the right engine", `sources` for "which Rust code".
+
+## 10. Decisions (2026-10-15)
+
+The Web Game Room party (with the security engineer and the adversary from the
+review crew) gave a GO to implement section 5 as written. The owner accepted
+the room's positions on all six open questions.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 1 | `BUILD.json` at run time | Required. |
+| 2 | Content-hashed names (option A) | Only if the S16 fallback-use signal shows mismatches in the field. |
+| 3 | Integrity beyond the engine set | Engine set only for now. The shell is backlog row `precache-shell-integrity` (#1046), which records the preview-deploy problem. |
+| 4 | No `crypto.subtle` | Refuse with `unverifiable`. No JavaScript SHA-256. |
+| 5 | Kill switch | None. A redeploy or a Vercel rollback is the fix; each build checks only against itself. |
+| 6 | The id #963 shows | Both: `package` and `sources`. |
+
+Conditions the implementation PR must meet:
+
+1. **Measure before relying on it.** Set the measurement before the code
+   lands: warm-precache boot and a cold online first visit on the throttled
+   mid-range profile, before and after, against the plan's "cold load within
+   +500 ms" row. If the cold first visit misses, compile from the verified
+   bytes as they arrive (the check stays; dropping it is not an option).
+2. **Switchable build first.** The check ships on the switchable default; the
+   wasm-only build relies on it only after the S16 signal is in.
+3. **An accessible mismatch screen.** The wasm-only failure overlay gets
+   `role="alert"` and moves focus to Reload, and the new copy goes through
+   the string catalog with the ids as format arguments.
+4. **The dev skip cannot ship.** A test proves the `import.meta.env.DEV`
+   skip is compiled out of a production bundle.
+
