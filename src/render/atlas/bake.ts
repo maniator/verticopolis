@@ -204,14 +204,15 @@ export function bake(jobs: readonly Job[], r: Renderer, onProgress?: (done: numb
     return { layers, softBase: soft ? { image: soft, piece: trim(soft) } : null };
   };
   const groups: number[] = [];
-  let ownPages = false;
+  let ownPages: boolean | string = false;
   jobs.forEach((job, done) => {
     onProgress?.(done, jobs.length);
-    // A family on pages of its own starts a new image group; one that does
-    // not may not come after it, or its images would land in the new group.
-    if (job.ownPages && !ownPages) groups.push(store.images.length);
+    // A family on pages of its own starts a new image group whenever its
+    // `ownPages` value changes (keep each family's jobs together); one that
+    // does not may not come after it, or its images would land in the group.
+    if (job.ownPages && job.ownPages !== ownPages) groups.push(store.images.length);
     if (ownPages && !job.ownPages) throw new Error(`${job.name} comes after a family on pages of its own`);
-    ownPages ||= job.ownPages === true;
+    if (job.ownPages) ownPages = job.ownPages;
     if (job.type === "anim") {
       const frameNames = job.frames.map((spec, i) => {
         const name = `${job.name}/${i}`;

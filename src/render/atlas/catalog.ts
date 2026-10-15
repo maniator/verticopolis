@@ -51,9 +51,10 @@ export interface StillJob {
    *  `layerEnd` becomes a front picture over the riders instead of landing
    *  on the shell (`BakedLayers.front`). */
   front?: boolean;
-  /** True for a family added after the first atlas: its new images pack on
-   *  pages after the first atlas's frame pages (`BakeResult.groups`). */
-  ownPages?: boolean;
+  /** Set for a family added after the first atlas: its new images pack on
+   *  pages after the first atlas's frame pages (`BakeResult.groups`). A
+   *  string names the family, so a later family starts pages of its own. */
+  ownPages?: boolean | string;
 }
 
 /** An animation: one frame per paint, `dt` seconds apart. */
@@ -69,9 +70,10 @@ export interface AnimJob {
   frames: PaintSpec[];
   /** True when every frame should also be split for depth, like a still. */
   layers?: boolean;
-  /** True for a family added after the first atlas: its new images pack on
-   *  pages after the first atlas's frame pages (`BakeResult.groups`). */
-  ownPages?: boolean;
+  /** Set for a family added after the first atlas: its new images pack on
+   *  pages after the first atlas's frame pages (`BakeResult.groups`). A
+   *  string names the family, so a later family starts pages of its own. */
+  ownPages?: boolean | string;
 }
 
 export type Job = StillJob | AnimJob;

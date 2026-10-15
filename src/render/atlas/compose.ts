@@ -1,6 +1,7 @@
 import type { BakeResult, BakedFrame, ImageRef } from "./bake";
 import type { Lookup } from "./lookup";
 import { blank, over, type Image } from "./pixels";
+import { TILE } from "../scale";
 
 /**
  * Composition the way a frontend does it: a frame's image, then its cycles at
@@ -94,7 +95,21 @@ export function composeLookup(bake: Pick<BakeResult, "images" | "frames">, found
   const rec = bake.frames.find((f) => f.name === name);
   if (!rec) throw new Error(`no frame ${name}`);
   const image = "animation" in found ? composeFrame(bake, rec) : composeFrame(bake, rec, found.chains, found.overlays, found.cycles);
-  return { name, image };
+  return { name, image: found.stretchTo === undefined ? image : stretch(image, found.stretchTo * TILE) };
+}
+
+/** Scale a picture horizontally to `w` pixels, nearest neighbor from its left
+ *  edge: the reader's `stretchTo` rule. */
+export function stretch(image: Image, w: number): Image {
+  if (!Number.isInteger(w) || w < 1 || image.w < 1) throw new Error(`cannot stretch a ${image.w} px picture to ${w} px`);
+  const out: Image = { w, h: image.h, data: new Uint8ClampedArray(w * image.h * 4) };
+  for (let y = 0; y < image.h; y++) {
+    for (let x = 0; x < w; x++) {
+      const sx = Math.min(image.w - 1, Math.floor((x * image.w) / w));
+      out.data.set(image.data.subarray((y * image.w + sx) * 4, (y * image.w + sx) * 4 + 4), (y * w + x) * 4);
+    }
+  }
+  return out;
 }
 
 /** Count differing pixels and their bounding box. */
