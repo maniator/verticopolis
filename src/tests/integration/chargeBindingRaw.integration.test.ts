@@ -15,17 +15,10 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
  * gameplay event, instead of coercing a value (`"5"` to 5, `null` to 0) or
  * throwing in the glue.
  *
- * Intentionally unsupported, each refused by the binding without moving
- * where TypeScript (taking the mark as an object) would extend:
- * - a mark passed as an object rather than its JSON text;
- * - a mark field written as a JSON float (`2.0`, `1e1`,
- *   `9007199254740990.5`, and `-0`, which the JSON reader takes as a float),
- *   since an f64 would read the fraction away;
- * - mark text that is not strict JSON anywhere, even in a field the engine
- *   ignores (a lone surrogate escape, nesting past 128 levels).
- * The reverse holds too: TypeScript's `extendTransport` takes the object, so
- * JSON text handed to it is refused there. The mirror relays only
- * `{ bottom, top }` through `JSON.stringify`, which writes none of these.
+ * Since #990 the extend gesture's high-water mark is engine-held
+ * (`beginExtend` and `endExtend`), so neither engine takes a mark from the
+ * caller: `extendTransport` has three arguments, and a fourth is ignored in
+ * both, an inflated one included.
  */
 
 if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
@@ -81,8 +74,8 @@ function cases(lift: number, office: number, stairs: number): Call[] {
     list.push({ name: `addCar(${what})`, ts: (s) => s.addCar(loose(id)), rust: (e) => e.addCar(id) });
     list.push({ name: `removeCar(${what})`, ts: (s) => s.removeCar(loose(id)), rust: (e) => e.removeCar(id) });
     list.push({ name: `removeFacility(${what}, sell)`, ts: (s) => s.removeFacility(loose(id), "sell"), rust: (e) => e.removeFacility(id, "sell") });
-    list.push({ name: `extendTransport(${what} id)`, ts: (s) => s.extendTransport(loose(id), "up", 3), rust: (e) => e.extendTransport(id, "up", 3, null) });
-    list.push({ name: `extendTransport(target ${what})`, ts: (s) => s.extendTransport(lift, "up", loose(id)), rust: (e) => e.extendTransport(lift, "up", id, null) });
+    list.push({ name: `extendTransport(${what} id)`, ts: (s) => s.extendTransport(loose(id), "up", 3), rust: (e) => e.extendTransport(id, "up", 3) });
+    list.push({ name: `extendTransport(target ${what})`, ts: (s) => s.extendTransport(lift, "up", loose(id)), rust: (e) => e.extendTransport(lift, "up", id) });
   }
   // Missing arguments: the glue reads them as undefined.
   list.push({ name: "addCar()", ts: (s) => call(s.addCar, s), rust: (e) => e.addCar() });
@@ -95,46 +88,23 @@ function cases(lift: number, office: number, stairs: number): Call[] {
   // Enums: only the exact strings.
   const ends: [string, unknown][] = [["UP", "UP"], ["Down", "Down"], ["empty", ""], ["padded", " up"], ["null", null], ["undefined", undefined], ["5", 5], ["true", true], ["an object", {}], ["a boxed String", new String("up")]];
   for (const [what, end] of ends) {
-    list.push({ name: `extendTransport(end ${what})`, ts: (s) => s.extendTransport(lift, loose(end), 3), rust: (e) => e.extendTransport(lift, end, 3, null) });
+    list.push({ name: `extendTransport(end ${what})`, ts: (s) => s.extendTransport(lift, loose(end), 3), rust: (e) => e.extendTransport(lift, end, 3) });
   }
   const methods: [string, unknown][] = [["Sell", "Sell"], ["BULLDOZE", "BULLDOZE"], ["empty", ""], ["burn", "burn"], ["null", null], ["undefined", undefined], ["7", 7], ["false", false], ["an array", ["sell"]], ["a boxed String", new String("sell")]];
   for (const [what, method] of methods) {
     list.push({ name: `removeFacility(method ${what})`, ts: (s) => s.removeFacility(office, loose(method)), rust: (e) => e.removeFacility(office, method) });
   }
-  // Marks. TypeScript takes the object; the binding takes its JSON text.
-  const marks: [string, unknown, unknown][] = [
-    ["a fractional top", { bottom: 1, top: 2.5 }, '{"bottom":1,"top":2.5}'],
-    ["a top past 2^53", { bottom: 1, top: 2 ** 53 }, '{"bottom":1,"top":9007199254740992}'],
-    ["a bottom past -2^53", { bottom: -(2 ** 53), top: 2 }, '{"bottom":-9007199254740992,"top":2}'],
-    // These two are refused by the JSON reader itself, before the field rule.
-    ["an Infinity top, written past the f64 range", { bottom: 1, top: Infinity }, '{"bottom":1,"top":1e400}'],
-    ["an Infinity top, written as a word", { bottom: 1, top: Infinity }, '{"bottom":1,"top":Infinity}'],
-    ["a string bottom", { bottom: "1", top: 2 }, '{"bottom":"1","top":2}'],
-    ["a NaN bottom, stringified", { bottom: Number.NaN, top: 2 }, JSON.stringify({ bottom: Number.NaN, top: 2 })],
-    ["a NaN bottom, written raw", { bottom: Number.NaN, top: 2 }, '{"bottom":NaN,"top":2}'],
-    ["a missing top", { bottom: 1 }, '{"bottom":1}'],
-    ["an array", [1, 2], "[1,2]"],
-    ["a number", 0, 0],
-    ["a boolean", false, false],
-    ["empty text", "", ""],
-    ["a boxed String", new String('{"bottom":1,"top":2}'), new String('{"bottom":1,"top":2}')],
-    ["text that is not JSON", "{oops", "{oops"],
-  ];
-  for (const [what, tsMark, rustMark] of marks) {
-    list.push({ name: `extendTransport(mark ${what})`, ts: (s) => s.extendTransport(lift, "up", 3, loose(tsMark)), rust: (e) => e.extendTransport(lift, "up", 3, rustMark) });
-  }
   return list;
 }
 
 /** Whole numbers the boundary accepts that name nothing in the tower, or a
- *  floor or mark at the edge of the safe range: the engines refuse them with
+ *  floor at the edge of the safe range: the engines refuse them with
  *  their own reason, and must agree on it. */
 function acceptedEdges(lift: number): Call[] {
   const max = Number.MAX_SAFE_INTEGER;
   const list: Call[] = [
     { name: "extendTransport(up to 2^53 - 1)", ts: (s) => s.extendTransport(lift, "up", max), rust: (e) => e.extendTransport(lift, "up", max) },
     { name: "extendTransport(down to -(2^53 - 1))", ts: (s) => s.extendTransport(lift, "down", -max), rust: (e) => e.extendTransport(lift, "down", -max) },
-    { name: "extendTransport(a mark of ±(2^53 - 1))", ts: (s) => s.extendTransport(lift, "up", max, { bottom: -max, top: max }), rust: (e) => e.extendTransport(lift, "up", max, JSON.stringify({ bottom: -max, top: max })) },
     // Floor 3 plus or minus 2^32 was floor 3 to the old i32 binding.
     { name: "extendTransport(up to 3 + 2^32)", ts: (s) => s.extendTransport(lift, "up", 3 + 2 ** 32), rust: (e) => e.extendTransport(lift, "up", 3 + 2 ** 32) },
     { name: "extendTransport(down to 3 - 2^32)", ts: (s) => s.extendTransport(lift, "down", 3 - 2 ** 32), rust: (e) => e.extendTransport(lift, "down", 3 - 2 ** 32) },
@@ -146,7 +116,7 @@ function acceptedEdges(lift: number): Call[] {
     list.push({ name: `addCar(${what})`, ts: (s) => s.addCar(id), rust: (e) => e.addCar(id) });
     list.push({ name: `removeCar(${what})`, ts: (s) => s.removeCar(id), rust: (e) => e.removeCar(id) });
     list.push({ name: `removeFacility(${what}, sell)`, ts: (s) => s.removeFacility(id, "sell"), rust: (e) => e.removeFacility(id, "sell") });
-    list.push({ name: `extendTransport(${what} id)`, ts: (s) => s.extendTransport(id, "up", 3), rust: (e) => e.extendTransport(id, "up", 3, null) });
+    list.push({ name: `extendTransport(${what} id)`, ts: (s) => s.extendTransport(id, "up", 3), rust: (e) => e.extendTransport(id, "up", 3) });
   }
   return list;
 }
@@ -176,51 +146,78 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
         }
       };
       const list = cases(lift, office, stairs);
-      // 2 ends checks + 16 ids x 5 + 7 missing + 10 ends + 10 methods + 15 marks.
-      expect(list).toHaveLength(124);
+      // 2 ends checks + 16 ids x 5 + 7 missing + 10 ends + 10 methods.
+      expect(list).toHaveLength(109);
       run(list, true);
       const edges = acceptedEdges(lift);
-      // 5 floor and mark edges + 6 ids x 4 commands.
-      expect(edges).toHaveLength(29);
+      // 4 floor edges + 6 ids x 4 commands.
+      expect(edges).toHaveLength(28);
       run(edges, false);
       expect(drained(sim, engine), "a refusal emitted an event").toEqual({ ts: [], rust: [] });
 
-      // Intentionally unsupported (see the header): each is refused by the
-      // binding without moving. `9007199254740990.5` has no TypeScript twin:
-      // as a JS number it is already the whole 9007199254740990.
-      const deep = `${"[".repeat(200)}${"]".repeat(200)}`;
-      const unsupported: unknown[] = [
-        { bottom: 1, top: 2 },
-        '{"bottom":1,"top":2.0}',
-        '{"bottom":1,"top":1e1}',
-        '{"bottom":1,"top":9007199254740990.5}',
-        '{"bottom":-0,"top":2}',
-        '{"bottom":1,"top":2,"label":"\\ud800"}',
-        `{"bottom":1,"top":2,"label":${deep}}`,
-      ];
-      for (const mark of unsupported) {
-        const refused = JSON.parse(engine.extendTransport(lift, "up", 3, mark));
-        expect(refused, JSON.stringify(mark)).toEqual({ ok: false, reason: INVALID_REQUEST, delta: 0, bottom: 1, top: 2, added: 0 });
-        expect(engine.stateDigest(), `Rust moved on ${JSON.stringify(mark)}`).toBe(start);
+      // beginExtend takes its id raw too: anything but a whole JS number
+      // naming an elevator opens no gesture, in either engine, and moves nothing.
+      const begin = (e: Engine, ...a: unknown[]) => loose<(...b: unknown[]) => boolean>(e.beginExtend).apply(e, a);
+      const beginTs = (...a: unknown[]) => loose<(...b: unknown[]) => boolean>(sim.beginExtend).apply(sim, a);
+      const badIds: unknown[][] = [[String(lift)], [null], [undefined], [true], [lift + 0.5], [Number.NaN], [Infinity], [2 ** 53], [BigInt(lift)], [{ id: lift }], [new Number(lift)], [], [office], [stairs], [lift + 2 ** 32], [-0]];
+      for (const args of badIds) {
+        const name = `beginExtend(${args.map((v) => typeof v === "bigint" ? `${v}n` : String(v)).join(", ")})`;
+        expect(beginTs(...args), name).toBe(false);
+        expect(begin(engine, ...args), name).toBe(false);
       }
-      expect(JSON.parse(engine.drainGameplayEvents())).toEqual([]);
+      expect(tsDigest(), "TypeScript moved on beginExtend").toBe(start);
+      expect(engine.stateDigest(), "Rust moved on beginExtend").toBe(start);
+      expect(drained(sim, engine), "beginExtend emitted an event").toEqual({ ts: [], rust: [] });
 
       // Well-formed calls still land in both, with the same answers, events
-      // and state: a JSON mark, the text `null` as no mark, a three-argument
-      // call, and a car.
+      // and state: a gesture that wiggles inside its mark for free, a press
+      // after it closes, a caller's inflated fourth argument that buys
+      // nothing, and the car and removal commands.
+      const extend = (e: Engine | Simulation, ...a: unknown[]) => loose<(...b: unknown[]) => unknown>(e.extendTransport).apply(e, a);
+      expect(beginTs(lift)).toBe(true);
+      expect(begin(engine, lift)).toBe(true);
+      // An open gesture is in neither engine's hashed state.
+      expect(tsDigest(), "TypeScript hashed the gesture").toBe(start);
+      expect(engine.stateDigest(), "Rust hashed the gesture").toBe(start);
       const good: Call[] = [
-        { name: "extendTransport with a mark", ts: (s) => s.extendTransport(lift, "up", 3, { bottom: 1, top: 2 }), rust: (e) => e.extendTransport(lift, "up", 3, '{"bottom":1,"top":2}') },
-        { name: "extendTransport with the text null", ts: (s) => s.extendTransport(lift, "up", 4, null), rust: (e) => e.extendTransport(lift, "up", 4, "null") },
-        { name: "extendTransport with three arguments", ts: (s) => s.extendTransport(lift, "up", 5), rust: (e) => e.extendTransport(lift, "up", 5) },
+        { name: "extendTransport in a gesture", ts: (s) => s.extendTransport(lift, "up", 4), rust: (e) => e.extendTransport(lift, "up", 4) },
+        { name: "extendTransport back inside the mark", ts: (s) => s.extendTransport(lift, "up", 3), rust: (e) => e.extendTransport(lift, "up", 3) },
+        { name: "extendTransport regrown inside the mark", ts: (s) => s.extendTransport(lift, "up", 4), rust: (e) => e.extendTransport(lift, "up", 4) },
+        { name: "endExtend, then a shrink", ts: (s) => (s.endExtend(), s.extendTransport(lift, "up", 3)), rust: (e) => (e.endExtend(), e.extendTransport(lift, "up", 3)) },
+        { name: "extendTransport with an inflated caller mark", ts: (s) => extend(s, lift, "up", 5, { bottom: 1, top: 50 }), rust: (e) => loose<string>(extend(e, lift, "up", 5, '{"bottom":1,"top":50}')) },
         { name: "addCar", ts: (s) => s.addCar(lift), rust: (e) => e.addCar(lift) },
         { name: "removeCar", ts: (s) => s.removeCar(lift), rust: (e) => e.removeCar(lift) },
         { name: "removeFacility", ts: (s) => s.removeFacility(office, "sell"), rust: (e) => e.removeFacility(office, "sell") },
       ];
+      const added: number[] = [];
       for (const c of good) {
-        const ts = c.ts(sim) as { ok: boolean };
+        const ts = c.ts(sim) as { ok: boolean; added?: number };
         expect(ts.ok, c.name).toBe(true);
         expect(JSON.parse(c.rust(engine)), c.name).toEqual(ts);
         expect(engine.stateDigest(), `${c.name}: the engines split`).toBe(tsDigest());
+        if (ts.added !== undefined) added.push(ts.added);
+      }
+      // Two floors billed out, none back in, none regrown, and the press after
+      // the gesture bills its floors past the span: the mark was engine-held.
+      expect(added).toEqual([2, 0, 0, 0, 2]);
+      // A refused begin drops an open gesture in both engines: after it, a
+      // shrink and regrow inside the old mark is billed again, alike.
+      for (const bad of [[lift + 0.5], [String(lift)], [stairs], []]) {
+        expect(beginTs(lift)).toBe(true);
+        expect(begin(engine, lift)).toBe(true);
+        const steps: Call[] = [
+          { name: "a paid floor", ts: (s) => s.extendTransport(lift, "up", 6), rust: (e) => e.extendTransport(lift, "up", 6) },
+          { name: "back down", ts: (s) => s.extendTransport(lift, "up", 5), rust: (e) => e.extendTransport(lift, "up", 5) },
+        ];
+        for (const c of steps) expect(JSON.parse(c.rust(engine)), c.name).toEqual(c.ts(sim));
+        expect(beginTs(...bad)).toBe(false);
+        expect(begin(engine, ...bad)).toBe(false);
+        const ts = sim.extendTransport(lift, "up", 6);
+        expect(ts, `regrow after beginExtend(${String(bad[0])})`).toMatchObject({ ok: true, added: 1 });
+        expect(JSON.parse(engine.extendTransport(lift, "up", 6))).toEqual(ts);
+        expect(engine.stateDigest()).toBe(tsDigest());
+        expect(sim.extendTransport(lift, "up", 5).ok).toBe(true);
+        expect(JSON.parse(engine.extendTransport(lift, "up", 5)).ok).toBe(true);
       }
       const events = drained(sim, engine);
       expect(events.rust).toEqual(events.ts);
@@ -239,7 +236,7 @@ describe.skipIf(!hasWasmPackage())("charge commands called raw through the bindi
     const proto = loose<Record<string, unknown>>(wasm().Engine.prototype);
     const glue = (name: string) => String(proto[name]);
     expect(glue("setTowerName")).toMatch(/passStringToWasm0/);
-    for (const name of ["addCar", "removeCar", "extendTransport", "removeFacility"]) {
+    for (const name of ["addCar", "removeCar", "beginExtend", "extendTransport", "endExtend", "removeFacility"]) {
       expect(glue(name), name).not.toMatch(/passStringToWasm0/);
     }
   });
