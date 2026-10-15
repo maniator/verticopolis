@@ -1022,8 +1022,8 @@ this slice closes the rest and puts the projects in CI.
 
 | Project | Files | Pass | Fail | Skip | Wall time |
 | --- | --- | --- | --- | --- | --- |
-| `integrationWasm` | 92 | 1680 | 0 | 39 | 165 s |
-| `unitWasm` | 250 | 2764 | 0 | 0 | 97 s |
+| `integrationWasm` | 92 | 1682 | 0 | 39 | 180 s |
+| `unitWasm` | 250 | 2794 | 0 | 0 | 116 s |
 
 The 39 skips are the 38 `itTypeScriptOnly` marks (24 in bucket (c), 14 in
 bucket (d), all in the table) plus one pre-existing skip. These figures are
