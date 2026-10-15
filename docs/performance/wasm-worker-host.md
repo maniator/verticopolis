@@ -290,6 +290,6 @@ On a desktop with a GPU, from a clean checkout of this branch:
 ## Follow-ups
 
 - #1045: the hourly full-save merge on the worker host's main thread.
-- #1018 (fixed in this PR): a synchronous save taken with steps in flight carried the frame loop's clock; it now carries its state's own minute.
+- #1018 (fixed in PR #1030): a synchronous save taken with steps in flight carried the frame loop's clock; it now carries its state's own minute.
 - #1019: the engine log after an engine-refused command.
 - #1020: two step-host edges the worker host review found.

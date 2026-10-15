@@ -205,12 +205,12 @@ fan-out, and an event is never handed out twice.
   full save). A camera
   stamp (`view`, which the save carries and the simulation never reads) since
   then is patched into it, so a save that stamps the camera first stays exact.
-- Otherwise it answers with the read model's own save. Once caught up, the
-  read model holds exactly the engine's state (the integration tests compare
-  the two saves field by field), so this save is the engine's state at the
-  last fresh reply plus the player's commands since. The steps still in
-  flight are not in it, so it carries that reply's minute rather than the
-  frame loop's clock: a tower loaded from it runs those steps again, an hour
+- Otherwise it answers with the read model's own save: the state of the
+  last fresh reply plus the player's commands since, with the internals the
+  frame does not carry (the RNG, `satisfaction`, the dispatch memos) as of
+  the last merge, which every hour pass carries. The steps still in flight
+  are not in it, so it carries that reply's minute instead of the frame
+  loop's clock, and a tower loaded from it runs those steps again, an hour
   or day pass among them (#1018).
 - `settle()` asks for an exact save and resolves when it has one.
   - The autosave and the `.vctower` export call it through `settleEngine`,

@@ -150,8 +150,8 @@ describe("worker host (fake engine)", () => {
     r.sim.tick(1);
     const approx = r.sim.serialize() as { minutes: number };
     expect(r.host.stats.approximateSaves).toBe(1);
-    // Its clock is the state's own (the last fresh reply's), not the frame
-    // loop's, which already counts the step not yet answered (#1018).
+    // Its clock is the state's own, the last fresh reply's: the frame loop's
+    // already counts the step not yet answered (#1018).
     expect(r.sim.clock.minutes).toBe(atReply + 1);
     expect(approx.minutes).toBe(atReply);
     r.host.detach();

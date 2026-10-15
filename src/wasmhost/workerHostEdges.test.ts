@@ -179,6 +179,21 @@ describe("worker host round 2 (fake engine)", () => {
     expect(sim.clock.minutes).toBe(minutes);
     expect(sim.money).toBe(money);
 
+    // An event batch that parses but is no list: the same.
+    const shaped = Simulation.newGame(4, "classic");
+    const sent3: ToWorker[] = [];
+    const fatal3: string[] = [];
+    const h3 = attachWorkerHost(shaped, { gen: 3, catalogs: core.catalogs(), send: (m) => sent3.push(m), onFatal: (m) => fatal3.push(m), onError: () => {} });
+    h3.receive({ type: "loaded", gen: 3, view: loaded });
+    shaped.tick(1);
+    h3.flush();
+    const req3 = (last(sent3) as Extract<ToWorker, { type: "ops" }>).request!.req;
+    h3.receive({ type: "frame", gen: 3, req: req3, seq: 1, view, events: "{}", dropped: 0, log: null, pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    expect(fatal3.join()).toMatch(/the event batch is not a list/);
+    expect(shaped.money).toBe(money);
+    h3.detach();
+    expect(shaped.clock.minutes).toBe(minutes);
+
     // The same for a merge whose save reads but whose telemetry does not:
     // the save's structure must not land either.
     const merged = Simulation.newGame(4, "classic");

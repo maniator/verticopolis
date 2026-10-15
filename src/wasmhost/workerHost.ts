@@ -10,7 +10,7 @@ import { decodeHeader } from "./frameView";
 import { SETTLE_TIMEOUT_MS, setStepGate } from "./stepGate";
 import { refuseForeignCatalog } from "./wasmHost";
 import type { FrameReply, FrameRequest, Op, ToWorker } from "./workerProtocol";
-import { applyHeaderFields, mergeSave, parseMerge, restoreOwn, structuredCloneOf } from "./workerApply";
+import { applyHeaderFields, mergeSave, parseArray, parseMerge, restoreOwn, structuredCloneOf } from "./workerApply";
 import { LATENCY_SAMPLES, newWorkerHostStats, pushSample, type WorkerHost, type WorkerHostOptions } from "./workerStats";
 
 export type { WorkerHost, WorkerHostOptions, WorkerHostStats } from "./workerStats";
@@ -208,7 +208,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     }
     const h = decodeHeader(r.view);
     checkRecords(r.view, h);
-    const events = JSON.parse(r.events) as GameplayEvent[];
+    const events = parseArray<GameplayEvent>(r.events, "event batch");
     droppedEngine = r.dropped;
     // A reply that includes every command the instance ran. One that does
     // not is refused (#908) except for its events: its state predates a
@@ -238,15 +238,16 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       if (staleStreak < MAX_STALE_STREAK || waiters.length > 0) requestFrame();
       return;
     }
-    // Read everything the reply carries before any write: one that does not
-    // parse is fatal with the read model as the last reply left it, so the
+    // Read everything the reply carries before any write (the events were
+    // read above, with the frame view): one that does not parse, or is not
+    // the engine's shape, is fatal with the read model as the last reply left it, so the
     // fallback's clock (rolled back to that reply's minute) and its state
     // agree.
     const tParse = now();
     const merge = r.merge ? parseMerge(r.merge) : null;
     const parseMs = now() - tParse;
     const pending = h.pending && r.pending && r.pending !== JSON.stringify(sim.events.pending) ? (JSON.parse(r.pending) as typeof sim.events.pending) : undefined;
-    const log = r.log !== null ? (JSON.parse(r.log) as LogEntry[]) : null;
+    const log = r.log !== null ? parseArray<LogEntry>(r.log, "log") : null;
     relay.suppress(() => {
       if (merge) {
         const t = now();
@@ -458,9 +459,9 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       const e = exactSave();
       if (!e) {
         stats.approximateSaves++;
-        // The read model's state is the engine's at the last fresh reply,
-        // plus the commands since; its clock already counts the steps still
-        // in flight. The save takes the state's own minute, so a tower
+        // The read model's state is as of the last fresh reply (its internals
+        // as of the last merge, which every hour pass carries), plus the
+        // commands since; its clock already counts the steps still in flight. The save takes the state's own minute, so a tower
         // loaded from it runs those steps again, an hour or day pass among
         // them, instead of starting past a boundary that never ran.
         const data = Simulation.prototype.serialize.call(sim);

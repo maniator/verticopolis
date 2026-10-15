@@ -18,11 +18,19 @@ export interface ParsedMerge {
 }
 
 export function parseMerge(m: MergePayload): ParsedMerge {
-  return {
-    fresh: Simulation.deserialize(JSON.parse(m.save)),
-    telemetry: JSON.parse(m.telemetry) as TelemetryDocument,
-    housekeeping: m.housekeeping ? (JSON.parse(m.housekeeping) as { cleaned: number; leftover: number }) : null,
-  };
+  const fresh = Simulation.deserialize(JSON.parse(m.save));
+  const telemetry = JSON.parse(m.telemetry) as TelemetryDocument;
+  if (!telemetry || !Array.isArray(telemetry.util) || !Array.isArray(telemetry.hourly) || !Array.isArray(telemetry.origins)) throw new Error("merge: the telemetry is not the engine's shape");
+  const housekeeping = m.housekeeping ? (JSON.parse(m.housekeeping) as { cleaned: number; leftover: number }) : null;
+  if (housekeeping && (typeof housekeeping.cleaned !== "number" || typeof housekeeping.leftover !== "number")) throw new Error("merge: the housekeeping report is not the engine's shape");
+  return { fresh, telemetry, housekeeping };
+}
+
+/** A JSON array from a reply, or an error naming the part. */
+export function parseArray<T>(text: string, what: string): T[] {
+  const v = JSON.parse(text) as unknown;
+  if (!Array.isArray(v)) throw new Error(`reply: the ${what} is not a list`);
+  return v as T[];
 }
 
 /** Merge the engine's full save into the read model, keeping the
