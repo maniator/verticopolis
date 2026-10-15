@@ -16,9 +16,12 @@ import type { WasmEngine } from "./binding";
  *   the engine, the relay and the host) may reach. They reach it through the
  *   TypeScript instance, which the relay mirrors (`mirror.ts`).
  * - **Tier 2, restores and reads.** Constructors from a save or a seed,
- *   getters and views, the save writers, and the host loop. Host-loop entries
- *   (`hostLoop: true`) advance or drain the engine and belong to the host,
- *   the dual run and tests; no UI or game module imports the binding at all.
+ *   getters and views, and the save writers. Entries marked `hostLoop` drive,
+ *   drain or free the running engine (`tick`, the frame and log reads, the
+ *   event drain, wasm-bindgen's `free`) and belong to the host, the dual run
+ *   and tests; the guard fails on a call elsewhere to one whose name the
+ *   TypeScript side does not share, and on any import of the binding's
+ *   declaration from outside that scope.
  * - **Tier 3, relay, test and seed ops.** Raw edits that skip the charge
  *   rules or the simulation layer (`setMoney`, `setCars`, `resizeTransport`,
  *   the bare tower edits), scripted events with no player trigger
@@ -37,7 +40,8 @@ export type BindingTier = 1 | 2 | 3;
 
 export interface TierEntry {
   tier: BindingTier;
-  /** Tier 2 only: drives or drains the engine's loop, for the host alone. */
+  /** Tier 2 only: drives, drains or frees the running engine, for the host
+   *  alone. */
   hostLoop?: true;
 }
 
@@ -105,7 +109,7 @@ export const BINDING_EXPORT_TIERS = {
   elevatorTelemetry: T2,
   housekeepingReport: T2,
   loopMemos: T2,
-  // Tier 2, the host loop.
+  // Tier 2, the host loop and the engine's lifetime.
   tick: LOOP,
   frameView: LOOP,
   logSince: LOOP,
