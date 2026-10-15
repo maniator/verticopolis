@@ -37,6 +37,8 @@ describe("fitAtGameScale", () => {
         expect(tilesPerFloor(tiles, floors, box.w, box.h)).toBeCloseTo(FLOOR / TILE, 8);
         expect(box.w).toBeLessThanOrEqual(maxW);
         expect(box.h).toBeLessThanOrEqual(maxH);
+        // At or above the world scale, only whole multiples are allowed.
+        if (box.scale >= 1) expect(Number.isInteger(box.scale), `scale ${box.scale}`).toBe(true);
       }
     }
   });
@@ -44,7 +46,6 @@ describe("fitAtGameScale", () => {
   it("draws at exactly the requested whole multiple when the cell has room", () => {
     const box = fitAtGameScale(4, 1, 10_000, 10_000, 3);
     expect(box.scale).toBe(3);
-    expect(box.tile).toBe(3 * TILE);
     expect(box.w).toBe(4 * 3 * TILE);
     expect(box.h).toBe(3 * FLOOR);
   });
@@ -60,11 +61,22 @@ describe("fitAtGameScale", () => {
     expect(tall.w).toBeCloseTo(2 * TILE * (90 / (3 * FLOOR)), 8);
   });
 
+  it("steps down to the largest whole multiple that fits, never a fraction above 1", () => {
+    // 2.6x fits, so a 3x request draws at 2x: every world pixel stays a whole
+    // block of screen pixels, which a fractional 2.6 would smear.
+    const box = fitAtGameScale(4, 1, 4 * TILE * 2.6, 10_000, 3);
+    expect(box.scale).toBe(2);
+    expect(box.w).toBe(4 * TILE * 2);
+    // Just short of 1x is the one case that has to go fractional.
+    expect(fitAtGameScale(4, 1, 4 * TILE - 1, 10_000, 3).scale).toBeLessThan(1);
+  });
+
   it("treats an unbounded budget as no constraint at all", () => {
     // How the gallery sizes the metro: its platform art fills whatever width it
     // is handed, so only the height comes from the fitter.
     const box = fitAtGameScale(375, 3, Infinity, 166, 2);
-    expect(box.h).toBe(166);
+    expect(box.scale).toBe(1);
+    expect(box.h).toBe(3 * FLOOR);
     expect(Number.isFinite(box.w)).toBe(true);
   });
 
@@ -72,7 +84,15 @@ describe("fitAtGameScale", () => {
     // A zero-width cell is reachable: the gallery's column width is computed
     // from the container, and a NaN box would spread through every coordinate
     // instead of simply drawing nothing.
-    for (const box of [fitAtGameScale(0, 1, 100, 100), fitAtGameScale(4, 0, 100, 100), fitAtGameScale(4, 1, 0, 0)]) {
+    for (const box of [
+      fitAtGameScale(0, 1, 100, 100),
+      fitAtGameScale(4, 0, 100, 100),
+      fitAtGameScale(4, 1, 0, 0),
+      fitAtGameScale(4, 1, -50, 100),
+      fitAtGameScale(4, 1, NaN, 100),
+      fitAtGameScale(4, 1, 100, NaN),
+      fitAtGameScale(NaN, 1, 100, 100),
+    ]) {
       expect(box.w).toBe(0);
       expect(box.h).toBe(0);
       expect(Number.isNaN(box.scale)).toBe(false);

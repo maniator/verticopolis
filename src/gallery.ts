@@ -23,9 +23,11 @@ interface Entry {
 
 /** How much larger than the world a cell may draw. Sprites at world scale are
  *  too small to judge in a catalog cell, so the page magnifies, and a whole
- *  multiple is the only magnification that keeps the aspect the game draws at.
- *  Three is what the cell height affords: a single-floor room at 3x is 3 * FLOOR
- *  tall, which is the tallest box `CELL_H` can hold under its caption. */
+ *  multiple is the only magnification that keeps every world pixel a whole
+ *  block of screen pixels. Three is the most a single-floor room gets: 3 * FLOOR
+ *  is 135px, inside the 186px box `CELL_H` leaves, where 4x (180px) would
+ *  crowd it. A footprint that cannot take 3x in its cell steps down to 2x or
+ *  1x (`fitAtGameScale`), so wide rooms and multi-floor kinds draw smaller. */
 const MAG = 3;
 
 /** Height reserved at the bottom of every cell for its caption. Rooms are fitted
@@ -68,9 +70,9 @@ function roomEntry(
     draw(d, cx, cy, cw, ch) {
       // Size the cell by the facility's own floor count so a genuinely multi-
       // floor kind (cinema, party hall, metro) shows at its true proportion
-      // instead of squished into one floor. `fitAtGameScale` shrinks the whole
-      // box uniformly when the magnified footprint overflows the cell, so a
-      // room that cannot fit loses size rather than shape.
+      // instead of squished into one floor. `fitAtGameScale` steps a footprint
+      // that overflows the cell down to a smaller whole multiple (and below 1x
+      // only when nothing else fits), so a room loses size rather than shape.
       const floors = f.floors ?? 1;
       // The metro spans the full lot (the world's lotWidth columns): an aspect so wide that
       // fitting its true width shrinks the tile to nearly nothing and collapses
@@ -85,8 +87,11 @@ function roomEntry(
       // clamps height up to 1, so a sub-pixel box paints a stray hairline. Both
       // are skipped, which is what "a degenerate cell draws nothing" has to mean.
       if (w < 1 || h < 1) return;
-      const x = cx + (cw - w) / 2;
-      const y = cy + (ch - CAPTION_H - h) / 2;
+      // Whole screen pixels for the origin: centering can land on a half pixel,
+      // and with the scale a whole multiple, a whole origin is what keeps every
+      // magnified world pixel on whole screen pixels instead of antialiasing.
+      const x = Math.round(cx + (cw - w) / 2);
+      const y = Math.round(cy + (ch - CAPTION_H - h) / 2);
       // The painters are FIXED-PIXEL: they draw a 17px cubicle whatever box they
       // are handed, because the game always rasterizes a unit at exactly its
       // world size and lets the camera do the zooming. So magnify the way the
@@ -149,8 +154,9 @@ function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
         carDir: cars ? [1, -1] : [],
         load: 1,
       };
-      const x = cx + (cw - w) / 2;
-      const topY = cy + (ch - CAPTION_H - box.h) / 2;
+      // Whole screen pixels for the origin, as in the room path.
+      const x = Math.round(cx + (cw - w) / 2);
+      const topY = Math.round(cy + (ch - CAPTION_H - box.h) / 2);
       const ctx = d.ctx;
       ctx.save();
       ctx.imageSmoothingEnabled = false;
@@ -167,8 +173,10 @@ function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
       for (let i = 0; i < cars; i++) {
         ctx.save();
         // Whole world units so the cab's 1px dressing rows (hazard stripes,
-        // livery pinstripe) sit on the world grid; the outer transform then
-        // magnifies them as a block rather than resampling each row.
+        // livery pinstripe) sit on the world grid. With a whole origin and a
+        // whole-multiple scale, which every shaft gets in a full-size cell,
+        // they land on whole screen pixels too. Only a cell too narrow for 1x
+        // (a narrow phone) scales by a fraction and softens them.
         ctx.translate(0, Math.round((t.top - t.carPositions[i]) * floorH));
         drawCar(ctx, i * 7 + 1, worldW, floorH, i === 0 ? 2 : 0, i === 0 ? "up" : "down", false, kind);
         ctx.restore();
@@ -222,13 +230,14 @@ const ENTRIES: Entry[] = [
 // sideways on a phone (3 columns wide, 2 on a tablet, 1 on a phone).
 let COLS = 3;
 let CELL_W = 300;
-// Tall enough to hold a single-floor room at the full `MAG` magnification: the
-// sprite box is `CELL_H - 8 - CAPTION_H`, so 200 leaves 166 for a box that wants
-// 3 * FLOOR = 135. Kinds that are wider or taller than that shrink uniformly
-// (`fitAtGameScale`), so they render smaller than their neighbors but never at a
-// proportion the game would not draw. Raising `MAG` without raising this would
-// only mean more kinds shrinking, which buys nothing.
-const CELL_H = 200;
+// The sprite box is `CELL_H - 8 - CAPTION_H`, so 220 leaves 186. That holds the
+// tallest subject at the world scale or better: an elevator cell is its three
+// floors of travel plus the landing, 4 * FLOOR = 180px at 1x. A single-floor
+// room takes 3x (135px), a two-floor room 2x (180px), the metro 1x (135px).
+// What still cannot fit at 1x is a footprint wider than the cell's 276px room
+// width (the 28-tile aquatic center, the 31-tile cinema, and most rooms on a
+// narrow phone), which shrinks by a fraction and draws with soft edges.
+const CELL_H = 220;
 const PAD = 12;
 const HEADER_H = 48;
 const SUBHEADER_H = 34;

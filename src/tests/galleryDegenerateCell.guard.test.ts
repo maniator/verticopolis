@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import type { Unit } from "../engine/types";
 import type { Transport } from "../engine/types";
+import { fakeContext, importRemovingWindowListeners } from "./spriteReviewPageHarness";
 
 /**
  * The gallery derives its column width from its container, which measures zero
@@ -17,6 +18,7 @@ import type { Transport } from "../engine/types";
 const rec = vi.hoisted(() => ({
   units: [] as Array<{ u: Unit; w: number; h: number }>,
   transports: [] as Array<{ t: Transport; w: number; floorH: number }>,
+  captions: [] as string[],
 }));
 
 vi.mock("../render/pixelSprites", () => ({ drawRoom: () => {} }));
@@ -32,35 +34,16 @@ vi.mock("../render/sprites", () => ({
 vi.mock("../telemetry", () => ({ injectVercelTelemetry: () => {} }));
 vi.mock("../analytics", () => ({ trackAppAction: () => {} }));
 
-function fakeContext(): CanvasRenderingContext2D {
-  const store: Record<string | symbol, unknown> = {};
-  const ctx: unknown = new Proxy({} as Record<string | symbol, unknown>, {
-    get(_t, prop) {
-      if (prop === "canvas") return { width: 4096, height: 4096, getContext: () => ctx };
-      if (prop === "createLinearGradient" || prop === "createRadialGradient" || prop === "createPattern") {
-        return () => ({ addColorStop: () => {} });
-      }
-      if (prop === "measureText") return () => ({ width: 4 });
-      if (prop in store) return store[prop];
-      return () => {};
-    },
-    set(_t, prop, value) {
-      store[prop] = value;
-      return true;
-    },
-  });
-  return ctx as CanvasRenderingContext2D;
-}
-
 let priorGetContext: PropertyDescriptor | undefined;
 let priorClientWidth: PropertyDescriptor | undefined;
+let removeListeners: () => void = () => {};
 
 beforeAll(async () => {
   priorGetContext = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, "getContext");
   Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
     configurable: true,
     writable: true,
-    value: () => fakeContext(),
+    value: () => fakeContext({ onFillText: (text) => rec.captions.push(text) }),
   });
   // The point of this file: a container that has not laid out yet.
   priorClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
@@ -71,10 +54,11 @@ beforeAll(async () => {
   app.id = "app";
   document.body.append(app);
 
-  await import("../gallery");
+  removeListeners = await importRemovingWindowListeners(() => import("../gallery"));
 });
 
 afterAll(() => {
+  removeListeners();
   if (priorGetContext) Object.defineProperty(HTMLCanvasElement.prototype, "getContext", priorGetContext);
   else Reflect.deleteProperty(HTMLCanvasElement.prototype, "getContext");
   if (priorClientWidth) Object.defineProperty(HTMLElement.prototype, "clientWidth", priorClientWidth);
@@ -84,6 +68,14 @@ afterAll(() => {
 });
 
 describe("the gallery draws nothing into a cell that has not laid out", () => {
+  it("still ran its frame over every cell (the positive control)", () => {
+    // Without this, a page that never reached its cells would pass the two
+    // emptiness checks below for the wrong reason. Each cell prints its caption
+    // whether or not its sprite drew, so the captions prove draw() was reached.
+    expect(rec.captions).toContain("Office (occupied)");
+    expect(rec.captions).toContain("Express Elevator");
+  });
+
   it("hands no room box to a painter when the container measures zero", () => {
     // Not "every box is empty": an empty box must never REACH the painter,
     // because the painter clamps it back up to a visible 1px.

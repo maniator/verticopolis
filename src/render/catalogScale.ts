@@ -13,9 +13,11 @@ import { FLOOR, TILE } from "./scale";
  * is what keeps that from happening a third time.
  *
  * A review page may draw LARGER than the world, because small art is hard to
- * judge, but only by a whole multiple of it, so the aspect survives the
- * magnification. A footprint too big for its cell then shrinks uniformly, which
- * costs size but never shape.
+ * judge, but only by a whole multiple of it, so every world pixel lands on a
+ * whole block of screen pixels. A footprint too big for the requested multiple
+ * steps down to the largest whole multiple that fits. Only a footprint too big
+ * to fit even at the world scale shrinks by a fraction; that keeps its shape but
+ * softens its edges, so a page should size its cells to make that the rare case.
  */
 
 /** One sprite box, sized for a cell. */
@@ -24,35 +26,35 @@ export interface CatalogBox {
   w: number;
   /** Box height in on-screen pixels. */
   h: number;
-  /** On-screen pixels per tile, for callers that place details by tile. */
-  tile: number;
-  /** How much of the world scale the box got: `mag` when the cell had room for
-   *  it, less when the footprint had to shrink to fit. */
+  /** How much of the world scale the box got: a whole number from 1 to `mag`
+   *  when the footprint fits at the world scale, a fraction below 1 when it
+   *  does not, and 0 for an empty box. */
   scale: number;
 }
 
+const EMPTY: CatalogBox = { w: 0, h: 0, scale: 0 };
+
 /**
  * Fit a `tiles` x `floors` footprint into a `maxW` x `maxH` cell at the world's
- * aspect, drawn at up to `mag` times the world scale.
+ * aspect, drawn at up to `mag` times the world scale. `mag` is a whole multiple:
+ * a fraction is floored, and anything below 1 (or not finite) counts as 1.
  *
  * Pass `Infinity` for a budget the caller does not want to bind on (the metro's
  * platform art composes itself into whatever width it is handed, so the gallery
  * takes only its height from here and lets it fill the cell).
  */
 export function fitAtGameScale(tiles: number, floors: number, maxW: number, maxH: number, mag = 1): CatalogBox {
-  // A degenerate footprint has no box rather than a NaN one: both budgets can be
-  // zero on a very narrow viewport, and 0 / 0 would poison every coordinate
-  // downstream instead of simply drawing nothing.
-  // A degenerate or non-finite footprint has no box rather than a NaN one. The
-  // comparison alone would let NaN through (every comparison against NaN is
-  // false), which is the exact coordinate poisoning this guard exists to stop.
-  if (!Number.isFinite(tiles) || !Number.isFinite(floors) || tiles <= 0 || floors <= 0) {
-    return { w: 0, h: 0, tile: 0, scale: 0 };
-  }
-  // Magnification is a WHOLE multiple of world scale, enforced here rather than
-  // trusted to callers: this module exists to hold that invariant, and a
-  // fractional mag would put half a world tile on screen.
+  // A degenerate or non-finite footprint, or a budget that is not a number, has
+  // no box rather than a NaN one. A comparison alone would let NaN through
+  // (every comparison against NaN is false), and a NaN box poisons every
+  // coordinate downstream instead of simply drawing nothing. Infinity is a
+  // legal budget, so the budgets are checked for NaN only.
+  if (!Number.isFinite(tiles) || !Number.isFinite(floors) || tiles <= 0 || floors <= 0) return EMPTY;
+  if (Number.isNaN(maxW) || Number.isNaN(maxH)) return EMPTY;
   const whole = Math.max(1, Math.floor(Number.isFinite(mag) ? mag : 1));
-  const scale = Math.max(0, Math.min(whole, maxW / (tiles * TILE), maxH / (floors * FLOOR)));
-  return { w: tiles * TILE * scale, h: floors * FLOOR * scale, tile: TILE * scale, scale };
+  const fit = Math.min(maxW / (tiles * TILE), maxH / (floors * FLOOR));
+  if (!(fit > 0)) return EMPTY;
+  // Step down through whole multiples; fall below 1 only when nothing else fits.
+  const scale = fit >= 1 ? Math.min(whole, Math.floor(fit)) : fit;
+  return { w: tiles * TILE * scale, h: floors * FLOOR * scale, scale };
 }

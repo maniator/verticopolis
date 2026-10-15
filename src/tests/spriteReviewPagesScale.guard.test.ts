@@ -3,6 +3,7 @@ import { FACILITIES } from "../engine/facilities";
 import { viewWorld } from "../presentation/viewWorld";
 import { FLOOR, TILE } from "../render/scale";
 import type { Transport, Unit } from "../engine/types";
+import { fakeContext, importRemovingWindowListeners } from "./spriteReviewPageHarness";
 
 /**
  * Shift-left guard: the two sprite-review pages draw at the world's proportions.
@@ -13,20 +14,24 @@ import type { Transport, Unit } from "../engine/types";
  * (issue #814): 12 x 44 on one page and 18 x 52 on the other, against a world of
  * 10 x 45. Nothing failed, because nothing was watching.
  *
- * This runs each page for one frame against a recording context and inspects the
- * BOX each sprite was handed, which is the page's whole contribution to how the
- * art reads. The assertion is the aspect (`FLOOR / TILE`), never a pixel size: a
- * page is free to magnify or to shrink a footprint into its cell, and pinning
- * sizes would only relocate the drift instead of catching it.
+ * This runs each page for one frame against a recording context. What reaches
+ * the screen is the box a painter is handed TIMES the context scale the page set
+ * around it, so both halves are checked: every box must carry the world's tiles
+ * per floor, and every scale must be uniform (the same factor on both axes) and
+ * a whole multiple of the world wherever the cell has room for 1x. A page that
+ * drew either half at a pitch of its own fails here. Pixel sizes are never
+ * pinned: pinning them would only relocate the drift instead of catching it.
  */
 
-/** Boxes the pages handed the sprite painters. Hoisted, because the module mocks
- *  below are hoisted above this file's own imports. */
+/** Boxes the pages handed the sprite painters, and the context scales they set,
+ *  tagged by page. Hoisted, because the module mocks below are hoisted above
+ *  this file's own imports. */
 const rec = vi.hoisted(() => ({
+  page: "" as "preview" | "gallery" | "",
   rooms: [] as Array<{ u: Unit; w: number; h: number }>,
   units: [] as Array<{ u: Unit; w: number; h: number }>,
   transports: [] as Array<{ t: Transport; w: number; floorH: number }>,
-  scales: [] as number[],
+  scales: { preview: [] as Array<[number, number]>, gallery: [] as Array<[number, number]> },
 }));
 
 // Recording stand-ins for the painters. What they draw is not this file's
@@ -50,31 +55,6 @@ vi.mock("../render/sprites", () => ({
 vi.mock("../telemetry", () => ({ injectVercelTelemetry: () => {} }));
 vi.mock("../analytics", () => ({ trackAppAction: () => {} }));
 
-/** A 2D-context stand-in that absorbs every call, so neither page needs a real
- *  canvas. Same Proxy shape the service-sprite suite uses. */
-function fakeContext(): CanvasRenderingContext2D {
-  const store: Record<string | symbol, unknown> = {};
-  const ctx: unknown = new Proxy({} as Record<string | symbol, unknown>, {
-    get(_t, prop) {
-      if (prop === "canvas") return { width: 4096, height: 4096, getContext: () => ctx };
-      if (prop === "createLinearGradient" || prop === "createRadialGradient" || prop === "createPattern") {
-        return () => ({ addColorStop: () => {} });
-      }
-      if (prop === "measureText") return () => ({ width: 4 });
-      // The pages magnify by TRANSFORMING the context, not by inflating the box,
-      // so the scale factor is only observable here.
-      if (prop === "scale") return (sx: number) => { rec.scales.push(sx); };
-      if (prop in store) return store[prop];
-      return () => {};
-    },
-    set(_t, prop, value) {
-      store[prop] = value;
-      return true;
-    },
-  });
-  return ctx as CanvasRenderingContext2D;
-}
-
 /** The world's floor pitch, in tiles. Both pages must reproduce this whatever
  *  they magnify or shrink by. */
 const TILES_PER_FLOOR = FLOOR / TILE;
@@ -94,13 +74,19 @@ const isFullLot = (u: Unit): boolean => FACILITIES[u.kind].width >= viewWorld().
 
 let priorGetContext: PropertyDescriptor | undefined;
 let priorClientWidth: PropertyDescriptor | undefined;
+let removeListeners: Array<() => void> = [];
 
 beforeAll(async () => {
   priorGetContext = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, "getContext");
   Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
     configurable: true,
     writable: true,
-    value: () => fakeContext(),
+    value: () =>
+      fakeContext({
+        onScale: (sx, sy) => {
+          if (rec.page) rec.scales[rec.page].push([sx, sy]);
+        },
+      }),
   });
   // The gallery sizes its columns from the container, which measures 0 with no
   // layout engine. Give it a desktop width so it lays out its three columns.
@@ -117,11 +103,16 @@ beforeAll(async () => {
   app.id = "app";
   document.body.append(app);
 
-  await import("../preview");
-  await import("../gallery");
+  rec.page = "preview";
+  removeListeners.push(await importRemovingWindowListeners(() => import("../preview")));
+  rec.page = "gallery";
+  removeListeners.push(await importRemovingWindowListeners(() => import("../gallery")));
+  rec.page = "";
 });
 
 afterAll(() => {
+  for (const remove of removeListeners) remove();
+  removeListeners = [];
   if (priorGetContext) Object.defineProperty(HTMLCanvasElement.prototype, "getContext", priorGetContext);
   else Reflect.deleteProperty(HTMLCanvasElement.prototype, "getContext");
   if (priorClientWidth) Object.defineProperty(HTMLElement.prototype, "clientWidth", priorClientWidth);
@@ -131,7 +122,6 @@ afterAll(() => {
 });
 
 describe("the sprite-review pages draw at the world scale", () => {
-
   it("preview.html gives every room the world's tiles per floor", () => {
     // A page that drew nothing would pass every loop below, so count first.
     expect(rec.rooms.length).toBeGreaterThan(5);
@@ -167,27 +157,34 @@ describe("the sprite-review pages draw at the world scale", () => {
     }
   });
 
-  it("magnifies by a whole multiple of the world scale on both pages", () => {
-    // A page may draw larger than the world so the art is legible, but only by a
-    // whole multiple, or its pixels land between the world's. Individual cells
-    // sit BELOW that ceiling whenever a footprint had to shrink to fit (uniform
-    // shrinking keeps the aspect, which the assertions above already prove), so
-    // what has to be a whole number is each page's ceiling: the magnification
-    // its roomiest cell reaches.
-    // Magnification is applied to the CONTEXT, so the boxes handed to painters
-    // are world-size and carry no scale information at all. Reading the ceiling
-    // off them would assert 1 === 1 forever. The recorded transform is the only
-    // place the real factor exists.
-    expect(rec.scales.length, "no page transformed its context").toBeGreaterThan(10);
-    const ceiling = Math.max(...rec.scales);
-    expect(ceiling, "no cell reaches its page's magnification").toBeGreaterThanOrEqual(1);
-    expect(Number.isInteger(ceiling), `a page magnifies by ${ceiling}x`).toBe(true);
-    // Anything below the ceiling is a footprint that did not fit and shrank
-    // uniformly. Nothing may exceed the ceiling, which would mean a cell
-    // magnified past what the page asked for.
-    for (const s of rec.scales) {
-      expect(s, `a cell scaled to ${s}, past the page ceiling ${ceiling}`).toBeLessThanOrEqual(ceiling);
-      expect(s, "a cell scaled to nothing").toBeGreaterThan(0);
+  it("scales the context uniformly on both pages", () => {
+    // The box half above is world-size by construction, so a page could only
+    // distort the art through its transform. Equal factors on both axes is the
+    // half of the aspect that lives there.
+    for (const page of ["preview", "gallery"] as const) {
+      expect(rec.scales[page].length, `${page} never transformed its context`).toBeGreaterThan(5);
+      for (const [sx, sy] of rec.scales[page]) expect(sy, `${page} scaled ${sx} x ${sy}`).toBe(sx);
     }
+  });
+
+  it("preview.html draws every room at exactly the world scale", () => {
+    // The preview's cells are sized so even the two-floor cinema fits at 1x;
+    // any other factor means a room shrank or a cell lost its height budget.
+    for (const [sx] of rec.scales.preview) expect(sx).toBe(1);
+  });
+
+  it("gallery.html magnifies by whole multiples, up to its ceiling of 3", () => {
+    // A cell may step down from 3x to 2x or 1x when its footprint is too big,
+    // but at or above the world scale only whole multiples keep each world
+    // pixel a whole block of screen pixels. Below 1x is allowed only for a
+    // footprint wider than the cell, so it must be the rare case.
+    const scales = rec.scales.gallery.map(([sx]) => sx);
+    expect(Math.max(...scales)).toBe(3);
+    for (const s of scales) {
+      expect(s, "a cell scaled to nothing").toBeGreaterThan(0);
+      if (s >= 1) expect(Number.isInteger(s), `a cell magnified by ${s}x`).toBe(true);
+    }
+    const fractional = scales.filter((s) => s < 1).length;
+    expect(fractional, "too many gallery cells shrank below the world scale").toBeLessThanOrEqual(3);
   });
 });
