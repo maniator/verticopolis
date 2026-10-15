@@ -13,6 +13,8 @@
 # Axes:
 #   type        — what kind of thing the issue is (mutually exclusive-ish)
 #   mode        — which game mode it touches (Classic = 1994-faithful, Modern = opt-in layer)
+#   priority    - the do-first order (P1 work next, P2 when you next touch the
+#                 area, P3 low or gated); mirrors the backlog row's Priority
 #   state       — where it is in triage
 #   area        - which subsystem it touches (an issue may carry more than one)
 #   contributor — signals aimed at people looking for something to work on
@@ -56,6 +58,17 @@ labels:
   - name: needs-repro
     color: "d4c5f9"
     description: Awaiting a reproduction
+
+  # --- priority ---
+  - name: P1
+    color: "e60000"
+    description: "Priority 1: work next"
+  - name: P2
+    color: "ff8c00"
+    description: "Priority 2: do when you next touch the area"
+  - name: P3
+    color: "b8e600"
+    description: "Priority 3: low, gated, watch-only or awaiting a spec"
 
   # --- area ---
   - name: engine
@@ -121,6 +134,9 @@ labels:
 #   gh label create modern        -c 1d76db -d "Affects Modern (opt-in) towers" --force
 #   gh label create needs-triage  -c fbca04 -d "Not yet reviewed by a maintainer" --force
 #   gh label create needs-repro   -c d4c5f9 -d "Awaiting a reproduction" --force
+#   gh label create P1            -c e60000 -d "Priority 1: work next" --force
+#   gh label create P2            -c ff8c00 -d "Priority 2: do when you next touch the area" --force
+#   gh label create P3            -c b8e600 -d "Priority 3: low, gated, watch-only or awaiting a spec" --force
 #   gh label create engine        -c c5def5 -d "The TypeScript simulation: tenants, demand, stars, events" --force
 #   gh label create engine-rs     -c c5def5 -d "The Rust engine crate, its binding and the conformance lock" --force
 #   gh label create wasm          -c c5def5 -d "The web's WASM host and worker, and the 3.0.0 cutover" --force

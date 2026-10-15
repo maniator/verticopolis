@@ -1,7 +1,6 @@
 name: 📚 Documentation issue
 description: A README, setup, or canon-reference doc is wrong, unclear, or missing.
-title: "[Docs]: "
-labels: ["documentation"]
+labels: ["documentation", "needs-triage"]
 body:
   - type: markdown
     attributes:
