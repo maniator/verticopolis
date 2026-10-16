@@ -136,8 +136,12 @@ Verticopolis has **two test tiers**:
     the `integrationWasm` and `unitWasm` projects, whose setup file hosts
     every `Simulation` a test ticks on the engine
     (story-engine-test-parity, #878). A test that cannot run there is marked
-    with `itTypeScriptOnly(reason)`, and the story's test-mapping table names
-    each one with the same reason. No CI job runs these projects yet.
+    with `itTypeScriptOnly(reason)`; a test that reads only what the
+    engine's frame carries but ticks too often for a full merge after every
+    tick calls `atEngineFrameCadence(reason)` and runs at the host's own
+    cadence. The story's test-mapping table names each one with the same
+    reason. CI runs both projects on every PR (`test-wasm-parity` in
+    `test.yml`).
 
   `npm test` (`vitest run`) runs **both** projects and is the CI gate. Coverage
   stays a single root-level measurement across both projects (see Coverage

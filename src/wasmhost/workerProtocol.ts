@@ -86,6 +86,8 @@ export interface MergePayload {
   save: string;
   telemetry: string;
   housekeeping: string | null;
+  /** `commuteStress()`: the per-origin commute-stress rows. */
+  commute: string;
 }
 
 /** The answer to a frame request. `view` is the engine's frame view, its

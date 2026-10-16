@@ -12,7 +12,7 @@ import { decodeFrame, decodeHeader, type FrameHeader, type FrameView } from "./f
 import { appendEngineLog, applyRecords, checkRecords } from "./frameApply";
 import { setStepGate } from "./stepGate";
 import { mergeSimulation } from "./merge";
-import { adoptTelemetry, type TelemetryDocument } from "./telemetry";
+import { adoptTelemetry, parseCommuteStress, type TelemetryDocument } from "./telemetry";
 import { useTowerCatalogSource } from "../engine/towerCatalog";
 import { catalogFor } from "../engine/catalog";
 import type { Catalog, CatalogWorld } from "../engine/catalogTypes";
@@ -191,6 +191,10 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
 
   const merge = (frame: Pick<FrameView, "header">) => {
     const fresh = Simulation.deserialize(JSON.parse(engine.serialize()));
+    // The per-origin commute-stress averages, live crowd state no save
+    // carries; read before any write, so a bad reply leaves the instance as
+    // it was.
+    const commute = parseCommuteStress(engine.commuteStress());
     const buffer = sim.gameplayEvents;
     try {
       mergeSimulation(sim, fresh, { revision: frame.header.revision, mealOverlayRevision: sim.tower.mealOverlayRevision });
@@ -205,6 +209,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     // likewise left out of the save (the stats screen and diagnostics read it).
     const hk = engine.housekeepingReport();
     sim.economy.adoptHousekeepingReport(hk ? (JSON.parse(hk) as { cleaned: number; leftover: number }) : null);
+    sim.crowd.adoptCommuteStress(commute);
     lastRevision = frame.header.revision;
     host.merges++;
   };

@@ -802,6 +802,14 @@ impl Engine {
             .map(|(cleaned, leftover)| format!(r#"{{"cleaned":{cleaned},"leftover":{leftover}}}"#))
     }
 
+    /// `crowd.commuteStressByFloor`: the per-origin-floor commute-stress
+    /// average as JSON `[[floor, seconds], ...]`, by floor. No save carries
+    /// it; it rebuilds as trips finish, as on the TypeScript engine.
+    #[wasm_bindgen(js_name = commuteStress)]
+    pub fn commute_stress(&self) -> String {
+        self.sim.crowd.commute_stress_json().to_string()
+    }
+
     /// Replace the elevator telemetry with an `elevatorTelemetry` document.
     /// Tooling only (the gallery's engine leg); no game command reaches it.
     #[wasm_bindgen(js_name = seedElevatorTelemetry)]

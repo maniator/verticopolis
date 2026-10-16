@@ -1,7 +1,7 @@
 import { Simulation } from "../engine/Simulation";
 import type { FrameHeader } from "./frameView";
 import { mergeSimulation } from "./merge";
-import { adoptTelemetry, isTelemetryDocument, type TelemetryDocument } from "./telemetry";
+import { adoptTelemetry, isTelemetryDocument, parseCommuteStress, type TelemetryDocument } from "./telemetry";
 import type { MergePayload } from "./workerProtocol";
 
 /**
@@ -15,6 +15,7 @@ export interface ParsedMerge {
   fresh: Simulation;
   telemetry: TelemetryDocument;
   housekeeping: { cleaned: number; leftover: number } | null;
+  commute: [number, number][];
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -28,7 +29,8 @@ export function parseMerge(m: MergePayload): ParsedMerge {
   if (!isTelemetryDocument(telemetry)) throw new Error("merge: the telemetry is not the engine's shape");
   const housekeeping = m.housekeeping ? (JSON.parse(m.housekeeping) as { cleaned: number; leftover: number }) : null;
   if (housekeeping && (typeof housekeeping.cleaned !== "number" || typeof housekeeping.leftover !== "number")) throw new Error("merge: the housekeeping report is not the engine's shape");
-  return { fresh, telemetry, housekeeping };
+  const commute = parseCommuteStress(m.commute);
+  return { fresh, telemetry, housekeeping, commute };
 }
 
 /** A JSON array from a reply whose every item passes `isItem`, or an error
@@ -78,6 +80,7 @@ export function mergeSave(sim: Simulation, m: ParsedMerge, h: FrameHeader): void
   }
   adoptTelemetry(sim, m.telemetry);
   sim.economy.adoptHousekeepingReport(m.housekeeping);
+  sim.crowd.adoptCommuteStress(m.commute);
 }
 
 /** The header fields a fresh reply sets, as the main-thread host sets them. */
