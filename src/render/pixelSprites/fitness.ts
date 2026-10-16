@@ -1,5 +1,5 @@
 import type { Unit } from "../../engine/types";
-import { busyStations, castShadow, personSeated, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
+import { busyStations, castShadow, hash, personSeated, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { artRow, authoredWidth } from "./artScale";
 import { layerBreak } from "./layers";
 
@@ -151,10 +151,16 @@ function drawClimb(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: 
   ctx.fillStyle = shade(look.wall, 18); // the wall panel
   ctx.fillRect(wallX, top, wallW, floorY - top);
   const holdHues = ["#E0407A", "#40C0E0", "#E0C040", "#60D060"];
-  for (let hy = top + 3; hy < floorY - 3; hy += 5) {
-    for (let hx = wallX + 3; hx + 2 < wallX + wallW - 1; hx += 7) {
-      ctx.fillStyle = holdHues[(hx + hy + seed) % holdHues.length];
-      ctx.fillRect(hx + ((hy / 5) % 2), hy, 2, 2);
+  // The holds key on the room's seed and each hold's row and column on the
+  // wall, so the region compositor paints the same wall wherever the room's
+  // region starts. The seed goes through `hash` first:
+  // taken raw modulo the palette, walls on one floor four columns apart would
+  // always match, and a basement room's negative seed would index out of range.
+  const holdShift = Math.floor(hash(seed) * holdHues.length);
+  for (let hy = top + 3, row = 0; hy < floorY - 3; hy += 5, row++) {
+    for (let hx = wallX + 3, col = 0; hx + 2 < wallX + wallW - 1; hx += 7, col++) {
+      ctx.fillStyle = holdHues[(row + col + holdShift) % holdHues.length];
+      ctx.fillRect(hx + (row % 2), hy, 2, 2);
     }
   }
   if (occ > 0) personStanding(ctx, wallX + Math.round(wallW * 0.5), floorY - Math.round((floorY - top) * 0.35), seed);

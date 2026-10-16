@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.35.3
+
+- Room details stay consistent when moving the camera across different parts of the tower.
+
 ## 2.35.2
 
 - Busy rooms fill their seats again. Several had quietly stopped using their last few, and left the people at them undrawn.

@@ -3,7 +3,7 @@ import type { Unit } from "../../engine/types";
 import { paintAnimatedUnit, paintSettledUnit } from "../regionPaint";
 import { FLOOR, TILE } from "../scale";
 import { bake, type Renderer } from "./bake";
-import { ORIGIN_SEEDED, variantPlacements, type Job } from "./catalog";
+import { variantPlacements, type Job } from "./catalog";
 import { compareImages, composeLayered, composeLookup } from "./compose";
 import { lookupRoom, type LiveScene } from "./lookup";
 import type { Image } from "./pixels";
@@ -24,8 +24,9 @@ import type { Sample } from "./samples";
  *
  * Settled rooms are painted at two different offsets inside a larger region
  * canvas, so any art that depends on where its region starts fails here.
- * The kinds known to do that ({@link ORIGIN_SEEDED}) are compared at the
- * per-unit origin, which is the look the atlas carries.
+ * Every sampled settled kind is held to that: room details seed from the
+ * room's floor and column (`src/render/originSeeds.test.ts` sweeps every room
+ * kind and subtype for it).
  */
 
 export interface SampleResult {
@@ -107,7 +108,7 @@ export function verifySample(doc: Document, jobs: readonly Job[], renderer: Rend
   const pictures = [{ label: sample.label, image: composed.image }];
   if (layered) pictures.push({ label: `${sample.label} (depth layers)`, image: layered });
   const animated = unit.state === "fire" || unit.state === "construction";
-  const offsets = animated || ORIGIN_SEEDED.has(unit.kind) ? [null] : REGION_OFFSETS;
+  const offsets = animated ? [null] : REGION_OFFSETS;
   return offsets.flatMap((at) => {
     const ref = webPaint(doc, unit, sample.scene, anim, at);
     return pictures.map((p) => {

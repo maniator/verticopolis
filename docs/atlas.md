@@ -240,11 +240,6 @@ finite atlas can cover. The atlas bakes four sampled placements per kind (the
 metro, which fills the lot, has one); pick one per room, for example from its
 position, and keep it.
 
-A few details in the security office, medical center, housekeeping, sky bar
-and fitness club follow the draw origin in the web game rather than the room's
-position. The atlas carries the look at the origin; see
-`signature.rules.originSeeded`.
-
 The cinema's marquee and screen read the animation clock. The atlas bakes
 each cinema frame at clock 0 and carries the rest as two `cycles`: the
 marquee bulbs swap colors 4 times a second (`marquee`, 2 steps) and the
@@ -635,9 +630,7 @@ layers for the sample room signatures with the reference reader, paints the
 same rooms through the game's own paint functions (`src/render/regionPaint.ts`,
 which the region compositor and the burning-room canvas call), and requires an
 exact pixel match. Settled rooms are painted at two region offsets; burning and
-unbuilt rooms at the per-unit origin the game paints them at; and the five
-origin-seeded kinds at the per-unit origin, the look the atlas carries (the
-game's region paint can differ for them, #915). A control case compares two different
+unbuilt rooms at the per-unit origin the game paints them at. A control case compares two different
 pictures and must report a mismatch. The bake refuses to write a layer that
 would not compose back to the game's pixels. A unit test rebuilds every frame
 and layer from the packed pages through the manifest.

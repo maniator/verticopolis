@@ -21,6 +21,11 @@ const SKY = "#0e1526"; // night sky through the window
 const COUNTER = "#3a2418"; // warm wood bar
 const BOTTLE = ["#e0b040", "#c85050", "#50b0c0", "#a060c0"]; // backlit bottles
 const WINDOW_LIGHT = ["#f0d070", "#f0a850", "#d0d0f0"]; // distant city windows
+/** Whether a skyline window is lit, keyed on room and window position. */
+export function skylineWindowLit(seed: number, building: number, row: number): boolean {
+  return hash(seed * 31 + building * 131 + row * 17) > 0.55;
+}
+
 /** The counter's inset from each wall, shared by its drawn width and its authored one. */
 const BAR_INSET = 3;
 
@@ -48,11 +53,13 @@ export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
     const bh = 4 + Math.round(hash(seed + i * 5) * (winBot - winTop - 5));
     ctx.fillStyle = shade(SKY, 10);
     ctx.fillRect(bx, winBot - bh, 5, bh);
-    // A few lit windows on each building.
-    for (let wy = winBot - bh + 2; wy < winBot - 1; wy += 3) {
-      if (hash(bx * 7 + wy) > 0.55) {
-        ctx.fillStyle = WINDOW_LIGHT[(i + wy) % WINDOW_LIGHT.length];
-        ctx.fillRect(bx + 1 + ((wy & 1) ? 2 : 0), wy, 1, 1);
+    // A few lit windows on each building, picked by `skylineWindowLit`; the
+    // color and stagger use the window's height inside the room.
+    for (let wy = winBot - bh + 2, k = 0; wy < winBot - 1; wy += 3, k++) {
+      const ry = wy - y; // the window's height inside the room
+      if (skylineWindowLit(seed, i, k)) {
+        ctx.fillStyle = WINDOW_LIGHT[(i + ry) % WINDOW_LIGHT.length];
+        ctx.fillRect(bx + 1 + ((ry & 1) ? 2 : 0), wy, 1, 1);
       }
     }
   }
