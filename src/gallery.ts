@@ -2,6 +2,8 @@ import { html, render } from "lit-html";
 import { FACILITIES } from "./engine/facilities";
 import { CLINIC_SUBTYPES, AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "./engine/retailSubtypes";
 import type { FacilityKind, Transport, Unit, UnitState } from "./engine/types";
+import { fitAtGameScale } from "./render/catalogScale";
+import { FLOOR, TILE } from "./render/scale";
 import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites";
 import { pageShell } from "./ui/templates/pageShell";
 import { injectVercelTelemetry } from "./telemetry";
@@ -18,6 +20,20 @@ interface Entry {
   label: string;
   draw(d: DrawCtx, cx: number, cy: number, cw: number, ch: number): void;
 }
+
+/** How much larger than the world a cell may draw. Sprites at world scale are
+ *  too small to judge in a catalog cell, so the page magnifies, and a whole
+ *  multiple is the only magnification that keeps every world pixel a whole
+ *  block of screen pixels. Three is the most a single-floor room gets: 3 * FLOOR
+ *  is 135px, inside the 186px box `CELL_H` leaves, where 4x (180px) would
+ *  crowd it. A footprint that cannot take 3x in its cell steps down to 2x or
+ *  1x (`fitAtGameScale`), so wide rooms and multi-floor kinds draw smaller. */
+const MAG = 3;
+
+/** Height reserved at the bottom of every cell for its caption. Rooms are fitted
+ *  into what is left, so a tall footprint shrinks rather than printing over its
+ *  own label. */
+const CAPTION_H = 26;
 
 function makeUnit(kind: FacilityKind, state: UnitState, occupants: number, id = 1, subtype?: string, floorOverride?: number): Unit {
   const f = FACILITIES[kind];
@@ -54,8 +70,9 @@ function roomEntry(
     draw(d, cx, cy, cw, ch) {
       // Size the cell by the facility's own floor count so a genuinely multi-
       // floor kind (cinema, party hall, metro) shows at its true proportion
-      // instead of squished into one floor. Scale the width down to preserve
-      // aspect if the full height would overflow the cell.
+      // instead of squished into one floor. `fitAtGameScale` steps a footprint
+      // that overflows the cell down to a smaller whole multiple (and below 1x
+      // only when nothing else fits), so a room loses size rather than shape.
       const floors = f.floors ?? 1;
       // The metro spans the full lot (the world's lotWidth columns): an aspect so wide that
       // fitting its true width shrinks the tile to nearly nothing and collapses
@@ -63,20 +80,38 @@ function roomEntry(
       // a whole station into whatever box it is handed), so size it by HEIGHT like
       // the other multi-floor rooms and let it fill the cell width.
       const fullLot = f.width >= viewWorld().lotWidth;
-      const tile = fullLot ? 9 * 2.0 : Math.min(9 * 2.0, (cw - 16) / f.width);
-      let w = fullLot ? cw - 16 : f.width * tile;
-      let h = 26 * (tile / 9) * floors;
-      const maxH = ch - 26;
-      if (h > maxH) {
-        if (!fullLot) w *= maxH / h;
-        h = maxH;
-      }
-      const x = cx + (cw - w) / 2;
-      const y = cy + (ch - 26 - h) / 2 + 4;
-      // Floor strip for context.
+      const box = fitAtGameScale(f.width, floors, fullLot ? Infinity : cw - 16, ch - CAPTION_H, MAG);
+      const w = fullLot ? Math.max(0, cw - 16) : box.w;
+      const h = box.h;
+      // Under 1px is as unusable as zero, and worse than nothing: drawFloor
+      // clamps height up to 1, so a sub-pixel box paints a stray hairline. Both
+      // are skipped, which is what "a degenerate cell draws nothing" has to mean.
+      if (w < 1 || h < 1) return;
+      // Whole screen pixels for the origin: centering can land on a half pixel,
+      // and with the scale a whole multiple, a whole origin is what keeps every
+      // magnified world pixel on whole screen pixels instead of antialiasing.
+      const x = Math.round(cx + (cw - w) / 2);
+      const y = Math.round(cy + (ch - CAPTION_H - h) / 2);
+      // The painters are FIXED-PIXEL: they draw a 17px cubicle whatever box they
+      // are handed, because the game always rasterizes a unit at exactly its
+      // world size and lets the camera do the zooming. So magnify the way the
+      // camera does, by transforming the context, and hand the painter its world
+      // box. Inflating the box instead would grow the room while its furniture
+      // stayed put, which is the same wrong-proportion defect this page was fixed
+      // to stop, just moved from aspect to interior scale.
+      const worldW = fullLot ? w / box.scale : f.width * TILE;
+      const worldH = floors * FLOOR;
+      const ctx = d.ctx;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.translate(x, y);
+      ctx.scale(box.scale, box.scale);
+      // Floor strip for context, in world units like everything else here.
       const floorU = makeUnit("floor", "occupied", 0, 999);
-      drawUnit(d, floorU, x - 6, y, w + 12, h);
-      drawUnit(d, makeUnit(kind, state, occ ?? (state === "occupied" ? f.population : 0), 1, subtype, floorOverride), x, y, w, h);
+      const pad = 6 / box.scale;
+      drawUnit(d, floorU, -pad, 0, worldW + pad * 2, worldH);
+      drawUnit(d, makeUnit(kind, state, occ ?? (state === "occupied" ? f.population : 0), 1, subtype, floorOverride), 0, 0, worldW, worldH);
+      ctx.restore();
     },
   };
 }
@@ -92,8 +127,20 @@ function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
   return {
     label,
     draw(d, cx, cy, cw, ch) {
-      const floorH = Math.min(26 * 1.1, (ch - 26) / (span + 1));
-      const w = f.width * (floorH / 26) * 9 * 1.0;
+      // A shaft is drawn as its span plus the floor it lands on, so it is sized
+      // as a `span + 1` floor footprint and its per-floor pitch falls out of the
+      // fitted box. Same scale as the rooms, so a shaft and a room next to each
+      // other in the catalog are honest about their relative proportions.
+      const floors = span + 1;
+      const box = fitAtGameScale(f.width, floors, cw - 16, ch - CAPTION_H, MAG);
+      // World units, like the room path: the shaft art is fixed-pixel too, so the
+      // context carries the magnification and the painter is handed its true box.
+      const worldW = f.width * TILE;
+      const floorH = FLOOR;
+      const w = box.w;
+      // Same degenerate-cell guard as the room path above: sub-pixel counts as
+      // empty, because drawFloor clamps a zero height up to a visible 1px.
+      if (w < 1 || box.h < 1) return;
       const cars = kind.startsWith("elevator") ? 2 : 0;
       const t: Transport = {
         id: 1,
@@ -107,23 +154,34 @@ function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
         carDir: cars ? [1, -1] : [],
         load: 1,
       };
-      const x = cx + (cw - w) / 2;
-      const topY = cy + (ch - 26 - floorH * (span + 1)) / 2 + 4;
-      // Backing floors so the shaft reads in context.
+      // Whole screen pixels for the origin, as in the room path.
+      const x = Math.round(cx + (cw - w) / 2);
+      const topY = Math.round(cy + (ch - CAPTION_H - box.h) / 2);
+      const ctx = d.ctx;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.translate(x, topY);
+      ctx.scale(box.scale, box.scale);
+      // Backing floors so the shaft reads in context, in world units.
+      const pad = 8 / box.scale;
       for (let i = 0; i <= span; i++) {
-        drawUnit(d, makeUnit("floor", "occupied", 0, 500 + i), x - 8, topY + i * floorH, w + 16, floorH);
+        drawUnit(d, makeUnit("floor", "occupied", 0, 500 + i), -pad, i * floorH, worldW + pad * 2, floorH);
       }
-      drawTransport(d.ctx, t, x, topY, w, floorH);
+      drawTransport(ctx, t, 0, 0, worldW, floorH);
       // Elevator entries also show their cars so the per-kind cab dressing
       // (standard / service / express) is visible in the catalog.
       for (let i = 0; i < cars; i++) {
-        d.ctx.save();
-        // Integer translate so the cab's 1px dressing rows (hazard stripes,
-        // livery pinstripe) land on whole pixels instead of antialiasing.
-        d.ctx.translate(Math.round(x), Math.round(topY + (t.top - t.carPositions[i]) * floorH));
-        drawCar(d.ctx, i * 7 + 1, w, floorH, i === 0 ? 2 : 0, i === 0 ? "up" : "down", false, kind);
-        d.ctx.restore();
+        ctx.save();
+        // Whole world units so the cab's 1px dressing rows (hazard stripes,
+        // livery pinstripe) sit on the world grid. With a whole origin and a
+        // whole-multiple scale, which every shaft gets in a full-size cell,
+        // they land on whole screen pixels too. Only a cell too narrow for 1x
+        // (a narrow phone) scales by a fraction and softens them.
+        ctx.translate(0, Math.round((t.top - t.carPositions[i]) * floorH));
+        drawCar(ctx, i * 7 + 1, worldW, floorH, i === 0 ? 2 : 0, i === 0 ? "up" : "down", false, kind);
+        ctx.restore();
       }
+      ctx.restore();
     },
   };
 }
@@ -172,12 +230,14 @@ const ENTRIES: Entry[] = [
 // sideways on a phone (3 columns wide, 2 on a tablet, 1 on a phone).
 let COLS = 3;
 let CELL_W = 300;
-// Tall enough that even the tallest kind renders at its TRUE proportion, never
-// shrunk to fit: a three-floor metro at full tile is 26 * 2 * 3 = 156px, and the
-// sprite box is `CELL_H - 8 - 26`, so this clears it (200 - 34 = 166 >= 156). The
-// two-floor kinds (cinema, party hall) and every single-floor room sit inside the
-// same box with headroom, so no cell is vertically compressed next to another.
-const CELL_H = 200;
+// The sprite box is `CELL_H - 8 - CAPTION_H`, so 220 leaves 186. That holds the
+// tallest subject at the world scale or better: an elevator cell is its three
+// floors of travel plus the landing, 4 * FLOOR = 180px at 1x. A single-floor
+// room takes 3x (135px), a two-floor room 2x (180px), the metro 1x (135px).
+// What still cannot fit at 1x is a footprint wider than the cell's 276px room
+// width (the 28-tile aquatic center, the 31-tile cinema, and most rooms on a
+// narrow phone), which shrinks by a fraction and draws with soft edges.
+const CELL_H = 220;
 const PAD = 12;
 const HEADER_H = 48;
 const SUBHEADER_H = 34;

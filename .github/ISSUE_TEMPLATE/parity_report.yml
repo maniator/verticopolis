@@ -1,7 +1,6 @@
 name: 🏙️ SimTower parity report
 description: Verticopolis behaves differently from the 1994 original SimTower.
-title: "[Parity]: "
-labels: ["parity", "classic"]
+labels: ["parity", "classic", "needs-triage"]
 body:
   - type: markdown
     attributes:

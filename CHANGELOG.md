@@ -16,6 +16,7 @@ notes, never a past version's.
 ## 2.35.0
 
 - Busy rooms fill their seats again. Several had quietly stopped using their last few, and left the people at them undrawn.
+- The Sprite Gallery now shows every room, shaft, and elevator at the same proportions as your tower.
 
 ## 2.34.1
 
