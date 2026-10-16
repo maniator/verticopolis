@@ -152,8 +152,10 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 - **Backlog rows mirror to GitHub issues (standing rule, 2026-07-15).** Every
   unresolved curated row in `_bmad-output/implementation-artifacts/backlog.md`
   carries its issue number in the `GH` column. Create the matching issue when a
-  row lands (template title prefix, `[P1]`-`[P3]` tag in the title, row notes as
-  the body) and close it when the row finishes. The full rule lives in the
+  row lands (a plain title, a type label and a `P1`-`P3` label, row notes as
+  the body) and close it when the row finishes. The row's `Priority` owns the
+  P label: `backlog-priority-labels.yml` re-syncs it whenever a push to `main`
+  changes the backlog, and weekly. The full rule lives in the
   backlog's "How items flow" section; `src/tests/backlogIssueMirror.test.ts`
   enforces the row half of the invariant (row shape, status vocabulary, refs
   present on unresolved rows, cleared on finished rows, and unique).

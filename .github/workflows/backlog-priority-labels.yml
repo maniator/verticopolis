@@ -1,0 +1,74 @@
+name: Backlog priority labels
+
+# Keep each mirrored issue's P1/P2/P3 label in step with its backlog row.
+#
+# The backlog's curated table (_bmad-output/implementation-artifacts/backlog.md)
+# is the source of truth for an issue's priority. When a push to main changes
+# it, and weekly, scripts/backlog-priority-labels.mjs reads the table and sets
+# the matching P label on each OPEN issue a row cites in its GH column, removing
+# any other P label and `needs-triage` (a row means the issue has been triaged).
+# Issues no row cites (a community report, say) keep the P label triage gave
+# them, and every other label stays. The weekly run puts back any P label
+# someone changed by hand on a mirrored issue.
+#
+# The job writes issues, so it only ever runs from main in this repository:
+# never on pull_request or pull_request_target (a fork could otherwise write
+# labels by editing the backlog in a PR), never for a manual run started on
+# another branch, and never on a fork's own schedule. It runs the repository's
+# own script with Node and no install step. The script makes its GitHub calls
+# through the `gh` CLI that GitHub preinstalls on its hosted runners, so the
+# token reaches only our script, Node and GitHub's own CLI (its version follows
+# the runner image).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "_bmad-output/implementation-artifacts/backlog.md"
+      - "scripts/backlog-priority-labels.mjs"
+      - ".github/workflows/backlog-priority-labels.yml"
+  schedule:
+    # Mondays at 13:07 UTC.
+    - cron: "7 13 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print the plan without changing any label"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: backlog-priority-labels
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'maniator/verticopolis' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # A full relabel of every row-cited issue is about 400 paced writes.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+
+      # gh is preinstalled on GitHub-hosted runners and reads the job token
+      # from GH_TOKEN; the script passes the repository explicitly, so no git
+      # remote or `gh auth login` is involved.
+      - name: Show the gh version
+        run: gh --version
+
+      - name: Sync P labels from the backlog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: node scripts/backlog-priority-labels.mjs $DRY_RUN

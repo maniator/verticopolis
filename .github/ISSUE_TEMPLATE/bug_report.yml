@@ -1,6 +1,5 @@
 name: 🐛 Bug report
 description: Something in the game behaves incorrectly or crashes.
-title: "[Bug]: "
 labels: ["bug", "needs-triage"]
 body:
   - type: markdown
