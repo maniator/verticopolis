@@ -1,4 +1,5 @@
 import type { FacilityKind, Unit } from "../../engine/types";
+import { visibleOccupants } from "../../engine/Crowd";
 import { viewWorld } from "../../presentation/viewWorld";
 
 /**
@@ -74,6 +75,63 @@ export function hash(seed: number): number {
   x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d);
   x = Math.imul(x ^ (x >>> 13), 0x297a2d39);
   return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+
+/**
+ * A room's occupancy as its art has to read it: whole people.
+ *
+ * `visibleOccupants` is the people system's canonical figure and can arrive
+ * fractional from a forged save, because nothing upstream rounds it. Art cannot
+ * draw four fifths of a person, so it has to pick a whole number, and a room
+ * that draws one gated figure as well as a row (a barber's seated client, a
+ * spa's tub guest, a golfer, the staff who appear because the room is open) has
+ * to pick it in one place or the two halves disagree.
+ *
+ * The rule is the one every other room's `i < n` figure loop already follows,
+ * and the one the atlas reader (`atlas/lookup.ts`) uses to pick a baked crowd:
+ * round UP. Rounding down here while the atlas rounds up would show a native
+ * frontend one more person than the web for the same room. A count that is not
+ * finite reads as nobody, and a corrupt `outForMeal` reads as nobody out, again
+ * as the atlas reads them. `roomOccupants.test.ts` holds the two in step.
+ *
+ * Used by the room kinds whose crowds the #813 fix rewired. The others read
+ * `visibleOccupants` directly and reach the same whole number through their
+ * loops.
+ */
+export function roomOccupants(u: { occupants: number; outForMeal?: number }): number {
+  const occupants = Number.isFinite(u.occupants) ? Math.max(0, u.occupants) : 0;
+  const out = u.outForMeal !== undefined && Number.isFinite(u.outForMeal)
+    ? Math.min(occupants, Math.max(0, u.outForMeal))
+    : 0;
+  return Math.ceil(visibleOccupants({ occupants, outForMeal: out }));
+}
+
+/**
+ * Which of a room's `stations` (stools, dance-floor spots, machines, mats,
+ * bikes, places on a mat) have someone at them: a stable pseudo-random subset of
+ * exactly `min(people, stations)` of them.
+ *
+ * The count is the point. Deciding each station on its own hash roll broke the
+ * honest-occupancy rule in both directions at once: a hall with two visitors
+ * could paint four figures at one column and none at the next, and where the
+ * loop counted a skipped station against the occupancy anyway, people who were
+ * in the room were simply never drawn.
+ *
+ * WHICH stations matters almost as much. Filling from one end would satisfy the
+ * count and turn a quiet room into a solid block of figures against one wall
+ * with an empty half beside it, so the subset is chosen by ranking the stations
+ * on their hash and taking the busiest. That spreads a small crowd over the
+ * whole row and is still a pure function of the room's own seed, which is what
+ * lets these rooms bake to a cached sprite.
+ */
+export function busyStations(stations: number, people: number, seed: number): Set<number> {
+  // Floored so a nonsense count can never claim a station it does not fill.
+  // Every caller hands in a whole number from `roomOccupants` already.
+  const want = Math.max(0, Math.min(Math.floor(people), stations));
+  if (!(want > 0)) return new Set(); // nobody here, or a nonsense count
+  const ranked = Array.from({ length: stations }, (_, i) => i);
+  ranked.sort((a, b) => hash(seed + b) - hash(seed + a) || a - b); // index breaks a tie
+  return new Set(ranked.slice(0, want));
 }
 
 // ---- Per-unit variety (geo-seeded) ----------------------------------------
