@@ -80,11 +80,15 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 - **The backlog mirrors to GitHub issues (standing rule, 2026-07-15).** Every
   unresolved curated row in `_bmad-output/implementation-artifacts/backlog.md`
   carries its issue number in the `GH` column: create the matching issue when a
-  row lands (template title prefix, `[P1]`-`[P3]` tag in the title, row notes
-  as the body) and close the issue when the row finishes. Only unfinished work
-  keeps a live issue, and a doc may claim something is "tracked in the backlog"
-  only when a real row exists. The full rule lives in the backlog's "How items
-  flow"; `src/tests/backlogIssueMirror.test.ts` enforces the row half in CI.
+  row lands (a plain title, a type label and a `P1`-`P3` label, row notes as
+  the body) and close the issue when the row finishes. The row's `Priority`
+  owns the P label: `backlog-priority-labels.yml` re-syncs it whenever a push
+  to `main` changes the backlog, and weekly. To change a priority, edit the
+  row.
+  Only unfinished work keeps a live issue, and a doc may claim something is
+  "tracked in the backlog" only when a real row exists. The full rule lives in
+  the backlog's "How items flow"; `src/tests/backlogIssueMirror.test.ts`
+  enforces the row half in CI.
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
 - **Keep a branch's own history readable before it merges.** A tidy branch is
   a handful of commits that each state a real step. When review nitpicks pile

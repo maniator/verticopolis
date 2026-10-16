@@ -16,6 +16,7 @@ notes, never a past version's.
 ## 2.35.0
 
 - The parking spaces, ramp, security office, clinic, housekeeping room, and recycling center are drawn on the current pixel grid, so the camera monitors, the folded linen, the clinic's bottles and the hazard tape are evenly spaced instead of drifting a pixel here and there.
+- The Sprite Gallery now shows every room, shaft, and elevator at the same proportions as your tower.
 
 ## 2.34.1
 
