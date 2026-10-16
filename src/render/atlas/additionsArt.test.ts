@@ -68,9 +68,11 @@ describe("the recycling center's fill breaks", () => {
   const same = (a: number, b: number) => JSON.stringify(recyclingLook(a)) === JSON.stringify(recyclingLook(b));
 
   it("are ascending, each the first fill of a new look", () => {
-    // 17 bags and 63 gauge rows (the 9th bag and the 32nd row both arrive
-    // at exactly 0.5), the second row past 0.5, amber past 0.7, FULL at 1.
-    expect(RECYCLE_BREAKS).toHaveLength(17 + 63 - 1 + 3);
+    // 14 bags and 65 gauge rows, the second row past 0.5, amber past 0.7,
+    // FULL at 1. No bag and row ever arrive together: bag k comes at
+    // (k - 0.5) / 14 and row j at (j - 0.5) / 65, and 65(2k - 1) is odd
+    // while 14(2j - 1) is even. The 33rd row arrives at exactly 0.5.
+    expect(RECYCLE_BREAKS).toHaveLength(14 + 65 + 3);
     for (let i = 0; i < RECYCLE_BREAKS.length; i++) {
       const b = RECYCLE_BREAKS[i];
       if (i > 0) expect(b).toBeGreaterThan(RECYCLE_BREAKS[i - 1]);
