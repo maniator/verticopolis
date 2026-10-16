@@ -1,5 +1,5 @@
 import type { Unit } from "../../engine/types";
-import { busyStations, castShadow, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
+import { busyStations, castShadow, hash, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { artRow, authoredWidth } from "./artScale";
 import { layerBreak, layerEnd } from "./layers";
 
