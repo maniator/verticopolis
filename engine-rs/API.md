@@ -52,6 +52,13 @@ it on only to prove conformance, as `consumer/` does:
 verticopolis-engine = { git = "https://github.com/maniator/verticopolis", rev = "<sha>", features = ["conformance"] }
 ```
 
+The JavaScript binding's exports carry tiers of their own, separate from
+the crate tiers on this page: player commands, restores and reads, and the
+relay, test and seed ops that skip the charge rules. The table is
+`src/dualrun/exportTiers.ts`; a new export picks a tier there, and
+`src/tests/bindingExportTiers.guard.test.ts` keeps the third tier out of the
+game's UI (#946).
+
 The build needs the Rust toolchain in `Cargo.toml` (`rust-version`) and
 the `engine-rs/` and `conformance/` directories (the event catalog is
 compiled in from there). It needs no Node.js, no npm and nothing else from
@@ -95,7 +102,7 @@ tier 2, the harness a host uses to prove conformance.
 | Start a game | `sim::Simulation::new_game(seed, GameMode::Classic)`, or `new_game_with(seed, mode, calendar, start_unbridged)` |
 | Advance time | `sim.tick(dt_minutes)`: any `dt`, split into steps that never skip an hour. Same seed, same commands and the same sequence of `dt` give the same game |
 | Quote a placement | `sim.can_build(kind, floor, x)`: `{ ok, reason, cost }`, the dry run `build` makes, with the full price. `sim.can_build_transport(kind, x, bottom, top)` is the same for a shaft, the dry run `build_transport` makes: an elevator costs the catalog `cost` plus `transportFloorCost` for each floor past its first, stairs and escalators the catalog `cost`. The price is a shaft's only when the kind is a transport and `top` is above `bottom`; the engine refuses anything else |
-| Player commands | `build`, `build_transport`, `sell_at`, `toggle_auto_bridge` (`build.rs`); `add_car`, `remove_car`, `extend_transport`, `remove_facility` (`charges.rs`), which charge or refund and report the money moved; `adjust_rent`, `set_no_rate`, `price_unit`, `apply_rent_batch` (`rent.rs`); `resolve_choice`, `set_film_policy` (`events.rs`) |
+| Player commands | `build`, `build_transport`, `sell_at`, `toggle_auto_bridge` (`build.rs`); `add_car`, `remove_car`, `extend_transport`, `remove_facility` (`charges.rs`), which charge or refund and report the money moved, with `begin_extend` and `end_extend` around a drag so `extend_transport` bills a wiggle once against the engine-held mark; `adjust_rent`, `set_no_rate`, `price_unit`, `apply_rent_batch` (`rent.rs`); `resolve_choice`, `set_film_policy` (`events.rs`) |
 | Read state | the public fields (`money`, `star`, `clock`, `tower`, `crowd`, `log`, ...) and `population()`; read them, never write them |
 | Read a frame | `frame::frame_view(&sim)`: every value a renderer reads between two structural syncs (clock, money, rating, effects, then one record per person, per unit and per shaft with its cars) as one flat `Vec<f64>`, laid out in `src/frame.rs`. Read it by name: the slots in `frame::header`, `frame::person`, `frame::unit`, `frame::transport` and `frame::car` (`frame::header::MONEY`, `frame::person::ROUTINE`, ...), and the record widths `FRAME_HEADER`, `PERSON_FIXED`, `UNIT_RECORD`, `TRANSPORT_FIXED` and `CAR_RECORD`; a routine code of `UNKNOWN_ROUTINE` means the engine has a routine the layout does not name yet, and a decoder should refuse it. `frame::log_since(&sim, seq)` returns the log entries numbered after `seq`. The JavaScript binding passes the same frame across as one typed array |
 | Gameplay events | `sim.gameplay.drain()` after each frame; `to_json()` on each event; names and payloads are listed in `conformance/events/catalog.json` (`gameplay::CATALOG_JSON`, checked with `check_event`). The buffer holds `GAMEPLAY_RING_CAP` events and counts any it had to drop in `sim.gameplay.dropped` |

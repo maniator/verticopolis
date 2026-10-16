@@ -18,8 +18,9 @@ import type { Sample } from "./samples";
  * threads through its `DrawCtx`. The two must match pixel for pixel.
  *
  * A room frame with depth layers is also composed through them (the shell
- * and its occupant steps, then the furniture and its occupant steps) and held
- * to the same paint.
+ * and its occupant steps, then its cycles, then the furniture and its
+ * occupant steps) and held to the same paint. A cinema sample at a clock
+ * other than 0 checks its marquee and screen cycles.
  *
  * Settled rooms are painted at two different offsets inside a larger region
  * canvas, so any art that depends on where its region starts fails here.
@@ -88,11 +89,13 @@ export function verifySample(doc: Document, jobs: readonly Job[], renderer: Rend
     pendingIncome: 0,
     label: "",
   };
-  const found = lookupRoom(unit, sample.scene, sample.variant);
+  const found = lookupRoom(unit, sample.scene, sample.variant, { recyclingEighths: sample.eighths });
   const jobName = "animation" in found ? found.animation : found.frame;
   const job = jobs.find((j) => j.name === jobName);
   if (!job) throw new Error(`no job ${jobName}`);
-  let anim = 0;
+  // A still room is painted at the scene's clock (the cinema's marquee and
+  // screen read it), an animated one at its loop frame's.
+  let anim = sample.scene.clock ?? 0;
   if (job.type === "anim") {
     const spec = job.frames[sample.frame ?? 0];
     if (!spec || spec.p !== "unit") throw new Error(`no frame ${sample.frame} in ${jobName}`);
@@ -101,7 +104,7 @@ export function verifySample(doc: Document, jobs: readonly Job[], renderer: Rend
   const baked = bake([job], renderer);
   const composed = composeLookup(baked, found, sample.frame ?? 0);
   const rec = baked.frames.find((f) => f.name === composed.name);
-  const layered = rec?.layers && !("animation" in found) ? composeLayered(baked, rec, found.chains, found.overlays) : null;
+  const layered = rec?.layers && !("animation" in found) ? composeLayered(baked, rec, found.chains, found.overlays, false, found.cycles) : null;
   const pictures = [{ label: sample.label, image: composed.image }];
   if (layered) pictures.push({ label: `${sample.label} (depth layers)`, image: layered });
   const animated = unit.state === "fire" || unit.state === "construction";

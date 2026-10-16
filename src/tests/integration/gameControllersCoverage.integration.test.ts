@@ -729,7 +729,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(last(f.toasts)).toEqual({ text: "Transport shafts cannot overlap.", kind: "bad" });
   });
 
-  it("extendSelectedTo bills only floors past the drag's high-water mark; wiggles re-bill nothing", () => {
+  it("extendSelectedTo bills only floors past the drag's engine-held mark; wiggles re-bill nothing", () => {
     sel = { type: "transport", id: lift.id };
     const before = sim.money;
     editor.extendSelectedTo("up", 4); // 1..2 → 1..4: two new floors billed
@@ -740,7 +740,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(lift.top).toBe(3);
     expect(before - sim.money).toBe(2 * ECON.transportFloorCost);
     expect(last(f.sfx)).toBe("click");
-    editor.extendSelectedTo("up", 4); // …and regrowing within the hwm re-bills nothing
+    editor.extendSelectedTo("up", 4); // …and regrowing within the mark re-bills nothing
     expect(lift.top).toBe(4);
     expect(before - sim.money).toBe(2 * ECON.transportFloorCost);
     editor.extendSelectedTo("up", 4); // no change at all: silent early return
@@ -749,13 +749,28 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(undo.captures).toEqual(["Extend"]); // ONE capture for the whole drag
     // endExtend closes the gesture: the next drag re-captures. Floor 5 is open
     // sky, but the extend now auto-lays the floor behind it (rests on floor 4),
-    // so the shaft grows to 5 and bills the one new floor past the fresh hwm.
+    // so the shaft grows to 5 and bills the one new floor past the fresh mark.
     editor.endExtend();
     editor.extendSelectedTo("up", 5);
     expect(lift.top).toBe(5);
     expect(before - sim.money).toBe(3 * ECON.transportFloorCost);
     expect(undo.captures).toEqual(["Extend", "Extend"]);
     for (let i = 0; i < 4; i++) expect(sim.tower.structureKindAt(5, 58 + i)).toBe("floor");
+    // The engine holds the mark (#990): the drag opened a gesture on the sim,
+    // and endExtend closed it, so a shrink and regrow after it bills again.
+    editor.extendSelectedTo("up", 4);
+    editor.endExtend();
+    sim.extendTransport(lift.id, "up", 5);
+    expect(before - sim.money).toBe(4 * ECON.transportFloorCost);
+    // A one-floor press while a drag's gesture is still open (its pointer-up
+    // lost, #1014) is a step of that gesture: a floor the drag already paid
+    // for is not billed twice.
+    editor.extendSelectedTo("up", 6); // paid floor 6
+    editor.extendSelectedTo("up", 5); // shrank back, the gesture still open
+    render(transportEditorTemplate(sim, lift), root);
+    editor.handleEditAction("extendUp", root);
+    expect(lift.top).toBe(6);
+    expect(before - sim.money).toBe(5 * ECON.transportFloorCost);
   });
 
   it("a tower swapped in mid-drag starts a fresh high-water mark, so nothing grows unbilled", () => {

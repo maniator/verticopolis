@@ -6,7 +6,7 @@ import type { FacilityKind } from "../../engine/types";
 import { withLayerHook } from "../pixelSprites/layers";
 import { roomJobs, roomKinds, type StillJob } from "./catalog";
 import { LOBBY_VARIANTS } from "../sprites";
-import { structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
+import { legacyShaftJobs, structureJobs, transportJobs, vehicleJobs } from "./catalogExtras";
 import { paint, type PaintSpec, type UnitPaint } from "./paint";
 
 /** A 2D context that accepts every call (the pixels are checked in a real
@@ -101,7 +101,7 @@ describe("depth-layer marks on the lobby", () => {
 
 describe("depth-layer marks on the cabs and the metro train", () => {
   it("breaks every cab and train frame once, at every rider count, and ends the cab's riders", () => {
-    const jobs = [...transportJobs(), ...vehicleJobs()].filter((j): j is StillJob => j.type === "still" && j.layers === true);
+    const jobs = [...transportJobs(), ...legacyShaftJobs(), ...vehicleJobs()].filter((j): j is StillJob => j.type === "still" && j.layers === true);
     const names = jobs.map((j) => j.name);
     expect(names.some((n) => n.startsWith("car/"))).toBe(true);
     expect(names.filter((n) => n.startsWith("vehicle/metrotrain/"))).toHaveLength(2);
@@ -141,7 +141,7 @@ describe("the vehicles' draw order", () => {
     expect(tm).not.toContain("#C6CCD4");
     expect(tf).toContain("#C6CCD4"); // the body comes after
     // Every cab kind, arrow and FULL state, at its fullest.
-    const cabs = transportJobs().filter((j): j is StillJob => j.type === "still" && j.name.startsWith("car/"));
+    const cabs = [...transportJobs(), ...legacyShaftJobs()].filter((j): j is StillJob => j.type === "still" && j.name.startsWith("car/"));
     expect(cabs.length).toBeGreaterThan(0);
     for (const cab of cabs) {
       const steps = cab.chains!.riders.steps;
@@ -149,6 +149,54 @@ describe("the vehicles' draw order", () => {
       expect(cm.length, cab.name).toBeGreaterThan(0);
       expect(cm.some((c) => c.startsWith("rgba(40,44,54")), cab.name).toBe(false);
       expect(cf.some((c) => c.startsWith("rgba(40,44,54")), cab.name).toBe(true); // the door frames
+    }
+  });
+});
+
+describe("the cab floor band", () => {
+  it("stays on the shell because the riders' feet cover every band row (#999)", () => {
+    // Each fillRect by phase: before the break, between the marks, after the end.
+    type Rect = { x: number; y: number; w: number; h: number };
+    const rects = (spec: PaintSpec, w: number, h: number) => {
+      const out: Rect[][] = [[], [], []];
+      let phase = 0;
+      const ctx = sinkCtx();
+      (ctx as unknown as { fillRect: (x: number, y: number, w: number, h: number) => void }).fillRect = (x, y, rw, rh) => out[phase].push({ x, y, w: rw, h: rh });
+      withLayerHook({ shellEnd: () => (phase = 1), furnitureEnd: () => (phase = 2) }, () => paint(ctx, spec, w, h));
+      return out;
+    };
+    const banded = transportJobs().filter(
+      (j): j is StillJob => j.type === "still" && (j.name.startsWith("car/elevatorService/") || j.name.startsWith("car/elevatorExpress/")),
+    );
+    expect(banded.some((j) => j.name.startsWith("car/elevatorService/"))).toBe(true);
+    expect(banded.some((j) => j.name.startsWith("car/elevatorExpress/"))).toBe(true);
+    for (const cab of banded) {
+      const bandRows = [cab.h - 5, cab.h - 4, cab.h - 3];
+      const covered = new Set<number>();
+      expect(cab.chains?.riders, cab.name).toBeDefined();
+      // The door frames and the center seam, the only front marks that reach the band.
+      const frames = (r: Rect) => r.w === 1 && (r.x === 2 || r.x === cab.w - 3 || r.x === cab.w / 2 - 0.5);
+      for (const step of cab.chains!.riders.steps) {
+        const [shell, riders, front] = rects(step, cab.w, cab.h);
+        // The band (a 3-row plate across the cab bottom) is painted before the break...
+        expect(shell.some((r) => r.x === 2 && r.y === cab.h - 5 && r.w === cab.w - 4 && r.h === 3), cab.name).toBe(true);
+        // ...the front marks still come after the riders...
+        expect(front.length, cab.name).toBeGreaterThan(0);
+        // ...and none of them paints over the band but the frames and the seam.
+        expect(front.filter((r) => r.y + r.h > cab.h - 5 && !frames(r)), cab.name).toEqual([]);
+        for (const r of riders) {
+          // No rider reaches the right side frame (its door frame is at w - 3);
+          // the first rider's contact shadow does meet the left one at x 2.
+          expect(r.x + r.w, cab.name).toBeLessThanOrEqual(cab.w - 3);
+          if (r.x >= cab.w - 2 || r.x + r.w <= 2) continue; // beside the band
+          for (const row of bandRows) if (row >= r.y && row < r.y + r.h) covered.add(row);
+        }
+      }
+      // A rider's legs reach the band's upper rows and its contact shadow the
+      // bottom one, so no whole band row could move to the front without
+      // changing a pixel of the flat frame: the band stays on the shell, as the
+      // game draws it (split by column, it would tear where the layers part).
+      expect([...covered].sort((a, b) => a - b), cab.name).toEqual(bandRows);
     }
   });
 });

@@ -233,7 +233,7 @@ pub fn edit(sim: &mut Simulation) -> Result<(), String> {
     for x in ELEVATOR_X..ELEVATOR_X + 6 {
         check(sim.build(Kind::Floor, 4, x).ok, "floor tiles on floor 4")?;
     }
-    let r = sim.extend_transport(elevator, ExtendEnd::Up, 4, None);
+    let r = sim.extend_transport(elevator, ExtendEnd::Up, 4);
     check(
         r.charge.ok && r.top == 4 && r.added == 1,
         "the elevator extends one floor",

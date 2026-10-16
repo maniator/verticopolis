@@ -1,3 +1,4 @@
+import { settleEngine } from "../wasmhost/stepGate";
 import type { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
 import type { UI } from "../ui/UI";
@@ -77,9 +78,18 @@ export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simul
     deps.ui.toast("The export is not responding. You can try exporting again.", "bad");
   }, EXPORT_WATCHDOG_MS);
   try {
-    const sim = deps.getSim();
-    // stampView FIRST: the export must carry the live camera, or towers
-    // export at a stale view.
+    let settling = deps.getSim();
+    // The worker host's exact save first (a no-op on every other engine),
+    // then the live camera, right before the save, or towers export at a
+    // stale view.
+    await settleEngine(settling);
+    // The tower the app holds now (one adopted during the wait is the one
+    // the player sees, so it is the one exported).
+    let sim = deps.getSim();
+    for (let tries = 0; sim !== settling && tries < 3; tries++) {
+      await settleEngine(sim);
+      [settling, sim] = [sim, deps.getSim()];
+    }
     stampView(sim);
     const file = await SaveGame.export(sim);
     // A download that failed has already said so (GH #997); the success line

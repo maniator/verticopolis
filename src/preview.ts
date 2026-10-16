@@ -1,5 +1,7 @@
 import { FACILITIES } from "./engine/facilities";
 import type { FacilityKind, Unit, UnitState } from "./engine/types";
+import { fitAtGameScale } from "./render/catalogScale";
+import { FLOOR, TILE } from "./render/scale";
 import { drawRoom, type RoomCtx } from "./render/pixelSprites";
 import { catalogFor } from "./engine/catalog";
 import { bindViewWorld } from "./presentation/viewWorld";
@@ -48,11 +50,25 @@ function makeUnit(e: Entry): Unit {
   };
 }
 
-const TILE = 12; // on-screen px per tile, matching the game scale feel
 const COLS = 2;
 const CELL_W = 440;
-const CELL_H = 110;
+// Tall enough that the tallest entry, the two-floor cinema, fits at the world
+// scale: its room budget (below) is 132 - 14 - 4 - 24 = 90, exactly 2 * FLOOR.
+// Any shorter and the cinema shrinks by a fraction, which decimates its seat
+// rows and balcony rail on the one entry that most needs judging.
+const CELL_H = 132;
 const PAD = 14;
+// Rooms draw at the world's own scale, so the page shows what the game shows and
+// any two cells can be compared by eye. 2x would be more legible, but the
+// cinema's room budget would then need 180px, twice the 90px this row affords.
+const MAG = 1;
+/** Where the room box starts inside its cell, and what has to clear underneath
+ *  it: the floor slab, then the caption band. Together these are the room's
+ *  height budget, so a room too tall for them shrinks instead of overprinting
+ *  its own label. */
+const ROOM_TOP = 14;
+const SLAB_H = 4;
+const CAPTION_H = 24;
 
 const canvas = document.getElementById("preview") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
@@ -82,19 +98,41 @@ function frame() {
     const u = makeUnit(e);
     const lit = e.hour >= 17 || e.hour < 6;
     const d: RoomCtx = { ctx, lit, anim, hour: e.hour };
-    const w = Math.min(CELL_W - 28, u.width * TILE);
-    const h = 44;
-    const rx = cx + (CELL_W - 8 - w) / 2;
-    const ry = cy + 14;
-    // Floor slab under the room for context.
-    ctx.fillStyle = "#9a9483";
-    ctx.fillRect(rx - 6, ry + h, w + 12, 4);
-    drawRoom(d, u, rx, ry, w, h);
+    // Size by the facility's own footprint, its floor count included: a cinema
+    // is two floors tall, and drawing it one floor tall squashed art the game
+    // never squashes.
+    const floors = FACILITIES[e.kind].floors ?? 1;
+    const box = fitAtGameScale(u.width, floors, CELL_W - 28, CELL_H - ROOM_TOP - SLAB_H - CAPTION_H, MAG);
+    // A box under 1px draws nothing, but the caption below still prints, so a
+    // missing room reads as missing rather than as a gap in the grid.
+    if (box.w >= 1 && box.h >= 1) {
+      // Whole pixels for the box and the slab alike, so both start on the same
+      // column and the room's 1px edges stay sharp. At 1x the box is already
+      // whole; the rounding only matters if an entry ever has to shrink.
+      const rx = Math.round(cx + (CELL_W - 8 - box.w) / 2);
+      const ry = cy + ROOM_TOP;
+      const w = Math.round(box.w);
+      const h = Math.round(box.h);
+      // Floor slab under the room for context.
+      ctx.fillStyle = "#9a9483";
+      ctx.fillRect(rx - 6, ry + h, w + 12, SLAB_H);
+      // The room painters are fixed-pixel: they draw a 6px seat row whatever box
+      // they are handed, because the game always rasterizes a unit at its world
+      // size and lets the camera zoom. So scale the context and hand the painter
+      // its world box. Sizing the box instead left the cinema's seat rows at their
+      // authored pitch inside a squashed room, overlapping the balcony rail.
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.translate(rx, ry);
+      ctx.scale(box.scale, box.scale);
+      drawRoom(d, u, 0, 0, u.width * TILE, floors * FLOOR);
+      ctx.restore();
+    }
 
     ctx.fillStyle = "#cdd6e6";
     ctx.font = "12px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(e.label, cx + (CELL_W - 8) / 2, cy + CELL_H - 14);
+    ctx.fillText(e.label, cx + (CELL_W - 8) / 2, cy + CELL_H - CAPTION_H + 10);
     ctx.textAlign = "left";
   });
   requestAnimationFrame(frame);

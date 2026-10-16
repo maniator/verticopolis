@@ -36,6 +36,9 @@ on:
       - "src/tests/fixtures/tdtImportCases.ts"
       - "src/tests/fixtures/tdtExportCases.ts"
       - "scripts/wasm-build.ts"
+      - "scripts/build-engine-wasm.sh"
+      - "scripts/gen-gameplay-events.ts"
+      - ".github/actions/engine-wasm/**"
       - "scripts/engine-third-party.ts"
       - "scripts/license-files.ts"
       - "src/build/thirdPartyNotices.ts"
@@ -124,6 +127,9 @@ jobs:
             case "$f" in src/tests/fixtures/tdtImportCases.ts) engine=true ;; esac
             case "$f" in src/tests/fixtures/tdtExportCases.ts) engine=true ;; esac
             case "$f" in scripts/wasm-build.ts) engine=true ;; esac
+            case "$f" in scripts/build-engine-wasm.sh) engine=true ;; esac
+            case "$f" in scripts/gen-gameplay-events.ts) engine=true ;; esac
+            case "$f" in .github/actions/engine-wasm/*) engine=true ;; esac
             case "$f" in scripts/engine-third-party.ts) engine=true ;; esac
             case "$f" in scripts/license-files.ts) engine=true ;; esac
             case "$f" in src/build/thirdPartyNotices.ts) engine=true ;; esac
@@ -198,6 +204,20 @@ jobs:
           rustup show active-toolchain | grep -q '^1\.97\.0'
           rustup component add rustfmt clippy
 
+      # The cargo registry and the compiled dependencies, keyed on the
+      # installed toolchains, each Cargo.lock and the job. Only a run on main
+      # saves, so a pull request reads main's cache and never writes one of
+      # its own. Old dependency builds are kept across lockfile bumps; bump
+      # prefix-key to start the cache over when it grows.
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          prefix-key: v1-rust
+          workspaces: |
+            engine-rs -> target
+            engine-rs/consumer -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
       # Default features: no binding and no conformance harness, the
       # library a host that only plays the game links.
       - name: The engine library builds alone
@@ -254,15 +274,15 @@ jobs:
         if: ${{ cancelled() }}
         run: exit 1
 
-  engine-rs:
+  rust:
     needs: changes
     # Fail closed: run unless the filter succeeded and found no engine file.
-    # always() rather than !cancelled(): a skipped required job counts as
-    # passed, so a run cancelled before this job starts must not skip it.
-    # Its last step fails the job if the run was cancelled.
+    # always() rather than !cancelled(): a run cancelled before this job
+    # starts must not skip it. Its last step fails the job if the run was
+    # cancelled.
     if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: engine-rs
@@ -278,6 +298,21 @@ jobs:
           rustup toolchain install 1.97.0 --profile minimal --component rustfmt,clippy
           rustup default 1.97.0
           rustup target add wasm32-unknown-unknown
+          # The image's own stable toolchain is unused here, and the cache
+          # key hashes every installed toolchain, so an image update would
+          # otherwise miss the cache on every pull request.
+          rustup toolchain uninstall stable || true
+
+      # The cargo registry and the compiled dependencies, keyed on the
+      # installed toolchains, Cargo.lock and the job. Only a run on main
+      # saves, so a pull request reads main's cache and never writes one of
+      # its own. Bump prefix-key to start the cache over when it grows.
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          prefix-key: v1-rust
+          workspaces: engine-rs -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Format
         run: cargo fmt --check
@@ -298,36 +333,15 @@ jobs:
       - name: Conformance
         run: cargo run --locked --release --features conformance --bin conformance
 
-      # The referee again, through the WASM binding from Node: the same
-      # TypeScript runner replays every scenario on the module wasm-bindgen
-      # generates (story-engine-wasm-binding), and the dual run's day gate
-      # (story-engine-dual-run) compares both engines every hour for a day on
-      # every fixture at each game speed. The CLI version must match the
-      # crate version Cargo.toml pins, so the pin is read from there and
-      # scripts/wasm-build.ts checks the match. The CLI is compiled from
-      # source here (a few minutes); the job's timeout allows for it.
-      - name: WASM binding
-        run: |
-          pin="$(grep -m1 -oP '^wasm-bindgen = \{ version = "=\K[0-9.]+' Cargo.toml)"
-          test -n "$pin"
-          cargo install wasm-bindgen-cli --locked --version "$pin"
-      - name: Use Node.js (from .nvmrc)
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      # The prebuilt cargo-llvm-cov release, checked against the hash the
+      # action's manifest records, in place of a compile from source. With
+      # no fallback, a version the manifest lacks fails the step instead of
+      # installing another way.
+      - name: cargo-llvm-cov
+        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
         with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
-      - name: Conformance through the binding
-        working-directory: .
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-          # A missing package fails the suite here instead of skipping it.
-          VC_REQUIRE_WASM: "1"
-        run: |
-          npm ci
-          npm run wasm:build
-          # The checked-in declarations have to be the ones this build wrote.
-          test -z "$(git status --porcelain -- src/dualrun/engine.d.ts src/engine/gameplayEvents.d.ts src/engine/gameplayEventRules.ts)" || { echo "src/dualrun/engine.d.ts, src/engine/gameplayEvents.d.ts or src/engine/gameplayEventRules.ts is stale or untracked: run npm run wasm:build and commit them"; exit 1; }
-          npm run test:wasm
+          tool: cargo-llvm-cov@0.9.1
+          fallback: none
 
       # Coverage of the unit tests plus the referee, with a line floor that
       # only ratchets up as scenarios land (80.58% at the first measurement,
@@ -338,13 +352,103 @@ jobs:
       - name: Coverage
         run: |
           rustup component add llvm-tools-preview
-          cargo install cargo-llvm-cov --locked --version 0.9.1
+          cargo llvm-cov --version | grep -qw '0\.9\.1'
           cargo llvm-cov --no-report --locked test --features conformance
           cargo llvm-cov --no-report --locked run --features conformance --bin conformance
           cargo llvm-cov report --fail-under-lines 87
 
       # A cancelled run can skip every step above and still leave the job
       # green, which would pass the required check unchecked. Fail instead.
+      - name: Fail a cancelled run
+        if: ${{ cancelled() }}
+        run: exit 1
+
+  # The referee again, through the WASM binding from Node: the same
+  # TypeScript runner replays every scenario on the module wasm-bindgen
+  # generates (story-engine-wasm-binding), and the dual run's day gate
+  # (story-engine-dual-run) compares both engines every hour for a day on
+  # every fixture at each game speed. This is the one job here that needs
+  # Node.js, so the Rust jobs above carry no Node.js setup at all. The
+  # package comes from .github/actions/engine-wasm: restored from the cache
+  # the other workflows share when the Rust sources are unchanged, and built
+  # on a miss with the prebuilt wasm-bindgen CLI at the version Cargo.toml
+  # pins, checked against its recorded hash (scripts/build-engine-wasm.sh;
+  # scripts/wasm-build.ts checks the version).
+  wasm-binding:
+    needs: changes
+    # Fail closed, as the rust job above.
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    runs-on: ubuntu-latest
+    # A cache miss compiles the crate for wasm32 (a few minutes, with the
+    # prebuilt CLI); anything near this is a hang.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: npm ci
+
+      - uses: ./.github/actions/engine-wasm
+
+      # The checked-in declarations have to be the ones the package's build
+      # wrote. The action checks the package was built from this tree's
+      # sources, so its declaration is the build's own, cached or not
+      # (scripts/wasm-build.ts copies it to src/dualrun/engine.d.ts byte for
+      # byte, and on a cache miss has just done so). The gameplay event files
+      # come from the event catalog through npm run gen:events.
+      - name: The declarations match the build
+        run: |
+          test -f engine-rs/pkg/verticopolis_engine.d.ts || { echo "the engine package has no engine-rs/pkg/verticopolis_engine.d.ts"; exit 1; }
+          cmp engine-rs/pkg/verticopolis_engine.d.ts src/dualrun/engine.d.ts || { echo "src/dualrun/engine.d.ts is stale: run npm run wasm:build and commit it"; exit 1; }
+          npm run gen:events
+          test -z "$(git status --porcelain -- src/dualrun/engine.d.ts src/engine/gameplayEvents.d.ts src/engine/gameplayEventRules.ts)" || { echo "src/dualrun/engine.d.ts, src/engine/gameplayEvents.d.ts or src/engine/gameplayEventRules.ts is stale or untracked: run npm run wasm:build (or npm run gen:events for the two event files) and commit them"; exit 1; }
+
+      - name: Conformance through the binding
+        env:
+          # A missing package fails the suite here instead of skipping it.
+          VC_REQUIRE_WASM: "1"
+        run: npm run test:wasm
+
+      - name: Fail a cancelled run
+        if: ${{ cancelled() }}
+        run: exit 1
+
+  # The check branch protection requires on main. It always runs and
+  # passes in two cases only: the changes filter succeeded and found no
+  # engine file (the three engine jobs above skipped on purpose), or all
+  # three passed. Anything else (a failure, a cancellation, a skip the
+  # filter did not ask for) fails it, so the binding's checks and the
+  # Node-free consumer gate a merge alongside the Rust job.
+  engine-rs:
+    needs: [changes, consumer, rust, wasm-binding]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every engine job passed, or the change touches no engine file
+        env:
+          FILTER: ${{ needs.changes.result }}
+          ENGINE: ${{ needs.changes.outputs.engine }}
+          CONSUMER: ${{ needs.consumer.result }}
+          RUST: ${{ needs.rust.result }}
+          BINDING: ${{ needs.wasm-binding.result }}
+        run: |
+          echo "changes: $FILTER (engine=$ENGINE), consumer: $CONSUMER, rust: $RUST, wasm-binding: $BINDING"
+          if [ "$FILTER" = success ] && [ "$ENGINE" = false ] && [ "$CONSUMER" = skipped ] && [ "$RUST" = skipped ] && [ "$BINDING" = skipped ]; then
+            exit 0
+          fi
+          test "$CONSUMER" = success && test "$RUST" = success && test "$BINDING" = success
+
       - name: Fail a cancelled run
         if: ${{ cancelled() }}
         run: exit 1

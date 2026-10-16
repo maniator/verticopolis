@@ -1,0 +1,2206 @@
+{
+ "schema": 1,
+ "generatedAt": "2026-10-15T21:02:08.260Z",
+ "commit": "df59d0d5e83371e2831d368025827829db62cfc7",
+ "dirty": false,
+ "appVersion": "2.34.1",
+ "node": "v22.22.0",
+ "config": {
+  "steps": 720,
+  "dt": 2,
+  "batch": 4,
+  "quick": false
+ },
+ "scenarios": [
+  {
+   "name": "small",
+   "sha256": "8018a9e0591009070780a22ecf2209c57f72ee861217b58bc51574a1b5bd8c1f"
+  },
+  {
+   "name": "medium",
+   "sha256": "159b444c6a652384d759b82c82cac50ac8251c2f64c51f851b27e0b15d4456de"
+  },
+  {
+   "name": "large",
+   "sha256": "e0db69ea489132e2f1163cc6a971220543ab0e60951479b6fe6ddea5f8163032"
+  }
+ ],
+ "readModel": [
+  {
+   "scenario": "small",
+   "steps": 720,
+   "dt": 2,
+   "batch": 4,
+   "composition": {
+    "totalChars": 109161,
+    "units": 2240,
+    "keys": [
+     {
+      "name": "units",
+      "count": 1,
+      "chars": 108054,
+      "share": 0.9898590155824882
+     },
+     {
+      "name": "log",
+      "count": 1,
+      "chars": 327,
+      "share": 0.0029955753428422237
+     },
+     {
+      "name": "transports",
+      "count": 1,
+      "chars": 269,
+      "share": 0.00246425005267449
+     },
+     {
+      "name": "events",
+      "count": 1,
+      "chars": 53,
+      "share": 0.00048552138584292926
+     },
+     {
+      "name": "ledger",
+      "count": 1,
+      "chars": 25,
+      "share": 0.00022901952162402323
+     },
+     {
+      "name": "milestones",
+      "count": 1,
+      "chars": 11,
+      "share": 0.00010076858951457022
+     },
+     {
+      "name": "modernCalendar",
+      "count": 1,
+      "chars": 11,
+      "share": 0.00010076858951457022
+     },
+     {
+      "name": "towerName",
+      "count": 1,
+      "chars": 11,
+      "share": 0.00010076858951457022
+     },
+     {
+      "name": "money",
+      "count": 1,
+      "chars": 10,
+      "share": 0.00009160780864960929
+     },
+     {
+      "name": "mode",
+      "count": 1,
+      "chars": 9,
+      "share": 0.00008244702778464837
+     },
+     {
+      "name": "builtWeddingHall",
+      "count": 1,
+      "chars": 5,
+      "share": 0.000045803904324804644
+     },
+     {
+      "name": "evaluatedTower",
+      "count": 1,
+      "chars": 5,
+      "share": 0.000045803904324804644
+     },
+     {
+      "name": "vipFavorable",
+      "count": 1,
+      "chars": 5,
+      "share": 0.000045803904324804644
+     },
+     {
+      "name": "lastVipNagDay",
+      "count": 1,
+      "chars": 4,
+      "share": 0.000036643123459843716
+     },
+     {
+      "name": "nextId",
+      "count": 1,
+      "chars": 4,
+      "share": 0.000036643123459843716
+     },
+     {
+      "name": "minutes",
+      "count": 1,
+      "chars": 3,
+      "share": 0.000027482342594882787
+     },
+     {
+      "name": "blockbusters",
+      "count": 1,
+      "chars": 2,
+      "share": 0.000018321561729921858
+     },
+     {
+      "name": "excavated",
+      "count": 1,
+      "chars": 2,
+      "share": 0.000018321561729921858
+     },
+     {
+      "name": "vipVisitDay",
+      "count": 1,
+      "chars": 2,
+      "share": 0.000018321561729921858
+     },
+     {
+      "name": "initialSeed",
+      "count": 1,
+      "chars": 1,
+      "share": 0.000009160780864960929
+     },
+     {
+      "name": "lastQuarterMoney",
+      "count": 1,
+      "chars": 1,
+      "share": 0.000009160780864960929
+     },
+     {
+      "name": "seed",
+      "count": 1,
+      "chars": 1,
+      "share": 0.000009160780864960929
+     },
+     {
+      "name": "star",
+      "count": 1,
+      "chars": 1,
+      "share": 0.000009160780864960929
+     },
+     {
+      "name": "treasuresFound",
+      "count": 1,
+      "chars": 1,
+      "share": 0.000009160780864960929
+     },
+     {
+      "name": "version",
+      "count": 1,
+      "chars": 1,
+      "share": 0.000009160780864960929
+     },
+     {
+      "name": "vipVisits",
+      "count": 1,
+      "chars": 1,
+      "share": 0.000009160780864960929
+     }
+    ],
+    "unitKinds": [
+     {
+      "name": "floor",
+      "count": 1960,
+      "chars": 86221,
+      "share": 0.7898516869577963
+     },
+     {
+      "name": "office",
+      "count": 104,
+      "chars": 9828,
+      "share": 0.09003215434083602
+     },
+     {
+      "name": "lobby",
+      "count": 140,
+      "chars": 5912,
+      "share": 0.054158536473649016
+     },
+     {
+      "name": "condo",
+      "count": 35,
+      "chars": 3794,
+      "share": 0.03475600260166176
+     },
+     {
+      "name": "fastFood",
+      "count": 1,
+      "chars": 58,
+      "share": 0.0005313252901677339
+     }
+    ]
+   },
+   "merges": [
+    {
+     "step": 32,
+     "reason": "hour",
+     "changed": 140,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 140,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction",
+      "state"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 60,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 92,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 120,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 152,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 180,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 212,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 240,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 272,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 300,
+     "reason": "hour",
+     "changed": 62,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 332,
+     "reason": "hour",
+     "changed": 112,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 360,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 392,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 420,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 452,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 33,
+     "unitKeys": [
+      "occupants",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 480,
+     "reason": "hour",
+     "changed": 33,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 33,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 512,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "patronageToday",
+      "patronageYest",
+      "profitToday",
+      "profitYest",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "events",
+      "ledger",
+      "minutes",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 540,
+     "reason": "hour",
+     "changed": 33,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 33,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 572,
+     "reason": "hour",
+     "changed": 33,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 33,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 600,
+     "reason": "hour",
+     "changed": 33,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 33,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 632,
+     "reason": "hour",
+     "changed": 33,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 33,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 660,
+     "reason": "hour",
+     "changed": 33,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 33,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 692,
+     "reason": "hour",
+     "changed": 61,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 33,
+     "unitKeys": [
+      "occupants",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 720,
+     "reason": "hour",
+     "changed": 34,
+     "added": 0,
+     "removed": 0,
+     "total": 2240,
+     "outsideFrame": 34,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    }
+   ],
+   "changedShare": {
+    "median": 0.015178571428571428,
+    "mean": 0.01951264880952381,
+    "max": 0.0625
+   },
+   "touched": {
+    "median": 34,
+    "mean": 43.708333333333336,
+    "max": 140
+   },
+   "changedCount": {
+    "median": 34,
+    "mean": 43.708333333333336,
+    "max": 140
+   },
+   "outsideFrame": {
+    "median": 34,
+    "mean": 38.083333333333336,
+    "max": 140
+   }
+  },
+  {
+   "scenario": "medium",
+   "steps": 720,
+   "dt": 2,
+   "batch": 4,
+   "composition": {
+    "totalChars": 648859,
+    "units": 12062,
+    "keys": [
+     {
+      "name": "units",
+      "count": 1,
+      "chars": 627334,
+      "share": 0.9668263829275697
+     },
+     {
+      "name": "excavated",
+      "count": 1,
+      "chars": 9905,
+      "share": 0.015265257937394718
+     },
+     {
+      "name": "ledger",
+      "count": 1,
+      "chars": 6962,
+      "share": 0.010729603812230391
+     },
+     {
+      "name": "transports",
+      "count": 1,
+      "chars": 3961,
+      "share": 0.006104562008078797
+     },
+     {
+      "name": "log",
+      "count": 1,
+      "chars": 161,
+      "share": 0.0002481278675336244
+     },
+     {
+      "name": "events",
+      "count": 1,
+      "chars": 57,
+      "share": 0.00008784651210817759
+     },
+     {
+      "name": "milestones",
+      "count": 1,
+      "chars": 31,
+      "share": 0.00004777617325181588
+     },
+     {
+      "name": "minutes",
+      "count": 1,
+      "chars": 18,
+      "share": 0.000027741003823635027
+     },
+     {
+      "name": "modernCalendar",
+      "count": 1,
+      "chars": 11,
+      "share": 0.000016952835669999182
+     },
+     {
+      "name": "towerName",
+      "count": 1,
+      "chars": 10,
+      "share": 0.000015411668790908347
+     },
+     {
+      "name": "initialSeed",
+      "count": 1,
+      "chars": 9,
+      "share": 0.000013870501911817513
+     },
+     {
+      "name": "mode",
+      "count": 1,
+      "chars": 9,
+      "share": 0.000013870501911817513
+     },
+     {
+      "name": "seed",
+      "count": 1,
+      "chars": 9,
+      "share": 0.000013870501911817513
+     },
+     {
+      "name": "money",
+      "count": 1,
+      "chars": 8,
+      "share": 0.000012329335032726678
+     },
+     {
+      "name": "builtWeddingHall",
+      "count": 1,
+      "chars": 5,
+      "share": 0.000007705834395454173
+     },
+     {
+      "name": "evaluatedTower",
+      "count": 1,
+      "chars": 5,
+      "share": 0.000007705834395454173
+     },
+     {
+      "name": "nextId",
+      "count": 1,
+      "chars": 5,
+      "share": 0.000007705834395454173
+     },
+     {
+      "name": "lastVipNagDay",
+      "count": 1,
+      "chars": 4,
+      "share": 0.000006164667516363339
+     },
+     {
+      "name": "vipFavorable",
+      "count": 1,
+      "chars": 4,
+      "share": 0.000006164667516363339
+     },
+     {
+      "name": "blockbusters",
+      "count": 1,
+      "chars": 2,
+      "share": 0.0000030823337581816695
+     },
+     {
+      "name": "vipVisitDay",
+      "count": 1,
+      "chars": 2,
+      "share": 0.0000030823337581816695
+     },
+     {
+      "name": "lastQuarterMoney",
+      "count": 1,
+      "chars": 1,
+      "share": 0.0000015411668790908347
+     },
+     {
+      "name": "star",
+      "count": 1,
+      "chars": 1,
+      "share": 0.0000015411668790908347
+     },
+     {
+      "name": "treasuresFound",
+      "count": 1,
+      "chars": 1,
+      "share": 0.0000015411668790908347
+     },
+     {
+      "name": "version",
+      "count": 1,
+      "chars": 1,
+      "share": 0.0000015411668790908347
+     },
+     {
+      "name": "vipVisits",
+      "count": 1,
+      "chars": 1,
+      "share": 0.0000015411668790908347
+     }
+    ],
+    "unitKinds": [
+     {
+      "name": "floor",
+      "count": 10129,
+      "chars": 455045,
+      "share": 0.7013002824958889
+     },
+     {
+      "name": "office",
+      "count": 379,
+      "chars": 49225,
+      "share": 0.07586393962324635
+     },
+     {
+      "name": "lobby",
+      "count": 830,
+      "chars": 37140,
+      "share": 0.05723893788943361
+     },
+     {
+      "name": "condo",
+      "count": 215,
+      "chars": 26497,
+      "share": 0.04083629879526985
+     },
+     {
+      "name": "hotelSingle",
+      "count": 148,
+      "chars": 17328,
+      "share": 0.026705339680885985
+     },
+     {
+      "name": "parking",
+      "count": 184,
+      "chars": 10535,
+      "share": 0.016236193071221944
+     },
+     {
+      "name": "hotelDouble",
+      "count": 76,
+      "chars": 9221,
+      "share": 0.014211099792096588
+     },
+     {
+      "name": "hotelSuite",
+      "count": 56,
+      "chars": 5873,
+      "share": 0.009051273080900472
+     },
+     {
+      "name": "shop",
+      "count": 8,
+      "chars": 1055,
+      "share": 0.0016259310574408307
+     },
+     {
+      "name": "housekeeping",
+      "count": 15,
+      "chars": 928,
+      "share": 0.0014302028637962947
+     },
+     {
+      "name": "fastFood",
+      "count": 6,
+      "chars": 891,
+      "share": 0.0013731796892699339
+     },
+     {
+      "name": "restaurant",
+      "count": 5,
+      "chars": 759,
+      "share": 0.0011697456612299437
+     },
+     {
+      "name": "parkingRamp",
+      "count": 6,
+      "chars": 371,
+      "share": 0.0005717729121426997
+     },
+     {
+      "name": "recycling",
+      "count": 2,
+      "chars": 120,
+      "share": 0.0001849400254909002
+     },
+     {
+      "name": "partyHall",
+      "count": 1,
+      "chars": 115,
+      "share": 0.00017723419109544602
+     },
+     {
+      "name": "cinema",
+      "count": 1,
+      "chars": 112,
+      "share": 0.0001726106904581735
+     },
+     {
+      "name": "security",
+      "count": 1,
+      "chars": 56,
+      "share": 0.00008630534522908675
+     }
+    ]
+   },
+   "merges": [
+    {
+     "step": 4,
+     "reason": "hour",
+     "changed": 132,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 126,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 32,
+     "reason": "hour",
+     "changed": 7,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 2,
+     "unitKeys": [
+      "occupants",
+      "pendingIncome",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 64,
+     "reason": "hour",
+     "changed": 6,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 6,
+     "unitKeys": [
+      "patronageToday",
+      "patronageYest",
+      "profitToday",
+      "profitYest",
+      "satisfaction"
+     ],
+     "topKeys": [
+      "events",
+      "ledger",
+      "minutes",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 92,
+     "reason": "hour",
+     "changed": 1,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 1,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 124,
+     "reason": "hour",
+     "changed": 1,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 1,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 152,
+     "reason": "hour",
+     "changed": 1,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 1,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 184,
+     "reason": "hour",
+     "changed": 1,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 1,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 212,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes",
+      "transports"
+     ]
+    },
+    {
+     "step": 244,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes",
+      "transports"
+     ]
+    },
+    {
+     "step": 272,
+     "reason": "hour",
+     "changed": 6,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 6,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 304,
+     "reason": "hour",
+     "changed": 216,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 6,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "state"
+     ],
+     "topKeys": [
+      "ledger",
+      "log",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 332,
+     "reason": "hour",
+     "changed": 6,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 6,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 364,
+     "reason": "hour",
+     "changed": 14,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 14,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 392,
+     "reason": "hour",
+     "changed": 19,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 19,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 424,
+     "reason": "hour",
+     "changed": 19,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 19,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 452,
+     "reason": "hour",
+     "changed": 122,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 19,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "state"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 484,
+     "reason": "hour",
+     "changed": 120,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 15,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "state"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 512,
+     "reason": "hour",
+     "changed": 22,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 15,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "state"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 544,
+     "reason": "hour",
+     "changed": 15,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 15,
+     "unitKeys": [
+      "patronageToday",
+      "pendingIncome",
+      "profitToday"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 572,
+     "reason": "hour",
+     "changed": 211,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 20,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "state"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 604,
+     "reason": "hour",
+     "changed": 258,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 20,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "state"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 632,
+     "reason": "hour",
+     "changed": 84,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 20,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "state"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 664,
+     "reason": "hour",
+     "changed": 54,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 20,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday",
+      "state"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 692,
+     "reason": "hour",
+     "changed": 37,
+     "added": 0,
+     "removed": 0,
+     "total": 12062,
+     "outsideFrame": 12,
+     "unitKeys": [
+      "occupants",
+      "patronageToday",
+      "pendingIncome",
+      "profitToday"
+     ],
+     "topKeys": [
+      "ledger",
+      "minutes",
+      "money",
+      "seed",
+      "transports",
+      "units"
+     ]
+    }
+   ],
+   "changedShare": {
+    "median": 0.001409384844967667,
+    "mean": 0.0046703144862654065,
+    "max": 0.02138948764715636
+   },
+   "touched": {
+    "median": 17,
+    "mean": 56.333333333333336,
+    "max": 258
+   },
+   "changedCount": {
+    "median": 17,
+    "mean": 56.333333333333336,
+    "max": 258
+   },
+   "outsideFrame": {
+    "median": 13,
+    "mean": 15.166666666666666,
+    "max": 126
+   }
+  },
+  {
+   "scenario": "large",
+   "steps": 720,
+   "dt": 2,
+   "batch": 4,
+   "composition": {
+    "totalChars": 2157388,
+    "units": 43358,
+    "keys": [
+     {
+      "name": "units",
+      "count": 1,
+      "chars": 2155803,
+      "share": 0.9992653152794027
+     },
+     {
+      "name": "transports",
+      "count": 1,
+      "chars": 696,
+      "share": 0.0003226123441865812
+     },
+     {
+      "name": "log",
+      "count": 1,
+      "chars": 281,
+      "share": 0.00013025009873050188
+     },
+     {
+      "name": "milestones",
+      "count": 1,
+      "chars": 108,
+      "share": 0.00005006053616688329
+     },
+     {
+      "name": "events",
+      "count": 1,
+      "chars": 53,
+      "share": 0.000024566744600414948
+     },
+     {
+      "name": "ledger",
+      "count": 1,
+      "chars": 25,
+      "share": 0.000011588087075667428
+     },
+     {
+      "name": "modernCalendar",
+      "count": 1,
+      "chars": 11,
+      "share": 0.000005098758313293668
+     },
+     {
+      "name": "towerName",
+      "count": 1,
+      "chars": 11,
+      "share": 0.000005098758313293668
+     },
+     {
+      "name": "money",
+      "count": 1,
+      "chars": 10,
+      "share": 0.000004635234830266971
+     },
+     {
+      "name": "mode",
+      "count": 1,
+      "chars": 9,
+      "share": 0.000004171711347240274
+     },
+     {
+      "name": "builtWeddingHall",
+      "count": 1,
+      "chars": 5,
+      "share": 0.0000023176174151334854
+     },
+     {
+      "name": "evaluatedTower",
+      "count": 1,
+      "chars": 5,
+      "share": 0.0000023176174151334854
+     },
+     {
+      "name": "nextId",
+      "count": 1,
+      "chars": 5,
+      "share": 0.0000023176174151334854
+     },
+     {
+      "name": "lastVipNagDay",
+      "count": 1,
+      "chars": 4,
+      "share": 0.0000018540939321067884
+     },
+     {
+      "name": "vipFavorable",
+      "count": 1,
+      "chars": 4,
+      "share": 0.0000018540939321067884
+     },
+     {
+      "name": "minutes",
+      "count": 1,
+      "chars": 3,
+      "share": 0.0000013905704490800913
+     },
+     {
+      "name": "blockbusters",
+      "count": 1,
+      "chars": 2,
+      "share": 9.270469660533942e-7
+     },
+     {
+      "name": "excavated",
+      "count": 1,
+      "chars": 2,
+      "share": 9.270469660533942e-7
+     },
+     {
+      "name": "vipVisitDay",
+      "count": 1,
+      "chars": 2,
+      "share": 9.270469660533942e-7
+     },
+     {
+      "name": "initialSeed",
+      "count": 1,
+      "chars": 1,
+      "share": 4.635234830266971e-7
+     },
+     {
+      "name": "lastQuarterMoney",
+      "count": 1,
+      "chars": 1,
+      "share": 4.635234830266971e-7
+     },
+     {
+      "name": "seed",
+      "count": 1,
+      "chars": 1,
+      "share": 4.635234830266971e-7
+     },
+     {
+      "name": "star",
+      "count": 1,
+      "chars": 1,
+      "share": 4.635234830266971e-7
+     },
+     {
+      "name": "treasuresFound",
+      "count": 1,
+      "chars": 1,
+      "share": 4.635234830266971e-7
+     },
+     {
+      "name": "version",
+      "count": 1,
+      "chars": 1,
+      "share": 4.635234830266971e-7
+     },
+     {
+      "name": "vipVisits",
+      "count": 1,
+      "chars": 1,
+      "share": 4.635234830266971e-7
+     }
+    ],
+    "unitKinds": [
+     {
+      "name": "floor",
+      "count": 40083,
+      "chars": 1819428,
+      "share": 0.8433476036762975
+     },
+     {
+      "name": "office",
+      "count": 2886,
+      "chars": 276173,
+      "share": 0.12801267087793203
+     },
+     {
+      "name": "lobby",
+      "count": 375,
+      "chars": 15907,
+      "share": 0.0073732680445056705
+     },
+     {
+      "name": "recycling",
+      "count": 9,
+      "chars": 547,
+      "share": 0.0002535473452156033
+     },
+     {
+      "name": "hotelSuite",
+      "count": 2,
+      "chars": 219,
+      "share": 0.00010151164278284667
+     },
+     {
+      "name": "medical",
+      "count": 1,
+      "chars": 57,
+      "share": 0.000026420838532521733
+     },
+     {
+      "name": "security",
+      "count": 1,
+      "chars": 57,
+      "share": 0.000026420838532521733
+     },
+     {
+      "name": "metro",
+      "count": 1,
+      "chars": 56,
+      "share": 0.000025957315049495036
+     }
+    ]
+   },
+   "merges": [
+    {
+     "step": 32,
+     "reason": "hour",
+     "changed": 2888,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 2886,
+     "unitKeys": [
+      "occupants",
+      "satisfaction",
+      "state"
+     ],
+     "topKeys": [
+      "ledger",
+      "log",
+      "minutes",
+      "money",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 60,
+     "reason": "hour",
+     "changed": 2886,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 2886,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "seed",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 92,
+     "reason": "hour",
+     "changed": 2886,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 2886,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 120,
+     "reason": "hour",
+     "changed": 2886,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 2886,
+     "unitKeys": [
+      "satisfaction",
+      "state",
+      "vacateAt",
+      "vacateReason"
+     ],
+     "topKeys": [
+      "log",
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 152,
+     "reason": "hour",
+     "changed": 1447,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 1447,
+     "unitKeys": [
+      "satisfaction",
+      "state",
+      "vacateAt",
+      "vacateReason"
+     ],
+     "topKeys": [
+      "log",
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 180,
+     "reason": "hour",
+     "changed": 70,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 70,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 212,
+     "reason": "hour",
+     "changed": 70,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 70,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 240,
+     "reason": "hour",
+     "changed": 70,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 70,
+     "unitKeys": [
+      "satisfaction",
+      "state",
+      "vacateAt",
+      "vacateReason"
+     ],
+     "topKeys": [
+      "log",
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 272,
+     "reason": "hour",
+     "changed": 42,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 42,
+     "unitKeys": [
+      "satisfaction"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 300,
+     "reason": "hour",
+     "changed": 42,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 42,
+     "unitKeys": [
+      "satisfaction",
+      "state",
+      "vacateAt",
+      "vacateReason"
+     ],
+     "topKeys": [
+      "log",
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 332,
+     "reason": "hour",
+     "changed": 2886,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [
+      "occupants"
+     ],
+     "topKeys": [
+      "minutes",
+      "transports",
+      "units"
+     ]
+    },
+    {
+     "step": 360,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes",
+      "transports"
+     ]
+    },
+    {
+     "step": 392,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes",
+      "transports"
+     ]
+    },
+    {
+     "step": 420,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes",
+      "transports"
+     ]
+    },
+    {
+     "step": 452,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes",
+      "transports"
+     ]
+    },
+    {
+     "step": 480,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes"
+     ]
+    },
+    {
+     "step": 512,
+     "reason": "hour",
+     "changed": 1,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [
+      "state"
+     ],
+     "topKeys": [
+      "events",
+      "ledger",
+      "log",
+      "minutes",
+      "seed",
+      "units"
+     ]
+    },
+    {
+     "step": 540,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes"
+     ]
+    },
+    {
+     "step": 572,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes"
+     ]
+    },
+    {
+     "step": 600,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes"
+     ]
+    },
+    {
+     "step": 632,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes"
+     ]
+    },
+    {
+     "step": 660,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes"
+     ]
+    },
+    {
+     "step": 692,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes"
+     ]
+    },
+    {
+     "step": 720,
+     "reason": "hour",
+     "changed": 0,
+     "added": 0,
+     "removed": 0,
+     "total": 43358,
+     "outsideFrame": 0,
+     "unitKeys": [],
+     "topKeys": [
+      "minutes",
+      "transports"
+     ]
+    }
+   ],
+   "changedShare": {
+    "median": 0.000011531897227731907,
+    "mean": 0.015543075480111322,
+    "max": 0.06660823838737949
+   },
+   "touched": {
+    "median": 0.5,
+    "mean": 673.9166666666666,
+    "max": 2888
+   },
+   "changedCount": {
+    "median": 0.5,
+    "mean": 673.9166666666666,
+    "max": 2888
+   },
+   "outsideFrame": {
+    "median": 0,
+    "mean": 553.5416666666666,
+    "max": 2886
+   }
+  }
+ ],
+ "limitations": [
+  "The read model section is measured in Node on the TypeScript engine, not in the browser: each scenario loads its save fresh, as the timed hosted run does after its throwaway warm-up, then runs the hosted rows' 720 steps in batches of 4, and a merge is counted after each batch where the worker host merges by its own rule (the hour-pass counter or the tower revision moved). The merges a host forces after a stale reply or for a settle are left out. Sizes are JSON characters of each value. The WASM engine reaches the same end state (the hosted end-state digests), but its intermediate saves were not compared."
+ ]
+}

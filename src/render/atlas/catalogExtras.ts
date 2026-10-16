@@ -78,46 +78,77 @@ export const RIDER_CAP = 4;
 export function transportJobs(): Job[] {
   const jobs: Job[] = [];
   for (const kind of Object.keys(FACILITIES) as FacilityKind[]) {
-    const f = FACILITIES[kind];
-    if (!f.transport) continue;
-    const w = f.width * TILE;
-    if (!isElevatorKind(kind)) {
-      // Stairs and escalators always span exactly two floors.
-      jobs.push(still(`transport/${kind}`, w, 2 * FLOOR, { p: "shaft", kind, floors: 2, band: 0, skip: [] }, { kind, floors: 2 }));
-      continue;
-    }
-    const band = (piece: string, floors: number, b: number, skip: number[]): StillJob =>
-      still(`shaft/${kind}/${piece}`, w, FLOOR, { p: "shaft", kind, floors, band: b, skip }, { kind, piece });
-    // Bands are numbered from the top floor down; floor 2 of a 3-floor shaft
-    // is its middle band.
-    jobs.push(
-      band("top", 3, 0, []),
-      band("stop", 3, 1, []),
-      band("skip", 3, 1, [2]),
-      band("bottom", 3, 2, []),
-      band("single", 1, 0, []),
-      // A skipped end floor (a resized or loaded non-express shaft can keep
-      // one in its skip list). The bottom loses its stop line; the top's is
-      // already under the motor housing, so top-skip matches top.
-      band("top-skip", 3, 0, [3]),
-      band("bottom-skip", 3, 2, [1]),
-      band("single-skip", 1, 0, [1]),
-    );
-    for (const arrow of [null, "up", "down"] as const) {
-      for (const full of [false, true]) {
-        CAR_SEEDS.forEach((seed, s) => {
-          const car = (riders: number): PaintSpec => ({ p: "car", kind, seed, riders, arrow, full });
-          const steps = Array.from({ length: RIDER_CAP + 1 }, (_, r) => car(r));
-          jobs.push({
-            ...still(`car/${kind}/${arrow ?? "idle"}/${full ? "full" : "notfull"}/s${s}`, w, FLOOR, car(0), { kind, arrow: arrow ?? "idle", full, variant: s }),
-            chains: { riders: { input: "riders", steps } },
-            // The cab's interior is the back, its riders, step by step, the
-            // furniture, and its door frames, FULL bar and lantern the front.
-            layers: true,
-            front: true,
-          });
+    if (FACILITIES[kind].transport) jobs.push(...shaftJobs(kind, FACILITIES[kind].width));
+  }
+  return jobs;
+}
+
+/** The narrower widths a legacy save keeps for a shaft (`deserialize` keeps a
+ *  stored width up to the catalog's; canon widths only ever grew). Stairs and
+ *  escalators went 4 to 8 (E1b), and the migration leaves walkways as stored;
+ *  the standard elevator went 3 to 4 and the express 4 to 6, and a shaft boxed
+ *  in on both sides keeps its legacy width (`widenLegacyElevatorShafts`). The
+ *  service elevator has always been 4. */
+export const LEGACY_SHAFT_WIDTHS: Partial<Record<FacilityKind, readonly number[]>> = {
+  stairs: [4],
+  escalator: [4],
+  elevatorStandard: [3],
+  elevatorExpress: [4],
+};
+
+/** The legacy-width shafts and their cabs, named with a `w<tiles>` segment
+ *  after the kind. They joined the atlas after its first release, so they
+ *  pack on pages of their own. */
+export function legacyShaftJobs(): Job[] {
+  const jobs: Job[] = [];
+  for (const [kind, widths] of Object.entries(LEGACY_SHAFT_WIDTHS) as [FacilityKind, readonly number[]][]) {
+    for (const tiles of widths) for (const job of shaftJobs(kind, tiles, `/w${tiles}`)) jobs.push({ ...job, keys: { ...job.keys, width: tiles }, ownPages: "legacy-shafts" });
+  }
+  return jobs;
+}
+
+/** One transport kind's frames at `tiles` wide: a two-floor flight for stairs
+ *  and escalators; shaft bands and cabs for an elevator. `seg` follows the
+ *  kind in each name (empty at the catalog width). */
+function shaftJobs(kind: FacilityKind, tiles: number, seg = ""): Job[] {
+  const jobs: Job[] = [];
+  const w = tiles * TILE;
+  if (!isElevatorKind(kind)) {
+    // Stairs and escalators always span exactly two floors.
+    jobs.push(still(`transport/${kind}${seg}`, w, 2 * FLOOR, { p: "shaft", kind, floors: 2, band: 0, skip: [] }, { kind, floors: 2 }));
+    return jobs;
+  }
+  const band = (piece: string, floors: number, b: number, skip: number[]): StillJob =>
+    still(`shaft/${kind}${seg}/${piece}`, w, FLOOR, { p: "shaft", kind, floors, band: b, skip }, { kind, piece });
+  // Bands are numbered from the top floor down; floor 2 of a 3-floor shaft
+  // is its middle band.
+  jobs.push(
+    band("top", 3, 0, []),
+    band("stop", 3, 1, []),
+    band("skip", 3, 1, [2]),
+    band("bottom", 3, 2, []),
+    band("single", 1, 0, []),
+    // A skipped end floor (a resized or loaded non-express shaft can keep
+    // one in its skip list). The bottom loses its stop line; the top's is
+    // already under the motor housing, so top-skip matches top.
+    band("top-skip", 3, 0, [3]),
+    band("bottom-skip", 3, 2, [1]),
+    band("single-skip", 1, 0, [1]),
+  );
+  for (const arrow of [null, "up", "down"] as const) {
+    for (const full of [false, true]) {
+      CAR_SEEDS.forEach((seed, s) => {
+        const car = (riders: number): PaintSpec => ({ p: "car", kind, seed, riders, arrow, full });
+        const steps = Array.from({ length: RIDER_CAP + 1 }, (_, r) => car(r));
+        jobs.push({
+          ...still(`car/${kind}${seg}/${arrow ?? "idle"}/${full ? "full" : "notfull"}/s${s}`, w, FLOOR, car(0), { kind, arrow: arrow ?? "idle", full, variant: s }),
+          chains: { riders: { input: "riders", steps } },
+          // The cab's interior is the back, its riders, step by step, the
+          // furniture, and its door frames, FULL bar and lantern the front.
+          layers: true,
+          front: true,
         });
-      }
+      });
     }
   }
   return jobs;
