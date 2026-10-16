@@ -17,8 +17,8 @@ import { dirname, resolve } from "node:path";
  * simulation-layer edits.
  *
  * Who may name them: the relay's own files (the command type, the mirror that
- * emits the command, the shadow that applies it, the binding's method list
- * and generated declaration), and test files (`*.test.*`). Every other
+ * emits the command, the shadow that applies it, the binding's method list,
+ * its tier table and generated declaration), and test files (`*.test.*`). Every other
  * tracked source under src/, scripts/, api/, tools/ and e2e/ is scanned, in
  * any JS or TS flavor; src/public/ (the built WASM glue, which defines the
  * ops, and static assets) is skipped. The file list comes from `git ls-files`,
@@ -34,6 +34,7 @@ const ALLOWED = new Set([
   "src/dualrun/binding.ts",
   "src/dualrun/commands.ts",
   "src/dualrun/engine.d.ts",
+  "src/dualrun/exportTiers.ts",
   "src/dualrun/mirror.ts",
   "src/dualrun/shadow.ts",
 ]);
