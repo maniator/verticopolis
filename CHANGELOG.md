@@ -13,9 +13,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.35.0
+## 2.35.1
 
 - The parking spaces, ramp, security office, clinic, housekeeping room, and recycling center are drawn on the current pixel grid, so the camera monitors, the folded linen, the clinic's bottles and the hazard tape are evenly spaced instead of drifting a pixel here and there.
+
+## 2.35.0
+
 - The Sprite Gallery now shows every room, shaft, and elevator at the same proportions as your tower.
 
 ## 2.34.1
