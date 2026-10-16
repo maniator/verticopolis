@@ -17,6 +17,10 @@ notes, never a past version's.
 
 - Busy rooms fill their seats again. Several had quietly stopped using their last few, and left the people at them undrawn.
 
+## 2.35.1
+
+- The parking spaces, ramp, security office, clinic, housekeeping room, and recycling center are drawn on the current pixel grid, so the camera monitors, the folded linen, the clinic's bottles and the hazard tape are evenly spaced instead of drifting a pixel here and there.
+
 ## 2.35.0
 
 - The Sprite Gallery now shows every room, shaft, and elevator at the same proportions as your tower.
