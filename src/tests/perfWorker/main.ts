@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, truncateSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { brotliCompressSync, constants } from "node:zlib";
@@ -136,7 +136,14 @@ export function readModelLimitations(config: WorkerConfig): string[] {
 }
 
 function sh(cmd: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env): void {
-  execFileSync(cmd, args, { cwd, stdio: "inherit", env });
+  if (process.platform !== "win32") {
+    execFileSync(cmd, args, { cwd, stdio: "inherit", env });
+    return;
+  }
+  // On Windows npm and npx are .cmd scripts, which Node runs only through a
+  // shell, so the line is joined here with any path that has a space quoted.
+  const quote = (a: string): string => (/[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a);
+  execSync([cmd, ...args].map(quote).join(" "), { cwd, stdio: "inherit", env });
 }
 
 interface Size { raw: number; brotli: number }

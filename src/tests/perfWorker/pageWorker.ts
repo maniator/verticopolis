@@ -37,7 +37,7 @@ export interface HostedRun {
   batchMainMs: number[];
   /** Worker host only: its counters over the timed steps (the settle that
    *  fetches the exact end save comes after and is not counted). */
-  worker: { replies: number; staleReplies: number; merges: number; messagesSent: number; messagesReceived: number; bytesReceived: number; frameBytes: number; mergeBytes: number; applyMs: number; mergeMs: number; workerOpsMs: number; workerReplyMs: number } | null;
+  worker: { replies: number; staleReplies: number; merges: number; messagesSent: number; messagesReceived: number; bytesReceived: number; frameBytes: number; mergeBytes: number; applyMs: number; mergeMs: number; workerOpsMs: number; workerReplyMs: number; deltas?: number; deltaBytes?: number; deltaMs?: number; workerSaveMs?: number } | null;
   startKey: string;
   endKey: string;
   hostErrorsAdded: string[];
@@ -145,7 +145,7 @@ export async function hostedRun(arg: { name: string; steps: number; warmSteps: n
       wallMs,
       mainMs,
       batchMainMs,
-      worker: isWorker() && before ? { replies: d("replies"), staleReplies: d("staleReplies"), merges: d("merges"), messagesSent: d("messagesSent"), messagesReceived: d("messagesReceived"), bytesReceived: d("bytesReceived"), frameBytes: d("frameBytes"), mergeBytes: d("mergeBytes"), applyMs: d("applyMs"), mergeMs: d("mergeMs"), workerOpsMs: d("workerOpsMs"), workerReplyMs: d("workerReplyMs") } : null,
+      worker: isWorker() && before ? { replies: d("replies"), staleReplies: d("staleReplies"), merges: d("merges"), messagesSent: d("messagesSent"), messagesReceived: d("messagesReceived"), bytesReceived: d("bytesReceived"), frameBytes: d("frameBytes"), mergeBytes: d("mergeBytes"), applyMs: d("applyMs"), mergeMs: d("mergeMs"), workerOpsMs: d("workerOpsMs"), workerReplyMs: d("workerReplyMs"), deltas: d("deltas"), deltaBytes: d("deltaBytes"), deltaMs: d("deltaMs"), workerSaveMs: d("workerSaveMs") } : null,
       startKey: `${tag}:start`,
       endKey: `${tag}:end`,
       hostErrorsAdded: errorsNow().slice(errorsAtStart),

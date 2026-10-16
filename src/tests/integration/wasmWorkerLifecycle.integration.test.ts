@@ -100,7 +100,7 @@ describe.skipIf(!hasWasmPackage())("worker host lifecycle", () => {
     const h = handle.current()!;
     const replies = h.stats.replies;
     const money = a.sim.money;
-    h.receive({ type: "frame", gen: 1, req: 1, seq: 999, view: new Float64Array(26), events: '[{"name":"x","payload":{}}]', dropped: 0, log: null, pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    h.receive({ type: "frame", gen: 1, req: 1, seq: 999, view: new Float64Array(26), events: '[{"name":"x","payload":{}}]', dropped: 0, log: null, pending: null, merge: null, delta: null, workMs: { ops: 0, reply: 0, save: 0 }, memoryBytes: null });
     expect(h.stats.replies).toBe(replies);
     expect(a.sim.money).toBe(money);
     expect(a.sim.drainGameplayEvents().some((e) => (e.name as string) === "x")).toBe(false);
@@ -207,7 +207,7 @@ describe.skipIf(!hasWasmPackage())("worker host lifecycle", () => {
     expect(handle.status.errors.join()).toMatch(/op 3: refused/);
     // A reply the host cannot apply (here, one that answers no request) is
     // fatal: the tower goes back to TypeScript.
-    h.receive({ type: "frame", gen: h.gen, req: 1, seq: 0, view: new Float64Array(3), events: "[]", dropped: 0, log: null, pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    h.receive({ type: "frame", gen: h.gen, req: 1, seq: 0, view: new Float64Array(3), events: "[]", dropped: 0, log: null, pending: null, merge: null, delta: null, workMs: { ops: 0, reply: 0, save: 0 }, memoryBytes: null });
     expect(handle.status.hosted).toBe(false);
     expect(handle.status.errors.join()).toMatch(/reply: a reply to request 1 while no request was in flight/);
     // The restart fails: reported, the tower stays on TypeScript.

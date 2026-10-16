@@ -103,7 +103,7 @@ describe("worker host round 2 (fake engine)", () => {
   it("is fatal on a reply to a request that is not in flight, and a camera stamp leaves the reply in flight fresh", async () => {
     const r = rig();
     await r.settleTasks();
-    r.host.receive({ type: "frame", gen: 1, req: 42, seq: 0, view: new Float64Array(26), events: "[]", dropped: 0, log: null, pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    r.host.receive({ type: "frame", gen: 1, req: 42, seq: 0, view: new Float64Array(26), events: "[]", dropped: 0, log: null, pending: null, merge: null, delta: null, workMs: { ops: 0, reply: 0, save: 0 }, memoryBytes: null });
     expect(r.fatal.join()).toMatch(/a reply to request 42 while no request was in flight/);
     r.host.detach();
 
@@ -145,7 +145,7 @@ describe("worker host round 2 (fake engine)", () => {
     sim.tick(1);
     h.flush();
     const req = (last(sent) as Extract<ToWorker, { type: "ops" }>).request!.req;
-    h.receive({ type: "frame", gen: 1, req, seq: 1, view: new Float64Array(3), events: "[]", dropped: 0, log: null, pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    h.receive({ type: "frame", gen: 1, req, seq: 1, view: new Float64Array(3), events: "[]", dropped: 0, log: null, pending: null, merge: null, delta: null, workMs: { ops: 0, reply: 0, save: 0 }, memoryBytes: null });
     expect(fatal.join()).toMatch(/frame view: 3 numbers/);
     h.detach();
   });
@@ -171,7 +171,7 @@ describe("worker host round 2 (fake engine)", () => {
     const view = new Float64Array(26);
     view[0] = minutes + 1;
     view[4] = money + 12_345;
-    h.receive({ type: "frame", gen: 1, req, seq: 1, view, events: "[]", dropped: 0, log: "{not json", pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    h.receive({ type: "frame", gen: 1, req, seq: 1, view, events: "[]", dropped: 0, log: "{not json", pending: null, merge: null, delta: null, workMs: { ops: 0, reply: 0, save: 0 }, memoryBytes: null });
     expect(fatal.length).toBe(1);
     expect(sim.money).toBe(money);
     h.detach();
@@ -188,7 +188,7 @@ describe("worker host round 2 (fake engine)", () => {
     shaped.tick(1);
     h3.flush();
     const req3 = (last(sent3) as Extract<ToWorker, { type: "ops" }>).request!.req;
-    h3.receive({ type: "frame", gen: 3, req: req3, seq: 1, view, events: "{}", dropped: 0, log: null, pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    h3.receive({ type: "frame", gen: 3, req: req3, seq: 1, view, events: "{}", dropped: 0, log: null, pending: null, merge: null, delta: null, workMs: { ops: 0, reply: 0, save: 0 }, memoryBytes: null });
     expect(fatal3.join()).toMatch(/the event batch is not a list/);
     expect(shaped.money).toBe(money);
     h3.detach();
@@ -206,7 +206,7 @@ describe("worker host round 2 (fake engine)", () => {
     const req2 = (last(sent2) as Extract<ToWorker, { type: "ops" }>).request!.req;
     const other = Simulation.newGame(4, "classic");
     other.tower.towerName = "From the bad merge";
-    h2.receive({ type: "frame", gen: 2, req: req2, seq: 1, view, events: "[]", dropped: 0, log: null, pending: null, merge: { save: JSON.stringify(other.serialize()), telemetry: "{not json", housekeeping: null }, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    h2.receive({ type: "frame", gen: 2, req: req2, seq: 1, view, events: "[]", dropped: 0, log: null, pending: null, merge: { save: JSON.stringify(other.serialize()), telemetry: "{not json", housekeeping: null, sync: 1 }, delta: null, workMs: { ops: 0, reply: 0, save: 0 }, memoryBytes: null });
     expect(fatal2.length).toBe(1);
     expect(merged.tower.towerName).not.toBe("From the bad merge");
     expect(merged.money).toBe(money);
@@ -247,7 +247,7 @@ describe("worker host round 2 (fake engine)", () => {
       view[0] = minutes + 1;
       view[4] = money + 12_345;
       if (c.pending) view[21] = 1;
-      h.receive({ type: "frame", gen, req, seq: 1, view, events: "[]", dropped: 0, log: null, pending: null, merge: null, workMs: { ops: 0, reply: 0 }, memoryBytes: null, ...c.reply } as never);
+      h.receive({ type: "frame", gen, req, seq: 1, view, events: "[]", dropped: 0, log: null, pending: null, merge: null, delta: null, workMs: { ops: 0, reply: 0, save: 0 }, memoryBytes: null, ...c.reply } as never);
       expect(fatal.join(), c.name).toMatch(c.error);
       expect(sim.money, c.name).toBe(money);
       expect(sim.tower.towerName, c.name).toBe(name);

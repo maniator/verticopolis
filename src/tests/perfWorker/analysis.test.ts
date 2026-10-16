@@ -18,7 +18,7 @@ const config = { ...makeConfig(parseArgs(["--reps", "6"]), ["small"]) };
  *  repetitions differ by a known factor), the same digests everywhere. */
 function run(rep: number, mode: ModeName, scale: number, over: Partial<ModeRun> = {}): ModeRun {
   const hosted = (t: number) => ({ wallMs: 100 * scale * t, mainMs: 50 * scale * t, batchMainP50Ms: 1, batchMainP95Ms: 2 * scale, batchMainMaxMs: 3, startDigest: "s", endDigest: "e", hostErrorsAdded: [],
-    worker: mode === "wasm-worker" ? { replies: 180, staleReplies: 0, merges: 6, messagesSent: 200, messagesReceived: 181, bytesReceived: 1000, frameBytes: 1800, mergeBytes: 600, applyMs: 10, mergeMs: 5, workerOpsMs: 40, workerReplyMs: 4 } : null });
+    worker: mode === "wasm-worker" ? { replies: 180, staleReplies: 0, merges: 6, messagesSent: 200, messagesReceived: 181, bytesReceived: 1000, frameBytes: 1800, mergeBytes: 600, applyMs: 10, mergeMs: 5, workerOpsMs: 40, workerReplyMs: 4, deltas: 18, deltaBytes: 360, deltaMs: 2 * scale, workerSaveMs: 3 } : null });
   const frames = { frames: 60, meanFps: 10 / scale, medianMs: 100, p95Ms: 150, p99Ms: 190, onePercentLowFps: 5, simMinutesPerSecond: 50, clampedFrames: 0, longTasks: 3, blockingMs: 20 * scale, commands: 5, commandsUnanswered: 0, commandToFrameP50Ms: 30, commandToFrameP95Ms: 40, commandToFrameMinMs: 20, hostErrorsAdded: [],
     worker: mode === "wasm-worker" ? { repliesPerSecond: 9, messagesPerSecond: 20, bytesPerSecond: 5000, staleReplies: 0, merges: 2, applyMsPerSecond: 3, commandAckP50Ms: 4, commandAckP95Ms: 6 } : null };
   return {
@@ -60,6 +60,15 @@ describe("perf:worker analysis", () => {
     expect(traffic.length).toBeGreaterThan(0);
     expect(traffic.every((m) => m.mode === "wasm-worker")).toBe(true);
     expect(traffic.find((m) => m.metric.startsWith("frame view bytes per reply") && m.throttle === "1")!.summary!.median).toBe(10);
+    // The hourly delta rows (#1045): the count, bytes per delta, and time.
+    const row = (prefix: string) => traffic.find((m) => m.metric.startsWith(prefix) && m.throttle === "1")!;
+    expect(row("hourly deltas").summary!.median).toBe(18);
+    expect(row("bytes per hourly delta").summary!.median).toBe(20);
+    expect(row("main-thread delta time").values.length).toBeGreaterThan(0);
+    expect(row("worker save time").summary!.median).toBe(3);
+    // A run recorded before the deltas has no sample in their rows.
+    const old = runs().map((r) => (r.mode === "wasm-worker" ? { ...r, scenarios: { small: { ...r.scenarios.small, hosted: { ...r.scenarios.small.hosted, 1: { ...r.scenarios.small.hosted[1]!, worker: { ...r.scenarios.small.hosted[1]!.worker!, deltas: undefined, deltaBytes: undefined, deltaMs: undefined } } } } } } : r));
+    expect(aggregate(config, old).find((m) => m.metric.startsWith("hourly deltas") && m.throttle === "1")?.values ?? []).toEqual([]);
     // A worker run whose worker heap could not be read has no combined sample.
     const missing = runs().map((r) => (r.mode === "wasm-worker" ? { ...r, scenarios: { small: { ...r.scenarios.small, memory: { ...r.scenarios.small.memory, workerHeapUsedBytes: null } } } } : r));
     expect(aggregate(config, missing).find((m) => m.metric.startsWith("JS heaps + WASM") && m.mode === "wasm-worker")!.values).toEqual([]);
