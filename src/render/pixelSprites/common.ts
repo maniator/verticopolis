@@ -99,8 +99,10 @@ export function hash(seed: number): number {
  * loops.
  */
 export function roomOccupants(u: { occupants: number; outForMeal?: number }): number {
-  const occupants = Number.isFinite(u.occupants) ? u.occupants : 0;
-  const out = u.outForMeal !== undefined && Number.isFinite(u.outForMeal) ? u.outForMeal : 0;
+  const occupants = Number.isFinite(u.occupants) ? Math.max(0, u.occupants) : 0;
+  const out = u.outForMeal !== undefined && Number.isFinite(u.outForMeal)
+    ? Math.min(occupants, Math.max(0, u.outForMeal))
+    : 0;
   return Math.ceil(visibleOccupants({ occupants, outForMeal: out }));
 }
 

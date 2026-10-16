@@ -28,7 +28,7 @@ const DAY: LiveScene = { hour: 12, lit: false, parkingUse: 0, recycleFill: 0, de
 
 describe("roomOccupants agrees with the atlas reader", () => {
   const counts = [0, 0.4, 0.5, 1, 2.5, 3.7, 6, -2, Number.NaN, Number.POSITIVE_INFINITY];
-  const out = [undefined, 0, 1, 1.5, 9, Number.NaN];
+  const out = [undefined, -9, -0.5, 0, 1, 1.5, 9, Number.NaN, Number.POSITIVE_INFINITY];
   it.each(counts)("occupants %s", (occupants) => {
     for (const outForMeal of out) {
       const u = { kind: "nightclub" as const, state: "occupied" as const, width: FACILITIES.nightclub.width, occupants, outForMeal, id: 1 };
