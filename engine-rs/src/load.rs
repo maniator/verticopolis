@@ -27,7 +27,7 @@ const SOLD_CONDO_MAX_PRICE: f64 = 240_000.0;
 const VIP_VISITS_CAP: f64 = 1_000_000.0;
 const LOG_TEXT_CAP: usize = 400;
 const LEGACY_CONDO_DEFAULT_PRICE: f64 = 120_000.0;
-const OLDEST_SAVE_VERSION: i64 = 1;
+pub(crate) const OLDEST_SAVE_VERSION: i64 = 1;
 /// `MAX_SAVE_INFLATED_BYTES` (saveCompression.ts).
 const MAX_SAVE_INFLATED_BYTES: u64 = 32 * 1024 * 1024;
 pub(crate) const UNIT_CAP: usize =

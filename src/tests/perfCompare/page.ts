@@ -251,7 +251,8 @@ export interface WasmColdLoad {
 
 /**
  * The engine package's load steps, timed apart, in a page that has never
- * compiled it (run on the TypeScript project, last): download the bytes,
+ * compiled it (run on the TypeScript project, last, in the last scenario's
+ * fresh page): download the bytes,
  * compile them, instantiate the glue (a cache-busted copy, so it is a fresh
  * module), and build the first Engine from a fixed scenario's save. This is a
  * step-by-step stand-in: the app itself streams the compile
