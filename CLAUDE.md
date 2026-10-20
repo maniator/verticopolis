@@ -181,6 +181,13 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 
 ## Canon reference (don't re-derive from memory)
 
+- **The engine crate version (`engine-rs/Cargo.toml`) goes up with the
+  conformance lock, the save/frame layout/catalog/identity versions and the
+  binding declaration `src/dualrun/engine.d.ts`.** Raise it in `Cargo.toml`,
+  `Cargo.lock` and `engine-rs/consumer/Cargo.lock`, then run
+  `npm run engine:compat`; a guard fails the PR otherwise. Steps and limits are
+  in CONTRIBUTING.md → Versioning → The engine crate version.
+
 - **Per-tower build caps live in `src/engine/facilities.ts`** (`BUILD_CAPS`,
   `POOLED_CAPS`, `MAX_CARS`, `maxSpanFor`) and are enforced in one place,
   `Tower.capReason`. That file is the single source of truth; mirror the 1994
