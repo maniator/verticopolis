@@ -149,10 +149,11 @@ resolving review threads). On top of that, in an agent session:
   add a Hot-Path Auditor layer (diff plus repository access) on a hot-path diff
   and print one record row per checklist item, which goes on the PR as a
   comment; a review without that record does not count as the deep review.
-  Triage a hot-path finding as `patch` or `defer` under its section 7, never
-  `dismiss` because the code was inherited.
-  When porting engine code, compare the TypeScript's caches first (HP-8) and
-  put the complexity note in the PR. Copilot and Codex reviewing a PR here
+  Ported, rewritten, moved or inherited code is reviewed as new. Triage a
+  hot-path finding as `patch` or `defer` under its section 7, never `dismiss`
+  because the code was inherited. Keep every cache, index and counter either
+  engine has (HP-8); when porting engine code, compare the TypeScript's caches
+  first, and put the complexity note in the PR. Copilot and Codex reviewing a PR here
   apply the checklist inline and are asked to print the same record (see
   Review guidelines below), and an independent reviewer's GO or CONDITIONAL GO
   needs it. The surrounding canon lives in

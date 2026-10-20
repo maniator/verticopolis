@@ -178,7 +178,7 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   tower-wide facts out of per-unit and per-person loops, keep counters instead of re-scanning, and
   memoize per-`revision` work (see `Tower.stopsOf`). The checklist,
   `docs/performance/hot-path-review.md` (HP-1 to HP-12), applies to Rust and TypeScript alike, to
-  ported, rewritten and inherited code, and to scans hidden in helpers. The deep review flags a
+  ported, rewritten, moved and inherited code, and to scans hidden in helpers. The deep review flags a
   whole-collection scan under any HP-2 multiplier and resolves it under that page's section 7:
   fixed, or deferred with evidence and an issue, never dismissed as pre-existing. The review
   skills load the page through `_bmad/custom/gds-code-review.toml` and

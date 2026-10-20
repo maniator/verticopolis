@@ -137,9 +137,10 @@ just the obvious lines in the diff, and flag anything CI wouldn't catch:
 - **Performance on hot paths:** apply the same checklist to every surface its
   section 1 lists (the app shell included). Flag whole-collection walks, route
   searches, clones, sorts, rebuilt maps and id scans under any HP-2
-  multiplier, in either language and inside helpers. Review ported, rewritten
-  and inherited code as new, and check a port against the TypeScript's caches
-  (HP-8). Report each finding for resolution under section 7, marked `patch`
+  multiplier, in either language and inside helpers. Review ported, rewritten,
+  moved and inherited code as new. Flag a change that drops, removes or
+  bypasses a cache, index or counter either engine has, and check a port
+  against the TypeScript's caches (HP-8). Report each finding for resolution under section 7, marked `patch`
   or `defer`, pre-existing ones too (naming the open issue that lists one, if
   any).
 
