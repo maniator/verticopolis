@@ -128,7 +128,9 @@ and 10, since "nothing else applies a command" holds only once the facade
 is the WASM host. Slice 9 is the facade's own PC run before the switch; it
 is not RUN-1, which runs on the shipping host after slice 10. Slice 13 (the
 engine's load-time memory peak, A8) lands before slice 9's verdict. The
-fallback's loss bound under the facade (review R6) waits on the owner.
+fallback's loss bound under the facade is up to 30 seconds of play, the
+owner's choice at 22:07 UTC (review R6): restore points ride the saves the
+host already takes, with no added cadence.
 
 **When the clock starts (21:56 UTC).** The eligibility clock starts at slice
 10, not slice 11, under six conditions:
@@ -1508,8 +1510,8 @@ approves this revision:
   no pre-approved drop-back and no automatic promotion (decided 2026-10-20,
   1.2);
 - slice 10, the facade becoming the WASM host; skipping slice 11 before the
-  freeze, if it is ever proposed; and the facade's fallback loss bound
-  (review R6, pending) (1.2);
+  freeze, if it is ever proposed (1.2). The facade's fallback loss bound
+  is decided: up to 30 seconds of play (review R6, 22:07 UTC);
 - the size gate's threshold (4.1);
 - the real saves A7's list asks for, and a local session to run them;
 - making the freeze guard a required check for the window (4.2), and a

@@ -1,7 +1,7 @@
 ---
 name: 'Rust-backed simulation facade'
 type: architecture-review
-status: accepted (owner sign-off of F1 to F9, 2026-10-20 21:40 UTC; R3 decided 21:56 UTC with conditions); review amendment R6 awaits the owner's choice
+status: accepted (owner sign-off of F1 to F9, 2026-10-20 21:40 UTC; R3 decided 21:56 UTC with conditions; R6 decided 22:07 UTC)
 created: '2026-10-20'
 binds: [AD-1, AD-3, AD-4, AD-7, AD-8, '#868', '#954', '#874', '#1068', '#1049', '#1050']
 companions:
@@ -18,8 +18,8 @@ companions:
 > engine crate 0.2.0, after #1139).** Status: the owner signed off F1 to F9
 > at 21:40 UTC; the independent review's amendments (R1 to R6, after the
 > decisions table) are applied. The owner decided R3 at 21:56 UTC with six
-> conditions (recorded in the release plan, section 1.2); R6 waits on his
-> choice. Nothing here is built yet, and nothing here changes the default
+> conditions (recorded in the release plan, section 1.2), and R6 at 22:07
+> UTC (accept a loss of up to 30 seconds of play). Nothing here is built yet, and nothing here changes the default
 > engine, starts a cohort stage or removes the TypeScript fallback. Every figure below is either a cloud
 > measurement labeled exploratory (method and tables in
 > [`measurements.md`](./measurements.md)) or a PC figure the owner quoted as
@@ -121,8 +121,8 @@ The owner signed off F1 to F9 as recommended at 21:40 UTC.
 
 The independent review (CONDITIONAL GO at `d285b45`) found six points that
 bear on the decisions. None of them changes a gate's definition; two are
-the owner's trade-offs. He decided R3 at 21:56 UTC; R6 waits on his
-answer.
+the owner's trade-offs. He decided R3 at 21:56 UTC and R6 at 22:07
+UTC.
 
 | Id | Finding | Amendment | Owner |
 | --- | --- | --- | --- |
@@ -131,7 +131,7 @@ answer.
 | R3 | The A5 mapping said both "slices 1 to 8" and "slices 1 to 8, 10, 11"; the second would start stage 3 and the 1,000-session clock at slice 11, a release later | Recommended: A5 (S6) is slices 1 to 8 and 10, S9 (#954) is slices 2, 7 and 10, and eligible sessions count from slice 10 on a stage-3 build. Slice 11 lands before the freeze and is not a stage-3 input. `?engine=wasm-mirror` sessions after slice 10 are early telemetry, never eligible. The alternative counts from slice 11. Either way slice 9 is not RUN-1: RUN-1 runs after slice 10, as the plan defines it (the shipping host after S6) | **decided 21:56 UTC: slice 10**, under six conditions (release plan 1.2): slice 10 really deploys the facade, with automated runtime and e2e proof that normal WASM play constructs, executes and deserializes no TypeScript `Simulation`; sessions count only once stage 3 is approved and live, the size gate is off, S9 is complete and the `engine_status` eligibility definition holds; mirror-host and TypeScript-arm sessions never count; the 1,000 sessions and the candidate's observation period stay distinct, and later engine, host, fallback, telemetry or key changes are assessed for restarting the observation or replay window; slice 11 before the freeze where practical, skipping it a separate decision; the ramp 0, 10, 25, 50% with every stage and rollback on his approval |
 | R4 | M6 would trip the stop rule at slice 9 on the load-time peak, a cost both designs share (the reviewer's probe: about 82% of the WASM high-water mark is transient load overhead) | Slice 13 becomes a hard prerequisite of slice 9's verdict run. M6's bar is unchanged | none |
 | R5 | No recovery point is checked on TypeScript before a fault | "Validated" means three things. A CI test on every change to the Rust save writer, the sidecar or the TypeScript load path loads Rust-written restore points (save plus sidecar, the conformance corpus and the medium and large scenarios) through the fallback's own adopt path and plays on. At a fault, the adopt checks the point (it loads, its invariants hold) and steps back to the next older point if not. A "recovery point refused" line in the reliability report counts each refusal. Points live in memory only, so the engine that wrote one and the fallback that reads it always come from the same commit, which the CI test covers. A TypeScript load during play would check more, but the owner's direction bans a normal-play deserialize, so it is not used | the report line, a new production analytics field, needs the owner's approval when slice 8 ships |
-| R6 | The fallback's loss bound grows from one game hour (about 6 s of play at speed 1, 0.5 s at top speed) to 30 s of play | Recommended: accept up to 30 s, since faults are rare and this is the emergency path. The alternative adds a point every 10 s of running play (at most 10 s lost, three times as many save pauses). A shorter cadence does not help the 50 ms budget, since each save costs the same (cloud, exploratory: 18 ms medium, 63 ms large); keeping the game-hour bound would cost about 126 ms of every second on large at top speed | waiting |
+| R6 | The fallback's loss bound grows from one game hour (about 6 s of play at speed 1, 0.5 s at top speed) to 30 s of play | Recommended: accept up to 30 s, since faults are rare and this is the emergency path. The alternative adds a point every 10 s of running play (at most 10 s lost, three times as many save pauses). A shorter cadence does not help the 50 ms budget, since each save costs the same (cloud, exploratory: 18 ms medium, 63 ms large); keeping the game-hour bound would cost about 126 ms of every second on large at top speed | decided 22:07 UTC: accept up to 30 s, no added cadence |
 
 The review's non-blocking points are applied too: totals beside the heap in
 section 3, a hot-path record marked on every code slice, branch coverage
@@ -398,8 +398,9 @@ at the top speed (120 game minutes a second) a game hour is half a real
 second, and a `serialize()` on large costs about 63 ms in the cloud. The
 lost-progress bound becomes "since the last gesture or autosave", at most
 30 seconds of play, against today's one game hour (about 6 s of play at
-speed 1, 0.5 s at top speed). That is R6, the owner's choice; once he
-answers, #874's disclosure and the `RestorePoints` text state the bound.
+speed 1, 0.5 s at top speed). The owner accepted that bound at 22:07 UTC
+(R6), so no recovery point is added on a timer; #874's disclosure and the
+`RestorePoints` text state the bound.
 The budget is pre-registered: no save task over 50 ms on large at 1x and
 4x on the PC. The remedies differ by kind of save. The autosave and manual
 saves can wait for idle time, so for them the order is idle-time capture, a

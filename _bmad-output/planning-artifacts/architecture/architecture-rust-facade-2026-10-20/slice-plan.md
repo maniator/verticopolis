@@ -5,9 +5,9 @@
 > independent review (R1 to R6 in
 > [`ARCHITECTURE-REVIEW.md`](./ARCHITECTURE-REVIEW.md)).** Status: the owner
 > signed off F1 to F9 at 21:40 UTC and decided R3 (when eligible sessions
-> start) at 21:56 UTC with six conditions (release plan section 1.2). R6
-> (the fallback's loss bound) waits on his answer, and nothing that depends
-> on it starts before it. Each slice gets its story file before its first
+> start) at 21:56 UTC with six conditions (release plan section 1.2), and R6
+> at 22:07 UTC: the fallback may lose up to 30 seconds of play, so restore
+> points ride the existing saves with no added cadence. Each slice gets its story file before its first
 > commit.
 > PR, issue and lane states drift after this; the live release matrix is
 > #1104.
