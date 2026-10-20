@@ -106,6 +106,9 @@ export function screenLength(authoredLength: number): number {
  */
 export function artRow(authoredRun: number, from: number, limit: number, pitch: number, dir: 1 | -1 = 1, minStep = 0): number[] {
   if (!(pitch > 0) || !(dir * (limit - from) >= 0) || !(authoredRun >= 0)) return []; // nothing fits (NaN included)
+  // An infinite end would make the count Infinity, and `Array.from` throws on it
+  // in the render path. A unit forged with `width: Infinity` is the way in.
+  if (!Number.isFinite(authoredRun) || !Number.isFinite(from) || !Number.isFinite(limit)) return [];
   // The epsilon keeps a slot that lands exactly on a boundary. Callers that own
   // a whole room hand in an exact integer, but one measured off a proportion of
   // a fractional width can arrive as 161.99999999999997, and losing a seat to

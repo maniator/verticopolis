@@ -114,8 +114,9 @@ describe("busyStations fills a room's seats to its occupancy", () => {
   });
 
   it("refuses to invent a seat from a nonsense count", () => {
-    // A forged save can carry anything, and a fractional count has to round the
-    // way a plain counting loop would.
+    // A forged save can carry anything. This helper floors a fractional count so
+    // it never claims a station it does not fill; the callers round up through
+    // `roomOccupants` before they get here.
     expect(busyStations(8, -3, 1).size).toBe(0);
     expect(busyStations(8, Number.NaN, 1).size).toBe(0);
     expect(busyStations(8, 2.7, 1).size).toBe(2);
