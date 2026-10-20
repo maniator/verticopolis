@@ -6,25 +6,29 @@ import { FLOOR, TILE } from "../../scale";
 import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./serviceKit";
 
 /**
- * In-tower service and utility facilities: security, the clinic, housekeeping,
- * and the metro station. (The recycling center lives in `recycling.ts`, the
- * basement garage in `garage.ts`, and the moving actors in `vehicles.ts`.)
+ * In-tower service and utility facilities: security, the medical center,
+ * housekeeping, and the metro station. (The recycling center lives in
+ * `recycling.ts`, the basement garage in `garage.ts`, and the moving actors in
+ * `vehicles.ts`.)
  *
  * Each look was first ported from its Figma reference build script
  * (`_bmad-output/implementation-artifacts/pixelart-figma/build-scripts/`,
  * page 01, drawn on the retired 11 by 44 grid). Since the re-authoring, this
  * TypeScript is the canonical art, drawn through the shared `refMap` scaler,
  * so the tower cross-section reads as the warm, lived-in dollhouse the art
- * direction calls for. Figures are the
- * shared finalized `person()` builds, never hand-rolled. Reserved state colors
+ * direction calls for. Figures are the shared finalized `person()` builds,
+ * never hand-rolled. Reserved state colors
  * are never reused for decoration. These are staffed amenities: they always
  * draw their interior, never a lease or vacancy card.
  *
- * The security, clinic and housekeeping references were re-authored onto the
- * live TILE 10 by FLOOR 45 grid, so `RW`/`RH` equal the shipped footprint and, drawn at that footprint, `refMap`
- * is the identity. Keep it that way: off the shipped size every rect resamples,
- * and a resampled repeat (the monitor wall, the linen, the bottle rows) loses
- * its even pitch. Previews that draw at another size (/gallery) still resample.
+ * The security, medical center and housekeeping references were re-authored
+ * onto the live TILE 10 by FLOOR 45 grid, so `RW`/`RH` equal the shipped
+ * footprint and, drawn at that footprint, `refMap` is the identity. Keep it
+ * that way: off the shipped size every rect resamples, and a resampled repeat
+ * (the monitor wall, the linen, the bottle rows) loses its even pitch. The
+ * gallery and preview pages hand the painters world-size boxes and zoom with
+ * `ctx.scale`, so every shipped path is at the identity; the off-identity guards
+ * in `serviceScale.test.ts` cover a caller that is not.
  */
 
 /** Staff appearance depends on room geography, not the compositor draw origin.
@@ -141,7 +145,8 @@ export function drawMedical(d: DrawCtx, u: Pick<Unit, "kind" | "floor" | "x">, x
   const cabX = 95, cabW = 21;
   box(F, cabX, fy - 16, cabW, 16, "#F4F4F0");
   const bottles = ["#9FD0C8", "#E8C9A0", "#5db4e8", "#F4A0A0", "#DcE8C0"];
-  // Ten copies of one bottle; /gallery is not at identity and frayed them.
+  // Ten copies of one bottle, so they take the uniform fill: off the shipped
+  // size a per-edge fill would round each copy to a different width.
   for (let r = 0; r < 2; r++) for (let k = 0; k < 5; k++) Fu(cabX + 1 + k * 4, fy - 14 + r * 7, 3, 4, bottles[k]);
   F(cabX, fy - 16, cabW, 1, "#D8D8D0");
   // Wheelchair.

@@ -22,13 +22,16 @@ export const RECYCLING_PILE_X0 = 25;
 export const RECYCLING_PILE_PITCH = 7;
 /** A bag is 6 wide, so one pitch leaves a 1px gap to the next. */
 export const RECYCLING_BAG_W = 6;
-/** The baler's left edge, and the five compacted cubes that wait left of it
- *  (6 wide, stepping left from 4px before the baler's edge, so the nearest one
- *  still covers the baler's left bevel; see backlog row #1063); the leftmost
- *  cube starts at `RECYCLING_CUBES_X`. */
+/** The baler's left edge, and the compacted cubes that wait left of it (6 wide,
+ *  stepping left from `RECYCLING_CUBE_GAP` px before the baler's edge, so the
+ *  nearest one still covers the baler's left bevel; see backlog row
+ *  `service-sprite-polish-10x45`); the leftmost cube starts at
+ *  `RECYCLING_CUBES_X`. */
 export const RECYCLING_BALER_X = RECYCLING_REF_W - 47;
+export const RECYCLING_CUBES = 5;
+export const RECYCLING_CUBE_GAP = 4;
 export const RECYCLING_CUBE_W = 6;
-export const RECYCLING_CUBES_X = RECYCLING_BALER_X - 4 - 4 * RECYCLING_CUBE_W;
+export const RECYCLING_CUBES_X = RECYCLING_BALER_X - RECYCLING_CUBE_GAP - (RECYCLING_CUBES - 1) * RECYCLING_CUBE_W;
 /** How many bags the pile holds when full: as many as fit before the
  *  compacted cubes, so the last bag never half covers one. */
 export const RECYCLING_PILE_SLOTS = Math.floor((RECYCLING_CUBES_X - RECYCLING_BAG_W - RECYCLING_PILE_X0) / RECYCLING_PILE_PITCH) + 1;

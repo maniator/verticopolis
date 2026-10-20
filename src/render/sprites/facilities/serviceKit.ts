@@ -8,9 +8,12 @@ import { shade } from "../common";
  * The Figma reference build scripts originally authored each tile against TILE
  * 11 by FLOOR 44. The world then moved to TILE 10 by FLOOR 45 to match the 1994
  * original's 4.5 tiles per floor, which knocked every caller off identity and
- * resampled every rect. The references were re-authored onto 10 by 45 (issue
- * #812), so each caller's `RW`/`RH` is now its true on-screen footprint and the
- * map is the identity again.
+ * resampled every rect. The six sprites for the parking space, parking ramp,
+ * security office, medical center, housekeeping room and recycling center were
+ * re-authored onto 10 by 45 (issue #812), so their `RW`/`RH` is now the true
+ * on-screen footprint and the map is the identity again. `drawMetro` was not
+ * part of that work and is not covered by the footprint guard in
+ * `serviceScale.test.ts`.
  *
  * Keep it that way. Resampling is fine for a surface and bad for a repeated
  * object. {@link refMap} returns TWO fills, both of the {@link Fill} type. `F`

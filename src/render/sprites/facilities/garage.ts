@@ -107,8 +107,7 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: Unit, x: numbe
   const farEdge = (px: number): number => 14 + Math.round(((px - rampX0) * (ground - rampT - 14)) / (rampX1 - rampX0));
   const nearEdge = (px: number): number => farEdge(px) + rampT;
   F(0, 0, W, RH, "#313640");
-  // Ceiling beam, joists, pipe, and conduit. The joists sit on one derived
-  // pitch under the pipe run, so they stay evenly spaced.
+  // Ceiling beam, joists, pipe, and conduit. The joists run under the pipe.
   F(0, 0, W, 4, "#4A4E56");
   F(0, 0, W, 1, "#5C606A");
   F(0, 4, W, 1, "#2E3238");
@@ -116,8 +115,10 @@ export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: Unit, x: numbe
   const pipeW = 131;
   const joists = 10;
   // Rounded per joist rather than stepped by a fixed pitch, so the run closes
-  // on the pipe's last pixel instead of stopping short of it. Spacing stays
-  // within a pixel of even, which a single integer pitch cannot manage here.
+  // on the pipe's last pixel. The gaps alternate between 14 and 15 pixels. A
+  // true single pitch is possible (11 joists at 13 also close on the pipe's
+  // end), but that moves approved art, so it waits on the art row
+  // `service-sprite-polish-10x45`.
   for (let k = 0; k < joists; k++) F(pipeX + Math.round((k * (pipeW - 1)) / (joists - 1)), 5, 1, 2, "#34383E");
   F(pipeX, 6, pipeW, 1, "#6C7684");
   F(pipeX, 8, pipeW, 1, "#4A525C");

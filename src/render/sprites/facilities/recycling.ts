@@ -3,7 +3,7 @@ import { personHiVis } from "../../pixelSprites/common";
 import { layerBreak, layerShell } from "../../pixelSprites/layers";
 import { rand, serviceLabel, type DrawCtx } from "../common";
 import { box, glow, refMap } from "./serviceKit";
-import { RECYCLING_BAG_W, RECYCLING_BALER_X, RECYCLING_CUBE_W, RECYCLING_DECK, RECYCLING_GAUGE_ROWS, RECYCLING_GAUGE_TOP, RECYCLING_PILE_PITCH, RECYCLING_PILE_X0, RECYCLING_REF_H, RECYCLING_REF_W, recyclingLook } from "./recyclingLook";
+import { RECYCLING_BAG_W, RECYCLING_BALER_X, RECYCLING_CUBES, RECYCLING_CUBE_GAP, RECYCLING_CUBE_W, RECYCLING_DECK, RECYCLING_GAUGE_ROWS, RECYCLING_GAUGE_TOP, RECYCLING_PILE_PITCH, RECYCLING_PILE_X0, RECYCLING_REF_H, RECYCLING_REF_W, recyclingLook } from "./recyclingLook";
 
 /**
  * The recycling center, first ported from its Figma reference build script
@@ -18,7 +18,9 @@ import { RECYCLING_BAG_W, RECYCLING_BALER_X, RECYCLING_CUBE_W, RECYCLING_DECK, R
  * the shipped footprint and, drawn at that footprint, `refMap` is the identity.
  * Keep it that way: off the shipped size every rect resamples, and a resampled
  * repeat (the sign letters, the belt bales, the hazard tape) loses its even
- * pitch. Previews that draw at another size (/gallery) still resample.
+ * pitch. The gallery and preview pages hand the painters world-size boxes and
+ * zoom with `ctx.scale`, so every shipped path is at the identity; the
+ * off-identity guards in `serviceScale.test.ts` cover a caller that is not.
  */
 
 // ---- Recycling --------------------------------------------------------------
@@ -37,7 +39,8 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   // Concrete hall: walls, roof ribs, girders, and a service pipe. The full-width
   // bands stay on the edge-derived fill so they meet without a seam; the ribs,
   // studs and pipe brackets are repeated objects and take the uniform one. The
-  // rib pitch divides the hall exactly, so the bay spacing cannot drift.
+  // hall is ten bays of 20, with a rib on each bay's left edge (none on the
+  // right wall, x 200).
   const ribPitch = W / 10;
   F(0, 0, W, H, "#6C6C64");
   F(0, 0, W, Math.round(H * 0.5), "#75756B");
@@ -77,17 +80,19 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   // the hall's own, so they go on the shell (layerShell).
   layerBreak(ctx);
   // Conveyor belt carrying baled recyclables (no reserved red bale). The bale
-  // run is bounded by the belt, so a narrower belt drops bales, never crowds them.
+  // run and the carried items stop at the belt's end cap, so a narrower belt
+  // drops bales and items.
   const by = deck - 24;
   const beltX = 24, beltW = 109;
+  const beltEnd = beltX + beltW - 2; // the end cap's left edge
   F(beltX, by, beltW, 6, "#3A3E44");
   F(beltX, by, beltW, 1, "#4E545C");
   F(beltX, by + 5, beltW, 1, "#242830");
-  for (let bx = beltX + 2; bx + 3 <= beltX + beltW - 2; bx += 6) Fu(bx, by + 1, 3, 4, "#2E323A"); // baled recyclables
+  for (let bx = beltX + 2; bx + 3 <= beltEnd; bx += 6) Fu(bx, by + 1, 3, 4, "#2E323A"); // baled recyclables
   F(beltX - 2, by - 1, 4, 8, "#4A4E54");
   F(beltX + beltW - 2, by - 1, 4, 8, "#4A4E54");
   const items = ["#4E7A4A", "#3E6A9E", "#C8A24A", "#C87A32", "#DCDCE0", "#8C5A3A"];
-  for (let ix = beltX + 4, k = 0; ix + 5 <= beltX + beltW; ix += 12, k++) {
+  for (let ix = beltX + 4, k = 0; ix + 5 <= beltEnd; ix += 12, k++) {
     Fu(ix, by - 4, 5, 4, items[k % items.length]);
     Fu(ix, by - 4, 5, 1, "#FFFFFF", 0.22);
   }
@@ -136,8 +141,8 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   // Compacted cubes waiting by the baler. The pile stops short of them
   // (`RECYCLING_CUBES_X` in recyclingLook.ts), so a full pile never half
   // covers a cube.
-  for (let i = 0; i < 5; i++) {
-    const gx2 = cx - 4 - i * RECYCLING_CUBE_W;
+  for (let i = 0; i < RECYCLING_CUBES; i++) {
+    const gx2 = cx - RECYCLING_CUBE_GAP - i * RECYCLING_CUBE_W;
     Fu(gx2, deck - 5, RECYCLING_CUBE_W, 5, i % 2 ? "#3A4232" : "#2F3628");
     Fu(gx2 + 2, deck - 6, 2, 2, "#FFFFFF", 0.28);
   }
@@ -163,10 +168,10 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
     const jit = Math.floor(rand((u.id * 31 + i) | 0) * 3);
     F(bx, deck - 6 - jit, RECYCLING_BAG_W, 6 + jit, i % 3 === 2 ? "#4a5a3a" : "#3a4232");
     Fu(bx + 2, deck - 7 - jit, 2, 2, "#FFFFFF", 0.35);
-    if (look.stacked && i % 2 === 0 && i < bags - 1) F(bx + 3, deck - 11 - jit, 6, 5, "#2f3628");
+    if (look.stacked && i % 2 === 0 && i < bags - 1) F(bx + 3, deck - 11 - jit, RECYCLING_BAG_W, 5, "#2f3628");
   }
   // Live wall gauge: green, then amber past 0.7, then red with the FULL cue at
-  // capacity. The FULL red is a deliberate state cue, not decoration.
+  // capacity. The FULL red is the reserved stress color, a deliberate state cue.
   const gY = RECYCLING_GAUGE_TOP;
   const gH = RECYCLING_GAUGE_ROWS;
   let gauge = "#6bd47a";
@@ -177,7 +182,7 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
     F(W - 6, gY, 4, gH, "#1B2A14");
     F(W - 5, gY + gH - gaugeH, 2, gaugeH, gauge);
     // serviceLabel's last-but-one argument is the narrowest room (in screen
-    // px) that still shows the label, not a floor height.
+    // px) that still shows the label.
     if (look.full) serviceLabel(ctx, "FULL", sx(W - 31), y, "#ffd2c8", FULL_LABEL_MIN_W, w);
   });
   // The vested plant hand (shared hi-vis build with a hardhat), drawn last so

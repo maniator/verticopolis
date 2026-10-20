@@ -34,11 +34,12 @@ vi.mock("./serviceKit", async (importOriginal) => {
  * three constants (issue #812). These guards are about UNIFORMITY, not beauty.
  * Even PITCH is now reachable too: the references were re-authored onto the live
  * 10 by 45 grid, so the security wall's five monitors are 7 wide on a 9 pitch
- * and the gaps between them are all 2. Pitch is asserted only for the two
- * shelf families (the linen stacks and the cabinet bottles) whose even pitch
- * this re-author was written to deliver. Elsewhere it is not asserted, because
- * an assertion on it would pin one art choice rather than the renderer, and the
- * pitch is only even because a whole number of them fits the authored wall.
+ * and the gaps between them are all 2. Pitch is asserted for the monitor wall
+ * and the two shelf families (the linen stacks and the cabinet bottles), whose
+ * even pitch this re-author was written to deliver. Elsewhere it is not
+ * asserted, because an assertion on it would pin one art choice rather than
+ * the renderer, and the pitch is only even because a whole number of them fits
+ * the authored wall.
  */
 
 /** Records fillRect geometry. A Proxy absorbs every other context call, which
@@ -102,7 +103,7 @@ function paint(sp: (typeof SPRITES)[number], w: number, h: number) {
   return r.rects;
 }
 
-describe("service sprites survive a non-identity reference map", () => {
+describe("service sprites on the grid they are authored for", () => {
   it.each(SPRITES.map((s) => [s.name, s] as const))(
     "%s keeps every filled rect inside its own canvas at the shipped scale",
     (_name, sp) => {
@@ -127,8 +128,15 @@ describe("service sprites survive a non-identity reference map", () => {
     const rects = paint(sprite("security"), 8 * TILE, 1 * FLOOR);
     const bodies = rects.filter((r) => r.c.toLowerCase() === "#0e1420");
     expect(bodies.length).toBe(10);
-    expect(new Set(bodies.map((r) => r.w)).size).toBe(1);
-    expect(new Set(bodies.map((r) => r.h)).size).toBe(1);
+    expect(new Set(bodies.map((r) => `${r.w}x${r.h}`))).toEqual(new Set(["7x9"]));
+    // The headline defect of #812 was the pitch: 2px gutters in every row and
+    // column, so the columns step by 9 and the rows by 11.
+    const steps = (vs: number[]) => {
+      const u = [...new Set(vs)].sort((a, b) => a - b);
+      return { count: u.length, steps: new Set(u.slice(1).map((v, i) => v - u[i])) };
+    };
+    expect(steps(bodies.map((r) => r.x))).toEqual({ count: 5, steps: new Set([9]) });
+    expect(steps(bodies.map((r) => r.y))).toEqual({ count: 2, steps: new Set([11]) });
   });
 
   // A fully general sweep was tried and abandoned: grouping rects by color and
@@ -155,11 +163,12 @@ describe("service sprites survive a non-identity reference map", () => {
   // The linen and the bottles share their tones with other objects in the same
   // room (the cart's towels, the rack's towel), so these pick them by color
   // AND by the shelf or cabinet they sit in, and check count, size and pitch.
-  it.each([
+  const SHELVES = [
     // name, sprite, colors, region [x0, x1), copies, size, column pitch
     ["housekeeping linen", "housekeeping", ["#F4F0EC", "#CFE0FF", "#E8D8C0"], [4, 31], 12, "5x5", 6],
     ["medical bottles", "medical", ["#9FD0C8", "#E8C9A0", "#5DB4E8", "#F4A0A0", "#DCE8C0"], [95, 116], 10, "3x4", 4],
-  ] as const)("%s renders every copy at one size on one pitch", (_label, name, colors, [x0, x1], copies, size, pitch) => {
+  ] as const;
+  it.each(SHELVES)("%s renders every copy at one size on one pitch", (_label, name, colors, [x0, x1], copies, size, pitch) => {
     const sp = sprite(name);
     const rects = paint(sp, sp.tiles * TILE, sp.floors * FLOOR);
     const fam = rects.filter((r) => (colors as readonly string[]).includes(r.c.toUpperCase()) && r.x >= x0 && r.x + r.w <= x1 && r.w > 1 && r.h > 1);
@@ -178,6 +187,11 @@ describe("service sprites survive a non-identity reference map", () => {
       const ref = paint(sp, sp.tiles * REF_TILE, sp.floors * REF_FLOOR);
       const now = paint(sp, sp.tiles * TILE, sp.floors * FLOOR);
       expect(now.length).toBe(ref.length);
+      // A drop or an invention inside the map would be matched by the same
+      // change in the other scale, so also require the paint to be real: some
+      // rects, none of them empty, at both scales.
+      expect(now.length).toBeGreaterThan(0);
+      for (const r of [...ref, ...now]) expect(Math.min(r.w, r.h), `${sp.name} ${r.x},${r.y} ${r.w}x${r.h} ${r.c}`).toBeGreaterThan(0);
     },
   );
 
@@ -203,11 +217,30 @@ describe("service sprites survive a non-identity reference map", () => {
   ] as const)("%s still render at one size at the retired footprint, where the map resamples", (_label, name, color, atLeast) => {
     // The shipped scale is identity, so `F` and `Fu` agree there and the
     // uniform-size tests above could not tell them apart. Off identity is where
-    // `Fu` earns its keep (the /gallery scale), so hold the families to one size
-    // there as well. Swapping `Fu` for `F` in one of these motifs breaks this.
+    // `Fu` earns its keep. No shipped path hands the painters another size (the
+    // gallery and preview draw at world size and zoom with `ctx.scale`), so this
+    // holds the families to one size for a caller that does. Swapping `Fu` for
+    // `F` in one of these motifs breaks it.
     const sp = sprite(name);
     const fam = paint(sp, sp.tiles * REF_TILE, sp.floors * REF_FLOOR).filter((r) => r.c.toUpperCase() === color.toUpperCase());
     expect(fam.length).toBeGreaterThanOrEqual(atLeast);
+    expect(new Set(fam.map((r) => `${r.w}x${r.h}`)).size).toBe(1);
+  });
+
+  it.each(SHELVES)("%s still render at one size at the retired footprint", (_label, name, colors, [x0, x1], copies) => {
+    // The same swap guard for the shelf families: they are checked only at
+    // identity above, where `F` and `Fu` agree, so a `Fu` turned into `F` would
+    // pass CI. The region follows the room onto the retired grid.
+    const sp = sprite(name);
+    const fam = paint(sp, sp.tiles * REF_TILE, sp.floors * REF_FLOOR).filter(
+      (r) =>
+        (colors as readonly string[]).includes(r.c.toUpperCase()) &&
+        r.x >= Math.floor((x0 * REF_TILE) / TILE) &&
+        r.x + r.w <= Math.ceil((x1 * REF_TILE) / TILE) &&
+        r.w > 1 &&
+        r.h > 1,
+    );
+    expect(fam.length).toBe(copies);
     expect(new Set(fam.map((r) => `${r.w}x${r.h}`)).size).toBe(1);
   });
 
@@ -248,8 +281,9 @@ describe("service sprites survive a non-identity reference map", () => {
       [0, 0, 80, 45], [6, 6, 7, 9], [15, 6, 7, 9], [53, 31, 24, 8],
       [71, 13, 1, 2], [0, 0, 1, 1], [79, 44, 1, 1], [3, 7, 5, 13],
     ];
-    // Every footprint this file draws, parking's 40 x 45 included: the identity
-    // guarantee is per-caller, so a footprint left out is a footprint unproven.
+    // Every footprint this file draws, parking's 40 x 45 included. This probes
+    // the map at each size; that each painter really passes its own size is the
+    // call-site test above.
     for (const [RW, RH] of [[40, 45], [80, 45], [160, 45], [200, 90]] as const) {
       const a = recorder();
       const b = recorder();
