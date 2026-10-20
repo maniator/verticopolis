@@ -375,3 +375,13 @@ describe("worker core (fake engine)", () => {
     expect((last(out) as Extract<FromWorker, { type: "frame" }>).merge).not.toBeNull();
   });
 });
+
+describe("EngineWorkerCore.identity (#963)", () => {
+  it("reads the engine's record, and answers undefined without the call or when it throws", () => {
+    const mod = fakeModule();
+    expect(new EngineWorkerCore(mod, () => {}).identity()).toBeUndefined();
+    expect(new EngineWorkerCore({ ...mod, engineIdentity: () => '{"schema":1}' }, () => {}).identity()).toBe('{"schema":1}');
+    const trap = { ...mod, engineIdentity: () => { throw new Error("trap"); } };
+    expect(new EngineWorkerCore(trap, () => {}).identity()).toBeUndefined();
+  });
+});

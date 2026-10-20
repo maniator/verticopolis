@@ -1,4 +1,5 @@
 import type { WasmModule } from "../dualrun/binding";
+import { readEngineIdentity } from "./engineIdentity";
 
 /**
  * How boot gets its engine, for both build modes (see
@@ -77,6 +78,10 @@ export interface EngineBootState {
   /** Set once the engine save writer has turned itself off this page life
    *  (`vctowerWriter.ts`); absent until then. */
   writerLatched?: true;
+  /** The engine's identity record as the loaded package reports it
+   *  (`engineIdentity()`, #963), for About and Copy Diagnostics. Absent when
+   *  no engine loaded or the package has no such call. */
+  identity?: string;
 }
 
 export interface EngineBootOptions {
@@ -147,7 +152,8 @@ export async function loadBootEngine(opts: EngineBootOptions): Promise<EngineBoo
     log.error(`[wasm] ${message}`);
     return { module: null, state: { build, engine: "none", failure: { stage: "load", reason: "package-mismatch", message } } };
   }
-  return { module: mod, state: { build, engine: "wasm", failure: null } };
+  const identity = readEngineIdentity(mod);
+  return { module: mod, state: { build, engine: "wasm", failure: null, ...(identity === undefined ? {} : { identity }) } };
 }
 
 /** Mark a boot that loaded its engine but could not start or keep it. */

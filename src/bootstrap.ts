@@ -227,6 +227,7 @@ export function bootGame(create: () => BootApp): Promise<void> {
     if (!__WASM_ONLY__ && choice === "wasm-worker") {
       try {
         engineWorker = await spawnEngineWorker(makeBrowserWorker, enginePackageUrl());
+        if (engineWorker.identity !== undefined) bootState = { ...bootState, identity: engineWorker.identity };
       } catch (e) {
         // Recorded with its reason, as a failed package load is (#874).
         bootState = { ...bootState, failure: { stage: "load", reason: bootFailureReason(e), message: e instanceof Error ? e.message : String(e) } };

@@ -71,6 +71,9 @@ export type ToWorker = InitMessage | LoadMessage | OpsMessage | FreeMessage;
 export interface ReadyReply {
   type: "ready";
   catalogs: { classic: string; modern: string };
+  /** The engine's identity record (`engineIdentity()`, #963), for About. Absent
+   *  from a package built before the call. */
+  identity?: string;
 }
 
 /** The tower's engine exists; `view` is its first frame. */

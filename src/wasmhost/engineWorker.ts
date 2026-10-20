@@ -22,7 +22,7 @@ async function load(url: string): Promise<void> {
   const mod = (await import(/* @vite-ignore */ url)) as { default: () => Promise<{ memory?: WebAssembly.Memory }> };
   const exports = await mod.default();
   const ready = new EngineWorkerCore(checkBinding(mod), post, () => exports?.memory?.buffer.byteLength ?? null);
-  post({ type: "ready", catalogs: ready.catalogs() });
+  post({ type: "ready", catalogs: ready.catalogs(), identity: ready.identity() });
   core = ready;
   const pending = queue ?? [];
   queue = null;

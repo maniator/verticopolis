@@ -123,3 +123,29 @@ describe("engineFailureCopy", () => {
     for (const line of all) expect(line).not.toMatch(/\u2014/);
   });
 });
+
+describe("loadBootEngine, engine identity (#963)", () => {
+  const withIdentity = (fn: () => string) => ({ ...mod(), engineIdentity: fn }) as unknown as WasmModule;
+
+  it("carries the engine's record on the boot state, in both build modes", async () => {
+    for (const wasmOnly of [false, true]) {
+      const r = await loadBootEngine({ wasmOnly, load: async () => withIdentity(() => '{"schema":1}') });
+      expect(r.state.identity).toBe('{"schema":1}');
+    }
+  });
+
+  it("boots on, with no identity, a package without the call or one whose call throws", async () => {
+    const throwing = withIdentity(() => {
+      throw new Error("trap");
+    });
+    for (const m of [mod(), throwing]) {
+      const r = await loadBootEngine({ wasmOnly: false, load: async () => m });
+      expect(r.state).toEqual({ build: "switchable", engine: "wasm", failure: null });
+    }
+  });
+
+  it("keeps the record when a later failure puts the game back on TypeScript", async () => {
+    const r = await loadBootEngine({ wasmOnly: false, load: async () => withIdentity(() => "{}") });
+    expect(failBoot(r.state, "start", "attach-refused", "x").identity).toBe("{}");
+  });
+});

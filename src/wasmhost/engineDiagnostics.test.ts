@@ -1,0 +1,218 @@
+import { describe, expect, it } from "vitest";
+import { buildDiagnostics, identityMismatches } from "./engineDiagnostics";
+import type { EngineBootState } from "./engineBoot";
+import type { ExpectedEnginePackage } from "./enginePackageRecord";
+import { IDENTITY_FIXTURE } from "./engineIdentity.fixture";
+
+const identity = JSON.stringify(IDENTITY_FIXTURE);
+const expected = (
+  version = IDENTITY_FIXTURE.crate.version,
+): ExpectedEnginePackage => ({
+  package: "0123456789abcdef".repeat(4),
+  files: {},
+  crate: { name: IDENTITY_FIXTURE.crate.name, version },
+});
+const wasmBoot = (extra: Partial<EngineBootState> = {}): EngineBootState => ({
+  build: "switchable",
+  engine: "wasm",
+  failure: null,
+  identity,
+  ...extra,
+});
+const base = { appVersion: "1.2.3", appSha: "abc1234" };
+const row = (r: ReturnType<typeof buildDiagnostics>, label: string) =>
+  r.rows.filter((x) => x.label === label).map((x) => x.value);
+
+describe("buildDiagnostics", () => {
+  it("builds from nothing at all: the page never published a boot state", () => {
+    const r = buildDiagnostics({ appVersion: "dev" });
+    expect(r.state).toBe("typescript");
+    expect(r.rows[0]).toEqual({ label: "App", value: "vdev" });
+    expect(r.text).toContain("Verticopolis diagnostics");
+  });
+
+  it("reports the TypeScript engine", () => {
+    const r = buildDiagnostics({
+      ...base,
+      boot: { build: "switchable", engine: "ts", failure: null },
+    });
+    expect(r.state).toBe("typescript");
+    expect(row(r, "Engine in use")).toEqual(["TypeScript engine"]);
+    expect(row(r, "App")).toEqual(["v1.2.3 (abc1234)"]);
+  });
+
+  it("reports a healthy WASM engine with every field of its record", () => {
+    const r = buildDiagnostics({
+      ...base,
+      boot: wasmBoot(),
+      host: { hosted: true },
+      expected: expected(),
+    });
+    expect(r.state).toBe("ok");
+    expect(row(r, "Engine in use")).toEqual(["WASM engine"]);
+    expect(row(r, "Engine crate")).toEqual(["example-engine 9.8.7"]);
+    expect(row(r, "Save version")).toEqual(["7 (loads back to 1)"]);
+    expect(row(r, "Frame layout")).toEqual(["2"]);
+    expect(row(r, "Catalog")).toEqual([
+      "3 (classic aaaa1111aaaa1111, modern bbbb2222bbbb2222)",
+    ]);
+    expect(row(r, "Conformance lock")).toEqual(["cccc3333cccc3333"]);
+    expect(row(r, "Package this page expects")).toEqual(["0123456789ab"]);
+    expect(row(r, "Mismatch")).toEqual([]);
+  });
+
+  it("names the worker placement", () => {
+    const r = buildDiagnostics({
+      ...base,
+      boot: wasmBoot(),
+      host: { hosted: true, placement: "worker" },
+    });
+    expect(row(r, "Engine in use")).toEqual(["WASM engine (worker)"]);
+  });
+
+  it("says the identity is unavailable for a package without the call", () => {
+    const { identity: _omit, ...noIdentity } = wasmBoot();
+    const r = buildDiagnostics({
+      ...base,
+      boot: noIdentity,
+      host: { hosted: true },
+    });
+    expect(r.state).toBe("unavailable");
+    expect(row(r, "Engine crate")).toEqual([]);
+  });
+
+  it("treats an unreadable record as unavailable", () => {
+    const r = buildDiagnostics({
+      ...base,
+      boot: wasmBoot({ identity: "{broken" }),
+      host: { hosted: true },
+    });
+    expect(r.state).toBe("unavailable");
+  });
+
+  it("names the field when the engine's crate differs from the build this page expects", () => {
+    const r = buildDiagnostics({
+      ...base,
+      boot: wasmBoot(),
+      host: { hosted: true },
+      expected: expected("0.0.1"),
+    });
+    expect(r.state).toBe("mismatch");
+    expect(row(r, "Mismatch")).toEqual([
+      "crate version (engine 9.8.7, this page was built for 0.0.1)",
+    ]);
+  });
+
+  it("skips the comparison when BUILD.json predates the crate key", () => {
+    const { crate: _omit, ...noCrate } = expected();
+    const r = buildDiagnostics({
+      ...base,
+      boot: wasmBoot(),
+      host: { hosted: true },
+      expected: noCrate,
+    });
+    expect(r.state).toBe("ok");
+    expect(row(r, "Crate this page expects")).toEqual([]);
+  });
+
+  it("reports an engine that never loaded in a switchable build, with the reason and the crate the page expects", () => {
+    const boot: EngineBootState = {
+      build: "switchable",
+      engine: "ts",
+      failure: {
+        stage: "load",
+        reason: "boot-timeout",
+        message: "no answer in 90 seconds",
+      },
+    };
+    const r = buildDiagnostics({ ...base, boot, expected: expected() });
+    expect(r.state).toBe("not-loaded");
+    expect(r.summary).toContain("TypeScript engine");
+    expect(row(r, "Failed at")).toEqual(["load"]);
+    expect(row(r, "Reason")).toEqual(["boot-timeout"]);
+    expect(row(r, "Detail")).toEqual(["no answer in 90 seconds"]);
+    expect(row(r, "Crate this page expects")).toEqual(["example-engine 9.8.7"]);
+    expect(row(r, "Engine crate")).toEqual([]);
+  });
+
+  it("reports a wasm-only build that stopped", () => {
+    const boot: EngineBootState = {
+      build: "wasm-only",
+      engine: "none",
+      failure: { stage: "load", reason: "package-mismatch", message: "x" },
+    };
+    const r = buildDiagnostics({ ...base, boot });
+    expect(r.state).toBe("not-loaded");
+    expect(row(r, "Engine in use")).toEqual(["none"]);
+    expect(r.summary).toContain("no other engine");
+  });
+
+  it("does not call a fallen-back engine healthy even though its identity was read", () => {
+    const r = buildDiagnostics({
+      ...base,
+      boot: wasmBoot({
+        engine: "ts",
+        failure: {
+          stage: "start",
+          reason: "attach-refused",
+          message: "refused",
+        },
+      }),
+    });
+    expect(r.state).toBe("not-loaded");
+  });
+
+  it("carries the host's last error and the count of errors it dropped", () => {
+    const r = buildDiagnostics({
+      ...base,
+      boot: wasmBoot(),
+      host: { hosted: true, lastError: "trap in tick", droppedErrors: 4 },
+    });
+    expect(row(r, "Last engine error")).toEqual(["trap in tick"]);
+    expect(row(r, "Errors not kept")).toEqual(["4"]);
+  });
+
+  it("keeps the start of a long message", () => {
+    const boot: EngineBootState = {
+      build: "switchable",
+      engine: "ts",
+      failure: {
+        stage: "load",
+        reason: "boot-error",
+        message: "x".repeat(500),
+      },
+    };
+    const detail = row(buildDiagnostics({ ...base, boot }), "Detail")[0];
+    expect(detail).toHaveLength(303);
+    expect(detail.endsWith("...")).toBe(true);
+  });
+
+  it("writes the text as heading, summary and one line per row, with no em-dash", () => {
+    const r = buildDiagnostics({
+      ...base,
+      boot: wasmBoot(),
+      host: { hosted: true },
+      expected: expected(),
+    });
+    const lines = r.text.split("\n");
+    expect(lines[0]).toBe("Verticopolis diagnostics");
+    expect(lines[1]).toBe(r.summary);
+    expect(lines.slice(2)).toEqual(r.rows.map((x) => `${x.label}: ${x.value}`));
+    expect(r.text).not.toContain("—");
+  });
+});
+
+describe("identityMismatches", () => {
+  const record = { ...IDENTITY_FIXTURE };
+  it("is empty without an expected crate", () => {
+    expect(identityMismatches(record, null)).toEqual([]);
+    expect(identityMismatches(record, undefined)).toEqual([]);
+  });
+  it("names the crate when the name differs", () => {
+    const e = expected();
+    e.crate = { name: "other-engine", version: "9.8.7" };
+    expect(identityMismatches(record, e)).toEqual([
+      "crate name (engine example-engine, this page was built for other-engine)",
+    ]);
+  });
+});

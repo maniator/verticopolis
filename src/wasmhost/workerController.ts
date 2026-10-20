@@ -28,6 +28,8 @@ export interface EngineWorkerLike {
 export interface SpawnedWorker {
   worker: EngineWorkerLike;
   catalogs: { classic: string; modern: string };
+  /** The engine's identity record as the worker read it (#963); undefined for a package without the call. */
+  identity?: string;
 }
 
 export interface WorkerHostStatus extends HostErrors {
@@ -80,7 +82,7 @@ export function spawnEngineWorker(make: () => EngineWorkerLike, url: string, tim
         clearTimeout(timer);
         worker.onmessage = null;
         worker.onerror = null;
-        resolve({ worker, catalogs: msg.catalogs });
+        resolve({ worker, catalogs: msg.catalogs, identity: msg.identity });
       } else if (msg.type === "error") {
         fail(msg.message);
       }

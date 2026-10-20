@@ -186,3 +186,27 @@ describe("settleEngine", () => {
     expect(stepGate(sim)).toBeUndefined();
   });
 });
+
+describe("spawnEngineWorker, engine identity (#963)", () => {
+  const readyWorker = (identity: string | undefined): EngineWorkerLike => {
+    const w: EngineWorkerLike = {
+      onmessage: null,
+      onerror: null,
+      postMessage() {
+        setTimeout(() => w.onmessage?.({ data: { type: "ready", catalogs: { classic: "c", modern: "m" }, ...(identity === undefined ? {} : { identity }) } satisfies FromWorker }), 0);
+      },
+      terminate() {},
+    };
+    return w;
+  };
+
+  it("hands the worker's identity record to the caller", async () => {
+    const spawned = await spawnEngineWorker(() => readyWorker('{"schema":1}'), "u");
+    expect(spawned.identity).toBe('{"schema":1}');
+  });
+
+  it("leaves it undefined for a worker whose package has no such call", async () => {
+    const spawned = await spawnEngineWorker(() => readyWorker(undefined), "u");
+    expect(spawned.identity).toBeUndefined();
+  });
+});
