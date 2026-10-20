@@ -106,6 +106,18 @@ function gitShortSha(): string {
  * read from the CHANGELOG.md section matching this version (see `changelogNotes`
  * and CONTRIBUTING.md → "Player notes").
  */
+/** Where the build writes dist/, as Vite resolved it (outDir is relative to
+ *  root, so the engine integrity transform asks rather than guesses). */
+let builtDistDir = resolve(__dirname, "dist");
+function captureOutDir(set: (dir: string) => void): Plugin {
+  return {
+    name: "capture-out-dir",
+    configResolved(config) {
+      set(resolve(config.root, config.build.outDir));
+    },
+  };
+}
+
 function emitVersionJson(): Plugin {
   return {
     name: "emit-version-json",
@@ -296,12 +308,16 @@ export default defineConfig(({ command }) => ({
     // The engine package this shell was built with (#985 criterion 5): the
     // package id and the glue and binary digests from
     // src/public/engine/BUILD.json. The page hashes what it fetches against
-    // this before it runs the engine. Null when there is no usable package
-    // (a dev serve, Vitest, a deliberate VC_ALLOW_NO_ENGINE=1 build); a
-    // production build with a broken record stops here.
-    __ENGINE_PACKAGE__: JSON.stringify(readExpectedPackage(resolve(__dirname, "src/public"), command === "build" && !process.env.VITEST ? "build" : "other")),
+    // this before it runs the engine. Null for a dev serve and Vitest (they
+    // skip the check) and for a production build with no package folder at
+    // all (VC_ALLOW_NO_ENGINE=1); a production build with a broken record
+    // stops here.
+    __ENGINE_PACKAGE__: JSON.stringify(readExpectedPackage(resolve(__dirname, "src/public"), command === "build" ? "build" : "other")),
   },
   plugins: [
+    captureOutDir((dir) => {
+      builtDistDir = dir;
+    }),
     emitVersionJson(),
     noUnlistedPackageFiles(),
     sharedHead(),
@@ -461,7 +477,7 @@ export default defineConfig(({ command }) => ({
           // host's own 404 rather than the game shell, same as the file below it.
           /\.well-known/,
         ],
-        manifestTransforms: [engineIntegrityTransform(resolve(__dirname, "dist"))],
+        manifestTransforms: [engineIntegrityTransform(() => builtDistDir)],
         cleanupOutdatedCaches: true,
         // Excalibur's bundle is comfortably large; lift the precache ceiling.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,

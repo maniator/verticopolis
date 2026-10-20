@@ -92,7 +92,13 @@ export interface VerifiedPackage {
 /** `navigator.serviceWorker` is undefined when service workers are off or the
  *  context is insecure, so the diagnostics read it with a guard. */
 export function isControlled(nav: { serviceWorker?: { controller?: unknown } } | undefined): boolean {
-  return nav?.serviceWorker?.controller != null;
+  try {
+    return nav?.serviceWorker?.controller != null;
+  } catch {
+    // Reading it can throw a SecurityError (blocked site data, a sandboxed
+    // frame); the diagnostics must still be built.
+    return false;
+  }
 }
 
 /** The page's digest: `crypto.subtle`, or undefined in an insecure context. */
@@ -117,8 +123,13 @@ const NAMES: Record<PackageFile, string> = { "build-record": "BUILD.json", glue:
  * there is no unbounded `arrayBuffer()` fallback.
  */
 async function readBounded(file: PackageFile, res: Response, cap: number, ctl: AbortController, fail: (kind: PackageFailureKind, why: string) => EnginePackageError): Promise<Uint8Array> {
-  const declared = Number(res.headers.get("content-length"));
-  if (Number.isFinite(declared) && res.headers.get("content-length") !== null && declared > cap) {
+  // Content-Length counts the encoded bytes, while the stream yields decoded
+  // ones, so it is only compared with a body that was not compressed. For a
+  // compressed one the real count below is the only measure.
+  const header = res.headers.get("content-length");
+  const encoding = res.headers.get("content-encoding");
+  const declared = header !== null && (encoding === null || encoding === "" || encoding.toLowerCase() === "identity") ? Number(header) : Number.NaN;
+  if (Number.isFinite(declared) && declared > cap) {
     await res.body?.cancel().catch(() => undefined);
     throw fail("mismatch", `${NAMES[file]} is larger than the ${cap} bytes this build expects`);
   }
@@ -140,9 +151,12 @@ async function readBounded(file: PackageFile, res: Response, cap: number, ctl: A
     }
   } catch (e) {
     if (e instanceof EnginePackageError || e instanceof SiblingStopped) throw e;
+    // A sibling's failure or the caller's deadline aborts this read too; that
+    // is not this file's fault and must not outrank the real failure.
+    if (ctl.signal.aborted) throw new SiblingStopped();
     throw fail("load-failed", `${NAMES[file]} stopped arriving: ${e instanceof Error ? e.message : String(e)}`);
   }
-  if (Number.isFinite(declared) && res.headers.get("content-length") !== null && total < declared) {
+  if (Number.isFinite(declared) && total < declared) {
     throw fail("load-failed", `${NAMES[file]} ended after ${total} of ${declared} bytes`);
   }
   const out = new Uint8Array(total);
@@ -192,9 +206,21 @@ export async function verifyEnginePackage(opts: VerifyOptions): Promise<Verified
       throw fail("load-failed", `${NAMES[file]} could not be fetched: ${e instanceof Error ? e.message : String(e)}`, { file });
     }
     if (ctl.signal.aborted) throw new SiblingStopped();
-    if (res.status !== 200) throw fail("load-failed", `${NAMES[file]} came back with HTTP ${res.status}`, { file });
-    if (res.redirected && new URL(res.url).origin !== opts.origin) throw fail("load-failed", `${NAMES[file]} was redirected to another origin`, { file });
-    if (/^text\/html/i.test(res.headers.get("content-type") ?? "")) throw fail("load-failed", `${NAMES[file]} came back as a web page`, { file });
+    const refuse = (why: string) => {
+      void res.body?.cancel().catch(() => undefined);
+      return fail("load-failed", `${NAMES[file]} ${why}`, { file });
+    };
+    if (res.status !== 200) throw refuse(`came back with HTTP ${res.status}`);
+    if (res.redirected) {
+      let origin: string | null = null;
+      try {
+        origin = new URL(res.url).origin;
+      } catch {
+        // An unparseable final URL cannot be shown to be ours.
+      }
+      if (origin !== opts.origin) throw refuse("was redirected to another origin");
+    }
+    if (/^text\/html/i.test(res.headers.get("content-type") ?? "")) throw refuse("came back as a web page");
     return readBounded(file, res, cap, ctl, (kind, why) => fail(kind, why, { file }));
   };
   const order: [PackageFile, string, number][] = [
@@ -227,19 +253,19 @@ export async function verifyEnginePackage(opts: VerifyOptions): Promise<Verified
   }
   const [recordBytes, glue, wasm] = bodies;
 
-  // A complete body of the wrong size is a different build. The sizes are
-  // compared before any hashing.
-  for (const [file, bytes] of [["glue", glue], ["wasm", wasm]] as const) {
-    const want = expected.files[file === "glue" ? ENGINE_GLUE : ENGINE_WASM];
-    if (bytes.length !== want.bytes) {
-      throw fail("mismatch", `${NAMES[file]} is ${bytes.length} bytes; this build expects ${want.bytes}`, { file, expected: shortId(want.sha256) });
-    }
-  }
-
   const parsed = parseEngineRecord(new TextDecoder().decode(recordBytes));
   if (!parsed.ok) throw fail("mismatch", `BUILD.json is not a usable record (${parsed.why})`, { file: "build-record" });
   const record = parsed.record;
   const served = { servedPackage: shortId(record.package) };
+  // A complete body of the wrong size is a different build (a body that ends
+  // early with nothing to say it was cut short reads the same way). The sizes
+  // are compared before any hashing, with the served id attached.
+  for (const [file, bytes] of [["glue", glue], ["wasm", wasm]] as const) {
+    const want = expected.files[file === "glue" ? ENGINE_GLUE : ENGINE_WASM];
+    if (bytes.length !== want.bytes) {
+      throw fail("mismatch", `${NAMES[file]} is ${bytes.length} bytes; this build expects ${want.bytes}`, { file, expected: shortId(want.sha256), ...served });
+    }
+  }
   if (record.package !== expected.package) {
     throw fail("mismatch", `BUILD.json names package ${shortId(record.package)}; this build expects ${shortId(expected.package)}`, { file: "build-record", ...served });
   }

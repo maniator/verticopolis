@@ -43,13 +43,14 @@ describe("readExpectedPackage", () => {
   it.each([
     ["an old schema 1 record", JSON.stringify({ sources: "a".repeat(64) })],
     ["text that is not JSON", "not json"],
-  ])("stops a build on %s, and tells a dev serve or a test nothing", (_name, text) => {
+  ])("stops a build on %s, and a dev serve or a test never reads it", (_name, text) => {
     const d = pkg({ record: text });
     expect(() => readExpectedPackage(d, "build")).toThrow(/not a usable schema 2 record/);
     expect(readExpectedPackage(d, "other")).toBeNull();
   });
 
-  it("gives a dev serve null for a package with no record", () => {
+  it("gives a dev serve or a test null even for a good record", () => {
+    expect(readExpectedPackage(pkg(), "other")).toBeNull();
     expect(readExpectedPackage(pkg({ record: null }), "other")).toBeNull();
   });
 });
@@ -78,6 +79,14 @@ describe("engineIntegrityTransform", () => {
     expect(manifest[0].integrity).toBe(integrityOf(glue));
   });
 
+  it("asks for the output folder when it is given a function, so a changed outDir is followed", () => {
+    const d = pkg();
+    let asked = 0;
+    const { manifest } = engineIntegrityTransform(() => (asked++, d))(entries());
+    expect(asked).toBe(3);
+    expect(manifest[0].integrity).toBe(integrityOf(glue));
+  });
+
   it("stops the build when an engine entry has no file to hash", () => {
     const d = pkg();
     rmSync(join(d, ENGINE_DIR, ENGINE_WASM));
@@ -98,17 +107,22 @@ describe("manifestIntegrity", () => {
     expect(got.get("engine/b.wasm")).toBe("sha256-x");
     expect(got.get("c.png")).toBe("sha256-y");
   });
+
+  it("reads a key only as a whole word, so baseurl or xintegrity do not count", () => {
+    const got = manifestIntegrity(`[{baseurl:"no.js",revision:"1"},{url:"a.js",revision:"2",xintegrity:"sha256-bad"}]`);
+    expect(got.has("no.js")).toBe(false);
+    expect(got.get("a.js")).toBeUndefined();
+  });
 });
 
 describe("engineDistProblems", () => {
   /** A manifest with the three engine entries carrying the right integrity. */
-  function manifestFor(d: string, over: Record<string, string | null> = {}): string {
+  function manifestFor(_d: string, over: Record<string, string | null> = {}): string {
     const entry = (name: string, bytes: Uint8Array) => {
       const url = ENGINE_DIR + name;
       const integrity = url in over ? over[url] : integrityOf(bytes);
       return `{url:"${url}",revision:"r"${integrity === null ? "" : `,integrity:"${integrity}"`}}`;
     };
-    void d;
     return `[${entry(ENGINE_GLUE, glue)},${entry(ENGINE_WASM, wasm)},${entry(ENGINE_BUILD_RECORD, new TextEncoder().encode(JSON.stringify(record)))}]`;
   }
 
@@ -139,6 +153,19 @@ describe("engineDistProblems", () => {
   it("reports a missing or unusable record", () => {
     expect(engineDistProblems(pkg({ record: null }), "[]")[0]).toContain("is missing");
     expect(engineDistProblems(pkg({ record: "{}" }), "[]")[0]).toContain("not a usable schema 2 record");
+  });
+
+  it("reports an engine entry that is not in the manifest at all", () => {
+    const d = pkg();
+    const only = manifestFor(d).replace(/\{url:"engine\/BUILD\.json"[^}]*\}/, "");
+    expect(engineDistProblems(d, only).join("\n")).toContain(`precache entry ${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing from the manifest`);
+    expect(engineDistProblems(d, "[]")).toHaveLength(3);
+  });
+
+  it("reports a binary that is missing from dist", () => {
+    const d = pkg();
+    rmSync(join(d, ENGINE_DIR, ENGINE_WASM));
+    expect(engineDistProblems(d, manifestFor(d)).join("\n")).toContain(`dist/${ENGINE_DIR}${ENGINE_WASM} is missing`);
   });
 
   it("reports an engine entry with no integrity, and one with the wrong integrity", () => {

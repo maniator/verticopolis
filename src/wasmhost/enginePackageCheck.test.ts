@@ -52,6 +52,10 @@ function server(files: Record<string, Served>) {
     const chunks = spec.chunks ?? [spec.body ?? new Uint8Array()];
     let i = 0;
     const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        // A real fetch errors a body that is still arriving when its signal fires.
+        if (spec.endless) init.signal.addEventListener("abort", () => c.error(new DOMException("aborted", "AbortError")));
+      },
       pull(c) {
         if (i < chunks.length) c.enqueue(chunks[i++]);
         else if (spec.breakAfter) c.error(new Error("connection reset"));
@@ -193,6 +197,16 @@ describe("files that do not arrive whole", () => {
     expect(e.detail.file).toBe("wasm");
   });
 
+  it("treats a redirect whose final URL cannot be read as load-failed", async () => {
+    const files = good();
+    files[URLS.glue] = { body: glue, redirected: "not a url" };
+    const { promise, seen } = run(files);
+    const e = (await promise.catch((err: unknown) => err)) as EnginePackageError;
+    expect(e.kind).toBe("load-failed");
+    expect(e.detail.file).toBe("glue");
+    expect(seen.find((x) => x.url === URLS.glue)?.cancelled).toBe(true);
+  });
+
   it("allows a redirect that stays on the origin", async () => {
     const files = good();
     files[URLS.wasm] = { body: wasm, redirected: `${ORIGIN}/elsewhere/engine.wasm` };
@@ -271,6 +285,30 @@ describe("files from another build", () => {
     expect(e.detail.file).toBe("glue");
     expect(e.message).toContain("bytes");
     expect(e.detail.found).toBeNull();
+  });
+
+  it("names the served package on a body of the wrong size, so the screen can show both ids", async () => {
+    const other = engineBuildRecord(glue.slice(0, glue.length - 5), wasm, "a".repeat(64), sha);
+    const files = good();
+    files[URLS.record] = { body: recordText(other) };
+    files[URLS.glue] = { body: glue.slice(0, glue.length - 5) };
+    const e = await refusal(files);
+    expect(e.kind).toBe("mismatch");
+    expect(e.detail.servedPackage).toBe(other.package.slice(0, 12));
+    expect(e.detail.expectedPackage).toBe(record.package.slice(0, 12));
+  });
+
+  it("does not compare Content-Length with a compressed body", async () => {
+    const files = good();
+    files[URLS.wasm] = { body: wasm, headers: { "content-encoding": "gzip", "content-length": "17" } };
+    await expect(run(files).promise).resolves.toBeTruthy();
+  });
+
+  it("compares Content-Length with an uncompressed body", async () => {
+    const files = good();
+    files[URLS.wasm] = { body: wasm.slice(0, 100), headers: { "content-encoding": "identity", "content-length": String(wasm.length) } };
+    const e = await refusal(files);
+    expect(e.kind).toBe("load-failed");
   });
 
   it("refuses a body longer than expected, cancelling the stream", async () => {
@@ -359,6 +397,15 @@ describe("the caller's deadline and the siblings", () => {
     ctl.abort();
     await expect(promise).rejects.toBeInstanceOf(EnginePackageAborted);
     expect(seen.every((s) => s.signal.aborted)).toBe(true);
+  });
+
+  it("treats a read that the deadline cut short as the caller's abort, not a load failure", async () => {
+    const files = good();
+    files[URLS.wasm] = { chunks: [wasm.slice(0, 100)], endless: true };
+    const { promise, ctl } = run(files);
+    await new Promise((r) => setTimeout(r, 10));
+    ctl.abort();
+    await expect(promise).rejects.toBeInstanceOf(EnginePackageAborted);
   });
 
   it("stops the other fetches when one file fails, and reports that file", async () => {

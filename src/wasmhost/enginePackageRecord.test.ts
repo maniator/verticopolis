@@ -58,6 +58,12 @@ describe("parseEngineRecord", () => {
     expect(parsed.ok).toBe(true);
   });
 
+  it("ignores an unknown key inside a file entry and drops it from the record", () => {
+    const r = record();
+    const parsed = parseEngineRecord(JSON.stringify({ ...r, files: { ...r.files, [ENGINE_GLUE]: { ...r.files[ENGINE_GLUE], note: "x" } } }));
+    expect(parsed).toEqual({ ok: true, record: r });
+  });
+
   const bad: [string, (r: Record<string, unknown>) => unknown][] = [
     ["schema 1", (r) => ({ ...r, schema: 1 })],
     ["no schema", ({ schema: _s, ...r }) => r],
@@ -72,7 +78,6 @@ describe("parseEngineRecord", () => {
     ["a negative byte count", (r) => ({ ...r, files: { ...(r.files as object), [ENGINE_GLUE]: { sha256: "0".repeat(64), bytes: -1 } } })],
     ["a fractional byte count", (r) => ({ ...r, files: { ...(r.files as object), [ENGINE_GLUE]: { sha256: "0".repeat(64), bytes: 1.5 } } })],
     ["a string byte count", (r) => ({ ...r, files: { ...(r.files as object), [ENGINE_GLUE]: { sha256: "0".repeat(64), bytes: "5" } } })],
-    ["an entry with an extra key", (r) => ({ ...r, files: { ...(r.files as object), [ENGINE_GLUE]: { sha256: "0".repeat(64), bytes: 1, extra: true } } })],
   ];
   it.each(bad)("refuses %s", (_name, mutate) => {
     const r = mutate({ ...record() } as unknown as Record<string, unknown>);

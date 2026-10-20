@@ -14,26 +14,24 @@ import { canonicalFilesJson, expectedOf, parseEngineRecord, type ExpectedEngineP
  * What `__ENGINE_PACKAGE__` is for a build: the record of `src/public/engine/`,
  * or null.
  *
- * - A production build (`vite build`) needs it. A missing package folder is
+ * - A production build (`mode: "build"`) needs it. A missing package folder is
  *   null, and scripts/verify-precache.ts enforces the opt-in rule afterwards
- *   (`missingEngine` in src/precacheEntry.ts); a record that is missing from a package that exists,
- *   unreadable, or not schema 2 stops the build here.
- * - A dev serve and Vitest get the record when there is a usable one and null
- *   otherwise, so `npm test` runs with no Rust toolchain and a dev session
- *   never stops for a stale package.
+ *   (`missingEngine` in src/precacheEntry.ts); a record that is missing from a
+ *   package that exists, unreadable, or not schema 2 stops the build here.
+ * - Anything else (a dev serve, Vitest) is always null and reads nothing, so
+ *   `npm test` runs with no Rust toolchain and a dev session never stops for a
+ *   stale package. Dev and test skip the byte check.
  */
 export function readExpectedPackage(publicDir: string, mode: "build" | "other"): ExpectedEnginePackage | null {
+  if (mode === "other") return null;
   const dir = resolve(publicDir, ENGINE_DIR);
   const file = resolve(dir, ENGINE_BUILD_RECORD);
   if (!existsSync(file)) {
-    if (mode === "other" || !existsSync(dir)) return null;
+    if (!existsSync(dir)) return null;
     throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing from a package that exists; rebuild it with npm run wasm:build`);
   }
   const parsed = parseEngineRecord(readFileSync(file, "utf8"));
-  if (!parsed.ok) {
-    if (mode === "other") return null;
-    throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is not a usable schema 2 record (${parsed.why}); rebuild the package with npm run wasm:build`);
-  }
+  if (!parsed.ok) throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is not a usable schema 2 record (${parsed.why}); rebuild the package with npm run wasm:build`);
   return expectedOf(parsed.record);
 }
 
@@ -60,18 +58,23 @@ interface ManifestEntry {
  * entry is unchanged. An engine entry whose file is not under `distDir` stops
  * the build rather than ship without a check.
  */
-export function engineIntegrityTransform(distDir: string) {
+export function engineIntegrityTransform(distDir: string | (() => string)) {
   return (entries: ManifestEntry[]): { manifest: ManifestEntry[]; warnings: string[] } => ({
     manifest: entries.map((e) => {
       const url = e.url.split(/[?#]/)[0].replace(/^\.?\//, "");
       if (!INTEGRITY_FILES.includes(url)) return e;
-      const file = resolve(distDir, url);
-      if (!existsSync(file)) throw new Error(`precache entry ${url} has no file under ${distDir}, so it cannot carry integrity`);
+      const dir = typeof distDir === "function" ? distDir() : distDir;
+      const file = resolve(dir, url);
+      if (!existsSync(file)) throw new Error(`precache entry ${url} has no file under ${dir}, so it cannot carry integrity`);
       return { ...e, integrity: integrityOf(readFileSync(file)) };
     }),
     warnings: [],
   });
 }
+
+/** `key: "value"` in a flat object literal, quoted or bare key, either quote,
+ *  and only as a whole key (`url`, not `baseurl`). The value is group 2. */
+const KEY = (key: string) => new RegExp(`(?:^|[{,\\s])["']?${key}["']?\\s*:\\s*(["'])(.*?)\\1`);
 
 /** The `integrity` each engine entry in a generated precache manifest carries,
  *  by URL. The manifest text is the array `precacheAndRoute(` is called with;
@@ -80,9 +83,9 @@ export function engineIntegrityTransform(distDir: string) {
 export function manifestIntegrity(manifest: string): Map<string, string | undefined> {
   const found = new Map<string, string | undefined>();
   for (const m of manifest.matchAll(/\{[^{}]*\}/g)) {
-    const url = /["']?url["']?\s*:\s*(["'])(.*?)\1/.exec(m[0])?.[2]?.replace(/^\.?\//, "");
+    const url = KEY("url").exec(m[0])?.[2]?.replace(/^\.?\//, "");
     if (!url) continue;
-    found.set(url, /["']?integrity["']?\s*:\s*(["'])(.*?)\1/.exec(m[0])?.[2]);
+    found.set(url, KEY("integrity").exec(m[0])?.[2]);
   }
   return found;
 }
@@ -116,7 +119,10 @@ export function engineDistProblems(distDir: string, manifest: string): string[] 
   const integrity = manifestIntegrity(manifest);
   for (const url of INTEGRITY_FILES) {
     const file = resolve(distDir, url);
-    if (!integrity.has(url)) continue; // absence from the manifest is reported by the coverage checks
+    if (!integrity.has(url)) {
+      problems.push(`precache entry ${url} is missing from the manifest, so the installed worker would not cache it with the rest of the package`);
+      continue;
+    }
     const have = integrity.get(url);
     if (!have) problems.push(`precache entry ${url} carries no integrity, so a body from another build could enter the precache`);
     else if (existsSync(file) && have !== integrityOf(readFileSync(file))) problems.push(`precache entry ${url} carries an integrity that is not the digest of the file in dist/`);

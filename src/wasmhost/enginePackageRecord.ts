@@ -79,18 +79,17 @@ export function expectedOf(record: EnginePackageRecord): ExpectedEnginePackage {
 
 function isFileRecord(v: unknown): v is EngineFileRecord {
   if (typeof v !== "object" || v === null || Array.isArray(v)) return false;
-  const keys = Object.keys(v);
-  if (keys.length !== 2 || !keys.includes("sha256") || !keys.includes("bytes")) return false;
-  const r = v as { sha256: unknown; bytes: unknown };
+  const r = v as { sha256?: unknown; bytes?: unknown };
   return typeof r.sha256 === "string" && SHA256_HEX.test(r.sha256) && typeof r.bytes === "number" && Number.isSafeInteger(r.bytes) && r.bytes >= 0;
 }
 
 /**
  * Reads a record from JSON text, strictly: schema 2, a `package` of 64 hex
  * digits, a `sources` string, and a `files` block naming exactly the glue and
- * the binary with valid digests and byte counts. Unknown top-level keys are
- * ignored (a later field must not strand an older shell); an unknown file or
- * a missing one is not. Returns why not on failure, never throws.
+ * the binary with valid digests and byte counts. Unknown keys, at the top
+ * level or inside an entry, are ignored (a later field must not strand an
+ * older shell, and the package id covers only the digest and size of each
+ * file); an unknown file or a missing one is not. Returns why not on failure, never throws.
  */
 export function parseEngineRecord(text: string): { ok: true; record: EnginePackageRecord } | { ok: false; why: string } {
   let v: unknown;
@@ -106,11 +105,12 @@ export function parseEngineRecord(text: string): { ok: true; record: EnginePacka
   if (typeof r.package !== "string" || !SHA256_HEX.test(r.package)) return { ok: false, why: "bad package id" };
   const files = r.files;
   if (typeof files !== "object" || files === null || Array.isArray(files)) return { ok: false, why: "no files block" };
-  const names = Object.keys(files).sort();
-  if (names.length !== 2 || names[0] !== ENGINE_GLUE || names[1] !== ENGINE_WASM) return { ok: false, why: "files block does not name exactly the glue and the binary" };
+  const names = Object.keys(files);
+  if (names.length !== 2 || !names.includes(ENGINE_GLUE) || !names.includes(ENGINE_WASM)) return { ok: false, why: "files block does not name exactly the glue and the binary" };
   for (const name of names) {
     if (!isFileRecord((files as Record<string, unknown>)[name])) return { ok: false, why: `bad entry for ${name}` };
   }
   const f = files as EngineFiles;
-  return { ok: true, record: { schema: 2, sources: r.sources, package: r.package, files: { [ENGINE_GLUE]: { ...f[ENGINE_GLUE] }, [ENGINE_WASM]: { ...f[ENGINE_WASM] } } } };
+  const entry = (name: string): EngineFileRecord => ({ sha256: f[name].sha256, bytes: f[name].bytes });
+  return { ok: true, record: { schema: 2, sources: r.sources, package: r.package, files: { [ENGINE_GLUE]: entry(ENGINE_GLUE), [ENGINE_WASM]: entry(ENGINE_WASM) } } };
 }
