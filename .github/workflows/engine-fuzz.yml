@@ -60,7 +60,7 @@ jobs:
           RUN_NUMBER: ${{ github.run_number }}
         run: |
           # Whole numbers only, read as base 10 (a leading zero is not octal).
-          num() { case "$1" in ''|*[!0-9]*) echo "$2 must be a whole number, got '$1'"; exit 2;; esac; [ "${#1}" -le 10 ] || { echo "$2 is too long: '$1'"; exit 2; }; echo $(( 10#$1 )); }
+          num() { case "$1" in ''|*[!0-9]*) echo "$2 must be a whole number, got '$1'" >&2; exit 2;; esac; [ "${#1}" -le 10 ] || { echo "$2 is too long: '$1'" >&2; exit 2; }; echo $(( 10#$1 )); }
           seeds=$(num "$SEEDS" seeds)
           [ "$seeds" -ge 1 ] || { echo "seeds must be a positive whole number"; exit 2; }
           block=$(( $(date +%s) / 86400 ))
@@ -83,6 +83,7 @@ jobs:
             # One block of seeds per day; a block holds up to 100000 seeds.
             first=$(( block * 100000 + offset + 1 )); last=$(( first + seeds - 1 ))
             [ "$offset" -lt 100000 ] || { echo "seed_offset must be below 100000"; exit 2; }
+            [ "$seeds" -le $(( 100000 - offset )) ] || { echo "seeds must fit in one block: at most $(( 100000 - offset )) from seed_offset $offset"; exit 2; }
             [ "$last" -le 4294967295 ] || { echo "seeds $first to $last do not fit in 32 bits (seed_block at most 42948)"; exit 2; }
           fi
           engine=""; diverged=""; harness=""
