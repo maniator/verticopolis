@@ -74,6 +74,16 @@ export class Engine {
     canBuild(kind: string, floor: number, x: number): string;
     clearStops(id: number): boolean;
     /**
+     * Changes whenever a completed trip contributes a commute sample.
+     */
+    commuteStressRevision(): number;
+    /**
+     * `crowd.commuteStressByFloor`: the per-origin-floor commute-stress
+     * average as JSON `[[floor, seconds], ...]`, by floor. No save carries
+     * it; it rebuilds as trips finish, as on the TypeScript engine.
+     */
+    commuteStress(): string;
+    /**
      * The crowd view's hash, as the lock records it.
      */
     crowdDigest(): string;
