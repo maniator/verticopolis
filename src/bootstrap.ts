@@ -270,8 +270,8 @@ export function bootGame(create: () => BootApp): Promise<void> {
           // startWorkerHost reports a refused first tower on its status. That
           // tower stays on TypeScript, recorded as the main-thread host records
           // it (#874); the host follows every later adopt either way.
-          const { hosted, errors } = workerHost.status;
-          bootState = hosted ? { ...bootState, engine: "wasm" } : failBoot(bootState, "start", "attach-refused", errors[errors.length - 1] ?? "the worker host did not take the first tower");
+          const { hosted, lastError } = workerHost.status;
+          bootState = hosted ? { ...bootState, engine: "wasm" } : failBoot(bootState, "start", "attach-refused", lastError ?? "the worker host did not take the first tower");
           publishBootState(bootState);
           refreshSplashVersion();
         } catch (e) {
@@ -311,7 +311,7 @@ export function bootGame(create: () => BootApp): Promise<void> {
           });
           // A refused first tower: strict mode reported it through onFatal; a
           // switchable build leaves it on TypeScript, recorded here (#874).
-          if (!handle.status.hosted && !bootState.failure) stopForEngine("start", handle.status.lastFallback?.reason ?? "attach-refused", handle.status.errors[handle.status.errors.length - 1] ?? "the host did not take the first tower");
+          if (!handle.status.hosted && !bootState.failure) stopForEngine("start", handle.status.lastFallback?.reason ?? "attach-refused", handle.status.lastError ?? "the host did not take the first tower");
           // A switchable build keeps the engine writer and label even when its
           // first tower stayed on TypeScript: the host follows every later
           // adopt, so the next tower it holds saves through the engine.

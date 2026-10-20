@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FACILITIES, facilityFloors } from "../../engine/facilities";
 import type { FacilityKind } from "../../engine/types";
-import { recyclingLook } from "../sprites/facilities/recyclingLook";
+import { RECYCLING_GAUGE_ROWS, RECYCLING_PILE_SLOTS, recyclingLook } from "../sprites/facilities/recyclingLook";
 import { FLOOR, TILE } from "../scale";
 import { RECYCLE_BREAKS, RECYCLE_STEPS, roomJobs, type StillJob } from "./catalog";
 import { CINEMA_CYCLES, clockFor, cycleStep, cycleSteps } from "./cycles";
@@ -68,9 +68,16 @@ describe("the recycling center's fill breaks", () => {
   const same = (a: number, b: number) => JSON.stringify(recyclingLook(a)) === JSON.stringify(recyclingLook(b));
 
   it("are ascending, each the first fill of a new look", () => {
-    // 17 bags and 63 gauge rows (the 9th bag and the 32nd row both arrive
-    // at exactly 0.5), the second row past 0.5, amber past 0.7, FULL at 1.
-    expect(RECYCLE_BREAKS).toHaveLength(17 + 63 - 1 + 3);
+    // 14 bags and 65 gauge rows, the second row past 0.5, amber past 0.7,
+    // FULL at 1. No bag and row ever arrive together: bag k comes at
+    // (k - 0.5) / 14 and row j at (j - 0.5) / 65, and 65(2k - 1) is odd
+    // while 14(2j - 1) is even. The oddness argument holds only for this pair,
+    // so pin the pair. The two threshold looks stay separate breaks for a float
+    // reason: the 33rd row arrives at exactly 0.5 and the 46th at exactly 0.7
+    // (0.7 * 65 is 45.5 in floats), while the stacked row and amber use strict
+    // comparisons and so first show at the next float up from each.
+    expect([RECYCLING_PILE_SLOTS, RECYCLING_GAUGE_ROWS]).toEqual([14, 65]);
+    expect(RECYCLE_BREAKS).toHaveLength(RECYCLING_PILE_SLOTS + RECYCLING_GAUGE_ROWS + 3);
     for (let i = 0; i < RECYCLE_BREAKS.length; i++) {
       const b = RECYCLE_BREAKS[i];
       if (i > 0) expect(b).toBeGreaterThan(RECYCLE_BREAKS[i - 1]);

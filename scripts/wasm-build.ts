@@ -11,7 +11,8 @@
  * (and the bridge's rules beside it, src/engine/gameplayEventRules.ts)
  * from conformance/events/catalog.json (the same as `npm run gen:events`).
  * The browser target lands in src/public/engine/ with a BUILD.json naming the
- * sources it came from (see src/wasmhost/packageHash.ts) and a
+ * sources it came from (see src/wasmhost/packageHash.ts) and the digests of
+ * its glue and binary (src/wasmhost/enginePackageRecord.ts) and a
  * THIRD-PARTY.json listing the crates compiled into it (see
  * scripts/engine-third-party.ts).
  * Needs the wasm32-unknown-unknown target and a wasm-bindgen CLI of the
@@ -24,6 +25,7 @@ import { copyFileSync, existsSync, readdirSync, readFileSync, rmSync, writeFileS
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { engineSourceHash } from "../src/wasmhost/packageHash.ts";
+import { engineBuildRecord } from "../src/wasmhost/enginePackageRecord.ts";
 import { ENGINE_BUILD_RECORD, ENGINE_GLUE, ENGINE_PACKAGE, ENGINE_WASM } from "../src/wasmhost/engineAssets.ts";
 import { ENGINE_THIRD_PARTY, checkToolchain, engineThirdParty } from "./engine-third-party.ts";
 import { checkCatalog, renderGameplayEventRules, renderGameplayEventsDts } from "../src/engine/gameplayCatalog.ts";
@@ -101,7 +103,12 @@ if (which === "engine") {
   rmSync(resolve(web, "verticopolis_engine.d.ts"), { force: true });
   rmSync(resolve(web, "verticopolis_engine_bg.wasm.d.ts"), { force: true });
   const sources = engineSourceHash(crate);
-  writeFileSync(resolve(web, ENGINE_BUILD_RECORD), `${JSON.stringify({ sources }, null, 2)}\n`);
+  // Schema 2 (#985 criterion 5): `sources` keeps its meaning, and `package`
+  // and `files` name the exact glue and binary bytes, so the page can refuse a
+  // glue or binary from another build.
+  const sha256Hex = (data: Uint8Array | string) => createHash("sha256").update(data).digest("hex");
+  const record = engineBuildRecord(readFileSync(resolve(web, ENGINE_GLUE)), readFileSync(resolve(web, ENGINE_WASM)), sources, sha256Hex);
+  writeFileSync(resolve(web, ENGINE_BUILD_RECORD), `${JSON.stringify(record, null, 2)}\n`);
   // The crates and the standard library compiled into the package, with
   // their licenses, so the site's notices can list them without a Rust
   // toolchain (#955).

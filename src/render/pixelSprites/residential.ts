@@ -1,7 +1,8 @@
 import type { Unit } from "../../engine/types";
 import { visibleOccupants } from "../../engine/Crowd";
 import { isLateHour } from "../lateNight";
-import { PAL, SKIN, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, shade, vacancy, windowView, type RoomCtx } from "./common";
+import { PAL, SKIN, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, roomOccupants, shade, vacancy, windowView, type RoomCtx } from "./common";
+import { artRow, authoredWidth, screenLength } from "./artScale";
 import { bevelBox, ceilingCap, curtain, downlights, fill, framedArt, glow, interiorWall, plankFloor } from "./dollhouse";
 import { layerBreak, layerEnd } from "./layers";
 import { ROACH_AMBER, ROACH_CHESTNUT, drawRoach } from "./residential.roaches";
@@ -61,7 +62,7 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   // mirrored, over warm cream walls and olive carpet. Occupancy stays readable
   // in every layout: seats map to the people actually present.
   const wall = OFFICE_WALLS[geoVariant(u, 0, OFFICE_WALLS.length)];
-  const filled = Math.max(0, visibleOccupants(u));
+  const filled = roomOccupants(u); // whole people, rounded as the atlas reads them
   const layout = geoVariant(u, 3, 5); // 0-2 cubicle row (anchor weight), 3 meeting, 4 executive
   const flip = geoVariant(u, 4, 2) === 1;
   const { floorH, floorY } = floorMetrics(y, h);
@@ -101,6 +102,11 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
     if (layout === 3) {
       // Meeting room: one long table with a laptop and papers, high-back chairs
       // both sides, seated staff up to the chair count, a corner plant.
+      // The table is drawn at its screen size, capped at its authored 60px,
+      // which is fixed art and keeps its size. Its chairs are counted from the
+      // table's AUTHORED length under that same cap, so a capped table seats
+      // the five it was drawn for and never a sixth.
+      const atw = Math.min(Math.round(authoredWidth(u.width) * 0.6), 60);
       const tw = Math.min(Math.round(w * 0.6), 60);
       const tx = x + Math.round((w - tw) / 2);
       fill(ctx, tx, floorY, tw, 1, "#000000", 0.16);
@@ -108,46 +114,78 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
       fill(ctx, tx + 6, floorY - 8, 4, 1, PAL.white); // papers
       fill(ctx, tx + tw - 12, floorY - 8, 4, 1, PAL.white);
       fill(ctx, tx + Math.round(tw / 2) - 3, floorY - 9, 6, 2, PAL.ink); // laptop
-      const chairs = Math.max(1, Math.floor(tw / 11)); // only count chairs that actually fit
-      const seated = Math.min(filled, chairs);
-      for (let i = 0; i < chairs; i++) {
-        const sx = tx + 3 + i * 11;
-        if (sx + 6 > tx + tw) break;
+      // Chair anchors, counted against the TABLE at the tile its 11px pitch was
+      // drawn for. Counting seats off the table's pixel width lost the fifth
+      // chair when the tile narrowed, and the fifth worker present went undrawn
+      // with it. A table too short for a chair seats none, which is what the
+      // per-chair fit check used to do.
+      // The minimum step is a chair's drawn width (7px from `sx - 1`), so two
+      // chairs never draw through each other.
+      const chairs = artRow(atw - 3 - 6, tx + 3, tx + tw - 6, 11, 1, 7);
+      const seated = Math.min(filled, chairs.length);
+      chairs.forEach((sx, i) => {
         fill(ctx, sx - 1, floorY - 12, 7, 5, "#3A3F4A"); // high-back chair
         fill(ctx, sx - 1, floorY - 12, 7, 1, "#4A5058");
         if (i < seated) personSeated(ctx, sx, floorY - 1, (u.id * 7 + i * 31) | 0);
-      }
+      });
       fill(ctx, x + w - 9, floorY - 6, 3, 6, "#7A5A3A"); // corner plant
       fill(ctx, x + w - 12, floorY - 13, 8, 8, "#4E7A3E");
       fill(ctx, x + w - 10, floorY - 16, 4, 4, PAL.green);
     } else if (layout === 4) {
       // Executive corner: a big desk with a seated executive, a tall binder
       // cabinet, plus two side cubicles so a staffed office still shows people.
-      fill(ctx, x + 6, floorY, 26, 1, "#000000", 0.16);
-      bevelBox(ctx, x + 6, floorY - 8, 26, 6, "#71512F"); // executive desk
-      fill(ctx, x + 9, floorY - 15, 8, 7, "#20242C"); // monitor bezel
-      fill(ctx, x + 10, floorY - 14, 6, 5, filled > 0 ? "#5FB0DC" : "#2E3640");
-      fill(ctx, x + 23, floorY - 17, 7, 17, "#5A3A2A"); // high-back leather chair
-      fill(ctx, x + 23, floorY - 17, 7, 1, "#6A4A38");
-      if (filled > 0) personSeated(ctx, x + 22, floorY - 1, (u.id * 7) | 0);
-      bevelBox(ctx, x + 36, floorY - 18, 14, 18, "#5A4436"); // binder cabinet
+      // The layout is one chain of absolute anchors authored to just fill the
+      // office at the retired 11px tile, so every anchor is restated at the
+      // current one. Left alone, the chain overran the narrower room and the
+      // second cubicle's worker dropped out of a fully staffed office. Only the
+      // anchors move: the items keep their authored widths, so the chain's slack
+      // is 1px rather than the 3 it was drawn with, and the fit check below is
+      // what holds it honest if a room narrower than the office ever renders it.
+      const ax = (n: number): number => x + Math.round(screenLength(n));
+      fill(ctx, ax(6), floorY, 26, 1, "#000000", 0.16);
+      bevelBox(ctx, ax(6), floorY - 8, 26, 6, "#71512F"); // executive desk
+      fill(ctx, ax(9), floorY - 15, 8, 7, "#20242C"); // monitor bezel
+      fill(ctx, ax(10), floorY - 14, 6, 5, filled > 0 ? "#5FB0DC" : "#2E3640");
+      fill(ctx, ax(23), floorY - 17, 7, 17, "#5A3A2A"); // high-back leather chair
+      fill(ctx, ax(23), floorY - 17, 7, 1, "#6A4A38");
+      if (filled > 0) personSeated(ctx, ax(22), floorY - 1, (u.id * 7) | 0);
+      bevelBox(ctx, ax(36), floorY - 18, 14, 18, "#5A4436"); // binder cabinet
       const spines = ["#8C3A32", "#3E5A8C", "#B08A3E", "#4A7A4A"];
-      for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) fill(ctx, x + 38 + k * 3, floorY - 16 + r * 4, 2, 3, spines[(k + r) % 4]);
+      for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) fill(ctx, ax(38) + k * 3, floorY - 16 + r * 4, 2, 3, spines[(k + r) % 4]);
       for (let i = 0; i < 2; i++) {
-        const cx = x + 54 + i * 22;
+        const cx = ax(54 + i * 22);
         if (cx + 18 > x + w - 2) break;
         cube(ctx, cx, floorY, i + 1 < filled, (u.id * 7 + (i + 1) * 31) | 0);
       }
     } else {
       // Classic cubicle row (the anchor layout): a bank of cubicles, staffed in
       // seat order up to the visible occupant count, one with an aisle plant.
-      const slot = 22;
+      // The bank is counted against the room measured at the authored tile (its
+      // width in tiles, which the scale change did not move) and fitted into the
+      // screen width, so a narrower tile tightens the aisles instead of retiring
+      // a desk and the worker sitting at it. It keeps its own count formula
+      // rather than `artRow`'s: this row reserves 12px of room where `artRow`
+      // would reserve a whole cubicle, and switching would add a fourth desk the
+      // office was never drawn with. The slot then holds its authored 22px
+      // wherever that still fits, so the 9-tile office the catalog ships is
+      // spaced exactly as it was drawn, and only tightens on the wide rooms
+      // where the bank would otherwise run out through the far wall. That leaves
+      // the fit check below as a backstop for the single-desk case, which has no
+      // pitch to compress.
+      // The count is also held to what the screen run can space at a desk's own
+      // 18px width, so a room drawn far narrower than its tiles (a corrupt or
+      // huge `u.width`, or a preview box) never stacks desks or walks them out
+      // past the left wall, and a width that is not a number seats one desk.
       const start = x + 7;
-      const count = Math.max(1, Math.floor((w - 12) / slot));
+      const last = x + w - 2 - 18; // the furthest a desk can start and still fit
+      const authored = Math.floor((authoredWidth(u.width) - 12) / 22);
+      const fits = last > start ? Math.floor((last - start) / 18) + 1 : 1;
+      const count = Math.max(1, Math.min(Number.isFinite(authored) ? authored : 1, fits));
+      const slot = count > 1 ? Math.min(22, (last - start) / (count - 1)) : 22;
       const plantDesk = geoVariant(u, 2, count);
       const seated = Math.min(count, filled);
       for (let i = 0; i < count; i++) {
-        const dx = start + i * slot;
+        const dx = start + Math.round(i * slot);
         if (dx + 18 > x + w - 2) break;
         cube(ctx, dx, floorY, i < seated, (u.id * 7 + i * 31) | 0);
         if (i === plantDesk) {

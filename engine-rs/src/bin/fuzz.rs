@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 
 use serde_json::{json, Value};
-use verticopolis_engine::facilities::{Kind, FACILITIES};
+use verticopolis_engine::facilities::{is_lobby_floor, Kind, FACILITIES};
 use verticopolis_engine::rng::Rng;
 use verticopolis_engine::scenario::{run_scenario, run_scenario_detailed, RunError, Scenario};
 
@@ -49,15 +49,32 @@ fn main() {
     // command sequence does not replay the simulation's random draws.
     let mut rng = Rng::new(seed ^ 0x9e37_79b9);
     let modern = rng.chance(0.5);
-    let height = rng.int(3, 9);
+    // One seed in four grows a tall tower (sky-lobby rows every 15 floors and a
+    // burst of shafts and stairs against the pool caps); the rest stay short
+    // and fast.
+    let tall = rng.chance(0.25);
+    let height = if tall { rng.int(16, 40) } else { rng.int(3, 9) };
+    // The tower is built with plenty of cash, then the cash is set to the
+    // seed's profile: a rich game, a modest one, or a tight one that runs out.
+    let cash = match rng.int(0, 3) {
+        0 | 1 => 500_000_000,
+        2 => rng.int(5, 50) * 1_000_000,
+        _ => rng.int(2, 40) * 100_000,
+    };
     let id = format!("fuzz-{seed}");
     let mut commands: Vec<Value> = vec![
         json!({"op": "setMoney", "amount": 500000000}),
         json!({"op": "buildRow", "kind": "lobby", "floor": 1, "from": LEFT, "to": RIGHT}),
     ];
     for fl in 2..=height {
-        commands.push(json!({"op": "buildRow", "kind": "floor", "floor": fl, "from": LEFT + 1, "to": RIGHT - 1}));
+        let kind = if is_lobby_floor(fl) { "lobby" } else { "floor" };
+        commands.push(
+            json!({"op": "buildRow", "kind": kind, "floor": fl, "from": LEFT + 1, "to": RIGHT - 1}),
+        );
+        // A tall tower's rows alone would overflow the runner's 1024-event window.
+        commands.push(json!({"op": "checkpoint", "label": format!("row{fl}")}));
     }
+    commands.push(json!({"op": "setMoney", "amount": cash}));
     let places: Vec<Kind> = FACILITIES
         .iter()
         .filter(|f| !f.transport && !f.basement && f.kind != Kind::Lobby && f.kind != Kind::Floor)
@@ -82,10 +99,46 @@ fn main() {
         let s = Scenario::parse(&text).expect("the fuzzer only emits valid commands");
         run_scenario(&s, &suite)
     };
+    // A tall tower starts with a burst of shafts and stairs that overruns the
+    // 24-shaft and 64-link pools, so both engines also agree on the refusal at
+    // each cap. The burst runs before the random commands and is not part of
+    // the command budget. Escalators, service and express shafts unlock at
+    // higher stars than a new game has, so they stay out of reach here.
+    let mut pressure: Vec<Value> = Vec::new();
+    if tall {
+        // Standard shafts: 27 slots (nine columns, three floor bands) against
+        // a pool of 24, in columns right of the stairs.
+        let band = height / 3;
+        for i in 0..27 {
+            let (bottom, top) = match i / 9 {
+                0 => (1, band),
+                1 => (band + 1, band * 2),
+                _ => (band * 2 + 1, height),
+            };
+            let x = LEFT + 42 + 4 * (i % 9);
+            pressure.push(json!({"op": "buildTransport", "kind": "elevatorStandard", "x": x, "bottom": bottom, "top": top}));
+        }
+        // Stairs: five columns over floor pairs 1 to 13, 65 slots against a
+        // pool of 64 links.
+        for k in 0..65 {
+            let bottom = 1 + k / 5;
+            let x = LEFT + 1 + 8 * (k % 5);
+            pressure.push(json!({"op": "buildTransport", "kind": "stairs", "x": x, "bottom": bottom, "top": bottom + 1}));
+        }
+        pressure.reverse();
+    }
     let mut kept = 0;
-    while kept < budget {
-        let roll = rng.int(0, 99);
-        let mut cmd = if roll < 38 {
+    let mut step = 0;
+    while kept < budget || !pressure.is_empty() {
+        let burst = pressure.pop();
+        let roll = if burst.is_some() { 0 } else { rng.int(0, 99) };
+        let mut cmd = if let Some(b) = burst.clone() {
+            b
+        } else if rng.chance(0.04) {
+            // Cash that runs out, or goes below zero, in the middle of a run.
+            let amount = [0, 1_000, 25_000, 250_000, -50_000, 3_000_000][rng.int(0, 5) as usize];
+            json!({"op": "setMoney", "amount": amount})
+        } else if roll < 38 {
             let kind = places[rng.int(0, places.len() as i64 - 1) as usize];
             json!({"op": "build", "kind": kind.as_str(), "floor": rng.int(1, height), "x": rng.int(LEFT, RIGHT)})
         } else if roll < 48 {
@@ -139,18 +192,30 @@ fn main() {
         trial.push(cmd.clone());
         let result = run(&trial);
         let op = cmd["op"].as_str().unwrap().to_string();
-        match result.error {
-            None => {
-                commands.push(cmd);
+        // A checkpoint after each command keeps the events between two
+        // checkpoints inside the runner's 1024-event window. A burst command
+        // adds only a few events, so it checkpoints every sixth.
+        // A reload carries its events over to the next command, so it does not
+        // checkpoint: the carry path stays covered.
+        let mut kept_one = |commands: &mut Vec<Value>, cmd: Value| {
+            let reload = cmd["op"] == "reload";
+            commands.push(cmd);
+            step += 1;
+            if burst.is_none() {
                 kept += 1;
             }
+            if !reload && (burst.is_none() || step % 6 == 0) {
+                commands.push(json!({"op": "checkpoint", "label": format!("k{step}")}));
+            }
+        };
+        match result.error {
+            None => kept_one(&mut commands, cmd),
             Some(RunError::Failed { index, what }) if index == trial.len() - 1 => {
                 match op.as_str() {
                     // A refusal the runner lets a scenario expect.
                     "build" | "buildTransport" | "callExterminator" => {
                         cmd["expectFail"] = json!(true);
-                        commands.push(cmd);
-                        kept += 1;
+                        kept_one(&mut commands, cmd);
                     }
                     // A refusal with no expectFail form: dropped, the prefix stays
                     // valid. The drop is logged so an accept-versus-refuse

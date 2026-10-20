@@ -41,7 +41,10 @@ npm run build       # production build must succeed
 
 `npm run test:coverage` (`vitest run --coverage`) is the **CI coverage gate**. It
 enforces the coverage floors described below and fails the build if any floor
-is breached. Run it locally when you touch measured code.
+is breached. Run it locally when you touch measured code. CI runs it without
+`src/tests/integration/conformance.integration.test.ts`, which has its own step
+without coverage (the 720-hour `holidays-classic` scenario is too slow under
+coverage on a shared runner); `npm test` still runs everything.
 
 ## Testing & coverage
 
@@ -133,7 +136,9 @@ Verticopolis has **two test tiers**:
     compares the state, crowd and events hashes at checkpoints at least
     every in-game hour, then the money, the log and each field of the full
     save, naming the first one that differs (`scripts/fuzz-compare.ts`; exit
-    3 marks a harness failure, not a divergence). A divergence it finds is
+    3 marks a harness failure, not a divergence). One seed in four grows a
+    tall tower that fills the shaft and stair pools; every seed sets a cash
+    profile once the tower is built, and cash can drop to zero or below mid-run. A divergence it finds is
     pinned as a named scenario in the fix PR. A run summary names its seed
     range and the `seed_block` and `seed_offset` that replay it.
 

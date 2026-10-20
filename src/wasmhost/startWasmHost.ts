@@ -4,6 +4,7 @@ import { readCatalog } from "../dualrun/catalog";
 import { attachWasmHost, refuseForeignCatalog, type WasmHost } from "./wasmHost";
 import { ENGINE_DIR, ENGINE_GLUE } from "./enginePackageNames";
 import { EngineBootError, type FallbackReason, type FallbackStage } from "./engineBoot";
+import { recordHostError, type HostErrors } from "./hostErrors";
 
 /**
  * The app side of the WASM switch: load the browser package, host the
@@ -15,22 +16,22 @@ import { EngineBootError, type FallbackReason, type FallbackStage } from "./engi
  * In a wasm-only build (`strict`) there is no TypeScript engine to leave it
  * on: the refusal is reported the same way and `onFatal` stops the game.
  */
-export interface WasmHostStatus {
+export interface WasmHostStatus extends HostErrors {
   engine: "wasm";
   /** Towers hosted so far (every adoptSim restarts the engine). */
   starts: number;
   /** Whether the current tower runs on the engine (false after a refusal). */
   hosted: boolean;
   /** Towers left on the TypeScript engine (or, in a wasm-only build, the
-   *  stop) so far, every one counted where `errors` keeps only the first 50. */
+   *  stop) so far, every one counted where `errors` keeps only the first ones. */
   fallbacks: number;
   /** The code and stage of the latest fallback, as analytics reports it
    *  (`engine_status`); null while there has been none. */
   lastFallback: HostFallback | null;
-  errors: string[];
 }
 
-/** A fallback as codes only: the message stays in `errors` and the log. */
+/** A fallback as codes only: its message is `lastError` until a later
+ *  error replaces it, is in `errors` while that list has room, and is logged. */
 export interface HostFallback {
   reason: FallbackReason;
   stage: FallbackStage;
@@ -89,12 +90,11 @@ export interface WasmHostOptions {
 }
 
 export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Console, "info" | "error"> = console, opts: WasmHostOptions = {}): WasmHostHandle {
-  const status: WasmHostStatus = { engine: "wasm", starts: 0, hosted: false, fallbacks: 0, lastFallback: null, errors: [] };
+  const status: WasmHostStatus = { engine: "wasm", starts: 0, hosted: false, fallbacks: 0, lastFallback: null, errors: [], lastError: null, droppedErrors: 0 };
   let host: WasmHost | null = null;
   let fatal = false;
   const noteError = (message: string) => {
-    if (status.errors.length >= 50) return;
-    status.errors.push(message);
+    recordHostError(status, message);
     log.error(`[wasm] ${message}`);
   };
   // Let go of the current tower. A trapped engine still lets go (the detach

@@ -37,6 +37,11 @@ describe("precacheUrls", () => {
     const sw = 's.precacheAndRoute([{url:"index.html",revision:"abc"},{url:"assets/a.js",revision:null},{revision:"x",url:"/b.png"},{url:"index.html",revision:"abc"}])';
     expect(precacheUrls(sw)).toEqual(["assets/a.js", "b.png", "index.html"]);
   });
+
+  it("reads entries that carry an integrity, in any key order", () => {
+    const sw = 's.precacheAndRoute([{url:"engine/a.js",revision:"1",integrity:"sha256-x"},{integrity:"sha256-y",revision:"2",url:"engine/b.wasm"},{revision:null,integrity:"sha256-z",url:"engine/BUILD.json"}])';
+    expect(precacheUrls(sw)).toEqual(["engine/BUILD.json", "engine/a.js", "engine/b.wasm"]);
+  });
 });
 
 /** A minimal module: magic, version, a type section, a custom "name" section. */

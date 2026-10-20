@@ -13,9 +13,17 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.36.0
+## 2.38.0
 
 - A save made while an exterminator is booked now remembers which rooms were booked, so after a reload the treatment covers the same rooms as if you had kept playing.
+
+## 2.37.0
+
+- Busy rooms fill their seats again. Several had quietly stopped using their last few, and left the people at them undrawn.
+
+## 2.36.0
+
+- The parking spaces, ramp, security office, Medical Center, housekeeping room, and recycling center are drawn on the current pixel grid, so the camera monitors, the folded linen, the Medical Center's bottles and the hazard tape are evenly spaced instead of drifting a pixel here and there. The recycling center's ceiling pipe has fewer brackets.
 
 ## 2.35.0
 
