@@ -241,25 +241,23 @@ read it (as retiring the TypeScript engine will).
 
 The table lists the caches, indexes and counters on the hot paths today: the
 TypeScript ones, and the Rust-only ones with "none" in the TypeScript column,
-with their Rust status at c12bc1b. Each PR that adds, ports or removes one
-updates its row, and its HP-8 review checks that. Between those PRs the table
-belongs to the owner of the #1158 audit (its assignee). #1139 changes the
-`roomUnits` and `noiseMemo` rows: when it merges, the #1158 owner opens a
-docs-only PR that updates those two rows and the commit above, and marks
-#1158's items for #1139 (A5 to A7) as landed. #1158 and its backlog row carry
-that task until it is done.
+with their Rust status at 9cd44d1 (`main` once #1139 merged). Each PR that
+adds, ports or removes one updates its row, and its HP-8 review checks that.
+Between those PRs the table belongs to the owner of the #1158 audit (its
+assignee), who corrects any row that has gone stale.
 
-| What it keeps | TypeScript | Keyed on | Rust at c12bc1b |
+| What it keeps | TypeScript | Keyed on | Rust at 9cd44d1 |
 | --- | --- | --- | --- |
 | units and transports by id | `byId`, `transportsById`, `src/engine/Tower.ts` | kept on every edit | `by_id`, `transport_by_id` |
 | tiles and rooms by position | `structure`, `structKind`, `rooms`, `src/engine/Tower.ts` | kept on every edit | ported (`structure`, `struct_kind`, `rooms`) |
 | lobby and room tiles per floor | `lobbyTiles`, `roomTiles`, `src/engine/Tower.ts` | counter | ported (`lobby_tiles`, `room_tiles`) |
-| rooms without floor and lobby tiles | `roomUnits`, `src/engine/tower/rooms.ts` | unit array, length, revision | missing; #1139 adds it |
+| rooms without floor and lobby tiles | `roomUnits`, `src/engine/tower/rooms.ts` | unit array, length, revision | ported (`room_index`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1139) |
+| floor and lobby tiles per floor, for `pickX` | none (`pickX` walks every unit, #539) | revision and unit count | `structural_tiles`, `engine-rs/src/tower_index.rs` (#1139) |
 | each floor's segment runs | `src/engine/tower/segments.ts` | revision | ported (cloned on read, #859) |
 | housekeeping staff ceiling | `staffCeiling` (`maxStaffFor`), `src/engine/crowd/spawn.ts` | revision | missing; #1143 |
 | live staff count | `crowd.staffCount`, `src/engine/Crowd.ts` | counter | ported |
 | riders per car | `crowd.carRiders`, `src/engine/Crowd.ts` | counter | ported (`car_riders`) |
-| noise verdicts | `noiseMemo`, `src/engine/sim/satisfaction.ts` | revision | missing; #1139 adds it |
+| noise verdicts | `noiseMemo`, `src/engine/sim/satisfaction.ts` | revision | ported (`noise_memo`, `engine-rs/src/noise.rs`; #1139) |
 | served floors, staff components | `src/engine/tower/routing.ts` (`servedSet`, `staffComp` on `Tower`) | revision | ported (cloned on read, #859) |
 | stops, transport columns | `stopsCache` on `Tower`, `src/engine/tower/transport.ts` | revision | ported (cloned on read, #859) |
 | built floor bounds | `floorBounds`, `src/engine/Tower.ts` | revision | missing (A11 in #1158) |
