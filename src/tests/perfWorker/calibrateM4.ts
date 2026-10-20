@@ -1,6 +1,6 @@
 import { coverageChecks, DEFAULT_EXCEEDANCE_LIMIT, DEFAULT_MIN_PASSES_PER_ENGINE, EPSILON_STEP_MS, family, LONG_TASK_CAP_MS, MIN_REPS, THROTTLES, type CalibrateOptions, type Family } from "../perfCompare/calibrate";
-import { duplicateCheck, poolIdentity, poolProblems, rendererProblem, treeProblem, type PoolIdentity, type PoolPass } from "../perfCompare/calibratePool";
-import { summarize } from "../perfCompare/stats";
+import { duplicateCheck, lossRecordProblem, poolIdentity, poolProblems, rendererProblem, treeProblem, type PoolIdentity, type PoolPass } from "../perfCompare/calibratePool";
+import { pairedDifferences, summarize } from "../perfCompare/stats";
 import type { EngineName } from "../perfCompare/types";
 import type { Metric } from "./analysis";
 
@@ -52,11 +52,7 @@ export function blockingDifference(p: Pick<WorkerPass, "metrics">, throttle: str
   const a = row("wasm");
   const b = row("ts");
   if (!a || !b) return null;
-  const diffs: number[] = [];
-  a.reps.forEach((rep, i) => {
-    const j = b.reps.indexOf(rep);
-    if (j >= 0) diffs.push(a.values[i] - b.values[j]);
-  });
+  const diffs = pairedDifferences(a, b);
   if (diffs.length < MIN_REPS) return null;
   return summarize(diffs).medianCiHigh;
 }
@@ -70,17 +66,6 @@ function shapeProblem(r: WorkerPass): string | null {
   if (typeof r.startedAt !== "string" || !Number.isFinite(Date.parse(r.startedAt))) return "startedAt is missing, so the copy check and the window cannot use it";
   if (!Array.isArray(r.metrics) || !r.validation) return "metrics or validation is missing";
   return null;
-}
-
-/**
- * Every good process run must carry a context-loss record (#1136): a folder
- * from a harness that did not look for a lost WebGL context is not evidence
- * of a stable renderer, and a folder with a loss in it fails the renderer
- * check through `rendererProblem`.
- */
-function lossRecordProblem(r: WorkerPass): string | null {
-  const good = (r.runs ?? []).filter((x) => x.ok);
-  return good.some((x) => !Array.isArray(x.contextLost)) ? "a process run has no WebGL context-loss record (a harness from before #1136)" : null;
 }
 
 export function calibrateM4(folders: { folder: string; results: WorkerPass; sha256?: string }[], options: CalibrateOptions = {}): M4Calibration {

@@ -15,6 +15,7 @@ import {
   LOCK_FILES,
   VERSION_CONSTANTS,
   baseRecord,
+  cargoPackage,
   cargoVersion,
   compatInputs,
   computeCompat,
@@ -263,13 +264,15 @@ describe("engine crate version rule", () => {
     ).toThrow(/SAVE_VERSION/);
     expect(rustConstant("pub(crate) const X: u32 = 4;\n", "X", "u32")).toBe(4);
     expect(() => cargoVersion('[dependencies]\nserde = "1"\n')).toThrow(
-      /version/,
+      /\[package\] name/,
     );
-    expect(
-      cargoVersion(
-        '[package]\nname = "x"\nversion = "1.2.3"\n[dependencies]\nserde = { version = "9" }\n',
-      ),
-    ).toBe("1.2.3");
+    const toml =
+      '[package]\nname = "x"\nversion = "1.2.3"\n[dependencies]\nserde = { version = "9" }\n';
+    expect(cargoVersion(toml)).toBe("1.2.3");
+    expect(cargoPackage(toml)).toEqual({ name: "x", version: "1.2.3" });
+    expect(() => cargoPackage('[package]\nversion = "1.2.3"\n')).toThrow(
+      /name/,
+    );
   });
 
   it("refuses a constant declared twice or only in a block comment", () => {
