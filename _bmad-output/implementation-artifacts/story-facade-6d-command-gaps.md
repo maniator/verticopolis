@@ -25,6 +25,7 @@ previews (`RustSim`, slice 7) cannot go Rust-first until these exist.
 | Rent batch preview | `previewRentBatch(kind, target, opts)`: the `BatchRentResult` the apply would give, nothing written; `null` for an unpriced kind or a target that does not apply | no export |
 | Unknown facility kind | `build` and `canBuild` answer `{ ok: false, reason: "Unknown facility." }`; `previewRentBatch` and `applyRentBatch` answer `null` | `build`, `buildTransport` and `applyRentBatch` throw |
 | Unknown kind on a shaft | `buildTransport` and `validateTransport` throw a `TypeError` (they index the catalog) | `buildTransport` throws |
+| Express stops | `tower.setExpressStops(id)` answers `false` for an id that names no shaft | `setExpressStops(id): void` (asked for by the slice 1 review, #1216) |
 | Placement dry run | `tower.placeTransportDryRun(kind, x, bottom, top)` | no export |
 | Shaft validation | `tower.validateTransport(kind, x, bottom, top)`: `{ ok }` or `{ ok: false, reason }` | no export |
 

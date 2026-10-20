@@ -213,6 +213,25 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers match the TypeS
     }
   });
 
+  describe("setExpressStops", () => {
+    for (const start of STARTS.filter((s) => s.fixture)) {
+      it(`${start.label}: answers whether the id names a shaft, like TypeScript`, () => {
+        const { sim, engine } = pair(start);
+        try {
+          const ids = sim.tower.transports.map((t) => t.id);
+          expect(ids.length).toBeGreaterThan(0);
+          for (const id of [...ids, 0, -1, 999_999]) {
+            const want = sim.tower.setExpressStops(id);
+            expect(engine.setExpressStops(id), `id ${id}`).toBe(want);
+          }
+          expect(engine.setExpressStops(999_999)).toBe(false);
+        } finally {
+          engine.free();
+        }
+      });
+    }
+  });
+
   describe("validateTransport and placeTransportDryRun", () => {
     const FLOORS = [-3, -1, 0, 1, 2, 3, 6, 10, 31, 60, 120];
     const XS = [-2, 0, 10, 88, 150, 160, 175, 199, 370, 371, 372, 1000];

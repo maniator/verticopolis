@@ -281,7 +281,11 @@ export class Engine {
      * whole JS number within `Number.isSafeInteger` is refused with `false`.
      */
     setCars(id: number, cars: number): boolean;
-    setExpressStops(id: number): void;
+    /**
+     * `setExpressStops(id)`: whether the id names a shaft, as TypeScript's
+     * answers; a shaft's stops are rebuilt, an unknown id changes nothing.
+     */
+    setExpressStops(id: number): boolean;
     /**
      * `setFilmPolicy(id, policy)`: the policy stored, or null.
      */

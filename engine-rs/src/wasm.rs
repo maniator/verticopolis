@@ -705,9 +705,16 @@ impl Engine {
         self.set_stop_checked(id.as_f64(), floor.as_f64(), stop.as_bool())
     }
 
+    /// `setExpressStops(id)`: whether the id names a shaft, as TypeScript's
+    /// answers; a shaft's stops are rebuilt, an unknown id changes nothing.
     #[wasm_bindgen(js_name = setExpressStops)]
-    pub fn set_express_stops(&mut self, id: i32) {
-        self.sim.tower.set_express_stops(id.into());
+    pub fn set_express_stops(&mut self, id: i32) -> bool {
+        let id = i64::from(id);
+        let known = self.sim.tower.get_transport(id).is_some();
+        if known {
+            self.sim.tower.set_express_stops(id);
+        }
+        known
     }
 
     #[wasm_bindgen(js_name = clearStops)]
