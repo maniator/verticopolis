@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BLOCKING_EPSILON_MS, compareRuns } from "./beforeAfter";
 import { comparisonMarkdown } from "./beforeAfterMain";
-import { after, BLOCK, both, before, LOW, results, row, TIME } from "./beforeAfterFixture";
+import { after, BLOCK, both, before, LOW, metric, results, row, TIME, type Spec } from "./beforeAfterFixture";
 import type { WorkerResults } from "./main";
 import type { ModeName } from "./pageWorker";
 
@@ -36,13 +36,27 @@ describe("controls that cannot see drift", () => {
   });
 
   it("lets a control with a little scatter vouch: the flat band is a third of the tolerance", () => {
-    const status = (wobble: number) => row(compareRuns(before({ wobble }), after({ wobble }), { controls: ["ts"] }), "ts", TIME).status;
+    const status = (wobble: number) => row(compareRuns(before({ wobble }), after({ wobble }), { controls: ["ts"] }), "ts", "mean FPS").status;
     // The pattern spans 2 x wobble. A 4% and a 2% range are past the 1.7% band; a 1% range is inside it.
     expect(status(0.02)).toBe("control-ok");
     expect(status(0.01)).toBe("control-ok");
     expect(status(0.005)).toBe("control-flat");
     const c = compareRuns(before({ wobble: 0.02 }), after({ wobble: 0.02, scale: { "wasm-worker": 1.2 } }), { controls: ["ts"] });
     expect(row(c, "wasm-worker", TIME).status).toBe("ok");
+  });
+
+  it("never calls a precise control flat on a metric no cap or floor pins: hosted time, heap size, byte counts", () => {
+    const heap = "main-thread JS heap";
+    const withHeap = (r: WorkerResults, spec: Spec): WorkerResults => ({ ...r, metrics: [...r.metrics, ...(["ts", "wasm-worker"] as ModeName[]).map((m) => metric(m, heap, 78e6, spec, { group: "memory", unit: "bytes" }))] });
+    // Everything exactly the same in both runs but for the worker's heap, which grows 20%.
+    const spec: Spec = { wobble: 0, scale: { "wasm-worker": 1.2 }, scaleOnly: heap };
+    const c = compareRuns(withHeap(before({ wobble: 0 }), { wobble: 0 }), withHeap(after({ wobble: 0 }), spec), { controls: ["ts"] });
+    expect(row(c, "ts", heap).status).toBe("control-ok");
+    expect(row(c, "wasm-worker", heap).status).toBe("ok");
+    expect(row(c, "wasm-worker", heap).notes).toEqual([]);
+    // The hosted time of a perfectly steady control vouches too, while a frame rate with the same values is flat.
+    expect(row(c, "ts", TIME).status).toBe("control-ok");
+    expect(row(c, "ts", "mean FPS").status).toBe("control-flat");
   });
 
   it("counts a flat blocking control (zero in both runs) as unable to vouch, and a quiet-but-moving one as able", () => {

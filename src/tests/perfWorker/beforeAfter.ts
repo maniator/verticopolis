@@ -79,7 +79,7 @@ export interface Row {
   status: "ok" | "noisy-controlled" | "void" | "uncontrolled" | "thin" | "control-ok" | "control-drift" | "control-noisy" | "control-flat";
   /** For a void row, the controls that moved, with their readings. */
   voidedBy: string[];
-  /** Things a reader needs beside an `ok`: a noisy control and its interval, flat controls that could not vouch, why a controlled ratio row has no net-of-control ratio. */
+  /** Things a reader needs beside an `ok`: a noisy control and its interval, flat controls (pinned at a cap or a floor) that could not vouch, why a controlled ratio row has no net-of-control ratio. */
   notes: string[];
   unthrottled?: "worker";
 }
@@ -228,8 +228,9 @@ function pair(b: Metric, a: Metric, mode: ModeName, role: Row["role"]): Paired {
   return { row, values: [...beforePaired, ...afterPaired], perRep: basis === "ratio" ? perRep : new Map() };
 }
 
-/** A control whose values barely move in either run, so a drift in the machine would not have shown in it: a rate pinned at its cap, a time at a floor, blocking that stays at zero. The band is a third of the tolerance of the control's own median (a tenth of the blocking epsilon for blocking), taken over every paired value of both runs. */
+/** A control whose values barely move in either run, so a drift in the machine would not have shown in it: a rate pinned at its cap, a time at a floor, blocking that stays at zero. Only metrics a cap or a floor can pin are tested (the frame-loop rates and times, blocking and counts); a heap size, a byte count or a hosted CPU time that is merely precise can still show drift, so it is never flat. The band is a third of the tolerance of the control's own median (a tenth of the blocking epsilon for blocking), taken over every paired value of both runs. */
 function isFlat(row: Row, values: number[], tolerance: number): boolean {
+  if (row.group !== "frames" && row.unit !== "count") return false;
   const spread = Math.max(...values) - Math.min(...values);
   if (BLOCKING.test(row.metric)) return spread <= BLOCKING_EPSILON_MS / 10;
   return spread <= (tolerance / 3) * Math.abs(summarize(values).median);

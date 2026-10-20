@@ -545,7 +545,9 @@ and make the tool check this). One exception, ruled for the #1068 pair on
 2026-10-20: a measured commit may add counters or fields to the measuring files
 when the diff between the two harness states is additions only, the independent
 reviewer confirms that at both commits, the additions stay outside the timed
-regions, rows that only the candidate's run has are never cited as ratios (the
+regions (a new non-test file that only a comparison or reporting tool reads,
+such as #1068's `crossRun.ts`, is covered when nothing the measuring code runs
+imports it), rows that only the candidate's run has are never cited as ratios (the
 comparison does not pair them), the readout names every addition, and a
 same-commit pair is run first to show the additions leave the numbers alone.
 
@@ -584,9 +586,12 @@ is 5%, the cap on δ in section 6.1, until the owner adopts the calibrated value
 (`--tolerance`, above 0 and at most 0.5; a value above 5% prints a banner in
 the report), so an effect smaller than it cannot be told from allowed drift.
 
-A control whose values all lie within a third of the tolerance of each other
-across both runs (for blocking, within a tenth of the 50 ms) is flat: a rate
-pinned at its cap, a time at a floor, blocking that stays at zero. It could not
+A control on a metric that a cap or a floor can pin (the frame-loop rates and
+times, main-thread blocking and counts) whose values all lie within a third of
+the tolerance of each other across both runs (for blocking, within a tenth of
+the 50 ms) is flat: a rate pinned at its cap, a time at a floor, blocking that
+stays at zero. Heap sizes, byte counts and the hosted and bare CPU times are
+never flat, however precise, because a baseline that moved would show there. It could not
 have shown drift, so it does not vouch, the report lists it as `CONTROL FLAT`,
 and a subject row that only flat controls cover is uncontrolled with a note
 saying so. A control whose median held but whose interval reaches past the
