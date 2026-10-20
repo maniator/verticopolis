@@ -206,7 +206,7 @@ describe("worker host round 2 (fake engine)", () => {
     const req2 = (last(sent2) as Extract<ToWorker, { type: "ops" }>).request!.req;
     const other = Simulation.newGame(4, "classic");
     other.tower.towerName = "From the bad merge";
-    h2.receive({ type: "frame", gen: 2, req: req2, seq: 1, view, events: "[]", dropped: 0, log: null, pending: null, merge: { save: JSON.stringify(other.serialize()), telemetry: "{not json", housekeeping: null }, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
+    h2.receive({ type: "frame", gen: 2, req: req2, seq: 1, view, events: "[]", dropped: 0, log: null, pending: null, merge: { save: JSON.stringify(other.serialize()), telemetry: "{not json", housekeeping: null, commute: "[]" }, workMs: { ops: 0, reply: 0 }, memoryBytes: null });
     expect(fatal2.length).toBe(1);
     expect(merged.tower.towerName).not.toBe("From the bad merge");
     expect(merged.money).toBe(money);
@@ -224,8 +224,13 @@ describe("worker host round 2 (fake engine)", () => {
       { name: "an event that is no event", reply: { events: "[1]" }, error: /an item in the event batch/ },
       { name: "a drop count that is no count", reply: { dropped: "x" }, error: /dropped-event count/ },
       { name: "a pending choice that is no choice", pending: true, reply: { pending: "5" }, error: /pending choice/ },
-      { name: "telemetry rows of the wrong shape", reply: { merge: { save: otherSave, telemetry: '{"util":[5],"hourly":[],"origins":[]}', housekeeping: null } }, error: /telemetry/ },
-      { name: "a save that parses but is no save", reply: { merge: { save: "{}", telemetry: '{"util":[],"hourly":[],"origins":[]}', housekeeping: null } }, error: /the save is not/ },
+      { name: "telemetry rows of the wrong shape", reply: { merge: { save: otherSave, telemetry: '{"util":[5],"hourly":[],"origins":[]}', housekeeping: null, commute: "[]" } }, error: /telemetry/ },
+      { name: "a save that parses but is no save", reply: { merge: { save: "{}", telemetry: '{"util":[],"hourly":[],"origins":[]}', housekeeping: null, commute: "[]" } }, error: /the save is not/ },
+      { name: "commute-stress rows of the wrong shape", reply: { merge: { save: otherSave, telemetry: '{"util":[],"hourly":[],"origins":[]}', housekeeping: null, commute: '[[3,"x"]]' } }, error: /commute stress/ },
+      { name: "a floor listed twice in the commute stress", reply: { merge: { save: otherSave, telemetry: '{"util":[],"hourly":[],"origins":[]}', housekeeping: null, commute: "[[3,1],[3,2]]" } }, error: /commute stress/ },
+      { name: "changed commute rows of the wrong shape", reply: { commute: '[[3,"x"]]' }, error: /commute stress/ },
+      { name: "a floor listed twice in changed commute rows", reply: { commute: "[[3,1],[3,2]]" }, error: /commute stress/ },
+      { name: "a merge with no commute stress", reply: { merge: { save: otherSave, telemetry: '{"util":[],"hourly":[],"origins":[]}', housekeeping: null } }, error: /commute stress/ },
     ];
     for (const [i, c] of cases.entries()) {
       const sim = Simulation.newGame(4, "classic");

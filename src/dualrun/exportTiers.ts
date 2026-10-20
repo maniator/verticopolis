@@ -118,6 +118,8 @@ export const BINDING_EXPORT_TIERS = {
   drainGameplayEvents: LOOP,
   gameplayEventsPending: LOOP,
   gameplayEventsDropped: LOOP,
+  commuteStress: LOOP,
+  commuteStressRevision: LOOP,
   free: LOOP,
 
   // Tier 3: relay, test and seed ops.

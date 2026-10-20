@@ -144,6 +144,15 @@ export class Crowd {
     return this.commuteWaitByFloor;
   }
 
+  /** @internal Replace the commute-stress EMA with the engine's rows
+   *  (`[floor, seconds]`), which the WASM host reads at each merge since no
+   *  save carries them. Filled in place, so a reader holding the map sees
+   *  each merge. */
+  adoptCommuteStress(rows: readonly (readonly [number, number])[]): void {
+    this.commuteWaitByFloor.clear();
+    for (const [f, w] of rows) this.commuteWaitByFloor.set(f, w);
+  }
+
   /**
    * Venue-associated meal-customer census: how many tower occupants are
    * currently out on a meal round-trip (heading to a venue, `dwelling`, or
