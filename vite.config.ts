@@ -232,6 +232,7 @@ function wasmParityProjects() {
     "**/conformanceWasmTdt.integration.test.ts",
     "**/conformanceWasmCanBuild.integration.test.ts",
     "**/conformanceWasmVctower.integration.test.ts",
+    "**/conformanceWasmSaves.integration.test.ts",
     "**/dualRunDay.integration.test.ts",
     "**/dualRunEdits.integration.test.ts",
     "**/loaderCases.integration.test.ts",

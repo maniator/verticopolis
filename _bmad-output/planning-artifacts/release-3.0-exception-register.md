@@ -36,3 +36,24 @@ approves an exception.
   cutover plan's section 6 Rollback row only flips the default back on the
   same build, which keeps the field and cannot show the loss, so the check
   binds once the owner approves that plan.
+
+## EX-2: a lone surrogate in a text field loads as U+FFFD in the engine
+
+- **Source:** the Saves audit (#1236), `conformanceWasmSaves.integration.test.ts`.
+- **Status:** proposed (2026-10-20). Awaiting the owner's decision at the
+  #945 sign-off.
+- **What is lost:** a save whose tower name (or another text field) holds an
+  unpaired UTF-16 surrogate, written as a `\ud800` style escape, opens in the
+  TypeScript engine with the character kept and in the Rust engine with
+  U+FFFD (the replacement character) in its place. A Rust string cannot hold
+  the unpaired half. Every other field of the save loads the same.
+- **Size:** one character of a name, only in a hand-edited or forged save, or
+  text pasted from a source that already broke a pair. The game's own text
+  input and writers never produce one, and no crash, refusal or other data
+  loss follows. The fixtures and the loader table have none.
+- **Why accepted:** keeping it would mean carrying text as UTF-16 (or a
+  lossy byte form) through the engine for a character that no input path
+  makes.
+- **Check:** the Saves audit pins the difference, so a change in either
+  direction fails the test and this entry has to be removed or rewritten.
+
