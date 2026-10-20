@@ -15,6 +15,6 @@ if (process.env.VC_LOG_TEST_STARTS === "1") {
     for (let t: { name: string; suite?: unknown } | undefined = task; t; t = t.suite as typeof t) {
       if (t.name) names.unshift(t.name);
     }
-    writeSync(2, testStartLine(task.file?.name ?? "?", names, new Date()));
+    writeSync(2, testStartLine(task.file?.name ?? "?", names, new Date(), process.pid));
   });
 }
