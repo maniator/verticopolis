@@ -22,28 +22,23 @@ const readText = (file: string): string => readFileSync(file, "utf8").replace(/^
  *   null, and scripts/verify-precache.ts enforces the opt-in rule afterwards
  *   (`missingEngine` in src/precacheEntry.ts); a record that is missing from a
  *   package that exists, unreadable, or not schema 2 stops the build here.
- *   `allowNoEngine` (VC_ALLOW_NO_ENGINE=1, a deliberate TypeScript-only build)
- *   turns those stops into null.
+ *   A leftover folder with a bad record stops a VC_ALLOW_NO_ENGINE=1 build too
+ *   (verify-precache.ts would stop it afterwards anyway); delete the folder.
  * - Anything else (a dev serve, Vitest) is always null and reads nothing, so
  *   `npm test` runs with no Rust toolchain and a dev session never stops for a
  *   stale package. Dev and test skip the byte check.
  */
-export function readExpectedPackage(publicDir: string, mode: "build" | "other", allowNoEngine = false): ExpectedEnginePackage | null {
+export function readExpectedPackage(publicDir: string, mode: "build" | "other"): ExpectedEnginePackage | null {
   if (mode === "other") return null;
   const dir = resolve(publicDir, ENGINE_DIR);
   const file = resolve(dir, ENGINE_BUILD_RECORD);
   if (!existsSync(file)) {
     // An empty folder counts as no package, as scripts/verify-precache.ts counts it.
-    if (!existsSync(dir) || readdirSync(dir).length === 0 || allowNoEngine) return null;
+    if (!existsSync(dir) || readdirSync(dir).length === 0) return null;
     throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing from a package that exists; rebuild it with npm run wasm:build`);
   }
   const parsed = parseEngineRecord(readText(file));
-  if (!parsed.ok) {
-    // A leftover folder from an older checkout must not stop a deliberate
-    // TypeScript-only build.
-    if (allowNoEngine) return null;
-    throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is not a usable schema 2 record (${parsed.why}); rebuild the package with npm run wasm:build`);
-  }
+  if (!parsed.ok) throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is not a usable schema 2 record (${parsed.why}); rebuild the package with npm run wasm:build`);
   return expectedOf(parsed.record);
 }
 

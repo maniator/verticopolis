@@ -47,9 +47,10 @@ Patches applied from it:
 
 - `engineAssets.ts` said the page already hashes the package; reworded to say
   the loader will, since the loader is not wired in this slice.
-- An unusable or missing `BUILD.json` in a leftover `src/public/engine/` folder
-  no longer stops a deliberate `VC_ALLOW_NO_ENGINE=1` build, and an empty
-  folder counts as no package (the same test `verify-precache.ts` uses).
+- An empty `src/public/engine/` folder counts as no package (the same test
+  `verify-precache.ts` uses). A leftover folder with a bad record still stops a
+  `VC_ALLOW_NO_ENGINE=1` build, as it did before (the confirming pass showed
+  that relaxing it only moved the failure to `verify-precache`).
 - The build reads `BUILD.json` without a leading byte order mark, as the
   page's `TextDecoder` does.
 - The Workbox integrity comment now says it covers newly fetched entries only.

@@ -312,7 +312,7 @@ export default defineConfig(({ command }) => ({
     // skip the check) and for a production build with no package folder at
     // all (VC_ALLOW_NO_ENGINE=1); a production build with a broken record
     // stops here.
-    __ENGINE_PACKAGE__: JSON.stringify(readExpectedPackage(resolve(__dirname, "src/public"), command === "build" ? "build" : "other", process.env.VC_ALLOW_NO_ENGINE === "1")),
+    __ENGINE_PACKAGE__: JSON.stringify(readExpectedPackage(resolve(__dirname, "src/public"), command === "build" ? "build" : "other")),
   },
   plugins: [
     captureOutDir((dir) => {
