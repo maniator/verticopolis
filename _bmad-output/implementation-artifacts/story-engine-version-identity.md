@@ -175,11 +175,11 @@ compatibility policy; the app's 3.0.0 does not decide it.
    mismatch; a served binary with its section removed shows the metadata
    unavailable state. Copy Diagnostics is checked in each, the never-loaded
    case included.
-10. **AC10** The metadata contract is written for other frontends
-    (`engine-rs/API.md`), and nothing in `engine-rs/` reads or requires it.
 9. **AC9** Plan 7.4 states the crate version rule; CONTRIBUTING.md's
    Versioning section links it; #1104's "Version identity" row and the
    backlog row `engine-identity-diagnostics` are current.
+10. **AC10** The metadata contract is written for other frontends
+    (`engine-rs/API.md`), and nothing in `engine-rs/` reads or requires it.
 
 ## PR slices
 
