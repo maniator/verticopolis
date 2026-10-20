@@ -427,7 +427,7 @@ describe("the catalog widths hold the counts measured off the pre-fix art", () =
     ["spin studio", { kind: "fitnessClub", occupants: 60, subtype: "Spin Studio" }, 16, 21, Math.max],
     ["spa", { kind: "spa", occupants: 18 }, 14, 1, Math.max],
   ] as [string, Partial<Unit>, number, number, (...n: number[]) => number][])(
-    "%s draws %i# people at its catalog width",
+    "%s draws %i people at its catalog width",
     (_label, over, tiles, expected, pick) => {
       expect(pick(...sweep(over, tiles, peopleCount))).toBe(expected);
     },
