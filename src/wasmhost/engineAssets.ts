@@ -11,12 +11,13 @@
  * `runtime: false` is precached anyway. engineAssets.test.ts fails when the
  * app source or the package build names an engine file this list lacks.
  *
- * Today the game fetches three files: the glue, which the host and the dual run
- * import by URL (enginePackageUrl in startWasmHost.ts), the binary, which the
- * glue fetches beside itself (`new URL("verticopolis_engine_bg.wasm",
- * import.meta.url)` in wasm-bindgen's web target), and `BUILD.json`, which the
- * package check reads to confirm those two came from the same build (#985's
- * criterion 5, enginePackageCheck.ts). `THIRD-PARTY.json` is read only at
+ * Today the game fetches two files: the glue, which the host and the dual run
+ * import by URL (enginePackageUrl in startWasmHost.ts), and the binary, which
+ * the glue fetches beside itself (`new URL("verticopolis_engine_bg.wasm",
+ * import.meta.url)` in wasm-bindgen's web target). `BUILD.json` is listed as a
+ * run-time file and precached with them because the package check
+ * (enginePackageCheck.ts, #985's criterion 5) reads it once the loader is
+ * wired to it. `THIRD-PARTY.json` is read only at
  * build and test time (the notices in src/build/rustNotices.ts), so it stays
  * out of the precache. Each run-time file is listed in the workbox glob by its
  * own path where the pattern matches no `.json` (see the note in
@@ -48,7 +49,7 @@ export interface EngineFile {
 export const ENGINE_PACKAGE: readonly EngineFile[] = [
   { name: ENGINE_GLUE, runtime: true, readBy: "the WASM host and the dual run's worker, imported by URL (startWasmHost.ts)" },
   { name: ENGINE_WASM, runtime: true, readBy: "the glue, fetched beside itself at init" },
-  { name: ENGINE_BUILD_RECORD, runtime: true, readBy: "the page, which hashes the glue and binary against it before it runs them (enginePackageCheck.ts); also the build, CI's package cache and packageHash.test.ts" },
+  { name: ENGINE_BUILD_RECORD, runtime: true, readBy: "the page, once the loader runs enginePackageCheck.ts (it hashes the glue and binary against this record); also the build, CI's package cache and packageHash.test.ts" },
   { name: ENGINE_THIRD_PARTY_RECORD, runtime: false, readBy: "the third-party notices build (scripts/gen-third-party-notices.ts)" },
 ];
 

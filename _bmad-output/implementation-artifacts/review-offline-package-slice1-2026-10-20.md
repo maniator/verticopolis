@@ -19,7 +19,7 @@ will also get `/gds-code-review`.
 - Verifier: Content-Length is compared only for bodies that are not
   compressed (the stream yields decoded bytes, the header counts encoded ones).
 - Verifier: an abort that arrives mid-body (the caller's deadline or a sibling
-  failing) is a stop, not a `load-failed` that could outrank the real failure.
+  failing) is a stop that must not outrank the real failure as a `load-failed`.
 - Verifier: a redirect whose final URL cannot be parsed is `load-failed`, and a
   refused response cancels its body.
 - Verifier: `isControlled` no longer throws when `navigator.serviceWorker` is
@@ -40,6 +40,31 @@ will also get `/gds-code-review`.
 - Tooling: `precacheUrls` in the perf bundle reader tolerates `integrity` in
   any position in a manifest entry.
 
+## `/gds-code-review` pass (2026-10-20)
+
+Blind Hunter, Edge Case Hunter and Acceptance Auditor ran on the PR diff.
+Patches applied from it:
+
+- `engineAssets.ts` said the page already hashes the package; reworded to say
+  the loader will, since the loader is not wired in this slice.
+- An unusable or missing `BUILD.json` in a leftover `src/public/engine/` folder
+  no longer stops a deliberate `VC_ALLOW_NO_ENGINE=1` build, and an empty
+  folder counts as no package (the same test `verify-precache.ts` uses).
+- The build reads `BUILD.json` without a leading byte order mark, as the
+  page's `TextDecoder` does.
+- The Workbox integrity comment now says it covers newly fetched entries only.
+  Workbox serves an entry already cached under the same revision key without
+  re-checking, so caches filled by an earlier worker are covered by the page's
+  byte check in slice 2 (and a cache key bump is an option there).
+- The `captureOutDir` block no longer splits `emitVersionJson`'s doc comment;
+  the "rejected" note cites decision 4; "X, not Y" phrasing reworded.
+
+Dismissed: the served-record package comparison being redundant (the design
+requires it and it catches a stale cached BUILD.json with a clear mismatch
+screen); base-path handling in the integrity match (`base` is `./` and
+`verify-precache` fails loudly if an entry is missed); brittle regex reading
+of `sw.js` (an existing approach, covered by `verify-precache`).
+
 ## Deferred to slice 2 (tracked on #985, the open backlog row `offline-pwa-engine-audio`)
 
 - Shell and dist package-id agreement check in `verify-precache.ts` (needs
@@ -54,6 +79,8 @@ will also get `/gds-code-review`.
 - The `unverifiable` fallback reason extends the closed `engine_status` list
   (`docs/analytics-data-map.md` and the governed definition test); it needs the
   owner's production OK.
+- Shell and dist package id agreement was raised again by the Blind Hunter (a
+  long-lived Vite process could bake an older package than `dist/` holds).
 - Criterion 7 tests, the two-deployment fixture server specs, the CI offline
   job, the load-cost measurement and the version bump.
 

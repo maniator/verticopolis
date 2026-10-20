@@ -5,10 +5,14 @@
  * precache entries carry. Node only; never imported by the app.
  */
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames.ts";
 import { canonicalFilesJson, expectedOf, parseEngineRecord, type ExpectedEnginePackage } from "../wasmhost/enginePackageRecord.ts";
+
+/** A text file as the page reads it: the page's TextDecoder drops a leading
+ *  byte order mark, so the build does too. */
+const readText = (file: string): string => readFileSync(file, "utf8").replace(/^\uFEFF/, "");
 
 /**
  * What `__ENGINE_PACKAGE__` is for a build: the record of `src/public/engine/`,
@@ -18,20 +22,28 @@ import { canonicalFilesJson, expectedOf, parseEngineRecord, type ExpectedEngineP
  *   null, and scripts/verify-precache.ts enforces the opt-in rule afterwards
  *   (`missingEngine` in src/precacheEntry.ts); a record that is missing from a
  *   package that exists, unreadable, or not schema 2 stops the build here.
+ *   `allowNoEngine` (VC_ALLOW_NO_ENGINE=1, a deliberate TypeScript-only build)
+ *   turns those stops into null.
  * - Anything else (a dev serve, Vitest) is always null and reads nothing, so
  *   `npm test` runs with no Rust toolchain and a dev session never stops for a
  *   stale package. Dev and test skip the byte check.
  */
-export function readExpectedPackage(publicDir: string, mode: "build" | "other"): ExpectedEnginePackage | null {
+export function readExpectedPackage(publicDir: string, mode: "build" | "other", allowNoEngine = false): ExpectedEnginePackage | null {
   if (mode === "other") return null;
   const dir = resolve(publicDir, ENGINE_DIR);
   const file = resolve(dir, ENGINE_BUILD_RECORD);
   if (!existsSync(file)) {
-    if (!existsSync(dir)) return null;
+    // An empty folder counts as no package, as scripts/verify-precache.ts counts it.
+    if (!existsSync(dir) || readdirSync(dir).length === 0 || allowNoEngine) return null;
     throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing from a package that exists; rebuild it with npm run wasm:build`);
   }
-  const parsed = parseEngineRecord(readFileSync(file, "utf8"));
-  if (!parsed.ok) throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is not a usable schema 2 record (${parsed.why}); rebuild the package with npm run wasm:build`);
+  const parsed = parseEngineRecord(readText(file));
+  if (!parsed.ok) {
+    // A leftover folder from an older checkout must not stop a deliberate
+    // TypeScript-only build.
+    if (allowNoEngine) return null;
+    throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is not a usable schema 2 record (${parsed.why}); rebuild the package with npm run wasm:build`);
+  }
   return expectedOf(parsed.record);
 }
 
@@ -73,7 +85,7 @@ export function engineIntegrityTransform(distDir: string | (() => string)) {
 }
 
 /** `key: "value"` in a flat object literal, quoted or bare key, either quote,
- *  and only as a whole key (`url`, not `baseurl`). The value is group 2. */
+ *  and only as a whole key (`baseurl` does not match `url`). The value is group 2. */
 const KEY = (key: string) => new RegExp(`(?:^|[{,\\s])["']?${key}["']?\\s*:\\s*(["'])(.*?)\\1`);
 
 /** The `integrity` each engine entry in a generated precache manifest carries,
@@ -101,7 +113,7 @@ export function engineDistProblems(distDir: string, manifest: string): string[] 
   const problems: string[] = [];
   const recordFile = resolve(distDir, ENGINE_DIR, ENGINE_BUILD_RECORD);
   if (!existsSync(recordFile)) return [`dist/${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing`];
-  const parsed = parseEngineRecord(readFileSync(recordFile, "utf8"));
+  const parsed = parseEngineRecord(readText(recordFile));
   if (!parsed.ok) return [`dist/${ENGINE_DIR}${ENGINE_BUILD_RECORD} is not a usable schema 2 record (${parsed.why})`];
   const { record } = parsed;
   const sha = (b: Uint8Array | string) => createHash("sha256").update(b).digest("hex");

@@ -97,15 +97,6 @@ function gitShortSha(): string {
   }
 }
 
-/**
- * Emit `dist/version.json` describing THIS build — the file the running (old)
- * client fetches when a new worker is waiting, to learn what it's updating to
- * (see src/pwa.ts `fetchUpdateInfo`). It is deliberately a `.json`, which
- * Workbox's `globPatterns` does not match, so it is never precached and is
- * always fetched network-fresh. `notes` is the player-facing "What's new" list,
- * read from the CHANGELOG.md section matching this version (see `changelogNotes`
- * and CONTRIBUTING.md → "Player notes").
- */
 /** Where the build writes dist/, as Vite resolved it (outDir is relative to
  *  root, so the engine integrity transform asks rather than guesses). */
 let builtDistDir = resolve(__dirname, "dist");
@@ -118,6 +109,15 @@ function captureOutDir(set: (dir: string) => void): Plugin {
   };
 }
 
+/**
+ * Emit `dist/version.json` describing THIS build — the file the running (old)
+ * client fetches when a new worker is waiting, to learn what it's updating to
+ * (see src/pwa.ts `fetchUpdateInfo`). It is deliberately a `.json`, which
+ * Workbox's `globPatterns` does not match, so it is never precached and is
+ * always fetched network-fresh. `notes` is the player-facing "What's new" list,
+ * read from the CHANGELOG.md section matching this version (see `changelogNotes`
+ * and CONTRIBUTING.md → "Player notes").
+ */
 function emitVersionJson(): Plugin {
   return {
     name: "emit-version-json",
@@ -312,7 +312,7 @@ export default defineConfig(({ command }) => ({
     // skip the check) and for a production build with no package folder at
     // all (VC_ALLOW_NO_ENGINE=1); a production build with a broken record
     // stops here.
-    __ENGINE_PACKAGE__: JSON.stringify(readExpectedPackage(resolve(__dirname, "src/public"), command === "build" ? "build" : "other")),
+    __ENGINE_PACKAGE__: JSON.stringify(readExpectedPackage(resolve(__dirname, "src/public"), command === "build" ? "build" : "other", process.env.VC_ALLOW_NO_ENGINE === "1")),
   },
   plugins: [
     captureOutDir((dir) => {
@@ -400,8 +400,12 @@ export default defineConfig(({ command }) => ({
         //
         // The three engine entries (glue, binary, BUILD.json) carry a Workbox
         // `integrity` (manifestTransforms below), so a body that is not the
-        // build's own bytes can never enter the precache: an install that
-        // overlaps a deploy fails whole and the old, consistent set stays.
+        // build's own bytes cannot be newly cached: an install that overlaps
+        // a deploy fails whole and the old, consistent set stays. Workbox
+        // applies it only to an entry it has to fetch; an entry already in
+        // the cache under the same revision key is served as it is, which is
+        // why the page's own byte check (#985 slice 2) is the defence for
+        // caches filled before this change.
         // scripts/verify-precache.ts fails the build when a run-time engine
         // or audio file is missing from the manifest, when a build-only
         // engine file is in it, and when the package holds a file the list

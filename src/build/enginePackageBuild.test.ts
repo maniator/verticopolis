@@ -49,6 +49,19 @@ describe("readExpectedPackage", () => {
     expect(readExpectedPackage(d, "other")).toBeNull();
   });
 
+  it("lets a deliberate TypeScript-only build (VC_ALLOW_NO_ENGINE=1) go past a leftover or unusable record", () => {
+    expect(readExpectedPackage(pkg({ record: null }), "build", true)).toBeNull();
+    expect(readExpectedPackage(pkg({ record: JSON.stringify({ sources: "a".repeat(64) }) }), "build", true)).toBeNull();
+    expect(readExpectedPackage(pkg(), "build", true)).toEqual({ package: record.package, files: record.files });
+  });
+
+  it("treats an empty engine folder as no package, and reads a record that starts with a byte order mark", () => {
+    dir = mkdtempSync(join(tmpdir(), "vc-pkg-"));
+    mkdirSync(join(dir, ENGINE_DIR));
+    expect(readExpectedPackage(dir, "build")).toBeNull();
+    expect(readExpectedPackage(pkg({ record: `\uFEFF${JSON.stringify(record)}` }), "build")).toEqual({ package: record.package, files: record.files });
+  });
+
   it("gives a dev serve or a test null even for a good record", () => {
     expect(readExpectedPackage(pkg(), "other")).toBeNull();
     expect(readExpectedPackage(pkg({ record: null }), "other")).toBeNull();
