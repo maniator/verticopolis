@@ -24,6 +24,10 @@ export interface CompareConfig {
   viewport: { width: number; height: number };
   scenarios: string[];
   quick: boolean;
+  /** An A/A pass (protocol section 6.1): both slots run this engine. The
+   *  slot names ("ts" and "wasm") stay the pairing labels, so every ratio
+   *  reads slot "wasm" over slot "ts". Null for a comparison run. */
+  aa: EngineName | null;
 }
 
 export interface StepSummary {
@@ -108,7 +112,12 @@ export interface ScenarioRun {
 
 export interface ProcessRun {
   rep: number;
+  /** The slot this process filled. It is the engine that ran, except in an
+   *  A/A pass (`CompareConfig.aa`), where both slots run the same one. */
   engine: EngineName;
+  /** The engine the page actually ran; absent in results written before A/A
+   *  passes existed, where it equals `engine`. */
+  ranEngine?: EngineName;
   order: number;
   ok: boolean;
   error: string | null;

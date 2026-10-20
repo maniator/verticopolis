@@ -90,6 +90,14 @@ describe("markdownReport", () => {
     expect(md).toMatch(/No engine comparison for cold DOMContentLoaded, cold load event, warm DOMContentLoaded, warm load event: boot order differs between engines/);
     expect(md).toContain("- one machine");
     expect(markdownReport(results(true))).toContain("**Validation: passed.**");
+    expect(md).not.toContain("A/A pass");
+  });
+
+  it("opens an A/A pass with a banner saying it is not a comparison", () => {
+    const r = results(true);
+    const md = markdownReport({ ...r, config: { ...r.config, aa: "wasm" } });
+    expect(md).toContain("**A/A pass, not a comparison.** Both slots ran the WASM engine.");
+    expect(markdownReport({ ...r, config: { ...r.config, aa: "ts" } })).toContain("Both slots ran the TypeScript engine.");
   });
 
   it("writes CSVs with one row per metric, value and comparison", () => {

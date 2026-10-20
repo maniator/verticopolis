@@ -50,14 +50,17 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
   const good = runs.filter((r) => r.ok);
   for (const r of good) {
     const tag = `rep ${r.rep} ${r.engine}`;
+    const ran = r.ranEngine ?? r.engine;
+    if (config.aa && ran !== config.aa) errors.push(`${tag}: an A/A pass of ${config.aa} ran ${ran}`);
+    if (!config.aa && ran !== r.engine) errors.push(`${tag}: a comparison run launched ${ran} in the ${r.engine} slot`);
     const slowRate = Math.max(...config.throttles);
     const phases: [string, ProcessRun["cold"]][] = [["cold start", r.cold], ["warm start", r.warm]];
     if (slowRate > 1) phases.push([`${slowRate}x cold start`, r.cold4x]);
     for (const [phase, s] of phases) {
       if (!s) errors.push(`${tag}: no ${phase} sample`);
-      else if (r.engine === "wasm" && (s.engineHostedMs === null || s.gameReadyMs === null || s.engineHostedMs > s.gameReadyMs)) errors.push(`${tag}: ${phase}: the engine was not hosted by the time the game was ready (hosted ${s.engineHostedMs ?? "never"}, ready ${s.gameReadyMs ?? "never"})`);
-      else if (s.engineActive !== r.engine) {
-        errors.push(r.engine === "wasm" ? `${tag}: ${phase}: the WASM engine did not initialize; the page fell back to TypeScript` : `${tag}: ${phase}: the TypeScript run reports the WASM engine active`);
+      else if (ran === "wasm" && (s.engineHostedMs === null || s.gameReadyMs === null || s.engineHostedMs > s.gameReadyMs)) errors.push(`${tag}: ${phase}: the engine was not hosted by the time the game was ready (hosted ${s.engineHostedMs ?? "never"}, ready ${s.gameReadyMs ?? "never"})`);
+      else if (s.engineActive !== ran) {
+        errors.push(ran === "wasm" ? `${tag}: ${phase}: the WASM engine did not initialize; the page fell back to TypeScript` : `${tag}: ${phase}: the TypeScript run reports the WASM engine active`);
       }
     }
     for (const name of config.scenarios) {
@@ -72,7 +75,7 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
             errors.push(`${tag}: ${name} ${mode} at ${t}x missing`);
             continue;
           }
-          if (s.engineActive !== r.engine) errors.push(`${tag}: ${name} ${mode} at ${t}x ran on ${s.engineActive}, not ${r.engine}`);
+          if (s.engineActive !== ran) errors.push(`${tag}: ${name} ${mode} at ${t}x ran on ${s.engineActive}, not ${ran}`);
           if (s.hostErrorsAdded.length) errors.push(`${tag}: ${name} ${mode} at ${t}x: the host reported ${s.hostErrorsAdded.join("; ")}`);
           if (s.end.minutes !== s.startMinutes + config.steps * config.dt) errors.push(`${tag}: ${name} ${mode} at ${t}x: the clock moved ${s.end.minutes - s.startMinutes} minutes, expected ${config.steps * config.dt}`);
           if (!s.gcAvailable) errors.push(`${tag}: ${name} ${mode} at ${t}x: gc() was missing (the browser ignored --js-flags=--expose-gc), so the loop did not start from a full collection`);
@@ -83,7 +86,7 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
             if (label === "frames" || r.audio?.started) errors.push(`${tag}: ${name} ${label} at ${t}x missing`);
             continue;
           }
-          if (f.engineActive !== r.engine) errors.push(`${tag}: ${name} ${label} at ${t}x ran on ${f.engineActive}, not ${r.engine}`);
+          if (f.engineActive !== ran) errors.push(`${tag}: ${name} ${label} at ${t}x ran on ${f.engineActive}, not ${ran}`);
           if (f.hostErrorsAdded.length) errors.push(`${tag}: ${name} ${label} at ${t}x: the host reported ${f.hostErrorsAdded.join("; ")}`);
           if (f.clampedFrames > 0) warnings.push(`${tag}: ${name} ${label} at ${t}x: ${f.clampedFrames} of ${f.frames} frames ran over 200 ms, which the game clamps to 1 ms of elapsed time, so that row understates the simulation work`);
           if (f.frames < 100) warnings.push(`${tag}: ${name} ${label} at ${t}x: only ${f.frames} frames in the window; its p99 and 1% low rest on one or two frames`);
@@ -96,6 +99,7 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
   }
 
   for (const r of good) {
+    const ran = r.ranEngine ?? r.engine;
     const fatal = r.pageErrors.filter((e) => /\[wasm\]|\[tick\]/.test(e));
     if (fatal.length) errors.push(`rep ${r.rep} ${r.engine}: engine or frame errors in the page: ${fatal.slice(0, 3).join(" | ")}`);
     else if (r.pageErrors.length) warnings.push(`rep ${r.rep} ${r.engine}: ${r.pageErrors.length} page error(s), first: ${r.pageErrors[0]}`);
@@ -115,14 +119,14 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
       for (const w of where) if (!probe?.timed?.[`${w}:${t}`]) errors.push(`rep ${r.rep} ${r.engine}: no CPU probe confirms the ${t}x throttle of ${w}`);
     }
     for (const [name, sc] of Object.entries(r.scenarios)) {
-      for (const [t, h] of Object.entries(sc.hosted)) if (r.engine === "wasm" && h.attribution && h.attribution.exportCalls === 0) errors.push(`rep ${r.rep} wasm: ${name} ${t}x: the attribution pass saw no export call, so its host JS share would include engine time`);
+      for (const [t, h] of Object.entries(sc.hosted)) if ((r.ranEngine ?? r.engine) === "wasm" && h.attribution && h.attribution.exportCalls === 0) errors.push(`rep ${r.rep} wasm: ${name} ${t}x: the attribution pass saw no export call, so its host JS share would include engine time`);
     }
     // Audio-on rows pair repetitions, so one that lost its audio would skew
     // them toward the repetitions where audio happened to start.
     if (!r.audio?.started || !r.audio.contexts.includes("running")) errors.push(`rep ${r.rep} ${r.engine}: audio did not start (contexts: ${r.audio?.contexts.join(", ") || "none"}), so the audio-on rows have no sample from it`);
     const fv = r.firstVisitWithServiceWorker;
     if (!fv || fv.error || !fv.swActive) warnings.push(`rep ${r.rep} ${r.engine}: the service worker first visit ${fv?.error ? `failed (${fv.error})` : "never activated"}; its transfer and offline rows have no sample from it`);
-    else if (fv.onlineEngineActive !== r.engine) warnings.push(`rep ${r.rep} ${r.engine}: the service worker first visit ran on ${fv.onlineEngineActive ?? "no engine"}; its bytes are left out`);
+    else if (fv.onlineEngineActive !== ran) warnings.push(`rep ${r.rep} ${r.engine}: the service worker first visit ran on ${fv.onlineEngineActive ?? "no engine"}; its bytes are left out`);
     if (fv?.onlinePageErrors.length) warnings.push(`rep ${r.rep} ${r.engine}: the service worker first visit logged ${fv.onlinePageErrors.length} page error(s), first: ${fv.onlinePageErrors[0]}`);
   }
 

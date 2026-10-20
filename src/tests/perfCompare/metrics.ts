@@ -74,7 +74,7 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
   if (slow !== "1") startup("cold4x");
   // Only visits whose service worker activated and that ran on the
   // requested engine count.
-  out.push({ group: "transfer", scenario: "-", throttle: "1", metric: "first visit with service worker, bytes served", unit: "bytes", better: "lower", value: (r) => { const f = r.firstVisitWithServiceWorker; return f?.swActive && f.onlineEngineActive === r.engine ? bytes(f.served) : null; } });
+  out.push({ group: "transfer", scenario: "-", throttle: "1", metric: "first visit with service worker, bytes served", unit: "bytes", better: "lower", value: (r) => { const f = r.firstVisitWithServiceWorker; return f?.swActive && f.onlineEngineActive === (r.ranEngine ?? r.engine) ? bytes(f.served) : null; } });
   for (const [metric, key] of [["fetch", "fetchMs"], ["compile", "compileMs"], ["instantiate", "instantiateMs"], ["first Engine", "firstEngineMs"]] as const) {
     out.push({ group: "wasm-load", scenario: "-", throttle: "1", metric: `cold ${metric}`, unit: "ms", better: "lower", value: (r) => r.wasmCold?.[key], engines: ["ts"] });
   }

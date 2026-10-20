@@ -9,7 +9,7 @@ import { comparisonsCsv, markdownReport, preThree, rawCsv, summaryCsv } from "./
 import { engineOrder, runProcess } from "./runner";
 import { buildScenarios } from "./scenarios";
 import { startServer } from "./server";
-import type { CompareConfig, CompareResults, ProcessRun } from "./types";
+import type { CompareConfig, CompareResults, EngineName, ProcessRun } from "./types";
 import type { Environment as Env } from "./env";
 import { validateResults } from "./validate";
 import { buildProduction, buildTooling } from "../perfWorker/build";
@@ -32,10 +32,12 @@ export interface Args {
   resume: string | null;
   scenarios: string[] | null;
   throttles: number[] | null;
+  /** `--aa ts|wasm`: an A/A pass, the same engine in both slots. */
+  aa: EngineName | null;
 }
 
 export function parseArgs(argv: readonly string[]): Args {
-  const a: Args = { reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, throttles: null };
+  const a: Args = { reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, throttles: null, aa: null };
   let repsSet = false;
   const seen = new Set<string>();
   for (let i = 0; i < argv.length; i++) {
@@ -63,7 +65,11 @@ export function parseArgs(argv: readonly string[]): Args {
       a.throttles = next().split(",").map(Number);
       if (a.throttles.some((t) => !Number.isFinite(t) || t < 1 || t > 20)) throw new Error("--throttles takes rates from 1 to 20, comma separated");
       if (new Set(a.throttles).size !== a.throttles.length) throw new Error("--throttles names a rate twice");
-    } else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --throttles 1,4`);
+    } else if (arg === "--aa") {
+      const v = next();
+      if (v !== "ts" && v !== "wasm") throw new Error("--aa takes the engine to run in both slots: ts or wasm");
+      a.aa = v;
+    } else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --throttles 1,4, --aa ts|wasm`);
   }
   if (a.quick && !repsSet) a.reps = 2;
   if (a.resume && a.out) throw new Error("--resume continues its own folder; it takes no --out");
@@ -83,6 +89,7 @@ export function makeConfig(args: Args, scenarioNames: string[]): CompareConfig {
     viewport: { width: 1280, height: 720 },
     scenarios: scenarioNames,
     quick: args.quick,
+    aa: args.aa,
   };
 }
 
@@ -310,13 +317,13 @@ export function packageErrors(perf: PackageState, prod: PackageState, sourceHash
  * and commit gets -2, -3, and so on, so no result is overwritten. An
  * explicit --out must not exist yet either.
  */
-export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync): string {
+export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild"> & { aa?: EngineName | null }, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync): string {
   if (args.out) {
     const out = resolve(repo, args.out);
     if (exists(out)) throw new Error(`${out} already exists; results are never overwritten`);
     return out;
   }
-  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.skipBuild ? "-skipbuild" : ""}${env.dirty ? "-dirty" : ""}`);
+  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${args.skipBuild ? "-skipbuild" : ""}${env.dirty ? "-dirty" : ""}`);
   let out = base;
   for (let n = 2; exists(out); n++) out = `${base}-${n}`;
   return out;

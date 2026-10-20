@@ -10,7 +10,7 @@ import { engineOrder, frameSummary, stepSummary } from "./runner";
 describe("parseArgs", () => {
   it("defaults to ten repetitions and both throttles", () => {
     const a = parseArgs([]);
-    expect(a).toEqual({ reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, throttles: null });
+    expect(a).toEqual({ reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, throttles: null, aa: null });
     expect(makeConfig(a, ["small"])).toMatchObject({ reps: 10, steps: 720, dt: 2, throttles: [1, 4], speed: 3, quick: false });
   });
   it("reads every flag, and --quick lowers the default reps only", () => {
@@ -31,6 +31,11 @@ describe("parseArgs", () => {
     expect(() => parseArgs(["--throttles", "1,Infinity"])).toThrow(/from 1 to 20/);
     expect(() => parseArgs(["--reps", "3", "--reps", "5"])).toThrow(/--reps is given twice/);
     expect(parseArgs(["--resume", "d"]).resume).toBe("d");
+    expect(parseArgs(["--aa", "wasm"]).aa).toBe("wasm");
+    expect(makeConfig(parseArgs(["--aa", "ts"]), ["small"]).aa).toBe("ts");
+    expect(makeConfig(parseArgs([]), ["small"]).aa).toBeNull();
+    expect(() => parseArgs(["--aa", "rust"])).toThrow(/ts or wasm/);
+    expect(() => parseArgs(["--aa", "ts", "--aa", "wasm"])).toThrow(/--aa is given twice/);
     expect(() => parseArgs(["--resume", "d", "--out", "e"])).toThrow(/takes no --out/);
   });
 });
@@ -66,6 +71,7 @@ describe("outputDir", () => {
   it("marks quick and dirty runs, and refuses an existing --out", () => {
     expect(outputDir("/r", { out: null, quick: true, skipBuild: true }, "2026-10-13", { commitShort: "abc1234", dirty: true }, () => false)).toBe("/r/docs/performance/results/2026-10-13-abc1234-quick-skipbuild-dirty");
     expect(outputDir("/r", { out: "x", quick: false, skipBuild: false }, "d", env, () => false)).toBe("/r/x");
+    expect(outputDir("/r", { out: null, quick: false, skipBuild: false, aa: "wasm" }, "2026-10-14", env, () => false)).toBe("/r/docs/performance/results/2026-10-14-abc1234-aa-wasm");
     expect(() => outputDir("/r", { out: "x", quick: false, skipBuild: false }, "d", env, () => true)).toThrow(/never overwritten/);
   });
 });

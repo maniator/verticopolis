@@ -24,6 +24,17 @@ describe("validateResults", () => {
     expect(v.warnings.join(" ")).toMatch(/only 2 repetition/);
   });
 
+  it("judges an A/A pass by the engine that ran, not the slot", () => {
+    const aa = (ran: "ts" | "wasm") =>
+      [0, 1].flatMap((rep) => (["ts", "wasm"] as const).map((slot) => ({ ...processRun(rep, ran), engine: slot, ranEngine: ran })));
+    for (const ran of ["ts", "wasm"] as const) {
+      const v = validateResults({ ...config(), aa: ran }, aa(ran), [node()]);
+      expect(v.errors).toEqual([]);
+    }
+    const v = validateResults({ ...config(), aa: "wasm" }, aa("ts"), [node()]);
+    expect(v.ok).toBe(false);
+  });
+
   it("names a WASM fallback as an error and never counts it", () => {
     const runs = good();
     runs[1].cold!.engineActive = "ts";

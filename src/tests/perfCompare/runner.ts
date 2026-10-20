@@ -186,11 +186,13 @@ async function memoryPass(page: Page, cdp: CDPSession, opts: RunnerOptions, engi
   return out;
 }
 
-export async function runProcess(opts: RunnerOptions, rep: number, engine: EngineName, order: number): Promise<ProcessRun> {
+export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineName, order: number): Promise<ProcessRun> {
   const { server, config, scenarios, log } = opts;
+  const engine = config.aa ?? slot;
   const run: ProcessRun = {
     rep,
-    engine,
+    engine: slot,
+    ranEngine: engine,
     order,
     ok: false,
     error: null,
@@ -295,7 +297,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, engine: Engin
       }
     }
     // The WASM package's load steps, before any audio runs.
-    if (engine === "ts") run.wasmCold = await ev(page, "wasm cold load", wasmColdLoad, { wasmUrl: `${server.url}/engine/verticopolis_engine_bg.wasm`, jsUrl: engineUrl, scenario: scenarios[0].name });
+    if (slot === "ts") run.wasmCold = await ev(page, "wasm cold load", wasmColdLoad, { wasmUrl: `${server.url}/engine/verticopolis_engine_bg.wasm`, jsUrl: engineUrl, scenario: scenarios[0].name });
 
     // Gameplay frames: an audio-off block and an audio-on block, each in a
     // fresh page, their order alternating by repetition so neither always
