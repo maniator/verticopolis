@@ -40,4 +40,8 @@ describe("the perf:compare runner", () => {
     // One page boot for all scenarios is the pattern that biased the second tower.
     expect(source).not.toMatch(/"timed passes boot"/);
   });
+
+  it("stashes the cold load's scenario in the page it runs in, which is the last scenario's fresh page", () => {
+    expect(source).toMatch(/stashSave, \{ name: scenarios\[0\]\.name, save: scenarios\[0\]\.save \}\);\s*run\.wasmCold = await ev\(page, "wasm cold load", wasmColdLoad/);
+  });
 });
