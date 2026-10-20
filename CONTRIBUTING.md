@@ -528,14 +528,18 @@ alone.
   `await`, broken call sites), cleanup (duplication, dead code, needless
   complexity), and **algorithmic complexity** (below). Fix what you find
   before opening or updating a PR.
-- **No Big-O regressions on hot paths.** The tick loop and render/UI refresh run
-  over the whole tower every step, and towers get large (hundreds of units,
-  dozens of shafts, ~100 floors, thousands of person-trips). Look entities up by
-  id via `Tower.getUnit` / `getTransport`, never `units.find` / `transports.find`.
-  Hoist tower-wide facts out of per-unit/per-person loops, keep running counters
-  instead of re-scanning, and memoize per-`revision` work. A new `.find` /
-  `.filter` / `.some` nested in a loop over another collection on a per-tick or
-  per-frame path is a review-blocking finding, the same as a correctness bug.
+- **Hot paths get a complexity review.** The checklist is
+  [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md).
+  It covers Rust, TypeScript, the WASM binding, the hosts, simulation ticks,
+  rendering and the other surfaces its section 1 lists, and ported, moved or
+  inherited code as much as new code. Trace each changed function's callers to
+  an entry point (its section 2); a whole-collection walk, clone, sort or
+  rebuilt map under one of its multipliers is a finding in either language,
+  helpers included. A significant change (its section 5) carries the
+  complexity note in the PR. A finding is fixed, or deferred with evidence and
+  a tracked issue, and never dismissed because it existed before; a new,
+  ported or moved scan over its tier's budget, or a dropped TypeScript cache,
+  gets fixed unless the owner accepts the deferral.
 - **Deep, adversarial review before merge, never deferred to "later."** The change gets a full
   adversarial review while its context is still loaded (before pushing, or
   immediately after opening/updating the PR), not left to a hypothetical

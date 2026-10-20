@@ -17,6 +17,10 @@ notes, never a past version's.
 
 - A save made while an exterminator is booked now remembers which rooms were booked, so after a reload the treatment covers the same rooms as if you had kept playing.
 
+## 2.40.0
+
+- On the opt-in WASM engine (`?engine=wasm`), a tower whose engine fails keeps running instead of freezing. It rewinds by up to an in-game hour, so recent changes may be undone, and a message says so.
+
 ## 2.39.0
 
 - Reaching TOWER while an emergency or an update prompt is waiting for your answer no longer freezes the game, and a saved tower that was stuck this way now continues. The question comes first, then the congratulations. A tab that is already frozen needs to be closed and the game reopened to pick up the fix.

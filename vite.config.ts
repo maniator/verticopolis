@@ -247,6 +247,8 @@ function wasmParityProjects() {
     // These start their own host (in process, or the worker's).
     "**/wasmHostAnalyticsBridge.integration.test.ts",
     "**/wasmHostExtermination.integration.test.ts",
+    "**/wasmHostFallback.integration.test.ts",
+    "**/wasmHostRollback*.integration.test.ts",
     "**/wasmWorkerHost.integration.test.ts",
     "**/wasmWorkerLifecycle.integration.test.ts",
     "**/wasmWorkerSaves.integration.test.ts",

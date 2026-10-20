@@ -1,14 +1,18 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync } from "node:fs";
 import { cpus, freemem, platform, release, totalmem, arch } from "node:os";
 import { join } from "node:path";
+import { treeRecord, type TreeRecord } from "./treeRecord";
 
 /** The machine and toolchain a comparison ran on (issue #972). */
 export interface Environment {
   commit: string;
   commitShort: string;
   dirty: boolean;
+  /** What made it dirty: the status, a hash of the tracked changes and of
+   *  each untracked file (see treeRecord.ts). Absent in older results. */
+  tree?: TreeRecord;
   branch: string;
   /** origin/main at the run (as last fetched), the merge base with it, and
    *  how many of its commits the measured tree lacks (0: a baseline of it). */
@@ -35,13 +39,22 @@ export interface Environment {
   enginePackage: Record<string, string>;
 }
 
-function run(cmd: string, args: string[], cwd: string): string | null {
+/** `raw` keeps the output byte for byte (a status line starts with a space)
+ *  and allows a large diff; otherwise it is trimmed. */
+function run(cmd: string, args: string[], cwd: string, raw = false): string | null {
+  return runBytes(cmd, args, cwd, raw)?.toString("utf8") ?? null;
+}
+
+function runBytes(cmd: string, args: string[], cwd: string, raw: boolean): Buffer | null {
   try {
     // Bounded, and never prompting for credentials, so a git that wants a
     // password or a remote that hangs cannot stall the benchmark.
     // (The user's own SSH settings are left alone; the timeout bounds an
     // SSH prompt.)
-    return execFileSync(cmd, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30_000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } }).trim();
+    // GIT_DIFF_OPTS changes the diff text, so the record's hash never sees it.
+    const { GIT_DIFF_OPTS: _ignored, ...inherited } = process.env;
+    const out = execFileSync(cmd, args, { cwd, stdio: ["ignore", "pipe", "ignore"], timeout: 30_000, maxBuffer: raw ? 256 * 2 ** 20 : undefined, env: { ...inherited, GIT_TERMINAL_PROMPT: "0" } });
+    return raw ? out : Buffer.from(out.toString("utf8").trim());
   } catch {
     return null;
   }
@@ -113,6 +126,20 @@ export function engineBuildHash(distDir: string): string | null {
   return packageState(distDir).buildHash;
 }
 
+const MAX_UNTRACKED_BYTES = 256 * 2 ** 20;
+
+/** An untracked file's bytes; a symlink's target text prefixed `symlink:` (the link itself is what the tree holds); null for anything else or a file too large to hash. */
+export function readUntracked(path: string): Buffer | null {
+  try {
+    const st = lstatSync(path);
+    if (st.isSymbolicLink()) return Buffer.from(`symlink:${readlinkSync(path)}`);
+    if (!st.isFile() || st.size > MAX_UNTRACKED_BYTES) return null;
+    return readFileSync(path);
+  } catch {
+    return null;
+  }
+}
+
 export function collectEnvironment(repo: string, distDir: string, sourceHash: string | null): Environment {
   const commit = run("git", ["rev-parse", "HEAD"], repo) ?? "unknown";
   // Untracked files count too: a new source file changes the build.
@@ -131,11 +158,17 @@ export function collectEnvironment(repo: string, distDir: string, sourceHash: st
   } catch {
     playwright = null;
   }
+  const tree = treeRecord((args) => runBytes("git", args, repo, true), (p) => readUntracked(join(repo, p)));
+  // A status that could not be read counts as dirty: unknown is not clean. So
+  // does a tracked file git was told to ignore changes in, and the flag with
+  // nothing in the record to explain it makes the record incomplete.
+  const dirty = status === null || status.length > 0 || (tree.hidden?.length ?? 0) > 0;
+  if (dirty && tree.porcelain?.length === 0 && !tree.hidden?.length) tree.complete = false;
   return {
     commit,
     commitShort: commit.slice(0, 7),
-    // A status that could not be read counts as dirty: unknown is not clean.
-    dirty: status === null ? true : status.length > 0,
+    dirty,
+    tree,
     branch: run("git", ["rev-parse", "--abbrev-ref", "HEAD"], repo) ?? "unknown",
     mainCommit,
     mainFetched: fetched,
