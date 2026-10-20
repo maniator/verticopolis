@@ -236,7 +236,7 @@ The owner, Naftali, set D1 to D6 that morning and asked the room to decide D1.
 
 🚢 **Dana:** Take them. They're three nearly done PRs. #817's status is green, the gallery was approved on the 15th. Finish them and the version numbers stop being a queue.
 
-😤 **Grumbal:** "Nearly done." #817's last Copilot review was in August. #1039 conflicts with its own base. Bots have been committing visual baselines to them since the 19th.
+😤 **Grumbal:** "Nearly done." #817's last Copilot review was on the 15th, and every attempt since errored. #1039 conflicts with its own base. Bots have been committing visual baselines to them since the 19th.
 
 ⚙️ **Hank:** Which is the cost of leaving them open. Every day they sit, the baseline bot chews on them and the stack drifts further from main.
 
@@ -362,7 +362,10 @@ the room said. They are corrected in place above:
   re-serialization; #1066 covers the two paths S9 leaves.
 - `sw.js` revalidates on every load; only `version.json` is `no-store`.
 - #985 criterion 5 has a design (#1047); criterion 7 is still open.
-- Of the twelve rowless issues, six are on the 3.0 path.
+- Of the twelve rowless issues, six were on the 3.0 path at the time; the
+  third pass below adds #1048.
+- #817's last Copilot review was on 2026-10-15 (at `a45c1c4`), and six later
+  attempts errored; Grumbal had said August.
 
 Some of what the room settled was changed by the review, and the plan
 (section 14) is the later word:
@@ -393,6 +396,18 @@ A confirming pass on the revised plan changed a few more:
   included) wait.
 - The reliability window counts sessions from every build since S4 and ends
   with a tail on the candidate engine, which a 2.x cohort release carries to
-  players.
+  players. Whether pre-S9 sessions count stays the owner's (OD-2); the plan
+  recommends they do, reported by build.
 - The catalog lane (WS-D) comes before the rendering stack in thread order;
   the stack may use a thread while WS-D waits for S6.
+
+A third pass changed more:
+
+- WS-A follows the owner's 2026-10-16 order on #945: #874 (with #1059) before
+  #902, since both edit the same host and save paths. Amelia's order put #902
+  first; #1062 still merges before both.
+- #1048 rises to P1 after all, since the owner's order lists it before the
+  flip with #1051 after it, which is close to Link Freeman's first call. Part
+  of it landed in #1056.
+- The candidate deploy is cut from a commit with the candidate engine and
+  every host-path input merged; a later host-path change restarts the tail.
