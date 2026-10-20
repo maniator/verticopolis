@@ -319,7 +319,7 @@ Other flags both accept: `--quick` (a 2-rep smoke test that never counts),
 `--resume DIR` (continue a run that stopped; it keeps its own folder, and an A/A folder resumes with `--aa <engine>` repeated),
 `--scenarios a,b`. `perf:compare` also takes `--throttles 1,4` and
 `--aa ts|wasm` (section 6.1);
-`perf:worker` also takes `--read-model` (Node only, no browser).
+`perf:worker` also takes `--read-model` (Node only, no browser) and `--aa ts|wasm` (an A/A pass, section 6.1).
 `perf:restore` takes `--quick`, `--scenarios`, `--throttles`, `--skip-build`
 and `--out`, but not `--resume`: a stopped run starts again in a new folder,
 and its `results.json` keeps the runs it finished. In PowerShell, quote a
@@ -514,8 +514,8 @@ was raised, and every family has a candidate inside its cap with the
 guarantee under the limit and the protocol's pass count and limit in use. `calibration.md` opens
 with the window of the passes (earliest and latest start) and the commit,
 because it is a snapshot, and calls the numbers provisional: it covers M1,
-M2, M3 and M5; M4's long-task ε needs `perf:worker` A/A passes (`perf:worker`
-has no `--aa` yet, follow-up #1111), and nothing in it sets a tolerance until
+M2, M3 and M5; M4's long-task ε comes from `perf:worker --aa` passes, which it
+does not read yet (follow-up #1111), and nothing in it sets a tolerance until
 the owner adopts the numbers.
 
 The harness for each metric is the last column of the table above: a tolerance
@@ -526,10 +526,15 @@ the folders by hand: RUN-0b collects them and the values come from
 
 One limit stays open, so the calibration is not complete:
 
-- **M4's ε has no A/A source yet.** `perf:compare` measures no long tasks and
-  `perf:worker` has no `--aa` (follow-up #1111), so the long-task ε stays
-  uncalibrated until that lands. RUN-1 needs M4, so #1111 and its A/A passes
-  land before RUN-1, either inside RUN-0b or as a follow-on campaign.
+- **M4's ε is not calibrated yet.** `perf:compare` measures no long tasks, so
+  its A/A source is `perf:worker --aa ts|wasm`: the same mode in both slots
+  (labelled `ts` and `wasm`), each run recording the slot and the mode it ran,
+  validation by the mode that ran, a marked folder (an `--out` name must carry
+  `aa-ts` or `aa-wasm`), an `aa` column in both CSVs, no verdict words, and
+  `perf:before-after` refuses such a folder. `perf:calibrate` does not read
+  these folders yet (the rest of #1111), and the A/A passes themselves wait
+  for the owner's PC. RUN-1 needs M4, so the passes land before RUN-1, either
+  inside RUN-0b or as a follow-on campaign.
 
 ### 6.2 BEFORE/AFTER comparison of a candidate PR
 
