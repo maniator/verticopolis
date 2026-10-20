@@ -114,6 +114,243 @@ The stories, in the order they run, each gated on the one before:
 Saves-keep-unknown-fields (phase 4) and the threading evaluation (phase 5)
 are independent of this order and land where they are needed.
 
+## Retiring the TypeScript engine: the inventory
+
+> **Snapshot, counted 2026-10-20 on `main` at `e34dfdf`, with the open PRs
+> read at their heads that day.** The figures and the PR list do not
+> refresh. Each PR's live state is in the release matrix, #1104. Code that
+> retirement has to remove and that this section does not list (anything
+> merged or opened after this snapshot) goes in the retirement story's list
+> (`story-engine-retire-typescript.md`, "What it removes"). Counts come
+> from the TypeScript parser over the paths named (an import is type-only
+> when it says `import type` or marks every name `type`); the commands at
+> the end reproduce the import table.
+
+Owner direction (2026-10-20): one authoritative Rust engine that any
+frontend can build on, with no permanent copy of the gameplay rules in
+TypeScript. #945 gates the 3.0.0 flip, which ships WASM as the default with
+the TypeScript engine as a temporary fallback. Removing the fallback is row 7
+of "Order and gates" above: its gates, then the owner's approval. Until then:
+
+- While the fallback is supported, a simulation fix lands in both engines
+  with the regenerated lock. The spine's inherited invariant runs this rule
+  to row 7, while CONTRIBUTING (and "Two engines, one simulation" above) end
+  it at the flip; #1112 settles the wording before the flip.
+- A new gameplay feature lands in the TypeScript engine only with a stated
+  compatibility reason, and its PR adds the TypeScript half to the story's
+  list.
+- New frontend code reads the catalog, the frame view or an engine query,
+  and adds no runtime import of `src/engine/`.
+- Host code that copies engine state into a `Simulation` is named as a
+  transitional adapter in its PR and in the story's list.
+
+### What retirement removes
+
+| Area | Paths (non-test unless stated) | Why it exists today |
+| --- | --- | --- |
+| The TypeScript simulation | `src/engine/`: 92 source files (19,569 lines, the files under "What moves out first" included) and 40 test files (6,872 lines; 32 on 2026-10-08) | The fallback engine |
+| Tests that drive it | 182 test files outside `src/engine/` import from it, 121 of them the `Simulation` class at runtime; 20 helpers in `src/tests/` import from it (17 at runtime), and the host fixtures `src/wasmhost/fakeEngine.fixture.ts` and `workerRig.fixture.ts`; `e2e/helpers.ts` and the specs that script the tower through `window.game`; the `ts` default of `VC_SHOT_ENGINE` in the screenshot builders | Each test maps first to a conformance scenario, a Rust test, an engine-hosted or data fixture, or a recorded drop. The table described above covers `src/engine/`; AC4 of `story-engine-test-parity.md` lists only the files that stay TypeScript-only, so most of the rest have no row yet. The WASM-leg conformance helpers and `viewWorldSetup.ts` (the `unit` and `integration` setup file) stay, repointed at the engine's catalog |
+| The two-engine harness | the `unitWasm` and `integrationWasm` projects and their `typescriptSide` list (`vite.config.ts`), `test:wasm:parity`, `test.yml`'s project matrix and the `dualRun` filter in `test:wasm`; `src/tests/parity/` (its ratchet names 17 test files); the dual run (`dualRun.ts`, `dualRunAbsent.ts`, `worker.ts`, `ShadowEngine`'s checkpoint op and `compare`, `Divergence`, `src/tests/dualrun/`, `dualRunDay`, `dualRunEdits`); the conformance runner's TypeScript adapters (`scenario.ts`'s `startTsEngine` default and its `facilitiesData` import, `tsCharges`, `tsCheckpointDetail`, the `econConfig` and `catalog` imports in `wasmEngine.ts` and the WASM conformance test); `scripts/fuzz-compare.ts` and its nightly, `engine-fuzz.yml`; the TypeScript conformance step in `test.yml` and its guard, `conformanceCi.guard.test.ts` (#1102); the TypeScript legs of `perf:compare` and `perf:worker`; `hourCost.bench` with `engine-bench.yml` and `scripts/loader-case-dump.ts`, which are TypeScript only; the `chromium-wasm` e2e project and its `PW_WASM_VISUAL` baseline workaround (`chromium` runs the default engine and keeps minting the visual baselines) | They prove the two engines agree, or measure one against the other |
+| The read-model merge | `src/wasmhost/merge.ts`, `frameApply.ts`, `personFields.ts`, `telemetry.ts`, `workerApply.ts`, the merge half of `wasmHost.ts` and `workerHost.ts`, and `refuseForeignCatalog` in `wasmHost.ts`, which checks the binding's catalog against the TypeScript tables | The UI, renderer, audio and analytics read `app.sim`, a TypeScript `Simulation` the host refreshes from the engine (AD-4) |
+| The instance-first relay | `src/dualrun/mirror.ts` (`relayCommands`, `attachMirror`, `loadCommand`) | Each command runs on the instance first and is relayed; #954 (S9, AD-1) has the engine answer first, and the instance mirrors accepted commands until S6 (#868) |
+| The engine switch and the fallback | `ts` in `engineChoice.ts` (`wasm`, `wasm-frame` and `wasm-worker` stay); `typescriptBoot` in `engineBoot.ts` and `bootstrap.ts`; `engineLabel.ts`'s `ts`; the switchable mode in `src/build/engineBundle.ts` and the `engineAliases` in `vite.config.ts`; `stepLoopAbsent.ts`; `scripts/engine-bundle.allow.txt` (86 modules), its guard and `test.yml`'s step-loop canary; `VC_ALLOW_NO_ENGINE` (a TypeScript-only build) in CI, the setup steps and the docs | 3.0.0's fallback (AD-7) |
+| Relay and seed exports | AD-3's tier 3 in `src/dualrun/exportTiers.ts` (`setMoney`, `setCars`, `resizeTransport`, the `tower*` pair, `removeUnit`, `removeTransport`, `advanceClock`, `startFire`, `bombThreat`, `evaluateStar`, the two seeds) | They replay the instance's state into the engine; AD-3 takes them out of the production binding (or behind a cargo feature) by retirement |
+| TypeScript codecs of engine data | `src/storage/tdt*` (21 files; `src/game/saveLoad.ts` calls `parseTDT` and `buildTDT`); `Simulation.deserialize`, `saveMigration.ts` and `migrations/` on the load path (`src/storage/SaveGame.ts`, `saveLoad.ts`) and the undo path (`src/main.ts`) | The crate has `engine-rs/src/tdt/` and the migrations and founder mark in `load.rs`; the web still calls the TypeScript copies (AD-8, #1066, `story-engine-tdt-port`) |
+
+### What moves out of `src/engine/` first
+
+These are not simulation, and code that stays imports them:
+
+- **Types** from `types.ts`, `catalogTypes.ts`, `serializedGame.ts`,
+  `gameplayEvents.d.ts` and the parts of `calendar.ts` and
+  `elevatorSchedule.ts` they import, plus the types other modules hand the
+  UI (`PriceRung`, `HeatmapMode`, the batch-pricing types, `SchedulePreset`,
+  `Person`, the TDT import and export reports). 31 non-test files import the
+  `Simulation` class only as a type; the 25 of them that stay need a
+  read-model type in its place (AD-4). The rules in `types.ts`
+  (`isOperational`, `isPresent`, `isTenanted`, `VACATE_REASON_TEXT`) become
+  engine queries under #868 instead of moving.
+- **The event catalog code:** `gameplayCatalog.ts` (the catalog's shape and
+  checks) and the files generated from `conformance/events/catalog.json`,
+  `gameplayEvents.d.ts` and `gameplayEventRules.ts` (the analytics event
+  schema, with no simulation logic). Their writers (`scripts/wasm-build.ts`,
+  `npm run gen:events`), their reader (`src/analyticsEngineBridge.ts`) and
+  the CI paths that name them (the cache key in
+  `.github/actions/engine-wasm/action.yml`, the drift check in
+  `engine-rs.yml`) move with them.
+- **Host helpers:** `UndoHistory.ts` (`src/main.ts`), `towerCatalog.ts` and
+  the lookups in `catalogTypes.ts` (`catalogFacility`, `catalogBuildKind`:
+  the catalog handle, minus its TypeScript tables), `wellFormed.ts` (save
+  compression and `uiCallbacks.ts`), `canonicalJson.ts` (conformance
+  tooling).
+
+The step driver (`sim/fixedStep.ts`, `timePacing.ts`) goes once #867 (S8,
+AD-2) ports it into the crate.
+
+### What stays in the browser
+
+Each frontend writes its own version of these:
+
+- **The host:** `src/wasmhost/` minus the merge (boot, package load and
+  identity, `startWasmHost.ts`, `frameView.ts`, `engineEvents.ts`,
+  `stepGate.ts`, the experimental worker host); the binding's surface in
+  `src/dualrun/` (`binding.ts`, `engine.d.ts`, `exportTiers.ts`,
+  `catalog.ts`, `ShadowEngine`'s `apply`, the one wrapper that applies
+  commands to the engine, and the `ShadowCommand` vocabulary in
+  `commands.ts`, which the worker protocol speaks); `src/bootstrap.ts`,
+  edited.
+- **Rendering, UI and input:** `src/render/`, `src/ui/`, `src/game/`,
+  `src/presentation/`, `src/audio/`, `src/styles/`, plus the public gallery
+  and preview pages (`src/gallery.ts`, `src/preview.ts`), which read the
+  facility tables today.
+- **PWA and package integrity:** `src/pwa*.ts`, `src/precacheEntry.ts`,
+  `src/build/` (edited), `scripts/verify-precache.ts`, the engine package
+  check (#985).
+- **Save I/O:** slots, compression, preferences and the `.vctower`
+  container in `src/storage/`. `vctowerWriter.ts` keeps its fflate writer
+  for when the engine's writer throws and for saves past
+  `ENGINE_WRITER_MAX_BYTES`.
+- **Analytics and diagnostics:** `src/analytics*.ts` and `src/telemetry.ts`.
+  The engine kinds `ts` and `ts-fallback` in `analyticsEngineStatus.ts` are
+  governed values, so dropping them is a data-map change.
+
+### How far `src/ui`, `src/game` and `src/render` reach into the engine
+
+Non-test files that import `src/engine/` (a module's figure counts the files
+that import it at all):
+
+| Directory | Files importing the engine | With a runtime import | Most imported |
+| --- | --- | --- | --- |
+| `src/ui` | 17 of 49 | 9 | `types` 11, `Simulation` 9, `catalogTypes` 8 |
+| `src/game` | 19 of 28 | 16 | `Simulation` 13, `towerCatalog` 12, `catalogTypes` 9 |
+| `src/render` | 46 of 91 | 31 | `types` 41, `Crowd` 13, `facilities` 12 |
+| The three | 82 of 168 | 56 | |
+
+Outside these three, `src/main.ts`, `src/gallery.ts`, `src/preview.ts` and
+`src/analyticsEngineBridge.ts` import it at runtime, and `src/presentation/`
+and `src/audio/` by type only. The tables above cover `src/storage/`,
+`src/wasmhost/` and `src/dualrun/`.
+
+The runtime imports, by kind:
+
+1. **What moves out first:** the catalog handle and its lookups
+   (`towerCatalog`, `catalogTypes`), the most common, plus `wellFormed` and
+   the view constants in `types.ts` (`VIEW_ZOOM_MIN`, `VIEW_ZOOM_MAX`).
+2. **Rule tables and reference data:** `facilities`, `gameRules`,
+   `residentialRentals`, `retailSubtypes`, `households` and `catalog`,
+   which #921 and #926 move to the engine's catalog; the `Ledger` copy,
+   which #868's row lists; `elevatorSchedule`'s hours and `sim/charges`'
+   refusal text, which no row names yet.
+3. **Gameplay rules evaluated on the read model:** `sim/gripe`,
+   `sim/satisfactionStep`, `scheduleAuthoring`, `scheduleOrigins` and the
+   rules in `types.ts`, which #868's backlog row lists as engine queries;
+   `EconomySystem`, `economy/housekeeping`, `sim/constants`, `traffic` and
+   the `Simulation` constants in `facilityDiagnostics.ts`, which #926's row
+   lists as catalog values. The inspector's gripe lines
+   (`src/game/gripeCopy.ts`, `facilityDiagnostics.ts`) and the elevator
+   schedule dialog run them on the merged instance, so while hosted they can
+   disagree with the engine's own decision, which AD-4 forbids.
+4. **The instance itself:** `Simulation` in `src/main.ts` and
+   `src/game/saveLoad.ts`, the step driver in `src/game/frameLoop.ts`
+   (#867), and `visibleOccupants` in 11 renderer files (#831 routes seven of
+   them through one shared helper, `pixelSprites/common.ts`, leaving 5).
+
+### Before the removal
+
+Beyond row 7's own gates (rows 4, 4b and 5, #873, row 6, two releases on
+WASM, the test-mapping table):
+
+- **Locks:** give each lock a Rust writer (the story's AC1). TypeScript
+  writes all four today (`expected.json`, `loader-cases.json`,
+  `catalog-digests.json`, `tdt-cases.json`, through
+  `VC_CONFORMANCE_UPDATE=1`).
+- **Frontend reads:** land #921 and #926, #868's engine queries and #867's
+  step driver, and give the schedule hours and the refusal text a home, so
+  no staying file imports `src/engine/` at runtime.
+- **Load paths:** boot TDT import, every save load and undo from the crate
+  (AD-8, #1066).
+- **Migrations:** add a test that the crate's `migrate_save` handles every
+  save version the TypeScript migrations do (v1 to v7).
+- **Types:** add a test that pins the moved types to what the binding sends.
+- **Conformance:** strip the runner's TypeScript adapters (above). WASM
+  conformance runs in `engine-rs.yml` and stays.
+- **Benchmarks:** decide whether a Rust bench replaces `hourCost.bench`.
+- **Coverage:** re-baseline the global floors in `vite.config.ts` once
+  `src/engine/` leaves `src/`.
+- **The stored choice:** make a stored `vc.engine = "ts"` and old
+  `?engine=ts` links fall back to the default.
+- **Tooling and docs that name `src/engine/`:** the guard tests that read
+  the directory (`engineAnalyticsFree`, `engineLocale`),
+  `src/tests/conformance/fuzzKey.ts`, the `src/engine` line in
+  `fileSize.ratchet.txt`, `engine-rs.yml`'s `src/engine/**` path filter,
+  `load.rs`'s pointer to `loader-case-dump.ts`, and the docs, CLAUDE.md's
+  canon among them (build caps in `src/engine/facilities.ts`).
+- **The real-game oracle scripts in `tools/simtower/`:** four build a
+  TypeScript `Simulation` and `tdt-to-vctower.ts` reads `SAVE_VERSION`;
+  they sit outside the typecheck, so nothing fails when the engine goes.
+  Repoint them at the crate's `tdt` binary (`engine-rs/src/bin/tdt.rs`) or
+  the binding, or retire them.
+
+### Open and planned work that adds temporary code
+
+Written as PR (issue). Retirement removes these parts; the rest of each PR
+stays.
+
+- **#1092 (#902):** the TypeScript half (`Simulation.ts`, `sim/coerce.ts`,
+  `sim/serialization.ts`, `sim/services.ts`, their test), the booking field
+  in `src/wasmhost/merge.ts`, the parity setup edits, and the two-engine
+  `wasmHostExtermination` test with its `typescriptSide` entry. The Rust
+  fix, the `exterminationRoomIds` save field, the conformance scenario and
+  the loader cases stay.
+- **#1101 (#874, with #1083), a draft with its spec only:** the spec
+  (`spec-874-runtime-fallback.md`) re-adopts a fresh TypeScript
+  `Simulation` on a trap (validated with `Simulation.deserialize`, the worker
+  restored the same way) and seeds the engine's commute rows from the
+  instance. The fault catching, the latch, the restore point and the status
+  fields would stay. After retirement a trap can only stop the game, as the
+  wasm-only build does, unless a later change restarts a fresh engine from
+  the restore point.
+- **#954 (S9), planned:** the instance mirroring each accepted command
+  until S6, and the checks against it: #1101's refusal report, #1064's dry
+  check and #1065's header comparison.
+- **#1068 (#1045), held:** the TypeScript record split
+  (`src/engine/sim/deserializeRecords.ts`, with its allow-list line) and the
+  delta merge into the instance (`merge.ts`, `workerApply.ts`,
+  `workerSaveSync.ts`, and their delta tests). The Rust `saveDelta` stays if
+  S6 picks design A (the engine-side "changed since last sent",
+  `docs/architecture/read-model-deltas.md`).
+- **#868 (S6), planned:** nothing, if its getters return data the UI reads
+  directly; anything that merges them into a `Simulation` is temporary.
+- **#1108:** `perf:compare --aa ts`. The A/A mode itself and `--aa wasm`
+  stay, to calibrate the pass rule after retirement.
+- **#985 slice 2, planned:** a refused package falls back to TypeScript in
+  a switchable build; after retirement it stops the game, as wasm-only does.
+- **#1085, remaining slices, planned:** the TypeScript side of the seeded
+  differential. The failing-seed corpus and the WASM leg could stay by
+  comparing the WASM build with the native one.
+- **#926, planned:** it moves the UI's reads to the catalog, which removes
+  frontend imports. Each item also lands in the TypeScript engine so the
+  fallback quotes the same catalog (`conformance/catalog-digests.json`), and
+  those copies go.
+
+#1100, #1103, #817, #831 and #1039 add no other runtime frontend import of
+`src/engine/` (#831's one import in `pixelSprites/common.ts` replaces
+seven). Three of their tests import `FACILITIES` or `subtypeListFor` and
+join the tests above: #817's existing `serviceScale.test.ts`, and the new
+`roomOccupants.test.ts` (#831) and `originSeeds.test.ts` (#1039).
+
+Re-count the import table (shown for `src/ui`; repeat for `src/game` and
+`src/render`). The grep reads one line at a time; at `e34dfdf` it matches
+the parser.
+
+```sh
+grep -rlE 'from "(\.\./)+engine/' src/ui --include='*.ts' | grep -vE '\.(test|fixture)\.ts$' | wc -l
+grep -rE 'from "(\.\./)+engine/' src/ui --include='*.ts' | grep -vE '\.(test|fixture)\.ts:' \
+  | grep -vE ':(import|export) type |:import \{ *type [^,}]+( *, *type [^,}]+)* *\} from' \
+  | cut -d: -f1 | sort -u | wc -l
+find src/ui -name '*.ts' ! -name '*.test.ts' ! -name '*.fixture.ts' | wc -l
+```
+
 ## Threading
 
 The simulation step is sequential by contract: three random streams are drawn
