@@ -27,6 +27,7 @@ pub mod fflate;
 pub mod frame;
 pub mod gameplay;
 pub mod housekeeping;
+pub mod identity;
 pub mod jsmath;
 pub mod ledger;
 pub mod load;

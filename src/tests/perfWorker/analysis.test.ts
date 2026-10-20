@@ -97,6 +97,43 @@ describe("perf:worker analysis", () => {
     expect(f.worker).toMatchObject({ repliesPerSecond: 10, bytesPerSecond: 1000, applyMsPerSecond: 20, commandAckP50Ms: 4 });
   });
 
+  it("marks only the worker host's rows above 1x as unthrottled, in the metrics, both CSVs and the report", () => {
+    const rs = runs();
+    const metrics = aggregate(config, rs);
+    const rr = ratios(metrics, config.modes);
+    const flagged = metrics.filter((m) => m.unthrottled);
+    expect(flagged.length).toBeGreaterThan(0);
+    expect(flagged.every((m) => m.mode === "wasm-worker" && m.throttle !== "1")).toBe(true);
+    expect(metrics.filter((m) => m.mode === "wasm-worker" && m.throttle !== "1").every((m) => m.unthrottled === "worker")).toBe(true);
+    expect(metrics.filter((m) => m.mode !== "wasm-worker" || m.throttle === "1").some((m) => m.unthrottled)).toBe(false);
+    const csvRows = (text: string) => text.trim().split("\n").slice(1);
+    expect(metricsCsv(metrics).split("\n")[0]).toMatch(/,unthrottled,values$/);
+    const markedMetrics = csvRows(metricsCsv(metrics)).filter((l) => /,worker,/.test(l));
+    expect(markedMetrics).toHaveLength(flagged.length);
+    expect(markedMetrics.every((l) => l.includes(",wasm-worker,"))).toBe(true);
+    const flaggedRatios = rr.filter((r) => r.unthrottled);
+    expect(flaggedRatios.length).toBeGreaterThan(0);
+    expect(flaggedRatios.every((r) => r.mode === "wasm-worker" && r.throttle !== "1")).toBe(true);
+    expect(csvRows(ratiosCsv(rr)).filter((l) => l.endsWith(",worker"))).toHaveLength(flaggedRatios.length);
+    const result = {
+      schema: 1 as const, startedAt: "2026-10-14T10:00:00Z", generatedAt: "2026-10-14T14:00:00Z", config, browser: { version: "141", executable: null },
+      environment: { commitShort: "abc1234", appVersion: "2.31.1", dirty: false, enginePackage: {}, engineBuildHash: "h", cpuModel: "cpu", logicalCpus: 4, totalMemoryBytes: 2 ** 34, os: "linux", node: "22", playwright: "1.61" } as never,
+      scenarios: [{ name: "small", sha256: "a".repeat(64), population: 10, units: 2, transports: 1, saveBytes: 5 }],
+      scripts: { worker: { raw: 8000, brotli: 2600 }, otherJs: { raw: 1, brotli: 1 }, enginePackage: { raw: 900_000, brotli: 330_000 } }, runs: rs, metrics, ratios: rr, validation: { ok: true, errors: [], warnings: [] }, limitations: ["one"],
+    };
+    const md = markdown(result);
+    expect(md).toMatch(/† The engine worker was barely CPU-throttled/);
+    expect(md).toMatch(/7 to 41% slower/);
+    const tableRows = md.split("\n").filter((l) => l.startsWith("| small |"));
+    expect(tableRows.some((l) => l.includes("†"))).toBe(true);
+    // A row is daggered when its own throttle is above 1x and its host is the worker: the 1x rows carry none, and the daggers sit only on 4x rows.
+    expect(tableRows.filter((l) => l.startsWith("| small | 1x |")).some((l) => l.includes("†"))).toBe(false);
+    expect(tableRows.filter((l) => l.includes("†")).every((l) => l.startsWith("| small | 4x |"))).toBe(true);
+    // Without the worker host in the run there is nothing to mark and no footnote.
+    const noWorker = markdown({ ...result, metrics: metrics.filter((m) => m.mode !== "wasm-worker"), ratios: rr.filter((r) => r.mode !== "wasm-worker" && r.against !== "wasm-worker") });
+    expect(noWorker).not.toMatch(/†/);
+  });
+
   it("writes the CSVs and a report that leads with the snapshot window and the validation state", () => {
     const rs = runs();
     const metrics = aggregate(config, rs);

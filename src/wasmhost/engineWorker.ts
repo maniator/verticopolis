@@ -35,7 +35,7 @@ async function load(url: string): Promise<void> {
   const ready = new EngineWorkerCore(binding, post, () => exports?.memory?.buffer.byteLength ?? null);
   // No catalog function at all is a foreign package, as the main-thread host
   // codes it (catalogVerdict).
-  if (typeof mod.catalog !== "function") throw new EngineBootError("package-mismatch", "the WASM binding exports no catalog");
+  if (typeof binding.catalog !== "function") throw new EngineBootError("package-mismatch", "the WASM binding exports no catalog");
   post({ type: "ready", catalogs: ready.catalogs() });
   core = ready;
   const pending = queue ?? [];

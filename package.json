@@ -27,6 +27,7 @@
     "perf:worker": "tsx scripts/perf-worker.ts",
     "perf:restore": "tsx scripts/perf-restore-points.ts",
     "perf:calibrate": "tsx scripts/perf-calibrate.ts",
+    "perf:before-after": "tsx scripts/perf-before-after.ts",
     "lint": "eslint src api --ext .ts,.tsx",
     "lint:fix": "eslint src api --ext .ts,.tsx --fix",
     "screenshots": "VC_TOOLING=1 vite build && RUN_SERVER=1 node scripts/screenshots.ts",
@@ -37,6 +38,7 @@
     "atlas": "tsx scripts/export-atlas.ts",
     "gen:events": "node scripts/gen-gameplay-events.ts",
     "wasm:build": "node scripts/wasm-build.ts",
+    "engine:compat": "node scripts/engine-compat.ts",
     "test:wasm": "VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm dualRun wasmHost wasmWorker chargeBindingRaw perfCompare/scenarios.integration",
     "test:wasm:parity": "VC_REQUIRE_WASM=1 vitest run --project integrationWasm --project unitWasm"
   },
