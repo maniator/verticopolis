@@ -50,16 +50,10 @@ src/render/excalibur/towerOverlay.ts facilities
 src/render/excalibur/towerReconcile.ts types
 src/render/excalibur/towerShaftNumbers.ts facilities
 src/render/pixelSprites.ts facilities
-src/render/pixelSprites/amusements.ts Crowd
-src/render/pixelSprites/boutique.ts Crowd
 src/render/pixelSprites/clinic.ts Crowd
-src/render/pixelSprites/daycare.ts Crowd
-src/render/pixelSprites/fitness.ts Crowd
+src/render/pixelSprites/common.ts Crowd
 src/render/pixelSprites/food.ts Crowd
-src/render/pixelSprites/nightclub.ts Crowd
 src/render/pixelSprites/residential.ts Crowd
-src/render/pixelSprites/skyBar.ts Crowd
-src/render/pixelSprites/spa.ts Crowd
 src/render/sprites/facilities/venue.ts Crowd
 src/render/sprites/transport.ts facilities
 src/ui/templates/editor.ts facilities gameRules residentialRentals types
