@@ -23,7 +23,7 @@ describe("eachScenarioFresh", () => {
 
   it("passes a failure from the fresh page or the body to the caller", async () => {
     await expect(eachScenarioFresh(scenarios, async () => Promise.reject(new Error("no page")), async () => undefined)).rejects.toThrow("no page");
-    await expect(eachScenarioFresh(scenarios, async () => undefined, async () => Promise.reject(new Error("body"))) ).rejects.toThrow("body");
+    await expect(eachScenarioFresh(scenarios, async () => undefined, async () => Promise.reject(new Error("body")))).rejects.toThrow("body");
   });
 });
 

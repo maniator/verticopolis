@@ -255,11 +255,21 @@ Every desktop metric runs at **1x and 4x** CPU throttle, on the small, medium
 and large scenarios with their pinned scenario hashes.
 
 `perf:compare` opens a fresh page for every scenario and engine in the timed
-simulation passes and in each gameplay-frames block. A page that already ran a
-scenario carries its JIT type feedback into the next one, which made the second
-tower on the TypeScript engine about twice as slow (PC, 1,441 ms against 705 ms
-on a fresh page). `perf:compare` results from before that change do not support
-a medium-versus-large engine comparison on the second tower (#1162).
+simulation passes and in each gameplay-frames block (#1162). Before that change
+it ran every scenario after the first in a page an earlier scenario had used,
+and the TypeScript engine ran slower there: most likely JIT state left by the
+earlier tower, though a reload in the same tab keeps the renderer process, so
+the cause is not settled. On the owner's PC the large tower took 1,441 ms on the
+TypeScript engine after medium (the #1051 before pass, main `06a6dcb`, 1x, bare
+engine, 2026-10-20) against 705 ms in a page of its own with `perf:worker`; the
+WASM engine was not affected. The bias favors WASM. Every `perf:compare`
+result from before the change is affected on its medium and large rows (the
+default run is small, medium, large): the timed simulation rows, the gameplay
+frames and the audio-on frames. Memory, startup, transfer, build size and the
+first scenario's rows are not. The committed folder `2026-10-14-01c6153`, the
+figures that `ts-vs-wasm.md` takes from it, and the #1051 PC passes (see the
+reading notes in #1139) are such results. Re-run before citing a cross-engine
+ratio on a scenario after the first.
 
 | Command (PowerShell) | What it measures |
 | --- | --- |

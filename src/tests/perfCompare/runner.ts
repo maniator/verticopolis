@@ -15,11 +15,13 @@ import type { CompareConfig, EngineName, FrameSummary, MemorySummary, ProcessRun
  * 1. cold start and warm start (reload);
  * 2. a memory pass: per scenario, a fresh page (reload), load the save,
  *    two in-game hours, full GC, then JS heap, WASM memory and browser PSS;
- * 3. per scenario and CPU throttle: the simulation-only runs (hosted, then
- *    the bare engine, then on WASM a separate attribution pass);
+ * 3. per scenario (each in a fresh page) and CPU throttle: the
+ *    simulation-only runs (hosted, then the bare engine, then on WASM a
+ *    separate attribution pass);
  * 4. (TypeScript process) the WASM package's load steps, timed apart;
- * 5. the gameplay frames in two fresh-page blocks, audio off (never
- *    started) and audio on, their order alternating by repetition;
+ * 5. the gameplay frames in two blocks, audio off (never started) and audio
+ *    on, each scenario in a fresh page, the block order alternating by
+ *    repetition;
  * 6. a cold start under the heaviest throttle in a second fresh context,
  *    with a CPU probe showing the throttle held;
  * 7. a first visit with the service worker allowed, then an offline reload
@@ -331,6 +333,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
             await throttle(cdp, 1);
           }
         }
+        await expectEngine(page, engine, `${sc.name} frames (audio ${block})`);
         return undefined;
       });
       await expectEngine(page, engine, `frames (audio ${block})`);
