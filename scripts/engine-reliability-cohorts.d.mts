@@ -1,6 +1,6 @@
 // Type surface for scripts/engine-reliability-cohorts.mjs. The script stays
 // plain dependency-free JS; these signatures only describe what
-// src/engine-reliability-cohorts.test.ts and engine-reliability.mjs use.
+// the cohort tests and engine-reliability.mjs use.
 import type { PageLife } from "./engine-reliability.mjs";
 
 export declare const OVERRIDE_SELECTIONS: string[];

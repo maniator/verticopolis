@@ -128,7 +128,8 @@ game unpaused and the game clock advancing in each counted second
 
 ## Acceptance
 
-- Each rule above pinned in `src/engine-reliability-cohorts.test.ts`: overrides
+- Each rule above pinned in `src/engine-reliability-cohorts.test.ts` and
+  `src/engine-reliability-cohorts-report.test.ts`: overrides
   in the all-attempts denominator and never eligible; a pre-engagement fault in
   the denominator and outside the cohort; a fault before engagement in an
   engaged session counted; engagement after a fallback (`engine: ts-fallback`)

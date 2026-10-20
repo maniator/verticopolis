@@ -1,8 +1,9 @@
 /**
  * The cohorts of the governed reliability definition (#1090; the owner's
  * direction of 2026-10-20, section 5), beside the overall rate in
- * `engine-reliability.mjs`. `src/engine-reliability-cohorts.test.ts` pins
- * every rule; change a rule here and in the test together, or not at all.
+ * `engine-reliability.mjs`. `src/engine-reliability-cohorts.test.ts` and
+ * `src/engine-reliability-cohorts-report.test.ts` pin
+ * every rule; change a rule here and in the tests together, or not at all.
  *
  * Three populations, kept apart so a failure before engagement never turns
  * into missing data and a zero-second page load never turns into a clean

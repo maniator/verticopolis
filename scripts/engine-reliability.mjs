@@ -441,7 +441,7 @@ export function renderReliabilityMarkdown(summary, meta) {
   const lines = [
     "# Engine reliability",
     "",
-    `> **Snapshot** of the ${meta.windowLabel} to ${meta.until} (UTC), production only: the page lives that settled (or made an attempt) in that window. It does not refresh: the live figure is this script run again (\`node scripts/engine-reliability.mjs\`), whose rules \`src/engine-reliability.test.ts\` and \`src/engine-reliability-cohorts.test.ts\` pin.`,
+    `> **Snapshot** of the ${meta.windowLabel} to ${meta.until} (UTC), production only: the page lives that settled (or made an attempt) in that window. It does not refresh: the live figure is this script run again (\`node scripts/engine-reliability.mjs\`), whose rules \`src/engine-reliability.test.ts\`, \`src/engine-reliability-cohorts.test.ts\` and \`src/engine-reliability-cohorts-report.test.ts\` pin.`,
     `> Counted: hosts ${meta.hosts.map(code).join(", ")}; builds ${meta.builds}; arms ${meta.arms}.`,
     "> **This overall rate is early telemetry, not release evidence** (plan 4.1, OD-2): triage each failure, and do not publish it as a reliability figure. The proposed release count is the engaged eligible cohort under *Release evidence and safety* (#1090; whether it replaces #945's \"1,000 engine sessions\" is the owner's decision).",
     ...(meta.cohorts ? cohortCaveats(meta.cohorts, { eligibleShas: meta.eligibleShas ?? [] }) : []),
