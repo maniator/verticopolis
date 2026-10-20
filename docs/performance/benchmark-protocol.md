@@ -209,12 +209,14 @@ that has the check.
 ### Machine state
 
 AC power; Windows in its best-performance power mode; nothing else building,
-testing or benchmarking; every browser and editor window closed; the ChatGPT
-desktop app and the NVIDIA Overlay closed; no antivirus scan running. Sample
-the idle CPU load just before the start and record it in the notes. Note
-anything unusual (a Windows update pending, thermal state) in the run's
-notes. The harness records CPU, memory, OS build, GPU, Node, Rust,
-wasm-bindgen, Playwright and browser versions in `results.json`.
+testing or benchmarking; no local model inference, model download or other
+heavy agent work (the owner's rule, 2026-10-20); every browser and editor
+window closed; the ChatGPT desktop app and the NVIDIA Overlay closed; no
+antivirus scan running. Sample the idle CPU load just before the start and
+record it in the notes. Note anything unusual (a Windows update pending,
+thermal state) in the run's notes. The harness records CPU, memory, OS
+build, GPU, Node, Rust, wasm-bindgen, Playwright and browser versions in
+`results.json`.
 
 ## 2. Preconditions
 
@@ -292,12 +294,18 @@ and large scenarios with their pinned scenario hashes.
 | --- | --- |
 | `npm.cmd run perf:worker -- --reps 10 --viewport 1280x720 --out docs/performance/results/<date>-<sha>-<label>-worker-1280x720` | Bare engine, the four hosts, frames, memory and traffic. Always pass `--viewport 1280x720`: the harness default is 640x360, and the committed desktop acceptance run (`2026-10-15-e25ec01c-worker-1280x720`) used 1280x720. `perf:compare` renders at 1280x720 fixed and has no `--viewport` flag |
 | `npm.cmd run perf:compare -- --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-<label>` | Startup, hosted and bare engine, frames with and without audio, memory, transfer and build sizes. Run it after `perf:worker`; `--skip-build` checks the builds on disk are this commit's |
+| `npm.cmd run perf:restore -- --reps 10` | The runtime fallback's restore points (#874) on the hosted engine alone, unpaired: engine saves beyond the merges' and the hosted saves (expected 0), every engine save per command and its time, the event reads' time and share of a step, what one restore point and one restore cost on each tower, and step times for plain frames, a drag, a click and rapid edits (an undo capture and a build per frame), each frame ending with the event drain. Writes `docs/performance/results/<date>-<sha>-restore-points/`. It builds into `dist-perf/` as `perf:compare` does, and after a `perf:compare` run on the same commit `--skip-build` reuses that build |
 
 Other flags both accept: `--quick` (a 2-rep smoke test that never counts),
 `--resume DIR` (continue a run that stopped; it keeps its own folder, and an A/A folder resumes with `--aa <engine>` repeated),
 `--scenarios a,b`. `perf:compare` also takes `--throttles 1,4` and
 `--aa ts|wasm` (section 6.1);
 `perf:worker` also takes `--read-model` (Node only, no browser).
+`perf:restore` takes `--quick`, `--scenarios`, `--throttles`, `--skip-build`
+and `--out`, but not `--resume`: a stopped run starts again in a new folder,
+and its `results.json` keeps the runs it finished. In PowerShell, quote a
+list (`--scenarios "small,large"`): an unquoted comma makes an array, which
+reaches the script as separate arguments.
 
 A results folder is `docs/performance/results/<date>-<sha>-<label>/` with the
 raw samples and the machine-written `report.md`, its snapshot header on top,

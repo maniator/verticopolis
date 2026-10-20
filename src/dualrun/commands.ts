@@ -68,6 +68,9 @@ export interface BoundaryMarkers {
   lastMonth: number;
   /** The open extend gesture (#990), which a save does not carry either. */
   extendGesture?: { id: number; bottom: number; top: number } | null;
+  /** The commute-stress averages as `[[floor, seconds], ...]` (#1083): live
+   *  crowd state no save carries, seeded into the engine at the load. */
+  commuteStress?: [number, number][];
 }
 
 /** Where a shadow's state first departs from the live engine's. */

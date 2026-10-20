@@ -125,19 +125,20 @@ error does; see above.)
 | --- | --- | --- |
 | `trigger` | `settle`, `fallback`, `writer-latch`, `summary` | Why this row was sent |
 | `engine_requested` | `ts`, `wasm`, `wasm-frame`, `wasm-worker` | The engine the page life asked for (`?engine=` or `vc.engine`; `ts` when neither is set). A wasm-only build always sends `wasm`, whatever the URL says. |
-| `engine` | `ts`, `wasm`, `wasm-frame`, `wasm-worker`, `ts-fallback`, `none` | What runs when the row is sent. `ts-fallback` is a switchable build back on TypeScript; `none` is a wasm-only build that stopped. After a fallback it stays `ts-fallback` for the rest of the page life, even when the host takes a later tower again (re-adoption reporting comes with #874). |
+| `engine` | `ts`, `wasm`, `wasm-frame`, `wasm-worker`, `ts-fallback`, `none` | What runs when the row is sent. `ts-fallback` is a switchable build back on TypeScript; `none` is a wasm-only build that stopped. After a fallback it stays `ts-fallback` for the rest of the page life. After a running engine's fault (#874) that is exact, since no later tower is hosted; after a refused tower the host can take a later one again, and no row reports that. |
 | `build` | `switchable`, `wasm-only` | The bundle kind (`src/build/engineBundle.ts`) |
-| `fallback_reason` | `none`, `boot-timeout`, `boot-error`, `package-mismatch`, `attach-refused`, `trap-command`, `trap-tick`, `trap-undo`, `other` | The latest fallback's reason. `package-mismatch` is a package this shell cannot use (missing exports, a link error, a catalog of another version or one this build cannot draw, or, in a wasm-only build, no save writer), which is the deploy race (#1046), and sits outside the rate. `attach-refused` is a tower the host would not take, including an engine that could not hand over its catalog. `other` is, for now, a boot step outside the engine that failed after the worker host started. The three `trap-*` codes are reserved for #874 and not sent yet. |
-| `fallback_stage` | `none`, `load`, `start`, `adopt`, `undo` | Where the latest fallback happened: loading the package, the first tower (or a boot step just after it, for `other`), a later tower (a load or new game) or an undo restore |
+| `fallback_reason` | `none`, `boot-timeout`, `boot-error`, `package-mismatch`, `attach-refused`, `trap-command`, `trap-tick`, `trap-undo`, `other` | The latest fallback's reason. `package-mismatch` is a package this shell cannot use (missing exports, a link error, a catalog of another version or one this build cannot draw, or, in a wasm-only build, no save writer), which is the deploy race (#1046), and sits outside the rate. `attach-refused` is a tower the host would not take, including an engine that could not hand over its catalog. `other` is a boot step outside the engine that failed after the worker host started, or, on a running engine, a save or the reads when a tower is let go. The three `trap-*` codes are a running engine's fault on the main-thread host (#874): a command (the undo capture's save just before an edit included), a tick, a frame sync or the per-frame event drain, and anything during an undo or redo. |
+| `fallback_stage` | `none`, `load`, `start`, `adopt`, `undo` | Where the latest fallback happened: loading the package, the first tower (or a boot step just after it, for `other`), a later tower (a load or new game) or an undo restore. For a running engine's fault, how the faulted tower was hosted |
 | `fallbacks` | integer | The running count for this page life. A reader takes its highest value per `page_life`, never the row count. |
-| `writer_latched` | boolean | The engine save writer turned itself off this page life (also `writerLatched` on `window.__vcEngineBoot`) |
+| `writer_latched` | boolean | The engine save writer turned itself off this page life (also `writerLatched` on `window.__vcEngineBoot`). A running engine's fault (#874) also turns the writer off, and is reported as that fallback rather than here |
 | `page_life` | random id | Minted in memory at the page life's first row and never stored, so a reload gets a new one. It only groups rows from one page life; it cannot link a page life to anything else. |
 | `version` | the build's version | Which release sent the row |
 | `sha` | the build's short commit (`__APP_SHA__`) | Which exact build, so two deploys of one version stay apart |
 
 **Planned, not collected yet.** The A4 cohort work adds `arm` (the cohort arm)
-and `size_gated` (a tower too large for the engine), and #874 (step A3) adds
-`divergence_reports`, a count. The governed definition already reads `arm` and `size_gated`, and an
+and `size_gated` (a tower too large for the engine), and #954 adds
+`divergence_reports`, a count of commands the engine refused after the
+TypeScript instance accepted them (the report moved there from #874). The governed definition already reads `arm` and `size_gated`, and an
 absent value reads as `none` and `false`. Each lands in this table, with its
 reason, in the change that sends it.
 
@@ -152,8 +153,8 @@ a fault when any of those page lives fell back for a reason other than
 `unassigned` arms are left out unless asked for; the bound is the exact
 one-sided 95% Clopper-Pearson bound, by build and by arm as well. The rate is a
 lower bound: the relay has no offline queue and a per-IP limit, a tab closed
-while the engine loads never sends its row, and runtime traps are not reported
-before #874. Until the definition sorts sessions into eligible evidence
+while the engine loads never sends its row, and runtime traps are reported only
+from the build that carries #874 (the worker host's are not reported yet). Until the definition sorts sessions into eligible evidence
 (#1090), every session it counts is early telemetry under plan 4.1 (OD-2),
 triaged and never published as a reliability figure. The script's header
 comment carries every rule and every gap.
