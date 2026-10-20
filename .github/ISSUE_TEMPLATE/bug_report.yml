@@ -6,15 +6,28 @@ body:
     attributes:
       value: |
         Thanks for reporting a bug! Please check the [live build](https://verticopolis.com)
-        first, since the issue may already be fixed. The build version is shown on the splash screen.
+        first, since the issue may already be fixed. The build version is shown on the splash screen,
+        and the line also names the simulation engine when the Rust engine is running.
   - type: input
     id: version
     attributes:
       label: Build version
-      description: The version shown on the splash screen (e.g. 1.1.0).
+      description: The version line shown on the splash screen (e.g. 1.1.0). If it also names an engine, include the whole line.
       placeholder: "1.1.0"
     validations:
       required: true
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Engine
+      description: Which simulation engine was running? The version line on the splash screen, in Settings and in Help says so. Choose Fallback if the game told you the Rust engine failed and moved to TypeScript.
+      options:
+        - Not sure
+        - Rust/WASM
+        - TypeScript
+        - Fallback
+    validations:
+      required: false
   - type: textarea
     id: what-happened
     attributes:
