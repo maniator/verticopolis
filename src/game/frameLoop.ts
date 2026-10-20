@@ -203,7 +203,13 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // chip is already visible from the instant the build was found, so if a
     // calm moment never comes the player still has a way in.
     maybeSurfaceUpdatePrompt(app);
-    if (app.sim.evaluatedTower && !app.shownWin && !splashUp) {
+    // The congratulations replace the shared dialog, so they wait for a later
+    // pass while the emergency choice or the update prompt is up. Opened over
+    // either one they would wipe its buttons and strand the freeze latch it
+    // owns (`shownChoice` or `shownUpdate`), and time would never move again.
+    // Both can be latched by the lines above in this very pass: the win day
+    // rolls an emergency, and a loaded TOWER save may carry an open one.
+    if (app.sim.evaluatedTower && !app.shownWin && !splashUp && !hasBlockingModal(app)) {
       app.shownWin = true;
       app.audio.sfx("promote");
       app.ui.congratsTower();

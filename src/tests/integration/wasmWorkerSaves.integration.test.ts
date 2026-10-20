@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { buildScenarios } from "../perfCompare/scenarios";
-import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import { fromSave, host } from "../wasmWorker/hostDriver";
 import { stepGate } from "../../wasmhost/stepGate";
 import { advanceOwedMinutes, SPEEDS } from "../../game/frameLoop";
@@ -22,6 +22,8 @@ import type { ToWorker } from "../../wasmhost/workerProtocol";
  */
 
 const SCENARIOS = buildScenarios();
+
+if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 describe.skipIf(!hasWasmPackage())("synchronous saves on the worker host while steps are in flight", () => {
   it("load and play on a fresh engine and on TypeScript, keep every command, and carry their state's own minute", async () => {
