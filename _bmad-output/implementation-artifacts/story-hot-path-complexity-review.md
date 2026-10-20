@@ -87,8 +87,9 @@ The rule missed them for reasons the text itself explains:
 - Docs and review tooling only: no engine code, no version bump (nothing a
   player notices).
 - Does not touch PR #1139, the PC benchmark, the 3.0 release gates or the
-  engine-flip authorization. PRs opened before the page merges keep the review
-  they already have; the page adds no merge condition to them.
+  engine-flip authorization. #1139 keeps the review it already had; every other
+  open PR gets the checklist on its next review (narrowed in the follow-up after
+  the independent review's F2).
 - No closing keywords for #1051, #1139 or #1143.
 
 ## Files
@@ -116,9 +117,9 @@ The rule missed them for reasons the text itself explains:
 
 **Round 1, `/gds-code-review`** (Blind Hunter, Edge Case Hunter, Acceptance
 Auditor; the hot-path gate found no hot-path surface in this diff, so no
-Hot-Path Auditor). About 40 findings after deduplication, all `patch` and all
-applied; no `defer`, no `decision_needed`; two dismissed (listed at the end of
-this round). The main ones:
+Hot-Path Auditor). About 40 findings after deduplication: two dismissed (listed
+at the end of this round), the rest `patch`, all applied; no `defer`, no
+`decision_needed`. The main ones:
 
 - Facts: the large tower has 40,458 floor and lobby tiles and 2,900 rooms
   (measured), steps are 1 to 20 game minutes (`quantumFor`), the Rust entry
@@ -181,3 +182,59 @@ dismissed. The main ones:
 - Summaries: `CLAUDE.md`, `CONTRIBUTING.md`, the Copilot overlay and the PR
   template now match the page's scope, tiers, significance rule and the layer
   order; section 8 is retitled for what it lists.
+
+**After merge.** #1163 merged by auto-merge at 19:49Z (6761fcf), before round 3
+and the independent review finished. The rest went into a follow-up PR.
+
+**Round 3, `/bmad-code-review`** (confirming pass on 08e2a11; no hot-path
+surface, so no Hot-Path Auditor). About 21 findings, all `patch`, applied in
+the follow-up; none deferred. The main ones:
+
+- Scope: section 1 names the test files that are not hot paths (Rust
+  `*_tests.rs` and `#[cfg(test)]` included) and counts code a PR removes;
+  section 2 maps the TypeScript entry points and says "per tick" means per
+  step; the 26% figure is labeled a cloud estimate.
+- Rules: HP-2's wall-clock budget names the HUD, audio and autosave;
+  section 5's "significant" covers wall-clock paths and cache changes;
+  section 7's always-`patch` rule covers rewrites, and owner acceptance is
+  recorded on the PR in spec and no-spec mode alike.
+- Hooks: the triage fact sends a non-owner's wish to defer an always-`patch`
+  finding back to `patch`, the record fact posts the record on the PR, the gate
+  ignores test files, and the quick-dev facts cover the one-shot route.
+- Guard: CRLF and TOML comments no longer fool it, the cite regex takes
+  two-digit sections, each fact must carry the words that make it bite, and
+  the auditor prompt is read across its wrapped lines.
+
+**Independent review after merge** (review 5590890213 on #1163, CONDITIONAL GO
+at 08e2a11, follow-ups F1 to F10). All ten are in the follow-up:
+
+- F1: the record goes on the PR as a comment and is updated each round; the
+  auto-merge rule in `CLAUDE.md` now needs it for sign-off on a hot-path diff.
+- F2: only #1139 keeps its earlier review. The reviewer put the scope to the
+  owner on a card; the follow-up uses the recommended option and changes if he
+  picks another.
+- F3: HP-8 no longer lets a sentence in the PR excuse a dropped cache, and it
+  covers removing a cache outside a port.
+- F4: a pure move counts as pre-existing code, deferrable by reference.
+- F5: a large port gets a per-function appendix and one auditor per chunk.
+- F6: a pass counts items times work per item, per occurrence, with a visit
+  allowance per tier (about 1,000 per step or frame, about 50,000 per hourly or
+  per-command pass).
+- F7: the triage fact overrides step 3's no-spec reclassification and its
+  narrow `defer` definition for hot-path findings; the quick-dev fact and the
+  guard cover `step-oneshot.md`.
+- F8: the guard pins the load-bearing clauses, the section 1 paths, the
+  `AGENTS.md` and template headings with their links, and that the gds and bmad
+  overrides match. Mutations of each were checked to fail it.
+- F9: who updates the HP-8 rows when #1139 merges (a docs-only PR, carried as a
+  task in #1158).
+- F10: the summaries name rewrites, point the Copilot overlay at section 1, drop
+  the undated sizes from `project-context.md`, show all section 5 fields in the
+  template, and ask Copilot to report findings for resolution.
+
+**Proof run: a real hot-path review launches the auditor.** `/gds-code-review`
+on a2d2cf8 (#1083, an engine commit touching `engine-rs/src/crowd/mod.rs`,
+`engine-rs/src/wasm.rs` and `src/dualrun/`), with the merged overrides. The
+gate said yes at the step 1 checkpoint and the Hot-Path Auditor ran beside the
+Blind Hunter and the Edge Case Hunter, returning all twelve rows. Record and
+triage: `hot-path-auditor-proof-2026-10-20.md`.
