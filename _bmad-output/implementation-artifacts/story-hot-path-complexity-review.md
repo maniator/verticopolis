@@ -56,8 +56,9 @@ The rule missed them for reasons the text itself explains:
 6. **AC6 Remedies.** Indexing, loop hoisting, incremental counters,
    revision-keyed caches and borrowed views are listed as the expected fixes.
 7. **AC7 TypeScript comparison.** Before porting, the TypeScript memos and
-   indexes for the function and its callees are listed and ported, or the PR
-   says why not.
+   indexes for the function and its callees are listed and ported, or replaced
+   by a named Rust structure that answers the same query at the same cost or
+   less; anything else is a finding (tightened in the follow-up, F3).
 8. **AC8 PR complexity note.** Significant engine changes carry collection
    sizes, call frequency, complexity before and after, and the justification
    for any remaining repeated scan. The PR template asks for it.
@@ -87,9 +88,11 @@ The rule missed them for reasons the text itself explains:
 - Docs and review tooling only: no engine code, no version bump (nothing a
   player notices).
 - Does not touch PR #1139, the PC benchmark, the 3.0 release gates or the
-  engine-flip authorization. #1139 keeps the review it already had; every other
-  open PR gets the checklist on its next review (narrowed in the follow-up after
-  the independent review's F2).
+  engine-flip authorization. For the PRs open when the page merged, the owner's
+  decision of 2026-10-20, 20:16 UTC (quoted on #1168) applies: #1139 keeps its
+  independent review's GO at 3fa30a8c for the code it covered, #1092, #1157
+  and #1068 get a proportional review, and every other PR gets the checklist
+  on its next review.
 - No closing keywords for #1051, #1139 or #1143.
 
 ## Files
@@ -97,13 +100,17 @@ The rule missed them for reasons the text itself explains:
 - New: `docs/performance/hot-path-review.md`, `_bmad/custom/gds-code-review.toml`,
   `_bmad/custom/bmad-code-review.toml`, `_bmad/custom/gds-quick-dev.toml`,
   `_bmad/custom/bmad-quick-dev.toml`, `src/tests/hotPathReview.guard.test.ts`
-  (keeps the page's sections, the overrides, the step anchors they name and
-  the summaries in step, and runs the resolver), this story.
+  (pins the page's sections, section 1 surfaces and the clauses the overrides
+  cite, the overrides and the step anchors they name, and runs the resolver;
+  for the summaries it checks only their links), this story, and the proof
+  records `hot-path-auditor-proof-2026-10-20.md` and
+  `hot-path-auditor-proof-nested-scan-2026-10-20.md`.
 - Updated (short summary plus link): `CLAUDE.md`, `AGENTS.md`,
   `CONTRIBUTING.md`, `_bmad-output/project-context.md`,
   `.github/copilot-instructions.md`, `.github/skills/engine-parity-review/SKILL.md`,
   `.github/PULL_REQUEST_TEMPLATE.md`, `_bmad-output/implementation-artifacts/backlog.md`
-  (rows for #1158 and for #1143, which had none).
+  (rows for #1158 and #1143, which had none, and in the follow-up for #1166
+  and #1170).
 
 ## Out of scope
 
@@ -208,29 +215,70 @@ the follow-up; none deferred. The main ones:
 **Independent review after merge** (review 5590890213 on #1163, CONDITIONAL GO
 at 08e2a11, follow-ups F1 to F10). All ten are in the follow-up:
 
-- F1: the record goes on the PR as a comment and is updated each round; the
-  auto-merge rule in `CLAUDE.md` now needs it for sign-off on a hot-path diff.
-- F2: only #1139 keeps its earlier review. The reviewer put the scope to the
-  owner on a card; the follow-up uses the recommended option and changes if he
-  picks another.
+- F1: whoever runs the review skill posts the record on the PR at step 4 of
+  every round and edits it once the fixes are in; the independent reviewer
+  puts its table in each verdict. Per the owner's decision, a hot-path PR is
+  signed off only when the record for its final commit and a posted
+  independent verdict are both on the PR. A reviewer still running has not
+  finished, so auto-merge stays off (`CLAUDE.md`).
+- F2: the owner decided the scope at 20:16 UTC (quoted on #1168): #1139 keeps
+  its GO at 3fa30a8c for the code that review covered, a docs-only results
+  commit does not restart it, and new hot-path changes on it are reviewed;
+  #1092, #1157 and #1068 get a review in proportion to what they change, with
+  no invented findings and no unrelated refactoring; no other PR is exempt.
 - F3: HP-8 no longer lets a sentence in the PR excuse a dropped cache, and it
-  covers removing a cache outside a port.
-- F4: a pure move counts as pre-existing code, deferrable by reference.
-- F5: a large port gets a per-function appendix and one auditor per chunk.
-- F6: a pass counts items times work per item, per occurrence, with a visit
-  allowance per tier (about 1,000 per step or frame, about 50,000 per hourly or
-  per-command pass).
+  covers removing or bypassing a cache outside a port. A cache may go only
+  when a named structure replaces it or every caller goes with it (as the
+  TypeScript engine's retirement will). The engine parity skill and AC7 say
+  the same.
+- F4: a move changes only where code lives (identical lines apart from
+  visibility, imports and module paths); its findings count as pre-existing,
+  and any other change to a moved function makes it a rewrite.
+- F5: a port, rewrite or addition over about 1,000 hot-path lines gets a
+  per-function appendix and one auditor per chunk, each given the whole diff
+  for context; the overrides ask for the appendix, and a missing one is a
+  failed layer.
+- F6: a pass counts items times work per item, per occurrence of its tier,
+  never averaged. Small collections (floors, shafts, links, the drawn crowd)
+  fit any tier under about 1,000 visits per occurrence; one per-step pass over
+  rooms (about 2,900) needs a stated reason; an hourly, daily or per-command
+  pass may reach about 50,000, roughly one linear pass over the large tower's
+  units. A pass HP-2 rules out at its tier is a finding whatever its count.
 - F7: the triage fact overrides step 3's no-spec reclassification and its
-  narrow `defer` definition for hot-path findings; the quick-dev fact and the
-  guard cover `step-oneshot.md`.
-- F8: the guard pins the load-bearing clauses, the section 1 paths, the
-  `AGENTS.md` and template headings with their links, and that the gds and bmad
-  overrides match. Mutations of each were checked to fail it.
-- F9: who updates the HP-8 rows when #1139 merges (a docs-only PR, carried as a
-  task in #1158).
+  narrow `defer` definition for hot-path findings, and no step 4 choice can
+  drop an always-`patch` finding without the owner. On both quick-dev routes
+  an author's wish to defer one stops for the owner without reverting code.
+- F8: the guard pins section 1's surfaces, paths and not-hot-path list, the
+  clauses of section 1, HP-2, HP-8 and sections 6 and 7 the overrides cite,
+  the auditor prompt as one blockquote, each override fact once inside
+  `persistent_facts` with its load-bearing phrases, `on_complete`, the
+  activation step, and the gds and bmad twins. Round 4's 22 mutations all
+  fail it.
+- F9: the owner of #1158 (its assignee, the maintainer) owns the HP-8 table
+  between PRs. #1139 merged at 9cd44d1 while this follow-up was open, so the
+  follow-up brings the table to that commit: `roomUnits` and `noiseMemo` are
+  ported (`room_index`, `noise_memo`), a Rust-only row names
+  `structural_tiles`, and #1158 marks A5 to A7 as landed.
 - F10: the summaries name rewrites, point the Copilot overlay at section 1, drop
   the undated sizes from `project-context.md`, show all section 5 fields in the
   template, and ask Copilot to report findings for resolution.
+
+**Round 4** (`/bmad-code-review` of the follow-up at e501606; Blind Hunter,
+Edge Case Hunter and Acceptance Auditor). About 50 findings after
+deduplication, all `patch` except four dismissed: TOML forms the guard
+cannot read (multi-line and literal strings, inline arrays) and the bmad
+step file's `decision-needed` spelling, which fail the guard loudly; and the
+gds one-shot route's missing On Complete section, which the quick-dev fact
+covers. The patches are the round 4 parts of F1 to F9 above, plus: the gate
+runs on the whole diff before step 1 narrows it, searches a deleted file's
+importers at the base, and reads the not-hot-path list from section 1; the
+auditor reads the repository at the diff's head commit and is re-run once
+before it counts as failed; a record made before the PR exists is saved and
+posted when it opens, and a "no hot-path surface" line counts only for the
+whole diff; owner acceptance must be in the owner's own words, since agents
+post with the owner's account; the summaries and the story match the page;
+and the first proof record now quotes the checkpoint and the auditor's reply
+verbatim and labels its defers correctly.
 
 **Proof run: a real hot-path review launches the auditor.** `/gds-code-review`
 on a2d2cf8 (#1083, an engine commit touching `engine-rs/src/crowd/mod.rs`,
@@ -238,3 +286,18 @@ on a2d2cf8 (#1083, an engine commit touching `engine-rs/src/crowd/mod.rs`,
 gate said yes at the step 1 checkpoint and the Hot-Path Auditor ran beside the
 Blind Hunter and the Edge Case Hunter, returning all twelve rows. Record and
 triage: `hot-path-auditor-proof-2026-10-20.md`.
+
+**Proof run 2: a planted nested scan is caught and blocks a GO.** A fresh
+agent, told nothing about hot paths, ran `/gds-code-review` on a throwaway
+local commit (7028513, never pushed) that adds a walk over every unit for each
+dwelling guest in each motion chunk. The gate said yes, and the Hot-Path
+Auditor found the scan with its tier, its estimate (about 6.07M unit visits
+per chunk on the large tower) and the fix, classed always `patch`. Asked as
+the author to defer it, the run held it for the owner. An independent verdict,
+given the record and an author's request for a GO that paraphrased the
+owner's consent, returned NO-GO under sections 6 and 7. That agent could not
+start agents of its own, so the layers ran from the skill's fallback prompt
+files in fresh agents. The verdict found the record had filed the scan under
+HP-6 only and marked HP-7 n/a, so the auditor prompt now asks for each finding
+in every row it falls under. The station `Unit` clone it found on `main` is
+now part of #1158 A19. Record: `hot-path-auditor-proof-nested-scan-2026-10-20.md`.
