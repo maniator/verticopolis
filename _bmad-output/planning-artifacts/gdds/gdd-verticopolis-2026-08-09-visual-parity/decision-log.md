@@ -85,6 +85,33 @@ Corollary from the same PR: verify with `CI=true` before pushing. Vitest rejects
 an orphaned snapshot only under CI, so a local run passed while CI failed the
 whole unit suite on six obsolete snapshots.
 
+## 2026-08-13 - Room occupant rows after the tile change (#813, PR #831)
+
+Recorded here on 2026-10-15, when the PR was refreshed onto main; the ruling
+itself was made on 2026-08-13 and lived only in the backlog row
+`rooms-underdraw-occupants` until now.
+
+**The defect.** Room furniture rows kept their authored pixel pitches when the
+tile moved from 11 to 10, so rows counted off the screen width lost a slot and
+the people at those slots went undrawn.
+
+**Decision: capacity is counted from the room's width in tiles at the authored
+11px tile, and a row steps at its authored pitch in screen pixels, compressing
+only when its run cannot hold it.** No item is resized or recolored. The first
+cut scaled the pitch with the tile instead; that spent the gap the art was
+drawn with, and the nightclub's dancers (6px figures at a 6px pitch) came out a
+pixel through each other.
+
+**Approval-gate judgment (party ruling, owner delegated the call): the overlap
+is a defect, and the call is made.** The same alternating pitch is treated as a
+defect on #812's monitor wall, and the overlap is worst at full occupancy, when
+the player is looking. So the club's dancer row now runs from a pixel left of
+the lit strip to just clear of the DJ booth, while its count still comes off the
+strip. A packed club spills off the lit floor onto floor that was empty, which
+reads correctly. Three other placements move with the fix: the executive's
+corner anchors, the boutique's door figure and the club row's start. Every
+other row keeps its place in its room.
+
 ## Open items
 
 - Whether Epic 3's density work covers every room kind at once, or leads with the
