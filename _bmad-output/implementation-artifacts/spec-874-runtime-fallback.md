@@ -3,7 +3,7 @@ title: 'Fall back to TypeScript when the hosted WASM engine throws or traps'
 type: bugfix
 created: '2026-10-20'
 status: in-review
-baseline_commit: f508db44 (main, after #1100 (#1059) and #1039 merged)
+baseline_commit: c12bc1be (main, after #1137, #1140, #1144, #1125 and #1142 merged)
 context:
   - CONTRIBUTING.md
   - _bmad-output/project-context.md
@@ -22,7 +22,8 @@ poisoned: every later call into it throws, the frame loop logs a frame error
 every two seconds, and nothing moves again. "The switch never takes the game
 down" holds only at package load and attach. Detaching the poisoned host
 today would hand the TypeScript tick a read model whose crowd has no routes
-(the frame view carries positions, not legs), which is unsafe to continue.
+(the frame view carries where each person is but none of their route legs),
+which is unsafe to continue.
 
 **Approach** (owner's handoff on #874, 2026-10-16; cutover plan S4):
 
@@ -75,8 +76,8 @@ adds its runtime stages here" changes to say this.
 
 A binding throw that is no trap (a parse error, an unknown kind) is treated
 the same way: the engine may have changed part of its state before it threw,
-and its refusals arrive as answers, never as throws (`build` returns
-`{ ok, reason }`, for example). A throw in the host's own TypeScript sync
+and a refusal comes back as an answer (`build` returns `{ ok, reason }`, for
+example), so a throw is no refusal. A throw in the host's own TypeScript sync
 code is coded the same way too; telling the two apart needs a new reason
 value, which is an owner decision (deferred, see the Review record).
 
@@ -124,11 +125,14 @@ leaves the host only once a point covers it:
   and an action that takes no undo capture (an emergency answer, an
   exterminator call, a rename) included.
 - The analytics session's own flush (a hide, or a window closing) lets the
-  held events go too, so a page that closes keeps them. A fault after that
-  flush and before a point can count those events twice; this is an
-  analytics count, never a gameplay effect, and needs a hide in that gap.
+  held events go too, after a drain that did not fault, so a page that
+  closes keeps them. A fault after that flush and before a point then takes
+  away an edit whose events analytics already has: an event with no edit
+  behind it, counted again if the player makes the same edit again. It
+  needs a hide in that gap and changes nothing in the game.
 - An edit that an undo takes back while the undo's snapshot traps loses its
-  own events with it: an undercount, never a duplicate.
+  own events with it, so analytics undercounts that edit and counts nothing
+  twice.
 - Events still in the engine at the fault are emitted again by the
   TypeScript engine from the point.
 
@@ -138,14 +142,21 @@ game already has (#1126).
 
 **Cost.** #874 adds no engine save per command or per tick. The undo
 capture's save is main's: on main the hosted tower's `serialize` reads
-`engine.serialize()` too. #874 adds an event read before each hosted save
-and keeps a reference to the text, up to three texts in all (the newest
-save, the newest merge's and, until the first merge, the attach save).
-Holding a command's events costs an array push. The restore-point benchmark
-measures the cost on the owner's PC.
+`engine.serialize()` too. #874 adds event reads: every relayed command,
+`emit` and `setView` included, reads the engine's pending events before
+`shadow.apply` (`pullTicks`) and after it (`readEvents`), and every merge
+and every hosted save reads them once more. It keeps a reference to each
+point's text, up to three texts in all (the newest save, the newest
+merge's and, until the first merge, the attach save). Holding a command's
+events costs an array push, and the redo hold keeps at most one cleared
+redo trail, only for a hosted tower in a build that falls back (see
+Recovery). The restore-point benchmark measures every
+engine event read as `pullMs` (the frame loop's own drain included) with
+its share of the step, beside the saves, on the owner's PC.
 
 > **Container figures: a snapshot of 2026-10-20, not refreshing.** Indicative
-> only, from a cloud container, not the owner's PC. The live figures come
+> only, from a cloud container; the owner's PC run is the evidence. The live
+> figures come
 > from `npm run perf:restore` (`scripts/perf-restore-points.ts`, its report
 > pinned by `src/tests/perfRestore/report.test.ts`) on the owner's PC, under
 > `docs/performance/benchmark-protocol.md`.
@@ -159,8 +170,9 @@ loses everything since the newest merge or hosted save:
 
 - the edit under way (from its undo capture, or from the newest merge
   inside a drag);
-- two edits when the edit before had not merged yet (paused) and the next
-  edit's own capture save is what traps;
+- two edits when the edit before had not merged yet (paused, or a
+  non-structural command inside the hour) and the next edit's own capture
+  save is what traps;
 - any action taken since that point without an undo capture (an emergency
   answer, an exterminator call, a rename);
 - the game time since that point, up to an in-game hour while the clock
@@ -189,7 +201,8 @@ edit made while paused. Both were dropped.
   can still play. The rollback is not silent: before the next frame, the
   money, the rooms and the transports come from the restored tower, the
   undo trail drops the step the lost edit left (it would change nothing
-  now), and the log gains one line of kind `bad`, which the UI shows as an
+  now) and gets back the redo steps that edit cleared, and the log gains
+  one line of kind `bad`, which the UI shows as an
   alert toast: "The WASM engine stopped, so the tower went back to its last
   good state and your recent changes were undone. It runs on the TypeScript
   engine now." That line needs both a command relayed since the newest point
@@ -199,19 +212,29 @@ edit made while paused. Both were dropped.
   when only the clock moved on, the line is "The WASM engine stopped, so the
   tower went back to its last good state and runs on the TypeScript
   engine." If comparing the two throws, the command count alone decides.
-  Nothing of the lost edit stays: no event, no undo step, no charge. A refusal answer for the trapped command
+  Nothing of the lost edit stays: no event, no undo step, no cleared redo
+  trail, no charge. A refusal answer for the trapped command
   instead would need a refusal value of each command's own shape (about 45
   commands and the setters), new decision logic in temporary code; after
   #954 the engine answers first, so a trap is a failed answer by
   construction.
-- **Skipped** when the app no longer holds the faulted tower (a load, a new
-  game, an undo or a redo replaced it, and that tower is not hosted) or the
-  host has stopped. The player still gets a line: "The WASM engine stopped,
-  so the game runs on the TypeScript engine now." After an undo or a redo
-  whose own snapshot trapped, the snapshot is the state before an edit no
-  point covered, so the undo and redo steps that would now change nothing
-  are dropped too. An adopt that throws after the faulted host was let go,
-  with the app still on the faulted tower, still restores.
+- **Skipped** when the host has stopped, with no line. **Skipped too** when
+  the app no longer holds the faulted tower (a load, a new game, an undo or
+  a redo replaced it, and that tower is not hosted), and the player still
+  gets a line. After an undo or a redo whose own snapshot trapped, that
+  snapshot is the newest point, from before any edit no point covered, so
+  the undo and redo steps that would now change nothing are dropped too.
+  When an undo or a redo replaced the tower and a command was relayed since
+  the newest point (`lostEdits`), or that tidy dropped a step, changes were
+  lost and the line says so: "The WASM engine stopped, so some of your
+  recent changes were lost. The game runs on the TypeScript engine now."
+  Otherwise it is "The WASM engine stopped, so the game runs on the
+  TypeScript engine now." A load or a new game (the swap that drops the
+  undo trail) gets that plain line whatever ran before it: the player's
+  own load let the old tower's changes go, and the line would otherwise
+  read as damage to the tower just opened. An adopt that throws after the
+  faulted host was let go, with the app still on the faulted tower, still
+  restores.
 - **`app.adoptSim(fresh, true)`**, the undo path: it keeps the camera, the
   undo history and the bridging toggle, and a title screen that is still up
   (`Onboarding.adoptSim(sim, keepSplash)`). The adopt wrapper's release
@@ -219,6 +242,25 @@ edit made while paused. Both were dropped.
   drop count, and GameApp's adopt passes them to the fresh tower. Then
   `app.dropEmptyUndo()` (`UndoHistory.dropUnchanged`) pops the undo and redo
   steps that would change nothing now.
+- **The redo trail.** A new edit clears the redo trail. While a hosted
+  tower can fall back (in a switchable build, from each attach until the
+  host stops, a tower is left on TypeScript, or a fault's recovery ends),
+  `UndoHistory.commit` keeps the steps it cleared on the edit's own undo
+  step (`holdClearedRedo`, set through `app.holdClearedRedo`), and
+  `dropUnchanged` puts them back when it drops that step. One step holds a
+  trail at a time: a later commit that clears a trail lets the older one
+  go, since the undo that made that trail read a point after the older
+  step, so no fallback can drop it; and turning the hold off lets it go
+  too. An undo of the holding step forgets its trail, as main does. A
+  wasm-only build, which stops instead of falling back, a tower the host
+  refused and a TypeScript-only game never hold.
+- **A gesture under way at the fault.** Its undo capture stays pending, and
+  `dropUnchanged` fingerprints it again from its own snapshot. A capture
+  whose save trapped took the newest point, which is where the recovery
+  went, so a release after the recovery with nothing done since leaves no
+  step (and no redo trail is cleared); a drag that goes on over the
+  restored tower leaves one step, which undoes what it did there. A capture
+  that read the tower itself keeps its fingerprint.
 - **No point loads, or the adopt throws:** the error is recorded, the frozen
   tower stays (its tick does nothing, its save is the newest point), and the
   player reads "The WASM engine stopped, and the tower could not go back to a
@@ -253,8 +295,8 @@ retirement):
 
 | Part | Class | At retirement |
 | --- | --- | --- |
-| `FaultLatch`, the guarded paths in `wasmHost.ts`, the fault record and report in `startWasmHost.ts`, the strict `onFatal` stop, `RestorePoints.newestSave` without its TypeScript load check (the strict build's save after a fault), the trap codes, the save writer turned off, `createAppHistory`, `Onboarding.adoptSim`'s `keepSplash` | Permanent host and app infrastructure | Stays: a Rust-only build still freezes and stops cleanly on a trap |
-| The rest of `RestorePoints`, `carryLiveState`, the point and event bookkeeping (`readPoint`, `pullTicks`, `HostEvents` with the held events and `lostEdits`), `recover`, `playerState`, `tidyHistory`, the frozen tower's own tick, the TypeScript re-adoption, `UndoHistory.dropUnchanged` and the `signatureOf` port, `dropEmptyUndo` (`GameApp`, `WasmHostApp`), the analytics bridge's `release` option, the restore-point benchmark (`perf:restore`) and the fallback-only tests | Temporary fallback code | Removed with the TypeScript simulation (listed in `story-engine-retire-typescript.md`) |
+| `FaultLatch`, the guarded paths in `wasmHost.ts`, the fault record and report in `startWasmHost.ts`, the strict `onFatal` stop, `RestorePoints.newestSave` without its TypeScript load check (the strict build's save after a fault), the trap codes, the save writer turned off, `createAppHistory`, `Onboarding.adoptSim`'s `keepSplash`; in tests, the trap helper `wasmTraps.ts` and `wasmHostFallback`'s latch, strict-stop and trap-coding cases (each without its recovery assertions) | Permanent host and app infrastructure | Stays: a Rust-only build still freezes and stops cleanly on a trap |
+| The rest of `RestorePoints`, `carryLiveState`, the point and event bookkeeping (`readPoint`, `pullTicks`, `HostEvents` with the held events and `lostEdits`), `recover`, `playerState`, `keptHistory`, `tidyHistory`, `holdRedo`, the player lines (`REPLACED`, `LOST`, `RESTORED`, `UNDONE`, `STUCK`), the frozen tower's own tick, the TypeScript re-adoption, `UndoHistory.dropUnchanged`, `holdClearedRedo` and the `signatureOf` port, `dropEmptyUndo` and `holdClearedRedo` (`GameApp`, `WasmHostApp`), the analytics bridge's `release` option, the restore-point benchmark (`perf:restore`), the fallback-only tests and the assertions of temporary behavior in changed tests | Temporary fallback code | Removed with the TypeScript simulation (each listed in `story-engine-retire-typescript.md`) |
 | The commute rows in the load markers and `Crowd::seed_commute_stress` | Rust-authoritative gameplay state | Stays: a load or re-host keeps the averages |
 
 ## Out of scope, flagged
@@ -296,8 +338,10 @@ retirement):
   context.
 - [x] `src/game/appHistory.ts` (new), `src/engine/UndoHistory.ts`,
   `src/main.ts`, `src/ui/Onboarding.ts`: the app's undo history moved out of
-  `main.ts`, `dropUnchanged`, `dropEmptyUndo`, and the title screen kept
-  through an undo or a fallback.
+  `main.ts` (its import moves with it, so the frontend import ratchet gains
+  the `src/game/appHistory.ts` line and `src/main.ts` loses `UndoHistory`),
+  `dropUnchanged`, the redo hold, `dropEmptyUndo`, `holdClearedRedo`, and
+  the title screen kept through an undo or a fallback.
 - [x] `src/bootstrap.ts`: turn the engine save writer off on a runtime
   fault, and record it in the boot state (`bootstrapEngine.test.ts` pins the
   switchable build's path: no stop message, the writer off, the boot state).
@@ -314,8 +358,9 @@ retirement):
 - [x] Backlog: #874's row stays open at P1 until #1092; #1083's row done;
   #954's row takes the refusal report; #1105's row for the worker; the
   defers from both review rounds, each with an issue.
-- [x] `package.json` minor bump with a changelog line (2.39.0 against main
-  at f508db44; set again at merge time if main moves).
+- [x] `package.json` minor bump with a changelog line (2.40.0 against main
+  at c12bc1be, where #1137 took 2.39.0; set again at merge time if main
+  moves).
 - [x] e2e: a forced tick and command trap on `chromium-wasm`
   (`e2e/wasmFallback.spec.ts`), and a trap on the wasm-only build that
   stops the game (`e2e/wasmOnly.spec.ts`).
@@ -326,9 +371,16 @@ retirement):
 - A command that throws after the engine changed part of its state: the
   caller gets the instance's answer, the status records `trap-command` once,
   and before the next frame the tower is the newest point's (the edit's
-  undo capture): its money, rooms, undo and redo trails, log and events
-  show nothing of the lost edit, and the log's last line says the recent
-  changes were undone.
+  undo capture): its money, rooms, undo and redo trails (the redo steps the
+  edit cleared included), log and events show nothing of the lost edit,
+  and the log's last line says the recent changes were undone.
+- A trapped undo or redo snapshot that loses a change no point covered (a
+  relayed command, or a step the tidy drops) says the recent changes were
+  lost. A load or a new game whose letting go traps says only that the
+  engine stopped.
+- A press whose undo capture's save traps, released after the recovery:
+  no undo step that changes nothing, and the redo trail the lost edit held
+  stays.
 - A tick that traps with a live crowd: the rest of the frame does nothing,
   then a fresh TypeScript tower from the restore point replaces the read
   model. Its crowd is the save's (empty until it respawns), and no person
@@ -378,25 +430,88 @@ poisoned engine does.
 - `wasmHostRollbackHistory.integration.test.ts`: a trap in the undo
   capture's own save, after a merge and after an unmerged edit (both edits
   lost); an undo whose snapshot traps, with the edit merged (the redo stays)
-  and unmerged (the redo goes); a redo whose snapshot traps; no redo trail
-  left after a trapped edit. `wasmRollback.ts` is their shared setting.
+  and unmerged (the redo goes, and the line says changes were lost); a
+  rename no point covers, lost with an undo's trapped snapshot (the line
+  says so, and the redo still works); a redo whose snapshot traps; the redo
+  trail a trapped edit cleared, back after the recovery; a press whose
+  capture's save traps and whose release comes after the recovery (no
+  empty step, with and without a held redo trail, and a drag that goes on
+  over the restored tower); a load whose letting go traps (the plain line).
+  `wasmRollback.ts` is their shared setting.
+- `undoHistory.integration.test.ts`: `dropUnchanged`, and the redo hold
+  (the cleared trail comes back under one or two dropped steps, an undo
+  forgets it, one step holds a trail at a time, turning the hold off lets
+  it go, and with the hold off the trail clears as on main; the number of
+  held trails is counted on both stacks), and the pending capture's
+  fingerprint after the tidy.
 - The fake engine covers the host's bookkeeping and the point rule in the
-  unit project (`hostFault.test.ts`, `wasmHostPoints.test.ts`,
-  `startWasmHost.test.ts`, `startWasmHostRecovery.test.ts`).
+  unit project (`hostFault.test.ts`, `wasmHostPoints.test.ts`, the flush
+  whose own drain faults included, `startWasmHost.test.ts`,
+  `startWasmHostRecovery.test.ts`, the `LOST` line, the plain line after a
+  load, and the hold's on and off included, with none in a wasm-only build
+  or for a refused tower). `wasmHostRollback.integration.test.ts` pins the same flush
+  on the real engine.
+- `src/tests/perfRestore/report.test.ts` pins the benchmark's problem list:
+  an extra save, saves counted above the engine's, and an `edits` run with
+  fewer hosted saves than edits.
 - The e2e specs force the same trap through `window.__vcEngine` on the
   `chromium-wasm` project (asserting the alert toast) and on the wasm-only
   build.
 
-Five existing tests pinned the pre-#874 behavior and changed with it: the
-load markers carry the commute rows (`mirror.test.ts`); a trap while
-letting a tower go now freezes it and hands back every event that left the
-engine, where it used to throw and count a trap's events from the read
-model's copies (`wasmHost.integration.test.ts`, two tests); the analytics
-bridge's drain failure is a fault that re-adopts the tower
-(`wasmHostAnalyticsBridge.integration.test.ts`); a host swapped away from a
-trapped engine is a fault, with no read-model copy count
-(`startWasmHost.test.ts`); and malformed commute rows at detach fault and
-freeze the tower (`wasmHostFrame.test.ts`).
+Existing tests that pinned the pre-#874 behavior and changed with it, each
+listed (a title in brackets is the old one):
+
+- `mirror.test.ts`, "stamps checkpoints with the generation and loads the
+  boundary markers": the markers carry the commute rows (#1083).
+- `wasmHost.integration.test.ts`:
+  - "lets go of the instance when the engine can no longer answer at
+    detach": the detach faults and freezes the tower instead of throwing,
+    and the held placements go with their commands (`host.restore()`).
+  - "counts a batch it cannot read as dropped, while hosted and at detach":
+    the garbled drain is set before the builds, and a hosted save covers
+    the one that reads.
+  - "keeps an unreadable batch's loss when the engine traps at detach, and
+    drops the held events no point covered" ["keeps an unreadable batch's
+    loss when the engine traps at detach"]: no throw; the two placements no
+    point covered are dropped, and the drop count leaves them out (#1147).
+  - "freezes on a drain that traps and hands back every event a point
+    covers" ["counts what a trap took while hosted once the host lets go"]:
+    the drain faults, hands back what the merge covered, and the restored
+    tower has the merged rooms only (`host.restore()`).
+  - "keeps the instance's own buffer across a merge": the merge moves the
+    placement behind the host instead of leaving the read model's copy.
+- `capacityEventMatrix.integration.test.ts`, "`${what}: ${expected} event on
+  the hosted engine`" and "reports once across the host's hour merge into
+  the instance": they read the events after a hosted save covers them.
+- `wasmHostAnalyticsBridge.integration.test.ts`:
+  - "reports a `${what}` as `${action}` on both engines": the hosted engine
+    sends nothing before a point ("before a point" assertions), then the
+    same event.
+  - "reports each removal as demolish with its method, and a refused one as
+    nothing, on both engines": drains after a point.
+  - "loses and repeats nothing when the engine fails a drain and the host
+    falls back" ["loses and repeats nothing when the engine fails one
+    drain"]: the failed drain is a fault that re-adopts the tower.
+- `startWasmHost.test.ts`:
+  - "latches hosting off when %s traps while a load lets the tower go"
+    (`it.each` over the drain and the drop count) ["swaps away from a
+    trapped engine and carries the loss to the new tower", and "counts a
+    trap at the drop count from the read model", deleted and folded in]:
+    the trap is a fault that latches hosting off, with no read-model copy
+    count, and the player gets the `REPLACED` line.
+  - "stops cleanly on a trapped engine": the stopped tower is frozen on its
+    newest point, and a stopped handle recovers nothing.
+- `wasmHostFrame.test.ts`, "faults, frees the engine and freezes the tower
+  when the commute rows at detach are malformed (#874)" ["still frees the
+  engine and gives the tower back when the commute rows at detach are
+  malformed"].
+- `frameApply.test.ts`: its import moved with the frame writers
+  (`frameSync.ts`); no assertion changed.
+
+The ones that assert temporary behavior (the restore, the held events, the
+`REPLACED` line, the bridge's fallback and "before a point" assertions) are
+listed for removal in `story-engine-retire-typescript.md`, with
+`bootstrapEngine.test.ts`'s switchable fault path.
 
 ## Restore-point benchmark
 
@@ -529,4 +644,69 @@ screen's version line still says "WASM engine" after a fault (#1129); and
 failure (#1130). Every binding throw counting as a trap, a JsError
 included, is folded into #1114. The commute rows' re-fetch cost is #1131.
 
-**Round 3:** the independent re-review of the new head.
+**Round 3 (2026-10-20): the independent re-review of 81a71018, CONDITIONAL
+GO** (review 5589164278 on #1101). What held: the held events (probe R7: a
+ransom answer's `emergency_resolved` is sent once), no added saves (probe
+R8: none over a game day on four fixtures), the latch, the "undone" line's
+state check, no deleted or skipped test, the moved files byte-identical, and
+the deferrals' rows and issues. Fixed:
+
+- The analytics flush released the held events before its own drain, so a
+  drain that trapped still sent them (probe R1): the flush releases only
+  after a drain that did not fault, with a fake-engine and a real-engine
+  test.
+- A rolled-back edit cleared the redo trail (probe R2): the redo hold keeps
+  the cleared steps on the edit's undo step while the host can fall back,
+  the tidy puts them back, and the test that pinned the cleared trail now
+  pins it kept. Writing this record found that the hold could keep more
+  than one trail; one step holds a trail at a time now, and turning the
+  hold off lets it go, each with a test.
+- A trapped undo or redo snapshot could lose changes with no word (probe
+  R3, a rename): the `LOST` line, tested with that rename.
+- `perf:restore` flags saves counted above the engine's and an `edits` run
+  with fewer hosted saves than edits, each with a test.
+- The fault messages read "while letting a tower go", "during a save" and
+  so on, as their tests assert.
+- Docs: the base commit; the two-edit bound's wording (paused, or a non-structural command
+  inside the hour) here, in the backlog row and in the PR body; the
+  changelog names the undone edits; the cost of the per-command event
+  reads; every changed test, listed above; the flush trade-off as an event
+  with no edit behind it; the lifetimes of the hold, the `LOST` line,
+  `playerState` and the trap helper, and `wasmHostFallback`'s permanent
+  cases; the refusal report given to #954 in the release plan, the #1064
+  row and the roadmap's inventory; exact-line assertions;
+  the "X, never Y" lines; stale e2e comments; the #1114 and #1131 rows.
+- Version 2.40.0, since #1137 merged as 2.39.0 first. The longer changelog
+  line ran past the update prompt's 200-character cap, which cuts a note
+  mid-sentence; it fits now, and `changelog.test.ts` reads this build's
+  notes whole.
+
+Defers, recorded in the backlog with issues: a trapped detach during a load
+drops the held events uncounted (#1147); refused commands count as edits for
+the recovery's line (#1148, probe R5b); the `STUCK` line after an adopt that
+throws though the point loaded (#1149); the boot state's engine at fault
+time and `stopForEngine` on a switchable path (#1150); and a real-engine
+trap test for an emergency answer, `resolveChoice` (#1151). The first
+wasm-binding attempt's stall in `conformanceWasm.integration.test.ts` did
+not reproduce in five local runs and is #1152.
+
+**Round 3 fix check (2026-10-20): CONDITIONAL GO at 50ecb8e5** (review
+5590072293 on #1101). All 11 items held, probes R1 to R3 passed on the
+real engine, and a full `test:wasm` ran with no stall. Fixed:
+
+- N1: a press whose undo capture's save trapped, with the edit before it
+  unmerged, and whose release came after the recovery left an undo step
+  that changed nothing and cleared the redo trail the tidy had put back.
+  The pending capture kept the frozen tower's fingerprint; `dropUnchanged`
+  now fingerprints it again from its own snapshot. Real-engine tests
+  release after the recovery, with and without a held redo trail, and a
+  drag that goes on over the restored tower keeps one step.
+- A load or a new game whose letting go trapped showed the `LOST` line on
+  the tower just opened. The line is `LOST` only when an undo or a redo
+  replaced the tower (`keptHistory`), with a fake-engine and a real-engine
+  test.
+- The redo hold ran in wasm-only builds and for a refused tower, where no
+  recovery can use it (up to 40 snapshots on the largest tower). The host
+  now holds only for a hosted tower in a build that falls back, with tests.
+- A test counts the held trails, so an undo that kept the trail on its
+  redo step would fail; the spec's and the changelog's wording.

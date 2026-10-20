@@ -979,11 +979,13 @@ The architecture review documents **no exception**:
   the owner's own saves. The owner chose to keep #1066 whole and complete
   the four for 3.0 (OD-8 (a)), with the real-save inputs identified early:
   A7's first task lists them (9.1).
-- **#1064 is S9's mirror image of S4's report.** S4, with the instance
-  answering first as today, reports a command the instance accepted and the
-  engine refused (A3, under #874). After S9 the engine answers first, and
-  #1064 reports a command the engine refused that the instance would have
-  accepted (A6).
+- **#1064 is S9's mirror image of the refusal report.** With the instance
+  answering first as today, a command the instance accepted and the engine
+  refused would be reported. That report was S4's third clause; #874 (A3)
+  moved it to #954 (A6), since telling a refusal apart needs #954's
+  per-command adapter. After S9 the engine answers first, and #1064 reports
+  a command the engine refused that the instance would have accepted
+  (A6).
 - **#1065 is S9's "a disagreement is reported"**, deep enough to see the same
   price with a different placement. It stays cheap: the revision, the counts
   and a layout hash, with no full state view per click.

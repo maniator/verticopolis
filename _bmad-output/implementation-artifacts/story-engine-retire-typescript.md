@@ -70,29 +70,58 @@ own line: the PR, the files, and why the fallback needs them):
     `src/wasmhost/hostEvents.ts` (`HostEvents`: the held command events and
     `lostEdits`); a Rust-only host hands its events out as it reads them.
   - `src/wasmhost/startWasmHost.ts`: `recover`, `playerState`,
-    `tidyHistory` and the player lines.
-  - The undo trail's tidy after a recovery: `UndoHistory.dropUnchanged` and
-    the `signatureOf` port (`src/engine/UndoHistory.ts`,
-    `src/game/appHistory.ts`), `GameApp.dropEmptyUndo` (`src/main.ts`) and
-    `WasmHostApp.dropEmptyUndo`.
+    `keptHistory`, `tidyHistory`, `holdRedo` and the player lines
+    (`REPLACED`, `LOST`, `RESTORED`, `UNDONE`, `STUCK`).
+  - The undo trail's tidy after a recovery and its redo hold:
+    `UndoHistory.dropUnchanged`, `UndoHistory.holdClearedRedo` with the
+    `cleared` field on its steps, and the `signatureOf` port
+    (`src/engine/UndoHistory.ts`, `src/game/appHistory.ts`),
+    `GameApp.dropEmptyUndo` and `GameApp.holdClearedRedo` (`src/main.ts`),
+    and `WasmHostApp.dropEmptyUndo` and `WasmHostApp.holdClearedRedo`.
   - The analytics bridge's `release` option on `drainGameplayEvents`
     (`src/analyticsEngineBridge.ts`), which lets held events go at the
     session's flush.
   - The restore-point benchmark, `npm run perf:restore`
     (`scripts/perf-restore-points.ts`, `src/tests/perfRestore/`).
-  - The fallback-only tests: `src/tests/integration/wasmHostRollback.integration.test.ts`,
-    `wasmHostRollbackHistory.integration.test.ts`, their helper
-    `wasmRollback.ts`, `wasmHostFallback.integration.test.ts`,
-    `src/wasmhost/startWasmHostRecovery.test.ts`, the restore and carry parts
-    of `hostFault.test.ts` and `wasmHostPoints.test.ts`, the
-    `drainGameplayEvents({ release })` case in `analyticsEngineBridge.test.ts`,
-    the redo-drop case in `undoHistory.integration.test.ts`, and
-    `e2e/wasmFallback.spec.ts`.
+  - The fallback-only tests:
+    - `src/tests/integration/wasmHostRollback.integration.test.ts`,
+      `wasmHostRollbackHistory.integration.test.ts` and their helper
+      `wasmRollback.ts`;
+    - in `wasmHostFallback.integration.test.ts`, the cases "falls back from
+      a command that traps...", "falls back from a tick that traps with a
+      live crowd...", "delivers every event once...", "falls back from a
+      trap in the coalesced host's flush" and "skips the recovery when a
+      load replaced the faulted tower first";
+    - `src/wasmhost/startWasmHostRecovery.test.ts`, the restore and carry
+      parts of `hostFault.test.ts`, and `wasmHostPoints.test.ts`;
+    - the `drainGameplayEvents({ release })` case in
+      `analyticsEngineBridge.test.ts`;
+    - the `dropUnchanged` and redo-hold cases in
+      `undoHistory.integration.test.ts`;
+    - `e2e/wasmFallback.spec.ts`.
+  - The assertions of temporary behavior in tests #1101 changed (the full
+    list is in the spec's Tests section):
+    - `wasmHostAnalyticsBridge.integration.test.ts`: the fallback case
+      ("loses and repeats nothing when the engine fails a drain and the host
+      falls back") and the "before a point" assertions with `drainCovered`;
+    - `capacityEventMatrix.integration.test.ts`'s `covered` helper (a plain
+      drain again);
+    - `wasmHost.integration.test.ts`'s `host.restore()` assertions and its
+      held-event counts;
+    - `startWasmHost.test.ts`'s `REPLACED` line in "latches hosting off
+      when %s traps while a load lets the tower go";
+    - `bootstrapEngine.test.ts`'s switchable fault path ("records a
+      switchable build's running engine fault on the boot state...").
 
   What stays, because a Rust-only build still freezes and stops cleanly on a
   trap: the fault latch, the guards, the strict stop (`onFatal`) and
   `RestorePoints.newestSave` without its TypeScript load check (the strict
-  build's save after a fault is the newest engine-written save).
+  build's save after a fault is the newest engine-written save). Their tests
+  stay too: the trap helper `src/tests/integration/wasmTraps.ts`, and
+  `wasmHostFallback.integration.test.ts`'s latch case ("records one fallback
+  and one recovery however many paths fault after it", without its adopt
+  assertions), strict-stop case and trap-coding case (without its adopt
+  assertion).
 
 ## Sequence it sits in
 
