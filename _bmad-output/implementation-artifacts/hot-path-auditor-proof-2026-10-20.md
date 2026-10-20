@@ -96,7 +96,9 @@ Hot-path findings, under section 7:
 - **D-0, the diff itself: no finding.** All new and changed code runs once per
   attach at O(F), with F ≤ 110 a hard cap: about 110 row visits on each side,
   about 0.2% of the three O(U) save passes (serialize, parse, deserialize) the
-  same entry point already makes.
+  same entry point already makes. The auditor's reply puts it under 0.1% of
+  two of those passes; on its own figures (220 visits against about 86,700)
+  it is nearer 0.25%. Either way it is small next to the passes it rides with.
 - **P-1, the per-sync commute round trip (pre-existing): deferred as a new
   item in #1158 (A26).** Whenever `commute_revision` moved (about every step),
   Rust collects, sorts and serializes up to 110 rows to JSON and the host
@@ -109,15 +111,19 @@ Hot-path findings, under section 7:
   sync is over that, and it runs about every step, so it is not a clear false
   positive. Not fixed now because it is small, measured by nobody yet, and
   outside #1083's scope. Fix: keep the averages in a `BTreeMap` or a dense
-  floor `Vec`, or carry them as numbers in the frame view.
+  floor `Vec`, or carry them as numbers in the frame view. Triage missed that
+  #1131, opened earlier that day from #1083, already asks for this cost to be
+  measured; round 6 of #1168's review caught it, and #1158 A26 now points to
+  #1131 and keeps only the fix proposal.
 - **P-2, `attachWasmHost` reads the whole frame view twice (pre-existing):
   deferred as a new item in #1158 (A25).** Three avoidable O(U) passes per
   attach (two frame view builds and a full decode) to read two header fields;
   per command, so HP-2's repeated-walk rule flags it. Not fixed now because
   the change belongs in the host, which #1083 did not touch, and the save
-  passes in the same entry point cost more. No open issue listed either
-  finding, so both joined the open #1158 audit as new items with their
-  estimates and fixes, and its backlog row was updated (section 7, item 2).
+  passes in the same entry point cost more. Triage found no open issue that
+  listed either finding (it missed #1131 for P-1, see above), so both joined
+  the open #1158 audit as new items with their estimates and fixes, and its
+  backlog row was updated (section 7, item 2).
 - **N-2, `commute_revision` had no HP-8 row: `patch`.** The auditor called it a
   doc note outside the diff; triage made it a `patch`, since the table is the
   inventory every port is checked against. Row added in #1168.

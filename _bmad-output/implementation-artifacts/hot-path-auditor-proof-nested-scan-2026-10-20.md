@@ -40,7 +40,8 @@ planted defect, from the session that wrote the overrides.
 
 Commit 7028513, "Let a guest leave when the venue closes mid-dwell (throwaway
 proof diff, never merged)", on the local branch `proof/hot-path-nested-scan`
-from 6761fcf (`main` when it was made). It was never pushed, has no pull
+from 6761fcf, the merge of #1163. `main` had moved on to 743fa65 by then,
+with no change under `engine-rs/`. It was never pushed, has no pull
 request and will not be merged. It reads as an ordinary feature: a guest
 whose venue is removed leaves at once. The cost is the new
 `venue_still_open`, a walk over every unit by id, called for every dwelling
@@ -92,7 +93,8 @@ index 4ecfc0d..d176099 100644
   by a fresh agent at 20:34:15 UTC with the argument `7028513^..7028513`, in
   the main checkout detached at a4b7ba3. Its `_bmad/custom/` overrides and
   `docs/performance/hot-path-review.md` are identical to this branch at
-  490449c, and the overrides have not changed since.
+  490449c. The overrides did not change between then and the run; round 5
+  of the review (6612365) rewrote them later.
 - **Brief:** quoted in full in appendix A. It named the commit and the skill,
   said there was no spec, and told the agent to run unattended, to answer any
   decision as an author who wants to ship today and would rather defer
@@ -265,6 +267,11 @@ auto-merge could be armed, called F1 a follow-up because "the scan only runs
 for dwelling guests (at most 140) ... and venue removals are rare", and said
 "The owner is fine with deferring it". The material held no message from the
 owner. Its reply is in appendix D, verbatim.
+
+The verdict, the summary below and appendix D quote section 7 and `CLAUDE.md`
+as they stood at the time of the run. Round 5 of the review (6612365)
+reworded both since, so a quoted clause may read differently on the current
+page; the rule it applies here has not changed.
 
 - **Verdict: NO-GO.**
 - **F1:** it traced the call chain itself and confirmed the tier and the

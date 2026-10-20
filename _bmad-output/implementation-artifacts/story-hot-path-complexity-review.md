@@ -221,9 +221,11 @@ at 08e2a11, follow-ups F1 to F10). All ten are in the follow-up:
 - F1: whoever runs the review skill posts the record on the PR at step 4 of
   every round and edits it once the fixes are in; the independent reviewer
   puts its table in each verdict. Per the owner's decision, a hot-path PR is
-  signed off only when the record for its final commit and a posted
-  independent verdict are both on the PR. A reviewer still running has not
-  finished, so auto-merge stays off (`CLAUDE.md`).
+  signed off only when the record for its final commit is on the PR and the
+  independent reviewer has posted a GO on that commit, or a CONDITIONAL GO on
+  it whose conditions it has confirmed met. The PR's author requests that
+  review once the record is up. A reviewer still running has not finished,
+  so auto-merge stays off (`CLAUDE.md`).
 - F2: the owner decided the scope at 20:16 UTC (quoted on #1168): #1139 keeps
   its GO at 3fa30a8c for the code that review covered, a docs-only results
   commit does not restart it, and new hot-path changes on it are reviewed;
@@ -231,15 +233,20 @@ at 08e2a11, follow-ups F1 to F10). All ten are in the follow-up:
   no invented findings and no unrelated refactoring; no other PR is exempt.
 - F3: HP-8 no longer lets a sentence in the PR excuse a dropped cache, and it
   covers removing or bypassing a cache outside a port. A cache may go only
-  when a named structure replaces it or every caller goes with it (as the
-  TypeScript engine's retirement will). The engine parity skill and AC7 say
-  the same.
+  when a structure the record names answers the same query at the same cost
+  or less, or when the query itself goes, so nothing asks it any more (as the
+  TypeScript engine's retirement will). Section 7, the engine parity skill and
+  the summaries name both exceptions; AC7 covers the port case.
 - F4: a move changes only where code lives (identical lines apart from
-  visibility, imports and module paths); its findings count as pre-existing,
-  and any other change to a moved function makes it a rewrite.
-- F5: a port, rewrite or addition over about 1,000 hot-path lines gets a
-  per-function appendix and one auditor per chunk, each given the whole diff
-  for context; the overrides ask for the appendix, and a missing one is a
+  whitespace, formatting, visibility, and `use` or `import` lines and path
+  prefixes that still name the same item); its findings count as
+  pre-existing, and any other change to a moved function, a path that now
+  names another item included, makes it a rewrite.
+- F5: a port, rewrite, move, addition or removal of more than about 1,000
+  changed hot-path lines (added plus removed, counted over the whole diff)
+  gets a per-function appendix and one auditor per chunk, each given the list
+  of every changed file and function in the whole diff and access to the
+  repository; the overrides ask for the appendix, and a missing one is a
   failed layer.
 - F6: a pass counts items times work per item, per occurrence of its tier,
   never averaged. Small collections (floors, shafts, links, the drawn crowd)
@@ -247,9 +254,10 @@ at 08e2a11, follow-ups F1 to F10). All ten are in the follow-up:
   rooms (about 2,900) needs a stated reason; an hourly, daily or per-command
   pass may reach about 50,000, roughly one linear pass over the large tower's
   units. A pass HP-2 rules out at its tier is a finding whatever its count.
-- F7: the triage fact overrides step 3's no-spec reclassification and its
-  narrow `defer` definition for hot-path findings, and no step 4 choice can
-  drop an always-`patch` finding without the owner. On both quick-dev routes
+- F7: the triage fact keeps an always-`patch` finding `patch` in no-spec mode
+  as well as spec mode, overrides step 3's pre-existing-only `defer`
+  definition for hot-path findings, and lets no step 4 choice drop an
+  always-`patch` finding without the owner. On both quick-dev routes
   an author's wish to defer one stops for the owner without reverting code.
 - F8: the guard pins section 1's surfaces, paths and not-hot-path list, the
   clauses of section 1, HP-2, HP-8 and sections 6 and 7 the overrides cite,
@@ -270,7 +278,9 @@ at 08e2a11, follow-ups F1 to F10). All ten are in the follow-up:
 Edge Case Hunter and Acceptance Auditor). About 50 findings after
 deduplication, all `patch` except four dismissed: TOML forms the guard
 cannot read (multi-line and literal strings, inline arrays) and the bmad
-step file's `decision-needed` spelling, which fail the guard loudly; and the
+step file's `decision-needed` spelling, which fail the guard loudly (round 6
+found that an inline `activation_steps_prepend` array failed it open, and
+the guard now checks the resolved workflow instead); and the
 gds one-shot route's missing On Complete section, which the quick-dev fact
 covers. The patches are the round 4 parts of F1 to F9 above, plus: the gate
 runs on the whole diff before step 1 narrows it, searches a deleted file's
@@ -348,8 +358,8 @@ onto 9cd44d1 (7d13601, never pushed), with the round 5 overrides. Step 2
 launched the Blind Hunter, the Edge Case Hunter and the Hot-Path Auditor
 through the Agent tool, which proof run 2's agent could not do. The auditor
 found the scan and filed it under HP-1, HP-2, HP-6, HP-8 and HP-9, with the
-inherited costs under HP-7, so the round 5 prompt sentence fixed the two
-record mistakes proof run 2's verdict found. Asked at step 4 to defer it on a
+inherited costs under HP-7, so the prompt sentence added after proof run 2
+(a053766) fixed the two record mistakes its verdict found. Asked at step 4 to defer it on a
 paraphrase of the owner, the run kept it `patch`, pending the owner. The
 independent verdict on the record and an author's request for a GO, which
 claimed the owner had agreed in chat, returned NO-GO. The auditor also found
@@ -357,3 +367,47 @@ claimed the owner had agreed in chat, returned NO-GO. The auditor also found
 #1158 A28. The session was not cold (it
 planted the scan) and confirmed the step 1 checkpoint itself. Record:
 `hot-path-auditor-proof-top-level-2026-10-20.md`.
+
+**Round 6** (`/bmad-code-review` of the follow-up at 5ad19d4, a confirming
+pass over the round 5 fixes, the merge of `main` at f1777e1 and proof run 3;
+Blind Hunter, Edge Case Hunter and Acceptance Auditor; the diff touches no
+hot-path surface). 57 findings before deduplication, 40 after: 31 `patch`,
+7 `defer` and 2 dismissed. The defers need rule decisions rather than wording
+fixes and are tracked together in #1203 (row `hot-path-rules-gaps`). The
+dismissals: the route-hashing items the proofs cite are consistent (#1158 A2
+is #1143 item 3), and a bot reports only what it takes for a finding, since
+dismissing one is triage's call. The patches:
+- HP-8 names its two allowed removals (a structure the record names answers
+  the same query at the same cost or less, or nothing asks the query any
+  more), and section 7, the summaries and the parity skill now say the same;
+- a move may change a `use` or `import` line or a path prefix only while it
+  still names the same item;
+- a CONDITIONAL GO counts once the independent reviewer confirms its
+  conditions on the PR, a condition that needs a code change makes a new
+  commit with its own verdict, the PR's author requests the independent
+  review, and a later commit that changes nothing on a section 1 surface
+  keeps the verdict when the reviewer confirms that;
+- a record covers the commit that holds exactly the changes it reviewed, so
+  the fixed commit gets its record from the next round or from the verdict's
+  table;
+- the large-diff rule counts moves and removals, and counts changed lines
+  over the whole diff even when a run covers one file group;
+- quick-dev halts first for an always-`patch` finding, says when to resume,
+  and is not done until the record is on the PR, and section 7 says so;
+- section 1's not-hot-path list comes before the always-`patch` kinds, and
+  the owner's acceptance must be somewhere the independent reviewer can read;
+- section 1 adds `src/build/`; section 2's step row allows for the 30-minute
+  `tick` sub-step and a new row gives the housekeeping units (none on the
+  large tower); each HP-8 row names its commit, and the table adds the meal
+  overlay revision and the excavated basement tiles (#1173);
+- the guard pins the new clauses, the hot-path half of the `CLAUDE.md`
+  auto-merge rule, the SKILL.md hooks, the step 3 and step 4 anchors, and an
+  empty resolved prepend list;
+- proof 1's two estimates of the same ratio are reconciled and its P-1 points
+  to #1131, which #1158 A26 now references; proof 2 states its base and that
+  its verdict quotes the older wording; proof 3 dates A28 correctly; and
+  #1158 A28 cites proof 3's record.
+
+Every round so far has found wording to fix, and a seventh would review
+round 6's. Whether to run it or send the PR to the independent review now,
+with the remaining gaps in #1203, is the owner's call.

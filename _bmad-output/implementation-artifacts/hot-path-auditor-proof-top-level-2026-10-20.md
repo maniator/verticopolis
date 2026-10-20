@@ -83,7 +83,7 @@ on it. It was never pushed, has no pull request and will not be merged.
   - The skill halts at the step 1 checkpoint for a human. The session
     confirmed it itself, since this is a proof run with no human at the
     keyboard. In a real review the person asking for it confirms.
-  - The checkout at 9cd44d1 holds the page as it was before this pull
+  - The checkout at 7d13601 holds the page as it was before this pull
     request, so the auditor and the verdict agent were pointed at the current
     copy in the main checkout.
   - The author's request at step 4 and the one given to the verdict agent
@@ -160,7 +160,7 @@ Layers: Blind Hunter 14 findings, Edge Case Hunter 5, Hot-Path Auditor 1 new
 | 11 | hotpath | P2: the station `Unit` clone on a metro return | defer (pre-existing) | By reference to #1158 A27. |
 | 12 | hotpath | P3: `segments_of` cloned on read through `walk_to` | defer (pre-existing) | By reference to #859 and #1158 A8. |
 | 13 | hotpath | P4: a route search with SipHash maps per returning guest | defer (pre-existing) | By reference to #1143 item 3 and #1158 A2. |
-| 14 | hotpath | P5: `landing_slots` rebuilds a map, an `IndexMap` and group `Vec`s and sorts each group per chunk; about 1,600 visits at worst | defer (pre-existing) | Over the 1,000-visit allowance at its worst, so not a false positive. Listed nowhere: added to #1158 as item A28. |
+| 14 | hotpath | P5: `landing_slots` rebuilds a map, an `IndexMap` and group `Vec`s and sorts each group per chunk; about 1,600 visits at worst | defer (pre-existing) | Over the 1,000-visit allowance at its worst, so not a false positive. Listed nowhere: to be added to #1158 as item A28 (that update was published at 21:42:09 UTC, after triage). |
 | 15 | blind | Reused unit ids defeat the check | dismiss | Ids are unique: `next_id` on place, `repair_entity_ids` on load. |
 | 16 | blind | Side effects and the start position on an early return | dismiss | `transition_to_return` reads only the origin and routes from the guest's current `x`. |
 
@@ -195,13 +195,15 @@ stays open. Section 6: no spec and no story key, so no status was set.
 
 The `on_complete` check:
 
-- **Met:** every HP row is filled; no appendix is needed at 15 lines; each
-  pre-existing hot-path defer names its issue and item (#1158 A19 and A27,
-  #859 and A8, #1143 item 3 and A2, and the new A28); the always-`patch` F1
-  was not deferred and is listed as pending the owner; the record is saved
-  for when a pull request opens.
-- **Open:** seven patches unapplied, so this is round 1 of the deep review,
-  not a finished one.
+- **Met:** every HP row is filled; no appendix is needed at 15 lines; four
+  of the five pre-existing hot-path defers name an issue and item that
+  already listed them (#1158 A19 and A27, #859 and A8, #1143 item 3 and A2);
+  the always-`patch` F1 was not deferred and is listed as pending the owner;
+  the record is saved for when a pull request opens.
+- **Open:** P5 named #1158 A28 before that item existed. The session
+  published it at 21:42:09 UTC, after the check and after the verdict agent
+  had read the issue, which is the gap the verdict found (below). Seven
+  patches are unapplied, so the deep review stopped after its first round.
 
 ## The independent verdict
 
