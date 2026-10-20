@@ -321,7 +321,8 @@ retirement):
 - **An exterminator booking pending at the trap** keeps its billed rooms
   after the fallback: #1092 merges this in and pins it in
   `wasmHostExtermination.integration.test.ts` (a trap in a tick and in a
-  command); #874 stays open until it lands.
+  command); #874 stays open until it lands and the owner's PC
+  restore-point run on `4fa8072` is done.
 - **A rollout, the default flip, a gate exception:** owner decisions (#945).
 
 ## Code map
@@ -540,7 +541,8 @@ workload is the owner's rapid-edit check.
 ## Merge
 
 #1059 (PR #1100) merged first; this branch merges main. #1092 merges this
-after it lands and adds the trap mid-booking test, and #874 closes then.
+after it lands and adds the trap mid-booking test. #874 closes once #1092
+has merged and the owner's PC restore-point run on `4fa8072` is done.
 
 ## Review record
 

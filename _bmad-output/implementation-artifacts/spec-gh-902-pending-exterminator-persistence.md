@@ -45,7 +45,7 @@ context:
 - `src/tests/parity/wasmHostSetup.ts` and `src/tests/parity/wasmHostSetup.integration.test.ts`: the parity setup no longer refuses a re-host while a booking is pending, and its test re-hosts mid-booking and ticks through the treatment.
 - `vite.config.ts` (`typescriptSide`) and `.github/workflows/engine-rs.yml` (paths and the named case list): the new host test runs on the TypeScript side and in the engine workflow.
 - `src/engine/sim/exterminationPersistence.test.ts` and `engine-rs/src/extermination_tests.rs`: the same cases in both engines (reload, legacy, non-array list, orphan and Classic lists, the cap and its boundaries, a demolished billed room).
-- `src/tests/integration/wasmHostExtermination.integration.test.ts`: actual WASM attach and mid-booking detach regressions; S4's booking case, an engine trap in a tick or a command mid-booking that falls back through `startWasmHost` and keeps the treatment; and the worker host's attach mid-booking, through the treatment and with a detach mid-booking (kept out of the parity projects, since it starts its own hosts).
+- `src/tests/integration/wasmHostExtermination.integration.test.ts`: actual WASM attach and mid-booking detach regressions; S4's booking case, an engine trap in a tick or a command mid-booking that falls back through `startWasmHost` and keeps the treatment; and the worker host mid-booking: its attach through the treatment, the hour pass's reply putting a cleared list back, and a detach (kept out of the parity projects, since it starts its own hosts).
 - `src/tests/integration/loaderCases.integration.test.ts`, `conformance/scenarios/hotel-exterminator-reload-modern.json`, `conformance/`: cross-engine lock evidence.
 - `_bmad-output/planning-artifacts/release-3.0-exception-register.md`: EX-1, the rollback loss.
 
@@ -89,7 +89,19 @@ context:
   the TypeScript loop treating only the billed room. All six cases in the
   file fail with the TypeScript loader dropping the list, with the merge
   deleting it, and with the Rust writer leaving it out (each checked by
-  hand).
+  hand). Gates rerun on `cc69346`: typecheck, lint, `npm test`, `test:wasm`,
+  `test:wasm:parity`, `cargo fmt`, `clippy` and `cargo test` (the
+  conformance referee included), the production and wasm-only builds, and
+  the `chromium-wasm` and wasm-only e2e specs; CI green on the same head.
+- 2026-10-20, `/gds-code-review` of the post-#874 head (`cc69346`), below:
+  the worker host's tests now show the hosting and the merges they rely on,
+  one of them clears the read model's list and needs the 08:00 hour pass's
+  own reply (no settle) to put it back, which is the path #1068's hourly
+  delta takes; the trap cases pin which restore point came back (the merge's
+  at three hours for a tick, the capture's a minute later for a command).
+  The merge-deleting mutation fails all six cases again. The hot-path
+  record found nothing new; its pre-existing items are #1173 and #1158's
+  A23.
 
 ## Design Notes
 
@@ -196,5 +208,53 @@ duplicating the first (kept on purpose, gds item 5).
 
 Noted for the merge (PR "Before merge"): PR #1068 rewrites `merge.ts` and
 still deletes `exterminationRoomIds`, so whichever lands second keeps the
-adoption, and the worker-host attach test owed here pins it; #1080 edits
-this backlog row (P1 and an S4 note); a re-bump if A3 bumps first.
+adoption, and the worker-host tests pin it; #1080 edits this backlog row
+(P1 and an S4 note); a re-bump if A3 bumps first. Since settled: the
+worker-host tests landed with the post-#874 merge, the version is 2.41.0
+above #1101's 2.40.0 (the 2.36.0 above was this branch's bump before
+then), and a trial merge of #1068 keeps the assignment inside its
+`adoptSimulationFields`.
+
+### `/gds-code-review`, 2026-10-20 (the post-#874 head, `cc69346`)
+
+Blind Hunter, Edge Case Hunter, Acceptance Auditor and the Hot-Path
+Auditor, on the whole PR with the focus on the merge of main, the new tests
+and the docs. Patch findings, all fixed:
+
+1. The worker host's tests never showed the worker was hosting or that a
+   merge ran, and their read-model checks held with no merge at all (the
+   list was on the instance before the attach). The attach case asserts
+   `loaded()`, a merge and an exact engine save (no approximate save
+   taken); the let-go case clears the read model's list and needs the
+   08:00 hour pass's own reply to put it back, with no settle, then
+   detaches without one.
+2. The let-go case ran a fixed 15 frames and read the hour as a stand-in
+   for the hourly pass; it now runs to the hour.
+3. The trap cases did not pin the restore point: a tick restores the last
+   merge's save (three hours in), a command the capture's save, a minute
+   later.
+4. Smaller test fixes: `MAX_STEPS_PER_FRAME` for the literal four, one
+   tower object per case, the log checked non-empty before its last line,
+   the older cases' `host` locals renamed (they shadowed the driver) and
+   reusing the shared helpers.
+5. Docs: the #902 backlog row's grammar and test list; #874's close
+   condition aligned across spec-874's bullet, its Merge section and the
+   backlog row (after #1092 and the owner's PC restore-point run); the
+   retirement story's test names and the read-model assertions that go;
+   this spec's stale merge note; a parity setup comment.
+
+Deferred: the Hot-Path Auditor's pre-existing items (the treatment and the
+booking walking every unit, and the Rust `excavated` list's linear dedupe,
+which the TypeScript keeps in a `Set`) are #1173 with a backlog row; the
+hourly full-save merge is #1158's A23. None is in code this PR adds or
+rewrites, and each fits its tier's budget today.
+
+Dismissed: `detach()` not awaited (it returns nothing); a timeout per
+worker case (the integration projects allow 120 s and the file runs in
+under a second); the unasserted log mocks (the fallback's reporting is
+#1101's tests'); the engine workflow's path list missing the shared test
+helpers (the other self-hosting tests do not list them either, and
+`test:wasm` runs the file on every PR); "Temporary, with the fallback."
+(the marker the fallback's code uses throughout); undo, redo and booking
+traps mid-booking (the general command-trap path is #1101's; S4 and S5 ask
+for a fallback mid-booking).

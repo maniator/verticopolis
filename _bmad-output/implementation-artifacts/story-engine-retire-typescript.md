@@ -128,7 +128,8 @@ own line: the PR, the files, and why the fallback needs them):
   attach).** The Rust writer and loader of `exterminationRoomIds`
   (`engine-rs/src/sim.rs`, `load.rs`, `extermination_tests.rs`), its
   conformance cases and the `hotel-exterminator-reload-modern` scenario are
-  Rust-authoritative and stay. Its TypeScript side goes:
+  Rust-authoritative and stay. Its TypeScript side goes, since only the
+  TypeScript engine and its read model use it:
   - the TypeScript writer and loader of the field
     (`src/engine/sim/serialization.ts`, `coerceExterminationRoomIds` in
     `src/engine/sim/coerce.ts`, the field in `src/engine/serializedGame.ts`)
@@ -141,10 +142,12 @@ own line: the PR, the files, and why the fallback needs them):
     and its test);
   - in `wasmHostExtermination.integration.test.ts`, the cases that run the
     TypeScript loop after a host lets go ("keeps the treatment to the billed
-    rooms when the host lets go mid-booking" and its worker-host twin) and
-    S4's booking case ("after a trap in a tick" and "in a command", which
-    the fallback needs). The attach cases stay, without their TypeScript
-    steps after the detach.
+    rooms when the host lets go mid-booking" and the worker host's "puts the
+    list back on the hour's merge, and keeps the treatment to it when the
+    worker host lets go") and S4's booking case ("after a trap in a tick"
+    and "in a command", which the fallback needs). The attach cases stay,
+    without their read-model assertions (they go with the merge's copy) and
+    their TypeScript steps after the detach.
 
 ## Sequence it sits in
 
