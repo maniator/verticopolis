@@ -126,7 +126,9 @@ export function roomOccupants(u: { occupants: number; outForMeal?: number }): nu
  */
 export function busyStations(stations: number, people: number, seed: number): Set<number> {
   // Floored so a nonsense count can never claim a station it does not fill.
-  // Every caller hands in a whole number from `roomOccupants` already.
+  // Every caller hands in a whole number from `roomOccupants`, which rounds a
+  // fractional occupancy UP the way the atlas does; a raw fractional count is
+  // not meant to reach here, and would come out one lower than the atlas.
   const want = Math.max(0, Math.min(Math.floor(people), stations));
   if (!(want > 0)) return new Set(); // nobody here, or a nonsense count
   const ranked = Array.from({ length: stations }, (_, i) => i);

@@ -63,6 +63,15 @@ describe("artRow measures capacity by the authored room, not by the tile", () =>
     expect(artRow(-1, 0, 100, 7)).toEqual([]); // a negative authored run
   });
 
+  it("refuses an infinite run or end instead of throwing", () => {
+    // A unit forged with `width: Infinity` reaches here as an infinite authored
+    // run, and the count would be Infinity inside `Array.from`.
+    expect(artRow(Infinity, 0, 100, 7)).toEqual([]);
+    expect(artRow(100, -Infinity, 100, 7)).toEqual([]);
+    expect(artRow(100, 0, Infinity, 7)).toEqual([]);
+    expect(artRow(Infinity, 0, Infinity, 7, 1, 6)).toEqual([]);
+  });
+
   it("refuses a pitch that is not a positive number instead of throwing", () => {
     // `authoredRun / 0` is Infinity, and `Array.from({ length: Infinity })`
     // throws RangeError inside the render path.

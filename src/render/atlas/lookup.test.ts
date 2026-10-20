@@ -62,6 +62,8 @@ describe("lookupRoom", () => {
   });
   it("reads corrupt or fractional counts the way the art can draw them", () => {
     expect(look({ kind: "office", state: "occupied", occupants: 4.7, outForMeal: 1, id: 1 }, DAY, 0)).toMatchObject({ chains: { occupants: 4 } });
+    // A negative `outForMeal` is nobody out, not extra people.
+    expect(look({ kind: "office", state: "occupied", occupants: 3, outForMeal: -9, id: 1 }, DAY, 0)).toMatchObject({ chains: { occupants: 3 } });
     expect(look({ kind: "office", state: "occupied", occupants: NaN, id: 1 }, DAY, 0)).toMatchObject({ frame: expect.stringMatching(/\/away$/) });
     expect(look({ kind: "parking", state: "occupied", occupants: 0, id: 12 }, { ...DAY, parkingUse: Infinity }, 0)).toMatchObject({ overlays: [] });
     expect(look({ kind: "shop", state: "occupied", subtype: "Nope", occupants: 1, id: 1 }, DAY, 0)).toMatchObject({ frame: expect.stringContaining("room/shop/occupied/-/") });
