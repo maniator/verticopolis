@@ -14,6 +14,8 @@ pub struct Memo {
     pub segs: Option<(i64, HashMap<i64, Vec<(i64, i64)>>)>,
     pub staff: Option<(i64, HashMap<i64, i64>)>,
     pub cols: Option<(i64, HashMap<i64, Vec<(i64, i64)>>)>,
+    pub tiles: Option<(crate::tower_index::IndexKey, crate::tower_index::FloorTiles)>,
+    pub rooms: Option<(crate::tower_index::IndexKey, std::sync::Arc<[usize]>)>,
 }
 
 // ---- unit state predicates (types.ts) --------------------------------------
@@ -110,18 +112,6 @@ impl Tower {
     pub fn room_at(&self, floor: i64, x: i64) -> Option<&Unit> {
         let id = self.rooms.get(&(floor, x))?;
         self.get_unit(*id)
-    }
-
-    /// `roomUnits`: every non-structural unit, in list order.
-    pub fn room_units(&self) -> impl Iterator<Item = &Unit> {
-        self.units.iter().filter(|u| !u.kind.is_structural())
-    }
-
-    /// Indices of the room units, for loops that must mutate them.
-    pub fn room_indices(&self) -> Vec<usize> {
-        (0..self.units.len())
-            .filter(|&i| !self.units[i].kind.is_structural())
-            .collect()
     }
 
     pub fn bump_meal_overlay_revision(&mut self) {
