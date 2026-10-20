@@ -1,22 +1,11 @@
 //! `incomeBreakdown` (`src/engine/sim/stats.ts`) over the ledger
 //! (`src/engine/Ledger.ts`): the average dollars per day for each report
-//! category over the trailing quarter, for the stats screen.
+//! category over the ledger's kept days (`WINDOW`), for the stats screen.
 
 use serde_json::{json, Map, Value};
 
-use crate::ledger::Ledger;
+use crate::ledger::{Ledger, LEDGER_CATS};
 use crate::sim::Simulation;
-
-/// `LEDGER_CATS`: the report categories in display order.
-pub const LEDGER_CATS: [&str; 7] = [
-    "offices",
-    "condos",
-    "hotels",
-    "retail",
-    "food",
-    "entertainment",
-    "upkeep",
-];
 
 impl Ledger {
     /// `averagePerDay`: net dollars per day per category, summed day by day in
@@ -24,11 +13,7 @@ impl Ledger {
     /// the running day's totals.
     pub fn average_per_day(&self) -> [f64; 7] {
         let mut out = [0.0; 7];
-        let days = if self.history.is_empty() {
-            1
-        } else {
-            self.history.len().max(1)
-        };
+        let days = self.history.len().max(1);
         let mut add = |day: &crate::ledger::DayTotals| {
             for (i, cat) in LEDGER_CATS.iter().enumerate() {
                 out[i] += day.get(cat).copied().unwrap_or(0.0);

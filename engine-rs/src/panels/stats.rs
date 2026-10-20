@@ -2,10 +2,12 @@
 //! rest of what `statsTemplate` asks the `Simulation` for while the stats
 //! screen is open (`src/engine/sim/stats.ts`, `src/ui/templates/stats.ts`).
 //!
-//! `tower_stats` is one pass over the units. Unit states, customers and money
+//! `tower_stats` is one pass over the rooms (the tower's room index, so the
+//! floor and lobby tiles are not walked). Unit states, customers and money
 //! move between revisions and between hours, so no revision or hour key could
-//! stand in for the pass without showing stale numbers; the pass costs
-//! microseconds in Rust (see the story's AC6 figures).
+//! stand in for the pass without showing stale numbers. `highest_floor`,
+//! `lowest_floor` and `population` are the engine's own reads and still walk
+//! the units; the story's AC6 figures and the backlog row cover them.
 
 use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
@@ -21,7 +23,7 @@ impl Simulation {
         let (mut hotel_rooms, mut occupied_hotel, mut dirty) = (0, 0, 0);
         let (mut shops, mut restaurants, mut vacant, mut vacant_no_rate) = (0, 0, 0, 0);
         let mut parking_spaces = 0;
-        for u in &self.tower.units {
+        for u in self.tower.room_units() {
             match u.kind {
                 Kind::Office => {
                     offices += 1;
@@ -85,7 +87,7 @@ impl Simulation {
     pub fn households_report(&self) -> Value {
         let mut mix: BTreeMap<i64, i64> = BTreeMap::new();
         let (mut households, mut residents) = (0, 0);
-        for u in &self.tower.units {
+        for u in self.tower.room_units() {
             if matches!(u.kind, Kind::Condo | Kind::RentalApartment) && u.is_present() {
                 let size = u.resident_count();
                 *mix.entry(size).or_insert(0) += 1;

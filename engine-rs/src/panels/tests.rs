@@ -42,6 +42,11 @@ pub(super) fn id_at(sim: &Simulation, floor: i64, x: i64) -> i64 {
     sim.tower.unit_at(floor, x).expect("a unit there").id
 }
 
+/// The heat cells as JSON, the way the binding hands them out.
+pub(super) fn heat(sim: &Simulation, mode: HeatmapMode) -> Value {
+    serde_json::from_str(&sim.floor_heatmap_json(mode)).expect("heat cells are JSON")
+}
+
 pub(super) fn settle(sim: &mut Simulation, hours: i64) {
     for _ in 0..hours {
         sim.tick(60.0);
@@ -65,13 +70,13 @@ fn a_new_tower_reads_empty_everywhere() {
             sim.peak_congestion_hotspot(),
             json!({ "ratio": 0.0, "floor": null })
         );
-        for mode in [
+        for overlay in [
             HeatmapMode::Congestion,
             HeatmapMode::Occupancy,
             HeatmapMode::Satisfaction,
             HeatmapMode::Cleanliness,
         ] {
-            assert_eq!(sim.floor_heatmap(mode), json!([]));
+            assert_eq!(heat(&sim, overlay), json!([]));
         }
         assert_eq!(
             sim.onboarding_facts(),
@@ -154,6 +159,34 @@ fn a_basement_only_extent_counts_the_basements() {
     }
     let s = sim.tower_stats();
     assert_eq!(s["basements"], 2, "floors 0 and -1 are two basements");
+}
+
+#[test]
+fn a_lobby_with_only_basements_below_reads_its_depth_and_nothing_above() {
+    let mut sim = Simulation::new_game(9, GameMode::Classic);
+    sim.money = 1.0e9;
+    for x in 150..230 {
+        put(&mut sim, Kind::Lobby, 1, x);
+    }
+    for fl in [0, -1, -2] {
+        for x in 151..160 {
+            let r = sim.build(Kind::Floor, fl, x);
+            assert!(r.ok, "floor {fl} at {x}: {:?}", r.reason);
+        }
+    }
+    let s = sim.tower_stats();
+    assert_eq!(s["basements"], 3);
+    assert_eq!(s["floors"], 1, "nothing above the lobby");
+    assert_eq!(s["offices"], 0);
+    let facts = sim.onboarding_facts();
+    assert_eq!(facts["lobby"], true);
+    assert_eq!(facts["floor"], false, "no floor at 2 or above");
+    let cells = heat(&sim, HeatmapMode::Congestion);
+    assert_eq!(
+        cells.as_array().unwrap().len(),
+        4,
+        "the lobby and three basement floors"
+    );
 }
 
 #[test]
@@ -248,8 +281,10 @@ fn housekeeping_coverage_counts_reach_dirt_and_infestation() {
     settle(&mut sim, 4 * 24);
     let room = id_at(&sim, 3, 160);
     let far = id_at(&sim, 4, 160);
+    let quiet = id_at(&sim, 3, 170);
     sim.tower.get_unit_mut(room).unwrap().state = UnitState::Dirty;
     sim.tower.get_unit_mut(far).unwrap().state = UnitState::Infested;
+    sim.tower.get_unit_mut(quiet).unwrap().state = UnitState::Empty;
     let cov = sim.housekeeping_coverage();
     assert_eq!(cov.crews, 1);
     assert_eq!(cov.maids, 6);
@@ -261,7 +296,7 @@ fn housekeeping_coverage_counts_reach_dirt_and_infestation() {
     assert_eq!(cov.out_of_reach, 1);
     assert_eq!(cov.to_json()["outOfReach"], 1);
 
-    let cells = sim.floor_heatmap(HeatmapMode::Cleanliness);
+    let cells = heat(&sim, HeatmapMode::Cleanliness);
     let cells = cells.as_array().unwrap();
     let tint_of = |floor: i64| {
         cells
@@ -284,7 +319,7 @@ fn a_floor_only_a_long_stair_climb_reaches_is_stranded() {
     let id = id_at(&sim, 12, 160);
     sim.tower.get_unit_mut(id).unwrap().state = UnitState::Occupied;
     // A chain of two-floor stair flights, a column apart each, up to floor 12.
-    for (i, bottom) in (1..12).step_by(1).enumerate() {
+    for (i, bottom) in (1..12).enumerate() {
         shaft(
             &mut sim,
             Kind::Stairs,

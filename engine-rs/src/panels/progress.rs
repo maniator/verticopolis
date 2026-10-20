@@ -9,6 +9,24 @@ use crate::facilities::Kind;
 use crate::sim::Simulation;
 use crate::star::{STAR_THRESHOLDS, TOWER_POPULATION};
 
+/// The milestone ids in table order (`MILESTONES` in `src/engine/milestones.ts`).
+/// `milestone_progress` reads the saved set against this list, so it does not
+/// evaluate the eleven tests (`Simulation::milestone_tests`); a test keeps the
+/// two tables equal.
+pub const MILESTONE_IDS: [&str; 11] = [
+    "pop-500",
+    "pop-2500",
+    "pop-7500",
+    "pop-12000",
+    "star-4",
+    "star-5",
+    "cinema",
+    "metro",
+    "skyline",
+    "well-served",
+    "full-house",
+];
+
 impl Simulation {
     /// `nextStarThreshold`: the population the next rung needs, `None` from
     /// 5 stars up.
@@ -81,10 +99,9 @@ impl Simulation {
     /// `milestoneProgress`: the milestones in table order with whether each is
     /// achieved (the saved set, not today's test).
     pub fn milestone_progress(&self) -> Value {
-        let list: Vec<Value> = self
-            .milestone_tests()
+        let list: Vec<Value> = MILESTONE_IDS
             .iter()
-            .map(|(id, _, _)| json!({ "id": id, "done": self.milestones.iter().any(|m| m == id) }))
+            .map(|id| json!({ "id": id, "done": self.milestones.iter().any(|m| m == id) }))
             .collect();
         let achieved = list.iter().filter(|m| m["done"] == true).count();
         json!({ "achieved": achieved, "total": list.len(), "list": list })

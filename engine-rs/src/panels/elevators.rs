@@ -30,7 +30,9 @@ impl Simulation {
             if !t.kind.is_elevator() || t.kind.is_staff_only_transport() {
                 continue;
             }
-            let utilization = self.telemetry.util.get(&t.id).copied().unwrap_or(0.0);
+            // A reading that is not a number sorts as idle, so the order is total.
+            let reading = self.telemetry.util.get(&t.id).copied().unwrap_or(0.0);
+            let utilization = if reading.is_nan() { 0.0 } else { reading };
             rows.push((
                 utilization,
                 json!({
@@ -39,12 +41,12 @@ impl Simulation {
                     "bottom": t.bottom,
                     "top": t.top,
                     "cars": t.cars,
-                    "capacity": t.cars as f64 * t.kind.car_capacity(),
+                    "capacity": Simulation::transport_capacity(t.kind, t.cars),
                     "utilization": utilization,
                 }),
             ));
         }
-        rows.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        rows.sort_by(|a, b| b.0.total_cmp(&a.0));
         Value::Array(rows.into_iter().map(|(_, v)| v).collect())
     }
 

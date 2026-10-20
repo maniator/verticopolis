@@ -10,19 +10,35 @@ use crate::sim::Simulation;
 use crate::tower::UnitState;
 
 impl Simulation {
-    /// `{ lobby, floor, office, connect, play }`, each a boolean.
+    /// `{ lobby, floor, office, connect, play }`, each a boolean. Reads the
+    /// lobby tile count and walks the units once for the floor step, then the
+    /// rooms once for the three office steps.
     pub fn onboarding_facts(&self) -> Value {
-        let units = &self.tower.units;
+        let lobby = self.tower.lobby_tiles.values().any(|&n| n > 0);
+        let floor = self
+            .tower
+            .units
+            .iter()
+            .any(|u| u.kind == Kind::Floor && u.floor >= 2);
+        let served = self.tower.served_floors();
+        let (mut office, mut connect, mut play) = (false, false, false);
+        for u in self.tower.room_units() {
+            if u.kind != Kind::Office {
+                continue;
+            }
+            office = true;
+            connect = connect || u.floor == 1 || served.contains(&u.floor);
+            play = play || u.state == UnitState::Occupied;
+            if connect && play {
+                break;
+            }
+        }
         json!({
-            "lobby": units.iter().any(|u| u.kind == Kind::Lobby),
-            "floor": units.iter().any(|u| u.kind == Kind::Floor && u.floor >= 2),
-            "office": units.iter().any(|u| u.kind == Kind::Office),
-            "connect": units
-                .iter()
-                .any(|u| u.kind == Kind::Office && self.tower.is_floor_served(u.floor)),
-            "play": units
-                .iter()
-                .any(|u| u.kind == Kind::Office && u.state == UnitState::Occupied),
+            "lobby": lobby,
+            "floor": floor,
+            "office": office,
+            "connect": connect,
+            "play": play,
         })
     }
 }

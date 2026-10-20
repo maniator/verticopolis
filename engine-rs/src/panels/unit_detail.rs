@@ -12,6 +12,9 @@ use crate::facilities::Kind;
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
+/// The Average rung of a Classic price ladder (the ladder has four rungs).
+const AVERAGE_RUNG: usize = 2;
+
 /// The default price in the tower's catalog (`catalogFacility(catalog, kind)
 /// .rent.default`): the Average rung in Classic, the band's default in Modern.
 /// Not the same number as `rent_of` for a Classic condo or hotel (the Average
@@ -19,7 +22,7 @@ use crate::tower::Unit;
 /// catalog's.
 pub(crate) fn catalog_rent_default(mode: GameMode, kind: Kind) -> Option<f64> {
     match mode {
-        GameMode::Classic => classic_ladder(kind).map(|rungs| rungs[2]),
+        GameMode::Classic => classic_ladder(kind).map(|rungs| rungs[AVERAGE_RUNG]),
         GameMode::Modern => rent_config(kind).map(|c| c.default),
     }
 }

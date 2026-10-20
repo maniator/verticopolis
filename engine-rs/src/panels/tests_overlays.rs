@@ -4,7 +4,7 @@
 use serde_json::json;
 
 use super::heatmap::{congestion_severity, HeatmapMode};
-use super::tests::{founded, id_at, put, settle, shaft};
+use super::tests::{founded, heat, id_at, put, settle, shaft};
 use crate::clock::GameMode;
 use crate::facilities::Kind;
 use crate::tower::UnitState;
@@ -21,7 +21,7 @@ fn heatmap_modes_cover_floors_tenants_and_the_ramp() {
     sim.tower.get_unit_mut(a).unwrap().satisfaction = 0.25;
     let b = id_at(&sim, 2, 170);
     sim.tower.get_unit_mut(b).unwrap().state = UnitState::Empty;
-    let occ = sim.floor_heatmap(HeatmapMode::Occupancy);
+    let occ = heat(&sim, HeatmapMode::Occupancy);
     let floor2 = occ
         .as_array()
         .unwrap()
@@ -33,10 +33,10 @@ fn heatmap_modes_cover_floors_tenants_and_the_ramp() {
         occ.as_array().unwrap().iter().all(|c| c["floor"] != 1),
         "a floor with nothing to rent is not tinted"
     );
-    let sat = sim.floor_heatmap(HeatmapMode::Satisfaction);
+    let sat = heat(&sim, HeatmapMode::Satisfaction);
     assert_eq!(sat.as_array().unwrap().len(), 1, "only the present tenant");
     assert_eq!(sat[0]["severity"], 0.75);
-    let cong = sim.floor_heatmap(HeatmapMode::Congestion);
+    let cong = heat(&sim, HeatmapMode::Congestion);
     assert!(cong.as_array().unwrap().iter().all(|c| c["tint"].is_null()));
 }
 
@@ -68,9 +68,24 @@ fn the_hotspot_names_the_lowest_floor_on_a_tie() {
     for id in [id_at(&sim, 3, 160), id_at(&sim, 4, 160)] {
         sim.tower.get_unit_mut(id).unwrap().state = UnitState::Occupied;
     }
+    // One shaft is the bottleneck for every floor it serves, so those floors
+    // share its ratio: the tie the rule exists for.
+    let by_floor = sim.spatial_congestion_by_floor();
+    let peak = by_floor.values().copied().fold(0.0, f64::max);
+    assert!(peak > 0.0, "a loaded shaft reads congested");
+    let mut tied: Vec<i64> = by_floor
+        .iter()
+        .filter(|(_, c)| **c == peak)
+        .map(|(f, _)| *f)
+        .collect();
+    tied.sort();
+    assert!(
+        tied.len() > 1,
+        "the floors tie on the shaft's ratio: {tied:?}"
+    );
     let spot = sim.peak_congestion_hotspot();
-    assert!(spot["ratio"].as_f64().unwrap() > 0.0);
-    assert!(spot["floor"].is_number());
+    assert_eq!(spot["ratio"].as_f64().unwrap(), peak);
+    assert_eq!(spot["floor"], tied[0], "the lowest tied floor is named");
 }
 
 #[test]
@@ -112,6 +127,12 @@ fn getters_leave_the_game_unchanged() {
         sim.onboarding_facts(),
     );
     let _ = (sim.peak_congestion_hotspot(), sim.income_breakdown());
+    let _ = (
+        sim.housekeeping_coverage(),
+        sim.next_star_requirements(),
+        sim.milestone_progress(),
+        sim.households_report(),
+    );
     for mode in [
         HeatmapMode::Congestion,
         HeatmapMode::Occupancy,
@@ -125,4 +146,11 @@ fn getters_leave_the_game_unchanged() {
         crate::canonical::digest(&crate::snapshot::state_view(&sim))
     );
     assert_eq!(crowd, crate::canonical::digest(&sim.crowd.view()));
+}
+
+#[test]
+fn the_milestone_id_table_matches_the_milestone_tests() {
+    let sim = founded(GameMode::Modern, 2);
+    let ids: Vec<&str> = sim.milestone_tests().iter().map(|(id, _, _)| *id).collect();
+    assert_eq!(ids, super::progress::MILESTONE_IDS);
 }
