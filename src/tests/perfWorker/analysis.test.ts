@@ -206,6 +206,14 @@ describe("perf:worker analysis", () => {
     }
   });
 
+  it("fails a run that lost a WebGL context, in every mode (#1136)", () => {
+    const lost = runs().map((r, i) => (i === 0 ? { ...r, contextLost: ["WebGL context lost on canvas#game (1280x720) at 900 ms of a page"] } : { ...r, contextLost: [] }));
+    expect(validate(config, lost).errors.join()).toMatch(/1 of \d+ process runs lost a WebGL context/);
+    expect(validate({ ...config, quick: true }, lost).errors.join()).toMatch(/lost a WebGL context/);
+    expect(validate(config, lost, "EX-4").errors.join()).toMatch(/lost a WebGL context/);
+    expect(validate(config, runs()).errors.join()).not.toMatch(/lost a WebGL context/);
+  });
+
   it("fails mixed renderers and a renderer that changed after the frames, even under a quick run or an exception", () => {
     const mixed = runs().map((r, i) => ({ ...r, page: { crossOriginIsolated: true, userAgent: "ua", webgl: { renderer: i === 0 ? "ANGLE (AMD, AMD Radeon RX 6800 Direct3D11, D3D11)" : RTX, vendor: "v" } }, rendererEnd: i === 0 ? "ANGLE (AMD, AMD Radeon RX 6800 Direct3D11, D3D11)" : RTX }));
     expect(validate(config, mixed).errors.join()).toMatch(/different WebGL renderers/);
