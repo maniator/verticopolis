@@ -131,4 +131,98 @@ describe("registerPWA: offline", () => {
       restore();
     }
   });
+
+  // version.json only decorates the update prompt (#985, criterion 7), so
+  // every way it can fail to arrive leaves the update on offer, with no info.
+  const failures: [string, () => Promise<Response>][] = [
+    ["answers 404", async () => new Response("not found", { status: 404 })],
+    ["answers 500", async () => new Response("down", { status: 500 })],
+    ["is not JSON", async () => new Response("<!doctype html>", { status: 200 })],
+    ["is JSON that is not an object", async () => new Response("null", { status: 200 })],
+  ];
+  it.each(failures)("still offers a waiting update when version.json %s", async (_name, answer) => {
+    const restore = makeBrowserBranchReachable();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(answer);
+    try {
+      const { registerPWA } = await importPwa();
+      const onUpdateAvailable = vi.fn();
+      registerPWA({ onUpdateAvailable });
+      (registerSW.mock.calls[0][0] as { onNeedRefresh: () => void }).onNeedRefresh();
+      await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
+      expect(onUpdateAvailable.mock.calls[0][1]).toBeUndefined();
+    } finally {
+      fetchSpy.mockRestore();
+      restore();
+    }
+  });
+
+  // A 200 whose body parses to something with no usable fields leaves nothing to
+  // show; the update is still on offer, with info that names no build.
+  it.each([["{}", "{}"], ["an array", "[1, 2]"], ["fields of the wrong type", '{"version":5,"sha":[],"notes":"x"}']])(
+    "still offers a waiting update when version.json is %s",
+    async (_name, body) => {
+      const restore = makeBrowserBranchReachable();
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(body, { status: 200 }));
+      try {
+        const { registerPWA } = await importPwa();
+        const onUpdateAvailable = vi.fn();
+        registerPWA({ onUpdateAvailable });
+        (registerSW.mock.calls[0][0] as { onNeedRefresh: () => void }).onNeedRefresh();
+        await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
+        expect(onUpdateAvailable.mock.calls[0][1]).toEqual({ version: undefined, sha: undefined, notes: [] });
+      } finally {
+        fetchSpy.mockRestore();
+        restore();
+      }
+    },
+  );
+
+  it("gives up on a version.json that never answers after four seconds and still offers the update", async () => {
+    const restore = makeBrowserBranchReachable();
+    vi.useFakeTimers();
+    // A fetch that hangs until its signal aborts, as a stalled connection does.
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+        }),
+    );
+    try {
+      const { registerPWA } = await importPwa();
+      const onUpdateAvailable = vi.fn();
+      registerPWA({ onUpdateAvailable });
+      (registerSW.mock.calls[0][0] as { onNeedRefresh: () => void }).onNeedRefresh();
+      await vi.advanceTimersByTimeAsync(3_999);
+      expect(onUpdateAvailable, "still waiting inside the four seconds").not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(2);
+      expect(onUpdateAvailable).toHaveBeenCalledTimes(1);
+      expect(onUpdateAvailable.mock.calls[0][1]).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+      fetchSpy.mockRestore();
+      restore();
+    }
+  });
+
+  it("hands the incoming build's identity to the prompt when version.json arrives", async () => {
+    const restore = makeBrowserBranchReachable();
+    const body = JSON.stringify({ version: "9.9.9", sha: "abc1234", notes: ["A new thing."] });
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(body, { status: 200 }));
+    try {
+      const { registerPWA } = await importPwa();
+      const onUpdateAvailable = vi.fn();
+      registerPWA({ onUpdateAvailable });
+      (registerSW.mock.calls[0][0] as { onNeedRefresh: () => void }).onNeedRefresh();
+      await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
+      expect(onUpdateAvailable.mock.calls[0][1]).toEqual({ version: "9.9.9", sha: "abc1234", notes: ["A new thing."] });
+      // It is fetched fresh: never from a cache, never precached.
+      const call = fetchSpy.mock.calls.find(([url]) => String(url).includes("version.json"));
+      expect(call, "version.json was requested").toBeDefined();
+      expect((call![1] as RequestInit).cache).toBe("no-store");
+      expect(new URL(String(call![0])).searchParams.has("t"), "with a cache-busting query").toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      restore();
+    }
+  });
 });
