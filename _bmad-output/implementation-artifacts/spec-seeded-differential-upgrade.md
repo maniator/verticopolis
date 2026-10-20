@@ -53,13 +53,28 @@ reads it.
 
 ### Slice 2: broader scenarios
 
-- Mixed money: starting cash, cash that runs out, bankruptcy.
-- Taller towers and transport pressure: lobby skips, express shafts, the
-  24-shaft and 64-link pools at their caps.
-- The six dropped commands (`sell`, `adjustRent`, `setCars`, `setNoRate`,
-  `setSchedule`, `startFire`) get an `expectFail` form, so a command one engine
-  refuses and the other accepts is a divergence. Reason compares wait for #865
-  (B4).
+Slice 2a (done): a cash profile per seed (rich, modest or tight, set after the
+tower is built) and mid-run cash of zero, small or negative; one seed in four
+grows a 16 to 40 floor tower with sky-lobby rows on floors 15 and 30; those
+tall seeds open with a burst of 27 standard shafts and 65 stairs, so the
+24-shaft and 64-link pools fill and both engines also agree on the refusal at
+each cap (the burst is outside the 40-command budget). A checkpoint follows
+every random command, so the runner's 1024-event window holds. The extra
+random draws change the scenario any given seed produces, so a seed from
+before this slice does not replay. The engine has no bankruptcy rule, so
+"cash that runs out" is the whole money goal.
+
+Slice 2b: the six dropped commands (`sell`, `adjustRent`, `setCars`,
+`setNoRate`, `setSchedule`, `startFire`) get an `expectFail` form, so a
+command one engine refuses and the other accepts is a divergence. Reason
+compares wait for #865 (B4). Needs schema work in both runners and a split of
+`scenario.ts`, which sits at the 500-line ceiling.
+
+Slice 2c: a path to higher stars, so escalators, service and express shafts
+(3, 2 and 3 stars) are accepted and the express stops and lobby skips run.
+A new game starts at one star and no scenario command raises it, so the
+nightly never builds them today.
+
 - Guard test: nightly scenarios start from a new game, never a fixture
   outside `conformance/fixtures/`.
 
