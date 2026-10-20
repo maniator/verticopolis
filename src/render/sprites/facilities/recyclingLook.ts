@@ -23,8 +23,9 @@ export const RECYCLING_PILE_PITCH = 7;
 /** A bag is 6 wide, so one pitch leaves a 1px gap to the next. */
 export const RECYCLING_BAG_W = 6;
 /** The baler's left edge, and the five compacted cubes that wait left of it
- *  (6 wide, the first 4px clear of the baler); the leftmost cube starts at
- *  `RECYCLING_CUBES_X`. */
+ *  (6 wide, stepping left from 4px before the baler's edge, so the nearest one
+ *  still covers the baler's left bevel; see backlog row #1063); the leftmost
+ *  cube starts at `RECYCLING_CUBES_X`. */
 export const RECYCLING_BALER_X = RECYCLING_REF_W - 47;
 export const RECYCLING_CUBE_W = 6;
 export const RECYCLING_CUBES_X = RECYCLING_BALER_X - 4 - 4 * RECYCLING_CUBE_W;

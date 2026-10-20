@@ -1,11 +1,26 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { Unit } from "../../../engine/types";
 import type { DrawCtx } from "../common";
+import { FACILITIES, facilityFloors } from "../../../engine/facilities";
 import { TILE, FLOOR } from "../../scale";
 import { refMap } from "./serviceKit";
 import { drawParking, drawParkingRamp } from "./garage";
 import { drawSecurity, drawMedical, drawHousekeeping } from "./service";
 import { drawRecycling } from "./recycling";
+
+/** Every `refMap` call the painters make, as (RW, RH, w, h). The wrapper passes
+ *  straight through, so the paint is unchanged. */
+const refMapCalls = vi.hoisted(() => [] as Array<{ RW: number; RH: number; w: number; h: number }>);
+vi.mock("./serviceKit", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./serviceKit")>();
+  return {
+    ...real,
+    refMap: (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, RW: number, RH: number) => {
+      refMapCalls.push({ RW, RH, w, h });
+      return real.refMap(ctx, x, y, w, h, RW, RH);
+    },
+  };
+});
 
 /**
  * The service sprites were once authored in a reference space (TILE 11 by
@@ -19,7 +34,9 @@ import { drawRecycling } from "./recycling";
  * three constants (issue #812). These guards are about UNIFORMITY, not beauty.
  * Even PITCH is now reachable too: the references were re-authored onto the live
  * 10 by 45 grid, so the security wall's five monitors are 7 wide on a 9 pitch
- * and the gaps between them are all 2. Pitch still is not asserted here, because
+ * and the gaps between them are all 2. Pitch is asserted only for the two
+ * shelf families (the linen stacks and the cabinet bottles) whose even pitch
+ * this re-author was written to deliver. Elsewhere it is not asserted, because
  * an assertion on it would pin one art choice rather than the renderer, and the
  * pitch is only even because a whole number of them fits the authored wall.
  */
@@ -73,6 +90,12 @@ const SPRITES = [
 const REF_TILE = 11;
 const REF_FLOOR = 44;
 
+const sprite = (name: string) => {
+  const sp = SPRITES.find((s) => s.name === name);
+  if (!sp) throw new Error(`no service sprite named ${name}`);
+  return sp;
+};
+
 function paint(sp: (typeof SPRITES)[number], w: number, h: number) {
   const r = recorder();
   sp.draw(r.ctx, w, h);
@@ -101,7 +124,7 @@ describe("service sprites survive a non-identity reference map", () => {
     // Edge-derived sizing landed them 8,7,7,7,7 per row, so a regular 2x5 grid
     // read broken. Selecting by the body color pins the monitors themselves
     // rather than whatever else happens to share a width.
-    const rects = paint(SPRITES[2], 8 * TILE, 1 * FLOOR);
+    const rects = paint(sprite("security"), 8 * TILE, 1 * FLOOR);
     const bodies = rects.filter((r) => r.c.toLowerCase() === "#0e1420");
     expect(bodies.length).toBe(10);
     expect(new Set(bodies.map((r) => r.w)).size).toBe(1);
@@ -119,10 +142,11 @@ describe("service sprites survive a non-identity reference map", () => {
   // returns two genuinely different authored sizes and the assertion would be
   // measuring the test's own ambiguity rather than the renderer.
   it.each([
-    ["recycling baled recyclables", 5, "#2E323A"],
-    ["recycling sign letters", 5, "#DCE8C0"],
-  ] as const)("%s renders every copy at one size", (_name, idx, color) => {
-    const rects = paint(SPRITES[idx], SPRITES[idx].tiles * TILE, SPRITES[idx].floors * FLOOR);
+    ["recycling baled recyclables", "recycling", "#2E323A"],
+    ["recycling sign letters", "recycling", "#DCE8C0"],
+  ] as const)("%s renders every copy at one size", (_label, name, color) => {
+    const sp = sprite(name);
+    const rects = paint(sp, sp.tiles * TILE, sp.floors * FLOOR);
     const fam = rects.filter((r) => r.c.toUpperCase() === color);
     expect(fam.length).toBeGreaterThanOrEqual(5);
     expect(new Set(fam.map((r) => `${r.w}x${r.h}`)).size).toBe(1);
@@ -132,11 +156,11 @@ describe("service sprites survive a non-identity reference map", () => {
   // room (the cart's towels, the rack's towel), so these pick them by color
   // AND by the shelf or cabinet they sit in, and check count, size and pitch.
   it.each([
-    // name, sprite index, colors, region [x0, x1), copies, size, column pitch
-    ["housekeeping linen", 4, ["#F4F0EC", "#CFE0FF", "#E8D8C0"], [4, 31], 12, "5x5", 6],
-    ["medical bottles", 3, ["#9FD0C8", "#E8C9A0", "#5DB4E8", "#F4A0A0", "#DCE8C0"], [95, 116], 10, "3x4", 4],
-  ] as const)("%s renders every copy at one size on one pitch", (_name, idx, colors, [x0, x1], copies, size, pitch) => {
-    const sp = SPRITES[idx];
+    // name, sprite, colors, region [x0, x1), copies, size, column pitch
+    ["housekeeping linen", "housekeeping", ["#F4F0EC", "#CFE0FF", "#E8D8C0"], [4, 31], 12, "5x5", 6],
+    ["medical bottles", "medical", ["#9FD0C8", "#E8C9A0", "#5DB4E8", "#F4A0A0", "#DCE8C0"], [95, 116], 10, "3x4", 4],
+  ] as const)("%s renders every copy at one size on one pitch", (_label, name, colors, [x0, x1], copies, size, pitch) => {
+    const sp = sprite(name);
     const rects = paint(sp, sp.tiles * TILE, sp.floors * FLOOR);
     const fam = rects.filter((r) => (colors as readonly string[]).includes(r.c.toUpperCase()) && r.x >= x0 && r.x + r.w <= x1 && r.w > 1 && r.h > 1);
     expect(fam.length).toBe(copies);
@@ -157,6 +181,36 @@ describe("service sprites survive a non-identity reference map", () => {
     },
   );
 
+  it.each(SPRITES.map((s) => [s.name, s] as const))(
+    "%s is authored for the footprint the engine gives its kind, and every refMap call says so",
+    (name, sp) => {
+      // The bounds guard cannot see a sprite whose own RW/RH drifted from its
+      // room: a wrong pair still stays in bounds, keeps its rect count and just
+      // resamples. So read the pair each painter hands refMap, and the room size
+      // from the engine's own facility data rather than this file's table.
+      expect([sp.tiles, sp.floors]).toEqual([FACILITIES[name as keyof typeof FACILITIES].width, facilityFloors(name as keyof typeof FACILITIES)]);
+      refMapCalls.length = 0;
+      paint(sp, sp.tiles * TILE, sp.floors * FLOOR);
+      expect(refMapCalls.length).toBeGreaterThan(0);
+      for (const c of refMapCalls) expect(c).toEqual({ RW: c.w, RH: c.h, w: sp.tiles * TILE, h: sp.floors * FLOOR });
+    },
+  );
+
+  it.each([
+    ["the security monitor bodies", "security", "#0E1420", 10],
+    ["the recycling baled recyclables", "recycling", "#2E323A", 5],
+    ["the recycling sign letters", "recycling", "#DCE8C0", 5],
+  ] as const)("%s still render at one size at the retired footprint, where the map resamples", (_label, name, color, atLeast) => {
+    // The shipped scale is identity, so `F` and `Fu` agree there and the
+    // uniform-size tests above could not tell them apart. Off identity is where
+    // `Fu` earns its keep (the /gallery scale), so hold the families to one size
+    // there as well. Swapping `Fu` for `F` in one of these motifs breaks this.
+    const sp = sprite(name);
+    const fam = paint(sp, sp.tiles * REF_TILE, sp.floors * REF_FLOOR).filter((r) => r.c.toUpperCase() === color.toUpperCase());
+    expect(fam.length).toBeGreaterThanOrEqual(atLeast);
+    expect(new Set(fam.map((r) => `${r.w}x${r.h}`)).size).toBe(1);
+  });
+
   it("pins the grid the references are authored on", () => {
     // The bounds guard above only fails when the grid SHRINKS: if TILE or FLOOR
     // grows, the derived canvas grows with it and the authored rects still fit,
@@ -168,6 +222,7 @@ describe("service sprites survive a non-identity reference map", () => {
   it.each([
     ["a full lot and a full plant", 1, 1],
     ["a half-full plant", 1, 0.6],
+    ["a plant past amber", 1, 0.85],
   ] as const)("keeps every filled rect inside its canvas with %s", (_label, parkingUse, recycleFill) => {
     // The default state draws no parked car, no pile and an empty gauge, so
     // those branches need their own pass under the same bounds guard.

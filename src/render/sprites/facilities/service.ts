@@ -182,9 +182,9 @@ export function drawHousekeeping(d: DrawCtx, u: Pick<Unit, "kind" | "floor" | "x
   for (let k = 0; k < 2; k++) F(cartX + 12 + k * 3, fy - 13, 2, 3, k ? "#5db4e8" : "#E85D5D");
   F(cartX, fy - 2, 2, 2, "#1A1D24");
   F(cartX + cartW - 2, fy - 2, 2, 2, "#1A1D24");
-  // Mop and bucket. The towel rack drawn next covers them entirely, as it did
-  // before the re-authoring; the approved composition keeps that on purpose,
-  // since revealing them would add an object to the room.
+  // Mop and bucket. The towel rack drawn next covers the bucket and the lower
+  // handle; the mop head and the top of the handle (rows 23 to 27) show above
+  // it. Kept as authored: moving them would change approved art.
   F(62, fy - 14, 1, 12, "#8A5A30");
   F(60, fy - 16, 5, 3, "#E8E0B0");
   box(F, 60, fy - 6, 6, 6, "#F4C020");

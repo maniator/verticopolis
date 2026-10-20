@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FACILITIES, facilityFloors } from "../../engine/facilities";
 import type { FacilityKind } from "../../engine/types";
-import { recyclingLook } from "../sprites/facilities/recyclingLook";
+import { RECYCLING_GAUGE_ROWS, RECYCLING_PILE_SLOTS, recyclingLook } from "../sprites/facilities/recyclingLook";
 import { FLOOR, TILE } from "../scale";
 import { RECYCLE_BREAKS, RECYCLE_STEPS, roomJobs, type StillJob } from "./catalog";
 import { CINEMA_CYCLES, clockFor, cycleStep, cycleSteps } from "./cycles";
@@ -72,7 +72,9 @@ describe("the recycling center's fill breaks", () => {
     // FULL at 1. No bag and row ever arrive together: bag k comes at
     // (k - 0.5) / 14 and row j at (j - 0.5) / 65, and 65(2k - 1) is odd
     // while 14(2j - 1) is even. The 33rd row arrives at exactly 0.5.
-    expect(RECYCLE_BREAKS).toHaveLength(14 + 65 + 3);
+    // The oddness argument above holds only for this pair, so pin the pair.
+    expect([RECYCLING_PILE_SLOTS, RECYCLING_GAUGE_ROWS]).toEqual([14, 65]);
+    expect(RECYCLE_BREAKS).toHaveLength(RECYCLING_PILE_SLOTS + RECYCLING_GAUGE_ROWS + 3);
     for (let i = 0; i < RECYCLE_BREAKS.length; i++) {
       const b = RECYCLE_BREAKS[i];
       if (i > 0) expect(b).toBeGreaterThan(RECYCLE_BREAKS[i - 1]);
