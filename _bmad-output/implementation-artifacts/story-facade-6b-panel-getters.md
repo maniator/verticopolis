@@ -1,6 +1,6 @@
 ---
 story: facade-6b-panel-getters
-status: ready-for-dev
+status: review
 issue: 1214
 tracking: 1207
 parent: 945
@@ -163,13 +163,44 @@ Sonnet 5.5 (high)
   has only the v2 model, so there is nothing to port or test.
 - **Cost (AC6).** Medians from the cloud sandbox, so indicative only; the
   owner's PC is the source for figures that go in a gate. Large fixture
-  (43,358 units): `towerStats` 0.45 ms, `statsReport` 3.7 ms,
-  `housekeepingCoverage` 0.27 ms, `unitDetail` 0.007 ms,
-  `peakCongestionHotspot` 0.31 ms, `onboardingFacts` 0.40 ms, `floorHeatmap`
-  congestion 2.6 ms, occupancy 1.8 ms, satisfaction 3.6 ms, cleanliness 0.42
-  ms. `statsReport` and three of the four overlays are over the 1 ms bar.
-  They run on a panel open or an hourly overlay refresh, not per tick.
-  Decision for the review: documented deferral or a revision-keyed memo.
+  (43,358 units), after the review fixes (before in brackets): `towerStats`
+  0.33 ms (0.45), `statsReport` 2.0 ms (3.7), `housekeepingCoverage` 0.01 ms
+  (0.27), `unitDetail` 0.008 ms, `peakCongestionHotspot` 0.28 ms (0.31),
+  `onboardingFacts` 0.02 ms (0.40), `floorHeatmap` congestion 1.0 ms (2.6),
+  occupancy 0.67 ms (1.8), satisfaction 0.72 ms (3.6, now written straight to
+  text), cleanliness 0.01 ms (0.42). `statsReport` is still over the 1 ms bar
+  and the congestion overlay is at it. What is left is in engine reads the
+  getters call and the Rust step hotspots lane owns (`count_operational`,
+  `highest_floor` / `lowest_floor`, `functional_parking_set`, the served-set
+  clone): documented deferral, backlog row `rust-reads-walk-every-unit`
+  (#1237). The overlay refreshes hourly game time, which is every 0.5 s at top
+  speed, so `statsReport` and the three overlays go on the slice 9 PC list
+  (#1220) at top speed; a frame-time or long-task impact makes the fix required
+  before 50/50.
+- **For the binding and slice 4.** The wrappers bind eight methods; the five
+  small getters (`next_star_requirements`, `milestone_progress`,
+  `next_star_threshold`, `income_breakdown`, `elevator_stats`) are reached
+  inside `statsReport`, the only screen that reads them. Heat cells cross as
+  text built straight from typed cells (`floor_heatmap_json`), not a `Value`
+  per cell; keep that when the overlay moves onto the port, keep the renderer's
+  (mode, hour, revision, meal revision) cache, and throttle the congestion
+  recompute to once per UI tick. `transport_detail` builds a `Value` per floor
+  and per origin ring; fine on panel open, measure it before a per-tick refresh.
+  Absent TypeScript fields answer `null` (see `panels/mod.rs`).
+- **Review (`/gds-code-review`, four layers).** Patched: `milestone_progress`
+  evaluated all eleven milestone tests to read ids (now a table with a drift
+  test); the overlay extent walk hashed every unit (dense floor table); heat
+  cells were a `Value` each (typed, written to text); coverage, cleanliness,
+  stats, households and onboarding walked tile units (rooms only); the crew
+  reach was copied (shared); the elevator sort was not a total order; two
+  capacity formulas (one); `LEDGER_CATS` duplicated (the ledger's); the module
+  doc claimed no writes; the tie, housekeeping and basement tests did not pin
+  what they named. Deferred: #1237 above. Dismissed with parity evidence (the
+  differential matches TypeScript at 606 checkpoints): the infinite ratio
+  reading green, the hotel `Asleep` count, the `tenanted` versus `Occupied`
+  tests, the household size 0 bucket, the population measure in `popHave`,
+  elevator counts in the HUD versus the list, the partial running day in the
+  income average.
 
 ### File List
 
