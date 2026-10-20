@@ -42,6 +42,21 @@ describe("calibrateM4", () => {
     expect(c.problems.some((p) => p.startsWith("M4: the candidate 60 ms is above its cap 50 ms"))).toBe(true);
   });
 
+  it("takes the upper end of the 95% interval of the median difference, which is x(9) of 10", () => {
+    // Differences 0 to 9: the median is 4.5, the order statistic is 8. The median, the maximum (9) and rank 8 (7) would each read differently.
+    const p = workerPass(0).results;
+    const [ts, wasm] = ["ts", "wasm"].map((mode) => p.metrics.find((m) => m.mode === mode && m.throttle === "1")!);
+    wasm.values = ts.values.map((v, r) => v + r);
+    expect(blockingDifference(p, "1")).toBe(8);
+  });
+
+  it("adopts a candidate of exactly the 50 ms cap", () => {
+    const c = calibrate(many(10, (i) => ({ diff4: i === 3 ? 50 : 1 })));
+    expect(c.family.candidate).toBe(50);
+    expect(c.family.withinCap).toBe(true);
+    expect(c.problems.some((p) => p.includes("above its cap"))).toBe(false);
+  });
+
   it("leaves M4 without a candidate when a throttle has fewer than 10 pairs", () => {
     const c = calibrate(many(10, (i) => ({ reps4: i === 0 ? 9 : 10 })));
     expect(c.family.values[0]).toBeNull();
@@ -86,6 +101,22 @@ describe("calibrateM4", () => {
     expect(reason("aa-worker-27")).toMatch(/gpuVerified/);
     expect(reason("aa-worker-28")).toMatch(/no WebGL context-loss record/);
     expect(reason("aa-worker-29")).toMatch(/lost its WebGL context/);
+  });
+
+  it("reads the context-loss record of every process run, not the first or any one", () => {
+    const run = () => ({ ok: true, page: { webgl: { renderer: RTX } }, rendererEnd: RTX, rendererEndCold: RTX, contextLost: [] as string[] | undefined });
+    const triple = (i: number, edit: (runs: ReturnType<typeof run>[]) => void) => {
+      const f = workerPass(i);
+      const runs = [run(), run(), run()];
+      edit(runs);
+      (f.results as unknown as { runs: unknown[] }).runs = runs;
+      return f;
+    };
+    const c = calibrate([...many(10), triple(20, (r) => (r[1].contextLost = undefined)), triple(21, (r) => (r[2].contextLost = ["webglcontextlost at 7 ms"])), triple(22, () => {})]);
+    const reason = (name: string) => c.excluded.find((e) => e.folder === name)?.reason;
+    expect(reason("aa-worker-20")).toMatch(/^a process run has no WebGL context-loss record/);
+    expect(reason("aa-worker-21")).toMatch(/lost its WebGL context/);
+    expect(c.passes.map((p) => p.folder)).toContain("aa-worker-22");
   });
 
   it("refuses to pool passes that differ, and counts a copy once", () => {

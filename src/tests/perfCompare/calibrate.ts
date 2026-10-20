@@ -275,14 +275,29 @@ export function calibrate(folders: { folder: string; results: Pass; sha256?: str
   return { passes, excluded, window: starts.length ? { from: starts[0], to: starts[starts.length - 1] } : null, minPassesPerEngine: minPasses, exceedanceLimit: limit, protocolDefaults, pool, guarantee, problems, families, tsColdStartMs, adoptable };
 }
 
-export function calibrationMarkdown(c: Calibration, generatedAt: string, withM4 = false): string {
+/** What a report that also holds M4 (from `perf:worker` folders) adds to the `perf:compare` report's banner, headline and problem list. */
+export interface MixedReport {
+  /** The window and commits of the `perf:worker` passes, which the banner names beside the `perf:compare` passes'. */
+  m4Window: { from: string; to: string } | null;
+  m4Commits: string[];
+  /** Every check of both halves and across them. */
+  adoptable: boolean;
+  /** The problems the `perf:compare` half does not list: M4's and the ones across the halves. */
+  problems: string[];
+}
+
+export function calibrationMarkdown(c: Calibration, generatedAt: string, mixed: MixedReport | null = null): string {
   const out: string[] = [];
   const commits = [...new Set(c.passes.map((p) => p.commit.slice(0, 7)))];
   out.push("# δ and ε calibration from A/A passes", "");
-  out.push(`> **Snapshot of ${c.window ? `A/A passes started ${c.window.from} to ${c.window.to}` : "no usable A/A pass"}${commits.length ? `, commit ${commits.join(", ")}` : ""}; computed ${generatedAt}.** The live numbers come from \`npm run perf:calibrate\` (src/tests/perfCompare/calibrate.ts, pinned by calibrate.test.ts) run on the folders listed below; this file never refreshes. Provisional: ${withM4 ? "it covers M1, M2, M3, M4 and M5; M4 is from the `perf:worker` A/A passes below" : "it covers M1, M2, M3 and M5; M4's long-task ε needs `perf:worker` A/A passes (#1111) and is missing"}, and nothing here sets a tolerance until the owner adopts the numbers (OD-4; the pass count is an open amendment to it).`, "");
-  out.push(c.adoptable ? "**Candidates pass every check of this tool.** They are provisional (see above)." : "**Not adoptable yet.** See the problems below.", "");
+  const snapshot = (passes: string, window: { from: string; to: string } | null, cs: string[]): string => `${window ? `${passes} started ${window.from} to ${window.to}` : `no usable ${passes.replace(/ passes$/, " pass")}`}${cs.length ? `, commit ${cs.join(", ")}` : ""}`;
+  const banner = mixed ? `${snapshot("perf:compare A/A passes", c.window, commits)}; ${snapshot("perf:worker A/A passes", mixed.m4Window, mixed.m4Commits)}` : snapshot("A/A passes", c.window, commits);
+  out.push(`> **Snapshot of ${banner}; computed ${generatedAt}.** The live numbers come from \`npm run perf:calibrate\` (src/tests/perfCompare/calibrate.ts, pinned by calibrate.test.ts${mixed ? "; M4: src/tests/perfWorker/calibrateM4.ts, pinned by calibrateM4.test.ts" : ""}) run on the folders listed below; this file never refreshes. Provisional: ${mixed ? "it covers M1, M2, M3, M4 and M5; M4 is from the `perf:worker` A/A passes below" : "it covers M1, M2, M3 and M5; M4's long-task ε needs `perf:worker` A/A passes (#1111) and is missing"}, and nothing here sets a tolerance until the owner adopts the numbers (OD-4; the pass count is an open amendment to it).`, "");
+  const adoptable = mixed ? mixed.adoptable : c.adoptable;
+  out.push(adoptable ? "**Candidates pass every check of this tool.** They are provisional (see above)." : "**Not adoptable yet.** See the problems below.", "");
   if (!c.protocolDefaults) out.push(`> **Looser than the protocol's parameters.** This run used ${c.minPassesPerEngine} passes per engine and a ${(c.exceedanceLimit * 100).toFixed(1)}% limit. The protocol's are ${DEFAULT_MIN_PASSES_PER_ENGINE} passes and ${(DEFAULT_EXCEEDANCE_LIMIT * 100).toFixed(0)}%, and loosening them needs the owner's approval, so nothing here is adoptable.`, "");
-  if (c.problems.length) out.push("## Problems", "", ...c.problems.map((p) => `- ${p}`), "");
+  const problems = [...c.problems, ...(mixed?.problems ?? [])];
+  if (problems.length) out.push("## Problems", "", ...problems.map((p) => `- ${p}`), "");
   const fewest = c.guarantee === null ? null : Math.round(1 / c.guarantee) - 1;
   out.push("## What the check guarantees", "", c.guarantee === null ? "There are no passes of one engine, so no guarantee can be stated." : `With ${fewest} passes of the engine that has the fewest, and passes that are exchangeable, the chance that a fresh pass lands above a candidate (before rounding) is 1/${fewest! + 1} on average = ${(c.guarantee * 100).toFixed(1)}%. The limit is ${(c.exceedanceLimit * 100).toFixed(0)}%, which needs at least ${passesForLimit(c.exceedanceLimit)} passes per engine. The leave-one-out column below is informational: it can only be 0 or 1, it shows whether the largest pass lands above the candidate the others set, and it never blocks adoption.`, "");
   out.push("## Candidates", "");

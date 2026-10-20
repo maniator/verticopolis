@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { calibrateM4, isWorkerResults, m4Markdown, type WorkerPass } from "../perfWorker/calibrateM4";
 import { calibrate, calibrationMarkdown, stable, type Calibration } from "./calibrate";
+import { halvesProblems } from "./calibratePool";
 import type { CompareResults } from "./types";
 
 /**
@@ -79,12 +80,18 @@ export function main(argv: string[], repo: string, now: () => string = () => new
   const workerFolders = folders.filter((f) => f.worker) as { folder: string; results: WorkerPass; sha256: string }[];
   const compare: Calibration | null = compareFolders.length ? calibrate(compareFolders, opts) : null;
   const m4 = workerFolders.length ? calibrateM4(workerFolders, opts) : null;
+  // Passes of the two kinds in one report must share a machine, a browser and an engine build.
+  const across = compare?.pool && m4?.pool ? halvesProblems(compare.pool, m4.pool) : [];
+  const m4Problems = (m4?.problems ?? []).map((p) => `perf:worker folders: ${p}`);
+  const adoptable = (compare?.adoptable ?? true) && (m4?.adoptable ?? true) && across.length === 0;
+  const problems = [...(compare?.problems ?? []), ...m4Problems, ...across];
+  // Which families this run cannot speak for, so a partial run does not read as a complete one.
+  const missingFamilies = [...(compare ? [] : ["M1", "M2", "M3", "M5-1x", "M5-4x"]), ...(m4 ? [] : ["M4"])];
   mkdirSync(out, { recursive: true });
   const generatedAt = now();
-  const adoptable = (compare?.adoptable ?? true) && (m4?.adoptable ?? true);
-  const problems = (compare?.problems.length ?? 0) + (m4?.problems.length ?? 0);
-  writeFileSync(join(out, "calibration.json"), JSON.stringify({ generatedAt, ...(compare ?? {}), m4, adoptable }, null, 1) + "\n");
-  writeFileSync(join(out, "calibration.md"), [compare ? calibrationMarkdown(compare, generatedAt, m4 !== null) : null, m4 ? m4Markdown(m4, generatedAt, compare !== null) : null].filter((x) => x !== null).join("\n"));
-  process.stdout.write(`perf:calibrate: wrote ${out} (${adoptable ? "adoptable" : `not adoptable: ${problems} problem(s)`})\n`);
+  writeFileSync(join(out, "calibration.json"), JSON.stringify({ generatedAt, ...(compare ?? {}), m4, missingFamilies, problems, adoptable }, null, 1) + "\n");
+  const mixed = m4 ? { m4Window: m4.window, m4Commits: [...new Set(m4.passes.map((p) => p.commit.slice(0, 7)))], adoptable, problems: [...m4Problems, ...across] } : null;
+  writeFileSync(join(out, "calibration.md"), [compare ? calibrationMarkdown(compare, generatedAt, mixed) : null, m4 ? m4Markdown(m4, generatedAt, compare !== null) : null].filter((x) => x !== null).join("\n"));
+  process.stdout.write(`perf:calibrate: wrote ${out} (${adoptable ? "adoptable" : `not adoptable: ${problems.length} problem(s)`})\n`);
   return adoptable ? 0 : 1;
 }

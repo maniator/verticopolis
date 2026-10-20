@@ -441,20 +441,50 @@ describe("perf:calibrate", () => {
       writeFileSync(join(repo, name, "results.json"), JSON.stringify(results));
       return name;
     };
-    const compare = many(40).map((f, i) => write(`aa-${i}`, f.results));
-    const worker = (diff4: number) => Array.from({ length: 40 }, (_, i) => workerPass(i, { diff4 })).map((f) => write(`${f.folder}-${diff4}`, f.results));
+    const compareFolders = many(40);
+    const compare = compareFolders.map((f, i) => write(`aa-${i}`, f.results));
+    // The worker folders share the compare folders' machine, browser and engine build unless a test changes one.
+    const shared = compareFolders[0].results as unknown as { environment: Record<string, unknown>; browser: Record<string, unknown> };
+    const worker = (diff4: number, tag = "", over: { cpu?: string; version?: string } = {}) =>
+      Array.from({ length: 40 }, (_, i) => workerPass(i, { diff4 })).map((f) => {
+        const r = f.results as unknown as { environment: Record<string, unknown>; browser: Record<string, unknown> };
+        r.environment = { ...shared.environment, commit: "fff9999aaa", ...(over.cpu ? { cpuModel: over.cpu } : {}) };
+        r.browser = { ...r.browser, version: over.version ?? shared.browser.version, executable: shared.browser.executable, channel: shared.browser.channel, args: shared.browser.args };
+        return write(`${f.folder}-${diff4}${tag}`, f.results);
+      });
+    // Same machine, browser and build: the two halves join. The banner names both windows and both commits.
     expect(main([...compare, ...worker(3), "--out", "both"], repo, () => "2026-10-21T00:00:00Z")).toBe(0);
     const json = JSON.parse(readFileSync(join(repo, "both", "calibration.json"), "utf8"));
     expect(json.adoptable).toBe(true);
+    expect(json.problems).toEqual([]);
+    expect(json.missingFamilies).toEqual([]);
     expect(json.families.map((f: { id: string }) => f.id)).toContain("M1");
     expect(json.m4.family.candidate).toBe(5);
     const md = readFileSync(join(repo, "both", "calibration.md"), "utf8");
     expect(md).toContain("it covers M1, M2, M3, M4 and M5");
     expect(md).toContain("## M4 long-task ε");
-    // A cap miss in the worker folders fails the whole command even though the compare half passes.
+    expect(md).toMatch(/Snapshot of perf:compare A\/A passes started .* to .*, commit [0-9a-f]{7}; perf:worker A\/A passes started 2026-10-21T01:00:00\.000Z to .*, commit fff9999;/);
+    expect(md).toContain("pinned by calibrateM4.test.ts");
+    expect(md).toContain("**Candidates pass every check of this tool.**");
+    // A cap miss in the worker folders fails the whole command, the headline says so, and the problem is in the top-level list.
     expect(main([...compare, ...worker(80), "--out", "miss"], repo)).toBe(1);
     const miss = JSON.parse(readFileSync(join(repo, "miss", "calibration.json"), "utf8"));
     expect(miss.adoptable).toBe(false);
     expect(miss.m4.adoptable).toBe(false);
+    expect(miss.problems.some((p: string) => /^perf:worker folders: M4: the candidate 80 ms is above its cap/.test(p))).toBe(true);
+    const missMd = readFileSync(join(repo, "miss", "calibration.md"), "utf8");
+    expect(missMd).toContain("**Not adoptable yet.** See the problems below.");
+    expect(missMd).not.toContain("**Candidates pass every check of this tool.**");
+    expect(missMd).toMatch(/## Problems\n\n(- .*\n)*- perf:worker folders: M4: the candidate 80 ms/);
+    // Halves from another machine or browser build do not join, even though each half passes alone.
+    expect(main([...compare, ...worker(3, "-b", { cpu: "other cpu", version: "150.0.1" }), "--out", "apart"], repo)).toBe(1);
+    const apart = JSON.parse(readFileSync(join(repo, "apart", "calibration.json"), "utf8"));
+    expect(apart.m4.adoptable).toBe(true);
+    expect(apart.adoptable).toBe(false);
+    expect(apart.problems).toHaveLength(1);
+    expect(apart.problems[0]).toMatch(/perf:compare passes \(commit [0-9a-f]{7}\) and the perf:worker passes \(commit fff9999\) differ in machine or runtime; browser/);
+    // A worker-only run says which families it cannot speak for.
+    expect(main([...worker(3, "-c"), "--out", "alone"], repo)).toBe(0);
+    expect(JSON.parse(readFileSync(join(repo, "alone", "calibration.json"), "utf8")).missingFamilies).toEqual(["M1", "M2", "M3", "M5-1x", "M5-4x"]);
   });
 });

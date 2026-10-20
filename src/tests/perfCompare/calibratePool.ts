@@ -104,6 +104,22 @@ export function poolProblems(used: PoolPass[]): string[] {
 }
 
 /**
+ * Why the `perf:compare` passes and the `perf:worker` passes of one command
+ * cannot share a report: one calibration comes from one machine, one browser
+ * and one engine build (the counting-browser pin in protocol section 3). Both
+ * commits are named, so a reader sees which snapshots were joined.
+ */
+export function halvesProblems(compare: PoolIdentity, worker: PoolIdentity): string[] {
+  const differ = [
+    ["machine or runtime", compare.machine, worker.machine],
+    ["browser (executable, channel, switches, version or WebGL renderer)", compare.browser, worker.browser],
+    ["engine build", [compare.engineBuildHash, compare.enginePackage], [worker.engineBuildHash, worker.enginePackage]],
+  ].filter(([, a, b]) => stable(a) !== stable(b)).map(([what]) => what as string);
+  if (!differ.length) return [];
+  return [`the perf:compare passes (commit ${compare.commit.slice(0, 7)}) and the perf:worker passes (commit ${worker.commit.slice(0, 7)}) differ in ${differ.join("; ")}; one calibration needs both kinds from one machine, browser and engine build`];
+}
+
+/**
  * Remembers the folders seen so far. `seen` returns why a folder repeats an
  * earlier one, or null: the same canonical hash, or the same start time,
  * commit, engine and build, is one pass counted twice.

@@ -545,7 +545,7 @@ the folders by hand: RUN-0b collects them and the values come from
 `perf:calibrate`'s output.
 
 **M4's ε** comes from `perf:worker --aa ts|wasm` passes (`perf:compare`
-measures no long tasks): the same mode in both slots (labelled `ts` and
+measures no long tasks): the same mode in both slots (labeled `ts` and
 `wasm`), each run recording the slot and the mode it ran, validation by the
 mode that ran, a marked folder (an `--out` name must carry `aa-ts` or
 `aa-wasm`), an `aa` column in both CSVs, no verdict words, and
@@ -564,10 +564,19 @@ folders in the same command as the `perf:compare` ones (it tells them apart by
   ok, a clean recorded tree, not `--quick`, 10 repetitions, the large scenario
   at 1x and 4x, a verified hardware renderer at all three reads, and no
   WebGL context loss. A folder that records no context-loss field comes from a
-  harness older than #1136 and is left out. The passes are pooled only if they
-  share commit, machine, browser, engine build and run parameters, and the
-  pass-count and coverage checks (including the open amendment to OD-4) are
-  the ones M1 to M5 use.
+  harness older than #1136 and is left out (`perf:worker` writes the field
+  from PR #1172 on, so M4 cannot be calibrated before that PR is in: every
+  earlier folder is left out). A `perf:compare` folder is not asked for the
+  field; its renderer check rejects a recorded loss. The passes are pooled
+  only if they share commit, machine, browser, engine build and run
+  parameters, and the pass-count and coverage checks (including the open
+  amendment to OD-4) are the ones M1 to M5 use.
+- When one command takes both kinds of folder, the two sets must also share
+  a machine, a browser and an engine build with each other. The banner names
+  both windows and both commits, the headline and the exit code come from
+  the combined result, and every problem of either half is listed under
+  Problems. `calibration.json` names the families a partial run cannot speak
+  for in `missingFamilies`.
 - The exit code is 0 only when every kind of folder given passes. A command
   given only `perf:worker` folders reports M4 alone, and a command given only
   `perf:compare` folders reports M1, M2, M3 and M5 and says M4 is missing; the

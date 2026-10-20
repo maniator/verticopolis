@@ -12,9 +12,10 @@ import type { Metric } from "./analysis";
  * median paired difference of that blocking (slot "wasm" minus slot "ts", in
  * ms, paired by repetition, at least `MIN_REPS` pairs), the larger of the two
  * throttles. The candidate is the largest value across passes, rounded up to
- * 5 ms, and it is not adopted above 50 ms. The pass screening, the pooling
- * checks and the coverage checks are the ones `calibrate.ts` applies to
- * `perf:compare` folders; this file adds what is specific to a worker folder.
+ * 5 ms, and it is not adopted above 50 ms. The tree, renderer, copy, pooling
+ * and coverage checks are the helpers `calibratePool.ts` and `calibrate.ts`
+ * share; the order in which this file applies them to a pass mirrors
+ * `calibrate.ts`, and what is specific to a worker folder lives here.
  */
 
 export const M4_SCENARIO = "large";
@@ -107,7 +108,8 @@ export function calibrateM4(folders: { folder: string; results: WorkerPass; sha2
       continue;
     }
     const tree = treeProblem(results);
-    const renderer = rendererProblem(results) ?? lossRecordProblem(results);
+    const renderer = rendererProblem(results);
+    const lossRecord = lossRecordProblem(results);
     if (engine !== "ts" && engine !== "wasm") leave('not an A/A pass (config.aa is not "ts" or "wasm")');
     else if (!results.validation.ok) leave("its validation failed");
     else if (tree) leave(tree);
@@ -115,6 +117,7 @@ export function calibrateM4(folders: { folder: string; results: WorkerPass; sha2
     else if (results.config.reps !== MIN_REPS) leave(`${results.config.reps} repetitions; the verdict runs use ${MIN_REPS}, and a pass with another count does not pool with them`);
     else if (!results.config.scenarios.includes(M4_SCENARIO) || THROTTLES.some((t) => !results.config.throttles.map(String).includes(t))) leave(`it lacks the ${M4_SCENARIO} scenario at 1x and 4x`);
     else if (renderer) leave(`its renderer is not verified hardware (${renderer})`);
+    else if (lossRecord) leave(lossRecord);
     else {
       used.push({ folder, engine, results });
       passes.push({ folder, engine, commit: results.environment.commit, reps: results.config.reps, startedAt: results.startedAt ?? null, sha256: sha256 ?? null });
@@ -165,7 +168,7 @@ export function m4Markdown(c: M4Calibration, generatedAt: string, afterCompare: 
   const h = afterCompare ? "##" : "#";
   if (afterCompare) out.push("");
   out.push(`${h} M4 long-task ε from \`perf:worker\` A/A passes`, "");
-  if (!afterCompare) out.push(`> **Snapshot of ${c.window ? `A/A passes started ${c.window.from} to ${c.window.to}` : "no usable A/A pass"}${commits.length ? `, commit ${commits.join(", ")}` : ""}; computed ${generatedAt}.** The live number comes from \`npm run perf:calibrate\` (src/tests/perfWorker/calibrateM4.ts) run on the folders listed below; this file never refreshes. Provisional: M1, M2, M3 and M5 need \`perf:compare\` A/A passes and are not in this report, and nothing here sets a tolerance until the owner adopts the numbers (OD-4).`, "");
+  if (!afterCompare) out.push(`> **Snapshot of ${c.window ? `A/A passes started ${c.window.from} to ${c.window.to}` : "no usable A/A pass"}${commits.length ? `, commit ${commits.join(", ")}` : ""}; computed ${generatedAt}.** The live number comes from \`npm run perf:calibrate\` (src/tests/perfWorker/calibrateM4.ts, pinned by calibrateM4.test.ts) run on the folders listed below; this file never refreshes. Provisional: M1, M2, M3 and M5 need \`perf:compare\` A/A passes and are not in this report, and nothing here sets a tolerance until the owner adopts the numbers (OD-4).`, "");
   out.push(c.adoptable ? "**M4 passes every check of this tool.** It is provisional (see above)." : "**M4 is not adoptable yet.** See the problems below.", "");
   if (!c.protocolDefaults) out.push(`> **Looser than the protocol's parameters.** This run used ${c.minPassesPerEngine} passes per engine and a ${(c.exceedanceLimit * 100).toFixed(1)}% limit, and loosening them needs the owner's approval, so nothing here is adoptable.`, "");
   if (c.problems.length) out.push("Problems:", "", ...c.problems.map((p) => `- ${p}`), "");
