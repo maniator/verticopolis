@@ -79,6 +79,8 @@ function load(repo: string, folder: string): { results: WorkerResults; sha256: s
   }
   const r = results as Partial<WorkerResults> | null;
   if (!r || !r.config || !r.environment || !r.browser || !Array.isArray(r.metrics) || !Array.isArray(r.runs) || !Array.isArray(r.scenarios) || !r.validation) throw new Error(`${file} is not a perf:worker results.json (config, environment, browser, scenarios, runs, metrics or validation is missing)`);
+  // A perf:compare results.json has all of the above and no `config.modes`.
+  if (!Array.isArray(r.config.modes)) throw new Error(`${file} is not a perf:worker results.json (config.modes is missing; a perf:compare folder cannot be compared here)`);
   return { results, sha256: createHash("sha256").update(stable(results)).digest("hex") };
 }
 

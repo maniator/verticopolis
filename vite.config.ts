@@ -246,13 +246,14 @@ function wasmParityProjects() {
     "**/wasmHostTelemetry.integration.test.ts",
     // These start their own host (in process, or the worker's).
     "**/wasmHostAnalyticsBridge.integration.test.ts",
+    "**/wasmHostExtermination.integration.test.ts",
     "**/wasmHostFallback.integration.test.ts",
     "**/wasmHostRollback*.integration.test.ts",
     "**/wasmWorkerHost.integration.test.ts",
     "**/wasmWorkerLifecycle.integration.test.ts",
     "**/wasmWorkerSaves.integration.test.ts",
   ];
-  const setupFiles = ["src/tests/viewWorldSetup.ts", "src/tests/parity/wasmHostSetup.ts"];
+  const setupFiles = ["src/tests/viewWorldSetup.ts", "src/tests/parity/wasmHostSetup.ts", "src/tests/ci/testStartLogSetup.ts"];
   // Every hosted tick also syncs the engine's frame (and in tick mode merges
   // its save), so a fixture-driven test runs several times slower here.
   const testTimeout = 120_000;
@@ -579,7 +580,7 @@ export default defineConfig(({ command }) => ({
         test: {
           name: "integration",
           include: ["src/**/*.integration.test.ts"],
-          setupFiles: ["src/tests/viewWorldSetup.ts"],
+          setupFiles: ["src/tests/viewWorldSetup.ts", "src/tests/ci/testStartLogSetup.ts"],
         },
       },
       // The parity projects (story-engine-test-parity, #878): the same two

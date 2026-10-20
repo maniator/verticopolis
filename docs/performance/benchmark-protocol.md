@@ -46,41 +46,62 @@ motivated it.
 A run records the browser it used (product, version, channel, extra switches,
 executable path and the WebGL renderer), and a report is comparable with a
 reference only when the browser build, the channel, the switches and the
-renderer all match. The references are the 2026-10-15 runs, RUN-0a, the A/A
-folders of one calibration and any earlier acceptance run. When any of those
+renderer all match. The references are the 2026-10-15 runs, the A/A
+folders of one calibration and any earlier acceptance run on the counting
+browser below. When any of those
 differ, the reference is run again on the same settings before it is used.
 `--resume` refuses a change of any of them. `perf:calibrate` refuses passes
 that differ in them and passes without a verified GPU (`gpuVerified`).
 
-What the references ran, from their committed `results.json` files: the two
-2026-10-15 folders (`2026-10-15-e25ec01-worker` and
-`2026-10-15-e25ec01c-worker-1280x720`) ran the full bundled Chromium binary
-(`.../ms-playwright/chromium-1228/chrome-win64/chrome.exe`, user agent
-`HeadlessChrome/149.0.0.0`), reached through `PW_CHROMIUM_PATH`, and got ANGLE
-on Direct3D 11 with the RTX 3060. RUN-0a ran Playwright's default headless
-shell (`executable: null`, `HeadlessChrome/149.0.7827.55`) and got SwiftShader.
-So the reference build is the full binary, and the lever that is expected to
-bring the GPU up on the owner's PC is `PW_CHROMIUM_PATH` pointed at that
-`chrome.exe`. `PW_CHROMIUM_CHANNEL=chromium` launches the same binary in the
-same headless mode, so it should match, but it records a channel where the
-references record a path, and only the PC probe can show that the two give the
-same renderer. Until the probe has run, a channel run is a different setting
-from the references.
+**The counting browser (the owner's decision for #1115, 2026-10-20).** The
+counting browser is Playwright's full bundled Chromium binary, not the default
+headless shell:
 
-Until the owner accepts a browser setting, nothing counts as the acceptance
-setting: the owner names the build, the channel and the switches in the
-decision that settles #1115, and this section is edited to say so in the same
-change. An installed Chrome (`PW_CHROMIUM_CHANNEL=chrome`, or
-`PW_CHROMIUM_PATH` at an installed `chrome.exe`) is a one-off check whose
-results folder says so. Installed Chrome updates itself, so a run on it
-records the version it ran, and a later run on a newer version is not
-comparable.
+| Setting | Value |
+| --- | --- |
+| Product and version | Chromium 149.0.7827.55 (Playwright's `chromium-1228` revision) |
+| Executable | `<ms-playwright>/chromium-1228/chrome-win64/chrome.exe`, reached through `PW_CHROMIUM_PATH` (on the owner's PC `C:\Users\nafta\AppData\Local\ms-playwright\chromium-1228\chrome-win64\chrome.exe`) |
+| Channel | none (`PW_CHROMIUM_CHANNEL` unset) |
+| Mode | headless; the user agent reads `HeadlessChrome/149.0.0.0` |
+| Launch switches | the harness's own two, `--autoplay-policy=no-user-gesture-required` and `--js-flags=--expose-gc`; no `PW_CHROMIUM_ARGS`, no GPU-selection switch |
+| WebGL renderer | `ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)`, vendor `Google Inc. (NVIDIA)` |
+
+The two 2026-10-15 folders (`2026-10-15-e25ec01-worker` and
+`2026-10-15-e25ec01c-worker-1280x720`) record exactly this browser in their
+committed `results.json`. The #1051 PC runs of 2026-10-20 launched it again
+and the preflight read the same renderer string on all three launches
+(`pc-run-1051-preflight-after.txt`, a project file, not in the repo). Both
+show that the setting brings the GPU up on the owner's PC with no extra
+switch, so no switch is added.
+
+A run counts only when it used this browser and the renderer check
+(`gpuVerified`, below) passed, and the rest of the protocol held (clean tree,
+10 paired reps, valid folder, no `--quick`, no exception). A run that cannot
+meet all of that is a smoke or a preview and its numbers are not evidence.
+Software-rendered runs are not accepted after the fact: RUN-0a (default
+headless shell, `HeadlessChrome/149.0.7827.55`, ANGLE on Vulkan SwiftShader),
+RUN-0b-prelim (SwiftShader) and every cloud folder stay in the repo as what
+they are, with their own notes, and no later change to this section makes
+them count. Their bare-step rows are not rescued either; a number that is
+needed is measured again on the counting browser.
+
+`PW_CHROMIUM_CHANNEL=chromium` launches the same binary in headless mode but
+records a channel where the references record a path, so a channel run is a
+different setting from the counting browser until a probe shows the same
+renderer, and it still does not match the reference identity that
+`perf:calibrate` and `--resume` check. An installed Chrome
+(`PW_CHROMIUM_CHANNEL=chrome`, or `PW_CHROMIUM_PATH` at an installed
+`chrome.exe`) is a one-off check whose results folder says so. Installed
+Chrome updates itself, so a run on it records the version it ran, and a later
+run on a newer version is not comparable. If Playwright is upgraded, the
+counting browser changes with it: the new build, version and renderer replace
+this table in the same change, and every reference is run again on it before
+it is used.
 
 Headless is the harness's only mode and the only mode that counts. Headed mode
 (the first option #1115 lists) is declined: the harness has no headed launch,
-and a headed browser changes the frame pacing the protocol measures. If no
-headless setting reaches the GPU on the owner's PC, headed mode is still owed
-as its own change, with its own references.
+and a headed browser changes the frame pacing the protocol measures. The
+counting browser reaches the GPU headless, so headed mode is not owed.
 
 **The renderer must be the GPU.** The 2026-10-15 reference runs recorded ANGLE
 on Direct3D 11 with the RTX 3060. RUN-0a (2026-10-20) ran on ANGLE with Vulkan
@@ -115,12 +136,20 @@ These are all errors in a full run:
 - different renderers across processes or across the reads of one process,
   whichever read they come from;
 - a renderer read at the start and none at a later read, which is how a GPU
-  process that died mid-run looks.
+  process that died mid-run looks;
+- a `webglcontextlost` event on any canvas in any page of a process run (the
+  run's `contextLost` list). The renderer reads come from a new canvas, so a
+  GPU process that restarted mid-run still reads the same adapter there while
+  the game's own context is gone, and the game recovers by rebuilding its
+  canvas. The frames around that are not measurements. The probe canvas the
+  harness makes stays detached, so releasing it is not counted, and the
+  service-worker first visit (a side measurement with no frames) is not
+  counted either.
 
 A `--quick` smoke run turns the first four into warnings so the cloud smoke
 still works, and its report says at the top that no frame row in it is GPU
 evidence. A register exception turns the first three into warnings (below) and
-leaves the missing renderer an error. The last two stay errors in every mode,
+leaves the missing renderer an error. The last three stay errors in every mode,
 quick or excepted. The same check runs on a throwaway browser launch before
 the builds, under one 60-second deadline from the launch call through the
 read, plus at most 5 seconds for the close, so a setting that does not reach
@@ -167,9 +196,9 @@ rasterizer, choose the browser for the next run through the environment
 (PowerShell: `$env:NAME = "value"`) and read the first lines of the console,
 which print the product, version and renderer before anything builds:
 
-- `PW_CHROMIUM_PATH` points at a browser binary (the reference build above is
-  the first thing to try). `PW_CHROMIUM_CHANNEL` is one of `chromium` (the
-  full bundled Chromium in new headless mode), `chrome`, `chrome-beta`,
+- `PW_CHROMIUM_PATH` points at a browser binary (the counting browser above).
+  `PW_CHROMIUM_CHANNEL` is one of `chromium` (the full bundled Chromium in new
+  headless mode), `chrome`, `chrome-beta`,
   `chrome-dev`, `chrome-canary` or `msedge` and its variants. Set one of them,
   not both. An empty `PW_CHROMIUM_PATH` counts as unset.
 - `PW_CHROMIUM_ARGS` takes only switches that choose how the GPU is reached:
@@ -190,11 +219,10 @@ which print the product, version and renderer before anything builds:
   Browser row prints them, and the browser version and renderer are part of
   the machine identity that `--resume` checks.
 
-Which of these brings the GPU up on the owner's PC is not known from the
-cloud. The PC probe for #1125 (a project file, `pc-probe-1125-gpu.md`, not in the
-repo) settles it, and its notes say what was set. Backlog row #1115 closes only after a PC report names a hardware
-renderer, this section names the counting build, channel and switches, and the
-references have been run again where those differ.
+The owner's PC reaches the GPU with `PW_CHROMIUM_PATH` alone (the counting
+browser in section 1, "Which browser counts"); the channel and switch variables
+stay available for a one-off probe on another machine, and a run that sets
+either is a different setting from the counting browser.
 
 RUN-0a is the exception to all of this. Its `e25ec01` tree has neither the
 check nor the variables above, and both of its runners launch with
@@ -319,7 +347,7 @@ Other flags both accept: `--quick` (a 2-rep smoke test that never counts),
 `--resume DIR` (continue a run that stopped; it keeps its own folder, and an A/A folder resumes with `--aa <engine>` repeated),
 `--scenarios a,b`. `perf:compare` also takes `--throttles 1,4` and
 `--aa ts|wasm` (section 6.1);
-`perf:worker` also takes `--read-model` (Node only, no browser).
+`perf:worker` also takes `--read-model` (Node only, no browser) and `--aa ts|wasm` (an A/A pass, section 6.1).
 `perf:restore` takes `--quick`, `--scenarios`, `--throttles`, `--skip-build`
 and `--out`, but not `--resume`: a stopped run starts again in a new folder,
 and its `results.json` keeps the runs it finished. In PowerShell, quote a
@@ -514,9 +542,9 @@ was raised, and every family has a candidate inside its cap with the
 guarantee under the limit and the protocol's pass count and limit in use. `calibration.md` opens
 with the window of the passes (earliest and latest start) and the commit,
 because it is a snapshot, and calls the numbers provisional: it covers M1,
-M2, M3 and M5; M4's long-task ε needs `perf:worker` A/A passes (`perf:worker`
-has no `--aa` yet, follow-up #1111), and nothing in it sets a tolerance until
-the owner adopts the numbers.
+M2, M3 and M5 from `perf:compare` folders, and M4 when `perf:worker --aa`
+folders are given beside them, and nothing in it sets a tolerance until the
+owner adopts the numbers.
 
 The harness for each metric is the last column of the table above: a tolerance
 calibrated on one harness's noise is not applied to the other's ratios, and
@@ -524,12 +552,49 @@ RUN-0a's reference figures come from `perf:worker`. Nobody reads δ or ε off
 the folders by hand: RUN-0b collects them and the values come from
 `perf:calibrate`'s output.
 
-One limit stays open, so the calibration is not complete:
+**M4's ε** comes from `perf:worker --aa ts|wasm` passes (`perf:compare`
+measures no long tasks): the same mode in both slots (labeled `ts` and
+`wasm`), each run recording the slot and the mode it ran, validation by the
+mode that ran, a marked folder (an `--out` name must carry `aa-ts` or
+`aa-wasm`), an `aa` column in both CSVs, no verdict words, and
+`perf:before-after` refuses such a folder. `perf:calibrate` takes those
+folders in the same command as the `perf:compare` ones (it tells them apart by
+`config.modes`) and computes M4 in `src/tests/perfWorker/calibrateM4.ts`:
 
-- **M4's ε has no A/A source yet.** `perf:compare` measures no long tasks and
-  `perf:worker` has no `--aa` (follow-up #1111), so the long-task ε stays
-  uncalibrated until that lands. RUN-1 needs M4, so #1111 and its A/A passes
-  land before RUN-1, either inside RUN-0b or as a follow-on campaign.
+- A pass's value is the one-sided upper bound of the median paired difference
+  (slot `wasm` minus slot `ts`, paired by repetition, at least 10 pairs) of the
+  large tower's "main-thread blocking (long tasks past 50 ms)" row, in ms, at
+  each of 1x and 4x, and the larger of the two. A throttle with fewer than 10
+  pairs leaves its pass without a value and M4 without a candidate.
+- The candidate is the largest value across passes, rounded up to 5 ms, and a
+  candidate above the 50 ms cap is not adopted.
+- A worker folder is screened as a `perf:compare` one is: A/A, validation
+  ok, a clean recorded tree, not `--quick`, 10 repetitions, the large scenario
+  at 1x and 4x, a verified hardware renderer at all three reads, and no
+  WebGL context loss. A folder that records no context-loss field comes from a
+  harness older than #1136 and is left out (`perf:worker` writes the field
+  from PR #1172 on, so M4 cannot be calibrated before that PR is in: every
+  earlier folder is left out). A `perf:compare` folder is not asked for the
+  field; its renderer check rejects a recorded loss. The passes are pooled
+  only if they share commit, machine, browser, engine build and run
+  parameters, and the pass-count and coverage checks (including the open
+  amendment to OD-4) are the ones M1 to M5 use.
+- When one command takes both kinds of folder, the two sets must also share
+  a machine, a browser and an engine build with each other. The banner names
+  both windows and both commits, the headline and the exit code come from
+  the combined result, and every problem of either half is listed under
+  Problems. `calibration.json` names the families a partial run cannot speak
+  for in `missingFamilies`.
+- The exit code is 0 only when every kind of folder given passes. A command
+  given only `perf:worker` folders reports M4 alone, and a command given only
+  `perf:compare` folders reports M1, M2, M3 and M5 and says M4 is missing; the
+  calibration is complete when one command (or the committed pair of reports)
+  covers all five.
+- 4x on the main-thread hosts throttles the engine and the page together, so
+  the A/A passes use `--aa ts` and `--aa wasm`, not the worker host.
+
+The A/A passes themselves wait for the owner's PC. RUN-1 needs M4, so the
+passes land before RUN-1, either inside RUN-0b or as a follow-on campaign.
 
 ### 6.2 BEFORE/AFTER comparison of a candidate PR
 
@@ -691,6 +756,9 @@ What it does not do, so a reader does not assume it:
   Worker (measured on Chromium 141), so the `wasm-worker` rows at 4x have a
   barely throttled engine thread. Those rows carry a dagger in both reports and
   the CSV `unthrottled` column says `worker`.
+  A 4x TypeScript-versus-worker throughput comparison is therefore not release
+  evidence (the owner's decision of 2026-10-20). The before/after comparison
+  of the worker against itself can still inform the #1068 decision.
 - **No separate hour-pass spike row.** The hourly main-thread spike is read
   from the per-batch maximum and the frame-time p99 rows.
 - **No GPU driver version check.** The runs do not record it.
@@ -777,8 +845,8 @@ npm.cmd run perf:compare -- --aa ts   --reps 10 --skip-build --out docs/performa
 npm.cmd run perf:compare -- --aa wasm --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b-aa-wasm-1
 ```
 
-Before the 10-rep commands, set the settled browser variables (the owner's
-decision for #1115; section 1 "Which browser counts") and run `npm.cmd run
+Before the 10-rep commands, set `PW_CHROMIUM_PATH` to the counting browser
+(section 1, "Which browser counts") and run `npm.cmd run
 perf:worker -- --quick --reps 1 --scenarios <one>` once to read the console's
 renderer line. The 10-rep commands start only after it names a hardware adapter. Both
 harnesses repeat the check before they build and stop on anything else.

@@ -1,15 +1,19 @@
-import { rendererFinding } from "./renderer";
+import { duplicateCheck, poolIdentity, poolProblems, rendererProblem, stable, treeProblem, type PoolIdentity, type PoolPass } from "./calibratePool";
 import { summarize } from "./stats";
 import type { CompareResults, EngineName } from "./types";
 
+export { stable, treeProblem };
+export type { PoolIdentity };
+
 /**
  * The tolerance calibration of benchmark-protocol.md section 6.1, applied to
- * a set of A/A result folders (`perf:compare --aa`). Only `perf:compare`
- * folders feed it, so it covers the families that harness measures: M1 (bare
- * engine total), M2 (hosted total), M3 (frame time p99, and 1% low FPS read as
- * TypeScript over WASM) for δ, one candidate each, and M5 (cold start to
- * ready, at each throttle) for ε. M4's long tasks come from `perf:worker`,
- * which has no A/A mode yet, so its ε is not computed here (#1111).
+ * a set of A/A result folders (`perf:compare --aa`). It covers the families
+ * that harness measures: M1 (bare engine total), M2 (hosted total), M3 (frame
+ * time p99, and 1% low FPS read as TypeScript over WASM) for δ, one candidate
+ * each, and M5 (cold start to ready, at each throttle) for ε. M4's long tasks
+ * come from `perf:worker --aa` folders and are computed in
+ * `perfWorker/calibrateM4.ts` (#1111), which shares this file's screening,
+ * pooling and coverage checks.
  *
  * Per pass, a family's value is the largest upper bound across its scenarios
  * and throttles. The candidate is the largest such value across every pass,
@@ -38,12 +42,14 @@ export const COLD_START_CAP_SHARE = 0.05;
 export const DEFAULT_EXCEEDANCE_LIMIT = 0.05;
 /** δ is rounded up to this step; ε for cold start to this many milliseconds. */
 const DELTA_STEP = 0.01;
-const EPSILON_STEP_MS = 5;
+export const EPSILON_STEP_MS = 5;
+/** The long-task ε cap: 50 ms of blocking, one 100 ms task (protocol 6.1 step 4). */
+export const LONG_TASK_CAP_MS = 50;
 export const DEFAULT_MIN_PASSES_PER_ENGINE = 5;
 /** The repetitions every pass must have: the verdict runs use 10, and a pass with another count does not pool with them. */
 export const MIN_REPS = 10;
-const SCENARIOS = ["medium", "large"];
-const THROTTLES = ["1", "4"];
+export const SCENARIOS = ["medium", "large"];
+export const THROTTLES = ["1", "4"];
 
 export interface CalibrateOptions {
   /** Passes of each engine required (protocol 6.1 step 1: default 5; the pass count is an open amendment to OD-4). */
@@ -56,7 +62,7 @@ export interface CalibrateOptions {
 export const passesForLimit = (limit: number): number => Math.floor(1 / limit + 1e-9);
 
 export interface Family {
-  id: "M1" | "M2" | "M3" | "M5-1x" | "M5-4x";
+  id: "M1" | "M2" | "M3" | "M4" | "M5-1x" | "M5-4x";
   kind: "delta" | "epsilon";
   unit: "ratio" | "ms";
   /** One value per pass, null when a pass lacks a cell the family needs. */
@@ -66,15 +72,6 @@ export interface Family {
   exceedance: { leaveOneOut: number; of: number; share: number } | null;
   withinCap: boolean | null;
   passesExceedanceLimit: boolean | null;
-}
-
-export interface PoolIdentity {
-  commit: string;
-  engineBuildHash: string | null;
-  enginePackage: unknown;
-  machine: Record<string, unknown>;
-  browser: { executable: string | null; channel: string | null; args: string[]; version: string | null; renderers: string[] };
-  config: Record<string, unknown>;
 }
 
 export interface Calibration {
@@ -99,25 +96,13 @@ export interface Calibration {
   adoptable: boolean;
 }
 
-type Pass = Pick<CompareResults, "config" | "comparisons" | "metrics" | "validation"> & {
-  startedAt?: string;
-  browser?: Partial<Pick<CompareResults["browser"], "version" | "executable" | "channel" | "args" | "rendererException" | "gpuVerified">>;
-  runs?: Pick<CompareResults["runs"][number], "ok" | "page" | "rendererEnd" | "rendererEndCold">[];
-  environment: Pick<CompareResults["environment"], "commit" | "dirty"> & Partial<Pick<CompareResults["environment"], "tree" | "cpuModel" | "logicalCpus" | "totalMemoryBytes" | "os" | "kernel" | "arch" | "node" | "rust" | "playwright" | "engineBuildHash" | "enginePackage">>;
-};
-
-/** JSON with object keys sorted, so equal values compare equal whatever order a writer used. */
-export function stable(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
-  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${stable((value as Record<string, unknown>)[k])}`).join(",")}}`;
-  return JSON.stringify(value) ?? "null";
-}
+type Pass = Pick<CompareResults, "config" | "comparisons" | "metrics" | "validation"> & PoolPass;
 
 /** A markdown table cell: pipes escaped, newlines flattened. */
 const cell = (x: string): string => x.replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ");
 
 /** Rounds up to a multiple of `step`, then to 6 places so float noise (57 * 0.01) stays out of the output. */
-const roundUp = (x: number, step: number): number => Number(Math.max(0, Math.ceil(x / step - 1e-9) * step).toFixed(6));
+export const roundUp = (x: number, step: number): number => Number(Math.max(0, Math.ceil(x / step - 1e-9) * step).toFixed(6));
 
 /** The largest of the cells' values, or null when any cell is missing. */
 function worst(cells: (number | null | undefined)[]): number | null {
@@ -149,7 +134,7 @@ function coldStartDifference(p: Pass, throttle: string): number | null {
   return summarize(diffs).medianCiHigh;
 }
 
-function family(id: Family["id"], kind: Family["kind"], unit: Family["unit"], values: (number | null)[], cap: number | null, step: number, limit: number): Family {
+export function family(id: Family["id"], kind: Family["kind"], unit: Family["unit"], values: (number | null)[], cap: number | null, step: number, limit: number): Family {
   const known = values.filter((v): v is number => v !== null);
   // A tolerance of zero could never pass, so the floor is one step.
   const candidate = known.length === values.length && values.length > 0 ? Math.max(step, roundUp(Math.max(...known), step)) : null;
@@ -187,35 +172,24 @@ function shapeProblem(r: Pass): string | null {
   return null;
 }
 
-/** Why the working-tree record cannot vouch for a clean tree, or null. */
-export function treeProblem(r: Pick<Pass, "environment">): string | null {
-  if (r.environment.dirty !== false) return "it ran on a dirty tree, or does not say it was clean";
-  const t = r.environment.tree;
-  if (!t) return "it has no working-tree record, so a clean tree is not proven";
-  if (!t.complete) return "its working-tree record is incomplete (git could not finish it)";
-  if (t.porcelain === null || t.porcelain.length > 0) return "its working-tree record shows changes";
-  if (!Array.isArray(t.untracked)) return "its working-tree record has no list of untracked files (an incomplete record)";
-  if (t.diffSha256 !== null || t.untracked.length > 0) return "its working-tree record holds a tracked-changes hash or untracked files, so the tree was not clean";
-  if (!t.hidden) return "its working-tree record did not check for edits git hides (assume-unchanged, skip-worktree)";
-  if (t.hidden.length > 0) return "its tree holds files git was told to ignore changes in (assume-unchanged or skip-worktree)";
-  return null;
-}
-
 /**
- * Why a pass's renderer cannot back the frame rows, or null. The check is the
- * harness's own (renderer.ts, the allowlist that fails closed): the pass must
- * record `gpuVerified: true`, and every good process run must show a hardware
- * adapter at its start, after its frames and after its cold start. A pass that
- * declared a renderer exception is not calibration evidence.
+ * The pass-count checks both calibrations make: enough passes of each engine,
+ * the stated guarantee 1 / (n + 1) from the engine with the fewest under the
+ * limit, and settings no looser than the protocol's (a stricter one is not a
+ * relaxation; only fewer passes or a higher limit need the owner).
  */
-function rendererProblem(r: Pass): string | null {
-  if (r.browser?.rendererException) return `it declared renderer exception ${r.browser.rendererException}`;
-  if (r.browser?.gpuVerified !== true) return r.browser?.gpuVerified === false ? "it recorded gpuVerified: false" : "it does not record gpuVerified: true (a harness from before the renderer check)";
-  const good = (r.runs ?? []).filter((x) => x.ok);
-  // A calibration pass always ran a throttled cold start, so the third read is part of the evidence.
-  if (good.some((x) => !x.rendererEndCold)) return "a process run has no renderer read after its cold start";
-  const f = rendererFinding(good.map((x) => x.page?.webgl?.renderer), good.map((x) => x.rendererEnd), { quick: false, lateEnds: good.map((x) => x.rendererEndCold) });
-  return f.errors.length ? f.errors[0] : null;
+export function coverageChecks(engines: readonly EngineName[], minPasses: number, limit: number): { guarantee: number | null; protocolDefaults: boolean; problems: string[] } {
+  const problems: string[] = [];
+  const perEngine = (["ts", "wasm"] as const).map((engine) => ({ engine, n: engines.filter((e) => e === engine).length }));
+  for (const { engine, n } of perEngine) {
+    if (n < minPasses) problems.push(`${n} usable A/A passes of ${engine}; this calibration asks for at least ${minPasses} per engine`);
+  }
+  const fewest = Math.min(...perEngine.map((e) => e.n));
+  const guarantee = fewest > 0 ? 1 / (fewest + 1) : null;
+  if (guarantee !== null && !(guarantee < limit)) problems.push(`${fewest} passes per engine guarantee only that a fresh pass lands above the candidate with probability 1/${fewest + 1} on average (${(guarantee * 100).toFixed(1)}%), which is not under the ${(limit * 100).toFixed(0)}% limit; the limit needs at least ${passesForLimit(limit)} passes per engine; the pass count and limit are the owner's to change (an open amendment to OD-4), and a looser setting is never adoptable until then`);
+  const protocolDefaults = minPasses >= DEFAULT_MIN_PASSES_PER_ENGINE && limit <= DEFAULT_EXCEEDANCE_LIMIT;
+  if (!protocolDefaults) problems.push(`this run used ${minPasses} passes per engine and a ${(limit * 100).toFixed(1)}% limit, looser than the protocol's ${DEFAULT_MIN_PASSES_PER_ENGINE} passes and ${(DEFAULT_EXCEEDANCE_LIMIT * 100).toFixed(0)}%; the pass count and limit are the owner's to settle (an open amendment to OD-4), so the result is not adoptable until the owner approves them`);
+  return { guarantee, protocolDefaults, problems };
 }
 
 /**
@@ -232,8 +206,7 @@ export function calibrate(folders: { folder: string; results: Pass; sha256?: str
   const excluded: Calibration["excluded"] = [];
   const passes: Calibration["passes"] = [];
   const used: { folder: string; engine: EngineName; results: Pass }[] = [];
-  const seenHash = new Map<string, string>();
-  const seenRun = new Map<string, string>();
+  const duplicate = duplicateCheck();
   for (const { folder, results, sha256 } of folders) {
     const leave = (reason: string): void => {
       excluded.push({ folder, reason, sha256: sha256 ?? null });
@@ -245,17 +218,11 @@ export function calibrate(folders: { folder: string; results: Pass; sha256?: str
       continue;
     }
     const engine = results.config.aa;
-    const runKey = results.startedAt ? `${results.startedAt}|${results.environment.commit}|${engine}|${results.environment.engineBuildHash ?? ""}` : null;
-    if (sha256 !== undefined && seenHash.has(sha256)) {
-      leave(`its results.json is identical to ${seenHash.get(sha256)}'s (one pass counted twice)`);
+    const repeat = duplicate(folder, results, engine, sha256);
+    if (repeat) {
+      leave(repeat);
       continue;
     }
-    if (runKey !== null && seenRun.has(runKey)) {
-      leave(`it has the start time, commit and engine of ${seenRun.get(runKey)} (one pass saved twice)`);
-      continue;
-    }
-    if (sha256 !== undefined) seenHash.set(sha256, folder);
-    if (runKey !== null) seenRun.set(runKey, folder);
     const tree = treeProblem(results);
     const renderer = rendererProblem(results);
     if (engine !== "ts" && engine !== "wasm") leave('not an A/A pass (config.aa is not "ts" or "wasm")');
@@ -270,34 +237,9 @@ export function calibrate(folders: { folder: string; results: Pass; sha256?: str
       passes.push({ folder, engine, commit: results.environment.commit, reps: results.config.reps, startedAt: results.startedAt ?? null, sha256: sha256 ?? null });
     }
   }
-  // One commit, one machine, one browser, one build, one set of run
-  // parameters: a calibration pools passes that differ only by chance.
-  const same = (what: string, key: (r: Pass) => unknown): void => {
-    if (new Set(used.map((u) => stable(key(u.results) ?? null))).size > 1) problems.push(`the passes differ in ${what}; calibrate passes that share it`);
-  };
-  // Names the fields that differ, so a pass whose toolchain version was not recorded (null) reads as that and not as an unexplained machine difference.
-  const sameFields = (what: string, fields: Record<string, (r: Pass) => unknown>): void => {
-    const differ = Object.entries(fields).filter(([, get]) => new Set(used.map((u) => stable(get(u.results) ?? null))).size > 1).map(([name]) => name);
-    if (differ.length) problems.push(`the passes differ in ${what}: ${differ.join(", ")}; calibrate passes that share them (a field recorded as unknown in one pass and known in another counts as different)`);
-  };
-  const renderers = (r: Pass): string[] => [...new Set((r.runs ?? []).filter((x) => x.ok).flatMap((x) => [x.page?.webgl?.renderer, x.rendererEnd, x.rendererEndCold]).filter((x): x is string => !!x))].sort();
-  sameFields("machine or runtime", { cpuModel: (r) => r.environment.cpuModel, logicalCpus: (r) => r.environment.logicalCpus, totalMemoryBytes: (r) => r.environment.totalMemoryBytes, os: (r) => r.environment.os, kernel: (r) => r.environment.kernel, arch: (r) => r.environment.arch, node: (r) => r.environment.node, rust: (r) => r.environment.rust, playwright: (r) => r.environment.playwright });
-  same("browser (executable, channel, switches, version or WebGL renderer)", (r) => [r.browser?.executable, r.browser?.channel, r.browser?.args, r.browser?.version, renderers(r)]);
-  same("engine build", (r) => [r.environment.engineBuildHash, r.environment.enginePackage]);
-  same("run parameters (repetitions, scenarios, throttles, steps, step size, frame window, speed, viewport or warm-up)", (r) => ({ ...r.config, aa: null, quick: false, scenarios: [...r.config.scenarios].sort(), throttles: r.config.throttles.map(Number).sort((a, b) => a - b) }));
-  if (new Set(passes.map((p) => p.commit)).size > 1) problems.push(`the passes come from more than one commit (${[...new Set(passes.map((p) => p.commit.slice(0, 7)))].join(", ")}); calibrate one commit's passes`);
-  const perEngine = (["ts", "wasm"] as const).map((engine) => ({ engine, n: passes.filter((p) => p.engine === engine).length }));
-  for (const { engine, n } of perEngine) {
-    if (n < minPasses) problems.push(`${n} usable A/A passes of ${engine}; this calibration asks for at least ${minPasses} per engine`);
-  }
-  // The stated guarantee, from the engine with the fewest passes.
-  const fewest = Math.min(...perEngine.map((e) => e.n));
-  const guarantee = fewest > 0 ? 1 / (fewest + 1) : null;
-  if (guarantee !== null && !(guarantee < limit)) problems.push(`${fewest} passes per engine guarantee only that a fresh pass lands above the candidate with probability 1/${fewest + 1} on average (${(guarantee * 100).toFixed(1)}%), which is not under the ${(limit * 100).toFixed(0)}% limit; the limit needs at least ${passesForLimit(limit)} passes per engine; the pass count and limit are the owner's to change (an open amendment to OD-4), and a looser setting is never adoptable until then`);
-
-  // A stricter setting than the protocol's is not a relaxation; only fewer passes or a looser limit need the owner.
-  const protocolDefaults = minPasses >= DEFAULT_MIN_PASSES_PER_ENGINE && limit <= DEFAULT_EXCEEDANCE_LIMIT;
-  if (!protocolDefaults) problems.push(`this run used ${minPasses} passes per engine and a ${(limit * 100).toFixed(1)}% limit, looser than the protocol's ${DEFAULT_MIN_PASSES_PER_ENGINE} passes and ${(DEFAULT_EXCEEDANCE_LIMIT * 100).toFixed(0)}%; the pass count and limit are the owner's to settle (an open amendment to OD-4), so the result is not adoptable until the owner approves them`);
+  problems.push(...poolProblems(used.map((u) => u.results)));
+  const { guarantee, protocolDefaults, problems: coverage } = coverageChecks(passes.map((p) => p.engine), minPasses, limit);
+  problems.push(...coverage);
 
   const all = used.map((u) => u.results);
   const over = (group: string, metric: string, invert = false): (number | null)[] =>
@@ -328,28 +270,34 @@ export function calibrate(folders: { folder: string; results: Pass; sha256?: str
   }
   const adoptable = problems.length === 0 && families.every((f) => f.candidate !== null && f.withinCap === true);
   const first = used[0]?.results;
-  const pool: PoolIdentity | null = first
-    ? {
-        commit: first.environment.commit,
-        engineBuildHash: first.environment.engineBuildHash ?? null,
-        enginePackage: first.environment.enginePackage ?? null,
-        machine: Object.fromEntries(["cpuModel", "logicalCpus", "totalMemoryBytes", "os", "kernel", "arch", "node", "rust", "playwright"].map((k) => [k, (first.environment as Record<string, unknown>)[k] ?? null])),
-        browser: { executable: first.browser?.executable ?? null, channel: first.browser?.channel ?? null, args: first.browser?.args ?? [], version: first.browser?.version ?? null, renderers: renderers(first) },
-        config: { ...first.config, aa: null },
-      }
-    : null;
+  const pool: PoolIdentity | null = first ? poolIdentity(first) : null;
   const starts = passes.map((p) => p.startedAt).filter((x): x is string => !!x).sort();
   return { passes, excluded, window: starts.length ? { from: starts[0], to: starts[starts.length - 1] } : null, minPassesPerEngine: minPasses, exceedanceLimit: limit, protocolDefaults, pool, guarantee, problems, families, tsColdStartMs, adoptable };
 }
 
-export function calibrationMarkdown(c: Calibration, generatedAt: string): string {
+/** What a report that also holds M4 (from `perf:worker` folders) adds to the `perf:compare` report's banner, headline and problem list. */
+export interface MixedReport {
+  /** The window and commits of the `perf:worker` passes, which the banner names beside the `perf:compare` passes'. */
+  m4Window: { from: string; to: string } | null;
+  m4Commits: string[];
+  /** Every check of both halves and across them. */
+  adoptable: boolean;
+  /** The problems the `perf:compare` half does not list: M4's and the ones across the halves. */
+  problems: string[];
+}
+
+export function calibrationMarkdown(c: Calibration, generatedAt: string, mixed: MixedReport | null = null): string {
   const out: string[] = [];
   const commits = [...new Set(c.passes.map((p) => p.commit.slice(0, 7)))];
   out.push("# δ and ε calibration from A/A passes", "");
-  out.push(`> **Snapshot of ${c.window ? `A/A passes started ${c.window.from} to ${c.window.to}` : "no usable A/A pass"}${commits.length ? `, commit ${commits.join(", ")}` : ""}; computed ${generatedAt}.** The live numbers come from \`npm run perf:calibrate\` (src/tests/perfCompare/calibrate.ts, pinned by calibrate.test.ts) run on the folders listed below; this file never refreshes. Provisional: it covers M1, M2, M3 and M5; M4's long-task ε needs \`perf:worker\` A/A passes (#1111) and is missing, and nothing here sets a tolerance until the owner adopts the numbers (OD-4; the pass count is an open amendment to it).`, "");
-  out.push(c.adoptable ? "**Candidates pass every check of this tool.** They are provisional (see above)." : "**Not adoptable yet.** See the problems below.", "");
+  const snapshot = (passes: string, window: { from: string; to: string } | null, cs: string[]): string => `${window ? `${passes} started ${window.from} to ${window.to}` : `no usable ${passes.replace(/ passes$/, " pass")}`}${cs.length ? `, commit ${cs.join(", ")}` : ""}`;
+  const banner = mixed ? `${snapshot("perf:compare A/A passes", c.window, commits)}; ${snapshot("perf:worker A/A passes", mixed.m4Window, mixed.m4Commits)}` : snapshot("A/A passes", c.window, commits);
+  out.push(`> **Snapshot of ${banner}; computed ${generatedAt}.** The live numbers come from \`npm run perf:calibrate\` (src/tests/perfCompare/calibrate.ts, pinned by calibrate.test.ts${mixed ? "; M4: src/tests/perfWorker/calibrateM4.ts, pinned by calibrateM4.test.ts" : ""}) run on the folders listed below; this file never refreshes. Provisional: ${mixed ? "it covers M1, M2, M3, M4 and M5; M4 is from the `perf:worker` A/A passes below" : "it covers M1, M2, M3 and M5; M4's long-task ε needs `perf:worker` A/A passes (#1111) and is missing"}, and nothing here sets a tolerance until the owner adopts the numbers (OD-4; the pass count is an open amendment to it).`, "");
+  const adoptable = mixed ? mixed.adoptable : c.adoptable;
+  out.push(adoptable ? "**Candidates pass every check of this tool.** They are provisional (see above)." : "**Not adoptable yet.** See the problems below.", "");
   if (!c.protocolDefaults) out.push(`> **Looser than the protocol's parameters.** This run used ${c.minPassesPerEngine} passes per engine and a ${(c.exceedanceLimit * 100).toFixed(1)}% limit. The protocol's are ${DEFAULT_MIN_PASSES_PER_ENGINE} passes and ${(DEFAULT_EXCEEDANCE_LIMIT * 100).toFixed(0)}%, and loosening them needs the owner's approval, so nothing here is adoptable.`, "");
-  if (c.problems.length) out.push("## Problems", "", ...c.problems.map((p) => `- ${p}`), "");
+  const problems = [...c.problems, ...(mixed?.problems ?? [])];
+  if (problems.length) out.push("## Problems", "", ...problems.map((p) => `- ${p}`), "");
   const fewest = c.guarantee === null ? null : Math.round(1 / c.guarantee) - 1;
   out.push("## What the check guarantees", "", c.guarantee === null ? "There are no passes of one engine, so no guarantee can be stated." : `With ${fewest} passes of the engine that has the fewest, and passes that are exchangeable, the chance that a fresh pass lands above a candidate (before rounding) is 1/${fewest! + 1} on average = ${(c.guarantee * 100).toFixed(1)}%. The limit is ${(c.exceedanceLimit * 100).toFixed(0)}%, which needs at least ${passesForLimit(c.exceedanceLimit)} passes per engine. The leave-one-out column below is informational: it can only be 0 or 1, it shows whether the largest pass lands above the candidate the others set, and it never blocks adoption.`, "");
   out.push("## Candidates", "");

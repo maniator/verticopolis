@@ -57,6 +57,13 @@ function buildCases(): Case[] {
   const classic = base("classic");
   const inputs: [string, Any][] = [
     ["modern-roundtrip", modern],
+    ["exterminator-booked-ids", mutate(modern, (s) => { s.exterminationDueDay = 2; s.exterminationRoomIds = [1, 1, 2.5, "2", null, true, -1, 0, 2147483648, 3]; })],
+    ["exterminator-invalid-list", mutate(modern, (s) => { s.exterminationDueDay = 2; s.exterminationRoomIds = "bad"; })],
+    ["exterminator-null-list", mutate(modern, (s) => { s.exterminationDueDay = 2; s.exterminationRoomIds = null; })],
+    ["exterminator-empty-list", mutate(modern, (s) => { s.exterminationDueDay = 2; s.exterminationRoomIds = []; })],
+    ["exterminator-legacy-list-absent", mutate(modern, (s) => { s.exterminationDueDay = 2; })],
+    ["exterminator-orphan-list", mutate(modern, (s) => { s.exterminationRoomIds = [1]; })],
+    ["exterminator-classic-list", mutate(classic, (s) => { s.exterminationDueDay = 2; s.exterminationRoomIds = [1]; })],
     ["classic-roundtrip", classic],
     ["optional-keys-absent", mutate(modern, (s) => { delete s.towerName; delete s.builtWeddingHall; delete s.evaluatedTower; delete s.view; })],
     ["seed-hex-string", mutate(modern, (s) => { s.seed = "0x10"; })],

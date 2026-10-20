@@ -293,8 +293,8 @@ impl Simulation {
         self.extermination_due_day = Some((self.clock.day() + 1) as f64);
         // `resolve_extermination` clears only the rooms billed here, so a wing
         // that escalates overnight is not swept for today's price. The list
-        // is transient on both sides: a save taken mid-booking drops it and
-        // the resolution falls back to clearing every infested room.
+        // is saved with the due day, so a reload or a host attach treats the
+        // same rooms.
         self.extermination_room_ids = Some(ids);
         // Logged as a money line in the TypeScript (`"money"`).
         self.emit(
@@ -316,7 +316,10 @@ impl Simulation {
             return;
         }
         self.extermination_due_day = None;
-        let billed = self.extermination_room_ids.take();
+        let billed = self
+            .extermination_room_ids
+            .take()
+            .map(|ids| ids.into_iter().collect::<std::collections::HashSet<_>>());
         let mut cleared = 0;
         for u in self.tower.units.iter_mut() {
             if !u.kind.is_hotel() || u.state != UnitState::Infested {
@@ -560,3 +563,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "extermination_tests.rs"]
+mod extermination_tests;
