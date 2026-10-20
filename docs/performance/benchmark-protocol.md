@@ -104,7 +104,7 @@ and large scenarios with their pinned scenario hashes.
 
 | Command (PowerShell) | What it measures |
 | --- | --- |
-| `npm.cmd run perf:worker -- --reps 10 --out docs/performance/results/<date>-<sha>-<label>-worker` | Bare engine, the four hosts, frames, memory and traffic (1280x720 unless `--viewport WxH`) |
+| `npm.cmd run perf:worker -- --reps 10 --viewport 1280x720 --out docs/performance/results/<date>-<sha>-<label>-worker-1280x720` | Bare engine, the four hosts, frames, memory and traffic. Always pass `--viewport 1280x720`: the harness default is 640x360, and the committed desktop acceptance run (`2026-10-15-e25ec01c-worker-1280x720`) used 1280x720. `perf:compare` renders at 1280x720 fixed and has no `--viewport` flag |
 | `npm.cmd run perf:compare -- --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-<label>` | Startup, hosted and bare engine, frames with and without audio, memory, transfer and build sizes. Run it after `perf:worker`; `--skip-build` checks the builds on disk are this commit's |
 
 Other flags both accept: `--quick` (a 2-rep smoke test that never counts),
@@ -226,7 +226,7 @@ git status --porcelain            # must print nothing
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 npm.cmd ci
 npm.cmd run wasm:build
-npm.cmd run perf:worker -- --reps 10 --out docs/performance/results/<date>-e25ec01-run0a-worker
+npm.cmd run perf:worker -- --reps 10 --viewport 1280x720 --out docs/performance/results/<date>-e25ec01-run0a-worker-1280x720
 ```
 
 Then, in the same folder, commit nothing yet, and send the results folder and
@@ -260,7 +260,7 @@ git status --porcelain
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 npm.cmd ci
 npm.cmd run wasm:build
-npm.cmd run perf:worker  -- --reps 10 --out docs/performance/results/<date>-<sha>-run0b-worker
+npm.cmd run perf:worker  -- --reps 10 --viewport 1280x720 --out docs/performance/results/<date>-<sha>-run0b-worker-1280x720
 npm.cmd run perf:compare -- --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b
 # A/A passes (not yet): five or more per engine, same flags
 npm.cmd run perf:compare -- --aa ts   --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b-aa-ts-1
