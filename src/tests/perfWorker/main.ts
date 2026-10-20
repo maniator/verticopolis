@@ -7,7 +7,8 @@ import { buildTree, collectEnvironment, packageState, type Environment } from ".
 import { machineOf, packageErrors, stampErrors } from "../perfCompare/main";
 import { gateBrowser, probeBrowser } from "../perfCompare/browserProbe";
 import { rendererLimitation } from "../perfCompare/limitations";
-import { browserLaunch } from "../perfCompare/renderer";
+import { resolveLaunch } from "../perfCompare/exceptionRegister";
+import { browserName, gpuVerified } from "../perfCompare/renderer";
 import { buildScenarios } from "../perfCompare/scenarios";
 import { startServer } from "../perfCompare/server";
 import { aggregate, ratios, validate, type Metric, type Ratio } from "./analysis";
@@ -179,7 +180,7 @@ export interface WorkerResults {
   generatedAt: string;
   config: WorkerConfig;
   environment: Environment;
-  browser: { version: string | null; executable: string | null; channel?: string | null; args?: string[]; rendererException?: string | null };
+  browser: { version: string | null; executable: string | null; channel?: string | null; args?: string[]; rendererException?: string | null; rendererExceptionSha256?: string | null; gpuVerified?: boolean };
   scenarios: { name: string; sha256: string; population: number; units: number; transports: number; saveBytes: number }[];
   scripts: ReturnType<typeof scriptSizes>;
   runs: ModeRun[];
@@ -216,11 +217,11 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const distPerf = join(repo, "dist-perf");
   // The browser is settled first, as in perf:compare: launch settings parsed
   // and the adapter read before any build or results folder exists.
-  const launch = browserLaunch(process.env);
-  const executablePath = process.env.PW_CHROMIUM_PATH ?? null;
+  const launch = resolveLaunch(process.env, repo);
+  const executablePath = process.env.PW_CHROMIUM_PATH || null;
   const probe = await probeBrowser(executablePath, launch);
-  for (const w of gateBrowser(probe, args.quick, launch)) log(`perf:worker: warning: ${w}`);
-  log(`perf:worker: Chromium ${probe.version}${launch.channel ? ` (channel ${launch.channel})` : ""}, WebGL renderer ${probe.renderer ?? "none"}`);
+  for (const w of gateBrowser(probe, args.quick, launch, executablePath)) log(`perf:worker: warning: ${w}`);
+  log(`perf:worker: ${browserName(launch.channel, executablePath)} ${probe.version}${launch.channel ? ` (channel ${launch.channel})` : ""}, WebGL renderer ${probe.renderer ?? "none"}`);
   const stampPaths = [join(dist, ".perf-build.json"), join(distPerf, ".perf-build.json")];
   const tree = buildTree(repo);
   if (!args.skipBuild) {
@@ -254,7 +255,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     log(`perf:worker: resuming ${out} with ${runs.length} finished run(s)${cp.retried ? `; ${cp.retried} failed run(s) will run again` : ""}`);
   } else {
     const day = started.slice(0, 10);
-    out = args.out ? resolve(repo, args.out) : resolve(repo, "docs/performance/results", `${day}-${environment.commitShort}-worker${args.quick ? "-quick" : ""}${environment.dirty ? "-dirty" : ""}`);
+    out = args.out ? resolve(repo, args.out) : resolve(repo, "docs/performance/results", `${day}-${environment.commitShort}-worker${args.quick ? "-quick" : ""}${launch.rendererException ? `-exception-${launch.rendererException.toLowerCase()}` : ""}${environment.dirty ? "-dirty" : ""}`);
     if (existsSync(out)) throw new Error(`${out} already exists; results are never overwritten`);
     mkdirSync(out, { recursive: true });
     writeFileSync(join(out, "checkpoint.json"), JSON.stringify({ ...meta, startedAt }, null, 1) + "\n");
@@ -294,7 +295,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     generatedAt: new Date().toISOString(),
     config,
     environment,
-    browser: { version: runs.find((r) => r.browserVersion)?.browserVersion ?? null, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException },
+    browser: { version: runs.find((r) => r.browserVersion)?.browserVersion ?? null, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException, rendererExceptionSha256: launch.rendererExceptionSha256, gpuVerified: gpuVerified(runs.filter((r) => r.ok).map((r) => r.page?.webgl?.renderer), runs.filter((r) => r.ok).map((r) => r.rendererEnd)) },
     scenarios: scenarios.map((s) => ({ name: s.name, sha256: s.sha256, population: s.population, units: s.units, transports: s.transports, saveBytes: s.save.length })),
     scripts,
     runs,
@@ -337,8 +338,9 @@ export function loadWorkerCheckpoint(dir: string, expected: Record<string, unkno
     // Name the options that differ, so a resume can repeat them.
     const a = (saved[k] ?? {}) as Record<string, unknown>;
     const b = (expected[k] ?? {}) as Record<string, unknown>;
-    const fields = k === "config" ? [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((f) => JSON.stringify(a[f]) !== JSON.stringify(b[f])) : [];
-    throw new Error(`cannot resume ${dir}: its ${k} differs from this run's${fields.length ? ` (${fields.join(", ")}; pass the options the run started with)` : ""}`);
+    const fields = k === "config" || k === "machine" ? [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((f) => JSON.stringify(a[f]) !== JSON.stringify(b[f])) : [];
+    const hint = k === "machine" ? "run on the machine and browser the run started with" : "pass the options the run started with";
+    throw new Error(`cannot resume ${dir}: its ${k} differs from this run's${fields.length ? ` (${fields.join(", ")}; ${hint})` : ""}`);
   }
   const path = join(dir, "runs.jsonl");
   let text = readFileSync(path, "utf8");

@@ -207,7 +207,7 @@ export interface CompareResults {
   issue: string;
   config: CompareConfig;
   environment: Environment;
-  browser: { version: string | null; headless: boolean; executable: string | null; channel?: string | null; args?: string[]; rendererException?: string | null };
+  browser: { version: string | null; headless: boolean; executable: string | null; channel?: string | null; args?: string[]; rendererException?: string | null; rendererExceptionSha256?: string | null; gpuVerified?: boolean };
   scenarios: { name: string; description: string; sha256: string; population: number; units: number; transports: number; saveBytes: number }[];
   nodeChecks: NodeCheck[];
   runs: ProcessRun[];

@@ -1,4 +1,4 @@
-import type { LaunchOptions } from "playwright-core";
+import type { LaunchOptions } from "playwright";
 
 /**
  * Which browser the benchmark runs, and whether its page rendered on the GPU
@@ -18,6 +18,8 @@ export interface BrowserLaunch {
   args: string[];
   /** The exception-register entry (for example "EX-4") that lets a run with an unverified renderer finish with warnings; null for none. */
   rendererException: string | null;
+  /** SHA-256 of that register entry's text once exceptionRegister.ts has resolved it; null before that and for no exception. */
+  rendererExceptionSha256?: string | null;
 }
 
 /** The switches every launch gets: autoplay without a gesture, and gc() for the timed loops. */
@@ -39,7 +41,6 @@ const GPU_SWITCHES: Readonly<Record<string, RegExp | null>> = {
   "use-gl": /^[a-z0-9_-]+$/,
   "ignore-gpu-blocklist": null,
   "enable-gpu-rasterization": null,
-  "enable-zero-copy": null,
 };
 
 const SWITCH = /^--([A-Za-z][A-Za-z0-9-]*)(?:=(.*))?$/;
@@ -92,8 +93,21 @@ export type RendererKind = "hardware" | "software" | "virtual" | "unknown";
 
 const SOFTWARE = /swiftshader|llvmpipe|softpipe|lavapipe|\bwarp\b|basic render|software|osmesa|offscreen|\bswr\b|swrast|mesa x11/i;
 const VIRTUAL = /vmware|svga3d|vmsvga|virtualbox|vbox|parallels|citrix|qemu|virtio|virgl|venus|hyper-v|basic display|remote display|\brdp\b|\bxen\b|bochs|cirrus/i;
-/** Vendor and device-family words of real adapters. A string must carry one of these, and none of the words above, to count. */
-const HARDWARE = /\b(nvidia|geforce|rtx|gtx|quadro|tesla|titan|radeon|radeonsi|amd|vega|intel|apple m\d|apple gpu|adreno|mali|powervr|qualcomm)\b/i;
+/** Device-family words of real adapters, each enough on its own to name a device. */
+const FAMILY = /\b(geforce|rtx|gtx|quadro|titan|tesla|radeon|radeonsi|vega|iris|uhd|arc|xe|adreno|mali|powervr|apple m\d+)\b/i;
+/** Vendor words, which name a maker and not a device: they count only beside a model token. */
+const VENDOR = /\b(nvidia|amd|intel|apple|qualcomm|arm|imagination)\b/i;
+/** API and driver words that carry digits but name no device (Direct3D11, vs_5_0, Vulkan 1.3.0). */
+const NOISE = /^(direct3d\d*|d3d\d+|vs|ps|opengl|es|gl|vulkan|metal|llvm|angle|0x[0-9a-f]+|version|unspecified)$/;
+
+/** A token that looks like a model number (A100, L4, 650, G78, 6800), not an API word. */
+function hasModelToken(text: string): boolean {
+  return text
+    .toLowerCase()
+    .split(/[^a-z0-9-]+|_/)
+    .filter((t) => t && !NOISE.test(t))
+    .some((t) => (/[a-z]/.test(t) && /\d/.test(t)) || /^\d{3,}$/.test(t));
+}
 
 /**
  * The unmasked WebGL renderer string, sorted by an allowlist: hardware only
@@ -107,7 +121,8 @@ export function classifyRenderer(renderer: string | null | undefined): RendererK
   if (!text) return "unknown";
   if (SOFTWARE.test(text)) return "software";
   if (VIRTUAL.test(text)) return "virtual";
-  return HARDWARE.test(text) ? "hardware" : "unknown";
+  // A bare vendor word, "ANGLE (Intel)" and "Intel, or similar" name no device.
+  return FAMILY.test(text) || (VENDOR.test(text) && hasModelToken(text)) ? "hardware" : "unknown";
 }
 
 export interface RendererFindingOptions {
@@ -134,16 +149,21 @@ export function rendererFinding(starts: readonly (string | null | undefined)[], 
   const errors: string[] = [];
   const warnings: string[] = [];
   const relaxed = opts.quick || !!opts.exception;
-  const unverified = (msg: string) => (relaxed ? warnings : errors).push(opts.exception && !opts.quick ? `exception ${opts.exception}: ${msg}` : msg);
+  const unverified = (msg: string) => (relaxed ? warnings : errors).push(opts.exception ? `exception ${opts.exception}: ${msg}` : msg);
   const fix = '(benchmark-protocol.md, "The renderer must be the GPU")';
-  const names = (list: readonly (string | null | undefined)[]) => [...new Set(list.filter((r): r is string => !!r && !!r.trim()))];
+  const read = (r: string | null | undefined): string => (typeof r === "string" ? r.trim() : "");
+  const names = (list: readonly (string | null | undefined)[]) => [...new Set(list.map(read).filter(Boolean))];
   const seenStart = names(starts);
   const seenEnd = names(ends);
   if (starts.length === 0) unverified(`no process run recorded a WebGL renderer, so whether the page rendered on the GPU is unknown ${fix}`);
-  const noStart = starts.filter((r) => !r || !r.trim()).length;
+  const noStart = starts.filter((r) => !read(r)).length;
   if (noStart > 0 && starts.length > 0) unverified(`${noStart} of ${starts.length} process runs recorded no WebGL renderer at their start, so the GPU is not verified ${fix}`);
-  const noEnd = ends.filter((r) => !r || !r.trim()).length;
-  if (noEnd > 0 || ends.length < starts.length) unverified(`${Math.max(noEnd, starts.length - ends.length)} of ${starts.length} process runs have no WebGL renderer read after the frames, so a GPU process that died mid-run would not show ${fix}`);
+  // A start read with no end read is the signature of a GPU process that died
+  // mid-run: no declared exception or smoke run hides it.
+  const lost = starts.filter((r, i) => !!read(r) && !read(ends[i])).length;
+  if (lost > 0) errors.push(`${lost} of ${starts.length} process runs read a WebGL renderer at their start but none after the frames, which is how a GPU process that died mid-run looks ${fix}`);
+  const noEnd = starts.filter((r, i) => !read(r) && !read(ends[i])).length;
+  if (noEnd > 0) unverified(`${noEnd} of ${starts.length} process runs have no WebGL renderer read after the frames either ${fix}`);
   const kinds = new Map<RendererKind, string[]>();
   for (const r of new Set([...seenStart, ...seenEnd])) kinds.set(classifyRenderer(r), [...(kinds.get(classifyRenderer(r)) ?? []), r]);
   for (const kind of ["software", "virtual", "unknown"] as const) {
@@ -151,37 +171,62 @@ export function rendererFinding(starts: readonly (string | null | undefined)[], 
     if (!list?.length) continue;
     const what = {
       software: ["a software rasterizer", ": frame rates, 1% lows and frame times are invalid and the CPU load may have moved the bare-step rows"],
-      virtual: ["a virtual display adapter", ", which is not the GPU"],
+      virtual: ["a virtual display adapter", " that is not the GPU"],
       unknown: ["a renderer string that does not name a hardware adapter", ", so whether the page used the GPU is unknown"],
     }[kind];
     unverified(`the page rendered with ${what[0]} (${list.map((u) => `"${u}"`).join("; ")})${what[1]}; run it on the GPU ${fix}`);
   }
-  if (seenStart.length > 1) errors.push(`the runs recorded different WebGL renderers: ${seenStart.join("; ")}`);
-  const changed = starts.map((r, i) => [r, ends[i]] as const).filter(([a, b]) => !!a && !!b && a.trim() !== b.trim());
+  // Every read of every run must name one adapter, in every mode.
+  const all = names([...starts, ...ends]);
+  if (all.length > 1) errors.push(`the runs recorded different WebGL renderers: ${all.join("; ")}`);
+  const changed = starts.map((r, i) => [read(r), read(ends[i])] as const).filter(([a, b]) => !!a && !!b && a !== b);
   if (changed.length) errors.push(`the WebGL renderer changed during ${changed.length} process run(s) (${changed.map(([a, b]) => `"${a}" then "${b}"`).join("; ")}), so the frames did not all run on one adapter`);
   return { errors, warnings };
 }
 
-/** The browser's product name for a report, from the channel that launched it. */
-export function browserName(channel: string | null | undefined): string {
-  if (!channel || channel === "chromium") return "Chromium";
-  return channel.startsWith("msedge") ? "Microsoft Edge" : "Google Chrome";
+/** True when every good run read a hardware renderer at its start and its end, with no exception and no `--quick` allowance. Recorded in the results so a consumer can refuse a run that was not GPU evidence. */
+export function gpuVerified(starts: readonly (string | null | undefined)[], ends: readonly (string | null | undefined)[]): boolean {
+  return starts.length > 0 && rendererFinding(starts, ends, { quick: false }).errors.length === 0;
+}
+
+/**
+ * The browser's product name for a report: from the channel when one launched
+ * it, otherwise from the executable (an installed Chrome or Edge reached with
+ * `PW_CHROMIUM_PATH`). Playwright's own Chromium builds live under
+ * `ms-playwright` or a `chromium-<n>` folder and stay "Chromium".
+ */
+export function browserName(channel: string | null | undefined, executable?: string | null): string {
+  if (channel && channel !== "chromium") return channel.startsWith("msedge") ? "Microsoft Edge" : "Google Chrome";
+  if (!channel && executable && !/ms-playwright|chromium/i.test(executable)) {
+    if (/msedge|microsoft edge/i.test(executable)) return "Microsoft Edge";
+    if (/google[ -]?chrome|[\\/]chrome(\.exe)?$/i.test(executable)) return "Google Chrome";
+  }
+  return "Chromium";
 }
 
 interface RendererRecord {
+  ok?: boolean;
   page?: { webgl?: { renderer: string } | null } | null;
   rendererEnd?: string | null;
 }
 
-/** The renderers the runs read, as one report line: at the start of each page and again after the frames. */
+/** The renderers the good runs read, as one report line: at the start of each page and again at the end of the run. */
 export function rendererSummary(runs: readonly RendererRecord[]): string {
+  const good = runs.filter((r) => r.ok !== false);
   const list = (xs: (string | null | undefined)[]) => [...new Set(xs.filter((x): x is string => !!x))].join("; ") || "none";
-  const start = list(runs.map((r) => r.page?.webgl?.renderer));
-  const end = list(runs.map((r) => r.rendererEnd));
-  return start === end ? start : `${start} (at the start); ${end} (after the frames)`;
+  const start = list(good.map((r) => r.page?.webgl?.renderer));
+  const end = list(good.map((r) => r.rendererEnd));
+  return start === end ? start : `${start} (at the start); ${end} (at the end)`;
 }
 
-/** The report line for a declared renderer exception, or null. It leads the report, because it changes what the frame rows prove. */
-export function exceptionBanner(exception: string | null | undefined): string | null {
-  return exception ? `> **Renderer exception ${exception} declared.** The renderer checks were warnings in this run, not a pass. The frame rows are GPU evidence only if that exception-register entry (owner-approved) says so.` : null;
+/**
+ * The lines that lead a report when its renderer was not verified as hardware:
+ * a declared register exception (with the entry's hash), and a `--quick`
+ * smoke run. Either way the frame rows are not GPU evidence on their own.
+ */
+export function rendererBanners(browser: { rendererException?: string | null; rendererExceptionSha256?: string | null; gpuVerified?: boolean }, quick: boolean): string[] {
+  const out: string[] = [];
+  if (browser.rendererException) out.push(`> **Renderer exception ${browser.rendererException} declared** (register entry SHA-256 ${browser.rendererExceptionSha256 ?? "unrecorded"}). The renderer checks were warnings in this run, so it is not verified GPU evidence. The frame rows count only as far as that owner-approved entry says.`);
+  if (quick && browser.gpuVerified === false) out.push("> **Smoke run.** The `--quick` option let this run finish without a verified hardware renderer, so no frame row in it is GPU evidence.");
+  return out;
 }

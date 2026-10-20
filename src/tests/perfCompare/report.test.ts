@@ -151,7 +151,7 @@ describe("markdownReport", () => {
     expect(wasm).toContain("pre-3.0 baseline");
     expect(ts).not.toContain("pre-3.0 baseline");
     expect(wasm).toContain("WebGL renderer in these runs: SwiftShader.");
-    expect(wasm).toContain("One machine and one headless Chromium");
+    expect(wasm).toContain("One machine and one headless browser build");
     expect(real).toMatch(/verdict needs six pairs/);
     expect(real).not.toContain("A/A pass");
   });

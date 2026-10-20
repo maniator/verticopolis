@@ -142,7 +142,7 @@ describe("perf:worker analysis", () => {
     const fell = withRenderer(RTX, "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)");
     expect(validate({ ...config, quick: true }, fell).errors.join()).toMatch(/renderer changed during/);
     expect(validate(config, fell, "EX-4").errors.join()).toMatch(/renderer changed during/);
-    expect(validate(config, withRenderer(RTX, null)).errors.join()).toMatch(/no WebGL renderer read after the frames/);
+    expect(validate(config, withRenderer(RTX, null)).errors.join()).toMatch(/none after the frames/);
   });
 
   it("turns the failures into warnings, naming the entry, when a register exception is declared", () => {

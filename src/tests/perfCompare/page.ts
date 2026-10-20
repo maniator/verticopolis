@@ -299,7 +299,8 @@ export function cpuProbe(): number {
 export function webglRenderer(): { renderer: string; vendor: string } | null {
   try {
     const canvas = document.createElement("canvas");
-    const gl = (canvas.getContext("webgl2") ?? canvas.getContext("webgl")) as WebGLRenderingContext | null;
+    // The game asks for the high-performance adapter, so a machine with two GPUs names the one the game uses.
+    const gl = (canvas.getContext("webgl2", { powerPreference: "high-performance" }) ?? canvas.getContext("webgl", { powerPreference: "high-performance" })) as WebGLRenderingContext | null;
     if (!gl) return null;
     const ext = gl.getExtension("WEBGL_debug_renderer_info");
     const renderer = gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER);

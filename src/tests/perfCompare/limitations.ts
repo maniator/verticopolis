@@ -11,7 +11,7 @@ interface Limitation {
 }
 
 const STATIC_LIMITATIONS: readonly Limitation[] = [
-  { text: "One machine and one headless Chromium. Spread is reported (CV, order-statistic intervals of the median, order-statistic intervals of the paired median ratios); results from other hardware, browsers or a GPU will differ." },
+  { text: "One machine and one headless browser build (named in the report's Browser row). Spread is reported (CV, order-statistic intervals of the median, order-statistic intervals of the paired median ratios); results from other hardware, browsers or a GPU will differ." },
   { text: "Both engines run on the main thread. The WASM host keeps a TypeScript read model of the tower, refreshed from the engine's frame view after every step and from a full save merge whenever the tower revision moves or an in-game hour passes (src/wasmhost/wasmHost.ts). The hosted rows include that cost; the bare-engine rows do not.", only: "cross" },
   { text: "The step driver (the frame loop's owed-minute math and fixed step) is the TypeScript host's for both engines (#867), and commands still run on both the read model and the engine (#954). This benchmark times ticks, which the engine alone runs when hosted; it does not time player commands.", only: "cross" },
   { text: "Pages are served cross-origin isolated (COOP/COEP) so performance.now() resolves to about 5 microseconds instead of 100. The production site is not isolated; isolation does not change how either engine executes." },
@@ -44,11 +44,11 @@ export function rendererLimitation(renderers: readonly string[], exception: stri
     const kind = classifyRenderer(renderer);
     if (kind === "hardware") out.push(`WebGL renderer in these runs: ${renderer}. Frame rates are for this GPU; other GPUs and displays will differ. The simulation-only rows do not depend on rendering.`);
     else if (kind === "software") out.push(`WebGL renderer in these runs: ${renderer}. That is a software rasterizer: render cost dominates the frame, the frame rows are invalid, and the CPU load may have moved the simulation rows. A protocol run fails validation on it.`);
-    else if (kind === "virtual") out.push(`WebGL renderer in these runs: ${renderer}. That is a virtual display adapter, not the GPU: the frame rows are invalid. A protocol run fails validation on it.`);
+    else if (kind === "virtual") out.push(`WebGL renderer in these runs: ${renderer}. That is a virtual display adapter that is not the GPU, so the frame rows are invalid. A protocol run fails validation on it.`);
     else out.push(`WebGL renderer in these runs: ${renderer}. It does not name a hardware adapter, so the frame rows are not verified GPU evidence. A protocol run fails validation on it.`);
   }
   if (renderers.length === 0) out.push("No WebGL renderer was recorded, so the frame rows are not verified GPU evidence. A protocol run fails validation on it.");
-  if (exception) out.push(`Renderer exception ${exception} was declared for this run: the renderer checks above are warnings, not a pass. The frame rows count as GPU evidence only if that register entry says so.`);
+  if (exception) out.push(`Renderer exception ${exception} was declared for this run: the renderer checks above were warnings. The frame rows count as GPU evidence only as far as that owner-approved register entry says.`);
   return out;
 }
 

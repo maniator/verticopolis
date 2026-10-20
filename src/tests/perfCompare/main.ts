@@ -5,7 +5,8 @@ import { analyzeBundle } from "./bundle";
 import { buildTree, collectEnvironment, ENGINE_PACKAGE_FILES, packageState, type Environment, type PackageState } from "./env";
 import { buildLimitations } from "./limitations";
 import { gateBrowser, probeBrowser, type BrowserProbe } from "./browserProbe";
-import { browserLaunch, type BrowserLaunch } from "./renderer";
+import { resolveLaunch } from "./exceptionRegister";
+import { browserName, gpuVerified, type BrowserLaunch } from "./renderer";
 import { aggregate, compareEngines, missingSamples } from "./metrics";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
@@ -116,11 +117,11 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   // The browser is settled first: launch settings are parsed and the adapter
   // is read before any build or results folder exists, so a setting that does
   // not reach the GPU fails in seconds.
-  const launch = browserLaunch(process.env);
-  const executablePath = process.env.PW_CHROMIUM_PATH ?? null;
+  const launch = resolveLaunch(process.env, repo);
+  const executablePath = process.env.PW_CHROMIUM_PATH || null;
   const probe = await probeBrowser(executablePath, launch);
-  for (const w of gateBrowser(probe, args.quick, launch)) log(`perf:compare: warning: ${w}`);
-  log(`perf:compare: Chromium ${probe.version}${launch.channel ? ` (channel ${launch.channel})` : ""}, WebGL renderer ${probe.renderer ?? "none"}`);
+  for (const w of gateBrowser(probe, args.quick, launch, executablePath)) log(`perf:compare: warning: ${w}`);
+  log(`perf:compare: ${browserName(launch.channel, executablePath)} ${probe.version}${launch.channel ? ` (channel ${launch.channel})` : ""}, WebGL renderer ${probe.renderer ?? "none"}`);
   if (!existsSync(join(repo, "src/public/engine/verticopolis_engine_bg.wasm"))) {
     throw new Error("the engine package src/public/engine/ is missing: build it first with `bash scripts/build-engine-wasm.sh` where that script exists (it installs the pinned toolchain), or `npm run wasm:build` (needs the wasm32 target and the pinned wasm-bindgen CLI)");
   }
@@ -182,7 +183,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify({ resumed: startedAt, runsFromCheckpoint: cp.runs.length }) + "\n");
     log(`perf:compare: resuming ${out} with ${runs.length} finished process run(s)${interruptedAttempts.length ? `; ${interruptedAttempts.length} attempt(s) were interrupted and run again` : ""}`);
   } else {
-    out = outputDir(repo, args, startedAt.slice(0, 10), environment);
+    out = outputDir(repo, args, startedAt.slice(0, 10), environment, existsSync, launch.rendererException);
     mkdirSync(out, { recursive: true });
     writeFileSync(join(out, CHECKPOINT_META), JSON.stringify(meta, null, 1) + "\n");
     writeFileSync(join(out, CHECKPOINT_RUNS), "");
@@ -244,7 +245,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     issue: "maniator/verticopolis#972",
     config,
     environment,
-    browser: { version: browserVersion, headless: true, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException },
+    browser: { version: browserVersion, headless: true, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException, rendererExceptionSha256: launch.rendererExceptionSha256, gpuVerified: gpuVerified(runs.filter((r) => r.ok).map((r) => r.page?.webgl?.renderer), runs.filter((r) => r.ok).map((r) => r.rendererEnd)) },
     scenarios: scenarios.map((s) => ({ name: s.name, description: s.description, sha256: s.sha256, population: s.population, units: s.units, transports: s.transports, saveBytes: s.save.length })),
     nodeChecks,
     runs,
@@ -311,7 +312,7 @@ export function packageErrors(perf: PackageState, prod: PackageState, sourceHash
  * and commit gets -2, -3, and so on, so no result is overwritten. An
  * explicit --out must not exist yet either.
  */
-export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild" | "aa">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync): string {
+export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild" | "aa">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync, rendererException: string | null = null): string {
   if (args.out) {
     // Only the folder's own name counts, and in lower case, because the results are written on case-insensitive disks too.
     const name = basename(resolve(repo, args.out));
@@ -325,7 +326,7 @@ export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skip
     if (exists(out)) throw new Error(`${out} already exists; results are never overwritten`);
     return out;
   }
-  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${args.skipBuild ? "-skipbuild" : ""}${env.dirty ? "-dirty" : ""}`);
+  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${args.skipBuild ? "-skipbuild" : ""}${rendererException ? `-exception-${rendererException.toLowerCase()}` : ""}${env.dirty ? "-dirty" : ""}`);
   let out = base;
   for (let n = 2; exists(out); n++) out = `${base}-${n}`;
   return out;

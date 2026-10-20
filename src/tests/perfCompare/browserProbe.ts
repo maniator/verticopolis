@@ -1,6 +1,9 @@
-import { chromium } from "playwright-core";
+import { chromium, type Browser } from "playwright";
 import { webglRenderer } from "./page";
-import { launchOptions, rendererFinding, type BrowserLaunch } from "./renderer";
+import { browserName, launchOptions, rendererFinding, type BrowserLaunch } from "./renderer";
+
+/** How long the start-of-run probe may take, from launch to the renderer read. */
+export const PROBE_TIMEOUT_MS = 60_000;
 
 /** What one throwaway launch shows before a run starts: the build and the adapter. */
 export interface BrowserProbe {
@@ -17,18 +20,29 @@ export interface BrowserProbe {
  * build or adapter is not the one the run started on (both go in the
  * machine identity).
  */
-export async function probeBrowser(executablePath: string | null, launch: BrowserLaunch): Promise<BrowserProbe> {
-  const browser = await chromium.launch(launchOptions(executablePath, launch));
+export async function probeBrowser(executablePath: string | null, launch: BrowserLaunch, timeoutMs = PROBE_TIMEOUT_MS): Promise<BrowserProbe> {
+  const browser = await chromium.launch({ ...launchOptions(executablePath, launch), timeout: timeoutMs });
+  let timer: NodeJS.Timeout | undefined;
+  // A driver that hangs while it creates a context would stall the run before
+  // any build, with no message: the timeout turns that into an error.
+  const hung = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`the browser probe did not finish in ${timeoutMs / 1000} s (a GPU driver that hangs at context creation looks like this)`)), timeoutMs);
+  });
   try {
-    const ctx = await browser.newContext();
-    await ctx.addInitScript({ content: "globalThis.__name = (fn) => fn;" });
-    const page = await ctx.newPage();
-    await page.goto("about:blank");
-    const gl = await page.evaluate(webglRenderer);
-    return { version: browser.version(), renderer: gl?.renderer ?? null };
+    return await Promise.race([read(browser), hung]);
   } finally {
+    clearTimeout(timer);
     await browser.close().catch(() => {});
   }
+}
+
+async function read(browser: Browser): Promise<BrowserProbe> {
+  const ctx = await browser.newContext();
+  await ctx.addInitScript({ content: "globalThis.__name = (fn) => fn;" });
+  const page = await ctx.newPage();
+  await page.goto("about:blank");
+  const gl = await page.evaluate(webglRenderer);
+  return { version: browser.version(), renderer: gl?.renderer ?? null };
 }
 
 /**
@@ -37,8 +51,8 @@ export async function probeBrowser(executablePath: string | null, launch: Browse
  * unknown renderer stops before the builds. Returns the warnings to print;
  * throws on an error.
  */
-export function gateBrowser(probe: BrowserProbe, quick: boolean, launch: BrowserLaunch): string[] {
+export function gateBrowser(probe: BrowserProbe, quick: boolean, launch: BrowserLaunch, executablePath: string | null = null): string[] {
   const f = rendererFinding([probe.renderer], [probe.renderer], { quick, exception: launch.rendererException });
-  if (f.errors.length) throw new Error(`the browser cannot be used for this run (Chromium ${probe.version}${launch.channel ? `, channel ${launch.channel}` : ""}):\n  - ${f.errors.join("\n  - ")}`);
+  if (f.errors.length) throw new Error(`the browser cannot be used for this run (${browserName(launch.channel, executablePath)} ${probe.version}${launch.channel ? `, channel ${launch.channel}` : ""}):\n  - ${f.errors.join("\n  - ")}`);
   return f.warnings;
 }

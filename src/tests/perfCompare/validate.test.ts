@@ -42,15 +42,18 @@ describe("validateResults", () => {
     const nulls = good().map((r) => ({ ...r, page: { ...r.page!, webgl: { renderer: "null", vendor: "" } }, rendererEnd: "null" }));
     expect(validateResults(config(), nulls, [node()]).errors.join(" ")).toMatch(/does not name a hardware adapter/);
     const noEnd = good().map((r) => ({ ...r, rendererEnd: undefined }));
-    expect(validateResults(config(), noEnd, [node()]).errors.join(" ")).toMatch(/no WebGL renderer read after the frames/);
+    expect(validateResults(config(), noEnd, [node()]).errors.join(" ")).toMatch(/none after the frames/);
     expect(validateResults({ ...config(), quick: true }, noGl, [node()]).errors.filter((e) => /renderer/i.test(e))).toEqual([]);
   });
 
-  it("downgrades unverified renderers to warnings under a register exception, and not a changed one", () => {
+  it("downgrades unverified renderers to warnings under a register exception, but keeps a changed or lost renderer an error", () => {
     const noGl = good().map((r) => ({ ...r, page: { ...r.page!, webgl: null }, rendererEnd: null }));
     const v = validateResults(config(), noGl, [node()], "EX-9");
     expect(v.errors.filter((e) => /renderer/i.test(e))).toEqual([]);
     expect(v.warnings.join(" ")).toMatch(/exception EX-9/);
+    const hw = (renderer: string | null) => good().map((r) => ({ ...r, page: { ...r.page!, webgl: { renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11, D3D11)", vendor: "v" } }, rendererEnd: renderer }));
+    expect(validateResults(config(), hw("llvmpipe (LLVM 15.0.7, 256 bits)"), [node()], "EX-9").errors.join(" ")).toMatch(/renderer changed during/);
+    expect(validateResults(config(), hw(null), [node()], "EX-9").errors.join(" ")).toMatch(/none after the frames/);
   });
 
   it("judges an A/A pass by the engine that ran", () => {

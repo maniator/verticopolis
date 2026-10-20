@@ -390,7 +390,8 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
         await expectMode(page, mode, `${sc.name} ${rate}x frames`);
       }
     }
-    // The adapter again, from a new context, once every frame is measured.
+    // The adapter again, from a new context, once every frame is measured (and
+    // once more after the throttled cold start below when there is one).
     run.rendererEnd = (await ev(page, "renderer after the frames", webglRenderer, undefined))?.renderer ?? null;
     await ctx.close();
 
@@ -406,6 +407,7 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
       });
       // The throttle held in this context too.
       run.cpuProbe.timed[`cold:${slowRate}`] = await ev(slowPage, "cpu probe", cpuProbe, undefined);
+      run.rendererEnd = (await ev(slowPage, "renderer after the cold start", webglRenderer, undefined))?.renderer ?? null;
       await slow.close();
     }
     run.ok = true;
