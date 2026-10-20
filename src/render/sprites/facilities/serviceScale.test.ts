@@ -77,9 +77,9 @@ const UNIT = { id: 7, kind: "parking", x: 0, floor: 1, width: 4, state: "occupie
 const SPRITES = [
   { name: "parking", tiles: 4, floors: 1, draw: (c: CanvasRenderingContext2D, w: number, h: number) => drawParking(dc(c), UNIT, 0, 0, w, h) },
   { name: "parkingRamp", tiles: 16, floors: 1, draw: (c: CanvasRenderingContext2D, w: number, h: number) => drawParkingRamp(c, UNIT, 0, 0, w, h) },
-  { name: "security", tiles: 8, floors: 1, draw: (c: CanvasRenderingContext2D, w: number, h: number) => drawSecurity(dc(c), 0, 0, w, h) },
-  { name: "medical", tiles: 16, floors: 1, draw: (c: CanvasRenderingContext2D, w: number, h: number) => drawMedical(dc(c), 0, 0, w, h) },
-  { name: "housekeeping", tiles: 8, floors: 1, draw: (c: CanvasRenderingContext2D, w: number, h: number) => drawHousekeeping(dc(c), 0, 0, w, h) },
+  { name: "security", tiles: 8, floors: 1, draw: (c: CanvasRenderingContext2D, w: number, h: number) => drawSecurity(dc(c), { ...UNIT, kind: "security" }, 0, 0, w, h) },
+  { name: "medical", tiles: 16, floors: 1, draw: (c: CanvasRenderingContext2D, w: number, h: number) => drawMedical(dc(c), { ...UNIT, kind: "medical" }, 0, 0, w, h) },
+  { name: "housekeeping", tiles: 8, floors: 1, draw: (c: CanvasRenderingContext2D, w: number, h: number) => drawHousekeeping(dc(c), { ...UNIT, kind: "housekeeping" }, 0, 0, w, h) },
   { name: "recycling", tiles: 20, floors: 2, draw: (c: CanvasRenderingContext2D, w: number, h: number) => drawRecycling(dc(c), UNIT, 0, 0, w, h) },
 ];
 
