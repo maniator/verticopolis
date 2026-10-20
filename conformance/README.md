@@ -64,6 +64,11 @@ Derive a new one the same way, with `scripts/derive-fixture.ts <source>
 save and writes nothing else, and say what was edited in the scenario's
 description.
 
+`split-tower-4` is the owner's own Modern save of the split tower (four stars,
+a founder's tower, 19,806 units, 194 KB): the largest fixture, kept unedited as
+a real save the engines have to load and replay the same way. The owner agreed
+to commit it on 2026-10-20.
+
 ## The loader table
 
 `loader-cases.json` is the referee for `deserialize` on saves no engine writes:

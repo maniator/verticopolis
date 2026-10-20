@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -65,5 +65,198 @@ describe("engine-rs.yml engine path lists", () => {
       "",
     );
     expect(casePaths(dropped)).not.toEqual(pushPaths(dropped));
+  });
+});
+
+/**
+ * The suites that host the engine themselves run in `npm run test:wasm` (#1122).
+ *
+ * The `integrationWasm` vitest project hands some suites to the TypeScript
+ * side (`typescriptSide` in `vite.config.ts`) because they start their own
+ * host or compare the two engines directly. If one of them is also missing
+ * from `test:wasm`'s file filters, no CI job runs it against the engine, and
+ * `engine-rs.yml`'s path filter would not catch that. This test requires
+ * every such suite to match a `test:wasm` filter, unless it needs no engine
+ * package (listed below with the reason), and requires the always-running
+ * `test-wasm-parity` job in `test.yml` to run `npm run test:wasm`.
+ */
+
+const root = resolve(here, "..", "..");
+/** A repo file as text, with Windows line endings folded so the patterns below stay simple. */
+const read = (rel: string): string =>
+  readFileSync(resolve(root, rel), "utf8").replace(/\r\n/g, "\n");
+
+/** Suites in `typescriptSide` that never touch the engine package, so the plain `test` job runs them. */
+const NO_ENGINE_PACKAGE: Record<string, string> = {
+  "src/tests/integration/conformance.integration.test.ts":
+    "the TypeScript engine against the conformance lock",
+  "src/tests/integration/loaderCases.integration.test.ts":
+    "the TypeScript loader",
+  "src/render/originSeedsSweep.integration.test.ts":
+    "pure render in a software raster",
+  "src/tests/perfCompare/page.integration.test.ts":
+    "the browser digest helper, TypeScript only",
+};
+/** What a suite that uses the engine package mentions; the exempt ones must not. */
+const ENGINE_USE =
+  /wasmEngine|hasWasmPackage|attachWasmHost|verticopolis_engine|loadWebPackage|checkScenario/;
+
+function integrationFiles(): string[] {
+  return (readdirSync(resolve(root, "src"), { recursive: true }) as string[])
+    .map((f) => `src/${f.split("\\").join("/")}`)
+    .filter((f) => f.endsWith(".integration.test.ts"));
+}
+
+/** A vitest exclude glob as a regular expression: `**` crosses directories, `*` does not. */
+function globToRegExp(glob: string): RegExp {
+  const body = glob
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*\//g, "@@ANYDIR@@")
+    .replace(/\*/g, "[^/]*")
+    .replace(/@@ANYDIR@@/g, "(?:.*/)?");
+  return new RegExp(`^${body}$`);
+}
+
+/** The files `wasmParityProjects` leaves to the TypeScript side. */
+function typescriptSideFiles(viteConfig: string): string[] {
+  const block = /const typescriptSide = \[\n([\s\S]*?)\n {2}\];/.exec(
+    viteConfig,
+  );
+  if (!block) throw new Error("vite.config.ts: typescriptSide list not found");
+  const entries = block[1]
+    .split("\n")
+    .filter((l) => l.trim() !== "" && !l.trim().startsWith("//"));
+  const files = integrationFiles();
+  return entries.flatMap((line) => {
+    const glob = /^ +"([^"]+)",$/.exec(line)?.[1];
+    if (!glob)
+      throw new Error(
+        `vite.config.ts typescriptSide: cannot read the entry ${JSON.stringify(line)}`,
+      );
+    const re = globToRegExp(glob);
+    const hits = files.filter((f) => re.test(f));
+    if (hits.length === 0)
+      throw new Error(
+        `vite.config.ts typescriptSide entry matches no file: ${glob}`,
+      );
+    return hits;
+  });
+}
+
+/** The positional file filters and the projects of the `test:wasm` script. */
+function testWasmArgs(script: string): {
+  filters: string[];
+  projects: string[];
+} {
+  const args = script
+    .replace(/^VC_REQUIRE_WASM=1 vitest run\s+/, "")
+    .split(/\s+/);
+  const filters: string[] = [];
+  const projects: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--project") projects.push(args[++i]);
+    else if (args[i].startsWith("-"))
+      throw new Error(
+        `test:wasm gained the option ${args[i]}; teach this guard what it takes`,
+      );
+    else filters.push(args[i]);
+  }
+  return { filters, projects };
+}
+
+/** Vitest matches a filter as a case-insensitive substring of the file path. */
+const matches = (file: string, filters: string[]): boolean =>
+  filters.some((x) => file.toLowerCase().includes(x.toLowerCase()));
+
+/** Suites handed to the TypeScript side that no `test:wasm` filter reaches and that need the package. */
+function unrun(files: string[], filters: string[]): string[] {
+  return files.filter((f) => !(f in NO_ENGINE_PACKAGE) && !matches(f, filters));
+}
+
+describe("the host suites run in test:wasm", () => {
+  const files = typescriptSideFiles(read("vite.config.ts"));
+  const script = (
+    JSON.parse(read("package.json")) as { scripts: Record<string, string> }
+  ).scripts["test:wasm"];
+  const { filters, projects } = testWasmArgs(script);
+
+  it("finds the lists", () => {
+    expect(files.length).toBeGreaterThan(10);
+    expect(filters).toContain("wasmHost");
+  });
+
+  it("requires the package and runs the plain integration project, where the handed-over suites live", () => {
+    expect(script).toMatch(/^VC_REQUIRE_WASM=1 vitest run /);
+    expect(projects).toEqual(["integration"]);
+  });
+
+  it("matches every typescriptSide suite that needs the engine package", () => {
+    expect(unrun(files, filters)).toEqual([]);
+  });
+
+  it("covers the six host suites and the perf-compare engine check by name", () => {
+    for (const name of [
+      "src/tests/integration/wasmHostAnalyticsBridge.integration.test.ts",
+      "src/tests/integration/wasmHostLogText.integration.test.ts",
+      "src/tests/integration/wasmHostTelemetry.integration.test.ts",
+      "src/tests/integration/wasmWorkerHost.integration.test.ts",
+      "src/tests/integration/wasmWorkerLifecycle.integration.test.ts",
+      "src/tests/integration/wasmWorkerSaves.integration.test.ts",
+      "src/tests/perfCompare/scenarios.integration.test.ts",
+    ])
+      expect(
+        matches(name, filters),
+        `${name} is matched by a test:wasm filter`,
+      ).toBe(true);
+  });
+
+  it("fails when a filter is dropped", () => {
+    expect(
+      unrun(
+        files,
+        filters.filter((x) => x !== "wasmWorker"),
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("keeps the exemption table honest: each file is still handed over and still leaves the engine alone", () => {
+    for (const f of Object.keys(NO_ENGINE_PACKAGE)) {
+      expect(files).toContain(f);
+      expect(
+        read(f),
+        `${f} now uses the engine package; drop it from the exemptions`,
+      ).not.toMatch(ENGINE_USE);
+    }
+  });
+
+  describe("in test.yml", () => {
+    const yaml = read(".github/workflows/test.yml");
+    const triggers = yaml.split("\njobs:")[0];
+    const jobs = yaml.split("\njobs:")[1];
+    const job = (name: string): string => {
+      const m = new RegExp(
+        `\\n {2}${name}:[^\\n]*\\n([\\s\\S]*?)(?=\\n {2}[a-z][\\w-]*:[^\\n]*\\n|$)`,
+      ).exec(jobs);
+      if (!m) throw new Error(`test.yml: job ${name} not found`);
+      return m[1];
+    };
+
+    it("runs on every PR and every push to main, with no path filter", () => {
+      expect(triggers).toMatch(/^ {2}push:\n {4}branches: \[main\]\n/m);
+      expect(triggers).toMatch(/^ {2}pull_request:\n {4}branches: \[main\]\n/m);
+      expect(triggers).not.toMatch(/^ +paths(-ignore)?:/m);
+    });
+
+    it("test-wasm-parity runs test:wasm in a step that is never skipped and never allowed to fail", () => {
+      const body = job("test-wasm-parity");
+      const step =
+        /^ {6}- name: Host suites on the WASM engine\n((?: {8}[^\n]*\n)+)/m.exec(
+          body,
+        );
+      if (!step)
+        throw new Error("test-wasm-parity: the host suites step is gone");
+      expect(step[1]).toMatch(/^ {8}run: npm run test:wasm$/m);
+      expect(step[1]).not.toMatch(/\bif:|continue-on-error/);
+    });
   });
 });
