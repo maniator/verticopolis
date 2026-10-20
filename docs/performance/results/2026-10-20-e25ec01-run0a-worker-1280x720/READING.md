@@ -45,6 +45,6 @@ This folder cannot say which of these moved the 4x rows. A RUN-0a repeat on the 
 ## Use
 
 - Frame metrics from this folder are invalid (software renderer). Do not quote FPS, 1% lows or frame-time rows.
-- The two large 1x medians landing inside the reference intervals is an observation, not a pass. No row of this folder is used as evidence for the gate.
+- The two large 1x medians landing inside the reference intervals is an observation only. No row of this folder is used as evidence for the gate.
 - RUN-0b waits on the renderer fix (#1115) before its frame metrics.
 - The old `perf:worker` report leads with TypeScript over WASM. The gate's orientation is the other way (WASM over TypeScript); invert before comparing with the pass rules.

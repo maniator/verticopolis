@@ -72,7 +72,8 @@ AC power; Windows in its best-performance power mode; nothing else building,
 testing or benchmarking; every browser and editor window closed; the ChatGPT
 desktop app and the NVIDIA Overlay closed; no antivirus scan running. Sample
 the idle CPU load just before the start and record it in the notes. Note
-anything unusual (a Windows update pending, thermal state) in the run's notes. The harness records CPU, memory, OS build, GPU, Node, Rust,
+anything unusual (a Windows update pending, thermal state) in the run's
+notes. The harness records CPU, memory, OS build, GPU, Node, Rust,
 wasm-bindgen, Playwright and browser versions in `results.json`.
 
 ## 2. Preconditions
