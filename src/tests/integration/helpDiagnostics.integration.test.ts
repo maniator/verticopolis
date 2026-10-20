@@ -152,6 +152,29 @@ describe("Help diagnostics", () => {
     expect(copied).not.toContain("Engine crate:");
   });
 
+  it("names the latest host error in About when the error list is full and more were dropped", () => {
+    g.__vcEngineBoot = {
+      build: "switchable",
+      engine: "wasm",
+      failure: null,
+      identity: JSON.stringify(IDENTITY_FIXTURE),
+    };
+    g.__vcEngine = {
+      status: {
+        hosted: true,
+        errors: Array.from({ length: 5 }, (_, i) => `older failure ${i + 1}`),
+        lastError: "trap in tick",
+        droppedErrors: 3,
+      },
+    };
+    const { ui } = makeUI();
+    ui.showHelp();
+    const text = dialog().querySelector(".help-diagnostics")!.textContent!;
+    expect(text).toContain("trap in tick");
+    expect(text).toContain("Errors not kept");
+    expect(text).not.toContain("older failure");
+  });
+
   it("tells the player when the copy fails", async () => {
     stubClipboard(async () => {
       throw new Error("denied");

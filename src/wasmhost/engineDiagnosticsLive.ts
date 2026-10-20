@@ -26,5 +26,7 @@ export function liveDiagnostics(
     host: g.__vcEngine?.status,
     expected:
       typeof __ENGINE_PACKAGE__ !== "undefined" ? __ENGINE_PACKAGE__ : null,
+    userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+    date: new Date().toISOString(),
   });
 }

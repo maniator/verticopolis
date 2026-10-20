@@ -48,6 +48,9 @@ export interface DiagnosticsHost {
   placement?: "worker";
   lastError?: string | null;
   droppedErrors?: number;
+  /** The code and stage of the latest fallback to the TypeScript engine
+   *  (`WasmHostStatus.lastFallback`); the worker host has none yet (#1086). */
+  lastFallback?: { reason: string; stage: string } | null;
 }
 
 export interface DiagnosticsInput {
@@ -59,6 +62,9 @@ export interface DiagnosticsInput {
   host?: DiagnosticsHost;
   /** `__ENGINE_PACKAGE__`: what this shell was built to run. */
   expected?: ExpectedEnginePackage | null;
+  /** `navigator.userAgent` and the time of the report, for a support ticket. */
+  userAgent?: string;
+  date?: string;
 }
 
 /** An engine message can be long; the clipboard text keeps the start. */
@@ -67,9 +73,20 @@ const MESSAGE_CAP = 300;
 const cap = (s: string): string =>
   s.length > MESSAGE_CAP ? `${s.slice(0, MESSAGE_CAP)}...` : s;
 
-/** The fields the engine's record and the shell's build record disagree on.
- *  The source hash is compared when the binary's section was read and the page
- *  recorded one; the engine's own record has no part in it. */
+/** The source hash the binary was stamped with against the one this page was
+ *  built for, or null when they agree or either is unknown. It needs only the
+ *  binary and the page's record, so a package that fails to link, or reports no
+ *  identity, still gets it. */
+export function sourceMismatch(
+  expected: ExpectedEnginePackage | null | undefined,
+  build: BuildMetadataResult | undefined,
+): string | null {
+  if (build?.state !== "ok" || !expected?.sources) return null;
+  if (build.sourceHash === expected.sources) return null;
+  return `source hash (engine binary ${shortId(build.sourceHash)}, this page was built for ${shortId(expected.sources)})`;
+}
+
+/** The fields the engine's record and the shell's build record disagree on. */
 export function identityMismatches(
   identity: EngineIdentity,
   expected: ExpectedEnginePackage | null | undefined,
@@ -85,14 +102,8 @@ export function identityMismatches(
     out.push(
       `crate version (engine ${identity.crate.version}, this page was built for ${crate.version})`,
     );
-  if (
-    build?.state === "ok" &&
-    expected?.sources &&
-    build.sourceHash !== expected.sources
-  )
-    out.push(
-      `source hash (engine binary ${shortId(build.sourceHash)}, this page was built for ${shortId(expected.sources)})`,
-    );
+  const source = sourceMismatch(expected, build);
+  if (source) out.push(source);
   return out;
 }
 
@@ -111,52 +122,82 @@ function buildValue(build: BuildMetadataResult): string {
   return `unavailable (malformed: ${build.why})`;
 }
 
+/** Whether the current tower runs on the WASM engine. The host's status is the
+ *  authority when there is one: a later tower can be hosted after the first
+ *  was refused, and a tower can fall back with no boot failure recorded. The
+ *  boot state decides only when no host handle exists. */
+function wasmRunning(input: DiagnosticsInput): boolean {
+  if (input.host) return !!input.host.hosted;
+  return input.boot?.engine === "wasm" && !input.boot.failure;
+}
+
 function engineName(input: DiagnosticsInput): string {
   if (input.boot?.engine === "none") return "none";
-  if (
-    input.host?.hosted ||
-    (input.boot?.engine === "wasm" && !input.boot.failure)
-  )
+  if (wasmRunning(input))
     return input.host?.placement === "worker"
       ? "WASM engine (worker)"
       : "WASM engine";
   return "TypeScript engine";
 }
 
+/** The sentence for an engine that is not running, by where it stopped. */
+function failureSummary(
+  boot: EngineBootState,
+  stage: string,
+): string {
+  const WHAT: Record<string, string> = {
+    host: "The WASM engine stopped after a fault",
+    start: "The WASM engine did not take the first tower",
+  };
+  const what = WHAT[stage] ?? "The WASM engine did not load";
+  return boot.engine === "none"
+    ? `${what}, and this build has no other engine.`
+    : `${what}, so the game is running on the TypeScript engine.`;
+}
+
 export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
   const { boot, host, expected } = input;
   const failure = boot?.failure ?? null;
   const identity = parseEngineIdentity(boot?.identity);
-  const wasmRunning = !!host?.hosted || (boot?.engine === "wasm" && !failure);
+  const running = wasmRunning(input);
   const mismatches = identity
     ? identityMismatches(identity, expected, boot?.binary)
-    : [];
+    : [sourceMismatch(expected, boot?.binary)].filter(
+        (m): m is string => m !== null,
+      );
   const noBuild = buildUnavailable(boot?.binary);
+  // "Matches" is claimed only when a comparison ran.
+  const compared =
+    (!!identity && !!expected?.crate) ||
+    (boot?.binary?.state === "ok" && !!expected?.sources);
 
   let state: DiagnosticsState;
   let summary: string;
-  if (failure) {
+  if (!running && failure) {
     state = "not-loaded";
-    summary =
-      boot?.engine === "none"
-        ? "The WASM engine did not start, and this build has no other engine."
-        : "The WASM engine did not start, so the game is running on the TypeScript engine.";
-  } else if (!wasmRunning) {
+    summary = failureSummary(boot as EngineBootState, failure.stage);
+  } else if (!running) {
     state = "typescript";
-    summary = "The game is running on the TypeScript engine.";
+    summary = host?.lastFallback
+      ? "The game fell back to the TypeScript engine for this tower."
+      : "The game is running on the TypeScript engine.";
+  } else if (mismatches.length > 0) {
+    state = "mismatch";
+    summary = "The WASM engine does not match the build this page expected.";
   } else if (!identity) {
     state = "unavailable";
     summary =
       "The WASM engine is running, but this package does not report its identity.";
-  } else if (mismatches.length > 0) {
-    state = "mismatch";
-    summary = "The WASM engine does not match the build this page expected.";
   } else if (noBuild) {
     state = "unavailable";
     summary = `The WASM engine is running, but ${noBuild}, so its source hash is unavailable.`;
-  } else {
+  } else if (compared) {
     state = "ok";
     summary = "The WASM engine is running and matches this build.";
+  } else {
+    state = "ok";
+    summary =
+      "The WASM engine is running. This page has no build record to compare it with.";
   }
 
   const rows: DiagnosticsRow[] = [
@@ -165,6 +206,9 @@ export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
       value: `v${input.appVersion}${input.appSha ? ` (${input.appSha})` : ""}`,
     },
   ];
+  if (input.date) rows.push({ label: "Date", value: input.date });
+  if (input.userAgent)
+    rows.push({ label: "Browser", value: cap(input.userAgent) });
   rows.push({ label: "Engine in use", value: engineName(input) });
   if (boot) rows.push({ label: "Build", value: boot.build });
   if (failure) {
@@ -172,6 +216,11 @@ export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
     rows.push({ label: "Reason", value: failure.reason });
     rows.push({ label: "Detail", value: cap(failure.message) });
   }
+  if (host?.lastFallback)
+    rows.push({
+      label: "Last fallback",
+      value: `${host.lastFallback.reason} at ${host.lastFallback.stage}`,
+    });
   if (host?.lastError)
     rows.push({ label: "Last engine error", value: cap(host.lastError) });
   if (host?.droppedErrors)

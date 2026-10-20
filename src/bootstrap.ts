@@ -15,6 +15,8 @@ import { isHostFault } from "./wasmhost/hostFault";
 import { ENGINE_FAILURE_ID } from "./game/interactionState";
 import { bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState, type FallbackReason } from "./wasmhost/engineBoot";
 import type { BuildMetadataResult } from "./wasmhost/buildSection";
+import { liveDiagnostics } from "./wasmhost/engineDiagnosticsLive";
+import { copyText } from "./ui/copyText";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -110,6 +112,16 @@ export function showBootMessage(content: TemplateResult | string, withReload = f
 
 let inertWatch: MutationObserver | null = null;
 
+/** Copy the engine diagnostics from the stop screen, where Help cannot be
+ *  opened (#963). The report is built from the page's own state, so it works
+ *  when the engine never loaded. */
+function copyEngineDiagnostics(e: Event): void {
+  const status = (e.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(".engine-failure-copy-status");
+  void copyText(liveDiagnostics().text, navigator, document, document.getElementById("boot-fallback-host") ?? document.body).then((ok) => {
+    if (status) status.textContent = ok ? "Copied." : "Could not copy.";
+  });
+}
+
 /** Stop the game with the wasm-only build's engine failure: what happened,
  *  why, and what to try. Covers the title screen and any running tower, like
  *  every other boot-fallback message. */
@@ -126,6 +138,10 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
       <ul style="text-align:left;margin:0 auto;max-width:36em">
         ${copy.steps.map((step) => html`<li>${step}</li>`)}
       </ul>
+      <p>
+        <button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="copy-diagnostics" @click=${copyEngineDiagnostics}>Copy diagnostics</button>
+        <span class="engine-failure-copy-status" role="status" aria-live="polite" style="margin-left:.5em;opacity:.8"></span>
+      </p>
     </div>`,
     true,
   );
@@ -148,7 +164,7 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
   // the one control left, so a keyboard or screen-reader user is not left on
   // an inert element.
   const host = document.getElementById("boot-fallback-host");
-  const reload = host?.querySelector<HTMLButtonElement>("#boot-fallback button");
+  const reload = host?.querySelector<HTMLButtonElement>("#boot-fallback button:not([data-act])");
   if (reload) reload.focus();
   else {
     const active = document.activeElement as HTMLElement | null;

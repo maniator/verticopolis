@@ -9,6 +9,9 @@ export async function copyText(
   text: string,
   nav: Pick<Navigator, "clipboard"> = navigator,
   doc: Document = document,
+  /** Where the fallback textarea goes. Inside an open modal dialog the rest of
+   *  the page is inert and cannot take a selection, so pass that dialog. */
+  container: Element = doc.querySelector("dialog[open]") ?? doc.body,
 ): Promise<boolean> {
   try {
     if (nav.clipboard?.writeText) {
@@ -18,18 +21,24 @@ export async function copyText(
   } catch {
     // fall through to the selection copy
   }
+  const previous = doc.activeElement as HTMLElement | null;
   const area = doc.createElement("textarea");
   area.value = text;
   area.setAttribute("readonly", "");
   area.style.position = "fixed";
   area.style.opacity = "0";
-  doc.body.appendChild(area);
+  container.appendChild(area);
   try {
+    area.focus();
     area.select();
+    // A copy of an empty selection reports success, so check that the whole
+    // text is selected before asking for it.
+    if (doc.activeElement !== area || area.selectionEnd - area.selectionStart !== text.length) return false;
     return doc.execCommand("copy");
   } catch {
     return false;
   } finally {
     area.remove();
+    previous?.focus?.();
   }
 }

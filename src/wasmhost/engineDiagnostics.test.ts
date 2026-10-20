@@ -305,3 +305,90 @@ describe("identityMismatches", () => {
     ]);
   });
 });
+
+describe("which engine is running, by the host's status", () => {
+  const sourceExpected = (): ExpectedEnginePackage => ({ ...expected(), sources: SRC });
+
+  it("calls a tower the host refused TypeScript even though boot recorded no failure", () => {
+    const r = buildDiagnostics({
+      ...base,
+      boot: wasmBoot(),
+      host: { hosted: false, lastFallback: { reason: "attach-refused", stage: "adopt" } },
+      expected: expected(),
+    });
+    expect(r.state).toBe("typescript");
+    expect(r.summary).toContain("fell back to the TypeScript engine");
+    expect(row(r, "Engine in use")).toEqual(["TypeScript engine"]);
+    expect(row(r, "Last fallback")).toEqual(["attach-refused at adopt"]);
+  });
+
+  it("follows the host when a later tower is hosted after the first was refused", () => {
+    const r = buildDiagnostics({
+      ...base,
+      boot: wasmBoot({ failure: { stage: "start", reason: "attach-refused", message: "crowd" } }),
+      host: { hosted: true },
+      expected: expected(),
+    });
+    expect(r.state).toBe("ok");
+    expect(row(r, "Engine in use")).toEqual(["WASM engine"]);
+    expect(row(r, "Failed at")).toEqual(["start"]);
+  });
+
+  it.each([
+    ["load", "did not load"],
+    ["start", "did not take the first tower"],
+    ["host", "stopped after a fault"],
+  ] as const)("words a %s failure as '%s'", (stage, words) => {
+    const boot: EngineBootState = { build: "switchable", engine: "ts", failure: { stage, reason: "boot-error", message: "x" } };
+    const r = buildDiagnostics({ ...base, boot, host: { hosted: false } });
+    expect(r.state).toBe("not-loaded");
+    expect(r.summary).toContain(words);
+    expect(r.summary).toContain("TypeScript engine");
+  });
+
+  it("says a wasm-only build has no other engine after a fault", () => {
+    const boot: EngineBootState = { build: "wasm-only", engine: "none", failure: { stage: "host", reason: "trap-tick", message: "trap" } };
+    const r = buildDiagnostics({ ...base, boot, host: { hosted: false } });
+    expect(r.summary).toBe("The WASM engine stopped after a fault, and this build has no other engine.");
+  });
+
+  it("reports a source hash mismatch for a package that reports no identity", () => {
+    const { identity: _omit, ...noIdentity } = wasmBoot({ binary: { state: "ok", sourceHash: OTHER_SRC } });
+    const r = buildDiagnostics({ ...base, boot: noIdentity, host: { hosted: true }, expected: sourceExpected() });
+    expect(r.state).toBe("mismatch");
+    expect(row(r, "Mismatch")).toHaveLength(1);
+  });
+
+  it("reports a source hash mismatch for a binary that failed to link", () => {
+    const boot: EngineBootState = {
+      build: "switchable",
+      engine: "ts",
+      failure: { stage: "load", reason: "package-mismatch", message: "import mismatch" },
+      binary: { state: "ok", sourceHash: OTHER_SRC },
+    };
+    const r = buildDiagnostics({ ...base, boot, expected: sourceExpected() });
+    expect(r.state).toBe("not-loaded");
+    expect(row(r, "Mismatch")).toEqual([
+      "source hash (engine binary 666666666666, this page was built for 555555555555)",
+    ]);
+  });
+
+  it("claims a match only when something was compared", () => {
+    const { crate: _c, ...noCrate } = expected();
+    const none = buildDiagnostics({ ...base, boot: wasmBoot(), host: { hosted: true }, expected: noCrate });
+    expect(none.state).toBe("ok");
+    expect(none.summary).toContain("no build record to compare");
+    const unknown = buildDiagnostics({ ...base, boot: wasmBoot(), host: { hosted: true }, expected: null });
+    expect(unknown.summary).toContain("no build record to compare");
+    const compared = buildDiagnostics({ ...base, boot: wasmBoot(), host: { hosted: true }, expected: expected() });
+    expect(compared.summary).toContain("matches this build");
+  });
+
+  it("carries the browser and the date for a support ticket", () => {
+    const r = buildDiagnostics({ ...base, userAgent: "TestBrowser/1.0", date: "2026-10-20T20:00:00.000Z" });
+    expect(row(r, "Browser")).toEqual(["TestBrowser/1.0"]);
+    expect(row(r, "Date")).toEqual(["2026-10-20T20:00:00.000Z"]);
+    expect(buildDiagnostics(base).rows.some((x) => x.label === "Browser" || x.label === "Date")).toBe(false);
+  });
+});
+

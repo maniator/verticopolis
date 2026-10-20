@@ -15,20 +15,15 @@ import { ENGINE_WASM } from "./enginePackageNames";
 
 type GlueModule = { default: (init?: { module_or_path: WebAssembly.Module }) => Promise<unknown> };
 
-/** Fetch and compile the engine binary and read its build metadata. */
+/** Fetch and compile the engine binary and read its build metadata. A binary
+ *  served as `application/wasm` compiles as it streams in; one served as
+ *  anything else (a server with no wasm MIME type) compiles from its bytes,
+ *  as the glue's own loader does. */
 export async function compileEngineBinary(wasmUrl: string | URL): Promise<{ module: WebAssembly.Module; build: BuildMetadataResult }> {
   const response = await fetch(wasmUrl);
   if (!response.ok) throw new Error(`failed to fetch Wasm: ${response.status} ${response.statusText} fetching '${String(wasmUrl)}'`);
-  let module: WebAssembly.Module | undefined;
-  if (typeof WebAssembly.compileStreaming === "function") {
-    // A server that does not send application/wasm refuses the streaming
-    // compile; the bytes compile just the same.
-    const copy = response.clone();
-    module = await WebAssembly.compileStreaming(response).catch(() => undefined);
-    if (!module) module = await WebAssembly.compile(await copy.arrayBuffer());
-  } else {
-    module = await WebAssembly.compile(await response.arrayBuffer());
-  }
+  const streams = typeof WebAssembly.compileStreaming === "function" && response.headers.get("Content-Type") === "application/wasm";
+  const module = streams ? await WebAssembly.compileStreaming(response) : await WebAssembly.compile(await response.arrayBuffer());
   return { module, build: parseBuildMetadata(WebAssembly.Module.customSections(module, BUILD_SECTION)) };
 }
 
@@ -48,8 +43,15 @@ export interface EngineLoadOptions {
  *  resolved to (the engine's exports, for the memory size). */
 export async function initEngineGlue(glueUrl: string, opts: EngineLoadOptions = {}): Promise<{ mod: GlueModule; exports: unknown }> {
   const wasmUrl = opts.wasmUrl ?? engineBinaryUrl(glueUrl);
-  const [mod, binary] = await Promise.all([import(/* @vite-ignore */ glueUrl) as Promise<GlueModule>, compileEngineBinary(wasmUrl)]);
-  opts.onBuild?.(binary.build);
+  // The build is reported as soon as the binary has compiled, so a glue that
+  // then fails to import still leaves what the binary said.
+  const [mod, binary] = await Promise.all([
+    import(/* @vite-ignore */ glueUrl) as Promise<GlueModule>,
+    compileEngineBinary(wasmUrl).then((b) => {
+      opts.onBuild?.(b.build);
+      return b;
+    }),
+  ]);
   const exports = await mod.default({ module_or_path: binary.module });
   return { mod, exports };
 }

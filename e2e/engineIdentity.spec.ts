@@ -26,14 +26,14 @@ async function buildRecord(page: Page): Promise<Record> {
   return (await res.json()) as Record;
 }
 
-/** Serve the real binary with one same-length text swap, so it still compiles
+/** Serve the real binary with one same-length text swap (the last match, where the build stamps its section), so it still compiles
  *  and links but its build section reads differently. */
 async function swapInBinary(page: Page, from: string, to: string): Promise<void> {
   expect(to).toHaveLength(from.length);
   await page.route(WASM, async (route: Route) => {
     const res = await route.fetch();
     const body = await res.body();
-    const at = body.indexOf(from);
+    const at = body.lastIndexOf(from);
     expect(at, `the served binary holds ${from}`).toBeGreaterThan(-1);
     to.split("").forEach((c, i) => (body[at + i] = c.charCodeAt(0)));
     await route.fulfill({ response: res, body });

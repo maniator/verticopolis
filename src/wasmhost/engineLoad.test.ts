@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -49,6 +50,14 @@ describe("compileEngineBinary", () => {
   it("compiles from the bytes when the server does not send application/wasm", async () => {
     vi.stubGlobal("fetch", wasmFetch(stampedWasm(HASH), { type: "application/octet-stream" }));
     expect((await compileEngineBinary("http://x/e.wasm")).build).toEqual({ state: "ok", sourceHash: HASH });
+  });
+
+  it("does not hide a binary that is not valid WebAssembly behind the bytes fallback", async () => {
+    const compile = vi.spyOn(WebAssembly, "compile");
+    vi.stubGlobal("fetch", wasmFetch(new Uint8Array([1, 2, 3, 4])));
+    await expect(compileEngineBinary("http://x/e.wasm")).rejects.toThrow();
+    expect(compile).not.toHaveBeenCalled();
+    compile.mockRestore();
   });
 
   it("refuses a response that is not ok, naming the URL", async () => {
@@ -110,6 +119,15 @@ describe("initEngineGlue", () => {
     const url = glue("export default async function init() { throw new Error('link failed'); }");
     await expect(initEngineGlue(url, { wasmUrl: "http://x/e.wasm", onBuild: (b) => seen.push(b.state) })).rejects.toThrow("link failed");
     expect(seen).toEqual(["missing"]);
+  });
+
+  it("reports the build even when the glue cannot be imported", async () => {
+    vi.stubGlobal("fetch", wasmFetch(stampedWasm(HASH)));
+    const seen: string[] = [];
+    await expect(
+      initEngineGlue("data:text/javascript,throw new Error('glue failed')", { wasmUrl: "http://x/e.wasm", onBuild: (b) => seen.push(b.state) }),
+    ).rejects.toThrow();
+    expect(seen).toEqual(["ok"]);
   });
 
   it("does not report a build when the binary cannot be fetched", async () => {

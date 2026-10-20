@@ -139,7 +139,8 @@ describe("loadWasmEngine", () => {
   it("codes a package that lacks what this shell calls as a package mismatch", async () => {
     // A data URL module that loads and initializes but exports no Engine.
     const url = `data:text/javascript,${encodeURIComponent("export default async function init() {}")}`;
-    vi.stubGlobal("fetch", wasmFetch(EMPTY_WASM));
+    // The bytes path: this file runs in a DOM environment whose Response is not the engine's own.
+    vi.stubGlobal("fetch", wasmFetch(EMPTY_WASM, { type: "application/octet-stream" }));
     const err = await loadWasmEngine(url, { wasmUrl: "http://x/e.wasm" }).catch((e: unknown) => e);
     vi.unstubAllGlobals();
     expect(err).toBeInstanceOf(EngineBootError);

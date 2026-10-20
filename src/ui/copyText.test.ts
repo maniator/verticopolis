@@ -51,4 +51,35 @@ describe("copyText", () => {
     ).toBe(false);
     expect(document.querySelector("textarea")).toBeNull();
   });
+
+  it("puts the fallback textarea inside an open dialog, which is where a modal page can select", async () => {
+    const dialog = document.createElement("dialog");
+    document.body.appendChild(dialog);
+    (dialog as HTMLDialogElement & { open: boolean }).open = true;
+    let parent: Element | null = null;
+    document.execCommand = vi.fn(() => {
+      parent = document.querySelector("textarea")?.parentElement ?? null;
+      return true;
+    });
+    expect(await copyText("hello", { clipboard: undefined as unknown as Clipboard })).toBe(true);
+    expect(parent).toBe(dialog);
+  });
+
+  it("gives focus back to the control that had it", async () => {
+    const button = document.createElement("button");
+    document.body.appendChild(button);
+    button.focus();
+    document.execCommand = vi.fn(() => true);
+    await copyText("hello", { clipboard: undefined as unknown as Clipboard });
+    expect(document.activeElement).toBe(button);
+  });
+
+  it("does not claim success when the text could not be selected", async () => {
+    const exec = vi.fn(() => true);
+    document.execCommand = exec;
+    const select = vi.spyOn(HTMLTextAreaElement.prototype, "select").mockImplementation(() => {});
+    expect(await copyText("hello", { clipboard: undefined as unknown as Clipboard })).toBe(false);
+    expect(exec).not.toHaveBeenCalled();
+    select.mockRestore();
+  });
 });

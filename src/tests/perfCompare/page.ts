@@ -256,8 +256,8 @@ export interface WasmColdLoad {
  * compile them, instantiate the glue (a cache-busted copy, so it is a fresh
  * module), and build the first Engine from a fixed scenario's save. This is a
  * step-by-step stand-in: the app itself streams the compile
- * (instantiateStreaming), which the boot-path probe times on the WASM
- * process.
+ * (compileStreaming, then instantiates the compiled module; engineLoad.ts),
+ * which the boot-path probe times on the WASM process.
  */
 export async function wasmColdLoad(arg: { wasmUrl: string; jsUrl: string; scenario: string }): Promise<WasmColdLoad> {
   const save = (window as any).__perfSaves[arg.scenario] as string;
