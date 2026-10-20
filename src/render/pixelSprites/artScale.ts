@@ -34,11 +34,11 @@ export const ART_TILE = 11;
  *
  * Tiles are the scale-free statement of how big a room is, which is why capacity
  * hangs off them. Restating the room's SCREEN width instead only agrees while
- * the caller draws at the world tile: `/gallery` and `/preview` render rooms at
- * tile sizes of their own (up to 18px, and 12px), and a 12-tile boutique handed
- * over at 144px would read as 158 authored pixels and seat 22 browsers where the
- * game seats 18, so those pages would advertise a capacity the room does not
- * have.
+ * the caller draws at the world tile. Today every caller does (`/gallery` and
+ * `/preview` draw at world size and zoom with `ctx.scale`), but a caller that
+ * drew at a tile of its own would hand a 12-tile boutique over at 144px, which
+ * reads as 158 authored pixels and seats 22 browsers where the game seats 18.
+ * That page would advertise a capacity the room does not have.
  */
 export function authoredWidth(tiles: number): number {
   return tiles * ART_TILE;
@@ -80,7 +80,7 @@ export function screenLength(authoredLength: number): number {
  *
  * `minStep` is the item's own width, when the caller knows it. Compression has
  * to stop somewhere, and the honest floor is the point where items would start
- * drawing through each other: below it a row is not tighter, it is wrong. Pass
+ * drawing through each other: below it the row is wrong, however tight it looks. Pass
  * it and the count drops instead, which only bites where the run physically
  * cannot hold the authored count without stacking. Omit it and the row may
  * compress without limit, which is safe for a row whose items are narrower than
@@ -94,8 +94,8 @@ export function screenLength(authoredLength: number): number {
  * reason.
  *
  * Returns no anchors when nothing fits: a `limit` that has crossed `from` means
- * the room is too narrow for the row, which is a real case for the preview pages
- * that render rooms at their own sizes. The screen run binds at that end, so a
+ * the room is too narrow for the row, which is a real case for a caller that
+ * draws rooms at a size of its own. The screen run binds at that end, so a
  * row with authored room but no pixels seats nobody rather than an item that
  * would hang out of the box.
  *

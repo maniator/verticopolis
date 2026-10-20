@@ -82,8 +82,8 @@ function drawArcade(ctx: CanvasRenderingContext2D, x: number, floorY: number, w:
   const cabH = Math.min(floorY - top - 2, 22);
   const cabY = floorY - cabH;
   // Cabinet anchors: the cabinet-plus-gap slot is authored art, so the row is
-  // counted at the authored tile (the hall's width in tiles) and stepped at the
-  // current one. Counting slots off the pixel width retired a cabinet, and the
+  // counted against the authored run (the hall's width in tiles) and fitted
+  // into the screen run by `artRow`. Counting slots off the pixel width retired a cabinet, and the
   // player standing at it, when the tile narrowed. The far margin is 5 rather
   // than the near 3 because a player stands at the cabinet's right edge and
   // carries a contact-shadow column past it; at 3 the last one reached outside
@@ -144,9 +144,9 @@ function drawClaw(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   const gap = 4;
   const macH = Math.min(floorY - top - 2, 24);
   const macY = floorY - macH;
-  // Machine anchors, on the same rule as the arcade row: counted at the
-  // authored tile, stepped at the current one, with the far margin widened to
-  // hold the player who stands at the last machine's edge.
+  // Machine anchors, on the same rule as the arcade row: counted
+  // against the authored run, fitted into the screen run by `artRow`, with the
+  // far margin widened to hold the player who stands at the last machine's edge.
   const spots = artRow(aw - 3 - 5 - macW, x + 3, x + w - 5 - macW, macW + gap, 1, macW);
   const busy = busyStations(spots.length, occ, seed * 23);
   spots.forEach((mx) => {
@@ -214,9 +214,9 @@ function drawGolf(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   // A golfer mid-putt (only when someone is here), plus any extra visitors
   // watching. The watcher row is bounded by the bay WIDTH, not the raw occupant
   // count, so a forged/corrupt save with a huge `occupants` can never
-  // over-iterate. Its 12px pitch is authored art, so the row is counted at the
-  // authored tile and stepped at the current one: read off the pixel width, the
-  // bay lost a standing spot when the tile narrowed. The start clearance stays
+  // over-iterate. Its 12px pitch is authored art, so the row is counted
+  // against the authored run and fitted into the screen run by `artRow`: read
+  // off the pixel width, the bay lost a standing spot when the tile narrowed. The start clearance stays
   // in screen pixels because what it clears (the golfer and the putter) is
   // fixed-size art. A bay whose screen run is gone (`x + w - 7` left of
   // `x + 32`) gets no watcher; one with any run at all gets at least one.

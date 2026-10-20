@@ -191,8 +191,9 @@ reader is `src/render/atlas/lookup.ts`; in short:
 3. For most rooms, append `/home` when `occupants > 0`, else `/away`, and on a
    home frame draw the `occupants` chain up to `occupants - outForMeal`
    (rounded up, at least 0, at most the chain's `max`). Read `outForMeal` as
-   between 0 and `occupants`: a negative value is nobody out, and a value over
-   `occupants` is everybody out.
+   between 0 and `occupants`: a negative or non-finite value is nobody out, and
+   a value over `occupants` is everybody out. A non-finite `occupants` is
+   nobody.
 4. A parking space draws the `dead` overlay when it is not chained to a ramp;
    otherwise it draws `car<id % 7>` when it holds a car (the game's presence
    roll is spelled out in `signature.rules.parkingRoll`; the game re-paints a

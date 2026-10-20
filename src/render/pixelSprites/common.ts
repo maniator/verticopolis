@@ -94,9 +94,12 @@ export function hash(seed: number): number {
  * finite reads as nobody, and a corrupt `outForMeal` reads as nobody out, again
  * as the atlas reads them. `roomOccupants.test.ts` holds the two in step.
  *
- * Used by the room kinds whose crowds the #813 fix rewired. The others read
- * `visibleOccupants` directly and reach the same whole number through their
- * loops.
+ * Used by the room kinds whose crowds the #813 fix rewired. The residential,
+ * food, clinic and venue painters still read `visibleOccupants` directly. They
+ * round up through their loops and so agree for every honest value, but they
+ * do not clamp `outForMeal`: a negative or non-finite one gives them a
+ * different count from the atlas. Routing them through here is part of
+ * backlog row `room-painters-read-ts-engine` (#1106).
  */
 export function roomOccupants(u: { occupants: number; outForMeal?: number }): number {
   const occupants = Number.isFinite(u.occupants) ? Math.max(0, u.occupants) : 0;

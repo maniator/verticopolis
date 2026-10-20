@@ -161,8 +161,8 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
       // Classic cubicle row (the anchor layout): a bank of cubicles, staffed in
       // seat order up to the visible occupant count, one with an aisle plant.
       // The bank is counted against the room measured at the authored tile (its
-      // width in tiles, which the scale change did not move) and stepped at the
-      // current one, so a narrower tile tightens the aisles instead of retiring
+      // width in tiles, which the scale change did not move) and fitted into the
+      // screen width, so a narrower tile tightens the aisles instead of retiring
       // a desk and the worker sitting at it. It keeps its own count formula
       // rather than `artRow`'s: this row reserves 12px of room where `artRow`
       // would reserve a whole cubicle, and switching would add a fourth desk the
