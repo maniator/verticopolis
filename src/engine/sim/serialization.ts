@@ -5,9 +5,7 @@ import { coerceCalendarKind, type CalendarKind } from "../calendar";
 
 import { rentConfig } from "../econConfig";
 import { snapToLadder } from "../gameRules";
-
 import { Ledger } from "../Ledger";
-
 import { MILESTONES } from "../milestones";
 import { canonicalSubtype, subtypeListFor } from "../retailSubtypes";
 import { FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isFacilityKind, isFixedSpanTransport, isHotelKind, maxCarsFor } from "../facilities";
@@ -59,6 +57,7 @@ export function serialize(sim: Simulation): SerializedGame {
     lastVipNagDay: sim.lastVipNagDay,
     treasuresFound: sim.treasuresFound,
     exterminationDueDay: sim.exterminationDueDay,
+    ...(sim.exterminationDueDay !== undefined && sim.exterminationRoomIds ? { exterminationRoomIds: [...sim.exterminationRoomIds] } : {}),
     events: sim.events.saveState(),
     excavated: [...sim.excavated],
     blockbusters: sim.economy.blockbusterIds,
@@ -138,6 +137,7 @@ export function deserialize(raw: SerializedGame): Simulation {
     typeof data.treasuresFound === "number" && Number.isFinite(data.treasuresFound) ? data.treasuresFound : 0,
   );
   sim.exterminationDueDay = coerceExterminationDueDay(sim.rules.infestationRecovery() !== null, sim.clock.day, data.exterminationDueDay);
+  sim.exterminationRoomIds = sim.exterminationDueDay === undefined ? undefined : coerceExterminationRoomIds(data.exterminationRoomIds);
   // Restore excavation history so buried treasure stays one-time per tile across
   // a save/reload (otherwise the build/bulldoze exploit reopens on load).
   if (Array.isArray(data.excavated)) {
@@ -497,4 +497,4 @@ export function newGame(seed = 12345, mode: GameMode = "classic", modernCalendar
   return sim;
 }
 
-import { serializeUnit, serializeTransport, coerceLog, coerceView, coerceDirtyDays, coerceExterminationDueDay } from "./coerce";
+import { serializeUnit, serializeTransport, coerceLog, coerceView, coerceDirtyDays, coerceExterminationDueDay, coerceExterminationRoomIds } from "./coerce";
