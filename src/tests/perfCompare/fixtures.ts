@@ -14,6 +14,7 @@ export function config(over: Partial<CompareConfig> = {}): CompareConfig {
     speed: 3,
     viewport: { width: 1280, height: 720 },
     scenarios: ["small"],
+    aa: null,
     quick: false,
     ...over,
   };

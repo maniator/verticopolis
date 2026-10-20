@@ -45,6 +45,22 @@ simulation's behavior today.
 5. **AC5 Version bump: major.** Players see no change, but the engine
    substrate is a headline milestone and the update flow should say so.
 
+## What it removes
+
+The inventory (what goes, what moves out of `src/engine/` first, what stays
+in the browser, what to close before the removal, and which open and planned
+work adds code this story removes) is the "Retiring the TypeScript engine:
+the inventory" section of the roadmap,
+`_bmad-output/planning-artifacts/architecture/architecture-engine-rust-port-2026-10-08.md`.
+It is a snapshot of `main` at `e34dfdf` (2026-10-20). AC5 disagrees with the
+roadmap's row 7 and the spine on the version bump; #1107 settles it.
+
+Temporary code this story also removes that the roadmap's section does not
+list, such as anything merged or opened after its snapshot (each PR adds its
+own line: the PR, the files, and why the fallback needs them):
+
+- None yet.
+
 ## Sequence it sits in
 
 See the roadmap's "Order and gates" section:
