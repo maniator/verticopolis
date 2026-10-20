@@ -57,6 +57,9 @@ export interface Ratio {
  */
 export const UNTHROTTLED_WORKER = (mode: ModeName, throttle: string): boolean => mode === "wasm-worker" && throttle !== "1";
 
+/** The mode a run actually ran: its slot, except in an A/A pass, where both slots run `config.aa`. */
+export const ranOf = (r: Pick<ModeRun, "mode" | "ranMode">): ModeName => r.ranMode ?? r.mode;
+
 type MetricPick = (r: ModeRun) => number | null | undefined;
 interface Def { group: Metric["group"]; scenario: string; throttle: string; metric: string; unit: string; better: "lower" | "higher"; pick: MetricPick }
 
@@ -77,8 +80,8 @@ export function definitions(config: WorkerConfig): Def[] {
       // A sample only when every part of it was read: the worker's heap and
       // linear memory on the worker host, the page's linear memory on the
       // main-thread WASM hosts.
-      if (r.mode === "wasm-worker" && (m.workerHeapUsedBytes === null || m.workerWasmBytes === null)) return null;
-      if ((r.mode === "wasm" || r.mode === "wasm-frame") && m.mainWasmBytes === null) return null;
+      if (ranOf(r) === "wasm-worker" && (m.workerHeapUsedBytes === null || m.workerWasmBytes === null)) return null;
+      if ((ranOf(r) === "wasm" || ranOf(r) === "wasm-frame") && m.mainWasmBytes === null) return null;
       return m.mainHeapUsedBytes + (m.workerHeapUsedBytes ?? 0) + (m.mainWasmBytes ?? 0) + (m.workerWasmBytes ?? 0);
     } });
     add({ group: "memory", scenario: sc, throttle: "1", metric: "browser process PSS", unit: "bytes", better: "lower", pick: (r) => s(r)?.memory.processPssBytes });
@@ -187,12 +190,18 @@ export function validate(config: WorkerConfig, runs: readonly ModeRun[], rendere
       else if (!r[0].ok) errors.push(`rep ${rep} ${mode}: failed: ${r[0].error}`);
     }
   }
+  // Validation by the mode that ran: in an A/A pass both slots must have run
+  // the asked-for mode, and in a comparison every run its own.
+  for (const r of runs) {
+    const want = config.aa ?? r.mode;
+    if (ranOf(r) !== want) errors.push(`rep ${r.rep} ${r.mode}: the run was asked for ${want} but recorded ${ranOf(r)}`);
+  }
   const versions = new Set(runs.map((r) => r.browserVersion).filter((v) => v !== null));
   if (versions.size > 1) errors.push(`the runs used different browser builds: ${[...versions].join(", ")}`);
   for (const r of runs) {
     if (!r.ok) continue;
     if (r.offline?.error) warnings.push(`rep ${r.rep} ${r.mode}: the offline measurement failed: ${r.offline.error}`);
-    else if (r.offline && r.offline.onlineMode !== r.mode) warnings.push(`rep ${r.rep} ${r.mode}: the service-worker visit came up on ${r.offline.onlineMode}, not ${r.mode}`);
+    else if (r.offline && r.offline.onlineMode !== ranOf(r)) warnings.push(`rep ${r.rep} ${r.mode}: the service-worker visit came up on ${r.offline.onlineMode}, not ${ranOf(r)}`);
     for (const name of config.scenarios) {
       const sc = r.scenarios[name];
       if (!sc) {
@@ -202,16 +211,16 @@ export function validate(config: WorkerConfig, runs: readonly ModeRun[], rendere
       for (const rate of config.throttles) {
         if (!sc.hosted[String(rate)]) errors.push(`rep ${r.rep} ${r.mode} ${name}: no ${rate}x hosted run`);
         if (!sc.frames[String(rate)]) errors.push(`rep ${r.rep} ${r.mode} ${name}: no ${rate}x frames run`);
-        if ((r.mode === "ts" || r.mode === "wasm") && !sc.raw?.[String(rate)]) errors.push(`rep ${r.rep} ${r.mode} ${name}: no ${rate}x bare engine run`);
+        if ((ranOf(r) === "ts" || ranOf(r) === "wasm") && !sc.raw?.[String(rate)]) errors.push(`rep ${r.rep} ${r.mode} ${name}: no ${rate}x bare engine run`);
       }
     }
     for (const [name, sc] of Object.entries(r.scenarios)) {
-      if (r.mode === "wasm-worker") {
+      if (ranOf(r) === "wasm-worker") {
         if (sc.memory.workerWasmBytes === null) warnings.push(`rep ${r.rep} wasm-worker ${name}: the worker's WASM memory was not reported, so its combined memory has no sample`);
         for (const [t, h] of Object.entries(sc.hosted)) if (!h.worker) errors.push(`rep ${r.rep} wasm-worker ${name} ${t}x hosted: no worker counters`);
         for (const [t, f] of Object.entries(sc.frames)) if (!f.worker) errors.push(`rep ${r.rep} wasm-worker ${name} ${t}x frames: no worker counters`);
       }
-      if (r.mode === "wasm-worker" && sc.memory.workerHeapUsedBytes === null) warnings.push(`rep ${r.rep} wasm-worker ${name}: the worker's JS heap could not be read, so its combined memory has no sample`);
+      if (ranOf(r) === "wasm-worker" && sc.memory.workerHeapUsedBytes === null) warnings.push(`rep ${r.rep} wasm-worker ${name}: the worker's JS heap could not be read, so its combined memory has no sample`);
       const f1 = sc.frames["1"];
       if (f1 && f1.simMinutesPerSecond < 1) warnings.push(`rep ${r.rep} ${r.mode} ${name} 1x frames: ${f1.simMinutesPerSecond.toFixed(2)} sim-minutes per second, so the window ran almost no simulation (clamped frames: ${f1.clampedFrames})`);
     }
