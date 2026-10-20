@@ -23,14 +23,15 @@ export interface WasmHostStatus extends HostErrors {
   /** Whether the current tower runs on the engine (false after a refusal). */
   hosted: boolean;
   /** Towers left on the TypeScript engine (or, in a wasm-only build, the
-   *  stop) so far, every one counted where `errors` keeps only the first 50. */
+   *  stop) so far, every one counted where `errors` keeps only the first ones. */
   fallbacks: number;
   /** The code and stage of the latest fallback, as analytics reports it
    *  (`engine_status`); null while there has been none. */
   lastFallback: HostFallback | null;
 }
 
-/** A fallback as codes only: the message stays in `errors` and the log. */
+/** A fallback as codes only: its message is `lastError` until a later
+ *  error replaces it, is in `errors` while that list has room, and is logged. */
 export interface HostFallback {
   reason: FallbackReason;
   stage: FallbackStage;

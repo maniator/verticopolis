@@ -7,6 +7,7 @@ import { settleEngine, stepGate, setStepGate, SETTLE_TIMEOUT_MS } from "./stepGa
 import type { FromWorker, ToWorker } from "./workerProtocol";
 import { fakeModule } from "./fakeEngine.fixture";
 import { EngineBootError } from "./engineBoot";
+import { HOST_ERROR_HISTORY } from "./hostErrors";
 
 const last = <T>(xs: readonly T[]): T | undefined => xs[xs.length - 1];
 
@@ -45,7 +46,7 @@ function app(): WasmHostApp {
 }
 
 describe("worker controller (fake engine)", () => {
-  it("retains the latest failure after 50 refused towers", async () => {
+  it("retains the latest failure once the error list is full, including after recovery", async () => {
     const a = app();
     const failedTower = (i: number) => {
       const sim = Simulation.newGame(i, "classic");
@@ -55,18 +56,43 @@ describe("worker controller (fake engine)", () => {
     a.sim = failedTower(1);
     const log = { info: vi.fn(), error: vi.fn() };
     const h = startWorkerHost(a, await spawnEngineWorker(fakeWorker, "u"), () => Promise.reject(new Error("unexpected restart")), log);
+    const lastFailed = HOST_ERROR_HISTORY + 1;
     try {
-      for (let i = 2; i <= 51; i++) a.adoptSim(failedTower(i));
-      expect(h.status.errors).toHaveLength(50);
-      expect(h.status.lastError).toBe("not hosting this tower: failure 51");
+      for (let i = 2; i <= lastFailed; i++) a.adoptSim(failedTower(i));
+      expect(h.status.errors).toHaveLength(HOST_ERROR_HISTORY);
+      expect(h.status.lastError).toBe(`not hosting this tower: failure ${lastFailed}`);
       expect(h.status.droppedErrors).toBe(1);
-      expect(log.error).toHaveBeenCalledTimes(51);
-      a.adoptSim(Simulation.newGame(52, "classic"));
+      expect(log.error).toHaveBeenCalledTimes(lastFailed);
+      a.adoptSim(Simulation.newGame(lastFailed + 1, "classic"));
       await h.settle();
       expect(h.status.hosted).toBe(true);
-      a.adoptSim(failedTower(53));
-      expect(h.status.lastError).toBe("not hosting this tower: failure 53");
-      expect(h.status.droppedErrors).toBe(2);
+      a.adoptSim(failedTower(lastFailed + 2));
+      expect(h.status).toMatchObject({ hosted: false, lastError: `not hosting this tower: failure ${lastFailed + 2}`, droppedErrors: 2 });
+      expect(h.status.errors).toHaveLength(HOST_ERROR_HISTORY);
+      expect(h.status.errors[0]).toBe("not hosting this tower: failure 1");
+      expect(log.error).toHaveBeenCalledTimes(lastFailed + 1);
+    } finally {
+      h.stop();
+    }
+  });
+
+  it("names a worker crash as the latest error even when letting go of the tower throws", async () => {
+    const first = await spawnEngineWorker(fakeWorker, "u");
+    const w = first.worker;
+    const h = startWorkerHost(app(), first, () => Promise.reject(new Error("no restart")), quiet);
+    try {
+      await h.settle();
+      const host = h.current()!;
+      host.detach = () => {
+        throw new Error("detach broke");
+      };
+      w.onerror?.({ message: "boom" });
+      expect(h.status).toMatchObject({
+        hosted: false,
+        errors: ["letting go of the last tower: detach broke", "the engine worker crashed: boom"],
+        lastError: "the engine worker crashed: boom",
+        droppedErrors: 0,
+      });
     } finally {
       h.stop();
     }
@@ -76,7 +102,7 @@ describe("worker controller (fake engine)", () => {
     const first = await spawnEngineWorker(fakeWorker, "u");
     const a = app();
     const h = startWorkerHost(a, first, () => spawnEngineWorker(fakeWorker, "u"), quiet);
-    expect(h.status).toMatchObject({ hosted: true, starts: 1, placement: "worker" });
+    expect(h.status).toMatchObject({ hosted: true, starts: 1, placement: "worker", errors: [], lastError: null, droppedErrors: 0 });
     await tasks();
     expect(h.current()?.loaded()).toBe(true);
     a.adoptSim(a.sim); // the tower already held keeps its host

@@ -107,10 +107,11 @@ export function startWorkerHost(app: WasmHostApp, first: SpawnedWorker, respawn:
   let gen = 0;
   let stopped = false;
   let respawning: Promise<void> | null = null;
-  // Keep the first 50 errors and the latest failure; log every error.
+  // Record before logging, as the main-thread host does. Every error is
+  // logged.
   const noteError = (message: string) => {
-    log.error(`[wasm-worker] ${message}`);
     recordHostError(status, message);
+    log.error(`[wasm-worker] ${message}`);
   };
   const release = () => {
     const h = host;
@@ -124,8 +125,10 @@ export function startWorkerHost(app: WasmHostApp, first: SpawnedWorker, respawn:
   };
   /** Drop the worker: its tower goes back to the TypeScript engine. */
   const kill = (message: string) => {
-    noteError(message);
+    // Let the tower go first, so a detach that throws is recorded before the
+    // cause and `lastError` names the cause.
     release();
+    noteError(message);
     const w = worker;
     worker = null;
     if (w) {
