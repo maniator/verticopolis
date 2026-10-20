@@ -13,11 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.35.2
+## 2.37.0
 
 - Busy rooms fill their seats again. Several had quietly stopped using their last few, and left the people at them undrawn.
 
-## 2.35.1
+## 2.36.0
 
 - The parking spaces, ramp, security office, clinic, housekeeping room, and recycling center are drawn on the current pixel grid, so the camera monitors, the folded linen, the clinic's bottles and the hazard tape are evenly spaced instead of drifting a pixel here and there.
 
