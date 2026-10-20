@@ -413,10 +413,14 @@ jobs:
           npm run gen:events
           test -z "$(git status --porcelain -- src/dualrun/engine.d.ts src/engine/gameplayEvents.d.ts src/engine/gameplayEventRules.ts)" || { echo "src/dualrun/engine.d.ts, src/engine/gameplayEvents.d.ts or src/engine/gameplayEventRules.ts is stale or untracked: run npm run wasm:build (or npm run gen:events for the two event files) and commit them"; exit 1; }
 
+      # The step limit and the start log keep a stall from running to the job's
+      # limit with no test name (#1152); see the same step in test.yml.
       - name: Conformance through the binding
+        timeout-minutes: 12
         env:
           # A missing package fails the suite here instead of skipping it.
           VC_REQUIRE_WASM: "1"
+          VC_LOG_TEST_STARTS: "1"
         run: npm run test:wasm
 
       - name: Fail a cancelled run

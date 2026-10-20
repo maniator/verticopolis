@@ -7,6 +7,14 @@ use serde_json::Value;
 
 use crate::sim::Simulation;
 
+/// The version of the frame view's layout, reported by `engineIdentity()`.
+/// Raise it, in the same commit, when a slot's offset or a record's width
+/// changes (`identity_tests.rs` pins every offset and width, and fails with
+/// the table) or when a slot's meaning or a state, routine or weather code
+/// changes (no test sees that; it is a review item). The compat record pins
+/// this number, so raising it also asks for a crate version bump.
+pub const FRAME_LAYOUT_VERSION: u32 = 1;
+
 /// The header slots of the frame view by name, so a native decoder reads
 /// `v[header::MONEY]` instead of a bare index. A group of values starts at
 /// its named slot: `EXPLOSION_FX` is seq, floor, x; `THIEF_FX` is seq,

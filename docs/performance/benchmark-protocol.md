@@ -47,40 +47,61 @@ A run records the browser it used (product, version, channel, extra switches,
 executable path and the WebGL renderer), and a report is comparable with a
 reference only when the browser build, the channel, the switches and the
 renderer all match. The references are the 2026-10-15 runs, the A/A
-folders of one calibration and any earlier acceptance run. When any of those
+folders of one calibration and any earlier acceptance run on the counting
+browser below. When any of those
 differ, the reference is run again on the same settings before it is used.
 `--resume` refuses a change of any of them. `perf:calibrate` refuses passes
 that differ in them and passes without a verified GPU (`gpuVerified`).
 
-What the references ran, from their committed `results.json` files: the two
-2026-10-15 folders (`2026-10-15-e25ec01-worker` and
-`2026-10-15-e25ec01c-worker-1280x720`) ran the full bundled Chromium binary
-(`.../ms-playwright/chromium-1228/chrome-win64/chrome.exe`, user agent
-`HeadlessChrome/149.0.0.0`), reached through `PW_CHROMIUM_PATH`, and got ANGLE
-on Direct3D 11 with the RTX 3060. RUN-0a ran Playwright's default headless
-shell (`executable: null`, `HeadlessChrome/149.0.7827.55`) and got SwiftShader.
-So the reference build is the full binary, and the lever that is expected to
-bring the GPU up on the owner's PC is `PW_CHROMIUM_PATH` pointed at that
-`chrome.exe`. `PW_CHROMIUM_CHANNEL=chromium` launches the same binary in the
-same headless mode, so it should match, but it records a channel where the
-references record a path, and only the PC probe can show that the two give the
-same renderer. Until the probe has run, a channel run is a different setting
-from the references.
+**The counting browser (the owner's decision for #1115, 2026-10-20).** The
+counting browser is Playwright's full bundled Chromium binary, not the default
+headless shell:
 
-Until the owner accepts a browser setting, nothing counts as the acceptance
-setting: the owner names the build, the channel and the switches in the
-decision that settles #1115, and this section is edited to say so in the same
-change. An installed Chrome (`PW_CHROMIUM_CHANNEL=chrome`, or
-`PW_CHROMIUM_PATH` at an installed `chrome.exe`) is a one-off check whose
-results folder says so. Installed Chrome updates itself, so a run on it
-records the version it ran, and a later run on a newer version is not
-comparable.
+| Setting | Value |
+| --- | --- |
+| Product and version | Chromium 149.0.7827.55 (Playwright's `chromium-1228` revision) |
+| Executable | `<ms-playwright>/chromium-1228/chrome-win64/chrome.exe`, reached through `PW_CHROMIUM_PATH` (on the owner's PC `C:\Users\nafta\AppData\Local\ms-playwright\chromium-1228\chrome-win64\chrome.exe`) |
+| Channel | none (`PW_CHROMIUM_CHANNEL` unset) |
+| Mode | headless; the user agent reads `HeadlessChrome/149.0.0.0` |
+| Launch switches | the harness's own two, `--autoplay-policy=no-user-gesture-required` and `--js-flags=--expose-gc`; no `PW_CHROMIUM_ARGS`, no GPU-selection switch |
+| WebGL renderer | `ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)`, vendor `Google Inc. (NVIDIA)` |
+
+The two 2026-10-15 folders (`2026-10-15-e25ec01-worker` and
+`2026-10-15-e25ec01c-worker-1280x720`) record exactly this browser in their
+committed `results.json`. The #1051 PC runs of 2026-10-20 launched it again
+and the preflight read the same renderer string on all three launches
+(`pc-run-1051-preflight-after.txt`, a project file, not in the repo). Both
+show that the setting brings the GPU up on the owner's PC with no extra
+switch, so no switch is added.
+
+A run counts only when it used this browser and the renderer check
+(`gpuVerified`, below) passed, and the rest of the protocol held (clean tree,
+10 paired reps, valid folder, no `--quick`, no exception). A run that cannot
+meet all of that is a smoke or a preview and its numbers are not evidence.
+Software-rendered runs are not accepted after the fact: RUN-0a (default
+headless shell, `HeadlessChrome/149.0.7827.55`, ANGLE on Vulkan SwiftShader),
+RUN-0b-prelim (SwiftShader) and every cloud folder stay in the repo as what
+they are, with their own notes, and no later change to this section makes
+them count. Their bare-step rows are not rescued either; a number that is
+needed is measured again on the counting browser.
+
+`PW_CHROMIUM_CHANNEL=chromium` launches the same binary in headless mode but
+records a channel where the references record a path, so a channel run is a
+different setting from the counting browser until a probe shows the same
+renderer, and it still does not match the reference identity that
+`perf:calibrate` and `--resume` check. An installed Chrome
+(`PW_CHROMIUM_CHANNEL=chrome`, or `PW_CHROMIUM_PATH` at an installed
+`chrome.exe`) is a one-off check whose results folder says so. Installed
+Chrome updates itself, so a run on it records the version it ran, and a later
+run on a newer version is not comparable. If Playwright is upgraded, the
+counting browser changes with it: the new build, version and renderer replace
+this table in the same change, and every reference is run again on it before
+it is used.
 
 Headless is the harness's only mode and the only mode that counts. Headed mode
 (the first option #1115 lists) is declined: the harness has no headed launch,
-and a headed browser changes the frame pacing the protocol measures. If no
-headless setting reaches the GPU on the owner's PC, headed mode is still owed
-as its own change, with its own references.
+and a headed browser changes the frame pacing the protocol measures. The
+counting browser reaches the GPU headless, so headed mode is not owed.
 
 **The renderer must be the GPU.** The 2026-10-15 reference runs recorded ANGLE
 on Direct3D 11 with the RTX 3060. RUN-0a (2026-10-20) ran on ANGLE with Vulkan
@@ -167,9 +188,9 @@ rasterizer, choose the browser for the next run through the environment
 (PowerShell: `$env:NAME = "value"`) and read the first lines of the console,
 which print the product, version and renderer before anything builds:
 
-- `PW_CHROMIUM_PATH` points at a browser binary (the reference build above is
-  the first thing to try). `PW_CHROMIUM_CHANNEL` is one of `chromium` (the
-  full bundled Chromium in new headless mode), `chrome`, `chrome-beta`,
+- `PW_CHROMIUM_PATH` points at a browser binary (the counting browser above).
+  `PW_CHROMIUM_CHANNEL` is one of `chromium` (the full bundled Chromium in new
+  headless mode), `chrome`, `chrome-beta`,
   `chrome-dev`, `chrome-canary` or `msedge` and its variants. Set one of them,
   not both. An empty `PW_CHROMIUM_PATH` counts as unset.
 - `PW_CHROMIUM_ARGS` takes only switches that choose how the GPU is reached:
@@ -190,11 +211,10 @@ which print the product, version and renderer before anything builds:
   Browser row prints them, and the browser version and renderer are part of
   the machine identity that `--resume` checks.
 
-Which of these brings the GPU up on the owner's PC is not known from the
-cloud. The PC probe for #1125 (a project file, `pc-probe-1125-gpu.md`, not in the
-repo) settles it, and its notes say what was set. Backlog row #1115 closes only after a PC report names a hardware
-renderer, this section names the counting build, channel and switches, and the
-references have been run again where those differ.
+The owner's PC reaches the GPU with `PW_CHROMIUM_PATH` alone (the counting
+browser in section 1, "Which browser counts"); the channel and switch variables
+stay available for a one-off probe on another machine, and a run that sets
+either is a different setting from the counting browser.
 
 RUN-0a is the exception to all of this. Its `e25ec01` tree has neither the
 check nor the variables above, and both of its runners launch with
@@ -719,6 +739,9 @@ What it does not do, so a reader does not assume it:
   Worker (measured on Chromium 141), so the `wasm-worker` rows at 4x have a
   barely throttled engine thread. Those rows carry a dagger in both reports and
   the CSV `unthrottled` column says `worker`.
+  A 4x TypeScript-versus-worker throughput comparison is therefore not release
+  evidence (the owner's decision of 2026-10-20). The before/after comparison
+  of the worker against itself can still inform the #1068 decision.
 - **No separate hour-pass spike row.** The hourly main-thread spike is read
   from the per-batch maximum and the frame-time p99 rows.
 - **No GPU driver version check.** The runs do not record it.
@@ -805,8 +828,8 @@ npm.cmd run perf:compare -- --aa ts   --reps 10 --skip-build --out docs/performa
 npm.cmd run perf:compare -- --aa wasm --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b-aa-wasm-1
 ```
 
-Before the 10-rep commands, set the settled browser variables (the owner's
-decision for #1115; section 1 "Which browser counts") and run `npm.cmd run
+Before the 10-rep commands, set `PW_CHROMIUM_PATH` to the counting browser
+(section 1, "Which browser counts") and run `npm.cmd run
 perf:worker -- --quick --reps 1 --scenarios <one>` once to read the console's
 renderer line. The 10-rep commands start only after it names a hardware adapter. Both
 harnesses repeat the check before they build and stop on anything else.
