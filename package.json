@@ -27,6 +27,7 @@
     "perf:worker": "tsx scripts/perf-worker.ts",
     "perf:calibrate": "tsx scripts/perf-calibrate.ts",
     "perf:before-after": "tsx scripts/perf-before-after.ts",
+    "perf:worker-diff": "tsx scripts/perf-worker-diff.ts",
     "lint": "eslint src api --ext .ts,.tsx",
     "lint:fix": "eslint src api --ext .ts,.tsx --fix",
     "screenshots": "VC_TOOLING=1 vite build && RUN_SERVER=1 node scripts/screenshots.ts",

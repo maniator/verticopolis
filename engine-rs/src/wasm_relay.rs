@@ -133,7 +133,7 @@ mod tests {
         let lift = sim.tower.transport_at(1, 10).unwrap().id;
         sim.money = 1_000_000.0;
         sim.gameplay.drain();
-        (Engine { sim }, lift, office)
+        (Engine::of(sim), lift, office)
     }
 
     fn invalid(text: String) {
