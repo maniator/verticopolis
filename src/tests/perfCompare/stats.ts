@@ -139,10 +139,11 @@ export interface PairedDifference {
   ciHigh: number | null;
 }
 
-/** The median of a minus b, paired by repetition number, with the 95% order-statistic interval of the median; null when nothing pairs. The one definition the M4 and M5 gates and their report cells read. */
+/** The median of a minus b, paired by repetition number, with the 95% order-statistic interval of the median; null when nothing pairs or a difference is not a finite number. The one definition the M4 and M5 gates and their report cells read. */
 export function pairedDifference(a: { reps: readonly number[]; values: readonly number[] }, b: { reps: readonly number[]; values: readonly number[] }): PairedDifference | null {
   const diffs = pairedDifferences(a, b);
-  if (!diffs.length) return null;
+  // A damaged value (a JSON null reads as NaN) leaves the row without a statistic, thin or not.
+  if (!diffs.length || !diffs.every(Number.isFinite)) return null;
   const s = summarize(diffs);
   return { n: s.n, median: s.median, ciLow: s.medianCiLow, ciHigh: s.medianCiHigh };
 }
