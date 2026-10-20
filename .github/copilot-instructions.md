@@ -95,9 +95,10 @@ don't claim a skill was invoked:
   inline yourself rather than invoking anything.
 - **Apply the review dimensions in the “Code review” section below,** scoped to
   the implicated lenses. Prefer a few high-signal findings over filler.
-- **On a hot-path diff, run the hot-path checklist** (the surfaces are listed
-  in section 1 of
-  [`docs/performance/hot-path-review.md`](../docs/performance/hot-path-review.md)).
+- **On a hot-path diff, run the hot-path checklist**: a diff that touches any
+  surface section 1 of
+  [`docs/performance/hot-path-review.md`](../docs/performance/hot-path-review.md)
+  lists.
   Apply items HP-1 to HP-12 inline, as the skills' Hot-Path Auditor layer
   would, reading callers in the checked-out repository, and print the section
   6 table with one row per item. See the Performance dimension below.
@@ -134,13 +135,13 @@ just the obvious lines in the diff, and flag anything CI wouldn't catch:
 - **Security:** untrusted input (saves, persistence) must degrade
   gracefully and never crash or trust foreign data.
 - **Performance on hot paths:** apply the same checklist to every surface its
-  section 1 lists (Rust, TypeScript, the WASM binding, the hosts, simulation
-  ticks, rendering, saves, UI, analytics, audio and the engine build). Flag
-  whole-collection walks, route searches, clones, sorts, rebuilt maps and id
-  scans under any HP-2 multiplier, in either language and inside helpers.
-  Review ported and inherited code as new, and check a port against the
-  TypeScript's caches (HP-8). Resolve findings under section 7, and report a
-  pre-existing one too.
+  section 1 lists (the app shell included). Flag whole-collection walks, route
+  searches, clones, sorts, rebuilt maps and id scans under any HP-2
+  multiplier, in either language and inside helpers. Review ported, rewritten
+  and inherited code as new, and check a port against the TypeScript's caches
+  (HP-8). Report each finding for resolution under section 7, marked `patch`
+  or `defer`, pre-existing ones too (naming the open issue that lists one, if
+  any).
 
 See [`CONTRIBUTING.md`](../CONTRIBUTING.md) → "Code review" for the
 deep-review-before-merge policy every change must meet;

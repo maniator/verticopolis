@@ -32,13 +32,15 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   in Rust, TypeScript, the WASM binding, the hosts, ticks, rendering and the
   other surfaces its section 1 lists. The review skills load it and add a
   Hot-Path Auditor layer that traces callers past the diff. The skills and the
-  independent reviewer print its one-row-per-item record, and Copilot and Codex
-  are asked to; without a record on the PR there is no GO and no sign-off.
-  Ported, moved or inherited code is reviewed as new. A finding is fixed or
-  deferred with evidence and an issue, and never dismissed as pre-existing; a
-  new, ported or moved scan over its tier's budget, or a dropped TypeScript
-  cache, gets fixed unless the owner accepts the deferral. PRs opened before
-  the page merged keep the review they had.
+  independent reviewer post its one-row-per-item record (its section 6) on the
+  PR, and Copilot and Codex are asked to print it. On a hot-path diff there is
+  no GO or CONDITIONAL GO without that record, and a Copilot or Codex sign-off
+  covers the hot-path part only once a record from the skill or the independent
+  reviewer is on the PR. Ported, rewritten, moved or inherited code is reviewed
+  as new. A finding is fixed or deferred with evidence and an issue, and never
+  dismissed as pre-existing; an added, ported or rewritten scan over its tier's
+  budget, or a dropped or removed cache, gets fixed unless the owner accepts the
+  deferral. Only #1139 keeps the review it had before the page merged.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
   `npm test`, `npm run build`. All four must be green. The build needs the
   engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a
@@ -121,7 +123,9 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 - **Enable auto-merge only after Copilot has signed off and CI is green, never
   speculatively.** Signed off means Copilot has reviewed the PR and left no
   blocking finding unresolved (an approval, or a review whose comments are all
-  addressed and marked resolved). CI green means every required check has
+  addressed and marked resolved). On a hot-path diff, signed off also needs
+  the section 6 record of `docs/performance/hot-path-review.md` on the PR, from
+  the review skill or the independent reviewer. CI green means every required check has
   passed, the screenshot drift check included. Do not arm auto-merge before
   both hold, and do not arm it early so it fires the moment the checks pass.
   Once both hold, auto-merge using a merge commit (never a squash-merge, per

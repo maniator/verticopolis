@@ -15,11 +15,13 @@ and the hosts.
 
 ## 1. When it applies
 
-Apply the checklist to any change that adds, ports, rewrites or moves
+Apply the checklist to any change that adds, ports, rewrites, moves or removes
 production code reachable from an entry point in section 2, or makes such code
 call something new. These paths always count as hot-path surfaces; so does any
-other production file whose changed code an entry point calls. Tests,
-fixtures, docs and tooling outside the table are not hot paths.
+other production file whose changed code an entry point calls. Tests
+(`*.test.ts`, `src/tests/`, `e2e/`, `engine-rs/tests/`, the
+`engine-rs/src/*_tests.rs` files and Rust `#[cfg(test)]` modules), fixtures,
+docs and tooling are not hot paths, even inside a path below.
 
 | Surface | Paths |
 | --- | --- |
@@ -36,9 +38,12 @@ A port or a rewrite changes every line it adds, so all of it is in scope,
 including algorithms copied unchanged. A diff that touches no hot-path surface
 records one line saying so (section 6).
 
-A PR opened before this page merged keeps the review it already has: the page
-adds no merge condition to it, and the costs it ships are listed in #1158. The
-next PR that changes the same code applies the checklist.
+This page took effect when it merged (2026-10-20, 19:49 UTC). One PR keeps the
+review it already had: #1139 (the bare-step indexes for #1051), at the owner's
+request. Hot-path code pushed to #1139 after that time gets the checklist, and
+a cost #1139 ships that no open issue lists is added to #1158. Every other PR,
+including those opened before the page merged (#1068, #1092 and #1157 among
+them), gets the checklist on its next review, over its whole diff.
 
 ## 2. Frequencies and sizes
 
@@ -52,10 +57,10 @@ with `buildLargeTower` and the fixture loaders in
 | Tier | Entry point | How often |
 | --- | --- | --- |
 | Per frame | the host's frame read (`frame_view`, then `decodeFrame` or `applyRecords` in `src/wasmhost/`), render sync, `runFrame` in `src/game/frameLoop.ts`, build preview (`canBuild` on every pointer move) | every rendered frame |
-| Per step | `Simulation::advance_step` (`engine-rs/src/sim_loop.rs`) / `advanceStep` (`src/engine/sim/loop.ts`): elevator demand, the spawn step, construction | a step is 1 to 20 game minutes (`quantumFor` in `src/engine/sim/fixedStep.ts`), sized so about one runs per frame, at most `MAX_STEPS_PER_FRAME` (4); the perf harness steps 2 minutes, 720 per game day |
-| Per chunk | motion chunks of up to 2.5 game minutes inside a step: `elevator_calls`, `move_cars`, `motion::advance` | one per short step, up to 8 per 20-minute step |
-| Per hour | `on_hour`: presence, hotel checkout, housekeeping dispatch, satisfaction, move-ins, traffic income, elevator utilization, star evaluation | every 60 game minutes (30 steps in the perf harness) |
-| Per day | `on_day`: rent and maintenance, random events, VIP, milestones, nudges | every game day |
+| Per step | `Simulation::advance_step` (`engine-rs/src/sim_loop.rs`) / `advanceStep` (`src/engine/sim/loop.ts`): elevator demand, the spawn step, construction. `tick` runs one or more steps, so "per tick" elsewhere means per step | a step is 1 to 20 game minutes (`quantumFor` in `src/engine/sim/fixedStep.ts`), sized so about one runs per frame, at most `MAX_STEPS_PER_FRAME` (4); the perf harness steps 2 minutes, 720 per game day |
+| Per chunk | motion chunks of up to 2.5 game minutes inside a step: `elevator_calls` / `elevatorCalls`, `move_cars` / `moveCars`, `motion::advance` and the crowd's advance | one per short step, up to 8 per 20-minute step |
+| Per hour | `on_hour` / `onHour`: presence, hotel checkout, housekeeping dispatch, satisfaction, move-ins, traffic income, elevator utilization, star evaluation | every 60 game minutes (30 steps in the perf harness) |
+| Per day | `on_day` / `onDay`: rent and maintenance, random events, VIP, milestones, nudges | every game day |
 | Per command | place, remove, transport edits, load | per player action. Every revision-keyed cache rebuilds after an edit, so its build cost counts here too |
 | Wall clock | HUD and panel refresh (about every 160 ms in `runFrame`), audio (about 6 per second), autosave (serializes the tower every 30 s) | fixed real-time cadence |
 
@@ -80,7 +85,7 @@ it. Example: `max_staff_for` walks all U to count housekeeping units. It runs
 for each staff spawn attempt, inside a loop over candidate rooms and crews in
 `dispatch_housekeepers`, which runs every hour in shift and on every step that
 returns staff results. A cloud native profile of the owner's save at ab49f86
-(2026-10-20) put it at 26% self time of the bare step, a relative share that #1143 tracks.
+(2026-10-20) put it at 26% self time of the bare step, a cloud estimate of its relative share that #1143 tracks.
 
 ## 3. The checklist
 
@@ -113,16 +118,29 @@ list is open:
   `.values()` / `.keys()`; `Vec::contains`; `retain`; `extend`; `Vec::remove`
   and `Vec::insert` (both shift the tail).
 
-What one pass may cost depends on the tier:
+A pass costs the items it visits times the work done for each: a pass over
+2,900 rooms that probes the tiles around each room costs rooms times tiles
+probed. Count the visits per occurrence of the tier (one step, one frame, one
+hourly pass, one command), never averaged over a longer period. What one pass
+may cost depends on the tier:
 
-- Per frame and per chunk: no walk over all units or tiles. Per-frame work
+- Per frame and per chunk: no walk over any collection that grows with the
+  tower (units, tiles, rooms, population, the route graph). Per-frame work
   scales with what is drawn (HP-12).
-- Per step: no walk over all units. A pass over rooms needs a reason in the
-  record, and repeated passes in the same step are a finding.
-- Per hour, per day and per command: one linear pass is fine. A pass per item
-  of another collection is the finding.
-- Wall clock: the HUD and panel refresh and audio follow the per-step budget,
-  and autosave may make one linear pass.
+- Per step: no walk over units, tiles, population or the route graph. One pass
+  over rooms, with constant work per room, is allowed when the record says why
+  no index, counter or per-revision cache can answer it (for example, a check
+  that reads each room's live state). Repeated passes in the same step, and
+  per-room work that walks other tiles or runs a route search, are findings.
+- Per hour, per day and per command: one pass that visits each item once, with
+  constant work per item, is fine. A pass per item of another collection is a
+  finding, and so is per-item work that probes other tiles or runs a route
+  search, unless the section 4 estimate puts the whole pass under about 50,000
+  visits on the large tower (the per-step allowance of about 1,000 visits comes
+  to 60,000 over an hour of one-minute steps).
+- Wall clock: the HUD and panel refresh follows HP-12 (it scales with what is
+  on screen), audio follows the per-step budget, and autosave may make one
+  linear pass.
 
 Two more patterns count at every tier:
 
@@ -176,12 +194,17 @@ conformance suite is already comparing the new code with the old.
 
 **HP-8 Compare with the TypeScript's caches before porting.** Before porting a
 function, list the caches, indexes and counters the TypeScript version and its
-callees use, and port each one or say in the PR why not. A comment in the port
-saying a cache was skipped (for example because the TypeScript cache "is pure"
-or the value is "computed fresh") is itself a finding. The TypeScript caches,
-indexes and counters on the hot paths today, with their Rust status at c12bc1b
-(#1139 predates this page, so the first PR after it on the same code, #1143,
-updates the rows #1139 changes):
+callees use, and port each one or name the Rust structure that answers the
+same query at the same cost or less. Anything else is a dropped cache, which
+section 7 makes always `patch`; a reason in the PR body or a comment in the
+port (for example that the TypeScript cache "is pure" or the value is
+"computed fresh") does not close it. The same holds outside a port: a change
+that removes or bypasses a cache, index or counter either engine has (a
+refactor that undoes one of #1139's caches, say) is an HP-8 finding. The
+TypeScript caches, indexes and counters on the hot paths today, with their
+Rust status at c12bc1b. #1139 changes the `roomUnits` and `noiseMemo` rows;
+when it merges, a docs-only PR updates those two rows and the commit in this
+paragraph, and #1158 carries that task until it is done:
 
 | What it keeps | TypeScript | Keyed on | Rust at c12bc1b |
 | --- | --- | --- | --- |
@@ -202,6 +225,7 @@ updates the rows #1139 changes):
 | segments served | `segServed`, `src/engine/crowd/segmentGraph.ts` | revision | ported (`connected_set`) |
 | queue view | `queueView`, `src/engine/Crowd.ts` | step and revision | no counterpart yet; check before porting one |
 | floor reachable from the lobby (`floorReachable`) | `reachMemos`, `src/engine/sim/services.ts` | revision | ported (`reach_memo` in `sim.rs`); the per-segment check on split floors is uncached in both (#849, #1143) |
+| commute averages revision (the hosts key their copies on it) | none (the TypeScript reads `commuteWaitByFloor` in place) | counter | `commute_revision`, `engine-rs/src/crowd/mod.rs` |
 | demand map (inspector reads) | `demandMemo`, `src/engine/sim/demand.ts` | revision and game hour | none (no inspector in Rust) |
 | reachability within one demand or income pass | `reachCache`, `src/engine/sim/demand.ts`, `src/engine/EconomySystem.ts` | one call | ported |
 | reachability during one move-in pass | `reachMemo`, `src/engine/sim/churn.ts` | one pass | ported |
@@ -264,7 +288,8 @@ bare-step measurement (section 4).
 and panels scales with what is on screen (camera bounds, the drawn crowd) and
 stays flat as the tower grows. No walk over all units per frame, and DOM
 rebuilt on change only. Build preview runs on every pointer move, so its cap
-checks (`count_kind` / `countKind` over all units) are per-frame work.
+checks (`count_kind` / `countKind` over all units, A24 in #1158) are
+per-frame work.
 
 ## 4. Measuring
 
@@ -286,10 +311,11 @@ chunk is not.
 A PR that touches a hot-path surface (section 1) fills in this note under the
 Complexity heading of the pull request template, or writes "n/a" there with a
 reason. A significant change must give every field: one that adds, ports,
-moves or rewrites code on a per-frame, per-step, per-chunk or per-hour path in
-either engine, the binding, a host or rendering; adds or changes a cache;
-changes what crosses the WASM boundary or the engine build; or adds
-per-command work that grows with the units placed or removed.
+moves or rewrites code on a per-frame, per-step, per-chunk, per-hour or
+wall-clock path in either engine, the binding, a host or rendering; adds,
+changes or removes a cache, index or counter; changes what crosses the WASM
+boundary or the engine build; or adds per-command work that grows with the
+units placed or removed.
 
 ```markdown
 - Hot paths touched: `function` ← caller ← entry point (tier), for each one.
@@ -327,8 +353,18 @@ item, and Copilot and Codex are asked to:
 - "n/a" gives a reason tied to the diff.
 - When the diff touches no hot-path surface (section 1), one line saying so
   replaces the table.
+- When the change has a PR, the record goes on it as a comment, posted again
+  (or edited in place) after each review round, with the resolution column
+  filled in once the fixes are in. The review skills post it from step 4; the
+  independent reviewer includes it in the verdict.
+- A port or rewrite that changes more than about 1,000 lines of hot-path code
+  adds an appendix to the record with one line per changed function: the
+  function, its hottest caller, the tier and the multiplier. The review skills
+  split such a diff by module, or into chunks of about 1,000 lines, and run one
+  Hot-Path Auditor per chunk; the review is not complete, and gives no GO,
+  until every chunk has its table.
 - A review without the record is incomplete, and an independent reviewer
-  cannot give a GO on it. When a Copilot or Codex review of a hot-path diff
+  cannot give a GO or a CONDITIONAL GO on it. When a Copilot or Codex review of a hot-path diff
   leaves the table out, its findings still count, but its sign-off covers the
   hot-path part only once a record from the review skill or the independent
   reviewer is on the PR.
@@ -342,7 +378,7 @@ Every hot-path finding ends in one of two states before merge:
    it is not fixed now, and a tracking issue with a backlog row (the backlog
    mirror rule in `CLAUDE.md`). Pre-existing findings from one review may
    share one issue and row. A pre-existing finding in code the PR does not
-   change, which an open issue with a backlog row already lists (for example
+   change or only moves, which an open issue with a backlog row already lists (for example
    an item in #1158, #1143 or #859), is deferred by reference: cite the issue
    and item, with no new issue or row, since that row already records it.
 
@@ -351,23 +387,32 @@ TypeScript, or for sitting outside the diff. In BMAD/BMGD triage a hot-path
 finding is `patch` or `defer`. It is `dismiss` only when it is a false positive:
 the code is not reachable from an entry point, or the written section 4
 estimate shows the work fits the HP-2 budget for its tier (for example the one
-per-step pass over rooms whose reason is in the record, or one linear pass per
-hour) or stays under about 1,000 item visits per step or per frame on the large
-tower. "The collection is bounded" is not enough on its own, since every
+per-step pass over rooms whose reason is in the record, or one pass per hour
+with constant work per item) or stays under the HP-2 visit counts on the large
+tower: about 1,000 item visits per step or per frame, and about 50,000 per
+hourly, daily or per-command pass, counted per occurrence with the work per
+item included. "The collection is bounded" is not enough on its own, since every
 collection here is.
 
 Two kinds are always `patch`, even when an open issue already lists them:
 
-- code the PR adds, ports, moves or rewrites that puts a whole-collection walk
-  under any HP-2 multiplier at a tier HP-2 does not allow;
-- a port that drops a cache, index or counter the TypeScript already has
-  (HP-8).
+- code the PR adds, ports or rewrites that puts a whole-collection walk under
+  any HP-2 multiplier at a tier HP-2 does not allow;
+- a change that drops, removes or bypasses a cache, index or counter either
+  engine has, in a port or not (HP-8).
 
-Deferring one of those needs the explicit acceptance of the repository owner
-(maniator), on top of the evidence and issue above, recorded on the PR as
-their comment or review, or as their message quoted with its date in the PR
-body. In triage it is `decision_needed` until the owner answers; without a
-spec, the reviewer asks the owner before closing triage.
+Code the PR only moves, with no change to the moved lines (for example a split
+of an oversized file under the file-size ratchet), is reviewed as new (HP-7),
+and its findings count as pre-existing: deferred by reference when an open
+issue lists them, otherwise with a new issue and row.
+
+Deferring an always-`patch` finding needs the explicit acceptance of the
+repository owner (maniator), on top of the evidence and issue above. It is
+recorded on the PR as their comment or review; when they gave it elsewhere,
+the PR quotes it with its date and where it was given, and the independent
+reviewer confirms it. In triage it is `decision_needed` until the owner
+answers, in spec mode and no-spec mode alike. A session user who is not the
+owner cannot settle it.
 
 ## 8. Worked example: what the Rust port shipped
 
@@ -389,22 +434,28 @@ spec, the reviewer asks the owner before closing triage.
   surface they run a fourth layer, the Hot-Path Auditor, beside Blind Hunter,
   Edge Case Hunter and Acceptance Auditor. It gets the diff and read access to
   the repository, because HP-1 cannot be done from the diff alone. Triage
-  follows section 7. `src/tests/hotPathReview.guard.test.ts` keeps the
-  overrides, this page and the summaries that point to it in step.
+  follows section 7. `src/tests/hotPathReview.guard.test.ts` keeps this
+  page's headings, its section 1 paths and the clauses of sections 6 and 7 the
+  overrides rely on, the overrides themselves (the gds and bmad copies
+  identical) and the step anchors they name in step. For the summaries it
+  checks only that each one links here (inside `AGENTS.md`'s Review guidelines
+  and the template's Complexity section too); it does not check their
+  wording.
 - **The quick-dev skills** run their own review loop, which does not replace
   this one: hot-path work still goes through the review skill `CLAUDE.md`
   names for it (`/gds-code-review` or `/bmad-code-review`). The overrides
   `_bmad/custom/gds-quick-dev.toml` and `_bmad/custom/bmad-quick-dev.toml` say
-  so inside a quick-dev run and keep its classify step from rejecting a
-  hot-path finding.
+  so inside a quick-dev run, in both its planned and its one-shot route, and
+  keep its classify steps from rejecting a hot-path finding that is not a
+  false positive.
 - **Copilot and Codex** apply the same items inline (the Performance dimension
   of `.github/copilot-instructions.md`, and the `## Review guidelines` section
   of `AGENTS.md`, which Codex reads) and are asked to print the section 6
   table.
 - **An independent reviewer** (a separate agent or person giving GO,
   CONDITIONAL GO or NO-GO) applies the checklist to the final commit and
-  includes the table in the verdict. GO needs every row filled and every
-  finding fixed or deferred under section 7.
+  includes the table in the verdict. GO and CONDITIONAL GO need every row
+  filled; GO also needs every finding fixed or deferred under section 7.
 - **`.github/skills/engine-parity-review/SKILL.md`** item 11 points here for
   changes on the engine seam.
 

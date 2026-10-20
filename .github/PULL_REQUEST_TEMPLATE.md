@@ -66,7 +66,7 @@ Any other change, or a hot-path change section 5 does not count as significant,
 may replace the line below with "n/a: <reason>".
 -->
 
-Hot paths touched, sizes, complexity before and after, remaining scans and why:
+Hot paths and call frequency (tier), sizes, complexity before and after, remaining scans and why, TypeScript caches compared, invalidation evidence, measurements:
 
 ## Screenshots / recordings
 
