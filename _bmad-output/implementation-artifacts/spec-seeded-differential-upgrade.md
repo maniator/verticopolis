@@ -53,10 +53,16 @@ reads it.
 
 ### Slice 2: broader scenarios
 
+Slice 2a (done): the fuzzer draws a cash profile per seed and sets cash
+mid-run (zero, small, negative), one seed in four grows a 16 to 40 floor tower
+with sky-lobby rows and extra shaft commands, and it checkpoints after every
+kept command so the runner's 1024-event window is never exceeded. A 32 seed
+run agreed on every checkpoint.
+
 - Mixed money: starting cash, cash that runs out, bankruptcy.
 - Taller towers and transport pressure: lobby skips, express shafts, the
   24-shaft and 64-link pools at their caps.
-- The six dropped commands (`sell`, `adjustRent`, `setCars`, `setNoRate`,
+- Slice 2b: the six dropped commands (`sell`, `adjustRent`, `setCars`, `setNoRate`,
   `setSchedule`, `startFire`) get an `expectFail` form, so a command one engine
   refuses and the other accepts is a divergence. Reason compares wait for #865
   (B4).

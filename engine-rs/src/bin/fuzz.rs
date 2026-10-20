@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 
 use serde_json::{json, Value};
-use verticopolis_engine::facilities::{Kind, FACILITIES};
+use verticopolis_engine::facilities::{is_lobby_floor, Kind, FACILITIES};
 use verticopolis_engine::rng::Rng;
 use verticopolis_engine::scenario::{run_scenario, run_scenario_detailed, RunError, Scenario};
 
@@ -49,15 +49,31 @@ fn main() {
     // command sequence does not replay the simulation's random draws.
     let mut rng = Rng::new(seed ^ 0x9e37_79b9);
     let modern = rng.chance(0.5);
-    let height = rng.int(3, 9);
+    // One seed in four grows a tall tower (sky lobbies every 15 floors, shafts
+    // that hit their span and pool caps); the rest stay short and fast.
+    let tall = rng.chance(0.25);
+    let height = if tall { rng.int(16, 40) } else { rng.int(3, 9) };
+    // The tower is built with plenty of cash, then the cash is set to the
+    // seed's profile: a rich game, a modest one, or a tight one that runs out.
+    let cash = match rng.int(0, 3) {
+        0 | 1 => 500_000_000,
+        2 => rng.int(5, 50) * 1_000_000,
+        _ => rng.int(2, 40) * 100_000,
+    };
     let id = format!("fuzz-{seed}");
     let mut commands: Vec<Value> = vec![
         json!({"op": "setMoney", "amount": 500000000}),
         json!({"op": "buildRow", "kind": "lobby", "floor": 1, "from": LEFT, "to": RIGHT}),
     ];
     for fl in 2..=height {
-        commands.push(json!({"op": "buildRow", "kind": "floor", "floor": fl, "from": LEFT + 1, "to": RIGHT - 1}));
+        let kind = if is_lobby_floor(fl) { "lobby" } else { "floor" };
+        commands.push(
+            json!({"op": "buildRow", "kind": kind, "floor": fl, "from": LEFT + 1, "to": RIGHT - 1}),
+        );
+        // A tall tower's rows alone would overflow the runner's 1024-event window.
+        commands.push(json!({"op": "checkpoint", "label": format!("row{fl}")}));
     }
+    commands.push(json!({"op": "setMoney", "amount": cash}));
     let places: Vec<Kind> = FACILITIES
         .iter()
         .filter(|f| !f.transport && !f.basement && f.kind != Kind::Lobby && f.kind != Kind::Floor)
@@ -82,13 +98,19 @@ fn main() {
         let s = Scenario::parse(&text).expect("the fuzzer only emits valid commands");
         run_scenario(&s, &suite)
     };
+    // A tall tower leans on shafts, so the 24-shaft and 64-link pools fill.
+    let more_shafts: i64 = if tall { 14 } else { 0 };
     let mut kept = 0;
     while kept < budget {
-        let roll = rng.int(0, 99);
-        let mut cmd = if roll < 38 {
+        let roll = rng.int(0, 99 + more_shafts);
+        let mut cmd = if rng.chance(0.04) {
+            // Cash that runs out, or goes below zero, in the middle of a run.
+            let amount = [0, 1_000, 25_000, 250_000, -50_000, 3_000_000][rng.int(0, 5) as usize];
+            json!({"op": "setMoney", "amount": amount})
+        } else if roll < 38 {
             let kind = places[rng.int(0, places.len() as i64 - 1) as usize];
             json!({"op": "build", "kind": kind.as_str(), "floor": rng.int(1, height), "x": rng.int(LEFT, RIGHT)})
-        } else if roll < 48 {
+        } else if roll < 48 + more_shafts {
             let kind = shafts[rng.int(0, shafts.len() as i64 - 1) as usize];
             let bottom = rng.int(1, height - 1);
             let top = if kind.max_span() == 1 {
@@ -97,13 +119,13 @@ fn main() {
                 rng.int(bottom + 1, height)
             };
             json!({"op": "buildTransport", "kind": kind.as_str(), "x": rng.int(LEFT, RIGHT), "bottom": bottom, "top": top})
-        } else if roll < 54 {
+        } else if roll < 54 + more_shafts {
             json!({"op": "sell", "floor": rng.int(1, height), "x": rng.int(LEFT, RIGHT)})
-        } else if roll < 60 {
+        } else if roll < 60 + more_shafts {
             json!({"op": "adjustRent", "floor": rng.int(2, height), "x": rng.int(LEFT, RIGHT), "dir": if rng.chance(0.5) { 1 } else { -1 }})
-        } else if roll < 63 {
+        } else if roll < 63 + more_shafts {
             json!({"op": "setCars", "floor": 1, "x": rng.int(LEFT, RIGHT), "cars": rng.int(1, 8)})
-        } else if roll < 66 {
+        } else if roll < 66 + more_shafts {
             let row = |rng: &mut Rng| -> Vec<i64> { (0..24).map(|_| rng.int(0, 3)).collect() };
             let weekday = row(&mut rng);
             let weekend = row(&mut rng);
@@ -114,9 +136,9 @@ fn main() {
                 "standardFloorDeparture": rng.int(1, 60),
                 "homeFloors": homes,
             }})
-        } else if roll < 68 && !modern {
+        } else if roll < 68 + more_shafts && !modern {
             json!({"op": "setNoRate", "floor": rng.int(2, height), "x": rng.int(LEFT, RIGHT)})
-        } else if roll < 86 {
+        } else if roll < 86 + more_shafts {
             let dt = [1, 3, 10, 20, 60][rng.int(0, 4) as usize];
             let times = rng.int(5, 240);
             // A checkpoint every in-game hour of the run (`60 / dt` ticks), or
@@ -124,13 +146,13 @@ fn main() {
             // divergence to the hour at the latest.
             let hour = 60 / dt;
             json!({"op": "tick", "dt": dt, "times": times, "checkpointEvery": hour.min((times / 4).max(1))})
-        } else if roll < 89 {
+        } else if roll < 89 + more_shafts {
             json!({"op": "startFire"})
-        } else if roll < 91 {
+        } else if roll < 91 + more_shafts {
             json!({"op": "bombThreat"})
-        } else if roll < 94 {
+        } else if roll < 94 + more_shafts {
             json!({"op": "evaluateStar"})
-        } else if roll < 97 && modern {
+        } else if roll < 97 + more_shafts && modern {
             json!({"op": "callExterminator"})
         } else {
             json!({"op": "reload"})
@@ -143,6 +165,9 @@ fn main() {
             None => {
                 commands.push(cmd);
                 kept += 1;
+                // A checkpoint after every command keeps the events between two
+                // checkpoints inside the runner's 1024-event window.
+                commands.push(json!({"op": "checkpoint", "label": format!("k{kept}")}));
             }
             Some(RunError::Failed { index, what }) if index == trial.len() - 1 => {
                 match op.as_str() {
@@ -151,6 +176,7 @@ fn main() {
                         cmd["expectFail"] = json!(true);
                         commands.push(cmd);
                         kept += 1;
+                        commands.push(json!({"op": "checkpoint", "label": format!("k{kept}")}));
                     }
                     // A refusal with no expectFail form: dropped, the prefix stays
                     // valid. The drop is logged so an accept-versus-refuse

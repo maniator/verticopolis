@@ -133,7 +133,9 @@ Verticopolis has **two test tiers**:
     compares the state, crowd and events hashes at checkpoints at least
     every in-game hour, then the money, the log and each field of the full
     save, naming the first one that differs (`scripts/fuzz-compare.ts`; exit
-    3 marks a harness failure, not a divergence). A divergence it finds is
+    3 marks a harness failure, not a divergence). One seed in four grows a
+    tall tower and every seed draws a starting-cash profile, including cash
+    that runs out. A divergence it finds is
     pinned as a named scenario in the fix PR. A run summary names its seed
     range and the `seed_block` and `seed_offset` that replay it.
 
