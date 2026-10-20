@@ -58,6 +58,15 @@ describe("engine crate version rule", () => {
     expect(drift(record, tree), REMEDY).toEqual([]);
   });
 
+  it("the native consumer's lockfile names the same crate version", () => {
+    const lock = read("engine-rs/consumer/Cargo.lock");
+    const m = /name = "verticopolis-engine"\nversion = "([^"]+)"/.exec(lock);
+    expect(
+      m?.[1],
+      "update engine-rs/consumer/Cargo.lock to the new crate version (CI builds it with --locked)",
+    ).toBe(tree.crateVersion);
+  });
+
   it("the record is the file the script writes", () => {
     expect(lf(read(COMPAT_RECORD_PATH))).toBe(recordText(tree));
   });
