@@ -84,7 +84,7 @@ export function markdown(res: WorkerResults): string {
   lines.push("");
   lines.push("Medians with their 95% order-statistic interval. Ratios are paired by repetition (mode over the column's reference); a verdict needs six pairs and an interval clear of a 5% band. `wasm-worker / wasm-frame` compares two hosts with the same sync changes, so it is the worker placement alone; `wasm-frame / wasm` is the sync changes alone. The gate column leads with the gate's orientation; the full set of ratios is in ratios.csv. A ratio marked with `(k zero)` dropped k repetitions where the reference was 0.");
   lines.push("");
-  if (res.metrics.some((m) => m.unthrottled)) lines.push("† The engine worker was not CPU-throttled: DevTools cannot throttle a worker, so at this throttle the worker host's main thread ran throttled and its engine thread ran at full speed. Compare such a row only with another run of the same mode.", "");
+  if (res.metrics.some((m) => m.unthrottled)) lines.push("† The engine worker was barely CPU-throttled: DevTools cannot throttle a worker, so at this throttle the worker host's main thread ran throttled and its engine thread ran 7 to 41% slower in the probe, against about 4x on the main thread. Compare such a row only with another run of the same mode.", "");
   const groups: Metric["group"][] = ["startup", "raw", "hosted", "frames", "memory", "traffic"];
   for (const g of groups) {
     const rows = res.metrics.filter((m) => m.group === g);

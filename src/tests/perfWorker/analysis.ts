@@ -47,12 +47,13 @@ export interface Ratio {
 /**
  * Chromium refuses `Emulation.setCPUThrottlingRate` on worker targets
  * ("Operation is only supported for pages, not workers"), and a page-level
- * throttle leaves a dedicated worker's loop at full speed (probed on Chromium
- * 141: a busy loop took 41 ms at 1x and 44 to 58 ms with the page at 4x, a
- * worker created after the throttle too). So at a throttle above 1x the
- * worker host's main thread is throttled and its engine thread is not. Every
- * such row carries this flag, and a comparison of the worker host with a
- * main-thread host at that throttle favors the worker.
+ * throttle leaves a dedicated worker's loop nearly unthrottled (probed on
+ * Chromium 141: a busy loop took 41 ms at 1x and 44 to 58 ms with the page at
+ * 4x, 7 to 41% slower against about 4x on the main thread, a worker created
+ * after the throttle too). So at a throttle above 1x the worker host's main
+ * thread is throttled and its engine thread is not. Every such row carries
+ * this flag, and a comparison of the worker host with a main-thread host at
+ * that throttle favors the worker.
  */
 export const UNTHROTTLED_WORKER = (mode: ModeName, throttle: string): boolean => mode === "wasm-worker" && throttle !== "1";
 
