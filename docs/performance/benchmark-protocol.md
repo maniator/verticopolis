@@ -43,28 +43,104 @@ motivated it.
 
 ### Which browser counts
 
-A run records the browser it used and only compares runs made with the same
-one. For acceptance runs:
+A run records the browser it used (product, version, channel, extra switches
+and the WebGL renderer) and a report is compared with a reference only when
+all of those match. The references are the 2026-10-15 runs, RUN-0a, the A/A
+folders of one calibration and any earlier acceptance run. A different browser
+build, a different channel (the `chromium` channel is another binary and
+headless mode than the headless shell the 2026-10-15 references used), other
+GPU switches or another renderer means the reference is run again on the same
+settings before it is used. `--resume` refuses a change of any of them, and
+`perf:calibrate` refuses passes that differ in them.
 
-1. **Playwright's bundled Chromium** (the default when `PW_CHROMIUM_PATH` is
-   unset; install once with `npx.cmd playwright install chromium`). This is the
-   engine the committed Windows runs used and the one the protocol assumes.
-2. An installed Chrome through `PW_CHROMIUM_PATH` is allowed for a one-off
-   check, and its results folder says so. It is never mixed into a comparison
-   with a bundled-Chromium run, because the version and flags differ.
+Until the owner accepts a browser setting, nothing counts as the acceptance
+setting: the owner names the build, the channel and the switches in the
+decision that settles #1115, and this section is edited to say so in the same
+change. Today the bundled Chromium is the default (install once with
+`npx.cmd playwright install chromium`) and an installed Chrome
+(`PW_CHROMIUM_CHANNEL=chrome` or `PW_CHROMIUM_PATH`) is a one-off check whose
+results folder says so. Installed Chrome updates itself, so a run on it records
+the version it ran and a later run on a newer version is not comparable.
 
-Headless is the harness's default and the only mode that counts. The report
-header records the exact browser version.
+Headless is the harness's only mode and the only mode that counts. Headed mode
+(the first option #1115 lists) is declined: the harness has no headed launch,
+and a headed browser changes the frame pacing the protocol measures. If no
+headless setting reaches the GPU on the owner's PC, headed mode is still owed
+as its own change, with its own references.
 
 **The renderer must be the GPU.** The 2026-10-15 reference runs recorded ANGLE
 on Direct3D 11 with the RTX 3060. RUN-0a (2026-10-20) ran the same bundled
 Chromium 149 headless on ANGLE with Vulkan SwiftShader, which is software
 rendering. That makes FPS, 1% lows, frame-time p99 and every frame-bound part
 of M1 to M8 invalid, and it may have moved the bare-step rows too (see the
-folder's `READING.md`). Not yet: the harness does not choose or check the
-renderer (follow-up #1115). Until it does, read the report's Renderer line
-before accepting any run, and reject a run whose renderer names SwiftShader,
-llvmpipe or any other software rasterizer.
+folder's `READING.md`).
+
+The harness fails closed. A full run passes the renderer check only when the
+WebGL renderer, read at the start of each browser process and again after its
+frames, names a hardware adapter: a string with a known vendor or device family
+(NVIDIA, GeForce, RTX, Radeon, Intel, Apple M-series, Adreno, Mali and the
+like) and no software or virtual-adapter word. These are all errors in a full
+run:
+
+- a software rasterizer (SwiftShader, llvmpipe, WARP, Microsoft Basic Render
+  Driver, Mesa software and the like);
+- a virtual display adapter (VMware SVGA, VirtualBox, Parallels, Citrix,
+  Microsoft Basic Display Adapter and the like);
+- a string that does not name an adapter, including a masked string, `null`,
+  an empty string and an unrecognized vendor;
+- no renderer recorded, at the start or after the frames, for any process;
+- different renderers across processes, or a different one after the frames
+  than at the start (a GPU process that died and fell back).
+
+A `--quick` smoke run turns the first four into warnings so the cloud smoke
+still works; the last stays an error. The same check runs before the builds,
+on a throwaway browser launch, so a setting that does not reach the GPU stops a
+full run in seconds and never after hours. `PW_RENDERER_EXCEPTION=EX-<n>`
+declares an owner-approved entry of the release exception register: the first
+four become warnings that name the entry, the entry is recorded in
+`results.json` (`browser.rendererException`) and in the machine identity, and
+the report leads with a banner saying the checks were warnings. Only the owner
+adds an entry, and a run under one is GPU evidence only as far as the entry
+says.
+
+The harness does not force the GPU. When the bundled headless Chromium comes
+up on a software rasterizer, choose the browser for the next run through the
+environment (PowerShell: `$env:NAME = "value"`) and read the first lines of
+the console, which print the version and the renderer before anything builds:
+
+- `PW_CHROMIUM_CHANNEL` is one of `chromium` (the full bundled Chromium in new
+  headless mode), `chrome`, `chrome-beta`, `chrome-dev`, `chrome-canary` or
+  `msedge` and its variants. Set it or `PW_CHROMIUM_PATH`, not both.
+- `PW_CHROMIUM_ARGS` takes only the switches that choose how the GPU is
+  reached: `--use-angle=<backend>`, `--use-gl=<backend>`,
+  `--ignore-gpu-blocklist`, `--enable-gpu-rasterization` and
+  `--enable-zero-copy`. Names are read in lower case (Chromium on Windows
+  lowercases them), values must be plain words, and a switch given twice is
+  refused. Everything else is refused, because it replaces the harness's own
+  switches or changes what is measured (feature lists, process-model and
+  compositor switches, the sandbox, a debugging port, extensions, a proxy, an
+  unlocked frame rate). Playwright already passes `--no-sandbox`.
+- Both are parsed before any build or results folder exists, so a mistake
+  fails at once.
+- The results record the channel and the switches (`browser.channel`,
+  `browser.args`), the report's Browser row prints them, and the browser
+  version and renderer are part of the machine identity that `--resume`
+  checks.
+
+Which of these brings the GPU up on the owner's PC is not known from the
+cloud. The PC probe (`pc-probe-1125-gpu`) settles it, and its notes say what
+was set. Backlog row #1115 closes only after a PC report names a hardware
+renderer, this section names the counting build, channel and switches, and the
+references have been run again where those differ.
+
+RUN-0a is the exception to all of this. Its `e25ec01` tree has neither the
+check nor the variables above, and both of its runners launch with
+`PW_CHROMIUM_PATH` only. A RUN-0a repeat therefore keeps the manual rule: read
+the report's Renderer line and reject the run when it names SwiftShader,
+llvmpipe or any other software rasterizer. The only lever it has is
+`PW_CHROMIUM_PATH`, pointed at an installed Chrome; it cannot set the channel
+or any switch. If that does not reach the GPU, the repeat waits for a commit
+that has the check.
 
 ### Machine state
 
@@ -340,6 +416,12 @@ npm.cmd run perf:compare -- --reps 10 --skip-build --out docs/performance/result
 npm.cmd run perf:compare -- --aa ts   --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b-aa-ts-1
 npm.cmd run perf:compare -- --aa wasm --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b-aa-wasm-1
 ```
+
+Before the 10-rep commands, set the settled browser variables (the owner's
+decision for #1115; section 3 "Which browser counts") and run `perf:worker
+-- --quick --reps 1 --scenarios <one>` once to read the console's renderer
+line. The 10-rep commands start only after it names a hardware adapter. Both
+harnesses repeat the check before they build and stop on anything else.
 
 Start RUN-0b only after A5's design rule is committed (plan section 5.2).
 RUN-0b also records the shipping host's main-thread cost split (engine step,
