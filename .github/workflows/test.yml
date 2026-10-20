@@ -80,6 +80,40 @@ jobs:
         env:
           VC_ALLOW_NO_ENGINE: "1"
 
+  # The unit and integration suites again, on the Rust/WASM engine (#878,
+  # story-engine-test-parity): every Simulation a test ticks is hosted on the
+  # engine, and a test that cannot run there is skipped by name with its
+  # reason (src/tests/parity/). One job per project so they run side by side.
+  # Runs after engine-wasm, so the package comes from the cache it filled.
+  test-wasm-parity:
+    needs: engine-wasm
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [unitWasm, integrationWasm]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: ./.github/actions/engine-wasm
+
+      - name: Run ${{ matrix.project }} on the WASM engine
+        env:
+          VC_REQUIRE_WASM: "1"
+        run: npx vitest run --project ${{ matrix.project }}
+
   # Resolve the Playwright container tag from the repo's own Playwright version so
   # the e2e job's browser can never drift from the one baselines were minted with
   # the whole basis of a stable visual gate. (container.image is fixed before a

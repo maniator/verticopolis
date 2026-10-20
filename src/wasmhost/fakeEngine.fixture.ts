@@ -64,6 +64,10 @@ export class FakeEngine {
   }
   elevatorTelemetry(): string { return '{"util":[],"hourly":[],"origins":[]}'; }
   housekeepingReport(): string | undefined { return undefined; }
+  commuteRows = "[]";
+  commuteRevision = 0;
+  commuteStress(): string { return this.commuteRows; }
+  commuteStressRevision(): number { return this.commuteRevision; }
   drainGameplayEvents(): string {
     const out = JSON.stringify(this.owed);
     this.owed = [];

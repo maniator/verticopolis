@@ -8,9 +8,10 @@ import { loadCommand, relayCommands, type CommandRelay } from "../dualrun/mirror
 import { appendEngineLog, applyRecords, checkRecords } from "./frameApply";
 import { decodeHeader } from "./frameView";
 import { SETTLE_TIMEOUT_MS, setStepGate } from "./stepGate";
+import { parseCommuteStress } from "./telemetry";
 import { refuseForeignCatalog } from "./wasmHost";
 import type { FrameReply, FrameRequest, Op, ToWorker } from "./workerProtocol";
-import { applyHeaderFields, isEventItem, isLogItem, mergeSave, parseArray, parseCount, parseMerge, parsePending, restoreOwn, structuredCloneOf } from "./workerApply";
+import { applyHeaderFields, isEventItem, isLogItem, mergeSave, parseArray, parseCount, parseMerge, parsePending, replyWatchdog, restoreOwn, structuredCloneOf } from "./workerApply";
 import { LATENCY_SAMPLES, newWorkerHostStats, pushSample, type WorkerHost, type WorkerHostOptions } from "./workerStats";
 
 export type { WorkerHost, WorkerHostOptions, WorkerHostStats } from "./workerStats";
@@ -63,20 +64,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   const load = loadCommand(sim, gen); // refuses a tower whose crowd exists
   const stats = newWorkerHostStats();
   const replyTimeoutMs = opts.replyTimeoutMs ?? REPLY_TIMEOUT_MS;
-  let watchdog: ReturnType<typeof setTimeout> | undefined;
-  const arm = (what: string) => {
-    clearTimeout(watchdog);
-    watchdog = setTimeout(() => {
-      // A hidden or frozen page can run an overdue timer before the reply
-      // queued behind it; the watchdog waits for a visible page.
-      if ((globalThis as { document?: { hidden?: boolean } }).document?.hidden) arm(what);
-      else fatal(`the worker did not answer ${what} within ${replyTimeoutMs} ms`);
-    }, replyTimeoutMs);
-  };
-  const disarm = () => {
-    clearTimeout(watchdog);
-    watchdog = undefined;
-  };
+  const { arm, disarm } = replyWatchdog(replyTimeoutMs, (message) => fatal(message));
   /** Post to the worker. A message that cannot be posted (a command whose
    *  payload cannot be cloned, a closed port) would leave a gap in the
    *  sequence the worker refuses, so it is fatal here. */
@@ -117,6 +105,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
    *  again (so they are dropped there rather than handed out twice). */
   let staleStreak = 0;
   let held: GameplayEvent[] = [];
+  let heldCommute: [number, number][] | null = null;
   /** The last op that is not a camera stamp, and the last camera stamp:
    *  a reply that includes the first is caught up, with the second patched
    *  into its save. */
@@ -197,12 +186,12 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     disarm();
     stats.replies++;
     stats.frameBytes += r.view.byteLength;
-    stats.bytesReceived += r.view.byteLength + 2 * (r.events.length + (r.log?.length ?? 0) + (r.pending?.length ?? 0));
+    stats.bytesReceived += r.view.byteLength + 2 * (r.events.length + (r.log?.length ?? 0) + (r.pending?.length ?? 0) + (r.commute?.length ?? 0));
     stats.workerOpsMs += r.workMs.ops;
     stats.workerReplyMs += r.workMs.reply;
     stats.workerMemoryBytes = r.memoryBytes;
     if (r.merge) {
-      const bytes = 2 * (r.merge.save.length + r.merge.telemetry.length + (r.merge.housekeeping?.length ?? 0));
+      const bytes = 2 * (r.merge.save.length + r.merge.telemetry.length + (r.merge.housekeeping?.length ?? 0) + (r.merge.commute?.length ?? 0));
       stats.mergeBytes += bytes;
       stats.bytesReceived += bytes;
     }
@@ -210,6 +199,8 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     checkRecords(r.view, h);
     const events = parseArray<GameplayEvent>(r.events, "event batch", isEventItem);
     const dropped = parseCount(r.dropped, "dropped-event count");
+    const commuteText = r.merge?.commute ?? r.commute;
+    const commute = commuteText == null ? heldCommute : parseCommuteStress(commuteText);
     // A reply that includes every command the instance ran. One that does
     // not is refused (#908) except for its events: its state predates a
     // command the instance already answered, and its crowd and cars may name
@@ -228,6 +219,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       staleStreak++;
       droppedEngine = dropped;
       for (const e of events) held.push(e);
+      heldCommute = commute;
       if (r.merge) needMerge = true;
       stats.applyMs += now() - t0;
       // Asked again at once, so the read model waits a round trip; after a
@@ -272,6 +264,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
         simLogSeqAtSync = sim.logSeq;
       }
       applyRecords(sim, r.view, h);
+      if (commute) sim.crowd.adoptCommuteStress(commute);
     });
     // Applied: every command so far is in the read model, so its copies of
     // their events give way to the engine's, which arrive now, after any
@@ -281,6 +274,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     for (const e of held) carried.push(e);
     for (const e of events) carried.push(e);
     held = [];
+    heldCommute = null;
     sim.gameplayEvents.drain();
     staleStreak = 0;
     engineMinutes = h.minutes;

@@ -199,6 +199,7 @@ pub struct Crowd {
     pub car_riders: HashMap<(i64, i64), i64>,
     pub frustration: f64,
     pub commute_wait_by_floor: HashMap<i64, f64>,
+    pub commute_revision: u32,
     pub adj: Option<(i64, AdjGraph)>,
     pub staff_adj: Option<(i64, AdjGraph)>,
     pub shaft_banks: Option<(i64, HashMap<(Kind, Vec<i64>, Vec<i64>), Vec<i64>>)>,
@@ -219,6 +220,7 @@ impl Crowd {
             car_riders: HashMap::new(),
             frustration: 0.0,
             commute_wait_by_floor: HashMap::new(),
+            commute_revision: 0,
             adj: None,
             staff_adj: None,
             shaft_banks: None,
@@ -240,6 +242,7 @@ impl Crowd {
     }
 
     pub fn record_commute(&mut self, origin_floor: i64, wait_seconds: f64) {
+        self.commute_revision = self.commute_revision.wrapping_add(1);
         let prev = self
             .commute_wait_by_floor
             .get(&origin_floor)
@@ -249,6 +252,17 @@ impl Crowd {
             origin_floor,
             prev + (wait_seconds - prev) * COMMUTE_STRESS_ALPHA,
         );
+    }
+
+    /// The commute-stress averages as `[[floor, seconds], ...]`, by floor.
+    pub fn commute_stress_json(&self) -> Value {
+        let mut rows: Vec<(i64, f64)> = self
+            .commute_wait_by_floor
+            .iter()
+            .map(|(&f, &w)| (f, w))
+            .collect();
+        rows.sort_by_key(|r| r.0);
+        json!(rows)
     }
 
     pub fn begin_step(&mut self) {
@@ -307,5 +321,27 @@ impl Crowd {
 
     pub fn elevator_calls(&self, tower: &Tower) -> ElevatorCalls {
         routing::elevator_calls(self, tower)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn commute_stress_lists_each_floor_in_order() {
+        let mut crowd = Crowd::new(1);
+        assert_eq!(crowd.commute_stress_json(), json!([]));
+        assert_eq!(crowd.commute_revision, 0);
+        crowd.record_commute(7, 40.0);
+        crowd.record_commute(3, 65.0);
+        crowd.record_commute(7, 80.0);
+        assert_eq!(crowd.commute_revision, 3);
+        // The first sample seeds the average; the second moves it by the alpha.
+        let seventh = 40.0 + (80.0 - 40.0) * COMMUTE_STRESS_ALPHA;
+        assert_eq!(
+            crowd.commute_stress_json(),
+            json!([[3, 65.0], [7, seventh]])
+        );
     }
 }
