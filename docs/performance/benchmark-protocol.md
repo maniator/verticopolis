@@ -108,10 +108,10 @@ These are all errors in a full run:
   Driver, Mesa software and the like);
 - a virtual display adapter (VMware SVGA, VirtualBox, Parallels, Citrix,
   Microsoft Basic Display Adapter and the like);
-- a string that does not name a device, including a masked string, `null`, an
-  empty string, a bare vendor and an unrecognized vendor;
-- no renderer recorded at the start of any process, or none at a later read of
-  a process that had none at the start;
+- a string that does not name a device, including a masked string, a bare
+  vendor and an unrecognized vendor;
+- no renderer recorded at the start of any process, including a `null` or empty
+  read, or none at a later read of a process that had none at the start;
 - different renderers across processes or across the reads of one process,
   whichever read they come from;
 - a renderer read at the start and none at a later read, which is how a GPU
@@ -132,21 +132,29 @@ check that stops such a run early is tracked in the backlog).
 An exception is an entry of the release exception register
 (`_bmad-output/planning-artifacts/release-3.0-exception-register.md`) that is
 **approved** and names #1115. Only the owner approves an entry. A run declares
-one with `PW_RENDERER_EXCEPTION=EX-<n>`, and the harness reads the entry from
-`origin/main` (`git show`) before it builds anything, so a branch or an
-uncommitted edit cannot approve its own exception. The register in the working
-tree must match main's, line endings aside, and main's commit is recorded.
-Exactly one entry must carry the id (`## EX-<n>` followed by a colon or
-space, ending at the next level-1 or level-2 heading, with code fences and HTML
-comments ignored), it must have exactly one `- **Status:**` line whose whole
-value is `approved`, and it must name `#1115`. An id that is not in the
+one with `PW_RENDERER_EXCEPTION=EX-<n>`, and the harness fetches `origin/main`
+(best effort) and reads the entry from `refs/remotes/origin/main` before it
+builds anything, so a branch, a tag or an uncommitted edit cannot approve its
+own exception and an entry revoked on main counts as revoked. The register in
+the working tree must match main's, line endings aside, and main's commit is
+recorded. Exactly one entry must carry the id (`## EX-<n>` followed by a colon
+or space, ending at the next level-1 or level-2 heading, with code fences and
+HTML comments ignored). It must have exactly one bullet that looks like a
+status (`- **Status:** ...`, or the same with the colon outside the bold, with
+`*` or `+` for the bullet, indented, or as a `Revoked` or `Withdrawn` line),
+that one bullet must be written `- **Status:** approved` at the left margin
+(a value wrapped onto indented lines is joined first and must still read
+exactly `approved`, so the register's house style `approved (date, ...)` is
+refused), the entry must not say revoked, withdrawn or rescinded anywhere, and
+it must name `#1115`. An id that is not in the
 register, an entry that is only proposed, rejected or "approved in principle",
 an entry about something else, a tree whose register differs from main's and a
 main that cannot be read all stop the run. With a valid entry, the first three
 errors become warnings that name it. `results.json` records the id, the entry's
 SHA-256 and main's commit (`browser.rendererException`,
 `browser.rendererExceptionSha256`, `browser.rendererExceptionCommit`) and puts
-the first two in the machine identity, an `--out` folder name must contain
+the first two in the machine identity (main's commit is a record only, so an
+unrelated merge to main does not refuse a resume), an `--out` folder name must contain
 `exception-ex-<n>` (the default name has it), the report leads with a banner,
 and `browser.gpuVerified` is `false` for every run that declared an
 exception, whatever it read. `gpuVerified` is `true` only when every good run

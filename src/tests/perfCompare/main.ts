@@ -388,7 +388,9 @@ export function machineOf(env: Env, executablePath: string | null, launch?: Brow
   // The launch settings, the browser build and the adapter are part of the
   // identity: a resume with a different channel, switch, browser update or
   // renderer would mix incompatible processes in one results folder.
-  const browser: Record<string, string | null> = launch ? { launch: JSON.stringify(launch) } : {};
+  // Main's commit is a record, not an identity: any unrelated merge to main would otherwise refuse the resume.
+  const { rendererExceptionCommit: _commit, ...identity } = launch ?? {};
+  const browser: Record<string, string | null> = launch ? { launch: JSON.stringify(identity) } : {};
   if (probe) {
     browser.browserVersion = probe.version;
     browser.renderer = probe.renderer;

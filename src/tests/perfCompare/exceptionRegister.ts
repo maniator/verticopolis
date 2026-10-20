@@ -29,7 +29,8 @@ const prose = (text: string): string => lf(text).replace(/^(```|~~~)[^\n]*\n[\s\
  * appears twice and a missing register all stop the run before it builds
  * anything. An entry runs from its `## <id>` heading to the next level-1 or
  * level-2 heading; its status must be one `- **Status:**` line whose whole
- * value is `approved`.
+ * value (a wrapped value is joined) is `approved`, and no other line may look like a
+ * Status, Revoked or Withdrawn bullet.
  */
 export function resolveRendererException(id: string, register: string | null): RegisterEntry {
   if (register === null) throw new Error(`PW_RENDERER_EXCEPTION=${id}: the exception register (${EXCEPTION_REGISTER}) could not be read, so no exception is approved; run on a verified GPU`);
@@ -40,9 +41,20 @@ export function resolveRendererException(id: string, register: string | null): R
   if (entries.length === 0) throw new Error(`PW_RENDERER_EXCEPTION=${id}: no such entry in ${EXCEPTION_REGISTER}`);
   if (entries.length > 1) throw new Error(`PW_RENDERER_EXCEPTION=${id}: ${entries.length} entries carry that id in ${EXCEPTION_REGISTER}; the register needs exactly one`);
   const entry = entries[0];
-  const statuses = [...entry.matchAll(/^- \*\*Status:\*\*[ \t]*(.*?)[ \t]*$/gm)].map((m) => m[1]);
-  if (statuses.length !== 1) throw new Error(`PW_RENDERER_EXCEPTION=${id}: the entry has ${statuses.length} Status lines; it needs exactly one`);
-  if (statuses[0].toLowerCase() !== "approved") throw new Error(`PW_RENDERER_EXCEPTION=${id}: the entry's status is "${statuses[0]}" and only a status of exactly "approved" counts; only the owner approves an exception`);
+  // Any bullet that looks like a Status, Revoked or Withdrawn line counts, in either bold form and at any indent, so a revocation in a near-miss format is a second line.
+  const looksLike = /^[ \t]*[-*+][ \t]+\*\*(status|revoked|withdrawn)(:\*\*|\*\*:)/i;
+  const lines = entry.split("\n");
+  const found = lines.map((l, i) => (looksLike.test(l) ? i : -1)).filter((i) => i >= 0);
+  if (found.length !== 1) throw new Error(`PW_RENDERER_EXCEPTION=${id}: the entry has ${found.length} Status, Revoked or Withdrawn lines; it needs exactly one Status line`);
+  const first = lines[found[0]];
+  const exact = /^- \*\*Status:\*\*[ \t]*(.*)$/.exec(first);
+  if (!exact) throw new Error(`PW_RENDERER_EXCEPTION=${id}: the entry's status line is not in the form "- **Status:** approved" (found "${first.trim()}")`);
+  // A wrapped value continues on the indented lines that follow, up to a blank line or the next bullet.
+  const value = [exact[1]];
+  for (let i = found[0] + 1; i < lines.length && /^[ \t]+\S/.test(lines[i]) && !/^[ \t]*[-*+][ \t]/.test(lines[i]); i++) value.push(lines[i].trim());
+  const status = value.join(" ").trim();
+  if (status.toLowerCase() !== "approved") throw new Error(`PW_RENDERER_EXCEPTION=${id}: the entry's status is "${status}" and only a status of exactly "approved" counts; only the owner approves an exception`);
+  if (/\b(revoked|withdrawn|rescinded)\b/i.test(entry)) throw new Error(`PW_RENDERER_EXCEPTION=${id}: the entry says it was revoked or withdrawn, so no exception is approved`);
   if (!new RegExp(`(?<![\\w#])${RENDERER_ISSUE}\\b`).test(entry)) throw new Error(`PW_RENDERER_EXCEPTION=${id}: the entry does not name ${RENDERER_ISSUE}, so it is not an exception for the renderer check`);
   return { id, sha256: createHash("sha256").update(entry.trim()).digest("hex") };
 }
@@ -50,10 +62,23 @@ export function resolveRendererException(id: string, register: string | null): R
 /** The register as `origin/main` holds it, with the commit it was read at; null when git cannot say. */
 export type MainRegister = (repo: string) => { text: string; commit: string } | null;
 
+const MAIN_REF = "refs/remotes/origin/main";
+
+/**
+ * Reads the register at the remote-tracking ref by its full name (a local
+ * branch or tag called `origin/main` would otherwise win the short name), after
+ * a best-effort fetch so an entry revoked on main counts as revoked. A fetch
+ * that fails leaves the last fetched state, which the recorded commit names.
+ */
 export const registerFromMain: MainRegister = (repo) => {
+  const git = (timeout: number, ...args: string[]): string => execFileSync("git", ["-C", repo, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 16 * 1024 * 1024, timeout, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
   try {
-    const git = (...args: string[]): string => execFileSync("git", ["-C", repo, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 16 * 1024 * 1024 });
-    return { text: git("show", `origin/main:${EXCEPTION_REGISTER}`), commit: git("rev-parse", "origin/main").trim() };
+    git(30_000, "fetch", "--quiet", "origin", `+refs/heads/main:${MAIN_REF}`);
+  } catch {
+    // Offline or no credentials: fall through to what the tracking ref already holds.
+  }
+  try {
+    return { text: git(15_000, "show", `${MAIN_REF}:${EXCEPTION_REGISTER}`), commit: git(15_000, "rev-parse", MAIN_REF).trim() };
   } catch {
     return null;
   }
@@ -90,6 +115,6 @@ export const exceptionMarker = (id: string): string => `exception-${id.toLowerCa
  */
 export function checkExceptionFolder(name: string, exception: string | null): void {
   const lower = name.toLowerCase();
-  if (exception && !lower.includes(exceptionMarker(exception))) throw new Error(`--out ${name}: this run declares renderer exception ${exception}, so the folder name must contain ${exceptionMarker(exception)}`);
+  if (exception && !new RegExp(`${exceptionMarker(exception)}(?!\\d)`).test(lower)) throw new Error(`--out ${name}: this run declares renderer exception ${exception}, so the folder name must contain ${exceptionMarker(exception)}`);
   if (!exception && /exception-ex-\d+/.test(lower)) throw new Error(`--out ${name} names a renderer exception, but this run declares none`);
 }

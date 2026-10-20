@@ -1,8 +1,9 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkExceptionFolder, EXCEPTION_REGISTER, exceptionMarker, resolveLaunch, resolveRendererException, type MainRegister } from "./exceptionRegister";
+import { checkExceptionFolder, EXCEPTION_REGISTER, exceptionMarker, registerFromMain, resolveLaunch, resolveRendererException, type MainRegister } from "./exceptionRegister";
 
 const entry = (id: string, status: string, body = "The renderer check (#1115) may warn instead of fail on the owner's laptop.") => `## ${id}: a title\n\n- **Source:** x\n- **Status:** ${status}\n- **What is lost:** ${body}\n`;
 const register = (...entries: string[]) => `# Release 3.0 exception register\n\nintro text\n\n${entries.join("\n")}`;
@@ -36,8 +37,20 @@ describe("resolveRendererException", () => {
       expect(() => resolveRendererException("EX-4", register(entry("EX-4", status))), status).toThrow(/only a status of exactly "approved" counts/);
     }
     expect(resolveRendererException("EX-4", register(entry("EX-4", "Approved"))).id).toBe("EX-4");
-    expect(() => resolveRendererException("EX-4", register(`${entry("EX-4", "approved")}- **Status:** revoked\n`))).toThrow(/2 Status lines/);
-    expect(() => resolveRendererException("EX-4", register("## EX-4: no status\n\n(#1115)\n"))).toThrow(/0 Status lines/);
+    expect(() => resolveRendererException("EX-4", register(`${entry("EX-4", "approved")}- **Status:** revoked\n`))).toThrow(/2 Status, Revoked or Withdrawn lines/);
+    expect(() => resolveRendererException("EX-4", register("## EX-4: no status\n\n(#1115)\n"))).toThrow(/0 Status, Revoked or Withdrawn lines/);
+  });
+  it("reads the whole status value and counts every Status-like line", () => {
+    const wrapped = (more: string) => `## EX-4: a title\n\n- **Status:** approved\n  ${more}\n- **Scope:** #1115\n`;
+    expect(() => resolveRendererException("EX-4", register(wrapped("in principle only, pending the PC probe")))).toThrow(/status is "approved in principle only/);
+    expect(resolveRendererException("EX-4", register(`${entry("EX-4", "approved")}\n`)).id).toBe("EX-4");
+    for (const revoke of ["- **Status**: revoked", "* **Status:** revoked", "  - **Status:** revoked", "- **Revoked:** 2026-10-22 by the owner", "- **Withdrawn:** yes"]) {
+      expect(() => resolveRendererException("EX-4", register(`${entry("EX-4", "approved")}${revoke}\n`)), revoke).toThrow(/Status, Revoked or Withdrawn lines/);
+    }
+    // The register's own house style is not the accepted form.
+    expect(() => resolveRendererException("EX-4", register(entry("EX-4", "approved (2026-10-21, at the #945 sign-off)")))).toThrow(/only a status of exactly "approved" counts/);
+    expect(() => resolveRendererException("EX-4", register(entry("EX-4", "approved", "Revoked on the 22nd. (#1115)")))).toThrow(/revoked or withdrawn/);
+    expect(() => resolveRendererException("EX-4", register("## EX-4: x\n\n* **Status:** approved\n\n#1115\n"))).toThrow(/not in the form/);
   });
   it("ends an entry at the next level-1 or level-2 heading, so a later section lends it nothing", () => {
     const text = register(entry("EX-4", "proposed", "something else"), "## Appendix\n\n- **Status:** approved\n\nSee #1115.\n");
@@ -102,12 +115,61 @@ describe("resolveLaunch", () => {
   });
 });
 
+describe("registerFromMain", () => {
+  const git = (cwd: string, ...args: string[]): string => execFileSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
+  const write = (dir: string, text: string): void => {
+    mkdirSync(dirname(join(dir, EXCEPTION_REGISTER)), { recursive: true });
+    writeFileSync(join(dir, EXCEPTION_REGISTER), text);
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "register");
+  };
+  const clone = (upstreamText: string) => {
+    const root = mkdtempSync(join(tmpdir(), "regmain-"));
+    const up = join(root, "up");
+    mkdirSync(up);
+    git(up, "init", "-q", "-b", "main");
+    write(up, upstreamText);
+    const work = join(root, "work");
+    git(root, "clone", "-q", up, work);
+    return { up, work };
+  };
+  const proposed = register(entry("EX-4", "proposed"));
+  const approved = register(entry("EX-4", "approved"));
+
+  it("reads the remote-tracking ref, so a local branch or tag called origin/main cannot approve an exception", () => {
+    const { work } = clone(proposed);
+    git(work, "checkout", "-q", "-b", "feature");
+    write(work, approved);
+    git(work, "branch", "origin/main", "feature");
+    git(work, "tag", "origin/main", "feature");
+    expect(registerFromMain(work)?.text).toBe(proposed);
+  });
+  it("fetches first, so an entry revoked on main counts as revoked", () => {
+    const { up, work } = clone(approved);
+    expect(registerFromMain(work)?.text).toBe(approved);
+    write(up, proposed);
+    const got = registerFromMain(work);
+    expect(got?.text).toBe(proposed);
+    expect(got?.commit).toBe(git(up, "rev-parse", "HEAD").trim());
+  });
+  it("answers null when there is no origin or no register on main", () => {
+    const dir = mkdtempSync(join(tmpdir(), "regmain-"));
+    git(dir, "init", "-q", "-b", "main");
+    expect(registerFromMain(dir)).toBeNull();
+    const { work } = clone("nothing here\n");
+    expect(registerFromMain(work)?.text).toBe("nothing here\n");
+  });
+});
+
 describe("checkExceptionFolder", () => {
   it("requires the exception marker in an --out name, and refuses one on a run without an exception", () => {
     expect(exceptionMarker("EX-4")).toBe("exception-ex-4");
     expect(() => checkExceptionFolder("2026-10-21-abc-run0b-worker", "EX-4")).toThrow(/must contain exception-ex-4/);
     expect(() => checkExceptionFolder("2026-10-21-abc-exception-ex-4-worker", "EX-4")).not.toThrow();
     expect(() => checkExceptionFolder("2026-10-21-abc-exception-ex-4-worker", null)).toThrow(/declares none/);
+    // The marker is matched as a whole number: ex-40 does not carry EX-4.
+    expect(() => checkExceptionFolder("2026-10-21-abc-exception-ex-40-worker", "EX-4")).toThrow(/must contain exception-ex-4/);
+    expect(() => checkExceptionFolder("2026-10-21-abc-exception-ex-4", "EX-4")).not.toThrow();
     expect(() => checkExceptionFolder("2026-10-21-abc-run0b-worker", null)).not.toThrow();
   });
 });

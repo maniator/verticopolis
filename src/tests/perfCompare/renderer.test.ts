@@ -154,6 +154,9 @@ describe("machineOf", () => {
     expect(machineOf(env, null, launch({ args: ["--use-angle=d3d11"] }), probe)).not.toEqual(base);
     expect(machineOf(env, null, launch({ rendererException: "EX-4" }), probe)).not.toEqual(base);
     expect(machineOf(env, null, launch({ rendererException: "EX-4", rendererExceptionSha256: "a" }), probe)).not.toEqual(machineOf(env, null, launch({ rendererException: "EX-4", rendererExceptionSha256: "b" }), probe));
+    // Main\'s commit is recorded, not part of the identity: an unrelated merge to main must not refuse a resume.
+    const withCommit = (c: string) => machineOf(env, null, launch({ rendererException: "EX-4", rendererExceptionSha256: "a", rendererExceptionCommit: c }), probe);
+    expect(withCommit("1".repeat(40))).toEqual(withCommit("2".repeat(40)));
     expect(machineOf(env, null, none, { ...probe, version: "142.0.0" })).not.toEqual(base);
     expect(machineOf(env, null, none, { ...probe, renderer: AMD })).not.toEqual(base);
     expect(machineOf(env, null, none, probe)).toEqual(base);
