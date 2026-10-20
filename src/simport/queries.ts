@@ -15,6 +15,7 @@ export interface QueryResults {
   isUnlocked: boolean;
 }
 
+export type QueryOp = Query["op"];
 export type QueryResult<Q extends Query> = QueryResults[Q["op"]];
 
 /** The key two equal queries share, so `cached` can find the last answer.

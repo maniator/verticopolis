@@ -11,7 +11,9 @@ import type { FacilityKind, LogEntry, SerializedView } from "../engine/types";
  * the other.
  *
  * Left out on purpose: `sellAt`, `setCars`, `resizeTransport` and the
- * tower's resize and car setters (no production caller), and `startFire`,
+ * tower's resize and car setters (no production caller); `removeUnit` and
+ * `removeTransport`, the tower's raw removes, which loaders and tests use
+ * while players remove through `removeFacility`; and `startFire`,
  * `bombThreat`, `evaluateStar` and money writes (tests and tooling only).
  */
 export type Command =
@@ -49,26 +51,28 @@ export type Command =
 export type FilmPolicy = "auto" | "feature" | "blockbuster";
 
 /** What every command answers. `ok` is false on a refusal, with the
- *  engine's `reason` when it gives one. `delta` is the signed change a
- *  charged command made to the balance (negative for a charge, positive for
- *  a refund, 0 on a refusal); commands that never move money leave it out. */
+ *  engine's `reason` when it gives one. `delta` is the signed change the
+ *  command made to the balance, measured the same way for every command:
+ *  negative for a charge, positive for a refund or an excavation find, and 0
+ *  when no money moved (always on a refusal). */
 export interface BaseResult {
   readonly ok: boolean;
   readonly reason?: string;
-  readonly delta?: number;
+  readonly delta: number;
 }
 
 /** Each command's answer: the base fields plus what its callers read today. */
 export interface CommandResults {
   build: BaseResult;
   buildTransport: BaseResult;
-  removeFacility: BaseResult & { readonly delta: number };
+  removeFacility: BaseResult;
   beginExtend: BaseResult;
   /** The shaft's ends afterwards and how many floors were billed. */
-  extendTransport: BaseResult & { readonly delta: number; readonly bottom: number; readonly top: number; readonly added: number };
+  extendTransport: BaseResult & { readonly bottom: number; readonly top: number; readonly added: number };
+  /** Closes the drag; always succeeds, open or not. */
   endExtend: BaseResult;
-  addCar: BaseResult & { readonly delta: number };
-  removeCar: BaseResult & { readonly delta: number };
+  addCar: BaseResult;
+  removeCar: BaseResult;
   setStop: BaseResult;
   setExpressStops: BaseResult;
   clearStops: BaseResult;
@@ -87,9 +91,13 @@ export interface CommandResults {
   rerollSubtype: BaseResult & { readonly subtype?: string };
   /** The booking's price and the rooms it treats, when booked. */
   callExterminator: BaseResult & { readonly reason?: "unavailable" | "pending" | "none" | "funds"; readonly cost?: number; readonly rooms?: number };
+  /** Refused when no emergency is waiting. Accepting without the funds
+   *  takes the default, as the engine does; `delta` shows which happened. */
   resolveChoice: BaseResult;
-  /** The preference now in force. */
+  /** The preference now in force; refused when it did not change (a
+   *  Classic tower always bridges). */
   toggleAutoBridge: BaseResult & { readonly value: boolean };
+  /** Refused when it would turn bridging off in a Classic tower. */
   setAutoBridge: BaseResult & { readonly value: boolean };
   setTowerName: BaseResult;
   setView: BaseResult;

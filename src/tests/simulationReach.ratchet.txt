@@ -1,8 +1,9 @@
 # Production files outside src/engine/ that import the TypeScript Simulation
 # at runtime (directly or through an engine module that does), with the
 # modules each imports and why. Read by simulationReach.guard.test.ts; one
-# file per line: `<file> <module> ... # reason`. The list only shrinks as the
-# facade's slices (#1207) move each consumer behind the port.
+# file per line: `<file> <module> ... # reason`. The list shrinks as the
+# facade's slices (#1207) move each consumer behind the port; a new line needs
+# a reason the PR states and a reviewer accepts.
 src/game/appHistory.ts Simulation # undo and redo deserialize a Simulation from a snapshot; facade slice 5 (#1212)
 src/game/facilityDiagnostics.ts Simulation # reads the gripe thresholds Simulation exports; facade slice 4 (#1211)
 src/game/saveLoad.ts Simulation # load and new game build a Simulation; facade slice 5 (#1212)

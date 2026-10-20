@@ -76,6 +76,19 @@ export function refreshFromEngine(sim: object): void {
   if (typeof hook === "function") (hook as (sim: object) => void)(sim);
 }
 
+/** Where `wasmHostSetup.ts` puts its counters, for {@link parityRestarts}. */
+export const STATS_HOOK = "__vcWasmParityStats";
+
+/** How many times the parity setup has restarted a host's engine from the
+ *  instance's save because the two disagreed before the crowd existed (a
+ *  re-host), or undefined off the parity projects. A re-host is a
+ *  divergence the setup forgives, so a test that holds every command to the
+ *  engine (the port's contract) reads it before and after. */
+export function parityRestarts(): number | undefined {
+  const stats = (globalThis as Record<string, unknown>)[STATS_HOOK] as { rehosts: number } | undefined;
+  return stats?.rehosts;
+}
+
 /** `wasmHostSetup.ts` notes each hosted tick, so a late request throws. */
 export function noteHostedTick(): void {
   (globalThis as Record<string, unknown>)[TICKED_FLAG] = true;

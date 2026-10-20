@@ -33,9 +33,10 @@ in while they do.
      serializes today;
    - `drainEvents()`, delegating to the instance's gameplay-event drain.
 
-   `load` and the engine change counter are not in this slice: their first
-   consumers are slices 5 and 6a, and `TsSim` could not give them today's
-   behavior exactly. The doc comment names that, so slice 5 adds them.
+   `load` and the change counter are not in this slice. Both port members
+   arrive with slice 5 (the counter as undo's signature, backed by slice
+   6a's engine counter), and `TsSim` could not give them today's behavior
+   exactly. The doc comment names that, so slice 5 adds them.
 2. **The view.** `src/simport/view.ts` exports `SimView` (`header`, `tower`,
    `crowd`), `HeaderView`, `TowerView`, `UnitView`, `TransportView`,
    `CrowdView` and `PersonView`, `readonly` all the way down
@@ -68,8 +69,8 @@ in while they do.
      from the live instance, with no copy and no allocation per read beyond
      the header object;
    - `command` runs the command synchronously by calling the instance's own
-     method (`sim.build(...)`, `sim.tower.setStop(...)`, `sim.view = ...`),
-     never an inner module function, so the mirror host's relay
+     method (`sim.build(...)`, `sim.tower.setStop(...)`, `sim.view = ...`)
+     rather than an inner module function, so the mirror host's relay
      (`relayCommands` in `src/dualrun/mirror.ts`) sees it exactly as it sees
      today's direct calls; the effect is on the view before the promise
      settles, the promise resolves with the converted result, and a throw
@@ -87,8 +88,9 @@ in while they do.
      change, an extension, an exterminator call where the mode allows it)
      returns results in the documented shapes;
    - after each command the view shows its effect (a structural command moves
-     `header.revision`; a charged command moves `header.money` by `-delta`
-     where the command reports one);
+     `header.revision`; a charged command moves `header.money` by `delta`,
+     the signed change to the balance, negative for a charge, as today's
+     `ChargeResult` reports it);
    - two commands issued back to back apply in issue order;
    - `canBuild` and `isUnlocked` answer as the instance does, and `cached`
      returns the last answer;
@@ -114,8 +116,8 @@ in while they do.
    - it starts with today's 9 edges (Dev Notes) and fails on a new edge, a
      stale line and an unreadable dynamic import;
    - its only permanent exceptions are the dual run files in
-     `src/build/engineBundle.ts`'s `DUAL_RUN` (imported from there, never
-     copied) and, from the slice that creates it, the adapter module that
+     `src/build/engineBundle.ts`'s `DUAL_RUN` (imported from there rather
+     than copied) and, from the slice that creates it, the adapter module that
      hosts the TypeScript engine; dynamic `import()` into the set is allowed
      only from that adapter;
    - a self-test on a synthetic graph covers: a chain through a non-engine
@@ -165,8 +167,9 @@ in while they do.
   - [x] the synthetic-graph self-test
 - [x] Gates and records (AC 8 to 10)
   - [x] the four gates, coverage, `test:wasm:parity`
-  - [x] the HP record in the PR body
-  - [x] `/bmad-code-review`, fixes, backlog rows for defers
+  - [ ] the HP record in the PR body
+  - [x] `/bmad-code-review` (all four layers), fixes, backlog rows for defers
+  - [ ] a confirming review pass on the fixed diff
 
 ## Dev Notes
 
@@ -189,7 +192,7 @@ in while they do.
 - The build-time bundle guard is `checkEngineBundle` in
   `src/build/engineBundle.ts`, run by `scripts/verify-engine-bundle.ts`. Its
   `DUAL_RUN` list is the tooling-only exception this story imports. The
-  chunk-level player-bundle check belongs to slice 10, not here.
+  chunk-level player-bundle check belongs to slice 10.
 
 ### Commands (the consumer inventory's 1C table)
 
@@ -259,7 +262,9 @@ remain.
   `src/tests/simulationReach.guard.test.ts`, its ratchet,
   `src/tests/importScan.ts`.
 - Changed: `src/tests/frontendEngineImports.guard.test.ts` (uses the shared
-  helper; behavior unchanged).
+  helper, so it now also reads Vite's query imports, root-absolute
+  specifiers and URLs written without `./` the way Vite loads them, and
+  fails a non-literal URL or glob; its ratchet is unchanged).
 - `src/simport/` is scanned by #1118's guard as frontend code, which is
   intended.
 
@@ -299,19 +304,60 @@ Claude Code (the facade lane's thread), 2026-10-20.
     (`sim.build(kind, floor, x)`) and would collide.
   - The contract suite is `src/simport/contract.fixture.ts`, so the shipped
     code scan and the coverage ratchet treat it as test code.
-  - `src/build/engineBundle.ts` exports `DUAL_RUN` (one word, no behavior
-    change) so the reach guard imports the build guard's own list.
+  - `src/build/engineBundle.ts` exports `DUAL_RUN` (an `export` and a
+    `readonly string[]` annotation, no behavior change) so the reach guard
+    imports the build guard's own list.
   - A file whose `import()` loads the engine package's glue by URL
     (`src/wasmhost/engineLoad.ts`) is named in the reach guard as a package
     loader rather than failing as unreadable; the guard checks it still is.
+- Changes from the review (`/bmad-code-review`, four layers), each recorded
+  here because it refines an AC:
+  - `delta` is on every command result, measured as the balance's change
+    around the command, so a build's excavation find, a booked exterminator
+    and a paid emergency all report it; AC 3's `delta?` is now required.
+  - Refusals the engine makes silently are reported: `resolveChoice` with no
+    emergency waiting, `toggleAutoBridge` when the value did not change, and
+    `setAutoBridge` turning bridging off in a Classic tower (which always
+    bridges) all answer `ok: false`. `endExtend` always succeeds, documented.
+  - `cached` keeps one map per query: placement answers in a 256-entry
+    least-recently-used map (a `cached` read counts as use) and unlock
+    answers without a cap, kept per tower in a `WeakMap`, so another tower
+    from `getSim()` starts with none and a replaced tower is not kept alive.
+  - `save()` waits for a host that steps in the background (the step gate's
+    `settle`, as `saveLoad.ts`'s autosave does) and saves the tower held once
+    it has caught up, which may then hold steps and commands issued after the
+    call; without a gate it saves at once, so issue order holds.
+  - `drainEvents({ release: true })` forwards the WASM host's release flag,
+    which the analytics flush on page close needs.
+  - The header's `population` is computed on its first read and kept for
+    that header object, so reading another field walks no rooms.
+  - The contract ticks before and after each case so the parity host sees
+    every command, and on the parity project fails a case in which the setup
+    restarted the engine (`parityRestarts`, a counter `wasmHostSetup.ts` now
+    publishes), since before a tower has people the setup restarts the
+    engine on a divergence instead of failing. It also asserts `delta`
+    against the balance for each command in the session and a revision move
+    for `addCar`, `extendTransport` and `removeCar`, pins command, query and
+    save order without awaits between them (the save holds both offices),
+    and checks the drained `facility_placed` events and their order (floors
+    2 then 3).
+  - The reach guard counts glob, URL, root-absolute and Vite-query imports
+    the way Vite loads them (a `?worker&url` import counts; a glob's `!`
+    patterns apply to its own call; a pattern with no base is unreadable),
+    fails a static edge into an engine module that loads `Simulation`
+    lazily, keeps a dual-run file in the reach set only when it reaches
+    `Simulation` through engine modules, and holds each file that loads the
+    engine package's glue by URL (`engineLoad.ts`, the dual-run worker) to
+    one unreadable import; any other unreadable import fails, the dual run's
+    included.
 - The reach set on `main` at this branch's base is `Simulation.ts`,
   `sim/loop.ts` and `sim/serialization.ts`, and the crossings are the 9
   files the Dev Notes list, each into `Simulation`, each with a reason and
   the slice that removes it.
-- The header read calls `Simulation.population`, a scan over the rooms
-  (`routing.totalPopulation`), the same cost the HUD pays per UI tick today.
-  Slice 3 must not read `view.header` per frame on `TsSim` without caching
-  it; the PR's hot-path record says so.
+- `Simulation.population` is a scan over the rooms
+  (`routing.totalPopulation`). The header reads it only when its
+  `population` is read, once per header object; slice 3 reads `view.header`
+  once per frame and keeps it, and the PR's hot-path record says so.
 
 ### File List
 
@@ -327,4 +373,5 @@ Claude Code (the facade lane's thread), 2026-10-20.
 - `src/tests/simulationReach.guard.test.ts` (new)
 - `src/tests/simulationReach.ratchet.txt` (new)
 - `src/tests/frontendEngineImports.guard.test.ts` (reads imports through `importScan.ts`)
+- `src/tests/parity/typescriptOnly.ts`, `src/tests/parity/wasmHostSetup.ts` (publish the re-host counter as `parityRestarts`)
 - `src/build/engineBundle.ts` (exports `DUAL_RUN`)

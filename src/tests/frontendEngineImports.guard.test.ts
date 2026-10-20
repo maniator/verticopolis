@@ -27,8 +27,12 @@ import { isTestFile, resolveRelative, scanRuntimeImports } from "./importScan";
  * `import "..."`, a dynamic `import()`, `new URL("...", import.meta.url)` and
  * `import.meta.glob`. A name used only as a type but imported without `type`
  * counts as runtime (the build drops it, the guard cannot tell), so mark it
- * `type`. A dynamic `import()` whose module is not a string literal fails,
- * since the guard cannot read it.
+ * `type`. Vite's `?raw`, `?url` and `?inline` imports load text or an
+ * address and do not count; a `?worker` import does. A root-absolute
+ * specifier (`/engine/x`, Vite's `src/` root) and a URL written without
+ * `./` resolve like relative ones. A dynamic `import()`, a URL or a glob
+ * whose module is not a string literal fails, since the guard cannot read
+ * it.
  *
  * A runtime import the list does not name fails, and so does a line that names
  * more than its file imports. The list shrinks as the frontend moves off the
@@ -165,7 +169,7 @@ describe("the frontend's runtime imports of src/engine/", () => {
 
   it("every dynamic import in the frontend names its module", () => {
     const unreadable = [...scans.values()].flatMap((s) => s.unreadable);
-    expect(unreadable, `The guard cannot tell what these import; give import() a string literal:\n${unreadable.join("\n")}`).toEqual([]);
+    expect(unreadable, `The guard cannot tell what these import; give import(), the URL or the glob a string literal:\n${unreadable.join("\n")}`).toEqual([]);
   });
 
   it("no frontend file imports an engine module at runtime that the ratchet does not name", () => {
