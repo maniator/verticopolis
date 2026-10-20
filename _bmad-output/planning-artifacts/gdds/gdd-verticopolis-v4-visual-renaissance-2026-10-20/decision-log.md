@@ -1,5 +1,7 @@
 # Decision log: Verticopolis 4.0 Visual Renaissance
 
+**GitHub tracking:** [v4.0 umbrella #1189](https://github.com/maniator/verticopolis/issues/1189), [draft planning PR #1188](https://github.com/maniator/verticopolis/pull/1188). Stage issues: [4A #1190](https://github.com/maniator/verticopolis/issues/1190), [4B #1191](https://github.com/maniator/verticopolis/issues/1191), [4C #1192](https://github.com/maniator/verticopolis/issues/1192), [4D #1193](https://github.com/maniator/verticopolis/issues/1193), [4E #1194](https://github.com/maniator/verticopolis/issues/1194), [4F #1195](https://github.com/maniator/verticopolis/issues/1195).
+
 **Created:** 2026-10-20
 **Status:** initial owner direction recorded; implementation and renderer decisions pending
 **Companions:** `gdd.md`, `epics.md`, `renderer-bakeoff-charter.md`
