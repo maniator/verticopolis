@@ -103,6 +103,100 @@ describe("UndoHistory — stack semantics", () => {
   });
 });
 
+describe("UndoHistory.dropUnchanged (#874)", () => {
+  // The fake world fingerprints a snapshot as its number.
+  function withSigOf() {
+    let world = { v: 0 };
+    const notes: string[] = [];
+    const hist = new UndoHistory({
+      snapshot: () => JSON.stringify(world),
+      restore: (s) => {
+        world = JSON.parse(s) as { v: number };
+      },
+      signature: () => String(world.v),
+      signatureOf: (s) => String((JSON.parse(s) as { v: number }).v),
+      notify: (m) => notes.push(m),
+    });
+    return { hist, notes, set: (v: number) => (world.v = v) };
+  }
+
+  it("drops the newest steps that would change nothing now, and keeps the rest", () => {
+    const { hist, notes, set } = withSigOf();
+    hist.capture("a");
+    set(1);
+    hist.commit();
+    hist.capture("b");
+    set(2);
+    hist.commit();
+    // A fallback put the world back to the state "b" captured, before "b".
+    set(1);
+    hist.dropUnchanged();
+    hist.undo();
+    expect(notes).toEqual(["Undid: a"]);
+    hist.undo();
+    expect(notes[notes.length - 1]).toBe("Nothing to undo.");
+  });
+
+  it("drops a redo step that would redo nothing, and keeps one that would not", () => {
+    let world = { v: 0 };
+    // A frozen host's snapshot answers with its newest restore point.
+    let point: string | null = null;
+    const notes: string[] = [];
+    const hist = new UndoHistory({
+      snapshot: () => point ?? JSON.stringify(world),
+      restore: (s) => {
+        world = JSON.parse(s) as { v: number };
+      },
+      signature: () => String(world.v),
+      signatureOf: (s) => String((JSON.parse(s) as { v: number }).v),
+      notify: (m) => notes.push(m),
+    });
+    hist.capture("a");
+    world.v = 1;
+    hist.commit();
+    // The undo's own snapshot traps: its redo step is the point, the state
+    // before "a", which is where the undo goes.
+    point = JSON.stringify({ v: 0 });
+    hist.undo();
+    hist.dropUnchanged();
+    hist.redo();
+    expect(notes).toEqual(["Undid: a", "Nothing to redo."]);
+    // A point from after "a" redoes it.
+    point = null;
+    hist.capture("b");
+    world.v = 2;
+    hist.commit();
+    point = JSON.stringify({ v: 2 });
+    hist.undo();
+    hist.dropUnchanged();
+    hist.redo();
+    expect(notes.slice(2)).toEqual(["Undid: b", "Redid: b"]);
+    expect(world.v).toBe(2);
+  });
+
+  it("keeps every step when the world differs from the newest one", () => {
+    const { hist, notes, set } = withSigOf();
+    hist.capture("a");
+    set(1);
+    hist.commit();
+    set(5);
+    hist.dropUnchanged();
+    hist.undo();
+    expect(notes).toEqual(["Undid: a"]);
+  });
+
+  it("does nothing without a way to fingerprint a snapshot", () => {
+    const { hist, notes, set } = fakeHistory();
+    hist.capture("a");
+    set(1);
+    hist.commit();
+    set(0);
+    hist.dropUnchanged();
+    hist.undo();
+    expect(notes).toEqual(["Undid: a"]);
+  });
+});
+
 describe("towerStateSig", () => {
   it("includes money but not the clock", () => {
     const sim = newSeededGame(1);

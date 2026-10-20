@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { FRAME_HEADER, PERSON_FIXED, decodeFrame, decodeHeader } from "./frameView";
 import { appendEngineLog, applyRecords } from "./frameApply";
-import { syncCars, syncPeople, syncUnits } from "./wasmHost";
+import { syncCars, syncPeople, syncUnits } from "./frameSync";
 
 /** A seeded generator, so a failure names a case that replays. */
 function rng(seed: number): () => number {

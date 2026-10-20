@@ -31,7 +31,7 @@ describe("the coalesced main-thread host (sync: frame)", () => {
     expect(sim.drainGameplayEvents().filter((e) => e.name === "star_reached")).toHaveLength(1);
     expect(sim.drainGameplayEvents()).toEqual([]);
   });
-  it("still frees the engine and gives the tower back when the commute rows at detach are malformed", () => {
+  it("faults, frees the engine and freezes the tower when the commute rows at detach are malformed (#874)", () => {
     const sim = Simulation.newGame(9, "classic");
     const mod = fakeModule();
     const host = attachWasmHost(sim, mod, { sync: "frame" });
@@ -40,10 +40,17 @@ describe("the coalesced main-thread host (sync: frame)", () => {
     engine.commuteRows = '[[2,"x"]]';
     engine.commuteRevision++;
     sim.tick(1);
-    expect(() => host.detach()).toThrow(/commute stress/);
+    expect(() => host.detach()).not.toThrow();
+    expect(host.fault).toMatchObject({ reason: "other", message: expect.stringMatching(/during letting a tower go: .*commute stress/) });
     expect(engine.freed).toBe(true);
     expect([...sim.crowd.commuteStressByFloor]).toEqual([[2, 10]]);
-    expect(Object.getOwnPropertyDescriptor(sim, "serialize")).toBeUndefined();
+    // A faulted tower never runs on TypeScript, and its save is the newest
+    // restore point (here the attach save).
+    const minutes = sim.clock.minutes;
+    sim.tick(30);
+    expect(sim.clock.minutes).toBe(minutes);
+    expect(Object.getOwnPropertyDescriptor(sim, "serialize")).toBeDefined();
+    expect(sim.serialize().minutes).toBe(Simulation.newGame(9, "classic").clock.minutes);
   });
   it("advances the clock per step and applies the frame once, at the flush", () => {
     const sim = Simulation.newGame(9, "classic");

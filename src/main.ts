@@ -1,5 +1,6 @@
 import { Simulation, type HeatmapMode } from "./engine/Simulation";
-import { UndoHistory, towerStateSig } from "./engine/UndoHistory";
+import type { UndoHistory } from "./engine/UndoHistory";
+import { createAppHistory } from "./game/appHistory";
 import { GRID } from "./engine/facilities";
 import type { FacilityKind, Transport, Unit } from "./engine/types";
 import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/TowerEngine";
@@ -52,8 +53,8 @@ import { gameplaySession } from "./analytics";
  * and VC_TOOLING=1 builds only (bootstrap.ts gates the publish; production
  * bundles carry none): the public fields (sim, engine, speed, grid) plus, via
  * any-cast, `selectPicked`, `selected`, `refreshEditor`, `onUpdateAvailable`,
- * `setSpeed` and `updateTraffic` (the last pins the traffic chip before a
- * capture); renaming any needs every consumer updated (TypeScript won't catch it).
+ * `setSpeed`, `onboarding.dismissSplash` and `updateTraffic` (the last pins the
+ * traffic chip); renaming any needs every consumer updated (TypeScript won't catch it).
  */
 class GameApp implements GameAppPorts {
   sim: Simulation;
@@ -229,14 +230,7 @@ class GameApp implements GameAppPorts {
     // fires onSelectTool synchronously (which needs this.keyboard/this.build).
     this.ui = new UI(createUICallbacks(this));
 
-    // Undo/redo history, ports close over `this` so snapshot / signature /
-    // restore always target the *current* sim (adoptSim swaps it).
-    this.history = new UndoHistory({
-      snapshot: () => JSON.stringify(this.sim.serialize()),
-      restore: (snap) => this.adoptSim(Simulation.deserialize(JSON.parse(snap)), true),
-      signature: () => towerStateSig(this.sim.tower, this.sim.money),
-      notify: (msg) => this.ui.toast(msg, "info"),
-    });
+    this.history = createAppHistory(this); // its ports read the live sim across adoptSim swaps
 
     wireEngine(this);
     bindKeys(this);
@@ -456,7 +450,7 @@ class GameApp implements GameAppPorts {
     this.inspector.clear();
     // A live Getting Started session must follow the swap, or it keeps
     // ticking the abandoned sim and teaches that tower's next step.
-    this.onboarding.adoptSim(sim);
+    this.onboarding.adoptSim(sim, preserveHistory);
     this.shownWin = false;
     this.lastStar = sim.star;
     this.accMinutes = 0;
@@ -487,6 +481,7 @@ class GameApp implements GameAppPorts {
   /** @internal */ captureUndo(label: string): void { this.history.capture(label); }
   /** @internal */ commitUndo(): void { this.history.commit(); }
   /** @internal */ discardUndo(): void { this.history.discard(); }
+  /** @internal Temporary, with the WASM engine's fallback (#874). */ dropEmptyUndo(): void { this.history.dropUnchanged(); }
   undo(): void { this.history.undo(); }
   redo(): void { this.history.redo(); }
 }

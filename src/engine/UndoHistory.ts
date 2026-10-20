@@ -53,6 +53,10 @@ export interface UndoPorts {
   restore(snap: string): void;
   /** Fingerprint the current player-mutable state (see {@link towerStateSig}). */
   signature(): string;
+  /** Fingerprint a snapshot's state the same way, when the host can (used
+   *  only by {@link UndoHistory.dropUnchanged}; temporary, with the WASM
+   *  engine's fallback, #874). */
+  signatureOf?(snap: string): string;
   /** Surface a short user-facing message ("Undid: Bulldoze", "Nothing to undo."). */
   notify(message: string): void;
 }
@@ -127,6 +131,21 @@ export class UndoHistory {
     this.undoStack.push({ snap: this.ports.snapshot(), label: entry.label });
     this.ports.restore(entry.snap);
     this.ports.notify(`Redid: ${entry.label}`);
+  }
+
+  /** Drop the newest undo and redo steps that would change nothing now. The
+   *  WASM engine's fallback (#874) can put the tower back to the state an
+   *  undo capture read, before the edit it captured, so that edit's step
+   *  would undo nothing; and an undo whose own snapshot trapped keeps, as its
+   *  redo step, the state it went back to, which would redo nothing. Both go.
+   *  A no-op without `signatureOf`. Temporary, with the fallback. */
+  dropUnchanged(): void {
+    const sigOf = this.ports.signatureOf;
+    if (!sigOf) return;
+    const now = this.ports.signature();
+    for (const stack of [this.undoStack, this.redoStack]) {
+      while (stack.length > 0 && sigOf(stack[stack.length - 1].snap) === now) stack.pop();
+    }
   }
 
   /** Drop the whole trail — e.g. when a *different* tower is adopted. */
