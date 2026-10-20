@@ -9,9 +9,10 @@
  * `src/tests/engineCompat.guard.test.ts` recomputes all of it from the tree and
  * fails when a pin moved and the record did not. After a deliberate change,
  * bump `version` in `engine-rs/Cargo.toml` and run `npm run engine:compat`,
- * which rewrites the record from the tree and refuses to when a pin moved
- * under the same crate version (`unbumpedPins`). A record edited by hand
- * skips that check; review owns that case.
+ * which rewrites the record from the tree and refuses to when a pin differs
+ * from `origin/main`'s record under the same crate version (`unbumpedPins`),
+ * so a version that has not merged yet can be re-recorded as main's lock moves
+ * under it. A record edited by hand skips that check; review owns that case.
  *
  * The digests are the first 16 hex digits of a SHA-256, as the conformance
  * digests are. `identity_tests.rs` recomputes the lock digest in Rust and

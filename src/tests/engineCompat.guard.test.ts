@@ -31,7 +31,7 @@ import {
  * no bump. `engine-rs/src/compat-record.json` records the version beside
  * those pins; this guard recomputes the pins from the tree and fails when one
  * moved and the record did not. `npm run engine:compat` rewrites the record
- * and refuses to when a pin moved under the same version.
+ * and refuses to when a pin differs from main's under the same version.
  *
  * What it cannot see is a record edited by hand in the same PR without a bump
  * (CI's checkout has no base branch to compare with); review owns that case.

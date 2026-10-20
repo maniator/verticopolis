@@ -76,8 +76,10 @@ a digest of `engine.d.ts` (comments and spacing aside). The lock is five
 files: the scenario, catalog, loader and `.TDT` tables and the gameplay event
 catalog. A TS guard recomputes all of it and fails when a pin moved and the
 record did not, or when the recorded version differs from `Cargo.toml`.
-`npm run engine:compat` rewrites the record and refuses when a pin moved under
-the same crate version. A record edited by hand in the same PR skips that
+`npm run engine:compat` rewrites the record and refuses when a pin differs from
+`origin/main`'s record under the same crate version, so a version that has not
+merged yet can be re-recorded as main's lock moves under it, and the first
+change after a release needs the next version. A record edited by hand in the same PR skips that
 check, since CI has no base branch to compare against; review owns that case
 until #1153 lands. What a frame slot or state code means is not visible to a
 test (#1154); the layout version pin covers offsets and widths.
@@ -98,8 +100,8 @@ with its compatibility policy, not by the app's 3.0.0.
    optional; old records still parse.
 4. **AC4** The compat-record guard fails on each of: a changed lock file,
    a changed version constant, a changed `engine.d.ts`, a recorded version that
-   differs from `Cargo.toml`; and `npm run engine:compat` refuses a moved pin
-   under an unmoved version. A mutation test proves each.
+   differs from `Cargo.toml`; and `npm run engine:compat` refuses a pin that
+   differs from main's record under an unmoved version. A mutation test proves each.
 5. **AC5** A pure diagnostics model builds one report from app version and
    SHA, the active engine and placement (and the fallback reason), the
    engine's record, `BUILD.json`'s record, the loaded package id, `lastError`
