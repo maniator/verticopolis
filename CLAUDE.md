@@ -39,8 +39,9 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   the independent reviewer is on the PR. Ported, rewritten, moved or inherited
   code is reviewed as new. A finding is fixed or deferred with evidence and an
   issue, and never dismissed as pre-existing; an added, ported or rewritten
-  scan over its tier's budget, or a dropped, removed or bypassed cache, gets
-  fixed unless the owner accepts the deferral in their own words. Section 1
+  scan over its tier's budget, or a cache dropped, removed or bypassed without
+  the equivalent HP-8 asks for, gets fixed unless the owner accepts the
+  deferral in their own words. Section 1
   also records the owner's scope decision for the pull requests that were open
   when the page merged.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
@@ -129,11 +130,12 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   independent review or a review-skill round has been requested or is running
   on the PR, hot-path or not, auto-merge stays off until that review has
   finished on the final commit (the independent reviewer has posted a GO, or a
-  CONDITIONAL GO whose conditions are met, and the skill's `patch` findings are
-  fixed). On a hot-path diff, signed off also needs the section 6 record of
-  `docs/performance/hot-path-review.md` for the final commit on the PR and
-  that independent verdict; the page's section 6 says when a record and a
-  verdict carry to a later commit. A reviewer that is still running has not
+  CONDITIONAL GO whose conditions it has confirmed met, and the skill's `patch`
+  findings are fixed). On a hot-path diff, signed off also needs the section 6
+  record of `docs/performance/hot-path-review.md` for the final commit on the
+  PR and a completed independent review of that commit, which the PR's author
+  requests; the page's section 6 says when a record and a verdict carry to a
+  later commit. A reviewer that is still running has not
   signed off. CI green means every required check has passed, the screenshot
   drift check included. Do not arm auto-merge before the PR is signed off and
   CI is green, and do not arm it early so it fires the moment the checks pass.

@@ -10,6 +10,7 @@ import {
   PAGE_CLAUSES,
   PROMPT,
   SECTIONS,
+  SKILL_HOOKS,
   SKILL_ROOTS,
   SKILLS,
   SUMMARIES,
@@ -228,6 +229,11 @@ describe("hot-path review guard", () => {
       ];
       expect(steps.sort()).toEqual(Object.keys(skill.anchors).sort());
       for (const root of SKILL_ROOTS) {
+        const hooks = read(join(root, skill.name, "SKILL.md"));
+        for (const hook of SKILL_HOOKS)
+          expect(hooks, `${root}/${skill.name}/SKILL.md: ${hook}`).toContain(
+            hook,
+          );
         for (const step of steps) {
           const path = join(root, skill.name, skill.stepDir, step);
           expect(existsSync(join(repoRoot, path)), path).toBe(true);
@@ -262,9 +268,12 @@ describe("hot-path review guard", () => {
           expect(out.status, out.stderr).toBe(0);
           const workflow = JSON.parse(out.stdout).workflow as {
             persistent_facts: string[];
+            activation_steps_prepend?: string[];
             activation_steps_append: string[];
             on_complete: string;
           };
+          // Catches a prepend step in any TOML form, which tomlArray cannot.
+          expect(workflow.activation_steps_prepend ?? [], "prepend").toEqual([]);
           expect(workflow.persistent_facts).toContain(
             "file:{project-root}/**/project-context.md",
           );

@@ -28,7 +28,10 @@ export const SURFACES: Record<string, string[]> = {
     "scripts/wasm-build.ts",
     "scripts/build-engine-wasm.sh",
   ],
-  "App build settings (which engine and code paths ship)": ["vite.config.ts"],
+  "App build settings (which engine and code paths ship)": [
+    "vite.config.ts",
+    "src/build/",
+  ],
   "TypeScript engine": ["src/engine/"],
   "WASM binding": [
     "engine-rs/src/wasm.rs",
@@ -99,6 +102,7 @@ export const PAGE_CLAUSES: Record<string, string[]> = {
     "Anything else is a dropped cache, which section 7 makes always `patch`",
     "does not close it",
     "Bypassing means computing what the cache holds without reading it",
+    "Every other removal is a finding.",
     "the repository owner (maniator), the #1158 audit's assignee",
     "a port that turns a cached read into a copy is an HP-8 finding",
   ],
@@ -126,6 +130,10 @@ export const PAGE_CLAUSES: Record<string, string[]> = {
     "who is not Copilot or Codex",
     "A NO-GO, or a verdict on an earlier commit, does not sign it off.",
     "and the independent reviewer confirms that on the PR",
+    "whose conditions it has confirmed met on the PR",
+    "The PR's author requests the independent review",
+    "changes nothing on a section 1 surface",
+    "its record comes from the next round of the skill or from the independent reviewer's table",
     "A review that is still running is not complete, and auto-merge stays off until both hold",
   ],
   "## 7. Resolving a finding": [
@@ -136,6 +144,8 @@ export const PAGE_CLAUSES: Record<string, string[]> = {
     "code the PR adds, ports or rewrites that puts a whole-collection walk under any HP-2 multiplier",
     "a change that drops, removes or bypasses a cache, index or counter either engine has",
     "The false-positive test above does not apply to these two",
+    "apart from the two removals HP-8 allows",
+    "Section 1's list of code that is not a hot path still comes first",
     "A path changed inside a function body makes it a rewrite",
     "Any other change to a moved function makes it a rewrite.",
     "repository owner (maniator)",
@@ -144,6 +154,7 @@ export const PAGE_CLAUSES: Record<string, string[]> = {
     "gives no GO when it cannot",
     "Until then the finding stays `patch`, in spec mode and no-spec mode alike, marked pending the owner",
     "dismisses, defers or drops it",
+    "halts for the human first instead",
   ],
   "## 9. How the review tools apply it": [
     "Copilot and Codex reviews do not stand in for it",
@@ -158,6 +169,9 @@ export const AUTO_MERGE = [
   "Enable auto-merge only after the PR is signed off and CI is green",
   "hot-path or not, auto-merge stays off until that review has finished on the final commit",
   "A reviewer that is still running has not signed off.",
+  "On a hot-path diff, signed off also needs the section 6 record",
+  "a completed independent review of that commit, which the PR's author requests",
+  "there is no GO or CONDITIONAL GO without that record",
 ];
 
 /** Sentences of the Hot-Path Auditor prompt (section 9) the layer depends on. */
@@ -175,6 +189,12 @@ export const PROMPT = [
 ];
 
 export const SKILL_ROOTS = [".claude/skills", ".agents/skills"];
+
+/** The lines of each skill's SKILL.md that load the facts and run the activation step. */
+export const SKILL_HOOKS = [
+  "{workflow.persistent_facts}",
+  "{workflow.activation_steps_append}",
+];
 
 export type Skill = {
   name: string;
@@ -211,6 +231,7 @@ export const SKILLS: Skill[] = [
         "for a diff of staged or uncommitted changes it reads the working tree",
         "the prompt in section 9",
         "one Hot-Path Auditor per module or chunk",
+        "counted over the whole diff even when this run covers one file group",
         "the list of every changed file and function",
         "merge them into one record",
         "appendix lines",
@@ -249,7 +270,7 @@ export const SKILLS: Skill[] = [
     },
     onComplete: [
       "every HP item filled",
-      "an appendix line for every changed function",
+      "an appendix line for every changed or removed function",
       "names the groups still to review",
       "names its issue and backlog row",
       "posted there as a comment",
@@ -271,6 +292,7 @@ export const SKILLS: Skill[] = [
         "{failed_layers}",
         "Clean review",
         "Pre-existing issue not caused by the current change",
+        "**decision_needed**",
       ],
       "step-04-present.md": [
         "{implementation_artifacts}",
@@ -279,6 +301,7 @@ export const SKILLS: Skill[] = [
         "## On Complete",
         "### 4. Resolve decision",
         "Walk through each patch",
+        "--key workflow.on_complete",
       ],
     },
   })),
@@ -294,6 +317,8 @@ export const SKILLS: Skill[] = [
         "overrides both files' rule that a defer is pre-existing only and goes only to the Deferral inbox",
         "always patch stays patch",
         "HALT for the human on either route before acting on any other finding, without reverting any code",
+        "resume when the human lets it be fixed or brings that acceptance",
+        "it is not done until its hot-path record is on the PR",
         "before the change is done and before merge",
       ],
     },

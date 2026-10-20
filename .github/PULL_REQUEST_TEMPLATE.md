@@ -57,9 +57,9 @@ Internal-only work needs no bump.
 
 <!--
 A change to a hot-path surface (section 1 of docs/performance/hot-path-review.md:
-either engine and its build, the WASM binding, the hosts, saves, rendering, the
-frame loop, UI, analytics, audio and the app shell) fills in the note from
-section 5 of that page: hot paths and callers, sizes, complexity before and
+either engine and its build, the app build settings, the WASM binding, the
+hosts, saves, rendering, the frame loop, UI, analytics, audio and the app
+shell) fills in the note from section 5 of that page: hot paths and callers, sizes, complexity before and
 after, remaining scans and why, the caches, indexes and counters either engine
 has there and whether each is kept (HP-8), invalidation evidence,
 measurements. A significant change (section 5) gives every field. Any other

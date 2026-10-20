@@ -76,9 +76,10 @@ not replace it.
     or less. Anything else is a dropped cache, which is always `patch`, and a
     reason in the PR or a comment in the port does not close it. Outside a
     port the same holds: a change that removes or bypasses a cache, index or
-    counter either engine has is always `patch`. HP-7: ported, rewritten and
-    moved code is reviewed as new, so "the TypeScript does the same" does not
-    close a finding. An optimization on one side must leave the lock, the RNG draw
+    counter either engine has is always `patch`, apart from the two removals
+    HP-8 allows (an equivalent named in the record, or the query itself gone).
+    HP-7: ported, rewritten and moved code is reviewed as new, so "the
+    TypeScript does the same" does not close a finding. An optimization on one side must leave the lock, the RNG draw
     order and collection order untouched (items 2, 6 and 7).
 
 ## How to verify locally
