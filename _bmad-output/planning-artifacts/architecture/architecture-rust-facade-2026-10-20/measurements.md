@@ -192,7 +192,9 @@ tile; each sample takes the next free tile (40 on medium, 8 on large).
   figures for the worker on `main` and with #1068's delta, and for the
   coalesced main-thread host with #1068's delta (prototype #1133): that last
   one was 1.19x / 3.83x the TypeScript main-thread time on medium / large,
-  about half of the full-merge figure. B's main-thread cost on a worker is the
+  about half of the full-merge figure. Run 2 (section 8b, with #1051's
+  engine speedup on every host) moved it to 0.72x / 1.63x, and today's
+  main-thread host to 3.03x / 9.01x. B's main-thread cost on a worker is the
   view apply alone, the `B-chg-f` minus `bare` difference above.
 - 4x speed, frame pacing in a browser, long tasks as the browser reports
   them, and memory in a browser. All of these are PC protocol rows.

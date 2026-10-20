@@ -59,12 +59,15 @@ Why, in order of weight:
    B with a changed-units frame costs about 1.6x bare on large and 0.27x
    the TypeScript engine in the same run, with no garbage collection in the
    timed window and a step p99 within about 1 ms of bare. A fully delta'd A
-   (#1068, #1049 and #1050 together) has not been measured. It would close
-   much of the transfer gap; the only measured step toward it, #1068's
-   delta on the coalesced host (prototype #1133, a browser figure under
-   software rendering, not comparable with these Node rows), halved the
-   full-merge cost and stayed at 3.83x the TypeScript main-thread time on
-   large.
+   (#1068, #1049 and #1050 together) has not been measured, and it would
+   close much of the transfer gap. The furthest measured step toward it is
+   the coalesced host with #1068's hourly delta (prototype #1133) plus
+   #1051's engine speedup: in the worker thread's cloud run 2 (a browser
+   figure under software rendering, exploratory, not comparable with these
+   Node rows) it reached 0.72x / 1.63x the TypeScript main-thread time on
+   medium / large at 1x, with its per-batch maximum still 5.4x TypeScript's
+   on large. So a delta'd A can beat TypeScript on the medium tower; on the
+   large tower it was still above, and its structural costs stay either way.
 4. **B is the shape retirement needs.** Every consumer that moves to the
    port stops depending on `src/engine/`, so the TypeScript engine shrinks
    to the fallback and the reference. Under A, the mirror is a permanent
@@ -101,7 +104,7 @@ peak. It needs its own item (section 8, M6).
 | F2 | Commands and panel queries return promises on every host, with the main-thread host resolving in the same task | Yes: one interface for both hosts, no pretend-sync |
 | F3 | The facility diagnostics ("why is this unhappy") move to a Rust getter that returns facts, with the TypeScript keeping only the copy | Yes: the largest single new Rust piece, and the only way the inspector stops running TypeScript gameplay code on the healthy path |
 | F4 | B supersedes A5's design rule for S6 (OD-9 (ii)): S6 becomes the facade, not a sync design picked from RUN-0b's churn rows | Yes. RUN-0b's cost split stays useful as the baseline |
-| F5 | #1068 stays on hold. Its read-model role ends under B; its Rust `SaveMirror` is kept only if restore-point cost needs it (section 5.7) | Yes. The worker evaluation keeps running |
+| F5 | #1068 stays on hold. Its read-model role ends under B; its Rust `SaveMirror` is kept only if restore-point cost needs it (section 5.7) | Yes. The worker evaluation keeps running. If F1 is declined, #1068 with #1051 is the strongest measured A path (cloud run 2: the worker's main-thread time 0.31x / 0.66x TypeScript's, its wall time 0.91x / 1.77x) |
 | F6 | #1049 and #1050 are retargeted from the mirror to B's view (changed units, structural snapshot) | Yes |
 | F7 | A new engine item for the load-time memory peak, checked against M6 | Yes |
 | F8 | Restore points under B are the engine saves the host already takes (undo captures, the 30-second autosave, manual saves), each with a versioned transient sidecar; no save added per command or tick (#1101's property); a pre-registered budget of no save task over 50 ms on large at 1x and 4x on the PC | Yes |
@@ -130,6 +133,16 @@ merge into TypeScript objects, the keyframe rule set as a read-model
 mechanism, and the per-command relay.
 
 ## 3. Evidence
+
+**From the worker thread's cloud run 2 (exploratory; section 8b of
+`release-3.0/host-sync/host-sync-analysis.md`).** With #1051 on every host,
+at 1x, medium / large, as a share of TypeScript's main-thread time: today's
+main-thread host 3.03x / 9.01x (#1051 moved it only 0.92x / 0.84x, since
+sync is its cost); the coalesced host with the hourly delta 0.72x / 1.63x;
+the worker with #1068 0.31x / 0.66x, with hosted wall time 0.91x / 1.77x
+TypeScript's. Memory did not move with #1051 (every WASM host about 96 /
+203 to 206 MiB against TypeScript's 60 / 75), which matches the load-time
+peak in [`measurements.md`](./measurements.md).
 
 **From the PC (motivation, not acceptance).** a532572 after #1051's
 optimization: WASM bare 222 / 296 ms per game day on medium / large, hosted
