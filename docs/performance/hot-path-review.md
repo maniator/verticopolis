@@ -212,10 +212,11 @@ hasher (SipHash) is slow for small integer keys, and a search that builds
 `prev` and `seen` maps on every call pays it on every insert. For a map that
 is only inserted into and looked up, never iterated, prefer a dense `Vec`
 indexed by unit, floor or segment, a reused scratch buffer, or a fast
-deterministic hasher. A map that is iterated keeps insertion order (`IndexMap`,
-`IndexSet` or a `Vec` in insertion order, engine parity checklist item 7), so
-its container stays as it is; iterating a `HashMap` or `HashSet` is an HP-10
-finding.
+deterministic hasher: `FastMap` / `FastSet` in
+`engine-rs/src/crowd/fasthash.rs`, which offer no iteration at all. A map
+that is iterated keeps insertion order (`IndexMap`, `IndexSet` or a `Vec` in
+insertion order, engine parity checklist item 7), so its container stays as
+it is; iterating a `HashMap` or `HashSet` is an HP-10 finding.
 
 **HP-6 Look up by id, and keep removal linear.** Use `getUnit` / `getTransport`
 in TypeScript and `get_unit` / `get_transport` in Rust (the `by_id` and
