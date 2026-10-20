@@ -4,9 +4,10 @@
 > the party review (`reviews/party-review.md`) and amended after the
 > independent review (R1 to R6 in
 > [`ARCHITECTURE-REVIEW.md`](./ARCHITECTURE-REVIEW.md)).** Status: the owner
-> signed off F1 to F9 at 21:40 UTC; R3 (when eligible sessions start) and R6
-> (the fallback's loss bound) wait on his answer, and nothing that depends
-> on them starts before it. Each slice gets its story file before its first
+> signed off F1 to F9 at 21:40 UTC and decided R3 (when eligible sessions
+> start) at 21:56 UTC with six conditions (release plan section 1.2). R6
+> (the fallback's loss bound) waits on his answer, and nothing that depends
+> on it starts before it. Each slice gets its story file before its first
 > commit.
 > PR, issue and lane states drift after this; the live release matrix is
 > #1104.
@@ -68,8 +69,8 @@ the Review column so a story cannot drop it (proportional, per the owner's
 | 7 | `RustSim` behind a flag | The main-thread adapter over `Engine` and the view; Rust-first commands; restore points riding the saves the host already takes (undo captures, the 30-second autosave, manual saves; no save added per command or tick, #1101's property), each with a versioned sidecar (schema, round trip on both engines, loud refusal on a mismatch); the save budget pre-registered; the `chromium-wasm` e2e project gains a facade run; the cadence-excluded tests move onto the port contract suite and leave the exclusions ratchet, one mapping row each (R1); the CI cross-engine restore-point test (R5) | 2 to 6 | this lane; host boot with the Runtime thread | M | gds + bmad + HP record | app minor if a player can reach the flag, else none |
 | 8 | Fallback from the Rust recovery point | `hostFault` and the recovery path adopt `TsSim` from the newest point that passes the adoption check (it loads and its invariants hold; otherwise the next older one) plus its sidecar; a "recovery point refused" reliability line (R5); the port holds or refuses calls during the adopt; forced-trap tests, one with the network off (the fallback module stays precached); no mirror read | 7 | Runtime thread co-owns (#874, #1101) | M | gds + HP record | none |
 | 9 | PC protocol run (the facade's pre-switch run, not RUN-1) | Facade, TypeScript and today's host on medium and large, 1x and 4x: frame pacing, long tasks, memory, command latency, throughput and the save budget (no save task over 50 ms on large at 1x and 4x), on the counting Chromium, GPU-verified, #1164's fresh-page harness | 8 and 13 (R4) | through the coordinator to the PC thread | run | n/a | n/a |
-| 10 | Facade becomes the WASM host | `?engine=wasm` selects `RustSim`; today's host stays reachable as `?engine=wasm-mirror` for one release, for rollback. The default engine stays TypeScript | 9 passes, owner approval (a host change for any live cohort) | this lane | S | bmad + HP record | app minor |
-| 11 | Remove the routine mirror | The per-step sync, the hourly merge, the relay and `?engine=wasm-mirror` leave the production WASM path; what the fallback needs stays; the mirror host stays as the test and tooling harness of the parity projects and the dual run, added to `engineBundle`'s player-build guard (R1), which leaves the worker host its merge path until slice 12 replaces it; the runtime guard that no `Simulation` exists on the healthy path turns on. Lands before the freeze; not a stage-3 input (R3) | 10, one release | this lane, Runtime thread | M | gds + bmad + HP record | app patch or none |
+| 10 | Facade becomes the WASM host | `?engine=wasm` selects `RustSim`; today's host stays reachable as `?engine=wasm-mirror` for one release, for rollback (an override, never eligible). The default engine stays TypeScript. Before the deploy, automated proof of the owner's condition 1 (release plan 1.2): the runtime guard that no `Simulation` exists on the healthy path turns on here, and runtime and `chromium-wasm` e2e checks show normal WASM play (boot, new game, load, play, commands, undo, saves) constructs, executes and deserializes no TypeScript `Simulation`, that every command's answer is Rust's, and that saves are engine-written. Merging or deploying it starts no reliability clock | 9 passes, owner approval (a host change for any live cohort) | this lane | S | bmad + HP record | app minor |
+| 11 | Remove the routine mirror | The per-step sync, the hourly merge, the relay and `?engine=wasm-mirror` leave the production WASM path; what the fallback needs stays; the mirror host stays as the test and tooling harness of the parity projects and the dual run, added to `engineBundle`'s player-build guard (R1), which leaves the worker host its merge path until slice 12 replaces it. Lands before the freeze where practical (skipping it is the owner's separate decision); not a stage-3 input and not a prerequisite for counting slice-10 sessions (R3). Its merge is assessed for restarting the observation period or the replay window (release plan 1.2, condition 4) | 10, one release | this lane, Runtime thread | M | gds + bmad + HP record | app patch or none |
 | 12 | `RustWorkerSim` | The worker adapter of the same port: transferred buffers, async commands and queries; replaces `parseMerge` on `?engine=wasm-worker` | 7, #1068's evaluation | worker thread | M | gds + bmad + HP record | none until it ships |
 | 13 | Engine load-time memory peak | Load the save without building a `serde_json::Value` tree for it (typed deserialization or a streaming parse), measured against M6; a prerequisite of slice 9's verdict run (R4) | none | this lane or the Rust performance lane | M | gds + HP record | crate minor |
 
@@ -78,12 +79,20 @@ Slices 2 to 5 can run in parallel after slice 1, but they share
 engine slices (6a to 6d, 13) run beside them; slice 13 must merge before
 slice 9's verdict run.
 
-**Mapping to the release plan (R3, recommended, waiting on the owner).**
+**Mapping to the release plan (R3, decided by the owner 21:56 UTC).**
 A5 (S6, #868) is slices 1 to 8 and 10; S9 (#954) is slices 2, 7 and 10, since
 "nothing else applies it" holds only once the facade is the WASM host.
-Eligible sessions count from slice 10 on a stage-3 build. Slice 11 lands
-before the freeze and is not a stage-3 input; `?engine=wasm-mirror` sessions
-after slice 10 are early telemetry, never eligible.
+Eligible sessions count from slice 10, but only once stage 3 is explicitly
+approved and live, the size gate is off, S9 is complete and the approved
+`engine_status` eligibility definition holds; merging slice 10 starts
+nothing. Slice 11 lands before the final candidate freeze where practical
+and is not a stage-3 input or a prerequisite for counting;
+`?engine=wasm-mirror` and TypeScript-arm sessions are never eligible. The
+production ramp stays 0, 10, 25, then 50%, each stage and any rollback on
+the owner's explicit approval. The release plan's section 1.2 keeps five
+things apart: slice 10's deploy and stage-3 eligibility, the 1,000 eligible
+sessions, the candidate's observation period, the 14-night replay and slice
+11's cleanup.
 
 **Slice 9 is not RUN-1.** The release plan defines RUN-1 as the shipping
 host's run after S6 lands, which under this mapping is after slice 10. Slice
@@ -135,7 +144,7 @@ whole acceptance list holds.
 | 0 | The spike shows the renderer's view read is too slow | Pause before slice 3; the spike branch never merges, so nothing to revert |
 | 9 | The PC run fails a row | Stop. Report to the owner with the numbers; slices 1 to 8 stay (the port is the fallback's seam either way) |
 | 13 | The load-time fix is late or does not reach M6 | The verdict run waits for it (R4); M6's bar is unchanged, and an M6 miss after slice 13 goes to the owner with the numbers |
-| 10 | Cohort players hit a facade defect | Switch `?engine=wasm` back to the mirror host (one line, kept for a release); the fallback catches faults meanwhile |
+| 10 | Cohort players hit a facade defect | Switch `?engine=wasm` back to the mirror host (one line, kept for a release), on the owner's approval like any rollback; the fallback catches faults meanwhile |
 | 11 | A missed consumer still needed the mirror | `git revert` brings the mirror back intact; slice 11 waits a release after 10 for this reason |
 
 **Stop rule.** If spike 0 shows the renderer cannot read the view within

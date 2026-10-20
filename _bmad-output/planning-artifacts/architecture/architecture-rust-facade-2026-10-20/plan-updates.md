@@ -6,7 +6,9 @@
 > (sections 3 and 4, with its own additions) at 21:42 and the review's
 > amendments at 21:45; the #1104 rows went to the triage thread, which edits
 > that issue, with the rows that depend on R3 held for the owner's answer.
-> The spine and plan edits land in their own docs PR after #1184.
+> The spine and plan edits are applied in the docs PR that follows #1184,
+> together with the owner's R3 decision of 21:56 UTC (release plan section
+> 1.2).
 
 ## 1. Spine: AD-9 and the amendments it brings
 
