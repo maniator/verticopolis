@@ -5,14 +5,15 @@
 # Quick-dev runs its own review in step-04-review.md (planned route) or
 # step-oneshot.md (one-shot route). On a hot-path change that loop does not
 # replace the review skill, and neither classify step may reject a hot-path
-# finding that is not a false positive. The checklist lives in
-# docs/performance/hot-path-review.md; each fact cites it as "section N (Name)".
+# finding that is not a false positive. The gds one-shot route has no On
+# Complete section, so on_complete never runs there; the fact carries the
+# rule on that route. The checklist lives in docs/performance/hot-path-review.md.
 # src/tests/hotPathReview.guard.test.ts checks this hook stays in place.
 
 [workflow]
 
 persistent_facts = [
-  "Hot-path review: when the change touches a surface in section 1 (When it applies) of docs/performance/hot-path-review.md, read that page before step-04-review.md (or step-oneshot.md on the one-shot route). In the Classify step of either file, a hot-path finding is never reject unless section 7 (Resolving a finding) calls it a false positive; otherwise it is patch or defer by section 7, and intent_gap and bad_spec are only for findings that are not hot-path findings. A finding section 7 calls always patch stays patch. If the author wants to defer it instead, HALT for the human on either route without reverting any code, and keep it patch until the repository owner accepts the deferral as section 7 describes. This loop does not replace the deep review: before the change is done and before merge it still goes through the review skill CLAUDE.md names for it (/gds-code-review or /bmad-code-review, or both when CLAUDE.md asks for both).",
+  "Hot-path review: when the change touches a surface in section 1 (When it applies) of docs/performance/hot-path-review.md, read that page before step-04-review.md (or step-oneshot.md on the one-shot route). In the Classify step of either file, a hot-path finding is never reject unless section 7 (Resolving a finding) calls it a false positive; otherwise it is patch or defer by section 7, and intent_gap and bad_spec are only for findings that are not hot-path findings. A hot-path defer may be a finding the change causes, as section 7 allows, and needs a tracking issue and a curated backlog row (or, for code the change does not touch or only moves, the open issue and item that already list it); for hot-path findings this overrides both files' rule that a defer is pre-existing only and goes only to the Deferral inbox. A finding section 7 calls always patch stays patch. If the author wants to defer it instead, HALT for the human on either route before acting on any other finding, without reverting any code, and keep it patch until the repository owner accepts the deferral as section 7 describes. This loop does not replace the deep review: before the change is done and before merge it still goes through the review skill CLAUDE.md names for it (/gds-code-review or /bmad-code-review, or both when CLAUDE.md asks for both).",
 ]
 
 on_complete = "If the change touched a surface in section 1 (When it applies) of docs/performance/hot-path-review.md, say before closing that it is not done until the review skill CLAUDE.md names (/gds-code-review or /bmad-code-review, or both) has run on it and its hot-path record is on the PR."

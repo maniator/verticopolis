@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { repoRoot } from "./guardFiles";
 import {
+  AUTO_MERGE,
   NOT_HOT,
   PAGE,
   PAGE_CLAUSES,
@@ -20,17 +21,21 @@ import {
  * applied through hooks that fail quietly: the review skills read it through
  * the team overrides in `_bmad/custom/`, and the resolver drops a malformed
  * override with a warning and exit 0. This guard pins what those hooks lean
- * on, so a rename, a TOML typo or a reworded rule fails here instead of
- * silently weakening every review:
+ * on, so a rename, a TOML typo, or a removed or reworded clause fails here
+ * instead of silently weakening every review:
  *
- * - the page's numbered sections, items HP-1 to HP-12, the section 1 surfaces,
- *   their paths and the not-hot-path list, the clauses of section 1, HP-2,
- *   HP-8 and sections 6 and 7 that the overrides cite, and the auditor prompt;
+ * - the page's numbered sections, items HP-1 to HP-12 with one record row
+ *   each, the section 1 surfaces, their paths and the not-hot-path list, the
+ *   clauses of sections 1, 3 to 7 and 9 that the overrides and summaries lean
+ *   on, and the auditor prompt;
  * - each override fact once, inside `persistent_facts`, with its load-bearing
- *   phrases, plus `on_complete` and the activation step, the gds and bmad
- *   copies identical, and the step-file text the facts name.
+ *   phrases, plus `on_complete`, the activation step, no prepend step, the
+ *   empty base `on_complete` it replaces, the gds and bmad copies identical,
+ *   and the step-file text the facts name;
+ * - the `CLAUDE.md` auto-merge rule.
  *
- * For the summaries it checks the link to the page only, never their wording.
+ * It checks phrases, so an added exception sentence passes it; catching that
+ * is the review's job. For the other summaries it checks the link only.
  */
 
 const read = (rel: string) =>
@@ -101,12 +106,15 @@ describe("hot-path review guard", () => {
   });
 
   it("keeps items HP-1 to HP-12, each once, a record row for each, and no others", () => {
+    const record = sectionOf(page, "## 6. Recording the review") ?? "";
     for (let n = 1; n <= 12; n++) {
       const item = new RegExp(`^\\*\\*HP-${n} `, "gm");
       expect(page.match(item)?.length, `HP-${n} heading`).toBe(1);
-      expect(page.includes(`| HP-${n} |`), `HP-${n} record row`).toBe(true);
+      const row = new RegExp(`^\\| HP-${n} \\|`, "gm");
+      expect(record.match(row)?.length, `HP-${n} record row`).toBe(1);
     }
     expect(page.match(/^\*\*HP-\d+ /gm)?.length).toBe(12);
+    expect(record.match(/^\| HP-\d+ \|/gm)?.length).toBe(12);
   });
 
   it("keeps the clauses the overrides rely on, each under its own heading", () => {
@@ -138,11 +146,12 @@ describe("hot-path review guard", () => {
     );
     expect(table).toEqual(SURFACES);
 
-    const list = section.slice(
-      section.indexOf("These are not"),
-      section.indexOf("| Surface"),
-    );
-    expect(spans(list)).toEqual(NOT_HOT);
+    // The list runs from its lead-in to the paragraph on build files; both are pinned clauses.
+    const prose = flat(section);
+    const from = prose.indexOf("apart from these");
+    const to = prose.indexOf("The build files in the table do count");
+    expect(from >= 0 && to > from, "not-hot-path list bounds").toBe(true);
+    expect(spans(prose.slice(from, to))).toEqual(NOT_HOT);
 
     const paths = [
       ...Object.values(SURFACES).flat(),
@@ -183,6 +192,14 @@ describe("hot-path review guard", () => {
       if (skill.stepDir)
         expect(facts).toContain(`"file:{project-root}/${PAGE}",`);
 
+      expect(tomlArray(toml, "activation_steps_prepend"), "prepend").toEqual(
+        [],
+      );
+      // on_complete replaces the base value, so the base must stay empty.
+      for (const root of SKILL_ROOTS)
+        expect(read(join(root, skill.name, "customize.toml"))).toContain(
+          'on_complete = ""',
+        );
       const onComplete = toml
         .split("\n")
         .filter((l) => l.startsWith("on_complete = "));
@@ -272,6 +289,11 @@ describe("hot-path review guard", () => {
 
   it("every summary points to the page", () => {
     expect(SUMMARIES.filter((rel) => !read(rel).includes(PAGE))).toEqual([]);
+  });
+
+  it("keeps the CLAUDE.md auto-merge rule that waits for a running review", () => {
+    const text = flat(read("CLAUDE.md"));
+    expect(AUTO_MERGE.filter((clause) => !text.includes(clause))).toEqual([]);
   });
 
   it("keeps the link inside AGENTS.md's Review guidelines and the template's Complexity section", () => {

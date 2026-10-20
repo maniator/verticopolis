@@ -17,9 +17,9 @@ and the hosts.
 
 Apply the checklist to any change that adds, ports, rewrites, moves or removes
 production code reachable from an entry point in section 2, or makes such code
-call something new. These paths always count as hot-path surfaces; so does any
-other production file whose changed code an entry point calls. These are not
-hot paths, even inside a path below:
+call something new. The paths in the table below are hot-path surfaces, and so
+is any other production file whose changed code an entry point calls, apart
+from these, which are not hot paths even inside a listed path:
 
 - tests: `*.test.ts`, `src/tests/`, `e2e/`, `engine-rs/tests/`, the
   `*_tests.rs` files under `engine-rs/src/` and Rust `#[cfg(test)]` modules;
@@ -27,15 +27,19 @@ hot paths, even inside a path below:
 - the engine's command-line tools in `engine-rs/src/bin/` (conformance, dump,
   fuzz and TDT), and docs;
 - code that runs once per session, such as module setup, WASM instantiation or
-  reading the engine identity, since no section 2 tier calls it. A load is a
-  command, so the load path counts.
+  reading the engine identity, since no section 2 tier calls it. Only the HP-1
+  trace can show that, so the gate leaves this case to the Hot-Path Auditor. A
+  load is a command, so the load path counts, and so does attach, which runs
+  on every undo, redo and fault restore.
 
-The engine build files in the table do count: they set the cost of every
-engine path at once (HP-11).
+The build files in the table do count: they set the cost of every engine path
+at once (HP-11). A Rust toolchain or Cargo configuration file added later
+(`rust-toolchain.toml`, `.cargo/config.toml`) joins the engine build row.
 
 | Surface | Paths |
 | --- | --- |
 | Rust engine and its build | `engine-rs/src/`, `engine-rs/Cargo.toml`, `engine-rs/Cargo.lock`, `scripts/wasm-build.ts`, `scripts/build-engine-wasm.sh` |
+| App build settings (which engine and code paths ship) | `vite.config.ts` |
 | TypeScript engine | `src/engine/` |
 | WASM binding | `engine-rs/src/wasm.rs`, `engine-rs/src/frame.rs`, `src/dualrun/` |
 | Hosts (main thread and worker) | `src/wasmhost/` |
@@ -50,7 +54,8 @@ records one line saying so (section 6).
 
 This page took effect when it merged (2026-10-20, 19:49 UTC). For the pull
 requests open then, the owner set the scope on 2026-10-20 at 20:16 UTC (quoted
-on #1168):
+on #1168). #1139 (at 9cd44d1) and #1157 (at a146861) have since merged, so
+their bullets are a record:
 
 - #1139 (the bare-step indexes for #1051) keeps its independent review's GO at
   3fa30a8c for the code that review covered. A docs-only results commit on it
@@ -83,7 +88,7 @@ with `buildLargeTower` and the fixture loaders in
 | --- | --- | --- |
 | Per frame | the host's frame read (`frame_view`, then `decodeFrame` or `applyRecords` in `src/wasmhost/`), render sync, `runFrame` in `src/game/frameLoop.ts`, build preview (`canBuild` on every pointer move) | every rendered frame |
 | Per step | `Simulation::advance_step` (`engine-rs/src/sim_loop.rs`) / `advanceStep` (`src/engine/sim/loop.ts`): elevator demand, the spawn step, construction. `tick` runs one or more steps, so "per tick" elsewhere means per step | a step is 1 to 20 game minutes (`quantumFor` in `src/engine/sim/fixedStep.ts`), sized so about one runs per frame, at most `MAX_STEPS_PER_FRAME` (4); the perf harness steps 2 minutes, 720 per game day |
-| Per chunk | motion chunks of up to 2.5 game minutes inside a step: `elevator_calls` / `elevatorCalls`, `move_cars` / `moveCars`, `motion::advance` and the crowd's advance | one per short step, up to 8 per 20-minute step |
+| Per chunk | motion chunks of up to 2.5 game minutes inside a step: `elevator_calls` / `elevatorCalls`, `move_cars` / `moveCars`, `motion::advance` and the crowd's advance | one per short step, up to 8 per 20-minute step (12 when `tick` runs a 30-minute sub-step, which the frame loop does not send) |
 | Per hour | `on_hour` / `onHour`: presence, hotel checkout, housekeeping dispatch, satisfaction, move-ins, traffic income, elevator utilization, star evaluation | every 60 game minutes (30 steps in the perf harness) |
 | Per day | `on_day` / `onDay`: rent and maintenance, random events, VIP, milestones, nudges | every game day |
 | Per command | place, remove, transport edits, load | per player action. Every revision-keyed cache rebuilds after an edit, so its build cost counts here too |
@@ -151,8 +156,9 @@ may cost depends on the tier:
 
 - Per frame and per chunk: no walk over any collection that grows with the
   tower (units, tiles, rooms, population, the route graph). Per-frame work
-  scales with what is drawn (HP-12). A step runs up to 8 chunks, so a
-  per-chunk pass also counts once per chunk toward its step.
+  scales with what is drawn (HP-12). A step runs up to 8 chunks (12 for a
+  30-minute `tick` sub-step), so a per-chunk pass also counts once per chunk
+  toward its step.
 - Per step: no walk over units, tiles, population or the route graph. One pass
   over rooms (about 2,900 visits on the large tower), with constant work per
   room, is allowed when the record says why
@@ -243,18 +249,19 @@ The table lists the caches, indexes and counters on the hot paths today: the
 TypeScript ones, and the Rust-only ones with "none" in the TypeScript column,
 with their Rust status at 9cd44d1 (`main` once #1139 merged). Each PR that
 adds, ports or removes one updates its row, and its HP-8 review checks that.
-Between those PRs the table belongs to the owner of the #1158 audit (its
-assignee), who corrects any row that has gone stale.
+Between those PRs the table belongs to the repository owner (maniator), the
+#1158 audit's assignee, who corrects any row that has gone stale.
 
 | What it keeps | TypeScript | Keyed on | Rust at 9cd44d1 |
 | --- | --- | --- | --- |
-| units and transports by id | `byId`, `transportsById`, `src/engine/Tower.ts` | kept on every edit | `by_id`, `transport_by_id` |
+| units and transports by id | `byId`, `transportsById`, `src/engine/Tower.ts` | kept on every edit | `by_id`, `transport_by_id`; `remove_unit` still finds the unit by a scan and rebuilds the whole index per removal (A17 in #1158) |
 | tiles and rooms by position | `structure`, `structKind`, `rooms`, `src/engine/Tower.ts` | kept on every edit | ported (`structure`, `struct_kind`, `rooms`) |
 | lobby and room tiles per floor | `lobbyTiles`, `roomTiles`, `src/engine/Tower.ts` | counter | ported (`lobby_tiles`, `room_tiles`) |
 | rooms without floor and lobby tiles | `roomUnits`, `src/engine/tower/rooms.ts` | unit array, length, revision | ported (`room_index`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1139) |
 | floor and lobby tiles per floor, for `pickX` | none (`pickX` walks every unit, #539) | revision and unit count | `structural_tiles`, `engine-rs/src/tower_index.rs` (#1139) |
 | each floor's segment runs | `src/engine/tower/segments.ts` | revision | ported (cloned on read, #859) |
 | housekeeping staff ceiling | `staffCeiling` (`maxStaffFor`), `src/engine/crowd/spawn.ts` | revision | missing; #1143 |
+| nearest crew and crew order per floor in one dispatch | `distByFloor`, `crewOrderByFloor`, `src/engine/economy/housekeeping.ts` | one pass | `dist_by_floor` ported; crew order missing, so the crews are cloned and sorted per room (A12 in #1158) |
 | live staff count | `crowd.staffCount`, `src/engine/Crowd.ts` | counter | ported |
 | riders per car | `crowd.carRiders`, `src/engine/Crowd.ts` | counter | ported (`car_riders`) |
 | noise verdicts | `noiseMemo`, `src/engine/sim/satisfaction.ts` | revision | ported (`noise_memo`, `engine-rs/src/noise.rs`; #1139) |
@@ -270,6 +277,11 @@ assignee), who corrects any row that has gone stale.
 | demand map (inspector reads) | `demandMemo`, `src/engine/sim/demand.ts` | revision and game hour | none (no inspector in Rust) |
 | reachability within one demand or income pass | `reachCache`, `src/engine/sim/demand.ts`, `src/engine/EconomySystem.ts` | one call | ported |
 | reachability during one move-in pass | `reachMemo`, `src/engine/sim/churn.ts` | one pass | ported |
+
+A row marked "cloned on read" keeps the cache but not its cost, since every
+read copies it (#859, A8 in #1158). It does not answer at the same cost, so a
+port that turns a cached read into a copy is an HP-8 finding, and new code
+that adds such a copy is an HP-3 finding.
 
 **HP-9 Name the remedy.** For each finding under HP-2 to HP-6, say which of
 these fixes it, in this order of preference:
@@ -337,7 +349,9 @@ chunk is not.
 - Estimate first: the visits in one occurrence of the tier (one step, frame,
   hourly pass or command), as multipliers times collection sizes with the work
   per item, using the sizes in section 2 on the large tower; then say how
-  often the tier runs. Write the estimate in the record.
+  often the tier runs. Write the estimate in the record. A visit is one item
+  read, compared, hashed, allocated or serialized, so a sort of n items counts
+  about n log2 n and a JSON round trip counts each element on both sides.
 - Measure when the estimate matters. A native profile of the bare step on a
   reference save, or `npm run perf:compare`, gives relative shares. Numbers
   from a cloud machine are estimates and say so.
@@ -361,7 +375,7 @@ units placed or removed.
 - Sizes: U, R, P, F, T on the reference saves that matter here.
 - Before and after: for example O(P × U) per step becomes O(P) per step plus O(U) per revision.
 - Repeated scans that remain, and why each is acceptable (frequency times size, measured or estimated).
-- TypeScript comparison (HP-8): the caches the TypeScript has here, and whether this ports them.
+- Caches (HP-8): the caches, indexes and counters either engine has here, and whether this ports, keeps or replaces each one, with nothing dropped or bypassed.
 - Results and invalidation (HP-10): cache keys, invalidation tests, conformance and differential evidence.
 - Measurements, each labeled cloud estimate or desktop evidence, or "none".
 ```
@@ -398,29 +412,38 @@ item, and Copilot and Codex are asked to:
   then edits that comment to fill in the "Findings and resolution" column once
   the round's fixes are in. The independent reviewer puts its own table in
   each verdict, for the commit it reviewed. A review run before the PR exists
-  saves its record under `_bmad-output/implementation-artifacts/` and posts it
-  when the PR opens. A "no hot-path surface" line counts only when it covers
-  the whole diff of the PR.
-- A port, rewrite or addition of more than about 1,000 lines of hot-path code
-  adds an appendix to the record with one line per changed function: the
-  function, its hottest caller, the tier and the multiplier. The review skills
-  split such a diff by module, or into chunks of about 1,000 lines, and run one
-  Hot-Path Auditor per chunk, each given its chunk and the whole diff for
-  context, and each returning its table and its appendix lines; the record
-  merges them. The review is not complete, and gives no GO or CONDITIONAL GO,
-  until every chunk has its table and every changed function its appendix
-  line.
+  saves its record under `_bmad-output/implementation-artifacts/`, and whoever
+  opens the PR posts it there and links it from the template's Complexity
+  section. A review split into file groups across runs posts one record per
+  group, each naming its group. A "no hot-path surface" line counts only when
+  it covers the whole diff of the PR, or when the group records together
+  cover it.
+- A port, rewrite, move or addition of more than about 1,000 changed lines
+  (added plus removed) of hot-path code adds an appendix to the record with
+  one line per changed function: the function, its hottest caller, the tier
+  and the multiplier. The review skills split such a diff by module, or into
+  chunks of about 1,000 lines, and run one Hot-Path Auditor per chunk, each
+  given its chunk, the list of every changed file and function, and read
+  access to the repository at the head commit, so it can trace callers
+  outside its chunk. Each returns its table and its appendix lines, and the
+  run that launched them merges them into one record. The review is not
+  complete, and gives no GO or CONDITIONAL GO, until every chunk has its table
+  and every changed function its appendix line.
 - A review without the record is incomplete, and an independent reviewer
-  cannot give a GO or a CONDITIONAL GO on it. When a Copilot or Codex review of a hot-path diff
-  leaves the table out, its findings still count, but its sign-off covers the
-  hot-path part only once a record from the review skill or the independent
-  reviewer is on the PR.
+  cannot give a GO or a CONDITIONAL GO on it. When a Copilot or Codex review
+  of a hot-path diff leaves the table out, its findings still count, but its
+  sign-off covers the hot-path part only once a record from the review skill
+  or the independent reviewer is on the PR.
 - A hot-path PR is signed off only when the record for its final commit is on
-  the PR and its independent review is complete: the reviewer (Copilot, or the
-  independent reviewer standing in for it) has posted its verdict on that
-  commit. A merge of `main` that leaves the PR's own diff unchanged keeps the
-  verdict. A review that is still running is not complete, and auto-merge
-  stays off until both hold (`CLAUDE.md`).
+  the PR and its independent review is complete: the independent reviewer
+  (section 9), who is not Copilot or Codex, has posted a GO, or a CONDITIONAL
+  GO whose conditions are met, on that commit. A NO-GO, or a verdict on an
+  earlier commit, does not sign it off. The record and the verdict carry to a
+  later commit only when that commit leaves the PR's own diff unchanged (a
+  merge of `main` with no conflict in the PR's files, or a reshape of its
+  history that keeps the final tree) and the independent reviewer confirms
+  that on the PR. A review that is still running is not complete, and
+  auto-merge stays off until both hold (`CLAUDE.md`).
 
 ## 7. Resolving a finding
 
@@ -432,10 +455,10 @@ Every hot-path finding ends in one of two states before merge:
    mirror rule in `CLAUDE.md`). Pre-existing findings from one review may
    share one issue and row, or join an open issue that already has a row
    (such as the #1158 audit) as new items in its body, with the row's notes
-   updated. A pre-existing finding in code the PR does not
-   change or only moves, which an open issue with a backlog row already lists (for example
-   an item in #1158, #1143 or #859), is deferred by reference: cite the issue
-   and item, with no new issue or row, since that row already records it.
+   updated. A pre-existing finding in code the PR does not change or only
+   moves, which an open issue with a backlog row already lists (for example an
+   item in #1158, #1143 or #859), is deferred by reference: cite the issue and
+   item, with no new issue or row, since that row already records it.
 
 A finding is never dismissed for being pre-existing, for matching the
 TypeScript, or for sitting outside the diff. In BMAD/BMGD triage a hot-path
@@ -457,25 +480,31 @@ Two kinds are always `patch`, even when an open issue already lists them:
 - a change that drops, removes or bypasses a cache, index or counter either
   engine has, in a port or not (HP-8).
 
+The false-positive test above does not apply to these two: a new id scan that
+bypasses an index is `patch` even when its pass fits the tier.
+
 A move changes only where code lives (for example a split of an oversized file
 under the file-size ratchet): the moved lines stay identical apart from
-visibility (`pub`, `export`), `use` and `import` lines and module paths. Moved
-code is reviewed as new (HP-7), and its findings count as pre-existing:
-deferred by reference when an open issue lists them, otherwise with a new
-issue and row. Any other change to a moved function makes it a rewrite.
+whitespace and formatting, visibility (`pub`, `export`), and `use` and
+`import` lines. A path changed inside a function body makes it a rewrite,
+since it can point a call at another helper. Moved code is reviewed as new
+(HP-7), and its findings count as pre-existing: deferred by reference when an
+open issue lists them, otherwise with a new issue and row. Any other change to
+a moved function makes it a rewrite.
 
 Deferring an always-`patch` finding needs the explicit acceptance of the
 repository owner (maniator), on top of the evidence and issue above. The PR
-records it in the owner's own words: a review they submit, or a quote of their
-message with its date and where they gave it. Agents here post with the
-owner's account, so a comment showing the owner as its author does not prove
-the acceptance on its own; the independent reviewer checks it against its
-source before a GO. In triage the finding is `decision_needed` until the owner
-answers, in spec mode and no-spec mode alike, and no later choice in the run
-(resolving a decision, walking through or skipping patches) dismisses, defers
-or drops it without that acceptance. A session user who is not the owner
-cannot settle it. While it waits, the run handles the other findings and
-reports this one as pending.
+records it as a quote of the owner's own message, with its date and where
+they gave it (for example the project chat or the session they wrote it in).
+Agents here post with the owner's account, so neither a comment nor a review
+showing the owner as its author proves the acceptance on its own, and an
+acceptance another agent relays counts only as that quote. The independent
+reviewer checks the quote against its source before a GO, and gives no GO
+when it cannot. Until then the finding stays `patch`, in spec mode and no-spec
+mode alike, marked pending the owner, and no choice in the run (resolving a
+decision, walking through or skipping patches) dismisses, defers or drops it.
+A session user who is not the owner cannot settle it. While it waits, the run
+handles the other findings and reports this one as pending.
 
 ## 8. Worked example: what the Rust port shipped
 
@@ -499,12 +528,15 @@ reports this one as pending.
   the repository at the diff's head commit, because HP-1 cannot be done from
   the diff alone. Triage follows section 7.
   `src/tests/hotPathReview.guard.test.ts` keeps in step this page's headings,
-  its section 1 surfaces and paths, the clauses of HP-2, HP-8 and sections 6
-  and 7 the overrides rely on, the auditor prompt, the overrides themselves
-  (each fact once, with its load-bearing phrases, and the gds and bmad copies
-  identical) and the step anchors they name. For the summaries it checks only
-  that each one links here (inside `AGENTS.md`'s Review guidelines and the
-  template's Complexity section too); it does not check their wording.
+  its section 1 surfaces and paths, the clauses of sections 1, 3, 6, 7 and 9
+  the overrides rely on, the record table, the auditor prompt, the overrides
+  themselves (each fact once, with its load-bearing phrases, and the gds and
+  bmad copies identical) and the step anchors they name. It checks phrases,
+  so a reworded or removed clause fails it, while an added exception does not:
+  that is the review's job. For the summaries it checks that each one links
+  here (inside `AGENTS.md`'s Review guidelines and the template's Complexity
+  section too) and that `CLAUDE.md` keeps its auto-merge rule; it does not
+  check their other wording.
 - **The quick-dev skills** run their own review loop, which does not replace
   this one: hot-path work still goes through the review skill `CLAUDE.md`
   names for it (`/gds-code-review` or `/bmad-code-review`). The overrides
@@ -518,26 +550,30 @@ reports this one as pending.
   of `AGENTS.md`, which Codex reads) and are asked to print the section 6
   table.
 - **An independent reviewer** (a separate agent or person giving GO,
-  CONDITIONAL GO or NO-GO) applies the checklist to the final commit and
-  includes the table in the verdict. GO and CONDITIONAL GO need every row
-  filled, and the appendix on a large port, rewrite or addition; GO also needs
-  every finding fixed or deferred under section 7.
+  CONDITIONAL GO or NO-GO; Copilot and Codex reviews do not stand in for it)
+  applies the checklist to the final commit and includes the table in the
+  verdict. GO and CONDITIONAL GO need every row filled, and the appendix on a
+  large port, rewrite, move or addition; GO also needs every finding fixed or
+  deferred under section 7.
 - **`.github/skills/engine-parity-review/SKILL.md`** item 11 points here for
   changes on the engine seam.
 
 The Hot-Path Auditor's prompt:
 
 > You are the Hot-Path Auditor. You have the diff and read access to the
-> repository; read it at the diff's head commit (`git show <commit>:<path>`
-> when the checkout is elsewhere). Apply `docs/performance/hot-path-review.md`, items HP-1 to HP-12,
-> to this change. For each changed, added or ported function, trace its callers
+> repository; read it at the diff's head commit, `<commit>` (`git show
+> <commit>:<path>` when the checkout is elsewhere, or the working tree when the
+> diff holds uncommitted changes). Apply `docs/performance/hot-path-review.md`,
+> items HP-1 to HP-12, to this change. For each changed, added or ported function, trace its callers
 > across every hot-path surface in section 1 (both engines, the hosts, the
 > frame loop, rendering and UI) up to an entry point in section 2, and record
 > the tier and the loops in between. Flag whole-collection work, route
 > searches, allocations, clones, sorts, hashing and id scans under a
-> multiplier, including inside helpers the diff calls but does not change. For
-> ported code, list the TypeScript caches, indexes and counters for the same
-> function and its callees and check that each was carried over. For each
+> multiplier, including inside helpers the diff calls but does not change.
+> Check that the change keeps every cache, index and counter either engine has
+> on these paths (the HP-8 table) and computes nothing one already answers; for
+> ported code, also list the TypeScript caches, indexes and counters for the
+> same function and its callees and check that each was carried over. For each
 > finding give the location, entry point and tier, collection sizes from
 > section 2, the section 4 estimate, the TypeScript equivalent, the proposed
 > remedy, any risk to results or cache invalidation (HP-10), and whether an
@@ -546,6 +582,7 @@ The Hot-Path Auditor's prompt:
 > findings as a Markdown list. Put each finding in the row of every item it
 > falls under: an id scan where an index already answers the query is HP-6 and
 > HP-8, and a cost in inherited code on the traced path is HP-7 as well. When
-> you are given one chunk of a larger port, rewrite or addition, review that
-> chunk with the rest of the diff as context, and add the section 6 appendix
-> lines for its changed functions.
+> you are given one chunk of a larger port, rewrite, move or addition, review
+> that chunk, trace callers outside it through the list of changed files and
+> functions and the repository, and add the section 6 appendix lines for its
+> changed functions.

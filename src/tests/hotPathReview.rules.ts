@@ -28,6 +28,7 @@ export const SURFACES: Record<string, string[]> = {
     "scripts/wasm-build.ts",
     "scripts/build-engine-wasm.sh",
   ],
+  "App build settings (which engine and code paths ship)": ["vite.config.ts"],
   "TypeScript engine": ["src/engine/"],
   "WASM binding": [
     "engine-rs/src/wasm.rs",
@@ -52,7 +53,11 @@ export const SURFACES: Record<string, string[]> = {
   ],
 };
 
-/** The code spans of section 1's not-hot-path list, in order. */
+/**
+ * The code spans of section 1's not-hot-path list, in order. This pins the
+ * list's wording; it is not an exclusion list (`engine-rs/src/` is here only
+ * because the `*_tests.rs` files it names live there).
+ */
 export const NOT_HOT = [
   "*.test.ts",
   "src/tests/",
@@ -69,6 +74,12 @@ export const NOT_HOT = [
 /** Clauses the overrides and summaries lean on, by the heading they must sit under. */
 export const PAGE_CLAUSES: Record<string, string[]> = {
   "## 1. When it applies": [
+    "apart from these, which are not hot paths even inside a listed path",
+    "Only the HP-1 trace can show that, so the gate leaves this case to the Hot-Path Auditor.",
+    "A load is a command, so the load path counts, and so does attach, which runs on every undo, redo and fault restore.",
+    "The build files in the table do count",
+    "joins the engine build row",
+    "A port or a rewrite changes every line it adds, so all of it is in scope",
     "keeps its independent review's GO at 3fa30a8c for the code that review covered",
     "any other hot-path change pushed to it gets the checklist",
     "A file being in scope is not a finding",
@@ -80,18 +91,41 @@ export const PAGE_CLAUSES: Record<string, string[]> = {
     "Per frame and per chunk: no walk over any collection that grows with the tower",
     "Per step: no walk over units, tiles, population or the route graph.",
     "Repeated passes in the same step, and per-room work that walks other tiles or runs a route search, are findings.",
+    "12 for a 30-minute `tick` sub-step",
     "under about 50,000 visits on the large tower",
     "stays under about 1,000 item visits on the large tower",
+    "Ported, rewritten or moved code is reviewed as if it were new.",
+    '"pre-existing" and "no new regression" do not close a finding',
     "Anything else is a dropped cache, which section 7 makes always `patch`",
     "does not close it",
     "Bypassing means computing what the cache holds without reading it",
+    "the repository owner (maniator), the #1158 audit's assignee",
+    "a port that turns a cached read into a copy is an HP-8 finding",
+  ],
+  "## 4. Measuring": [
+    "A visit is one item read, compared, hashed, allocated or serialized",
+  ],
+  "## 5. The PR complexity note": [
+    "Caches (HP-8): the caches, indexes and counters either engine has here",
   ],
   "## 6. Recording the review": [
+    "| Item | Result | What was checked | Findings and resolution |",
+    'A bare "checked" or "looks fine" does not count.',
+    '"n/a" gives a reason tied to the diff.',
     "the record goes on it as a comment",
     "Whoever runs the review skill posts its record at step 4 of every round",
-    "counts only when it covers the whole diff of the PR",
+    "whoever opens the PR posts it there",
+    "posts one record per group",
+    "counts only when it covers the whole diff of the PR, or when the group records together cover it",
+    "more than about 1,000 changed lines (added plus removed)",
+    "the list of every changed file and function",
+    "the run that launched them merges them into one record",
     "until every chunk has its table and every changed function its appendix line",
     "cannot give a GO or a CONDITIONAL GO on it",
+    "A hot-path PR is signed off only when the record for its final commit is on the PR and its independent review is complete",
+    "who is not Copilot or Codex",
+    "A NO-GO, or a verdict on an earlier commit, does not sign it off.",
+    "and the independent reviewer confirms that on the PR",
     "A review that is still running is not complete, and auto-merge stays off until both hold",
   ],
   "## 7. Resolving a finding": [
@@ -101,22 +135,42 @@ export const PAGE_CLAUSES: Record<string, string[]> = {
     "Two kinds are always `patch`",
     "code the PR adds, ports or rewrites that puts a whole-collection walk under any HP-2 multiplier",
     "a change that drops, removes or bypasses a cache, index or counter either engine has",
+    "The false-positive test above does not apply to these two",
+    "A path changed inside a function body makes it a rewrite",
     "Any other change to a moved function makes it a rewrite.",
     "repository owner (maniator)",
-    "does not prove the acceptance on its own",
-    "`decision_needed` until the owner answers, in spec mode and no-spec mode alike",
+    "neither a comment nor a review showing the owner as its author proves the acceptance on its own",
+    "an acceptance another agent relays counts only as that quote",
+    "gives no GO when it cannot",
+    "Until then the finding stays `patch`, in spec mode and no-spec mode alike, marked pending the owner",
+    "dismisses, defers or drops it",
+  ],
+  "## 9. How the review tools apply it": [
+    "Copilot and Codex reviews do not stand in for it",
+    "GO and CONDITIONAL GO need every row filled",
+    "GO also needs every finding fixed or deferred under section 7",
+    "that `CLAUDE.md` keeps its auto-merge rule",
   ],
 };
+
+/** The `CLAUDE.md` auto-merge rule that keeps a running review from being raced. */
+export const AUTO_MERGE = [
+  "Enable auto-merge only after the PR is signed off and CI is green",
+  "hot-path or not, auto-merge stays off until that review has finished on the final commit",
+  "A reviewer that is still running has not signed off.",
+];
 
 /** Sentences of the Hot-Path Auditor prompt (section 9) the layer depends on. */
 export const PROMPT = [
   "You are the Hot-Path Auditor.",
-  "read it at the diff's head commit",
+  "read it at the diff's head commit, `<commit>`",
   "trace its callers across every hot-path surface in section 1",
+  "Check that the change keeps every cache, index and counter either engine has on these paths (the HP-8 table) and computes nothing one already answers",
   "list the TypeScript caches, indexes and counters for the same function and its callees",
   "Report pre-existing code too, marked pre-existing.",
   "Output the section 6 table with a row for every item",
   "Put each finding in the row of every item it falls under",
+  "trace callers outside it through the list of changed files and functions and the repository",
   "add the section 6 appendix lines for its changed functions",
 ];
 
@@ -145,37 +199,50 @@ export const SKILLS: Skill[] = [
         "{diff_output}",
         "CHECKPOINT",
         "search its importers (in the base commit too, for a deleted file)",
-        "lists as not hot paths",
-        "run this gate on the whole diff first",
+        "lists as not hot paths by path",
+        "only the auditor's caller trace can show it",
+        "instruction 6 of steps/step-01-gather-context.md",
+        "run this gate first on the whole diff, rebuilt from the source chosen in instruction 3",
         "whether this run includes the Hot-Path Auditor layer",
       ],
       "Hot-Path Auditor layer:": [
         "launches a fourth parallel subagent",
-        "read access to the repository at the diff's head commit",
+        "with <commit> replaced by the head commit's SHA and the repository's path added",
+        "for a diff of staged or uncommitted changes it reads the working tree",
         "the prompt in section 9",
         "one Hot-Path Auditor per module or chunk",
+        "the list of every changed file and function",
+        "merge them into one record",
         "appendix lines",
-        "counts as a failed layer",
+        "with an n/a that gives no reason",
+        "counts as a failed layer, and so does a timeout",
         "run that auditor once more",
         "{failed_layers}",
       ],
       "Hot-path triage:": [
         "never dismissed for being pre-existing",
-        "dismiss only for a false positive as section 7 defines it",
+        "dismiss only for a false positive as section 7 defines it, which never applies to an always-patch finding",
         "always patch is patch",
-        "decision_needed until the repository owner (maniator) answers, in spec mode and no-spec mode alike",
+        "it stays patch, marked pending the owner",
+        "only the repository owner (maniator) can accept that deferral",
+        "in spec mode and no-spec mode alike",
         "no choice dismisses, defers or skips an always-patch finding",
-        "cannot give it",
+        "a session user who is not the owner cannot give it, and neither can another agent passing it on",
+        "is not a decision_needed finding",
         "does not change or only moves",
-        "overrides two base rules",
+        "a bullet in the Deferral inbox alone is not enough",
+        "overrides the definition of defer",
         "{failed_layers}",
         "clean review",
       ],
       "Hot-path record:": [
         "before any choice is offered",
         "only when that covers the whole diff of the PR",
+        "names its group",
         "as a comment in every round",
         "{implementation_artifacts}",
+        "whoever opens the PR posts it there",
+        "Each defer in the record names its issue",
         "does not count",
         "{failed_layers}",
       ],
@@ -183,6 +250,8 @@ export const SKILLS: Skill[] = [
     onComplete: [
       "every HP item filled",
       "an appendix line for every changed function",
+      "names the groups still to review",
+      "names its issue and backlog row",
       "posted there as a comment",
       "does not count as the deep review",
     ],
@@ -193,15 +262,20 @@ export const SKILLS: Skill[] = [
       "step-01-gather-context.md": [
         "CHECKPOINT",
         "{diff_output}",
+        "6. Sanity check",
         "chunk the review by file group",
+        "3. Construct `{diff_output}`",
       ],
       "step-02-review.md": ["{failed_layers}"],
       "step-03-triage.md": [
         "{failed_layers}",
         "Clean review",
-        "decision_needed",
+        "Pre-existing issue not caused by the current change",
       ],
       "step-04-present.md": [
+        "{implementation_artifacts}",
+        "findings must be resolved before handling `patch` findings",
+        "Deferral inbox",
         "## On Complete",
         "### 4. Resolve decision",
         "Walk through each patch",
@@ -216,8 +290,10 @@ export const SKILLS: Skill[] = [
       "Hot-path review:": [
         "never reject",
         "intent_gap and bad_spec are only for findings that are not hot-path findings",
+        "needs a tracking issue and a curated backlog row",
+        "overrides both files' rule that a defer is pre-existing only and goes only to the Deferral inbox",
         "always patch stays patch",
-        "HALT for the human on either route without reverting any code",
+        "HALT for the human on either route before acting on any other finding, without reverting any code",
         "before the change is done and before merge",
       ],
     },
@@ -229,8 +305,15 @@ export const SKILLS: Skill[] = [
         "**reject**",
         "**intent_gap**",
         "**bad_spec**",
+        "pre-existing issue not caused by this story",
+        "Deferral inbox",
       ],
-      "step-oneshot.md": ["### Classify", "**reject**"],
+      "step-oneshot.md": [
+        "### Classify",
+        "**reject**",
+        "pre-existing issue not caused by this change",
+        "Deferral inbox",
+      ],
     },
   })),
 ];
