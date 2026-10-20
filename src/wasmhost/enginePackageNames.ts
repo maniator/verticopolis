@@ -10,9 +10,9 @@
 
 /** The folder the package is served from, under the site base. */
 export const ENGINE_DIR = "engine/";
-/** The JavaScript glue wasm-bindgen writes; the game imports it by URL. */
+/** The JavaScript glue wasm-bindgen writes; the verified loader imports it. */
 export const ENGINE_GLUE = "verticopolis_engine.js";
-/** The engine binary; the glue fetches it beside itself. */
+/** The engine binary; the verified loader fetches it beside the glue. */
 export const ENGINE_WASM = "verticopolis_engine_bg.wasm";
 /** The hash of the Rust sources the package was built from. */
 export const ENGINE_BUILD_RECORD = "BUILD.json";

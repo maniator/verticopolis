@@ -58,7 +58,9 @@ load-cost measurement on the owner's PC (booked until about 02:00 UTC on
 7. **The dev skip cannot ship.** `import.meta.env.DEV` skips verification so
    `npm run wasm:build` during a dev session does not need a restart. The
    branch holds a unique marker string, and `verify-precache` (run by
-   `postbuild`) fails when that string is in any emitted file.
+   `postbuild`) fails when that string is in any emitted `.js`, `.mjs` or
+   `.html` file (source maps carry the source text, so they are not scanned).
+   A positive assertion that the loader chunk carries the check is a 2b item.
 8. **Real second build.** The offline e2e builds deployment B with a second
    `vite build` (a public folder with the salted package), so B's shell
    carries B's id. The existing update spec then proves B's engine runs with
@@ -66,10 +68,15 @@ load-cost measurement on the owner's PC (booked until about 02:00 UTC on
 9. **Tamper e2e.** A tampered precache entry (binary, then glue) is refused
    with the boot state naming both ids; an uncontrolled page routed to a
    salted binary is refused; a persisting mismatch causes no reload loop.
-10. **Hot path.** The loader runs once per page life and once per worker
+10. **Perf harness.** The perf harnesses no longer import the glue to reach
+    the app's instance (that is a second module now). Their init probe keeps
+    the first `WebAssembly` instance's memory and the memory read uses it.
+    The boot-path probe now times `instantiate` from bytes, not
+    `instantiateStreaming` (2b measures the load cost).
+11. **Hot path.** The loader runs once per page life and once per worker
     (checklist `docs/performance/hot-path-review.md`): one linear pass over
     about 1.45 MB for the digests, no per-frame or per-step code.
-11. **Version.** Minor bump (opt-in players on `?engine=wasm` see refusals,
+12. **Version.** Minor bump (opt-in players on `?engine=wasm` see refusals,
     and `sw.js` and the shell change).
 
 ## Code classification
@@ -80,8 +87,11 @@ check, the dev-skip guard, the e2e deployments.
 Temporary, removed with the TypeScript engine (line added to "What it
 removes" in `story-engine-retire-typescript.md`): the switchable build's
 branch that keeps the game on the TypeScript engine after a refused package
-(`loadBootEngine`'s `!wasmOnly` path and its tests). Nothing new is added for
-it in 2a; the code already exists and this slice only gives it a reason.
+(`loadBootEngine`'s `!wasmOnly` path and its tests), the non-wasm-only branch
+of `e2e/engineIntegrity.spec.ts`'s refusal check, and the `!__WASM_ONLY__`
+worker-host catalog verdict in `bootstrap.ts`. The first already exists and
+this slice only gives it a reason; the other two are small and listed in the
+retirement story.
 
 ## Coordination
 
@@ -96,6 +106,6 @@ it in 2a; the code already exists and this slice only gives it a reason.
 ## Out of scope for 2a
 
 Failure copy, Copy Diagnostics, Repair, cache-key rotation, the
-`unverifiable` code, eviction, install-race and first-install specs, the load
+`unverifiable` code, the respawn latch, eviction, install-race and first-install specs, the load
 measurement, Safari and Firefox passes (a merge condition for the wasm-only
 flip, design section 11).

@@ -14,7 +14,7 @@ import { enginePackageUrl } from "../wasmhost/startWasmHost";
  *
  * Switch it on with `?dualrun=1` in the URL or `localStorage.setItem("vc.dualrun", "1")`
  * under `npm run dev`: it only ever starts where the tooling handle does,
- * and the worker loads the browser package by URL from
+ * and the worker loads the browser package (through the verified loader) from
  * `src/public/engine/` (written by `npm run wasm:build`, served beside the app).
  */
 export interface DualRunStatus {

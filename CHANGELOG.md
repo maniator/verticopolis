@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.41.0
+
+- On the opt-in WASM engine (`?engine=wasm`), the start screen now says the engine is loading when the download is slow, instead of showing an empty sky.
+- That engine now checks its own files before it runs them. If the files do not belong together, the game stays on the standard engine and tells you why.
+
 ## 2.40.0
 
 - On the opt-in WASM engine (`?engine=wasm`), a tower whose engine fails keeps running instead of freezing. It rewinds by up to an in-game hour, so recent changes may be undone, and a message says so.
