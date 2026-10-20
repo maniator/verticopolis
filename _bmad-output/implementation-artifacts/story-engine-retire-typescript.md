@@ -61,6 +61,39 @@ own line: the PR, the files, and why the fallback needs them):
 
 - PR #831 (room occupant seats): `roomOccupants` in `src/render/pixelSprites/common.ts` imports `visibleOccupants` from the TypeScript engine (through `engine/Crowd`), and `residential.ts`, `food.ts`, `clinic.ts` and `sprites/facilities/venue.ts` import it directly. After the removal, each reads the engine read model's visible-occupant count instead (backlog row `room-painters-read-ts-engine`, #1106). The PR cuts the render importers of `visibleOccupants` from 11 files on main to these five.
 
+- **#1101 (#874, the runtime fallback).** They exist to re-adopt a faulted
+  tower on a fresh TypeScript `Simulation`, so they go with it:
+  - `src/wasmhost/hostFault.ts`: `RestorePoints` (all but `newestSave`, see
+    below) and `carryLiveState`.
+  - `src/wasmhost/wasmHost.ts`: the restore-point bookkeeping
+    (`readPoint`, `pullTicks`, `restore`, the frozen tower's own tick), and
+    `src/wasmhost/hostEvents.ts` (`HostEvents`: the held command events and
+    `lostEdits`); a Rust-only host hands its events out as it reads them.
+  - `src/wasmhost/startWasmHost.ts`: `recover`, `playerState`,
+    `tidyHistory` and the player lines.
+  - The undo trail's tidy after a recovery: `UndoHistory.dropUnchanged` and
+    the `signatureOf` port (`src/engine/UndoHistory.ts`,
+    `src/game/appHistory.ts`), `GameApp.dropEmptyUndo` (`src/main.ts`) and
+    `WasmHostApp.dropEmptyUndo`.
+  - The analytics bridge's `release` option on `drainGameplayEvents`
+    (`src/analyticsEngineBridge.ts`), which lets held events go at the
+    session's flush.
+  - The restore-point benchmark, `npm run perf:restore`
+    (`scripts/perf-restore-points.ts`, `src/tests/perfRestore/`).
+  - The fallback-only tests: `src/tests/integration/wasmHostRollback.integration.test.ts`,
+    `wasmHostRollbackHistory.integration.test.ts`, their helper
+    `wasmRollback.ts`, `wasmHostFallback.integration.test.ts`,
+    `src/wasmhost/startWasmHostRecovery.test.ts`, the restore and carry parts
+    of `hostFault.test.ts` and `wasmHostPoints.test.ts`, the
+    `drainGameplayEvents({ release })` case in `analyticsEngineBridge.test.ts`,
+    the redo-drop case in `undoHistory.integration.test.ts`, and
+    `e2e/wasmFallback.spec.ts`.
+
+  What stays, because a Rust-only build still freezes and stops cleanly on a
+  trap: the fault latch, the guards, the strict stop (`onFatal`) and
+  `RestorePoints.newestSave` without its TypeScript load check (the strict
+  build's save after a fault is the newest engine-written save).
+
 ## Sequence it sits in
 
 See the roadmap's "Order and gates" section:

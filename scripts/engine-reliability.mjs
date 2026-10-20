@@ -41,8 +41,9 @@
  *   `package-mismatch` (or, with its rows lost, no reason at all).
  *   `package-mismatch` comes from the deploy race (#1046) and says nothing
  *   about the engine. Every other code counts, `attach-refused` included, as
- *   plan 4.1 rules, and so does `other`, which today only the worker host
- *   sends, for a boot step outside the engine (so it overstates that host).
+ *   plan 4.1 rules, and so does `other`: the worker host sends it for a boot
+ *   step outside the engine (so it overstates that host), and the
+ *   main-thread host for a save that failed on a running engine (#874).
  * - A page life whose settle row already fell back on `package-mismatch`, and
  *   that sent no other reason, never ran the engine: it is neither a pass nor
  *   a fault. One whose first tower ran on the engine and that met the mismatch
@@ -74,7 +75,7 @@
  * first row or after a capped drop with no later hide, or a boot whose engine
  * failed and whose game then never started. A page life whose settle row was
  * lost is left out. Runtime traps are not reported before #874, and the worker
- * host reports only its first tower. Outcomes are as of the run, so a page
+ * host reports only its first tower (none of its runtime faults). Outcomes are as of the run, so a page
  * life that settled near the end of the window can still fall back later. A
  * page life that never became visible (a background tab) still counts. The
  * rate is a lower bound, and the report says so at the top. Sessions are not
