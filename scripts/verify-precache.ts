@@ -18,7 +18,7 @@ import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets.ts";
 import { engineDistProblems } from "../src/build/enginePackageBuild.ts";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
-import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, glueLoads } from "../src/wasmhost/engineAssets.ts";
+import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, ENGINE_WASM, glueLoads } from "../src/wasmhost/engineAssets.ts";
 
 const DIST = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const SW = resolve(DIST, "sw.js");
@@ -126,6 +126,10 @@ if (builtEngine) {
   // itself; each such file must be one the list marks as fetched.
   const glueRefs = glueLoads(readFileSync(resolve(DIST, ENGINE_DIR + ENGINE_GLUE), "utf8")).map((f) => ENGINE_DIR + f);
   if (!glueRefs.some((f) => f !== ENGINE_DIR + ENGINE_GLUE)) fail(`found no file the engine glue loads beside itself (its binary); did wasm-bindgen's output change shape? (glueLoads in src/wasmhost/engineAssets.ts)`);
+  // The byte check verifies the glue and the binary only, so a glue that
+  // pulls in anything else (a snippet) would run bytes nothing has hashed.
+  const stray = glueRefs.filter((f) => f !== ENGINE_DIR + ENGINE_GLUE && f !== ENGINE_DIR + ENGINE_WASM);
+  if (stray.length > 0) fail(`the engine glue loads files besides its binary (${stray.join(", ")}); the package check hashes only the glue and the binary, so extend it (design 5.2) before shipping them`);
   const notRuntime = glueRefs.filter((f) => !ENGINE_RUNTIME_FILES.includes(f));
   if (notRuntime.length > 0) fail(`the engine glue loads files src/wasmhost/engineAssets.ts does not mark as fetched at run time, so they would not be precached: ${notRuntime.join(", ")}`);
   const absent = ENGINE_RUNTIME_FILES.filter((f) => !seen.has(f));

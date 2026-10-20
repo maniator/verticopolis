@@ -404,7 +404,7 @@ export default defineConfig(({ command }) => ({
         // a deploy fails whole and the old, consistent set stays. Workbox
         // applies it only to an entry it has to fetch; an entry already in
         // the cache under the same revision key is served as it is, which is
-        // why the page's own byte check (#985 slice 2) is the defence for
+        // why the page's own byte check (#985 slice 2) is the defense for
         // caches filled before this change.
         // scripts/verify-precache.ts fails the build when a run-time engine
         // or audio file is missing from the manifest, when a build-only

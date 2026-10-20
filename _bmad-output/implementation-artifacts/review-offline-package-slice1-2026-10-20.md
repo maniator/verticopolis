@@ -66,6 +66,14 @@ screen); base-path handling in the integrity match (`base` is `./` and
 `verify-precache` fails loudly if an entry is missed); brittle regex reading
 of `sw.js` (an existing approach, covered by `verify-precache`).
 
+## Independent review (Opus, 2026-10-20): CONDITIONAL GO
+
+Conditions met: the deferrals are on the #985 backlog row (and its stale
+"`.json` is still not matched" is fixed); `verify-precache` now fails when the
+glue loads anything besides its binary (design 5.2.4); the PR body says
+`__ENGINE_PACKAGE__` is defined but not yet referenced by a shipped chunk;
+"defense" spelling and the stale `BUILD.json` comment in the perf harness.
+
 ## Deferred to slice 2 (tracked on #985, the open backlog row `offline-pwa-engine-audio`)
 
 - Shell and dist package-id agreement check in `verify-precache.ts` (needs
