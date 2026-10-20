@@ -1,5 +1,5 @@
-import { duplicateCheck, poolIdentity, poolProblems, rendererProblem, stable, treeProblem, type PoolIdentity, type PoolPass } from "./calibratePool";
-import { summarize } from "./stats";
+import { duplicateCheck, lossRecordProblem, poolIdentity, poolProblems, rendererProblem, stable, treeProblem, type PoolIdentity, type PoolPass } from "./calibratePool";
+import { pairedDifferences, summarize } from "./stats";
 import type { CompareResults, EngineName } from "./types";
 
 export { stable, treeProblem };
@@ -120,16 +120,12 @@ function ratioCell(p: Pass, group: string, metric: string, scenario: string, thr
 }
 
 /** The upper bound of the paired difference (slot wasm minus slot ts) of cold start to ready, in ms. */
-function coldStartDifference(p: Pass, throttle: string): number | null {
+export function coldStartDifference(p: Pick<Pass, "metrics">, throttle: string): number | null {
   const row = (engine: EngineName) => p.metrics.find((m) => m.group === "startup" && m.metric === "cold game ready" && m.throttle === throttle && m.engine === engine);
   const a = row("wasm");
   const b = row("ts");
   if (!a || !b) return null;
-  const diffs: number[] = [];
-  a.reps.forEach((rep, i) => {
-    const j = b.reps.indexOf(rep);
-    if (j >= 0) diffs.push(a.values[i] - b.values[j]);
-  });
+  const diffs = pairedDifferences(a, b);
   if (diffs.length < MIN_REPS) return null;
   return summarize(diffs).medianCiHigh;
 }
@@ -225,6 +221,7 @@ export function calibrate(folders: { folder: string; results: Pass; sha256?: str
     }
     const tree = treeProblem(results);
     const renderer = rendererProblem(results);
+    const lossRecord = lossRecordProblem(results);
     if (engine !== "ts" && engine !== "wasm") leave('not an A/A pass (config.aa is not "ts" or "wasm")');
     else if (!results.validation.ok) leave("its validation failed");
     else if (tree) leave(tree);
@@ -232,6 +229,7 @@ export function calibrate(folders: { folder: string; results: Pass; sha256?: str
     else if (results.config.reps !== MIN_REPS) leave(`${results.config.reps} repetitions; the verdict runs use ${MIN_REPS}, and a pass with another count does not pool with them`);
     else if (SCENARIOS.some((s) => !results.config.scenarios.includes(s)) || THROTTLES.some((t) => !results.config.throttles.map(String).includes(t))) leave("it lacks the medium and large scenarios at 1x and 4x");
     else if (renderer) leave(`its renderer is not verified hardware (${renderer})`);
+    else if (lossRecord) leave(lossRecord);
     else {
       used.push({ folder, engine, results });
       passes.push({ folder, engine, commit: results.environment.commit, reps: results.config.reps, startedAt: results.startedAt ?? null, sha256: sha256 ?? null });

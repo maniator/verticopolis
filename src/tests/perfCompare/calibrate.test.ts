@@ -1,82 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-import { calibrate as calibrateWith, calibrationMarkdown, passesForLimit, stable } from "./calibrate";
-import { main, parseCalibrateArgs } from "./calibrateMain";
-import { workerPass } from "../perfWorker/calibrateM4Fixture";
+import { describe, expect, it } from "vitest";
+import { calibrate as calibrateWith, calibrationMarkdown, coldStartDifference, passesForLimit } from "./calibrate";
+import { halvesProblems, poolIdentity } from "./calibratePool";
+import { fam, many, pass, RTX, SWIFT, type Folder, type Spec } from "./calibrateFixture";
 import type { EngineName } from "./types";
 
-type Folder = Parameters<typeof calibrateWith>[0][number];
-
-const RTX = "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)";
-const SWIFT = "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)";
 /** Five passes per engine guarantee 1/6, so most tests state a 20% limit; the default 5% limit is tested on its own. */
 const calibrate = (folders: Folder[], options: Parameters<typeof calibrateWith>[1] = {}) => calibrateWith(folders, { exceedanceLimit: 0.2, ...options });
-
-interface Spec {
-  engine?: EngineName | null;
-  /** Upper bound of every ratio cell. */
-  upper?: number;
-  /** Cold start paired difference: the wasm slot's value minus ts slot's, per rep. */
-  coldDiff?: number;
-  reps?: number;
-  commit?: string;
-  dirty?: boolean;
-  ok?: boolean;
-  scenarios?: string[];
-  quick?: boolean;
-  /** Replaces the cmp pairs of every ratio cell. */
-  pairs?: number;
-  cpu?: string;
-  renderer?: string | null;
-  rendererEnd?: string | null;
-  rendererEndCold?: string | null;
-  channel?: string | null;
-  args?: string[];
-  browserVersion?: string;
-  exception?: string | null;
-  gpuVerified?: boolean | null;
-  tree?: unknown;
-  throttles?: number[];
-  startedAt?: string;
-}
-
-const alternate = (i: number): EngineName => (i % 2 === 0 ? "ts" : "wasm");
-
-const cmp = (group: string, metric: string, scenario: string, throttle: string, upper: number, pairs = 10) => ({
-  group, scenario, throttle, metric, unit: "ms", better: "lower", tsMedian: 1, wasmMedian: 1, ratio: 1, ciLow: 2 - upper, ciHigh: upper, verdict: "equivalent", n: { ts: 10, wasm: 10, pairs },
-});
-
-function pass(i: number, s: Spec = {}): Folder {
-  const reps = s.reps ?? 10;
-  const upper = s.upper ?? 1.01;
-  // Unset means the verified card; null means no WebGL read at all.
-  const renderer = s.renderer === undefined ? RTX : s.renderer;
-  const webgl = renderer === null ? null : { renderer, vendor: "v" };
-  const scenarios = s.scenarios ?? ["small", "medium", "large"];
-  const comparisons = scenarios.flatMap((sc) =>
-    ["1", "4"].flatMap((t) => [cmp("sim-raw", "total for fixed duration", sc, t, upper, s.pairs), cmp("sim-hosted", "total for fixed duration", sc, t, upper, s.pairs), cmp("frames", "frame time p99", sc, t, upper, s.pairs), cmp("frames", "1% low FPS", sc, t, upper, s.pairs)]),
-  );
-  const repsList = Array.from({ length: reps }, (_, r) => r);
-  const startup = (engine: EngineName, t: string) => ({ group: "startup", scenario: "-", throttle: t, metric: "cold game ready", unit: "ms", better: "lower", engine, reps: repsList, values: repsList.map((r) => (t === "1" ? 400 : 1600) + r + (engine === "wasm" ? (s.coldDiff ?? 0) * (t === "1" ? 1 : 4) : 0)), summary: null });
-  return {
-    folder: `aa-${i}`,
-    results: {
-      startedAt: s.startedAt ?? new Date(Date.UTC(2026, 9, 21, 0, i)).toISOString(),
-      config: { aa: s.engine === undefined ? alternate(i) : s.engine, reps, scenarios, throttles: s.throttles ?? [1, 4], quick: s.quick ?? false, dt: 2, steps: 720 },
-      browser: { version: s.browserVersion ?? "141.0.1", executable: null, channel: s.channel ?? null, args: s.args ?? [], rendererException: s.exception ?? null, gpuVerified: "gpuVerified" in s ? s.gpuVerified : true },
-      runs: [{ ok: true, page: { webgl }, rendererEnd: s.rendererEnd === undefined ? renderer : s.rendererEnd, rendererEndCold: "rendererEndCold" in s ? s.rendererEndCold : renderer }],
-      comparisons,
-      metrics: ["1", "4"].flatMap((t) => [startup("ts", t), startup("wasm", t)]),
-      validation: { ok: s.ok ?? true, errors: [], warnings: [] },
-      environment: { commit: s.commit ?? "abc1234def", dirty: s.dirty ?? false, cpuModel: s.cpu ?? "cpu-a", tree: s.tree ?? { porcelain: [], diffSha256: null, untracked: [], hidden: [], complete: true } },
-    },
-  } as unknown as Folder;
-}
-
-const many = (n: number, over: (i: number) => Spec = () => ({})): Folder[] => Array.from({ length: n }, (_, i) => pass(i, over(i)));
-const fam = (c: ReturnType<typeof calibrate>, id: string) => c.families.find((f) => f.id === id)!;
 
 describe("calibrate", () => {
   it("adopts round candidates when enough quiet passes agree", () => {
@@ -244,6 +173,33 @@ describe("calibrate", () => {
     expect(left(() => undefined)).toBe("");
   });
 
+  it("leaves out a pass with no context-loss record, as a worker pass is, and one that lost a context", () => {
+    const c = calibrate([...many(10), pass(20, { contextLost: null }), pass(21, { contextLost: ["webglcontextlost at 12 ms"] })]);
+    const reason = (name: string) => c.excluded.find((e) => e.folder === name)?.reason;
+    expect(reason("aa-20")).toMatch(/^a process run has no WebGL context-loss record/);
+    expect(reason("aa-21")).toMatch(/lost its WebGL context/);
+    expect(c.passes).toHaveLength(10);
+  });
+
+  it("takes the upper end of the 95% interval of the median cold-start difference, which is x(9) of 10", () => {
+    // Differences 0 to 9: the median is 4.5, the maximum 9 and rank 8 is 7; the bound is 8.
+    const p = pass(0).results as unknown as { metrics: { throttle: string; engine: string; values: number[] }[] };
+    const [ts, wasm] = ["ts", "wasm"].map((engine) => p.metrics.find((m) => m.throttle === "1" && m.engine === engine)!);
+    wasm.values = ts.values.map((v, r) => v + r);
+    expect(coldStartDifference(p as never, "1")).toBe(8);
+  });
+
+  it("refuses halves that differ in engine build, and names the field", () => {
+    const base = pass(0).results as unknown as Parameters<typeof poolIdentity>[0];
+    const other = (env: Record<string, unknown>) => poolIdentity({ ...base, environment: { ...base.environment, ...env } });
+    expect(halvesProblems(poolIdentity(base), other({}))).toEqual([]);
+    const build = halvesProblems(poolIdentity(base), other({ engineBuildHash: "other-build", commit: "fff9999aaa" }));
+    expect(build).toHaveLength(1);
+    expect(build[0]).toMatch(/differ in engine build; one calibration/);
+    expect(build[0]).toMatch(/commit abc1234\) and the perf:worker passes \(commit fff9999\)/);
+    expect(halvesProblems(poolIdentity(base), other({ cpuModel: "cpu-b" }))[0]).toMatch(/differ in machine or runtime;/);
+  });
+
   it("leaves out a pass whose working-tree record cannot prove a clean tree", () => {
     const clean = { porcelain: [], diffSha256: null, untracked: [], hidden: [], complete: true };
     const left = (tree: unknown) => calibrate([...many(9), pass(9, { tree })]).excluded.map((e) => e.reason).join("\n");
@@ -371,120 +327,3 @@ describe("calibrate", () => {
   });
 });
 
-describe("perf:calibrate", () => {
-  const dirs: string[] = [];
-  afterEach(() => {
-    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
-  });
-  it("reads folders and a new --out", () => {
-    expect(parseCalibrateArgs(["a", "b", "--out", "o"])).toEqual({ folders: ["a", "b"], out: "o" });
-    expect(parseCalibrateArgs(["a", "--out", "o", "--min-passes", "20", "--exceedance-limit", "0.05"])).toEqual({ folders: ["a"], out: "o", minPassesPerEngine: 20, exceedanceLimit: 0.05 });
-    for (const bad of [["--min-passes", "1"], ["--min-passes", "x"], ["--min-passes"], ["--exceedance-limit", "0"], ["--exceedance-limit", "1.5"], ["--min-passes", "5", "--min-passes", "6"]]) expect(() => parseCalibrateArgs(["a", "--out", "o", ...bad]), bad.join(" ")).toThrow(/--min-passes|--exceedance-limit/);
-    expect(() => parseCalibrateArgs(["--out", "o"])).toThrow(/at least one/);
-    expect(() => parseCalibrateArgs(["a"])).toThrow(/--out DIR is required/);
-    expect(() => parseCalibrateArgs(["a", "--out"])).toThrow(/needs a value/);
-    expect(() => parseCalibrateArgs(["a", "--out", "o", "--out", "p"])).toThrow(/given twice/);
-    expect(() => parseCalibrateArgs(["a", "--fast"])).toThrow(/unknown argument --fast/);
-  });
-
-
-  it("writes calibration.json and calibration.md, never over an existing folder", () => {
-    const repo = mkdtempSync(join(tmpdir(), "calibrate-"));
-    dirs.push(repo);
-    const names = many(40).map((f, i) => {
-      mkdirSync(join(repo, `aa-${i}`));
-      writeFileSync(join(repo, `aa-${i}`, "results.json"), JSON.stringify(f.results));
-      return `aa-${i}`;
-    });
-    const limit = ["--exceedance-limit", "0.2"];
-    // Twenty passes per engine meet the protocol's 5%; a looser limit is the owner's call, so it exits 1.
-    expect(main([...names, "--out", "loose", ...limit], repo)).toBe(1);
-    expect(main(names.slice(0, 10).concat(["--out", "strict"]), repo)).toBe(1);
-    expect(main([...names, "--out", "cal"], repo, () => "2026-10-21T00:00:00Z")).toBe(0);
-    expect(JSON.parse(readFileSync(join(repo, "cal", "calibration.json"), "utf8")).adoptable).toBe(true);
-    expect(readFileSync(join(repo, "cal", "calibration.md"), "utf8")).toContain("# δ and ε calibration");
-    expect(() => main([...names, "--out", "cal"], repo)).toThrow(/never overwritten/);
-    expect(() => main(["missing", "--out", "cal2"], repo)).toThrow(/has no results.json/);
-    expect(main(names.slice(0, 3).concat(["--out", "cal3"]), repo)).toBe(1);
-    // A folder copied under another name is one pass, and the record keeps each input's hash.
-    mkdirSync(join(repo, "copy"));
-    writeFileSync(join(repo, "copy", "results.json"), readFileSync(join(repo, "aa-0", "results.json")));
-    expect(main([...names, "copy", "--out", "cal4"], repo)).toBe(1);
-    const cal = JSON.parse(readFileSync(join(repo, "cal4", "calibration.json"), "utf8"));
-    expect(cal.excluded).toEqual([{ folder: "copy", reason: expect.stringMatching(/identical to aa-0's/), sha256: cal.passes[0].sha256 }]);
-    expect(cal.passes[0].sha256).toMatch(/^[0-9a-f]{64}$/);
-    // A copy re-saved with CRLF line endings, other indentation and another key order is the same pass.
-    mkdirSync(join(repo, "resaved"));
-    const original = JSON.parse(readFileSync(join(repo, "aa-1", "results.json"), "utf8")) as Record<string, unknown>;
-    const reordered = Object.fromEntries(Object.entries(original).reverse());
-    writeFileSync(join(repo, "resaved", "results.json"), JSON.stringify(reordered, null, 4).replace(/\n/g, "\r\n"));
-    expect(main([...names, "resaved", "--out", "cal7"], repo)).toBe(1);
-    expect(JSON.parse(readFileSync(join(repo, "cal7", "calibration.json"), "utf8")).excluded).toEqual([{ folder: "resaved", reason: expect.stringMatching(/identical to aa-1's/), sha256: expect.stringMatching(/^[0-9a-f]{64}$/) }]);
-    expect(stable({ b: 1, a: [2, { d: 1, c: 2 }] })).toBe(stable({ a: [2, { c: 2, d: 1 }], b: 1 }));
-    mkdirSync(join(repo, "bad"));
-    writeFileSync(join(repo, "bad", "results.json"), "{}");
-    expect(() => main(["bad", "--out", "cal5"], repo)).toThrow(/is not a perf:compare or perf:worker results.json/);
-    writeFileSync(join(repo, "bad", "results.json"), "{");
-    expect(() => main(["bad", "--out", "cal6"], repo)).toThrow(/not valid JSON/);
-    // A UTF-8 byte order mark (PowerShell 5.1 writes one) does not abort the run.
-    mkdirSync(join(repo, "bom"));
-    writeFileSync(join(repo, "bom", "results.json"), `\uFEFF${JSON.stringify(many(1)[0].results)}`);
-    expect(main([...names, "bom", "--out", "cal8"], repo)).toBe(1);
-    expect(JSON.parse(readFileSync(join(repo, "cal8", "calibration.json"), "utf8")).excluded[0].reason).toMatch(/identical to aa-0/);
-  });
-
-  it("takes perf:worker folders beside perf:compare folders and needs both to pass", () => {
-    const repo = mkdtempSync(join(tmpdir(), "calibrate-mixed-"));
-    dirs.push(repo);
-    const write = (name: string, results: unknown): string => {
-      mkdirSync(join(repo, name));
-      writeFileSync(join(repo, name, "results.json"), JSON.stringify(results));
-      return name;
-    };
-    const compareFolders = many(40);
-    const compare = compareFolders.map((f, i) => write(`aa-${i}`, f.results));
-    // The worker folders share the compare folders' machine, browser and engine build unless a test changes one.
-    const shared = compareFolders[0].results as unknown as { environment: Record<string, unknown>; browser: Record<string, unknown> };
-    const worker = (diff4: number, tag = "", over: { cpu?: string; version?: string } = {}) =>
-      Array.from({ length: 40 }, (_, i) => workerPass(i, { diff4 })).map((f) => {
-        const r = f.results as unknown as { environment: Record<string, unknown>; browser: Record<string, unknown> };
-        r.environment = { ...shared.environment, commit: "fff9999aaa", ...(over.cpu ? { cpuModel: over.cpu } : {}) };
-        r.browser = { ...r.browser, version: over.version ?? shared.browser.version, executable: shared.browser.executable, channel: shared.browser.channel, args: shared.browser.args };
-        return write(`${f.folder}-${diff4}${tag}`, f.results);
-      });
-    // Same machine, browser and build: the two halves join. The banner names both windows and both commits.
-    expect(main([...compare, ...worker(3), "--out", "both"], repo, () => "2026-10-21T00:00:00Z")).toBe(0);
-    const json = JSON.parse(readFileSync(join(repo, "both", "calibration.json"), "utf8"));
-    expect(json.adoptable).toBe(true);
-    expect(json.problems).toEqual([]);
-    expect(json.missingFamilies).toEqual([]);
-    expect(json.families.map((f: { id: string }) => f.id)).toContain("M1");
-    expect(json.m4.family.candidate).toBe(5);
-    const md = readFileSync(join(repo, "both", "calibration.md"), "utf8");
-    expect(md).toContain("it covers M1, M2, M3, M4 and M5");
-    expect(md).toContain("## M4 long-task ε");
-    expect(md).toMatch(/Snapshot of perf:compare A\/A passes started .* to .*, commit [0-9a-f]{7}; perf:worker A\/A passes started 2026-10-21T01:00:00\.000Z to .*, commit fff9999;/);
-    expect(md).toContain("pinned by calibrateM4.test.ts");
-    expect(md).toContain("**Candidates pass every check of this tool.**");
-    // A cap miss in the worker folders fails the whole command, the headline says so, and the problem is in the top-level list.
-    expect(main([...compare, ...worker(80), "--out", "miss"], repo)).toBe(1);
-    const miss = JSON.parse(readFileSync(join(repo, "miss", "calibration.json"), "utf8"));
-    expect(miss.adoptable).toBe(false);
-    expect(miss.m4.adoptable).toBe(false);
-    expect(miss.problems.some((p: string) => /^perf:worker folders: M4: the candidate 80 ms is above its cap/.test(p))).toBe(true);
-    const missMd = readFileSync(join(repo, "miss", "calibration.md"), "utf8");
-    expect(missMd).toContain("**Not adoptable yet.** See the problems below.");
-    expect(missMd).not.toContain("**Candidates pass every check of this tool.**");
-    expect(missMd).toMatch(/## Problems\n\n(- .*\n)*- perf:worker folders: M4: the candidate 80 ms/);
-    // Halves from another machine or browser build do not join, even though each half passes alone.
-    expect(main([...compare, ...worker(3, "-b", { cpu: "other cpu", version: "150.0.1" }), "--out", "apart"], repo)).toBe(1);
-    const apart = JSON.parse(readFileSync(join(repo, "apart", "calibration.json"), "utf8"));
-    expect(apart.m4.adoptable).toBe(true);
-    expect(apart.adoptable).toBe(false);
-    expect(apart.problems).toHaveLength(1);
-    expect(apart.problems[0]).toMatch(/perf:compare passes \(commit [0-9a-f]{7}\) and the perf:worker passes \(commit fff9999\) differ in machine or runtime; browser/);
-    // A worker-only run says which families it cannot speak for.
-    expect(main([...worker(3, "-c"), "--out", "alone"], repo)).toBe(0);
-    expect(JSON.parse(readFileSync(join(repo, "alone", "calibration.json"), "utf8")).missingFamilies).toEqual(["M1", "M2", "M3", "M5-1x", "M5-4x"]);
-  });
-});
