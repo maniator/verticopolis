@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { marked } from "marked";
 import { escapeMarkdown, notesForVersion, releaseNoteLines } from "./changelog";
 import { MAX_NOTES, MAX_NOTE_LEN } from "./pwaUpdateInfo";
@@ -117,6 +119,15 @@ describe("notesForVersion", () => {
 
   it("turns a hard line break inside a bullet into a space", () => {
     expect(notesForVersion("## 1.0.0\n- line one  \n  line two\n", "1.0.0")).toEqual(["line one line two"]);
+  });
+
+  // The update prompt cuts a longer note mid-sentence, so this build's own
+  // notes have to fit the caps whole.
+  it("reads this build's notes whole, within the caps", () => {
+    const changelog = readFileSync(resolve(__dirname, "../CHANGELOG.md"), "utf8");
+    const { version } = JSON.parse(readFileSync(resolve(__dirname, "../package.json"), "utf8")) as { version: string };
+    const whole = notesForVersion(changelog, version, { maxNotes: Infinity, maxLen: Infinity });
+    expect(notesForVersion(changelog, version)).toEqual(whole);
   });
 });
 

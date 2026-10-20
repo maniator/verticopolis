@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 2.39.0
 
-- On the opt-in WASM engine (`?engine=wasm`), a tower whose engine fails mid-game now keeps running from its last good state, up to an in-game hour back, and a message says so.
+- On the opt-in WASM engine (`?engine=wasm`), a tower whose engine fails keeps running instead of freezing. It rewinds by up to an in-game hour, so recent changes may be undone, and a message says so.
 
 ## 2.38.0
 
