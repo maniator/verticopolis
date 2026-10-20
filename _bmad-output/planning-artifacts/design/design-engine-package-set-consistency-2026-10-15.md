@@ -278,25 +278,39 @@ lives in a small module (`src/wasmhost/enginePackageCheck.ts`) with
 injected `fetch` and `digest`, so the unit tests run in Node:
 
 1. If `__ENGINE_PACKAGE__` is `null`, refuse: "this build carries no engine
-   package".
+   package", with `load-failed` and detail `missing-compiled-package`.
 2. If `crypto.subtle` is missing (an insecure context), refuse with reason
    `unverifiable` (open question 4).
 3. Fetch `engine/BUILD.json`, the glue and the binary in parallel, each with
    the browser's default cache mode (a controlled page reads the precache),
-   under one `AbortController` that the load timeout also aborts, so a
-   timed-out load never instantiates later in the background. A network
+   under one `AbortController` that the load timeout also aborts. A network
    error or a non-OK status is a load failure (`load-failed`), kept apart
-   from a mismatch. A body larger than its expected size plus a small
-   margin is cut off and refused, so a broken server cannot make the page
-   hash an unbounded body.
-4. Parse `BUILD.json`. Missing, unparsable, not schema 2, or a `files`
+   from a mismatch. Read bodies through a bounded stream reader, before
+   concatenating chunks: `BUILD.json` has a fixed 16 KiB cap, and glue and
+   binary have their exact sizes from the compiled record as caps. Reject
+   an excessive `Content-Length` early, but count actual bytes even when
+   the header is absent or false. On overflow cancel the reader, abort
+   sibling fetches and refuse with `mismatch`. An unavailable stream refuses
+   with `load-failed`; do not use an unbounded `arrayBuffer()` fallback.
+4. Parse an HTTP-successful `BUILD.json`. Empty, unparsable, not schema 2, or a `files`
    block that does not name exactly the glue and the binary: refuse
    (`mismatch`, with the served id unknown when there is none). A size
-   that differs from the record refuses before hashing.
+   that differs from either record refuses before hashing. A missing HTTP
+   resource (including 404) was already classified as `load-failed` in
+   step 3; an HTTP 200 with an invalid or incomplete record is `mismatch`.
+   Validate digest syntax (64 lowercase hex digits), finite nonnegative
+   integer byte counts, and the exact two file names before using fields.
 5. Hash the glue and the binary. Refuse (`mismatch`) when either digest
    differs from `__ENGINE_PACKAGE__`, or when `BUILD.json`'s `package`
-   differs from it. A `BUILD.json` that differs only in `sources` passes:
-   the bytes are identical.
+   differs from it. Also recompute the served record's canonical `package`
+   digest from its validated `files` block, compare it with its own
+   `package`, and compare each served file entry with the actual fetched
+   size and digest. Preserving the expected package string while changing
+   its file entries must refuse. The canonical encoding is UTF-8
+   `JSON.stringify` of a newly constructed object with file keys in the
+   order shown in section 5.1 and each entry's keys ordered `sha256`,
+   then `bytes`, with no whitespace. Never hash the received JSON text.
+   A `BUILD.json` that differs only in `sources` passes: the bytes are identical.
 6. Import the glue from a Blob (type `text/javascript`) built from the
    verified bytes themselves, with no decode and re-encode in between; call
    `init({ module_or_path: wasmBytes })` with the verified binary; revoke
@@ -305,13 +319,26 @@ injected `fetch` and `digest`, so the unit tests run in Node:
    the check. A content security policy added later must allow `blob:` for
    scripts (the site sets none today).
 
+The loader owns one deadline and a terminal attempt state shared with
+`loadBootEngine`; expiry marks the attempt terminal before publishing
+`timeout`. Check that state and the monotonic deadline after every await
+(headers, each body chunk, digest, import, init), immediately before import
+and init, and before returning the checked binding or attaching a host.
+An import already running cannot be cancelled. Initialization already
+running may finish or even instantiate after the deadline; its result is
+discarded and never published, attached, or ticked. Fetch abort alone does
+not cancel those operations. Always observe late rejections, revoke Blob
+URLs on eventual settlement, and release any created engine handle. No
+second attempt starts automatically. This bounds the wait for the player,
+not a synchronous browser compilation that blocks the event loop.
+
 The check runs inside the existing 90-second load timeout. Dev serves
 (`import.meta.env.DEV`) skip the check and report `verified: false`, since
 `npm run wasm:build` during a dev session would otherwise refuse the new
 package until a server restart. The dual run's worker uses the same loader,
 so tooling never runs a mix either.
 
-### 5.4 Fallback and diagnostics on a mismatch
+### 5.4 Fallback, diagnostics and recovery on every refusal
 
 A refusal throws `EnginePackageMismatch` (or `EnginePackageUnverifiable`)
 carrying `file` (`glue`, `wasm` or `build-record`), the expected and found
@@ -327,10 +354,40 @@ plain sentence, for example
 "The engine files do not match this version of the game (expected
 3f2a9c01d4e7, found 91be0477aa13)."
 
-| Build | On a mismatch |
+| Build | On any load refusal |
 | --- | --- |
-| Switchable (today's default; WASM opt-in) | Runs on the TypeScript engine. `__vcEngineBoot` is `{ engine: "ts", failure: { stage: "load", reason: "mismatch", ... } }`. One `console.error`. #963 shows "TypeScript fallback (version mismatch)" with both ids. |
-| Wasm-only (3.0.0 on) | `engine: "none"`. The engine failure screen shows mismatch copy. Online: "The game's files are from two different updates, so the engine was not started. Reload to finish the update." Offline adds: "Connect to the internet and reload once so the update can finish." The existing "activate a waiting update at once" registration stays. |
+| Switchable (today's default; WASM opt-in) | Runs on the TypeScript engine. `__vcEngineBoot` is `{ engine: "ts", failure: { stage: "load", reason, ... } }`. One `console.error`. #963 shows the fallback reason and available ids. The player can keep playing and saving with TypeScript. |
+| Wasm-only (3.0.0 on) | `engine: "none"`. The engine failure screen uses the reason-specific string below, `role="alert"`, and initial focus on Reload. No host attaches. The existing waiting-update registration stays, with its single-reload guard. |
+
+| Reason | Copy and retry policy in both builds |
+| --- | --- |
+| `mismatch` | "The engine files do not match this version of the game. The engine was not started." Show both package ids when known, otherwise an unavailable label. Reload is a manual retry; an online **Repair engine files** action is available as described below. |
+| `load-failed` | "The engine files could not be loaded. Connect to the internet and try Reload." Covers HTTP errors, interrupted streams, import/init failures, and a missing compiled package. That last case explains that a corrected deployment is needed. Repair is offered only when a worker controls the page. |
+| `timeout` | "The engine took too long to load. Try Reload when your connection is ready." The expired attempt stays terminal. Reload starts a fresh document and attempt. |
+| `unverifiable` | "This browser connection cannot verify the engine files. Open the game using HTTPS." Reload alone cannot repair an insecure context. Do not offer cache repair for this reason. |
+| `no-save-writer` | Existing compatibility policy stays: a wasm-only build refuses with "The engine cannot save towers. Reload after the game is updated." A switchable build keeps its existing TypeScript save writer; this is not a package-verification failure and does not force engine fallback. |
+
+Every screen includes Copy Diagnostics, including when no module loaded.
+Offline copy adds "Connect to the internet before repairing engine files."
+All copy and labels come from the string catalog, with ids as arguments.
+
+**Corrupted-entry recovery.** A normal Reload does not repair an existing
+corrupted Cache Storage response: Workbox integrity is checked on network
+fetches, not on a cache hit. The explicit online **Repair engine files**
+action deletes only precache keys for the three engine URLs under this
+deployment's exact origin and base path, including their Workbox revision
+query variants. Restrict cache names to this app's Workbox precache namespace;
+leave other applications' caches, all shell/audio entries, IndexedDB,
+localStorage and saves alone. Do not unregister workers or clear site data.
+Reject the action while offline, and show deletion/update failures with a
+manual retry. After deletion request one registration update check and
+offer Reload; never promise that the live deployment has been repaired.
+The controlling worker refetches missing engine entries with its manifest's
+integrity. A different live deployment may still fail until its worker
+activates. A broken live deployment remains refused after repair.
+Deleting engine revisions can affect another tab or a waiting install;
+their integrity checks and the page byte gate must still refuse any mix.
+Repair never activates a worker itself or triggers an automatic reload.
 
 Rules for both:
 
@@ -353,6 +410,7 @@ Rules for both:
 | R3 activation mid-boot | B refuses; a reload runs the new shell with its own set. |
 | R5 HTTP cache | B refuses. |
 | R6 missing entry | D2 refills it only with matching bytes; otherwise the fetch fails and the load is refused as `load-failed`. |
+| Corrupted existing entry | The page refuses with `mismatch`; only explicit online repair deletes the engine cache keys. A subsequent matching refetch may recover; Reload alone is not promised to recover. |
 | R7 pre-2.32.0 shell | Unchanged until that player updates. Opt-in players only, on a switchable build. |
 | R9 build pipeline | `verify-precache.ts` fails the build. |
 
@@ -366,15 +424,26 @@ Rules for both:
   - a matching set passes, and the instantiate step receives the same
     buffers that were hashed (the fetcher counts calls: one per file);
   - a glue mismatch, a binary mismatch, a `BUILD.json` naming another
-    `package`, and `BUILD.json` missing, unparsable or schema 1 each refuse
+    `package`, and an HTTP-successful `BUILD.json` empty, unparsable or schema 1 each refuse
     with the right `file` and both ids;
   - `BUILD.json` differing only in `sources` passes;
-  - a fetch failure gives `load-failed`, kept apart from `mismatch`;
+  - a fetch failure or HTTP 404 for each file gives `load-failed`, kept apart from `mismatch`;
+  - a forged `files` block retaining the expected package id refuses;
+    canonical serialization ignores received field order and whitespace;
+  - oversized record/glue/binary bodies refuse before buffering, with and
+    without `Content-Length`, including a false small header; the exact cap
+    passes and cap plus one fails, with reader cancellation and sibling abort;
+  - expiry during fetch, digest, deferred import and deferred init publishes
+    one `timeout`; resolving or rejecting later never publishes a module,
+    attaches a host, ticks, logs an unhandled rejection, or leaks a Blob URL;
   - no `crypto.subtle` gives `unverifiable`; `__ENGINE_PACKAGE__ === null`
     refuses;
   - a fetcher that returns glue A, then binary B (the R3 shape) refuses.
-- `engineBoot`: the `reason` for each failure in both build modes;
-  `engineFailureCopy` for a mismatch online and offline.
+- `engineBoot`: every reason in section 5.4 in both build modes, including
+  existing switchable save-writer behavior; reason-specific copy online and
+  offline, unavailable ids, alert role, focus and Copy Diagnostics.
+- Repair: exact base-path/cache-namespace selection, revision variants,
+  offline refusal, failed deletion/update, and no saved-data mutation.
 - `verify-precache` helpers (pure functions moved beside
   `src/precacheEntry.ts`): a missing or wrong `integrity`, a `dist/engine`
   file that differs from `BUILD.json`, a shell chunk carrying another id,
@@ -397,9 +466,12 @@ How to manufacture a mismatched set:
 - **Second build.** A CI step copies the package aside, salts it, rewrites
   its `BUILD.json`, runs a second `vite build` into `dist-b/` (the define
   and the shell chunk hash change with it, and so does `sw.js`), and
-  restores the package. The e2e serves `dist/` and switches to `dist-b/` at
-  the "deploy" moment with `context.route`, which in Chromium also
-  intercepts the worker's own requests (to confirm in the first spike).
+  restores the package. Use a same-origin HTTP fixture server that can
+  switch its document root from `dist/` to `dist-b/` at the "deploy" moment
+  and override individual engine responses. It must observe both page and
+  service-worker requests; do not depend on `page.route` or `context.route`
+  intercepting worker requests. Each response snapshots its root at request
+  arrival so a switch cannot change a streaming response halfway through.
 
 Specs:
 
@@ -427,6 +499,31 @@ Specs:
    page on the failure screen (or the TypeScript engine). The test counts
    main-frame navigations with `page.on("framenavigated")` and expects the
    count to stop at the one reload it made.
+7. **Eviction and recovery (R6).** Install A, assert it controls the page,
+   then delete each engine entry separately. With A still deployed, reload
+   online and prove the missing response is fetched with manifest integrity,
+   cached under A's key, and WASM advances without fallback. Delete again,
+   go offline and reload: expect `load-failed` and the section 5.4 result.
+   Reconnect to A and manually reload: the same key refills and WASM runs.
+   Repeat deletion with B deployed but A controlling: B must never be stored
+   under A's key, and A refuses until B's worker and shell activate. Finally
+   remove the whole precache while offline and assert the browser's unavailable
+   navigation outcome; reconnect and prove a new online visit recovers.
+8. **Corrupted-cache repair without a new worker.** Tamper A's cached glue,
+   binary and record separately while A remains deployed and no worker waits.
+   Reload alone still refuses. Use Repair engine files online, then Reload;
+   prove the set now matches A and WASM runs, with an online save intact.
+   Offline repair is disabled and never deletes entries. A corrupt live
+   response stays refused with no retry loop. Repeat with another A tab and
+   a waiting B worker: no tab may run mismatched bytes during repair.
+9. **First-install race.** Start with an empty profile and no registration.
+   Serve A's worker with B's engine response during installation. Assert the
+   installer becomes redundant, the page stays uncontrolled, and no B bytes
+   are stored under A's engine keys. A failed install may leave correctly
+   fetched partial entries; do not falsely require an atomic cache rollback.
+   With one settled deployment, close all pages and revisit online, assert
+   a successful install/control and a fully matching set, then close all
+   pages and cold-start offline with WASM advancing and no fallback.
 
 R3 (activation mid-boot) is timing-dependent in a browser; the unit test
 with the A-then-B fetcher covers its logic.
@@ -452,9 +549,12 @@ with the A-then-B fetcher covers its logic.
 - **CI time:** the second build for e2e spec 5 adds one `vite build` (no
   Rust rebuild) to the offline e2e job. The job must run on every PR that
   can change the precache or the engine package (#985's release rule):
-  path filters on `vite.config.ts`, `src/pwa.ts`, `src/wasmhost/**`,
-  `scripts/wasm-build.ts`, `scripts/verify-precache.ts`, `engine-rs/**`,
-  `vercel.json` and `e2e/offline*`.
+  run it unfiltered on every pull request and on main pushes. This includes
+  build wrappers, `.github/actions/engine-wasm/**`, dependency lockfiles,
+  `conformance/events/**`, public audio, loader imports and future inputs
+  without maintaining a second, inevitably incomplete dependency list.
+  Keep this correctness job separate from heavyweight fuzzing and performance
+  jobs. Changes to its own workflow must exercise this gate too.
 
 ## 8. Migration and rollback
 
