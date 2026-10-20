@@ -144,7 +144,7 @@ export interface ProcessRun {
   cpuProbe: { unthrottledMs: number; throttledMs: number | null; rate: number; timed: Record<string, number> } | null;
   scenarios: Record<string, ScenarioRun>;
   wasmCold: { fetchMs: number; bytes: number; compileMs: number; instantiateMs: number; firstEngineMs: number } | null;
-  /** The audio start for the audio-on frame pass. */
+  /** The audio start of the audio-on frame pass: the last scenario's page, since each scenario starts audio in its own. */
   audio: { started: boolean; muted: boolean; contexts: string[] } | null;
   /** A first visit with the service worker allowed, then an offline
    *  reload: which engine came back without the network. */
