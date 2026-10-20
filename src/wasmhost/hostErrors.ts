@@ -9,7 +9,9 @@ export interface HostErrors {
   /** The latest error message, kept after `errors` is full; null while there
    *  has been none. While `droppedErrors` is 0 it is also that list's last
    *  entry. It is not tied to a fallback: an error recorded while a tower is
-   *  still hosted (a detach that threw) replaces it too. */
+   *  still hosted (a detach that threw) replaces it too. The worker host
+   *  records a failed detach before the cause when it drops its worker, so
+   *  there `errors` lists the detach failure first and this keeps the cause. */
   lastError: string | null;
   /** Errors left out of `errors` because it was full. The latest of them is
    *  still `lastError`, so `droppedErrors - 1` are lost when it is above 0. */

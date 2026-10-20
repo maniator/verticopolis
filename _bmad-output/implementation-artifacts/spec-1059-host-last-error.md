@@ -70,13 +70,14 @@ Do not clear history on tower swaps, since status spans the host session.
 ## Verification
 
 Run targeted unit tests, typecheck, lint, the full Tier-1 suite, coverage and
-the production build. Run bmad-code-review over this diff with this spec;
-resolve patch findings and mirror deferred findings to GitHub and backlog.
+the production build. Run `/bmad-code-review` and `/gds-code-review` over
+this diff with this spec; resolve patch findings and mirror deferred
+findings to GitHub and backlog.
 
 ## Merge
 
 This lands in its own pull request, ahead of #874. The 3.0 web release
-plan's draft A3 row (#1080) pairs the two, but the owner's handoff on #874
+plan's A3 row (#1080, merged) pairs the two, but the owner's handoff on #874
 (2026-10-16) asks for #874 alone in a focused pull request, so #874 builds
 on this branch and goes up separately. It closes #1059: the issue's test (a
 host that records 51 errors reports the 51st) is met for both hosts. The
@@ -205,6 +206,12 @@ Dismissed:
   Codex worktree and applied unchanged at its base (the patch's two
   planning-doc hunks left out; #1080 replaces them), then main merged in.
   A1 (#1088) had added `fallbacks` and `lastFallback` to `WasmHostStatus`,
-  so the merge keeps both sets of fields. The one consumer on main that
-  read the list's last entry, the boot's first-tower stop in
-  `bootstrap.ts`, now reads `lastError`.
+  so the merge keeps both sets of fields. The three readers on main that
+  read the list's last entry (the boot's first-tower stops for the
+  main-thread and worker hosts in `bootstrap.ts`, and the screenshot
+  tooling's refusal message) now read `lastError`.
+- 2026-10-20, independent review (the release's go or no-go reviewer, on
+  6e34744): CONDITIONAL GO, with the takeover note on #1059 as the
+  condition. Its wording fixes are in: the `lastError` field doc names the
+  worker host's kill order, and this spec names both review skills, the
+  merged plan and the three readers.
