@@ -128,7 +128,7 @@ async function expectRefused(page: Page, file: "glue" | "wasm" | "build-record")
     const failure = page.locator("#engine-failure");
     await expect(failure).toBeVisible();
     await expect(failure).toHaveAttribute("role", "alert");
-    await expect(page.locator("#boot-fallback button")).toBeFocused();
+    await expect(page.locator("#boot-fallback button:not([data-act])")).toBeFocused();
     expect(await page.evaluate(() => !!(window as any).game)).toBe(false);
   } else {
     // The default build keeps the game on the TypeScript engine.

@@ -17,7 +17,7 @@ fault, once, on the next adopt).
 | Item | Result | What was checked | Resolution |
 | --- | --- | --- | --- |
 | HP-1 | clear | Every caller traced. `loadWasmEngine` has one caller (`bootstrap.ts`); `loadEngineModule` has three (main-thread boot, engine worker, dual-run worker); `catalogVerdict` has two (a refused attach in `startWasmHost`, once at boot in `bootstrap`). Nothing reaches the frame loop, `advance_step`, render sync or `canBuild`. | none |
-| HP-2 | clear | No collection of units, rooms, people, floors, transports or the route graph is walked. The loader makes one linear pass over about 1.47 MB per load; `catalogVerdict` reads two catalogs of about 20 KB (under 1 ms), and now only on a refusal. | none |
+| HP-2 | clear | No collection of units, rooms, people, floors, transports or the route graph is walked. The loader makes one linear pass over about 1.47 MB per load; `catalogVerdict` reads two catalogs of about 20 KB (under 1 ms), and now only on a refusal. The independent review measured the three digests in headless Chromium: about 0.1, 0.4 and 4.8 ms (242 B, 48 KB, 1.44 MB), so the binary's SHA-256 is about 4.6 ms there, not the 1.2 ms Node figure; still once per load. | none |
 | HP-3 | clear (info) | Transient copies at load only: stream chunks plus the joined buffer, the digest's input copy, the Blob copy of the 47 KB glue, the engine's own wire bytes. About 3 to 4.5 MB above `main` while loading, none kept (the glue keeps only the compiled module, the instance and its exports). Steady state is unchanged. | none |
 | HP-4 | n/a | No sort or ordered rebuild added. `shellProblems` uses Set and Map at build time. | none |
 | HP-5 | n/a | No container on a hot path, no Rust change. | none |

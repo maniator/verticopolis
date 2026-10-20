@@ -14,8 +14,10 @@
  * Today the game fetches three files, all through the verified loader
  * (loadEngineModule.ts, #985's criterion 5): the glue (enginePackageUrl in
  * startWasmHost.ts names it), the binary beside it, and `BUILD.json`, whose
- * record the loader checks both against. The loader hashes the bytes and hands
- * them to the glue's `init`, so the glue never fetches the binary itself.
+ * record the loader checks both against. The loader hashes the bytes, compiles
+ * the binary itself (reading its build section, engineLoad.ts, #963) and hands
+ * the compiled module to the glue's `init`, so the glue never fetches the
+ * binary itself.
  * `THIRD-PARTY.json` is read only at
  * build and test time (the notices in src/build/rustNotices.ts), so it stays
  * out of the precache. Each run-time file is listed in the workbox glob by its

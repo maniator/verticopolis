@@ -89,12 +89,58 @@ describe("parseEngineRecord", () => {
   });
 });
 
+describe("the crate entry", () => {
+  const crate = { name: "verticopolis-engine", version: "0.2.0" };
+  const withCrate = () => engineBuildRecord(glue, wasm, "a".repeat(64), sha, crate);
+
+  it("is written when given and left out when not", () => {
+    expect(withCrate().crate).toEqual(crate);
+    expect("crate" in record()).toBe(false);
+  });
+
+  it("stays out of the package id", () => {
+    expect(withCrate().package).toBe(record().package);
+  });
+
+  it("round-trips through the parser", () => {
+    expect(parseEngineRecord(JSON.stringify(withCrate()))).toEqual({ ok: true, record: withCrate() });
+  });
+
+  it("reads a record without one, as an older build wrote it", () => {
+    const parsed = parseEngineRecord(JSON.stringify(record()));
+    expect(parsed.ok && "crate" in parsed.record).toBe(false);
+  });
+
+  it.each([
+    ["a string", "0.2.0"],
+    ["an array", ["verticopolis-engine", "0.2.0"]],
+    ["a missing version", { name: "verticopolis-engine" }],
+    ["an empty name", { name: "", version: "0.2.0" }],
+    ["a numeric version", { name: "verticopolis-engine", version: 2 }],
+    ["null", null],
+  ])("treats %s as absent and still loads the package", (_label, bad) => {
+    const parsed = parseEngineRecord(JSON.stringify({ ...record(), crate: bad }));
+    expect(parsed.ok).toBe(true);
+    expect(parsed.ok && "crate" in parsed.record).toBe(false);
+  });
+
+  it("drops unknown keys inside the entry", () => {
+    const parsed = parseEngineRecord(JSON.stringify({ ...record(), crate: { ...crate, extra: 1 } }));
+    expect(parsed).toEqual({ ok: true, record: withCrate() });
+  });
+
+  it("rides into the part of the record the shell compiles in, beside the package and files", () => {
+    expect(expectedOf(withCrate())).toEqual({ package: record().package, files: record().files, crate, sources: record().sources });
+    expect("crate" in expectedOf(record())).toBe(false);
+  });
+});
+
 describe("shortId and expectedOf", () => {
   it("shows the first 12 digits", () => {
     expect(shortId("0123456789abcdef".repeat(4))).toBe("0123456789ab");
   });
-  it("keeps the package and the files and drops the sources hash", () => {
+  it("keeps the package and the files, and carries the sources hash as a label", () => {
     const r = record();
-    expect(expectedOf(r)).toEqual({ package: r.package, files: r.files });
+    expect(expectedOf(r)).toEqual({ package: r.package, files: r.files, sources: r.sources });
   });
 });

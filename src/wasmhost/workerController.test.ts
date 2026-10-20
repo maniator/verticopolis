@@ -163,7 +163,7 @@ describe("worker controller (fake engine)", () => {
 
   it("keeps a refused package's kind and ids when the worker's byte check refuses it (#985)", async () => {
     const package_ = { kind: "mismatch" as const, file: "wasm" as const, expected: "aaaaaaaaaaaa", found: "bbbbbbbbbbbb", expectedPackage: "111111111111", servedPackage: "222222222222", controlled: true };
-    const refusing = (kind: "mismatch" | "load-failed"): EngineWorkerLike => {
+    const refusing = (kind: "mismatch" | "load-failed" | "unverifiable"): EngineWorkerLike => {
       const w = fakeWorker();
       w.postMessage = () => {
         setTimeout(() => w.onmessage?.({ data: { type: "error", fatal: true, message: "could not load the WASM engine: refused", package: { ...package_, kind } } }), 0);
@@ -175,6 +175,9 @@ describe("worker controller (fake engine)", () => {
     expect(mismatch).toMatchObject({ reason: "package-mismatch", package: { kind: "mismatch", servedPackage: "222222222222" } });
     const missing = await spawnEngineWorker(() => refusing("load-failed"), "x").catch((e: unknown) => e);
     expect(missing).toMatchObject({ reason: "boot-error", package: { kind: "load-failed" } });
+    // The browser could not hash the files: its own code, sent by the worker or derived from the kind.
+    const unverifiable = await spawnEngineWorker(() => refusing("unverifiable"), "x").catch((e: unknown) => e);
+    expect(unverifiable).toMatchObject({ reason: "unverifiable", package: { kind: "unverifiable" } });
   });
 
   it("keeps the code a worker gave a failed load, a binding the shell cannot use included (#1086)", async () => {
@@ -208,6 +211,42 @@ describe("worker controller (fake engine)", () => {
     expect(await spawnEngineWorker(() => reply({ package: { kind: "other" } }), "x").catch((e: unknown) => e)).not.toBeInstanceOf(EngineBootError);
   });
 
+  it("reports the page's own controlled state for a refused package, whatever the worker says (#985)", async () => {
+    const refused = (controlled: boolean): EngineWorkerLike => {
+      const w = fakeWorker();
+      w.postMessage = () => {
+        setTimeout(() => w.onmessage?.({ data: { type: "error", fatal: true, message: "refused", package: { kind: "mismatch", file: "wasm", controlled } as never } }), 0);
+      };
+      return w;
+    };
+    const controlledBy = (controller: object | null) => vi.stubGlobal("navigator", { serviceWorker: { controller } });
+    try {
+      controlledBy({});
+      expect(await spawnEngineWorker(() => refused(false), "x").catch((e: unknown) => e)).toMatchObject({ package: { controlled: true } });
+      controlledBy(null);
+      expect(await spawnEngineWorker(() => refused(true), "x").catch((e: unknown) => e)).toMatchObject({ package: { controlled: false } });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("rebuilds the build section's account from known values only", async () => {
+    const hash = "ab".repeat(32);
+    const reply = (build: unknown): EngineWorkerLike => {
+      const w = fakeWorker();
+      w.postMessage = () => {
+        setTimeout(() => w.onmessage?.({ data: { type: "error", fatal: true, message: "could not load the WASM engine", build: build as never } }), 0);
+      };
+      return w;
+    };
+    const built = async (build: unknown) => ((await spawnEngineWorker(() => reply(build), "x").catch((e: unknown) => e)) as { build?: unknown }).build;
+    expect(await built({ state: "ok", sourceHash: hash, extra: "x" })).toEqual({ state: "ok", sourceHash: hash });
+    expect(await built({ state: "missing" })).toEqual({ state: "missing" });
+    expect(await built({ state: "malformed", why: "w".repeat(500) })).toEqual({ state: "malformed", why: "w".repeat(120) });
+    expect(await built({ state: "ok", sourceHash: "not a hash" })).toBeUndefined();
+    expect(await built({ state: "other" })).toBeUndefined();
+  });
+
   it("codes a worker that never answers ready as a boot timeout", async () => {
     const silent: EngineWorkerLike = { onmessage: null, onerror: null, postMessage() {}, terminate: vi.fn() };
     const err = await spawnEngineWorker(() => silent, "u", 5).catch((e: unknown) => e);
@@ -231,5 +270,100 @@ describe("settleEngine", () => {
     expect(SETTLE_TIMEOUT_MS).toBeGreaterThan(0);
     setStepGate(sim, null);
     expect(stepGate(sim)).toBeUndefined();
+  });
+});
+
+describe("spawnEngineWorker, engine identity (#963)", () => {
+  const readyWorker = (identity: string | undefined): EngineWorkerLike => {
+    const w: EngineWorkerLike = {
+      onmessage: null,
+      onerror: null,
+      postMessage() {
+        setTimeout(() => w.onmessage?.({ data: { type: "ready", catalogs: { classic: "c", modern: "m" }, ...(identity === undefined ? {} : { identity }) } satisfies FromWorker }), 0);
+      },
+      terminate() {},
+    };
+    return w;
+  };
+
+  it("hands the worker's identity record to the caller", async () => {
+    const spawned = await spawnEngineWorker(() => readyWorker('{"schema":1}'), "u");
+    expect(spawned.identity).toBe('{"schema":1}');
+  });
+
+  it("leaves it undefined for a worker whose package has no such call", async () => {
+    const spawned = await spawnEngineWorker(() => readyWorker(undefined), "u");
+    expect(spawned.identity).toBeUndefined();
+  });
+});
+
+describe("spawnEngineWorker, the engine binary's build metadata (#963)", () => {
+  const answering = (reply: FromWorker): EngineWorkerLike => {
+    const w: EngineWorkerLike = {
+      onmessage: null,
+      onerror: null,
+      postMessage() {
+        setTimeout(() => w.onmessage?.({ data: reply }), 0);
+      },
+      terminate() {},
+    };
+    return w;
+  };
+  const ok = { state: "ok", sourceHash: "a".repeat(64) } as const;
+
+  it("hands the worker's read of the section to the caller", async () => {
+    const reply: FromWorker = { type: "ready", catalogs: { classic: "c", modern: "m" }, build: ok };
+    expect((await spawnEngineWorker(() => answering(reply), "u")).build).toEqual(ok);
+  });
+
+  it("leaves it undefined for a worker that did not say", async () => {
+    const reply: FromWorker = { type: "ready", catalogs: { classic: "c", modern: "m" } };
+    expect((await spawnEngineWorker(() => answering(reply), "u")).build).toBeUndefined();
+  });
+
+  it("carries it on the rejection of a load that failed after the binary compiled", async () => {
+    const err = await spawnEngineWorker(() => answering({ type: "error", fatal: true, message: "link failed", build: ok }), "u").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).toMatchObject({ message: "link failed", build: ok });
+  });
+
+  it("adds no build to a rejection that has none", async () => {
+    const err = await spawnEngineWorker(() => answering({ type: "error", fatal: true, message: "404" }), "u").catch((e: unknown) => e);
+    expect("build" in (err as object)).toBe(false);
+  });
+
+  /** A worker that reports the binary's build, then does `then`. */
+  const reporting = (then: (w: EngineWorkerLike) => void): EngineWorkerLike => {
+    const w: EngineWorkerLike = {
+      onmessage: null,
+      onerror: null,
+      postMessage() {
+        setTimeout(() => {
+          w.onmessage?.({ data: { type: "build", build: ok } });
+          then(w);
+        }, 0);
+      },
+      terminate() {},
+    };
+    return w;
+  };
+
+  it("keeps the build a worker reported when it then never answers", async () => {
+    const err = await spawnEngineWorker(() => reporting(() => undefined), "u", 20).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(EngineBootError);
+    expect(err).toMatchObject({ reason: "boot-timeout", build: ok });
+  });
+
+  it("keeps the build a worker reported when it then fails to start", async () => {
+    const err = await spawnEngineWorker(() => reporting((w) => w.onerror?.({ message: "boom" } as ErrorEvent)), "u").catch((e: unknown) => e);
+    expect(err).toMatchObject({ build: ok });
+  });
+
+  it("prefers the build an error reply carries over the one reported earlier", async () => {
+    const other = { state: "missing" } as const;
+    const err = await spawnEngineWorker(() => reporting((w) => w.onmessage?.({ data: { type: "error", fatal: true, message: "x", build: other } })), "u").catch(
+      (e: unknown) => e,
+    );
+    expect(err).toMatchObject({ build: other });
   });
 });

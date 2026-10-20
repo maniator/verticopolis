@@ -1,5 +1,7 @@
 import type { WasmModule } from "../dualrun/binding";
 import { EnginePackageError, type PackageFailureDetail, type PackageFailureKind } from "./enginePackageCheck";
+import { readEngineIdentity } from "./engineIdentity";
+import type { BuildMetadataResult } from "./buildSection";
 
 /**
  * How boot gets its engine, for both build modes (see
@@ -98,6 +100,19 @@ export function cleanPackageFailure(raw: unknown): PackageFailure | undefined {
   };
 }
 
+/** A worker's account of the binary's build section, rebuilt from known
+ *  values (a state from the list, a 64-digit hash, a short reason), so the
+ *  boot state never carries free text from a message. Undefined for anything
+ *  else. */
+export function cleanBuildMetadata(raw: unknown): BuildMetadataResult | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const b = raw as Record<string, unknown>;
+  if (b.state === "missing") return { state: "missing" };
+  if (b.state === "ok") return typeof b.sourceHash === "string" && /^[0-9a-f]{64}$/.test(b.sourceHash) ? { state: "ok", sourceHash: b.sourceHash } : undefined;
+  if (b.state === "malformed") return { state: "malformed", why: typeof b.why === "string" ? b.why.slice(0, 120) : "" };
+  return undefined;
+}
+
 /** The code for a refused package. A set that disagrees with the shell is a
  *  mismatch, a browser that cannot hash the files is `unverifiable` (the files
  *  may be fine; neither sits in the fault rate), and files that did not arrive
@@ -140,13 +155,25 @@ export interface EngineBootState {
   /** Set once the engine save writer has turned itself off this page life
    *  (`vctowerWriter.ts`); absent until then. */
   writerLatched?: true;
+  /** The engine's identity record as the loaded package reports it
+   *  (`engineIdentity()`, #963), for About and Copy Diagnostics. Absent when
+   *  no engine loaded or the package has no such call. */
+  identity?: string;
+  /** What the engine binary's `verticopolis.build` section said (#963): the
+   *  hash of the Rust sources it was built from, `missing` or `malformed`.
+   *  Absent when the binary was never read (a TypeScript boot, or a load that
+   *  failed before the binary compiled). Read even when the engine then
+   *  failed to link, so About can say which build the failed binary was. */
+  binary?: BuildMetadataResult;
 }
 
 export interface EngineBootOptions {
   wasmOnly: boolean;
   /** Loads the engine. The signal fires at the time limit; the loader checks
-   *  it after each step and drops a result that arrives later. */
-  load: (signal: AbortSignal) => Promise<WasmModule>;
+   *  it after each step and drops a result that arrives later. `onBuild` gets
+   *  the binary's build metadata as soon as it is read, so a failure later in
+   *  the load still reports it. */
+  load: (signal: AbortSignal, onBuild: (build: BuildMetadataResult) => void) => Promise<WasmModule>;
   log?: Pick<Console, "error">;
   /** How long the load may take before boot gives up on it (ms). */
   timeoutMs?: number;
@@ -196,26 +223,29 @@ export async function loadBootEngine(opts: EngineBootOptions): Promise<EngineBoo
   const log = opts.log ?? console;
   const build = opts.wasmOnly ? "wasm-only" : "switchable";
   let mod: WasmModule;
+  let binary: BuildMetadataResult | undefined;
+  const binaryField = () => (binary === undefined ? {} : { binary });
   try {
     const attempt = new AbortController();
-    mod = await withTimeout(opts.load(attempt.signal), opts.timeoutMs ?? ENGINE_LOAD_TIMEOUT_MS, () => attempt.abort());
+    mod = await withTimeout(opts.load(attempt.signal, (b) => (binary = b)), opts.timeoutMs ?? ENGINE_LOAD_TIMEOUT_MS, () => attempt.abort());
   } catch (e) {
     if (!opts.wasmOnly) {
       // The fallback is recorded with its reason (#874) as well as logged.
       log.error("[wasm] the engine package did not load; running on the TypeScript engine:", e);
-      return { module: null, state: { build, engine: "ts", failure: bootFailure("load", e) } };
+      return { module: null, state: { build, engine: "ts", failure: bootFailure("load", e), ...binaryField() } };
     }
     log.error("[wasm] the engine package did not load, and this build has no other engine:", e);
-    return { module: null, state: { build, engine: "none", failure: bootFailure("load", e) } };
+    return { module: null, state: { build, engine: "none", failure: bootFailure("load", e), ...binaryField() } };
   }
   // Saves go through the engine's own writer (#935). A switchable build keeps
   // the TypeScript writer for a package without one; a wasm-only build needs it.
   if (opts.wasmOnly && !mod.encodeVctower) {
     const message = "the engine package has no save writer (encodeVctower); rebuild it";
     log.error(`[wasm] ${message}`);
-    return { module: null, state: { build, engine: "none", failure: { stage: "load", reason: "package-mismatch", message } } };
+    return { module: null, state: { build, engine: "none", failure: { stage: "load", reason: "package-mismatch", message }, ...binaryField() } };
   }
-  return { module: mod, state: { build, engine: "wasm", failure: null } };
+  const identity = readEngineIdentity(mod);
+  return { module: mod, state: { build, engine: "wasm", failure: null, ...(identity === undefined ? {} : { identity }), ...binaryField() } };
 }
 
 /** Mark a boot that loaded its engine but could not start or keep it. */

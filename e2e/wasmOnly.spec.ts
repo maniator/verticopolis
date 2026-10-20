@@ -45,7 +45,7 @@ test.describe("starts on the WASM engine", () => {
     await page.addInitScript(() => localStorage.setItem("vc.engine", "ts"));
     await page.goto("/?engine=ts");
     await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, { timeout: 30_000 });
-    expect(await bootState(page)).toEqual({ build: "wasm-only", engine: "wasm", failure: null });
+    expect(await bootState(page)).toMatchObject({ build: "wasm-only", engine: "wasm", failure: null });
     await expect(page.locator(".splash-version")).toContainText("WASM engine");
     await page.evaluate(() => document.getElementById("splash")?.remove());
     await page.evaluate(() => (window as any).game.setSpeed(1));
@@ -133,7 +133,7 @@ test.describe("never falls back to the TypeScript engine", () => {
     const failure = page.locator("#engine-failure");
     await expect(failure).toBeVisible({ timeout: 30_000 });
     await expect(failure).toHaveAttribute("data-stage", stage);
-    await expect(page.locator("#boot-fallback button")).toHaveText("Reload");
+    await expect(page.locator("#boot-fallback button:not([data-act])")).toHaveText("Reload");
     const state = await bootState(page);
     expect(state).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage } });
     expect(await page.evaluate(() => ({ game: !!(window as any).game, host: !!(window as any).__vcEngine }))).toEqual({ game: false, host: false });
@@ -146,6 +146,16 @@ test.describe("never falls back to the TypeScript engine", () => {
     const text = await expectStopped(page, "load");
     expect(text).toContain("could not start");
     expect(text).toContain("Reload the page to try again");
+    // Help cannot open here, so the stop screen carries Copy diagnostics (#963).
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t: string) => ((window as any).__copied = t) }, configurable: true });
+    });
+    await page.locator('#boot-fallback button[data-act="copy-diagnostics"]').click();
+    await expect(page.locator(".engine-failure-copy-status")).toHaveText("Copied.");
+    const copied = await page.evaluate(() => (window as any).__copied as string);
+    expect(copied).toContain("Failed at: load");
+    expect(copied).toContain("Engine in use: none");
+    expect(copied).toContain("Build: wasm-only");
   });
 
   test("a corrupted engine binary stops boot", async ({ page }) => {
