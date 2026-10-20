@@ -158,11 +158,6 @@ export function rustConstant(
   return Number(found[0][1]);
 }
 
-/** `SAVE_VERSION` as `engine-rs/src/sim.rs` declares it. */
-export function saveVersion(simSource: string): number {
-  return rustConstant(simSource, "SAVE_VERSION", "i64");
-}
-
 /** The crate version `engine-rs/Cargo.toml` declares in its `[package]` table. */
 export function cargoVersion(cargoToml: string): string {
   const pkg = /\[package\]([\s\S]*?)(?:\n\s*\[|$)/.exec(cargoToml)?.[1] ?? "";
