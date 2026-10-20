@@ -6,11 +6,12 @@ import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
 import { dualRunRequested, startDualRun, type DualRunApp } from "./dualrun/dualRun";
 import { engineRequested } from "./wasmhost/engineChoice";
-import { enginePackageUrl, loadWasmEngine, startWasmHost, type WasmHostApp } from "./wasmhost/startWasmHost";
+import { enginePackageUrl, loadWasmEngine, startWasmHost, type WasmHostApp, type WasmHostHandle } from "./wasmhost/startWasmHost";
 import { makeBrowserWorker, spawnEngineWorker, startWorkerHost, type SpawnedWorker, type WorkerHostHandle } from "./wasmhost/workerController";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { noteEngineFallback, noteEngineSettled, noteEngineWriterLatched } from "./analyticsEngineStatus";
 import { refreshSplashVersion } from "./wasmhost/engineLabel";
+import { isHostFault } from "./wasmhost/hostFault";
 import { ENGINE_FAILURE_ID } from "./game/interactionState";
 import { bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState, type FallbackReason } from "./wasmhost/engineBoot";
 
@@ -301,13 +302,25 @@ export function bootGame(create: () => BootApp): Promise<void> {
         };
         let hosted = false;
         try {
-          const handle = startWasmHost(app as unknown as WasmHostApp, wasmModule, console, {
-            // onFatal hears only a tower the host would not take.
+          let handle: WasmHostHandle | null = null;
+          handle = startWasmHost(app as unknown as WasmHostApp, wasmModule, console, {
+            // onFatal hears a tower the host would not take, and a running
+            // engine's fault (#874).
             ...(__WASM_ONLY__ ? { strict: true, onFatal: (m: string, reason: FallbackReason) => stopForEngine(starting ? "start" : "host", reason, m) } : {}),
             sync: !__WASM_ONLY__ && choice === "wasm-frame" ? "frame" : "step",
             // A later tower the host would not take is a fallback of its own;
-            // the first one is in the boot state the settle row reads.
-            onFallback: noteEngineFallback,
+            // the first one is in the boot state the settle row reads. A
+            // running engine's fault (#874) also turns the engine save writer
+            // off, since a trapped module may be corrupt.
+            onFallback: (fallback) => {
+              if (isHostFault(fallback.reason)) {
+                setEngineWriter(null);
+                // The boot state tooling and support read says so too (a
+                // wasm-only build records it through onFatal).
+                if (!__WASM_ONLY__) stopForEngine("host", fallback.reason, handle?.status.lastError ?? fallback.reason);
+              }
+              noteEngineFallback(fallback);
+            },
           });
           // A refused first tower: strict mode reported it through onFatal; a
           // switchable build leaves it on TypeScript, recorded here (#874).

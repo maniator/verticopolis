@@ -35,7 +35,7 @@ export const PRE_THREE_LIMITATION = "This is a pre-3.0 baseline of an engine sti
 
 /** What an A/A folder says in place of the cross-engine limitations. */
 export const aaLimitation = (aa: EngineName): string =>
-  `An A/A pass: ${aa === "wasm" ? "WASM" : "TypeScript"} ran in both slots. This folder is one input to the calibration summary (#1110) and sets no tolerance by itself. The limitations that describe two different engines are left out, and so are the rows only the ${aa === "wasm" ? "TypeScript" : "WASM"} engine produces and the cold WASM load steps.`;
+  `An A/A pass: ${aa === "wasm" ? "WASM" : "TypeScript"} ran in both slots. This folder is one input to \`npm run perf:calibrate\` and sets no tolerance by itself. The limitations that describe two different engines are left out, and so are the rows only the ${aa === "wasm" ? "TypeScript" : "WASM"} engine produces and the cold WASM load steps.`;
 
 /** What the WebGL renderers of the good runs mean for the frame rows (the protocol requires verified hardware). Each distinct renderer is classified on its own. */
 export function rendererLimitation(renderers: readonly string[], exception: string | null = null): string[] {

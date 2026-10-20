@@ -1,3 +1,4 @@
+import type { ChurnReport } from "./churn";
 import type { Environment } from "./env";
 import type { BundleReport } from "./bundle";
 import type { NodeCheck } from "./nodeCheck";
@@ -39,7 +40,7 @@ export interface StepSummary {
   stepMaxMs: number;
   /** From a separate wrapped pass (hosted WASM only); the timings above
    *  come from an unwrapped pass. */
-  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; wrappedTotalMs: number; merges: number; engineTicks: number; exportCalls: number; exportsWrapped: number } | null;
+  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; wrappedTotalMs: number; merges: number; engineTicks: number; exportCalls: number; exportsWrapped: number; byExport: Record<string, { calls: number; ms: number }>; parseMs: number; parseCalls: number } | null;
   engineActive: EngineName;
   hostErrorsAdded: string[];
   /** The loop began from a full GC (gc() was there). */
@@ -212,6 +213,8 @@ export interface CompareResults {
   browser: { version: string | null; headless: boolean; executable: string | null; channel?: string | null; args?: string[]; rendererException?: string | null; rendererExceptionSha256?: string | null; rendererExceptionCommit?: string | null; gpuVerified?: boolean };
   scenarios: { name: string; description: string; sha256: string; population: number; units: number; transports: number; saveBytes: number }[];
   nodeChecks: NodeCheck[];
+  /** Hourly save churn on the WASM engine in Node, per scenario. */
+  churn?: ChurnReport[];
   runs: ProcessRun[];
   bundle: BundleReport | null;
   /** The same totals for the VC_TOOLING=1 build the timings ran on. */

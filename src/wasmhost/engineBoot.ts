@@ -24,17 +24,20 @@ export type BootStage = "load" | "start" | "host";
  * engine message can quote a tower name or a path.
  *
  * Boot sends the first five, plus `other` for a boot step outside the engine
- * that failed after the worker host started (the host is let go). The trap
- * codes are reserved for the runtime fallback (#874), which also sends
- * `other`, so the list is fixed before the field ships.
+ * that failed after the worker host started (the host is let go). The
+ * runtime fallback (#874) sends the trap codes for a running engine's fault
+ * in a command (the undo capture's save just before an edit included), a
+ * tick, a frame sync or the event drain, or an undo or redo, and `other` for
+ * a save or the reads when a tower is let go.
  */
 export const FALLBACK_REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"] as const;
 export type FallbackReason = (typeof FALLBACK_REASONS)[number];
 
 /** Where a fallback happened: loading the package, starting the host on the
  *  first tower, or a later tower the host was handed (a load or a new game,
- *  or an undo restore). Closed like {@link FALLBACK_REASONS}; #874 adds its
- *  runtime stages here. */
+ *  or an undo restore). Closed like {@link FALLBACK_REASONS}. A running
+ *  engine's fault (#874) takes the stage of how its tower was hosted, so the
+ *  trap code says which path failed and the stage on which kind of tower. */
 export const FALLBACK_STAGES = ["none", "load", "start", "adopt", "undo"] as const;
 export type FallbackStage = (typeof FALLBACK_STAGES)[number];
 

@@ -53,6 +53,21 @@ Internal-only work needs no bump.
 
 - [ ] Bumped `version` (minor / patch), **or** this change is internal-only and needs no bump
 
+## Complexity
+
+<!--
+A change to a hot-path surface (section 1 of docs/performance/hot-path-review.md:
+either engine and its build, the WASM binding, the hosts, saves, rendering, the
+frame loop, UI, analytics, audio and the app shell) fills in the note from
+section 5 of that page: hot paths and callers, sizes, complexity before and
+after, remaining scans and why, TypeScript caches compared, invalidation
+evidence, measurements. A significant change (section 5) gives every field.
+Any other change, or a hot-path change section 5 does not count as significant,
+may replace the line below with "n/a: <reason>".
+-->
+
+Hot paths touched, sizes, complexity before and after, remaining scans and why:
+
 ## Screenshots / recordings
 
 <!--

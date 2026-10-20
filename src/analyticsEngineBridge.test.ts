@@ -276,6 +276,15 @@ describe("analytics engine bridge", () => {
     expect(sent()).toEqual([["star_reached", { star: 4 }]]);
   });
 
+  it("asks the source to let go of held events at the session's own flushes, and only there (#874)", () => {
+    const calls: unknown[] = [];
+    bindEngineBridge(() => ({ drainGameplayEvents: (opts?: unknown) => (calls.push(opts), []), gameplayEventsDropped: 0, gameplayEvents: { discardOnHandOff: false } }));
+    drainEngineEvents({ drainGameplayEvents: (opts?: unknown) => (calls.push(opts), []), gameplayEventsDropped: 0, gameplayEvents: { discardOnHandOff: false } });
+    gameplaySession.end(); // a hide: the report folds the engine's last events
+    gameplaySession.startEpoch(); // a window closing: dropped unsent
+    expect(calls).toEqual([undefined, { release: true }, { release: true }]);
+  });
+
   it("refills the removal budget when a window closes", () => {
     bindEngineBridge(() => source([]));
     for (let i = 0; i <= REMOVAL_SEND_LIMIT; i++) forwardGameplayEvents([removed("office", "bulldoze")], 5);

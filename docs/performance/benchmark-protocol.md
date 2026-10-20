@@ -49,8 +49,8 @@ reference only when the browser build, the channel, the switches and the
 renderer all match. The references are the 2026-10-15 runs, RUN-0a, the A/A
 folders of one calibration and any earlier acceptance run. When any of those
 differ, the reference is run again on the same settings before it is used.
-`--resume` refuses a change of any of them. `perf:calibrate` (not yet, #1124)
-will refuse passes that differ in them and passes without a verified GPU.
+`--resume` refuses a change of any of them. `perf:calibrate` refuses passes
+that differ in them and passes without a verified GPU (`gpuVerified`).
 
 What the references ran, from their committed `results.json` files: the two
 2026-10-15 folders (`2026-10-15-e25ec01-worker` and
@@ -209,12 +209,14 @@ that has the check.
 ### Machine state
 
 AC power; Windows in its best-performance power mode; nothing else building,
-testing or benchmarking; every browser and editor window closed; the ChatGPT
-desktop app and the NVIDIA Overlay closed; no antivirus scan running. Sample
-the idle CPU load just before the start and record it in the notes. Note
-anything unusual (a Windows update pending, thermal state) in the run's
-notes. The harness records CPU, memory, OS build, GPU, Node, Rust,
-wasm-bindgen, Playwright and browser versions in `results.json`.
+testing or benchmarking; no local model inference, model download or other
+heavy agent work (the owner's rule, 2026-10-20); every browser and editor
+window closed; the ChatGPT desktop app and the NVIDIA Overlay closed; no
+antivirus scan running. Sample the idle CPU load just before the start and
+record it in the notes. Note anything unusual (a Windows update pending,
+thermal state) in the run's notes. The harness records CPU, memory, OS
+build, GPU, Node, Rust, wasm-bindgen, Playwright and browser versions in
+`results.json`.
 
 ## 2. Preconditions
 
@@ -242,9 +244,43 @@ A run proves it measured the commit it names.
    record only: the build embeds the builder's cargo registry paths, so the
    binary differs across machines for the same sources (#1079).
 5. **A dirty tree voids the run.** The one exception is RUN-0a's declared
-   patch (section 7). The notes paste `git status --porcelain` and the patch's
-   SHA-256. Not yet: the harness does not record the declared patch's SHA-256
-   or the porcelain output itself; B3's harness PR adds both.
+   patch (section 7). A harness at or after the cost-split PR (#1124) records
+   what git reports in `environment.tree` and prints it in the report as a
+   "Working tree" row: the `git status --porcelain` lines, the SHA-256 of the
+   tracked changes, the SHA-256 of each untracked file, and the tracked files
+   marked assume-unchanged or skip-worktree (git hides edits to those from
+   status and diff, so any such file makes the tree dirty). `docs/performance/results`
+   is left out of all four. A clean tree prints "clean" only when the record
+   is complete.
+   The tracked-changes hash is the SHA-256 of the raw bytes of
+   `git -c diff.suppressBlankEmpty=false -c core.compression=-1 -c core.quotepath=true diff HEAD --binary --full-index --no-color --no-ext-diff --no-textconv --no-renames --src-prefix=a/ --dst-prefix=b/ -U3 --inter-hunk-context=0 --diff-algorithm=myers --indent-heuristic -O/dev/null --ignore-submodules=none -- . ':(exclude)docs/performance/results'`
+   with `GIT_DIFF_OPTS` removed from git's environment, which fixes the common
+   settings (context lines, algorithm, colors, renames, prefixes); a diff
+   driver from `core.attributesFile` or `.git/info/attributes` still changes
+   the output. The same command piped to `sha256sum` reproduces the hash on
+   the same machine (on Windows, run the command from Git Bash so
+   the bytes are not re-encoded). The hash identifies a tree on one machine
+   under one git configuration; it is not promised to match another
+   machine's. With `core.autocrlf=true` git normalizes tracked files to LF
+   before it diffs them, and untracked files are hashed as the raw bytes on
+   disk, so a CRLF checkout can hash an untracked file differently from an LF
+   one. A symlink is hashed as `symlink:` plus its target text. The record is **incomplete**
+   (and the run void) when git fails, a file cannot be read or is over
+   256 MiB; the report says so instead of printing "none", and
+   `perf:compare` and `perf:worker` each record a validation error for it and
+   print the same report text. It holds
+   what git reports: ignored files and a mode change under
+   `core.fileMode=false` fall outside it (backlog row #1123).
+   A tree holding exactly RUN-0a's patch (SHA-256 `cf781ee6…d73a1`) on
+   `e25ec01` with `build.ts` untracked records the status
+   ` M src/tests/perfCompare/main.ts`, ` M src/tests/perfWorker/main.ts` and
+   `?? src/tests/perfWorker/build.ts`, tracked changes
+   `de44774bc060738a5d83e231198d4c5ddb57b153a609370aa0419e58b85532b7` and
+   `build.ts` `e1c69bac2a055a193ecf9d13f032c63df5c6781114680b8b915426e64ba55ec3`.
+   Those hashes were computed by hand on a fresh Linux worktree with LF
+   endings, with the flags above; no test pins them.
+   The `e25ec01` harness itself predates the record, so for RUN-0a the notes
+   paste `git status --porcelain` and the patch's SHA-256 by hand.
 
 ## 4. Runs
 
@@ -258,12 +294,18 @@ and large scenarios with their pinned scenario hashes.
 | --- | --- |
 | `npm.cmd run perf:worker -- --reps 10 --viewport 1280x720 --out docs/performance/results/<date>-<sha>-<label>-worker-1280x720` | Bare engine, the four hosts, frames, memory and traffic. Always pass `--viewport 1280x720`: the harness default is 640x360, and the committed desktop acceptance run (`2026-10-15-e25ec01c-worker-1280x720`) used 1280x720. `perf:compare` renders at 1280x720 fixed and has no `--viewport` flag |
 | `npm.cmd run perf:compare -- --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-<label>` | Startup, hosted and bare engine, frames with and without audio, memory, transfer and build sizes. Run it after `perf:worker`; `--skip-build` checks the builds on disk are this commit's |
+| `npm.cmd run perf:restore -- --reps 10` | The runtime fallback's restore points (#874) on the hosted engine alone, unpaired: engine saves beyond the merges' and the hosted saves (expected 0), every engine save per command and its time, the event reads' time and share of a step, what one restore point and one restore cost on each tower, and step times for plain frames, a drag, a click and rapid edits (an undo capture and a build per frame), each frame ending with the event drain. Writes `docs/performance/results/<date>-<sha>-restore-points/`. It builds into `dist-perf/` as `perf:compare` does, and after a `perf:compare` run on the same commit `--skip-build` reuses that build |
 
 Other flags both accept: `--quick` (a 2-rep smoke test that never counts),
 `--resume DIR` (continue a run that stopped; it keeps its own folder, and an A/A folder resumes with `--aa <engine>` repeated),
 `--scenarios a,b`. `perf:compare` also takes `--throttles 1,4` and
 `--aa ts|wasm` (section 6.1);
 `perf:worker` also takes `--read-model` (Node only, no browser).
+`perf:restore` takes `--quick`, `--scenarios`, `--throttles`, `--skip-build`
+and `--out`, but not `--resume`: a stopped run starts again in a new folder,
+and its `results.json` keeps the runs it finished. In PowerShell, quote a
+list (`--scenarios "small,large"`): an unquoted comma makes an array, which
+reaches the script as separate arguments.
 
 A results folder is `docs/performance/results/<date>-<sha>-<label>/` with the
 raw samples and the machine-written `report.md`, its snapshot header on top,
@@ -287,10 +329,14 @@ three into warnings, and the report says so at the top.
 
 - **Orientation.** Every gate ratio is written so that above 1.0 means WASM is
   worse: WASM ÷ TypeScript for times, memory and long tasks; TypeScript ÷ WASM
-  for frame rates. Not yet: `perf:worker`'s report still leads with
-  TypeScript ÷ WASM (its `ratios.csv` has both) and `perf:compare` already
-  prints WASM ÷ TypeScript. B3's harness PR makes both lead with the gate's
-  orientation. Until then, invert before comparing to a pass rule.
+  for frame rates. `perf:worker`'s report puts a gate column in that
+  orientation (`wasm / ts`, and `ts / wasm` for rates) right after the
+  metric, then the per-mode values, then the other modes over the shipped host
+  as measured (for a rate, above 1.0 there is better); its `ratios.csv` has
+  every pairing. Not yet: `perf:compare` still prints WASM ÷ TypeScript for
+  every row, rates included (follow-up #1123), so above 1.0 on its mean FPS
+  and 1% low FPS rows is better there: invert those before applying a pass
+  rule. `perf:calibrate` inverts 1% low FPS itself.
 - **Intervals.** Ratios are paired by repetition. The interval is the
   distribution-free 95% order-statistic interval over the paired ratios. A
   verdict needs at least 10 valid pairs.
@@ -309,16 +355,16 @@ every desktop metric at both throttles. A speed metric passes only when the
 bound below 1.0 is "beat". Tolerances come from measured noise (section 6.1),
 never from a number picked to pass.
 
-| # | Metric | Scenarios | Pass rule |
-| --- | --- | --- | --- |
-| M1 | Bare engine, 720 steps | medium, large; 1x, 4x | Ratio upper bound at most 1 + δ |
-| M2 | Hosted main-thread time, 720 steps | medium, large; 1x, 4x | As M1 |
-| M3 | Frame time p99, and 1% low FPS | medium, large; 1x, 4x | As M1, for each |
-| M4 | Main-thread blocking (long tasks past 50 ms) | large; 1x, 4x | Paired difference upper bound at most ε |
-| M5 | Cold start to ready | 1x, 4x | Paired difference upper bound at most that throttle's ε |
-| M6 | Peak JS heaps plus WASM linear memory | large; 1x, 4x | Ratio upper bound at most 1.25 (a memory ceiling, outside δ) |
-| M7 | 5,000+ population fixture in `npm run perf` | CI | A CI tripwire, read on the candidate commit's CI run. Not a desktop metric |
-| M8 | Scripted build-and-demolish scene (PF2) | large; 1x, 4x | Frame p99 as M1, long tasks as M4. Own δ and ε, fixed when PF2 lands |
+| # | Metric | Scenarios | Pass rule | Harness |
+| --- | --- | --- | --- | --- |
+| M1 | Bare engine, 720 steps | medium, large; 1x, 4x | Ratio upper bound at most 1 + δ | `perf:compare` |
+| M2 | Hosted main-thread time, 720 steps | medium, large; 1x, 4x | As M1 | `perf:compare` |
+| M3 | Frame time p99, and 1% low FPS | medium, large; 1x, 4x | As M1, for each | `perf:compare` |
+| M4 | Main-thread blocking (long tasks past 50 ms) | large; 1x, 4x | Paired difference upper bound at most ε | `perf:worker` |
+| M5 | Cold start to ready | 1x, 4x | Paired difference upper bound at most that throttle's ε | `perf:compare` |
+| M6 | Peak JS heaps plus WASM linear memory | large; 1x, 4x | Ratio upper bound at most 1.25 (a memory ceiling, outside δ) | `perf:worker` |
+| M7 | 5,000+ population fixture in `npm run perf` | CI | A CI tripwire, read on the candidate commit's CI run. Not a desktop metric | — |
+| M8 | Scripted build-and-demolish scene (PF2) | large; 1x, 4x | Frame p99 as M1, long tasks as M4. Own δ and ε, fixed when PF2 lands | — |
 
 M5 replaces the old fixed 500 ms cold-start allowance, which would let a
 measured regression pass. A failed verdict stands: a run is repeated only
@@ -331,20 +377,34 @@ against `ts`) with the verdict runs' repetition count. Identical engines
 straddle 1.0, so a tolerance of zero could never pass; the A/A spread is the
 noise the tolerance has to cover.
 
-1. Run **at least five A/A passes per engine**, at 1x and 4x, each with 10
-   repetitions, on the medium and large scenarios.
-2. Each ratio family gets its own δ: M1 and M2 (times), M3 (frames). The
+1. Run A/A passes of each engine at 1x and 4x, each with 10 repetitions (the
+   verdict runs' count: a pass with another count does not pool with them) on
+   the medium and large scenarios. How many passes per engine is a parameter of
+   `perf:calibrate` (`--min-passes`, default 5), because step 3 ties the count
+   to a coverage limit the owner sets (an open amendment to OD-4).
+2. Each ratio family gets its own δ: one for M1 (time), one for M2 (time) and
+   one for M3 (frames). The
    value is the smallest round number that clears the largest A/A upper bound
    across both engines and both throttles. ε does the same for the paired
    differences: one ε for M4's long tasks, and one for M5's cold start at each
-   throttle.
-3. **Exceedance check.** With the pass count chosen, estimate how often a
-   stable harness would exceed each tolerance: the share of A/A passes whose
-   upper bound lands above the candidate value, leaving one pass out in turn
-   (leave-one-out, so the pass that sets the tolerance cannot vouch for
-   itself). Add passes until that share is **under 5%** for every family.
-   With five passes, one exceedance is 20%, so five is the floor and the usual
-   answer is more.
+   throttle, taken as the upper bound of the 95% order-statistic interval of
+   the median paired difference (WASM slot minus TypeScript slot, one-sided).
+   Not yet: the verdict report has to print that same statistic before M5 can
+   be judged against ε.
+3. **Coverage.** For passes that are exchangeable, on average over
+   the draw of the passes, a fresh pass lands above the largest of n passes
+   with probability 1/(n + 1) (before rounding).
+   `perf:calibrate` computes that from the engine with the fewest passes and
+   states it as the guarantee. A 5% limit needs at least 20 passes per
+   engine. Five passes guarantee only 1/6, about 16.7%, so with five the tool
+   reports the calibration as not adoptable. The pass count and the limit are
+   the owner's to change (an open amendment to OD-4); `--min-passes` and
+   `--exceedance-limit` can state a looser pair, and the tool then marks the
+   result as not adoptable until the owner approves it. A leave-one-out
+   column runs beside it for information: it leaves each pass out in turn and
+   asks whether that pass lands above the candidate the others set. Only the
+   largest pass can, so it reads 0 or 1. It never blocks adoption and does not
+   replace the guarantee.
 4. **Caps.** A δ above **0.05**, a long-task ε above **50 ms** of blocking
    (one 100 ms task), or a cold-start ε above **5% of TypeScript's median cold
    start** at that throttle is not adopted. Add repetitions or remove the
@@ -354,6 +414,12 @@ noise the tolerance has to cover.
    calibration run's folder.
 6. RUN-3 repeats one A/A pass per engine beside the verdict. An A/A pass
    outside δ or ε goes to the owner, who decides whether RUN-3 stands.
+
+`perf:calibrate` takes only A/A folders and refuses any folder that does not
+record `gpuVerified: true`, so the 2026-10-15 references, which predate
+`gpuVerified`, the channel and switches record, and the end-of-run renderer
+reads, cannot feed a calibration. It checks all three renderer reads (start,
+after the frames, after the throttled cold start).
 
 `perf:compare --aa ts|wasm` runs one engine in both slots. `results.json`
 records it in `config.aa`, and each run records the slot (`engine`) and the
@@ -391,27 +457,67 @@ compared in an A/A folder. An `--aa ts` pass still needs the WASM package
 and the Node check of both engines to pass, because the harness validates the
 whole setup.
 
-Two limits are open, so the calibration is not complete:
+`npm run perf:calibrate -- <A/A folder>... --out <dir>` (`npm.cmd run
+perf:calibrate` in PowerShell) applies steps 1 to 4 to a set of
+`perf:compare` A/A folders and writes `calibration.json` and `calibration.md`
+into the new `--out` folder. `--min-passes N` sets the passes asked for per
+engine (default 5) and `--exceedance-limit X` the coverage limit (default
+0.05).
 
-- **δ and ε are adopted only from the calibration summary** that applies steps
-  1 to 4 to a set of A/A folders (follow-up #1110). RUN-0b may collect the
-  folders. Nobody reads values off them by hand.
+It leaves out a folder that is not an A/A pass, failed validation, ran on a
+dirty tree or without a complete working-tree record (section 3 step 5,
+including files git was told to ignore changes in), is a `--quick` run, had
+fewer than 10 repetitions, lacks the medium and large scenarios at 1x and 4x,
+did not render on a verified hardware GPU (the check in "The renderer must be
+the GPU", at the start and the end of each process run; a declared renderer
+exception also leaves a pass out), or repeats another folder (the same
+`results.json` once parsed and written back with sorted keys, so a re-save
+with other line endings or indentation counts as the same file, or the same
+start time, commit and engine). It raises a problem when the passes it keeps
+differ in commit, machine and runtime (CPU, logical CPUs, memory, OS, kernel,
+architecture, Node, Rust, Playwright), browser (executable, channel,
+switches, version, renderers), engine build, or run parameters (the whole
+configuration except the A/A engine and the quick flag: repetitions,
+scenarios, throttles, steps, step size, frame window, speed, viewport and
+warm-up).
+
+Per pass it takes each family's value as the largest upper bound across the
+medium and large scenarios at 1x and 4x (other scenarios and throttles in a
+folder do not feed it), and a ratio cell with fewer than 10 valid pairs
+leaves that family without a candidate for every pass. The candidate is the
+largest such value rounded up (δ to 0.01, ε to 5 ms, never below one step).
+It holds the candidate to its cap, states the guarantee of step 3 and runs
+the informational leave-one-out column. Any folder it leaves out is listed in
+`calibration.md` and `calibration.json` with the reason, and the output keeps
+each input's canonical `results.json` SHA-256. It reads 1% low FPS as
+TypeScript over WASM. It exits 0 only when nothing was left out, no problem
+was raised, and every family has a candidate inside its cap with the
+guarantee under the limit and the protocol's pass count and limit in use. `calibration.md` opens
+with the window of the passes (earliest and latest start) and the commit,
+because it is a snapshot, and calls the numbers provisional: it covers M1,
+M2, M3 and M5; M4's long-task ε needs `perf:worker` A/A passes (`perf:worker`
+has no `--aa` yet, follow-up #1111), and nothing in it sets a tolerance until
+the owner adopts the numbers.
+
+The harness for each metric is the last column of the table above: a tolerance
+calibrated on one harness's noise is not applied to the other's ratios, and
+RUN-0a's reference figures come from `perf:worker`. Nobody reads δ or ε off
+the folders by hand: RUN-0b collects them and the values come from
+`perf:calibrate`'s output.
+
+One limit stays open, so the calibration is not complete:
+
 - **M4's ε has no A/A source yet.** `perf:compare` measures no long tasks and
   `perf:worker` has no `--aa` (follow-up #1111), so the long-task ε stays
   uncalibrated until that lands. RUN-1 needs M4, so #1111 and its A/A passes
   land before RUN-1, either inside RUN-0b or as a follow-on campaign.
-- **The harness for each metric.** The reference figures of RUN-0a come from
-  `perf:worker`, and the calibration summary reads `perf:compare` folders. A
-  tolerance calibrated on one harness's noise is not applied to the other's
-  ratios, so the summary calibrates per harness and the table in section 6
-  names the harness for each metric (recorded in #1110).
 
 ## 7. Scheduled runs
 
 | Run | Commit | Purpose |
 | --- | --- | --- |
 | RUN-0a | `e25ec01` | Does the desktop reproduce 702 ms (TS) and 830 ms (WASM) on the large tower's 720 bare steps at 1x, inside the committed intervals? |
-| RUN-0b | `main` once PRs #1097, #1098 and the cost-split harness PR are merged, and A5's design rule is committed | The baseline later runs compare with: the shipping host's cost split and each hour's churn, and the A/A passes of section 6.1 (folders only; the values come from the calibration summary, #1110) |
+| RUN-0b | `main` once PRs #1097, #1098 and #1124 (the cost-split harness) are merged, and A5's design rule is committed | The baseline later runs compare with: the shipping host's cost split and each hour's churn, and the A/A passes of section 6.1 (folders only; the values come from `perf:calibrate`) |
 | RUN-1 | after S6 | The shipping host after S6; the input to cohort stage 3 (M2 to M6 at 1x and 4x) |
 | RUN-2 | after #1051 (and #859), and the cold-start fix if needed | Bare tick parity and cold start |
 | RUN-3 | the candidate commit | The gate verdict with one A/A pass per engine beside it |
@@ -468,8 +574,8 @@ narrower, and a run is reported against both when a reader asks.
 
 ### RUN-0b, exact steps
 
-Run it after the harness PR with the cost split is merged. A/A mode has
-landed; that PR's description completes the commands. The shape:
+Run it after #1124 (the harness with the cost split) is merged. A/A mode has
+landed. The shape:
 
 ```powershell
 git -c core.autocrlf=false clone https://github.com/maniator/verticopolis.git "C:\Users\nafta\projects\vc-run0b"
@@ -481,7 +587,9 @@ npm.cmd ci
 npm.cmd run wasm:build
 npm.cmd run perf:worker  -- --reps 10 --viewport 1280x720 --out docs/performance/results/<date>-<sha>-run0b-worker-1280x720
 npm.cmd run perf:compare -- --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b
-# A/A passes: five or more per engine, same flags
+# A/A passes: as many per engine as section 6.1 step 3 asks for (an open amendment to OD-4), same flags.
+# Calibrate them with:
+# npm.cmd run perf:calibrate -- <folders> --out docs/performance/results/<date>-<sha>-calibration
 npm.cmd run perf:compare -- --aa ts   --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b-aa-ts-1
 npm.cmd run perf:compare -- --aa wasm --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b-aa-wasm-1
 ```
@@ -493,10 +601,41 @@ renderer line. The 10-rep commands start only after it names a hardware adapter.
 harnesses repeat the check before they build and stop on anything else.
 
 Start RUN-0b only after A5's design rule is committed (plan section 5.2).
-RUN-0b also records the shipping host's main-thread cost split (engine step,
-per-step sync, hourly serialize, parse and merge) and each hour's churn. Not
-yet: the harness reports the first three partly (`perf:worker` times the
-hosts; the split into sync, serialize and merge is B3's harness PR).
+RUN-0b also records the shipping host's main-thread cost split and each
+hour's churn, both from `perf:compare`:
+
+- **Cost split.** The hosted WASM scenarios run once more with a timer on the
+  engine's tick, on every other export the host calls and on `JSON.parse`.
+  The report lists, as shares of that pass's step time, the engine step
+  (`share in the engine's tick`), the hourly serialize, the per-step sync
+  reads (every export except tick and serialize), `JSON.parse`, and the merge
+  and the rest of host JS. Within one pass the five add up to one. The
+  report shows the median of each across repetitions, and medians do not add
+  up exactly, so the five rows can sum to a little under or over one.
+  `results.json` keeps every export's call count and time
+  (`attribution.byExport`). Only the outermost wrapped call is timed and
+  `JSON.parse` is timed outside the wrapped exports, so no time lands in two
+  parts. Each part is clamped into the category it belongs to, so the five add
+  up to one even when timer noise makes them overlap. Host JS that a per-step
+  sync does outside an export call lands in "merge and the rest". The wrappers
+  cost time, and the per-call timer weighs more on a part with many small
+  calls (`JSON.parse`), so the shares are approximate. The timed passes run
+  separately and carry no timers.
+- **Churn.** The "Hourly save churn" section is the share of the save's unit
+  text that changes from one in-game hour to the next on the WASM engine in
+  Node. The denominator is the unit text of the later hour's save plus the text
+  of units that disappeared since the earlier hour (a unit that disappears
+  counts as changed at its old size). The hours are 60 in-game minutes of steps counted from the end of
+  the warm-up steps, so they start where the scenario starts and not at a clock
+  hour (the medium tower starts at :57.47). Every window holds one hour pass,
+  at the same position, but that position is the scenario's own. A step that
+  does not divide an hour is refused. The character counts leave out the keys
+  and punctuation between units, so they are smaller than the serialized
+  save. The unit definition is in `src/tests/perfCompare/churn.ts`. This
+  is a different measure from `perf:worker --read-model` in
+  `docs/architecture/read-model-deltas.md`, which counts changed units per
+  merge on the TypeScript engine. A5's design rule reads RUN-0b's WASM
+  numbers on the large tower.
 
 ## 8. After a run
 
