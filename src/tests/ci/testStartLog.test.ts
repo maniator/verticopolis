@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -15,9 +15,9 @@ import { testStartLine } from "./testStartLine";
 const read = (rel: string) => readFileSync(resolve(repoRoot, rel), "utf8");
 
 describe("testStartLine", () => {
-  it("names the file and the suites and test, with the time", () => {
-    expect(testStartLine("a.test.ts", ["group", "case"], new Date("2026-10-20T17:03:09Z"))).toBe(
-      "[17:03:09] test start a.test.ts > group > case\n",
+  it("names the file and the suites and test, with the time and the worker's pid", () => {
+    expect(testStartLine("a.test.ts", ["group", "case"], new Date("2026-10-20T17:03:09Z"), 4242)).toBe(
+      "[17:03:09 pid 4242] test start a.test.ts > group > case\n",
     );
   });
 });
@@ -44,6 +44,17 @@ describe("CI wiring for the stall log", () => {
     });
   }
 
+  it(".github/workflows/test.yml: the WASM parity step turns the start log on, so its worker setup file is not inert", () => {
+    const text = read(".github/workflows/test.yml");
+    const at = text.indexOf("- name: Run ${{ matrix.project }} on the WASM engine");
+    expect(at).toBeGreaterThan(0);
+    const rest = text.slice(at + 1);
+    const next = rest.search(/\n {6}- /);
+    const step = rest.slice(0, next < 0 ? undefined : next);
+    expect(step).toMatch(/VC_REQUIRE_WASM: "1"/);
+    expect(step).toMatch(/VC_LOG_TEST_STARTS: "1"/);
+  });
+
   it("the vitest projects that run the engine tests load the setup file", () => {
     const config = read("vite.config.ts");
     expect(config).toContain('const setupFiles = ["src/tests/viewWorldSetup.ts", "src/tests/parity/wasmHostSetup.ts", "src/tests/ci/testStartLogSetup.ts"]');
@@ -52,7 +63,7 @@ describe("CI wiring for the stall log", () => {
 });
 
 describe("the log in a real run", () => {
-  it("writes a test's line before its body runs, so a run killed mid-stall still names it", () => {
+  it("writes a test's line before its body runs, so a run killed mid-stall still names it", async () => {
     const dir = mkdtempSync(resolve(tmpdir(), "start-log-"));
     try {
       const setup = resolve(repoRoot, "src/tests/ci/testStartLogSetup.ts");
@@ -66,16 +77,36 @@ describe("group", () => {
 });
 `,
       );
-      const r = spawnSync(
-        process.execPath,
-        [resolve(repoRoot, "node_modules/vitest/vitest.mjs"), "run", "--root", dir, "--config", resolve(dir, "vitest.config.mjs")],
-        { encoding: "utf8", env: { ...process.env, VC_LOG_TEST_STARTS: "1" }, timeout: 10_000, killSignal: "SIGKILL" },
-      );
-      const starts = `${r.stdout}\n${r.stderr}`.split("\n").filter((l) => l.includes("test start"));
-      expect(starts.map((l) => l.replace(/^\[[\d:]+\] /, ""))).toEqual([
+      // The run is killed as soon as the spinning test's line appears (its own group dies with it), which is the stall the log exists for; the spin only bounds a failure.
+      const child = spawn(process.execPath, [resolve(repoRoot, "node_modules/vitest/vitest.mjs"), "run", "--root", dir, "--config", resolve(dir, "vitest.config.mjs")], {
+        env: { ...process.env, VC_LOG_TEST_STARTS: "1" },
+        detached: true,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let out = "";
+      const seen = new Promise<void>((done) => {
+        const take = (chunk: Buffer) => {
+          out += chunk.toString("utf8");
+          if (out.includes("spins in one call")) done();
+        };
+        child.stdout.on("data", take);
+        child.stderr.on("data", take);
+        child.on("exit", () => done());
+      });
+      const timer = setTimeout(() => process.kill(-child.pid!, "SIGKILL"), 20_000);
+      await seen;
+      clearTimeout(timer);
+      try {
+        process.kill(-child.pid!, "SIGKILL");
+      } catch {
+        // already gone
+      }
+      const starts = out.split("\n").filter((l) => l.includes("test start"));
+      expect(starts.map((l) => l.replace(/^\[[\d:]+ pid \d+\] /, ""))).toEqual([
         "test start spin.test.mjs > group > quick one",
         "test start spin.test.mjs > group > spins in one call",
       ]);
+      expect(starts.every((l) => /^\[\d\d:\d\d:\d\d pid [1-9]\d*\] /.test(l))).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
