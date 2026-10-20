@@ -362,7 +362,9 @@ A refusal throws `EnginePackageMismatch` (or `EnginePackageUnverifiable`)
 carrying `file` (`glue`, `wasm` or `build-record`), the expected and found
 digests (12 hex digits each), the expected `package` id, the served one when
 `BUILD.json` named one, and whether a worker controlled the page
-(`navigator.serviceWorker.controller !== null`).
+(`navigator.serviceWorker?.controller != null`; `navigator.serviceWorker` is
+undefined when service workers are disabled or the context is insecure, and
+that must not throw before the refusal is built).
 
 `EngineBootFailure` gains a `reason` code for the load stage:
 `load-failed`, `timeout`, `mismatch`, `unverifiable` and `no-save-writer`.
@@ -396,9 +398,13 @@ else in the body is made inert while the failure shows.
 **Corrupted-entry recovery.** A normal Reload does not repair an existing
 corrupted Cache Storage response: Workbox integrity is checked on network
 fetches only; a cache hit is returned as stored. The explicit online **Repair engine files**
-action writes only precache keys for the three engine URLs under this
-deployment's exact origin and base path, including their Workbox revision
-query variants. Restrict cache names to this app's Workbox precache namespace;
+action writes only the precache keys of the running build: the three engine
+URLs under this deployment's exact origin and base path, with the Workbox
+revision this shell was built for. Every worker version shares one precache,
+so a waiting worker's engine entries sit beside them under other revision
+keys. Repair never deletes, rewrites or repopulates those; a waiting build
+keeps its own valid set and can still cold-start offline once it activates.
+Restrict cache names to this app's Workbox precache namespace;
 leave other applications' caches, all shell/audio entries, IndexedDB,
 localStorage and saves alone. Do not unregister workers or clear site data.
 Repair replaces in place and never deletes first. For each of the three
@@ -412,8 +418,9 @@ flaky connection. After the writes, request one registration update check and
 offer Reload; never promise that the live deployment has been repaired. A
 different live deployment may still fail until its worker activates, and a
 broken live deployment remains refused after repair.
-Deleting engine revisions can affect another tab or a waiting install;
-their integrity checks and the page byte gate must still refuse any mix.
+Because Repair touches only the running build's keys, another tab or a
+waiting install is not affected by it; their integrity checks and the page
+byte gate still refuse any mix.
 Repair never activates a worker itself or triggers an automatic reload.
 
 Rules for both:
@@ -469,11 +476,16 @@ Rules for both:
     attaches a host, ticks, logs an unhandled rejection, or leaks a Blob URL;
   - no `crypto.subtle` gives `unverifiable`; `__ENGINE_PACKAGE__ === null`
     refuses;
+  - `navigator.serviceWorker` undefined (service workers disabled or an
+    insecure context) still yields the `unverifiable` refusal with the
+    diagnostics `controlled: false`, not a TypeError;
   - a fetcher that returns glue A, then binary B (the R3 shape) refuses.
 - `engineBoot`: every reason in section 5.4 in both build modes, including
   existing switchable save-writer behavior; reason-specific copy online and
   offline, unavailable ids, alert role, focus and Copy Diagnostics.
-- Repair: exact base-path/cache-namespace selection, revision variants,
+- Repair: exact base-path/cache-namespace selection, the running build's
+  revision keys only (other revision variants, including a waiting worker's,
+  untouched),
   a failed or digest-failing fetch leaving the old entry untouched, a
   failure partway through the three files, failed update check, and no
   saved-data mutation.
@@ -552,7 +564,9 @@ Specs:
    Offline, or with the engine fetch blocked, Repair stops at the first
    failed fetch and every existing entry is unchanged. A corrupt live
    response stays refused with no retry loop. Repeat with another A tab and
-   a waiting B worker: no tab may run mismatched bytes during repair.
+   a waiting B worker: no tab may run mismatched bytes during repair, B's
+   engine entries are byte-identical before and after Repair, and after B
+   activates the page cold-starts offline on B's engine.
 9. **First-install race.** Start with an empty profile and no registration.
    Serve A's worker with B's engine response during installation. Assert the
    installer becomes redundant, the page stays uncontrolled, and no B bytes
@@ -612,12 +626,7 @@ with the A-then-B fetcher covers its logic.
   engine cache keys with the first schema 2 worker or purges the three
   engine keys at its first activation; until then the page byte gate refuses
   such a set and Repair fixes it. Players on older workers (R7) are
-  unaffected until they update. Workbox returns an already cached entry without checking
-  integrity, so a mixed set stored by a pre-integrity worker would survive
-  the update: the implementation either changes the engine cache keys with
-  the first schema 2 worker or purges the three engine keys at its first
-  activation. Until then the page byte gate refuses such a set and Repair
-  fixes it.
+  unaffected until they update.
 - **`BUILD.json` consumers.** Besides CI, the readers are
   `scripts/gen-third-party-notices.ts`, `src/build/rustNotices.ts`, the
   `perfCompare` environment check and the `engine-wasm-download` action; each

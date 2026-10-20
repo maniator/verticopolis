@@ -55,3 +55,15 @@ condition for the wasm-only flip.
 
 Merge order: #1080 first (or together), because section 10 cites the #1046
 row that PR restores. Keep #985 open until implementation and CI proof merge.
+
+## Review follow-up (2026-10-20, takeover by the offline-package thread)
+
+- Repair is scoped to the running build's revision keys. A waiting worker's
+  engine entries share the precache and are never deleted, rewritten or
+  repopulated; spec 8 now proves they stay byte-identical and that the
+  waiting build can cold-start offline after it activates.
+- The controller check is `navigator.serviceWorker?.controller != null`, with
+  a loader test for an undefined `navigator.serviceWorker`.
+- Removed a duplicated "First update" paragraph.
+- The PR description now lists the three files this diff changes. The #1046
+  backlog row is still restored by #1080, so this PR must not merge first.
