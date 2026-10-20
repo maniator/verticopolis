@@ -406,8 +406,9 @@ A third pass changed more:
 - WS-A follows the owner's 2026-10-16 order on #945: #874 (with #1059) before
   #902, since both edit the same host and save paths. Amelia's order put #902
   first; #1062 still merges before both.
-- #1048 rises to P1 after all, since the owner's order lists it before the
-  flip with #1051 after it, which is close to Link Freeman's first call. Part
-  of it landed in #1056.
-- The candidate deploy is cut from a commit with the candidate engine and
-  every host-path input merged; a later host-path change restarts the tail.
+- #1048 rises to P1 after all: the owner's order puts #1051 after it, and
+  #1051 is P1, which is close to Link Freeman's first call. Part of it
+  landed in #1056.
+- The candidate deploy is cut with every gate input on the tail's paths
+  merged; a later merge to those paths, or a new key, restarts the tail
+  unless the owner waives it.
