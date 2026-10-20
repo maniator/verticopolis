@@ -16,9 +16,9 @@ Frontends may differ. Simulations may not.
   events both engines emit (see Checkpoints).
 
 The reference runner is `src/tests/conformance/scenario.ts`, and
-`src/tests/integration/conformance.integration.test.ts` runs it in CI as part
-of `npm test`. A mismatch fails the build and names the first checkpoint that
-differs.
+`src/tests/integration/conformance.integration.test.ts` runs it in CI (its own
+step of the `test` job, without coverage) and in `npm test`. A mismatch fails
+the build and names the first checkpoint that differs.
 
 The runner drives any engine behind its `ScenarioEngine` interface. The
 TypeScript engine is the default; the Rust engine answers twice, natively
