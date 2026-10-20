@@ -126,7 +126,7 @@ export function interfaceDigest(declaration: string): string {
 
 /**
  * The one `const NAME: TYPE = N;` declaration, with any `pub` or `pub(crate)`,
- * at the start of a line. Block comments are dropped first, and a second
+ * at the start of a line. Comments are dropped first, and a second
  * match (a `#[cfg(test)]` copy, a raw string that quotes it) is an error, so
  * the constant read here is the constant the engine compiles.
  */
@@ -135,7 +135,12 @@ export function rustConstant(
   name: string,
   type: string,
 ): number {
-  const code = source.replace(/\/\*[\s\S]*?\*\//g, "");
+  // One pass in the order things start, so a `/*` inside a line comment (as in
+  // `migrations/*`) does not open a block comment that eats the declaration.
+  const code = source.replace(
+    /"(?:[^"\\]|\\[\s\S])*"|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
+    (m) => (m[0] === "/" ? " " : m),
+  );
   const found = [
     ...code.matchAll(
       new RegExp(

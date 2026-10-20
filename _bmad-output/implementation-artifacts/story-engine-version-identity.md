@@ -77,8 +77,10 @@ files: the scenario, catalog, loader and `.TDT` tables and the gameplay event
 catalog. A TS guard recomputes all of it from the tree and fails when a pin
 moved and the record did not, or when the recorded version differs from
 `Cargo.toml` or the native consumer's lockfile. `FRAME_LAYOUT_VERSION` and
-`IDENTITY_SCHEMA` each have a pin table with one entry per version, so a pin
-cannot be pasted over without raising the version.
+`IDENTITY_SCHEMA` each have a pin table with one entry per version. A new
+layout fails until an entry is appended and the version raised; overwriting an
+old entry still passes the tests and shows in the diff as an old pin changing,
+which review refuses (#1153 tracks a record field that lets the guard see it).
 
 `npm run engine:compat` rewrites the record. It fetches `origin/main`, names
 the commit it compared with, refuses a pin that differs from main's record

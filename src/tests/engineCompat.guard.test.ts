@@ -285,6 +285,19 @@ describe("engine crate version rule", () => {
     );
   });
 
+  it("reads past a line comment that mentions a block comment opener", () => {
+    const src =
+      "// see migrations/*.ts\npub const X: u32 = 7;\n/// globs like **/ close it\n";
+    expect(rustConstant(src, "X", "u32")).toBe(7);
+  });
+
+  it("wires each version constant to the Rust name its key spells", () => {
+    for (const [key, c] of Object.entries(VERSION_CONSTANTS)) {
+      const snake = key.replace(/[A-Z]/g, (m) => `_${m}`).toUpperCase();
+      expect(c.name, key).toBe(snake);
+    }
+  });
+
   it("reads a CRLF checkout of a Rust file and a Cargo.toml", () => {
     expect(rustConstant("pub const X: u32 = 4;\r\n", "X", "u32")).toBe(4);
     expect(
@@ -343,7 +356,7 @@ describe("engine crate version rule", () => {
       expect(r.source).toContain("no record yet");
     });
 
-    it("refuses with no origin/main, rather than reading the working tree", () => {
+    it("refuses with no origin/main, and never reads the working tree", () => {
       expect(() => baseRecord(fakeGit({ ref: false }))).toThrow(
         /git fetch origin main/,
       );
@@ -371,12 +384,10 @@ describe("engine crate version rule", () => {
     // or to this list when it is an input the lock already covers.
     const inputs = new Set(["README.md", "fixtures", "scenarios"]);
     const locked = new Set(LOCK_FILES.map((f) => f.split("/")[0]));
-    const top = readdirSync(resolve(ROOT, "conformance")).filter(
-      (n) => !inputs.has(n),
-    );
+    const visible = (dir: string) =>
+      readdirSync(resolve(ROOT, dir)).filter((n) => !n.startsWith("."));
+    const top = visible("conformance").filter((n) => !inputs.has(n));
     expect(top.sort()).toEqual([...locked].sort());
-    expect(readdirSync(resolve(ROOT, "conformance/events"))).toEqual([
-      "catalog.json",
-    ]);
+    expect(visible("conformance/events")).toEqual(["catalog.json"]);
   });
 });

@@ -33,11 +33,10 @@ fn hex16(data: &[u8]) -> String {
 
 /// One pin per `FRAME_LAYOUT_VERSION`, oldest first: entry `n - 1` is the hash
 /// of version `n`'s slot table. A layout change appends an entry and raises the
-/// version together, so pasting the new hash over the old one cannot pass.
+/// version together. Overwriting an old entry still passes the tests, but the
+/// diff then shows an old pin changing, which a reviewer must refuse (#1153
+/// tracks a record field that makes the guard see it).
 const FRAME_LAYOUT_PINS: &[&str] = &["c62b6d031b60a0d3"];
-
-/// How many layout constants `the_frame_layout_is_pinned` lists.
-const FRAME_LAYOUT_SLOT_COUNT: usize = 53;
 
 /// One pin per `IDENTITY_SCHEMA`, oldest first, on the same terms.
 const IDENTITY_SCHEMA_PINS: &[&str] = &["7d6d6ef773015066"];
@@ -155,9 +154,8 @@ fn the_lock_digest_is_the_digest_of_the_lock_files() {
 /// The frame layout, slot by slot. A host decodes the frame by these numbers,
 /// so a change to any of them raises `FRAME_LAYOUT_VERSION` in the same
 /// commit, and this table changes with it.
-#[test]
-fn the_frame_layout_is_pinned() {
-    let slots: Vec<(&str, usize)> = vec![
+fn frame_slots() -> Vec<(&'static str, usize)> {
+    vec![
         ("header::MINUTES", header::MINUTES),
         ("header::TOWER_REVISION", header::TOWER_REVISION),
         (
@@ -214,7 +212,12 @@ fn the_frame_layout_is_pinned() {
         ("car::DIRECTION", car::DIRECTION),
         ("CAR_RECORD", CAR_RECORD),
         ("UNKNOWN_ROUTINE", crate::frame::UNKNOWN_ROUTINE as usize),
-    ];
+    ]
+}
+
+#[test]
+fn the_frame_layout_is_pinned() {
+    let slots = frame_slots();
     let table: String = slots.iter().map(|(n, v)| format!("{n}={v}\n")).collect();
     let hex = hex16(table.as_bytes());
     assert_eq!(
@@ -229,22 +232,38 @@ fn the_frame_layout_is_pinned() {
     );
 }
 
-/// Every slot the layout declares is in the table above: a new offset or width
-/// constant in `frame.rs` fails here until it is pinned.
+/// Every layout constant `frame.rs` declares is in the table above, by name: a
+/// new offset or width fails here until it is added to `frame_slots`, which
+/// changes the table hash and so needs a new `FRAME_LAYOUT_VERSION`. A constant
+/// that is not part of the layout does not belong in `frame.rs`.
 #[test]
 fn the_frame_layout_table_is_complete() {
     let source = std::fs::read_to_string(crate_dir().join("src/frame.rs")).unwrap();
-    let declared = source
-        .lines()
-        .filter(|l| {
-            let t = l.trim_start();
-            t.starts_with("pub const ") && t.contains(": usize")
-                || t.starts_with("pub const UNKNOWN_ROUTINE")
-        })
-        .count();
+    let mut module: Option<String> = None;
+    let mut declared: Vec<String> = Vec::new();
+    for line in source.lines() {
+        let t = line.trim_start();
+        if let Some(rest) = t.strip_prefix("pub mod ") {
+            module = Some(rest.trim_end_matches(" {").to_owned());
+        } else if line.starts_with('}') {
+            module = None;
+        } else if let Some(rest) = t.strip_prefix("pub const ") {
+            let name = rest.split(':').next().unwrap();
+            if name == "FRAME_LAYOUT_VERSION" {
+                continue;
+            }
+            declared.push(match &module {
+                Some(m) => format!("{m}::{name}"),
+                None => name.to_owned(),
+            });
+        }
+    }
+    let mut listed: Vec<String> = frame_slots().iter().map(|(n, _)| (*n).to_owned()).collect();
+    declared.sort_unstable();
+    listed.sort_unstable();
     assert_eq!(
-        declared, FRAME_LAYOUT_SLOT_COUNT,
-        "frame.rs declares {declared} layout constants and the pin table lists {FRAME_LAYOUT_SLOT_COUNT}: add the new one to `the_frame_layout_is_pinned`"
+        declared, listed,
+        "frame.rs and `frame_slots` disagree: add the new constant to the table and raise FRAME_LAYOUT_VERSION"
     );
 }
 

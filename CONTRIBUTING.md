@@ -468,7 +468,7 @@ whoever merges second rebases and re-bumps.
 
 `engine-rs/Cargo.toml` carries its own version, separate from the app's. It is
 the answer to "which engine contract is this?": `engineIdentity()` reports it
-and About shows it. The app version stays what players see.
+and About will show it (#963 slice 3). The app version stays what players see.
 
 **The crate version goes up in the same PR as any of these:**
 
@@ -476,8 +476,10 @@ and About shows it. The app version stays what players see.
   `expected.json`, `loader-cases.json` or `tdt-cases.json` under `conformance/`
   (a new fixture or scenario lands through `expected.json`, so it counts);
 - `SAVE_VERSION`, or the oldest save version the engine loads;
-- `FRAME_LAYOUT_VERSION`, `CATALOG_VERSION` or `IDENTITY_SCHEMA` (each has a
-  pin table in `engine-rs/src/identity_tests.rs` that grows with it);
+- `FRAME_LAYOUT_VERSION`, `CATALOG_VERSION` or `IDENTITY_SCHEMA` (the frame
+  layout and the identity record's shape each have a pin table in
+  `engine-rs/src/identity_tests.rs` that grows with the version; the catalog
+  version has none yet, see #1154);
 - the binding's declaration, `src/dualrun/engine.d.ts`, outside comments.
 
 An internal change that keeps all of these, such as a performance
