@@ -115,6 +115,7 @@ export const BINDING_EXPORT_TIERS = {
   // Tier 2, the host loop and the engine's lifetime.
   tick: LOOP,
   frameView: LOOP,
+  frameDynamicProto: LOOP,
   logSince: LOOP,
   drainGameplayEvents: LOOP,
   gameplayEventsPending: LOOP,

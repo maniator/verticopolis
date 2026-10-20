@@ -126,6 +126,13 @@ export class Engine {
      */
     fires(): number;
     /**
+     * FACADE SPIKE 0, MEASUREMENT ONLY (never merged): the frame view with only
+     * the unit records that changed since the last call (all on the first
+     * call or when the unit id sequence moved). `mode` 0: changed units,
+     * 1: no units at all (people and cars only).
+     */
+    frameDynamicProto(mode: number): Float64Array;
+    /**
      * The per-frame read model as one flat number array (see
      * `frame_view` for the layout): what the host reads every frame while
      * the engine runs the simulation.
