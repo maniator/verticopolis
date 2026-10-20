@@ -1,0 +1,69 @@
+# The frontend's runtime imports of the TypeScript engine, one line per file:
+# the file, then each module under src/engine/ it imports at runtime (its path
+# there, without the extension). A "# reason" may follow on the same line.
+#
+# frontendEngineImports.guard.test.ts scans every non-test file under src/
+# except src/engine/, src/tests/ and the host and save code (src/wasmhost/,
+# src/dualrun/, src/storage/). It fails when a file imports an engine module
+# at runtime that its line does not name, and when a line names a module its
+# file no longer imports. Delete a module when its file stops importing it,
+# and the line when it names nothing. The list grows only with a reason the
+# PR states and a reviewer accepts.
+#
+# Why it shrinks: the engine is 3.0.0's fallback, and retiring it removes
+# src/engine/ (roadmap row 7, "Retiring the TypeScript engine: the inventory"
+# in _bmad-output/planning-artifacts/architecture/architecture-engine-rust-port-2026-10-08.md).
+# New frontend code reads the catalog, the frame view or an engine query.
+#
+# The catalog handle (towerCatalog, catalogTypes) is not counted: it is how
+# the frontend reads the catalog, and it moves out of src/engine/ before
+# retirement.
+#
+# The list started (2026-10-20, main at 68725a2) with 43 files: the 56 runtime
+# importers the inventory counts in src/ui/, src/game/ and src/render/, less
+# the 17 that import only the catalog handle, plus src/main.ts, src/gallery.ts,
+# src/preview.ts and src/analyticsEngineBridge.ts. src/presentation/ and
+# src/audio/ import the engine for types only; the scan keeps them that way.
+src/analyticsEngineBridge.ts gameplayCatalog gameplayEventRules
+src/gallery.ts catalog facilities retailSubtypes
+src/game/editorActions.ts facilities sim/charges
+src/game/facilityDiagnostics.ts EconomySystem Simulation facilities residentialRentals sim/constants sim/gripe types
+src/game/frameLoop.ts sim/fixedStep timePacing
+src/game/gripeCopy.ts facilities residentialRentals sim/gripe sim/satisfactionStep
+src/game/housekeepingDiagnostics.ts economy/housekeeping
+src/game/saveLoad.ts Simulation
+src/game/trafficHud.ts traffic
+src/game/uiCallbacks.ts wellFormed
+src/main.ts Simulation UndoHistory facilities
+src/preview.ts catalog facilities
+src/render/atlas/browserEntry.ts catalog
+src/render/atlas/catalog.ts facilities households residentialRentals retailSubtypes
+src/render/atlas/catalogExtras.ts facilities
+src/render/atlas/lookup.ts facilities retailSubtypes
+src/render/atlas/scenery.ts catalog
+src/render/atlas/verify.ts facilities
+src/render/atlas/verifyExtras.ts facilities
+src/render/excalibur/roomSignature.ts facilities
+src/render/excalibur/towerCrowd.ts facilities types
+src/render/excalibur/towerInputCamera.ts facilities types
+src/render/excalibur/towerOverlay.ts facilities
+src/render/excalibur/towerReconcile.ts types
+src/render/excalibur/towerShaftNumbers.ts facilities
+src/render/pixelSprites.ts facilities
+src/render/pixelSprites/amusements.ts Crowd
+src/render/pixelSprites/boutique.ts Crowd
+src/render/pixelSprites/clinic.ts Crowd
+src/render/pixelSprites/daycare.ts Crowd
+src/render/pixelSprites/fitness.ts Crowd
+src/render/pixelSprites/food.ts Crowd
+src/render/pixelSprites/nightclub.ts Crowd
+src/render/pixelSprites/residential.ts Crowd
+src/render/pixelSprites/skyBar.ts Crowd
+src/render/pixelSprites/spa.ts Crowd
+src/render/sprites/facilities/venue.ts Crowd
+src/render/sprites/transport.ts facilities
+src/ui/templates/editor.ts facilities gameRules residentialRentals types
+src/ui/templates/inspector.ts facilities types
+src/ui/templates/stats.ts Ledger facilities types
+src/ui/templates/toolInfo.ts facilities
+src/ui/uiElevatorSchedule.ts elevatorSchedule scheduleAuthoring scheduleOrigins

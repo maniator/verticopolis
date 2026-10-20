@@ -378,6 +378,19 @@ diagrams). The prose conventions below are the source of truth.
 - **`src/main.ts`**: the composition root that wires input, engine, and the
   game loop together.
 
+New frontend code adds no runtime import of `src/engine/`, because retiring the
+TypeScript engine deletes that directory. It reads the catalog through the
+catalog handle (`towerCatalog`, `catalogTypes`, which move out of `src/engine/`
+first and are not counted), the frame view (`src/wasmhost/frameView.ts`) or an
+engine query (#868) instead. `src/tests/frontendEngineImports.guard.test.ts`
+scans every non-test file under `src/` except the engine, the tests, and the
+host and save code (`src/wasmhost/`, `src/dualrun/`, `src/storage/`), and pins
+each file's other runtime engine imports in `frontendEngineImports.ratchet.txt`.
+The list shrinks: delete a module from a file's line when the file stops
+importing it. It grows only with a reason the PR states and a reviewer accepts.
+A type-only import is not counted, so import a name you use only as a type with
+`import type`.
+
 The tower grid is **two-layered**: a structural layer (floor/lobby) with a room
 layer sitting on top, exactly like the original SimTower corridor model.
 
