@@ -64,6 +64,20 @@ describe("the WASM parity CI job", () => {
     expect(fromJob).toEqual(fromScript);
   });
 
+  it("reports the two check names branch protection requires (#1082)", () => {
+    // A required check matches the name GitHub shows: the job key plus the
+    // matrix value, as long as the job sets no `name:` of its own. Renaming
+    // the job, a project or adding a `name:` would leave a required check
+    // waiting for a name that never reports.
+    expect(job).not.toMatch(/^ {4}name:/m);
+    const matrix = /project: \[([^\]]+)\]/.exec(job)?.[1] ?? "";
+    const names = matrix
+      .split(",")
+      .map((p) => `test-wasm-parity (${p.trim()})`)
+      .sort();
+    expect(names).toEqual(["test-wasm-parity (integrationWasm)", "test-wasm-parity (unitWasm)"]);
+  });
+
   it("is a plain gate: after the engine build, never skipped, never allowed to fail", () => {
     expect(job).toMatch(/^ {4}needs: (engine-wasm|\[[^\]]*\bengine-wasm\b[^\]]*\])$/m);
     expect(job).not.toMatch(/\bif:/); // job level or any step
