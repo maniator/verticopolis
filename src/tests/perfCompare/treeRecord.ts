@@ -30,16 +30,18 @@ const sha256 = (data: string | Buffer): string => createHash("sha256").update(da
 const EXCLUDE = [":(exclude)docs/performance/results"];
 
 /**
- * Settings that change the diff text, pinned so a machine's own git
- * configuration does not alter it: configuration through `-c` before the
- * subcommand, the rest through flags. (`GIT_DIFF_OPTS` is removed from git's
- * environment by the caller.) The hash covers git's raw output bytes, so `git
- * diff <these flags> | sha256sum` reproduces it. Line endings stay as git
- * reports them: with `core.autocrlf=true` git normalizes tracked files to LF
- * before diffing, but untracked files are hashed as the raw bytes on disk, so
- * a CRLF checkout can hash its untracked files differently from an LF one. The
- * hash identifies a tree on one machine under one git configuration; it is not
- * promised to match another machine's.
+ * Settings that change the diff text, fixed through `-c` before the
+ * subcommand and flags so the common ones (context lines, the diff algorithm,
+ * colors, renames, prefixes) cannot differ. (`GIT_DIFF_OPTS` is removed from
+ * git's environment by the caller.) Some configuration still changes the
+ * output, such as a diff driver from `core.attributesFile` or
+ * `.git/info/attributes`. The hash covers git's raw output bytes, so `git
+ * diff <these flags> | sha256sum` reproduces it on the same machine. Line
+ * endings stay as git reports them: with `core.autocrlf=true` git normalizes
+ * tracked files to LF before diffing, but untracked files are hashed as the
+ * raw bytes on disk, so a CRLF checkout can hash its untracked files
+ * differently from an LF one. The hash identifies a tree on one machine under
+ * one git configuration; it is not promised to match another machine's.
  */
 const DIFF_CONFIG = ["-c", "diff.suppressBlankEmpty=false", "-c", "core.compression=-1", "-c", "core.quotepath=true"];
 const DIFF_FLAGS = ["--binary", "--full-index", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames", "--src-prefix=a/", "--dst-prefix=b/", "-U3", "--inter-hunk-context=0", "--diff-algorithm=myers", "--indent-heuristic", "-O/dev/null", "--ignore-submodules=none"];
@@ -105,3 +107,6 @@ export function treeSummary(t: TreeRecord | undefined, dirty?: boolean): string 
   if (!t.complete) parts.push("the record is incomplete (the run is void)");
   return parts.join("; ");
 }
+
+/** The validation error for a working-tree record git could not finish, or null. A run without a record (an older harness) is judged elsewhere. */
+export const incompleteTreeError = (t: TreeRecord | undefined): string | null => (t && !t.complete ? "git could not finish the working-tree record, so the run cannot be tied to a tree" : null);

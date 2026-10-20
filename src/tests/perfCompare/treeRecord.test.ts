@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { treeRecord, treeSummary, UNREADABLE } from "./treeRecord";
+import { incompleteTreeError, treeRecord, treeSummary, UNREADABLE } from "./treeRecord";
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
@@ -101,5 +101,15 @@ describe("treeSummary", () => {
     expect(s).toContain("f0\\|x s");
     expect(s).toContain("and 5 more");
     expect(s).not.toContain("f24");
+  });
+});
+
+describe("incompleteTreeError", () => {
+  const record = { porcelain: [], diffSha256: null, untracked: [], hidden: [], complete: true };
+  it("is the validation error for a record git could not finish, and null otherwise", () => {
+    expect(incompleteTreeError({ ...record, complete: false })).toMatch(/git could not finish the working-tree record/);
+    expect(incompleteTreeError(record)).toBeNull();
+    // A run from before the record has none; other checks judge that.
+    expect(incompleteTreeError(undefined)).toBeNull();
   });
 });

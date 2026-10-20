@@ -252,20 +252,21 @@ A run proves it measured the commit it names.
    is complete.
    The tracked-changes hash is the SHA-256 of the raw bytes of
    `git -c diff.suppressBlankEmpty=false -c core.compression=-1 -c core.quotepath=true diff HEAD --binary --full-index --no-color --no-ext-diff --no-textconv --no-renames --src-prefix=a/ --dst-prefix=b/ -U3 --inter-hunk-context=0 --diff-algorithm=myers --indent-heuristic -O/dev/null --ignore-submodules=none -- . ':(exclude)docs/performance/results'`
-   with `GIT_DIFF_OPTS` removed from git's environment, so the machine's git
-   config and environment do not change it and the same command piped to
-   `sha256sum` reproduces it (on Windows, run the command from Git Bash so
+   with `GIT_DIFF_OPTS` removed from git's environment, which fixes the common
+   settings (context lines, algorithm, colors, renames, prefixes); a diff
+   driver from `core.attributesFile` or `.git/info/attributes` still changes
+   the output. The same command piped to `sha256sum` reproduces the hash on
+   the same machine (on Windows, run the command from Git Bash so
    the bytes are not re-encoded). The hash identifies a tree on one machine
    under one git configuration; it is not promised to match another
    machine's. With `core.autocrlf=true` git normalizes tracked files to LF
    before it diffs them, and untracked files are hashed as the raw bytes on
    disk, so a CRLF checkout can hash an untracked file differently from an LF
-   one. A symlink is hashed by its target text. The record is **incomplete**
+   one. A symlink is hashed as `symlink:` plus its target text. The record is **incomplete**
    (and the run void) when git fails, a file cannot be read or is over
    256 MiB; the report says so instead of printing "none", and
-   `perf:compare` records a validation error for it. `perf:worker` prints the
-   same report text and does not validate, so a `perf:worker` run with an
-   incomplete record is void by this rule and must be discarded. It holds
+   `perf:compare` and `perf:worker` each record a validation error for it and
+   print the same report text. It holds
    what git reports: ignored files and a mode change under
    `core.fileMode=false` fall outside it (backlog row #1123).
    A tree holding exactly RUN-0a's patch (SHA-256 `cf781ee6…d73a1`) on
@@ -353,7 +354,7 @@ never from a number picked to pass.
 | M3 | Frame time p99, and 1% low FPS | medium, large; 1x, 4x | As M1, for each | `perf:compare` |
 | M4 | Main-thread blocking (long tasks past 50 ms) | large; 1x, 4x | Paired difference upper bound at most ε | `perf:worker` |
 | M5 | Cold start to ready | 1x, 4x | Paired difference upper bound at most that throttle's ε | `perf:compare` |
-| M6 | Peak JS heaps plus WASM linear memory | large; 1x, 4x | Ratio upper bound at most 1.25 (a memory ceiling, outside δ) | — |
+| M6 | Peak JS heaps plus WASM linear memory | large; 1x, 4x | Ratio upper bound at most 1.25 (a memory ceiling, outside δ) | `perf:worker` |
 | M7 | 5,000+ population fixture in `npm run perf` | CI | A CI tripwire, read on the candidate commit's CI run. Not a desktop metric | — |
 | M8 | Scripted build-and-demolish scene (PF2) | large; 1x, 4x | Frame p99 as M1, long tasks as M4. Own δ and ε, fixed when PF2 lands | — |
 
@@ -388,11 +389,13 @@ noise the tolerance has to cover.
    `perf:calibrate` computes that from the engine with the fewest passes and
    states it as the guarantee. A 5% limit needs at least 20 passes per
    engine. Five passes guarantee only 1/6, about 16.7%, so with five the tool
-   reports the calibration as not adoptable unless the owner restates the
-   limit (`--exceedance-limit`; the amendment to OD-4). A leave-one-out check runs beside
-   it: it leaves each pass out in turn and asks whether that pass lands above
-   the candidate the others set. Only the largest pass can, so it reads 0 or
-   1 and flags a single outlier the other passes do not cover. It does not
+   reports the calibration as not adoptable. The pass count and the limit are
+   the owner's to change (an open amendment to OD-4); `--min-passes` and
+   `--exceedance-limit` can state a looser pair, and the tool then marks the
+   result as not adoptable until the owner approves it. A leave-one-out
+   column runs beside it for information: it leaves each pass out in turn and
+   asks whether that pass lands above the candidate the others set. Only the
+   largest pass can, so it reads 0 or 1. It never blocks adoption and does not
    replace the guarantee.
 4. **Caps.** A δ above **0.05**, a long-task ε above **50 ms** of blocking
    (one 100 ms task), or a cold-start ε above **5% of TypeScript's median cold
@@ -476,25 +479,26 @@ folder do not feed it), and a ratio cell with fewer than 10 valid pairs
 leaves that family without a candidate for every pass. The candidate is the
 largest such value rounded up (δ to 0.01, ε to 5 ms, never below one step).
 It holds the candidate to its cap, states the guarantee of step 3 and runs
-the leave-one-out check. Any folder it leaves out is listed in
+the informational leave-one-out column. Any folder it leaves out is listed in
 `calibration.md` and `calibration.json` with the reason, and the output keeps
 each input's canonical `results.json` SHA-256. It reads 1% low FPS as
 TypeScript over WASM. It exits 0 only when nothing was left out, no problem
 was raised, and every family has a candidate inside its cap with the
-guarantee under the limit and a clean leave-one-out. `calibration.md` opens
+guarantee under the limit and the protocol's pass count and limit in use. `calibration.md` opens
 with the window of the passes (earliest and latest start) and the commit,
 because it is a snapshot, and calls the numbers provisional: it covers M1,
 M2, M3 and M5; M4's long-task ε needs `perf:worker` A/A passes (`perf:worker`
 has no `--aa` yet, follow-up #1111), and nothing in it sets a tolerance until
 the owner adopts the numbers.
 
-Two limits stay open, so the calibration is not complete (the harness for each
-metric is the last column of the table above: a tolerance calibrated on one
-harness's noise is not applied to the other's ratios, and RUN-0a's reference
-figures come from `perf:worker`):
+The harness for each metric is the last column of the table above: a tolerance
+calibrated on one harness's noise is not applied to the other's ratios, and
+RUN-0a's reference figures come from `perf:worker`. Nobody reads δ or ε off
+the folders by hand: RUN-0b collects them and the values come from
+`perf:calibrate`'s output.
 
-- **δ and ε are adopted only from `perf:calibrate`'s output.** RUN-0b collects
-  the folders. Nobody reads values off them by hand.
+One limit stays open, so the calibration is not complete:
+
 - **M4's ε has no A/A source yet.** `perf:compare` measures no long tasks and
   `perf:worker` has no `--aa` (follow-up #1111), so the long-task ε stays
   uncalibrated until that lands. RUN-1 needs M4, so #1111 and its A/A passes

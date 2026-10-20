@@ -128,7 +128,7 @@ export function engineBuildHash(distDir: string): string | null {
 
 const MAX_UNTRACKED_BYTES = 256 * 2 ** 20;
 
-/** An untracked file's bytes; a symlink's target text (the link itself is what the tree holds); null for anything else or a file too large to hash. */
+/** An untracked file's bytes; a symlink's target text prefixed `symlink:` (the link itself is what the tree holds); null for anything else or a file too large to hash. */
 export function readUntracked(path: string): Buffer | null {
   try {
     const st = lstatSync(path);

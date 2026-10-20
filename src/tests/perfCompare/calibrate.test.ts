@@ -223,11 +223,24 @@ describe("calibrate", () => {
     expect(left({ rendererEndCold: RTX })).toBe("");
     expect(left({ exception: "EX-4" })).toMatch(/declared renderer exception EX-4/);
     expect(left({ gpuVerified: false })).toMatch(/gpuVerified: false/);
+    // Fail closed: a missing, null or wrongly typed field is not "verified".
+    for (const bad of [null, undefined, "true", 1]) expect(left({ gpuVerified: bad as never }), String(bad)).toMatch(/does not record gpuVerified: true/);
     expect(left({})).toBe("");
     // An all-software set adopts nothing.
     const soft = calibrate(many(10, () => ({ renderer: SWIFT, rendererEnd: SWIFT })));
     expect(soft.passes).toHaveLength(0);
     expect(soft.adoptable).toBe(false);
+  });
+
+  it("leaves out a pass with no read after its cold start, and one that never recorded the field", () => {
+    const left = (mutate: (r: { runs: { rendererEndCold?: unknown }[] }) => void) => {
+      const folders = many(10);
+      mutate(folders[9].results as unknown as { runs: { rendererEndCold?: unknown }[] });
+      return calibrate(folders).excluded.map((e) => e.reason).join("\n");
+    };
+    expect(left((r) => delete r.runs[0].rendererEndCold)).toMatch(/no renderer read after its cold start/);
+    expect(left((r) => (r.runs[0].rendererEndCold = ""))).toMatch(/no renderer read after its cold start/);
+    expect(left(() => undefined)).toBe("");
   });
 
   it("leaves out a pass whose working-tree record cannot prove a clean tree", () => {
@@ -241,6 +254,12 @@ describe("calibrate", () => {
     expect(left({ ...clean, hidden: ["a.ts"] })).toMatch(/assume-unchanged or skip-worktree/);
     const { hidden: _hidden, ...older } = clean;
     expect(left(older)).toMatch(/did not check for edits git hides/);
+    // An empty status list does not prove a clean tree when the record holds a tracked-changes hash or untracked files.
+    expect(left({ ...clean, diffSha256: "a".repeat(64) })).toMatch(/tracked-changes hash or untracked files/);
+    expect(left({ ...clean, untracked: [{ path: "x.ts", sha256: "b".repeat(64) }] })).toMatch(/tracked-changes hash or untracked files/);
+    // A record with no untracked list is an incomplete record that leaves the pass out, and does not crash the calibration.
+    const { untracked: _untracked, ...noList } = clean;
+    expect(left(noList)).toMatch(/no list of untracked files/);
     const none = many(10);
     for (const f of none) delete (f.results as { environment: { tree?: unknown } }).environment.tree;
     expect(calibrate(none).excluded[0].reason).toMatch(/no working-tree record, so a clean tree is not proven/);
@@ -282,7 +301,7 @@ describe("calibrate", () => {
     // The default limit is the protocol's 5%: five passes per engine give 1/6.
     const five = calibrateWith(many(10));
     expect(five.guarantee).toBeCloseTo(1 / 6, 9);
-    expect(five.problems.join("\n")).toMatch(/5 passes per engine guarantee only that a fresh pass lands above the candidate with probability at most 1\/6 \(16\.7%\), which is not under the 5% limit; the limit needs at least 20 passes per engine/);
+    expect(five.problems.join("\n")).toMatch(/5 passes per engine guarantee only that a fresh pass lands above the candidate with probability 1\/6 on average \(16.7%\), which is not under the 5% limit; the limit needs at least 20 passes per engine; the pass count and limit are the owner/);
     expect(five.adoptable).toBe(false);
     expect(passesForLimit(0.05)).toBe(20);
     expect(passesForLimit(0.2)).toBe(5);
@@ -315,7 +334,7 @@ describe("calibrate", () => {
     expect(c.pool).toMatchObject({ commit: "abc1234def", browser: { channel: null, args: [], version: "141.0.1", renderers: [RTX] }, config: { reps: 10, aa: null } });
     expect(c.pool!.machine).toMatchObject({ cpuModel: "cpu-a" });
     const md = calibrationMarkdown(c, "2026-10-21T00:00:00Z");
-    expect(md).toMatch(/## What the passes share[\s\S]*Commit abc1234def[\s\S]*Browser: executable default headless shell, channel default, switches none, version 141\.0\.1, renderer ANGLE/);
+    expect(md).toMatch(/## What the passes share[\s\S]*machine, browser and run parameters match[\s\S]*Provenance: commit abc1234def[\s\S]*\(not a condition on the verdict run\)[\s\S]*Browser: executable default headless shell, channel default, switches none, version 141\.0\.1, renderer ANGLE/);
     const other = calibrateWith(many(40, () => ({ channel: "chrome", args: ["--use-angle=d3d11"] })), {});
     expect(other.pool!.browser).toMatchObject({ channel: "chrome", args: ["--use-angle=d3d11"] });
     expect(calibrateWith([]).pool).toBeNull();
@@ -335,7 +354,7 @@ describe("calibrate", () => {
     expect(md).toContain("Provisional: it covers M1, M2, M3 and M5; M4's long-task ε needs `perf:worker` A/A passes (#1111)");
     expect(md).toContain("nothing here sets a tolerance until the owner adopts the numbers (OD-4");
     expect(md).toContain("**Candidates pass every check of this tool.** They are provisional");
-    expect(md).toContain("With 20 passes of the engine that has the fewest, and passes that are exchangeable, the chance that a fresh pass lands above a candidate (before rounding) is at most 1/21 = 4.8%. The limit is 5%");
+    expect(md).toContain("With 20 passes of the engine that has the fewest, and passes that are exchangeable, the chance that a fresh pass lands above a candidate (before rounding) is 1/21 on average = 4.8%. The limit is 5%");
     expect(md).toContain("The leave-one-out column below is informational");
     expect(md).toMatch(/\| M1 \| δ \| 0\.0[0-9]+ \| 0\.050 \|/);
     expect(md).toMatch(/\| M5-4x \| ε \| [1-9]\d*\.0 ms \|/);

@@ -194,6 +194,7 @@ export function treeProblem(r: Pick<Pass, "environment">): string | null {
   if (!t) return "it has no working-tree record, so a clean tree is not proven";
   if (!t.complete) return "its working-tree record is incomplete (git could not finish it)";
   if (t.porcelain === null || t.porcelain.length > 0) return "its working-tree record shows changes";
+  if (!Array.isArray(t.untracked)) return "its working-tree record has no list of untracked files (an incomplete record)";
   if (t.diffSha256 !== null || t.untracked.length > 0) return "its working-tree record holds a tracked-changes hash or untracked files, so the tree was not clean";
   if (!t.hidden) return "its working-tree record did not check for edits git hides (assume-unchanged, skip-worktree)";
   if (t.hidden.length > 0) return "its tree holds files git was told to ignore changes in (assume-unchanged or skip-worktree)";
@@ -274,7 +275,7 @@ export function calibrate(folders: { folder: string; results: Pass; sha256?: str
   const same = (what: string, key: (r: Pass) => unknown): void => {
     if (new Set(used.map((u) => stable(key(u.results) ?? null))).size > 1) problems.push(`the passes differ in ${what}; calibrate passes that share it`);
   };
-  // Names the fields that differ, so a pass whose toolchain version was not recorded (null) reads as that, not as an unexplained machine difference.
+  // Names the fields that differ, so a pass whose toolchain version was not recorded (null) reads as that and not as an unexplained machine difference.
   const sameFields = (what: string, fields: Record<string, (r: Pass) => unknown>): void => {
     const differ = Object.entries(fields).filter(([, get]) => new Set(used.map((u) => stable(get(u.results) ?? null))).size > 1).map(([name]) => name);
     if (differ.length) problems.push(`the passes differ in ${what}: ${differ.join(", ")}; calibrate passes that share them (a field recorded as unknown in one pass and known in another counts as different)`);
@@ -292,7 +293,7 @@ export function calibrate(folders: { folder: string; results: Pass; sha256?: str
   // The stated guarantee, from the engine with the fewest passes.
   const fewest = Math.min(...perEngine.map((e) => e.n));
   const guarantee = fewest > 0 ? 1 / (fewest + 1) : null;
-  if (guarantee !== null && !(guarantee < limit)) problems.push(`${fewest} passes per engine guarantee only that a fresh pass lands above the candidate with probability at most 1/${fewest + 1} (${(guarantee * 100).toFixed(1)}%), which is not under the ${(limit * 100).toFixed(0)}% limit; the limit needs at least ${passesForLimit(limit)} passes per engine, or the owner restates the limit (an open amendment to OD-4)`);
+  if (guarantee !== null && !(guarantee < limit)) problems.push(`${fewest} passes per engine guarantee only that a fresh pass lands above the candidate with probability 1/${fewest + 1} on average (${(guarantee * 100).toFixed(1)}%), which is not under the ${(limit * 100).toFixed(0)}% limit; the limit needs at least ${passesForLimit(limit)} passes per engine; the pass count and limit are the owner's to change (an open amendment to OD-4), and a looser setting is never adoptable until then`);
 
   // A stricter setting than the protocol's is not a relaxation; only fewer passes or a looser limit need the owner.
   const protocolDefaults = minPasses >= DEFAULT_MIN_PASSES_PER_ENGINE && limit <= DEFAULT_EXCEEDANCE_LIMIT;
@@ -350,7 +351,7 @@ export function calibrationMarkdown(c: Calibration, generatedAt: string): string
   if (!c.protocolDefaults) out.push(`> **Looser than the protocol's parameters.** This run used ${c.minPassesPerEngine} passes per engine and a ${(c.exceedanceLimit * 100).toFixed(1)}% limit. The protocol's are ${DEFAULT_MIN_PASSES_PER_ENGINE} passes and ${(DEFAULT_EXCEEDANCE_LIMIT * 100).toFixed(0)}%, and loosening them needs the owner's approval, so nothing here is adoptable.`, "");
   if (c.problems.length) out.push("## Problems", "", ...c.problems.map((p) => `- ${p}`), "");
   const fewest = c.guarantee === null ? null : Math.round(1 / c.guarantee) - 1;
-  out.push("## What the check guarantees", "", c.guarantee === null ? "There are no passes of one engine, so no guarantee can be stated." : `With ${fewest} passes of the engine that has the fewest, and passes that are exchangeable, the chance that a fresh pass lands above a candidate (before rounding) is at most 1/${fewest! + 1} = ${(c.guarantee * 100).toFixed(1)}%. The limit is ${(c.exceedanceLimit * 100).toFixed(0)}%, which needs at least ${passesForLimit(c.exceedanceLimit)} passes per engine. The leave-one-out column below is informational: it can only be 0 or 1, it shows whether the largest pass lands above the candidate the others set, and it never blocks adoption.`, "");
+  out.push("## What the check guarantees", "", c.guarantee === null ? "There are no passes of one engine, so no guarantee can be stated." : `With ${fewest} passes of the engine that has the fewest, and passes that are exchangeable, the chance that a fresh pass lands above a candidate (before rounding) is 1/${fewest! + 1} on average = ${(c.guarantee * 100).toFixed(1)}%. The limit is ${(c.exceedanceLimit * 100).toFixed(0)}%, which needs at least ${passesForLimit(c.exceedanceLimit)} passes per engine. The leave-one-out column below is informational: it can only be 0 or 1, it shows whether the largest pass lands above the candidate the others set, and it never blocks adoption.`, "");
   out.push("## Candidates", "");
   out.push("| Family | Kind | Candidate | Cap | Leave-one-out (informational) | Largest pass values |", "| --- | --- | --- | --- | --- | --- |");
   const num = (x: number | null, unit: string): string => {
@@ -363,8 +364,8 @@ export function calibrationMarkdown(c: Calibration, generatedAt: string): string
   }
   out.push("", `Scope: the ${SCENARIOS.join(" and ")} scenarios at ${THROTTLES.map((t) => `${t}x`).join(" and ")}. Other scenarios and throttles in the folders do not feed these numbers. M1, M2 and M3 each get their own δ. Each pass's value is the largest upper bound across the scenarios and throttles, and a ratio cell with fewer than ${MIN_REPS} valid pairs leaves its pass without a value, which leaves the whole family without a candidate.`);
   if (c.pool) {
-    out.push("", "## What the passes share", "", "A verdict run may use these numbers only if it matches all of this.", "");
-    out.push(`- Commit ${c.pool.commit}, engine build ${c.pool.engineBuildHash ?? "n/a"}`);
+    out.push("", "## What the passes share", "", "A verdict run may use these numbers only if its machine, browser and run parameters match the three lines below. The commit and engine build are provenance: the verdict runs come from later commits.", "");
+    out.push(`- Provenance: commit ${c.pool.commit}, engine build ${c.pool.engineBuildHash ?? "n/a"} (not a condition on the verdict run)`);
     out.push(`- Machine: ${Object.entries(c.pool.machine).map(([k, v]) => `${k} ${cell(String(v))}`).join("; ")}`);
     out.push(`- Browser: executable ${cell(c.pool.browser.executable ?? "default headless shell")}, channel ${c.pool.browser.channel ?? "default"}, switches ${c.pool.browser.args.length ? cell(c.pool.browser.args.join(" ")) : "none"}, version ${c.pool.browser.version ?? "n/a"}, renderer ${c.pool.browser.renderers.length ? c.pool.browser.renderers.map(cell).join("; ") : "n/a"}`);
     out.push(`- Run parameters: ${cell(stable(c.pool.config))}`);
