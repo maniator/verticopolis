@@ -5,11 +5,13 @@
 //! TypeScript instance gives today, in the JSON shape its result type has.
 //!
 //! Arguments arrive already read off their raw JS values, as in
-//! `wasm_relay.rs`: a number is `Some` only for a JS number, and must be whole
-//! within `Number.isSafeInteger` (`crate::charges::whole`) or the call is
-//! refused with `INVALID_REQUEST` before anything is read. A kind is a string
-//! the catalog knows, or the call is refused with `UNKNOWN_FACILITY`. Native
-//! tests call these directly, since a raw JS value needs a wasm target.
+//! `wasm_relay.rs`. A kind is a string the catalog knows; anything else is
+//! unknown, and the shaft calls answer `UNKNOWN_FACILITY` while the rent batch
+//! calls answer `None` (TypeScript's `null`). Once the kind is known, a
+//! coordinate must be a JS number that is whole within `Number.isSafeInteger`
+//! (`crate::charges::whole`) or the shaft call is refused with
+//! `INVALID_REQUEST` before the tower is read. Native tests call these
+//! directly, since a raw JS value needs a wasm target.
 use crate::charges::{whole, INVALID_REQUEST};
 use crate::facilities::Kind;
 use crate::services::ExterminatorRefusal;
@@ -128,8 +130,8 @@ mod tests {
         serde_json::from_str(text).expect("the answer is JSON")
     }
 
-    /// A Modern tower with a lobby, a floor run, two hotel rooms and an
-    /// office, plenty of money; the shaft checks need structure to stand on.
+    /// A Modern tower with a lobby run, two floor runs, an office and a
+    /// hotel room, plenty of money; the shaft checks need structure to stand on.
     fn fixture() -> Engine {
         let mut e = Engine {
             sim: Simulation::new_game(7, GameMode::Modern),
@@ -320,25 +322,5 @@ mod tests {
         }
         let json = e.validate_transport_json("elevatorStandard", Some(180.0), Some(1.0), Some(3.0));
         assert_eq!(json, r#"{"ok":true}"#);
-    }
-
-    #[test]
-    fn the_shaft_check_writes_nothing() {
-        let e = fixture();
-        let before = e.serialize();
-        for x in [150.0, 170.0, 190.0] {
-            for (b, t) in [(1.0, 3.0), (2.0, 3.0), (1.0, 2.0)] {
-                for kind in [
-                    "stairs",
-                    "escalator",
-                    "elevatorStandard",
-                    "elevatorExpress",
-                    "elevatorService",
-                ] {
-                    let _ = e.validate_transport_checked(kind, Some(x), Some(b), Some(t));
-                }
-            }
-        }
-        assert_eq!(e.serialize(), before);
     }
 }

@@ -301,9 +301,7 @@ export const PRICED_KINDS = ["office", "condo", "hotelSingle", "hotelDouble", "h
 
 /** The price band for a unit kind, or null if its price isn't player-set. */
 export function rentConfig(kind: string): { default: number; min: number; max: number; step: number } | null {
-  // An own key only: a name that sits on the object's prototype ("constructor",
-  // "toString") is not a priced kind (#1216; the Rust engine reads the catalog).
-  return Object.prototype.hasOwnProperty.call(ECON.rent, kind) ? ECON.rent[kind] : null;
+  return ECON.rent[kind] ?? null;
 }
 
 /** The effective price for a unit — the player's choice, or the kind default. */

@@ -35,7 +35,8 @@ export class Engine {
      * `applyRentBatch(kind, target, onlyDefaultPriced)` with the target as
      * JSON text (a number, `"default"` or `"noRate"`): the result counters
      * as JSON, or null when the batch does not apply: an unknown or unpriced
-     * kind, or a target that is not one of those three, as in TypeScript.
+     * kind, a No Rate target off the ladder, or a target that is not
+     * `"default"`, `"noRate"` or a finite number, as in TypeScript.
      */
     applyRentBatch(kind: string, target: string, only_default_priced: boolean): string | undefined;
     /**
@@ -207,6 +208,8 @@ export class Engine {
      * `previewRentBatch(kind, target, onlyDefaultPriced)` with the target as
      * JSON text, as for `applyRentBatch`: the counters that call would
      * report, as JSON, with nothing written; null where it would not apply.
+     * A kind that is not a string is an unknown kind, and the flag is read
+     * by JavaScript truthiness, as TypeScript's `opts.onlyDefaultPriced` is.
      */
     previewRentBatch(kind: string, target: string, only_default_priced: boolean): string | undefined;
     /**

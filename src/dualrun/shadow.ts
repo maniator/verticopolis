@@ -1,6 +1,16 @@
 import type { Divergence, ShadowCommand } from "./commands";
 import type { WasmEngine, WasmModule } from "./binding";
 
+/** A batch target as JSON text. One JSON cannot write (undefined, a BigInt, a
+ *  symbol) is `null`, which the engine reads as "does not apply", as TypeScript does. */
+function batchTarget(target: unknown): string {
+  try {
+    return JSON.stringify(target) ?? "null";
+  } catch {
+    return "null";
+  }
+}
+
 /**
  * The second engine behind the shadow commands: one WASM `Engine` instance
  * that receives what the live simulation received, and answers a checkpoint
@@ -68,7 +78,7 @@ export class ShadowEngine {
       case "adjustRent": this.live().adjustRent(cmd.id, cmd.dir); return null;
       case "setNoRate": this.live().setNoRate(cmd.id); return null;
       case "priceUnit": this.live().priceUnit(cmd.id, cmd.target); return null;
-      case "applyRentBatch": this.live().applyRentBatch(cmd.kind, JSON.stringify(cmd.target), cmd.onlyDefaultPriced); return null;
+      case "applyRentBatch": this.live().applyRentBatch(cmd.kind, batchTarget(cmd.target), cmd.onlyDefaultPriced); return null;
       case "setFilmPolicy": this.live().setFilmPolicy(cmd.id, cmd.policy); return null;
       case "rerollSubtype": this.live().rerollSubtype(cmd.id); return null;
       case "toggleAutoBridge": this.live().toggleAutoBridge(); return null;

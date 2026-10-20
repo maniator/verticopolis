@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES } from "../../engine/facilitiesData";
-import { PRICED_KINDS, rentConfig } from "../../engine/econConfig";
+import { PRICED_KINDS } from "../../engine/econConfig";
 import type { FacilityKind, GameMode } from "../../engine/types";
 import type { SerializedGame } from "../../engine/serializedGame";
 import { decodeVctower } from "../../storage/vctowerContainer";
@@ -89,16 +89,19 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers match the TypeS
     };
     const fee = (rooms: number) => 5_000 + 2_000 * rooms;
 
-    const book = (label: string, start: Start, tweak: (sim: Simulation) => void, repeat = 1) =>
+    const book = (label: string, start: Start, tweak: (sim: Simulation) => void, expected: object, repeat = 1) =>
       it(label, () => {
         const { sim, engine } = pair(start, tweak);
         try {
+          let want: unknown;
           for (let i = 0; i < repeat; i++) {
-            const want = sim.callExterminator();
+            want = sim.callExterminator();
             const got = JSON.parse(engine.callExterminator()) as unknown;
             expect(got).toEqual(want);
             expect(isDeepStrictEqual(got, want)).toBe(true);
           }
+          // The answer is the one the case names, so a drifted fee or mode shows here.
+          expect(want).toEqual(expected);
           // The booking is the same money and the same pending treatment.
           const saved = JSON.parse(engine.serialize()) as { money: number; exterminationDueDay?: number; exterminationRoomIds?: number[] };
           const ts = sim.serialize() as unknown as typeof saved;
@@ -112,20 +115,26 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers match the TypeS
 
     const modern: Start = { label: "new Modern game", seed: 3, mode: "modern" };
     const classic: Start = { label: "new Classic game", seed: 3, mode: "classic" };
-    book("books three rooms and carries cost and rooms", modern, infested(3, 1e9));
-    book("a second call is pending", modern, infested(3, 1e9), 2);
-    book("refuses short of funds with the price and the rooms", modern, infested(3, fee(3) - 1));
-    book("books at exactly the price", modern, infested(3, fee(3)));
-    book("refuses when no room is infested", modern, infested(0, 1e9));
-    book("is unavailable in Classic", classic, (sim) => {
-      sim.money = 1e9;
-      for (let x = 170; x < 190; x++) {
-        expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-        expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-      }
-      const r = sim.tower.place("hotelSingle", 2, 170);
-      sim.tower.getUnit(r.unitId!)!.state = "infested";
-    });
+    book("books three rooms and carries cost and rooms", modern, infested(3, 1e9), { ok: true, cost: fee(3), rooms: 3 });
+    book("a second call is pending", modern, infested(3, 1e9), { ok: false, reason: "pending" }, 2);
+    book("refuses short of funds with the price and the rooms", modern, infested(3, fee(3) - 1), { ok: false, reason: "funds", cost: fee(3), rooms: 3 });
+    book("books at exactly the price", modern, infested(3, fee(3)), { ok: true, cost: fee(3), rooms: 3 });
+    book("refuses when no room is infested", modern, infested(0, 1e9), { ok: false, reason: "none" });
+    book(
+      "is unavailable in Classic",
+      classic,
+      (sim) => {
+        sim.money = 1e9;
+        for (let x = 170; x < 190; x++) {
+          expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+          expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+        }
+        const r = sim.tower.place("hotelSingle", 2, 170);
+        expect(r.ok).toBe(true);
+        sim.tower.getUnit(r.unitId!)!.state = "infested";
+      },
+      { ok: false, reason: "unavailable" },
+    );
   });
 
   describe("previewRentBatch", () => {
@@ -160,6 +169,7 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers match the TypeS
       it(`${start.label}: a preview is what the apply then reports`, () => {
         const { Engine } = wasm();
         const { engine, text } = pair(start, variedPrices);
+        let reported = 0;
         try {
           for (const kind of PRICED_KINDS) {
             for (const target of ["default", "noRate", 1, 9_999]) {
@@ -167,21 +177,54 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers match the TypeS
                 const preview = engine.previewRentBatch(kind, JSON.stringify(target), only);
                 const fresh = Engine.fromSave(text);
                 try {
-                  expect(fresh.applyRentBatch(kind, JSON.stringify(target), only)).toBe(preview);
+                  const applied = fresh.applyRentBatch(kind, JSON.stringify(target), only);
+                  expect(applied).toBe(preview);
+                  if (applied !== undefined) {
+                    reported++;
+                    // An apply that reports a change wrote it.
+                    if ((JSON.parse(applied) as { changed: number }).changed > 0) expect(fresh.serialize()).not.toBe(text);
+                  }
                 } finally {
                   fresh.free();
                 }
               }
             }
           }
+          expect(reported).toBeGreaterThan(0);
         } finally {
           engine.free();
         }
       }, 120_000);
     }
 
-    it("covers every priced kind", () => {
-      for (const kind of PRICED_KINDS) expect(rentConfig(kind)).not.toBeNull();
+    it("reads the flag by truthiness and a kind that is not a string as unknown, as TypeScript does", () => {
+      const { sim, engine } = pair(STARTS[1], (s) => {
+        s.money = 1e9;
+        for (let x = 150; x < 200; x++) {
+          expect(s.tower.place("lobby", 1, x).ok).toBe(true);
+          expect(s.tower.place("floor", 2, x).ok).toBe(true);
+        }
+        expect(s.tower.place("office", 2, 150).ok).toBe(true);
+        const second = s.tower.place("office", 2, 160);
+        expect(second.ok).toBe(true);
+        s.tower.getUnit(second.unitId!)!.rent = 1_234;
+      });
+      const raw = engine as unknown as { previewRentBatch(kind: unknown, target: string, only: unknown): string | undefined };
+      try {
+        for (const only of [true, false, "yes", "", "0", 0, 0.5, 2 ** 32, {}, [], null, undefined]) {
+          const want = sim.previewRentBatch("office", 5_000, { onlyDefaultPriced: only as boolean });
+          expect(parse(raw.previewRentBatch("office", "5000", only)), `only=${String(only)}`).toEqual(want);
+        }
+        for (const kind of [null, undefined, 5, {}, [], Symbol("k")]) {
+          expect(raw.previewRentBatch(kind, '"default"', false)).toBeUndefined();
+          expect(JSON.parse(engine.validateTransport(kind as never, 150, 1, 3))).toEqual({ ok: false, reason: "Unknown facility." });
+          expect(engine.placeTransportDryRun(kind as never, 150, 1, 3)).toBe(false);
+          expect(JSON.parse(engine.build(kind as never, 2, 150))).toEqual({ ok: false, reason: "Unknown facility." });
+          expect(JSON.parse(engine.buildTransport(kind as never, 150, 1, 3))).toEqual({ ok: false, reason: "Unknown facility." });
+        }
+      } finally {
+        engine.free();
+      }
     });
   });
 
@@ -286,6 +329,16 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers match the TypeS
               expect(engine.placeTransportDryRun("elevatorStandard", x, b, t), label).toBe(false);
               expect(sim.tower.placeTransportDryRun("elevatorStandard", x, b, t), label).toBe(false);
             }
+          }
+          // The last safe integer is a whole number: both engines read it and the
+          // tower, not the number rule, refuses the shaft off the lot.
+          const edge = 2 ** 53 - 1;
+          for (const args of [[edge, 1, 3], [-edge, 1, 3], [150, -edge, 3], [150, 1, edge]]) {
+            const [x, b, t] = args as [number, number, number];
+            const want = sim.tower.validateTransport("elevatorStandard", x, b, t);
+            expect(want.ok).toBe(false);
+            expect(want.reason, args.join(",")).not.toBe("That request is not valid.");
+            expect(JSON.parse(engine.validateTransport("elevatorStandard", x, b, t))).toEqual(want);
           }
           // An argument missing altogether is refused the same way.
           const raw = engine as unknown as { validateTransport(kind: string): string };
