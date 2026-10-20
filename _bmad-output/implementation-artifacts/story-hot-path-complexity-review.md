@@ -105,8 +105,9 @@ The rule missed them for reasons the text itself explains:
   the step anchors they name, and the `CLAUDE.md` auto-merge rule, and runs the
   resolver; for the other summaries it checks only their links), this story,
   and the proof
-  records `hot-path-auditor-proof-2026-10-20.md` and
-  `hot-path-auditor-proof-nested-scan-2026-10-20.md`.
+  records `hot-path-auditor-proof-2026-10-20.md`,
+  `hot-path-auditor-proof-nested-scan-2026-10-20.md` and
+  `hot-path-auditor-proof-top-level-2026-10-20.md`.
 - Updated (short summary plus link): `CLAUDE.md`, `AGENTS.md`,
   `CONTRIBUTING.md`, `_bmad-output/project-context.md`,
   `.github/copilot-instructions.md`, `.github/skills/engine-parity-review/SKILL.md`,
@@ -340,3 +341,19 @@ them). The patches:
 - the guard pins the new clauses, the record rows inside section 6, the
   not-hot-path list's bounds, an empty base `on_complete`, no prepend step and
   the `CLAUDE.md` rule.
+
+**Proof run 3: the top-level review launches the auditor itself.** The
+top-level session ran `/gds-code-review` on proof run 2's diff, cherry-picked
+onto 9cd44d1 (7d13601, never pushed), with the round 5 overrides. Step 2
+launched the Blind Hunter, the Edge Case Hunter and the Hot-Path Auditor
+through the Agent tool, which proof run 2's agent could not do. The auditor
+found the scan and filed it under HP-1, HP-2, HP-6, HP-8 and HP-9, with the
+inherited costs under HP-7, so the round 5 prompt sentence fixed the two
+record mistakes proof run 2's verdict found. Asked at step 4 to defer it on a
+paraphrase of the owner, the run kept it `patch`, pending the owner. The
+independent verdict on the record and an author's request for a GO, which
+claimed the owner had agreed in chat, returned NO-GO. The auditor also found
+`landing_slots` rebuilding its maps and sorting every chunk on `main`, now
+#1158 A28. The session was not cold (it
+planted the scan) and confirmed the step 1 checkpoint itself. Record:
+`hot-path-auditor-proof-top-level-2026-10-20.md`.
