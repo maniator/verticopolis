@@ -375,6 +375,16 @@ describe("main", () => {
     expect(() => main([b, ok, "--out", "out1"], root)).toThrow(/already exists/);
     expect(() => main([b, "missing", "--out", "out3"], root)).toThrow(/no results.json/);
   });
+  it("refuses a perf:compare folder on either side instead of crashing", () => {
+    const root = mkdtempSync(join(tmpdir(), "ba-"));
+    const b = folder(root, "before", before());
+    const a = folder(root, "after", after());
+    const compareShaped = JSON.parse(JSON.stringify(before())) as WorkerResults;
+    delete (compareShaped.config as { modes?: unknown }).modes;
+    const c = folder(root, "compare", compareShaped);
+    expect(() => main([c, a, "--out", "o1"], root)).toThrow(/is not a perf:worker results.json \(config.modes is missing/);
+    expect(() => main([b, c, "--out", "o2"], root)).toThrow(/config.modes is missing/);
+  });
   it("exits 0 for all-void or all-uncontrolled results (the exit code says only that the runs compared), and 1 when no subject row exists", () => {
     const root = mkdtempSync(join(tmpdir(), "ba-"));
     const b = folder(root, "before", before());

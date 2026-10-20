@@ -186,9 +186,9 @@ export class Simulation implements SimContext {
   /** Buried-treasure finds so far. Capped so a basement dug full of cheap parking
    * can't be farmed into tens of millions (the find stays a bounded windfall). */
   treasuresFound = 0;
-  /** Modern only: the day a booked exterminator's treatment lands (persisted),
-   *  and the infested room ids it was billed for (transient; a mid-booking save
-   *  loses them and resolution then clears every infested room instead). */
+  /** Modern only: the day a booked exterminator's treatment lands and the
+   *  infested room ids it was billed for, both saved. A legacy save without
+   *  the ids clears every infested room when the treatment lands. */
   exterminationDueDay?: number;
   exterminationRoomIds?: number[];
 
