@@ -19,7 +19,7 @@ notes, never a past version's.
 
 ## 2.36.0
 
-- The parking spaces, ramp, security office, clinic, housekeeping room, and recycling center are drawn on the current pixel grid, so the camera monitors, the folded linen, the clinic's bottles and the hazard tape are evenly spaced instead of drifting a pixel here and there.
+- The parking spaces, ramp, security office, Medical Center, housekeeping room, and recycling center are drawn on the current pixel grid, so the camera monitors, the folded linen, the Medical Center's bottles and the hazard tape are evenly spaced instead of drifting a pixel here and there. The recycling center's ceiling pipe has fewer brackets.
 
 ## 2.35.0
 
