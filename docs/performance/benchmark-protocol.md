@@ -56,11 +56,22 @@ one. For acceptance runs:
 Headless is the harness's default and the only mode that counts. The report
 header records the exact browser version.
 
+**The renderer must be the GPU.** The 2026-10-15 reference runs recorded ANGLE
+on Direct3D 11 with the RTX 3060. RUN-0a (2026-10-20) ran the same bundled
+Chromium 149 headless on ANGLE with Vulkan SwiftShader, which is software
+rendering. That makes FPS, 1% lows, frame-time p99 and every frame-bound part
+of M1 to M8 invalid, and it may have moved the bare-step rows too (see the
+folder's `READING.md`). Not yet: the harness does not choose or check the
+renderer (follow-up #1115). Until it does, read the report's Renderer line
+before accepting any run, and reject a run whose renderer names SwiftShader,
+llvmpipe or any other software rasterizer.
+
 ### Machine state
 
 AC power; Windows in its best-performance power mode; nothing else building,
-testing or benchmarking; every browser and editor window closed; no antivirus
-scan running. Note anything unusual (a Windows update pending, thermal state)
+testing or benchmarking; every browser and editor window closed; the ChatGPT
+desktop app and the NVIDIA Overlay closed; no antivirus scan running. Sample
+the idle CPU load just before the start and record it in the notes. Note anything unusual (a Windows update pending, thermal state)
 in the run's notes. The harness records CPU, memory, OS build, GPU, Node, Rust,
 wasm-bindgen, Playwright and browser versions in `results.json`.
 
