@@ -20,6 +20,8 @@ import type { UpdateInfo } from "../pwa";
 import { isInstalledStandalone } from "./standalone";
 import { trackAppAction } from "../analytics";
 import { engineSuffix } from "../wasmhost/engineLabel";
+import { liveDiagnostics } from "../wasmhost/engineDiagnosticsLive";
+import { copyText } from "./copyText";
 
 /**
  * Dialog and modal controllers for {@link UI}, as friend functions taking the
@@ -280,7 +282,8 @@ export function showHelp(ui: UI): void {
   // Replay binds inline via @click. While the splash is up the button is
   // disabled, so a real browser suppresses the click, and onReplayOnboarding
   // also no-ops behind #splash; both make a splash-time trigger a no-op.
-  const box = ui.openModalTemplate(helpTemplate(onSplash, version, { onReplay: () => ui.cb.onReplayOnboarding() }, engineSuffix()), { displaceable: true });
+  const diagnostics = liveDiagnostics();
+  const box = ui.openModalTemplate(helpTemplate(onSplash, version, { onReplay: () => ui.cb.onReplayOnboarding() }, engineSuffix(), diagnostics), { displaceable: true });
   // "Open the full help page" is a real <a href="/help#classic-vs-modern"
   // target="_blank">, so a plain browser tab opens the shareable help page
   // (deep-linked to the comparison section) as written. But from an installed
@@ -295,7 +298,14 @@ export function showHelp(ui: UI): void {
       showCompare(ui);
     }
   });
-  ui.wireActions(box);
+  ui.wireActions(box, {
+    "copy-diagnostics": () => {
+      const status = box.querySelector<HTMLElement>(".help-diagnostics-status");
+      void copyText(diagnostics.text, navigator, document, box.closest("dialog") ?? undefined).then((ok) => {
+        if (status) status.textContent = ok ? "Copied." : "Could not copy. Select the lines above and copy them by hand.";
+      });
+    },
+  });
 }
 
 /**

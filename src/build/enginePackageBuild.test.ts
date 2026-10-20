@@ -27,7 +27,7 @@ function pkg(over: { record?: string | null; glue?: Uint8Array; wasm?: Uint8Arra
 
 describe("readExpectedPackage", () => {
   it("reads the package id and the file digests of a good record", () => {
-    expect(readExpectedPackage(pkg(), "build")).toEqual({ package: record.package, files: record.files });
+    expect(readExpectedPackage(pkg(), "build")).toEqual({ package: record.package, files: record.files, sources: record.sources });
   });
 
   it("is null when there is no package folder, in a build or not", () => {
@@ -53,7 +53,7 @@ describe("readExpectedPackage", () => {
     dir = mkdtempSync(join(tmpdir(), "vc-pkg-"));
     mkdirSync(join(dir, ENGINE_DIR));
     expect(readExpectedPackage(dir, "build")).toBeNull();
-    expect(readExpectedPackage(pkg({ record: `\uFEFF${JSON.stringify(record)}` }), "build")).toEqual({ package: record.package, files: record.files });
+    expect(readExpectedPackage(pkg({ record: `\uFEFF${JSON.stringify(record)}` }), "build")).toEqual({ package: record.package, files: record.files, sources: record.sources });
   });
 
   it("gives a dev serve or a test null even for a good record", () => {

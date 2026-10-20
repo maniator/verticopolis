@@ -17,6 +17,10 @@ notes, never a past version's.
 
 - On the opt-in WASM engine (`?engine=wasm`), an engine failure that has to go back past the last good state now says so and clears the undo history, and a failed switch to TypeScript says so too.
 
+## 2.42.0
+
+- Help's About now shows which game engine runs and which build it is, with a Copy diagnostics button to send us if something looks wrong. It works even when the engine cannot start.
+
 ## 2.41.0
 
 - Saving, or undoing an edit, while an exterminator is booked now keeps the booked rooms, so the treatment covers only the rooms you paid for.

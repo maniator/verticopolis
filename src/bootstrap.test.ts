@@ -202,10 +202,55 @@ describe("showEngineFailure", () => {
       expect.stringMatching(/^You appear to be offline/),
       expect.stringMatching(/^If it keeps happening/),
     ]);
-    expect(document.querySelector("#boot-fallback button")?.textContent).toBe("Reload");
+    expect(document.querySelector("#boot-fallback button:not([data-act])")?.textContent).toBe("Reload");
     // The stop announces itself to assistive technology.
     expect(box.getAttribute("role")).toBe("alert");
     expect(box.getAttribute("aria-live")).toBe("assertive");
+  });
+
+  it("offers Copy diagnostics on the stop screen, built from the page's own state", async () => {
+    const g = globalThis as { __vcEngineBoot?: unknown };
+    const state = { build: "wasm-only", engine: "none", failure: { stage: "load", reason: "package-mismatch", message: "import mismatch" }, binary: { state: "ok", sourceHash: "9".repeat(64) } };
+    g.__vcEngineBoot = state;
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    try {
+      showEngineFailure(state as never, false);
+      const copy = document.querySelector<HTMLButtonElement>('#boot-fallback button[data-act="copy-diagnostics"]')!;
+      expect(copy.textContent).toBe("Copy diagnostics");
+      copy.click();
+      await new Promise((r) => setTimeout(r, 0));
+      const text = (writeText.mock.calls[0] as unknown as [string])[0];
+      expect(text).toContain("Reason: package-mismatch");
+      expect(text).toContain("Source hash in the engine binary: 999999999999");
+      expect(document.querySelector(".engine-failure-copy-status")?.textContent).toBe("Copied.");
+    } finally {
+      delete g.__vcEngineBoot;
+    }
+  });
+
+  it("shows the report to select by hand when the stop screen cannot copy it", async () => {
+    const g = globalThis as { __vcEngineBoot?: unknown };
+    const state = { build: "wasm-only", engine: "none", failure: { stage: "load", reason: "package-mismatch", message: "import mismatch" } };
+    g.__vcEngineBoot = state;
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn(async () => Promise.reject(new Error("denied"))) }, configurable: true });
+    // The selection fallback fails too: jsdom has no execCommand.
+    try {
+      showEngineFailure(state as never, false);
+      document.querySelector<HTMLButtonElement>('#boot-fallback button[data-act="copy-diagnostics"]')!.click();
+      await vi.waitFor(() => expect(document.querySelector(".engine-failure-copy-status")?.textContent).toContain("Could not copy"));
+      const area = document.querySelector<HTMLTextAreaElement>("#boot-fallback textarea.engine-failure-copy-text")!;
+      expect(area.readOnly).toBe(true);
+      expect(area.value).toContain("Verticopolis diagnostics");
+      expect(area.value).toContain("Reason: package-mismatch");
+      expect(document.activeElement).toBe(area);
+      // A second failed copy reuses the block.
+      document.querySelector<HTMLButtonElement>('#boot-fallback button[data-act="copy-diagnostics"]')!.click();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(document.querySelectorAll(".engine-failure-copy-text")).toHaveLength(1);
+    } finally {
+      delete g.__vcEngineBoot;
+    }
   });
 
   it("leaves only the message reachable: everything behind it goes inert and focus moves to Reload", async () => {
@@ -218,7 +263,7 @@ describe("showEngineFailure", () => {
     expect((document.getElementById("boot-fallback-host") as HTMLElement).inert).toBeFalsy();
     expect(document.activeElement).not.toBe(button);
     // Focus lands on Reload, the one control left.
-    expect(document.activeElement).toBe(document.querySelector("#boot-fallback button"));
+    expect(document.activeElement).toBe(document.querySelector("#boot-fallback button:not([data-act])"));
     // A surface mounted after the stop goes inert too.
     const late = document.createElement("div");
     document.body.appendChild(late);

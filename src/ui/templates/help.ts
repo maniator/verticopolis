@@ -1,5 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { HELP_SECTIONS, helpLede, helpAboutBody, helpPrivacyBody, helpReportBlock } from "./helpContent";
+import { diagnosticsBlock } from "./diagnostics";
+import type { DiagnosticsReport } from "../../wasmhost/engineDiagnostics";
 
 /**
  * The How-to-play / Help dialog. Organized so it opens SHORT: a lead and the
@@ -39,7 +41,7 @@ export interface HelpActions {
   onReplay: () => void;
 }
 
-export function helpTemplate(onSplash: boolean, version: string, actions: HelpActions, engine = ""): TemplateResult {
+export function helpTemplate(onSplash: boolean, version: string, actions: HelpActions, engine = "", diagnostics?: DiagnosticsReport): TemplateResult {
   return html`
       <h2>How to play</h2>
       ${helpLede()}
@@ -57,6 +59,7 @@ export function helpTemplate(onSplash: boolean, version: string, actions: HelpAc
       <details class="help-modes">
         <summary><span role="heading" aria-level="3">About</span></summary>
         ${helpAboutBody(version, engine)}
+        ${diagnostics ? diagnosticsBlock(diagnostics) : nothing}
       </details>
       <details class="help-modes">
         <summary><span role="heading" aria-level="3">Privacy</span></summary>

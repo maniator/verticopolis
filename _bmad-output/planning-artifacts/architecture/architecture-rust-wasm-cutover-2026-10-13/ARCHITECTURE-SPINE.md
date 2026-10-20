@@ -7,13 +7,14 @@ paradigm: 'hexagonal: one engine core behind a command port and a read-model por
 scope: 'The web game from the switch behind ?engine=wasm to the 3.0.0 default flip and TypeScript retirement'
 status: final
 created: '2026-10-13'
-updated: '2026-10-13'
+updated: '2026-10-20'
 binds: [FR1, FR2, FR3, FR4, FR5, FR6, NFR1, NFR3, NFR4, roadmap-row-4, roadmap-row-4b, roadmap-row-5, roadmap-row-6, roadmap-row-7]
 sources:
   - _bmad-output/planning-artifacts/architecture/architecture-engine-rust-port-2026-10-08.md
   - _bmad-output/planning-artifacts/rust-wasm-web-cutover-plan-2026-10.md
   - _bmad-output/implementation-artifacts/story-engine-wasm-switch.md
   - _bmad-output/implementation-artifacts/story-engine-retire-typescript.md
+  - _bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/ARCHITECTURE-REVIEW.md
 companions:
   - _bmad-output/planning-artifacts/implementation-readiness-report-2026-10-13-rust-wasm-cutover.md
 ---
@@ -25,16 +26,18 @@ companions:
 Hexagonal. `engine-rs/` is the core. It exposes a **command port** (player
 actions with results), a **read-model port** (frame view, getters, catalog,
 log, events) and a **persistence port** (the `.vctower` codec). The web host
-(`src/wasmhost/`, `src/dualrun/`) is an adapter over the WASM binding
-(`engine-rs/src/wasm.rs`). The TypeScript `src/engine/` is a second core kept
-only as the reference until retirement.
+implements one `SimPort` per host (main thread, worker, fallback) over the
+WASM binding (`engine-rs/src/wasm.rs`); `src/ui`, `src/game` and
+`src/render` see only the port (AD-9). The TypeScript `src/engine/` is a
+second core kept as the reference and as the fallback after a fault, until
+retirement.
 
 ```mermaid
 flowchart LR
-  UI[src/ui, src/game, src/render] --> Host[src/wasmhost host adapter]
-  Host --> Bind[engine-rs/src/wasm.rs binding]
+  UI[src/ui, src/game, src/render] --> Port[SimPort: RustSim, RustWorkerSim, TsSim]
+  Port --> Bind[engine-rs/src/wasm.rs binding]
   Bind --> Core[engine-rs core: sim, clock, charges, catalog, load]
-  Host -. relay until retirement .-> TS[src/engine reference]
+  Port -. fallback after a fault .-> TS[src/engine reference]
   Lock[conformance lock] --> Core
   Lock --> TS
 ```
@@ -61,10 +64,13 @@ host; nothing in `src/ui` calls the binding directly.
 - **Rule:** before the default flip, the host applies each player command to
   the engine first and returns the engine's result. Every tier-1 command
   answers in one shape, JSON `{ ok, reason?, delta? }` plus named extra
-  fields, converted by one host adapter. The instance skips a command the
-  engine refused, and while hosted only the engine writes the log and emits
-  gameplay events. A disagreement is reported and the engine's state wins. Today the instance answers and relays (switch story,
-  "How it works"); that is the gap.
+  fields, converted by one host adapter. While hosted only the engine writes
+  the log and emits gameplay events. Wherever two engines answer the same
+  command (today's mirror host while it exists, the dual run, the parity
+  harness), a disagreement is reported and the engine's state wins (#1064,
+  #1065, D5). Under AD-9 the healthy WASM path has no instance, so a command
+  can only be answered by the engine, once. Today the instance answers and
+  relays (switch story, "How it works"); that is the gap the facade closes.
 
 ### AD-2: The step driver lives in the engine
 
@@ -131,7 +137,11 @@ host; nothing in `src/ui` calls the binding directly.
   The record widths (`FRAME_HEADER`, `PERSON_FIXED`) are Rust constants that
   `src/wasmhost/frameView.ts` copies by hand today; the binding exports them
   and a layout version, consumers check both, and a layout change bumps the
-  version. The engine's identity (crate version, build hash, protocol, frame
+  version. The structural snapshot (units and transports rebuilt when the
+  tower's revision moves, floor and lobby tiles as runs) is part of the
+  read model, with its layout version beside the frame's. A unit field that
+  can change without the revision (label, subtype) travels as unit metadata
+  under its own revision, written through one engine setter. The engine's identity (crate version, build hash, protocol, frame
   layout and save format versions, catalog and lock digests) is one
   versioned record built in Rust and read through the binding; a frontend
   shows it beside its own app version and hardcodes none of it (#963).
@@ -170,7 +180,42 @@ host; nothing in `src/ui` calls the binding directly.
 - **Rule:** a load or an undo boots the engine from the engine-written
   bytes, and the instance's read model is rebuilt from the engine's save. An
   undo snapshot taken before an attach was written by TypeScript; it loads
-  through the engine's loader like any save.
+  through the engine's loader like any save. Undo's signature comes from an
+  engine change counter whose coverage equals the TypeScript `towerStateSig`.
+
+### AD-9: One simulation on the healthy WASM path
+
+- **Binds:** FR1, FR4, NFR1, `src/simport/` (new), `src/wasmhost/`,
+  `src/main.ts`, `src/game/`, `src/ui/`, `src/render/`
+- **Prevents:** a second simulation in the page that has to be kept in step
+  with the engine, answers commands or panels the engine should answer, and
+  costs a full merge on every hour and every edit.
+- **Rule:** while the WASM engine is healthy, the page holds no TypeScript
+  `Simulation`. `app.sim` is a `SimPort`: commands and panel queries go to
+  the engine and return promises on every host; the renderer and HUD read a
+  view built from engine data (a structural snapshot rebuilt on a revision
+  change, a per-frame dynamic frame with changed units only, a header,
+  cached slices). The view holds no rule and decides nothing. Saves, undo,
+  loads and imports use engine bytes. The TypeScript engine runs only after
+  a fault, started from an engine-written restore point and its transient
+  sidecar, behind the same port. A source check over the static imports of
+  every production module under `src/`, and a check on the player bundle,
+  fail when anything reaches the `Simulation` module except the adapter
+  that hosts the TypeScript engine (its own arm and the fallback, loaded
+  lazily) or tooling kept out of player builds; runtime and e2e checks fail
+  when normal play constructs, executes or deserializes one. The parity projects and the dual run keep
+  the mirror host as a test and tooling harness, kept out of player builds.
+- **Release identity (owner, 2026-10-20 22:12 UTC):** the facade reaches
+  players during the 3.0 pre-release test on 2.x (stages 0 to 3, the release
+  plan's 1.2); stage 3 runs it as the WASM host, and the reliability
+  evidence and both 14-night windows finish before the 3.0.0 flip. From
+  slice 10 the healthy WASM path holds no mirror; once slice 11 lands the
+  mirror lives only in CI and parity tooling, outside the player bundle,
+  and the TypeScript emergency fallback stays.
+- **Owner decision (2026-10-20):** adopted (F1 to F9, 21:40 UTC); the design
+  and slice plan are
+  `architecture-rust-facade-2026-10-20/` (ARCHITECTURE-REVIEW.md,
+  slice-plan.md).
 
 ## Consistency Conventions
 
@@ -211,13 +256,11 @@ src/dualrun/     # relay, shadow, mirror (tier 3 callers, with the AD-3 exemptio
 
 - **Worker message protocol** (#908): after the flip; the command and
   read-model ports above are what it serializes.
-- **Structural snapshot shape** (#868): its layout is a read-model change
-  under AD-4.
 - **Crate release and semver** (#893): the published crate's compatibility
   policy for its users.
 - **The merge read model** (`mergeSimulation` and its `KEEP` set) has no
-  version; it is replaced by the structural snapshot (#868), so it stays as
-  it is until then.
+  version. AD-9 removes it from the healthy path; it stays only as the test
+  and tooling harness until retirement.
 - **Toolchain upgrades:** held for the cutover. The reality-check lens
   reported newer upstream releases (TypeScript, Vite, Vitest, Rust stable);
   moving them is separate work.

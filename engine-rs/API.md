@@ -135,14 +135,23 @@ it, and nothing in the engine reads it or requires it:
 ```
 
 `sourceHash` is the SHA-256 over the engine's Rust sources and the conformance
-event catalog (`engineSourceHash` in `src/wasmhost/packageHash.ts`). It names
-sources, not a compiled binary; a binary's own digest is a separate fact (the
-package id in `BUILD.json`). The web build is to write the object, as UTF-8
-JSON, into a custom section named `verticopolis.build` of each `.wasm`
-(`scripts/wasm-build.ts`, before any digest is taken); that packaging step
-lands with the second slice of #963, so today no binary carries the section. A
-native Rust or Godot host supplies the same object its own way, for example a file its build step
-writes next to the library or a constant it links in, and a frontend that shows
+event catalog (`engineSourceHash` in `src/wasmhost/packageHash.ts`). A packager
+outside the web build computes the same value as follows. Take every file under
+the crate directory except `target/`, `pkg/`, hidden names, names ending in `~`
+and Markdown files, plus every file under `conformance/events/` at the repository root and
+every file a plain `include_str!("...")` or `include_bytes!("...")` names. Label each
+file with its path relative to the crate directory, using `/` (the conformance
+files are labeled `../conformance/events/...`). Sort the labels
+by UTF-16 code unit. For each file in that order, feed the SHA-256 the label, a
+zero byte, the file with each CRLF read as LF (a file containing a zero byte is taken as it is), and a zero byte.
+The hex digest, in lowercase, is the value. That makes the hash a fact about
+the sources; a compiled binary's own digest is a separate one (the package id
+in `BUILD.json`). The web build writes the object, as UTF-8 JSON,
+into a custom section named `verticopolis.build` of each `.wasm`
+(`scripts/wasm-build.ts`, right after wasm-bindgen and before any digest is
+taken), and the page reads it back from the compiled module
+(`src/wasmhost/engineLoad.ts`). A native Rust or Godot host supplies the same
+object its own way, for example a file its build step writes next to the library or a constant it links in, and a frontend that shows
 both shows them side by side. A missing or malformed object is reported as
 unavailable, never as a failure of the engine.
 
