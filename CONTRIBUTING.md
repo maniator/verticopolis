@@ -129,15 +129,30 @@ Verticopolis has **two test tiers**:
     it, a Rust test replays it), and the `.TDT` codec by
     `conformance/tdt-cases.json` (`tdtCases.integration.test.ts` writes it,
     `cargo run --release --features conformance --bin tdt` and a Rust test replay it). A nightly differential fuzzer
-    (`engine-fuzz.yml`) runs seeded random scenarios through both engines; a
-    divergence it finds is pinned as a named scenario in the fix PR.
+    (`engine-fuzz.yml`) runs seeded random scenarios through both engines and
+    compares the state, crowd and events hashes at checkpoints at least
+    every in-game hour, then the money, the log and each field of the full
+    save, naming the first one that differs (`scripts/fuzz-compare.ts`; exit
+    3 marks a harness failure, not a divergence). A divergence it finds is
+    pinned as a named scenario in the fix PR. A run summary names its seed
+    range and the `seed_block` and `seed_offset` that replay it.
 
     **The vitest tiers on the WASM engine.** `npm run test:wasm:parity` runs
     the `integrationWasm` and `unitWasm` projects, whose setup file hosts
     every `Simulation` a test ticks on the engine
     (story-engine-test-parity, #878). A test that cannot run there is marked
-    with `itTypeScriptOnly(reason)`, and the story's test-mapping table names
-    each one with the same reason. No CI job runs these projects yet.
+    with `itTypeScriptOnly(reason)`; a test that reads only what the
+    engine's frame carries but ticks too often for a full merge after every
+    tick calls `atEngineFrameCadence(reason)` and runs at the host's own
+    cadence. The story's test-mapping table names each one with the same
+    reason, and `src/tests/parity/exclusions.ratchet.txt` pins how many each
+    file holds. CI runs both projects on every PR (`test-wasm-parity` in
+    `test.yml`). Knobs: `VC_WASM_SYNC=hour` runs every test at the host's own
+    cadence, `VC_PARITY_DUMP=<dir>` writes both views where the instance
+    and the engine depart, `VC_PARITY_TRACE=1` logs each re-host (see the header of
+    `src/tests/parity/wasmHostSetup.ts`). The projects run with a 120 s test
+    timeout, so a test with its own shorter timeout can still time out on a
+    slow machine.
 
   `npm test` (`vitest run`) runs **both** projects and is the CI gate. Coverage
   stays a single root-level measurement across both projects (see Coverage

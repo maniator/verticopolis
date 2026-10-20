@@ -61,6 +61,26 @@ describe("the .vctower writer", () => {
     },
   );
 
+  it("reports the latch-off once, and a report that throws never costs the save", () => {
+    vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const sim = new Simulation(1);
+    const ownPacked = SaveGame.packSync(sim);
+    const onLatch = vi.fn(() => {
+      throw new Error("analytics is down");
+    });
+    setEngineWriter(() => "not a tower file", onLatch);
+    expect(SaveGame.packSync(sim)).toBe(ownPacked);
+    expect(SaveGame.packSync(sim)).toBe(ownPacked);
+    expect(onLatch).toHaveBeenCalledTimes(1);
+    // A writer set again starts with no listener unless it brings one.
+    const quiet = vi.fn();
+    setEngineWriter(() => "still not one", null);
+    setEngineWriter(null, quiet);
+    expect(SaveGame.packSync(sim)).toBe(ownPacked);
+    expect(quiet).not.toHaveBeenCalled();
+  });
+
   it("writes a save past the engine's size limit on the TypeScript side, with the engine left on", () => {
     const writer = vi.fn(() => "VCTOWER1\nZW5naW5l\n");
     setEngineWriter(writer);

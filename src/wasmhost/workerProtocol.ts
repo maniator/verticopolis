@@ -86,6 +86,8 @@ export interface MergePayload {
   save: string;
   telemetry: string;
   housekeeping: string | null;
+  /** `commuteStress()`: the per-origin commute-stress rows. */
+  commute: string;
 }
 
 /** The answer to a frame request. `view` is the engine's frame view, its
@@ -106,6 +108,8 @@ export interface FrameReply {
   log: string | null;
   pending: string | null;
   merge: MergePayload | null;
+  /** Changed commute rows when this reply carries no full merge. */
+  commute?: string | null;
   workMs: { ops: number; reply: number };
   /** The worker's WASM linear memory, when the entry point can read it. */
   memoryBytes: number | null;

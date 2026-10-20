@@ -6,6 +6,7 @@ import type { WasmHostApp } from "./startWasmHost";
 import { settleEngine, stepGate, setStepGate, SETTLE_TIMEOUT_MS } from "./stepGate";
 import type { FromWorker, ToWorker } from "./workerProtocol";
 import { fakeModule } from "./fakeEngine.fixture";
+import { EngineBootError } from "./engineBoot";
 
 const last = <T>(xs: readonly T[]): T | undefined => xs[xs.length - 1];
 
@@ -131,6 +132,15 @@ describe("worker controller (fake engine)", () => {
     const w = fakeWorker();
     const crashing = () => { setTimeout(() => w.onerror?.({ message: "no module" }), 0); return w; };
     await expect(spawnEngineWorker(crashing, "u")).rejects.toThrow(/failed to start: no module/);
+    await expect(spawnEngineWorker(crashing, "u")).rejects.not.toBeInstanceOf(EngineBootError);
+  });
+
+  it("codes a worker that never answers ready as a boot timeout", async () => {
+    const silent: EngineWorkerLike = { onmessage: null, onerror: null, postMessage() {}, terminate: vi.fn() };
+    const err = await spawnEngineWorker(() => silent, "u", 5).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(EngineBootError);
+    expect(err).toMatchObject({ reason: "boot-timeout", message: "the engine worker did not answer within 5 ms" });
+    expect(silent.terminate).toHaveBeenCalled();
   });
 });
 

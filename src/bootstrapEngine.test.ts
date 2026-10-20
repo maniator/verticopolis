@@ -39,12 +39,17 @@ vi.mock("./wasmhost/workerController", async (importOriginal) => {
     startWorkerHost: vi.fn(() => ({ status: { hosted: true, errors: [] as string[] }, stop: vi.fn() })),
   };
 });
-import { startWasmHost } from "./wasmhost/startWasmHost";
+// The relay, so the reliability rows (`engine_status`) can be read back.
+vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
+import { startWasmHost, type WasmHostOptions } from "./wasmhost/startWasmHost";
+import { sendToRelay } from "./analyticsRelay";
+import { resetEngineStatus } from "./analyticsEngineStatus";
 import { startWorkerHost } from "./wasmhost/workerController";
 import * as pwa from "./pwa";
 import { Simulation } from "./engine/Simulation";
 import { SaveGame } from "./storage/SaveGame";
 import { setEngineWriter } from "./storage/vctowerWriter";
+import { EngineBootError } from "./wasmhost/engineBoot";
 
 
 /** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */
@@ -84,7 +89,7 @@ describe("bootGame engine", () => {
       expect(error).toHaveBeenCalledWith(expect.stringContaining("[wasm]"), wasmStub.loadError);
       expect(document.getElementById("boot-fallback-host")).toBeNull();
       // A switchable build reports the engine it settled on, and why.
-      expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "load", message: "404 engine/verticopolis_engine.js" } });
+      expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "load", reason: "boot-error", message: "404 engine/verticopolis_engine.js" } });
     } finally {
       wasmStub.requested = "ts";
       wasmStub.loadError = null;
@@ -107,22 +112,23 @@ describe("bootGame engine", () => {
         throw new Error("no worker host");
       });
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
-      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "no worker host" } });
+      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", reason: "boot-error", message: "no worker host" } });
       // A later throw lets the started host go, so the state stops claiming it.
       vi.spyOn(pwa, "registerPWA").mockImplementationOnce(() => {
         throw new Error("no service worker");
       });
       await expect(bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })))).rejects.toThrow("no service worker");
-      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "no service worker" } });
+      // The throw came from outside the engine, so it is coded `other`.
+      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", reason: "other", message: "no service worker" } });
       // A refused first tower is not thrown: the host reports it and stays.
       vi.mocked(startWorkerHost).mockImplementationOnce(() => ({ status: { hosted: false, errors: ["not hosting this tower: it has a crowd"] }, stop: vi.fn() }) as never);
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
-      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "not hosting this tower: it has a crowd" } });
+      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", reason: "attach-refused", message: "not hosting this tower: it has a crowd" } });
       wasmStub.workerError = new Error("the engine worker did not answer ready");
       vi.mocked(startWorkerHost).mockClear();
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
       expect(startWorkerHost).not.toHaveBeenCalled();
-      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "load", message: "the engine worker did not answer ready" } });
+      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "load", reason: "boot-error", message: "the engine worker did not answer ready" } });
       expect(error).toHaveBeenCalledWith(expect.stringContaining("[wasm-worker]"), expect.any(Error));
     } finally {
       wasmStub.requested = "ts";
@@ -161,7 +167,7 @@ describe("bootGame engine", () => {
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
       expect(error).toHaveBeenCalledWith(expect.stringContaining("[wasm]"), expect.any(Error));
       // The fallback is recorded with its reason (#874) as well as logged.
-      expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "no host" } });
+      expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", reason: "boot-error", message: "no host" } });
       expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
       expect(encodeVctower).not.toHaveBeenCalled();
     } finally {
@@ -176,10 +182,10 @@ describe("bootGame engine", () => {
     wasmStub.requested = "wasm";
     const encodeVctower = vi.fn(() => "VCTOWER1\nZW5naW5l\n");
     wasmStub.module = { Engine: class {}, encodeVctower };
-    vi.mocked(startWasmHost).mockImplementationOnce(() => ({ status: { engine: "wasm", starts: 0, hosted: false, errors: ["not hosting this tower: it has a crowd"] }, current: () => null, stop: () => {} }));
+    vi.mocked(startWasmHost).mockImplementationOnce(() => ({ status: { engine: "wasm", starts: 0, hosted: false, fallbacks: 1, lastFallback: { reason: "attach-refused", stage: "start" }, errors: ["not hosting this tower: it has a crowd"], lastError: "not hosting this tower: it has a crowd", droppedErrors: 0 }, current: () => null, stop: () => {} }));
     try {
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
-      expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "not hosting this tower: it has a crowd" } });
+      expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", reason: "attach-refused", message: "not hosting this tower: it has a crowd" } });
       // The host follows every later adopt, so saves keep the engine's writer.
       expect(await SaveGame.export(new Simulation(1))).toBe("VCTOWER1\nZW5naW5l\n");
       expect(encodeVctower).toHaveBeenCalledTimes(1);
@@ -188,5 +194,201 @@ describe("bootGame engine", () => {
       wasmStub.requested = "ts";
       wasmStub.module = null;
     }
+  });
+});
+
+const lastRow = (xs: Record<string, unknown>[]): Record<string, unknown> | undefined => xs[xs.length - 1];
+const bootState = (): unknown => (globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot;
+
+/** Every `engine_status` row the relay saw, in order. */
+const engineRows = (): Record<string, unknown>[] =>
+  vi
+    .mocked(sendToRelay)
+    .mock.calls.filter(([name]) => name === "engine_status")
+    .map(([, props]) => props as Record<string, unknown>);
+
+/**
+ * The reliability instrument's wiring (issue #1081): the row boot sends once
+ * it has picked its engine, the later fallbacks the host reports, and the
+ * writer latch-off, all as codes, never the messages behind them.
+ */
+describe("bootGame engine_status", () => {
+  const secret = "could not read /home/player/My Secret Tower.vctower";
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.innerHTML = "";
+    delete (window as unknown as { game?: unknown }).game;
+    window.location.href = "http://localhost:3000/";
+    setEngineWriter(null);
+    wasmStub.requested = "ts";
+    wasmStub.loadError = null;
+    wasmStub.module = null;
+    wasmStub.workerError = null;
+  });
+
+  const boot = async () => {
+    resetEngineStatus();
+    vi.mocked(sendToRelay).mockClear();
+    window.location.href = "https://verticopolis.com/";
+    await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+  };
+
+  it("reports the TypeScript default, once", async () => {
+    stubWebGL();
+    await boot();
+    expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", engine_requested: "ts", engine: "ts", build: "switchable", fallback_reason: "none", fallbacks: 0 })]);
+  });
+
+  it("reports a package that failed to load by its code, with none of the message", async () => {
+    stubWebGL();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    wasmStub.requested = "wasm";
+    wasmStub.loadError = new Error(secret);
+    await boot();
+    expect(engineRows()).toEqual([expect.objectContaining({ engine_requested: "wasm", engine: "ts-fallback", fallback_reason: "boot-error", fallback_stage: "load", fallbacks: 1 })]);
+    expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret|player|vctower/);
+  });
+
+  it("reports a worker that did not start as a fallback at the load", async () => {
+    stubWebGL();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    wasmStub.requested = "wasm-worker";
+    wasmStub.workerError = new Error(secret);
+    await boot();
+    expect(engineRows()).toEqual([expect.objectContaining({ engine_requested: "wasm-worker", engine: "ts-fallback", fallback_reason: "boot-error", fallback_stage: "load" })]);
+    expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret/);
+  });
+
+  it("counts a refused first tower once, then each later tower the host refuses", async () => {
+    stubWebGL();
+    wasmStub.requested = "wasm";
+    wasmStub.module = { Engine: class {} };
+    let opts: WasmHostOptions | undefined;
+    vi.mocked(startWasmHost).mockImplementationOnce((_app, _mod, _log, o) => {
+      opts = o;
+      // The real host reports the first refusal through onFallback as well.
+      o?.onFallback?.({ reason: "attach-refused", stage: "start" });
+      return { status: { engine: "wasm", starts: 0, hosted: false, fallbacks: 1, lastFallback: { reason: "attach-refused", stage: "start" }, errors: [`not hosting this tower: ${secret}`], lastError: `not hosting this tower: ${secret}`, droppedErrors: 0 }, current: () => null, stop: () => {} };
+    });
+    await boot();
+    expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", engine: "ts-fallback", fallback_reason: "attach-refused", fallback_stage: "start", fallbacks: 1 })]);
+    opts?.onFallback?.({ reason: "attach-refused", stage: "adopt" });
+    expect(lastRow(engineRows())).toMatchObject({ trigger: "fallback", fallback_stage: "adopt", fallbacks: 2 });
+    expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret/);
+  });
+
+  it("reports the engine writer turning itself off, on the boot state too", async () => {
+    stubWebGL();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    wasmStub.requested = "wasm";
+    wasmStub.module = { Engine: class {}, encodeVctower: () => "not a tower file" };
+    await boot();
+    expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", engine: "wasm", writer_latched: false })]);
+    expect(bootState()).toEqual({ build: "switchable", engine: "wasm", failure: null });
+    await SaveGame.export(new Simulation(1));
+    expect(lastRow(engineRows())).toMatchObject({ trigger: "writer-latch", engine: "wasm", writer_latched: true });
+    expect(bootState()).toEqual({ build: "switchable", engine: "wasm", failure: null, writerLatched: true });
+  });
+
+  it("codes every boot failure path, and sends none of the message behind it", async () => {
+    stubWebGL();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const settled = async () => {
+      await boot();
+      expect(engineRows()).toHaveLength(1);
+      return engineRows()[0];
+    };
+    wasmStub.requested = "wasm";
+    wasmStub.loadError = new EngineBootError("boot-timeout", secret);
+    expect(await settled()).toMatchObject({ engine: "ts-fallback", fallback_reason: "boot-timeout", fallback_stage: "load", fallbacks: 1 });
+    wasmStub.loadError = new WebAssembly.LinkError(secret);
+    expect(await settled()).toMatchObject({ engine: "ts-fallback", fallback_reason: "package-mismatch", fallback_stage: "load" });
+    wasmStub.loadError = null;
+    wasmStub.module = { Engine: class {} };
+    vi.mocked(startWasmHost).mockImplementationOnce(() => {
+      throw new Error(secret);
+    });
+    expect(await settled()).toMatchObject({ engine: "ts-fallback", fallback_reason: "boot-error", fallback_stage: "start" });
+    wasmStub.module = null;
+    wasmStub.requested = "wasm-worker";
+    vi.mocked(startWorkerHost).mockImplementationOnce(() => {
+      throw new Error(secret);
+    });
+    expect(await settled()).toMatchObject({ engine_requested: "wasm-worker", engine: "ts-fallback", fallback_reason: "boot-error", fallback_stage: "start" });
+    vi.mocked(startWorkerHost).mockImplementationOnce(() => ({ status: { hosted: false, errors: [`not hosting this tower: ${secret}`] }, stop: vi.fn() }) as never);
+    expect(await settled()).toMatchObject({ engine: "ts-fallback", fallback_reason: "attach-refused", fallback_stage: "start" });
+    expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret|player|vctower/);
+  });
+
+  it("keeps the row when a boot step after the engine throws, and sends none when the game never existed", async () => {
+    stubWebGL();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const failingPwa = () =>
+      vi.spyOn(pwa, "registerPWA").mockImplementationOnce(() => {
+        throw new Error(secret);
+      });
+    // The main-thread host keeps running: the settle row stands alone.
+    wasmStub.requested = "wasm";
+    wasmStub.module = { Engine: class {} };
+    failingPwa();
+    await expect(boot()).rejects.toThrow("Secret");
+    expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", engine: "wasm", fallbacks: 0 })]);
+    // The worker host is let go, so a fallback follows the settle row.
+    wasmStub.module = null;
+    wasmStub.requested = "wasm-worker";
+    failingPwa();
+    await expect(boot()).rejects.toThrow("Secret");
+    expect(engineRows()).toEqual([
+      expect.objectContaining({ trigger: "settle", engine: "wasm-worker", fallbacks: 0 }),
+      expect.objectContaining({ trigger: "fallback", engine: "ts-fallback", fallback_reason: "other", fallback_stage: "start", fallbacks: 1 }),
+    ]);
+    // No game, no engine ran: no row (the error reaches $exception instead).
+    resetEngineStatus();
+    vi.mocked(sendToRelay).mockClear();
+    await expect(
+      bootGame(() => {
+        throw new Error(secret);
+      }),
+    ).rejects.toThrow("Secret");
+    expect(engineRows()).toEqual([]);
+    expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls.filter(([n]) => n === "engine_status"))).not.toMatch(/Secret/);
+  });
+
+  describe("a wasm-only build", () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("reports a package that did not load as a stop, with no engine left", async () => {
+      stubWebGL();
+      vi.stubGlobal("__WASM_ONLY__", true);
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      wasmStub.loadError = new Error(secret);
+      await expect(boot()).rejects.toThrow(/did not start/);
+      expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", build: "wasm-only", engine_requested: "wasm", engine: "none", fallback_reason: "boot-error", fallback_stage: "load", fallbacks: 1 })]);
+      // A package without the engine writer is the wrong package.
+      wasmStub.loadError = null;
+      wasmStub.module = { Engine: class {} };
+      await expect(boot()).rejects.toThrow(/did not start/);
+      expect(engineRows()).toEqual([expect.objectContaining({ engine: "none", fallback_reason: "package-mismatch", fallback_stage: "load" })]);
+      expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret/);
+    });
+
+    it("reports a first tower the strict host refused as a stop at the start", async () => {
+      stubWebGL();
+      vi.stubGlobal("__WASM_ONLY__", true);
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      wasmStub.module = { Engine: class {}, encodeVctower: () => "VCTOWER1\n" };
+      vi.mocked(startWasmHost).mockImplementationOnce((_app, _mod, _log, o) => {
+        o?.onFallback?.({ reason: "attach-refused", stage: "start" });
+        o?.onFatal?.(`not hosting this tower: ${secret}`, "attach-refused");
+        return { status: { engine: "wasm", starts: 0, hosted: false, fallbacks: 1, lastFallback: { reason: "attach-refused", stage: "start" }, errors: [`not hosting this tower: ${secret}`], lastError: `not hosting this tower: ${secret}`, droppedErrors: 0 }, current: () => null, stop: () => {} };
+      });
+      await boot();
+      expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", build: "wasm-only", engine: "none", fallback_reason: "attach-refused", fallback_stage: "start", fallbacks: 1 })]);
+      expect(bootState()).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage: "start", reason: "attach-refused" } });
+      expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret/);
+    });
   });
 });
