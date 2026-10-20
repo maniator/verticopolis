@@ -27,7 +27,9 @@ import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./servic
  * its even pitch. Previews that draw at another size (/gallery) still resample.
  */
 
-/** Staff appearance depends on room geography, not the compositor draw origin. */
+/** Staff appearance depends on room geography, not the compositor draw origin.
+ *  `geoVariant` reads the world's lowest floor and lot width, so the shirts
+ *  follow those too; both are constant for the shipped catalog. */
 function staffSeed(u: Pick<Unit, "kind" | "floor" | "x">): number {
   return geoVariant(u, 6, 997);
 }

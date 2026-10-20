@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 2.35.3
 
-- Room details stay consistent when moving the camera across different parts of the tower.
+- Staff shirts, the sky bar's window lights and a few other room details no longer change depending on where the room sits in the tower.
 
 ## 2.35.2
 

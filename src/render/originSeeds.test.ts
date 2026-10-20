@@ -261,6 +261,11 @@ const CASES: ReadonlyArray<{ label: string; unit: Unit }> = [
   { label: "boutique (phone repair)", unit: unitOf("boutiqueBay", { subtype: "Phone Repair" }) },
   { label: "clinic (pharmacy)", unit: unitOf("clinic", { subtype: "Pharmacy" }) },
   { label: "amusements (claw parlor)", unit: unitOf("amusements", { subtype: "Claw Parlor" }) },
+  // Basement placements give a negative raw seed, so a pick that goes back to a
+  // plain `% length` fails here (the claw prize would index undefined).
+  { label: "boutique (phone repair) in the basement", unit: unitOf("boutiqueBay", { subtype: "Phone Repair", floor: -3, x: 2 }) },
+  { label: "clinic (pharmacy) in the basement", unit: unitOf("clinic", { subtype: "Pharmacy", floor: -3, x: 2 }) },
+  { label: "amusements (claw parlor) in the basement", unit: unitOf("amusements", { subtype: "Claw Parlor", floor: -3, x: 2 }) },
 ];
 
 /** The looks the sweep paints each kind and subtype in: the settled states,
