@@ -136,12 +136,20 @@ These are all errors in a full run:
 - different renderers across processes or across the reads of one process,
   whichever read they come from;
 - a renderer read at the start and none at a later read, which is how a GPU
-  process that died mid-run looks.
+  process that died mid-run looks;
+- a `webglcontextlost` event on any canvas in any page of a process run (the
+  run's `contextLost` list). The renderer reads come from a new canvas, so a
+  GPU process that restarted mid-run still reads the same adapter there while
+  the game's own context is gone, and the game recovers by rebuilding its
+  canvas. The frames around that are not measurements. The probe canvas the
+  harness makes stays detached, so releasing it is not counted, and the
+  service-worker first visit (a side measurement with no frames) is not
+  counted either.
 
 A `--quick` smoke run turns the first four into warnings so the cloud smoke
 still works, and its report says at the top that no frame row in it is GPU
 evidence. A register exception turns the first three into warnings (below) and
-leaves the missing renderer an error. The last two stay errors in every mode,
+leaves the missing renderer an error. The last three stay errors in every mode,
 quick or excepted. The same check runs on a throwaway browser launch before
 the builds, under one 60-second deadline from the launch call through the
 read, plus at most 5 seconds for the close, so a setting that does not reach
