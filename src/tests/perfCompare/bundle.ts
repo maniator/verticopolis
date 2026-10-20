@@ -61,8 +61,12 @@ export function categorize(path: string): Category {
 /** The precache URLs a Workbox `sw.js` lists (`{url:"...",revision:...}`). */
 export function precacheUrls(swSource: string): string[] {
   const urls = new Set<string>();
-  for (const m of swSource.matchAll(/\{\s*url:\s*"([^"]+)"\s*,\s*revision:/g)) urls.add(m[1].replace(/^\//, ""));
-  for (const m of swSource.matchAll(/\{\s*revision:\s*(?:"[^"]*"|null)\s*,\s*url:\s*"([^"]+)"\s*\}/g)) urls.add(m[1].replace(/^\//, ""));
+  // Every flat `{...}` entry that names a url, in any key order (revision,
+  // integrity and url may come in any sequence).
+  for (const m of swSource.matchAll(/\{[^{}]*\}/g)) {
+    const url = /(?:^|[{,\s])["']?url["']?\s*:\s*"([^"]+)"/.exec(m[0])?.[1];
+    if (url && /(?:^|[{,\s])["']?revision["']?\s*:/.test(m[0])) urls.add(url.replace(/^\//, ""));
+  }
   return [...urls].sort();
 }
 

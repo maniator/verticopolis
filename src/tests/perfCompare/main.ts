@@ -266,8 +266,9 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
  * timed build), `prod` is dist/ (the sizes), `sourceHash` the current
  * engine-rs sources' hash. Each build must hold the whole package, both
  * builds must serve the same bytes, and the timed build's BUILD.json must
- * record these sources. BUILD.json records the sources, not the binary's
- * bytes, so these checks tie the package to the sources only as far as the
+ * record these sources. Besides the sources hash, BUILD.json (schema 2) records
+ * the digest and size of the glue and the binary, but these checks do not
+ * compare them yet, so they tie the package to the sources only as far as the
  * build that wrote it was honest. A checkout without engine-rs sources
  * fails, since then nothing proves which engine ran. `recorded`, given after
  * the runs, is the package recorded before them.
