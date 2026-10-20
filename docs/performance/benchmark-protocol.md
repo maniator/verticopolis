@@ -438,8 +438,10 @@ noise the tolerance has to cover.
    the median paired difference (WASM slot minus TypeScript slot, one-sided).
    `perf:worker`'s report prints M4's difference (median and 95% interval of
    the median, WASM minus TypeScript, in ms); the upper end is the statistic
-   `perf:calibrate` computes for a pass. Not yet: the `perf:compare` report has
-   to print that same statistic before M5 can be judged against ε.
+   `perf:calibrate` computes for a pass. The `perf:compare` report prints M5's statistic
+   the same way, under the Startup table (one row per CPU throttle, with the
+   pair count); a row under 10 pairs is marked as below the gate's minimum, in
+   both reports.
 3. **Coverage.** For passes that are exchangeable, on average over
    the draw of the passes, a fresh pass lands above the largest of n passes
    with probability 1/(n + 1) (before rounding).
