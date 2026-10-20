@@ -59,6 +59,7 @@ Temporary code this story also removes that the roadmap's section does not
 list, such as anything merged or opened after its snapshot (each PR adds its
 own line: the PR, the files, and why the fallback needs them):
 
+- **Benchmark parity tooling that runs the TypeScript engine** (#1124, the cost-split, churn and calibration PR, with #1108's A/A mode): `perf:compare --aa ts` and the TypeScript slot of every `perf:compare` run (`src/tests/perfCompare/{runner,validate,metrics,limitations}.ts`), the TypeScript side of the Node check (`nodeCheck.ts`), `perf:calibrate`'s `ts` passes and cold-start cap, and the `perf:worker` `ts` mode and its gate column (`src/tests/perfWorker/`). The WASM-only parts (the export cost split, hourly churn, the working-tree record, calibration of WASM A/A passes) stay as permanent benchmark infrastructure. Removing the TypeScript engine retires the comparison, so these go with it or collapse to WASM-only runs.
 - PR #831 (room occupant seats): `roomOccupants` in `src/render/pixelSprites/common.ts` imports `visibleOccupants` from the TypeScript engine (through `engine/Crowd`), and `residential.ts`, `food.ts`, `clinic.ts` and `sprites/facilities/venue.ts` import it directly. After the removal, each reads the engine read model's visible-occupant count instead (backlog row `room-painters-read-ts-engine`, #1106). The PR cuts the render importers of `visibleOccupants` from 11 files on main to these five.
 
 ## Sequence it sits in

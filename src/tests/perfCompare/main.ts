@@ -8,6 +8,7 @@ import { gateBrowser, probeBrowser, type BrowserProbe } from "./browserProbe";
 import { checkExceptionFolder, exceptionMarker, resolveLaunch } from "./exceptionRegister";
 import { browserName, recordedGpuVerified, type BrowserLaunch } from "./renderer";
 import { aggregate, compareEngines, missingSamples } from "./metrics";
+import { measureChurn } from "./churn";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
 import { engineOrder, runProcess } from "./runner";
@@ -193,6 +194,10 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const mod = await loadWebPackage(join(distPerf, "engine"));
   const nodeChecks = scenarios.map((sc, i) => checkScenario(mod, sc, config.steps, config.dt, config.warmSteps, i % 2 === 0 ? "ts-first" : "wasm-first"));
   for (const c of nodeChecks) log(`  ${c.scenario}: ${c.match ? "engines agree" : "ENGINES DISAGREE"} (Node: ts ${c.nodeTsMs.toFixed(0)} ms, wasm ${c.nodeWasmMs.toFixed(0)} ms)`);
+  // Hourly save churn on the WASM engine; no TypeScript side, so an A/A pass
+  // of TypeScript has nothing to add and an A/A pass of WASM repeats it.
+  const churn = scenarios.map((sc) => measureChurn(mod, sc, Math.max(1, Math.floor((config.steps * config.dt) / 60)), config.dt, config.warmSteps));
+  for (const c of churn) log(`  ${c.scenario}: hourly save churn median ${(c.medianShare * 100).toFixed(1)}%, p95 ${(c.p95Share * 100).toFixed(1)}% of ${c.saveChars} characters`);
 
   const server = await startServer(distPerf);
   let browserVersion: string | null = runs.find((r) => r.browserVersion)?.browserVersion ?? null;
@@ -248,6 +253,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     browser: { version: browserVersion, headless: true, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException, rendererExceptionSha256: launch.rendererExceptionSha256, rendererExceptionCommit: launch.rendererExceptionCommit, gpuVerified: recordedGpuVerified(launch.rendererException, runs.filter((r) => r.ok).map((r) => r.page?.webgl?.renderer), runs.filter((r) => r.ok).map((r) => r.rendererEnd), runs.filter((r) => r.ok).map((r) => r.rendererEndCold)) },
     scenarios: scenarios.map((s) => ({ name: s.name, description: s.description, sha256: s.sha256, population: s.population, units: s.units, transports: s.transports, saveBytes: s.save.length })),
     nodeChecks,
+    churn,
     runs,
     bundle,
     toolingBundleTotals: toolingBundle.totals,

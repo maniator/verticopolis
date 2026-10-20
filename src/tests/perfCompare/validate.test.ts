@@ -247,7 +247,7 @@ describe("validateResults", () => {
   it("fails audio-on frames without a running context, an attribution pass with no export call, and a throttle that did not hold", () => {
     const runs = good();
     runs[1].audio = { started: true, muted: false, contexts: ["suspended"] };
-    runs[2].scenarios.small.hosted["1"].attribution = { engineTickMs: 1, engineExportMs: 0, hostJsMs: 1, wrappedTotalMs: 2, merges: 1, engineTicks: 10, exportCalls: 0, exportsWrapped: 40 };
+    runs[2].scenarios.small.hosted["1"].attribution = { engineTickMs: 1, engineExportMs: 0, hostJsMs: 1, wrappedTotalMs: 2, merges: 1, engineTicks: 10, exportCalls: 0, exportsWrapped: 40, byExport: {}, parseMs: 0, parseCalls: 0 };
     runs[0].cpuProbe = { unthrottledMs: 50, throttledMs: 60, rate: 4, timed: {} };
     const v = validateResults(config(), runs, [node()]);
     expect(v.errors).toEqual(expect.arrayContaining(["rep 0 wasm: audio-on frames ran with no running AudioContext (suspended)", "rep 1 wasm: small 1x: the attribution pass saw no export call, so its host JS share would include engine time"]));

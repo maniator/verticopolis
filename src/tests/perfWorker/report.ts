@@ -1,3 +1,4 @@
+import { treeSummary } from "../perfCompare/treeRecord";
 import { browserName, rendererBanners, rendererSummary } from "../perfCompare/renderer";
 import type { Metric, Ratio } from "./analysis";
 import type { ReadModelResults, WorkerResults } from "./main";
@@ -22,6 +23,9 @@ const cell = (m: Metric | undefined): string => {
   const ci = s.medianCiLow !== null && s.medianCiHigh !== null ? ` [${fmt(s.medianCiLow, m!.unit)}, ${fmt(s.medianCiHigh, m!.unit)}]` : "";
   return `${fmt(s.median, m!.unit)}${ci}`;
 };
+
+/** Metrics the gate judges by an additive paired difference, not a ratio (protocol section 5, M4: a zero TypeScript reference has no ratio). Their gate cell says so; the harness does not report that difference yet (#1111). */
+const DIFFERENCE_GATED = /^main-thread blocking/;
 
 const ratioCell = (r: Ratio | undefined): string => {
   if (!r) return "";
@@ -69,6 +73,7 @@ export function markdown(res: WorkerResults): string {
   lines.push(`> **Snapshot, measured ${res.startedAt} to ${res.generatedAt} on commit \`${env.commitShort}\` (app ${env.appVersion})${env.dirty ? ", dirty tree" : ""}.** Live numbers: re-run \`npm run perf:worker\` (src/tests/perfWorker/, its arithmetic pinned by src/tests/perfWorker/analysis.test.ts). ${res.validation.ok ? "Validation passed." : "VALIDATION FAILED: see the end of this report."}`);
   for (const banner of rendererBanners(res.browser, res.config.quick)) lines.push("", banner);
   lines.push("");
+  if (treeSummary(env.tree, env.dirty)) lines.push(`- Working tree: ${treeSummary(env.tree, env.dirty)}`);
   lines.push(`- Engine package: ${Object.entries(env.enginePackage).map(([k, v]) => `${k} \`${String(v).slice(0, 16)}\``).join(", ")}; source hash \`${env.engineBuildHash ?? "none"}\``);
   lines.push(`- Machine: ${env.cpuModel}, ${env.logicalCpus} CPUs, ${(env.totalMemoryBytes / 2 ** 30).toFixed(1)} GiB, ${env.os}; Node ${env.node}; Playwright ${env.playwright}`);
   lines.push(`- Browser: ${browserName(res.browser.channel, res.browser.executable)} ${res.browser.version ?? "unknown"} (headless${res.browser.channel ? `, channel ${res.browser.channel}` : ""}${res.browser.executable ? `, ${res.browser.executable}` : ""}${res.browser.args?.length ? `, extra switches ${res.browser.args.join(" ")}` : ""})`);
@@ -77,7 +82,7 @@ export function markdown(res: WorkerResults): string {
   lines.push(`- Scenarios: ${res.scenarios.map((s) => `${s.name} (${s.population} population, \`${s.sha256.slice(0, 12)}\`)`).join(", ")}`);
   lines.push(`- Download (production build, Brotli 11): engine worker chunk ${fmt(res.scripts.worker.brotli, "bytes")} (${fmt(res.scripts.worker.raw, "bytes")} raw); engine package (WASM modes) ${fmt(res.scripts.enginePackage.brotli, "bytes")} (${fmt(res.scripts.enginePackage.raw, "bytes")} raw); all other JavaScript ${fmt(res.scripts.otherJs.brotli, "bytes")}`);
   lines.push("");
-  lines.push("Medians with their 95% order-statistic interval. Ratios are paired by repetition (mode over the column's reference); a verdict needs six pairs and an interval clear of a 5% band. `wasm-worker / wasm-frame` compares two hosts with the same sync changes, so it is the worker placement alone; `wasm-frame / wasm` is the sync changes alone. Ratios against TypeScript are in ratios.csv. A ratio marked with `(k zero)` dropped k repetitions where the reference was 0.");
+  lines.push("Medians with their 95% order-statistic interval. Ratios are paired by repetition (mode over the column's reference); a verdict needs six pairs and an interval clear of a 5% band. `wasm-worker / wasm-frame` compares two hosts with the same sync changes, so it is the worker placement alone; `wasm-frame / wasm` is the sync changes alone. The gate column leads with the gate's orientation; the full set of ratios is in ratios.csv. A ratio marked with `(k zero)` dropped k repetitions where the reference was 0.");
   lines.push("");
   const groups: Metric["group"][] = ["startup", "raw", "hosted", "frames", "memory", "traffic"];
   for (const g of groups) {
@@ -87,14 +92,22 @@ export function markdown(res: WorkerResults): string {
     lines.push("");
     const keys = [...new Set(rows.map((m) => `${m.scenario}|${m.throttle}|${m.metric}|${m.unit}`))];
     const present = modes.filter((mode) => rows.some((m) => m.mode === mode && m.summary));
-    const cols: [ModeName, ModeName][] = [...present.filter((m) => m !== "wasm").map((m) => [m, "wasm"] as [ModeName, ModeName]), ...(present.includes("wasm-worker") && present.includes("wasm-frame") ? [["wasm-worker", "wasm-frame"] as [ModeName, ModeName]] : [])];
-    lines.push(`| scenario | throttle | metric | ${present.join(" | ")} | ${cols.map(([a, b]) => `${a} / ${b}`).join(" | ")} |`);
-    lines.push(`|${"---|".repeat(3 + present.length + cols.length)}`);
+    // The gate's orientation leads (protocol section 5): the shipped host over
+    // TypeScript, read so that above 1.0 is worse, which for a rate (better:
+    // higher) means TypeScript over the shipped host. The other columns keep
+    // each mode over the shipped host.
+    const gate = present.includes("ts") && present.includes("wasm");
+    const cols: [ModeName, ModeName][] = [...present.filter((m) => m !== "wasm" && !(gate && m === "ts")).map((m) => [m, "wasm"] as [ModeName, ModeName]), ...(present.includes("wasm-worker") && present.includes("wasm-frame") ? [["wasm-worker", "wasm-frame"] as [ModeName, ModeName]] : [])];
+    const row = (cells: string[]) => `| ${cells.join(" | ")} |`;
+    const header = ["scenario", "throttle", "metric", ...(gate ? ["gate: wasm / ts (rates: ts / wasm)"] : []), ...present, ...cols.map(([a, b]) => `${a} / ${b}`)];
+    lines.push(row(header));
+    lines.push(row(header.map(() => "---")));
     for (const k of keys) {
       const [scenario, throttle, metric, unit] = k.split("|");
       const of = (mode: ModeName) => rows.find((m) => m.scenario === scenario && m.throttle === throttle && m.metric === metric && m.mode === mode);
       const ratio = (mode: ModeName, against: ModeName) => res.ratios.find((r) => r.scenario === scenario && r.throttle === throttle && r.metric === metric && r.mode === mode && r.against === against);
-      lines.push(`| ${scenario} | ${throttle}x | ${metric} (${unit}) | ${present.map((m) => cell(of(m))).join(" | ")} | ${cols.map(([a, b]) => ratioCell(ratio(a, b))).join(" | ")} |`);
+      const higher = (of("wasm") ?? rows.find((m) => m.scenario === scenario && m.throttle === throttle && m.metric === metric))?.better === "higher";
+      lines.push(row([scenario, `${throttle}x`, `${metric} (${unit})`, ...(gate ? [DIFFERENCE_GATED.test(metric) ? "no ratio: gated by a paired difference (#1111)" : ratioCell(higher ? ratio("ts", "wasm") : ratio("wasm", "ts"))] : []), ...present.map((m) => cell(of(m))), ...cols.map(([a, b]) => ratioCell(ratio(a, b)))]));
     }
     lines.push("");
   }
