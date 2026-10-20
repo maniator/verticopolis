@@ -153,7 +153,10 @@ a fault when any of those page lives fell back for a reason other than
 one-sided 95% Clopper-Pearson bound, by build and by arm as well. The rate is a
 lower bound: the relay has no offline queue and a per-IP limit, a tab closed
 while the engine loads never sends its row, and runtime traps are not reported
-before #874. The script's header comment carries every rule and every gap.
+before #874. Until the definition sorts sessions into eligible evidence
+(#1090), every session it counts is early telemetry under plan 4.1 (OD-2),
+triaged and never published as a reliability figure. The script's header
+comment carries every rule and every gap.
 
 ## Retention and deletion
 

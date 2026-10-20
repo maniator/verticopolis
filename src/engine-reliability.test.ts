@@ -366,7 +366,9 @@ describe("renderReliabilityMarkdown", () => {
   it("puts the snapshot window, the live source and the lower-bound caveat above every figure", () => {
     const md = renderReliabilityMarkdown(summarizeReliability([life()]), meta);
     const firstFigure = md.indexOf("| Measure |");
-    for (const lead of ["**Snapshot** of the last 30 days to 2026-10-20 12:00 (UTC), production only", "node scripts/engine-reliability.mjs", "src/engine-reliability.test.ts", "**A lower bound.**"]) {
+    // Until the eligibility split (#1090), every session is early telemetry,
+    // which plan 4.1 (OD-2) never publishes as a reliability figure.
+    for (const lead of ["**Snapshot** of the last 30 days to 2026-10-20 12:00 (UTC), production only", "node scripts/engine-reliability.mjs", "src/engine-reliability.test.ts", "**Early telemetry, not release evidence.**", "**A lower bound.**"]) {
       const at = md.indexOf(lead);
       expect(at, lead).toBeGreaterThan(-1);
       expect(at, lead).toBeLessThan(firstFigure);

@@ -230,7 +230,11 @@ in their own file for that reason. `workerController.ts` is not in #1062.
 | A new boot failure path is added without a reason | `EngineBootFailure.reason` is required, so the compiler asks for one |
 
 ## Out of scope
-
+- The amended plan's (39680f0, OD-2) split of early telemetry from eligible
+  sessions, the per-arm crash rates, the tail's bound and the stop signals:
+  definition logic with no new client field, in #1090 (backlog row
+  `engine-reliability-eligibility-split`). Until then the report says at the
+  top that every session is early telemetry.
 - The cohort, `arm`, the size gate and `size_gated` (A4, owner-gated).
 - Runtime traps and their reasons, divergence counts, re-adoption (#874).
 - Later fallbacks of the experimental worker host (measurement only, never a

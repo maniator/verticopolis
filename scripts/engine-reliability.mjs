@@ -62,6 +62,9 @@
  *   on faults over N: about 3/N with none, about 4.74/N with one.
  * - The size of a loop is kept: the report gives the fallbacks the counted
  *   page lives sent in all, and the most in one page life.
+ * - Every session is early telemetry for now (plan 4.1, OD-2): the split into
+ *   eligible evidence, the per-arm crash rates and the tail's bound come with
+ *   #1090, and the report says so at the top.
  *
  * What it cannot see: the relay is best-effort, with no offline queue and a
  * per-IP rate limit, so a fallback in an offline session never reports, nor
@@ -352,6 +355,7 @@ export function renderReliabilityMarkdown(summary, meta) {
     "",
     `> **Snapshot** of the ${meta.windowLabel} to ${meta.until} (UTC), production only: the page lives that settled in that window. It does not refresh: the live figure is this script run again (\`node scripts/engine-reliability.mjs\`), whose rules \`src/engine-reliability.test.ts\` pins.`,
     `> Counted: hosts ${meta.hosts.map(code).join(", ")}; builds ${meta.builds}; arms ${meta.arms}.`,
+    "> **Early telemetry, not release evidence.** This report does not yet sort sessions into eligible evidence (plan 4.1, OD-2; #1090), and no build carries S4 (#874) and S9 (#954) yet, so every session here is early telemetry: triage each failure, and do not publish the rate as a reliability figure.",
     "> **A lower bound.** The relay is best-effort, with no offline queue and a per-IP rate limit, so a fallback in an offline session, a tab closed while the engine loads, a tab killed before it reports (or after a capped drop with no later hide) and a boot whose game never started after its engine failed never count. Runtime traps are not reported before #874. Outcomes are as of this run, so a page life that settled near the end of the window can still fall back. Background tabs that were never seen still count. Sessions are not independent, so the bound below is optimistic.",
   ];
   if (meta.hosts.includes("wasm-worker")) lines.push("> **The worker host** reports only its first tower, so its later fallbacks are missing, and its `other` is a boot step outside the engine, counted as a fault.");
