@@ -152,8 +152,24 @@ impl Simulation {
         false
     }
 
-    /// `noiseAfflicted` (computed fresh; the TypeScript memo is pure).
-    pub fn noise_afflicted(&self, u: &Unit) -> bool {
+    /// `noiseAfflicted`: memoized per unit for one tower revision, as the
+    /// TypeScript is. The answer depends only on the layout, which no path
+    /// changes without bumping the revision.
+    pub fn noise_afflicted(&mut self, u: &Unit) -> bool {
+        if self.noise_memo.0 != self.tower.revision {
+            self.noise_memo.0 = self.tower.revision;
+            self.noise_memo.1.clear();
+        }
+        if let Some(&hit) = self.noise_memo.1.get(&u.id) {
+            return hit;
+        }
+        let fresh = self.noise_afflicted_fresh(u);
+        self.noise_memo.1.insert(u.id, fresh);
+        fresh
+    }
+
+    /// `noiseAfflictedFresh`: the scan behind the memo.
+    pub fn noise_afflicted_fresh(&self, u: &Unit) -> bool {
         if u.kind == Kind::Office {
             return self.nearest_kind_within(u, |k| k.is_commercial(), OFFICE_NOISE_TILES);
         }

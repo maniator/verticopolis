@@ -1,8 +1,10 @@
-//! Tests for `tower_index.rs`: every revision-keyed answer equals the walk
-//! it replaced, after each kind of layout edit.
+//! Tests for `tower_index.rs` and the noise memo: every revision-keyed
+//! answer equals the walk it replaced, after each kind of layout edit.
 
+use crate::clock::GameMode;
 use crate::crowd::spawn::{pick_x, pick_x_in_segment};
 use crate::facilities::Kind;
+use crate::sim::Simulation;
 use crate::tower::Tower;
 
 /// `pickX`'s tile list as the walk over every unit builds it.
@@ -144,4 +146,39 @@ fn a_reload_rebuilds_the_indexes() {
     tower.units = units;
     tower.reindex();
     assert_matches_walks(&tower);
+}
+
+#[test]
+fn the_noise_memo_matches_the_fresh_scan_after_every_edit() {
+    let mut sim = Simulation::new_game(7, GameMode::Classic);
+    sim.tower = stacked();
+    let parity = |sim: &mut Simulation| {
+        for i in 0..sim.tower.units.len() {
+            let u = sim.tower.units[i].clone();
+            let fresh = sim.noise_afflicted_fresh(&u);
+            assert_eq!(sim.noise_afflicted(&u), fresh, "unit {}", u.id);
+        }
+    };
+    let office = must(sim.tower.place(Kind::Office, 3, 100));
+    let width = Kind::Office.facility().width;
+    parity(&mut sim);
+    let afflicted = |sim: &mut Simulation, id: i64| {
+        let u = sim.tower.get_unit(id).unwrap().clone();
+        sim.noise_afflicted(&u)
+    };
+    assert!(!afflicted(&mut sim, office));
+    // A shared wall with a commercial room is the harshest case.
+    let food = must(sim.tower.place(Kind::FastFood, 3, 100 + width));
+    parity(&mut sim);
+    assert!(afflicted(&mut sim, office));
+    // Demolition heals it with no manual invalidation: the removal moves
+    // the revision and the next query refills from the scan.
+    assert!(sim.tower.remove_unit(food).is_some());
+    parity(&mut sim);
+    assert!(!afflicted(&mut sim, office));
+    // State is not an input: an empty or gutted source still radiates.
+    let food = must(sim.tower.place(Kind::FastFood, 3, 100 + width));
+    sim.tower.get_unit_mut(food).unwrap().state = crate::tower::UnitState::Gutted;
+    parity(&mut sim);
+    assert!(afflicted(&mut sim, office));
 }
