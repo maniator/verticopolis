@@ -49,8 +49,9 @@ fn main() {
     // command sequence does not replay the simulation's random draws.
     let mut rng = Rng::new(seed ^ 0x9e37_79b9);
     let modern = rng.chance(0.5);
-    // One seed in four grows a tall tower (sky lobbies every 15 floors, shafts
-    // that hit their span and pool caps); the rest stay short and fast.
+    // One seed in four grows a tall tower (sky-lobby rows every 15 floors and a
+    // burst of shafts and stairs against the pool caps); the rest stay short
+    // and fast.
     let tall = rng.chance(0.25);
     let height = if tall { rng.int(16, 40) } else { rng.int(3, 9) };
     // The tower is built with plenty of cash, then the cash is set to the
@@ -98,19 +99,49 @@ fn main() {
         let s = Scenario::parse(&text).expect("the fuzzer only emits valid commands");
         run_scenario(&s, &suite)
     };
-    // A tall tower leans on shafts, so the 24-shaft and 64-link pools fill.
-    let more_shafts: i64 = if tall { 14 } else { 0 };
+    // A tall tower starts with a burst of shafts and stairs that overruns the
+    // 24-shaft and 64-link pools, so both engines also agree on the refusal at
+    // each cap. The burst runs before the random commands and is not part of
+    // the command budget. Escalators, service and express shafts unlock at
+    // higher stars than a new game has, so they stay out of reach here.
+    let mut pressure: Vec<Value> = Vec::new();
+    if tall {
+        // Standard shafts: 27 slots (nine columns, three floor bands) against
+        // a pool of 24, in columns right of the stairs.
+        let band = height / 3;
+        for i in 0..27 {
+            let (bottom, top) = match i / 9 {
+                0 => (1, band),
+                1 => (band + 1, band * 2),
+                _ => (band * 2 + 1, height),
+            };
+            let x = LEFT + 42 + 4 * (i % 9);
+            pressure.push(json!({"op": "buildTransport", "kind": "elevatorStandard", "x": x, "bottom": bottom, "top": top}));
+        }
+        // Stairs: five columns over floor pairs 1 to 13, 65 slots against a
+        // pool of 64 links.
+        for k in 0..65 {
+            let bottom = 1 + k / 5;
+            let x = LEFT + 1 + 8 * (k % 5);
+            pressure.push(json!({"op": "buildTransport", "kind": "stairs", "x": x, "bottom": bottom, "top": bottom + 1}));
+        }
+        pressure.reverse();
+    }
     let mut kept = 0;
-    while kept < budget {
-        let roll = rng.int(0, 99 + more_shafts);
-        let mut cmd = if rng.chance(0.04) {
+    let mut step = 0;
+    while kept < budget || !pressure.is_empty() {
+        let burst = pressure.pop();
+        let roll = if burst.is_some() { 0 } else { rng.int(0, 99) };
+        let mut cmd = if let Some(b) = burst.clone() {
+            b
+        } else if rng.chance(0.04) {
             // Cash that runs out, or goes below zero, in the middle of a run.
             let amount = [0, 1_000, 25_000, 250_000, -50_000, 3_000_000][rng.int(0, 5) as usize];
             json!({"op": "setMoney", "amount": amount})
         } else if roll < 38 {
             let kind = places[rng.int(0, places.len() as i64 - 1) as usize];
             json!({"op": "build", "kind": kind.as_str(), "floor": rng.int(1, height), "x": rng.int(LEFT, RIGHT)})
-        } else if roll < 48 + more_shafts {
+        } else if roll < 48 {
             let kind = shafts[rng.int(0, shafts.len() as i64 - 1) as usize];
             let bottom = rng.int(1, height - 1);
             let top = if kind.max_span() == 1 {
@@ -119,13 +150,13 @@ fn main() {
                 rng.int(bottom + 1, height)
             };
             json!({"op": "buildTransport", "kind": kind.as_str(), "x": rng.int(LEFT, RIGHT), "bottom": bottom, "top": top})
-        } else if roll < 54 + more_shafts {
+        } else if roll < 54 {
             json!({"op": "sell", "floor": rng.int(1, height), "x": rng.int(LEFT, RIGHT)})
-        } else if roll < 60 + more_shafts {
+        } else if roll < 60 {
             json!({"op": "adjustRent", "floor": rng.int(2, height), "x": rng.int(LEFT, RIGHT), "dir": if rng.chance(0.5) { 1 } else { -1 }})
-        } else if roll < 63 + more_shafts {
+        } else if roll < 63 {
             json!({"op": "setCars", "floor": 1, "x": rng.int(LEFT, RIGHT), "cars": rng.int(1, 8)})
-        } else if roll < 66 + more_shafts {
+        } else if roll < 66 {
             let row = |rng: &mut Rng| -> Vec<i64> { (0..24).map(|_| rng.int(0, 3)).collect() };
             let weekday = row(&mut rng);
             let weekend = row(&mut rng);
@@ -136,9 +167,9 @@ fn main() {
                 "standardFloorDeparture": rng.int(1, 60),
                 "homeFloors": homes,
             }})
-        } else if roll < 68 + more_shafts && !modern {
+        } else if roll < 68 && !modern {
             json!({"op": "setNoRate", "floor": rng.int(2, height), "x": rng.int(LEFT, RIGHT)})
-        } else if roll < 86 + more_shafts {
+        } else if roll < 86 {
             let dt = [1, 3, 10, 20, 60][rng.int(0, 4) as usize];
             let times = rng.int(5, 240);
             // A checkpoint every in-game hour of the run (`60 / dt` ticks), or
@@ -146,13 +177,13 @@ fn main() {
             // divergence to the hour at the latest.
             let hour = 60 / dt;
             json!({"op": "tick", "dt": dt, "times": times, "checkpointEvery": hour.min((times / 4).max(1))})
-        } else if roll < 89 + more_shafts {
+        } else if roll < 89 {
             json!({"op": "startFire"})
-        } else if roll < 91 + more_shafts {
+        } else if roll < 91 {
             json!({"op": "bombThreat"})
-        } else if roll < 94 + more_shafts {
+        } else if roll < 94 {
             json!({"op": "evaluateStar"})
-        } else if roll < 97 + more_shafts && modern {
+        } else if roll < 97 && modern {
             json!({"op": "callExterminator"})
         } else {
             json!({"op": "reload"})
@@ -161,22 +192,30 @@ fn main() {
         trial.push(cmd.clone());
         let result = run(&trial);
         let op = cmd["op"].as_str().unwrap().to_string();
-        match result.error {
-            None => {
-                commands.push(cmd);
+        // A checkpoint after each command keeps the events between two
+        // checkpoints inside the runner's 1024-event window. A burst command
+        // adds only a few events, so it checkpoints every sixth.
+        // A reload carries its events over to the next command, so it does not
+        // checkpoint: the carry path stays covered.
+        let mut kept_one = |commands: &mut Vec<Value>, cmd: Value| {
+            let reload = cmd["op"] == "reload";
+            commands.push(cmd);
+            step += 1;
+            if burst.is_none() {
                 kept += 1;
-                // A checkpoint after every command keeps the events between two
-                // checkpoints inside the runner's 1024-event window.
-                commands.push(json!({"op": "checkpoint", "label": format!("k{kept}")}));
             }
+            if !reload && (burst.is_none() || step % 6 == 0) {
+                commands.push(json!({"op": "checkpoint", "label": format!("k{step}")}));
+            }
+        };
+        match result.error {
+            None => kept_one(&mut commands, cmd),
             Some(RunError::Failed { index, what }) if index == trial.len() - 1 => {
                 match op.as_str() {
                     // A refusal the runner lets a scenario expect.
                     "build" | "buildTransport" | "callExterminator" => {
                         cmd["expectFail"] = json!(true);
-                        commands.push(cmd);
-                        kept += 1;
-                        commands.push(json!({"op": "checkpoint", "label": format!("k{kept}")}));
+                        kept_one(&mut commands, cmd);
                     }
                     // A refusal with no expectFail form: dropped, the prefix stays
                     // valid. The drop is logged so an accept-versus-refuse
