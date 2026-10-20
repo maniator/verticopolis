@@ -21,7 +21,7 @@ const cell = (m: Metric | undefined): string => {
   const s = m?.summary;
   if (!s) return "n/a";
   const ci = s.medianCiLow !== null && s.medianCiHigh !== null ? ` [${fmt(s.medianCiLow, m!.unit)}, ${fmt(s.medianCiHigh, m!.unit)}]` : "";
-  return `${fmt(s.median, m!.unit)}${ci}`;
+  return `${fmt(s.median, m!.unit)}${ci}${m!.unthrottled ? " †" : ""}`;
 };
 
 /** Metrics the gate judges by an additive paired difference (protocol section 5, M4: a zero TypeScript reference has no ratio). Their gate cell says so; the harness does not report that difference yet (#1111). */
@@ -30,7 +30,7 @@ const DIFFERENCE_GATED = /^main-thread blocking/;
 const ratioCell = (r: Ratio | undefined): string => {
   if (!r) return "";
   const ci = r.ciLow !== null && r.ciHigh !== null ? ` [${r.ciLow.toFixed(2)}, ${r.ciHigh.toFixed(2)}]` : "";
-  return `${r.ratio.toFixed(2)}x${ci} ${r.verdict}${r.zeroReference ? ` (${r.zeroReference} zero)` : ""}`;
+  return `${r.ratio.toFixed(2)}x${ci} ${r.verdict}${r.zeroReference ? ` (${r.zeroReference} zero)` : ""}${r.unthrottled ? " †" : ""}`;
 };
 
 /** A count, or a mean of counts, to one decimal when it is not whole. */
@@ -84,6 +84,7 @@ export function markdown(res: WorkerResults): string {
   lines.push("");
   lines.push("Medians with their 95% order-statistic interval. Ratios are paired by repetition (mode over the column's reference); a verdict needs six pairs and an interval clear of a 5% band. `wasm-worker / wasm-frame` compares two hosts with the same sync changes, so it is the worker placement alone; `wasm-frame / wasm` is the sync changes alone. The gate column leads with the gate's orientation; the full set of ratios is in ratios.csv. A ratio marked with `(k zero)` dropped k repetitions where the reference was 0.");
   lines.push("");
+  if (res.metrics.some((m) => m.unthrottled)) lines.push("† The engine worker was not CPU-throttled: DevTools cannot throttle a worker, so at this throttle the worker host's main thread ran throttled and its engine thread ran at full speed. Compare such a row only with another run of the same mode.", "");
   const groups: Metric["group"][] = ["startup", "raw", "hosted", "frames", "memory", "traffic"];
   for (const g of groups) {
     const rows = res.metrics.filter((m) => m.group === g);

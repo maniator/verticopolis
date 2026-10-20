@@ -500,6 +500,60 @@ figures come from `perf:worker`):
   uncalibrated until that lands. RUN-1 needs M4, so #1111 and its A/A passes
   land before RUN-1, either inside RUN-0b or as a follow-on campaign.
 
+### 6.2 BEFORE/AFTER comparison of a candidate PR
+
+A candidate (for example #1068) is measured against `main` in two full
+`perf:worker` runs on the PC, BEFORE on `main` and AFTER on the candidate,
+with the same machine, browser, GPU check and flags. Both runs use a
+confirmed hardware renderer (the fail-closed check of section 1: no
+`--quick`, no renderer exception), `--scenarios medium,large`, the default
+throttles (1x and 4x) and `--reps 10`, which is the protocol's minimum for a
+verdict. Build each commit with the engine package first and run from a clean
+tree (section 3).
+
+```powershell
+# On main, then on the candidate commit; same shell, same environment.
+npm.cmd run perf:worker -- --reps 10 --viewport 1280x720 --scenarios medium,large --out docs/performance/results/<date>-<sha>-before-worker-1280x720
+npm.cmd run perf:worker -- --reps 10 --viewport 1280x720 --scenarios medium,large --out docs/performance/results/<date>-<sha>-after-worker-1280x720
+
+# A light attribution pass on main only (the cost split and the WASM churn rows).
+npm.cmd run perf:compare -- --reps 3 --scenarios medium,large --throttles 1 --skip-build --out docs/performance/results/<date>-<sha>-attribution-main
+
+# The comparison. Folder order matters: BEFORE first, then AFTER.
+npm.cmd run perf:before-after -- docs/performance/results/<before folder> docs/performance/results/<after folder> --out docs/performance/results/<date>-<sha>-before-after
+```
+
+`perf:before-after` pairs repetition i of BEFORE with repetition i of AFTER
+for every metric and mode, and writes `comparison.json`, `comparison.csv` and
+`comparison.md`. It reads each ratio so that above 1.0 is worse: AFTER over
+BEFORE for times, memory and counts, BEFORE over AFTER for rates and frame
+rates. The interval is the distribution-free order-statistic one from
+`perfCompare/stats.ts`.
+
+The two runs happen hours apart, so the machine can drift between them. The
+`ts`, `wasm` and `wasm-frame` modes run code the candidate does not touch and
+act as controls. When a control row of a metric is more than the tolerance
+(5%, the cap on δ in section 6.1, until the owner adopts the calibrated one)
+away from 1.0, the subject rows of that metric are marked VOID and the
+report names the control that moved. A metric no control measures is marked
+uncontrolled. The command exits 1 when the two runs cannot be compared at all
+(different scenarios, parameters, builds of the engine, browser versions, a
+dirty tree, an unverified renderer, fewer than 10 repetitions, or AFTER
+started before BEFORE), and writes the reasons into `comparison.md`.
+
+What it does not do, so a reader does not assume it:
+
+- **No real 4x worker throttle.** CDP CPU throttling does not reach a Web
+  Worker (measured on Chromium 141), so the `wasm-worker` rows at 4x have an
+  unthrottled engine thread. Those rows carry a dagger in both reports and
+  the CSV `unthrottled` column says `worker`. Compare such a row only with
+  another run of the same mode.
+- **No separate hour-pass spike row.** The hourly main-thread spike is read
+  from the per-batch maximum and the frame-time p99 rows.
+- **No check of the delta oracle, save fidelity, event order or crash
+  recovery.** The comparison adds nothing to the validation of the two runs
+  and those properties belong to tests.
+
 ## 7. Scheduled runs
 
 | Run | Commit | Purpose |
