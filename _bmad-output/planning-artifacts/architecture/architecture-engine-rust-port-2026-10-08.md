@@ -286,10 +286,13 @@ WASM, the test-mapping table):
   `load.rs`'s pointer to `loader-case-dump.ts`, and the docs, CLAUDE.md's
   canon among them (build caps in `src/engine/facilities.ts`).
 - **The real-game oracle scripts in `tools/simtower/`:** four build a
-  TypeScript `Simulation` and `tdt-to-vctower.ts` reads `SAVE_VERSION`;
-  they sit outside the typecheck, so nothing fails when the engine goes.
-  Repoint them at the crate's `tdt` binary (`engine-rs/src/bin/tdt.rs`) or
-  the binding, or retire them.
+  TypeScript `Simulation`, and both converters call the TypeScript TDT codec
+  (`tdt-to-vctower.ts` uses `parseTDT`, `buildTDT` and `SAVE_VERSION`,
+  `vctower-to-tdt.ts` uses `buildTDT`). They sit outside the typecheck, so
+  nothing fails when the engine goes. Repoint them at a crate surface that
+  converts any file, such as the binding's `importTdt` and `exportTdt`
+  (`engine-rs/src/bin/tdt.rs` only replays `conformance/tdt-cases.json`), or
+  retire them.
 
 ### Open and planned work that adds temporary code
 
