@@ -154,6 +154,17 @@ fn a_reload_rebuilds_the_indexes() {
     tower.units = units;
     tower.reindex();
     assert_matches_walks(&tower);
+    // Pin the reset itself: with the memo full, a list that keeps its count
+    // but reorders a room and a tile only reads right after `reindex`.
+    let room = tower.room_index()[0];
+    let tile = (0..tower.units.len())
+        .find(|&i| tower.units[i].kind.is_structural() && tower.units[i].floor == 3)
+        .unwrap();
+    let (count, revision) = (tower.units.len(), tower.revision);
+    tower.units.swap(room, tile);
+    assert_eq!((tower.units.len(), tower.revision), (count, revision));
+    tower.reindex();
+    assert_matches_walks(&tower);
     // The real save round trip answers like a fresh walk of what it loaded.
     let mut sim = Simulation::new_game(7, GameMode::Classic);
     sim.tower = tower;
@@ -172,6 +183,15 @@ fn a_list_changed_behind_the_revision_rebuilds_rather_than_overruns() {
     must(tower.place(Kind::Office, 2, 104));
     assert_matches_walks(&tower);
     let revision = tower.revision;
+    tower.units.truncate(tower.units.len() - 1);
+    assert_eq!(tower.revision, revision);
+    assert_matches_walks(&tower);
+    // A cut structural tile: the tile index must drop it too, which only
+    // the count in its key can tell.
+    let last = tower.units.last().unwrap();
+    assert!(last.kind.is_structural());
+    let floor = last.floor;
+    assert!(tower.structural_tiles(floor).unwrap().contains(&last.x));
     tower.units.truncate(tower.units.len() - 1);
     assert_eq!(tower.revision, revision);
     assert_matches_walks(&tower);
@@ -216,6 +236,24 @@ fn the_noise_memo_matches_the_fresh_scan_after_every_edit() {
     must(sim.tower.place(Kind::Office, 2, next));
     assert_noise_parity(&mut sim);
     assert!(afflicted(&mut sim, condo));
+}
+
+#[test]
+fn the_noise_memo_follows_a_swap_that_keeps_the_unit_count() {
+    // The shop goes and a tile comes, with no query in between, so only the
+    // revision moves. A memo keyed on the unit count would still hear it.
+    let mut sim = Simulation::new_game(7, GameMode::Classic);
+    sim.tower = stacked();
+    let office = must(sim.tower.place(Kind::Office, 3, 100));
+    let width = Kind::Office.facility().width;
+    let food = must(sim.tower.place(Kind::FastFood, 3, 100 + width));
+    assert!(afflicted(&mut sim, office));
+    let count = sim.tower.units.len();
+    assert!(sim.tower.remove_unit(food).is_some());
+    must(sim.tower.place(Kind::Floor, 5, 100));
+    assert_eq!(sim.tower.units.len(), count);
+    assert!(!afflicted(&mut sim, office));
+    assert_noise_parity(&mut sim);
 }
 
 #[test]

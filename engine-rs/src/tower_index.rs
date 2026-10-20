@@ -6,16 +6,23 @@
 //! once or twice for each person spawned. These indexes answer from one walk
 //! per tower revision.
 //!
-//! They are keyed like `roomUnits` in `tower/rooms.ts`: on `revision` and the
-//! unit count. Every placement and removal bumps the revision, a load resets
-//! the memo, and no other path adds, removes, moves or resizes a unit; the
-//! count is a second guard, so a list changed behind the revision rebuilds
-//! rather than indexing past its end.
+//! They are keyed on `revision` and the unit count. Every placement and
+//! removal bumps the revision, a load ends in `reindex`, which resets the
+//! memo and bumps it too, and no other path adds, removes, moves or resizes
+//! a unit. The count guards one case only: a list cut behind the revision
+//! rebuilds instead of indexing past its end. A change that keeps the count
+//! and skips the bump would be served stale; no production path makes one.
+//! (`roomUnits` in `tower/rooms.ts` also keys on the array's identity. Here
+//! only a load replaces the list, and it reindexes.)
 //!
 //! Both hand out shared slices rather than borrows of the memo, so a caller
-//! can hold one while it makes any other memoized query. `Arc` rather than
-//! `Rc` keeps `Tower` `Send`, as it was before the indexes; nothing here
-//! runs on another thread.
+//! can hold one while it makes any other memoized query. The slices are
+//! `Arc`, which fits #1051's rule against WASM threads, atomics and
+//! `SharedArrayBuffer`: the wasm32 build enables no atomics
+//! (`scripts/wasm-build.ts`), so the count compiles to plain loads and
+//! stores in unshared memory, as the `OnceLock` in `fflate.rs` already does.
+//! `Arc` also keeps `Tower` `Send`, as it was on `main`, though nothing needs
+//! that today and nothing here runs on another thread.
 
 use std::collections::HashMap;
 use std::sync::Arc;
