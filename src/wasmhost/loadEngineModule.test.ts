@@ -1,5 +1,5 @@
 import { createHash, webcrypto } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { EnginePackageAborted, EnginePackageError } from "./enginePackageCheck";
@@ -77,10 +77,13 @@ describe("enginePackageUrls", () => {
   });
 });
 
-describe("the glue the loader imports from a Blob", () => {
+// The served package is build output (npm run wasm:build): these checks skip
+// without it, as packageHash.test.ts does, and run where the package is built.
+const GLUE_FILE = resolve(import.meta.dirname, "../public/engine/verticopolis_engine.js");
+describe.skipIf(!existsSync(GLUE_FILE))("the glue the loader imports from a Blob", () => {
   // A Blob URL has no folder, so anything the glue resolves against its own
   // URL would fail or, made absolute, load code nobody hashed.
-  const text = readFileSync(resolve(import.meta.dirname, "../public/engine/verticopolis_engine.js"), "utf8");
+  const text = existsSync(GLUE_FILE) ? readFileSync(GLUE_FILE, "utf8") : "";
 
   it("has no imports of its own", () => {
     expect(text).not.toMatch(/^\s*import\b/m);
