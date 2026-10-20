@@ -397,6 +397,12 @@ noise the tolerance has to cover.
 6. RUN-3 repeats one A/A pass per engine beside the verdict. An A/A pass
    outside δ or ε goes to the owner, who decides whether RUN-3 stands.
 
+`perf:calibrate` takes only A/A folders and refuses any folder that does not
+record `gpuVerified: true`, so the 2026-10-15 references, which predate
+`gpuVerified`, the channel and switches record, and the end-of-run renderer
+reads, cannot feed a calibration. It checks all three renderer reads (start,
+after the frames, after the throttled cold start).
+
 `perf:compare --aa ts|wasm` runs one engine in both slots. `results.json`
 records it in `config.aa`, and each run records the slot (`engine`) and the
 engine it was asked to run (`ranEngine`, which is `config.aa ?? engine`). The

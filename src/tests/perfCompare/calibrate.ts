@@ -86,7 +86,7 @@ export interface Calibration {
 type Pass = Pick<CompareResults, "config" | "comparisons" | "metrics" | "validation"> & {
   startedAt?: string;
   browser?: Partial<Pick<CompareResults["browser"], "version" | "executable" | "channel" | "args" | "rendererException" | "gpuVerified">>;
-  runs?: Pick<CompareResults["runs"][number], "ok" | "page" | "rendererEnd">[];
+  runs?: Pick<CompareResults["runs"][number], "ok" | "page" | "rendererEnd" | "rendererEndCold">[];
   environment: Pick<CompareResults["environment"], "commit" | "dirty"> & Partial<Pick<CompareResults["environment"], "tree" | "cpuModel" | "logicalCpus" | "totalMemoryBytes" | "os" | "kernel" | "arch" | "node" | "rust" | "playwright" | "engineBuildHash" | "enginePackage">>;
 };
 
@@ -190,7 +190,7 @@ function rendererProblem(r: Pass): string | null {
   if (r.browser?.rendererException) return `it declared renderer exception ${r.browser.rendererException}`;
   if (r.browser?.gpuVerified === false) return "it recorded gpuVerified: false";
   const good = (r.runs ?? []).filter((x) => x.ok);
-  const f = rendererFinding(good.map((x) => x.page?.webgl?.renderer), good.map((x) => x.rendererEnd), { quick: false });
+  const f = rendererFinding(good.map((x) => x.page?.webgl?.renderer), good.map((x) => x.rendererEnd), { quick: false, lateEnds: good.map((x) => x.rendererEndCold) });
   return f.errors.length ? f.errors[0] : null;
 }
 
@@ -251,7 +251,7 @@ export function calibrate(folders: { folder: string; results: Pass; sha256?: str
   const same = (what: string, key: (r: Pass) => unknown): void => {
     if (new Set(used.map((u) => stable(key(u.results) ?? null))).size > 1) problems.push(`the passes differ in ${what}; calibrate passes that share it`);
   };
-  const renderers = (r: Pass): string[] => [...new Set((r.runs ?? []).filter((x) => x.ok).flatMap((x) => [x.page?.webgl?.renderer, x.rendererEnd]).filter((x): x is string => !!x))].sort();
+  const renderers = (r: Pass): string[] => [...new Set((r.runs ?? []).filter((x) => x.ok).flatMap((x) => [x.page?.webgl?.renderer, x.rendererEnd, x.rendererEndCold]).filter((x): x is string => !!x))].sort();
   same("machine or runtime", (r) => [r.environment.cpuModel, r.environment.logicalCpus, r.environment.totalMemoryBytes, r.environment.os, r.environment.kernel, r.environment.arch, r.environment.node, r.environment.rust, r.environment.playwright]);
   same("browser (executable, channel, switches, version or WebGL renderer)", (r) => [r.browser?.executable, r.browser?.channel, r.browser?.args, r.browser?.version, renderers(r)]);
   same("engine build", (r) => [r.environment.engineBuildHash, r.environment.enginePackage]);

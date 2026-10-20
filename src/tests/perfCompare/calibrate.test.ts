@@ -30,6 +30,7 @@ interface Spec {
   cpu?: string;
   renderer?: string | null;
   rendererEnd?: string | null;
+  rendererEndCold?: string | null;
   channel?: string | null;
   args?: string[];
   browserVersion?: string;
@@ -61,7 +62,7 @@ function pass(i: number, s: Spec = {}): Folder {
       startedAt: s.startedAt ?? `2026-10-21T0${i % 10}:00:00Z${i}`,
       config: { aa: s.engine === undefined ? alternate(i) : s.engine, reps, scenarios, throttles: s.throttles ?? [1, 4], quick: s.quick ?? false, dt: 2, steps: 720 },
       browser: { version: s.browserVersion ?? "141.0.1", executable: null, channel: s.channel ?? null, args: s.args ?? [], rendererException: s.exception ?? null, gpuVerified: s.gpuVerified },
-      runs: [{ ok: true, page: { webgl: s.renderer === null ? null : { renderer: s.renderer ?? RTX, vendor: "v" } }, rendererEnd: s.rendererEnd === undefined ? (s.renderer ?? (s.renderer === null ? null : RTX)) : s.rendererEnd }],
+      runs: [{ ok: true, page: { webgl: s.renderer === null ? null : { renderer: s.renderer ?? RTX, vendor: "v" } }, rendererEnd: s.rendererEnd === undefined ? (s.renderer ?? (s.renderer === null ? null : RTX)) : s.rendererEnd, ...(s.rendererEndCold === undefined ? {} : { rendererEndCold: s.rendererEndCold }) }],
       comparisons,
       metrics: ["1", "4"].flatMap((t) => [startup("ts", t), startup("wasm", t)]),
       validation: { ok: s.ok ?? true, errors: [], warnings: [] },
@@ -198,6 +199,10 @@ describe("calibrate", () => {
     expect(left({ renderer: null, rendererEnd: null })).toMatch(/renderer is not verified hardware/);
     expect(left({ rendererEnd: null })).toMatch(/renderer is not verified hardware/);
     expect(left({ rendererEnd: SWIFT })).toMatch(/renderer is not verified hardware/);
+    // The read after the throttled cold start counts too: a software or missing read there refuses the pass.
+    expect(left({ rendererEndCold: SWIFT })).toMatch(/renderer/);
+    expect(left({ rendererEndCold: null })).toMatch(/renderer/);
+    expect(left({ rendererEndCold: RTX })).toBe("");
     expect(left({ exception: "EX-4" })).toMatch(/declared renderer exception EX-4/);
     expect(left({ gpuVerified: false })).toMatch(/gpuVerified: false/);
     expect(left({})).toBe("");
