@@ -2,6 +2,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { WasmHostApp } from "./startWasmHost";
 import { attachWorkerHost, type WorkerHost } from "./workerHost";
 import type { FromWorker, ToWorker } from "./workerProtocol";
+import { recordHostError, type HostErrors } from "./hostErrors";
 
 /**
  * The app side of the experimental worker host (`?engine=wasm-worker`): own
@@ -28,14 +29,13 @@ export interface SpawnedWorker {
   catalogs: { classic: string; modern: string };
 }
 
-export interface WorkerHostStatus {
+export interface WorkerHostStatus extends HostErrors {
   engine: "wasm";
   placement: "worker";
   starts: number;
   hosted: boolean;
   /** Workers started (a failure starts the next tower on a fresh one). */
   workers: number;
-  errors: string[];
 }
 
 export interface WorkerHostHandle {
@@ -97,18 +97,17 @@ export function makeBrowserWorker(): EngineWorkerLike {
 }
 
 export function startWorkerHost(app: WasmHostApp, first: SpawnedWorker, respawn: () => Promise<SpawnedWorker>, log: Pick<Console, "info" | "error"> = console): WorkerHostHandle {
-  const status: WorkerHostStatus = { engine: "wasm", placement: "worker", starts: 0, hosted: false, workers: 1, errors: [] };
+  const status: WorkerHostStatus = { engine: "wasm", placement: "worker", starts: 0, hosted: false, workers: 1, errors: [], lastError: null, droppedErrors: 0 };
   let worker: EngineWorkerLike | null = null;
   let catalogs = first.catalogs;
   let host: WorkerHost | null = null;
   let gen = 0;
   let stopped = false;
   let respawning: Promise<void> | null = null;
-  // The status keeps the first 50 errors; the console gets every one, so a
-  // late fallback's reason is never silent.
+  // Keep the first 50 errors and the latest failure; log every error.
   const noteError = (message: string) => {
     log.error(`[wasm-worker] ${message}`);
-    if (status.errors.length < 50) status.errors.push(message);
+    recordHostError(status, message);
   };
   const release = () => {
     const h = host;

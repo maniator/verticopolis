@@ -69,6 +69,38 @@ function app(): WasmHostApp & { adopted: Simulation[] } {
 const quiet = () => ({ info: vi.fn(), error: vi.fn() });
 
 describe("startWasmHost", () => {
+  it("retains the latest failure after 50 refused towers, including after recovery", () => {
+    const a = app();
+    const mod = fakeModule();
+    const log = quiet();
+    let failure: string | null = "failure 1";
+    const fromSave = mod.Engine.fromSave;
+    mod.Engine.fromSave = (save: string) => {
+      if (failure) throw new Error(failure);
+      return fromSave(save);
+    };
+    const h = startWasmHost(a, mod, log);
+    try {
+      for (let i = 2; i <= 51; i++) {
+        failure = `failure ${i}`;
+        a.adoptSim(Simulation.newGame(i, "classic"));
+      }
+      expect(h.status.errors).toHaveLength(50);
+      expect(h.status.lastError).toBe("not hosting this tower: failure 51");
+      expect(h.status.droppedErrors).toBe(1);
+      failure = null;
+      a.adoptSim(Simulation.newGame(52, "classic"));
+      expect(h.status.hosted).toBe(true);
+      failure = "relapsed";
+      a.adoptSim(Simulation.newGame(53, "classic"));
+      expect(h.status.lastError).toBe("not hosting this tower: relapsed");
+      expect(h.status.droppedErrors).toBe(2);
+      expect(log.error).toHaveBeenCalledTimes(52);
+    } finally {
+      h.stop();
+    }
+  });
+
   it("hosts with the sync mode it is given, and every adopted tower with the same one", () => {
     const a = app();
     const handle = startWasmHost(a, fakeModule(), quiet(), { sync: "frame" });

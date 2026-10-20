@@ -44,6 +44,33 @@ function app(): WasmHostApp {
 }
 
 describe("worker controller (fake engine)", () => {
+  it("retains the latest failure after 50 refused towers", async () => {
+    const a = app();
+    const failedTower = (i: number) => {
+      const sim = Simulation.newGame(i, "classic");
+      sim.serialize = () => { throw new Error(`failure ${i}`); };
+      return sim;
+    };
+    a.sim = failedTower(1);
+    const log = { info: vi.fn(), error: vi.fn() };
+    const h = startWorkerHost(a, await spawnEngineWorker(fakeWorker, "u"), () => Promise.reject(new Error("unexpected restart")), log);
+    try {
+      for (let i = 2; i <= 51; i++) a.adoptSim(failedTower(i));
+      expect(h.status.errors).toHaveLength(50);
+      expect(h.status.lastError).toBe("not hosting this tower: failure 51");
+      expect(h.status.droppedErrors).toBe(1);
+      expect(log.error).toHaveBeenCalledTimes(51);
+      a.adoptSim(Simulation.newGame(52, "classic"));
+      await h.settle();
+      expect(h.status.hosted).toBe(true);
+      a.adoptSim(failedTower(53));
+      expect(h.status.lastError).toBe("not hosting this tower: failure 53");
+      expect(h.status.droppedErrors).toBe(2);
+    } finally {
+      h.stop();
+    }
+  });
+
   it("spawns through the ready handshake, hosts, follows adopts and stops", async () => {
     const first = await spawnEngineWorker(fakeWorker, "u");
     const a = app();

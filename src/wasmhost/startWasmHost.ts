@@ -2,6 +2,7 @@ import type { Simulation } from "../engine/Simulation";
 import { checkBinding, type WasmModule } from "../dualrun/binding";
 import { attachWasmHost, type WasmHost } from "./wasmHost";
 import { ENGINE_DIR, ENGINE_GLUE } from "./enginePackageNames";
+import { recordHostError, type HostErrors } from "./hostErrors";
 
 /**
  * The app side of the WASM switch: load the browser package, host the
@@ -13,13 +14,12 @@ import { ENGINE_DIR, ENGINE_GLUE } from "./enginePackageNames";
  * In a wasm-only build (`strict`) there is no TypeScript engine to leave it
  * on: the refusal is reported the same way and `onFatal` stops the game.
  */
-export interface WasmHostStatus {
+export interface WasmHostStatus extends HostErrors {
   engine: "wasm";
   /** Towers hosted so far (every adoptSim restarts the engine). */
   starts: number;
   /** Whether the current tower runs on the engine (false after a refusal). */
   hosted: boolean;
-  errors: string[];
 }
 
 export interface WasmHostApp {
@@ -63,12 +63,11 @@ export interface WasmHostOptions {
 }
 
 export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Console, "info" | "error"> = console, opts: WasmHostOptions = {}): WasmHostHandle {
-  const status: WasmHostStatus = { engine: "wasm", starts: 0, hosted: false, errors: [] };
+  const status: WasmHostStatus = { engine: "wasm", starts: 0, hosted: false, errors: [], lastError: null, droppedErrors: 0 };
   let host: WasmHost | null = null;
   let fatal = false;
   const noteError = (message: string) => {
-    if (status.errors.length >= 50) return;
-    status.errors.push(message);
+    recordHostError(status, message);
     log.error(`[wasm] ${message}`);
   };
   // Let go of the current tower. A trapped engine still lets go (the detach
