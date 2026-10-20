@@ -34,9 +34,13 @@ import { trackEconomyAction, trackEconomyActionOnce, trackEmergencyChoice } from
  */
 
 /** What the bridge drains: the live `Simulation` (whose drain the WASM host
- *  overrides to answer with its engine's batch). */
+ *  overrides to answer with its engine's batch). `release` is the session's
+ *  own flush (a hide, or a window closing): a host that holds a command's
+ *  events back until its engine's state covers them (the WASM host, #874)
+ *  lets them go then, so a page that closes keeps them. `release` is
+ *  temporary, with that fallback (story-engine-retire-typescript.md). */
 export interface GameplayEventSource {
-  drainGameplayEvents(): GameplayEvent[];
+  drainGameplayEvents(opts?: { release?: boolean }): GameplayEvent[];
   readonly gameplayEventsDropped: number;
   readonly gameplayEvents: { readonly discardOnHandOff: boolean };
 }
@@ -194,10 +198,10 @@ export function forwardGameplayEvents(batch: readonly unknown[], now = monotonic
 
 /** Drain `source`: the events and their batch, or null when the drain threw
  *  or answered with something other than a batch (counted). */
-function drain(source: GameplayEventSource): unknown[] | null {
+function drain(source: GameplayEventSource, release = false): unknown[] | null {
   let batch: unknown;
   try {
-    batch = source.drainGameplayEvents();
+    batch = release ? source.drainGameplayEvents({ release }) : source.drainGameplayEvents();
   } catch (err) {
     stats.drainFailures++;
     warnOnce("a drain threw", err);
@@ -221,9 +225,9 @@ function drain(source: GameplayEventSource): unknown[] | null {
 /** Drain `source` and fold its batch. A title backdrop's events are drained
  *  and dropped; a drain that fails folds nothing and is counted. Never
  *  throws: the frame loop calls it every frame. */
-export function drainEngineEvents(source: GameplayEventSource | undefined, now = monotonicNow()): void {
+export function drainEngineEvents(source: GameplayEventSource | undefined, now = monotonicNow(), release = false): void {
   if (!source) return;
-  const batch = drain(source);
+  const batch = drain(source, release);
   if (!batch) return;
   if (source.gameplayEvents?.discardOnHandOff) {
     stats.discarded += batch.length;
@@ -240,11 +244,11 @@ export function drainEngineEvents(source: GameplayEventSource | undefined, now =
 export function bindEngineBridge(live: () => GameplayEventSource | undefined): void {
   gameplaySession.setEngineFlush((closing) => {
     if (!closing) {
-      drainEngineEvents(live());
+      drainEngineEvents(live(), monotonicNow(), true);
       return;
     }
     const source = live();
-    const batch = source ? drain(source) : null;
+    const batch = source ? drain(source, true) : null;
     if (batch) stats.discarded += batch.length;
     // The new window starts with a full send budget, like its other latches.
     limiter = freshLimiter();

@@ -23,7 +23,7 @@ import type { EngineChoice } from "./wasmhost/engineChoice";
  *   first tower is hosted or refused. A fallback before this point is in the
  *   boot state the settle row reads, so it is not sent on its own.
  * - `fallback`, on each later fallback (a tower the host refused at a load, a
- *   new game or an undo restore; #874 adds the runtime traps).
+ *   new game or an undo restore, or a running engine's fault, #874).
  * - `writer-latch`, when the engine save writer turns itself off.
  * - `summary`, at a hide, only when the cap below dropped a row since the last
  *   row went out, so the count it carries is the true one. It is outside the
@@ -183,9 +183,9 @@ export function noteEngineSettled(settle: EngineSettle): void {
   send(status, "settle");
 }
 
-/** A fallback after boot settled: a tower the host would not take, or (with
- *  #874) a trap. Before `settle` it is ignored, because the boot state the
- *  settle row reads already holds it. */
+/** A fallback after boot settled: a tower the host would not take, or a
+ *  running engine's fault (#874). Before `settle` it is ignored, because the
+ *  boot state the settle row reads already holds it. */
 export function noteEngineFallback(fallback: { reason: FallbackReason; stage: FallbackStage }): void {
   if (!status) return;
   status.fallbacks++;

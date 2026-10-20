@@ -222,6 +222,13 @@ fn apply_markers(sim: &mut Simulation, text: &str) -> Result<(), String> {
     sim.last_day = field("lastDay")?;
     sim.last_quarter = field("lastQuarter")?;
     sim.last_month = field("lastMonth")?;
+    // The live engine's commute-stress averages (#1083); absent or null
+    // keeps the empty map a load starts with.
+    if let Some(rows) = v.get("commuteStress").filter(|r| !r.is_null()) {
+        sim.crowd
+            .seed_commute_stress(rows)
+            .map_err(|e| format!("markers: {e}"))?;
+    }
     // The live engine's open extend gesture (#990); absent or null is none.
     match v.get("extendGesture") {
         None | Some(Value::Null) => sim.end_extend(),
@@ -304,11 +311,12 @@ impl Engine {
     /// (`load::parse_save_json`). Nothing else the import path does (the
     /// founder mark) runs.
     /// `markers`, when given, is JSON `{ lastHour, lastDay, lastQuarter,
-    /// lastMonth, extendGesture? }`: the live engine's boundary markers and
-    /// open extend gesture `{ id, bottom, top }` (#990), which a save does
-    /// not carry (a load rebuilds the markers from the clock, a founded game
-    /// keeps them unset until the first boundary, and a load has no
-    /// gesture), so a shadow can start exactly where the live engine stands.
+    /// lastMonth, extendGesture?, commuteStress? }`: the live engine's
+    /// boundary markers, open extend gesture `{ id, bottom, top }` (#990) and
+    /// commute-stress rows (#1083), which a save does not carry (a load
+    /// rebuilds the markers from the clock, a founded game keeps them unset
+    /// until the first boundary, and a load has no gesture and no averages),
+    /// so a shadow can start exactly where the live engine stands.
     #[wasm_bindgen(js_name = fromSave)]
     pub fn from_save(text: &str, markers: Option<String>) -> Result<Engine, JsError> {
         let raw = crate::load::parse_save_json(text.as_bytes()).map_err(err)?;

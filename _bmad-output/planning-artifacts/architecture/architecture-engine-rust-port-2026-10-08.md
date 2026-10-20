@@ -305,17 +305,22 @@ stays.
   `wasmHostExtermination` test with its `typescriptSide` entry. The Rust
   fix, the `exterminationRoomIds` save field, the conformance scenario and
   the loader cases stay.
-- **#1101 (#874, with #1083), a draft with its spec only:** the spec
-  (`spec-874-runtime-fallback.md`) re-adopts a fresh TypeScript
-  `Simulation` on a trap (validated with `Simulation.deserialize`, the worker
-  restored the same way) and seeds the engine's commute rows from the
-  instance. The fault catching, the latch, the restore point and the status
-  fields would stay. After retirement a trap can only stop the game, as the
-  wasm-only build does, unless a later change restarts a fresh engine from
-  the restore point.
+- **#1101 (#874, with #1083):** the TypeScript re-adoption of a faulted
+  tower: the restore points (validated with `Simulation.deserialize`) but
+  `newestSave`, `carryLiveState`, the held-event bookkeeping, the recovery
+  and its player lines, the undo trail's tidy and redo hold, the analytics
+  bridge's `release` option, the restore-point benchmark and the
+  fallback-only tests (each listed in `story-engine-retire-typescript.md`).
+  The fault catching, the latch, the strict stop, `newestSave` without its
+  TypeScript load check (the newest engine-written save) and the status
+  fields stay, as do the commute rows in the load markers. After retirement
+  a trap can only stop the game, as the wasm-only build does, unless a later
+  change restarts a fresh engine from the newest engine save. The worker's
+  restore is #1105.
 - **#954 (S9), planned:** the instance mirroring each accepted command
-  until S6, and the checks against it: #1101's refusal report, #1064's dry
-  check and #1065's header comparison.
+  until S6, and the checks against it: the report of a command the
+  instance accepted and the engine refused (S4's third clause, moved here
+  from #874), #1064's dry check and #1065's header comparison.
 - **#1068 (#1045), held:** the TypeScript record split
   (`src/engine/sim/deserializeRecords.ts`, with its allow-list line) and the
   delta merge into the instance (`merge.ts`, `workerApply.ts`,
