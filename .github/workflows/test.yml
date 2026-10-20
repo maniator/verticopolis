@@ -124,6 +124,17 @@ jobs:
           VC_REQUIRE_WASM: "1"
         run: npx vitest run --project ${{ matrix.project }}
 
+      # The suites the integrationWasm project hands to the TypeScript side
+      # because they host the engine themselves (the wasmHost and wasmWorker
+      # suites, the analytics bridge, the perf-compare engine check). The
+      # engine-rs workflow runs them too, but only when its path filter matches,
+      # which misses the analytics modules and the suites' own files (#1122).
+      # Running them here puts them on every PR and every push to main. One
+      # matrix leg carries it, so the job names stay as they are.
+      - name: Host suites on the WASM engine
+        if: ${{ matrix.project == 'unitWasm' }}
+        run: npm run test:wasm
+
   # Resolve the Playwright container tag from the repo's own Playwright version so
   # the e2e job's browser can never drift from the one baselines were minted with
   # the whole basis of a stable visual gate. (container.image is fixed before a

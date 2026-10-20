@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { buildScenarios } from "./scenarios";
+import { wasmRequired } from "../conformance/wasmEngine";
 
 const PKG = resolve(import.meta.dirname, "../../public/engine");
 const hasPkg = existsSync(resolve(PKG, "verticopolis_engine_bg.wasm"));
@@ -24,9 +25,11 @@ describe("the comparison's scenarios", () => {
     expect(large.transports).toBeGreaterThanOrEqual(5);
   });
 
-  // The served browser package (committed until #958; a CI checkout without
-  // it skips, the same way packageHash.test.ts treats a missing package).
-  it.skipIf(!hasPkg)("run identically on both engines in Node for two in-game hours", async () => {
+  // The served browser package (build output, written by wasm:build). A plain
+  // checkout without it skips, the same way packageHash.test.ts treats a
+  // missing package; `npm run test:wasm` sets VC_REQUIRE_WASM=1, where a
+  // missing package fails instead of skipping (#1122).
+  it.skipIf(!hasPkg && !wasmRequired())("run identically on both engines in Node for two in-game hours", async () => {
     const mod = await loadWebPackage(PKG);
     for (const sc of scenarios.slice(0, 2)) {
       const c = checkScenario(mod, sc, 60, 2, 5);
