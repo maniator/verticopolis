@@ -1,7 +1,7 @@
 /**
  * Rewrites `engine-rs/src/compat-record.json` from the tree (`npm run engine:compat`).
- * Bump `version` in `engine-rs/Cargo.toml` first (and in
- * `engine-rs/consumer/Cargo.lock`) when the conformance lock, `SAVE_VERSION`
+ * Bump `version` in `engine-rs/Cargo.toml` first (and in `engine-rs/Cargo.lock`
+ * and `engine-rs/consumer/Cargo.lock`) when the conformance lock, `SAVE_VERSION`
  * or the public Rust/WASM interface changed; the rules and the guard are in
  * `src/build/engineCompat.ts`.
  *
@@ -65,7 +65,7 @@ if (base?.record) {
   const moved = unbumpedPins(base.record, record);
   if (moved.length > 0)
     refuse(
-      `${moved.join(", ")} changed from ${base.source}'s record but the crate is still ${record.crateVersion}: bump \`version\` in engine-rs/Cargo.toml and engine-rs/consumer/Cargo.lock first (release plan 7.4)`,
+      `${moved.join(", ")} changed from ${base.source}'s record but the crate is still ${record.crateVersion}: bump \`version\` in engine-rs/Cargo.toml, engine-rs/Cargo.lock and engine-rs/consumer/Cargo.lock first (release plan 7.4)`,
     );
 }
 writeFileSync(resolve(root, COMPAT_RECORD_PATH), recordText(record));

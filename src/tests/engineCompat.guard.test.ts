@@ -56,7 +56,7 @@ function drift(rec: CompatRecord, now: CompatRecord): string[] {
 }
 
 const REMEDY =
-  "bump `version` in engine-rs/Cargo.toml and engine-rs/consumer/Cargo.lock for a lock, version-constant or interface change, then run `npm run engine:compat` and commit the record (release plan 7.4)";
+  "bump `version` in engine-rs/Cargo.toml, engine-rs/Cargo.lock and engine-rs/consumer/Cargo.lock for a lock, version-constant or interface change, then run `npm run engine:compat` and commit the record (release plan 7.4)";
 
 /** The tree `computeCompat` reads, copied to a temp directory so a test can change one input. */
 function withTree<T>(
