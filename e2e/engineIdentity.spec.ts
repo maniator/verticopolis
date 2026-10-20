@@ -26,8 +26,8 @@ async function buildRecord(page: Page): Promise<Record> {
   return (await res.json()) as Record;
 }
 
-/** Serve the real binary with one same-length text swap (the last match, where the build stamps its section), so it still compiles
- *  and links but its build section reads differently. */
+/** Serve the real binary with one same-length text swap (the last match, where the build stamps its section). The binary is then
+ *  not the one this build's record names, so the byte check refuses it before it compiles. */
 async function swapInBinary(page: Page, from: string, to: string): Promise<void> {
   expect(to).toHaveLength(from.length);
   await page.route(WASM, async (route: Route) => {

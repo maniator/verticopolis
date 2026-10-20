@@ -247,6 +247,27 @@ describe("worker controller (fake engine)", () => {
     expect(await built({ state: "other" })).toBeUndefined();
   });
 
+  it("rebuilds the build section's account on the build message and on ready too", async () => {
+    const hash = "ab".repeat(32);
+    const dirty = { state: "ok", sourceHash: hash, extra: "not wanted" };
+    const answering = (messages: object[]): EngineWorkerLike => {
+      const w = fakeWorker();
+      w.postMessage = () => {
+        messages.forEach((m, i) => setTimeout(() => w.onmessage?.({ data: m as never }), i));
+      };
+      return w;
+    };
+    // A build message, then a failure that carries none: the message's account is kept, cleaned.
+    const failed = (await spawnEngineWorker(() => answering([{ type: "build", build: dirty }, { type: "error", fatal: true, message: "late failure" }]), "x").catch((e: unknown) => e)) as { build?: unknown };
+    expect(failed.build).toEqual({ state: "ok", sourceHash: hash });
+    // A ready that carries a dirty account: only the known values reach the caller.
+    const catalogs = { classic: "{}", modern: "{}" };
+    const spawned = await spawnEngineWorker(() => answering([{ type: "ready", catalogs, build: dirty }]), "x");
+    expect(spawned.build).toEqual({ state: "ok", sourceHash: hash });
+    const bad = await spawnEngineWorker(() => answering([{ type: "ready", catalogs, build: { state: "ok", sourceHash: "short" } }]), "x");
+    expect(bad.build).toBeUndefined();
+  });
+
   it("codes a worker that never answers ready as a boot timeout", async () => {
     const silent: EngineWorkerLike = { onmessage: null, onerror: null, postMessage() {}, terminate: vi.fn() };
     const err = await spawnEngineWorker(() => silent, "u", 5).catch((e: unknown) => e);

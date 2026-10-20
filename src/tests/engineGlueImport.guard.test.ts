@@ -11,9 +11,9 @@ import { repoRel, sourceFiles } from "./guardFiles";
  * dual run's worker had no test of their own at the time this guard landed).
  *
  * So: a `import()` whose argument is not a string literal may appear only in
- * the files named below, and the unchecked loader (`initEngineGlue` in
- * engineLoad.ts, the development serve's route) is called only from the
- * checked one.
+ * the files named below, and the unchecked loaders in engineLoad.ts (`initEngineGlue`, the
+ * development serve's route, and `compileEngineBinary`, which it uses) are
+ * named only by the checked loader or by engineLoad.ts itself.
  */
 const isTestFile = (rel: string): boolean => /\.(test|spec|fixture)\.tsx?$/.test(rel);
 
@@ -27,8 +27,11 @@ const COMPUTED_IMPORT_ALLOWED = new Set([
   "src/tests/perfCompare/nodeCheck.ts",
 ]);
 
-const UNCHECKED_LOADER = "initEngineGlue";
-const UNCHECKED_LOADER_CALLERS = new Set(["src/wasmhost/loadEngineModule.ts", "src/wasmhost/engineLoad.ts"]);
+/** The unchecked loaders in engineLoad.ts (each fetches or imports the package on its own), and who may name them. */
+const UNCHECKED_LOADERS: Record<string, ReadonlySet<string>> = {
+  initEngineGlue: new Set(["src/wasmhost/loadEngineModule.ts", "src/wasmhost/engineLoad.ts"]),
+  compileEngineBinary: new Set(["src/wasmhost/engineLoad.ts"]),
+};
 
 function parse(abs: string): ts.SourceFile {
   return ts.createSourceFile(abs, readFileSync(abs, "utf8"), ts.ScriptTarget.Latest, true);
@@ -65,14 +68,14 @@ describe("the engine glue is imported only through the byte check", () => {
     expect([...seen].sort(), "a stale name in COMPUTED_IMPORT_ALLOWED").toEqual([...COMPUTED_IMPORT_ALLOWED].sort());
   });
 
-  it("calls the unchecked loader only from the checked one", () => {
+  it.each(Object.keys(UNCHECKED_LOADERS))("names %s only where it may be", (name) => {
     const callers = new Set<string>();
     for (const { abs, rel } of sources) {
       visit(parse(abs), (n) => {
         // Any mention counts: a call, an import, or a property read off a dynamic import.
-        if (ts.isIdentifier(n) && n.text === UNCHECKED_LOADER) callers.add(rel);
+        if (ts.isIdentifier(n) && n.text === name) callers.add(rel);
       });
     }
-    expect([...callers].filter((r) => !UNCHECKED_LOADER_CALLERS.has(r))).toEqual([]);
+    expect([...callers].filter((r) => !UNCHECKED_LOADERS[name]!.has(r))).toEqual([]);
   });
 });
