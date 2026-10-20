@@ -1,0 +1,129 @@
+group,scenario,throttle,metric,unit,ts_median,wasm_median,wasm_over_ts_paired,ci_low,ci_high,verdict,n_ts,n_wasm,n_pairs
+startup,-,1,cold game ready,ms,415.713,461.453,1.11552,1.08562,1.17319,wasm slower,10,10,10
+startup,-,1,cold first frame after ready,ms,498.035,543.728,1.10145,1.04761,1.16172,inconclusive,10,10,10
+transfer,-,1,cold bytes served before ready,bytes,311153,648100,2.08290,2.08290,2.08290,wasm larger,10,10,10
+transfer,-,1,cold bytes served total,bytes,313510,648100,2.06724,2.06724,2.06724,wasm larger,10,10,10
+transfer,-,1,cold before ready: html,bytes,3474,3474,1,1,1,equivalent,10,10,10
+transfer,-,1,cold before ready: app-js,bytes,295589,295589,1,1,1,equivalent,10,10,10
+transfer,-,1,cold before ready: css,bytes,6591,6591,1,1,1,equivalent,10,10,10
+startup,-,1,warm game ready,ms,66.6325,83.0925,1.25607,1.18971,1.30445,wasm slower,10,10,10
+startup,-,1,warm first frame after ready,ms,124.320,138.785,1.12301,1.07653,1.15562,wasm slower,10,10,10
+startup,-,4,cold game ready,ms,544.813,674.015,1.22368,1.21662,1.24327,wasm slower,10,10,10
+startup,-,4,cold first frame after ready,ms,844.715,959.328,1.13549,1.12517,1.15153,wasm slower,10,10,10
+transfer,-,1,"first visit with service worker, bytes served",bytes,853335,1187925,1.39210,1.39210,1.39210,wasm larger,10,10,10
+memory,medium,1,adopt (load the save),ms,41.1225,115.478,2.81793,2.79592,2.90658,wasm slower,10,10,10
+memory,medium,1,JS heap used,bytes,60785236,65190962,1.07246,1.07218,1.07326,wasm larger,10,10,10
+memory,medium,1,JS heap + WASM linear memory,bytes,60785236,104184882,1.71405,1.71343,1.71494,wasm larger,10,10,10
+sim-hosted,medium,1,total for fixed duration,ms,817.607,2341.19,2.84618,2.47975,3.10286,wasm slower,10,10,10
+sim-hosted,medium,1,step median,ms,0.817500,1.56500,1.91125,1.67380,2.04908,wasm slower,10,10,10
+sim-hosted,medium,1,step p95,ms,2.51787,3.25375,1.27969,1.07019,1.38668,wasm slower,10,10,10
+sim-hosted,medium,1,step p99,ms,5.69675,50.6586,8.91965,7.89098,9.84520,wasm slower,10,10,10
+sim-raw,medium,1,total for fixed duration,ms,767.215,393.445,0.518857,0.494078,0.692936,wasm faster,10,10,10
+sim-raw,medium,1,step median,ms,0.802500,0.373750,0.467734,0.449848,0.596154,wasm faster,10,10,10
+sim-raw,medium,1,step p95,ms,2.44087,0.943000,0.386337,0.370798,0.533319,wasm faster,10,10,10
+sim-raw,medium,1,step p99,ms,5.00205,4.48967,0.896143,0.817481,1.29987,inconclusive,10,10,10
+sim-raw,medium,1,instance from save,ms,44.4750,88.4325,2.18920,1.94171,2.80378,wasm slower,10,10,10
+frames,medium,1,frame time median,ms,14.4938,14.5150,1.00147,1.00034,1.00694,equivalent,10,10,10
+frames,medium,1,frame time p95,ms,15.0525,29.7138,1.97434,1.96114,1.99306,wasm slower,10,10,10
+frames,medium,1,frame time p99,ms,29.3001,45.2690,1.55683,1.52876,1.89708,wasm slower,10,10,10
+frames,medium,1,mean FPS,fps,67.9233,61.2471,0.903587,0.894697,0.908735,wasm slower,10,10,10
+frames,medium,1,1% low FPS,fps,33.5638,16.2101,0.481291,0.451646,0.508067,wasm slower,10,10,10
+frames,medium,1,sim minutes per real second,min/s,119.981,119.986,0.999961,0.999163,1.00042,equivalent,10,10,10
+frames,medium,1,share of frame time in sim.tick,ratio,0.0758372,0.232449,3.01345,2.96208,3.08723,wasm higher,10,10,10
+frames,medium,1,share of frame time in ui.update,ratio,0.00366509,0.00380298,1.04049,0.986088,1.07573,inconclusive,10,10,10
+frames,medium,1,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,0.920544,0.763741,0.832517,0.828115,0.835580,wasm lower,10,10,10
+frames-audio,medium,1,frame time median,ms,14.5150,14.5225,1.00103,1.00000,1.00172,equivalent,10,10,10
+frames-audio,medium,1,frame time p95,ms,15.2575,29.5925,1.94619,1.90823,1.96491,wasm slower,10,10,10
+frames-audio,medium,1,frame time p99,ms,29.4780,50.6233,1.72190,1.52096,1.97484,wasm slower,10,10,10
+frames-audio,medium,1,mean FPS,fps,67.2618,60.2672,0.895061,0.887640,0.903922,wasm slower,10,10,10
+frames-audio,medium,1,1% low FPS,fps,33.5726,16.2423,0.483135,0.459563,0.504309,wasm slower,10,10,10
+frames-audio,medium,1,sim minutes per real second,min/s,120.007,120.010,0.999921,0.999270,1.00089,equivalent,10,10,10
+frames-audio,medium,1,share of frame time in sim.tick,ratio,0.0819531,0.235777,2.88504,2.83220,2.94975,wasm higher,10,10,10
+frames-audio,medium,1,share of frame time in ui.update,ratio,0.00397797,0.00395792,0.995144,0.960847,1.05933,inconclusive,10,10,10
+frames-audio,medium,1,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,0.914073,0.760343,0.831529,0.829238,0.833991,wasm lower,10,10,10
+sim-hosted,medium,4,total for fixed duration,ms,4706.68,13878.1,2.94492,2.88853,2.98699,wasm slower,10,10,10
+sim-hosted,medium,4,step median,ms,4.90500,9.59500,1.95566,1.88230,1.96518,wasm slower,10,10,10
+sim-hosted,medium,4,step p95,ms,16.2496,13.8454,0.857071,0.812950,0.913469,wasm faster,10,10,10
+sim-hosted,medium,4,step p99,ms,27.1620,285.819,10.4987,10.1588,10.6812,wasm slower,10,10,10
+sim-raw,medium,4,total for fixed duration,ms,4789.47,2479.31,0.519065,0.507867,0.520195,wasm faster,10,10,10
+sim-raw,medium,4,step median,ms,5.09625,2.26250,0.443981,0.442157,0.460834,wasm faster,10,10,10
+sim-raw,medium,4,step p95,ms,16.1568,5.70825,0.352335,0.343276,0.363886,wasm faster,10,10,10
+sim-raw,medium,4,step p99,ms,27.4412,29.9632,1.10171,1.05756,1.12626,wasm slower,10,10,10
+sim-raw,medium,4,instance from save,ms,204.757,590.050,2.88370,2.77346,3.05796,wasm slower,10,10,10
+frames,medium,4,frame time median,ms,88.2613,117.927,1.33522,1.31935,1.34243,wasm slower,10,10,10
+frames,medium,4,frame time p95,ms,162.263,355.280,2.19503,2.18225,2.26489,wasm slower,10,10,10
+frames,medium,4,frame time p99,ms,176.431,390.084,2.18666,2.10624,2.37138,wasm slower,10,10,10
+frames,medium,4,mean FPS,fps,11.1208,6.86873,0.620669,0.597359,0.629682,wasm slower,10,10,10
+frames,medium,4,1% low FPS,fps,5.41025,2.25578,0.425307,0.389660,0.468821,wasm slower,10,10,10
+frames,medium,4,sim minutes per real second,min/s,81.6471,54.9498,0.676705,0.662004,0.689972,wasm slower,10,10,10
+frames,medium,4,share of frame time in sim.tick,ratio,0.270403,0.524320,1.95534,1.85392,2.02384,wasm higher,10,10,10
+frames,medium,4,share of frame time in ui.update,ratio,0.0163021,0.0134998,0.842746,0.760552,0.908425,wasm lower,10,10,10
+frames,medium,4,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,0.713550,0.462135,0.646109,0.621065,0.669743,wasm lower,10,10,10
+frames-audio,medium,4,frame time median,ms,88.2712,121.670,1.37467,1.33501,1.48111,wasm slower,10,10,10
+frames-audio,medium,4,frame time p95,ms,162.238,355.302,2.19201,2.15343,2.25586,wasm slower,10,10,10
+frames-audio,medium,4,frame time p99,ms,176.968,382.595,2.15913,2.09026,2.24345,wasm slower,10,10,10
+frames-audio,medium,4,mean FPS,fps,10.5327,6.60299,0.621222,0.618895,0.636592,wasm slower,10,10,10
+frames-audio,medium,4,1% low FPS,fps,5.42820,2.50347,0.446436,0.418371,0.547856,wasm slower,10,10,10
+frames-audio,medium,4,sim minutes per real second,min/s,80.2955,52.8239,0.656471,0.649219,0.667412,wasm slower,10,10,10
+frames-audio,medium,4,share of frame time in sim.tick,ratio,0.255785,0.495492,1.93378,1.91373,2.02956,wasm higher,10,10,10
+frames-audio,medium,4,share of frame time in ui.update,ratio,0.0158166,0.0134372,0.848974,0.787438,0.876866,wasm lower,10,10,10
+frames-audio,medium,4,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,0.728508,0.491279,0.675498,0.649305,0.683048,wasm lower,10,10,10
+memory,large,1,adopt (load the save),ms,67.7425,328.613,4.83347,4.31783,5.04774,wasm slower,10,10,10
+memory,large,1,JS heap used,bytes,77803024,76404688,0.981976,0.981777,0.982050,equivalent,10,10,10
+memory,large,1,JS heap + WASM linear memory,bytes,77803024,210950096,2.71130,2.71093,2.71136,wasm larger,10,10,10
+sim-hosted,large,1,total for fixed duration,ms,1374.17,7623.27,5.54195,5.40912,5.82891,wasm slower,10,10,10
+sim-hosted,large,1,step median,ms,0.830000,5.05875,6.03171,5.64054,6.58567,wasm slower,10,10,10
+sim-hosted,large,1,step p95,ms,6.04900,9.61163,1.60322,1.52571,1.66153,wasm slower,10,10,10
+sim-hosted,large,1,step p99,ms,10.6104,152.702,14.3513,13.9130,15.0478,wasm slower,10,10,10
+sim-raw,large,1,total for fixed duration,ms,1441.34,822.210,0.571470,0.492668,0.586087,wasm faster,10,10,10
+sim-raw,large,1,step median,ms,0.878750,0.507500,0.586473,0.501253,0.631098,wasm faster,10,10,10
+sim-raw,large,1,step p95,ms,6.13337,2.41513,0.394605,0.365436,0.401291,wasm faster,10,10,10
+sim-raw,large,1,step p99,ms,12.6072,11.5172,0.916169,0.892327,0.956979,inconclusive,10,10,10
+sim-raw,large,1,instance from save,ms,64.4525,92.3975,1.43879,1.41947,1.48156,wasm slower,10,10,10
+frames,large,1,frame time median,ms,14.2087,14.8400,1.04350,1.02236,1.05675,inconclusive,10,10,10
+frames,large,1,frame time p95,ms,15.0500,60.3464,4.00493,3.92622,8.84043,wasm slower,10,10,10
+frames,large,1,frame time p99,ms,29.4551,162.262,5.50144,5.16747,6.03474,wasm slower,10,10,10
+frames,large,1,mean FPS,fps,68.1905,39.8429,0.584199,0.548020,0.601814,wasm slower,10,10,10
+frames,large,1,1% low FPS,fps,30.4807,5.14093,0.171751,0.160536,0.185316,wasm slower,10,10,10
+frames,large,1,sim minutes per real second,min/s,120.021,116.362,0.968797,0.954532,0.973419,equivalent,10,10,10
+frames,large,1,share of frame time in sim.tick,ratio,0.123909,0.635319,5.17083,4.89812,5.44633,wasm higher,10,10,10
+frames,large,1,share of frame time in ui.update,ratio,0.00919383,0.00919031,1.00445,0.929601,1.02296,inconclusive,10,10,10
+frames,large,1,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,0.866707,0.355503,0.411435,0.366221,0.419925,wasm lower,10,10,10
+frames-audio,large,1,frame time median,ms,14.5250,14.9475,1.02962,1.01945,1.03236,equivalent,10,10,10
+frames-audio,large,1,frame time p95,ms,15.0904,146.418,9.69046,8.86884,9.74062,wasm slower,10,10,10
+frames-audio,large,1,frame time p99,ms,29.5273,176.099,5.98730,5.55870,6.11246,wasm slower,10,10,10
+frames-audio,large,1,mean FPS,fps,67.4366,36.1939,0.537576,0.519891,0.543190,wasm slower,10,10,10
+frames-audio,large,1,1% low FPS,fps,28.7801,4.88411,0.168802,0.153958,0.188925,wasm slower,10,10,10
+frames-audio,large,1,sim minutes per real second,min/s,119.954,113.852,0.948785,0.938901,0.974785,inconclusive,10,10,10
+frames-audio,large,1,share of frame time in sim.tick,ratio,0.131590,0.670115,5.06931,4.94467,5.24486,wasm higher,10,10,10
+frames-audio,large,1,share of frame time in ui.update,ratio,0.0101847,0.00977109,0.933184,0.893826,1.06138,inconclusive,10,10,10
+frames-audio,large,1,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,0.858101,0.320377,0.375103,0.362006,0.383389,wasm lower,10,10,10
+sim-hosted,large,4,total for fixed duration,ms,9271.74,46317.7,5.00403,4.95990,5.02670,wasm slower,10,10,10
+sim-hosted,large,4,step median,ms,4.71500,32.1825,6.79901,6.70355,6.89125,wasm slower,10,10,10
+sim-hosted,large,4,step p95,ms,42.1506,45.4871,1.08714,1.06184,1.16302,wasm slower,10,10,10
+sim-hosted,large,4,step p99,ms,58.6006,955.398,16.3000,15.9778,16.9937,wasm slower,10,10,10
+sim-raw,large,4,total for fixed duration,ms,9379.01,5235.53,0.559154,0.552580,0.563078,wasm faster,10,10,10
+sim-raw,large,4,step median,ms,4.69625,3.47500,0.738635,0.706731,0.740543,wasm faster,10,10,10
+sim-raw,large,4,step p95,ms,42.8902,14.2929,0.333961,0.329786,0.347842,wasm faster,10,10,10
+sim-raw,large,4,step p99,ms,59.4441,77.5743,1.30929,1.28877,1.32468,wasm slower,10,10,10
+sim-raw,large,4,instance from save,ms,426.047,611.712,1.42561,1.31687,1.49417,wasm slower,10,10,10
+frames,large,4,frame time median,ms,58.9387,206.028,3.49464,3.24903,3.98283,wasm slower,10,10,10
+frames,large,4,frame time p95,ms,203.738,1116.99,5.49704,5.39400,5.88759,wasm slower,10,10,10
+frames,large,4,frame time p99,ms,238.063,1146.11,4.70092,4.57202,5.01737,wasm slower,10,10,10
+frames,large,4,mean FPS,fps,13.4104,3.19873,0.242590,0.233019,0.260767,wasm slower,10,10,10
+frames,large,4,1% low FPS,fps,3.87179,0.862012,0.225696,0.209847,0.238418,wasm slower,10,10,10
+frames,large,4,sim minutes per real second,min/s,78.1752,21.7128,0.276058,0.266248,0.307654,wasm slower,10,10,10
+frames,large,4,share of frame time in sim.tick,ratio,0.458265,0.775314,1.66933,1.63924,1.71673,wasm higher,10,10,10
+frames,large,4,share of frame time in ui.update,ratio,0.0497031,0.0315025,0.629239,0.594321,0.663526,wasm lower,10,10,10
+frames,large,4,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,0.492316,0.192424,0.392823,0.378723,0.431135,wasm lower,10,10,10
+frames,large,4,frames over 200 ms (game time clamped),frames,11,26,2.63636,2,3,wasm more,10,10,10
+frames-audio,large,4,frame time median,ms,74.7300,205.540,2.69794,2.32661,2.79207,wasm slower,10,10,10
+frames-audio,large,4,frame time p95,ms,208.008,1086.55,5.22783,4.94584,5.55910,wasm slower,10,10,10
+frames-audio,large,4,frame time p99,ms,241.937,1114.79,4.59170,4.38641,4.79907,wasm slower,10,10,10
+frames-audio,large,4,mean FPS,fps,11.4546,3.32738,0.294616,0.272825,0.317569,wasm slower,10,10,10
+frames-audio,large,4,1% low FPS,fps,3.98324,0.890496,0.225901,0.220441,0.237888,wasm slower,10,10,10
+frames-audio,large,4,sim minutes per real second,min/s,75.1535,21.4087,0.286453,0.277692,0.298572,wasm slower,10,10,10
+frames-audio,large,4,share of frame time in sim.tick,ratio,0.445273,0.746581,1.67069,1.63082,1.70827,wasm higher,10,10,10
+frames-audio,large,4,share of frame time in ui.update,ratio,0.0473717,0.0290832,0.618496,0.580659,0.662877,wasm lower,10,10,10
+frames-audio,large,4,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,0.506810,0.222211,0.439382,0.417008,0.459966,wasm lower,10,10,10
+frames-audio,large,4,frames over 200 ms (game time clamped),frames,11,29.5000,2.86364,2.54545,3.20000,wasm more,10,10,10
