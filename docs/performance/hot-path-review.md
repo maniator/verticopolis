@@ -76,7 +76,7 @@ real towers can be bigger.
 | route graph | segments and links across every floor | route searches, reachability and flood fills walk it |
 
 The effective cost of a scan is its own size times every loop and tier above
-it. Example: `max_staff_for` walks all U to count housekeeping units. It runs
+it. Example: `max_staff_for` walked all U to count housekeeping units until #1143. It runs
 for each staff spawn attempt, inside a loop over candidate rooms and crews in
 `dispatch_housekeepers`, which runs every hour in shift and on every step that
 returns staff results. A cloud native profile of the owner's save at ab49f86
@@ -190,7 +190,7 @@ updates the rows #1139 changes):
 | lobby and room tiles per floor | `lobbyTiles`, `roomTiles`, `src/engine/Tower.ts` | counter | ported (`lobby_tiles`, `room_tiles`) |
 | rooms without floor and lobby tiles | `roomUnits`, `src/engine/tower/rooms.ts` | unit array, length, revision | missing; #1139 adds it |
 | each floor's segment runs | `src/engine/tower/segments.ts` | revision | ported (cloned on read, #859) |
-| housekeeping staff ceiling | `staffCeiling` (`maxStaffFor`), `src/engine/crowd/spawn.ts` | revision | missing; #1143 |
+| housekeeping staff ceiling | `staffCeiling` (`maxStaffFor`), `src/engine/crowd/spawn.ts` | revision | ported (`housekeeping_units`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1143) |
 | live staff count | `crowd.staffCount`, `src/engine/Crowd.ts` | counter | ported |
 | riders per car | `crowd.carRiders`, `src/engine/Crowd.ts` | counter | ported (`car_riders`) |
 | noise verdicts | `noiseMemo`, `src/engine/sim/satisfaction.ts` | revision | missing; #1139 adds it |
