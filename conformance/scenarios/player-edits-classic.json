@@ -90,7 +90,8 @@
       "x": 200,
       "bottom": 15,
       "top": 27,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Stairway links exactly two floors."
     },
     {
       "op": "resizeTransport",
