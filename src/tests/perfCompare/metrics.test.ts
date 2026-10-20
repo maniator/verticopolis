@@ -16,6 +16,16 @@ describe("aggregate", () => {
     expect(hostedWasm.summary!.median).toBeCloseTo(200.4, 6);
   });
 
+  it("leaves out the rows only one engine produces in an A/A pass, and words its differences as noise", () => {
+    const aa = runs().map((r) => ({ ...r, ranEngine: "wasm" as const }));
+    const rows = aggregate(aa, ["small"], [1], "wasm");
+    expect(rows.some((r) => r.group === "wasm-load" || r.metric === "WASM linear memory")).toBe(false);
+    expect(aggregate(aa, ["small"], [1]).some((r) => r.group === "wasm-load")).toBe(true);
+    const words = compareEngines(rows, [], "wasm").map((c) => c.verdict);
+    expect(words).toContain("outside band");
+    expect(words.some((w) => /^wasm (faster|slower|smaller|larger|lower|higher|fewer|more)$/.test(w))).toBe(false);
+  });
+
   it("measures engine-specific metrics on that engine only", () => {
     const rows = aggregate(runs(), ["small"], [1]);
     expect(rows.filter((r) => r.metric === "WASM linear memory").map((r) => r.engine)).toEqual(["wasm"]);

@@ -109,7 +109,8 @@ and large scenarios with their pinned scenario hashes.
 
 Other flags both accept: `--quick` (a 2-rep smoke test that never counts),
 `--resume DIR` (continue a run that stopped; it keeps its own folder),
-`--scenarios a,b`. `perf:compare` also takes `--throttles 1,4`;
+`--scenarios a,b`. `perf:compare` also takes `--throttles 1,4` and
+`--aa ts|wasm` (section 6.1);
 `perf:worker` also takes `--read-model` (Node only, no browser).
 
 A results folder is `docs/performance/results/<date>-<sha>-<label>/` with the
@@ -198,21 +199,32 @@ noise the tolerance has to cover.
    outside δ or ε goes to the owner, who decides whether RUN-3 stands.
 
 `perf:compare --aa ts|wasm` runs one engine in both slots. `results.json`
-records it in `config.aa`, each run records the slot (`engine`) and the engine
-that ran (`ranEngine`), and the report opens with a banner saying it is not a
-comparison. The slot labels stay `ts` and `wasm`, and every ratio is slot
-`wasm` over slot `ts`, so an A/A folder reads with the same tools as a real
-one. Validation judges each run by the engine that ran and refuses a folder
-whose runs do not match `config.aa`. Without `--out`, the folder name gains
-`-aa-<engine>`. Not yet: the calibration summary that applies the steps above
-to a set of A/A folders; until it lands, the folders are read by hand.
+records it in `config.aa`, and each run records the slot (`engine`) and the
+engine that ran (`ranEngine`). The slot labels stay `ts` and `wasm`, and every
+ratio is slot `wasm` over slot `ts`, so an A/A folder reads with the same
+tools as a real one. Validation judges each run by the engine that ran and
+refuses a folder whose runs do not match `config.aa`; a resume refuses a
+checkpoint from a different mode.
+
+Four things keep an A/A folder from passing for a comparison. The report opens
+with a banner. The three CSVs end in an `aa` column. A difference outside the
+5% band reads "outside band" where a real run says which engine is faster. The
+folder name must contain `aa-<engine>`: it gains `-aa-<engine>` without
+`--out`, and `--out` is refused without it. Rows only one engine produces (the
+wasm-load, WASM-memory and attribution rows) are left out, and the
+cross-engine limitations in the report do not apply to its ratios. An `--aa ts`
+pass still needs the WASM package and the Node check of both engines to pass,
+because the harness validates the whole setup.
+
+Not yet: the calibration summary that applies the steps above to a set of A/A
+folders; until it lands, the folders are read by hand.
 
 ## 7. Scheduled runs
 
 | Run | Commit | Purpose |
 | --- | --- | --- |
 | RUN-0a | `e25ec01` | Does the desktop reproduce 702 ms (TS) and 830 ms (WASM) on the large tower's 720 bare steps at 1x, inside the committed intervals? |
-| RUN-0b | `main` once PRs #1097, #1098 and the harness PR are merged | The baseline later runs compare with: the shipping host's cost split and each hour's churn, and the A/A passes of section 6.1 |
+| RUN-0b | `main` once PRs #1097, #1098 and the cost-split harness PR are merged | The baseline later runs compare with: the shipping host's cost split and each hour's churn, and the A/A passes of section 6.1 |
 | RUN-1 | after S6 | The shipping host after S6; the input to cohort stage 3 (M2 to M6 at 1x and 4x) |
 | RUN-2 | after #1051 (and #859), and the cold-start fix if needed | Bare tick parity and cold start |
 | RUN-3 | the candidate commit | The gate verdict with one A/A pass per engine beside it |
@@ -265,8 +277,8 @@ committed interval.
 
 ### RUN-0b, exact steps
 
-Run it only after the harness PR with the cost split is merged (A/A mode has landed);
-the commands are completed in that PR's description. The shape:
+Run it after the harness PR with the cost split is merged. A/A mode has
+landed; that PR's description completes the commands. The shape:
 
 ```powershell
 git -c core.autocrlf=false clone https://github.com/maniator/verticopolis.git "C:\Users\nafta\projects\vc-run0b"

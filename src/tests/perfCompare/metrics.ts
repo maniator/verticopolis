@@ -123,10 +123,13 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
   return out;
 }
 
-export function aggregate(runs: readonly ProcessRun[], scenarios: readonly string[], throttles: readonly number[]): MetricRow[] {
+export function aggregate(runs: readonly ProcessRun[], scenarios: readonly string[], throttles: readonly number[], aa: EngineName | null = null): MetricRow[] {
   const rows: MetricRow[] = [];
   const good = runs.filter((r) => r.ok);
   for (const p of picks(scenarios, throttles.map(String))) {
+    // An A/A pass has one engine in both slots, so a row only one engine
+    // produces has no pair to compare and nothing to calibrate.
+    if (aa && p.engines) continue;
     for (const engine of p.engines ?? (["ts", "wasm"] as EngineName[])) {
       const values: number[] = [];
       const reps: number[] = [];
@@ -150,7 +153,7 @@ export function aggregate(runs: readonly ProcessRun[], scenarios: readonly strin
  *  ratio's interval against a 5% equivalence band (stats.verdict), in the
  *  metric's own direction: "faster"/"slower" for times and rates, "smaller"/
  *  "larger" for bytes. */
-export function compareEngines(rows: readonly MetricRow[], skipped: string[] = []): Comparison[] {
+export function compareEngines(rows: readonly MetricRow[], skipped: string[] = [], aa: EngineName | null = null): Comparison[] {
   const out: Comparison[] = [];
   const key = (r: MetricRow) => `${r.group}|${r.scenario}|${r.throttle}|${r.metric}`;
   const byKey = new Map<string, Partial<Record<EngineName, MetricRow>>>();
@@ -191,7 +194,9 @@ export function compareEngines(rows: readonly MetricRow[], skipped: string[] = [
     const r = pairedRatio(pairs);
     const v = r.n < MIN_VERDICT_N ? "inconclusive" : verdict(r);
     let word: Comparison["verdict"] = v === "equivalent" ? "equivalent" : "inconclusive";
-    if (v === "higher" || v === "lower") {
+    // The same engine ran in both slots, so a difference is noise to size.
+    if (aa && (v === "higher" || v === "lower")) word = "outside band";
+    else if (v === "higher" || v === "lower") {
       const wasmBetter = (v === "lower") === (ts.better === "lower");
       if (ts.unit === "bytes") word = v === "lower" ? "wasm smaller" : "wasm larger";
       else if (ts.unit === "ratio") word = v === "lower" ? "wasm lower" : "wasm higher";

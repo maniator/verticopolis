@@ -187,7 +187,7 @@ export interface Comparison {
   ratio: number;
   ciLow: number | null;
   ciHigh: number | null;
-  verdict: "wasm faster" | "wasm slower" | "wasm smaller" | "wasm larger" | "wasm lower" | "wasm higher" | "wasm fewer" | "wasm more" | "equivalent" | "inconclusive";
+  verdict: "wasm faster" | "wasm slower" | "wasm smaller" | "wasm larger" | "wasm lower" | "wasm higher" | "wasm fewer" | "wasm more" | "equivalent" | "outside band" | "inconclusive";
   n: { ts: number; wasm: number; pairs: number };
 }
 

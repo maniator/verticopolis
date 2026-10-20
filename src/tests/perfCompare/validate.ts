@@ -119,7 +119,7 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
       for (const w of where) if (!probe?.timed?.[`${w}:${t}`]) errors.push(`rep ${r.rep} ${r.engine}: no CPU probe confirms the ${t}x throttle of ${w}`);
     }
     for (const [name, sc] of Object.entries(r.scenarios)) {
-      for (const [t, h] of Object.entries(sc.hosted)) if ((r.ranEngine ?? r.engine) === "wasm" && h.attribution && h.attribution.exportCalls === 0) errors.push(`rep ${r.rep} wasm: ${name} ${t}x: the attribution pass saw no export call, so its host JS share would include engine time`);
+      for (const [t, h] of Object.entries(sc.hosted)) if (ran === "wasm" && h.attribution && h.attribution.exportCalls === 0) errors.push(`rep ${r.rep} ${r.engine}: ${name} ${t}x: the attribution pass saw no export call, so its host JS share would include engine time`);
     }
     // Audio-on rows pair repetitions, so one that lost its audio would skew
     // them toward the repetitions where audio happened to start.

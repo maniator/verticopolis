@@ -93,6 +93,10 @@ export function makeConfig(args: Args, scenarioNames: string[]): CompareConfig {
   };
 }
 
+/** What an A/A folder's other limitations leave unsaid: they describe two engines. */
+export const aaLimitation = (aa: EngineName): string =>
+  `An A/A pass: ${aa === "wasm" ? "WASM" : "TypeScript"} ran in both slots, so the limitations below that describe a cross-engine comparison (the TypeScript read model, boot order, the incremental WASM download) do not apply to this folder's ratios, and the wasm-load, WASM-memory and attribution rows are left out.`;
+
 const STATIC_LIMITATIONS = [
   "One machine, headless Chromium in a container. Spread is reported (CV, order-statistic intervals of the median, order-statistic intervals of the paired median ratios); results from other hardware, browsers or a GPU will differ.",
   "Frame rates come from a software WebGL rasterizer (see the WebGL renderer row), so render cost is much higher than on a GPU device and dominates the frame. The simulation-only rows are unaffected by rendering.",
@@ -229,10 +233,10 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   if (resumes.length) validation.warnings.push(`the run was resumed ${resumes.length} time(s) (${resumes.map((r) => r.at).join(", ")}); the checkpoint proved the same commit, build mode, configuration, engine bytes, scenarios, machine and toolchain, and validation checked that every process ran the same browser build`);
   if (environment.dirty) validation.warnings.push("the working tree had uncommitted or untracked changes; the results folder is marked -dirty");
   if (environment.behindMain) validation.warnings.push(`the measured tree lacks ${environment.behindMain} commit(s) of origin/main (${environment.mainCommit}); it is not a baseline of the latest main`);
-  const metrics = aggregate(runs, config.scenarios, config.throttles);
+  const metrics = aggregate(runs, config.scenarios, config.throttles, config.aa);
   // Pairs with a zero TypeScript median (WASM-only bytes, no clamped
   // frames) get no ratio; the report lists them per engine instead.
-  const comparisons = compareEngines(metrics);
+  const comparisons = compareEngines(metrics, [], config.aa);
   for (const w of missingSamples(metrics, runs)) validation.warnings.push(w);
   validation.ok = validation.errors.length === 0;
   const bundle = analyzeBundle(dist);
@@ -256,13 +260,13 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     metrics,
     comparisons,
     validation,
-    limitations: [...STATIC_LIMITATIONS, ...(preThree(environment.appVersion) ? [PRE_THREE_LIMITATION] : []), ...(renderer ? [`WebGL renderer in these runs: ${renderer}.`] : [])],
+    limitations: [...(config.aa ? [aaLimitation(config.aa)] : []), ...STATIC_LIMITATIONS, ...(preThree(environment.appVersion) ? [PRE_THREE_LIMITATION] : []), ...(renderer ? [`WebGL renderer in these runs: ${renderer}.`] : [])],
   };
 
   writeFileSync(join(out, "results.json"), JSON.stringify(results, null, 1) + "\n");
-  writeFileSync(join(out, "metrics.csv"), summaryCsv(metrics));
-  writeFileSync(join(out, "raw.csv"), rawCsv(metrics));
-  writeFileSync(join(out, "comparisons.csv"), comparisonsCsv(comparisons));
+  writeFileSync(join(out, "metrics.csv"), summaryCsv(metrics, config.aa));
+  writeFileSync(join(out, "raw.csv"), rawCsv(metrics, config.aa));
+  writeFileSync(join(out, "comparisons.csv"), comparisonsCsv(comparisons, config.aa));
   writeFileSync(join(out, "report.md"), markdownReport(results));
   // results.json now holds every run; the checkpoint files are spent.
   rmSync(join(out, CHECKPOINT_RUNS), { force: true });
@@ -317,8 +321,9 @@ export function packageErrors(perf: PackageState, prod: PackageState, sourceHash
  * and commit gets -2, -3, and so on, so no result is overwritten. An
  * explicit --out must not exist yet either.
  */
-export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild"> & { aa?: EngineName | null }, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync): string {
+export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild" | "aa">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync): string {
   if (args.out) {
+    if (args.aa && !args.out.includes(`aa-${args.aa}`)) throw new Error(`--aa ${args.aa} needs an --out name containing aa-${args.aa}, so the folder cannot be mistaken for a comparison`);
     const out = resolve(repo, args.out);
     if (exists(out)) throw new Error(`${out} already exists; results are never overwritten`);
     return out;
@@ -432,7 +437,10 @@ export function loadCheckpoint(
     if (entry === null || typeof entry !== "object" || Array.isArray(entry)) throw bad();
     if (entry.started) started.push(entry.started as { rep: number; engine: string; at: string });
     else if (entry.resumed) resumes.push({ at: String(entry.resumed), runsFromCheckpoint: Number(entry.runsFromCheckpoint) });
-    else if (typeof entry.rep === "number" && (entry.engine === "ts" || entry.engine === "wasm") && typeof entry.scenarios === "object" && entry.scenarios !== null) runs.push(entry as unknown as ProcessRun);
+    else if (typeof entry.rep === "number" && (entry.engine === "ts" || entry.engine === "wasm") && typeof entry.scenarios === "object" && entry.scenarios !== null) {
+      if ((entry.ranEngine ?? entry.engine) !== (expected.config.aa ?? entry.engine)) throw new Error(`cannot resume ${dir}: line ${i + 1} of ${CHECKPOINT_RUNS} ran ${String(entry.ranEngine)} where this run's configuration calls for ${expected.config.aa ?? entry.engine}`);
+      runs.push(entry as unknown as ProcessRun);
+    }
     else throw bad();
   });
   // An attempt with no run after it was interrupted.

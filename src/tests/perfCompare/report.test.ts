@@ -93,11 +93,17 @@ describe("markdownReport", () => {
     expect(md).not.toContain("A/A pass");
   });
 
-  it("opens an A/A pass with a banner saying it is not a comparison", () => {
+  it("opens an A/A pass with a banner and marks its CSVs", () => {
     const r = results(true);
     const md = markdownReport({ ...r, config: { ...r.config, aa: "wasm" } });
-    expect(md).toContain("**A/A pass, not a comparison.** Both slots ran the WASM engine.");
+    expect(md).toContain("**A/A pass.** Both slots ran the WASM engine.");
     expect(markdownReport({ ...r, config: { ...r.config, aa: "ts" } })).toContain("Both slots ran the TypeScript engine.");
+    expect(md).toMatch(/\| ts \(ran ts\) \|/);
+    expect(summaryCsv(r.metrics, "wasm").split("\n")[1]).toMatch(/,wasm$/);
+    expect(summaryCsv(r.metrics, "wasm").split("\n")[0]).toMatch(/,aa$/);
+    expect(rawCsv(r.metrics, "ts").split("\n")[0]).toMatch(/,value,aa$/);
+    expect(comparisonsCsv(r.comparisons, "ts").split("\n")[0]).toMatch(/,n_pairs,aa$/);
+    expect(summaryCsv(r.metrics)).not.toMatch(/,aa\n/);
   });
 
   it("writes CSVs with one row per metric, value and comparison", () => {
