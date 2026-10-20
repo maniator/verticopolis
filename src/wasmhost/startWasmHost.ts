@@ -4,7 +4,7 @@ import { attachWasmHost, type WasmHost } from "./wasmHost";
 import { catalogVerdict } from "./foreignCatalog";
 import { ENGINE_DIR, ENGINE_GLUE } from "./enginePackageNames";
 import { EngineBootError, type FallbackReason, type FallbackStage } from "./engineBoot";
-import { loadEngineModule } from "./loadEngineModule";
+import { loadEngineModule, type LoadEngineOptions } from "./loadEngineModule";
 import { recordHostError, type HostErrors } from "./hostErrors";
 import type { FaultContext, HostFault } from "./hostFault";
 import { towerStateSig } from "../engine/UndoHistory";
@@ -113,8 +113,8 @@ export function enginePackageUrl(base = import.meta.env.BASE_URL, href = globalT
  *  (loadEngineModule). A package that passes it but lacks what this shell
  *  calls is a mismatched package too (a shell and an engine from different
  *  builds), coded so analytics tells it from a broken engine. */
-export async function loadWasmEngine(url = enginePackageUrl(), signal?: AbortSignal): Promise<WasmModule> {
-  const { mod } = await loadEngineModule(url, { signal });
+export async function loadWasmEngine(url = enginePackageUrl(), signal?: AbortSignal, opts: Omit<LoadEngineOptions, "signal"> = {}): Promise<WasmModule> {
+  const { mod } = await loadEngineModule(url, { ...opts, signal });
   try {
     return checkBinding(mod);
   } catch (e) {

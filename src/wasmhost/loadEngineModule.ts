@@ -60,7 +60,11 @@ const importByUrl = (url: string) => import(/* @vite-ignore */ url) as Promise<E
 /**
  * Load and initialize the engine package served at `glueUrl`. Rejects with an
  * `EnginePackageError` for a refusal (see {@link verifyEnginePackage}), or
- * `EnginePackageAborted` once `signal` fires; a late result is dropped.
+ * `EnginePackageAborted` once `signal` fires and a step then settles OK (its
+ * result is dropped). A step that fails after the signal fired keeps its own
+ * error; the caller that set the deadline has already given up on the load.
+ * A step already running (the compile inside `init`) cannot be cancelled, so
+ * a late engine can finish and stay in memory with the glue's module record.
  */
 export async function loadEngineModule(glueUrl: string, opts: LoadEngineOptions = {}): Promise<LoadedEngine> {
   const importModule = opts.importModule ?? importByUrl;

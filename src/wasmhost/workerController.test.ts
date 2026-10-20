@@ -189,6 +189,25 @@ describe("worker controller (fake engine)", () => {
     expect(await spawnEngineWorker(() => coded("boot-error"), "x").catch((e: unknown) => e)).toMatchObject({ reason: "boot-error" });
   });
 
+  it("ignores a code a failed load cannot carry, and rebuilds the detail from known values only", async () => {
+    const reply = (data: object): EngineWorkerLike => {
+      const w = fakeWorker();
+      w.postMessage = () => {
+        setTimeout(() => w.onmessage?.({ data: { type: "error", fatal: true, message: "could not load the WASM engine", ...data } }), 0);
+      };
+      return w;
+    };
+    // `none` would hide the failure from the fault rate; a trap code is for a running engine.
+    expect(await spawnEngineWorker(() => reply({ reason: "none" }), "x").catch((e: unknown) => e)).not.toBeInstanceOf(EngineBootError);
+    expect(await spawnEngineWorker(() => reply({ reason: "trap-tick" }), "x").catch((e: unknown) => e)).not.toBeInstanceOf(EngineBootError);
+    const dirty = { kind: "mismatch", file: "/etc/passwd", expected: "not hex", found: "A".repeat(40), expectedPackage: "111111111111", servedPackage: null, controlled: "yes" };
+    const err = (await spawnEngineWorker(() => reply({ package: dirty }), "x").catch((e: unknown) => e)) as EngineBootError;
+    expect(err.reason).toBe("package-mismatch");
+    expect(err.package).toEqual({ kind: "mismatch", file: null, expected: null, found: null, expectedPackage: "111111111111", servedPackage: null, controlled: false });
+    // No usable kind: no detail, and no code from it.
+    expect(await spawnEngineWorker(() => reply({ package: { kind: "other" } }), "x").catch((e: unknown) => e)).not.toBeInstanceOf(EngineBootError);
+  });
+
   it("codes a worker that never answers ready as a boot timeout", async () => {
     const silent: EngineWorkerLike = { onmessage: null, onerror: null, postMessage() {}, terminate: vi.fn() };
     const err = await spawnEngineWorker(() => silent, "u", 5).catch((e: unknown) => e);

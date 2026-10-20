@@ -71,6 +71,33 @@ export class EngineBootError extends Error {
   }
 }
 
+/** The codes a failed load can carry: the rest of the closed list is for a
+ *  fault in a running engine or for no fault at all. */
+export const LOAD_FAILURE_REASONS: readonly FallbackReason[] = ["boot-error", "package-mismatch", "boot-timeout"];
+
+const PACKAGE_KINDS: readonly string[] = ["mismatch", "load-failed", "unverifiable"];
+const PACKAGE_FILES: readonly string[] = ["glue", "wasm", "build-record"];
+const hexId = (v: unknown): string | null => (typeof v === "string" && /^[0-9a-f]{12}$/.test(v) ? v : null);
+
+/** A package detail that came across a worker message, rebuilt from known
+ *  values only: the kind and file from their lists, the ids as 12 hex digits.
+ *  Anything else is dropped, so the boot state never carries free text from a
+ *  message. Undefined when there is no usable kind. */
+export function cleanPackageFailure(raw: unknown): PackageFailure | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const p = raw as Record<string, unknown>;
+  if (typeof p.kind !== "string" || !PACKAGE_KINDS.includes(p.kind)) return undefined;
+  return {
+    kind: p.kind as PackageFailureKind,
+    file: typeof p.file === "string" && PACKAGE_FILES.includes(p.file) ? (p.file as PackageFailure["file"]) : null,
+    expected: hexId(p.expected),
+    found: hexId(p.found),
+    expectedPackage: hexId(p.expectedPackage),
+    servedPackage: hexId(p.servedPackage),
+    controlled: p.controlled === true,
+  };
+}
+
 /** The code for a refused package. A set that disagrees with the shell is a
  *  mismatch. Files that did not arrive and a browser that cannot hash are
  *  `boot-error` for now: the closed list has no code of their own until the

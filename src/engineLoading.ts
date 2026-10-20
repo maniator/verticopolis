@@ -7,7 +7,8 @@ import { announceLive } from "./game/liveRegion";
  * cover says the engine is loading, and a screen reader hears it through
  * `#a11y-live`. After a longer wait it adds that a slow connection or device can take a while (it does not claim a first visit, since an installed game can be slow too).
  * The line goes when the load settles; the cover itself goes with the splash
- * or a boot message (`hideBootCover` in bootstrap.ts).
+ * or a boot message (`hideBootCover` in bootstrap.ts). The slow-load note is
+ * announced too.
  */
 export const ENGINE_LOADING_DELAY_MS = 1200;
 export const ENGINE_SLOW_AFTER_MS = 6000;
@@ -28,7 +29,9 @@ export function showEngineLoading(doc: Document = document): () => void {
     announceLive(ENGINE_LOADING_TEXT);
   };
   const slow = () => {
-    if (line) line.textContent = `${ENGINE_LOADING_TEXT} ${ENGINE_SLOW_TEXT}`;
+    if (!line) return;
+    line.textContent = `${ENGINE_LOADING_TEXT} ${ENGINE_SLOW_TEXT}`;
+    announceLive(ENGINE_SLOW_TEXT);
   };
   timers.push(setTimeout(show, ENGINE_LOADING_DELAY_MS), setTimeout(slow, ENGINE_SLOW_AFTER_MS));
   return () => {
@@ -37,7 +40,7 @@ export function showEngineLoading(doc: Document = document): () => void {
     // The region only held our announcement; leave a later one alone.
     const live = doc.getElementById("a11y-live");
     const clear = () => {
-      if (live?.textContent === ENGINE_LOADING_TEXT) live.textContent = "";
+      if (live?.textContent === ENGINE_LOADING_TEXT || live?.textContent === ENGINE_SLOW_TEXT) live.textContent = "";
     };
     if (line) {
       clear();

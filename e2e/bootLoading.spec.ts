@@ -30,17 +30,31 @@ test("a slow engine download shows a loading line that is announced and gone onc
 });
 
 test("a fast load never shows the line", async ({ page }) => {
-  await page.addInitScript(() => {
-    (window as any).__loadingLines = 0;
-    new MutationObserver((records) => {
-      for (const r of records) for (const n of r.addedNodes) if (n instanceof Element && (n.classList.contains("boot-loading") || n.querySelector(".boot-loading"))) (window as any).__loadingLines++;
-    }).observe(document, { childList: true, subtree: true });
-  });
+  // One visit first, so the engine files are in the HTTP cache for the timed one.
   await page.goto("/");
   await hostedGame(page);
-  const { lines, at } = await page.evaluate(() => ({ lines: (window as any).__loadingLines as number, at: performance.now() }));
-  // On a machine too slow to load inside the delay the line is right to show;
-  // the test says nothing then.
-  test.skip(at >= ENGINE_LOADING_DELAY_MS, `the game took ${Math.round(at)} ms to come up, past the ${ENGINE_LOADING_DELAY_MS} ms delay`);
+  await page.addInitScript(() => {
+    const w = window as any;
+    w.__loadingLines = 0;
+    new MutationObserver((records) => {
+      for (const r of records) for (const n of r.addedNodes) if (n instanceof Element && (n.classList.contains("boot-loading") || n.querySelector(".boot-loading"))) w.__loadingLines++;
+    }).observe(document, { childList: true, subtree: true });
+    // When the engine boot settles: boot publishes its state once the load is over.
+    let state: unknown;
+    Object.defineProperty(w, "__vcEngineBoot", {
+      configurable: true,
+      get: () => state,
+      set: (v) => {
+        state = v;
+        w.__bootSettledAt ??= performance.now();
+      },
+    });
+  });
+  await page.reload();
+  await hostedGame(page);
+  const { lines, settled } = await page.evaluate(() => ({ lines: (window as any).__loadingLines as number, settled: (window as any).__bootSettledAt as number }));
+  // The line is right to show on a machine too slow to settle inside the
+  // delay; only a load that beat it is held to the claim.
+  test.skip(!(settled < ENGINE_LOADING_DELAY_MS), `the engine took ${Math.round(settled)} ms to settle, past the ${ENGINE_LOADING_DELAY_MS} ms delay`);
   expect(lines).toBe(0);
 });

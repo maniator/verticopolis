@@ -46,8 +46,8 @@ export function installProbes(): void {
     };
   }
   // Time the engine package's compile and instantiate on the app's own boot
-  // path (wasm-bindgen's loader calls instantiateStreaming, or instantiate
-  // as its fallback): the first call's start and end.
+  // path (the verified loader passes bytes, so the glue calls instantiate; the
+  // streaming variant is kept in case a path still uses it): the first call's start and end.
   const wa = WebAssembly as any;
   for (const name of ["instantiateStreaming", "instantiate"]) {
     const orig = wa[name];

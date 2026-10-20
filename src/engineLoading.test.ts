@@ -23,7 +23,7 @@ describe("showEngineLoading", () => {
     expect(live()).toBe("");
   });
 
-  it("shows the line after the wait, announces it, and adds the first-visit note later", () => {
+  it("shows the line after the wait, announces it, and adds the slow-load note later", () => {
     const stop = showEngineLoading();
     vi.advanceTimersByTime(ENGINE_LOADING_DELAY_MS);
     expect(line()?.textContent).toBe(ENGINE_LOADING_TEXT);
@@ -31,7 +31,9 @@ describe("showEngineLoading", () => {
     expect(live()).toBe(ENGINE_LOADING_TEXT);
     vi.advanceTimersByTime(ENGINE_SLOW_AFTER_MS);
     expect(line()?.textContent).toBe(`${ENGINE_LOADING_TEXT} ${ENGINE_SLOW_TEXT}`);
+    expect(live()).toBe(ENGINE_SLOW_TEXT);
     stop();
+    expect(live()).toBe("");
   });
 
   it("takes the line and its announcement away when the load settles", () => {
@@ -40,7 +42,7 @@ describe("showEngineLoading", () => {
     stop();
     expect(line()).toBeNull();
     expect(live()).toBe("");
-    // A second stop, and the timers that were cancelled, do nothing.
+    // A second stop, and the timers that were canceled, do nothing.
     stop();
     vi.advanceTimersByTime(ENGINE_SLOW_AFTER_MS * 2);
     expect(line()).toBeNull();

@@ -130,6 +130,8 @@ const isUpdateCheck = (path: string): boolean => path === "/sw.js" || /^\/workbo
 // The second deployment is a full `vite build`. It runs here, with a budget of
 // its own, so the build does not eat into the test's.
 test.beforeAll(async () => {
+  // A project that skips the test builds nothing.
+  if (!onWasm(test.info().project.name)) return;
   test.setTimeout(300_000);
   deployments = await startDeployments();
 });

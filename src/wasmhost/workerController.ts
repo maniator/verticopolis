@@ -2,7 +2,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { WasmHostApp } from "./startWasmHost";
 import { attachWorkerHost, type WorkerHost } from "./workerHost";
 import type { FromWorker, ToWorker } from "./workerProtocol";
-import { EngineBootError, FALLBACK_REASONS, packageFailureReason, type FallbackReason, type PackageFailure } from "./engineBoot";
+import { EngineBootError, LOAD_FAILURE_REASONS, cleanPackageFailure, packageFailureReason, type FallbackReason, type PackageFailure } from "./engineBoot";
 import { recordHostError, type HostErrors } from "./hostErrors";
 
 /**
@@ -73,10 +73,11 @@ export function spawnEngineWorker(make: () => EngineWorkerLike, url: string, tim
       worker.terminate();
       // A load the worker coded keeps its code and, for a refused package,
       // its kind and ids, so the boot state names them.
-      const sent = coded?.reason && (FALLBACK_REASONS as readonly string[]).includes(coded.reason) ? coded.reason : undefined;
-      const reason = sent ?? (coded?.package ? packageFailureReason(coded.package.kind) : undefined);
+      const detail = cleanPackageFailure(coded?.package);
+      const sent = coded?.reason && LOAD_FAILURE_REASONS.includes(coded.reason) ? coded.reason : undefined;
+      const reason = sent ?? (detail ? packageFailureReason(detail.kind) : undefined);
       if (timedOut) reject(new EngineBootError("boot-timeout", message));
-      else reject(reason ? new EngineBootError(reason, message, coded?.package) : new Error(message));
+      else reject(reason ? new EngineBootError(reason, message, detail) : new Error(message));
     };
     const timer = setTimeout(() => fail(`the engine worker did not answer within ${timeoutMs} ms`, true), timeoutMs);
     worker.onmessage = (e) => {

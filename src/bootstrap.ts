@@ -259,7 +259,11 @@ export function bootGame(create: () => BootApp): Promise<void> {
       // A fixed deploy is the way out of a broken or stale engine package:
       // with no tower running there is nothing to save, so take it at once.
       registerPWA({ onUpdateAvailable: (activate) => void activate() });
-      throw new Error(`the WASM engine did not start (${bootState.failure.stage}): ${bootState.failure.message}`);
+      // This error reaches the exception tracker, which groups by message, so a
+      // refused package is named by its code and kind, never by its file or
+      // digests (those stay on the console and in `__vcEngineBoot`).
+      const f = bootState.failure;
+      throw new Error(`the WASM engine did not start (${f.stage}): ${f.package ? `${f.reason}, ${f.package.kind}` : f.message}`);
     }
     // Whether the game exists: a boot that throws before it does sends no
     // row, even when its engine had already failed to load (the error itself

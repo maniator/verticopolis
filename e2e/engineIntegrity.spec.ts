@@ -55,6 +55,15 @@ async function spy(page: Page): Promise<void> {
         return real.apply(this, args);
       };
     }
+    // The glue's synchronous path (`initSync`) builds a Module and an Instance directly.
+    for (const name of ["Module", "Instance"] as const) {
+      (WebAssembly as any)[name] = new Proxy(WebAssembly[name], {
+        construct(target, args, newTarget) {
+          seen.instantiate++;
+          return Reflect.construct(target, args, newTarget);
+        },
+      });
+    }
     const create = URL.createObjectURL.bind(URL);
     URL.createObjectURL = (obj: Blob | MediaSource) => {
       if (obj instanceof Blob && obj.type === "text/javascript") seen.scriptBlobs++;
@@ -128,12 +137,11 @@ async function expectRefused(page: Page, file: "glue" | "wasm" | "build-record")
   return state.failure!;
 }
 
-/** Main-frame navigations from now on. */
+/** Page loads from now on. The `load` event fires for a reload or a
+ *  navigation, not for a same-document change such as `history.replaceState`. */
 function navigations(page: Page): { count: number } {
   const seen = { count: 0 };
-  page.on("framenavigated", (frame) => {
-    if (frame === page.mainFrame()) seen.count++;
-  });
+  page.on("load", () => void seen.count++);
   return seen;
 }
 
@@ -220,7 +228,9 @@ test.describe("an uncontrolled page", () => {
     await spy(page);
     await page.route("**/engine/verticopolis_engine_bg.wasm", async (route) => {
       const response = await route.fetch();
-      await route.fulfill({ response, body: Buffer.concat([await response.body(), Buffer.from(SALT_SECTION)]) });
+      const body = Buffer.concat([await response.body(), Buffer.from(SALT_SECTION)]);
+      // The new length goes in the header, so the refusal is the digest's, not a cut body's.
+      await route.fulfill({ response, body, headers: { ...response.headers(), "content-length": String(body.length) } });
     });
     await page.goto("/");
     const failure = await expectRefused(page, "wasm");
@@ -231,7 +241,8 @@ test.describe("an uncontrolled page", () => {
     await spy(page);
     await page.route("**/engine/verticopolis_engine.js", async (route) => {
       const response = await route.fetch();
-      await route.fulfill({ response, body: `${await response.text()}\n// another build\n` });
+      const body = Buffer.from(`${await response.text()}\n// another build\n`);
+      await route.fulfill({ response, body, headers: { ...response.headers(), "content-length": String(body.length) } });
     });
     await page.goto("/");
     const failure = await expectRefused(page, "glue");

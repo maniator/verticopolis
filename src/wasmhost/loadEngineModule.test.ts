@@ -1,8 +1,12 @@
 import { createHash, webcrypto } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { EnginePackageAborted, EnginePackageError } from "./enginePackageCheck";
 import { ENGINE_BUILD_RECORD, ENGINE_GLUE, ENGINE_WASM } from "./enginePackageNames";
 import { engineBuildRecord, expectedOf } from "./enginePackageRecord";
+import { EngineBootError } from "./engineBoot";
+import { loadWasmEngine } from "./startWasmHost";
 import { enginePackageUrls, loadEngineModule, type EngineGlue, type LoadEngineOptions } from "./loadEngineModule";
 
 const sha = (d: Uint8Array | string) => createHash("sha256").update(d).digest("hex");
@@ -70,6 +74,44 @@ function opts(h: ReturnType<typeof harness>, s: ReturnType<typeof served>, over:
 describe("enginePackageUrls", () => {
   it("names the record and the binary beside the glue", () => {
     expect(enginePackageUrls(GLUE_URL)).toEqual({ glue: GLUE_URL, wasm: `${ORIGIN}/engine/${ENGINE_WASM}`, record: `${ORIGIN}/engine/${ENGINE_BUILD_RECORD}` });
+  });
+});
+
+describe("the glue the loader imports from a Blob", () => {
+  // A Blob URL has no folder, so anything the glue resolves against its own
+  // URL would fail or, made absolute, load code nobody hashed.
+  const text = readFileSync(resolve(import.meta.dirname, "../public/engine/verticopolis_engine.js"), "utf8");
+
+  it("has no imports of its own", () => {
+    expect(text).not.toMatch(/^\s*import\b/m);
+    expect(text).not.toMatch(/\bimport\s*\(/);
+    expect(text).not.toMatch(/^\s*export\b[^\n]*\bfrom\b/m);
+  });
+
+  it("reads its own URL only to find the binary when init is given none, which the loader always does", () => {
+    const uses = text.match(/.*import\.meta.*/g) ?? [];
+    expect(uses.length).toBeGreaterThan(0);
+    for (const line of uses) expect(line).toMatch(/new URL\(\s*['"]verticopolis_engine_bg\.wasm['"]\s*,\s*import\.meta\.url\s*\)/);
+  });
+});
+
+describe("loadWasmEngine on the verified route", () => {
+  it("codes a verified package that lacks what the shell calls as package-mismatch", async () => {
+    const h = harness();
+    const o = opts(h, served());
+    const err = await loadWasmEngine(GLUE_URL, undefined, o).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(EngineBootError);
+    expect(err).toMatchObject({ reason: "package-mismatch" });
+    expect(h.init).toHaveBeenCalled();
+  });
+
+  it("hands the deadline's signal to the loader", async () => {
+    const h = harness();
+    const ctl = new AbortController();
+    ctl.abort();
+    const err = await loadWasmEngine(GLUE_URL, ctl.signal, opts(h, served())).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(EnginePackageAborted);
+    expect(h.io.importModule).not.toHaveBeenCalled();
   });
 });
 

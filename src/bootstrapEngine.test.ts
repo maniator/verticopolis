@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bootGame } from "./bootstrap";
+import { EnginePackageError } from "./wasmhost/enginePackageCheck";
 
 // The telemetry SDKs are gated on the host and best-effort; stub them so the
 // gate and its catch can be asserted without touching the real endpoints.
@@ -444,6 +445,10 @@ describe("bootGame engine_status", () => {
       await expect(boot()).rejects.toThrow(/did not start/);
       expect(engineRows()).toEqual([expect.objectContaining({ engine: "none", fallback_reason: "package-mismatch", fallback_stage: "load" })]);
       expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret/);
+      // A refused package reaches the exception tracker by code and kind, not by digest.
+      wasmStub.module = null;
+      wasmStub.loadError = new EnginePackageError("mismatch", "the wasm is not the file expected (aaaaaaaaaaaa)", { file: "wasm", expected: null, found: "aaaaaaaaaaaa", expectedPackage: null, servedPackage: null, controlled: false });
+      await expect(boot()).rejects.toThrow(/\(load\): package-mismatch, mismatch$/);
     });
 
     it("says the engine is loading after a wait, and the failure copy replaces the line when the load times out (#1132)", async () => {
