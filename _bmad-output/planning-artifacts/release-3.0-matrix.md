@@ -1,7 +1,8 @@
 # 3.0 web release matrix
 
 > **Snapshot of 2026-10-20 against `main` at `8f3a143` (app 2.35.0), revised
-> the same day after the plan's adversarial review. Not live.** The live copy
+> the same day after the plan's adversarial review and the owner's decisions
+> (plan section 12). Not live.** The live copy
 > is the release matrix tracking issue, a sub-issue of #945, created when the
 > plan is approved; until then #945 and the PRs below are the live source.
 > Threads edit the live copy in place at each milestone. This file changes
@@ -12,8 +13,9 @@ so it lands before the freeze; Phase C ends when none of it is open.
 
 Labels: "now" is GitHub on 2026-10-20; "plan" is the backlog row after this
 plan's PR merges (the label follows the row on `main`). Gate rows marked
-"proposed" in the plan bind only after the owner approves OD-7; until then
-#945's text holds.
+"proposed" in the plan were approved in principle under OD-7 and bind only
+when the owner approves the reconciled plan at the final review; until then
+#945's text holds. The plan's own choices are listed in plan section 12.
 
 ## Gate rows (#945)
 
@@ -21,18 +23,18 @@ plan's PR merges (the label follows the row on `main`). Gate rows marked
 | --- | --- | --- |
 | Conformance | Not met | B4 (#865) |
 | Dual run | Not met | B5 (#867) |
-| Seeded replay | Instrument incomplete; window not started | B2, B4, then the freeze (OD-3) |
+| Seeded replay | Instrument incomplete; window not started | B2 (with the freeze guard), B4, then the freeze on `main` (OD-3) |
 | Analytics | Unverified | A1, X1 (#879, #873) or exceptions |
 | Unit and integration | Not met | B1 (#1062); A5 removes the named exclusions |
-| End to end | Not met | A3 (#874); the cue-timing spec in A5 and A6 if OD-7 adds it |
+| End to end | Not met | A3 (#874); the cue-timing spec in A5 and A6 (OD-7) |
 | Authority | Not met | A6 (#954, #1064, #1065, #1066), UI1 (#921, #926 items 1 to 4) |
 | Saves | Unverified | A2 (#902), A6 (#1066), B6 (S12 and the audit) or exceptions |
-| Performance (provisional) | Not met as last measured | B3, PF1 to PF4, A5; OD-4 |
-| Reliability (provisional) | Not startable | A1, A3, A4; OD-1, OD-2 |
-| Rollback | Not started | Release lane (X2), OD-5 |
+| Performance (provisional) | Not met as last measured | B3a, B3, PF1 to PF5, A5; OD-4: every speed metric's upper bound within a capped noise tolerance, at 1x and 4x |
+| Reliability (provisional) | Not startable | A1, A3, A4's stages (OD-1); A6 (#954) and stage 3, since eligible sessions start at S9 on a build without the size gate; 1,000 eligible sessions and the observation period (OD-2) |
+| Rollback | Not started | Release lane (X2), on the switchable build (OD-5) |
 | Deployment | Partial | B0, C1 (#985 criteria 5 and 7), A1 |
 | Version identity | Not met | C2 (#963) |
-| Source of truth | At the flip | Release lane (X3) |
+| Source of truth | At the flip | Release lane (X3), with 3.0.0's compatibility policy (OD-6) |
 | Coverage | Holding | Recheck on the candidate |
 | Sign-off | Owner only | Everything above |
 
@@ -40,33 +42,35 @@ plan's PR merges (the label follows the row on `main`). Gate rows marked
 
 | ID | Work | Issue / PR | Gate rows | Lane | Depends on | Changes the key | Label now → plan | State 2026-10-20 | Next step |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A1 | Reliability signal: engine, fallback reason, size gate flag, latch-off, divergence count, arm; governed definition; data map (A1 creates it); #841 check | new issue on approval (S16's signal half) | Reliability, Analytics, Deployment | WS-A | none (runtime reasons with A3) | no | new → P1 | Not started | Spec, then draft PR; production needs the owner's separate OK (plan 13) |
+| A1 | Reliability signal: engine, fallback reason, size gate flag, latch-off, divergence count, arm and stage; governed definition with the split into early telemetry and eligible sessions, per-arm crash rates, and the exact bound computed in the tested script (OD-2); data map (A1 creates it); #841 check | new issue on approval (S16's signal half) | Reliability, Analytics, Deployment | WS-A | none (runtime reasons with A3) | no | new → P1 | Not started | Spec, then draft PR; production needs the owner's separate OK (plan 13) |
 | A2 | S5: a booking survives attach in both engines; S4's booking-case test (#874 stays open until it merges) | #902 | Saves | WS-A | A3 (the owner's 2026-10-16 order); B1 merged (parity setup files) | yes | P2 → P1 | Recovered patch, no PR | Apply `wasm-authority.patch` on `8f3a143`, merge `main`, draft PR early; merge after A3 |
 | A3 | S4: runtime fallback; engine refusals of commands the instance accepted reported; last error kept | #874, #1059 (#1020 if same code) | End to end, Reliability | WS-A | B1 merged | yes (binding) | P2 → P1; P3 → P1; P3 | Boot fallback only | After B1 merges |
-| A4 | Engine cohort release | OD-1 | Reliability | Owner, then WS-A | A1, A3, A2 | no | n/a | Owner decision | Owner |
-| A5 | S6: getters, result shapes, per-step sync and hourly merge removed (design per OD-9); cue-timing test, and #965 if that test fails | #868 | Authority, Performance, Unit and integration | WS-A | RUN-0b (design input); lane order after A2 | yes | P2 → P1 | Partial | After A2 |
+| A4 | The staged cohort: stages 1 to 3 (10%, 25%, 50%), the bucket draw with its read-back check, the config module, the `arm` and `stage` fields, the size gate (off at stage 3), stop signals, help sentence | new issue on approval (OD-1, plan 4.1) | Reliability | WS-A; its fields, each stage and each drop-back on the owner's approval | A1; stage 1: stage 0, A3 with its forced-trap spec, A2; stage 3: A5 and a protocol run passing M2 to M6 at 1x and 4x | no | new → P1 | Decided as stages; not built | Spec after A3 |
+| A5 | S6: getters, result shapes, per-step sync and hourly merge removed (design A or B from RUN-0b by a rule written first, OD-9 (ii)); cue-timing test, and #965 if that test fails | #868 | Authority, Performance, Unit and integration | WS-A | RUN-0b (design input); lane order after A2 | yes | P2 → P1 | Partial | The design rule now, committed before RUN-0b; the code after A2 |
 | A6 | S9: the engine answers; then D5 items, each in a focused PR; build rolls; #965 if its cue test is the first to fail | #954, #1064, #1065, #1066, #1067 | Authority, Saves | WS-A | A3, A5; A7 for #1066's `.TDT` half only (OD-8) | yes | P1; P2 → P1 (x3); P3 | Absent; earlier work lost | After A5 |
-| A7 | TDT prerequisites of #1066's `.TDT` half | #885, #886, #887, #920 | Saves, Authority | WS-A (the owner supplies #885's real saves) | OD-8 | yes (`engine-rs/src/tdt`) | P2 → P1; P2 → P1; P3 → P1; P3 → P1 | Open | Owner decision OD-8 |
+| A7 | TDT prerequisites of #1066's `.TDT` half; first, the list of real-save inputs | #885, #886, #887, #920 | Saves, Authority | WS-A (the owner supplies the saves A7's list names) | OD-8 (a), decided | yes (`engine-rs/src/tdt`) | P2 → P1; P2 → P1; P3 → P1; P3 → P1 | Open | The real-save list in Phase A; the rest between A3 and A6 |
 | B0 | #985 criterion 5 design repair | PR #1047 | Deployment | WS-B | this plan's PR merged first (it carries the #1046 row) | no | P1 (#985) | Repair in `wasm-offline.patch` | Push, drop #1047's copy of the #1046 row, address and resolve the 9 Codex threads and Copilot's open thread, ask the owner |
 | B1 | S3: vitest on WASM in CI, commute fix | PR #1062 (#878) | Unit and integration | WS-B | none | yes (before the window) | P1 | Open, four merges behind `main` (234 commits by `git rev-list`), green before #1060 only | Take over, apply `wasm-conformance.patch` on its head, merge `main` |
-| B2 | Differential upgrade, PR corpus, run hygiene, rehearsal window | new issue on approval | Seeded replay | WS-B | none; B4 adds the reasons after it | yes (the differential) | new → P1 | Not started | Once B1 is up for review |
-| B3 | Windows harness build fix, #880, protocol doc, gate orientation, A/A mode, shipping-host cost split | new issue on approval, #880 | Performance | WS-B | OD-9 (i) | yes (#880, `packageHash.ts`) | new → P1; P3 → P1 (#880) | Build fix in `perf-worker-1068.patch` | Draft PR on `main` |
+| B2 | Differential upgrade, PR corpus, run hygiene, the key script, the freeze guard as a required check (OD-3), rehearsal window | new issue on approval | Seeded replay | WS-B | none; B4 adds the reasons after it | yes (the differential) | new → P1 | Not started | Once B1 is up for review |
+| B3a | Windows harness build fix for both harnesses (`perfWorker` and `perfCompare`), extracted from #1068 | new issue on approval | Performance | WS-B | OD-9 (i), decided | no | new → P1 | Build fix in `perf-worker-1068.patch` | Focused tooling PR on `main`; #1068's hold unchanged |
+| B3 | #880, protocol doc with the OD-4 rule, gate orientation, A/A mode (δ, ε, their caps and the exit to the owner), shipping-host cost split and churn | new issue on approval, #880 | Performance | WS-B | B3a | yes (#880, `packageHash.ts`) | new → P1; P3 → P1 (#880) | Not started | Draft PR on `main` after B3a |
 | B4 | S11: refusal reasons pinned; reasons in the differential | #865 | Conformance, Seeded replay | WS-B | B2 | yes | P3 → P1 | Absent | After B3 |
 | B5 | S8: the step driver in the engine | #867 | Dual run | WS-B | B1; A2 (`fixedStep.ts`); A5's cue test (`frameLoop.ts`) | yes | P2 → P1 | Absent | After B4 |
 | B6 | S12 fixed or excepted; the Saves-row audit | #858, #856 | Saves | WS-B | A2 (`load.rs`) | yes | P3 | Open | After B5, before the freeze |
-| B7 | #1068 CI repair under the hold | PR #1068 (#1045) | none | WS-B | B3 | n/a (held) | P2 | Red since #1060; owner hold | Tier entries, merge `main`; no merge (D2) |
-| PF1 | Protocol runs RUN-0a (now), RUN-0b, RUN-1 to RUN-3 | B3's issue | Performance | A local session the coordinator schedules (PC measurement; no implementation thread runs it) | RUN-0b on B3 | no | n/a | Not run | RUN-0a now |
+| B7 | #1068 CI repair under the hold | PR #1068 (#1045) | none | WS-B | B3a | n/a (held) | P2 | Red since #1060; owner hold | Tier entries, merge `main`; no merge (D2) |
+| PF1 | Protocol runs RUN-0a (now), RUN-0b, RUN-1 to RUN-3 | B3's issue | Performance | A local session the coordinator schedules (PC measurement; no implementation thread runs it) | RUN-0b on B3 and A5's design rule | no | n/a | Not run | RUN-0a now |
 | PF2 | Edit scene for the shipping host (M8) | new issue on approval | Performance | WS-P | B3 | no | new → P1 | Not started | After B3 |
 | PF3 | The rest of the `perf:worker` cost split, then the bare-step gap; borrowed views if profiling picks them | #1048, #1051, #859 | Performance | WS-P | RUN-0a; B3 for code work; #1048 before #1051 (the owner's 2026-10-16 order) | #1051 and #859 yes; #1048 no | P2 → P1 (#1048); P2 → P1; P3 | #1048 partly landed (#1056); #1051 claim retired; #859 recovered patch | After B3: #1048's remainder; #1051 starts by checking the flat TypeScript curve |
-| PF4 | WASM perf baseline in CI; startup accounting; TDT package cost | #900, #983, #1005, #932 | Performance | WS-P | A5 (#900); C1 (`scripts/wasm-build.ts`) for #932 | #932 yes; the rest no | P3 → P1; P3; P3; P3 → P1 | Recovered patch (#983, #1005) | Apply `perf-startup.patch` |
+| PF4 | WASM perf baseline in CI with M7's A/A-calibrated tolerances; startup accounting; the cold-start split; TDT package cost | #900, #983, #1005, #932 | Performance | WS-P | A5 (#900); C1 (`scripts/wasm-build.ts`) for #932 | #932 yes; the rest no | P3 → P1; P3; P3 → P1; P3 → P1 | Recovered patch (#983, #1005) | Apply `perf-startup.patch`; #1005's fetch and compile split first, for PF5 |
+| PF5 | The cold-start fix (M5) | new issue on approval | Performance | WS-P | #1005; RUN-0b confirms the gap | if it touches the key's inputs | new → P1 | Not started; M5 fails as last measured | After #1005; before the freeze if it changes the key, before RUN-3 in any case |
 | C1 | Engine-set check at boot; size budget and old-cache cleanup | #985 | Deployment | WS-C | B0 approved; A3 (S16 depends on S4) | yes (`wasm-build.ts`, `engineAssets.ts`) | P1 | Criteria 1 to 4 and 6 on `main` | After approval |
 | C2 | About and diagnostics identity | #963 | Version identity | WS-C | C1 | yes (identity export) | P1 | Absent; earlier work lost | Re-implement before the freeze |
 | C3 | Shell precache integrity | #1046 | Deployment (adjacent) | WS-C | A1 signal data | no | P3 (gated) | Design open question | Wait for the signal |
-| UI1 | The UI reads the engine catalog | #921, #926 | Authority | WS-D | A5; WS-R for `src/render` | yes (catalog exports) | P1; P2 → P1 | #921 part 1 merged | After A5 |
-| RS1 | Rendering stack | PR #817 (#812), PR #831 (#813), PR #1039 (#915) | none | WS-R | a spare thread after WS-P and WS-C while WS-D waits for S6, or after WS-D | no | P1; P2; P3 | Open; #1039 conflicts with its base | Stack order, versions per plan 9.7 |
-| X1 | Analytics close-out | #879, #873 | Analytics | Release | S1 (done) | #879 yes | P3; P2 | Open | Fix or exception register; engine-side changes (#879's pins in `gameplay.rs`) before the freeze |
-| X2 | Rollback rehearsal, including a deploy rollback to the last release before #902 | #945 | Rollback | Release | OD-5, candidate | no | n/a | Not started | Script at Phase D |
-| X3 | Flip PR edits: CLAUDE.md source of truth, CONTRIBUTING build line, `engineChoice.ts`, gallery and baselines from the WASM engine (#878), exception register | #945 | Source of truth, Sign-off | Release | everything | no | P1 | n/a | Owner approval |
+| UI1 | The UI reads the engine catalog | #921, #926 | Authority | WS-D | A5; for `src/render`, the stack parks when WS-D needs it (plan 9.5) | yes (catalog exports) | P1; P2 → P1 | #921 part 1 merged | After A5 |
+| RS1 | Rendering stack | PR #817 (#812), PR #831 (#813), PR #1039 (#915) | none | WS-R | a spare thread after WS-P and WS-C while WS-D waits for S6, or after WS-D; parks at a PR boundary when WS-D needs `src/render` | no | P1; P2; P3 | Open; #1039 conflicts with its base | Stack order, versions per plan 9.7 |
+| X1 | Analytics close-out | #879, #873 | Analytics | Release | S1 (done) | #879 yes | P3; P2 | Open | Fix or exception register; engine-side changes (#879's pins in `gameplay.rs`) before the freeze; #873's analytics half before the candidate deploy (a tail path) |
+| X2 | Rollback rehearsal, including a deploy rollback to the last release before #902 | #945 | Rollback | Release | the switchable build (OD-5), candidate | no | n/a | Not started | Script at Phase D |
+| X3 | Flip PR edits: CLAUDE.md source of truth, CONTRIBUTING build line and 3.0.0's compatibility policy (OD-6), `engineChoice.ts`, gallery and baselines from the WASM engine (#878), exception register | #945 | Source of truth, Sign-off | Release | everything | no | P1 | n/a | Owner approval |
 
 ## Held, after the flip, or out of path
 
@@ -74,7 +78,7 @@ plan's PR merges (the label follows the row on `main`). Gate rows marked
 | --- | --- |
 | #1045 (via #1068), #1049, #1050, #1053, #1071, #1058 | Worker host: a measurement placement until after the flip (AD-7) |
 | #908, #919, #966, #980, #1057 | After the flip or at retirement |
-| #893 | Crate publish for a second frontend; cutover decision 4 leans on it (OD-6) |
+| #893 | Crate publish for a second frontend, after the flip at P2 (OD-6 (b)); 3.0.0's major bump rests on CLAUDE.md's versioning rule |
 | #883, #884 | TDT lock hardening, after the flip; #885, #886, #887 and #920 moved onto the path (A7) |
 | #1020, #1021 | Latent host edges and the rest of #923; taken only where a lane touches the same code |
 
@@ -88,12 +92,13 @@ plan's PR merges (the label follows the row on `main`). Gate rows marked
 | `src/wasmhost/startWasmHost.ts`, `workerController.ts`, `hostErrors.ts`, `engineBoot.ts`, `engineChoice.ts`, `src/bootstrap.ts` | WS-A (A1, A3, A4) | WS-C (C1's boot check) after A3 merges; the release lane at the flip. #1062 also touches `startWasmHost.test.ts` and `src/wasmhost/fakeEngine.fixture.ts`, which A1 and A3 edit too: B1 merges first, and A1 and A3 rebase over it |
 | `src/analytics*`, the data map | WS-A | The release lane (X1, #873) |
 | `src/ui/templates/helpContent.ts` | WS-A (A4's cohort sentence) | WS-C (C2's About changes) |
+| A4's cohort config module (the stage share and the size gate's threshold) | WS-A (A4) | The release lane at the flip |
 | `engine-rs/src/bin/fuzz.rs`, `scripts/fuzz-compare.ts`, `engine-fuzz.yml`, the `conformance/` corpus | WS-B (B2, B4) | |
 | `src/game/frameLoop.ts` | WS-A (A5's cue-timing test, and #965 if that test fails) | WS-B (B5); A6's #965, if A6's test is the first to fail, rebases over B5 |
 | `engine-rs/src/clock.rs` | WS-B (B5) | |
-| `src/tests/perfWorker/*`, `src/tests/perfCompare/*`, `scripts/perf-*.ts`, `src/wasmhost/packageHash.ts` | WS-B (B3) | WS-P |
+| `src/tests/perfWorker/*`, `src/tests/perfCompare/*`, `scripts/perf-*.ts`, `src/wasmhost/packageHash.ts` | WS-B (B3a, then B3) | WS-P |
 | `engine-rs/src/tower_query.rs`, `tower_routing.rs` (#859) | WS-P (lands before the freeze) | |
-| `src/render/**`, sprites | WS-R | WS-D (#921 parts 2b and 2c, and their `src/render` lint rule) after the stack merges or parks |
+| `src/render/**`, sprites | WS-R, until WS-D needs these files | WS-D (#921 parts 2b and 2c, and their `src/render` lint rule). WS-D does not wait: when it needs `src/render`, the stack parks at its next PR boundary (the coordinator's call) unless its open PR is ready to merge, and later stack PRs rebase over WS-D |
 | `src/ui/**`, `src/game/**` catalog reads | WS-D | |
 | The About and Diagnostics UI (#963); `src/build/workboxGlob.ts`, `scripts/verify-precache.ts` (#985 criteria 5 and 7) | WS-C | |
 | `scripts/wasm-build.ts`, `src/wasmhost/engineAssets.ts`, `src/wasmhost/enginePackageNames.ts` | WS-C (C1) | WS-P (#932's feature split) |
@@ -115,8 +120,9 @@ other lane's on rebase; the `package.json` version, per plan 9.7 rule 7; and
 | --- | --- | --- | --- | --- |
 | Seeded replay (rehearsal) | not started | n/a | 0 | n/a |
 | Seeded replay (counting) | not started | the key of plan 4.2 | 0 of 14 | none yet |
-| Reliability | not started | build and arm | 0 | n/a |
-| Reliability tail | not started | the candidate deploy and later deploys that keep the key and the tail's paths | 0 | a merge to the tail's paths (a tail fix included) or a new key restarts it, unless the owner waives (plan 4.1) |
+| Reliability, early telemetry | not started | build, stage and arm | 0 | n/a |
+| Reliability, eligible sessions | not started | builds with S9 (#954) and without the size gate (stage 3 on), by build, stage and arm | 0 of 1,000 | n/a |
+| Observation period (the tail) | not started | the candidate deploy and later deploys that keep the key and the tail's paths | 0 (at least 14 nights, and 100 eligible sessions as proposed) | a merge to the tail's paths (a tail fix included) or a new key restarts it, unless the owner waives (plan 4.1) |
 
 The replay ledger (one line per night: date, key, run link, result) lives in
 the live matrix issue.

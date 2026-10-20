@@ -412,3 +412,31 @@ A third pass changed more:
 - The candidate deploy is cut with every gate input on the tail's paths
   merged; a later merge to those paths, or a new key, restarts the tail
   unless the owner waives it.
+
+The owner's review (2026-10-20) decided the open questions. Each line gives
+what the owner decided, then what the revised plan chose to carry it out;
+those choices are proposals for the owner's final review (plan section 12):
+
+- D1 stands: the owner confirmed the takeover. WS-R owns #817, #831 and
+  #1039 (conflicts, reviews, tests, merges in stack order) on spare thread
+  capacity, below the Rust and WASM release blockers and clear of the
+  performance work.
+- OD-1: the owner asked for a progressive cohort in explicit stages,
+  starting small once runtime fallback is tested, with no 50% while the
+  performance and host reliability gaps remain. The plan proposes 10%, then
+  25%, then 50% once a protocol run passes M2 to M6, with a bucket from 0 to
+  99 per browser so a stage can grow or drop back without redrawing arms.
+- OD-2: the owner separated early telemetry from the final evidence (at
+  least 1,000 eligible sessions, every failure triaged, an observation
+  period on the candidate build, the bound reported as achieved). The plan
+  proposes that eligibility start at S9 on a build without the size gate,
+  where the room had recommended counting pre-S9 sessions.
+- OD-3: the owner asked for the option that reliably runs the actual
+  candidate. The plan weighed a candidate ref and kept the room's freeze on
+  `main`, with a freeze guard.
+- OD-4: the owner approved M1 to M8 at 1x and 4x, a tolerance only for
+  measured noise, and WASM at least as fast as TypeScript. The plan proposes
+  an upper-bound rule with δ and ε from A/A noise under caps; cold start
+  loses its 500 ms allowance.
+- OD-5, OD-6 (b), OD-7 and OD-8 (a) followed the recommendations. Under
+  OD-9 the owner approved (i) and left S6's design to RUN-0b's evidence.

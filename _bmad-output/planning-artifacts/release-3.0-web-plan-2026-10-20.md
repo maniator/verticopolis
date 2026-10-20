@@ -1,7 +1,8 @@
 # Verticopolis 3.0 web release plan (Phase 2)
 
 > **Snapshot, written 2026-10-20 against `main` at `8f3a143` (app 2.35.0),
-> revised the same day after its adversarial review (section 14).** PR,
+> revised the same day after its adversarial review (section 14) and after
+> the owner's decisions (section 12).** PR,
 > branch, issue and label states drift after this. The live release matrix is
 > the tracking issue proposed in section 9.6; until it exists, #945 and the PRs
 > named below are the live source. Every performance figure here is historical,
@@ -16,10 +17,15 @@
 > dashboard. Day counts derived from them are projections and are labeled as
 > such.
 
-**Status: draft for the owner's approval.** Nothing here changes the default
-engine, deploys a cohort, publishes 3.0.0 or grants a gate exception, and
-nothing here amends #945 or the cutover plan until the owner approves OD-7.
-Those stay with the owner.
+**Status: draft for the owner's final review.** The owner decided OD-1 to
+OD-9 on 2026-10-20 (section 12), and this revision carries those decisions.
+Where carrying them out took a choice the owner did not make (a stage's
+share, a floor, a cap), section 12 lists it for the final review. Nothing
+here changes the default engine, deploys a cohort stage, publishes
+3.0.0 or grants a gate exception, and nothing here amends #945 or the
+cutover plan until the owner's final approval, which OD-7 ties to the
+reconciled reliability and performance definitions. Those stay with the
+owner.
 
 **Scope:** `maniator/verticopolis` only, the web release and the Rust/WASM
 engine. No other repository, no native client, desktop, Steam, Godot or 3D
@@ -37,16 +43,21 @@ eight recovered Codex patches, and the planning party
 1. **Two gate rows run on a calendar, and neither can start today.**
    - **Reliability** has no population and no instrument: the TypeScript
      default produces no engine sessions, and no analytics field records the
-     engine or a fallback. Its threshold is also ambiguous. Zero fallbacks in
-     1,000 sessions is under 0.1% as a point estimate, but it bounds the rate
-     only at about 0.3% as a 95% upper bound. The instrument ships first. The
-     population and the reading of the threshold are owner decisions (OD-1,
-     OD-2).
+     engine or a fallback. The instrument ships first. The owner decided the
+     population (OD-1: a cohort in explicit stages, starting small once
+     runtime fallback is tested) and the pass rule (OD-2: at least 1,000
+     eligible engine sessions, every failure triaged, an observation period
+     on the candidate build, and the confidence bound reported as achieved).
+     Eligible sessions start once S9's engine answers ship and the size gate
+     is off, which in this plan is stage 3, after the performance gaps close
+     (4.1). Zero fallbacks in 1,000 sessions bounds the rate at about 0.3%
+     at 95%, and the report states that bound.
    - **Seeded replay** has a nightly fuzzer, but the differential the row
      describes does not exist yet: it compares only two hashes per checkpoint,
      on small rich towers, with no saves, logs or events, and only on the
-     native engine. It needs an upgrade, a key and counting rules (proposed under
-     OD-7), and a freeze or a candidate ref (OD-3).
+     native engine. It needs an upgrade, a key and counting rules (OD-7), and a
+     freeze: the plan freezes the key's paths on `main`, the option OD-3's
+     evaluation picks (4.2).
      Every engine change, the binding and performance work included, lands
      before its 14 nights.
 2. **The host that ships is the slow one.** On the large tower the main-thread
@@ -62,35 +73,42 @@ eight recovered Codex patches, and the planning party
    own split is not measured yet (B3). S6 (#868) has to remove both costs, so
    it is a performance story as well as a read-model story.
 3. **Performance is decided by a pre-registered protocol on the owner's
-   desktop** (section 5), with a margin the owner sets before the run (OD-4).
+   desktop** (section 5), under the owner's rule (OD-4): M1 to M8 at 1x and
+   4x, and WASM at least as fast as TypeScript on every speed metric. A
+   metric passes when the upper bound of its paired interval stays within a
+   tolerance calibrated from measured noise, and a cap on that tolerance
+   keeps a noisy harness from passing a material slowdown (5.3).
    The conflicting TypeScript figures are reconciled in section 5.1: the two
    desktop runs agree, the container runs are another machine, and the 1,640
    ms claim has no provenance and is retired.
 4. **First two workstreams** (section 9): **WS-A, engine authority and
    fallback** (the reliability instrument, #874 with #1059, #902, #868, #954
    with #1064 to #1067), and **WS-B, evidence** (the #1047 repair, taking over
-   #1062, the differential upgrade, the Windows harness split, #865, #867, S12,
+   #1062, the differential upgrade, the Windows harness fix from #1068 (B3a)
+   and the harness (B3), #865, #867, S12,
    then the #1068 CI repair under its hold). Where both lanes touch a file,
    section 9.5 fixes which one merges first; the other rebases.
-5. **Owner decisions:** D1 is decided by the party (take over the rendering
-   stack; in thread order it comes after the performance, offline and
-   catalog lanes, section 7.1). D5 is decided (no exception, section 7.2), and #1066's `.TDT`
-   half brings prerequisites the owner should see (OD-8). D6 is applied in the
-   backlog rows this PR changes (section 8). Nine decisions remain for the
-   owner (section 12).
+5. **Owner decisions:** D1 is decided by the party and confirmed by the
+   owner (take over the rendering stack; in thread order it comes after the
+   performance, offline and catalog lanes, section 7.1). D5 is decided (no
+   exception, section 7.2), and the owner chose to complete #1066's `.TDT`
+   prerequisites for 3.0 (OD-8). D6 is applied in the backlog rows this PR
+   changes (section 8). The owner decided OD-1 to OD-9 on 2026-10-20; section
+   12 records each decision and what is still the owner's.
 
 ### 1.1 The owner's decisions this plan works under (2026-10-20)
 
 | | Decision |
 | --- | --- |
-| D1 | The rendering stack (#817, #831, #1039): the owner leans toward a takeover and asked the planning party to decide |
+| D1 | The rendering stack (#817, #831, #1039): the owner leaned toward a takeover and asked the planning party to decide; the party took it over (7.1), and the owner confirmed that on 2026-10-20 |
 | D2 | #1068 stays on hold: CI fixes and reviews are allowed, and it does not merge until paired desktop performance and correctness evidence meets its criteria |
 | D3 | Each new thread posts a takeover note on stale Codex claims |
 | D4 | Every local branch, worktree, patch and uncommitted change is preserved; no cleanup without the owner's approval |
 | D5 | #1064, #1065 and especially #1066 are required for 3.0, unless an architecture review documents an exception for the owner to approve |
 | D6 | Priority labels follow release dependencies; a release requirement wins over a P2 or P3 label |
 
-D1 to D6 are given. The OD-n items in section 12 are still open.
+D1 to D6 are given. The owner decided OD-1 to OD-9 on 2026-10-20; section
+12 records each decision and what it changed.
 
 ## 2. Where things stand (from the takeover inventory)
 
@@ -118,7 +136,7 @@ the plan builds on:
   | `wasm-conformance.patch` | `3ffed638da07983088a314487de5008946a73cc27a30c8efbd0beaae65fbaeb5` | `300c7d9` (#1062 head) | #1062 (B1) |
   | `wasm-authority.patch` | `cefbea5fad0ca684b80a60cc1a18ddee325e10837d4f2590c658244f300c491e` | `8f3a143` | new PR for #902 (A2) |
   | `wasm-integration.patch` | `ef142ccea53bd7f7a41a3478c412d3ac0a5d3dc08be833818a22506a0d26702d` | `8f3a143` | #1059's code and tests with #874 (A3); its audit doc and its edit to the cutover plan are plan input only |
-  | `perf-worker-1068.patch` | `e9e6d168273fcdc71f2a9ea380983994210154631eddbc9225ab1aa4407dc0a5` | `1d544cb` (#1068 head) | the Windows build fix to `main` (B3) if the owner approves OD-9 (i), the tier entries to #1068 (B7) |
+  | `perf-worker-1068.patch` | `e9e6d168273fcdc71f2a9ea380983994210154631eddbc9225ab1aa4407dc0a5` | `1d544cb` (#1068 head) | the Windows build fix to `main` in its own tooling PR (B3a, OD-9 (i)), the tier entries to #1068 (B7) |
   | `wasm-offline.patch` | `bf3bfb5cb5c16a390c42c37c53175dac4afbc48e3ee0f37fca405a9b008029b3` | `e114ea0` (#1047 head) | the #1047 design repair (B0) |
   | `perf-rust-859.patch` | `213050737407d4acb0410cdf7db8f61f1f43f46d6424d744123cdeaf49e95712` | `8f3a143` | new PR for #859 (WS-P) |
   | `perf-startup.patch` | `ad6892444572ab4cb733e3701e7357c91fd24325cf2ab4b9490a3ca93ced29c3` | `8f3a143` | new PR for #983 and #1005 (WS-P) |
@@ -151,12 +169,13 @@ the plan builds on:
 Two terms first. **The candidate engine** is the engine source at the freeze,
 identified by the window key (section 4.2). **The candidate commit** is the
 first commit on `main` with that key and every other gate input merged. The
-replay window counts only on the candidate engine. The reliability window
-counts from the first build with S4 (if the owner agrees under OD-2, which
-recommends counting pre-S9 sessions, reported by build) and ends with a tail
-on the candidate deploy (4.1). **The candidate deploy** is the 2.x release
-that carries the candidate engine to engine players at the freeze (the cohort
-release under OD-1 (a)), cut from a commit with the candidate engine and every
+replay window counts only on the candidate engine. Reliability evidence
+counts eligible sessions, which start at the first build that carries S9's
+engine answers (#954) and runs without the size gate (OD-2, 4.1); earlier
+engine sessions are early telemetry. It ends with the
+observation period on the candidate deploy (4.1). **The candidate deploy**
+is the 2.x release that carries the candidate engine to engine players at
+the freeze (a release of the cohort at its current stage, OD-1), cut from a commit with the candidate engine and every
 gate input that touches the tail's paths merged (4.1 lists them; A3 with A1's
 runtime reasons and C1 are among them). Both windows can
 finish at the candidate commit; the rollback rehearsal and then the gate
@@ -165,11 +184,14 @@ review run on it.
 The two long windows can only start once the work they observe is in place, so
 the critical path is the work in front of each window:
 
-- **Reliability window** needs the instrument, S4 runtime fallback (a cohort
-  without it means a trap ends a real player's game), S5 for S4's booking
-  case, and the owner's cohort decision. Its tail runs on the candidate
-  engine, which reaches players in a 2.x cohort release (the candidate
-  deploy, an owner step).
+- **Reliability evidence** needs the instrument, S4 runtime fallback tested
+  (a cohort without it means a trap ends a real player's game), S5 for S4's
+  booking case, and the owner's approval of each cohort stage (4.1).
+  Eligible sessions start with S9 (#954) on a stage-3 build, and stage 3
+  waits for S6 and a protocol run that passes M2 to M6, so the 1,000
+  accumulate after both. The observation period runs on the candidate
+  engine, which reaches players in a cohort release (the candidate deploy,
+  an owner step).
 - **Seeded replay window** needs the full differential upgrade (with #865's
   reasons) and a frozen engine: S5, S6's engine half, S8, S9 with #1066 (and
   #1067 or its exception entry), the catalog items of S7 that the Authority
@@ -178,8 +200,9 @@ the critical path is the work in front of each window:
   half (#879's pins in `gameplay.rs`, or its exceptions), S17's identity
   export, #1051 (with #859 if its profiling picks it), and #932's cargo
   feature if it ships. All of them change the key.
-- **Performance verdict** needs the protocol and harness (B3), S6 for the
-  shipping host, #1051 (after #1048) for bare tick parity, and RUN-3 on the
+- **Performance verdict** needs the protocol and harness (B3a and B3), S6
+  for the shipping host, #1051 (after #1048) for bare tick parity, the
+  cold-start fix (PF5) if RUN-0b confirms M5's gap, and RUN-3 on the
   candidate commit.
 
 ```mermaid
@@ -192,15 +215,19 @@ flowchart TD
   P1062["#1062 S3 vitest on WASM (B1)"] -. "merges first: shared files" .-> P902["#902 S5 booking survives attach"]
   P1062 -. "merges first: shared files" .-> P874["#874 S4 runtime fallback + #1059"]
   P874 --> P902
-  P874 --> COH{{"Owner: 2.x engine cohort (OD-1)"}}
+  P874 --> COH{{"Owner: cohort stages 1 and 2 (OD-1)"}}
   P902 --> COH
   SIG --> COH
-  COH --> REL[["Reliability window"]]
-  P868["#868 S6 read model: sync and merge (OD-9)"] --> P954["#954 S9 engine answers"]
+  COH --> TEL[["Early engine telemetry"]]
+  TEL --> STG3{{"Owner: cohort stage 3, 50% (OD-1)"}}
+  P868["#868 S6 read model: sync and merge (design from RUN-0b, OD-9)"] --> P954["#954 S9 engine answers"]
+  P868 -->|"RUN-1 or RUN-2 passes M2 to M6"| STG3
+  STG3 -->|"no size gate"| REL[["Reliability evidence: 1,000 eligible sessions (OD-2)"]]
+  P954 -->|"eligible from S9"| REL
   P874 --> P954
   P874 --> E2E[["End to end"]]
   P954 --> D5["#1064 #1065 #1066 (#1067)"]
-  TDT["#886 #885 #887 #920 (OD-8)"] --> D5
+  TDT["#886 #885 #887 #920 (OD-8 (a)), real saves from the owner"] --> D5
   P868 --> S7["#921 #926 S7 UI reads the catalog"]
   P868 --> P900["#900 S13 perf baseline"]
   P1062 --> UNIT[["Unit and integration"]]
@@ -211,15 +238,20 @@ flowchart TD
   P867 --> DUAL[["Dual run"]]
   P865["#865 S11 refusal reasons (B4)"] --> CONF[["Conformance"]]
   DIFF --> P865
+  B3A["B3a Windows harness fix from #1068 (OD-9 (i))"] --> HARN
   HARN["B3 harness split, #880, protocol, cost split"] --> RUN0B["RUN-0b: main on main"]
+  A5R["A5's design rule, committed first (OD-9 (ii))"] --> RUN0B
   RUN0B --> P868
+  RUN0B --> PF5["PF5 cold-start fix, if RUN-0b confirms M5's gap (#1005 first)"]
+  PF5 --> PERF
+  PF5 -. "if it changes the key" .-> FREEZE
   RUN0 --> P1051["#1051 bare-step gap (#859 if picked)"]
   HARN --> P1048["#1048 perf:worker cost split (part landed in #1056)"]
   P1048 --> P1051
   P874 -. "S16 depends on S4" .-> P985
   P1047["#1047 design approved"] --> P985["#985 criteria 5 and 7"]
   P985 --> P963["#963 S17 identity"]
-  DIFF --> FREEZE{{"Engine freeze: the candidate engine (OD-3)"}}
+  DIFF --> FREEZE{{"Engine freeze on main: the candidate engine (OD-3)"}}
   P902 --> FREEZE
   P867 --> FREEZE
   D5 --> FREEZE
@@ -234,8 +266,10 @@ flowchart TD
   FREEZE --> SEED[["Seeded replay: 14 nights"]]
   FREEZE --> PERF[["Performance: RUN-3 on the candidate commit"]]
   HARN --> PERF
-  REL --> RELTAIL[["Reliability tail on the candidate engine"]]
+  REL --> RELTAIL[["Observation period (the tail) on the candidate deploy"]]
   FREEZE --> CDEP{{"Owner: candidate deploy to the cohort"}}
+  X1A["#873 S14 analytics half (X1) or exception"] --> CDEP
+  X1A --> ANA
   CDEP --> RELTAIL
   D5 --> AUTH[["Authority"]]
   S7 --> AUTH
@@ -270,10 +304,10 @@ starts, is in section 9.
 
 | Phase | What happens | Ends when |
 | --- | --- | --- |
-| A, now | Instruments (A1, B2, RUN-0a); the nearly done PRs (the #1047 repair, #1062); #902's draft from its patch | The signal is deployed, #1062 is merged, the rehearsal window is running, RUN-0a is committed |
-| B | S4, then S5 (#902), the cohort decision, the harness split and RUN-0b, S6, #865, S8 | The cohort is live (if approved), S6 is merged, RUN-1 has run |
-| C | S9 with D5 and its TDT prerequisites, S7, #1048 then #1051 (and #859), S12, S14's engine half, #985 criteria 5 and 7, S17 | No matrix work item marked as changing the key is open |
-| D | The freeze and the 14 nights; the candidate deploy and the reliability tail; RUN-3; the rollback rehearsal; then the gate review | The owner signs off, or names what is missing |
+| A, now | Instruments (A1, B2, RUN-0a); the nearly done PRs (the #1047 repair, #1062); #902's draft from its patch; A7's list of real-save inputs | The signal is deployed, #1062 is merged, the rehearsal window is running, RUN-0a is committed, the owner has A7's list |
+| B | S4, then S5 (#902), cohort stages 1 and 2 (each on the owner's approval), the harness (B3a, then B3), A5's design rule, then RUN-0b, S6, #865, S8 | Stage 2 is live (if approved), S6 is merged, RUN-1 has run |
+| C | Cohort stage 3 once stage 2 has moved on and a committed protocol run passes M2 to M6 at 1x and 4x (4.1); S9 with D5 and its TDT prerequisites (eligible sessions count from S9 on a stage-3 build), S7, #1048 then #1051 (and #859), the cold-start fix (PF5) if needed, S12, S14, #985 criteria 5 and 7, S17 | No matrix work item marked as changing the key is open |
+| D | The freeze and the 14 nights; the candidate deploy and its observation period; the rest of the 1,000 eligible sessions; RUN-3; the rollback rehearsal; then the gate review | The owner signs off, or names what is missing |
 
 ## 4. The long-lead gates
 
@@ -307,7 +341,9 @@ A1, runtime reasons with A3.
   - `size_gated`, a flag kept apart from fallback;
   - `writer_latched` (the S2 writer's latch-off);
   - `divergence_reports`, a count, from A3 onward (S4's reports, then S9's);
-  - `arm` (`wasm`, `ts`, `override`, `unassigned`), if a cohort runs.
+  - `arm` (`wasm`, `ts`, `override`, `unassigned`) and `stage` (the cohort
+    stage the build carries), once the cohort runs (A4). Sending these
+    two also needs the owner's production OK, which A4's PR asks for.
 - **When they are sent.** `boot` fires before the host starts, so it cannot
   carry them. A1 mints an in-memory page-life id at boot and sends the fields,
   with the build's `version` and commit (`__APP_SHA__`), once per page life
@@ -333,12 +369,18 @@ A1, runtime reasons with A3.
   session that ran several builds counts once under each; *N* still counts it
   once. *N* and the tail read only the page lives on counted builds and in
   counted arms: a session enters if any counted page life ran, and counts as
-  a fallback only if a counted page life fell back. The definition's test
-  pins these rules. The definition
-  lives beside `scripts/posthog-report.mjs` with a test that pins it to the
-  view's walk, as `src/posthog-report.test.ts` does today, or as a saved
-  insight on the dashboard. Either way it is a governed source before anyone
-  publishes a rate.
+  a fallback only if a counted page life fell back. The definition also sorts
+  each page life into early telemetry or eligible evidence by the commit it
+  ran (OD-2, below), assigns each session the arm of its first page life
+  (sessions whose arm changes are reported apart), and computes per arm the
+  crash rate (sessions with a `$exception` from engine or host code) and the
+  95% interval of the difference between the arms. The definition's test
+  pins these rules. It lives beside `scripts/posthog-report.mjs` with a test
+  that pins it to the view's walk, as `src/posthog-report.test.ts` does
+  today. A saved insight on the dashboard may show its counts, but the exact
+  one-sided 95% upper bound (Clopper-Pearson) that the report states is
+  computed in the tested script, since HogQL has no inverse beta function.
+  Either way it is a governed source before anyone publishes a rate.
 - **What it cannot see.** The relay is best-effort with no offline queue, so a
   fallback in an offline session or a tab that is killed never reports: the
   rate is a lower bound, and the report says so. Sessions are not independent
@@ -347,93 +389,164 @@ A1, runtime reasons with A3.
 - #841 (crash loops lose magnitude once capped) is checked against the new
   counts in A1, so a fallback loop cannot hide under the cap.
 
-**The population (OD-1).** Under the TypeScript default the only engine
-sessions are people who set `?engine=wasm`. The room's recommendation:
+**The population (OD-1, decided 2026-10-20).** Under the TypeScript default
+the only engine sessions are people who set `?engine=wasm`. The owner chose a
+progressive cohort in explicit stages, starting small once runtime fallback
+is tested, with no 50% arm while the performance and host reliability gaps
+remain.
 
-- **A randomized cohort** in a 2.x release, from the first build that has S4
-  runtime fallback. A random draw per browser, stored in `localStorage` beside
-  `vc.engine`, picks the WASM default or the TypeScript default. The stored
-  arm is a two-value label that identifies no one, so the posture the help
-  page describes holds; A4 adds a sentence about the cohort to the help text.
-  `?engine=` and `vc.engine` take precedence, and those sessions report
-  `arm: override` and are left out of both arms. A browser whose storage
-  cannot be read gets the TypeScript default and `arm: unassigned`, also left
-  out. The analysis is by assigned arm and also reports which engine actually
-  ran. The TypeScript arm is the control (fallback rate, crash rate and
-  session length by arm, on the governed view). Tooling and CI builds turn the
-  draw off, so e2e, the screenshot pipeline and `npm run perf` keep a known
-  engine.
-- **An optional size gate until S6 lands.** A save above a unit threshold
-  (set by the owner with OD-1) boots on TypeScript with `size_gated` set.
-  Size-gated sessions count in neither the numerator nor the denominator,
-  and the report gives their share. The would-be gate is computed in both
-  arms, and sessions above it leave both, so the arms stay comparable. The gate is checked when a tower loads,
-  never mid-tower; A4's spec defines what a second load in the same session
-  does. Without the gate, players with large towers get the hourly-merge
-  stutter (frame p99 141 ms against 15.5 on the large tower,
-  `2026-10-15-e25ec01c-worker-1280x720`). The room split on whether it is
-  needed (transcript, round 1).
-- The cohort is a default-engine change for real players, so it ships only on
-  the owner's approval.
+- **The draw.** A 2.x release assigns each browser to the WASM default or the
+  TypeScript default. The browser stores a bucket from 0 to 99 in
+  `localStorage` beside `vc.engine` and runs the WASM default when its bucket
+  is below the stage's share, so a later stage moves browsers only from the
+  TypeScript arm into the WASM arm, and a drop-back moves them back. The
+  bucket is one of 100 values, is sent nowhere, and identifies no one, so the
+  posture the help page describes holds; A4 adds a sentence about the cohort
+  to the help text. `?engine=` and `vc.engine` take precedence, and those
+  sessions report `arm: override` and are left out of both arms. A browser
+  whose storage cannot be read, or reads but does not keep a write (A4 reads
+  the bucket back after writing it), gets the TypeScript default and
+  `arm: unassigned`, also left out. Override and unassigned sessions on any
+  build are early telemetry: triaged, and never counted toward the 1,000.
+  The analysis is by assigned arm and stage,
+  and also reports which engine actually ran. The TypeScript arm is the
+  control (fallback rate, crash rate and session length by arm, on the
+  governed view). Tooling and CI builds turn the draw off, so e2e, the
+  screenshot pipeline and `npm run perf` keep a known engine.
+- **The stages.** Each stage's share is one constant, beside the size gate's
+  threshold, in a config module A4 creates outside `src/wasmhost`, the
+  tail's paths and the key (its spec names the file). A stage change or a
+  drop-back is then a production deploy that restarts neither the tail nor
+  the replay count, and the freeze guard exempts that file. Each one ships
+  only on the owner's approval. The day counts are projections from 749
+  sessions per 30 days, before exclusions.
 
-**The pass rule (OD-2).** With zero fallbacks in *n* sessions the 95% upper
-bound on the rate is about 3/*n*; with one fallback it is about 4.74/*n*. The
-day columns are projections from 749 sessions per 30 days, before any
-exclusion (overrides, unassigned, size-gated); they are not measurements.
+  | Stage | WASM share | Starts when | Moves on when (each move on the owner's approval) |
+  | --- | --- | --- | --- |
+  | 0 | none (`?engine=wasm` only) | A1 is live in production, with the owner's separate OK | A1's fields arrive from production `?engine=wasm` sessions, and a forced fallback on a preview tooling build of the same commit reports the reason the host status shows (that preview's sessions stay out of every count) |
+  | 1 | 10% | Stage 0 has moved on, A3 (#874) has merged with its forced-trap spec green on `chromium-wasm`, A2 (#902) has merged, and the size gate and A4's help sentence are in the build | At least 14 days and 30 engine sessions (about 12 days of traffic at 10%) on builds that carry every fix the stage needed, every fallback and every engine or host `$exception` triaged, each engine-fault fallback fixed and deployed or excepted by the owner, no latch-off, and no stop signal open |
+  | 2 | 25% | Stage 1 has moved on | At least 14 days and 100 engine sessions (about 16 days at 25%), with the same conditions |
+  | 3 | 50%, without the size gate | Stage 2 has moved on (its host reliability conditions held), S6 (A5) has merged, and the last committed protocol run (RUN-1, RUN-2, or a run repeated after a fix) shows M2 to M6 passing at 1x and 4x on the medium and large towers | The flip, or a drop-back |
 
-| Engine sessions | Fallbacks | 95% upper bound | Days, every session in the engine arm | Days, a 50% arm |
-| --- | --- | --- | --- | --- |
-| 1,000 | 0 | about 0.30% | about 40 | about 80 |
-| 3,000 | 0 | about 0.10% | about 120 | about 240 |
-| 4,750 | 1 | about 0.10% | about 190 | about 380 |
+  A stage that stays below its move-on floor for 30 days goes to the owner,
+  who keeps it, moves it on or drops it back.
 
-Reliability is therefore the release date. The room proposes restating the
-row as:
+- **Stop signals.** A writer latch-off, an engine-fault fallback that repeats
+  (the same reason on the same build in two sessions), a repeat crash from
+  engine or host code (the same `$exception` on the same build in two
+  sessions), or a crash-rate difference whose 95% interval lies above zero
+  (the WASM arm worse than the control, on A1's governed definition) holds
+  the stage, and the coordinator asks the owner for a drop-back to the stage
+  before or to no cohort. Section 12 asks the owner whether to pre-approve
+  that drop-back, so it can ship at once.
+- **A size gate through stage 2.** A save above a unit threshold (set by the
+  owner from RUN-0b, or from the 2026-10-15 desktop runs if stage 1 is ready
+  first) boots on TypeScript with `size_gated` set. The gate is checked only
+  when a tower loads, and is recorded per page life: a page life
+  above it leaves both arms, counting in neither the numerator nor the
+  denominator, and the report gives its share. The would-be gate is computed
+  in both arms, so the arms stay comparable; A4's spec defines what a second
+  load in the same session does, and what happens to a tower that grows past
+  the threshold while it runs. Without the gate, players with large towers
+  get the hourly-merge stutter (frame p99 141 ms against 15.5 on the large
+  tower, `2026-10-15-e25ec01c-worker-1280x720`). The room split on whether
+  it is needed (transcript, round 1); the plan keeps it through stage 2. It
+  comes off at stage 3, and 3.0.0 ships without it, so the release evidence
+  includes large towers: no session on a build with the gate is eligible.
+- Every stage is a default-engine change for real players, so each ships only
+  on the owner's approval.
 
-- at least *N* engine sessions (the owner picks *N*);
-- every fallback triaged to a root cause with a linked issue, and each
-  engine-fault fallback fixed in the candidate or excepted by the owner;
-- no engine-writer latch-off, and every divergence report triaged;
-- the report states the upper bound it achieved, by build and by arm.
+**The pass rule (OD-2, decided 2026-10-20).** The owner separated early
+engine telemetry from the final candidate reliability evidence.
 
-`package-mismatch` fallbacks come from the deploy race (#1046) and say nothing
-about the engine. The proposal reports them on their own line, outside the engine-fault
-rate, and brings #1046 forward if they appear in the field. Sessions are
-reported by build, so the owner can decide how many must run on an engine
-that answers commands (S9).
+- **Early engine telemetry** is every engine session that is not eligible:
+  `?engine=wasm` sessions, every session on a build without S9's engine
+  answers or with the size gate (stages 1 and 2), and override and
+  unassigned sessions on any build. It is reported by build, stage and arm,
+  every failure in it is triaged, and it decides whether a stage moves on.
+  It is not release evidence, and its rate is not published as a
+  reliability figure.
+- **An eligible session** runs in the WASM arm on a production build that
+  carries S4 runtime fallback and S9's engine answers (#954 merged; the D5
+  follow-ups that land after it are in the candidate either way) and runs
+  without the size gate (stage 3 onward), and is neither an override nor
+  unassigned. Only its page lives on eligible builds count, by the rules
+  A1's definition pins.
+- **The rule:**
+  1. at least 1,000 eligible engine sessions;
+  2. every failure triaged to a root cause with a linked issue, in early
+     telemetry as well as in eligible sessions: each fallback, and each
+     `$exception` from engine or host code; each engine-fault fallback
+     fixed in the candidate or excepted by the owner;
+  3. no engine-writer latch-off in an eligible session, and every divergence
+     report triaged;
+  4. the observation period on the candidate build (the tail, below) passes;
+  5. the report states the exact one-sided 95% upper bound it achieved on
+     the engine-fault fallback rate, over all eligible sessions and over the
+     tail alone, by build and arm. A fallback whose cause was fixed still
+     counts in the all-eligible bound. The report does not present the
+     session count as proof that the true rate is below that bound, and the
+     0.1% figure in #945's row leaves the rule, since 1,000 sessions cannot
+     show it.
+- **`package-mismatch` fallbacks** come from the deploy race (#1046) and say
+  nothing about the engine. They are reported on their own line, outside the
+  engine-fault rate, and #1046 comes forward if they appear in the field.
 
-**The tail.** Under the recommendation in OD-2, sessions from every build
-since S4 count toward *N*, pre-S9 builds included, reported by build; the
-owner decides. The tail is the part of the window on the candidate engine:
-once the freeze starts, a 2.x release carries it to engine players (the
-candidate deploy, an owner step).
+What the report would state, with zero or one engine-fault fallback; with
+zero in *n* sessions the bound is about 3/*n*, with one about 4.74/*n*. The
+day column is a projection from 749 sessions per 30 days at stage 3's 50%
+arm, counted from the first eligible build and before any exclusion
+(overrides and unassigned); it is not a measurement.
+
+| Eligible sessions | Engine-fault fallbacks | 95% upper bound | Days at stage 3 (50%) |
+| --- | --- | --- | --- |
+| 1,000 | 0 | about 0.30% | about 80 |
+| 1,000 | 1 | about 0.47% | about 80 |
+| 3,000 | 0 | about 0.10% | about 240 |
+
+Reliability is therefore the release date: the 1,000 eligible sessions start
+at the later of S9 and stage 3 and take about 80 days, a projection (R4).
+
+**The observation period on the candidate build (the tail).** The owner's
+rule requires one. Once the freeze starts, a 2.x release carries the
+candidate engine to the cohort at its current stage (the candidate deploy,
+an owner step), and the tail is the part of the window on that engine. Its
+sessions also count toward the 1,000.
 
 - **The tail's paths** are `src/wasmhost`, `src/game/frameLoop.ts`,
-  `src/bootstrap.ts`, `src/dualrun`, `src/analytics*` (the instrument), and
-  the service worker and precache build behind `package-mismatch` (the
-  Workbox block in `vite.config.ts`, `src/build/workboxGlob.ts`,
-  `src/pwa.ts`). The candidate deploy is cut with every gate input that
-  touches them merged.
+  `src/game/saveLoad.ts` and `src/game/exportFlow.ts` (both settle the
+  engine before a save or an export), `src/bootstrap.ts`, `src/dualrun`,
+  `src/analytics*` (the instrument), and the service worker and precache
+  build behind `package-mismatch` (the Workbox block in `vite.config.ts`,
+  which the guard checks by a hash of the block's content,
+  `src/build/workboxGlob.ts`, `src/pwa.ts`). The candidate deploy is cut
+  with every gate input that touches them merged, S14's analytics half (X1,
+  #873) or its exception included, since `src/analytics*` is among them.
+  The gate review lists every change outside these paths that merged during
+  the tail, so the owner sees what the tail did not cover.
 - **What it covers:** every production deploy from the candidate deploy on
   that keeps the key and the tail's paths, since `main` keeps deploying
-  (version bumps included) during the freeze. Over 14 nights from the
-  candidate deploy every session on those deploys is triaged, with no
-  latch-off.
+  (version bumps included) during the freeze. It lasts at least 14 nights
+  from the candidate deploy, and until those deploys hold at least 100
+  eligible sessions; every failure on them is triaged, with no latch-off,
+  and the report gives the tail's own bound. The 100-session floor is this
+  revision's proposal for the owner's final review, so a tail cannot pass on
+  a handful of sessions.
 - **What restarts it:** a merge to the tail's paths, a fix found during the
   tail included, or a new key (which also means a new candidate). The tail
-  then runs 14 nights from the next deploy, unless the owner records a
+  then starts again from the next deploy, unless the owner records a
   waiver. Merges to the tail's paths wait for the tail to end, as merges to
   the key's paths wait for the replay window, except a fix for what the tail
-  found. So the tail passes on a deploy that runs 14 nights with every
-  engine-fault fallback fixed earlier or excepted by the owner (R22).
+  found; the freeze guard (4.2) checks both. So the tail passes on a deploy
+  that runs its full period with every engine-fault fallback fixed earlier
+  or excepted by the owner (R22).
 - **Attribution.** An internal-only merge keeps the version number, so A1
   sends the build's commit (`__APP_SHA__`) beside `version`, and the tail is
   read by commit.
-- **Size.** At a 50% arm the tail is at most about 175 sessions, a projection
-  from the same 749 per 30 days that assumes every session runs the new build
-  at once; the report gives the real share from A1's commit field.
-
-The owner sets the tail's rule with OD-2.
+- **Size.** Over its first 14 nights at stage 3's 50% arm the tail holds at
+  most about 175 sessions, a projection from the same 749 per 30 days that
+  assumes every session runs the new build at once; the report gives the
+  real share from A1's commit field.
 
 ### 4.2 Seeded replay: the differential and its window
 
@@ -481,7 +594,7 @@ money, logs and gameplay events; failing seeds kept and shrunk.
    - B2's spec sets the nightly's time budget after the upgrade (the 60-minute
      limit will not hold), and the PR corpus stays inside its ten minutes.
 
-**The window rule (proposed under OD-7; the freeze itself is OD-3).**
+**The window rule (OD-7; the freeze is OD-3, below).**
 
 - **The key** is a SHA-256 over:
   1. `engineSourceHash` of `engine-rs/` (`src/wasmhost/packageHash.ts`): the
@@ -544,19 +657,47 @@ Consequences:
   performance work included: #859 and #1051 change sources while keeping
   digests identical, S17 adds an identity export, and each would restart the
   count.
-- **Default: freeze the key's paths on `main` for the 14 nights.** Other work
-  keeps merging. The alternative (the nightly runs against a declared
-  candidate ref so `main` never freezes) is recorded as a split; the owner
-  picks. Version bumps keep merging during the freeze, since the key leaves
-  out the lockfile's version fields. Merges that touch the key's paths wait
-  for the 14 nights to end, Dependabot's included (its Actions group rewrites
-  the pins in `engine-fuzz.yml`, its npm group the lockfile); a security fix
-  that cannot wait merges and restarts the count, on the owner's call.
+- **The freeze: the key's inputs on `main`, until the 14 nights and the
+  tail have both ended (OD-3).** The owner asked for whichever option
+  reliably runs the actual candidate through the full differential without
+  blocking unrelated work more than it must; the evaluation follows this
+  list. Other work keeps merging. Version bumps keep merging, since the key
+  leaves out the lockfile's version fields. Merges that touch the key's
+  inputs wait, Dependabot's included (its Actions group rewrites the pins in
+  `engine-fuzz.yml`, its npm group the lockfile); a security fix that cannot
+  wait merges and restarts the count, on the owner's call.
+- **A freeze guard (B2).** While a counting window or the tail is open, a
+  pull request check fails on any change to the key's inputs, and during the
+  tail on any change to the tail's paths (4.1); A4's cohort config module is
+  exempt. The guard holds the freeze only as a required check, so the owner
+  makes it one for the window (a branch-protection change that also requires
+  branches to be up to date before they merge). A fix that cannot wait
+  merges past it on the owner's call and restarts the count. B2's spec
+  picks the switch that opens and closes the guard (for example a marker
+  file outside the key, set by a pull request at the freeze). The gate
+  review and the flip each recompute the key and check it against the
+  window's.
 - **No neutral-change exemption.** A change that passes the existing locks and
   corpus is exactly the case 14 nights of new seeds exist to test. The first
   draft offered one; the review removed it (section 14).
 - **A rehearsal window starts the night the upgrade lands.** It does not count.
   It finds harness flakes and real divergences while they are cheap to fix.
+
+**OD-3: a frozen candidate ref against a freeze on `main`.**
+
+| | Freeze the key's inputs on `main` | Run against a frozen candidate ref |
+| --- | --- | --- |
+| Runs the actual candidate | Yes. The scheduled run checks out `main`, which production deploys, and each night records its key | Only while the ref and the eventual release commit share a key, which needs its own check at the flip. The scheduled workflow file comes from `main` while the code comes from the ref, so the key has to cover both trees |
+| What it blocks | Merges to the key's inputs, Dependabot's npm and Actions updates included, until the 14 nights and the tail end | Nothing on `main` for the replay count. The tail still runs on production deploys from `main`, though, and a new key there restarts the tail, so key changes on `main` wait for the tail either way |
+| New machinery | The freeze guard | A ref input for the nightly, a key over two trees, a key check at the flip, and the guard for the tail |
+| How it fails | A merge to the key's inputs resets the count, which the ledger shows; the guard, as a required check, stops them | A stale or wrong ref counts nights on code that never ships; nothing resets, and the flip's key check throws the nights away, late |
+
+The tail overlaps the replay window on `main`, so a candidate ref would free
+almost nothing and would add a way to count nights on the wrong code. The
+plan freezes `main` and puts the guard in B2. It keeps the whole lockfile in
+the key, minus the root `version` fields: a narrower input would let more
+dependency updates merge during the freeze, but one the import walk missed
+would change what the nightly runs without a reset.
 
 ## 5. Performance: the PC benchmark protocol
 
@@ -606,12 +747,13 @@ The large tower, 720 bare engine steps, 1x. Every source is a folder under
 Written up as `docs/performance/benchmark-protocol.md` in B3.
 
 1. **Preconditions.** Runs on `main` (RUN-0b onward) need the shell-free
-   Windows perf build for both harnesses (`perf:compare` builds through the
-   same `sh(...)` calls as `perf:worker`; a run may instead build with
+   Windows perf build for both harnesses (`perf:compare` runs the same two
+   build commands through its own `sh(...)` helper in
+   `src/tests/perfCompare/main.ts`; a run may instead build with
    `perf:worker` and then run `perf:compare --skip-build`, which checks its
-   builds are this commit's). B3 ports it by hand from
-   `perf-worker-1068.patch` if the owner approves OD-9 (i), since the patch
-   does not apply to `main`; otherwise B3 writes its own. #880
+   builds are this commit's). B3a ports the fix by hand from
+   `perf-worker-1068.patch` (OD-9 (i)), since the patch does not apply to
+   `main`, and applies it to both harnesses. #880
    (line-ending-stable source hash) must be merged too. RUN-0a runs the `e25ec01` tree as
    it is: the 2026-10-15 desktop runs built it on Windows from a clean tree,
    and their recorded source hash (`b2786beb…`) equals the Linux hash of that
@@ -620,8 +762,7 @@ Written up as `docs/performance/benchmark-protocol.md` in B3.
    run fixes the build on `e25ec01` by hand: it adds
    `src/tests/perfWorker/build.ts` and replaces the two `sh(...)` calls in
    `main.ts` (harness files outside the key), ported from
-   `perf-worker-1068.patch` if the owner has approved OD-9 (i) and written
-   from the Windows failure otherwise. The patch itself does not apply to
+   `perf-worker-1068.patch` (OD-9 (i)). The patch itself does not apply to
    `e25ec01`. The run's notes commit that diff, made with `git add -N` so the
    new file is in it, and its SHA-256 as the declared patch.
 2. **Machine state.** The owner's desktop, on AC power, Windows in its
@@ -681,54 +822,87 @@ Written up as `docs/performance/benchmark-protocol.md` in B3.
 | Run | When | Purpose |
 | --- | --- | --- |
 | RUN-0a | Now: PC measurement in a local session on the owner's desktop, scheduled by the coordinator; no implementation thread runs it | Reconciliation: the `e25ec01` harness on `e25ec01`. Do 702 and 830 reproduce inside their intervals? |
-| RUN-0b | After B3 | `main`'s harness on `main`: the baseline later runs compare with; the shipping host's cost split, which decides S6's design (OD-9); an A/A calibration for δ (OD-4) |
-| RUN-1 | After S6 lands | The shipping host after S6 |
-| RUN-2 | After #1051 (and #859) | Bare tick parity |
-| RUN-3 | On the candidate commit: its SHA, a clean tree, the window key and the engine source hash recorded | The gate verdict. A change to the host paths (`src/wasmhost`, `src/game/frameLoop.ts`, `src/bootstrap.ts`, `src/dualrun`) merged after it and before the flip means a re-run or an owner-recorded waiver |
+| RUN-0b | After B3, and after A5's design rule is committed | `main`'s harness on `main`: the baseline later runs compare with; the shipping host's cost split and each hour's churn, which decide S6's design by A5's rule (OD-9 (ii)); three A/A passes per engine for δ and ε (OD-4), each with the verdict runs' repetition count |
+| RUN-1 | After S6 lands | The shipping host after S6; also the input to cohort stage 3, which needs M2 to M6 passing at 1x and 4x (4.1) |
+| RUN-2 | After #1051 (and #859), and after the cold-start fix (PF5) if one is needed | Bare tick parity and cold start; a full run, so it can also open stage 3 |
+| RUN-3 | On the candidate commit: its SHA, a clean tree, the window key and the engine source hash recorded | The gate verdict, with one A/A pass beside it; an A/A pass outside δ or ε voids the run and goes to the owner. A change to the host paths (`src/wasmhost`, `src/game/frameLoop.ts`, `src/game/saveLoad.ts`, `src/game/exportFlow.ts`, `src/bootstrap.ts`, `src/dualrun`) merged after it and before the flip means a re-run or an owner-recorded waiver; the flip PR's change to the default is the flip itself and needs neither |
 
-### 5.3 What the gate measures (proposed amendment, OD-4)
+### 5.3 What the gate measures (OD-4)
+
+**OD-4, decided 2026-10-20.** The owner approved M1 to M8, 1x and 4x
+included, and set two conditions: a tolerance covers measured noise only and
+must not authorize a material performance regression, and the released web
+experience is at least as fast as TypeScript. So every desktop metric binds
+at both throttles, and every speed metric passes only when the upper bound
+of its paired interval stays within a noise tolerance under a fixed cap. M6
+is a memory ceiling and keeps the existing row's 1.25x.
 
 On the host that ships (`wasm`, main thread) against `ts`, the same build,
 every ratio in the orientation of 5.2:
 
 | # | Metric | Scenarios | Pass rule (proposed) |
 | --- | --- | --- | --- |
-| M1 | Bare engine, 720 steps | medium, large; 1x, 4x | Paired ratio's upper bound at most 1 + δ |
-| M2 | Hosted main-thread time, 720 steps | medium, large; 1x, 4x | Upper bound at most 1 + δ |
-| M3 | Frame time p99, and 1% low FPS | medium, large; 1x | Each upper bound at most 1 + δ |
-| M4 | Main-thread blocking (long tasks past 50 ms) | large; 1x | The paired difference in ms (WASM minus TypeScript), its upper bound within the allowance the owner sets with OD-4 |
-| M5 | Cold start to ready | 1x, 4x | At most TypeScript plus 500 ms (existing row), read on the paired difference's upper bound |
-| M6 | Peak JS heaps plus WASM linear memory | large; 1x | At most 1.25x TypeScript (existing row), read on the paired ratio's upper bound |
-| M7 | A 5,000+ population fixture in `npm run perf` | e2e | A CI gate outside the desktop protocol, read on the candidate commit's CI run: the WASM run within the TypeScript engine's own baseline (existing row); #900 adds a baseline per engine, so CI also catches each engine regressing against itself |
-| M8 | Edits: a scripted build-and-demolish scene (PF2) | large; 1x | Frame p99's upper bound at most 1 + δ; long tasks as in M4, against the same allowance |
+| M1 | Bare engine, 720 steps | medium, large; 1x, 4x | The paired ratio's upper bound at most 1 + δ |
+| M2 | Hosted main-thread time, 720 steps | medium, large; 1x, 4x | As M1 |
+| M3 | Frame time p99, and 1% low FPS | medium, large; 1x, 4x | As M1, for each |
+| M4 | Main-thread blocking (long tasks past 50 ms) | large; 1x, 4x | The paired difference in ms (WASM minus TypeScript): its upper bound at most ε |
+| M5 | Cold start to ready | 1x, 4x | The paired difference in ms: its upper bound at most that throttle's ε. This replaces the existing row's 500 ms allowance, since a fixed allowance would let a measured regression pass |
+| M6 | Peak JS heaps plus WASM linear memory | large; 1x, 4x | At most 1.25x TypeScript (existing row), read on the paired ratio's upper bound; a memory ceiling, outside the speed rule |
+| M7 | A 5,000+ population fixture in `npm run perf` | e2e | A CI tripwire outside the desktop protocol, read on the candidate commit's CI run: the WASM run within the TypeScript engine's own baseline (existing row). #900 adds a baseline per engine and calibrates M7's tolerances from A/A CI runs under the same cap as δ, so CI also catches each engine regressing against itself. The desktop protocol decides speed |
+| M8 | Edits: a scripted build-and-demolish scene (PF2) | large; 1x, 4x | Frame p99 as M1; long tasks as M4 |
 
 **Scenarios.** The existing Performance row names a late-game fixture on
 Modern, and no fixture of that kind exists yet (#864, P3). The proposal uses
 the harness's pinned medium and large towers (the large one holds 17,322
-people); OD-4 asks the owner to accept that or to put #864 on the path.
+people) in its place, and #864 stays off the path at P3; section 12 lists
+that reading for the owner's final review.
 
-**δ is the owner's.** "Match or beat" needs a margin: a margin of zero means
-two identical engines can never pass, because the interval always straddles
-1.0. The recommendation is to calibrate it. RUN-0b runs three A/A passes for
-each engine (the same engine in both slots), since one pass would put δ where a
+**How δ and ε work.** The bound rule carries "at least as fast": a speed
+metric passes only when its paired interval's upper bound shows WASM slower
+than TypeScript by no more than the tolerance. A tolerance of zero would
+mean two identical engines can never pass, because their interval straddles
+1.0, so the tolerance is calibrated from measured noise. RUN-0b runs three
+A/A passes for each engine (the same engine in both slots), each with the
+repetition count the verdict runs use, since one pass would put δ where a
 second pass of identical engines lands outside it about half the time. Each
-ratio family (M1 and M2 times, M3 and M8 frames) gets its own δ: the smallest
-round value that clears the largest A/A upper bound across both engines,
-fixed before RUN-1. RUN-3 repeats one A/A pass on its own harness and reports
-it beside the verdict. The Codex checkpoint quoted an owner
-no-regression criterion and warned against reusing the report's 5% band as
-that criterion; a calibrated δ is independent of that band. An upper bound
-below 1.0 is "beat".
+ratio family (M1 and M2 times, M3 and M8 frames) gets its own δ: the
+smallest round value that clears the largest A/A upper bound across both
+engines and both throttles, fixed before RUN-1. ε does the same for the
+paired differences: one ε for long tasks (M4 and M8), and one for cold start
+(M5) at each throttle. δ tracks the harness's noise, so a slowdown can pass
+only when it is smaller than the noise can resolve, and the cap keeps a
+noisy harness from passing a material one: a δ above 0.05, a long-task ε
+above 50 ms of blocking (one 100 ms task), or a cold-start ε above 5% of
+TypeScript's median cold start at that throttle is not adopted. The protocol
+then adds repetitions or removes the noise source and calibrates again;
+after two rounds that still miss the cap, the coordinator takes it to the
+owner. M8's δ and ε are calibrated the same way when PF2 lands. RUN-3
+repeats one A/A pass on its own harness and reports it beside the verdict;
+an A/A pass outside δ or ε voids RUN-3 and goes to the owner. A failed
+verdict stands: a run is repeated only after a code change or a recorded
+cause, so no one re-runs to chase a pass. The Codex checkpoint quoted an
+owner no-regression criterion and warned against reusing the report's 5%
+band as that criterion; the bound rule with its caps is that criterion, and
+δ's cap is a ceiling on noise, unrelated to that band. An upper bound below
+1.0 is "beat".
 
-**Two findings for the gate as it stands** (historical, large, 1x,
+**Two findings for the gate as it stands** (historical, from
 `2026-10-15-e25ec01c-worker-1280x720`):
 
-- M6 would fail at 2.72x (202.7 MiB against 74.5). A plausible cause, to be
-  measured: WASM linear memory never shrinks, and the hourly serialize builds a
-  4.49 MiB string inside it. If so, S6 fixes time and memory together. The
-  protocol records peak WASM memory per phase.
-- M5 is met as last measured (606 ms against 485, +121 ms), and M2 fails by
-  about 10x. The cold start is not where the work is.
+- M6 would fail at 2.72x on the large tower at 1x (202.7 MiB against 74.5).
+  A plausible cause, to be measured: WASM linear memory never shrinks, and
+  the hourly serialize builds a 4.49 MiB string inside it. If so, S6 fixes
+  time and memory together. The protocol records peak WASM memory per phase.
+- M5 fails as last measured, where the old 500 ms allowance passed it. Cold
+  start to ready was 606 ms against 485 at 1x and 954 against 840 at 4x. The
+  report gives only ratios: in the gate's orientation (WASM ÷ TypeScript)
+  their upper bounds are about 1.28 at 1x and 1.22 at 4x, far past an ε
+  capped at 5% of TypeScript's cold start. Cold start becomes work: #1005
+  (now P1) first separates fetch from compile so the cause is known, RUN-0b
+  confirms or clears the gap, and the fix is PF5 (WS-P, a new issue on
+  approval), which lands before the freeze if it changes the key and before
+  RUN-3 in any case. M2 fails by about 10x and is still where most of the
+  work is.
 
 ## 6. The ten assumptions, challenged
 
@@ -737,13 +911,13 @@ below 1.0 is "beat".
 | 1 | **Rust has command and simulation authority under `?engine=wasm`** | The engine ticks, but `wasmHost.ts` still relays every command through the instance (`relayCommands`); every load boots the engine from the instance's re-serialization (`loadCommand` in `src/dualrun/mirror.ts`); 7 non-test files in `src/ui` and `src/game` and 12 in `src/render` read `src/engine/facilities`; the S9 work was lost | **False today.** S9 (#954) with #1064 to #1067; AD-8 through S9 and #1066; S7 (#921, #926) |
 | 2 | **Saves and determinism are at parity** | Conformance pins no refusal reasons; the fuzzer compares two hashes on small, rich towers, on the native engine only, and never compares saves, logs or events; the 32 MiB and Unicode save cases were not verified; a booking is lost on attach (#902) | **Unproven.** The differential upgrade (4.2), #865, #902, S12 and a Saves-row audit (B6) |
 | 3 | **WASM is faster in a real browser** | Bare engine faster on small and medium, slower on large in every conclusive committed run (one inconclusive); the shipping host is 10x TypeScript's main-thread time on large; frames and memory worse; one uncommitted claim says otherwise | **False for the shipping host, as last measured.** The protocol (5), S6, #1051 |
-| 4 | **The worker host is the performance answer and is ready** | It is the best hosted figure (2,585 ms against the main-thread host's 6,784, `2026-10-15-e25ec01c-worker-1280x720`) but experimental: commands still relayed (#1071), identity unavailable (#1058), approximate saves (#1053); AD-7 puts it after the flip | **Not for 3.0.** It stays a measurement placement; #1068 keeps its hold (D2); its Rust `saveDelta` may serve S6 only if the owner approves (OD-9) |
+| 4 | **The worker host is the performance answer and is ready** | It is the best hosted figure (2,585 ms against the main-thread host's 6,784, `2026-10-15-e25ec01c-worker-1280x720`) but experimental: commands still relayed (#1071), identity unavailable (#1058), approximate saves (#1053); AD-7 puts it after the flip | **Not for 3.0.** It stays a measurement placement; #1068 keeps its hold (D2); its Rust `saveDelta` may serve S6 only if RUN-0b's evidence picks design A (OD-9 (ii)) |
 | 5 | **The installed PWA works offline on the engine** | Criteria 1 to 4 and 6 of #985 are on `main`; criterion 5 (the boot-time check that glue, binary and `BUILD.json` are one set) has only its design (#1047), and criterion 7 (size budget, old-cache cleanup) is open; criterion 5's implementation was lost | **Partly.** The #1047 repair now, then #985 criteria 5 and 7 (WS-C) |
 | 6 | **Sound and caches stay intact on the engine** | Audio cues poll mirror state (`sim.star` in `frameLoop.ts`), which the engine host updates at the merge, so a cue can arrive late; `/engine/*` has no explicit `Cache-Control` and its files are not content-hashed | **At risk.** S6 and S9 each add a `chromium-wasm` cue-timing test (the cue within one frame of the engine's event); #965 moves cues to engine events in whichever step's test fails first (A5 or A6); criterion 5 covers the cache pairing |
-| 7 | **Analytics and diagnostics can observe the engine in production** | No engine or fallback field; no engine sessions under the TypeScript default; 749 sessions per 30 days (snapshot); the gate rows speak of consent, which the web game does not have; S17's identity record was lost | **False today.** The instrument first (4.1), the cohort decision (OD-1), S17 (#963), the consent wording restated (OD-7) |
+| 7 | **Analytics and diagnostics can observe the engine in production** | No engine or fallback field; no engine sessions under the TypeScript default; 749 sessions per 30 days (snapshot); the gate rows speak of consent, which the web game does not have; S17's identity record was lost | **False today.** The instrument first (4.1), the staged cohort (OD-1), S17 (#963), the consent wording restated (OD-7) |
 | 8 | **CI tests the engine** | `test:wasm:parity` is not in CI (#1062 adds it); `chromium-wasm` e2e runs; `npm run perf` in CI is TypeScript-only (#900); coverage floors hold (TypeScript lines 94, branches 86; Rust lines 87); Copilot was intermittent (429s until 2026-10-19) | **Partly.** #1062, #900, the PR corpus (4.2), the review-loop rule when both bots are down |
 | 9 | **A deploy serves the bytes it was built from** | `scripts/vercel-build.sh` builds the package from source on every deploy; the file names are not hashed; a Windows checkout computes a different source hash (#880); the binary itself differs by builder (#1079) | **Mostly, for deploys.** Criterion 5 for the runtime pairing; #880 for the protocol's identity check |
-| 10 | **We can roll back** | No rehearsal recorded; CONTRIBUTING says 3.0.0 deploys the wasm-only build, which ignores the flag the Rollback row flips; #902 adds a save field a build from before it drops | **Not as documented.** 3.0.0 ships the switchable build if the owner agrees (7.3, OD-5); a scripted rehearsal in both directions, including a tower mid-booking and a deploy rollback to the last release before #902; the #902 loss goes in the exception register |
+| 10 | **We can roll back** | No rehearsal recorded; CONTRIBUTING says 3.0.0 deploys the wasm-only build, which ignores the flag the Rollback row flips; #902 adds a save field a build from before it drops | **Not as documented.** 3.0.0 ships the switchable build (7.3, OD-5); a scripted rehearsal in both directions, including a tower mid-booking and a deploy rollback to the last release before #902; the #902 loss goes in the exception register |
 
 ## 7. Decisions made in Phase 2
 
@@ -789,9 +963,9 @@ The architecture review documents **no exception**:
   (`story-engine-tdt-port.md`). #886 (the test parity table) and #887
   (forged-input handling) are due before that route too. Under D5 and D6
   those four become 3.0 prerequisites, raised to P1 by this PR, and #885 needs
-  the owner's own saves. OD-8 asks the owner to keep #1066 whole with those
-  prerequisites (the D5 default) or to split it and put the `.TDT` half in the
-  exception register.
+  the owner's own saves. The owner chose to keep #1066 whole and complete
+  the four for 3.0 (OD-8 (a)), with the real-save inputs identified early:
+  A7's first task lists them (9.1).
 - **#1064 is S9's mirror image of S4's report.** S4, with the instance
   answering first as today, reports a command the instance accepted and the
   engine refused (A3, under #874). After S9 the engine answers first, and
@@ -811,9 +985,24 @@ will deploy" (flag ignored, no TypeScript loop, no fallback). AD-7 says the
 flip keeps the fallback; the Rollback row flips the default back with the
 flag; the owner's note on #874 limits fallback to switchable builds; and the
 owner's standing rule keeps the TypeScript fallback until its removal is
-approved. **Recommendation (OD-5): 3.0.0 ships the switchable build with WASM
-as the default.** The strict build ships at retirement, after two releases on
-WASM, with its own approval. The flip PR corrects the CONTRIBUTING line.
+approved. **Decided (OD-5, 2026-10-20): 3.0.0 ships the switchable build with
+WASM as the default and the TypeScript fallback.** The strict build ships at
+retirement, after two releases on WASM, with its own approval. The flip PR
+corrects the CONTRIBUTING line.
+
+### 7.4 The crate and 3.0.0's compatibility policy (OD-6)
+
+The owner chose option (b): #893 publishes the crate after the flip, at P2,
+and cutover decision 4 changes so 3.0.0's major bump rests on CLAUDE.md's
+versioning rule (a headline milestone), with the compatibility policy
+documented. The flip PR (X3) writes that policy into CONTRIBUTING.md's
+Versioning section: what 3.0.0 promises players (a save loads on either
+engine of the switchable build, `?engine=ts` stays, and a rollback loses
+only what the exception register names), and that `engine-rs`
+carries no published API promise until #893 publishes the crate with its
+own semver policy. Decision 4's text changes with the other cutover
+amendments at the owner's final approval. The policy's content and its
+place in the flip PR are this plan's proposal, listed in section 12.
 
 ## 8. Priority labels (D6)
 
@@ -836,11 +1025,12 @@ exception register (S12 and S14, below). Labels follow the backlog row's `Priori
 | #900 | S13 perf baseline | P3 | P1 | Performance row (M7); the owner's 10-16 order |
 | #926 | S7 catalog second slice | P2 | P1 | Authority row: items 1 to 4 (the values the UI still applies itself); items 5 to 7 are not gate inputs and may split off |
 | #932 | TDT package cost | P3 | P1 | The owner's 10-16 order lists it before the flip, so its row's flip trigger is now |
-| #885 | TDT differential fuzzer | P2 | P1 | #1066's `.TDT` half (OD-8) |
-| #886 | TDT test parity table | P2 | P1 | #1066's `.TDT` half (OD-8) |
-| #887 | TDT forged-input handling | P3 | P1 | #1066's `.TDT` half (OD-8) |
-| #920 | TDT 1994-fidelity claims | P3 | P1 | #1066's `.TDT` half (OD-8) |
+| #885 | TDT differential fuzzer | P2 | P1 | #1066's `.TDT` half (OD-8 (a)) |
+| #886 | TDT test parity table | P2 | P1 | #1066's `.TDT` half (OD-8 (a)) |
+| #887 | TDT forged-input handling | P3 | P1 | #1066's `.TDT` half (OD-8 (a)) |
+| #920 | TDT 1994-fidelity claims | P3 | P1 | #1066's `.TDT` half (OD-8 (a)) |
 | #880 | Source hash line endings | P3 | P1 | B3 carries it, and the protocol's runs on `main` (the Performance row's evidence) need it on Windows |
+| #1005 | Cold-start split (fetch and compile) | P3 | P1 | Performance row: under OD-4, M5 fails as last measured, and the fix (PF5) needs this split first |
 
 **Restored rows** (the issues already exist; slugs are the ones the issues
 name):
@@ -868,15 +1058,19 @@ name):
   work at P2, although the cutover plan lists S14 as P3.
 - #859 stays P3: it is one candidate fix inside #1051, landing before the
   freeze if #1051's profiling picks it.
-- #983 and #1005 stay P3: they refine startup accounting, and M5 is met as
-  last measured without them.
+- #983 stays P3: it refines the size accounting.
 - #841 stays P2: A1 checks it, and it rises to P1 only if the check finds the
   cap hiding fallbacks.
 - #965 stays P2: it rises to P1 if a cue-timing test fails.
 - #1020 stays P3: A3 takes its edges if it touches the same code; it is not a
   gate input.
 - #1021 stays P3 (the remainder of #923, outside the row text).
-- #893 is the owner's (OD-6).
+
+**Lowered:**
+
+| Issue | Story | Was | Now | Why |
+| --- | --- | --- | --- | --- |
+| #893 | Crate publish | P1 | P2 | OD-6 (b): it publishes after the flip, and 3.0.0's major bump rests on CLAUDE.md's versioning rule (7.4) |
 
 **Follow-up when this PR merges:** drop the stale `[P2]`, `[P3]`, `[Bug]:` and
 `[Feature]:` title prefixes on #1058, #1059, #1064, #1065, #1066, #1067 and
@@ -893,13 +1087,38 @@ plumbing and for every recovered patch.
 
 | Step | Work | Recovered input | Notes |
 | --- | --- | --- | --- |
-| A1 | The reliability instrument (4.1): host status fields, analytics fields, the governed definition and its test, the analytics data map (A1 creates it) and its entries, the #841 check | none | `src/analytics*`; the new data map; `WasmHostStatus` in `src/wasmhost/startWasmHost.ts` and the boot state in `engineBoot.ts`; a `telemetry.ts` edit, if needed, waits for #1062. Sending the new fields to production needs the owner's separate OK (section 13) |
+| A1 | The reliability instrument (4.1): host status fields, analytics fields, the governed definition and its test (with the split into early telemetry and eligible sessions, the per-arm crash rates, and the exact bound computed in the tested script, OD-2), the analytics data map (A1 creates it) and its entries, the #841 check | none | `src/analytics*`; the new data map; `WasmHostStatus` in `src/wasmhost/startWasmHost.ts` and the boot state in `engineBoot.ts`; a `telemetry.ts` edit, if needed, waits for #1062. Sending the new fields to production needs the owner's separate OK (section 13) |
 | A2 | S5 #902: booked rooms survive attach in both engines | `wasm-authority.patch` | The patch touches `merge.ts`, `load.rs`, `services.rs`, `sim.rs`, `src/engine/sim/*`, `serializedGame.ts`, a new conformance scenario and the parity setup (`src/tests/parity/wasmHostSetup*`); it does not touch `wasmHost.ts`. Draft PR early; merges after A3 (the owner's 2026-10-16 order on #945 queues #902 after #874: the same host and save paths) and after #1062 (shared parity setup). Engine-semantic; lock change, no save-version bump; the rollback loss goes in the exception register |
 | A3 | S4 #874: throw, panic and stall fallback with re-adoption; engine refusals of commands the instance accepted are reported; #1059's last error; #1020's edges if they sit in the same code | `wasm-integration.patch` (#1059 code and tests only) | After #1062 merges (`wasmHost.ts`). A1's runtime reasons ship here. Nothing in WS-A merges ahead of it except A1, though #902's draft may open earlier (risk R19); S4's booking-case test lands with A2, and #874 stays open until A2 merges (the cutover plan's S4 row lists S5 as a dependency for that case; the owner's later order on #945 wins) |
-| A4 | Owner decision OD-1, then the cohort build and its help-text sentence | none | No cohort without the owner's approval |
-| A5 | S6 #868: getters and result shapes; remove the per-step sync and the hourly merge (design per OD-9); audio cue-timing test, and #965 if that test fails | `saveDelta` from #1068 only if OD-9 approves it | The design is chosen from RUN-0b's cost split before code; RUN-1 measures it |
+| A4 | The staged cohort (OD-1, 4.1): the bucket draw with its read-back check, the config module that holds the share constant and the size gate's threshold, the `arm` and `stage` fields, the size gate, the stop signals in A1's report, and the help-text sentence | none | Its fields need the owner's production OK, as A1's do. Each stage and each drop-back ships only on the owner's approval; stage 1 waits for stage 0, A3's forced-trap spec and A2; stage 3 waits for A5 and a protocol run passing M2 to M6 at 1x and 4x, and takes the size gate off |
+| A5 | S6 #868: getters and result shapes; remove the per-step sync and the hourly merge (design from RUN-0b, OD-9 (ii)); audio cue-timing test, and #965 if that test fails | `saveDelta` from #1068 only if RUN-0b's evidence picks design A | A5's spec commits the rule below before RUN-0b runs; the design is then chosen from RUN-0b before code; RUN-1 measures it |
 | A6 | S9 #954 with #1064, #1065, #1066 and #1067; audio cue-timing test; #965 if this test is the first to fail | none (re-implementation) | The engine answers; AD-8 on every load path. #954 first, then #1064, #1065 and #1066 each in a focused PR with parity tests (the owner's 2026-10-16 order). Only #1066's `.TDT` half waits for A7 (OD-8); the rest of S9 does not |
-| A7 | Under OD-8 (a), #1066's `.TDT` prerequisites: #886 (test parity table), #887 (forged-input handling), #885 (TDT differential fuzzer), #920 (1994-fidelity checks) | none | Worked between A3 and A6, ordered in A7's spec; `/gds-code-review` (CLAUDE.md's TDT rule); the owner supplies the real saves for #885's local check |
+| A7 | Under OD-8 (a), #1066's `.TDT` prerequisites: #886 (test parity table), #887 (forged-input handling), #885 (TDT differential fuzzer), #920 (1994-fidelity checks) | none | First, in Phase A beside A1, the list of real-save inputs (below), which the coordinator puts to the owner. The rest is worked between A3 and A6, ordered in A7's spec; `/gds-code-review` (CLAUDE.md's TDT rule) |
+
+**A7's real-save inputs (OD-8).** #885's local check compares both codecs on
+the owner's own `.TDT` saves with the local-only `scripts/tdt-compare.ts`
+that #885 adds, and nothing from a real save enters the repository. #920's
+eleven claims are checked against the 1994 game, on the Wine harness where it
+applies, and some need a game-written save that exercises the claim; the
+retail disc carries no sample towers (#737's row). A7's first task lists,
+for each check, which save it needs, which of the game-written saves the
+docs already name serve (`my_tower`, `mo` and `TOWER5` in the canon notes,
+`MYTP0` in the no-rate finance spec), and where the check runs. A tower we
+exported ourselves, such as `sixseven_14`, can test our own round trip but
+stands in for no game-written save. A run on a real save happens in a local
+session on the owner's machine, which the coordinator schedules like a PC
+run.
+
+**A5's design rule (OD-9 (ii)).** The owner left S6's design to RUN-0b's
+evidence. WS-A writes the rule early, as a short spec committed before
+RUN-0b runs (RUN-0b waits for it), in terms of what RUN-0b measures: the
+shipping host's split (step, per-step sync, hourly serialize, parse and
+merge) and each hour's churn on the large tower. The starting rule has one
+threshold: design A (the engine-side "changed since last sent" contract,
+with #1068's Rust `saveDelta` and its own evidence on the shipping host)
+when the median hourly churn is below a share of the save that the spec
+fixes, and design B (the versioned slices) otherwise. #1068's worker change
+stays held either way (D2).
 
 ### 9.2 WS-B: evidence
 
@@ -910,8 +1129,9 @@ Review: `/gds-code-review` for engine and test-parity work,
 | --- | --- | --- | --- |
 | B0 | Push the #1047 design repair (commit `32cc179` content) so the owner can review it in parallel | `wasm-offline.patch` | Docs only; the review-input diffs stay out. #1047 also adds a #1046 backlog row (typed `design-deferral`, which Copilot's open thread flags); this PR already restores that row as `design-decision`, so B0 drops #1047's copy, which answers the thread. B0's PR merges only after this PR, which carries the row |
 | B1 | Take over #1062 (S3 #878): apply the patch, merge `main`, tier `commuteStress`, add the missing regressions; `test:wasm:parity` in CI, with the six merge-per-tick timeouts named as exclusions until S6 | `wasm-conformance.patch` | Merges before A2 and A3 (9.5) |
-| B2 | The differential upgrade (4.2, items 1 to 3 and 5 to 8, and item 4's dropped-command forms) and the PR corpus; the rehearsal window starts | none | Touches none of #1062's files; starts as soon as B1 is up for review. New issue on approval |
-| B3 | The harness: the shell-free Windows perf build on `main`, #880, `docs/performance/benchmark-protocol.md`, gate-orientation ratios, an A/A mode, and the shipping host's main-thread cost split (engine step, per-step sync, hourly serialize, parse and merge) | `perf-worker-1068.patch` (build half: `src/tests/perfWorker/build*.ts`, `main.ts`), ported by hand since it does not apply to `main`; `perf:compare`'s build gets the same fix | Tooling only; it carries none of #1068's held worker change (D2), and the owner confirms the extraction with OD-9. If the owner declines, B3 writes its own fix from the Windows failure, without #1068's code. Unblocks RUN-0b |
+| B2 | The differential upgrade (4.2, items 1 to 3 and 5 to 8, and item 4's dropped-command forms) and the PR corpus; the key script; the freeze guard (OD-3), which the owner makes a required check for the window; the rehearsal window starts | none | Touches none of #1062's files; starts as soon as B1 is up for review. New issue on approval |
+| B3a | The Windows harness build fix, extracted from #1068 as its own focused tooling PR on `main` (OD-9 (i)): `src/tests/perfWorker/build.ts`, the two `sh(...)` calls in `src/tests/perfWorker/main.ts`, and the same fix for `perf:compare`'s own `sh(...)` calls in `src/tests/perfCompare/main.ts` | `perf-worker-1068.patch` (build half: `src/tests/perfWorker/build*.ts`, `main.ts`), ported by hand since it does not apply to `main` | Tooling only. It carries none of #1068's held worker change, and #1068's hold is unchanged (D2). WS-B owns it and opens it as the first of B3's PRs, since B3 and B7 hold the same harness files |
+| B3 | The harness, after B3a: #880, `docs/performance/benchmark-protocol.md` with the OD-4 pass rule, gate-orientation ratios, an A/A mode with the δ and ε calibration, its caps and its exit to the owner, and the shipping host's main-thread cost split (engine step, per-step sync, hourly serialize, parse and merge) and hourly churn | none (B3a carries the patch) | Tooling only. Unblocks RUN-0b |
 | B4 | S11 #865: refusal reasons pinned; then the differential compares the reasons of refusals both engines make (4.2 item 4) | none | After B2, and before the counting window starts, so the window counts on the complete differential |
 | B5 | S8 #867, the step driver | none | After #1062; `frameLoop.ts` after A5's cue-timing test; `src/engine/sim/fixedStep.ts` after A2 |
 | B6 | S12 (#858, #856) fixed, or entered in the exception register; the Saves-row audit (32 MiB, Unicode, every fixture byte for byte) | none | Before the freeze: S12 edits `engine-rs/src/load.rs`, which is in the key |
@@ -921,18 +1141,18 @@ Review: `/gds-code-review` for engine and test-parity work,
 
 | Order | Lane | Work | Starts |
 | --- | --- | --- | --- |
-| 1 | WS-P | Performance: RUN-0a with a local session; RUN-0b to RUN-3; PF2, the edit scene; #1048 (the rest of the `perf:worker` cost split; #1056 landed part; its desktop check is read from the next protocol run on `main`), then #1051 once #1048's code merges (and #859 from `perf-rust-859.patch` if profiling picks it); #900; #983 and #1005 (`perf-startup.patch`); #932 | RUN-0a now, as PC measurement in a local session the coordinator schedules (no implementation thread runs it); code work after B3 merges |
+| 1 | WS-P | Performance: RUN-0a with a local session; RUN-0b to RUN-3; PF2, the edit scene; #1048 (the rest of the `perf:worker` cost split; #1056 landed part; its desktop check is read from the next protocol run on `main`), then #1051 once #1048's code merges (and #859 from `perf-rust-859.patch` if profiling picks it); #900; #983 and #1005 (`perf-startup.patch`), then the cold-start fix (PF5) if RUN-0b confirms M5's gap; #932 | RUN-0a now, as PC measurement in a local session the coordinator schedules (no implementation thread runs it); code work after B3 merges |
 | 2 | WS-C | Offline and identity: #985 criteria 5 and 7, S17 #963, #1046 (gated) | Once the owner approves #1047; C1's runtime half after A3 merges |
-| 3 | WS-D | S7: #921 parts 2a to 2c, #926 items 1 to 4 | S6 merged; its `src/render` parts after the stack merges or parks |
-| 4 | WS-R | The rendering stack #817, #831, #1039 (D1) | When a thread is spare after WS-P and WS-C while WS-D waits for S6, or after WS-D (7.1) |
-| | Release | S14 close-out or exceptions (its engine half before the freeze, since `gameplay.rs` is in the key), the rollback rehearsal, the flip PR edits, the exception register | S14's engine half in Phase C; the rest in Phase D |
+| 3 | WS-D | S7: #921 parts 2a to 2c, #926 items 1 to 4 | S6 merged; its `src/render` parts do not wait for the stack (9.5) |
+| 4 | WS-R | The rendering stack #817, #831, #1039 (D1, confirmed by the owner on 2026-10-20): its conflicts, reviews and tests, merged in stack order. It never takes priority over the Rust and WASM release blockers, and never gets in the way of the performance work | When a thread is spare after WS-P and WS-C while WS-D waits for S6, or after WS-D (7.1) |
+| | Release | S14 close-out or exceptions (its engine half before the freeze, since `gameplay.rs` is in the key, and its analytics half before the candidate deploy, since `src/analytics*` is a tail path), the rollback rehearsal, the flip PR edits with 3.0.0's compatibility policy (7.4), the exception register | S14 in Phase C; the rest in Phase D |
 
 ### 9.4 PR takeover strategy
 
 | PR | Owner | Plan |
 | --- | --- | --- |
 | #1062 | WS-B (B1) | Take over in place on its branch and post a takeover note. Check the patch against the manifest's SHA-256, apply `wasm-conformance.patch` on the branch head (its base, `300c7d9`), then merge `main`, then add the missing regressions; both reviews; Copilot if available |
-| #1068 | WS-B (B3, B7) | Take over in place. If the owner approves OD-9 (i), the Windows build fix goes to `main` in B3's own PR (otherwise B3 writes its own); the tier entries come here in B7. The owner's hold stays: no merge without paired desktop evidence (D2) |
+| #1068 | WS-B (B3a, B7) | Take over in place. The Windows build fix goes to `main` in its own tooling PR (B3a, OD-9 (i)); the tier entries come here in B7. The owner's hold stays: no merge without paired desktop evidence (D2) |
 | #1047 | WS-B (B0), then WS-C | Push the repair, drop its copy of the #1046 backlog row (this PR restores it), address and resolve the 9 Codex threads and Copilot's open thread, ask the owner for approval; merges only after this PR; the implementation is a separate PR |
 | #817, #831, #1039 | WS-R | Take over in stack order (D1) |
 | New: #902 | WS-A (A2) | Branch from `8f3a143` (the patch's base), apply `wasm-authority.patch`, merge `main`; draft PR at the first push, early; merges after #874 (A3) |
@@ -962,12 +1182,13 @@ live matrix lists the current holder.
 | `src/wasmhost/startWasmHost.ts`, `workerController.ts`, `hostErrors.ts`, `engineBoot.ts`, `engineChoice.ts`, `src/bootstrap.ts` | WS-A (A1, A3, A4) | WS-C (C1's boot check) after A3 merges; the release lane at the flip. #1062 also touches `startWasmHost.test.ts` and `src/wasmhost/fakeEngine.fixture.ts`, which A1 and A3 edit too: B1 merges first, and A1 and A3 rebase over it |
 | `src/analytics*`, the data map | WS-A | The release lane (X1, #873) |
 | `src/ui/templates/helpContent.ts` | WS-A (A4's cohort sentence) | WS-C (C2's About changes) |
+| A4's cohort config module (the stage share and the size gate's threshold) | WS-A (A4) | The release lane at the flip |
 | `engine-rs/src/bin/fuzz.rs`, `scripts/fuzz-compare.ts`, `engine-fuzz.yml`, the `conformance/` corpus | WS-B (B2, B4) | |
 | `src/game/frameLoop.ts` | WS-A (A5's cue-timing test, and #965 if that test fails) | WS-B (B5); A6's #965, if A6's test is the first to fail, rebases over B5 |
 | `engine-rs/src/clock.rs` | WS-B (B5) | |
-| `src/tests/perfWorker/*`, `src/tests/perfCompare/*`, `scripts/perf-*.ts`, `src/wasmhost/packageHash.ts` | WS-B (B3) | WS-P |
+| `src/tests/perfWorker/*`, `src/tests/perfCompare/*`, `scripts/perf-*.ts`, `src/wasmhost/packageHash.ts` | WS-B (B3a, then B3) | WS-P |
 | `engine-rs/src/tower_query.rs`, `tower_routing.rs` (#859) | WS-P (lands before the freeze) | |
-| `src/render/**`, sprites | WS-R | WS-D (#921 parts 2b and 2c, and their `src/render` lint rule) after the stack merges or parks |
+| `src/render/**`, sprites | WS-R, until WS-D needs these files | WS-D (#921 parts 2b and 2c, and their `src/render` lint rule). WS-D does not wait: when it needs `src/render`, the stack parks at its next PR boundary (the coordinator's call) unless its open PR is ready to merge, and later stack PRs rebase over WS-D |
 | `src/ui/**`, `src/game/**` catalog reads | WS-D | |
 | The About and Diagnostics UI (#963); `src/build/workboxGlob.ts`, `scripts/verify-precache.ts` (#985 criteria 5 and 7) | WS-C | |
 | `scripts/wasm-build.ts`, `src/wasmhost/engineAssets.ts`, `src/wasmhost/enginePackageNames.ts` | WS-C (C1) | WS-P (#932's feature split) |
@@ -1029,8 +1250,8 @@ status well and reasons badly.
    so the bump is reviewed with the rest; if another lane takes the number
    first, re-bump on rebase. Auto-merge is armed only after that bump.
 8. **Matrix:** update the live matrix row at each milestone.
-9. **Never without the owner:** the default flip, a cohort, the candidate
-   deploy, A1's new analytics fields in production, the 3.0.0 publish, a
+9. **Never without the owner:** the default flip, a cohort stage or a
+   drop-back, the candidate deploy, A1's new analytics fields in production, the 3.0.0 publish, a
    gate exception, PC cleanup. Never
    report a desktop number that is not in a committed results folder from a
    local run.
@@ -1047,7 +1268,7 @@ step out.
 | --- | --- | --- |
 | WS-A (A1 to A7) | Rust simulation correctness and architecture | Extra High |
 | WS-B: B2, B4, B5, B6 | Rust simulation correctness and architecture | Extra High |
-| WS-B: B0, B1, B3, B7 | Testing, CI and bounded tooling | High |
+| WS-B: B0, B1, B3a, B3, B7 | Testing, CI and bounded tooling | High |
 | WS-P: #1048, #1051, #859, #932 | Complex Rust and WASM performance | Extra High |
 | WS-P: PF2, #900, #983, #1005 | Testing, CI and bounded tooling | High |
 | WS-C | Web PWA and deployment, escalating for complex cross-layer failures | High |
@@ -1058,25 +1279,28 @@ step out.
 
 ## 10. Acceptance gates (#945 rows, objective form)
 
-"Proposed" marks an amendment for the owner's approval (OD-7); the rest
-restates the row as it stands with its evidence.
+"Proposed" marks an amendment. The owner approved the amendments in
+principle under OD-7 on 2026-10-20, once the reliability and performance
+definitions are reconciled; they bind only when the owner approves this
+reconciled text at the final review. The rest restates the row as it stands
+with its evidence.
 
 | Row | Pass condition | Evidence artifact | Today |
 | --- | --- | --- | --- |
 | Conformance | Every scenario matches in both runners; refusal reasons pinned (#865) | CI `conformance.integration.test.ts`, the Rust referee, `conformanceWasm` | Not met: no `reason` pins |
 | Dual run | A day on every fixture at every speed, no divergence, with the Rust step driver (#867) | The dual-run day gate on the candidate | Not met: no Rust driver |
-| Seeded replay | The upgraded differential (4.2) green 14 counted nights on one key, ending at the candidate. **Proposed:** the key, counting and reset rules of 4.2 | The nightly runs with their keys, and the ledger in the matrix issue | Instrument incomplete; window not started |
+| Seeded replay | The upgraded differential (4.2) green 14 counted nights on one key, ending at the candidate. **Proposed:** the key, counting and reset rules of 4.2, with the freeze on `main` and its guard (OD-3) | The nightly runs with their keys, and the ledger in the matrix issue | Instrument incomplete; window not started |
 | Analytics | Each gameplay event once per action on the engine; consent off sends nothing; a tower swap and a page hide drain exactly once. **Proposed:** the web game has no consent switch, so "consent off" becomes "the reliability fields keep the relay's posture: no cookie, no `localStorage` identifier, codes only" | #938 bridge tests on `chromium-wasm`; the instrument's tests | Unverified |
 | Unit and integration | The vitest suites pass on the engine, or each exclusion is named (#878). #1062 can meet it with the six merge-per-tick timeouts named; S6 removes them | `test:wasm:parity` in CI | Not met: #1062 open |
 | End to end | `chromium-wasm` green with a forced-trap fallback spec (#874). **Proposed:** plus the audio cue-timing spec (S6, S9) | CI e2e | Not met |
 | Authority | No command answer comes from the instance (#954); exports tiered, tier 3 confined (#946); the UI reads no TypeScript rule table (#921, #926 items 1 to 4). **Proposed:** #1064, #1065, #1066 named (D5) | Guard tests, per-command tests, the forced-disagreement test | Not met |
 | Saves | Every fixture and the loader table byte for byte through the engine; 32 MiB and Unicode cases fail the same way (#858, #856 fixed in B6 or excepted). **Proposed:** the #902 booking field round-trips; every load path boots from engine bytes (#1066) | Loader table tests, WASM byte comparison | Unverified |
-| Performance (provisional) | **Proposed:** M1 to M8 of 5.3 under the protocol of 5.2, with δ set by the owner, on RUN-3 | A committed results folder for RUN-3 | Not met as last measured |
-| Reliability (provisional) | Over at least 1,000 engine sessions whose players consented to analytics, fallback under 0.1%, no latch-off, every divergence report triaged. **Proposed:** the OD-1 population and the OD-2 rule of 4.1, without the consent wording | The governed definition's report, by build and arm | Not startable: no signal, no engine sessions |
+| Performance (provisional) | **Proposed:** M1 to M8 of 5.3 under the protocol of 5.2, every desktop metric at 1x and 4x, on RUN-3: on every speed metric the paired interval's upper bound stays within δ or ε, calibrated from A/A noise under a fixed cap, and M7 is CI's tripwire (OD-4) | A committed results folder for RUN-3, with its A/A pass | Not met as last measured |
+| Reliability (provisional) | Over at least 1,000 engine sessions whose players consented to analytics, fallback under 0.1%, no latch-off, every divergence report triaged. **Proposed:** the staged cohort of OD-1 and the OD-2 rule of 4.1 (at least 1,000 eligible sessions, every failure triaged, the observation period on the candidate build, the bound reported as achieved), without the consent wording; the 0.1% figure leaves the row, since 1,000 sessions cannot show it | The governed definition's report, by build, stage and arm | Not startable: no signal, no engine sessions |
 | Rollback | **Proposed, concretely:** on the switchable build, deploy a `ts` default, load towers the engine build wrote (including one mid-booking), play an hour, save, reload; then back to `wasm`; then a deploy rollback to the last release before #902 with a tower the candidate wrote mid-booking, confirming the loss the exception register names and nothing more; scripted and recorded on #945 | The checklist and its results | Not started |
 | Deployment | An old cached shell never runs a newer engine package (#985 criterion 5); offline cold start with the engine and today's sounds, tests green (#985); no deploy serves a package whose hash differs from its sources; a fallback-use signal exists (A1) | CI e2e for #985; the deploy's build log | Partial |
 | Version identity | About and Copy Diagnostics show UI version and commit, the active engine with any fallback reason, and the binding's identity record, including mismatch and unavailable (#963) | UI and e2e tests | Not met: lost work |
-| Source of truth | The flip PR names `engine-rs` in CLAUDE.md for rules, caps and tuning. **Proposed:** it also corrects CONTRIBUTING's 3.0.0 build line (7.3) | The flip PR | At the flip |
+| Source of truth | The flip PR names `engine-rs` in CLAUDE.md for rules, caps and tuning. **Proposed:** it also corrects CONTRIBUTING's 3.0.0 build line (7.3) and documents 3.0.0's compatibility policy (7.4) | The flip PR | At the flip |
 | Coverage | `vite.config.ts` floors and the Rust line floor hold | CI | Holding on `8f3a143` |
 | Sign-off | The owner approves with the exception register attached | #945 | Owner only |
 
@@ -1086,28 +1310,83 @@ restates the row as it stands with its evidence.
 | --- | --- | --- | --- | --- | --- | --- |
 | R1 | PC-only Codex work is lost before it is recovered | Medium | High | A patch hash no longer matches, or the PC changes | Patches verified and held off the PC; recover each into a branch in the first step of its lane; no PC cleanup without the owner (D4) | WS-A, WS-B, WS-P |
 | R2 | Finished work is lost again in a session that dies | Medium | High | A thread reports "done" with no PR link | Draft PR at the first push, pushes at every green step while a draft (9.7) | Every thread |
-| R3 | Reliability cannot collect engine sessions | Certain without a cohort | Release-blocking | A1 not deployed by the end of Phase A | Instrument first; the owner's OK to ship it asked for early; OD-1 | Owner, WS-A |
-| R4 | The 0.1% threshold is unprovable at current traffic | Certain as an upper bound | Release-blocking | OD-2 still open when the cohort starts | OD-2 restates it, with the price of each bound | Owner |
+| R3 | Reliability cannot collect engine sessions | Certain without a cohort | Release-blocking | A1 not deployed by the end of Phase A | Instrument first; the owner's OK to ship it asked for early; the staged cohort (OD-1) | Owner, WS-A |
+| R4 | The 1,000 eligible sessions take months: they start at the later of S9 and stage 3, and stage 3 waits for S6 and a protocol run that passes M2 to M6 | High | Months | Stage 3 not live when S9 merges | Move each stage on as soon as its conditions hold; S6 and the performance work early; the report states the bound it achieved (OD-2) | Owner, WS-A, WS-P |
 | R5 | The 14 nights keep resetting | High | Weeks | A key change in the ledger | Front-load engine work; freeze; rehearsal window; a wide key so a reset is visible, which leaves out the lockfile's version fields so version bumps do not reset it | WS-B |
 | R6 | The shipping host misses the performance gate | High as last measured | Release-blocking | RUN-0b's cost split; RUN-1 results | S6 removes the per-step sync and the merge; OD-9; #1051 | WS-A, WS-P |
-| R7 | The protocol yields "inconclusive" with no time to re-run | Medium | Weeks | Intervals straddling 1 + δ in RUN-1 or RUN-2 | RUN-0a to RUN-2 early; δ calibrated and fixed before RUN-1 | WS-P, owner |
+| R7 | The protocol yields "inconclusive" with no time to re-run | Medium | Weeks | Intervals straddling 1 + δ in RUN-1 or RUN-2 | RUN-0a to RUN-2 early; δ and ε calibrated and fixed before RUN-1, with more repetitions where the cap needs them, and the owner after two rounds (5.3) | WS-P, owner |
 | R8 | The heap row fails (2.72x historical) | High | Release-blocking | RUN-1 memory rows | Peak WASM memory per phase; S6 | WS-A, WS-P |
 | R9 | Parallel threads collide on shared files | Medium | Days | Two lanes with open PRs on one file | Merge order (9.5); #1062 first | Coordinator |
 | R10 | Outside reviewers stay unavailable | Medium | Days per PR | 429s or errored review jobs | The CLAUDE.md review loop, noted on the PR | Every thread |
 | R11 | Audio cues go late or silent under the engine | Medium | Player-visible | The cue-timing spec fails | Spec in S6 and S9; #965 if needed | WS-A |
 | R12 | A shell and an engine from different builds pair | Low to medium | Player-visible | `package-mismatch` in the signal | #985 criterion 5; #1046 if the field shows the shell half | WS-C |
-| R13 | 3.0.0 ships the strict build and cannot roll back | Low once OD-5 is decided | High | A flip PR setting `VC_ENGINE=wasm` | OD-5; the rollback rehearsal on the switchable build | Owner, release lane |
-| R14 | #1066's `.TDT` half waits on the TDT story's gates (#885 needs the owner's real saves, #920 the 1994 checks) | High | Weeks | #885 or #920 not started by Phase C | OD-8 decided early; the founder-mark half lands first | Owner, WS-A |
+| R13 | 3.0.0 ships the strict build and cannot roll back | Low (OD-5 decided) | High | A flip PR setting `VC_ENGINE=wasm` | OD-5; the rollback rehearsal on the switchable build | Owner, release lane |
+| R14 | #1066's `.TDT` half waits on the TDT story's gates (#885 needs the owner's real saves, #920 the 1994 checks) | High | Weeks | A7's real-save list not with the owner by the end of Phase A, or #885 or #920 not started by Phase C | OD-8 (a); A7 lists the real-save inputs in Phase A; the founder-mark half lands first | Owner, WS-A |
 | R15 | Stale Codex and Copilot claims mislead a thread | Medium | Hours | Duplicate work on one issue | Takeover notes (D3) | Every thread |
 | R16 | Reliability fields leak personal data | Low | High | A raw message in an event | Closed reason list; codes only; data map first; the relay's no-identifier posture | WS-A (Noor's rule) |
 | R17 | The exception register grows until the gate means little | Medium | Trust | An entry beyond S12, S14, #1067 and the #902 rollback loss | Each exception needs the owner's explicit approval | Owner |
 | R18 | The version queue (rendering stack plus player-facing PRs) causes repeated conflicts | High | Hours | Two PRs holding one version | Bump just before the final review, re-bump on rebase (9.7) | Each PR's author |
-| R19 | S4 slips, so the cohort, and with it the reliability clock, starts late | Medium | Weeks | #1062 not merged when A1 deploys, or #874 without a draft PR a week after both A1 has deployed and #1062 has merged | B1 is WS-B's first code step, and A1 and #902's draft proceed meanwhile; nothing in WS-A merges ahead of #874 except A1; the recovered #1059 code shortens it | WS-A |
+| R19 | S4 slips, so the cohort's early stages start late; the reliability clock starts at stage 3, so the slip delays it only if stage 2 is still short of its floor when stage 3's other conditions hold | Medium | Weeks | #1062 not merged when A1 deploys, or #874 without a draft PR a week after both A1 has deployed and #1062 has merged | B1 is WS-B's first code step, and A1 and #902's draft proceed meanwhile; nothing in WS-A merges ahead of #874 except A1; the recovered #1059 code shortens it | WS-A |
 | R20 | The replay window miscounts (a manual run cancels a night, or an infrastructure failure reads as green) | Medium | Trust | A ledger date with no scheduled run | B2's run hygiene; the ledger | WS-B |
 | R21 | The reliability rate understates real fallbacks | Medium | Trust | Fallbacks in host status that never reach analytics | Stated as a lower bound; triage by repeat, reason and build | WS-A |
-| R22 | The reliability tail keeps restarting, since every tail fix and every host-path merge restarts it | Medium | Weeks | A second candidate deploy | Triage fast and batch tail fixes; the tail's paths wait like the key's (4.1); the owner may waive a restart for a change outside engine behavior | WS-A, owner |
+| R22 | The reliability tail keeps restarting, since every tail fix and every host-path merge restarts it | Medium | Weeks | A second candidate deploy | Triage fast and batch tail fixes; the tail's paths wait like the key's, under the freeze guard (4.1, 4.2); the owner may waive a restart for a change outside engine behavior | WS-A, owner |
+| R23 | A stage moves on past a stop signal, or a drop-back waits on an approval while players hit it | Low to medium | Player-visible | A latch-off or a repeated fallback in a live stage | Stop signals in A1's report hold the stage; the owner's pre-approval of drop-back (section 12) | WS-A, owner |
 
-## 12. Owner decisions needed
+## 12. Owner decisions (2026-10-20)
+
+The owner reviewed this plan on 2026-10-20 and decided each question; this
+table is what holds. The questions as they were put, with the room's
+recommendations, follow it for the record.
+
+| # | Question | The owner's decision | Where the plan carries it |
+| --- | --- | --- | --- |
+| OD-1 | How engine sessions are produced before the flip | A progressive cohort in explicit stages, starting small once runtime fallback is tested; no 50% arm while the performance and host reliability gaps remain | 4.1: stages 0 to 3 (none, 10%, 25%, 50%), stage 3 only once M2 to M6 pass, the bucket draw, stop signals; A4 |
+| OD-2 | The Reliability pass rule | Early engine telemetry kept apart from the final candidate evidence; at least 1,000 eligible engine sessions, fully triaged failures and an observation period on the candidate build; the confidence bound reported as achieved, with the sample not presented as proof of a lower rate | 4.1: eligible sessions from S9 on stage-3 builds, the five-part rule, the tail with its 100-session floor; A1's definition |
+| OD-3 | The 14-night window | Weigh a frozen candidate ref against a freeze on `main`, and pick the one that reliably runs the actual candidate through the full differential without blocking unrelated work more than it must | 4.2: the freeze on `main` until the 14 nights and the tail end, with a freeze guard in B2 as a required check |
+| OD-4 | The performance pass rule | M1 to M8, 1x and 4x; tolerance from measured noise only, so it cannot authorize a material regression; the released web experience at least as fast as TypeScript | 5.3: the upper-bound rule on every speed metric, δ and ε from A/A passes under caps with an exit to the owner, every desktop metric at both throttles, M5's 500 ms allowance replaced |
+| OD-5 | The build 3.0.0 ships | The switchable build, WASM default, TypeScript fallback | 7.3 |
+| OD-6 | #893 and cutover decision 4 | Option (b): the crate publishes after the flip, with the compatibility policy documented | 7.4; #893 to P2; X3 |
+| OD-7 | The #945 amendments | Approved once the revised reliability and performance definitions are reconciled | Section 10, reconciled in this revision; it binds at the owner's final review |
+| OD-8 | #1066's `.TDT` half | Complete the Rust TDT import prerequisites for 3.0, and identify the real-save inputs early | A7, its real-save list first (9.1) |
+| OD-9 | What may come out of #1068 | (i) The Windows harness fix as a focused tooling PR; (ii) the read-model design chosen from RUN-0b evidence | B3a (9.2); A5's rule (9.1); #1068's hold unchanged |
+
+**Plan choices for the owner's final review.** Carrying out the decisions
+took choices the owner did not make. They stay proposals until the owner
+approves this revision:
+
+- the stage shares (10%, 25%, 50%), their move-on floors (14 days with 30,
+  then 100, engine sessions), the 30-day escalation, and the 0 to 99 bucket
+  in `localStorage` (4.1);
+- the stop signals, the crash-rate test among them (4.1);
+- where eligibility starts: S9's engine answers (#954) on a build without
+  the size gate, so stage 3, which puts the 1,000 sessions after the
+  performance work (4.1, R4);
+- dropping #945's 0.1% figure for the achieved bound (4.1, section 10);
+- the tail's floor of 100 eligible sessions, its paths and its restart
+  rule (4.1);
+- the freeze guard as a required check, and the freeze lasting until the
+  tail ends (4.2);
+- the upper-bound rule with δ and ε from A/A passes, the caps (δ at most
+  0.05; ε at most 50 ms of blocking, or 5% of TypeScript's cold start), and
+  the exit to the owner after two rounds (5.3);
+- every desktop metric binding at 1x and 4x, M6 kept at 1.25x, M7 as a CI
+  tripwire with tolerances #900 calibrates, and the harness towers in place
+  of the late-game fixture, with #864 off the path (5.3);
+- 7.4's policy content, and its place in the flip PR.
+
+**Still the owner's:**
+
+- the OK to send A1's and A4's new analytics fields to production
+  (section 13);
+- each cohort stage and each drop-back, and whether to pre-approve a
+  drop-back on the stop signals (4.1);
+- the size gate's threshold (4.1);
+- the real saves A7's list asks for, and a local session to run them;
+- making the freeze guard a required check for the window (4.2);
+- the candidate deploy, gate exceptions, the 3.0.0 flip and its publish;
+- the final review of this plan, and merging this PR.
+
+**The questions as they were put** (superseded by the decisions above):
 
 | # | Decision | Options | Recommendation |
 | --- | --- | --- | --- |
@@ -1123,21 +1402,25 @@ restates the row as it stands with its evidence.
 
 ## 13. On approval
 
-The owner approves the plan by saying so or by merging this PR; either starts
-the steps below. Only the owner merges this PR; no thread arms auto-merge on
-it. OD-1 to OD-9 stay open until the owner answers each one.
+The owner decided OD-1 to OD-9 on 2026-10-20 (section 12) and gives this
+revision a final review. Approving it, by saying so or by merging this PR,
+starts the steps below. Only the owner merges this PR; no thread arms
+auto-merge on it.
 
 - Create the live matrix issue (a sub-issue of #945) and its backlog row.
-- Create issues and rows for: the reliability signal (A1), the differential
-  upgrade (B2), the harness and protocol (B3), and the edit scene (PF2).
-- Approving the plan does not approve sending A1's new analytics fields to
-  production. They change no player-visible behavior, but they are new
-  data, so A1's PR asks the owner for a separate OK before its fields reach
-  production. B3's extraction of #1068's build fix likewise waits for OD-9
-  (i).
+- Create issues and rows for: the reliability signal (A1), the staged
+  cohort (A4), the differential upgrade with its freeze guard (B2), the
+  Windows harness fix (B3a), the harness and protocol (B3), the edit scene
+  (PF2), and the cold-start fix (PF5, closed if RUN-0b clears M5's gap).
+- Approving the plan does not approve sending A1's or A4's new analytics
+  fields to production. They change no player-visible behavior, but they
+  are new data, so each PR asks the owner for a separate OK before its
+  fields reach production. Each cohort stage needs its own approval too
+  (4.1).
 - Post the takeover notes (9.4) as each lane starts.
 - Comment on #868 and #954 with the audio cue-timing acceptance, and on #945
-  with the proposed amendments for the owner.
+  with the approved amendments; a docs PR then carries them, and decision
+  4's new text (7.4), into the cutover plan.
 - Drop the stale title prefixes when this PR merges (section 8).
 
 ## 14. Adversarial review of this plan
@@ -1150,7 +1433,8 @@ finding's outcome are recorded in
 What changed as a result:
 
 - **Precedence.** The cutover plan's pointer no longer ranks this draft above
-  it: its rows hold until the owner approves OD-7.
+  it: its rows hold until the owner approves OD-7 (since approved in
+  principle, binding at the final review).
 - **The windows.** The candidate engine and commit are defined, so the gates
   no longer wait on themselves. The replay key now covers the whole engine
   package and the TypeScript side of the compare; the counting rules are
@@ -1188,8 +1472,9 @@ then #902. The same order puts #1051 after #1048, so #1048 rises to P1 and WS-P 
 first.
 The pass also tied the candidate deploy to the host-path inputs, widened the
 replay key to the WASM build's cache inputs and the fixtures a scenario reads,
-sorted the reset rules by cause, kept the pre-S9 question open under OD-2,
-and corrected the Copilot review facts; the record lists each.
+sorted the reset rules by cause, kept the pre-S9 question open under OD-2
+(since decided, section 12), and corrected the Copilot review facts; the
+record lists each.
 
 A fourth pass found the third pass's changes not yet carried everywhere
 (the matrix, the shared-file table, the record's older outcomes), a
@@ -1206,3 +1491,16 @@ with R3); an engine change during the freeze resets the nights (R5); #1066's
 `.TDT` half waits on the TDT story's gates (R14); one protocol run on the
 wrong commit returns "inconclusive" (R7); the promotion cue goes quiet (R11); a
 thread finishes work and does not push it (R2).
+
+**The owner's decisions and the focused review (2026-10-20).** The passes
+above describe the plan before the owner decided OD-1 to OD-9. Folding the
+decisions in went through a focused `/bmad-code-review` of the amendments
+(the same three layers). It found that the first draft's median comparison
+could not show "at least as fast", that stage 3 could open before the
+performance gaps closed, that the size gate could keep large towers out of
+the release evidence, that the plan's own choices read as the owner's, and
+that a narrowed lockfile input could let a missed update change what the
+nightly runs. Each is fixed: the upper-bound rule with capped tolerances
+(5.3), stage 3 behind M2 to M6 and without the size gate (4.1), the list of
+plan choices (section 12), and the whole lockfile back in the key (4.2).
+The record lists every finding and its outcome.

@@ -15,10 +15,11 @@ gates", rows 4, 4b, 5, 6 and 7); the cutover's invariants,
 `implementation-readiness-report-2026-10-13-rust-wasm-cutover.md`.
 
 **Phase 2 (2026-10-20):** `release-3.0-web-plan-2026-10-20.md`, a draft for
-the owner's approval, sequences these stories for the release, assigns them
-to workstreams and proposes amendments to the section 6 gate rows. Until the
-owner approves those amendments (its decision OD-7), this plan's stories,
-acceptance criteria and gate rows hold unchanged.
+the owner's final review, sequences these stories for the release, assigns
+them to workstreams, and amends the section 6 gate rows (approved in
+principle as its decision OD-7) and decision 4 (its decision OD-6). Both
+bind at that final review; until then, this plan's stories, acceptance
+criteria, gate rows and decisions hold unchanged.
 
 ## 1. Outcome
 

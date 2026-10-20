@@ -319,3 +319,80 @@ was checked against the repository or the project instructions and applied.
 | C-7 | Plan approval must not cover A1's fields in production | Section 13, 9.1, 9.7 rule 9, R3 and the matrix: A1's PR asks the owner for a separate OK |
 | C-8 | Model and effort per lane | New 9.8, keyed to the project instructions' kinds of work; the model names stay in the project instructions, since repository artifacts carry no model identifiers |
 | C-9 | RUN-0a is PC measurement | 5.2, 9.3 and the matrix: a local session the coordinator schedules, and no implementation thread runs it |
+
+## Owner decisions (2026-10-20, after the coordinator corrections)
+
+The owner reviewed head `cbe970d`, confirmed D1 and decided OD-1 to OD-9.
+Each decision was carried into the plan, the matrix and the backlog as
+below; the focused review that follows checked the amendments.
+
+| # | Decision | Where it landed |
+| --- | --- | --- |
+| O-1 | D1: the takeover stands; WS-R owns the stack on spare capacity, below the Rust and WASM blockers and clear of the performance work | 1, 1.1 and 9.3; section 7.1 unchanged; the transcript |
+| O-2 | OD-1: a progressive cohort in explicit stages, starting small once runtime fallback is tested, with no 50% arm while the performance and host reliability gaps remain | 4.1's draw (a bucket from 0 to 99) and stages 0 to 3 with entry and exit conditions and stop signals; A4; R23; the graph and phases; matrix A4 |
+| O-3 | OD-2: early telemetry kept apart from candidate evidence; at least 1,000 eligible sessions, fully triaged failures, an observation period on the candidate build; the bound reported as achieved | 4.1's eligible sessions (S9's #954 on a build without the size gate, so stage 3), the five-part rule, the tail's 100-session floor (proposed); A1's definition; R4; section 10; the matrix's counting windows |
+| O-4 | OD-3: weigh a frozen candidate ref against a freeze on `main` and pick the reliable one that blocks least | 4.2's evaluation picks the freeze on `main`, lasting until the 14 nights and the tail end; a freeze guard in B2 as a required check; key item 5 as before (FR-24) |
+| O-5 | OD-4: M1 to M8 at 1x and 4x; tolerance from measured noise only; the released web experience at least as fast as TypeScript | 5.3's upper-bound rule on every speed metric, every desktop metric at 1x and 4x, δ and ε from A/A passes under caps with an exit to the owner, M5's 500 ms allowance replaced; #1005 to P1 and the cold-start fix PF5; RUN-0b; section 10 |
+| O-6 | OD-5: the switchable build with WASM default and TypeScript fallback | 7.3; section 6 row 10; R13; matrix X2 |
+| O-7 | OD-6: option (b), the crate after the flip, with the compatibility policy documented | New 7.4; #893 to P2 in section 8 and its backlog row; X3; the cutover pointer |
+| O-8 | OD-7: the gate amendments, once the reliability and performance definitions are reconciled | Section 10's rows restated; they bind at the owner's final review |
+| O-9 | OD-8: complete the Rust TDT import prerequisites for 3.0 and identify the real-save inputs early | 7.2; A7's real-save list first (9.1); the #885, #886, #887 and #920 rows; R14 |
+| O-10 | OD-9: (i) the Windows harness fix as a focused tooling PR; (ii) S6's design from RUN-0b evidence | B3a in 9.2, 9.4, 5.2 and the matrix, owned by WS-B; A5's pre-registered rule (9.1); the #868 row; #1068's hold unchanged |
+
+## Focused review of the amendments
+
+The diff of the owner-decision amendments against `cbe970de` (the plan, the
+matrix, the backlog rows, the cutover pointer, the transcript, the memlog
+and this record) went through `/bmad-code-review`: the Blind Hunter read
+only the diff, and the Edge Case Hunter and the Acceptance Auditor read it
+with the repository and the owner's decisions. The Auditor confirmed that
+section 7.1 is byte for byte unchanged, that WS-R, the Godot and native
+exclusion, the owner-only merge and every production approval are kept, and
+that each projection and bound in the diff is correct for 749 sessions per
+30 days.
+
+Raw findings: Blind Hunter 25, Edge Case Hunter 25, Acceptance Auditor 22.
+After merging duplicates, 37 remain. All are patched; none is deferred or
+dismissed. The heaviest were in the draft's own readings of OD-1, OD-2 and
+OD-4, which the plan now lists for the owner's final review (plan section
+12).
+
+| # | Finding | Sources | Class | Outcome |
+| --- | --- | --- | --- | --- |
+| FR-1 | The median rule turns parity into a coin flip: an engine equal to TypeScript fails each cell about half the time, and no rule stops re-runs | BH1, AA2, ECH1 | patch | 5.3's upper-bound rule: a speed metric passes when its paired interval's upper bound is within δ or ε; a failed verdict stands, and a run repeats only after a code change or a recorded cause |
+| FR-2 | Stage 3 (50%) can open with M2 and M3 alone at 1x, or with the size gate kept on, so the performance gaps stay open and large towers leave the evidence; the gate's lifetime is stated two ways | BH2, BH10, AA1, AA9, ECH3, ECH13 | patch | Stage 3 needs stage 2 moved on, S6, and a committed run (RUN-1, RUN-2 or a run repeated after a fix) passing M2 to M6 at 1x and 4x on the medium and large towers; the gate stays through stage 2, comes off at stage 3, and 3.0.0 ships without it; no session on a gated build is eligible; the gate is recorded per page life; A4's spec covers a second load and a tower that grows past the threshold |
+| FR-3 | The plan's own choices are labeled "approved under OD-7", the transcript and memlog credit them to the owner, and the owner's conditional approval is overstated | BH3, AA3, AA4, AA12, AA19 | patch | Section 10 and the matrix header: approved in principle, binding at the final review; section 12 lists the plan's choices for that review; the transcript and the two memlog lines separate the owner's decisions from the plan's choices (rewritten before their first commit); the matrix marks the tail floor as proposed |
+| FR-4 | WS-R ranks below the release blockers yet holds `src/render`, which S7's Authority work needs, with no rule for who parks the stack | BH4 | patch | 9.5: WS-D does not wait; when it needs `src/render` the stack parks at its next PR boundary (the coordinator's call) unless its open PR is ready, and later stack PRs rebase over WS-D; matrix UI1 and RS1 |
+| FR-5 | Eligibility reads "A6 merged, #1066 included" in one place and "from S9" elsewhere, which would tie the reliability clock to A7 | BH5, ECH2 | patch | Eligibility starts at #954 (S9's engine answers); the D5 follow-ups are in the candidate either way |
+| FR-6 | M7 keeps a baseline that lets WASM pass up to 10% slower (`e2e/perf.spec.ts:55-57`), and M6's carve-out is the plan's | BH6, AA5, ECH5 | patch | M7 is a CI tripwire whose tolerances #900 calibrates from A/A CI runs under δ's cap; the desktop protocol decides speed; M6's 1.25x ceiling is listed for the owner |
+| FR-7 | "Including 1x and 4x" became "wherever the table lists them", dropping 4x for M3, M4, M6 and M8 | BH7, AA11, ECH24 | patch | Every desktop metric binds at both throttles |
+| FR-8 | Nothing makes RUN-0b wait for A5's design rule, and the rule has a gap between its two branches | BH8, AA8, ECH7 | patch | WS-A commits the rule early as a short spec; RUN-0b waits for it (5.2, graph, matrix PF1 and A5); one threshold on the median hourly churn |
+| FR-9 | The graph makes reliability evidence wait for stage 3 while the text projects a 25% arm | BH9, AA22, ECH25 | patch | Consistent now, since eligibility needs a build without the size gate; the 25% columns are gone |
+| FR-10 | Section 10's Reliability row still reads as keeping 0.1% | BH11 | patch | The row says the figure leaves it |
+| FR-11 | #1005 waits for RUN-0b although it comes before it, keeps P3 while M5 fails, says "Not blocking", and the cold-start fix has no item | BH12, AA13, ECH19 | patch | #1005 to P1 (section 8 and its row, "Not blocking" removed); 5.3 restates M5 from the report's ratios (upper bounds about 1.28 at 1x, 1.22 at 4x); PF5 in WS-P, a new issue on approval, on the graph before RUN-3 and before the freeze if it changes the key |
+| FR-12 | The δ and ε calibration can loop forever; repetition counts, RUN-3's own A/A, M8's calibration and which cold start sets ε are unstated; the 50 ms explanation is wrong | BH13, AA14, ECH6 | patch | Two rounds, then the owner; A/A passes use the verdict runs' repetition count; an A/A pass outside δ or ε voids RUN-3; M8 calibrates when PF2 lands; one ε for long tasks and one per throttle for cold start; 50 ms of blocking is one 100 ms task |
+| FR-13 | "Fully triaged failures" became fallbacks only | BH14, AA10 | patch | Rule item 2 and the stage floors triage every fallback and every `$exception` from engine or host code; the tail triages every failure |
+| FR-14 | The tail misses `saveLoad.ts` and `exportFlow.ts`, a path guard cannot target the Workbox block, and changes outside the tail's paths go unseen | BH15, ECH14, ECH15 | patch | Both files join the tail's paths and RUN-3's host paths; the guard checks the Workbox block by a hash of its content; the gate review lists changes outside the tail's paths |
+| FR-15 | The crash-rate stop signal has no definition or threshold | BH16, ECH16 | patch | A1's governed definition computes each arm's crash rate and the 95% interval of the difference; the signal fires on a repeat crash from engine or host code or an interval above zero |
+| FR-16 | A stage change, a drop-back or the flip collides with the tail and the guard | BH17, ECH4 | patch | The share and the gate's threshold live in a config module outside `src/wasmhost`, the tail's paths and the key, which the guard exempts (9.5 row added); the flip PR's change to the default needs no RUN-3 re-run |
+| FR-17 | R19 says an S4 slip delays the reliability clock | BH18 | patch | It delays the early stages, and the clock only if stage 2 is still short of its floor |
+| FR-18 | "So it is done for 3.0" reads as a status, and the owner wrote "prefer" | BH19, AA21 | patch | "Required for 3.0 unless the owner later approves an exception" in the #885, #886, #887 and #920 rows |
+| FR-19 | Stage 1 does not need stage 0; floors can be met before a fix ships; a stage that never reaches its floor has no exit | BH20, ECH18 | patch | Stage 1 needs stage 0 moved on; floors count on builds that carry every fix; 30 days below a floor goes to the owner |
+| FR-20 | Override sessions on S9 builds fit neither bucket | BH21 | patch | Override and unassigned sessions on any build are early telemetry, triaged and never counted |
+| FR-21 | The OD-3 table says nothing catches a wrong ref, beside the key check it lists | BH22 | patch | "The flip's key check throws the nights away, late" |
+| FR-22 | The cutover pointer credits decision 4's change to OD-7 | BH23, AA16, ECH25 | patch | Gate rows under OD-7, decision 4 under OD-6, both binding at the final review |
+| FR-23 | "X, never Y" restatements in section 12 and 5.3 | BH24, AA15 | patch | Reworded |
+| FR-24 | The narrowed lockfile input contradicts the wide key, does not say whether it covers transitive tools (esbuild under tsx), and cannot drive the corpus filter | BH25, AA7, ECH10 | patch | Item 5 is back to the whole lockfile minus the root `version` fields; Dependabot's npm updates wait like its Actions updates; 4.2 says why |
+| FR-25 | The #1049 and #1051 rows still say "once the owner sets its margin" | AA6 | patch | δ calibrated from measured noise under its cap (OD-4) |
+| FR-26 | The coordinator's scope question has no answer | AA17 | patch | WS-A gains A4's staged cohort (bucket, config module, fields, stop signals), A1's split and crash rates, A5's early rule and A7's real-save list; WS-B gains B3a, the freeze guard and the capped A/A calibration; neither lane's goal changes; given to the coordinator with the push |
+| FR-27 | This record named a focused review that it did not contain | AA18 | patch | This section |
+| FR-28 | A section 14 line reads as stale | AA20 | patch | Notes on OD-7 and the pre-S9 question, and a closing paragraph on the owner's decisions and this review |
+| FR-29 | S14's analytics half lands in Phase D, on a tail path | ECH8 | patch | X1 (#873) or its exception lands before the candidate deploy (4.1, 9.3, graph, matrix X1) |
+| FR-30 | A7's list names `sixseven_14`, our own export, as a canon save and misses `TOWER5` and `MYTP0` | ECH9 | patch | `my_tower`, `mo`, `TOWER5` (canon) and `MYTP0` (the no-rate finance spec); an export of ours stands in for no game-written save |
+| FR-31 | Stale checks, direct pushes and the time after the window can bypass the freeze guard | ECH11 | patch | The owner makes the guard a required check with up-to-date branches; the gate review and the flip recompute the key |
+| FR-32 | A session whose arm changes has no arm, and storage that drops writes redraws the bucket each page life | ECH12 | patch | A session takes its first page life's arm, arm-changing sessions are reported apart, and A4 reads the bucket back (unassigned if it did not keep) |
+| FR-33 | HogQL has no inverse beta, and fixed fallbacks' place in the bound is unstated | ECH17 | patch | The exact bound is computed in the tested script; fixed fallbacks still count in the all-eligible bound |
+| FR-34 | The stage-0 forced-fallback check has no mechanism in production | ECH20 | patch | Production `?engine=wasm` fields, plus a forced fallback on a preview tooling build of the same commit, kept out of every count |
+| FR-35 | A4 has no issue, and its fields are new data | ECH21 | patch | Section 13 creates A4's issue; A4's `arm` and `stage` fields need the owner's production OK |
+| FR-36 | 4.2 says the freeze ends with the 14 nights, though a new key restarts the tail | ECH22 | patch | The freeze lasts until the 14 nights and the tail both end |
+| FR-37 | B3a's list misses `perfCompare/main.ts`, and a separate thread would split files WS-B holds | ECH23 | patch | B3a covers both harnesses; WS-B owns it; the "same `sh(...)` calls" line in 5.2 is corrected |
