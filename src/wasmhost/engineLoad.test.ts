@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { compileEngineBinary, engineBinaryUrl, initEngineGlue } from "./engineLoad";
 import { EMPTY_WASM, buildSectionWith, customSection, stampedWasm, wasmFetch, wasmWith } from "./engineLoad.fixture";
 import { ENGINE_WASM } from "./enginePackageNames";
+import { wasmRequired } from "../tests/conformance/wasmEngine";
 
 const HASH = "ab".repeat(32);
 
@@ -71,8 +72,13 @@ describe("compileEngineBinary", () => {
   });
 });
 
-// Like the other package tests: it runs where the engine package is built (a local build, the e2e jobs) and skips in the plain unit job.
-describe.skipIf(!existsSync(resolve(__dirname, "../public/engine/BUILD.json")))("the built engine binary", () => {
+// Like the other package tests, it runs where the engine package is built (a
+// local build, `test-wasm-parity (unitWasm)`) and skips in the plain unit job.
+// Where the package is required (`VC_REQUIRE_WASM=1`) a missing one is a failure.
+const PACKAGE_BUILD = resolve(__dirname, "../public/engine/BUILD.json");
+if (wasmRequired() && !existsSync(PACKAGE_BUILD)) throw new Error("VC_REQUIRE_WASM=1 but src/public/engine/ is not built; run npm run wasm:build");
+
+describe.skipIf(!existsSync(PACKAGE_BUILD))("the built engine binary", () => {
   it("carries the source hash BUILD.json records, as the page reads it", async () => {
     const dir = resolve(__dirname, "../public/engine");
     const bytes = readFileSync(resolve(dir, ENGINE_WASM));
@@ -129,6 +135,25 @@ describe("initEngineGlue", () => {
       initEngineGlue("data:text/javascript,throw new Error('glue failed')", { wasmUrl: "http://x/e.wasm", onBuild: (b) => seen.push(b.state) }),
     ).rejects.toThrow();
     expect(seen).toEqual(["ok"]);
+  });
+
+  it("reports the build when the glue fails before the binary has compiled", async () => {
+    const fast = wasmFetch(stampedWasm(HASH));
+    // The glue's failure beats the binary's fetch, as a 404 on a small glue file can in production.
+    vi.stubGlobal("fetch", (async (u: string | URL) => {
+      await new Promise((r) => setTimeout(r, 30));
+      return fast(u);
+    }) as typeof fetch);
+    const seen: string[] = [];
+    await expect(
+      initEngineGlue("data:text/javascript,throw new Error('glue failed')", { wasmUrl: "http://x/e.wasm", onBuild: (b) => seen.push(b.state) }),
+    ).rejects.toThrow("glue failed");
+    expect(seen).toEqual(["ok"]);
+  });
+
+  it("rejects with the glue's error when the binary fails too, without an unhandled rejection", async () => {
+    vi.stubGlobal("fetch", wasmFetch(EMPTY_WASM, { status: 500 }));
+    await expect(initEngineGlue("data:text/javascript,throw new Error('glue failed')", { wasmUrl: "http://x/e.wasm" })).rejects.toThrow("glue failed");
   });
 
   it("does not report a build when the binary cannot be fetched", async () => {

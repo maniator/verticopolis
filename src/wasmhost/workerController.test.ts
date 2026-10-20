@@ -245,4 +245,39 @@ describe("spawnEngineWorker, the engine binary's build metadata (#963)", () => {
     const err = await spawnEngineWorker(() => answering({ type: "error", fatal: true, message: "404" }), "u").catch((e: unknown) => e);
     expect("build" in (err as object)).toBe(false);
   });
+
+  /** A worker that reports the binary's build, then does `then`. */
+  const reporting = (then: (w: EngineWorkerLike) => void): EngineWorkerLike => {
+    const w: EngineWorkerLike = {
+      onmessage: null,
+      onerror: null,
+      postMessage() {
+        setTimeout(() => {
+          w.onmessage?.({ data: { type: "build", build: ok } });
+          then(w);
+        }, 0);
+      },
+      terminate() {},
+    };
+    return w;
+  };
+
+  it("keeps the build a worker reported when it then never answers", async () => {
+    const err = await spawnEngineWorker(() => reporting(() => undefined), "u", 20).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(EngineBootError);
+    expect(err).toMatchObject({ reason: "boot-timeout", build: ok });
+  });
+
+  it("keeps the build a worker reported when it then fails to start", async () => {
+    const err = await spawnEngineWorker(() => reporting((w) => w.onerror?.({ message: "boom" } as ErrorEvent)), "u").catch((e: unknown) => e);
+    expect(err).toMatchObject({ build: ok });
+  });
+
+  it("prefers the build an error reply carries over the one reported earlier", async () => {
+    const other = { state: "missing" } as const;
+    const err = await spawnEngineWorker(() => reporting((w) => w.onmessage?.({ data: { type: "error", fatal: true, message: "x", build: other } })), "u").catch(
+      (e: unknown) => e,
+    );
+    expect(err).toMatchObject({ build: other });
+  });
 });

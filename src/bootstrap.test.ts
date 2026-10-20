@@ -229,6 +229,30 @@ describe("showEngineFailure", () => {
     }
   });
 
+  it("shows the report to select by hand when the stop screen cannot copy it", async () => {
+    const g = globalThis as { __vcEngineBoot?: unknown };
+    const state = { build: "wasm-only", engine: "none", failure: { stage: "load", reason: "package-mismatch", message: "import mismatch" } };
+    g.__vcEngineBoot = state;
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn(async () => Promise.reject(new Error("denied"))) }, configurable: true });
+    // The selection fallback fails too: jsdom has no execCommand.
+    try {
+      showEngineFailure(state as never, false);
+      document.querySelector<HTMLButtonElement>('#boot-fallback button[data-act="copy-diagnostics"]')!.click();
+      await vi.waitFor(() => expect(document.querySelector(".engine-failure-copy-status")?.textContent).toContain("Could not copy"));
+      const area = document.querySelector<HTMLTextAreaElement>("#boot-fallback textarea.engine-failure-copy-text")!;
+      expect(area.readOnly).toBe(true);
+      expect(area.value).toContain("Verticopolis diagnostics");
+      expect(area.value).toContain("Reason: package-mismatch");
+      expect(document.activeElement).toBe(area);
+      // A second failed copy reuses the block.
+      document.querySelector<HTMLButtonElement>('#boot-fallback button[data-act="copy-diagnostics"]')!.click();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(document.querySelectorAll(".engine-failure-copy-text")).toHaveLength(1);
+    } finally {
+      delete g.__vcEngineBoot;
+    }
+  });
+
   it("leaves only the message reachable: everything behind it goes inert and focus moves to Reload", async () => {
     document.body.innerHTML = `<div id="stage"><button id="quick-save">Quick Save</button></div><div id="splash"></div>`;
     const button = document.getElementById("quick-save") as HTMLButtonElement;

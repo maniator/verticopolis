@@ -19,8 +19,10 @@ import type { BuildMetadataResult } from "./buildSection";
  * does not carry it, so a missing or malformed section leaves the engine
  * running and the source hash unavailable.
  *
- * The text carries no tower, save or player data: versions, codes, digests and
- * the engine's own error text.
+ * The text carries versions, codes, digests, the browser and the engine's own
+ * error text. It holds no save and no player data, but an engine error message
+ * can quote a tower name (a hand-edited save controls it), so it is something
+ * the player sends on purpose, never something the page sends by itself.
  */
 export type DiagnosticsState =
   | "ok"
@@ -72,6 +74,10 @@ const MESSAGE_CAP = 300;
 
 const cap = (s: string): string =>
   s.length > MESSAGE_CAP ? `${s.slice(0, MESSAGE_CAP)}...` : s;
+
+/** One row is one line of the clipboard text, so a message that spans lines
+ *  (a stack, a multi-line engine error) is folded onto one. */
+const oneLine = (s: string): string => s.replace(/\s*[\r\n]+\s*/g, " ");
 
 /** The source hash the binary was stamped with against the one this page was
  *  built for, or null when they agree or either is unknown. It needs only the
@@ -269,8 +275,8 @@ export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
 
   const text = [
     "Verticopolis diagnostics",
-    summary,
-    ...rows.map((r) => `${r.label}: ${r.value}`),
+    oneLine(summary),
+    ...rows.map((r) => `${r.label}: ${oneLine(r.value)}`),
   ].join("\n");
   return { state, summary, rows, text };
 }

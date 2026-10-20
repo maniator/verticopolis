@@ -117,8 +117,25 @@ let inertWatch: MutationObserver | null = null;
  *  when the engine never loaded. */
 function copyEngineDiagnostics(e: Event): void {
   const status = (e.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(".engine-failure-copy-status");
-  void copyText(liveDiagnostics().text, navigator, document, document.getElementById("boot-fallback-host") ?? document.body).then((ok) => {
-    if (status) status.textContent = ok ? "Copied." : "Could not copy.";
+  const host = document.getElementById("boot-fallback-host") ?? document.body;
+  const { text } = liveDiagnostics();
+  void copyText(text, navigator, document, host).then((ok) => {
+    if (status) status.textContent = ok ? "Copied." : "Could not copy. Select the text below and copy it by hand.";
+    if (ok) return;
+    // Nothing reached the clipboard, so show the report where it can be selected.
+    let area = host.querySelector<HTMLTextAreaElement>(".engine-failure-copy-text");
+    if (!area) {
+      area = document.createElement("textarea");
+      area.className = "engine-failure-copy-text";
+      area.readOnly = true;
+      area.rows = 12;
+      area.setAttribute("aria-label", "Engine diagnostics");
+      area.style.cssText = "width:min(48em,100%);box-sizing:border-box;font:12px/1.4 ui-monospace,monospace;text-align:left";
+      status?.closest("p")?.insertAdjacentElement("afterend", area);
+    }
+    area.value = text;
+    area.focus();
+    area.select();
   });
 }
 

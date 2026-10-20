@@ -44,14 +44,23 @@ export interface EngineLoadOptions {
 export async function initEngineGlue(glueUrl: string, opts: EngineLoadOptions = {}): Promise<{ mod: GlueModule; exports: unknown }> {
   const wasmUrl = opts.wasmUrl ?? engineBinaryUrl(glueUrl);
   // The build is reported as soon as the binary has compiled, so a glue that
-  // then fails to import still leaves what the binary said.
-  const [mod, binary] = await Promise.all([
-    import(/* @vite-ignore */ glueUrl) as Promise<GlueModule>,
-    compileEngineBinary(wasmUrl).then((b) => {
-      opts.onBuild?.(b.build);
-      return b;
-    }),
-  ]);
+  // then fails to import or to initialize still leaves what the binary said.
+  // The compile is awaited even when the glue import fails first: a small glue
+  // file's 404 or syntax error can beat the compile of the binary, and the
+  // caller reads the build as soon as this rejects.
+  const compiled = compileEngineBinary(wasmUrl).then((b) => {
+    opts.onBuild?.(b.build);
+    return b;
+  });
+  compiled.catch(() => undefined);
+  let mod: GlueModule;
+  try {
+    mod = (await import(/* @vite-ignore */ glueUrl)) as GlueModule;
+  } catch (e) {
+    await compiled.catch(() => undefined);
+    throw e;
+  }
+  const binary = await compiled;
   const exports = await mod.default({ module_or_path: binary.module });
   return { mod, exports };
 }

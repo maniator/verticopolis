@@ -37,4 +37,15 @@ describe("liveDiagnostics", () => {
     });
     expect(r.state).toBe("not-loaded");
   });
+
+  it("never throws: a page whose boot state cannot be read still gives a report to copy", () => {
+    const hostile = {
+      get __vcEngineBoot(): never {
+        throw new Error("blocked");
+      },
+    };
+    const r = liveDiagnostics(hostile);
+    expect(r.state).toBe("unavailable");
+    expect(r.text).toBe("Verticopolis diagnostics\nThe report could not be built: blocked");
+  });
 });

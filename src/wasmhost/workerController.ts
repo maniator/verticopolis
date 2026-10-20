@@ -71,12 +71,16 @@ export function spawnEngineWorker(make: () => EngineWorkerLike, url: string, tim
   return new Promise<SpawnedWorker>((resolve, reject) => {
     // The ready timeout carries its code (`boot-timeout`), as the main-thread
     // load's limit does; every other start failure is an untyped error.
+    // What the worker said about the binary before it failed or went quiet.
+    let seen: BuildMetadataResult | undefined;
     const fail = (message: string, timedOut = false, build?: BuildMetadataResult) => {
       clearTimeout(timer);
       worker.onmessage = null;
       worker.onerror = null;
       worker.terminate();
-      reject(timedOut ? new EngineBootError("boot-timeout", message) : Object.assign(new Error(message), build ? { build } : {}));
+      const known = build ?? seen;
+      const error = timedOut ? new EngineBootError("boot-timeout", message) : new Error(message);
+      reject(known ? Object.assign(error, { build: known }) : error);
     };
     const timer = setTimeout(() => fail(`the engine worker did not answer within ${timeoutMs} ms`, true), timeoutMs);
     worker.onmessage = (e) => {
@@ -86,6 +90,8 @@ export function spawnEngineWorker(make: () => EngineWorkerLike, url: string, tim
         worker.onmessage = null;
         worker.onerror = null;
         resolve({ worker, catalogs: msg.catalogs, identity: msg.identity, build: msg.build });
+      } else if (msg.type === "build") {
+        seen = msg.build;
       } else if (msg.type === "error") {
         fail(msg.message, false, msg.build);
       }

@@ -301,7 +301,7 @@ export function showHelp(ui: UI): void {
   ui.wireActions(box, {
     "copy-diagnostics": () => {
       const status = box.querySelector<HTMLElement>(".help-diagnostics-status");
-      void copyText(diagnostics.text).then((ok) => {
+      void copyText(diagnostics.text, navigator, document, box.closest("dialog") ?? undefined).then((ok) => {
         if (status) status.textContent = ok ? "Copied." : "Could not copy. Select the lines above and copy them by hand.";
       });
     },

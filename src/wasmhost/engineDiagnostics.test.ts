@@ -194,6 +194,17 @@ describe("buildDiagnostics", () => {
     expect(detail.endsWith("...")).toBe(true);
   });
 
+  it("folds a message that spans lines onto its row in the copied text", () => {
+    const boot: EngineBootState = {
+      build: "switchable",
+      engine: "ts",
+      failure: { stage: "load", reason: "boot-error", message: "first line\r\n   at second\nthird" },
+    };
+    const r = buildDiagnostics({ ...base, boot });
+    expect(r.text).toContain("Detail: first line at second third");
+    expect(r.text.split("\n").filter((l) => l.startsWith("Detail:"))).toHaveLength(1);
+  });
+
   it("writes the text as heading, summary and one line per row, with no em-dash", () => {
     const r = buildDiagnostics({
       ...base,
@@ -219,6 +230,13 @@ describe("the source hash stamped in the engine binary", () => {
     expect(row(r, "Source hash in the engine binary")).toEqual(["555555555555"]);
     expect(row(r, "Source hash this page expects")).toEqual(["555555555555"]);
     expect(row(r, "Package id this page expects")).toEqual(["0123456789ab"]);
+  });
+
+  it("compares all 64 digits, not the 12 shown", () => {
+    const near = SRC.slice(0, 12) + "6".repeat(52);
+    const r = run(wasmBoot({ binary: { state: "ok", sourceHash: near } }), withSources());
+    expect(r.state).toBe("mismatch");
+    expect(row(r, "Mismatch")[0]).toContain("source hash");
   });
 
   it("is a mismatch, naming the source hash, when the binary was built from other sources", () => {

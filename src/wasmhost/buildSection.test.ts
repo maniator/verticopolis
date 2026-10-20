@@ -21,6 +21,19 @@ const concat = (...parts: (Uint8Array | number[])[]) =>
   Uint8Array.from(parts.flatMap((p) => [...p]));
 const payloadText = (u: Uint8Array) => new TextDecoder().decode(u);
 
+describe("parseBuildMetadata, a payload that is not UTF-8", () => {
+  it("is malformed, not read with replacement characters", () => {
+    const bad = Uint8Array.from([0x7b, 0xff, 0xfe, 0x7d]);
+    expect(parseBuildMetadata([bad])).toEqual({ state: "malformed", why: "not JSON" });
+  });
+
+  it("does not accept a hash that only parses after replacement", () => {
+    const json = text(`{"schema":1,"sourceHash":"${HASH}"}`);
+    const withBad = Uint8Array.from([...json.subarray(0, 5), 0xc3, ...json.subarray(5)]);
+    expect(parseBuildMetadata([withBad]).state).toBe("malformed");
+  });
+});
+
 describe("stampBuildSection", () => {
   it("appends the section and leaves every other byte alone", () => {
     const other = concat(

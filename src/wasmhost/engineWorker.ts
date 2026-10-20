@@ -24,7 +24,12 @@ let loading = false;
 let build: BuildMetadataResult | undefined;
 
 async function load(url: string): Promise<void> {
-  const loaded = await initEngineGlue(url, { onBuild: (b) => (build = b) });
+  const loaded = await initEngineGlue(url, {
+    onBuild: (b) => {
+      build = b;
+      post({ type: "build", build: b });
+    },
+  });
   const exports = loaded.exports as { memory?: WebAssembly.Memory } | undefined;
   const ready = new EngineWorkerCore(checkBinding(loaded.mod), post, () => exports?.memory?.buffer.byteLength ?? null);
   post({ type: "ready", catalogs: ready.catalogs(), identity: ready.identity(), build });

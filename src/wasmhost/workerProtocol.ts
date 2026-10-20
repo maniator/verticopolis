@@ -137,4 +137,13 @@ export interface ErrorReply {
   build?: BuildMetadataResult;
 }
 
-export type FromWorker = ReadyReply | LoadedReply | FrameReply | ErrorReply;
+/** The binary compiled and its build section was read, sent before the glue
+ *  has linked it, so a worker that then fails or never answers still leaves
+ *  what the binary said (#963). Only the spawn waits for it; a host that is
+ *  attached ignores it, as it ignores any reply with no generation. */
+export interface BuildReply {
+  type: "build";
+  build: BuildMetadataResult;
+}
+
+export type FromWorker = ReadyReply | BuildReply | LoadedReply | FrameReply | ErrorReply;
