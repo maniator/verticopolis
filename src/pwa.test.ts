@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, type MockInstance } from "vitest";
 
 /**
  * Pins the gating rules on `registerPWA` in `src/pwa.ts`: the build registers
@@ -130,5 +130,122 @@ describe("registerPWA: offline", () => {
       fetchSpy.mockRestore();
       restore();
     }
+  });
+
+  /** Run `scenario` with `fetch` replaced, in a reachable browser branch, and put everything back. */
+  async function withFetch(impl: typeof fetch, scenario: (fetchSpy: MockInstance<typeof fetch>) => Promise<void>): Promise<void> {
+    const restore = makeBrowserBranchReachable();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(impl);
+    try {
+      await scenario(fetchSpy);
+    } finally {
+      fetchSpy.mockRestore();
+      restore();
+    }
+  }
+
+  /** The URL of a version.json request among the fetch calls, or undefined. */
+  const versionJsonCall = (fetchSpy: MockInstance<typeof fetch>) => fetchSpy.mock.calls.find(([url]) => String(url).includes("version.json"));
+
+  /** Register, let the worker report a waiting update, and return the prompt handler. */
+  async function needRefresh(): Promise<ReturnType<typeof vi.fn>> {
+    const { registerPWA } = await importPwa();
+    const onUpdateAvailable = vi.fn();
+    registerPWA({ onUpdateAvailable });
+    (registerSW.mock.calls[0][0] as { onNeedRefresh: () => void }).onNeedRefresh();
+    return onUpdateAvailable;
+  }
+
+  // version.json only decorates the update prompt (#985, criterion 7). On the
+  // path where the worker reports a waiting update (onNeedRefresh), every way
+  // it can fail to arrive still leaves the update on offer, with no info. The
+  // hourly backstop path is different: see the test after these.
+  const failures: [string, () => Promise<Response>][] = [
+    ["answers 404", async () => new Response("not found", { status: 404 })],
+    ["answers 500", async () => new Response("down", { status: 500 })],
+    ["is not JSON", async () => new Response("<!doctype html>", { status: 200 })],
+    ["is JSON that is not an object", async () => new Response("null", { status: 200 })],
+  ];
+  it.each(failures)("still offers a waiting update when version.json %s", async (_name, answer) => {
+    await withFetch(answer, async (fetchSpy) => {
+      const onUpdateAvailable = await needRefresh();
+      await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
+      expect(versionJsonCall(fetchSpy), "version.json was requested").toBeDefined();
+      expect(onUpdateAvailable.mock.calls[0][1]).toBeUndefined();
+    });
+  });
+
+  // A 200 whose body parses to something with no usable fields leaves nothing to
+  // show; the update is still on offer, with info that names no build.
+  it.each([["{}", "{}"], ["an array", "[1, 2]"], ["fields of the wrong type", '{"version":5,"sha":[],"notes":"x"}']])(
+    "still offers a waiting update when version.json is %s",
+    async (_name, body) => {
+      await withFetch(async () => new Response(body, { status: 200 }), async (fetchSpy) => {
+        const onUpdateAvailable = await needRefresh();
+        await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
+        expect(versionJsonCall(fetchSpy), "version.json was requested").toBeDefined();
+        expect(onUpdateAvailable.mock.calls[0][1]).toEqual({ version: undefined, sha: undefined, notes: [] });
+      });
+    },
+  );
+
+  it("gives up on a version.json that never answers after four seconds and still offers the update", async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | null | undefined;
+    // A fetch that hangs until its signal aborts, as a stalled connection does.
+    const stalls: typeof fetch = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        signal = init?.signal;
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      });
+    try {
+      await withFetch(stalls, async () => {
+        const onUpdateAvailable = await needRefresh();
+        await vi.advanceTimersByTimeAsync(3_999);
+        expect(onUpdateAvailable, "still waiting inside the four seconds").not.toHaveBeenCalled();
+        expect(signal?.aborted, "not yet aborted").toBe(false);
+        await vi.advanceTimersByTimeAsync(2);
+        expect(signal?.aborted, "aborted by the four second limit").toBe(true);
+        expect(onUpdateAvailable).toHaveBeenCalledTimes(1);
+        expect(onUpdateAvailable.mock.calls[0][1]).toBeUndefined();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("hands the incoming build's identity to the prompt when version.json arrives", async () => {
+    const body = JSON.stringify({ version: "9.9.9", sha: "abc1234", notes: ["A new thing."] });
+    await withFetch(async () => new Response(body, { status: 200 }), async (fetchSpy) => {
+      const onUpdateAvailable = await needRefresh();
+      await vi.waitFor(() => expect(onUpdateAvailable).toHaveBeenCalledTimes(1));
+      expect(onUpdateAvailable.mock.calls[0][1]).toEqual({ version: "9.9.9", sha: "abc1234", notes: ["A new thing."] });
+      // It is fetched fresh: never from a cache, never precached.
+      const call = versionJsonCall(fetchSpy);
+      expect(call, "version.json was requested").toBeDefined();
+      expect((call![1] as RequestInit).cache).toBe("no-store");
+      expect(new URL(String(call![0])).searchParams.has("t"), "with a cache-busting query").toBe(true);
+    });
+  });
+
+  // The hourly and on-focus backstop asks for a waiting worker, then confirms
+  // against version.json. A missing version.json is "no information", which is
+  // not a different build, so the backstop does not offer the update; the
+  // worker's own onNeedRefresh still does. Whether a missing version.json
+  // should offer it here is open (the #985 backlog row records the choice).
+  it("does not offer a waiting worker from the backstop check when version.json is missing", async () => {
+    await withFetch(async () => new Response("not found", { status: 404 }), async (fetchSpy) => {
+      const { registerPWA } = await importPwa();
+      const onUpdateAvailable = vi.fn();
+      registerPWA({ onUpdateAvailable });
+      const opts = registerSW.mock.calls[0][0] as { onRegisteredSW: (url: string, registration: unknown) => void };
+      opts.onRegisteredSW("sw.js", { update: async () => undefined, waiting: {} });
+      // The tab returning to the foreground runs the same check as the poll.
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(versionJsonCall(fetchSpy), "the check asked for version.json").toBeDefined());
+      // Let the answer settle: the check has no promise to await from here.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(onUpdateAvailable).not.toHaveBeenCalled();
+    });
   });
 });

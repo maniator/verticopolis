@@ -10,10 +10,10 @@ import { bundleBake } from "../scripts/atlas-bundle.ts";
  * (`src/render/atlas/verify.ts`, samples in `samples.ts`). A room with depth
  * layers is also composed through its shell and furniture (each with its
  * occupant steps) and held to the same paint. Settled rooms are painted at two
- * region offsets; burning, unbuilt and origin-seeded rooms at the per-unit
- * origin. The non-room families are
- * checked the same way (`verifyExtras.ts`), and a control case must report a
- * mismatch. The export runs the same check before it writes an archive.
+ * region offsets; burning and unbuilt rooms at the per-unit origin. The
+ * non-room families are checked the same way (`verifyExtras.ts`), and a control
+ * case must report a mismatch. The export runs the same check before it writes
+ * an archive.
  */
 
 test.describe("sprite atlas matches the web bake", () => {

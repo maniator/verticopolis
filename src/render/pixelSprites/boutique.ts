@@ -125,10 +125,12 @@ function drawPhone(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: 
     ctx.fillStyle = (i % 2 === 0) ? accent : shade(accent, 30); // lit screen
     ctx.fillRect(dx, cTop - 4, 3, 2);
   }
-  // Parts bins on the back wall.
+  // Parts bins on the back wall. The shade keys on the room's seed and each
+  // bin's row and column, so the region compositor paints the same wall
+  // wherever the room's region starts.
   for (let by = top + 3, r = 0; by + 3 < cTop - 6; by += 5, r++) {
-    for (let bx = x + 4; bx + 3 < x + w - 3; bx += 6) {
-      ctx.fillStyle = shade("#8A929A", (hash(bx * 7 + by + seed) > 0.5 ? 12 : -12));
+    for (let bx = x + 4, c = 0; bx + 3 < x + w - 3; bx += 6, c++) {
+      ctx.fillStyle = shade("#8A929A", (hash(seed * 31 + r * 131 + c * 17) > 0.5 ? 12 : -12));
       ctx.fillRect(bx, by, 4, 3);
     }
   }

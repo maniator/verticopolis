@@ -13,9 +13,13 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.38.0
+## 2.39.0
 
 - A save made while an exterminator is booked now remembers which rooms were booked, so after a reload the treatment covers the same rooms as if you had kept playing.
+
+## 2.38.0
+
+- Staff shirts, the sky bar's window lights and a few other small room details now stay the same across the whole room. They no longer shift with how the tower is drawn.
 
 ## 2.37.0
 

@@ -1,5 +1,5 @@
 import type { Unit } from "../../engine/types";
-import { busyStations, castShadow, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
+import { busyStations, castShadow, hash, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { artRow, authoredWidth } from "./artScale";
 import { layerBreak, layerEnd } from "./layers";
 
@@ -144,12 +144,14 @@ function drawClaw(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   const gap = 4;
   const macH = Math.min(floorY - top - 2, 24);
   const macY = floorY - macH;
+  // Keep prize colors fixed to the room, independent of render offset.
+  const prizeShift = Math.floor(hash(seed) * SCREEN_HUES.length);
   // Machine anchors, on the same rule as the arcade row: counted
   // against the authored run, fitted into the screen run by `artRow`, with the
   // far margin widened to hold the player who stands at the last machine's edge.
   const spots = artRow(aw - 3 - 5 - macW, x + 3, x + w - 5 - macW, macW + gap, 1, macW);
   const busy = busyStations(spots.length, occ, seed * 23);
-  spots.forEach((mx) => {
+  spots.forEach((mx, i) => {
     ctx.fillStyle = shade(look.neon, -30); // machine frame
     ctx.fillRect(mx, macY, macW, macH);
     const glassY = macY + 4;
@@ -158,8 +160,8 @@ function drawClaw(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
     ctx.fillRect(mx + 1, glassY, macW - 2, glassH);
     // A jumble of plush prizes inside.
     for (let py = 0; py < 2; py++) {
-      for (let gx = mx + 2; gx + 2 < mx + macW - 1; gx += 3) {
-        ctx.fillStyle = SCREEN_HUES[(gx + py + seed) % SCREEN_HUES.length];
+      for (let gx = mx + 2, c = 0; gx + 2 < mx + macW - 1; gx += 3, c++) {
+        ctx.fillStyle = SCREEN_HUES[(i * 4 + c + py + prizeShift) % SCREEN_HUES.length];
         ctx.fillRect(gx, glassY + glassH - 3 - py * 3, 2, 2);
       }
     }
