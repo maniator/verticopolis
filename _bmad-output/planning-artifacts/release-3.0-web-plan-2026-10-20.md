@@ -570,9 +570,11 @@ engine telemetry from the final candidate reliability evidence.
   A1's definition pins. Under AD-9 it also meets the owner's conditions in
   1.2: it runs the Rust-backed facade as the WASM host (slice 10), stage 3
   is approved and live, and the approved `engine_status` eligibility
-  definition accepts it (#1090, which gains the owner's engagement
-  threshold and a separate all-attempts safety denominator, owner direction
-  of 2026-10-20, section 5). Merging slice 10 starts nothing; a page life on
+  definition accepts it (#1090, owner direction of 2026-10-20, section 5).
+  The owner's engagement threshold and the separate all-attempts safety
+  denominator enter #1090's definition once they are measurable and the owner
+  has approved the change they make to #945's Reliability row (section 12).
+  Merging slice 10 starts nothing; a page life on
   the old mirror host, in the TypeScript arm, under an override or at an
   earlier stage never counts.
 - **The rule:**
@@ -610,9 +612,11 @@ at the later of S9 and stage 3 (R4). The earlier figure of about 80 days
 (749 sessions per 30 days at stage 3's 50% arm, no exclusions) is not the
 current estimate. The traffic projection of 2026-10-20
 (`release-3.0/traffic-projection/eligible-session-projection.md` in the
-project's shared folder, read from the governed `session_lengths` view)
-puts the central estimate near 110 days, 88 to 135, before #1090's
-engagement filter; it is recomputed once that definition is approved, with
+project's shared folder, read from the governed `session_lengths` view, and
+reproduced by `proj2.py` beside it) put the central estimate near 110 days,
+88 to 135, without the engagement rule (revision 1), and about 140 days, 130
+to 200, with it (revision 2, which also finds the rule not yet measurable).
+It is recomputed once #1090's definition is approved, with
 stages 1 and 2's floors, stage 3's real exposure and exclusions, and the
 candidate and replay windows reported separately. 1,000 clean sessions do
 not show a fallback rate below 0.1% at 95%. These are projections, not
@@ -1536,6 +1540,11 @@ approves this revision:
 
 - the OK to send A1's and A4's new analytics fields to production
   (section 13);
+- the #945 Reliability row's unit: engine sessions narrowed to engaged
+  eligible sessions by #1090's engagement threshold (owner direction,
+  section 5), with any instrumentation it needs on his analytics approval.
+  Waiting until the rule is measurable; the traffic projection (revision 2,
+  section 8) names it a gate change for him (4.1);
 - each cohort stage and each drop-back, each on his explicit approval, with
   no pre-approved drop-back and no automatic promotion (decided 2026-10-20,
   1.2);
