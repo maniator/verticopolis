@@ -21,24 +21,32 @@ import type { ModeName } from "./pageWorker";
  * way. A subject row is void when a control row of the same metric moved,
  * judged on the control's median, because then the machine or the browser
  * moved and the code did not. A control whose median sat still but whose
- * pairs scatter is called noisy: it still vouches, and its scatter is carried
+ * pairs scatter is called noisy: it still vouches, but a subject that only
+ * noisy controls vouch for gets its own status, and its scatter is carried
  * into the subject through the net-of-control ratio (the subject's ratio over
  * the control's ratio, repetition by repetition, with its own interval). A
- * row with no control to vouch for it is marked uncontrolled.
+ * control whose values barely move in either run (pinned at a cap or a
+ * floor) could not have shown drift, so it does not vouch. A row with no
+ * control to vouch for it is marked uncontrolled.
  */
 
 export interface BeforeAfterOptions {
-  /** Modes the candidate does not change; their before-to-after ratio must stay near 1. Default: all three main-thread modes for two runs of one build, `ts` alone when the engine build differs (the candidate then moves the WASM modes). */
+  /** Modes the candidate does not change; their before-to-after ratio must stay near 1. Default: all three main-thread modes for two runs of one build, `ts` alone when the commit or the engine build differs (the candidate then moves the WASM modes). */
   controls: ModeName[];
   /** Modes under test; default is every other mode in the runs. */
   subjects?: ModeName[];
-  /** A control row whose median ratio is farther than this from 1.0 voids the subject rows of the same metric. Default 0.05, the cap on δ in protocol section 6.1; the A/A noise measured by `perf:calibrate` replaces it once the owner adopts one. */
+  /** A control row whose median ratio is farther than this from 1.0 voids the subject rows of the same metric (blocking time is judged against BLOCKING_EPSILON_MS instead). Default 0.05, the cap on δ in protocol section 6.1; the A/A noise measured by `perf:calibrate` replaces it once the owner adopts one. */
   tolerance: number;
   /** Fewest pairs a row needs for an interval. Default 10, the protocol's minimum for a verdict. */
   minPairs: number;
 }
 
 export const DEFAULT_CONTROLS: ModeName[] = ["ts", "wasm", "wasm-frame"];
+
+/** Long-task time a blocking control may move before it voids the subject rows: the 50 ms cap that protocol section 5 (M4) puts on ε, until the owner adopts a calibrated one. A fraction of a control's own size would be hundreds of milliseconds on a busy tower and a rounding error on a quiet one. */
+export const BLOCKING_EPSILON_MS = 50;
+
+const BLOCKING = /^main-thread blocking/;
 
 export interface Row {
   group: Metric["group"];
@@ -67,11 +75,11 @@ export interface Row {
   diffCiHigh: number | null;
   /** The subject's per-repetition ratio over the vouching controls' ratio, with its interval; null on the difference basis or without enough paired repetitions. */
   net: { ratio: number; ciLow: number | null; ciHigh: number | null; pairs: number; controls: ModeName[] } | null;
-  /** `ok` means only that no control moved: it is not a verdict, and an effect smaller than the tolerance cannot be told from allowed drift. */
-  status: "ok" | "void" | "uncontrolled" | "thin" | "control-ok" | "control-drift" | "control-noisy";
+  /** `ok` means only that no control moved: it is not a verdict, and an effect smaller than the tolerance cannot be told from allowed drift. `noisy-controlled` is the same with only noisy controls behind it. A flat control (`control-flat`) never vouches. */
+  status: "ok" | "noisy-controlled" | "void" | "uncontrolled" | "thin" | "control-ok" | "control-drift" | "control-noisy" | "control-flat";
   /** For a void row, the controls that moved, with their readings. */
   voidedBy: string[];
-  /** Things a reader needs beside an `ok`: a noisy control and its interval, too few paired repetitions for the net ratio. */
+  /** Things a reader needs beside an `ok`: a noisy control and its interval, flat controls that could not vouch, why a controlled ratio row has no net-of-control ratio. */
   notes: string[];
   unthrottled?: "worker";
 }
@@ -96,7 +104,7 @@ export interface BeforeAfter {
   rows: Row[];
   /** Metrics one run has and the other lacks (or has no values for), or whose unit or direction differs; each is named with the run that lacks it. */
   missing: string[];
-  /** Metric rows with no values in either run (for example PSS off Linux, or bare-engine rows of a host that does not measure them); they are left out, not rows of noise. */
+  /** Metric rows with no values in either run (for example PSS off Linux, or bare-engine rows of a host that does not measure them); they have no numbers to compare, so they get no row. */
   notMeasured: number;
   /** Modes in the runs that are neither control nor subject, so a reader knows what was left out. */
   unlisted: ModeName[];
@@ -143,7 +151,7 @@ export function comparability(before: WorkerResults, after: WorkerResults, minPa
   return out;
 }
 
-const emptyCounts = (): BeforeAfter["counts"] => ({ ok: 0, void: 0, uncontrolled: 0, thin: 0, "control-ok": 0, "control-drift": 0, "control-noisy": 0 });
+const emptyCounts = (): BeforeAfter["counts"] => ({ ok: 0, "noisy-controlled": 0, void: 0, uncontrolled: 0, thin: 0, "control-ok": 0, "control-drift": 0, "control-noisy": 0, "control-flat": 0 });
 
 const keyOf = (m: Pick<Metric, "group" | "scenario" | "throttle" | "metric">): string => `${m.group}|${m.scenario}|${m.throttle}|${m.metric}`;
 
@@ -166,7 +174,7 @@ function metricProblems(name: string, r: WorkerResults): string[] {
 const factor = (ratio: number, tolerance: number): boolean => ratio > 1 + tolerance || ratio < 1 / (1 + tolerance);
 
 /** Counts, and the blocking time the protocol gates (section 5, M4) on a paired difference: a zero reference is the normal case, so they have no ratio. */
-const differenceMetric = (m: Metric): boolean => m.unit === "count" || /^main-thread blocking/.test(m.metric);
+const differenceMetric = (m: Metric): boolean => m.unit === "count" || BLOCKING.test(m.metric);
 
 /** The controls the runs get when `--controls` is not given. */
 export function resolveControls(before: WorkerResults, after: WorkerResults, options: Partial<BeforeAfterOptions>): ModeName[] {
@@ -177,6 +185,8 @@ export function resolveControls(before: WorkerResults, after: WorkerResults, opt
 
 interface Paired {
   row: Row;
+  /** Every paired value of both runs, for the flat-control check. */
+  values: number[];
   /** Oriented ratio (above 1.0 is worse) per repetition number; empty on the difference basis. */
   perRep: Map<number, number>;
 }
@@ -215,7 +225,14 @@ function pair(b: Metric, a: Metric, mode: ModeName, role: Row["role"]): Paired {
     diffMedian: d?.median ?? null, diffCiLow: d?.medianCiLow ?? null, diffCiHigh: d?.medianCiHigh ?? null,
     net: null, status: "ok", voidedBy: [], notes: [], ...(UNTHROTTLED_WORKER(b.mode, b.throttle) ? { unthrottled: "worker" as const } : {}),
   };
-  return { row, perRep: basis === "ratio" ? perRep : new Map() };
+  return { row, values: [...beforePaired, ...afterPaired], perRep: basis === "ratio" ? perRep : new Map() };
+}
+
+/** A control whose values barely move in either run, so a drift in the machine would not have shown in it: a rate pinned at its cap, a time at a floor, blocking that stays at zero. The band is a third of the tolerance of the control's own median (a tenth of the blocking epsilon for blocking), taken over every paired value of both runs. */
+function isFlat(row: Row, values: number[], tolerance: number): boolean {
+  const spread = Math.max(...values) - Math.min(...values);
+  if (BLOCKING.test(row.metric)) return spread <= BLOCKING_EPSILON_MS / 10;
+  return spread <= (tolerance / 3) * Math.abs(summarize(values).median);
 }
 
 /** A control's reading for the report, in the unit its basis uses. */
@@ -249,12 +266,17 @@ export function compareRuns(before: WorkerResults, after: WorkerResults, options
   for (const m of after.metrics) if (!beforeKeys.has(`${keyOf(m)}|${m.mode}`)) result.missing.push(`${m.mode} ${m.scenario} ${m.throttle}x ${m.metric}: only in AFTER`);
   const byKey = new Map<string, Paired[]>();
   for (const p of paired) byKey.set(keyOf(p.row), [...(byKey.get(keyOf(p.row)) ?? []), p]);
-  // A control row: moved, noisy, thin, or fine. Its median decides whether it moved, even when it is thin, so a thin control that moved still blocks.
-  for (const { row } of paired.filter((p) => p.row.role === "control")) {
+  // A control row: moved, thin, flat, noisy, or fine. Its median decides whether it moved, even when it is thin, so a thin control that moved still blocks.
+  for (const { row, values } of paired.filter((p) => p.row.role === "control")) {
     let moved = false;
-    if (row.pairs > 0) moved = row.basis === "ratio" ? factor(row.ratio!, opts.tolerance) : Math.abs(row.diffMedian!) > opts.tolerance * Math.abs(row.beforeMedian ?? 0);
+    if (row.pairs > 0) {
+      if (row.basis === "ratio") moved = factor(row.ratio!, opts.tolerance);
+      else if (BLOCKING.test(row.metric)) moved = Math.abs(row.diffMedian!) > BLOCKING_EPSILON_MS;
+      else moved = Math.abs(row.diffMedian!) > opts.tolerance * Math.abs(row.beforeMedian ?? 0);
+    }
     if (moved) row.status = "control-drift";
     else if (row.pairs < opts.minPairs) row.status = "thin";
+    else if (isFlat(row, values, opts.tolerance)) row.status = "control-flat";
     else if (row.basis === "ratio" && row.ciLow !== null && row.ciHigh !== null && (factor(row.ciLow, opts.tolerance) || factor(row.ciHigh, opts.tolerance))) row.status = "control-noisy";
     else row.status = "control-ok";
   }
@@ -263,24 +285,31 @@ export function compareRuns(before: WorkerResults, after: WorkerResults, options
     const peers = (byKey.get(keyOf(row)) ?? []).filter((x) => x.row.role === "control");
     const drifted = peers.filter((c) => c.row.status === "control-drift");
     const vouching = peers.filter((c) => c.row.status === "control-ok" || c.row.status === "control-noisy");
+    const noisy = vouching.filter((c) => c.row.status === "control-noisy");
     if (drifted.length) {
       row.status = "void";
       row.voidedBy = drifted.map((c) => `${c.row.mode} ${reading(c.row)}${c.row.pairs < opts.minPairs ? ` (only ${c.row.pairs} pairs, but it moved)` : ""}`);
     } else if (row.pairs < opts.minPairs) row.status = "thin";
     else if (vouching.length === 0) row.status = "uncontrolled";
-    for (const c of vouching) if (c.row.status === "control-noisy") row.notes.push(`control ${c.row.mode} is noisy (ratio ${c.row.ratio!.toFixed(2)}x, interval ${c.row.ciLow!.toFixed(2)} to ${c.row.ciHigh!.toFixed(2)}); read the net-of-control ratio`);
+    else if (noisy.length === vouching.length) row.status = "noisy-controlled";
+    const flat = peers.filter((c) => c.row.status === "control-flat");
+    if (flat.length && row.status !== "void") row.notes.push(`control ${flat.map((c) => c.row.mode).join(", ")} ${flat.length === 1 ? "is" : "are"} flat in both runs (pinned at a cap or a floor), so ${flat.length === 1 ? "it" : "they"} could not have shown drift and ${flat.length === 1 ? "does" : "do"} not vouch`);
+    if ((row.status !== "ok" && row.status !== "noisy-controlled") || row.basis !== "ratio") continue;
     // The subject over the controls, repetition by repetition: the controls' scatter lands in this interval.
     const withRatios = vouching.filter((c) => c.perRep.size > 0);
-    if (row.status === "ok" && row.basis === "ratio" && withRatios.length) {
-      const net: number[] = [];
-      for (const [rep, ratio] of p.perRep) {
-        const cs = withRatios.map((c) => c.perRep.get(rep)).filter((x): x is number => x !== undefined);
-        if (cs.length) net.push(ratio / summarize(cs).median);
-      }
-      if (net.length >= opts.minPairs) {
-        const s = summarize(net);
-        row.net = { ratio: s.median, ciLow: s.medianCiLow, ciHigh: s.medianCiHigh, pairs: net.length, controls: withRatios.map((c) => c.row.mode) };
-      } else row.notes.push(`only ${net.length} repetitions have a control ratio, so there is no net-of-control ratio`);
+    const net: number[] = [];
+    for (const [rep, ratio] of p.perRep) {
+      const cs = withRatios.map((c) => c.perRep.get(rep)).filter((x): x is number => x !== undefined);
+      if (cs.length) net.push(ratio / summarize(cs).median);
+    }
+    const noisyNote = noisy.map((c) => `${c.row.mode} (ratio ${c.row.ratio!.toFixed(2)}x, interval ${c.row.ciLow!.toFixed(2)} to ${c.row.ciHigh!.toFixed(2)})`).join(", ");
+    if (net.length >= opts.minPairs) {
+      const s = summarize(net);
+      row.net = { ratio: s.median, ciLow: s.medianCiLow, ciHigh: s.medianCiHigh, pairs: net.length, controls: withRatios.map((c) => c.row.mode) };
+      if (noisy.length) row.notes.push(`noisy control ${noisyNote}: the raw ratio assumes the machine drifted no more than the control's median shows; the net-of-control ratio assumes the drift is common to the subject and the control, and carries the control's scatter`);
+    } else {
+      const why = withRatios.length === 0 ? "no vouching control has a per-repetition ratio (the controls are judged on a difference)" : `only ${net.length} repetitions have a control ratio`;
+      row.notes.push(`no net-of-control ratio: ${why}${noisy.length ? `; noisy control ${noisyNote}, so read the raw ratio against that scatter` : ""}`);
     }
   }
   const rows = paired.map((p) => p.row);

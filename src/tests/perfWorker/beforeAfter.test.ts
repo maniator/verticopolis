@@ -4,105 +4,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Metric } from "./analysis";
 import { compareRuns, resolveControls } from "./beforeAfter";
+import { after, BLOCK, both, before, LOW, MERGES, MODES, results, row, SWIFT, TIME, type Spec } from "./beforeAfterFixture";
 import { comparisonCsv, comparisonMarkdown, main, parseBeforeAfterArgs } from "./beforeAfterMain";
 import type { WorkerResults } from "./main";
 import type { ModeName } from "./pageWorker";
-
-const RTX = "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)";
-const SWIFT = "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)";
-const REPS = Array.from({ length: 10 }, (_, i) => i);
-const MODES: ModeName[] = ["ts", "wasm", "wasm-frame", "wasm-worker"];
-const TIME = "main-thread time, 720 steps";
-const LOW = "1% low FPS";
-const BLOCK = "main-thread blocking (long tasks past 50 ms)";
-const MERGES = "full-save merges, 720 steps (hosted)";
-
-interface Spec {
-  commit?: string;
-  hash?: string;
-  startedAt?: string;
-  generatedAt?: string | null;
-  reps?: number;
-  /** Multiplier on every value of a mode, to make the mode slower (times) in this run. */
-  scale?: Partial<Record<ModeName, number>>;
-  /** Limits `scale` to the metrics with this name, leaving the others steady. */
-  scaleOnly?: string;
-  dirty?: boolean;
-  gpuVerified?: boolean;
-  browserVersion?: string;
-  scenarioHash?: string;
-  scenarioOrder?: boolean;
-  quick?: boolean | undefined;
-  validationOk?: boolean;
-  validationErrors?: string[];
-  skipRep?: number;
-  skipRepFor?: ModeName;
-  /** The same wobble in every run, so intervals are not degenerate but ratios stay exact. */
-  wobble?: number;
-  /** Independent relative noise per value, from a hash of `seed` and the value's place: two runs with different seeds are a real A/A pair. */
-  jitter?: number;
-  seed?: number;
-  /** Replaces a value; return undefined to keep the generated one. */
-  valueFor?: (mode: ModeName, name: string, rep: number, base: number) => number | undefined;
-  rendererEnd?: string | null;
-  rendererEndCold?: string | null | undefined;
-}
-
-/** A value in [-1, 1] that depends only on the key. */
-const noise = (key: string): number => {
-  let h = 0x811c9dc5;
-  for (const ch of key) {
-    h ^= ch.charCodeAt(0);
-    h = Math.imul(h, 0x01000193);
-  }
-  h ^= h >>> 15;
-  h = Math.imul(h, 0x2c1b3c6d);
-  h ^= h >>> 12;
-  return ((h >>> 0) / 0xffffffff) * 2 - 1;
-};
-
-const metric = (mode: ModeName, name: string, base: number, spec: Spec, over: Partial<Metric> = {}): Metric => {
-  const reps = REPS.filter((r) => !(r === spec.skipRep && (!spec.skipRepFor || spec.skipRepFor === mode)));
-  const scale = !spec.scaleOnly || spec.scaleOnly === name ? (spec.scale?.[mode] ?? 1) : 1;
-  const values = reps.map((r) => spec.valueFor?.(mode, name, r, base) ?? base * scale * (1 + (spec.wobble ?? 0.01) * ((r % 3) - 1)) * (1 + (spec.jitter ?? 0) * noise(`${spec.seed ?? 0}|${mode}|${name}|${over.throttle ?? "1"}|${r}`)));
-  return { group: "hosted", scenario: "large", throttle: "1", metric: name, unit: "ms", better: "lower", mode, values, reps, summary: null, ...over };
-};
-
-const results = (spec: Spec = {}): WorkerResults => {
-  const metrics = MODES.flatMap((m) => [
-    metric(m, TIME, 800, spec),
-    metric(m, "mean FPS", 60, spec, { group: "frames", unit: "fps", better: "higher" }),
-    metric(m, LOW, 30, spec, { group: "frames", unit: "fps", better: "higher" }),
-    metric(m, BLOCK, 0, spec, { group: "frames", unit: "ms" }),
-    // Rows no run can have data for: the bare engine of a host that does not measure it, and PSS off Linux.
-    ...(m === "wasm-worker" ? [metric(m, "bare engine, 720 steps", 1, spec, { group: "raw", values: [], reps: [] })] : []),
-    metric(m, "browser process PSS", 1, spec, { group: "memory", unit: "bytes", values: [], reps: [] }),
-    metric(m, TIME, 800, spec, { throttle: "4", ...(m === "wasm-worker" ? { unthrottled: "worker" as const } : {}) }),
-    ...(m === "wasm-worker" ? [metric(m, MERGES, 24, spec, { group: "traffic", unit: "count" })] : []),
-  ]);
-  const scenarios = [{ name: "large", sha256: spec.scenarioHash ?? "s1", population: 1, units: 1, transports: 1, saveBytes: 1 }, { name: "medium", sha256: "s0", population: 1, units: 1, transports: 1, saveBytes: 1 }];
-  return {
-    schema: 1,
-    startedAt: spec.startedAt ?? "2026-10-21T08:00:00Z",
-    generatedAt: spec.generatedAt === null ? undefined : (spec.generatedAt ?? "2026-10-21T12:00:00Z"),
-    config: { reps: spec.reps ?? 10, modes: MODES, scenarios: ["large", "medium"], throttles: [1, 4], steps: 720, dt: 2, batch: 4, memorySteps: 1, warmSteps: 1, frameWindowMs: 1, frameWarmMs: 1, speed: 3, commandEveryMs: 1000, quick: "quick" in spec ? spec.quick : false, viewport: { width: 1280, height: 720 } },
-    environment: { commit: spec.commit ?? "a".repeat(40), commitShort: "aaaaaaa", appVersion: "2.36.0", dirty: spec.dirty ?? false, tree: { porcelain: [], diffSha256: null, untracked: [], hidden: [], complete: true }, engineBuildHash: spec.hash ?? "h1", cpuModel: "Ryzen 5 5600X", logicalCpus: 12, totalMemoryBytes: 32 * 2 ** 30, os: "win32", kernel: "10", arch: "x64", node: "22.22.0", rust: "1.90", playwright: "1.61.1" },
-    browser: { version: spec.browserVersion ?? "149.0.7827.55", executable: null, channel: null, args: [], rendererException: null, gpuVerified: spec.gpuVerified ?? true },
-    scenarios: spec.scenarioOrder ? scenarios.slice().reverse() : scenarios,
-    scripts: {},
-    runs: [{ rep: 0, mode: "ts", ok: true, page: { webgl: { renderer: RTX, vendor: "v" } }, rendererEnd: "rendererEnd" in spec ? spec.rendererEnd : RTX, rendererEndCold: "rendererEndCold" in spec ? spec.rendererEndCold : RTX }],
-    metrics,
-    ratios: [],
-    validation: { ok: spec.validationOk ?? true, errors: spec.validationErrors ?? [], warnings: [] },
-    limitations: [],
-  } as unknown as WorkerResults;
-};
-
-const before = (spec: Spec = {}) => results(spec);
-const after = (spec: Spec = {}) => results({ commit: "b".repeat(40), hash: "h2", startedAt: "2026-10-21T14:00:00Z", generatedAt: "2026-10-21T18:00:00Z", ...spec });
-type Cmp = ReturnType<typeof compareRuns>;
-const row = (c: Cmp, mode: ModeName, name: string, throttle = "1") => c.rows.find((r) => r.mode === mode && r.metric === name && r.throttle === throttle)!;
-const both = ["ts", "wasm"] as ModeName[];
 
 describe("compareRuns", () => {
   it("measures a subject slowdown against steady controls, above 1.0 meaning worse", () => {
@@ -216,7 +121,7 @@ describe("compareRuns", () => {
     expect(s.ratio).toBe(2);
     expect(s.ciLow).toBe(2);
     expect(s.ciHigh).toBe(2);
-    // The medians are over the 9 paired repetitions (100 + 10 r without r = 3), not over all 10 BEFORE values.
+    // The medians are over the 9 paired repetitions (100 + 10 r without r = 3); all 10 BEFORE values would give another median.
     expect(s.beforeMedian).toBeCloseTo(100 + 10 * 5, 6);
     expect(s.afterMedian).toBeCloseTo(2 * (100 + 10 * 5), 6);
     expect(compareRuns(before(), after({ skipRep: 3 })).rows.find((r) => r.role === "subject" && r.metric === TIME)!.status).toBe("thin");
@@ -231,7 +136,10 @@ describe("compareRuns", () => {
     expect(s.diffMedian).toBe(400);
     expect(s.diffCiLow).toBe(400);
     expect(s.diffCiHigh).toBe(400);
-    expect(s.status).toBe("ok");
+    // The only control (ts) sits at zero blocking in both runs: it is flat and cannot vouch.
+    expect(row(c, "ts", BLOCK).status).toBe("control-flat");
+    expect(s.status).toBe("uncontrolled");
+    expect(s.notes.join(" ")).toMatch(/control ts is flat in both runs/);
     // Blocking that stayed at 0 reads 0.
     expect(row(c, "wasm-worker", BLOCK, "1").beforeMedian).toBe(0);
     expect(row(compareRuns(before(), after()), "wasm-worker", BLOCK).diffMedian).toBe(0);
@@ -267,7 +175,7 @@ describe("compareRuns", () => {
     expect(c.rows.filter((r) => r.unthrottled).every((r) => r.mode === "wasm-worker" && r.throttle === "4")).toBe(true);
   });
 
-  it("chooses the default controls by whether the engine build differs", () => {
+  it("chooses the default controls by whether the commit or the engine build differs", () => {
     expect(compareRuns(before(), after()).options.controls).toEqual(["ts"]);
     expect(compareRuns(before(), after()).options.subjects).toEqual(["wasm", "wasm-frame", "wasm-worker"]);
     expect(compareRuns(before(), results({ startedAt: "2026-10-21T14:00:00Z", generatedAt: "2026-10-21T18:00:00Z" })).options.controls).toEqual(["ts", "wasm", "wasm-frame"]);
@@ -322,7 +230,7 @@ describe("compareRuns", () => {
     expect(problems({ rendererEnd: null })).toMatch(/none after the frames/);
     expect(problems({ rendererEndCold: SWIFT })).toMatch(/SwiftShader/);
     expect(problems({ rendererEndCold: null })).toMatch(/none after the cold start/);
-    // A run without a cold start (the read is absent, not null) is not held to it.
+    // A run without a cold start (the read is absent; null would be a failed read) is not held to it.
     expect(problems({ rendererEndCold: undefined })).toBe("");
     // The cold-start read is part of the browser identity.
     expect(compareRuns(before(), after({ rendererEndCold: "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 Direct3D11 vs_5_0 ps_5_0, D3D11)" })).problems.join("\n")).toMatch(/different WebGL renderers|differ in browser/);
@@ -345,7 +253,7 @@ describe("compareRuns", () => {
     expect(compareRuns(before(), before()).problems.join(" ")).toMatch(/same results/);
   });
 
-  it("names a metric one run lacks, and one whose unit differs, instead of dropping it", () => {
+  it("names a metric one run lacks, and one whose unit differs", () => {
     const a = after();
     a.metrics = a.metrics.filter((m) => m.metric !== MERGES);
     a.metrics.find((m) => m.mode === "ts" && m.metric === "mean FPS")!.unit = "ms";
@@ -420,7 +328,7 @@ describe("output", () => {
 
   it("lists a drifted control and the void rows it caused", () => {
     const md = comparisonMarkdown(compareRuns(before(), after({ scale: { wasm: 1.3, "wasm-worker": 1.1 } }), { controls: both }), "t");
-    expect(md).toMatch(/Controls that moved, are noisy or are thin/);
+    expect(md).toMatch(/Controls that moved, are noisy, flat or thin/);
     expect(md).toMatch(/VOID \(control moved: wasm 1\.30x\)/);
   });
 
