@@ -74,7 +74,7 @@ A run on `main` needs all of these merged:
   `ERR_UNSUPPORTED_ESM_URL_SCHEME`).
 - PR #1098 (#880, line-ending-stable engine source hash).
 
-RUN-0a is the exception: it runs the `e25ec01` tree as it is (section 7).
+RUN-0a is the exception: it runs the `e25ec01` tree with one declared build patch (section 7).
 
 ## 3. Identity
 
@@ -214,38 +214,49 @@ steps above to a set of A/A folders.
 
 ### RUN-0a, exact steps
 
-Source: the plan's section 5.2, item 1. The 2026-10-15 desktop runs built
-`e25ec01` on Windows from a clean tree and recorded engine source hash
-`b2786beb…`, which equals the Linux hash of that commit.
+RUN-0a asks whether the 2026-10-15 desktop figures (702 ms TypeScript, 830 ms
+WASM on the large tower's 720 bare steps at 1x) reproduce. That question is
+about the engine at `e25ec01`, so the run needs that commit's engine sources;
+a later `main` commit has a different engine and says nothing about it. The
+2026-10-15 runs built `e25ec01` on Windows from a clean tree and recorded
+engine source hash `b2786beb…`, which equals the Linux hash of that commit.
+
+At `e25ec01` the harnesses still build through `sh("npm", ...)`, which dies on
+Windows (`spawnSync npm ENOENT`, `src/tests/perfWorker/main.ts` line 200). The
+run applies one declared patch, `patches/run0a-e25ec01-build-fix.patch`
+(SHA-256 `cf781ee652a9377252ae6be5da73a0b990e325c39984be292be3a715bbad73a1`).
+It adds `src/tests/perfWorker/build.ts` (copied from `main`, PR #1093) and
+replaces the build calls in both `src/tests/perfWorker/main.ts` (lines
+200 and 201) and `src/tests/perfCompare/main.ts` (lines 132 to 134) with
+`buildProduction(repo)` and `buildTooling(repo, distPerf)`. It touches no
+engine source, so the engine source hash must still equal `b2786beb…`. No hand
+editing is needed: the commands below apply it with `git apply`.
 
 ```powershell
 git -c core.autocrlf=false clone https://github.com/maniator/verticopolis.git "C:\Users\nafta\projects\vc-run0a"
 cd "C:\Users\nafta\projects\vc-run0a"
 git checkout e25ec01
 git status --porcelain            # must print nothing
+# Fetch the declared patch from the protocol's branch (or main, once #1099 merges).
+git fetch origin claude/benchmark-protocol
+git checkout FETCH_HEAD -- docs/performance/patches/run0a-e25ec01-build-fix.patch
+(Get-FileHash docs/performance/patches/run0a-e25ec01-build-fix.patch -Algorithm SHA256).Hash   # must be CF781EE6...D73A1
+git apply docs/performance/patches/run0a-e25ec01-build-fix.patch
+git reset -q HEAD -- docs/performance/patches/run0a-e25ec01-build-fix.patch
+Remove-Item docs/performance/patches/run0a-e25ec01-build-fix.patch
+git status --porcelain            # exactly: M perfCompare/main.ts, M perfWorker/main.ts, ?? perfWorker/build.ts
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 npm.cmd ci
 npm.cmd run wasm:build
 npm.cmd run perf:worker -- --reps 10 --viewport 1280x720 --out docs/performance/results/<date>-e25ec01-run0a-worker-1280x720
 ```
 
-Then, in the same folder, commit nothing yet, and send the results folder and
-the console log to the coordinator. A passing run reproduces the two
-committed desktop runs: TypeScript near 702 ms and WASM near 830 ms, each
-inside the committed interval.
-
-If the build fails on Windows (the old `sh(...)` build calls), fix the build
-on `e25ec01` by hand, and declare it:
-
-1. Add `src/tests/perfWorker/build.ts` and replace the two `sh(...)` calls in
-   `src/tests/perfCompare/main.ts`, ported from
-   `perf-worker-1068.patch`. The patch itself does not apply to `e25ec01`.
-2. `git add -N src/tests/perfWorker/build.ts`, then
-   `git diff > run0a-build-fix.patch`, then
-   `(Get-FileHash run0a-build-fix.patch -Algorithm SHA256).Hash`.
-3. The run's notes commit the patch, its SHA-256, and the output of
-   `git status --porcelain`. These are harness files outside the engine
-   source hash, which must still equal `b2786beb…`.
+The run's notes paste both `git status --porcelain` outputs and the patch's
+SHA-256. The folder is marked `-dirty` by the harness because of the declared
+patch; that is expected for RUN-0a only. Send the results folder and the
+console log to the coordinator. A passing run reproduces the two committed
+desktop runs: TypeScript near 702 ms and WASM near 830 ms, each inside the
+committed interval.
 
 ### RUN-0b, exact steps
 
