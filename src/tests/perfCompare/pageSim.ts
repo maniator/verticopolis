@@ -18,8 +18,10 @@ export interface SimRun {
    *  inside the exports the host reads back (serialize, frameView,
    *  logSince, telemetry and the rest), and the JavaScript remainder
    *  (decode, merge, read-model sync), plus how many ticks reached the
-   *  engine through the wrapper (must equal `steps`). */
-  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; wrappedTotalMs: number; merges: number; engineTicks: number; exportCalls: number; exportsWrapped: number } | null;
+   *  engine through the wrapper (must equal `steps`). `byExport` splits the
+   *  exports by name, and `parseMs` is the JSON.parse time inside the host
+   *  JavaScript remainder. */
+  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; wrappedTotalMs: number; merges: number; engineTicks: number; exportCalls: number; exportsWrapped: number; byExport: Record<string, { calls: number; ms: number }>; parseMs: number; parseCalls: number } | null;
   /** Whether the page had gc() (Chromium's --expose-gc), so the loop began
    *  from a full collection. */
   gcAvailable: boolean;
@@ -134,11 +136,15 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
   const startMinutes = d.fields().minutes;
 
   const h = hostOf()?.current?.();
-  const acc = { tick: 0, exp: 0, ticks: 0, calls: 0 };
+  const acc = { tick: 0, exp: 0, ticks: 0, calls: 0, parse: 0, parses: 0 };
+  const byExport: Record<string, { calls: number; ms: number }> = {};
   const restore: (() => void)[] = [];
   const mergesBefore = hostedWasm ? (h.merges as number) : 0;
   const attributing = arg.attribute && hostedWasm;
   let exportsWrapped = 0;
+  // Only the outermost wrapped call is timed, and JSON.parse is timed only
+  // outside every wrapped call, so no millisecond lands in two categories.
+  let depth = 0;
   const stepMs = new Array<number>(arg.steps);
   const gcAvailable = typeof (globalThis as any).gc === "function";
   let t0 = 0;
@@ -150,13 +156,22 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
         const own = Object.getOwnPropertyDescriptor(e, name);
         const orig = e[name];
         e[name] = function (this: unknown, ...a: unknown[]) {
+          if (depth > 0) return orig.apply(this, a);
+          depth++;
           const t = performance.now();
           try {
             return orig.apply(this, a);
           } finally {
-            acc[slot] += performance.now() - t;
+            depth--;
+            const ms = performance.now() - t;
+            acc[slot] += ms;
             if (slot === "tick") acc.ticks++;
-            else acc.calls++;
+            else {
+              acc.calls++;
+              const b = (byExport[name] ??= { calls: 0, ms: 0 });
+              b.calls++;
+              b.ms += ms;
+            }
           }
         };
         restore.push(() => {
@@ -165,6 +180,23 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
         });
       };
       wrap("tick", "tick");
+      // JSON.parse is where the host turns the engine's strings into the
+      // read model, so its share is the "parse" of parse-and-merge. It runs
+      // in the attribution pass only, like the export wrappers.
+      const parse = JSON.parse;
+      JSON.parse = function (this: unknown, ...a: Parameters<typeof JSON.parse>) {
+        if (depth > 0) return parse.apply(this, a);
+        const t = performance.now();
+        try {
+          return parse.apply(this, a);
+        } finally {
+          acc.parse += performance.now() - t;
+          acc.parses++;
+        }
+      } as typeof JSON.parse;
+      restore.push(() => {
+        JSON.parse = parse;
+      });
       // Every other method the binding's class has, so no export the host
       // calls can land in the "host JS" remainder unseen.
       for (const name of Object.getOwnPropertyNames(Object.getPrototypeOf(e))) {
@@ -203,7 +235,7 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
     totalMs,
     stepMs,
     attribution: attributing
-      ? { engineTickMs: acc.tick, engineExportMs: acc.exp, hostJsMs: Math.max(0, sum - acc.tick - acc.exp), wrappedTotalMs: sum, merges: (h.merges as number) - mergesBefore, engineTicks: acc.ticks, exportCalls: acc.calls, exportsWrapped }
+      ? { engineTickMs: acc.tick, engineExportMs: acc.exp, hostJsMs: Math.max(0, sum - acc.tick - acc.exp), wrappedTotalMs: sum, merges: (h.merges as number) - mergesBefore, engineTicks: acc.ticks, exportCalls: acc.calls, byExport, parseMs: acc.parse, parseCalls: acc.parses, exportsWrapped }
       : null,
     hostErrorsAdded,
     gcAvailable,

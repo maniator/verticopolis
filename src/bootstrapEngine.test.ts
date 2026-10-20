@@ -299,6 +299,40 @@ describe("bootGame engine_status", () => {
     expect(bootState()).toEqual({ build: "switchable", engine: "wasm", failure: null, writerLatched: true });
   });
 
+  it("records a switchable build's running engine fault on the boot state, turns the engine writer off and shows no stop (#874)", async () => {
+    stubWebGL();
+    wasmStub.requested = "wasm";
+    const encodeVctower = vi.fn(() => "VCTOWER1\nZW5naW5l\n");
+    wasmStub.module = { Engine: class {}, encodeVctower };
+    let opts: WasmHostOptions | undefined;
+    const status = { engine: "wasm" as const, starts: 1, hosted: true, fallbacks: 0, errors: [] as string[], lastError: null as string | null, droppedErrors: 0 };
+    vi.mocked(startWasmHost).mockImplementationOnce((_app, _mod, _log, o) => {
+      opts = o;
+      return { status, current: () => null, stop: () => {} } as never;
+    });
+    const setSpeed = vi.fn();
+    resetEngineStatus();
+    vi.mocked(sendToRelay).mockClear();
+    window.location.href = "https://verticopolis.com/";
+    await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn(), setSpeed })));
+    expect(opts?.strict).toBeUndefined();
+    expect(await SaveGame.export(new Simulation(1))).toBe("VCTOWER1\nZW5naW5l\n");
+    expect(encodeVctower).toHaveBeenCalledTimes(1);
+    // The engine traps in a tick; the host has frozen it and moves the game
+    // to TypeScript.
+    status.lastError = `the WASM engine failed during a tick: ${secret}`;
+    opts?.onFallback?.({ reason: "trap-tick", stage: "start" });
+    expect(bootState()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "host", reason: "trap-tick", message: status.lastError } });
+    // The game runs on: no stop message, and the clock is left alone.
+    expect(document.getElementById("engine-failure")).toBeNull();
+    expect(setSpeed).not.toHaveBeenCalled();
+    // Saves go back to the TypeScript writer: the trapped module is not asked.
+    expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
+    expect(encodeVctower).toHaveBeenCalledTimes(1);
+    expect(lastRow(engineRows())).toMatchObject({ trigger: "fallback", engine: "ts-fallback", fallback_reason: "trap-tick", fallbacks: 1 });
+    expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret/);
+  });
+
   it("codes every boot failure path, and sends none of the message behind it", async () => {
     stubWebGL();
     vi.spyOn(console, "error").mockImplementation(() => {});

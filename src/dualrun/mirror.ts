@@ -37,7 +37,18 @@ export function loadCommand(sim: Simulation, gen: number): Extract<ShadowCommand
     op: "load",
     gen,
     save: JSON.stringify(sim.serialize()),
-    markers: { lastHour: sim.lastHour, lastDay: sim.lastDay, lastQuarter: sim.lastQuarter, lastMonth: sim.lastMonth, extendGesture: extendGesture(sim) ?? null },
+    markers: {
+      lastHour: sim.lastHour,
+      lastDay: sim.lastDay,
+      lastQuarter: sim.lastQuarter,
+      lastMonth: sim.lastMonth,
+      extendGesture: extendGesture(sim) ?? null,
+      // The engine starts with the instance's averages instead of none
+      // (#1083). A row the engine would refuse (a floor that is not whole, an
+      // average that is not finite) is left out, so a bad average costs that
+      // floor's readout and never the attach.
+      commuteStress: [...sim.crowd.commuteStressByFloor].filter(([floor, seconds]) => Number.isSafeInteger(floor) && Number.isFinite(seconds)),
+    },
   };
 }
 

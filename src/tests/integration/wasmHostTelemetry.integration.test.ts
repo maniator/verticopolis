@@ -173,6 +173,35 @@ describe.skipIf(!hasWasmPackage())("elevator telemetry on both engines", () => {
     }
   }, 120_000);
 
+  it("seeds the engine's commute averages from the instance's at attach (#1083)", () => {
+    const sim = loadFixture(FIXTURES[0]);
+    sim.crowd.adoptCommuteStress([[1, 12.5], [7, 80]]);
+    for (const sync of ["step", "frame"] as const) {
+      const host = attachWasmHost(sim, wasm(), { sync });
+      try {
+        expect(JSON.parse(host.engine.commuteStress()), sync).toEqual([[1, 12.5], [7, 80]]);
+        // The first sync keeps them, where the engine's empty map replaced
+        // them before.
+        host.syncStructure();
+        expect(commuteRows(sim), sync).toEqual([[1, 12.5], [7, 80]]);
+      } finally {
+        host.detach();
+      }
+    }
+    // The load command carries the rows; a load without them starts empty,
+    // as every load did before, and malformed rows refuse the load.
+    const load = loadCommand(sim, 0);
+    expect(load.markers.commuteStress).toEqual([[1, 12.5], [7, 80]]);
+    const shadow = new ShadowEngine(wasm());
+    try {
+      shadow.apply({ ...load, markers: { ...load.markers, commuteStress: undefined } });
+      expect(JSON.parse(shadow.handle().commuteStress())).toEqual([]);
+      expect(() => shadow.apply({ ...load, markers: { ...load.markers, commuteStress: [[1, 2], [1, 3]] } })).toThrow(/commuteStress/);
+    } finally {
+      shadow.free();
+    }
+  });
+
   it("seeds the telemetry and the loop memos, and moves the clock without a pass", () => {
     const sim = loadFixture(FIXTURES[0]);
     const shadow = new ShadowEngine(wasm());

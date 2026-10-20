@@ -5,6 +5,7 @@ import { readdirSync } from "node:fs";
 import { engineSourceHash } from "../../wasmhost/packageHash";
 import { buildTree, collectEnvironment, packageState, type Environment } from "../perfCompare/env";
 import { machineOf, packageErrors, stampErrors } from "../perfCompare/main";
+import { incompleteTreeError } from "../perfCompare/treeRecord";
 import { gateBrowser, probeBrowser } from "../perfCompare/browserProbe";
 import { rendererLimitation } from "../perfCompare/limitations";
 import { checkExceptionFolder, exceptionMarker, resolveLaunch } from "../perfCompare/exceptionRegister";
@@ -288,6 +289,8 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   }
   const v = validate(config, runs, launch.rendererException);
   for (const e of packageErrors(packageState(distPerf), packageState(dist), sourceHash, { files: environment.enginePackage, buildHash: environment.engineBuildHash })) v.errors.push(e);
+  const treeError = incompleteTreeError(environment.tree);
+  if (treeError) v.errors.push(treeError);
   if (environment.dirty) v.warnings.push("the working tree had uncommitted changes; the folder is marked -dirty");
   const metrics = aggregate(config, runs);
   const results: WorkerResults = {
