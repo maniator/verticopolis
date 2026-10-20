@@ -844,5 +844,5 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
   });
 }
 
-// Exported for unit tests; the script itself uses them directly above.
-export { parseWindow, lit, buildTotalsQuery, buildDepthQuery, buildSessionDepthQuery, buildBreakdownQuery, buildFilteredCountQuery, rowsToObjects, totalsByEvent, depthRow, breakdownRows, countRow };
+// Exported for unit tests and scripts/engine-reliability.mjs; used directly above.
+export { parseWindow, lit, buildTotalsQuery, buildDepthQuery, buildSessionDepthQuery, buildBreakdownQuery, buildFilteredCountQuery, rowsToObjects, totalsByEvent, depthRow, breakdownRows, countRow, runQuery };

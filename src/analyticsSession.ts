@@ -2,6 +2,7 @@ import { telemetryHostAllowed } from "./telemetry";
 import { trackEvent, setCommonProps, type GameplayEvents } from "./analyticsCore";
 import { clearActionLatches } from "./analyticsActions";
 import { noteCrash as reportCrash, releaseCrashThrottle as releaseCrashSlots } from "./analyticsCrash";
+import { resetEngineStatus } from "./analyticsEngineStatus";
 
 /**
  * The per-tab {@link GameplaySession} and the one process-wide instance of it,
@@ -398,12 +399,14 @@ class GameplaySession {
   }
 
   /** Test hook: forget all session state. A fresh window, plus the few things a
-   *  window deliberately outlives (the listener claim and the module-level common
-   *  props, both cleared here to keep tests isolated). */
+   *  window deliberately outlives (the listener claim, the module-level common
+   *  props and the page life's engine status, all cleared here to keep tests
+   *  isolated). */
   reset(): void {
     this.engineFlush = null;
     this.startEpoch();
     this.releaseCrashThrottle();
+    resetEngineStatus();
     this.resumedAt = null;
     this.armed = false;
     setCommonProps({});
