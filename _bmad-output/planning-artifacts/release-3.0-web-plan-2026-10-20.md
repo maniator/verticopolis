@@ -1190,7 +1190,7 @@ live matrix lists the current holder.
 | `src/wasmhost/wasmHost.ts`, `telemetry.ts`, `engine-rs/src/wasm.rs`, `engine-rs/src/crowd/mod.rs`, `src/engine/Crowd.ts`, `src/dualrun/binding.ts`, `engine.d.ts`, `src/tests/parity/*`, `vite.config.ts`, `.github/workflows/test.yml` (all in #1062) | WS-B (B1) | WS-A (each A-step PR in lane order while it is open: A3, then A2's parity setup); WS-C for the Workbox block in `vite.config.ts`. After B1 merges, other lanes add binding exports in their own PRs (WS-B's B5, WS-C's S17 identity export, WS-D's catalog exports, WS-P's #932 feature split) and merge after any open A-step PR on the same file |
 | `src/wasmhost/workerApply.ts`, `workerCore.ts`, `workerHost.ts`, `workerProtocol.ts` | WS-B (B1) | WS-P (#1048's cost split); B7 keeps #1068 rebased over it under the hold |
 | `src/wasmhost/merge.ts`, `engine-rs/src/load.rs`, `services.rs`, `sim.rs`, `src/engine/sim/*`, `src/engine/serializedGame.ts` | WS-A (A2) | WS-B (B5's `fixedStep.ts`, B6's `load.rs`) after A2 merges |
-| `src/wasmhost/startWasmHost.ts`, `workerController.ts`, `hostErrors.ts`, `engineBoot.ts`, `engineChoice.ts`, `src/bootstrap.ts` | WS-A (A1, A3, A4) | WS-C (C1's boot check) after A3 merges; the release lane at the flip. #1062 also touches `startWasmHost.test.ts` and `src/wasmhost/fakeEngine.fixture.ts`, which A1 and A3 edit too: B1 merges first, and A1 and A3 rebase over it |
+| `src/wasmhost/startWasmHost.ts`, `workerController.ts`, `hostErrors.ts` (a new file in `wasm-integration.patch`, A3), `engineBoot.ts`, `engineChoice.ts`, `src/bootstrap.ts` | WS-A (A1, A3, A4) | WS-C (C1's boot check) after A3 merges; the release lane at the flip. #1062 also touches `startWasmHost.test.ts` and `src/wasmhost/fakeEngine.fixture.ts`, which A1 and A3 edit too: B1 merges first, and A1 and A3 rebase over it |
 | `src/analytics*`, the data map | WS-A | The release lane (X1, #873) |
 | `src/ui/templates/helpContent.ts` | WS-A (A4's cohort sentence) | WS-C (C2's About changes) |
 | A4's cohort config module (the stage share and the size gate's threshold) | WS-A (A4) | The release lane at the flip |
@@ -1198,7 +1198,7 @@ live matrix lists the current holder.
 | `src/game/frameLoop.ts` | WS-A (A5's cue-timing test, and #965 if that test fails) | WS-B (B5); A6's #965, if A6's test is the first to fail, rebases over B5 |
 | `engine-rs/src/clock.rs` | WS-B (B5) | |
 | `src/tests/perfWorker/*`, `src/tests/perfCompare/*`, `scripts/perf-*.ts`, `src/wasmhost/packageHash.ts` | WS-B (B3a, then B3) | WS-P |
-| `engine-rs/src/tower_query.rs`, `tower_routing.rs` (#859) | WS-P (lands before the freeze) | |
+| `engine-rs/src/tower_query.rs`, `tower_routing.rs` (#859; a new file in `perf-rust-859.patch`) | WS-P (lands before the freeze) | |
 | `src/render/**`, sprites | WS-R, until WS-D needs these files | WS-D (#921 parts 2b and 2c, and their `src/render` lint rule). WS-D waits only until the stack parks: when it needs `src/render`, the stack parks at its next PR boundary (the coordinator's call) unless its open PR is ready to merge, and later stack PRs rebase over WS-D |
 | `src/ui/**`, `src/game/**` catalog reads | WS-D | |
 | The About and Diagnostics UI (#963); `src/build/workboxGlob.ts`, `scripts/verify-precache.ts` (#985 criteria 5 and 7) | WS-C | |
