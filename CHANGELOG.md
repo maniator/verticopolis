@@ -13,9 +13,13 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.44.0
+
+- On the opt-in WASM engine (`?engine=wasm`), an engine failure that has to go back past the last good state now says so and clears the undo history, and a failed switch to TypeScript says so too.
+
 ## 2.41.0
 
-- A save made while an exterminator is booked now remembers which rooms were booked, so after a reload the treatment covers the same rooms as if you had kept playing.
+- Saving, or undoing an edit, while an exterminator is booked now keeps the booked rooms, so the treatment covers only the rooms you paid for.
 
 ## 2.40.0
 
