@@ -29,6 +29,10 @@ approves an exception.
   save-version bump, so every build can still open the save. A version bump
   would make a rolled-back build refuse the save outright, which costs the
   player more than one free treatment.
-- **Check:** the Rollback row of section 6 rehearses a deploy rollback to the
-  last release before #902 with a tower the candidate wrote mid-booking, and
-  confirms this loss and nothing more.
+- **Check (proposed):** the Rollback row that the 3.0 web release plan
+  proposes (`release-3.0-web-plan-2026-10-20.md`, section 10, PR #1080) adds
+  a deploy rollback to the last release before #902 with a tower the
+  candidate wrote mid-booking, confirming this loss and nothing more. The
+  cutover plan's section 6 Rollback row only flips the default back on the
+  same build, which keeps the field and cannot show the loss, so the check
+  binds once the owner approves that plan.

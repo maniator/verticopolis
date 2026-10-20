@@ -49,10 +49,13 @@ describe.skipIf(!hasWasmPackage())("WASM attach with a pending exterminator", ()
   it("keeps the treatment to the billed rooms when the host lets go mid-booking", () => {
     const { sim, paid, later } = booked();
     const host = attachWasmHost(sim, wasm());
-    host.syncStructure();
-    sim.tick(60);
-    host.syncStructure();
-    host.detach();
+    try {
+      host.syncStructure();
+      sim.tick(60);
+      host.syncStructure();
+    } finally {
+      host.detach();
+    }
     expect(sim.exterminationRoomIds).toEqual([paid.unitId]);
     // Back on the TypeScript loop: 08:00 on the due day lands the treatment.
     for (let hour = 0; hour < 24; hour++) sim.tick(60);

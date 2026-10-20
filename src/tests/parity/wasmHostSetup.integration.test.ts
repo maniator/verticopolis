@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import type { GameMode } from "../../engine/types";
@@ -128,6 +128,33 @@ describe.skipIf(!onWasmParityProject())("the WASM parity setup", () => {
     expect(sim.tower.units.find((u) => u.id === room.id)!.state).toBe("empty");
   });
 
+  it("names a booking the two engines answer differently instead of re-hosting it", async () => {
+    const { WasmParityError } = await import("./wasmHostSetup");
+    const sim = hotelTower(25, "modern");
+    const paid = placeHotel(sim, MID - 20);
+    const other = placeHotel(sim, MID);
+    paid.state = "infested";
+    // The instance's booking also writes a room the relay never carries, so
+    // the two engines disagree right after it while the crowd is empty.
+    const real = Simulation.prototype.callExterminator;
+    let armed = true;
+    const spy = vi.spyOn(Simulation.prototype, "callExterminator").mockImplementation(function (this: Simulation) {
+      const result = real.call(this);
+      if (armed && this.exterminationDueDay !== undefined) {
+        armed = false;
+        other.state = "infested";
+      }
+      return result;
+    });
+    try {
+      sim.tick(1);
+      expect(sim.crowd.people).toHaveLength(0);
+      expect(() => sim.callExterminator()).toThrow(WasmParityError);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("keeps the billed rooms on a re-host while an exterminator booking is pending", () => {
     const sim = hotelTower(24, "modern");
     const paid = placeHotel(sim, MID - 20);
@@ -138,7 +165,7 @@ describe.skipIf(!onWasmParityProject())("the WASM parity setup", () => {
     later.state = "infested";
     expect(() => sim.tick(1)).not.toThrow();
     expect(sim.exterminationRoomIds).toEqual([paid.id]);
-    for (let h = 0; h < 24; h++) sim.tick(60);
+    for (let h = 0; h < 30; h++) sim.tick(60);
     expect(sim.tower.getUnit(paid.id)!.state).toBe("empty");
     expect(sim.tower.getUnit(later.id)!.state).toBe("infested");
   });

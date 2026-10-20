@@ -13,9 +13,9 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.35.1
+## 2.36.0
 
-- A booked exterminator now treats the same rooms after you save and reload as it would have if you had kept playing.
+- A save made while an exterminator is booked now remembers which rooms were booked, so after a reload the treatment covers the same rooms as if you had kept playing.
 
 ## 2.35.0
 

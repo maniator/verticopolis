@@ -5,7 +5,12 @@ import { coerceExterminationRoomIds } from "./coerce";
 import { resolveExtermination } from "./services";
 import { UNIT_CAP } from "./deserializeGuards";
 
-function booked(): { sim: Simulation; paid: number; later: number } {
+/** A Modern tower's save with one infested room booked for the exterminator
+ *  and a second room infested after the booking, written into the save the
+ *  way an overnight escalation leaves it. On the WASM parity projects the
+ *  booking runs on the engine too and `serialize` returns the engine's save,
+ *  so nothing here edits the instance after the booking. */
+function booked(): { raw: SerializedGame; paid: number; later: number } {
   const sim = Simulation.newGame(902, "modern");
   sim.money = 1e8;
   for (let x = 170; x < 220; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
@@ -18,19 +23,25 @@ function booked(): { sim: Simulation; paid: number; later: number } {
   const later = b.unitId!;
   sim.tower.getUnit(paid)!.state = "infested";
   expect(sim.callExterminator()).toMatchObject({ ok: true, rooms: 1 });
-  sim.tower.getUnit(later)!.state = "infested";
-  return { sim, paid, later };
+  const raw = JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame;
+  raw.units.find((u) => u.id === later)!.state = "infested";
+  return { raw, paid, later };
+}
+
+/** Load a copy of `raw` and land its treatment on the TypeScript engine. */
+function treated(raw: SerializedGame): Simulation {
+  const sim = Simulation.deserialize(structuredClone(raw));
+  sim.clock.minutes += 1440;
+  resolveExtermination(sim);
+  return sim;
 }
 
 describe("pending exterminator persistence", () => {
   it("treats only billed rooms after reload, clears the booking and allows a relapse booking", () => {
-    const { sim, paid, later } = booked();
-    const raw = JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame;
+    const { raw, paid, later } = booked();
     expect(raw.exterminationRoomIds).toEqual([paid]);
-    const restored = Simulation.deserialize(raw);
-    expect(restored.callExterminator()).toMatchObject({ ok: false, reason: "pending" });
-    restored.clock.minutes += 1440;
-    resolveExtermination(restored);
+    expect(Simulation.deserialize(structuredClone(raw)).callExterminator()).toMatchObject({ ok: false, reason: "pending" });
+    const restored = treated(raw);
     expect(restored.tower.getUnit(paid)!.state).toBe("empty");
     expect(restored.tower.getUnit(later)!.state).toBe("infested");
     expect(restored.exterminationRoomIds).toBeUndefined();
@@ -40,44 +51,37 @@ describe("pending exterminator persistence", () => {
   });
 
   it("keeps the legacy tower-wide treatment only when the list is absent", () => {
-    const { sim, paid, later } = booked();
-    const raw = sim.serialize();
+    const { raw, paid, later } = booked();
     delete raw.exterminationRoomIds;
-    const restored = Simulation.deserialize(raw);
-    expect(restored.exterminationRoomIds).toBeUndefined();
-    restored.clock.minutes += 1440;
-    resolveExtermination(restored);
+    expect(Simulation.deserialize(structuredClone(raw)).exterminationRoomIds).toBeUndefined();
+    const restored = treated(raw);
     expect([paid, later].map((id) => restored.tower.getUnit(id)!.state)).toEqual(["empty", "empty"]);
   });
 
   it("bills no rooms for a list that is not an array", () => {
+    const { raw, paid } = booked();
     for (const bad of ["bad", null, { 0: 1 }]) {
-      const { sim, paid } = booked();
-      const raw = sim.serialize() as unknown as Record<string, unknown>;
-      raw.exterminationRoomIds = bad;
-      const restored = Simulation.deserialize(raw as unknown as SerializedGame);
-      expect(restored.exterminationRoomIds).toEqual([]);
-      restored.clock.minutes += 1440;
-      resolveExtermination(restored);
+      (raw as unknown as Record<string, unknown>).exterminationRoomIds = bad;
+      expect(Simulation.deserialize(structuredClone(raw)).exterminationRoomIds).toEqual([]);
+      const restored = treated(raw);
       expect(restored.tower.getUnit(paid)!.state).toBe("infested");
       expect(restored.exterminationDueDay).toBeUndefined();
     }
   });
 
   it("ignores a list without a due day or in Classic", () => {
-    const { sim, paid } = booked();
-    const raw = sim.serialize();
+    const { raw, paid } = booked();
     delete raw.exterminationDueDay;
     expect(raw.exterminationRoomIds).toEqual([paid]);
-    expect(Simulation.deserialize(raw).exterminationRoomIds).toBeUndefined();
+    expect(Simulation.deserialize(structuredClone(raw)).exterminationRoomIds).toBeUndefined();
     raw.mode = "classic";
     raw.exterminationDueDay = 1;
     expect(Simulation.deserialize(raw).exterminationRoomIds).toBeUndefined();
   });
 
   it("skips a billed room demolished before the treatment", () => {
-    const { sim, paid, later } = booked();
-    const restored = Simulation.deserialize(sim.serialize());
+    const { raw, paid, later } = booked();
+    const restored = Simulation.deserialize(raw);
     const x = restored.tower.getUnit(paid)!.x;
     expect(restored.tower.removeUnit(paid)).toBeDefined();
     const rebuilt = restored.tower.place("hotelSingle", 2, x).unitId!;

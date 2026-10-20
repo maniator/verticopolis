@@ -111,6 +111,9 @@ fn ids_keep_the_first_unit_cap_valid_unique_values() {
         json!(true),
         json!(2147483648u64),
     ];
+    // The literal cap, the same tripwire `storage.integration.test.ts` pins
+    // on the TypeScript side, so the two loaders keep one cap.
+    assert_eq!(UNIT_CAP, 82_500);
     let cap = UNIT_CAP as i64;
     list.extend((1..=cap - 2).map(|i| json!(i)));
     list.extend([json!(1), json!(cap - 1), json!(cap), json!(cap + 1)]);

@@ -40,9 +40,10 @@ context:
 ## Code Map
 
 - `src/engine/serializedGame.ts`, `src/engine/sim/serialization.ts`, `src/engine/sim/coerce.ts`, `src/engine/Simulation.ts`: optional saved field and loader trust boundary.
-- `engine-rs/src/sim.rs`, `engine-rs/src/load.rs`, `engine-rs/src/services.rs`: matching persistence, hardening and treatment membership.
+- `engine-rs/src/sim.rs`, `engine-rs/src/load.rs`, `engine-rs/src/services.rs`: matching persistence, loader coercion (the patch, then the review's cap and dedupe fixes) and treatment membership.
 - `src/wasmhost/merge.ts`: preserve pending IDs and clear completed bookings.
-- `src/tests/parity/wasmHostSetup.ts`: the parity setup no longer refuses a re-host while a booking is pending.
+- `src/tests/parity/wasmHostSetup.ts` and `src/tests/parity/wasmHostSetup.integration.test.ts`: the parity setup no longer refuses a re-host while a booking is pending, and its test re-hosts mid-booking and ticks through the treatment.
+- `vite.config.ts` (`typescriptSide`) and `.github/workflows/engine-rs.yml` (paths and the named case list): the new host test runs on the TypeScript side and in the engine workflow.
 - `src/engine/sim/exterminationPersistence.test.ts` and `engine-rs/src/extermination_tests.rs`: the same cases in both engines (reload, legacy, non-array list, orphan and Classic lists, the cap and its boundaries, a demolished billed room).
 - `src/tests/integration/wasmHostExtermination.integration.test.ts`: actual WASM attach and mid-booking detach regressions (kept out of the parity projects, since it starts its own host).
 - `src/tests/integration/loaderCases.integration.test.ts`, `conformance/scenarios/hotel-exterminator-reload-modern.json`, `conformance/`: cross-engine lock evidence.
@@ -90,7 +91,7 @@ S5 explicitly permits the optional field and resulting conformance hash change. 
 
 ## Review
 
-### `/gds-code-review`, 2026-10-20 (on 0c3022a)
+### `/gds-code-review`, 2026-10-20 (on the recovered patch with its regenerated locks, before 6861477)
 
 Blind Hunter, Edge Case Hunter and Acceptance Auditor. Fixed:
 
@@ -118,7 +119,7 @@ Blind Hunter, Edge Case Hunter and Acceptance Auditor. Fixed:
 7. The backlog row, the test-parity story and this spec described the old
    behavior; the rollback loss had no register entry (now EX-1).
 8. A player who reloads mid-booking sees a different treatment, so the
-   version moves to 2.35.1 with a changelog line.
+   version moves with a changelog line (2.36.0 after the bmad pass below).
 9. The Rust test grew `services.rs`, already over the ceiling; the booking
    tests now live in `engine-rs/src/extermination_tests.rs`.
 
@@ -137,3 +138,50 @@ dropping a list the instance booked (commands relay to the engine as they
 happen); a corrupt list using up a paid booking (by design, AC4); the
 cutover plan's gap table (a dated snapshot).
 
+### `/bmad-code-review`, 2026-10-20 (on 6861477 plus the CI fixes)
+
+Blind Hunter, Edge Case Hunter and Acceptance Auditor, on the non-gameplay
+surface. Fixed:
+
+1. CI: `exterminationPersistence.test.ts` failed on `unitWasm`. Its
+   `booked()` wrote the later infestation onto the hosted instance after
+   the booking, and a hosted instance's `serialize()` returns the engine's
+   save, so the write never reached the save. The tests now write it into
+   the raw save. The parity re-host test ticked 24 hours, an hour short of
+   the treatment; it ticks 30.
+2. Removing the booking guard from `compareOrRehost` also let the compare
+   right after a relayed `callExterminator` re-host on a difference while
+   the crowd is empty, so a booking the two engines answered differently
+   would be re-hosted away. That compare now throws on any difference
+   (`rehost: false`), pinned by a parity setup test that fails without it.
+3. EX-1's check cited a section 6 rehearsal that only flips the default on
+   the same build, which keeps the field. It now points at the deploy
+   rollback the 3.0 web release plan proposes (#1080, section 10) and stays
+   proposed.
+4. The `merge.ts` comment gave the wrong reason for the explicit copy (the
+   loop already copies the key; the line is a safeguard).
+5. The host detach test now detaches in `finally`.
+6. The Rust loader's cap had no literal pin; its test pins 82,500, the
+   value `storage.integration.test.ts` pins for TypeScript.
+7. CONTRIBUTING files a visible fix under minor and gives a patch no
+   changelog line, so the version is 2.36.0.
+8. The Code Map, the backlog row's pinned-by list (the host tests, and the
+   two tests owed with the A3 rebase) and the changelog line (now about
+   saves made from this version on) were incomplete.
+
+Dismissed: the reload scenario not reaching the billed-only branch (a
+probe on the TypeScript engine shows six rooms turning infested in the
+treatment's own tick before it lands; a tower-wide treatment leaves none,
+the billed one leaves those six, so `cleared` pins the branch); the
+`t+10800` lock move (the second booking is pending there); `load.rs` and
+`services.rs` growing (both on the ratchet; the test module follows the
+`*_tests.rs` include convention, and the coercion sits with the other save
+fields); the row reading done before the merge (it says the issue closes
+on merge and lists the tests still owed); `serialization.ts` at exactly 500
+lines; `BUILD.json` not committed (generated); the second scenario
+duplicating the first (kept on purpose, gds item 5).
+
+Noted for the merge (PR "Before merge"): PR #1068 rewrites `merge.ts` and
+still deletes `exterminationRoomIds`, so whichever lands second keeps the
+adoption, and the worker-host attach test owed here pins it; #1080 edits
+this backlog row (P1 and an S4 note); a re-bump if A3 bumps first.

@@ -218,15 +218,15 @@ function finishAttach(sim: Simulation, host: WasmHost): Hosting {
   // The booking runs on the instance and is relayed to the engine by the
   // host's own wrapper. The compare before it carries an un-relayed edit
   // into the engine (a re-host) while no booking is pending yet; the one
-  // after it catches an answer the two engines disagree on when no tick
-  // follows.
+  // after it throws on any difference, so an answer the two engines
+  // disagree on is reported, never re-hosted away.
   const exterminatorWrapper = function (this: Simulation): ReturnType<Simulation["callExterminator"]> {
     const current = hosted.get(this);
     if (!current) return relayExterminator.call(this);
     const before = compareOrRehost(this, current);
     if (before !== current) return before.exterminatorWrapper.call(this);
     const result = relayExterminator.call(this);
-    const after = compareOrRehost(this, current);
+    const after = compareOrRehost(this, current, { rehost: false });
     after.revision = this.tower.revision;
     after.fingerprint = fingerprint(this);
     return result;
@@ -261,8 +261,9 @@ function release(sim: Simulation): void {
 
 /** Compare the instance's state view with the engine's (see the module
  *  doc for when), re-host on a difference while the crowd is empty, and
- *  throw once it exists. Returns the hosting in force afterwards. */
-function compareOrRehost(sim: Simulation, entry: Hosting): Hosting {
+ *  throw once it exists or when `rehost` is false. Returns the hosting in
+ *  force afterwards. */
+function compareOrRehost(sim: Simulation, entry: Hosting, opts: { rehost?: boolean } = {}): Hosting {
   // A tower edit moves the revision; a direct field write (`u.rent = n`,
   // `sim.money = n`) does not, so while the crowd is still empty
   // (the setup phase of most suites, where the instance is cheap to
@@ -304,6 +305,12 @@ function compareOrRehost(sim: Simulation, entry: Hosting): Hosting {
     throw new WasmParityError(
       `the instance's state departs from the engine's between ticks at ${d?.path ?? "?"} (instance ${JSON.stringify(d?.live)}, engine ${JSON.stringify(d?.shadow)})${entryDetail}: ` +
         "an edit the relay does not carry (tower.place, a direct field write) or a divergence on a relayed command, after the crowd exists",
+    );
+  }
+  if (opts.rehost === false) {
+    throw new WasmParityError(
+      `the instance's state departs from the engine's at ${d?.path ?? "?"} right after a relayed callExterminator (instance ${JSON.stringify(d?.live)}, engine ${JSON.stringify(d?.shadow)}): ` +
+        "the two engines answered the booking differently",
     );
   }
   if (syncMode() === "hour" && entry.ticked) {
