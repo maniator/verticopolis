@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.38.0
+
+- Staff shirts, the sky bar's window lights and a few other small room details now stay the same across the whole room. They no longer shift with how the tower is drawn.
+
 ## 2.37.0
 
 - Busy rooms fill their seats again. Several had quietly stopped using their last few, and left the people at them undrawn.

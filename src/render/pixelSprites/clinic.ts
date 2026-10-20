@@ -1,6 +1,6 @@
 import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
-import { castShadow, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
+import { castShadow, hash, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
 import { layerBreak } from "./layers";
 
 /**
@@ -134,11 +134,15 @@ function drawOptometry(ctx: CanvasRenderingContext2D, x: number, floorY: number,
 
 function drawPharmacy(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, top: number, look: ClinicLook, occ: number, seed: number): void {
   // Back-wall shelves of medicine bottles, a counter, an Rx sign.
+  const shelfShift = Math.floor(hash(seed) * 3); // per room, in 0..2
   for (let sy = top + 2, r = 0; sy + 3 < floorY - 6; sy += 4, r++) {
     ctx.fillStyle = "#A0A8A0"; // shelf
     ctx.fillRect(x + 3, sy + 2, w - 6, 1);
-    for (let bx = x + 4; bx + 1 < x + w - 4; bx += 2) {
-      ctx.fillStyle = shade(look.accent, ((bx + r) % 3) * 18 - 18); // varied bottles
+    // The bottle shades key on the room's seed and each bottle's row and column
+    // on the shelf, so the region compositor paints the same shelves wherever
+    // the room's region starts.
+    for (let bx = x + 4, c = 0; bx + 1 < x + w - 4; bx += 2, c++) {
+      ctx.fillStyle = shade(look.accent, ((c + r + shelfShift) % 3) * 18 - 18); // varied bottles
       ctx.fillRect(bx, sy, 1, 2);
     }
   }

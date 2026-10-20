@@ -113,11 +113,11 @@ function drawInterior(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: n
     case "parkingRamp":
       return drawParkingRamp(ctx, u, x, y, w, h);
     case "security":
-      return drawSecurity(d, x, y, w, h);
+      return drawSecurity(d, u, x, y, w, h);
     case "medical":
-      return drawMedical(d, x, y, w, h);
+      return drawMedical(d, u, x, y, w, h);
     case "housekeeping":
-      return drawHousekeeping(d, x, y, w, h);
+      return drawHousekeeping(d, u, x, y, w, h);
     case "recycling":
       return drawRecycling(d, u, x, y, w, h);
     case "metro":

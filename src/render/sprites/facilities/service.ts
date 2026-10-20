@@ -1,4 +1,5 @@
-import { ceilingFixture, personSeated, personStanding, roomGlow, SKIN } from "../../pixelSprites/common";
+import type { Unit } from "../../../engine/types";
+import { ceilingFixture, geoVariant, personSeated, personStanding, roomGlow, SKIN } from "../../pixelSprites/common";
 import { layerBreak, layerEnd } from "../../pixelSprites/layers";
 import type { DrawCtx } from "../common";
 import { FLOOR, TILE } from "../../scale";
@@ -30,9 +31,16 @@ import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./servic
  * in `serviceScale.test.ts` cover a caller that is not.
  */
 
+/** Staff appearance depends on room geography alone. `geoVariant` reads the
+ *  world's lowest floor and lot width, so the shirts follow those too; both
+ *  are constant for the shipped catalog. */
+function staffSeed(u: Pick<Unit, "kind" | "floor" | "x">): number {
+  return geoVariant(u, 6, 997);
+}
+
 // ---- Security ---------------------------------------------------------------
 
-export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: number): void {
+export function drawSecurity(d: DrawCtx, u: Pick<Unit, "kind" | "floor" | "x">, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
   const RW = 8 * TILE;
   const RH = FLOOR;
@@ -70,7 +78,7 @@ export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: num
   const deskX = 53, deskW = 24;
   box(F, deskX, fy - 8, deskW, 8, "#2A3550");
   F(deskX, fy - 8, deskW, 1, "#3E4A66");
-  personSeated(ctx, sx(deskX + 8), sy(fy - 8), (Math.round(x) * 3 + 5) | 0);
+  personSeated(ctx, sx(deskX + 8), sy(fy - 8), staffSeed(u) * 3 + 5);
   // Brass badge shield.
   F(deskX + 2, fy - 14, 6, 6, "#D8B05A");
   F(deskX + 4, fy - 13, 2, 4, "#8A6A2A");
@@ -82,7 +90,7 @@ export function drawSecurity(d: DrawCtx, x: number, y: number, w: number, h: num
 
 // ---- Medical ----------------------------------------------------------------
 
-export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: number): void {
+export function drawMedical(d: DrawCtx, u: Pick<Unit, "kind" | "floor" | "x">, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
   const RW = 16 * TILE;
   const RH = FLOOR;
@@ -128,9 +136,9 @@ export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: numb
   const nurseX = sx(76);
   const doctorX = sx(84);
   const foot = sy(fy);
-  personStanding(ctx, nurseX, foot, (Math.round(x) * 2 + 1) | 0);
+  personStanding(ctx, nurseX, foot, staffSeed(u) * 2 + 1);
   whiteCoat(ctx, nurseX, foot);
-  personStanding(ctx, doctorX, foot, (Math.round(x) * 2 + 7) | 0);
+  personStanding(ctx, doctorX, foot, staffSeed(u) * 2 + 7);
   whiteCoat(ctx, doctorX, foot);
   // Stocked supply cabinet, sized so the five bottle columns sit flush against
   // both bevels, the same at each end.
@@ -155,7 +163,7 @@ export function drawMedical(d: DrawCtx, x: number, y: number, w: number, h: numb
 
 // ---- Housekeeping -----------------------------------------------------------
 
-export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h: number): void {
+export function drawHousekeeping(d: DrawCtx, u: Pick<Unit, "kind" | "floor" | "x">, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
   const RW = 8 * TILE;
   const RH = FLOOR;
@@ -195,7 +203,7 @@ export function drawHousekeeping(d: DrawCtx, x: number, y: number, w: number, h:
   for (let k = 0; k < 4; k++) F(rackX + 2 + k * 3, fy - 9, 1, 9, "#9A8460");
   F(rackX + 2, fy - 11, 10, 3, "#F4F0EC");
   // Standing housekeeper by the cart (the teal cart carries the uniform read).
-  personStanding(ctx, sx(35), sy(fy), (Math.round(x) * 3 + 3) | 0);
+  personStanding(ctx, sx(35), sy(fy), staffSeed(u) * 3 + 3);
   layerEnd(ctx); // the ceiling light belongs to the shell but draws last
   ceilingFixture(ctx, x, y, w, d.lit);
 }
