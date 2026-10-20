@@ -571,7 +571,7 @@ sessions also count toward the 1,000.
 **What the row requires and is missing:** an hourly compare of full saves,
 money, logs and gameplay events; failing seeds kept and shrunk.
 
-**The upgrade (B2, new issue on approval):**
+**The upgrade (B2, #1085):**
 
 1. At every in-game hour, compare the full save bytes, money, the log and the
    drained gameplay events, beside the existing hashes. Report the first
@@ -1140,7 +1140,7 @@ Review: `/gds-code-review` for engine and test-parity work,
 | --- | --- | --- | --- |
 | B0 | Push the #1047 design repair (commit `32cc179` content) so the owner can review it in parallel | `wasm-offline.patch` | Docs only; the review-input diffs stay out. #1047 also adds a #1046 backlog row (typed `design-deferral`, which Copilot's open thread flags); this PR already restores that row as `design-decision`, so B0 drops #1047's copy, which answers the thread. B0's PR merges only after this PR, which carries the row |
 | B1 | Take over #1062 (S3 #878): apply the patch, merge `main`, tier `commuteStress`, add the missing regressions; `test:wasm:parity` in CI, with the six merge-per-tick timeouts named as exclusions until S6 | `wasm-conformance.patch` | Merges before A2 and A3 (9.5) |
-| B2 | The differential upgrade (4.2, items 1 to 3 and 5 to 8, and item 4's dropped-command forms) and the PR corpus; the key script; the freeze guard (OD-3), which the owner makes a required check for the window; the rehearsal window starts | none | Touches none of #1062's files; starts as soon as B1 is up for review. New issue on approval |
+| B2 | The differential upgrade (4.2, items 1 to 3 and 5 to 8, and item 4's dropped-command forms) and the PR corpus; the key script; the freeze guard (OD-3), which the owner makes a required check for the window; the rehearsal window starts | none | Touches none of #1062's files; starts as soon as B1 is up for review. Issue #1085 |
 | B3a | The Windows harness build fix, extracted from #1068 as its own focused tooling PR on `main` (OD-9 (i)): `src/tests/perfWorker/build.ts`, the two `sh(...)` calls in `src/tests/perfWorker/main.ts`, and the same fix for `perf:compare`'s own `sh(...)` calls in `src/tests/perfCompare/main.ts` | `perf-worker-1068.patch` (build half: `src/tests/perfWorker/build*.ts`, `main.ts`), ported by hand since it does not apply to `main` | Tooling only. It carries none of #1068's held worker change, and #1068's hold is unchanged (D2). WS-B owns it and opens it as the first of B3's PRs, since B3 and B7 hold the same harness files |
 | B3 | The harness, after B3a: #880, `docs/performance/benchmark-protocol.md` with the OD-4 pass rule, gate-orientation ratios, an A/A mode with the δ and ε calibration, its caps and its exit to the owner, and the shipping host's main-thread cost split (engine step, per-step sync, hourly serialize, parse and merge) and hourly churn | none (B3a carries the patch) | Tooling only. Unblocks RUN-0b |
 | B4 | S11 #865: refusal reasons pinned; then the differential compares the reasons of refusals both engines make (4.2 item 4) | none | After B2, and before the counting window starts, so the window counts on the complete differential |
@@ -1436,10 +1436,12 @@ starts the steps below. Only the owner merges this PR; no thread arms
 auto-merge on it.
 
 - Create the live matrix issue (a sub-issue of #945) and its backlog row.
-- Create issues and rows for: the reliability signal (A1), the staged
-  cohort (A4), the differential upgrade with its freeze guard (B2), the
-  Windows harness fix (B3a), the harness and protocol (B3), the edit scene
-  (PF2), and the cold-start fix (PF5, closed if RUN-0b clears M5's gap).
+- Create issues and rows for the steps that have none: the staged cohort
+  (A4), the Windows harness fix (B3a) if its PR (#1093) still needs one,
+  the harness and protocol (B3), the edit scene (PF2), and the cold-start
+  fix (PF5, closed if RUN-0b clears M5's gap). The reliability signal (A1,
+  #1081) and the differential upgrade with its freeze guard (B2, #1085)
+  already have theirs.
 - Approving the plan does not approve sending A1's or A4's new analytics
   fields to production. They change no player-visible behavior, but they
   are new data, so each PR asks the owner for a separate OK before its

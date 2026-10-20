@@ -434,3 +434,13 @@ and the entry format that PR uses, A2 opens it, 9.5 and the matrix list it
 as a shared file, and section 12 lists the path and format as a plan choice.
 The plan does not create the file. No review pass ran on this edit: it adds
 a path and a format and changes no rule.
+
+## After the confirming pass: the matrix brought to live state
+
+At the owner's request, the matrix moved from the `8f3a143` snapshot to
+the PR state of 2026-10-20 at 12:15 UTC (`main` at `7d02f27`): #1062,
+#1087, #1088 and #1091 merged, #1089, #1092 and #1093 open. The rows for
+A1, A2, A3, B0, B1, B2 and B3a, the gate rows they feed and the counting
+windows changed with it. The plan's B2 references and section 13 now name
+the issues that already exist (#1081, #1085), so approval creates no
+duplicates. No rule changed, and no review pass ran on this edit.
