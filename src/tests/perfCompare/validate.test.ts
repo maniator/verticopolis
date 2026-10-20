@@ -24,6 +24,35 @@ describe("validateResults", () => {
     expect(v.warnings.join(" ")).toMatch(/only 2 repetition/);
   });
 
+  it("fails a software renderer and warns on a quick run", () => {
+    const soft = (runs: ReturnType<typeof good>) => runs.map((r) => ({ ...r, page: { ...r.page!, webgl: { renderer: "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)", vendor: "Google Inc. (Google)" } }, rendererEnd: "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)" }));
+    const v = validateResults(config(), soft(good()), [node()]);
+    expect(v.ok).toBe(false);
+    expect(v.errors.join(" ")).toMatch(/software rasterizer.*SwiftShader.*run it on the GPU/);
+    const quick = validateResults({ ...config(), quick: true }, soft(good()), [node()]);
+    expect(quick.errors).toEqual([]);
+    expect(quick.warnings.join(" ")).toMatch(/software rasterizer/);
+    const mixed = good().map((r, i) => (i === 0 ? { ...r, page: { ...r.page!, webgl: { renderer: "ANGLE (AMD, AMD Radeon RX 6800 Direct3D11, D3D11)", vendor: "AMD" } }, rendererEnd: "ANGLE (AMD, AMD Radeon RX 6800 Direct3D11, D3D11)" } : r));
+    expect(validateResults(config(), mixed, [node()]).errors.join(" ")).toMatch(/different WebGL renderers/);
+  });
+
+  it("fails closed on a run with no renderer, an unnamed one, or none read after the frames", () => {
+    const noGl = good().map((r) => ({ ...r, page: { ...r.page!, webgl: null } }));
+    expect(validateResults(config(), noGl, [node()]).errors.join(" ")).toMatch(/recorded no WebGL renderer/);
+    const nulls = good().map((r) => ({ ...r, page: { ...r.page!, webgl: { renderer: "null", vendor: "" } }, rendererEnd: "null" }));
+    expect(validateResults(config(), nulls, [node()]).errors.join(" ")).toMatch(/does not name a hardware adapter/);
+    const noEnd = good().map((r) => ({ ...r, rendererEnd: undefined }));
+    expect(validateResults(config(), noEnd, [node()]).errors.join(" ")).toMatch(/no WebGL renderer read after the frames/);
+    expect(validateResults({ ...config(), quick: true }, noGl, [node()]).errors.filter((e) => /renderer/i.test(e))).toEqual([]);
+  });
+
+  it("downgrades unverified renderers to warnings under a register exception, and not a changed one", () => {
+    const noGl = good().map((r) => ({ ...r, page: { ...r.page!, webgl: null }, rendererEnd: null }));
+    const v = validateResults(config(), noGl, [node()], "EX-9");
+    expect(v.errors.filter((e) => /renderer/i.test(e))).toEqual([]);
+    expect(v.warnings.join(" ")).toMatch(/exception EX-9/);
+  });
+
   it("judges an A/A pass by the engine that ran", () => {
     const aa = (ran: "ts" | "wasm") =>
       [0, 1].flatMap((rep) => (["ts", "wasm"] as const).map((slot) => ({ ...processRun(rep, ran), engine: slot, ranEngine: ran })));

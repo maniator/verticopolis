@@ -4,6 +4,8 @@ import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
 import { buildTree, collectEnvironment, ENGINE_PACKAGE_FILES, packageState, type Environment, type PackageState } from "./env";
 import { buildLimitations } from "./limitations";
+import { gateBrowser, probeBrowser, type BrowserProbe } from "./browserProbe";
+import { browserLaunch, type BrowserLaunch } from "./renderer";
 import { aggregate, compareEngines, missingSamples } from "./metrics";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
@@ -111,6 +113,14 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const log = (line: string) => process.stderr.write(`${line}\n`);
   const dist = join(repo, "dist");
   const distPerf = join(repo, "dist-perf");
+  // The browser is settled first: launch settings are parsed and the adapter
+  // is read before any build or results folder exists, so a setting that does
+  // not reach the GPU fails in seconds.
+  const launch = browserLaunch(process.env);
+  const executablePath = process.env.PW_CHROMIUM_PATH ?? null;
+  const probe = await probeBrowser(executablePath, launch);
+  for (const w of gateBrowser(probe, args.quick, launch)) log(`perf:compare: warning: ${w}`);
+  log(`perf:compare: Chromium ${probe.version}${launch.channel ? ` (channel ${launch.channel})` : ""}, WebGL renderer ${probe.renderer ?? "none"}`);
   if (!existsSync(join(repo, "src/public/engine/verticopolis_engine_bg.wasm"))) {
     throw new Error("the engine package src/public/engine/ is missing: build it first with `bash scripts/build-engine-wasm.sh` where that script exists (it installs the pinned toolchain), or `npm run wasm:build` (needs the wasm32 target and the pinned wasm-bindgen CLI)");
   }
@@ -154,7 +164,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     config,
     enginePackage: environment.enginePackage,
     scenarios: scenarios.map((s) => s.sha256),
-    machine: machineOf(environment, process.env.PW_CHROMIUM_PATH ?? null),
+    machine: machineOf(environment, executablePath, launch, probe),
     startedAt,
   };
   let out: string;
@@ -184,7 +194,6 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   for (const c of nodeChecks) log(`  ${c.scenario}: ${c.match ? "engines agree" : "ENGINES DISAGREE"} (Node: ts ${c.nodeTsMs.toFixed(0)} ms, wasm ${c.nodeWasmMs.toFixed(0)} ms)`);
 
   const server = await startServer(distPerf);
-  const executablePath = process.env.PW_CHROMIUM_PATH ?? null;
   let browserVersion: string | null = runs.find((r) => r.browserVersion)?.browserVersion ?? null;
   try {
     for (let rep = 0; rep < config.reps; rep++) {
@@ -196,7 +205,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
         // A marker first, so an attempt killed mid-way is reported, never
         // silently replaced by its rerun.
         appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify({ started: { rep, engine, at: new Date().toISOString() } }) + "\n");
-        const run = await runProcess({ server, config, scenarios, executablePath, log }, rep, engine, position);
+        const run = await runProcess({ server, config, scenarios, executablePath, launch, log }, rep, engine, position);
         browserVersion ??= run.browserVersion;
         runs.push(run);
         appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify(run) + "\n");
@@ -206,7 +215,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     await server.close();
   }
 
-  const validation = validateResults(config, runs, nodeChecks);
+  const validation = validateResults(config, runs, nodeChecks, launch.rendererException);
   // Checked again after the runs, against the package recorded before them
   // (the two ends only).
   for (const e of packageErrors(packageState(distPerf), packageState(dist), sourceHash, { files: environment.enginePackage, buildHash: environment.engineBuildHash })) validation.errors.push(e);
@@ -225,7 +234,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   validation.ok = validation.errors.length === 0;
   const bundle = analyzeBundle(dist);
   const toolingBundle = analyzeBundle(distPerf);
-  const renderer = runs.find((r) => r.page?.webgl)?.page?.webgl?.renderer;
+  const renderers = [...new Set(runs.filter((r) => r.ok).flatMap((r) => [r.page?.webgl?.renderer, r.rendererEnd]).filter((x): x is string => !!x))];
   const results: CompareResults = {
     schema: 1,
     startedAt: meta.startedAt,
@@ -235,7 +244,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     issue: "maniator/verticopolis#972",
     config,
     environment,
-    browser: { version: browserVersion, headless: true, executable: executablePath },
+    browser: { version: browserVersion, headless: true, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException },
     scenarios: scenarios.map((s) => ({ name: s.name, description: s.description, sha256: s.sha256, population: s.population, units: s.units, transports: s.transports, saveBytes: s.save.length })),
     nodeChecks,
     runs,
@@ -244,7 +253,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     metrics,
     comparisons,
     validation,
-    limitations: buildLimitations(config.aa, environment.appVersion, renderer),
+    limitations: buildLimitations(config.aa, environment.appVersion, renderers, launch.rendererException),
   };
 
   writeResultFiles(out, results);
@@ -373,8 +382,16 @@ export interface CheckpointMeta {
 }
 
 /** The machine and toolchain fields a resume must match. */
-export function machineOf(env: Env, executablePath: string | null): Record<string, string | number | null> {
-  return { cpuModel: env.cpuModel, logicalCpus: env.logicalCpus, totalMemoryBytes: env.totalMemoryBytes, os: env.os, kernel: env.kernel, arch: env.arch, node: env.node, rust: env.rust, playwright: env.playwright, executablePath };
+export function machineOf(env: Env, executablePath: string | null, launch?: BrowserLaunch, probe?: BrowserProbe): Record<string, string | number | null> {
+  // The launch settings, the browser build and the adapter are part of the
+  // identity: a resume with a different channel, switch, browser update or
+  // renderer would mix incompatible processes in one results folder.
+  const browser: Record<string, string | null> = launch ? { launch: JSON.stringify(launch) } : {};
+  if (probe) {
+    browser.browserVersion = probe.version;
+    browser.renderer = probe.renderer;
+  }
+  return { ...browser, cpuModel: env.cpuModel, logicalCpus: env.logicalCpus, totalMemoryBytes: env.totalMemoryBytes, os: env.os, kernel: env.kernel, arch: env.arch, node: env.node, rust: env.rust, playwright: env.playwright, executablePath };
 }
 
 /**

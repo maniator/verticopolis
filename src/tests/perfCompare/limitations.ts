@@ -1,3 +1,4 @@
+import { classifyRenderer } from "./renderer";
 import { preThree } from "./report";
 import type { EngineName } from "./types";
 
@@ -10,8 +11,7 @@ interface Limitation {
 }
 
 const STATIC_LIMITATIONS: readonly Limitation[] = [
-  { text: "One machine, headless Chromium in a container. Spread is reported (CV, order-statistic intervals of the median, order-statistic intervals of the paired median ratios); results from other hardware, browsers or a GPU will differ." },
-  { text: "Frame rates come from a software WebGL rasterizer (see the WebGL renderer row), so render cost is much higher than on a GPU device and dominates the frame. The simulation-only rows are unaffected by rendering." },
+  { text: "One machine and one headless Chromium. Spread is reported (CV, order-statistic intervals of the median, order-statistic intervals of the paired median ratios); results from other hardware, browsers or a GPU will differ." },
   { text: "Both engines run on the main thread. The WASM host keeps a TypeScript read model of the tower, refreshed from the engine's frame view after every step and from a full save merge whenever the tower revision moves or an in-game hour passes (src/wasmhost/wasmHost.ts). The hosted rows include that cost; the bare-engine rows do not.", only: "cross" },
   { text: "The step driver (the frame loop's owed-minute math and fixed step) is the TypeScript host's for both engines (#867), and commands still run on both the read model and the engine (#954). This benchmark times ticks, which the engine alone runs when hosted; it does not time player commands.", only: "cross" },
   { text: "Pages are served cross-origin isolated (COOP/COEP) so performance.now() resolves to about 5 microseconds instead of 100. The production site is not isolated; isolation does not change how either engine executes." },
@@ -37,8 +37,23 @@ export const PRE_THREE_LIMITATION = "This is a pre-3.0 baseline of an engine sti
 export const aaLimitation = (aa: EngineName): string =>
   `An A/A pass: ${aa === "wasm" ? "WASM" : "TypeScript"} ran in both slots. This folder is one input to the calibration summary (#1110) and sets no tolerance by itself. The limitations that describe two different engines are left out, and so are the rows only the ${aa === "wasm" ? "TypeScript" : "WASM"} engine produces and the cold WASM load steps.`;
 
+/** What the WebGL renderers of the good runs mean for the frame rows (the protocol requires verified hardware). Each distinct renderer is classified on its own. */
+export function rendererLimitation(renderers: readonly string[], exception: string | null = null): string[] {
+  const out: string[] = [];
+  for (const renderer of [...new Set(renderers)]) {
+    const kind = classifyRenderer(renderer);
+    if (kind === "hardware") out.push(`WebGL renderer in these runs: ${renderer}. Frame rates are for this GPU; other GPUs and displays will differ. The simulation-only rows do not depend on rendering.`);
+    else if (kind === "software") out.push(`WebGL renderer in these runs: ${renderer}. That is a software rasterizer: render cost dominates the frame, the frame rows are invalid, and the CPU load may have moved the simulation rows. A protocol run fails validation on it.`);
+    else if (kind === "virtual") out.push(`WebGL renderer in these runs: ${renderer}. That is a virtual display adapter, not the GPU: the frame rows are invalid. A protocol run fails validation on it.`);
+    else out.push(`WebGL renderer in these runs: ${renderer}. It does not name a hardware adapter, so the frame rows are not verified GPU evidence. A protocol run fails validation on it.`);
+  }
+  if (renderers.length === 0) out.push("No WebGL renderer was recorded, so the frame rows are not verified GPU evidence. A protocol run fails validation on it.");
+  if (exception) out.push(`Renderer exception ${exception} was declared for this run: the renderer checks above are warnings, not a pass. The frame rows count as GPU evidence only if that register entry says so.`);
+  return out;
+}
+
 /** The limitations a results folder lists. */
-export function buildLimitations(aa: EngineName | null, appVersion: string, renderer: string | undefined): string[] {
+export function buildLimitations(aa: EngineName | null, appVersion: string, renderers: readonly string[], exception: string | null = null): string[] {
   const kept = STATIC_LIMITATIONS.filter((l) => !aa || !l.only || (l.only === "wasm" && aa === "wasm")).map((l) => l.text);
-  return [...(aa ? [aaLimitation(aa)] : []), ...kept, ...(preThree(appVersion) ? [PRE_THREE_LIMITATION] : []), ...(renderer ? [`WebGL renderer in these runs: ${renderer}.`] : [])];
+  return [...(aa ? [aaLimitation(aa)] : []), ...kept, ...(preThree(appVersion) ? [PRE_THREE_LIMITATION] : []), ...rendererLimitation(renderers, exception)];
 }

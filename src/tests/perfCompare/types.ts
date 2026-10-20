@@ -127,6 +127,8 @@ export interface ProcessRun {
   pageErrors: string[];
   browserVersion: string | null;
   page: { crossOriginIsolated: boolean; timerResolutionMs: number; userAgent: string; viewport: { width: number; height: number; dpr: number }; webgl: { renderer: string; vendor: string } | null } | null;
+  /** The WebGL renderer read again from a new context once the frames were done. A GPU process that died in between shows as a different string or none (validate.ts). Absent in results written before this check. */
+  rendererEnd?: string | null;
   cold: StartupSample | null;
   warm: StartupSample | null;
   /** A cold start under the heaviest configured CPU throttle (4x by
@@ -205,7 +207,7 @@ export interface CompareResults {
   issue: string;
   config: CompareConfig;
   environment: Environment;
-  browser: { version: string | null; headless: boolean; executable: string | null };
+  browser: { version: string | null; headless: boolean; executable: string | null; channel?: string | null; args?: string[]; rendererException?: string | null };
   scenarios: { name: string; description: string; sha256: string; population: number; units: number; transports: number; saveBytes: number }[];
   nodeChecks: NodeCheck[];
   runs: ProcessRun[];

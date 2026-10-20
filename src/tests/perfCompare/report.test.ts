@@ -140,9 +140,9 @@ describe("markdownReport", () => {
   });
 
   it("builds an A/A limitations list without the two-engine caveats", () => {
-    const wasm = buildLimitations("wasm", "2.29.6", "SwiftShader").join("\n");
-    const ts = buildLimitations("ts", "3.0.0", undefined).join("\n");
-    const real = buildLimitations(null, "3.0.0", undefined).join("\n");
+    const wasm = buildLimitations("wasm", "2.29.6", ["SwiftShader"]).join("\n");
+    const ts = buildLimitations("ts", "3.0.0", []).join("\n");
+    const real = buildLimitations(null, "3.0.0", []).join("\n");
     for (const text of [wasm, ts]) expect(text).not.toMatch(/verdict needs six pairs|two engines' processes|slower engine simulates|Both engines run on the main thread|step driver/i);
     expect(wasm).toContain("An A/A pass: WASM ran in both slots");
     expect(wasm).toMatch(/WASM linear memory only grows/);
@@ -151,7 +151,7 @@ describe("markdownReport", () => {
     expect(wasm).toContain("pre-3.0 baseline");
     expect(ts).not.toContain("pre-3.0 baseline");
     expect(wasm).toContain("WebGL renderer in these runs: SwiftShader.");
-    expect(wasm).toContain("One machine, headless Chromium");
+    expect(wasm).toContain("One machine and one headless Chromium");
     expect(real).toMatch(/verdict needs six pairs/);
     expect(real).not.toContain("A/A pass");
   });

@@ -1,4 +1,5 @@
 import type { NodeCheck } from "./nodeCheck";
+import { rendererFinding } from "./renderer";
 import type { CompareConfig, EngineName, ProcessRun, StepSummary } from "./types";
 
 /**
@@ -34,7 +35,7 @@ export interface Validation {
 
 const ENGINES: EngineName[] = ["ts", "wasm"];
 
-export function validateResults(config: CompareConfig, runs: readonly ProcessRun[], nodeChecks: readonly NodeCheck[]): Validation {
+export function validateResults(config: CompareConfig, runs: readonly ProcessRun[], nodeChecks: readonly NodeCheck[], rendererException: string | null = null): Validation {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -169,6 +170,9 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
   if (viewports.size > 1) errors.push(`the runs used different viewports: ${[...viewports].join(", ")}`);
   const isolation = new Set(good.map((r) => r.page?.crossOriginIsolated ?? null));
   if (isolation.size > 1) errors.push("some runs were cross-origin isolated and some were not");
+  const gl = rendererFinding(good.map((r) => r.page?.webgl?.renderer), good.map((r) => r.rendererEnd), { quick: config.quick, exception: rendererException });
+  errors.push(...gl.errors);
+  warnings.push(...gl.warnings);
   const coarse = good.filter((r) => (r.page?.timerResolutionMs ?? Infinity) > 0.02);
   if (coarse.length) warnings.push(`${coarse.length} process(es) had a timer coarser than 20 microseconds; per-step quantiles there are quantized`);
 

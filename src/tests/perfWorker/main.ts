@@ -5,6 +5,9 @@ import { readdirSync } from "node:fs";
 import { engineSourceHash } from "../../wasmhost/packageHash";
 import { buildTree, collectEnvironment, packageState, type Environment } from "../perfCompare/env";
 import { machineOf, packageErrors, stampErrors } from "../perfCompare/main";
+import { gateBrowser, probeBrowser } from "../perfCompare/browserProbe";
+import { rendererLimitation } from "../perfCompare/limitations";
+import { browserLaunch } from "../perfCompare/renderer";
 import { buildScenarios } from "../perfCompare/scenarios";
 import { startServer } from "../perfCompare/server";
 import { aggregate, ratios, validate, type Metric, type Ratio } from "./analysis";
@@ -108,12 +111,12 @@ export function makeConfig(args: Args, scenarios: string[]): WorkerConfig {
 }
 
 /** The report's limitations, worded from the run's own configuration. */
-export function limitations(config: WorkerConfig): string[] {
+export function limitations(config: WorkerConfig, renderers: readonly string[] = [], exception: string | null = null): string[] {
   const k = config.modes.length;
   const firsts = Array.from({ length: k }, (_, i) => Math.floor(config.reps / k) + (i < config.reps % k ? 1 : 0));
   const firstText = firsts.every((n) => n === firsts[0]) ? `each mode first ${firsts[0]} time(s)` : `modes first between ${Math.min(...firsts)} and ${Math.max(...firsts)} times`;
   return [
-  "One machine, headless Chromium in a container, software WebGL (see the renderer line): render cost dominates every frame, so the FPS rows say more about how much main-thread time each host leaves the renderer than about GPU-backed frame rates.",
+  "One machine and one headless Chromium. The renderer line says whether the page used the GPU; a software rasterizer fails validation in a protocol run, because render cost then dominates every frame and the FPS rows say more about the CPU than about GPU-backed frame rates.",
   "CPU throttling is DevTools emulation of the renderer process. The engine worker runs in the same renderer process, so the 4x rows slow it too; whether emulation throttles a worker thread exactly as it throttles the main thread was not measured.",
   `Hosted rows run ${config.steps} steps of ${config.dt} minutes in batches of ${config.batch} (the frame loop's cap is 4) with no rendering. Wall time includes the worker host's wait for each reply; main-thread time counts the steps, the flushes and the time applying replies, and leaves the worker's own time out (reported apart). The browser's unpacking of each reply (the structured clone of its strings, the full save's included) runs on the main thread before the host sees the reply and is not in the hosted main-thread rows; the frames rows (frame times, long tasks) include it.`,
   "The worker host keeps one batch in flight. A frame that finds a batch still out takes no steps (the frame loop banks its minutes under the 30-minute cap), so on a tower the engine cannot step in real time the worker host simulates fewer minutes per second rather than queueing work; the sim-minutes-per-second row shows it.",
@@ -125,6 +128,7 @@ export function limitations(config: WorkerConfig): string[] {
   `Throttles run in a fixed order (${config.throttles.map((t) => `${t}x`).join(" then ")}) in each process. The mode order rotates by repetition (${config.reps} repetitions over ${k} modes: ${firstText}). The throttled cold start throttles before the navigation and again at commit; its CPU probe runs after startup, so a throttle gap at navigation would not show.`,
   `The read model section is measured in Node on the TypeScript engine, not in the browser: each scenario loads its save fresh, as the timed hosted run does after its throwaway warm-up, then runs the hosted rows' ${config.steps} steps in batches of ${config.batch}, and a merge is counted after each batch where the worker host merges by its own rule (the hour-pass counter or the tower revision moved). The merges a host forces after a stale reply or for a settle are left out. Sizes are JSON characters of each value. The WASM engine reaches the same end state (the hosted end-state digests), but its intermediate saves were not compared.`,
   "Audio was not started in these frames (measured in perf:compare). The coalesced and worker hosts are experimental and opt-in; the shipped default is unchanged.",
+  ...rendererLimitation(renderers, exception),
   ];
 }
 
@@ -175,7 +179,7 @@ export interface WorkerResults {
   generatedAt: string;
   config: WorkerConfig;
   environment: Environment;
-  browser: { version: string | null; executable: string | null };
+  browser: { version: string | null; executable: string | null; channel?: string | null; args?: string[]; rendererException?: string | null };
   scenarios: { name: string; sha256: string; population: number; units: number; transports: number; saveBytes: number }[];
   scripts: ReturnType<typeof scriptSizes>;
   runs: ModeRun[];
@@ -210,6 +214,13 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const log = (line: string) => process.stderr.write(`${line}\n`);
   const dist = join(repo, "dist");
   const distPerf = join(repo, "dist-perf");
+  // The browser is settled first, as in perf:compare: launch settings parsed
+  // and the adapter read before any build or results folder exists.
+  const launch = browserLaunch(process.env);
+  const executablePath = process.env.PW_CHROMIUM_PATH ?? null;
+  const probe = await probeBrowser(executablePath, launch);
+  for (const w of gateBrowser(probe, args.quick, launch)) log(`perf:worker: warning: ${w}`);
+  log(`perf:worker: Chromium ${probe.version}${launch.channel ? ` (channel ${launch.channel})` : ""}, WebGL renderer ${probe.renderer ?? "none"}`);
   const stampPaths = [join(dist, ".perf-build.json"), join(distPerf, ".perf-build.json")];
   const tree = buildTree(repo);
   if (!args.skipBuild) {
@@ -231,8 +242,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   // The sizes, read before anything is measured: a build without the
   // worker chunk or the package fails here, not after hours of runs.
   const scripts = scriptSizes(dist);
-  const executablePath = process.env.PW_CHROMIUM_PATH ?? null;
-  const meta = { commit: environment.commit, dirty: environment.dirty, skipBuild: args.skipBuild, config, enginePackage: environment.enginePackage, scenarios: scenarios.map((s) => s.sha256), machine: machineOf(environment, executablePath) };
+  const meta = { commit: environment.commit, dirty: environment.dirty, skipBuild: args.skipBuild, config, enginePackage: environment.enginePackage, scenarios: scenarios.map((s) => s.sha256), machine: machineOf(environment, executablePath, launch, probe) };
   const runs: ModeRun[] = [];
   let out: string;
   let startedAt = started;
@@ -266,7 +276,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
         const position = order++;
         if (runs.some((r) => r.rep === rep && r.mode === mode)) continue;
         log(`perf:worker: rep ${rep + 1}/${config.reps}, ${mode}`);
-        const run = await runMode({ server, config, scenarios, executablePath, log }, rep, mode, position);
+        const run = await runMode({ server, config, scenarios, executablePath, launch, log }, rep, mode, position);
         runs.push(run);
         appendFileSync(join(out, "runs.jsonl"), JSON.stringify(run) + "\n");
       }
@@ -274,7 +284,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   } finally {
     await server.close();
   }
-  const v = validate(config, runs);
+  const v = validate(config, runs, launch.rendererException);
   for (const e of packageErrors(packageState(distPerf), packageState(dist), sourceHash, { files: environment.enginePackage, buildHash: environment.engineBuildHash })) v.errors.push(e);
   if (environment.dirty) v.warnings.push("the working tree had uncommitted changes; the folder is marked -dirty");
   const metrics = aggregate(config, runs);
@@ -284,7 +294,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     generatedAt: new Date().toISOString(),
     config,
     environment,
-    browser: { version: runs.find((r) => r.browserVersion)?.browserVersion ?? null, executable: executablePath },
+    browser: { version: runs.find((r) => r.browserVersion)?.browserVersion ?? null, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException },
     scenarios: scenarios.map((s) => ({ name: s.name, sha256: s.sha256, population: s.population, units: s.units, transports: s.transports, saveBytes: s.save.length })),
     scripts,
     runs,
@@ -292,7 +302,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     ratios: ratios(metrics, config.modes),
     readModel,
     validation: { ok: v.errors.length === 0, ...v },
-    limitations: limitations(config),
+    limitations: limitations(config, [...new Set(runs.filter((r) => r.ok).flatMap((r) => [r.page?.webgl?.renderer, r.rendererEnd]).filter((x): x is string => !!x))], launch.rendererException),
   };
   writeFileSync(join(out, "results.json"), JSON.stringify(results, null, 1) + "\n");
   writeFileSync(join(out, "metrics.csv"), metricsCsv(results.metrics));
