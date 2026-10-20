@@ -429,11 +429,12 @@ the network off.
 ### 5.8 Rust independence
 
 The new exports are one-line wrappers in `src/wasm.rs` over functions in
-core modules (`wasm.rs` is already 1,455 lines and on the file-size
-ratchet; if the wrappers still grow it, slice 6a first splits it into
-`src/wasm/` and the independence test admits that directory) (a view builder, panel getters, the dirty marks), which know nothing
-of JavaScript, workers or the DOM; `engine-rs/tests/independence.rs` keeps
-holding. Getters are read-only, so the conformance lock and the hashes do
+core modules (a view builder, panel getters, the metadata setters), which
+know nothing of JavaScript, workers or the DOM;
+`engine-rs/tests/independence.rs` keeps holding. `wasm.rs` is already 1,455
+lines and on the file-size ratchet, so if the wrappers still grow it, slice
+6a first splits it into `src/wasm/` and the independence test admits that
+directory. Getters are read-only, so the conformance lock and the hashes do
 not move; dirty marks live beside the revision-keyed memos, outside the
 save, `state_view` and the digest.
 
