@@ -9,6 +9,14 @@
 > [`results/2026-10-14-01c6153/`](results/2026-10-14-01c6153/) (`results.json`,
 > `metrics.csv`, `raw.csv`, `comparisons.csv`, and the machine-written
 > `report.md`).
+>
+> **Biased in WASM's favor.** That run measured the medium and large towers in
+> a page an earlier tower had used, which slowed the TypeScript engine (#1162,
+> benchmark protocol section 4). The medium and large timed, frame and audio
+> rows below, and the ratios built from them (0.54x on medium, 1.08x on large,
+> the hosted 3x to 8x), are therefore too kind to WASM by an amount that was
+> never measured on this run. Small-tower, memory, startup and transfer rows are
+> not affected. Re-run `perf:compare` for a figure to cite.
 
 Spec: #972. Harness and these results: PR #979.
 
@@ -492,7 +500,9 @@ counterpart in a later `comparisons.csv`.
 ## Reddit-ready summary (draft, not posted)
 
 > **Snapshot from 2026-10-14 (commit `01c6153`, before our 3.0 engine
-> cutover). Current numbers come from re-running `npm run perf:compare`.** We
+> cutover). Current numbers come from re-running `npm run perf:compare`. The
+> medium and large figures below favor WASM: that run measured them in a page an
+> earlier tower had used, which slowed the TypeScript engine (#1162).** We
 > benchmarked our tower sim's TypeScript engine against its
 > Rust engine compiled to WASM, on the same build in headless Chromium, with 10
 > paired runs in fresh processes, at 1x and 4x CPU throttle. The two engines

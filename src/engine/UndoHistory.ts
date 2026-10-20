@@ -53,6 +53,10 @@ export interface UndoPorts {
   restore(snap: string): void;
   /** Fingerprint the current player-mutable state (see {@link towerStateSig}). */
   signature(): string;
+  /** Fingerprint a snapshot's state the same way, when the host can (used
+   *  only by {@link UndoHistory.dropUnchanged}; temporary, with the WASM
+   *  engine's fallback, #874). */
+  signatureOf?(snap: string): string;
   /** Surface a short user-facing message ("Undid: Bulldoze", "Nothing to undo."). */
   notify(message: string): void;
 }
@@ -60,6 +64,9 @@ export interface UndoPorts {
 interface Entry {
   snap: string;
   label: string;
+  /** The redo steps this step's commit cleared, kept while
+   *  {@link UndoHistory.holdClearedRedo} is on (temporary, #874). */
+  cleared?: Entry[];
 }
 
 /** Most snapshots we keep on each stack before the oldest is dropped. */
@@ -76,8 +83,31 @@ export class UndoHistory {
   private undoStack: Entry[] = [];
   private redoStack: Entry[] = [];
   private pending: { snap: string; sig: string; label: string } | null = null;
+  private hold = false;
 
   constructor(private readonly ports: UndoPorts) {}
+
+  /** While on, a commit keeps the redo steps it clears with its own undo
+   *  step, and {@link dropUnchanged} puts them back when it drops that step:
+   *  an edit the WASM engine's fallback takes away leaves the redo trail as
+   *  it was. One step holds a trail at a time: a later commit that clears a
+   *  trail lets the older one go (an undo since then read a restore point
+   *  after that step, so no fallback can drop it), and so does turning the
+   *  hold off. So the history keeps at most one redo trail beyond what it
+   *  keeps with the hold off. The host turns it on while it can fall back.
+   *  Temporary, with the fallback (#874). */
+  get holdClearedRedo(): boolean {
+    return this.hold;
+  }
+
+  set holdClearedRedo(on: boolean) {
+    this.hold = on;
+    if (!on) this.letHeldGo();
+  }
+
+  private letHeldGo(): void {
+    for (const entry of this.undoStack) delete entry.cleared;
+  }
 
   /**
    * Capture the pre-action snapshot at the start of a gesture. Called exactly
@@ -106,9 +136,15 @@ export class UndoHistory {
     const p = this.pending;
     this.pending = null;
     if (!p || this.ports.signature() === p.sig) return;
-    this.undoStack.push({ snap: p.snap, label: p.label });
+    // A fresh action invalidates the redo trail.
+    const cleared = this.redoStack.splice(0);
+    const entry: Entry = { snap: p.snap, label: p.label };
+    if (this.hold && cleared.length > 0) {
+      this.letHeldGo();
+      entry.cleared = cleared;
+    }
+    this.undoStack.push(entry);
     if (this.undoStack.length > UNDO_CAP) this.undoStack.shift();
-    this.redoStack.length = 0; // a fresh action invalidates the redo trail
   }
 
   undo(): void {
@@ -127,6 +163,35 @@ export class UndoHistory {
     this.undoStack.push({ snap: this.ports.snapshot(), label: entry.label });
     this.ports.restore(entry.snap);
     this.ports.notify(`Redid: ${entry.label}`);
+  }
+
+  /** Drop the newest undo and redo steps that would change nothing now, and
+   *  answer how many went. The WASM engine's fallback (#874) can put the
+   *  tower back to the state an undo capture read, before the edit it
+   *  captured, so that edit's step would undo nothing (the redo steps its
+   *  commit cleared come back); and an undo whose own snapshot trapped keeps,
+   *  as its redo step, the state it went back to, which would redo nothing.
+   *  Both go. A gesture under way keeps its capture, fingerprinted again from
+   *  its own snapshot: a capture whose save trapped took the newest restore
+   *  point, which is where the fallback went, so a release with nothing done
+   *  since leaves no step. A no-op without `signatureOf`. Temporary, with
+   *  the fallback. */
+  dropUnchanged(): number {
+    const sigOf = this.ports.signatureOf;
+    if (!sigOf) return 0;
+    const now = this.ports.signature();
+    let dropped = 0;
+    while (this.undoStack.length > 0 && sigOf(this.undoStack[this.undoStack.length - 1].snap) === now) {
+      const entry = this.undoStack.pop()!;
+      if (entry.cleared) this.redoStack = [...entry.cleared, ...this.redoStack];
+      dropped++;
+    }
+    while (this.redoStack.length > 0 && sigOf(this.redoStack[this.redoStack.length - 1].snap) === now) {
+      this.redoStack.pop();
+      dropped++;
+    }
+    if (this.pending) this.pending.sig = sigOf(this.pending.snap);
+    return dropped;
   }
 
   /** Drop the whole trail — e.g. when a *different* tower is adopted. */

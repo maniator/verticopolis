@@ -95,6 +95,12 @@ don't claim a skill was invoked:
   inline yourself rather than invoking anything.
 - **Apply the review dimensions in the “Code review” section below,** scoped to
   the implicated lenses. Prefer a few high-signal findings over filler.
+- **On a hot-path diff, run the hot-path checklist** (the surfaces are listed
+  in section 1 of
+  [`docs/performance/hot-path-review.md`](../docs/performance/hot-path-review.md)).
+  Apply items HP-1 to HP-12 inline, as the skills' Hot-Path Auditor layer
+  would, reading callers in the checked-out repository, and print the section
+  6 table with one row per item. See the Performance dimension below.
 - **Include in every review (ideally as the last line) the exact marker**
   `Reviewed against Verticopolis conventions (.github/copilot-instructions.md).`
   so it stays reliably searchable as confirmation this overlay was applied, even
@@ -127,6 +133,14 @@ just the obvious lines in the diff, and flag anything CI wouldn't catch:
   SimTower parity model; watch for dead spots and exploits.
 - **Security:** untrusted input (saves, persistence) must degrade
   gracefully and never crash or trust foreign data.
+- **Performance on hot paths:** apply the same checklist to every surface its
+  section 1 lists (Rust, TypeScript, the WASM binding, the hosts, simulation
+  ticks, rendering, saves, UI, analytics, audio and the engine build). Flag
+  whole-collection walks, route searches, clones, sorts, rebuilt maps and id
+  scans under any HP-2 multiplier, in either language and inside helpers.
+  Review ported and inherited code as new, and check a port against the
+  TypeScript's caches (HP-8). Resolve findings under section 7, and report a
+  pre-existing one too.
 
 See [`CONTRIBUTING.md`](../CONTRIBUTING.md) → "Code review" for the
 deep-review-before-merge policy every change must meet;

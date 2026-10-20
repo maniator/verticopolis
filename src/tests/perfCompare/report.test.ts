@@ -71,6 +71,7 @@ function results(ok: boolean, aa: "ts" | "wasm" | null = null): CompareResults {
     browser: { version: "141", headless: true, executable: null },
     scenarios: [{ name: "small", description: "d", sha256: "f".repeat(64), population: 700, units: 10, transports: 2, saveBytes: 1000 }],
     nodeChecks: [{ scenario: "small", steps: 10, dt: 2, start: { tsState: "a", wasmState: "a", tsCrowd: "c", wasmCrowd: "c" }, end: { tsState: "b", wasmState: "b", tsCrowd: "d", wasmCrowd: "e" }, match: false, nodeTsMs: 1, nodeWasmMs: 1 }],
+    churn: [{ scenario: "small", saveChars: 1000, hours: 24, hourly: [], medianShare: 0.045, p95Share: 0.12, maxShare: 0.2, sections: { units: { saveShare: 0.9, medianChurn: 0.04 }, money: { saveShare: 0.01, medianChurn: 1 } } }],
     runs,
     bundle: null,
     metrics,
@@ -91,6 +92,8 @@ describe("markdownReport", () => {
     expect(md).toContain("verticopolis_engine_bg.wasm aaaaaaaaaaaaaaaa");
     expect(md).toContain("| Public main (origin/main as last fetched) | c928ff4 (merge base c928ff4; this tree contains it) |");
     expect(md).toContain("| small | 10 | same | same | DIFFERENT | NO |");
+    expect(md).toContain("## Hourly save churn (WASM engine, Node)");
+    expect(md).toContain("| small | 1000 | 24 | 4.5% | 12.0% | 20.0% | units 90.0% / 4.0%; money 1.0% / 100.0% |");
     expect(md).toContain("## Simulation only, engine as the app hosts it");
     expect(md).toMatch(/\| small \| 1x \| total for fixed duration \| 100 ms \| 200 ms \| 2\.00x \(2\.00 to 2\.00\) \| wasm slower \| 6\/6\/6 \|/);
     expect(md).toContain("ts: ts; wasm: ts");
@@ -98,6 +101,15 @@ describe("markdownReport", () => {
     expect(md).toContain("- one machine");
     expect(markdownReport(results(true))).toContain("**Validation: passed.**");
     expect(md).not.toContain("A/A pass");
+  });
+
+  it("names what made the tree dirty", () => {
+    const r = results(true);
+    const md = markdownReport({ ...r, environment: { ...r.environment, dirty: true, tree: { porcelain: [" M a.ts", "?? b.ts"], diffSha256: "d".repeat(64), untracked: [{ path: "b.ts", sha256: "e".repeat(64) }], complete: true } } });
+    expect(md).toContain(`| Working tree | status:  M a.ts; ?? b.ts; tracked changes SHA-256 ${"d".repeat(64)}; untracked: b.ts ${"e".repeat(64)} |`);
+    expect(markdownReport(r)).not.toContain("Working tree |");
+    // A clean record says so, which a harness without a record does not.
+    expect(markdownReport({ ...r, environment: { ...r.environment, tree: { porcelain: [], diffSha256: null, untracked: [], complete: true } } })).toContain("| Working tree | clean (nothing outside docs/performance/results) |");
   });
 
   it("opens an A/A pass with a banner, slot-neutral wording and no verdicts", () => {
@@ -113,7 +125,7 @@ describe("markdownReport", () => {
     expect(md).not.toMatch(/No engine comparison/);
     expect(md).toContain("slot ts: ts; slot wasm: ts");
     expect(md).toContain("| Rep | Slot |");
-    expect(md).toContain("one input to the calibration summary");
+    expect(md).toContain("one input to `npm run perf:calibrate`");
     expect(r.validation.errors).toEqual([]);
     expect(validateResults(r.config, r.runs, [{ ...r.nodeChecks[0], match: true }]).errors).toEqual([]);
     expect(summaryCsv(r.metrics, "wasm").split("\n")[1]).toMatch(/,wasm$/);

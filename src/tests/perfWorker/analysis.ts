@@ -21,6 +21,8 @@ export interface Metric {
   values: number[];
   reps: number[];
   summary: Summary | null;
+  /** Set on the worker host's rows at a throttle above 1x: CDP cannot CPU-throttle a worker, so the main thread ran throttled and the engine thread did not (see `UNTHROTTLED_WORKER`). */
+  unthrottled?: "worker";
 }
 
 export interface Ratio {
@@ -38,7 +40,22 @@ export interface Ratio {
    *  is often zero), so `n` is the pairs that remained. */
   zeroReference: number;
   verdict: "higher" | "lower" | "equivalent" | "inconclusive";
+  /** Set when either side is the worker host at a throttle above 1x: the engine thread was not throttled. */
+  unthrottled?: "worker";
 }
+
+/**
+ * Chromium refuses `Emulation.setCPUThrottlingRate` on worker targets
+ * ("Operation is only supported for pages, not workers"), and a page-level
+ * throttle leaves a dedicated worker's loop nearly unthrottled (probed on
+ * Chromium 141: a busy loop took 41 ms at 1x and 44 to 58 ms with the page at
+ * 4x, 7 to 41% slower against about 4x on the main thread, a worker created
+ * after the throttle too). So at a throttle above 1x the worker host's main
+ * thread is throttled and its engine thread is not. Every such row carries
+ * this flag, and a comparison of the worker host with a main-thread host at
+ * that throttle favors the worker.
+ */
+export const UNTHROTTLED_WORKER = (mode: ModeName, throttle: string): boolean => mode === "wasm-worker" && throttle !== "1";
 
 type MetricPick = (r: ModeRun) => number | null | undefined;
 interface Def { group: Metric["group"]; scenario: string; throttle: string; metric: string; unit: string; better: "lower" | "higher"; pick: MetricPick }
@@ -112,7 +129,7 @@ export function aggregate(config: WorkerConfig, runs: readonly ModeRun[]): Metri
         reps.push(r.rep);
       }
       if (d.group === "traffic" && values.length === 0) continue; // worker-only rows
-      out.push({ group: d.group, scenario: d.scenario, throttle: d.throttle, metric: d.metric, unit: d.unit, better: d.better, mode, values, reps, summary: values.length ? summarize(values) : null });
+      out.push({ group: d.group, scenario: d.scenario, throttle: d.throttle, metric: d.metric, unit: d.unit, better: d.better, mode, values, reps, summary: values.length ? summarize(values) : null, ...(UNTHROTTLED_WORKER(mode, d.throttle) ? { unthrottled: "worker" as const } : {}) });
     }
   }
   return out;
@@ -150,7 +167,7 @@ export function ratios(metrics: readonly Metric[], modes: readonly ModeName[]): 
         });
         if (pairs.length === 0) continue;
         const r = pairedRatio(pairs);
-        out.push({ group: a.group, scenario: a.scenario, throttle: a.throttle, metric: a.metric, mode, against, ...r, zeroReference, verdict: verdict(r) });
+        out.push({ group: a.group, scenario: a.scenario, throttle: a.throttle, metric: a.metric, mode, against, ...r, zeroReference, verdict: verdict(r), ...(UNTHROTTLED_WORKER(mode, a.throttle) || UNTHROTTLED_WORKER(against, a.throttle) ? { unthrottled: "worker" as const } : {}) });
       }
     }
   }

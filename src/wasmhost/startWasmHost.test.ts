@@ -193,53 +193,49 @@ describe("startWasmHost", () => {
 
   // A load or a new game is the way out of a trapped engine: the swap goes
   // through, the new tower is hosted, and the counted loss moves with it.
-  it("swaps away from a trapped engine and carries the loss to the new tower", () => {
+  // A trap while a tower is let go is a fault like any other (#874): the
+  // module may be corrupt, so no tower is hosted on it again.
+  it.each(["drainGameplayEvents", "gameplayEventsDropped"] as const)("latches hosting off when %s traps while a load lets the tower go", async (method) => {
     const mod = fakeModule();
     const a = app();
     const log = quiet();
     const handle = startWasmHost(a, mod, log);
     a.sim.drainGameplayEvents(); // the founding
     const trapped = mod.engines[0];
-    trapped.drainGameplayEvents = () => { throw new Error("unreachable executed"); };
-    // The read model's copy of a command's event the engine still owed.
-    a.sim.gameplayEvents.push("facility_placed", { kind: "office", floor: 2, count: 1 });
+    trapped[method] = () => { throw new Error("unreachable executed"); };
     const next = Simulation.newGame(4, "modern");
     a.adoptSim(next);
     expect(a.sim).toBe(next);
-    expect(handle.status).toMatchObject({ starts: 2, hosted: true });
-    expect(handle.status.errors).toEqual(["letting go of the last tower: unreachable executed"]);
+    expect(handle.status).toMatchObject({ starts: 1, hosted: false, fallbacks: 1, lastFallback: { reason: "other", stage: "start" } });
+    expect(handle.status.errors).toEqual(["the WASM engine failed while letting a tower go: unreachable executed"]);
     expect(trapped.freed).toBe(true);
+    expect(mod.engines).toHaveLength(1); // the loaded tower stays on TypeScript
     expect(next.drainGameplayEvents()).toEqual([{ name: "tower_founded", payload: { mode: "modern" } }]);
-    expect(next.gameplayEventsDropped).toBe(1);
+    expect(next.gameplayEventsDropped).toBe(0);
+    await new Promise((r) => setTimeout(r, 0));
+    // Nothing to restore (the player chose the new tower), and the log says why.
+    expect(next.log[next.log.length - 1]).toMatchObject({ text: "The WASM engine stopped, so the game runs on the TypeScript engine now.", kind: "bad" });
     handle.stop();
   });
 
-  // An engine that traps at its first call (the drop count) loses its whole
-  // batch; the read model's copies stand in.
-  it("counts a trap at the drop count from the read model", () => {
-    const mod = fakeModule();
-    const a = app();
-    const handle = startWasmHost(a, mod, quiet());
-    a.sim.drainGameplayEvents(); // the founding
-    mod.engines[0].gameplayEventsDropped = () => { throw new Error("unreachable executed"); };
-    a.sim.gameplayEvents.push("facility_placed", { kind: "office", floor: 2, count: 1 });
-    const next = Simulation.newGame(4, "modern");
-    a.adoptSim(next);
-    expect(handle.status).toMatchObject({ starts: 2, hosted: true });
-    expect(next.drainGameplayEvents()).toEqual([{ name: "tower_founded", payload: { mode: "modern" } }]);
-    expect(next.gameplayEventsDropped).toBe(1);
-    handle.stop();
-  });
-
-  it("stops cleanly on a trapped engine", () => {
+  it("stops cleanly on a trapped engine", async () => {
     const mod = fakeModule();
     const a = app();
     const handle = startWasmHost(a, mod, quiet());
     mod.engines[0].drainGameplayEvents = () => { throw new Error("unreachable executed"); };
+    const sim = a.sim;
+    const logged = sim.log.length;
     handle.stop();
-    expect(handle.status.errors).toEqual(["letting go of the last tower: unreachable executed"]);
+    expect(handle.status.errors).toEqual(["the WASM engine failed while letting a tower go: unreachable executed"]);
     expect(mod.engines[0].freed).toBe(true);
     expect(handle.status.hosted).toBe(false);
+    // The stopped tower is frozen, and its save is the newest restore point.
+    const minutes = sim.clock.minutes;
+    sim.tick(30);
+    expect(sim.clock.minutes).toBe(minutes);
+    expect(() => sim.serialize()).not.toThrow();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sim.log).toHaveLength(logged); // a stopped handle recovers nothing
     a.adoptSim(Simulation.newGame(5, "classic"));
     expect(mod.engines.length).toBe(1); // no longer follows swaps
     expect((globalThis as { __vcEngine?: unknown }).__vcEngine).toBeUndefined();

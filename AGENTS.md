@@ -87,15 +87,15 @@ pair took the same approach, and two of the four PRs were closed. To stop that:
 ## Code review: the agent workflow
 
 Follow [CONTRIBUTING.md](./CONTRIBUTING.md) → **Code review** for the review
-requirements every change must meet (self-review, no Big-O regressions on hot
-paths, the deep adversarial review before merge, re-requesting Copilot, and
+requirements every change must meet (self-review, the hot-path complexity
+review, the deep adversarial review before merge, re-requesting Copilot, and
 resolving review threads). On top of that, in an agent session:
 
 - **MANDATORY: the deep review IS running the BMGD/BMAD review skill:
   `/gds-code-review` for gameplay/engine work, `/bmad-code-review` for anything
   else (storage, persistence, tooling, UI plumbing).** That skill's parallel
-  adversarial layers (Blind Hunter → Edge Case Hunter → Acceptance Auditor, then
-  triage) ARE the deep review. A self-read, a generic `/code-review`, or an
+  adversarial layers (Blind Hunter → Edge Case Hunter → Acceptance Auditor, plus
+  the Hot-Path Auditor on a hot-path diff, then triage) ARE the deep review. A self-read, a generic `/code-review`, or an
   ad-hoc subagent pass does **not** satisfy this and must not be reported as "the
   deep review". Actually invoke the skill, let it triage, then fix every
   `patch` finding and record every `defer` finding in
@@ -142,8 +142,28 @@ resolving review threads). On top of that, in an agent session:
 
   For larger or higher-risk changes, convene several of these as a party
   (`bmad-party-mode`) so the perspectives challenge each other.
-- The full canon and rationale for the hot-path performance rules live in
+- **Hot-path complexity review.** The checklist is
+  [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md).
+  The team overrides `_bmad/custom/gds-code-review.toml` and
+  `_bmad/custom/bmad-code-review.toml` load it into both review skills, which
+  add a Hot-Path Auditor layer (diff plus repository access) on a hot-path diff
+  and print one record row per checklist item; a review without that record
+  does not count as the deep review. Triage a hot-path finding as `patch` or
+  `defer` under its section 7, never `dismiss` because the code was inherited.
+  When porting engine code, compare the TypeScript's caches first (HP-8) and
+  put the complexity note in the PR. Copilot and Codex reviewing a PR here
+  apply the checklist inline and are asked to print the same record (see
+  Review guidelines below), and an independent reviewer's GO needs it. The surrounding canon lives in
   `_bmad-output/project-context.md` (Performance section).
+
+## Review guidelines
+
+For any reviewer that reads this file, Codex included: on a diff that touches a
+hot-path surface (section 1 of
+[`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md)),
+apply items HP-1 to HP-12, trace callers in the repository, and print the
+section 6 record with one row per item. Report pre-existing findings too, and
+resolve each one under section 7.
 
 ## Testing discipline: shift-left and regression
 

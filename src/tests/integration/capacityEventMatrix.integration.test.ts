@@ -36,6 +36,14 @@ function tower(seed = 51): { sim: Simulation; shaft: number } {
 
 const capacity = (events: GameplayEvent[]) => events.filter((e) => e.name === "capacity_changed");
 
+/** The hosted tower's events once a restore point covers them: the WASM
+ *  host holds a command's events until one does (#874), and a hosted save
+ *  (an undo capture, an autosave) is one. */
+const covered = (sim: Simulation): GameplayEvent[] => {
+  sim.serialize();
+  return sim.drainGameplayEvents();
+};
+
 const EDITS: Edit[] = [
   ["setCars to a new count", 1, (sim, id) => sim.setCars(id, 2)],
   ["setCars to the same count", 0, (sim, id) => sim.setCars(id, sim.tower.transportById(id)!.cars)],
@@ -115,9 +123,9 @@ describe.skipIf(!hasWasmPackage())("capacity_changed on the WASM host and in the
       let host: WasmHost | null = attachWasmHost(sim, wasm());
       try {
         setup?.(sim, shaft);
-        sim.drainGameplayEvents();
+        covered(sim);
         run(sim, shaft);
-        const got = capacity(sim.drainGameplayEvents());
+        const got = capacity(covered(sim));
         expect(got).toHaveLength(expected);
         for (const e of got) expect(e.payload).toEqual({ kind: "elevatorStandard" });
         // Nothing is owed at detach, so nothing is reported twice.
@@ -139,9 +147,9 @@ describe.skipIf(!hasWasmPackage())("capacity_changed on the WASM host and in the
       sim.drainGameplayEvents();
       expect(host.merges).toBeGreaterThan(merges);
       expect(sim.setCars(shaft, 2)).toBe(true);
-      expect(capacity(sim.drainGameplayEvents())).toHaveLength(1);
+      expect(capacity(covered(sim))).toHaveLength(1);
       expect(sim.addCar(shaft).ok).toBe(true);
-      expect(capacity(sim.drainGameplayEvents())).toHaveLength(1);
+      expect(capacity(covered(sim))).toHaveLength(1);
     } finally {
       host.detach();
     }

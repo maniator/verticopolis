@@ -26,6 +26,7 @@
 # src/audio/ import the engine for types only; the scan keeps them that way.
 src/analyticsEngineBridge.ts gameplayCatalog gameplayEventRules
 src/gallery.ts catalog facilities retailSubtypes
+src/game/appHistory.ts Simulation UndoHistory # moved from src/main.ts with the app's undo history (#874): no new engine import
 src/game/editorActions.ts facilities sim/charges
 src/game/facilityDiagnostics.ts EconomySystem Simulation facilities residentialRentals sim/constants sim/gripe types
 src/game/frameLoop.ts sim/fixedStep timePacing
@@ -34,7 +35,7 @@ src/game/housekeepingDiagnostics.ts economy/housekeeping
 src/game/saveLoad.ts Simulation
 src/game/trafficHud.ts traffic
 src/game/uiCallbacks.ts wellFormed
-src/main.ts Simulation UndoHistory facilities
+src/main.ts Simulation facilities
 src/preview.ts catalog facilities
 src/render/atlas/browserEntry.ts catalog
 src/render/atlas/catalog.ts facilities households residentialRentals retailSubtypes
