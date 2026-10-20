@@ -1,7 +1,7 @@
 ---
 name: 'Rust-backed simulation facade'
 type: architecture-review
-status: proposed (awaiting the owner's sign-off)
+status: accepted (owner sign-off of F1 to F9, 2026-10-20 21:40 UTC); review amendments R3 and R6 await the owner's choice
 created: '2026-10-20'
 binds: [AD-1, AD-3, AD-4, AD-7, AD-8, '#868', '#954', '#874', '#1068', '#1049', '#1050']
 companions:
@@ -15,9 +15,11 @@ companions:
 # The TypeScript mirror or a Rust-backed facade (A vs B)
 
 > **Snapshot, written 2026-10-20 against `main` at `9cd44d1` (app 2.40.0,
-> engine crate 0.2.0, after #1139).** Status: proposed. Nothing here is built,
-> and nothing here changes the default engine, starts a cohort stage or
-> removes the TypeScript fallback. Every figure below is either a cloud
+> engine crate 0.2.0, after #1139).** Status: the owner signed off F1 to F9
+> at 21:40 UTC; the independent review's amendments (R1 to R6, after the
+> decisions table) are applied, and two of them (R3, R6) wait on the owner's
+> choice. Nothing here is built yet, and nothing here changes the default
+> engine, starts a cohort stage or removes the TypeScript fallback. Every figure below is either a cloud
 > measurement labeled exploratory (method and tables in
 > [`measurements.md`](./measurements.md)) or a PC figure the owner quoted as
 > motivation; acceptance numbers come only from the PC protocol (release
@@ -86,7 +88,8 @@ passed, so any slice can be reverted on its own (the slice plan,
 **What B costs the schedule.** B lengthens the path to the flip. S6 grows
 from a sync design into slices 1 to 8, and eligible reliability sessions
 start at S9, which under B is slice 10, when the facade becomes the WASM
-host; nothing in B redefines eligibility. Some work leaves the path: A5's
+host (R3 asks the owner to confirm slice 10 over slice 11); nothing in B
+redefines eligibility. Some work leaves the path: A5's
 sync design rule, RUN-0b's churn decision for S6, #1050's patching of the
 mirror and #954's skip-and-reapply logic.
 
@@ -94,7 +97,8 @@ mirror and #954's skip-and-reapply logic.
 loading the save (51 MiB medium, 128 MiB large in Node), in both designs,
 because `fromSave` parses the whole save into a `serde_json::Value` tree
 first. B removes the mirror's JavaScript heap (21 MiB on large) but not that
-peak. It needs its own item (section 8, M6).
+peak. It needs its own item (section 8, M6), and that item lands before the
+PC verdict run (R4).
 
 ### Decisions for the owner
 
@@ -104,11 +108,33 @@ peak. It needs its own item (section 8, M6).
 | F2 | Commands and panel queries return promises on every host, with the main-thread host resolving in the same task | Yes: one interface for both hosts, no pretend-sync |
 | F3 | The facility diagnostics ("why is this unhappy") move to a Rust getter that returns facts, with the TypeScript keeping only the copy | Yes: the largest single new Rust piece, and the only way the inspector stops running TypeScript gameplay code on the healthy path |
 | F4 | B supersedes A5's design rule for S6 (OD-9 (ii)): S6 becomes the facade, not a sync design picked from RUN-0b's churn rows | Yes. RUN-0b's cost split stays useful as the baseline |
-| F5 | #1068 stays on hold. Its read-model role ends under B; its Rust `SaveMirror` is kept only if restore-point cost needs it (section 5.7) | Yes. The worker evaluation keeps running. If F1 is declined, #1068 with #1051 is the strongest measured A path (cloud run 2: the worker's main-thread time 0.31x / 0.66x TypeScript's, its wall time 0.91x / 1.77x) |
+| F5 | #1068 stays on hold. Its read-model role ends under B; its Rust `SaveMirror` is kept only if restore-point cost needs it (section 5.7) | Yes. The worker evaluation keeps running. If F1 is declined, #1068 with #1051 is the strongest measured A path (cloud run 2, exploratory, software rendering: the worker's main-thread time 0.31x / 0.66x TypeScript's, its wall time 0.91x / 1.77x) |
 | F6 | #1049 and #1050 are retargeted from the mirror to B's view (changed units, structural snapshot) | Yes |
-| F7 | A new engine item for the load-time memory peak, checked against M6 | Yes |
-| F8 | Restore points under B are the engine saves the host already takes (undo captures, the 30-second autosave, manual saves), each with a versioned transient sidecar; no save added per command or tick (#1101's property); a pre-registered budget of no save task over 50 ms on large at 1x and 4x on the PC | Yes |
-| F9 | Accept the longer path to the flip: eligible sessions start when the facade becomes the WASM host (slice 10) | Yes, given the owner's direction; the alternative is to ship 3.0 on A |
+| F7 | A new engine item for the load-time memory peak, checked against M6, landing before slice 9's verdict run (R4) | Yes |
+| F8 | Restore points under B are the engine saves the host already takes (undo captures, the 30-second autosave, manual saves), each with a versioned transient sidecar; no save added per command or tick (#1101's property); a pre-registered budget of no save task over 50 ms on large at 1x and 4x on the PC; "validated" defined in R5; the loss bound is R6 | Yes |
+| F9 | Accept the longer path to the flip: eligible sessions start when the facade becomes the WASM host (slice 10; R3) | Yes, given the owner's direction; the alternative is to ship 3.0 on A |
+
+The owner signed off F1 to F9 as recommended at 21:40 UTC.
+
+### Amendments after the independent review
+
+The independent review (CONDITIONAL GO at `d285b45`) found six points that
+bear on the decisions. None of them changes a gate's definition; two are
+the owner's trade-offs and wait on his answer.
+
+| Id | Finding | Amendment | Owner |
+| --- | --- | --- | --- |
+| R1 | `test:wasm:parity` and the dual run run on the mirror host, and #868 promised to remove the cadence exclusions with no mechanism under B | The parity projects and the dual run keep the mirror host (`attachWasmHost`'s sync and merge, `mirror.ts`) as a test and tooling harness, kept out of player builds by the `engineBundle` guard that already keeps the dual run out. The cadence-excluded tests move onto the port contract suite in slice 7, where each engine runs natively with no merge, and leave the ratchet with a mapping row each, so "A5 removes the named exclusions" holds. A test that cannot be expressed through the port stays named and goes to the owner as a gate exception before slice 11, never silently | none: the Unit and integration row is unchanged |
+| R2 | The AD-1 amendment and #954's draft dropped #1064 and #1065 without D5's exception | #1064 and #1065 stay 3.0 blockers (D5, no exception). They run wherever two engines answer the same command: the mirror host while it exists, the dual run and the parity harness. On the facade's healthy path only Rust answers, so there is nothing to compare there, and the field's divergence line is empty by construction; the disagreement evidence is the dual run and parity in CI | none: D5 is unchanged |
+| R3 | The A5 mapping said both "slices 1 to 8" and "slices 1 to 8, 10, 11"; the second would start stage 3 and the 1,000-session clock at slice 11, a release later | Recommended: A5 (S6) is slices 1 to 8 and 10, S9 (#954) is slices 2, 7 and 10, and eligible sessions count from slice 10 on a stage-3 build. Slice 11 lands before the freeze and is not a stage-3 input. `?engine=wasm-mirror` sessions after slice 10 are early telemetry, never eligible. The alternative counts from slice 11 | waiting |
+| R4 | M6 would trip the stop rule at slice 9 on the load-time peak, a cost both designs share (the reviewer's probe: about 82% of the WASM high-water mark is transient load overhead) | Slice 13 becomes a hard prerequisite of slice 9's verdict run. M6's bar is unchanged | none |
+| R5 | No recovery point is checked on TypeScript before a fault | "Validated" means three things. A CI test on every change to the Rust save writer, the sidecar or the TypeScript load path loads Rust-written restore points (save plus sidecar, the conformance corpus and the medium and large scenarios) through the fallback's own adopt path and plays on. At a fault, the adopt checks the point (it loads, its invariants hold) and steps back to the next older point if not. A "recovery point refused" line in the reliability report counts each refusal. Points live in memory only, so the engine that wrote one and the fallback that reads it always come from the same commit, which the CI test covers. A TypeScript load during play would check more, but the owner's direction bans a normal-play deserialize, so it is not used | none |
+| R6 | The fallback's loss bound grows from one game hour (about 6 s of play at speed 1, 0.5 s at top speed) to 30 s of play | Recommended: accept up to 30 s, since faults are rare and this is the emergency path. The alternative adds a point every 10 s of running play (at most 10 s lost, three times as many save pauses). A shorter cadence does not help the 50 ms budget, since each save costs the same (cloud, exploratory: 18 ms medium, 63 ms large); keeping the game-hour bound would cost about 126 ms of every second on large at top speed | waiting |
+
+The review's non-blocking points are applied too: totals beside the heap in
+section 3, a hot-path record marked on every code slice, branch coverage
+reported for each differential test, the exploratory label on F5, and three
+stale phrases.
 
 ## 2. The two options
 
@@ -166,6 +192,12 @@ Same machine, same process, interleaved, 7 repetitions, 720 steps:
 | A: one build plus its sync | 104 ms | 369 ms |
 | B: one build plus its structural snapshot | 1.5 ms | 5.6 ms |
 | JS heap the read model keeps (A's mirror / B's view) | 7.4 / 0.65 MiB | 21.4 / 1.0 MiB |
+| Total memory, heap plus WASM, after load and 60 steps (A / B) | 43.5 / 50.7 MiB | 148.6 / 128.2 MiB |
+
+M6 is total memory, so the last row is the one it reads. B is above A on
+medium only because A's engine boots from the instance's re-serialization
+(AD-8's gap), whose load peaks lower; the load-time peak is slice 13's item
+(R4).
 
 Units differ across sources: the PC and #1133 figures are browser
 main-thread times, these are Node times, and the two are never divided by
@@ -353,16 +385,30 @@ That keeps #1101's property and avoids the game-hour clock, which matters:
 at the top speed (120 game minutes a second) a game hour is half a real
 second, and a `serialize()` on large costs about 63 ms in the cloud. The
 lost-progress bound becomes "since the last gesture or autosave", at most
-30 seconds of play, which #874's disclosure states. The budget is
-pre-registered: no save task over 50 ms on large at 1x and 4x on the PC. If
-the autosave's `serialize()` misses it, the remedies in order are idle-time
-capture, a faster serializer, then #1068's `SaveMirror` (keyframe plus
-deltas, the C6 patcher), the one place its Rust half may still be wanted
-(F5). Today's host pays a 370 ms merge every game hour, so this is a
-smaller version of a cost players already have.
+30 seconds of play, against today's one game hour (about 6 s of play at
+speed 1, 0.5 s at top speed). That is R6, the owner's choice; once he
+answers, #874's disclosure and the `RestorePoints` text state the bound.
+The budget is pre-registered: no save task over 50 ms on large at 1x and
+4x on the PC. The remedies differ by kind of save. The autosave and manual
+saves can wait for idle time, so for them the order is idle-time capture, a
+faster serializer, then #1068's `SaveMirror` (keyframe plus deltas, the C6
+patcher), the one place its Rust half may still be wanted (F5). An undo
+capture runs synchronously before a gesture's first command and cannot
+wait, so for it the order is a faster serializer, then an engine-side copy
+of the state taken at the capture and serialized after the gesture at idle
+time. The undo capture's `serialize()` is undo's own cost under AD-8; the
+restore point adds only the sidecar read. Today's host pays a 370 ms merge
+every game hour, so this is a smaller version of a cost players already
+have.
+
+"Validated" (the owner's item 9) is defined in R5: a CI test that loads
+Rust-written points through the fallback's adopt path on every change to
+the writer, the sidecar or the TypeScript load path; a check at adoption
+that steps back to an older point when one fails; and a "recovery point
+refused" line in the reliability report.
 
 On a fault, the host builds a TypeScript `Simulation` from the newest point
-that loads, applies the sidecar, swaps in `TsSim`, and rebuilds the view
+that passes the adoption check, applies the sidecar, swaps in `TsSim`, and rebuilds the view
 from it. The TypeScript engine never runs before that. The fallback module
 may load through a dynamic import, but it stays in the precache manifest
 (the `verify-precache` gate), and a test plays on after a forced trap with
@@ -388,7 +434,10 @@ save, `state_view` and the digest.
 | Rust getters disagree with the TypeScript functions | stats, inspector, diagnostics, overlays | A differential test per getter on the conformance corpus; the Rust value is authoritative on the healthy path |
 | Diagnostics port is large | about 790 lines of TypeScript across three files | Facts in Rust, wording in TypeScript; its own slice and review |
 | The view lags or shows a stale structure | renderer | Revision-keyed snapshot; a test that the view equals a fresh snapshot after every caught-up frame (the oracle #1068 built, aimed at the view) |
-| Restore points cost a long task | fallback | Points ride the existing saves (no added save); PC measurement against the budget; idle-time capture; `SaveMirror` as the last remedy |
+| Restore points cost a long task | fallback | Points ride the existing saves (no added save); PC measurement against the budget; remedies per kind of save (section 5.7) |
+| A recovery point fails to load at a fault | fallback | The CI cross-engine test on every writer or loader change; the adoption check steps back to an older point; a "recovery point refused" report line (R5) |
+| M6 fails on the load-time peak, a cost both designs share | slice 9 | Slice 13 lands before the verdict run (R4); M6's bar is unchanged |
+| The parity projects lose their harness when the mirror leaves | slice 11 | The mirror host stays as a test and tooling harness, kept out of player builds (R1) |
 | Shared files with other lanes | `wasmHost.ts`, `startWasmHost.ts`, `hostFault.ts` (Runtime), renderer files (Rendering), worker files (worker thread) | Slices that touch them are agreed with the owning thread first; none starts while #1092 is mid-flight in the same files |
 | The critical path gets longer | S6 and S9 grow | Offset in part: A5's sync design, RUN-0b's churn decision and #1050's mirror patching drop out. Section 8 and the slice plan show the order |
 
@@ -396,9 +445,15 @@ save, `state_view` and the digest.
 
 What changes: the merge and sync tests (`merge`, `frameSync`, `frameApply`,
 `wasmHostPoints`, `workerApply`) test code that B removes from the healthy
-path; they stay while today's host stays and go with it in the last slice.
-What does not change: conformance, parity, the seeded differential, the
-fuzz, the dual run and the save round trips test the engines, not the hosts.
+path. The code itself stays as a test and tooling harness (R1): the WASM
+parity projects (`test:wasm:parity`) host every TypeScript suite's
+`Simulation` through `attachWasmHost`, and the dual run attaches through
+`mirror.ts`, so both keep the mirror, kept out of player builds by the
+`engineBundle` guard that already keeps the dual run out. Their tests stay
+with them. The cadence-excluded tests move onto the port contract suite in
+slice 7 and leave the exclusions ratchet. What does not change:
+conformance, parity, the seeded differential, the fuzz, the dual run and the
+save round trips.
 
 What B adds:
 
@@ -415,20 +470,26 @@ What B adds:
   per-getter differential tests (section 5.4).
 - **A forced-trap test** that the fallback starts from a restore point plus
   sidecar, with no mirror.
+- **A cross-engine restore-point test** in CI (R5): Rust-written points from
+  the conformance corpus and both scenarios load through the fallback's
+  adopt path and play on, on every change to the writer, the sidecar or the
+  TypeScript load path.
+- **The disagreement reports (#1064, #1065)** on the dual run and the parity
+  harness, where two engines answer the same command (R2).
 - **The cue-timing test** on the facade.
 
 ## 8. Release-gate effects
 
 | Gate or row | Effect of B |
 | --- | --- |
-| Performance (M2 to M6) | Expected to improve throughput, frame pacing and long tasks sharply on both towers; measured only by the PC protocol on the facade. M6 (memory) still carries the load-time WASM peak, which B does not touch: F7's item |
-| Authority (#954, S9) | Met by construction once commands go through `RustSim`; the per-command tests stay |
-| Reliability eligibility | Eligible sessions start at the first build carrying S9 (OD-2). Under B that is slice 10, when `RustSim` becomes the WASM host, so the 1,000-session count and the observation period start later than under A (F9) |
+| Performance (M2 to M6) | Expected to improve throughput, frame pacing and long tasks sharply on both towers; measured only by the PC protocol on the facade. M6 (memory) still carries the load-time WASM peak, which B does not touch: F7's item, slice 13, which lands before the verdict run (R4) |
+| Authority (#954, S9) | Met by construction once commands go through `RustSim`; the per-command tests stay. #1064 and #1065 stay D5 blockers, run where two engines answer (R2) |
+| Reliability eligibility | Eligible sessions start at the first build carrying S9 (OD-2). Under B that is slice 10, when `RustSim` becomes the WASM host, so the 1,000-session count and the observation period start later than under A (F9; R3 waits on the owner). On facade sessions the divergence line is empty by construction; rule 3's disagreement evidence comes from the dual run and parity in CI. A "recovery point refused" line is added (R5) |
 | Seeded replay and the freeze | B adds Rust exports, which change the window key; they land before the freeze like every other key-changing item |
-| Unit and integration | The six exclusions S6 was to remove go with the mirror; the port contract suite is added |
+| Unit and integration | Unchanged: A5 still removes the cadence exclusions, by moving those tests onto the port contract suite in slice 7; the parity projects keep the mirror as a test-only host (R1); the port contract suite is added |
 | End to end | `chromium-wasm` runs on the facade before it becomes the WASM path |
 | Saves | Unchanged format, no save version bump; AD-8 holds structurally |
-| Dual run, conformance | Unchanged |
+| Dual run, conformance | Unchanged; the dual run keeps the mirror host as tooling (R1) |
 | Rollback rehearsal | Rehearses the facade and the TypeScript fallback |
 
 ## 9. Hot-path record for the design

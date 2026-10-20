@@ -1,11 +1,12 @@
 # Proposed updates to the spine, the 3.0 plan, #868, #954 and #1104
 
-> **Snapshot, written 2026-10-20 against `main` at `93ec86a`.** Status:
-> proposed. None of these edits is applied until the owner signs off the A
-> vs B review ([`ARCHITECTURE-REVIEW.md`](./ARCHITECTURE-REVIEW.md)); then
-> the spine and plan edits land in a docs PR, the #868 and #954 bodies are
-> agreed with the Runtime fallback thread before they change, and the
-> #1104 rows go to the triage thread, which edits that issue.
+> **Snapshot, written 2026-10-20 against `main` at `93ec86a`, amended after
+> the independent review.** Status: the owner signed off F1 to F9 at 21:40
+> UTC. The Runtime fallback thread applied the #868 and #954 bodies
+> (sections 3 and 4, with its own additions) at 21:42 and the review's
+> amendments at 21:45; the #1104 rows went to the triage thread, which edits
+> that issue, with the rows that depend on R3 held for the owner's answer.
+> The spine and plan edits land in their own docs PR after #1184.
 
 ## 1. Spine: AD-9 and the amendments it brings
 
@@ -39,10 +40,13 @@ Amendments:
   worker, fallback); `src/ui`, `src/game` and `src/render` see only the
   port". The diagram's "relay until retirement" edge becomes "fallback
   after a fault".
-- **AD-1:** drop "The instance skips a command the engine refused" and "A
-  disagreement is reported and the engine's state wins"; under AD-9 there
-  is no instance to skip or disagree. Keep the one result shape and the
-  engine-only log and events.
+- **AD-1:** drop "The instance skips a command the engine refused", since
+  under AD-9 there is no instance on the healthy path. Scope "A
+  disagreement is reported and the engine's state wins" to wherever two
+  engines answer the same command (the mirror host while it exists, the
+  dual run, the parity harness), which is where #1064 and #1065 run (D5, no
+  exception; review R2). Keep the one result shape and the engine-only log
+  and events.
 - **AD-4:** the structural snapshot moves from Deferred into the rule, with
   its layout version beside the frame's.
 - **AD-8:** add "the undo signature comes from an engine change counter".
@@ -54,14 +58,14 @@ Amendments:
 | Section | Change |
 | --- | --- |
 | Header and 1.1 | Add the owner's 2026-10-20 20:45 UTC direction (Rust authority, no TypeScript mirror on the healthy path) and, once signed off, AD-9 |
-| 3, critical path | `P868` becomes "#868 S6: the facade (slices 1 to 8)", fed by the owner's sign-off instead of RUN-0b and A5's rule; `P954` becomes "#954 S9: Rust-first commands (slices 2 and 7)"; add "slice 13, load-time memory" feeding PERF; `A5R` and the `RUN0B --> P868` edge go |
+| 3, critical path | `P868` becomes "#868 S6: the facade (slices 1 to 8 and 10)", fed by the owner's sign-off instead of RUN-0b and A5's rule; `P954` becomes "#954 S9: Rust-first commands (slices 2, 7 and 10)"; add "slice 13, load-time memory" feeding PERF ahead of the facade's protocol run; `A5R` and the `RUN0B --> P868` edge go (mappings per R3, waiting on the owner) |
 | 3, phases | Phase B: "S6 (the facade slices to 8)"; phase C: "the PC run on the facade, then the facade as the WASM host (owner)" |
-| 3, the reliability window | Eligible sessions start with S9, which under AD-9 is the facade becoming the WASM host (slice 10), so the 1,000-session count and the observation period start later than the plan assumed; eligibility itself is unchanged (F9) |
+| 3, the reliability window | Eligible sessions start with S9, which under AD-9 is the facade becoming the WASM host (slice 10), so the 1,000-session count and the observation period start later than the plan assumed; eligibility itself is unchanged (F9). Slice 10 over slice 11 is R3, waiting on the owner; `?engine=wasm-mirror` sessions are early telemetry. On facade sessions the divergence line is empty by construction, and rule 3's disagreement evidence is the dual run and parity in CI (R2); a "recovery point refused" line joins the report (R5) |
 | 6, assumption 6 | Audio cues read the view's header or engine events; the cue-timing test runs on the facade |
-| 9.1, A5 | "S6 #868: the Rust-backed facade (AD-9), slices 1 to 8, 10, 11 of `architecture-rust-facade-2026-10-20/slice-plan.md`; audio cue-timing test" |
-| 9.1, A6 | "S9 #954: commands through the port, Rust first (slices 2 and 7), with #1064, #1065, #1066" |
-| 9.1, new A8 | "Engine load-time memory peak (slice 13), against M6" |
-| 11, risks | Add: the port migration regresses a UI flow (strangler order, revert per slice); the facade's PC run fails (stop rule, the owner decides); restore-point cost (PC-measured cadence, `SaveMirror` as the remedy) |
+| 9.1, A5 | "S6 #868: the Rust-backed facade (AD-9), slices 1 to 8 and 10 of `architecture-rust-facade-2026-10-20/slice-plan.md`; audio cue-timing test; slice 11 before the freeze" (R3) |
+| 9.1, A6 | "S9 #954: commands through the port, Rust first (slices 2, 7 and 10), with #1064, #1065, #1066" |
+| 9.1, new A8 | "Engine load-time memory peak (slice 13), against M6, before the facade's protocol run" (R4) |
+| 11, risks | Add: the port migration regresses a UI flow (strangler order, revert per slice); the facade's PC run fails (stop rule, the owner decides); restore-point cost (the 50 ms save budget measured on the PC, with remedies per kind of save: review section 5.7); a recovery point fails to load at a fault (R5) |
 | 12, OD-9 (ii) | Note: superseded by AD-9 for S6 once signed off; RUN-0b's cost split stays as the baseline |
 
 ## 3. #868, proposed body
@@ -92,14 +96,19 @@ Amendments:
 >    through the port, `previewRentBatch`, the exterminator's `cost` and
 >    `rooms`, an unknown kind refused instead of thrown,
 >    `placeTransportDryRun` and `validateTransport`.
-> 5. On the WASM path: no per-step sync, no hourly or per-revision
->    `serialize` / `JSON.parse` / `Simulation.deserialize` / merge; the six
->    named unit and integration exclusions removed.
+> 5. On the WASM path in production: no per-step sync, no hourly or
+>    per-revision `serialize` / `JSON.parse` / `Simulation.deserialize` /
+>    merge. The cadence-excluded tests run on the port contract suite and
+>    leave the exclusions ratchet, one mapping row each; the parity projects
+>    and the dual run keep the mirror as a test-only host; a test that
+>    cannot be expressed through the port goes to the owner as a gate
+>    exception before slice 11 (review R1).
 > 6. The `chromium-wasm` e2e project passes on the facade, with a check that
 >    normal play constructs and deserializes no `Simulation`; the audio
 >    cue-timing test passes.
 > 7. The PC protocol run on the facade (medium and large, 1x and 4x) is
->    recorded before the facade becomes the WASM host.
+>    recorded before the facade becomes the WASM host, after the load-time
+>    memory item (review R4).
 >
 > Not in this issue: Rust-first commands (#954), the worker adapter (after
 > the flip, AD-7), the load-time memory peak (its own issue).
@@ -135,9 +144,14 @@ Amendments:
 > `chromium-wasm` green on the facade.
 >
 > The 2026-10-20 handover from #874 (report a command the instance
-> accepted and the engine refused) is satisfied by construction on the
-> healthy path, since no instance answers; it stays relevant only on
-> today's host until slice 11 removes it, and is tested there until then.
+> accepted and the engine refused) holds by construction on the facade,
+> since no instance answers; today's instance-first host still reports it
+> until slice 11 removes that host from production (the Runtime thread made
+> it acceptance item 6).
+>
+> **Blockers (D5, no exception):** #1064 and #1065. They run wherever two
+> engines answer the same command: the mirror host while it exists, the
+> dual run and the parity harness (review R2).
 >
 > Depends on #868 (the port and result shapes) and #874 (the fallback). It
 > gates the default flip (#945). Review: `/gds-code-review`.
@@ -146,12 +160,12 @@ Amendments:
 
 | Row | Change |
 | --- | --- |
-| A5 | Work: "S6: the Rust-backed facade (AD-9), slices 1 to 8, 10, 11; cue-timing test". Depends on: "the owner's sign-off; slice 5 after A2 (#1092) in shared files". Next step: "slice 1's story" |
-| A6 | Work: "S9: Rust-first commands through the port (slices 2 and 7) and the D5 items". Depends on: "A3, A5's slice 1" |
-| new A8 | "Engine load-time memory peak (slice 13)", key yes, against M6 |
-| Unit and integration gate | Blocking work: "A5 (the facade) removes the named exclusions" |
-| Performance gate | Blocking work: add "the PC run on the facade (slice 9); A8 for M6" |
-| Reliability gate | Note that eligible sessions start with the slice that puts `RustSim` on the WASM path (slice 10) |
+| A5 | Work: "S6: the Rust-backed facade (AD-9), slices 1 to 8 and 10; cue-timing test; slice 11 before the freeze" (R3, held for the owner's answer). Depends on: "the owner's sign-off; slices 5, 7, 8 after the Runtime thread's #1113/#1126/#1149 PR in shared files". Next step: "slice 1's story" |
+| A6 | Work: "S9: Rust-first commands through the port (slices 2, 7 and 10) and the D5 items (#1064, #1065, #1066)". Depends on: "A3, A5's slice 1" |
+| new A8 | "Engine load-time memory peak (slice 13)", key yes, against M6, before the facade's protocol run (R4) |
+| Unit and integration gate | Blocking work: "A5 (the facade) removes the named exclusions: the cadence-excluded tests move onto the port contract suite in slice 7; the parity projects keep the mirror as a test-only host" (R1) |
+| Performance gate | Blocking work: add "A8 for M6, then the PC run on the facade (slice 9)" |
+| Reliability gate | Note that eligible sessions start with the slice that puts `RustSim` on the WASM path (slice 10; R3, held for the owner's answer); the divergence line is empty on facade sessions by construction (R2); a "recovery point refused" line (R5) |
 | B7 (#1068) | Next step: the owner's recommendation now weighs that AD-9 ends #1068's read-model role; its Rust `SaveMirror` stays a candidate for restore points only |
 | Off the path | #1049 and #1050 are retargeted to the facade's view (slice 6a covers #1049's changed units; the structural snapshot covers #1050) |
 

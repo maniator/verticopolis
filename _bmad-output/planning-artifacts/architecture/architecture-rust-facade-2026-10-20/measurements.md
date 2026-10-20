@@ -99,8 +99,9 @@ What the two runs show, within each run:
 - **B costs a little more than bare.** B-chg-f adds 0.02 to 0.1 s on medium
   and about 0.3 s on large over 720 steps (about 0.1 to 0.5 ms and 1.5 to 1.8 ms
   per rendered frame) with the prototype's full-frame build and walk still in
-  it; B-pc-f adds about half of that. Step p99 stays within about 1 ms of
-  bare, and B triggers no garbage collection.
+  it; B-pc-f adds between about half of that and all of it (about half in
+  run 2; the same on medium and about 60% on large in run 1). Step p99
+  stays within about 1 ms of bare, and B triggers no garbage collection.
 - **Reading the whole frame every frame is the next cost.** B-up-f moves
   360 MiB per game day on large, nearly all of it unit records that did not
   change; carrying only changed units cuts it to 2.6 MiB. This is #1049's
