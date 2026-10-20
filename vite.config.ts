@@ -224,6 +224,9 @@ function wasmParityProjects() {
     "**/loaderCases.integration.test.ts",
     // The engine comparison's own checks run each engine themselves (#972).
     "**/perfCompare/*.integration.test.ts",
+    // Pure render: it paints in a software raster and never touches the engine,
+    // so the WASM project would only repeat the TypeScript run.
+    "**/originSeedsSweep.integration.test.ts",
     "**/wasmHost.integration.test.ts",
     "**/wasmHostCatalog.integration.test.ts",
     "**/wasmHostLogText.integration.test.ts",
