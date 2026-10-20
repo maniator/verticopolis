@@ -148,7 +148,8 @@
     },
     {
       "op": "callExterminator",
-      "expectFail": true
+      "expectFail": true,
+      "reason": "funds"
     },
     {
       "op": "setMoney",
@@ -159,7 +160,8 @@
     },
     {
       "op": "callExterminator",
-      "expectFail": true
+      "expectFail": true,
+      "reason": "pending"
     },
     {
       "op": "checkpoint",

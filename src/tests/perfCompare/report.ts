@@ -1,5 +1,6 @@
 import { treeSummary } from "./treeRecord";
 import { browserName, rendererBanners, rendererSummary } from "./renderer";
+import { MIN_REPS, pairedDifference } from "./stats";
 import type { CompareResults, Comparison, EngineName, MetricRow } from "./types";
 
 /**
@@ -58,8 +59,10 @@ export function fmt(v: number | null | undefined, unit: string): string {
   }
   if (unit === "ratio") return `${(v * 100).toFixed(1)}%`;
   if (unit === "ms") {
-    if (v >= 100) return `${v.toFixed(0)} ms`;
-    return v >= 1 ? `${v.toFixed(2)} ms` : `${v.toFixed(3)} ms`;
+    // By size, so a negative paired difference rounds like a positive one.
+    const size = Math.abs(v);
+    if (size >= 100) return `${v.toFixed(0)} ms`;
+    return size >= 1 ? `${v.toFixed(2)} ms` : `${v.toFixed(3)} ms`;
   }
   return `${v.toFixed(2)} ${unit}`;
 }
@@ -72,6 +75,28 @@ function ratioText(c: Comparison): string {
 function table(header: string[], rows: string[][]): string {
   const line = (r: string[]) => `| ${r.join(" | ")} |`;
   return [line(header), line(header.map(() => "---")), ...rows.map(line)].join("\n");
+}
+
+/**
+ * M5's statistic (protocol 6.1 step 2): the median of the cold start to ready,
+ * wasm minus ts per repetition, with the 95% interval of the median. The upper
+ * end is the value `perf:calibrate` reads against ε for a pass
+ * (`coldStartDifference`); both come from `pairedDifference`.
+ */
+export function coldStartDifferenceLines(metrics: readonly MetricRow[], aa: EngineName | null): string[] {
+  const rows = metrics.filter((m) => m.group === "startup" && m.metric === "cold game ready");
+  const throttles = [...new Set(rows.map((m) => m.throttle))];
+  const lines = throttles.flatMap((t) => {
+    const wasm = rows.find((m) => m.throttle === t && m.engine === "wasm");
+    const ts = rows.find((m) => m.throttle === t && m.engine === "ts");
+    const d = wasm && ts ? pairedDifference(wasm, ts) : null;
+    if (!d) return [];
+    const ci = d.ciLow !== null && d.ciHigh !== null ? `${fmt(d.ciLow, "ms")} to ${fmt(d.ciHigh, "ms")}` : "no interval";
+    return [[`${t}x`, fmt(d.median, "ms"), ci, d.n < MIN_REPS ? `${d.n} (below the gate's minimum of ${MIN_REPS})` : String(d.n)]];
+  });
+  if (!lines.length) return [];
+  const sign = aa ? "slot wasm minus slot ts" : "WASM minus TypeScript";
+  return ["", `Cold start to ready, paired difference (${sign}; above zero is worse):`, "", table(["CPU", "Median", "95% CI of median", "Pairs"], lines)];
 }
 
 export function markdownReport(res: CompareResults): string {
@@ -161,6 +186,7 @@ export function markdownReport(res: CompareResults): string {
       const head = aa ? ['slot "ts" median', 'slot "wasm" median', 'slot wasm / slot ts, paired (95% CI)'] : ["TypeScript median", "WASM median", "WASM / TS, paired (95% CI)"];
       out.push(table(["Scenario", "CPU", "Metric", ...head, ...(aa ? [] : ["Verdict"]), "n (ts/wasm/pairs)"], comps.map((x) => [x.scenario, `${x.throttle}x`, x.metric, fmt(x.tsMedian, x.unit), fmt(x.wasmMedian, x.unit), ratioText(x), ...(aa ? [] : [x.verdict]), `${x.n.ts}/${x.n.wasm}/${x.n.pairs}`])));
     }
+    if (g === "startup") out.push(...coldStartDifferenceLines(res.metrics, aa));
     if (single.length) {
       out.push("");
       out.push(table(["Scenario", "CPU", "Metric", aa ? "Slot" : "Engine", "Median", "95% CI of median", "p95", "CV", "n"], single.map((m) => [m.scenario, `${m.throttle}x`, m.metric, m.engine, fmt(m.summary?.median, m.unit), m.summary?.medianCiLow != null ? `${fmt(m.summary.medianCiLow, m.unit)} to ${fmt(m.summary.medianCiHigh, m.unit)}` : "n/a", fmt(m.summary?.p95, m.unit), m.summary ? `${(m.summary.cv * 100).toFixed(1)}%` : "n/a", String(m.values.length)])));

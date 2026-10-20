@@ -158,12 +158,25 @@ export function rustConstant(
   return Number(found[0][1]);
 }
 
+/** The `[package]` name and version of `engine-rs/Cargo.toml`. */
+export function cargoPackage(cargoToml: string): {
+  name: string;
+  version: string;
+} {
+  const pkg = /\[package\]([\s\S]*?)(?:\n\s*\[|$)/.exec(cargoToml)?.[1] ?? "";
+  const field = (key: string) =>
+    new RegExp(`^${key}\\s*=\\s*"([^"]+)"`, "m").exec(pkg)?.[1];
+  const name = field("name");
+  const version = field("version");
+  if (!name) throw new Error("engine-rs/Cargo.toml has no [package] name");
+  if (!version)
+    throw new Error("engine-rs/Cargo.toml has no [package] version");
+  return { name, version };
+}
+
 /** The crate version `engine-rs/Cargo.toml` declares in its `[package]` table. */
 export function cargoVersion(cargoToml: string): string {
-  const pkg = /\[package\]([\s\S]*?)(?:\n\s*\[|$)/.exec(cargoToml)?.[1] ?? "";
-  const m = /^version\s*=\s*"([^"]+)"/m.exec(pkg);
-  if (!m) throw new Error("engine-rs/Cargo.toml has no [package] version");
-  return m[1];
+  return cargoPackage(cargoToml).version;
 }
 
 /** Every file `computeCompat` reads, relative to the repository root. */

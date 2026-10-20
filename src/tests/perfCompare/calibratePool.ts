@@ -56,6 +56,16 @@ export function rendererProblem(r: Pick<PoolPass, "browser" | "runs">): string |
   return f.errors.length ? f.errors[0] : null;
 }
 
+/**
+ * Every good process run must carry a context-loss record (#1136): a folder
+ * from a harness that did not look for a lost WebGL context is not evidence
+ * of a stable renderer, and a folder with a loss in it fails `rendererProblem`.
+ */
+export function lossRecordProblem(r: Pick<PoolPass, "runs">): string | null {
+  const good = (r.runs ?? []).filter((x) => x.ok);
+  return good.some((x) => !Array.isArray(x.contextLost)) ? "a process run has no WebGL context-loss record (a harness from before #1136)" : null;
+}
+
 /** The distinct renderer strings a pass read, in order. */
 export const renderers = (r: Pick<PoolPass, "runs">): string[] => [...new Set((r.runs ?? []).filter((x) => x.ok).flatMap((x) => [x.page?.webgl?.renderer, x.rendererEnd, x.rendererEndCold]).filter((x): x is string => !!x))].sort();
 

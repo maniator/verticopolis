@@ -145,7 +145,8 @@
       "kind": "office",
       "floor": 2,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Something is already here."
     },
     {
       "op": "checkpoint",

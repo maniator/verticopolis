@@ -436,8 +436,12 @@ noise the tolerance has to cover.
    differences: one ε for M4's long tasks, and one for M5's cold start at each
    throttle, taken as the upper bound of the 95% order-statistic interval of
    the median paired difference (WASM slot minus TypeScript slot, one-sided).
-   Not yet: the verdict report has to print that same statistic before M5 can
-   be judged against ε.
+   `perf:worker`'s report prints M4's difference (median and 95% interval of
+   the median, WASM minus TypeScript, in ms); the upper end is the statistic
+   `perf:calibrate` computes for a pass. The `perf:compare` report prints M5's statistic
+   the same way, under the Startup table (one row per CPU throttle, with the
+   pair count); a row under 10 pairs is marked as below the gate's minimum, in
+   both reports.
 3. **Coverage.** For passes that are exchangeable, on average over
    the draw of the passes, a fresh pass lands above the largest of n passes
    with probability 1/(n + 1) (before rounding).
@@ -574,8 +578,8 @@ folders in the same command as the `perf:compare` ones (it tells them apart by
   WebGL context loss. A folder that records no context-loss field comes from a
   harness older than #1136 and is left out (`perf:worker` writes the field
   from PR #1172 on, so M4 cannot be calibrated before that PR is in: every
-  earlier folder is left out). A `perf:compare` folder is not asked for the
-  field; its renderer check rejects a recorded loss. The passes are pooled
+  earlier folder is left out). A `perf:compare` folder is asked for the same
+  record, so a compare pass from before #1136 is left out too. The passes are pooled
   only if they share commit, machine, browser, engine build and run
   parameters, and the pass-count and coverage checks (including the open
   amendment to OD-4) are the ones M1 to M5 use.
