@@ -218,8 +218,8 @@ function finishAttach(sim: Simulation, host: WasmHost): Hosting {
   // The booking runs on the instance and is relayed to the engine by the
   // host's own wrapper. The compare before it carries an un-relayed edit
   // into the engine (a re-host) while no booking is pending yet; the one
-  // after it throws on any difference, so an answer the two engines
-  // disagree on is reported, never re-hosted away.
+  // after it throws on any difference (it never re-hosts), so an answer the
+  // two engines disagree on fails the test.
   const exterminatorWrapper = function (this: Simulation): ReturnType<Simulation["callExterminator"]> {
     const current = hosted.get(this);
     if (!current) return relayExterminator.call(this);

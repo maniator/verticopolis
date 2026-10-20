@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import { quantumFor } from "../../engine/sim/fixedStep";
+import { MAX_STEPS_PER_FRAME, quantumFor } from "../../engine/sim/fixedStep";
 import { SPEEDS } from "../../game/frameLoop";
 import { attachWasmHost } from "../../wasmhost/wasmHost";
 import { startWasmHost } from "../../wasmhost/startWasmHost";
@@ -49,22 +49,19 @@ afterEach(freePoisoned);
 describe.skipIf(!hasWasmPackage())("WASM attach with a pending exterminator", () => {
   it("keeps billed IDs through attach, merge, treatment and detach", () => {
     const { sim, paid, later } = booked();
-    const host = attachWasmHost(sim, wasm());
+    const attached = attachWasmHost(sim, wasm());
     try {
-      host.syncStructure();
+      attached.syncStructure();
       expect(sim.exterminationRoomIds).toEqual([paid.unitId]);
-      expect(JSON.parse(host.engine.serialize()).exterminationRoomIds).toEqual([paid.unitId]);
+      expect(JSON.parse(attached.engine.serialize()).exterminationRoomIds).toEqual([paid.unitId]);
       // From 07:00 on day 0, 25 hourly ticks reach 08:00 on the due day, when
       // the Modern housekeeping shift lands the treatment.
       for (let hour = 0; hour < 25; hour++) sim.tick(60);
-      host.syncStructure();
+      attached.syncStructure();
       expect([sim.clock.day, sim.clock.hour]).toEqual([1, 8]);
-      expect(sim.tower.getUnit(paid.unitId!)!.state).toBe("empty");
-      expect(sim.tower.getUnit(later.unitId!)!.state).toBe("infested");
-      expect(sim.exterminationDueDay).toBeUndefined();
-      expect(sim.exterminationRoomIds).toBeUndefined();
+      treatedBilledOnly(sim, paid, later);
     } finally {
-      host.detach();
+      attached.detach();
     }
     expect(sim.exterminationRoomIds).toBeUndefined();
     expect(sim.callExterminator()).toMatchObject({ ok: true, rooms: 1 });
@@ -72,21 +69,18 @@ describe.skipIf(!hasWasmPackage())("WASM attach with a pending exterminator", ()
 
   it("keeps the treatment to the billed rooms when the host lets go mid-booking", () => {
     const { sim, paid, later } = booked();
-    const host = attachWasmHost(sim, wasm());
+    const attached = attachWasmHost(sim, wasm());
     try {
-      host.syncStructure();
+      attached.syncStructure();
       sim.tick(60);
-      host.syncStructure();
+      attached.syncStructure();
     } finally {
-      host.detach();
+      attached.detach();
     }
     expect(sim.exterminationRoomIds).toEqual([paid.unitId]);
     // Back on the TypeScript loop: 08:00 on the due day lands the treatment.
-    for (let hour = 0; hour < 24; hour++) sim.tick(60);
-    expect([sim.clock.day, sim.clock.hour]).toEqual([1, 8]);
-    expect(sim.tower.getUnit(paid.unitId!)!.state).toBe("empty");
-    expect(sim.tower.getUnit(later.unitId!)!.state).toBe("infested");
-    expect(sim.exterminationDueDay).toBeUndefined();
+    toTreatment(sim);
+    treatedBilledOnly(sim, paid, later);
   });
 });
 
@@ -101,7 +95,8 @@ describe.skipIf(!hasWasmPackage())("an engine trap mid-booking falls back and ke
   it.each([
     // A trap in a tick: the newest point is the last merge's save.
     { path: "tick", line: RESTORED, trap: (sim: Simulation) => sim.tick(60) },
-    // A trap in a command: the newest point is the undo capture's save.
+    // A trap in a command: the newest point is the undo capture's save, a
+    // minute after the last merge (a step with no hour pass merges nothing).
     { path: "command", line: UNDONE, trap: (sim: Simulation) => expect(sim.build("lobby", 1, 220).ok).toBe(true) },
   ])("after a trap in a $path, the TypeScript loop treats only the billed room", async ({ path, line, trap }) => {
     const { sim, paid, later } = booked();
@@ -112,8 +107,12 @@ describe.skipIf(!hasWasmPackage())("an engine trap mid-booking falls back and ke
       expect(h.status.hosted).toBe(true);
       // Three hosted hours: each hour's merge is a restore point the engine wrote.
       for (let hour = 0; hour < 3; hour++) sim.tick(60);
+      expect(sim.clock.minutes).toBe(startedAt + 180);
       expect(sim.exterminationRoomIds).toEqual([paid.unitId]);
-      if (path === "command") a.captureUndo("Lobby");
+      if (path === "command") {
+        sim.tick(1);
+        a.captureUndo("Lobby");
+      }
       trapAfter(h.current()!.engine, path === "tick" ? "tick" : "build");
       trap(sim);
       if (path === "command") a.commitUndo();
@@ -122,10 +121,12 @@ describe.skipIf(!hasWasmPackage())("an engine trap mid-booking falls back and ke
       const fresh = a.sim;
       expect(fresh).not.toBe(sim);
       expect(h.status.hosted).toBe(false);
+      expect(fresh.log.length).toBeGreaterThan(0);
       expect(fresh.log[fresh.log.length - 1].text).toBe(line);
-      // The tower came back from a point the engine wrote after the attach,
-      // with the booking as it was.
-      expect(fresh.clock.minutes).toBeGreaterThan(startedAt);
+      // The tower came back from the newest point the engine wrote after the
+      // attach (the last merge's, or the capture's a minute later), with the
+      // booking as it was.
+      expect(fresh.clock.minutes).toBe(startedAt + (path === "tick" ? 180 : 181));
       expect(fresh.clock.day).toBe(0);
       expect(fresh.exterminationDueDay).toBe(1);
       expect(fresh.exterminationRoomIds).toEqual([paid.unitId]);
@@ -139,55 +140,71 @@ describe.skipIf(!hasWasmPackage())("an engine trap mid-booking falls back and ke
   });
 });
 
-/** Step the worker host at the fastest speed, four steps a frame as the
- *  frame loop caps them, to 08:00 on the due day. */
-async function workerToTreatment(h: Hosted): Promise<void> {
+/** One frame at the fastest speed: the frame loop's four steps, each sized
+ *  from the clock, then the flush and the worker's reply. */
+async function workerFrame(h: Hosted): Promise<void> {
+  for (let step = 0; step < MAX_STEPS_PER_FRAME; step++) h.sim.tick(quantumFor(SPEEDS[3], h.sim.clock.minuteOfDay));
+  await h.sync();
+}
+
+/** Run the worker host a frame at a time until the read model's clock is
+ *  in `hour` on `day`. */
+async function workerUntil(h: Hosted, day: number, hour: number): Promise<void> {
   for (let frame = 0; frame < 2_000; frame++) {
-    await h.sync();
-    if (h.sim.clock.day > 1 || (h.sim.clock.day === 1 && h.sim.clock.hour >= 8)) break;
-    for (let step = 0; step < 4; step++) h.sim.tick(quantumFor(SPEEDS[3], h.sim.clock.minuteOfDay));
+    if (h.sim.clock.day > day || (h.sim.clock.day === day && h.sim.clock.hour >= hour)) break;
+    await workerFrame(h);
   }
-  expect([h.sim.clock.day, h.sim.clock.hour]).toEqual([1, 8]);
+  expect([h.sim.clock.day, h.sim.clock.hour]).toEqual([day, hour]);
 }
 
 /**
  * The worker host attaches from the instance's save and adopts the engine's
  * state through the same `mergeSimulation` (#902). PR #1068 rewrites that
  * merge and adds an hourly save delta, so these pin the adoption of the
- * booked list for the worker host, across hourly passes.
+ * booked list for the worker host on both paths: the full save a settle
+ * asks for, and the hour pass's own reply.
  */
 describe.skipIf(!hasWasmPackage())("the worker host with a pending exterminator (#902)", () => {
-  it("keeps the billed rooms through the worker's attach and merges, and the engine treats only them", async () => {
+  it("keeps the billed rooms through the worker's attach, and the engine treats only them", async () => {
     const { sim, paid, later } = booked();
     const h = await host("worker", sim);
+    const worker = h.worker!;
     try {
-      await h.worker!.host.settle();
+      await worker.host.settle();
+      expect(worker.host.loaded()).toBe(true);
+      // The settle's merge kept the list on the read model.
+      expect(worker.host.stats.merges).toBeGreaterThan(0);
       expect(sim.exterminationRoomIds).toEqual([paid.unitId]);
-      expect((h.sim.serialize() as { exterminationRoomIds?: number[] }).exterminationRoomIds).toEqual([paid.unitId]);
-      await workerToTreatment(h);
-      await h.worker!.host.settle();
+      // The engine's own exact save carries the list: no approximate save
+      // from the read model was taken.
+      const approximate = worker.host.stats.approximateSaves;
+      expect((sim.serialize() as { exterminationRoomIds?: number[] }).exterminationRoomIds).toEqual([paid.unitId]);
+      expect(worker.host.stats.approximateSaves).toBe(approximate);
+      await workerUntil(h, 1, 8);
+      await worker.host.settle();
       treatedBilledOnly(sim, paid, later);
-      expect(h.worker!.fatal).toEqual([]);
-      expect(h.worker!.errors).toEqual([]);
+      expect(worker.fatal).toEqual([]);
+      expect(worker.errors).toEqual([]);
     } finally {
       h.detach();
     }
   });
 
-  it("keeps the treatment to the billed rooms when the worker host lets go mid-booking", async () => {
+  it("puts the list back on the hour's merge, and keeps the treatment to it when the worker host lets go", async () => {
     const { sim, paid, later } = booked();
     const h = await host("worker", sim);
+    const worker = h.worker!;
     try {
-      for (let frame = 0; frame < 15; frame++) {
-        for (let step = 0; step < 4; step++) sim.tick(quantumFor(SPEEDS[3], sim.clock.minuteOfDay));
-        await h.sync();
-      }
-      await h.worker!.host.settle();
-      // Past at least one hourly pass, and still on the booking day.
-      expect(sim.clock.hour).toBeGreaterThanOrEqual(8);
-      expect(sim.clock.day).toBe(0);
+      await h.sync();
+      expect(worker.host.loaded()).toBe(true);
+      // Cleared on the read model, the list can only come back from the
+      // engine's state, which the 08:00 hour pass sends with its reply (no
+      // settle here, so this is the hourly path).
+      sim.exterminationRoomIds = undefined;
+      await workerUntil(h, 0, 8);
       expect(sim.exterminationRoomIds).toEqual([paid.unitId]);
-      expect(h.worker!.fatal).toEqual([]);
+      expect(worker.fatal).toEqual([]);
+      expect(worker.errors).toEqual([]);
     } finally {
       h.detach();
     }
