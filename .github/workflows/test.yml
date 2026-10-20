@@ -80,7 +80,7 @@ jobs:
 
       - name: Engine conformance (no coverage)
         if: ${{ !cancelled() }}
-        run: npx vitest run --project integration conformance.integration
+        run: npm exec --no -- vitest run --project integration conformance.integration
 
       # This job only proves the bundle builds, with no engine package (the e2e
       # job below builds with one), so it opts out of the engine requirement

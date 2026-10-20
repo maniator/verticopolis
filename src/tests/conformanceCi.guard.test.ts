@@ -37,16 +37,21 @@ describe("conformance in the test job", () => {
   const conformance = steps[named("Engine conformance (no coverage)")] ?? [];
 
   it("is excluded from the coverage run", () => {
-    expect(coverage).toContain(`run: npm run test:coverage -- --run --exclude '**/${FILE}'`);
+    expect(coverage).toEqual(["name: Run tests", `run: npm run test:coverage -- --run --exclude '**/${FILE}'`]);
   });
 
   it("runs in its own step after the coverage run, with nothing that could make it pass without running", () => {
     expect(named("Engine conformance (no coverage)")).toBeGreaterThan(named("Run tests"));
+    // An install step that went missing would make this -1 and pass the
+    // ordering check below on its own.
+    expect(named("Install dependencies")).toBeGreaterThanOrEqual(0);
     expect(named("Run tests")).toBeGreaterThan(named("Install dependencies"));
     expect(conformance).toEqual([
       "name: Engine conformance (no coverage)",
       "if: ${{ !cancelled() }}",
-      "run: npx vitest run --project integration conformance.integration",
+      // `npm exec --no` never fetches from the registry: the step also runs
+      // after a failed install, where `npx` would run an unpinned vitest.
+      "run: npm exec --no -- vitest run --project integration conformance.integration",
     ]);
     // The positional filter is a substring match on the file path.
     expect(FILE.startsWith("conformance.integration")).toBe(true);
