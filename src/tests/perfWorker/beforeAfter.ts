@@ -122,6 +122,7 @@ export function comparability(before: WorkerResults, after: WorkerResults, minPa
   for (const [name, r] of [["BEFORE", before], ["AFTER", after]] as const) {
     if (r.validation?.ok !== true || (r.validation.errors ?? []).length > 0) out.push(`${name} failed its own validation`);
     if (r.config.quick !== false) out.push(`${name} is a --quick run, or does not say it was not`);
+    if (r.config.aa) out.push(`${name} is an A/A pass (${r.config.aa} in both slots), not a run of a build`);
     const tree = treeProblem({ environment: r.environment });
     if (tree) out.push(`${name}: ${tree}`);
     if (r.browser.rendererException) out.push(`${name} declared renderer exception ${r.browser.rendererException}`);
