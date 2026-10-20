@@ -1,10 +1,11 @@
 import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright";
 import { processTreePss } from "../perfCompare/env";
-import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave } from "../perfCompare/page";
+import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave, webglRenderer } from "../perfCompare/page";
 import type { PerfServer } from "../perfCompare/server";
 import type { Scenario } from "../perfCompare/scenarios";
 import { frameStats, quantile } from "../perfCompare/stats";
 import { simRun } from "../perfCompare/pageSim";
+import { launchOptions, type BrowserLaunch } from "../perfCompare/renderer";
 import { activeMode, engineMemory, framesRun, hostedRun, type ModeName } from "./pageWorker";
 
 /**
@@ -121,6 +122,10 @@ export interface ModeRun {
   pageErrors: string[];
   browserVersion: string | null;
   page: { crossOriginIsolated: boolean; userAgent: string; webgl: { renderer: string; vendor: string } | null } | null;
+  /** The renderer read again from a new context after the frames; see ProcessRun.rendererEnd. */
+  rendererEnd?: string | null;
+  /** The same read after the throttled cold start, kept apart so it cannot hide a change after the frames; absent for a run without a cold start. */
+  rendererEndCold?: string | null;
   cold: Startup | null;
   warm: Startup | null;
   cold4x: Startup | null;
@@ -295,6 +300,7 @@ export interface RunnerOptions {
   config: WorkerConfig;
   scenarios: Scenario[];
   executablePath: string | null;
+  launch: BrowserLaunch;
   log: (line: string) => void;
 }
 
@@ -316,7 +322,7 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
   const slowRate = Math.max(...config.throttles);
   let browser: Browser | null = null;
   try {
-    browser = await chromium.launch({ headless: true, args: ["--autoplay-policy=no-user-gesture-required", "--js-flags=--expose-gc"], ...(opts.executablePath ? { executablePath: opts.executablePath } : {}) });
+    browser = await chromium.launch(launchOptions(opts.executablePath, opts.launch));
     run.browserVersion = browser.version();
     const ctx = await newContext(browser, config, "block");
     const page = await ctx.newPage();
@@ -324,7 +330,7 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
     const cdp = await ctx.newCDPSession(page);
     run.cold = await startup(page, server, mode, () => page.goto(url, { waitUntil: "commit" }));
     const info = await page.evaluate(pageInfo);
-    run.page = { crossOriginIsolated: info.crossOriginIsolated, userAgent: info.userAgent, webgl: info.webgl };
+    run.page = { crossOriginIsolated: info.crossOriginIsolated, userAgent: info.userAgent, webgl: await ev(page, "renderer", webglRenderer, undefined) };
     run.warm = await startup(page, server, mode, () => page.reload({ waitUntil: "commit" }));
     run.cpuProbe = { unthrottledMs: await ev(page, "cpu probe", cpuProbe, undefined), timed: {} };
     log(`  rep ${rep} ${mode}: cold ready ${run.cold.modeReadyMs?.toFixed(0)} ms, warm ready ${run.warm.modeReadyMs?.toFixed(0)} ms`);
@@ -386,6 +392,9 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
         await expectMode(page, mode, `${sc.name} ${rate}x frames`);
       }
     }
+    // The adapter again, from a new context, once every frame is measured (and
+    // once more after the throttled cold start below when there is one).
+    run.rendererEnd = (await ev(page, "renderer after the frames", webglRenderer, undefined))?.renderer ?? null;
     await ctx.close();
 
     if (slowRate > 1) {
@@ -400,6 +409,7 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
       });
       // The throttle held in this context too.
       run.cpuProbe.timed[`cold:${slowRate}`] = await ev(slowPage, "cpu probe", cpuProbe, undefined);
+      run.rendererEndCold = (await ev(slowPage, "renderer after the cold start", webglRenderer, undefined))?.renderer ?? null;
       await slow.close();
     }
     run.ok = true;

@@ -4,6 +4,9 @@ import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
 import { buildTree, collectEnvironment, ENGINE_PACKAGE_FILES, packageState, type Environment, type PackageState } from "./env";
 import { buildLimitations } from "./limitations";
+import { gateBrowser, probeBrowser, type BrowserProbe } from "./browserProbe";
+import { checkExceptionFolder, exceptionMarker, resolveLaunch } from "./exceptionRegister";
+import { browserName, recordedGpuVerified, type BrowserLaunch } from "./renderer";
 import { aggregate, compareEngines, missingSamples } from "./metrics";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
@@ -111,6 +114,14 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const log = (line: string) => process.stderr.write(`${line}\n`);
   const dist = join(repo, "dist");
   const distPerf = join(repo, "dist-perf");
+  // The browser is settled first: launch settings are parsed and the adapter
+  // is read before any build or results folder exists, so a setting that does
+  // not reach the GPU fails in seconds.
+  const launch = resolveLaunch(process.env, repo);
+  const executablePath = process.env.PW_CHROMIUM_PATH || null;
+  const probe = await probeBrowser(executablePath, launch);
+  for (const w of gateBrowser(probe, args.quick, launch, executablePath)) log(`perf:compare: warning: ${w}`);
+  log(`perf:compare: ${browserName(launch.channel, executablePath)} ${probe.version}${launch.channel ? ` (channel ${launch.channel})` : ""}, WebGL renderer ${probe.renderer ?? "none"}`);
   if (!existsSync(join(repo, "src/public/engine/verticopolis_engine_bg.wasm"))) {
     throw new Error("the engine package src/public/engine/ is missing: build it first with `bash scripts/build-engine-wasm.sh` where that script exists (it installs the pinned toolchain), or `npm run wasm:build` (needs the wasm32 target and the pinned wasm-bindgen CLI)");
   }
@@ -154,7 +165,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     config,
     enginePackage: environment.enginePackage,
     scenarios: scenarios.map((s) => s.sha256),
-    machine: machineOf(environment, process.env.PW_CHROMIUM_PATH ?? null),
+    machine: machineOf(environment, executablePath, launch, probe),
     startedAt,
   };
   let out: string;
@@ -172,7 +183,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify({ resumed: startedAt, runsFromCheckpoint: cp.runs.length }) + "\n");
     log(`perf:compare: resuming ${out} with ${runs.length} finished process run(s)${interruptedAttempts.length ? `; ${interruptedAttempts.length} attempt(s) were interrupted and run again` : ""}`);
   } else {
-    out = outputDir(repo, args, startedAt.slice(0, 10), environment);
+    out = outputDir(repo, args, startedAt.slice(0, 10), environment, existsSync, launch.rendererException);
     mkdirSync(out, { recursive: true });
     writeFileSync(join(out, CHECKPOINT_META), JSON.stringify(meta, null, 1) + "\n");
     writeFileSync(join(out, CHECKPOINT_RUNS), "");
@@ -184,7 +195,6 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   for (const c of nodeChecks) log(`  ${c.scenario}: ${c.match ? "engines agree" : "ENGINES DISAGREE"} (Node: ts ${c.nodeTsMs.toFixed(0)} ms, wasm ${c.nodeWasmMs.toFixed(0)} ms)`);
 
   const server = await startServer(distPerf);
-  const executablePath = process.env.PW_CHROMIUM_PATH ?? null;
   let browserVersion: string | null = runs.find((r) => r.browserVersion)?.browserVersion ?? null;
   try {
     for (let rep = 0; rep < config.reps; rep++) {
@@ -196,7 +206,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
         // A marker first, so an attempt killed mid-way is reported, never
         // silently replaced by its rerun.
         appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify({ started: { rep, engine, at: new Date().toISOString() } }) + "\n");
-        const run = await runProcess({ server, config, scenarios, executablePath, log }, rep, engine, position);
+        const run = await runProcess({ server, config, scenarios, executablePath, launch, log }, rep, engine, position);
         browserVersion ??= run.browserVersion;
         runs.push(run);
         appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify(run) + "\n");
@@ -206,7 +216,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     await server.close();
   }
 
-  const validation = validateResults(config, runs, nodeChecks);
+  const validation = validateResults(config, runs, nodeChecks, launch.rendererException);
   // Checked again after the runs, against the package recorded before them
   // (the two ends only).
   for (const e of packageErrors(packageState(distPerf), packageState(dist), sourceHash, { files: environment.enginePackage, buildHash: environment.engineBuildHash })) validation.errors.push(e);
@@ -225,7 +235,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   validation.ok = validation.errors.length === 0;
   const bundle = analyzeBundle(dist);
   const toolingBundle = analyzeBundle(distPerf);
-  const renderer = runs.find((r) => r.page?.webgl)?.page?.webgl?.renderer;
+  const renderers = [...new Set(runs.filter((r) => r.ok).flatMap((r) => [r.page?.webgl?.renderer, r.rendererEnd, r.rendererEndCold]).filter((x): x is string => !!x))];
   const results: CompareResults = {
     schema: 1,
     startedAt: meta.startedAt,
@@ -235,7 +245,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     issue: "maniator/verticopolis#972",
     config,
     environment,
-    browser: { version: browserVersion, headless: true, executable: executablePath },
+    browser: { version: browserVersion, headless: true, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException, rendererExceptionSha256: launch.rendererExceptionSha256, rendererExceptionCommit: launch.rendererExceptionCommit, gpuVerified: recordedGpuVerified(launch.rendererException, runs.filter((r) => r.ok).map((r) => r.page?.webgl?.renderer), runs.filter((r) => r.ok).map((r) => r.rendererEnd), runs.filter((r) => r.ok).map((r) => r.rendererEndCold)) },
     scenarios: scenarios.map((s) => ({ name: s.name, description: s.description, sha256: s.sha256, population: s.population, units: s.units, transports: s.transports, saveBytes: s.save.length })),
     nodeChecks,
     runs,
@@ -244,7 +254,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     metrics,
     comparisons,
     validation,
-    limitations: buildLimitations(config.aa, environment.appVersion, renderer),
+    limitations: buildLimitations(config.aa, environment.appVersion, renderers, launch.rendererException),
   };
 
   writeResultFiles(out, results);
@@ -302,11 +312,12 @@ export function packageErrors(perf: PackageState, prod: PackageState, sourceHash
  * and commit gets -2, -3, and so on, so no result is overwritten. An
  * explicit --out must not exist yet either.
  */
-export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild" | "aa">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync): string {
+export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild" | "aa">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync, rendererException: string | null = null): string {
   if (args.out) {
     // Only the folder's own name counts, and in lower case, because the results are written on case-insensitive disks too.
     const name = basename(resolve(repo, args.out));
     const lower = name.toLowerCase();
+    checkExceptionFolder(name, rendererException);
     if (args.aa) {
       const other = args.aa === "ts" ? "wasm" : "ts";
       if (!lower.includes(`aa-${args.aa}`)) throw new Error(`--aa ${args.aa} needs an --out folder name containing aa-${args.aa}, so the folder cannot be mistaken for a comparison`);
@@ -316,7 +327,7 @@ export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skip
     if (exists(out)) throw new Error(`${out} already exists; results are never overwritten`);
     return out;
   }
-  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${args.skipBuild ? "-skipbuild" : ""}${env.dirty ? "-dirty" : ""}`);
+  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${args.skipBuild ? "-skipbuild" : ""}${rendererException ? `-${exceptionMarker(rendererException)}` : ""}${env.dirty ? "-dirty" : ""}`);
   let out = base;
   for (let n = 2; exists(out); n++) out = `${base}-${n}`;
   return out;
@@ -373,8 +384,18 @@ export interface CheckpointMeta {
 }
 
 /** The machine and toolchain fields a resume must match. */
-export function machineOf(env: Env, executablePath: string | null): Record<string, string | number | null> {
-  return { cpuModel: env.cpuModel, logicalCpus: env.logicalCpus, totalMemoryBytes: env.totalMemoryBytes, os: env.os, kernel: env.kernel, arch: env.arch, node: env.node, rust: env.rust, playwright: env.playwright, executablePath };
+export function machineOf(env: Env, executablePath: string | null, launch?: BrowserLaunch, probe?: BrowserProbe): Record<string, string | number | null> {
+  // The launch settings, the browser build and the adapter are part of the
+  // identity: a resume with a different channel, switch, browser update or
+  // renderer would mix incompatible processes in one results folder.
+  // Main's commit is a record, not an identity: any unrelated merge to main would otherwise refuse the resume.
+  const { rendererExceptionCommit: _commit, ...identity } = launch ?? {};
+  const browser: Record<string, string | null> = launch ? { launch: JSON.stringify(identity) } : {};
+  if (probe) {
+    browser.browserVersion = probe.version;
+    browser.renderer = probe.renderer;
+  }
+  return { ...browser, cpuModel: env.cpuModel, logicalCpus: env.logicalCpus, totalMemoryBytes: env.totalMemoryBytes, os: env.os, kernel: env.kernel, arch: env.arch, node: env.node, rust: env.rust, playwright: env.playwright, executablePath };
 }
 
 /**

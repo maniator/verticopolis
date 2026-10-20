@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.39.0
+
+- Reaching TOWER while an emergency or an update prompt is waiting for your answer no longer freezes the game, and a saved tower that was stuck this way now continues. The question comes first, then the congratulations. A tab that is already frozen needs to be closed and the game reopened to pick up the fix.
+
 ## 2.38.0
 
 - Staff shirts, the sky bar's window lights and a few other small room details now stay the same across the whole room. They no longer shift with how the tower is drawn.

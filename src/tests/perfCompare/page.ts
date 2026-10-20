@@ -89,7 +89,6 @@ export interface PageInfo {
   timerResolutionMs: number;
   userAgent: string;
   viewport: { width: number; height: number; dpr: number };
-  webgl: { renderer: string; vendor: string } | null;
 }
 
 export function pageInfo(): PageInfo {
@@ -115,14 +114,6 @@ export function pageInfo(): PageInfo {
       last = now;
     }
   }
-  let webgl: PageInfo["webgl"] = null;
-  try {
-    const gl = document.createElement("canvas").getContext("webgl");
-    const ext = gl?.getExtension("WEBGL_debug_renderer_info");
-    if (gl && ext) webgl = { renderer: String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)), vendor: String(gl.getParameter(ext.UNMASKED_VENDOR_WEBGL)) };
-  } catch {
-    webgl = null;
-  }
   return {
     engineActive,
     host,
@@ -141,7 +132,6 @@ export function pageInfo(): PageInfo {
     timerResolutionMs: Number.isFinite(res) ? res : -1,
     userAgent: navigator.userAgent,
     viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio },
-    webgl,
   };
 }
 
@@ -295,4 +285,30 @@ export function cpuProbe(): number {
   const ms = performance.now() - t;
   (globalThis as unknown as { __perfSink?: number }).__perfSink = x;
   return ms;
+}
+
+/**
+ * The WebGL adapter this page gets: the unmasked renderer and vendor, or the
+ * plain `RENDERER` and `VENDOR` when the debug extension is missing. Null when
+ * no context could be made or the renderer is not a non-empty string (a lost
+ * context answers null, which must never be recorded as the text "null").
+ * The game asks for webgl2 first, so the probe does too. The probe's context
+ * is released at once, so the renderer is read again later (after the frames)
+ * from a new context, and a GPU process that died in between shows.
+ */
+export function webglRenderer(): { renderer: string; vendor: string } | null {
+  try {
+    const canvas = document.createElement("canvas");
+    // The game asks for the high-performance adapter, so a machine with two GPUs names the one the game uses.
+    const gl = (canvas.getContext("webgl2", { powerPreference: "high-performance" }) ?? canvas.getContext("webgl", { powerPreference: "high-performance" })) as WebGLRenderingContext | null;
+    if (!gl) return null;
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    const renderer = gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
+    const vendor = gl.getParameter(ext ? ext.UNMASKED_VENDOR_WEBGL : gl.VENDOR);
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    if (typeof renderer !== "string" || !renderer.trim()) return null;
+    return { renderer: renderer.trim(), vendor: typeof vendor === "string" ? vendor.trim() : "" };
+  } catch {
+    return null;
+  }
 }
