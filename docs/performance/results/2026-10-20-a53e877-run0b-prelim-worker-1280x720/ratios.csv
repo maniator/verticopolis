@@ -1,0 +1,609 @@
+group,scenario,throttle,metric,mode,against,ratio,ci_low,ci_high,pairs,zero_reference,verdict
+startup,-,1,cold start to mode ready,ts,wasm,0.9420352181885474,0.9142061146045818,1.0023795283889636,10,0,inconclusive
+startup,-,1,cold start to mode ready,wasm-frame,wasm,1.006703525321651,0.9829891944623289,1.0372025589002005,10,0,equivalent
+startup,-,1,cold start to mode ready,wasm-worker,wasm,0.9869063579303371,0.9786787792209143,1.0429062640832663,10,0,equivalent
+startup,-,1,cold start to mode ready,wasm,ts,1.0615728983642887,0.9976261203251148,1.0938452325190653,10,0,inconclusive
+startup,-,1,cold start to mode ready,wasm-frame,ts,1.0716045088745068,1.0154362582154064,1.1031525081199918,10,0,inconclusive
+startup,-,1,cold start to mode ready,wasm-worker,ts,1.0532431663166055,0.9986772487488732,1.0946265759300038,10,0,inconclusive
+startup,-,1,cold start to mode ready,wasm-worker,wasm-frame,0.9925150958938602,0.9517791103093454,0.9993227879587548,10,0,equivalent
+startup,-,1,warm start to mode ready,ts,wasm,1.363442776243268,1.330067286156147,1.3910997910092349,10,0,higher
+startup,-,1,warm start to mode ready,wasm-frame,wasm,1.0005491190460885,0.986646781273788,1.0512673535584016,10,0,inconclusive
+startup,-,1,warm start to mode ready,wasm-worker,wasm,1.027652045562322,1.0070123993878828,1.0627601277237733,10,0,inconclusive
+startup,-,1,warm start to mode ready,wasm,ts,0.733442630787558,0.7188556899102873,0.7518416627552497,10,0,lower
+startup,-,1,warm start to mode ready,wasm-frame,ts,0.7439396323839205,0.716850207663958,0.8284546762320525,10,0,lower
+startup,-,1,warm start to mode ready,wasm-worker,ts,0.7526822456105065,0.7366238127268827,0.7990273415378232,10,0,lower
+startup,-,1,warm start to mode ready,wasm-worker,wasm-frame,1.0192138581223138,0.995290396575761,1.0594739667526294,10,0,inconclusive
+startup,-,4,cold start to mode ready,ts,wasm,0.9001403674872188,0.8833955055301475,0.9134883764431225,10,0,lower
+startup,-,4,cold start to mode ready,wasm-frame,wasm,0.9918702439338289,0.9671637516696225,1.0170988537292531,10,0,equivalent
+startup,-,4,cold start to mode ready,wasm-worker,wasm,0.9379193239160677,0.9091690044459976,1.082880984839458,10,0,inconclusive
+startup,-,4,cold start to mode ready,wasm,ts,1.1109792768689881,1.0947046791046542,1.1319957977371362,10,0,higher
+startup,-,4,cold start to mode ready,wasm-frame,ts,1.0993435337597235,1.0814072127600507,1.1513516283047727,10,0,higher
+startup,-,4,cold start to mode ready,wasm-worker,ts,1.040449642935675,1.0191898723972024,1.1949107374124506,10,0,inconclusive
+startup,-,4,cold start to mode ready,wasm-worker,wasm-frame,0.9379897221500215,0.9219091489450354,1.068760896434884,10,0,inconclusive
+startup,-,1,bytes before mode ready (cold),ts,wasm,0.4810997416277144,0.4810997416277144,0.4810997416277144,10,0,lower
+startup,-,1,bytes before mode ready (cold),wasm-frame,wasm,1,1,1,10,0,equivalent
+startup,-,1,bytes before mode ready (cold),wasm-worker,wasm,1.0043160268359785,1.0043160268359785,1.0043160268359785,10,0,equivalent
+startup,-,1,bytes before mode ready (cold),wasm,ts,2.0785710601645304,2.0785710601645304,2.0785710601645304,10,0,higher
+startup,-,1,bytes before mode ready (cold),wasm-frame,ts,2.0785710601645304,2.0785710601645304,2.0785710601645304,10,0,higher
+startup,-,1,bytes before mode ready (cold),wasm-worker,ts,2.087542228640689,2.087542228640689,2.087542228640689,10,0,higher
+startup,-,1,bytes before mode ready (cold),wasm-worker,wasm-frame,1.0043160268359785,1.0043160268359785,1.0043160268359785,10,0,equivalent
+memory,small,1,main-thread JS heap,ts,wasm,1.0162796002422976,1.0008487205222785,1.0168022384309687,10,0,equivalent
+memory,small,1,main-thread JS heap,wasm-frame,wasm,0.9983982110676839,0.9977033543893287,0.999097185155506,10,0,equivalent
+memory,small,1,main-thread JS heap,wasm-worker,wasm,0.9980174522490642,0.9974603401157169,0.9986061036049375,10,0,equivalent
+memory,small,1,main-thread JS heap,wasm,ts,0.9839813295841324,0.9834754116425861,0.999151999193409,10,0,equivalent
+memory,small,1,main-thread JS heap,wasm-frame,ts,0.9823732296054093,0.981338380829391,0.9982257616785473,10,0,equivalent
+memory,small,1,main-thread JS heap,wasm-worker,ts,0.989025156328209,0.9814461021815726,0.997188306918351,10,0,equivalent
+memory,small,1,main-thread JS heap,wasm-worker,wasm-frame,0.9995423404700179,0.9989607012761804,1.0002390138549266,10,0,equivalent
+memory,small,1,JS heaps + WASM memory (main and worker),ts,wasm,0.8604719789314195,0.8473401556057268,0.8608461321946592,10,0,lower
+memory,small,1,JS heaps + WASM memory (main and worker),wasm-frame,wasm,0.9986438981787721,0.9980554153266373,0.9992356514412474,10,0,equivalent
+memory,small,1,JS heaps + WASM memory (main and worker),wasm-worker,wasm,1.0076392437803303,1.0071610726474673,1.0081387874222043,10,0,equivalent
+memory,small,1,JS heaps + WASM memory (main and worker),wasm,ts,1.162153030508649,1.1616477818754658,1.1801635900108418,10,0,higher
+memory,small,1,JS heaps + WASM memory (main and worker),wasm-frame,ts,1.16055286996361,1.1594155875523724,1.17923735249598,10,0,higher
+memory,small,1,JS heaps + WASM memory (main and worker),wasm-worker,ts,1.1784850031498735,1.1703376425052259,1.1891965744761086,10,0,higher
+memory,small,1,JS heaps + WASM memory (main and worker),wasm-worker,wasm-frame,1.008942633485262,1.0084454770356865,1.0095340658907186,10,0,equivalent
+raw,small,1,"bare engine, 720 steps",ts,wasm,1.6072082855203638,1.4213139163334667,1.6986336671628297,10,0,higher
+raw,small,1,"bare engine, 720 steps",wasm,ts,0.6224034304646144,0.588708453936549,0.7035743395658003,10,0,lower
+hosted,small,1,"wall time, 720 steps",ts,wasm,0.27444695103463373,0.2685066679072927,0.28889398105871605,10,0,lower
+hosted,small,1,"wall time, 720 steps",wasm-frame,wasm,0.6895367043950553,0.6723677070506696,0.7259889061751711,10,0,lower
+hosted,small,1,"wall time, 720 steps",wasm-worker,wasm,0.6952078947141358,0.6580235455154155,0.7061338288578073,10,0,lower
+hosted,small,1,"wall time, 720 steps",wasm,ts,3.6438929374615223,3.461477446969571,3.7243022968251576,10,0,higher
+hosted,small,1,"wall time, 720 steps",wasm-frame,ts,2.511950915877164,2.4730189238843137,2.6257527842510084,10,0,higher
+hosted,small,1,"wall time, 720 steps",wasm-worker,ts,2.5072089709712575,2.4114720403252297,2.8378348102716666,10,0,higher
+hosted,small,1,"wall time, 720 steps",wasm-worker,wasm-frame,1.0092532432582497,0.9521795847248286,1.1222135228754122,10,0,inconclusive
+hosted,small,1,"main-thread time, 720 steps",ts,wasm,0.2741996943243572,0.268209719658226,0.28852906562170416,10,0,lower
+hosted,small,1,"main-thread time, 720 steps",wasm-frame,wasm,0.6893612388699267,0.6722491406209532,0.7257933530195421,10,0,lower
+hosted,small,1,"main-thread time, 720 steps",wasm-worker,wasm,0.3661548619003195,0.35043202908609344,0.37118134116880697,10,0,lower
+hosted,small,1,"main-thread time, 720 steps",wasm,ts,3.647180460316047,3.465855330190958,3.7284256561405718,10,0,higher
+hosted,small,1,"main-thread time, 720 steps",wasm-frame,ts,2.5141262447939345,2.4749814956696485,2.627331997296709,10,0,higher
+hosted,small,1,"main-thread time, 720 steps",wasm-worker,ts,1.3327288194085847,1.2811021627606158,1.4602836104214645,10,0,higher
+hosted,small,1,"main-thread time, 720 steps",wasm-worker,wasm-frame,0.5369083253215117,0.49911516784631504,0.5769424069802678,10,0,lower
+hosted,small,1,"main-thread time per batch, p95",ts,wasm,0.15507302556256122,0.1376525200172375,0.1723103407872568,10,0,lower
+hosted,small,1,"main-thread time per batch, p95",wasm-frame,wasm,0.8929333854420605,0.8733364544624564,0.9909828277398169,10,0,inconclusive
+hosted,small,1,"main-thread time per batch, p95",wasm-worker,wasm,0.5951831610574168,0.56373517291056,0.6196368695338439,10,0,lower
+hosted,small,1,"main-thread time per batch, p95",wasm,ts,6.448939797190633,5.803482225333484,7.264669036751201,10,0,higher
+hosted,small,1,"main-thread time per batch, p95",wasm-frame,ts,5.62416754176063,5.509070088817309,6.48626704729553,10,0,higher
+hosted,small,1,"main-thread time per batch, p95",wasm-worker,ts,3.841513453131797,3.6278735775899684,4.448123293443822,10,0,higher
+hosted,small,1,"main-thread time per batch, p95",wasm-worker,wasm-frame,0.665816592939426,0.6252750826642275,0.8059994822784006,10,0,lower
+hosted,small,1,"main-thread time per batch, max",ts,wasm,0.20626251720687322,0.18666666593307105,0.21874999932837313,10,0,lower
+hosted,small,1,"main-thread time per batch, max",wasm-frame,wasm,0.7900306625167732,0.6347163898298047,1.00958379362634,10,0,inconclusive
+hosted,small,1,"main-thread time per batch, max",wasm-worker,wasm,0.5171105887976228,0.4824753596161048,0.6558974339411809,10,0,lower
+hosted,small,1,"main-thread time per batch, max",wasm,ts,4.848577559178054,4.5714285854642025,5.357142878196303,10,0,higher
+hosted,small,1,"main-thread time per batch, max",wasm-frame,ts,3.9177025449865948,3.418670366257466,4.639231872240607,10,0,higher
+hosted,small,1,"main-thread time per batch, max",wasm-worker,ts,2.632893876248441,2.3689986380379477,3.1126373866598844,10,0,higher
+hosted,small,1,"main-thread time per batch, max",wasm-worker,wasm-frame,0.6991363757820142,0.5106445858447238,0.8024079347796859,10,0,lower
+frames,small,1,mean FPS,ts,wasm,1.0317074787569769,1.022673084473468,1.0374182187317014,10,0,equivalent
+frames,small,1,mean FPS,wasm-frame,wasm,1.012896685364967,1.0069076938122157,1.0187656097242932,10,0,equivalent
+frames,small,1,mean FPS,wasm-worker,wasm,1.0179978919488069,1.0142598887152159,1.0270436949418629,10,0,equivalent
+frames,small,1,mean FPS,wasm,ts,0.9692670256420504,0.9639314038870003,0.9778295871694508,10,0,equivalent
+frames,small,1,mean FPS,wasm-frame,ts,0.9800510108327207,0.9756681198734843,0.9921421966237423,10,0,equivalent
+frames,small,1,mean FPS,wasm-worker,ts,0.9886264534319826,0.9801980198019802,0.9999999999999999,10,0,equivalent
+frames,small,1,mean FPS,wasm-worker,wasm-frame,1.0079200371034562,1.0011085807073699,1.0124435311420343,10,0,equivalent
+frames,small,1,1% low FPS,ts,wasm,1.0908595041097042,1,1.1999160016799362,10,0,inconclusive
+frames,small,1,1% low FPS,wasm-frame,wasm,1,0.9999500000000261,1.0000000000000182,10,0,equivalent
+frames,small,1,1% low FPS,wasm-worker,wasm,1,1,1.000050002500099,10,0,equivalent
+frames,small,1,1% low FPS,wasm,ts,0.9167083354167536,0.8333916695835002,1,10,0,inconclusive
+frames,small,1,1% low FPS,wasm-frame,ts,0.9167083354167748,0.8333916695835002,1,10,0,inconclusive
+frames,small,1,1% low FPS,wasm-worker,ts,0.9166854173958774,0.8333916695835154,1,10,0,inconclusive
+frames,small,1,1% low FPS,wasm-worker,wasm-frame,1,1,1.000050002500099,10,0,equivalent
+frames,small,1,frame time p95,ts,wasm,0.9999999999999781,0.9999999999999564,1,10,0,equivalent
+frames,small,1,frame time p95,wasm-frame,wasm,0.9999999999999957,0.9999999999999618,1.0000000000000437,10,0,equivalent
+frames,small,1,frame time p95,wasm-worker,wasm,1,0.9999999999999781,1.0000000000000437,10,0,equivalent
+frames,small,1,frame time p95,wasm,ts,1.0000000000000218,1,1.0000000000000437,10,0,equivalent
+frames,small,1,frame time p95,wasm-frame,ts,1.0000000000000218,1,1.0000570021090482,10,0,equivalent
+frames,small,1,frame time p95,wasm-worker,ts,1.0000000000000218,0.9999999999999901,1.00005700210907,10,0,equivalent
+frames,small,1,frame time p95,wasm-worker,wasm-frame,1.0000000000000082,0.9999999999999781,1.0000000000000437,10,0,equivalent
+frames,small,1,frame time p99,ts,wasm,0.8333916695835053,0.833388335863453,0.9999979999049606,10,0,inconclusive
+frames,small,1,frame time p99,wasm-frame,wasm,0.9999992499654978,0.840054002700151,1.0000025001250046,10,0,inconclusive
+frames,small,1,frame time p99,wasm-worker,wasm,0.9999987499405998,0.9999515000000078,1.0000000000000169,10,0,equivalent
+frames,small,1,frame time p99,wasm,ts,1.1999160016799288,1.0000020000990397,1.1999208015839635,10,0,inconclusive
+frames,small,1,frame time p99,wasm-frame,ts,1.1027595988603747,0.9999999999999823,1.1999160016799624,10,0,inconclusive
+frames,small,1,frame time p99,wasm-worker,ts,1.1999160016799384,0.9999994999752579,1.1999160016799624,10,0,inconclusive
+frames,small,1,frame time p99,wasm-worker,wasm-frame,0.9999999999999867,0.9999499999999898,1.190399660957222,10,0,inconclusive
+frames,small,1,sim minutes per second,ts,wasm,1.0317074787569769,1.0226730844734677,1.0374182187317016,10,0,equivalent
+frames,small,1,sim minutes per second,wasm-frame,wasm,1.012896685364967,1.0069076938122157,1.0187656097242932,10,0,equivalent
+frames,small,1,sim minutes per second,wasm-worker,wasm,0.9441121871116422,0.941959470345589,0.9544244437843573,10,0,inconclusive
+frames,small,1,sim minutes per second,wasm,ts,0.9692670256420503,0.9639314038870002,0.9778295871694509,10,0,equivalent
+frames,small,1,sim minutes per second,wasm-frame,ts,0.9800510108327205,0.9756681198734845,0.9921421966237424,10,0,equivalent
+frames,small,1,sim minutes per second,wasm-worker,ts,0.9177089021225648,0.9108910891089109,0.9246231155778895,10,0,lower
+frames,small,1,sim minutes per second,wasm-worker,wasm-frame,0.9340122826893084,0.9296008249425577,0.9414767273896035,10,0,lower
+frames,small,1,main-thread blocking (long tasks past 50 ms),ts,wasm,0.9377668745584371,0.9283105900442052,0.9555815312682642,10,0,inconclusive
+frames,small,1,main-thread blocking (long tasks past 50 ms),wasm-frame,wasm,0.9752735368720201,0.9618684461391802,0.9907567879838244,10,0,equivalent
+frames,small,1,main-thread blocking (long tasks past 50 ms),wasm-worker,wasm,0.9208340305232813,0.9046718365802913,0.9317620224291959,10,0,lower
+frames,small,1,main-thread blocking (long tasks past 50 ms),wasm,ts,1.0663634951464407,1.0464831804281345,1.0772256728778469,10,0,inconclusive
+frames,small,1,main-thread blocking (long tasks past 50 ms),wasm-frame,ts,1.0419526928298524,1.0137587238285144,1.0527726242011957,10,0,inconclusive
+frames,small,1,main-thread blocking (long tasks past 50 ms),wasm-worker,ts,0.974325732709671,0.9537387836490528,0.9929606625258799,10,0,equivalent
+frames,small,1,main-thread blocking (long tasks past 50 ms),wasm-worker,wasm-frame,0.9391282299708708,0.9282389449185415,0.9551831644583009,10,0,inconclusive
+frames,small,1,"command to visible frame, median",ts,wasm,0.9315024115737907,0.8602620036243194,1.1318907752283291,10,0,inconclusive
+frames,small,1,"command to visible frame, median",wasm-frame,wasm,0.9795866029474711,0.8449516721668161,1.0908383078795458,10,0,inconclusive
+frames,small,1,"command to visible frame, median",wasm-worker,wasm,7.626514975463745,6.93882548716211,8.702569425210056,10,0,higher
+frames,small,1,"command to visible frame, median",wasm,ts,1.0735347142440048,0.8834774714002561,1.1624365551273435,10,0,inconclusive
+frames,small,1,"command to visible frame, median",wasm-frame,ts,0.998123601176693,0.7812926733107606,1.1368141247258012,10,0,inconclusive
+frames,small,1,"command to visible frame, median",wasm-worker,ts,7.852624365991375,7.4459518515610315,8.483354839201896,10,0,higher
+frames,small,1,"command to visible frame, median",wasm-worker,wasm-frame,7.982214764588472,7.453089273016684,9.831925450670147,10,0,higher
+frames,small,1,"command to visible frame, p95",ts,wasm,0.9545475490703201,0.7658691074054664,1.0413974634428769,10,0,inconclusive
+frames,small,1,"command to visible frame, p95",wasm-frame,wasm,0.9520949777116801,0.8393307182989946,1.1296421191787214,10,0,inconclusive
+frames,small,1,"command to visible frame, p95",wasm-worker,wasm,5.65104583699657,4.921303605946541,6.264041277507185,10,0,higher
+frames,small,1,"command to visible frame, p95",wasm,ts,1.048399089454254,0.9602481618247695,1.3057061452546355,10,0,inconclusive
+frames,small,1,"command to visible frame, p95",wasm-frame,ts,1.0469825825123453,0.9362405060596468,1.1242958215946441,10,0,inconclusive
+frames,small,1,"command to visible frame, p95",wasm-worker,ts,6.043720811667313,5.679269079692691,6.493635431407244,10,0,higher
+frames,small,1,"command to visible frame, p95",wasm-worker,wasm-frame,5.814477541374897,5.626318066584127,6.282437474897896,10,0,higher
+raw,small,4,"bare engine, 720 steps",ts,wasm,1.4984471777956565,1.4706727779607165,1.5270341821989992,10,0,higher
+raw,small,4,"bare engine, 720 steps",wasm,ts,0.667360354053372,0.6548641881480047,0.6799609097182264,10,0,lower
+hosted,small,4,"wall time, 720 steps",ts,wasm,0.2892792644860508,0.2866373823074584,0.2927192574665368,10,0,lower
+hosted,small,4,"wall time, 720 steps",wasm-frame,wasm,0.7402369723583715,0.7311571660678915,0.7484341182679378,10,0,lower
+hosted,small,4,"wall time, 720 steps",wasm-worker,wasm,0.4695341451884538,0.46669994459250524,0.47644808815062173,10,0,lower
+hosted,small,4,"wall time, 720 steps",wasm,ts,3.456867543579916,3.416242609573845,3.4887284831793544,10,0,higher
+hosted,small,4,"wall time, 720 steps",wasm-frame,ts,2.556787755455904,2.5334248056228894,2.5835619493895368,10,0,higher
+hosted,small,4,"wall time, 720 steps",wasm-worker,ts,1.623689701528191,1.6133205398857777,1.6433216013346168,10,0,higher
+hosted,small,4,"wall time, 720 steps",wasm-worker,wasm-frame,0.6366791616896221,0.6292847465569494,0.6413781571534439,10,0,lower
+hosted,small,4,"main-thread time, 720 steps",ts,wasm,0.2891393389652407,0.28650944222399954,0.2924851420301403,10,0,lower
+hosted,small,4,"main-thread time, 720 steps",wasm-frame,wasm,0.7401879643070727,0.7314378816662488,0.7484402426906285,10,0,lower
+hosted,small,4,"main-thread time, 720 steps",wasm-worker,wasm,0.3989971603968495,0.39617507554081294,0.4062880697059162,10,0,lower
+hosted,small,4,"main-thread time, 720 steps",wasm,ts,3.4585420963848947,3.418977090798516,3.4902863662628523,10,0,higher
+hosted,small,4,"main-thread time, 720 steps",wasm-frame,ts,2.5597728466071796,2.5338983045037202,2.585554679647577,10,0,higher
+hosted,small,4,"main-thread time, 720 steps",wasm-worker,ts,1.3819498036587712,1.3556083543970492,1.401121946928105,10,0,higher
+hosted,small,4,"main-thread time, 720 steps",wasm-worker,wasm-frame,0.5422021259490762,0.5303417731306845,0.5453910735303301,10,0,lower
+hosted,small,4,"main-thread time per batch, p95",ts,wasm,0.145568277661703,0.14240597403213084,0.14612333757831342,10,0,lower
+hosted,small,4,"main-thread time per batch, p95",wasm-frame,wasm,0.9510480635362815,0.928788244141717,0.9642502670841855,10,0,inconclusive
+hosted,small,4,"main-thread time per batch, p95",wasm-worker,wasm,0.6184228252228212,0.6072161102691626,0.6335876228356465,10,0,lower
+hosted,small,4,"main-thread time per batch, p95",wasm,ts,6.869632758222999,6.843533802148883,7.02217731240946,10,0,higher
+hosted,small,4,"main-thread time per batch, p95",wasm-frame,ts,6.551512386928709,6.385412450498865,6.704119348407021,10,0,higher
+hosted,small,4,"main-thread time per batch, p95",wasm-worker,ts,4.268112217058103,4.180502862710817,4.405129234766206,10,0,higher
+hosted,small,4,"main-thread time per batch, p95",wasm-worker,wasm-frame,0.6557593221577875,0.6341456011275918,0.6705434848677579,10,0,lower
+hosted,small,4,"main-thread time per batch, max",ts,wasm,0.22645129392087565,0.20848034366572088,0.23558862437766986,10,0,lower
+hosted,small,4,"main-thread time per batch, max",wasm-frame,wasm,0.9505129598073678,0.9107232858257326,0.9854565402740272,10,0,inconclusive
+hosted,small,4,"main-thread time per batch, max",wasm-worker,wasm,0.7495269849138142,0.7157258057217458,0.7622281670414638,10,0,lower
+hosted,small,4,"main-thread time per batch, max",wasm,ts,4.415993605303424,4.244687122061164,4.796615270374882,10,0,higher
+hosted,small,4,"main-thread time per batch, max",wasm-frame,ts,4.189110577149446,4.096221952214668,4.418306782533379,10,0,higher
+hosted,small,4,"main-thread time per batch, max",wasm-worker,ts,3.2522136862397435,3.1517805034772683,3.571383941496475,10,0,higher
+hosted,small,4,"main-thread time per batch, max",wasm-worker,wasm-frame,0.7796822187107006,0.7504865160771971,0.808315066671017,10,0,lower
+frames,small,4,mean FPS,ts,wasm,1.0934129288632195,1.0800619227862691,1.0983039538471393,10,0,higher
+frames,small,4,mean FPS,wasm-frame,wasm,1.0296952152296794,1.0205475822745034,1.0325450319536658,10,0,equivalent
+frames,small,4,mean FPS,wasm-worker,wasm,1.0800622824217398,1.0781116624973288,1.0849780302230783,10,0,higher
+frames,small,4,mean FPS,wasm,ts,0.9145686791588141,0.9104947646752976,0.9258728401611169,10,0,lower
+frames,small,4,mean FPS,wasm-frame,ts,0.939113144309826,0.9370166367794889,0.9474766020572253,10,0,lower
+frames,small,4,mean FPS,wasm-worker,ts,0.9889207148094163,0.983388965622929,1.0000003329767149,10,0,equivalent
+frames,small,4,mean FPS,wasm-worker,wasm-frame,1.0507140597441313,1.0471698113207546,1.0583164383326407,10,0,inconclusive
+frames,small,4,1% low FPS,ts,wasm,1.181835537978997,1.1818033055146537,1.299981999279937,10,0,higher
+frames,small,4,1% low FPS,wasm-frame,wasm,0.8666660000666823,0.8666373327466664,0.8666746669867006,10,0,lower
+frames,small,4,1% low FPS,wasm-worker,wasm,1.083327083177083,1.0833020825520439,1.0833541677083942,10,0,higher
+frames,small,4,1% low FPS,wasm,ts,0.8461414197359933,0.7692414206919036,0.8461644973691441,10,0,lower
+frames,small,4,1% low FPS,wasm-frame,ts,0.7333219997333139,0.6666533330666877,0.7333493339733719,10,0,lower
+frames,small,4,1% low FPS,wasm-worker,ts,0.9166479161978951,0.8333416670833467,0.9166729168229173,10,0,lower
+frames,small,4,1% low FPS,wasm-worker,wasm-frame,1.2499937498437244,1.1666541663541503,1.2500375018750605,10,0,higher
+frames,small,4,frame time p95,ts,wasm,0.8333416670833347,0.8333166658332943,0.8333416670833692,10,0,lower
+frames,small,4,frame time p95,wasm-frame,wasm,0.9853598327682245,0.9791677083854362,0.9999999999999946,10,0,equivalent
+frames,small,4,frame time p95,wasm-worker,wasm,0.916670833541666,0.9166708335416385,0.9166708335417082,10,0,lower
+frames,small,4,frame time p95,wasm,ts,1.199987999520009,1.1999879995199592,1.2000240016801138,10,0,higher
+frames,small,4,frame time p95,wasm-frame,ts,1.1775243765974632,1.1749894995799708,1.2000120004800128,10,0,higher
+frames,small,4,frame time p95,wasm-worker,ts,1.0999939997599908,1.099993999759974,1.1000138008004776,10,0,higher
+frames,small,4,frame time p95,wasm-worker,wasm-frame,0.9341778049318488,0.916670833541665,0.9361734723188726,10,0,lower
+frames,small,4,frame time p99,ts,wasm,0.7704493952990392,0.7692414206918615,0.8389732571276447,10,0,lower
+frames,small,4,frame time p99,wasm-frame,wasm,0.996132418566563,0.9245028817511558,1.0015624869985404,10,0,inconclusive
+frames,small,4,frame time p99,wasm-worker,wasm,0.9160840977798107,0.8474678125872747,0.9908117702942525,10,0,inconclusive
+frames,small,4,frame time p99,wasm,ts,1.2979437794377966,1.1919331057388591,1.2999819992800081,10,0,higher
+frames,small,4,frame time p99,wasm-frame,ts,1.2474828617423461,1.1019455911101805,1.2959834393375889,10,0,higher
+frames,small,4,frame time p99,wasm-worker,ts,1.1445079803192217,1.0927372165446125,1.1999559594142397,10,0,higher
+frames,small,4,frame time p99,wasm-worker,wasm-frame,0.9181838595333407,0.9166511458139405,0.9916435306426773,10,0,inconclusive
+frames,small,4,sim minutes per second,ts,wasm,1.0934129288632195,1.0800619227862691,1.0983039538471395,10,0,higher
+frames,small,4,sim minutes per second,wasm-frame,wasm,1.0296952152296794,1.0205475822745034,1.0325450319536658,10,0,equivalent
+frames,small,4,sim minutes per second,wasm-worker,wasm,0.9438382107649437,0.9427881154295684,0.9488742492540688,10,0,lower
+frames,small,4,sim minutes per second,wasm,ts,0.9145686791588141,0.9104947646752974,0.925872840161117,10,0,lower
+frames,small,4,sim minutes per second,wasm-frame,ts,0.939113144309826,0.9370166367794889,0.9474766020572252,10,0,lower
+frames,small,4,sim minutes per second,wasm-worker,ts,0.8647482083717861,0.859357924913731,0.8738741648535255,10,0,lower
+frames,small,4,sim minutes per second,wasm-worker,wasm-frame,0.9187838735973358,0.9150943396226415,0.9248350857501454,10,0,lower
+frames,small,4,frames over 200 ms (clamped),ts,wasm,0,0,0,10,0,lower
+frames,small,4,frames over 200 ms (clamped),wasm-frame,wasm,0.5833333333333333,0.5,1.5,10,0,inconclusive
+frames,small,4,frames over 200 ms (clamped),wasm-worker,wasm,0,0,0,10,0,lower
+frames,small,4,frames over 200 ms (clamped),wasm-worker,wasm-frame,0,0,0,10,0,lower
+frames,small,4,main-thread blocking (long tasks past 50 ms),ts,wasm,0.9480559080782868,0.9454563956446524,0.9533721048872564,10,0,inconclusive
+frames,small,4,main-thread blocking (long tasks past 50 ms),wasm-frame,wasm,0.9847743819333585,0.9793047201549597,0.9885737604570496,10,0,equivalent
+frames,small,4,main-thread blocking (long tasks past 50 ms),wasm-worker,wasm,0.886588133141454,0.883678254664084,0.8905325443786982,10,0,lower
+frames,small,4,main-thread blocking (long tasks past 50 ms),wasm,ts,1.05479054718506,1.0489083904109588,1.0576902378646003,10,0,inconclusive
+frames,small,4,main-thread blocking (long tasks past 50 ms),wasm-frame,ts,1.0369481755088032,1.0323132891076396,1.0430580908407603,10,0,equivalent
+frames,small,4,main-thread blocking (long tasks past 50 ms),wasm-worker,ts,0.9353524426082882,0.928617294520548,0.9395373856912318,10,0,lower
+frames,small,4,main-thread blocking (long tasks past 50 ms),wasm-worker,wasm-frame,0.9009206739778918,0.8970329783934663,0.9033796392286958,10,0,lower
+frames,small,4,"command to visible frame, median",ts,wasm,0.9671949792579817,0.947716454084491,0.9938131880738789,10,0,inconclusive
+frames,small,4,"command to visible frame, median",wasm-frame,wasm,0.9225708510823878,0.9008978413048665,0.987587276771623,10,0,inconclusive
+frames,small,4,"command to visible frame, median",wasm-worker,wasm,2.8101714122517993,2.7215056494929493,2.9262974439664005,10,0,higher
+frames,small,4,"command to visible frame, median",wasm,ts,1.0339329934195223,1.0062253268525365,1.0551679204156224,10,0,inconclusive
+frames,small,4,"command to visible frame, median",wasm-frame,ts,0.9635270357160934,0.9396805458457365,0.9845133605367863,10,0,inconclusive
+frames,small,4,"command to visible frame, median",wasm-worker,ts,2.897248163825636,2.8571542387645597,3.07927618913234,10,0,higher
+frames,small,4,"command to visible frame, median",wasm-worker,wasm-frame,3.032676696292554,2.93303220848278,3.1550912050806135,10,0,higher
+frames,small,4,"command to visible frame, p95",ts,wasm,0.8637229632617403,0.8198025752915383,1.0108257137973036,10,0,inconclusive
+frames,small,4,"command to visible frame, p95",wasm-frame,wasm,1.3681470773258084,1.0621966294507603,1.6234357085332847,10,0,higher
+frames,small,4,"command to visible frame, p95",wasm-worker,wasm,2.4580840792721466,2.236119344581299,2.668947749403832,10,0,higher
+frames,small,4,"command to visible frame, p95",wasm,ts,1.1588446700820567,0.9892902271385289,1.2198058778290368,10,0,inconclusive
+frames,small,4,"command to visible frame, p95",wasm-frame,ts,1.5766634935353323,1.1876166180378418,1.793903394018949,10,0,higher
+frames,small,4,"command to visible frame, p95",wasm-worker,ts,2.7324987002570325,2.558475012411819,2.973141378849273,10,0,higher
+frames,small,4,"command to visible frame, p95",wasm-worker,wasm-frame,1.6676033420467697,1.543863527028538,2.256405394877025,10,0,higher
+memory,medium,1,main-thread JS heap,ts,wasm,1.0004021313533982,0.9993490255837255,1.0116631249274755,10,0,equivalent
+memory,medium,1,main-thread JS heap,wasm-frame,wasm,0.9983583666488625,0.986940205453352,0.9994735009378163,10,0,equivalent
+memory,medium,1,main-thread JS heap,wasm-worker,wasm,1.0085347185488465,1.0075981194015926,1.0200976472676753,10,0,equivalent
+memory,medium,1,main-thread JS heap,wasm,ts,0.9995980462342825,0.9884713353288314,1.0006513984600067,10,0,equivalent
+memory,medium,1,main-thread JS heap,wasm-frame,ts,0.998103743307057,0.9870147799623983,0.9985360491149345,10,0,equivalent
+memory,medium,1,main-thread JS heap,wasm-worker,ts,1.0082721069162996,1.0076623020235254,1.0149098273762927,10,0,equivalent
+memory,medium,1,main-thread JS heap,wasm-worker,wasm-frame,1.0101465196279862,1.0094513446507374,1.02254299786772,10,0,equivalent
+memory,medium,1,JS heaps + WASM memory (main and worker),ts,wasm,0.61468480490933,0.6142226686003629,0.6188312829994509,10,0,lower
+memory,medium,1,JS heaps + WASM memory (main and worker),wasm-frame,wasm,0.998991216432078,0.9919749917575257,0.9996780717049142,10,0,equivalent
+memory,medium,1,JS heaps + WASM memory (main and worker),wasm-worker,wasm,1.0106395201000453,1.0100634978562875,1.0177275812237956,10,0,equivalent
+memory,medium,1,JS heaps + WASM memory (main and worker),wasm,ts,1.6268500510858352,1.6159493346119145,1.6280740700741523,10,0,higher
+memory,medium,1,JS heaps + WASM memory (main and worker),wasm-frame,ts,1.6253799183574116,1.6144492432250166,1.6258990518390501,10,0,higher
+memory,medium,1,JS heaps + WASM memory (main and worker),wasm-worker,ts,1.644416060764922,1.6436772512560374,1.6552342745687647,10,0,higher
+memory,medium,1,JS heaps + WASM memory (main and worker),wasm-worker,wasm-frame,1.011631065543566,1.0112043735753864,1.019218903497913,10,0,equivalent
+raw,medium,1,"bare engine, 720 steps",ts,wasm,1.9587217036101743,1.9162980177262536,2.0293272357013543,10,0,higher
+raw,medium,1,"bare engine, 720 steps",wasm,ts,0.5105455077682017,0.49277414820404297,0.5218395003020098,10,0,lower
+hosted,medium,1,"wall time, 720 steps",ts,wasm,0.3378900880871979,0.31344337611108325,0.3453830772042113,10,0,lower
+hosted,medium,1,"wall time, 720 steps",wasm-frame,wasm,0.6875545510565582,0.6583857234156715,0.7103962310492777,10,0,lower
+hosted,medium,1,"wall time, 720 steps",wasm-worker,wasm,0.7156021460090329,0.6638182827611762,0.7543917208982249,10,0,lower
+hosted,medium,1,"wall time, 720 steps",wasm,ts,2.959570541696932,2.8953358343285003,3.190368903012337,10,0,higher
+hosted,medium,1,"wall time, 720 steps",wasm-frame,ts,2.06658774949154,2.0188118308857734,2.10049333817264,10,0,higher
+hosted,medium,1,"wall time, 720 steps",wasm-worker,ts,2.127432667961333,2.068615344135761,2.2937314166874168,10,0,higher
+hosted,medium,1,"wall time, 720 steps",wasm-worker,wasm-frame,1.0269787245653976,1.0022474639666608,1.1093532711585028,10,0,inconclusive
+hosted,medium,1,"main-thread time, 720 steps",ts,wasm,0.3378596344341048,0.3134080253778231,0.34532113663585695,10,0,lower
+hosted,medium,1,"main-thread time, 720 steps",wasm-frame,wasm,0.6875653418863332,0.6583713897725186,0.7104151104158546,10,0,lower
+hosted,medium,1,"main-thread time, 720 steps",wasm-worker,wasm,0.3847154531516058,0.35972721208944514,0.41260635573028714,10,0,lower
+hosted,medium,1,"main-thread time, 720 steps",wasm,ts,2.9598369833446263,2.8958551733672344,3.1907287594006855,10,0,higher
+hosted,medium,1,"main-thread time, 720 steps",wasm-frame,ts,2.066937172453434,2.018976057485234,2.100684527713774,10,0,higher
+hosted,medium,1,"main-thread time, 720 steps",wasm-worker,ts,1.148670968733145,1.1205854329398242,1.2435004223140746,10,0,higher
+hosted,medium,1,"main-thread time, 720 steps",wasm-worker,wasm-frame,0.5522119244495101,0.542838830508197,0.6067432028996802,10,0,lower
+hosted,medium,1,"main-thread time per batch, p95",ts,wasm,0.16750287912521128,0.1585136525853901,0.17912440916693514,10,0,lower
+hosted,medium,1,"main-thread time per batch, p95",wasm-frame,wasm,0.9168328612851144,0.8967988886286831,0.952500050439864,10,0,inconclusive
+hosted,medium,1,"main-thread time per batch, p95",wasm-worker,wasm,0.6165637200942289,0.5861817434325084,0.6832468396728907,10,0,lower
+hosted,medium,1,"main-thread time per batch, p95",wasm,ts,5.970144281043755,5.582712063926749,6.308604865825722,10,0,higher
+hosted,medium,1,"main-thread time per batch, p95",wasm-frame,ts,5.550819380909105,5.254773123029555,5.7133624271660635,10,0,higher
+hosted,medium,1,"main-thread time per batch, p95",wasm-worker,ts,3.681665895515927,3.383084159515085,4.3103343373204455,10,0,higher
+hosted,medium,1,"main-thread time per batch, p95",wasm-worker,wasm-frame,0.6720599038083879,0.6280164040704339,0.7544304063095212,10,0,lower
+hosted,medium,1,"main-thread time per batch, max",ts,wasm,0.33262094388362723,0.31060479822117654,0.3433583965672296,10,0,lower
+hosted,medium,1,"main-thread time per batch, max",wasm-frame,wasm,0.5914345373825715,0.5778907033223355,0.6229665072155006,10,0,lower
+hosted,medium,1,"main-thread time per batch, max",wasm-worker,wasm,0.37996490734640836,0.36634503720581785,0.43668686493261377,10,0,lower
+hosted,medium,1,"main-thread time per batch, max",wasm,ts,3.006427933835073,2.9124087542277413,3.2195252801211285,10,0,higher
+hosted,medium,1,"main-thread time per batch, max",wasm-frame,ts,1.78213368741338,1.7218421038828398,1.8451404731402112,10,0,higher
+hosted,medium,1,"main-thread time per batch, max",wasm-worker,ts,1.1325741853441489,1.074585267085462,1.3956014518550064,10,0,higher
+hosted,medium,1,"main-thread time per batch, max",wasm-worker,wasm-frame,0.6508683837873239,0.5974792364575351,0.7563808657987238,10,0,lower
+frames,medium,1,mean FPS,ts,wasm,1.12883712425481,1.117799480614337,1.143358377206121,10,0,higher
+frames,medium,1,mean FPS,wasm-frame,wasm,1.0546315916661266,1.0452571622116915,1.0761984840162109,10,0,inconclusive
+frames,medium,1,mean FPS,wasm-worker,wasm,1.1102248354104631,1.0948605209100797,1.1165647877341236,10,0,higher
+frames,medium,1,mean FPS,wasm,ts,0.8858717377813699,0.874616410686186,0.8946148368671678,10,0,lower
+frames,medium,1,mean FPS,wasm-frame,ts,0.9367944300939937,0.925961815129218,0.945491437334738,10,0,lower
+frames,medium,1,mean FPS,wasm-worker,ts,0.978232175851251,0.9706121689456115,0.9956070940444395,10,0,equivalent
+frames,medium,1,mean FPS,wasm-worker,wasm-frame,1.0492774415403123,1.0346820809248551,1.0635272303207495,10,0,inconclusive
+frames,medium,1,1% low FPS,ts,wasm,1.4284826538920954,1.2856897955684587,1.4286387793588298,10,0,higher
+frames,medium,1,1% low FPS,wasm-frame,wasm,1.1180490159630652,1.0000000000000242,1.2499812495312481,10,0,inconclusive
+frames,medium,1,1% low FPS,wasm-worker,wasm,1.118082351518765,0.9999999999999515,1.2499812495312481,10,0,inconclusive
+frames,medium,1,1% low FPS,wasm,ts,0.7000435023251264,0.6999669996699922,0.7777925930864661,10,0,lower
+frames,medium,1,1% low FPS,wasm-frame,ts,0.8263951977657957,0.7777925930864285,0.8750468761718797,10,0,lower
+frames,medium,1,1% low FPS,wasm-worker,ts,0.8263989009138917,0.7777666666666725,0.8750093752343998,10,0,lower
+frames,medium,1,1% low FPS,wasm-worker,wasm-frame,1,0.8888962965432358,1.1249906247655967,10,0,inconclusive
+frames,medium,1,frame time p95,ts,wasm,0.7500332829662923,0.7500093755859693,0.8571220413218644,10,0,lower
+frames,medium,1,frame time p95,wasm-frame,wasm,0.8750421901368779,0.8750093752343759,1,10,0,inconclusive
+frames,medium,1,frame time p95,wasm-worker,wasm,0.8750257826856187,0.8749751555357504,0.9999571422448805,10,0,inconclusive
+frames,medium,1,frame time p95,wasm,ts,1.3332741665666936,1.1666949999999852,1.3333166658333004,10,0,higher
+frames,medium,1,frame time p95,wasm-frame,ts,1.1666654170208435,1.1666499999999886,1.166708335416749,10,0,higher
+frames,medium,1,frame time p95,wasm-worker,ts,1.1666500000000086,1.1665999999999985,1.1666583329166138,10,0,higher
+frames,medium,1,frame time p95,wasm-worker,wasm-frame,0.9999571422449047,0.9999571422448805,1,10,0,equivalent
+frames,medium,1,frame time p99,ts,wasm,0.7019037615542474,0.6666888896296427,0.875003281285272,10,0,lower
+frames,medium,1,frame time p99,wasm-frame,wasm,0.8889051859802696,0.8888722957431826,1.0387354683867007,10,0,inconclusive
+frames,medium,1,frame time p99,wasm-worker,wasm,0.888901371036003,0.888862962098726,0.999985749846791,10,0,inconclusive
+frames,medium,1,frame time p99,wasm,ts,1.4252716668980279,1.142852857112859,1.499950000000026,10,0,higher
+frames,medium,1,frame time p99,wasm-frame,ts,1.2954949728460399,1.1428185711585674,1.3332999999999913,10,0,higher
+frames,medium,1,frame time p99,wasm-worker,ts,1.2954981125096048,1.14283657128455,1.3332625000000098,10,0,higher
+frames,medium,1,frame time p99,wasm-worker,wasm-frame,0.9999930621398503,0.9627090153695343,1.0000082505156802,10,0,equivalent
+frames,medium,1,sim minutes per second,ts,wasm,1.12883712425481,1.117799480614337,1.143358377206121,10,0,higher
+frames,medium,1,sim minutes per second,wasm-frame,wasm,1.0546315916661266,1.0452571622116913,1.0761984840162109,10,0,inconclusive
+frames,medium,1,sim minutes per second,wasm-worker,wasm,1.023633004018266,1.0077693431104142,1.0306751886776526,10,0,equivalent
+frames,medium,1,sim minutes per second,wasm,ts,0.8858717377813697,0.874616410686186,0.8946148368671678,10,0,lower
+frames,medium,1,sim minutes per second,wasm-frame,ts,0.9367944300939937,0.925961815129218,0.9454914373347378,10,0,lower
+frames,medium,1,sim minutes per second,wasm-worker,ts,0.9021446975770633,0.8942718859948332,0.9185988105271901,10,0,lower
+frames,medium,1,sim minutes per second,wasm-worker,wasm-frame,0.9681178604266973,0.9537572254335257,0.9812654555998076,10,0,equivalent
+frames,medium,1,main-thread blocking (long tasks past 50 ms),ts,wasm,0.8454858932736069,0.8257794457274826,0.8544498027181061,10,0,lower
+frames,medium,1,main-thread blocking (long tasks past 50 ms),wasm-frame,wasm,0.9344972198207483,0.9086272843178921,0.9435152582159625,10,0,lower
+frames,medium,1,main-thread blocking (long tasks past 50 ms),wasm-worker,wasm,0.7244078536255181,0.717083150664913,0.741902237926973,10,0,lower
+frames,medium,1,main-thread blocking (long tasks past 50 ms),wasm,ts,1.1827668567871301,1.1703437660338636,1.2109771019052613,10,0,higher
+frames,medium,1,main-thread blocking (long tasks past 50 ms),wasm-frame,ts,1.1049774482728703,1.0837546343107516,1.1152081863091037,10,0,higher
+frames,medium,1,main-thread blocking (long tasks past 50 ms),wasm-worker,ts,0.8641012232946914,0.8392337951086027,0.8710180055401662,10,0,lower
+frames,medium,1,main-thread blocking (long tasks past 50 ms),wasm-worker,wasm-frame,0.7759848125296631,0.7683097496501322,0.7989518818484993,10,0,lower
+frames,medium,1,"command to visible frame, median",ts,wasm,0.7408037976691345,0.5888142083737744,0.7832372521614024,10,0,lower
+frames,medium,1,"command to visible frame, median",wasm-frame,wasm,0.9347558123991173,0.8264157173067905,1.102349661146289,10,0,inconclusive
+frames,medium,1,"command to visible frame, median",wasm-worker,wasm,3.3939073351380387,2.859097449091944,3.5640429858842073,10,0,higher
+frames,medium,1,"command to visible frame, median",wasm,ts,1.3506183247109351,1.27675234705758,1.6983285827321752,10,0,higher
+frames,medium,1,"command to visible frame, median",wasm-frame,ts,1.336818651683514,1.1652872161330075,1.7068409514713652,10,0,higher
+frames,medium,1,"command to visible frame, median",wasm-worker,ts,4.681431081670795,4.078233162561518,5.563962099113138,10,0,higher
+frames,medium,1,"command to visible frame, median",wasm-worker,wasm-frame,3.6534005153331153,3.0573518777365583,3.853029975058882,10,0,higher
+frames,medium,1,"command to visible frame, p95",ts,wasm,0.5285472885104399,0.5039892663680762,0.5713180293470329,10,0,lower
+frames,medium,1,"command to visible frame, p95",wasm-frame,wasm,0.7856624030867275,0.5084972679599483,1.0353833121576734,10,0,inconclusive
+frames,medium,1,"command to visible frame, p95",wasm-worker,wasm,2.007886480690844,1.7893587503832356,2.5228108618913105,10,0,higher
+frames,medium,1,"command to visible frame, p95",wasm,ts,1.8939341412662878,1.7503386006265436,1.9841692407585416,10,0,higher
+frames,medium,1,"command to visible frame, p95",wasm-frame,ts,1.4919782741432033,1.0055518820868463,1.8787926933354735,10,0,inconclusive
+frames,medium,1,"command to visible frame, p95",wasm-worker,ts,3.767745745559587,3.5069202737886056,4.60244263371886,10,0,higher
+frames,medium,1,"command to visible frame, p95",wasm-worker,wasm-frame,2.8154272267896796,2.0833435207500006,3.527711900549749,10,0,higher
+raw,medium,4,"bare engine, 720 steps",ts,wasm,1.9038593877447005,1.8279695261742037,1.9258116853665237,10,0,higher
+raw,medium,4,"bare engine, 720 steps",wasm,ts,0.5252494984175965,0.5192615703802204,0.5470550715869543,10,0,lower
+hosted,medium,4,"wall time, 720 steps",ts,wasm,0.33749471158229993,0.3317790927385065,0.3408070531274746,10,0,lower
+hosted,medium,4,"wall time, 720 steps",wasm-frame,wasm,0.6911190849542106,0.6861637870840992,0.6959360096911404,10,0,lower
+hosted,medium,4,"wall time, 720 steps",wasm-worker,wasm,0.45781164892771486,0.45654608811861896,0.47201658826069015,10,0,lower
+hosted,medium,4,"wall time, 720 steps",wasm,ts,2.963009412662477,2.9342115746236113,3.0140536938177585,10,0,higher
+hosted,medium,4,"wall time, 720 steps",wasm-frame,ts,2.041537171135949,2.0264483197828493,2.096650060393624,10,0,higher
+hosted,medium,4,"wall time, 720 steps",wasm-worker,ts,1.3665239584375706,1.3418187913329704,1.4181563064693563,10,0,higher
+hosted,medium,4,"wall time, 720 steps",wasm-worker,wasm-frame,0.6707840796763465,0.6575752351436533,0.6811476924382743,10,0,lower
+hosted,medium,4,"main-thread time, 720 steps",ts,wasm,0.33746861191018895,0.3317833910896355,0.3407588934554345,10,0,lower
+hosted,medium,4,"main-thread time, 720 steps",wasm-frame,wasm,0.6911018147647738,0.6862042613076703,0.6959522432700168,10,0,lower
+hosted,medium,4,"main-thread time, 720 steps",wasm-worker,wasm,0.39609580962281865,0.392912404581585,0.40501732614179486,10,0,lower
+hosted,medium,4,"main-thread time, 720 steps",wasm,ts,2.963238609787302,2.934626268619408,3.0140146458682655,10,0,higher
+hosted,medium,4,"main-thread time, 720 steps",wasm-frame,ts,2.041749794454978,2.026303525927118,2.0967967370863834,10,0,higher
+hosted,medium,4,"main-thread time, 720 steps",wasm-worker,ts,1.1815669955779924,1.1530510637515359,1.222430627181254,10,0,higher
+hosted,medium,4,"main-thread time, 720 steps",wasm-worker,wasm-frame,0.5788022138128669,0.5651908191391808,0.5834092246671083,10,0,lower
+hosted,medium,4,"main-thread time per batch, p95",ts,wasm,0.16155928964119987,0.15418350504781625,0.16528816532739665,10,0,lower
+hosted,medium,4,"main-thread time per batch, p95",wasm-frame,wasm,0.921288340610689,0.9025361756651602,0.935630892155318,10,0,lower
+hosted,medium,4,"main-thread time per batch, p95",wasm-worker,wasm,0.6228532970373726,0.6141506983731105,0.6508189621576805,10,0,lower
+hosted,medium,4,"main-thread time per batch, p95",wasm,ts,6.189687806728051,6.050039928867486,6.485778097273599,10,0,higher
+hosted,medium,4,"main-thread time per batch, p95",wasm-frame,ts,5.70498499752251,5.530769857636765,5.905929883147607,10,0,higher
+hosted,medium,4,"main-thread time per batch, p95",wasm-worker,ts,3.904627841115074,3.7453821261465103,4.083703108406485,10,0,higher
+hosted,medium,4,"main-thread time per batch, p95",wasm-worker,wasm-frame,0.68285253359582,0.6679084275766951,0.6955937086028177,10,0,lower
+hosted,medium,4,"main-thread time per batch, max",ts,wasm,0.29728840297405645,0.28322608800967874,0.3078633402263298,10,0,lower
+hosted,medium,4,"main-thread time per batch, max",wasm-frame,wasm,0.5756827066731858,0.5608138274472585,0.5946122663624304,10,0,lower
+hosted,medium,4,"main-thread time per batch, max",wasm-worker,wasm,0.36541112809681664,0.3366186238284754,0.3840285950783478,10,0,lower
+hosted,medium,4,"main-thread time per batch, max",wasm,ts,3.3656774681433106,3.248194472472224,3.530748198470428,10,0,higher
+hosted,medium,4,"main-thread time per batch, max",wasm-frame,ts,1.9660124017278924,1.8495257392234985,2.0376633555757397,10,0,higher
+hosted,medium,4,"main-thread time per batch, max",wasm-worker,ts,1.2513705572372151,1.0957458922474481,1.3005028703428545,10,0,higher
+hosted,medium,4,"main-thread time per batch, max",wasm-worker,wasm-frame,0.6364417649424882,0.5902419369772895,0.6470551070939987,10,0,lower
+frames,medium,4,mean FPS,ts,wasm,1.3094100555511101,1.2742510866100496,1.3390284567585988,10,0,higher
+frames,medium,4,mean FPS,wasm-frame,wasm,1.0771814058595726,1.0656901868353692,1.0965970802433727,10,0,higher
+frames,medium,4,mean FPS,wasm-worker,wasm,1.2707975727267729,1.236028664955106,1.2824085194971575,10,0,higher
+frames,medium,4,mean FPS,wasm,ts,0.7637085634600178,0.746810118151418,0.7847746888412294,10,0,lower
+frames,medium,4,mean FPS,wasm-frame,ts,0.8188337183488679,0.808960346721008,0.8407017842246081,10,0,lower
+frames,medium,4,mean FPS,wasm-worker,ts,0.9595039645133894,0.9544123507298213,0.9822232227537685,10,0,equivalent
+frames,medium,4,mean FPS,wasm-worker,wasm-frame,1.174622414571482,1.1638369774144264,1.1885417805952199,10,0,higher
+frames,medium,4,1% low FPS,ts,wasm,1.7500140631152128,1.7058501720639192,1.8124765619140824,10,0,higher
+frames,medium,4,1% low FPS,wasm-frame,wasm,1.0363845890403494,0.9999896547800143,1.1111037034567715,10,0,inconclusive
+frames,medium,4,1% low FPS,wasm-worker,wasm,1.0955554518723902,1.0740810702698047,1.120004800192007,10,0,higher
+frames,medium,4,1% low FPS,wasm,ts,0.5714239794278525,0.5517312725655006,0.5862179553495566,10,0,lower
+frames,medium,4,1% low FPS,wasm-frame,ts,0.5925897118404206,0.5714408168950659,0.6154023678198002,10,0,lower
+frames,medium,4,1% low FPS,wasm-worker,ts,0.62769066383855,0.5925975310288124,0.6799951998079893,10,0,lower
+frames,medium,4,1% low FPS,wasm-worker,wasm-frame,1.038453328136927,0.9999884610502644,1.120004800192007,10,0,inconclusive
+frames,medium,4,frame time p95,ts,wasm,0.5617635486809975,0.5384650889076148,0.5769177513154208,10,0,lower
+frames,medium,4,frame time p95,wasm-frame,wasm,0.961539815146024,0.9398487760423712,0.984616272226896,10,0,inconclusive
+frames,medium,4,frame time p95,wasm-worker,wasm,0.8586549557066471,0.8076987872563773,0.8846118342102833,10,0,lower
+frames,medium,4,frame time p95,wasm,ts,1.7801342273503828,1.7333493339733719,1.8571306118075397,10,0,higher
+frames,medium,4,frame time p95,wasm-frame,ts,1.705772438849958,1.666666666666686,1.7856959177113252,10,0,higher
+frames,medium,4,frame time p95,wasm-worker,ts,1.5195779979119197,1.4666906676267177,1.5714282652951825,10,0,higher
+frames,medium,4,frame time p95,wasm-worker,wasm-frame,0.8878358472421943,0.8400098404526529,0.9099925777342721,10,0,lower
+frames,medium,4,frame time p99,ts,wasm,0.5683230217118329,0.551722065319719,0.5858647643391386,10,0,lower
+frames,medium,4,frame time p99,wasm-frame,wasm,0.9578028375769795,0.924568002870283,0.9999993571152125,10,0,inconclusive
+frames,medium,4,frame time p99,wasm-worker,wasm,0.864321911923154,0.8522014338896863,0.8928598215437614,10,0,lower
+frames,medium,4,frame time p99,wasm,ts,1.7595627206470819,1.7068785509365973,1.8125068088775953,10,0,higher
+frames,medium,4,frame time p99,wasm-frame,ts,1.6875012656803787,1.578760689586271,1.7552745493744941,10,0,higher
+frames,medium,4,frame time p99,wasm-worker,ts,1.520954979280346,1.4990771190601335,1.5965758276883608,10,0,higher
+frames,medium,4,frame time p99,wasm-worker,wasm-frame,0.9016676581861476,0.8823676476852029,0.9615995152264014,10,0,inconclusive
+frames,medium,4,sim minutes per second,ts,wasm,1.3699372600130115,1.3068516442548357,1.4385396773876693,10,0,higher
+frames,medium,4,sim minutes per second,wasm-frame,wasm,1.1031702081751393,1.0811911350075203,1.1169351127812621,10,0,higher
+frames,medium,4,sim minutes per second,wasm-worker,wasm,1.1589080260273925,1.1278169336123298,1.1769289019603335,10,0,higher
+frames,medium,4,sim minutes per second,wasm,ts,0.729962480030236,0.6951494044404533,0.7651977976200949,10,0,lower
+frames,medium,4,sim minutes per second,wasm-frame,ts,0.8067231936795626,0.7761811575101307,0.8263378692152716,10,0,lower
+frames,medium,4,sim minutes per second,wasm-worker,ts,0.8377736646431453,0.8105849090750885,0.8539014097064594,10,0,lower
+frames,medium,4,sim minutes per second,wasm-worker,wasm-frame,1.0417964869344942,1.020310568680582,1.0576333105393059,10,0,inconclusive
+frames,medium,4,frames over 200 ms (clamped),ts,wasm,0.6007957559681698,0.5,0.6785714285714286,10,0,lower
+frames,medium,4,frames over 200 ms (clamped),wasm-frame,wasm,0.8864285714285715,0.8571428571428571,1,10,0,inconclusive
+frames,medium,4,frames over 200 ms (clamped),wasm-worker,wasm,0.5862068965517241,0.4827586206896552,0.6923076923076923,10,0,lower
+frames,medium,4,frames over 200 ms (clamped),wasm,ts,1.6654411764705883,1.4736842105263157,2,10,0,higher
+frames,medium,4,frames over 200 ms (clamped),wasm-frame,ts,1.4871323529411766,1.263157894736842,1.9285714285714286,10,0,higher
+frames,medium,4,frames over 200 ms (clamped),wasm-worker,ts,0.975,0.7647058823529411,1.1333333333333333,10,0,inconclusive
+frames,medium,4,frames over 200 ms (clamped),wasm-worker,wasm-frame,0.6348148148148148,0.56,0.75,10,0,lower
+frames,medium,4,main-thread blocking (long tasks past 50 ms),ts,wasm,0.9087302120902004,0.8844679219562068,0.9172611797459544,10,0,lower
+frames,medium,4,main-thread blocking (long tasks past 50 ms),wasm-frame,wasm,0.9758943520814909,0.9630202958376333,0.9986155576706758,10,0,equivalent
+frames,medium,4,main-thread blocking (long tasks past 50 ms),wasm-worker,wasm,0.8341108365720364,0.8255090738689614,0.848268661910562,10,0,lower
+frames,medium,4,main-thread blocking (long tasks past 50 ms),wasm,ts,1.1004366455902868,1.0902020297827943,1.1306232540217704,10,0,higher
+frames,medium,4,main-thread blocking (long tasks past 50 ms),wasm-frame,ts,1.0859896188230524,1.0637389737266432,1.0965320665083136,10,0,higher
+frames,medium,4,main-thread blocking (long tasks past 50 ms),wasm-worker,ts,0.923240772428936,0.9168678188664672,0.9307367613200307,10,0,lower
+frames,medium,4,main-thread blocking (long tasks past 50 ms),wasm-worker,wasm-frame,0.851477225683954,0.8419932612165277,0.8609065909695733,10,0,lower
+frames,medium,4,"command to visible frame, median",ts,wasm,0.681871691932265,0.5434947260998141,0.8358007809147239,10,0,lower
+frames,medium,4,"command to visible frame, median",wasm-frame,wasm,0.7399432678254361,0.6390995355534544,1.1551546637662826,10,0,inconclusive
+frames,medium,4,"command to visible frame, median",wasm-worker,wasm,1.6464512165757448,1.6160640616289224,2.266912138512549,10,0,higher
+frames,medium,4,"command to visible frame, median",wasm,ts,1.4782173132343508,1.1964573650021861,1.8399442570052607,10,0,higher
+frames,medium,4,"command to visible frame, median",wasm-frame,ts,1.0564860572800405,0.8238881611265064,1.5312433126003557,10,0,inconclusive
+frames,medium,4,"command to visible frame, median",wasm-worker,ts,2.741772615000185,2.4860341409084303,3.035654804419213,10,0,higher
+frames,medium,4,"command to visible frame, median",wasm-worker,wasm-frame,2.433134637735243,1.9971693673444229,2.8854767288781686,10,0,higher
+frames,medium,4,"command to visible frame, p95",ts,wasm,0.5329665825565739,0.44120080324301064,0.6934557516418853,10,0,lower
+frames,medium,4,"command to visible frame, p95",wasm-frame,wasm,0.9226045858423488,0.6570037237414109,1.4770551321704921,10,0,inconclusive
+frames,medium,4,"command to visible frame, p95",wasm-worker,wasm,1.2804281048153157,0.9590737762255063,1.72975150951954,10,0,inconclusive
+frames,medium,4,"command to visible frame, p95",wasm,ts,1.8766191137681507,1.4420530763964596,2.266541657788429,10,0,higher
+frames,medium,4,"command to visible frame, p95",wasm-frame,ts,1.5721659838559745,1.36681547074755,2.2532041844206194,10,0,higher
+frames,medium,4,"command to visible frame, p95",wasm-worker,ts,2.3211927568570454,1.9667754180026187,2.612564905984942,10,0,higher
+frames,medium,4,"command to visible frame, p95",wasm-worker,wasm-frame,1.499248712760647,0.9047352824155126,1.9395247742023214,10,0,inconclusive
+memory,large,1,main-thread JS heap,ts,wasm,1.001615113343856,1.001324576185732,1.0021342518016976,10,0,equivalent
+memory,large,1,main-thread JS heap,wasm-frame,wasm,0.9989094972162591,0.9983013271737949,0.9993071569196474,10,0,equivalent
+memory,large,1,main-thread JS heap,wasm-worker,wasm,1.0258868698780712,1.0251514527973309,1.026257643615665,10,0,equivalent
+memory,large,1,main-thread JS heap,wasm,ts,0.9983874912873303,0.9978702935281769,0.9986771759954425,10,0,equivalent
+memory,large,1,main-thread JS heap,wasm-frame,ts,0.997193454343674,0.9967771572534201,0.9974403938603781,10,0,equivalent
+memory,large,1,main-thread JS heap,wasm-worker,ts,1.024191346896763,1.0235541959653491,1.0248259216492637,10,0,equivalent
+memory,large,1,main-thread JS heap,wasm-worker,wasm-frame,1.0271042301354116,1.026337234595999,1.0274983457055622,10,0,equivalent
+memory,large,1,JS heaps + WASM memory (main and worker),ts,wasm,0.3681491121066037,0.36810105094293927,0.36827646774236966,10,0,lower
+memory,large,1,JS heaps + WASM memory (main and worker),wasm-frame,wasm,0.9995991618203226,0.9993754793412251,0.9997453407261738,10,0,equivalent
+memory,large,1,JS heaps + WASM memory (main and worker),wasm-worker,wasm,1.012052853683972,1.011784548434472,1.0121888821516134,10,0,equivalent
+memory,large,1,JS heaps + WASM memory (main and worker),wasm,ts,2.716290675185638,2.7153513395256,2.716645327250135,10,0,higher
+memory,large,1,JS heaps + WASM memory (main and worker),wasm-frame,ts,2.714765352908052,2.7139957589197077,2.715713915867392,10,0,higher
+memory,large,1,JS heaps + WASM memory (main and worker),wasm-worker,ts,2.748880951867565,2.7472695991226703,2.749995095952792,10,0,higher
+memory,large,1,JS heaps + WASM memory (main and worker),wasm-worker,wasm-frame,1.0124940240756835,1.012214497561637,1.0126382951050907,10,0,equivalent
+raw,large,1,"bare engine, 720 steps",ts,wasm,0.839571197024113,0.7538256674638362,0.9357603827578539,10,0,lower
+raw,large,1,"bare engine, 720 steps",wasm,ts,1.1912074520057203,1.0686496441031414,1.326566662772827,10,0,higher
+hosted,large,1,"wall time, 720 steps",ts,wasm,0.10660960306055717,0.10431055949175186,0.13483242307940155,10,0,lower
+hosted,large,1,"wall time, 720 steps",wasm-frame,wasm,0.6660214963332329,0.6442852695640051,0.7050265817764376,10,0,lower
+hosted,large,1,"wall time, 720 steps",wasm-worker,wasm,0.6885468260069735,0.6696303881879554,0.6973545941169542,10,0,lower
+hosted,large,1,"wall time, 720 steps",wasm,ts,9.380028876685948,7.41661372807273,9.586757130557553,10,0,higher
+hosted,large,1,"wall time, 720 steps",wasm-frame,ts,6.173677160663826,5.2289098250593185,6.4704072822484635,10,0,higher
+hosted,large,1,"wall time, 720 steps",wasm-worker,ts,6.42570263456351,5.061584404009289,6.572453658012412,10,0,higher
+hosted,large,1,"wall time, 720 steps",wasm-worker,wasm-frame,1.0192305485364122,0.9674086505102412,1.0716673173596691,10,0,inconclusive
+hosted,large,1,"main-thread time, 720 steps",ts,wasm,0.10659533121170436,0.10429521446846306,0.1348099836698571,10,0,lower
+hosted,large,1,"main-thread time, 720 steps",wasm-frame,wasm,0.6660293985191966,0.6442953489945789,0.7050273432879469,10,0,lower
+hosted,large,1,"main-thread time, 720 steps",wasm-worker,wasm,0.40653577250939577,0.39560587561364147,0.421620740969698,10,0,lower
+hosted,large,1,"main-thread time, 720 steps",wasm,ts,9.381284717361396,7.417848239259118,9.588167636419996,10,0,higher
+hosted,large,1,"main-thread time, 720 steps",wasm-frame,ts,6.174477715969874,5.229785837038031,6.4711445170062785,10,0,higher
+hosted,large,1,"main-thread time, 720 steps",wasm-worker,ts,3.815618034725155,3.0011427152563637,3.927960976425762,10,0,higher
+hosted,large,1,"main-thread time, 720 steps",wasm-worker,wasm-frame,0.60559372984694,0.5713739979587796,0.6352389669951164,10,0,lower
+hosted,large,1,"main-thread time per batch, p95",ts,wasm,0.0680421044640988,0.06493008575173383,0.07231973399510204,10,0,lower
+hosted,large,1,"main-thread time per batch, p95",wasm-frame,wasm,0.899635713312597,0.8769636726035056,0.937782324275922,10,0,lower
+hosted,large,1,"main-thread time per batch, p95",wasm-worker,wasm,0.6368292294845317,0.6304030374303762,0.6522618887389727,10,0,lower
+hosted,large,1,"main-thread time per batch, p95",wasm,ts,14.69780240811948,13.827484488089054,15.401180953673652,10,0,higher
+hosted,large,1,"main-thread time per batch, p95",wasm-frame,ts,12.950369432838357,12.71796988170593,14.442955271330138,10,0,higher
+hosted,large,1,"main-thread time per batch, p95",wasm-worker,ts,9.334585108926293,8.727886651478508,9.832479382120964,10,0,higher
+hosted,large,1,"main-thread time per batch, p95",wasm-worker,wasm-frame,0.7032927336001098,0.6763747791116373,0.7234663706421528,10,0,lower
+hosted,large,1,"main-thread time per batch, max",ts,wasm,0.14781394465823988,0.14108010368494345,0.17037300016917642,10,0,lower
+hosted,large,1,"main-thread time per batch, max",wasm-frame,wasm,0.8814901013593373,0.8103174085818582,1.12751984171323,10,0,inconclusive
+hosted,large,1,"main-thread time per batch, max",wasm-worker,wasm,0.6701373676188069,0.6312854164592724,0.8088592097561352,10,0,lower
+hosted,large,1,"main-thread time per batch, max",wasm,ts,6.765315030983219,5.869474617498215,7.08817171153471,10,0,higher
+hosted,large,1,"main-thread time per batch, max",wasm-frame,ts,6.054432969183162,5.122402181490702,7.181276164599746,10,0,higher
+hosted,large,1,"main-thread time per batch, max",wasm-worker,ts,4.479618006906431,4.124596221852914,5.31245520937761,10,0,higher
+hosted,large,1,"main-thread time per batch, max",wasm-worker,wasm-frame,0.7390500050714673,0.5963657629599141,0.9865565646147191,10,0,inconclusive
+frames,large,1,mean FPS,ts,wasm,1.5167253251338688,1.5061699592456457,1.5249722547152005,10,0,higher
+frames,large,1,mean FPS,wasm-frame,wasm,1.1517075726378658,1.1413200423433638,1.1608549900399332,10,0,higher
+frames,large,1,mean FPS,wasm-worker,wasm,1.324180577029355,1.3136923781203755,1.3401075898417016,10,0,higher
+frames,large,1,mean FPS,wasm,ts,0.6593151614093786,0.6557496353838629,0.6639356958764752,10,0,lower
+frames,large,1,mean FPS,wasm-frame,ts,0.7590199798787511,0.7525276390403528,0.7653306130839297,10,0,lower
+frames,large,1,mean FPS,wasm-worker,ts,0.8739479040453602,0.8664026869072619,0.8897452652108961,10,0,lower
+frames,large,1,mean FPS,wasm-worker,wasm-frame,1.1507760132015987,1.1400025247160186,1.168997792184446,10,0,higher
+frames,large,1,1% low FPS,ts,wasm,2.6153721891716755,2.4285867352405117,3.166499999999942,10,0,higher
+frames,large,1,1% low FPS,wasm-frame,wasm,1.060649106841889,1,1.125011719262681,10,0,inconclusive
+frames,large,1,1% low FPS,wasm-worker,wasm,1.2966941761548978,1.1428234689067476,1.3333600016001208,10,0,higher
+frames,large,1,1% low FPS,wasm,ts,0.382354757870948,0.3158060950576404,0.41176211065031876,10,0,lower
+frames,large,1,1% low FPS,wasm-frame,ts,0.40625058596313646,0.31580110846189186,0.4374941403686186,10,0,lower
+frames,large,1,1% low FPS,wasm-worker,ts,0.46428303570062496,0.40002400144008543,0.5384588756577237,10,0,lower
+frames,large,1,1% low FPS,wasm-worker,wasm-frame,1.222523310783278,1.1428234689066852,1.3076940828948678,10,0,higher
+frames,large,1,frame time p95,ts,wasm,0.35781027981926283,0.3571502808853393,0.3846349118434311,10,0,lower
+frames,large,1,frame time p95,wasm-frame,wasm,0.9285759440436654,0.8571520411443782,0.9352720004834932,10,0,lower
+frames,large,1,frame time p95,wasm-worker,wasm,0.7785836359709675,0.7143040822886658,0.7913742046327805,10,0,lower
+frames,large,1,frame time p95,wasm,ts,2.7947861042780255,2.5998680026400165,2.7999417990687325,10,0,higher
+frames,large,1,frame time p95,wasm-frame,ts,2.5998080038399363,2.3998920021600965,2.59996159938561,10,0,higher
+frames,large,1,frame time p95,wasm-worker,ts,2.1498800023999816,1.9999400012000075,2.1998980020398204,10,0,higher
+frames,large,1,frame time p95,wasm-worker,wasm-frame,0.832072976826139,0.7692485212972568,0.846143372434627,10,0,lower
+frames,large,1,frame time p99,ts,wasm,0.3848783601564662,0.374997656147466,0.4406583962377723,10,0,lower
+frames,large,1,frame time p99,wasm-frame,wasm,0.9602637851486173,0.9333373334933485,1.0019022376547277,10,0,inconclusive
+frames,large,1,frame time p99,wasm-worker,wasm,0.7943595387363422,0.769714661132699,0.8441141028221458,10,0,lower
+frames,large,1,frame time p99,wasm,ts,2.598223500000015,2.2693315469255597,2.6666833341666405,10,0,higher
+frames,large,1,frame time p99,wasm-frame,ts,2.4599560006749686,2.1834293789554238,2.6332357994148206,10,0,higher
+frames,large,1,frame time p99,wasm-worker,ts,2.023334154412639,1.915574762739061,2.166615166306191,10,0,higher
+frames,large,1,frame time p99,wasm-worker,wasm-frame,0.8336003597899948,0.7683649676061983,0.8807554011671618,10,0,lower
+frames,large,1,sim minutes per second,ts,wasm,1.5159607846974545,1.5061699592456457,1.5249722547152003,10,0,higher
+frames,large,1,sim minutes per second,wasm-frame,wasm,1.1198664455684746,1.1016700040434515,1.1452852783512557,10,0,higher
+frames,large,1,sim minutes per second,wasm-worker,wasm,1.0686454229440323,1.063356816706811,1.0834912428507375,10,0,higher
+frames,large,1,sim minutes per second,wasm,ts,0.6596478061924786,0.655749635383863,0.6639356958764752,10,0,lower
+frames,large,1,sim minutes per second,wasm-frame,ts,0.741114409130567,0.7338307250454141,0.7471472810774838,10,0,lower
+frames,large,1,sim minutes per second,wasm-worker,ts,0.7046178765628881,0.70077013655184,0.7193685122981714,10,0,lower
+frames,large,1,sim minutes per second,wasm-worker,wasm-frame,0.9539688930353474,0.94185209061907,0.968068655339141,10,0,inconclusive
+frames,large,1,frames over 200 ms (clamped),ts,wasm,0,0,0,10,0,lower
+frames,large,1,frames over 200 ms (clamped),wasm-frame,wasm,0.6393188854489165,0.5263157894736842,0.8235294117647058,10,0,lower
+frames,large,1,frames over 200 ms (clamped),wasm-worker,wasm,0.11437908496732026,0.058823529411764705,0.21052631578947367,10,0,lower
+frames,large,1,frames over 200 ms (clamped),wasm-worker,wasm-frame,0.17142857142857143,0.1,0.36363636363636365,10,0,lower
+frames,large,1,main-thread blocking (long tasks past 50 ms),ts,wasm,0.5303333451335459,0.526948333539834,0.5406889665501747,10,0,lower
+frames,large,1,main-thread blocking (long tasks past 50 ms),wasm-frame,wasm,0.8548357153718162,0.845059786028949,0.8719582112371003,10,0,lower
+frames,large,1,main-thread blocking (long tasks past 50 ms),wasm-worker,wasm,0.5214187104332733,0.5018721917124314,0.5334437507962798,10,0,lower
+frames,large,1,main-thread blocking (long tasks past 50 ms),wasm,ts,1.8856239495856872,1.8494921514312097,1.8977192569950623,10,0,higher
+frames,large,1,main-thread blocking (long tasks past 50 ms),wasm-frame,ts,1.6135553375644547,1.5861034164358263,1.6440963855421686,10,0,higher
+frames,large,1,main-thread blocking (long tasks past 50 ms),wasm-worker,ts,0.9801727766056184,0.933602512337371,1.0050602409638554,10,0,inconclusive
+frames,large,1,main-thread blocking (long tasks past 50 ms),wasm-worker,wasm-frame,0.6113720409331972,0.5852132149614321,0.6210480093676815,10,0,lower
+frames,large,1,"command to visible frame, median",ts,wasm,0.37757262975883427,0.36196318993478344,0.39574132747670504,10,0,lower
+frames,large,1,"command to visible frame, median",wasm-frame,wasm,0.6211353098466937,0.49534558184839517,0.7579740631505717,10,0,lower
+frames,large,1,"command to visible frame, median",wasm-worker,wasm,2.5454859577063655,2.371135646375999,2.799964471862059,10,0,higher
+frames,large,1,"command to visible frame, median",wasm,ts,2.6485207497754595,2.526903132346884,2.762711866309319,10,0,higher
+frames,large,1,"command to visible frame, median",wasm-frame,ts,1.68124105448367,1.3412893200261693,1.996539795679842,10,0,higher
+frames,large,1,"command to visible frame, median",wasm-worker,ts,6.782566082076469,6.452886899737281,6.958246845870687,10,0,higher
+frames,large,1,"command to visible frame, median",wasm-worker,wasm-frame,4.123764267877593,3.4851530938311868,4.6585063358296495,10,0,higher
+frames,large,1,"command to visible frame, p95",ts,wasm,0.17833720112509724,0.1036702641990213,0.26931795699503686,10,0,lower
+frames,large,1,"command to visible frame, p95",wasm-frame,wasm,1.002817494476996,0.6932136921310379,1.900417374492562,10,0,inconclusive
+frames,large,1,"command to visible frame, p95",wasm-worker,wasm,2.5767889205278083,1.37412545801357,3.0760269087934504,10,0,higher
+frames,large,1,"command to visible frame, p95",wasm,ts,5.631126157558185,3.713083268407641,9.645967507908026,10,0,higher
+frames,large,1,"command to visible frame, p95",wasm-frame,ts,6.509147422562922,4.474019176052522,9.138631798942463,10,0,higher
+frames,large,1,"command to visible frame, p95",wasm-worker,ts,14.30239425377789,11.339505189361205,15.269893395439626,10,0,higher
+frames,large,1,"command to visible frame, p95",wasm-worker,wasm-frame,1.8408980234558103,1.5456701231033116,3.365648445902405,10,0,higher
+raw,large,4,"bare engine, 720 steps",ts,wasm,0.8980803768786065,0.8781491752504198,0.9485033698386905,10,0,lower
+raw,large,4,"bare engine, 720 steps",wasm,ts,1.1135049108547084,1.054292511549081,1.1387586849521691,10,0,higher
+hosted,large,4,"wall time, 720 steps",ts,wasm,0.11303502712157595,0.1112173310801568,0.11797929270077166,10,0,lower
+hosted,large,4,"wall time, 720 steps",wasm-frame,wasm,0.7048593913630944,0.6933434201404058,0.7069202963163425,10,0,lower
+hosted,large,4,"wall time, 720 steps",wasm-worker,wasm,0.4726862114310758,0.46637147639148097,0.4736839654371084,10,0,lower
+hosted,large,4,"wall time, 720 steps",wasm,ts,8.846831028084488,8.476063698197263,8.991404399726854,10,0,higher
+hosted,large,4,"wall time, 720 steps",wasm-frame,ts,6.233723250445161,5.775567852122157,6.293492346664108,10,0,higher
+hosted,large,4,"wall time, 720 steps",wasm-worker,ts,4.155663265485176,3.9539443219126045,4.227447983155058,10,0,higher
+hosted,large,4,"wall time, 720 steps",wasm-worker,wasm-frame,0.6705008067037805,0.6666223006786722,0.6818605366339119,10,0,lower
+hosted,large,4,"main-thread time, 720 steps",ts,wasm,0.11300257295602067,0.11120027860562012,0.11794346523805112,10,0,lower
+hosted,large,4,"main-thread time, 720 steps",wasm-frame,wasm,0.7048569110422244,0.69328684469719,0.7069061213387651,10,0,lower
+hosted,large,4,"main-thread time, 720 steps",wasm-worker,wasm,0.41416537586771474,0.4074350451145725,0.4170899058427884,10,0,lower
+hosted,large,4,"main-thread time, 720 steps",wasm,ts,8.849370897996595,8.478638455989492,8.99278322446091,10,0,higher
+hosted,large,4,"main-thread time, 720 steps",wasm-frame,ts,6.234883428317822,5.777035987077656,6.295144365870731,10,0,higher
+hosted,large,4,"main-thread time, 720 steps",wasm-worker,ts,3.6436333833628214,3.454494441826228,3.725079234206245,10,0,higher
+hosted,large,4,"main-thread time, 720 steps",wasm-worker,wasm-frame,0.5881733469996423,0.5817190222974151,0.5961280580983278,10,0,lower
+hosted,large,4,"main-thread time per batch, p95",ts,wasm,0.057436470713772246,0.056959321602301084,0.06129559247107507,10,0,lower
+hosted,large,4,"main-thread time per batch, p95",wasm-frame,wasm,0.9304681419704717,0.9186474707377104,0.9441071901422722,10,0,lower
+hosted,large,4,"main-thread time per batch, p95",wasm-worker,wasm,0.6210063773645835,0.6123392168863109,0.6241057551927626,10,0,lower
+hosted,large,4,"main-thread time per batch, p95",wasm,ts,17.41054050867822,16.314386723187194,17.55638887313576,10,0,higher
+hosted,large,4,"main-thread time per batch, p95",wasm-frame,ts,16.145231523338516,14.787319666134515,16.559164465006276,10,0,higher
+hosted,large,4,"main-thread time per batch, p95",wasm-worker,ts,10.778832625942016,9.989938790056874,10.886925353740533,10,0,higher
+hosted,large,4,"main-thread time per batch, p95",wasm-worker,wasm-frame,0.6697316816765171,0.6553514383880042,0.6755746826069865,10,0,lower
+hosted,large,4,"main-thread time per batch, max",ts,wasm,0.15024215186427253,0.14370075349266145,0.153974006097284,10,0,lower
+hosted,large,4,"main-thread time per batch, max",wasm-frame,wasm,0.9440660501006085,0.9194539367751668,0.9768254332695542,10,0,inconclusive
+hosted,large,4,"main-thread time per batch, max",wasm-worker,wasm,0.6639450957326949,0.643100260151079,0.6884564367638187,10,0,lower
+hosted,large,4,"main-thread time per batch, max",wasm,ts,6.656001293952887,6.494602727736908,6.958905751674213,10,0,higher
+hosted,large,4,"main-thread time per batch, max",wasm-frame,ts,6.428862737964817,6.098724637515303,6.59369668873315,10,0,higher
+hosted,large,4,"main-thread time per batch, max",wasm-worker,ts,4.442062590593517,4.21725960772285,4.621082878490481,10,0,higher
+hosted,large,4,"main-thread time per batch, max",wasm-worker,wasm-frame,0.6958649486233348,0.6850993601981993,0.709402655908803,10,0,lower
+frames,large,4,mean FPS,ts,wasm,1.8420379510292149,1.7753306346198574,1.9387755102040807,10,0,higher
+frames,large,4,mean FPS,wasm-frame,wasm,0.9623194172564858,0.9306743236685943,1.000447481129438,10,0,inconclusive
+frames,large,4,mean FPS,wasm-worker,wasm,1.4619903639007537,1.4198463551151737,1.4967499245907097,10,0,higher
+frames,large,4,mean FPS,wasm,ts,0.5428826091698036,0.5157894736842108,0.5632753586850175,10,0,lower
+frames,large,4,mean FPS,wasm-frame,ts,0.5190341493304766,0.5034552336463013,0.5325513849509604,10,0,lower
+frames,large,4,mean FPS,wasm-worker,ts,0.7925356720854233,0.765957192608941,0.811392075084847,10,0,lower
+frames,large,4,mean FPS,wasm-worker,wasm-frame,1.5171451187087686,1.4954105977972347,1.5552109815599935,10,0,higher
+frames,large,4,1% low FPS,ts,wasm,4.088193770404944,3.833375002083436,4.176440483543547,10,0,higher
+frames,large,4,1% low FPS,wasm-frame,wasm,1.07691828384342,1.0606070248328283,1.0923063431475226,10,0,higher
+frames,large,4,1% low FPS,wasm-worker,wasm,1.3725517302266135,1.3148177984699279,1.458329687363268,10,0,higher
+frames,large,4,1% low FPS,wasm,ts,0.24461946026571635,0.23943834562956323,0.26086672956767887,10,0,lower
+frames,large,4,1% low FPS,wasm-frame,ts,0.26358439722835814,0.2615400237239141,0.2769249231507682,10,0,lower
+frames,large,4,1% low FPS,wasm-worker,ts,0.3401396396730161,0.32692540688986027,0.36000240009600015,10,0,lower
+frames,large,4,1% low FPS,wasm-worker,wasm-frame,1.2843183969892942,1.222226543401932,1.3541632811230502,10,0,higher
+frames,large,4,frame time p95,ts,wasm,0.24999779403329994,0.2446102251422843,0.25467985011535194,10,0,lower
+frames,large,4,frame time p95,wasm-frame,wasm,0.9536209277217734,0.9338232050048988,0.9588050937767846,10,0,inconclusive
+frames,large,4,frame time p95,wasm-worker,wasm,0.6698483763400742,0.6567168723725216,0.6816474906187204,10,0,lower
+frames,large,4,frame time p95,wasm,ts,4.0000352957786465,3.9264983058026415,4.088136542200239,10,0,higher
+frames,large,4,frame time p95,wasm-frame,ts,3.7647289284201686,3.7353257800367228,3.9513490445255317,10,0,higher
+frames,large,4,frame time p95,wasm-worker,ts,2.6764877170690307,2.647077509529867,2.7355493385176963,10,0,higher
+frames,large,4,frame time p95,wasm-worker,wasm-frame,0.7086297827763219,0.6875015820960172,0.7133892567508477,10,0,lower
+frames,large,4,frame time p99,ts,wasm,0.24514403561627257,0.24285971438858026,0.24753855585653647,10,0,lower
+frames,large,4,frame time p99,wasm-frame,wasm,0.9319329425296912,0.9280373473089394,0.9420302142914613,10,0,lower
+frames,large,4,frame time p99,wasm-worker,wasm,0.7096319498620024,0.6911477500353179,0.7285622832041349,10,0,lower
+frames,large,4,frame time p99,wasm,ts,4.079243487234611,4.039774719294882,4.117603458925182,10,0,higher
+frames,large,4,frame time p99,wasm-frame,ts,3.806691800327182,3.79531657527723,3.823550329670875,10,0,higher
+frames,large,4,frame time p99,wasm-worker,ts,2.8919005149685866,2.8235519179783912,2.9764546016059885,10,0,higher
+frames,large,4,frame time p99,wasm-worker,wasm-frame,0.7587689754910507,0.7430784923704626,0.7784654564400263,10,0,lower
+frames,large,4,sim minutes per second,ts,wasm,2.6292525654987413,2.5228858329636648,2.717752497100136,10,0,higher
+frames,large,4,sim minutes per second,wasm-frame,wasm,1.375080421392472,1.2860695566009979,1.4073009891042851,10,0,higher
+frames,large,4,sim minutes per second,wasm-worker,wasm,1.7578871529221525,1.7022618374427736,1.7997201151232545,10,0,higher
+frames,large,4,sim minutes per second,wasm,ts,0.3803362276923159,0.367951092333466,0.3963714833759591,10,0,lower
+frames,large,4,sim minutes per second,wasm-frame,ts,0.5211409066362171,0.5046096827030458,0.5352212615466371,10,0,lower
+frames,large,4,sim minutes per second,wasm-worker,ts,0.6665158669450298,0.6560407471603912,0.6859612983015665,10,0,lower
+frames,large,4,sim minutes per second,wasm-worker,wasm-frame,1.2915064099352318,1.254772657477853,1.3094750986617611,10,0,higher
+frames,large,4,frames over 200 ms (clamped),ts,wasm,0.5,0.45714285714285713,0.53125,10,0,lower
+frames,large,4,frames over 200 ms (clamped),wasm-frame,wasm,0.5151515151515151,0.4722222222222222,0.53125,10,0,lower
+frames,large,4,frames over 200 ms (clamped),wasm-worker,wasm,0.4852813852813853,0.4473684210526316,0.53125,10,0,lower
+frames,large,4,frames over 200 ms (clamped),wasm,ts,2.0018382352941178,1.8823529411764706,2.1875,10,0,higher
+frames,large,4,frames over 200 ms (clamped),wasm-frame,ts,1,1,1.125,10,0,inconclusive
+frames,large,4,frames over 200 ms (clamped),wasm-worker,ts,1,0.9411764705882353,1.0625,10,0,inconclusive
+frames,large,4,frames over 200 ms (clamped),wasm-worker,wasm-frame,0.9722222222222222,0.9411764705882353,1,10,0,inconclusive
+frames,large,4,main-thread blocking (long tasks past 50 ms),ts,wasm,0.8100688053643079,0.7889117669488294,0.823055028462998,10,0,lower
+frames,large,4,main-thread blocking (long tasks past 50 ms),wasm-frame,wasm,1.0242416917516062,0.987852723706051,1.0389028607356177,10,0,equivalent
+frames,large,4,main-thread blocking (long tasks past 50 ms),wasm-worker,wasm,0.7982032937501902,0.7740304813641165,0.8062125512456638,10,0,lower
+frames,large,4,main-thread blocking (long tasks past 50 ms),wasm,ts,1.2344640232890902,1.214985590778098,1.2675688738521025,10,0,higher
+frames,large,4,main-thread blocking (long tasks past 50 ms),wasm-frame,ts,1.267058816771236,1.2519091348477525,1.275630415733619,10,0,higher
+frames,large,4,main-thread blocking (long tasks past 50 ms),wasm-worker,ts,0.9890628230358518,0.9700288184438041,0.999123490455785,10,0,equivalent
+frames,large,4,main-thread blocking (long tasks past 50 ms),wasm-worker,wasm-frame,0.7803249451794465,0.7714242607121303,0.7869813358013266,10,0,lower
+frames,large,4,"command to visible frame, median",ts,wasm,0.5369176213839686,0.35581793724866173,0.5780260353612027,10,0,lower
+frames,large,4,"command to visible frame, median",wasm-frame,wasm,0.7948944191533092,0.7463102197566058,1.4248862158258246,10,0,inconclusive
+frames,large,4,"command to visible frame, median",wasm-worker,wasm,1.1036502693058554,0.9653758601244119,1.16975385419442,10,0,inconclusive
+frames,large,4,"command to visible frame, median",wasm,ts,1.8624920682325312,1.7300258791545782,2.8104260502785015,10,0,higher
+frames,large,4,"command to visible frame, median",wasm-frame,ts,1.6897674118263197,1.387768451631623,2.4650900282293127,10,0,higher
+frames,large,4,"command to visible frame, median",wasm-worker,ts,2.055572687079804,1.723721160356955,2.5643203450858754,10,0,higher
+frames,large,4,"command to visible frame, median",wasm-worker,wasm-frame,1.4210476581507658,0.7900262468695894,1.461003222304231,10,0,inconclusive
+frames,large,4,"command to visible frame, p95",ts,wasm,0.30505289777358713,0.19000091669509997,0.7989730935089071,10,0,lower
+frames,large,4,"command to visible frame, p95",wasm-frame,wasm,0.9499890300201056,0.6057120264693506,3.8682233971857745,10,0,inconclusive
+frames,large,4,"command to visible frame, p95",wasm-worker,wasm,0.6637904138019153,0.524166844845114,2.188731949024144,10,0,inconclusive
+frames,large,4,"command to visible frame, p95",wasm,ts,3.2789179056520226,1.2516066036820197,5.263132501643291,10,0,higher
+frames,large,4,"command to visible frame, p95",wasm-frame,ts,3.2009311746561577,2.941959100436519,4.868249724259013,10,0,higher
+frames,large,4,"command to visible frame, p95",wasm-worker,ts,2.80395325120824,2.0852762281173383,3.0110988476488165,10,0,higher
+frames,large,4,"command to visible frame, p95",wasm-worker,wasm-frame,0.7139746987429065,0.5587791910368016,0.9413800776294089,10,0,lower
