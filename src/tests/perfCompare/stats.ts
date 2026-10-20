@@ -129,6 +129,24 @@ export function pairedDifferences(a: { reps: readonly number[]; values: readonly
   return diffs;
 }
 
+/** The repetitions every pass must have, and the fewest pairs a gate reads: the verdict runs use 10. */
+export const MIN_REPS = 10;
+
+export interface PairedDifference {
+  n: number;
+  median: number;
+  ciLow: number | null;
+  ciHigh: number | null;
+}
+
+/** The median of a minus b, paired by repetition number, with the 95% order-statistic interval of the median; null when nothing pairs. The one definition the M4 and M5 gates and their report cells read. */
+export function pairedDifference(a: { reps: readonly number[]; values: readonly number[] }, b: { reps: readonly number[]; values: readonly number[] }): PairedDifference | null {
+  const diffs = pairedDifferences(a, b);
+  if (!diffs.length) return null;
+  const s = summarize(diffs);
+  return { n: s.n, median: s.median, ciLow: s.medianCiLow, ciHigh: s.medianCiHigh };
+}
+
 export interface FrameStats {
   frames: number;
   medianMs: number;

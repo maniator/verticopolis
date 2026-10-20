@@ -29,6 +29,9 @@ describe("fmt", () => {
     expect(fmt(1234.5, "ms")).toBe("1235 ms");
     expect(fmt(12.345, "ms")).toBe("12.35 ms");
     expect(fmt(0.1234, "ms")).toBe("0.123 ms");
+    expect(fmt(-12.345, "ms")).toBe("-12.35 ms");
+    expect(fmt(-1234.5, "ms")).toBe("-1235 ms");
+    expect(fmt(-0.1234, "ms")).toBe("-0.123 ms");
     expect(fmt(59.5, "fps")).toBe("59.50 fps");
     expect(fmt(null, "ms")).toBe("n/a");
     expect(fmt(NaN, "ms")).toBe("n/a");
