@@ -71,8 +71,8 @@ llvmpipe or any other software rasterizer.
 AC power; Windows in its best-performance power mode; nothing else building,
 testing or benchmarking; every browser and editor window closed; the ChatGPT
 desktop app and the NVIDIA Overlay closed; no antivirus scan running. Sample
-the idle CPU load just before the start and record it in the notes. Note anything unusual (a Windows update pending, thermal state)
-in the run's notes. The harness records CPU, memory, OS build, GPU, Node, Rust,
+the idle CPU load just before the start and record it in the notes. Note
+anything unusual (a Windows update pending, thermal state) in the run's notes. The harness records CPU, memory, OS build, GPU, Node, Rust,
 wasm-bindgen, Playwright and browser versions in `results.json`.
 
 ## 2. Preconditions
@@ -265,9 +265,13 @@ npm.cmd run perf:worker -- --reps 10 --viewport 1280x720 --out docs/performance/
 The run's notes paste both `git status --porcelain` outputs and the patch's
 SHA-256. The folder is marked `-dirty` by the harness because of the declared
 patch; that is expected for RUN-0a only. Send the results folder and the
-console log to the coordinator. A passing run reproduces the two committed
-desktop runs: TypeScript near 702 ms and WASM near 830 ms, each inside the
-committed interval.
+console log to the coordinator. A passing run meets the machine state and the
+GPU renderer above and reproduces the 1280x720 reference run
+(`2026-10-15-e25ec01c-worker-1280x720`): TypeScript near 702 ms and WASM near
+830 ms, each inside that run's committed interval ([670, 734] and [786, 971]).
+The earlier 640x360 run (`2026-10-15-e25ec01-worker`, 705 and 806) used another
+viewport and is not the rule's reference; its WASM interval ([791, 830]) is
+narrower, and a run is reported against both when a reader asks.
 
 ### RUN-0b, exact steps
 

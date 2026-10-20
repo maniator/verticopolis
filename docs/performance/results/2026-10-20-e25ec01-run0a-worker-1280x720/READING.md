@@ -1,17 +1,17 @@
 # RUN-0a reading
 
-Measured 2026-10-20 on the owner's desktop at `e25ec01` plus the declared build patch. `NOTES.md` is the PC session's record; this file reads the result against the protocol's rule (docs/performance/benchmark-protocol.md, section 7, RUN-0a). The committed reference is `docs/performance/results/2026-10-15-e25ec01c-worker-1280x720`. This is a snapshot; no live number lives here.
+Measured 2026-10-20 on the owner's desktop at `e25ec01` plus the declared build patch. `NOTES.md` is the PC session's record; this file reads the result against the protocol's rule (docs/performance/benchmark-protocol.md, section 7, RUN-0a). The committed reference is `docs/performance/results/2026-10-15-e25ec01c-worker-1280x720`. This is a snapshot. The percentages below are this file's own arithmetic on the medians in `metrics.csv`. For live numbers run `npm run perf:worker`; the report's definitions are pinned by `src/tests/perfWorker/analysis.test.ts`.
 
 ## The rule
 
-RUN-0a passes when the large tower's 720 bare steps at 1x come out near 702 ms (TypeScript) and 830 ms (WASM), each median inside the committed interval.
+RUN-0a passes when the run meets the machine state and the GPU renderer, and the large tower's 720 bare steps at 1x come out near 702 ms (TypeScript) and 830 ms (WASM), each median inside the committed interval of the 1280x720 reference run.
 
 | Large tower, 720 bare steps, 1x | 2026-10-15 reference, median [95% interval] | RUN-0a, median [95% interval] | Inside the reference interval |
 | --- | --- | --- | --- |
 | TypeScript | 702 [670, 734] | 732 [696, 815] | yes (732 is 2 ms under the upper bound) |
 | WASM | 830 [786, 971] | 832 [810, 855] | yes |
 
-**RUN-0a reproduces the reference by the protocol's rule.** TypeScript sits at the top of its reference interval (4.3% above the old median), and WASM matches to within 0.3%.
+Both large 1x medians fall inside the 1280x720 reference intervals: TypeScript sits at the top of its interval (4.3% above the old median), and WASM matches to within 0.3%. **RUN-0a does not pass.** The run used a software renderer and missed the machine state (see the differences below), so it does not qualify, and RUN-0a stays open until a compliant repeat or the owner's explicit acceptance. Against the earlier 640x360 run (large 1x, WASM 806 [791, 830]), WASM 832 is also 1.9 ms above its upper bound.
 
 ## What does not reproduce
 
@@ -45,6 +45,6 @@ This folder cannot say which of these moved the 4x rows. A RUN-0a repeat on the 
 ## Use
 
 - Frame metrics from this folder are invalid (software renderer). Do not quote FPS, 1% lows or frame-time rows.
-- The two large 1x figures stand as reproduced. No other row of this folder is used as evidence for the gate.
+- The two large 1x medians landing inside the reference intervals is an observation, not a pass. No row of this folder is used as evidence for the gate.
 - RUN-0b waits on the renderer fix (#1115) before its frame metrics.
 - The old `perf:worker` report leads with TypeScript over WASM. The gate's orientation is the other way (WASM over TypeScript); invert before comparing with the pass rules.
