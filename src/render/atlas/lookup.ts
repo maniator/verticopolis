@@ -99,7 +99,8 @@ function lookupAtCatalogWidth(u: LiveUnit, s: LiveScene, variant: number, width:
   if (occupants <= 0) return { frame: `${stem}/away`, chains: {}, overlays: [], ...cycles };
   // Whole figures only. The art's figure loops run `i < n`, so a fractional
   // count (a forged save) paints like the next whole one: round up.
-  const visible = Math.ceil(Math.max(0, occupants - finite(u.outForMeal ?? 0)));
+  const outForMeal = Math.min(occupants, Math.max(0, finite(u.outForMeal ?? 0)));
+  const visible = Math.ceil(Math.max(0, occupants - outForMeal));
   return { frame: `${stem}/home`, chains: { occupants: visible }, overlays: [], ...cycles };
 }
 

@@ -56,12 +56,24 @@ one. For acceptance runs:
 Headless is the harness's default and the only mode that counts. The report
 header records the exact browser version.
 
+**The renderer must be the GPU.** The 2026-10-15 reference runs recorded ANGLE
+on Direct3D 11 with the RTX 3060. RUN-0a (2026-10-20) ran the same bundled
+Chromium 149 headless on ANGLE with Vulkan SwiftShader, which is software
+rendering. That makes FPS, 1% lows, frame-time p99 and every frame-bound part
+of M1 to M8 invalid, and it may have moved the bare-step rows too (see the
+folder's `READING.md`). Not yet: the harness does not choose or check the
+renderer (follow-up #1115). Until it does, read the report's Renderer line
+before accepting any run, and reject a run whose renderer names SwiftShader,
+llvmpipe or any other software rasterizer.
+
 ### Machine state
 
 AC power; Windows in its best-performance power mode; nothing else building,
-testing or benchmarking; every browser and editor window closed; no antivirus
-scan running. Note anything unusual (a Windows update pending, thermal state)
-in the run's notes. The harness records CPU, memory, OS build, GPU, Node, Rust,
+testing or benchmarking; every browser and editor window closed; the ChatGPT
+desktop app and the NVIDIA Overlay closed; no antivirus scan running. Sample
+the idle CPU load just before the start and record it in the notes. Note
+anything unusual (a Windows update pending, thermal state) in the run's
+notes. The harness records CPU, memory, OS build, GPU, Node, Rust,
 wasm-bindgen, Playwright and browser versions in `results.json`.
 
 ## 2. Preconditions
@@ -108,8 +120,9 @@ and large scenarios with their pinned scenario hashes.
 | `npm.cmd run perf:compare -- --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-<label>` | Startup, hosted and bare engine, frames with and without audio, memory, transfer and build sizes. Run it after `perf:worker`; `--skip-build` checks the builds on disk are this commit's |
 
 Other flags both accept: `--quick` (a 2-rep smoke test that never counts),
-`--resume DIR` (continue a run that stopped; it keeps its own folder),
-`--scenarios a,b`. `perf:compare` also takes `--throttles 1,4`;
+`--resume DIR` (continue a run that stopped; it keeps its own folder, and an A/A folder resumes with `--aa <engine>` repeated),
+`--scenarios a,b`. `perf:compare` also takes `--throttles 1,4` and
+`--aa ts|wasm` (section 6.1);
 `perf:worker` also takes `--read-model` (Node only, no browser).
 
 A results folder is `docs/performance/results/<date>-<sha>-<label>/` with the
@@ -197,17 +210,63 @@ noise the tolerance has to cover.
 6. RUN-3 repeats one A/A pass per engine beside the verdict. An A/A pass
    outside δ or ε goes to the owner, who decides whether RUN-3 stands.
 
-Not yet: the harness has no A/A mode and no calibration script. B3's harness
-PR adds `--aa ts|wasm` (the engine in both slots, tagged in `results.json` so
-it can never be read as a verdict) and a calibration summary that applies the
-steps above to a set of A/A folders.
+`perf:compare --aa ts|wasm` runs one engine in both slots. `results.json`
+records it in `config.aa`, and each run records the slot (`engine`) and the
+engine it was asked to run (`ranEngine`, which is `config.aa ?? engine`). The
+engine the page reported running is checked against `ranEngine` during the run
+(`engineActive`), so a page that fell back to the other engine fails
+validation. The slot labels stay `ts` and `wasm`, and every ratio is slot
+`wasm` over slot `ts`. Validation judges each run by `ranEngine` and refuses a
+folder whose runs do not match `config.aa`; a resume refuses a checkpoint from
+a different mode.
+
+Four things keep an A/A folder from passing for a comparison:
+
+- The report opens with a banner, says "A/A calibration results" in its title,
+  names the columns by slot, and has no Verdict column. The comparisons CSV
+  reads `A/A` where a real run gives a verdict word, so no A/A ratio is
+  called equivalent or faster. The interval bounds are the result.
+- The three CSVs end in an `aa` column.
+- The folder's own name (the last path segment) must contain `aa-<engine>`. It
+  gains `-aa-<engine>` without `--out`, `--out` is refused without it, and a
+  run without `--aa` refuses an `aa-ts` or `aa-wasm` name.
+- The limitations that describe two different engines are left out of the
+  report and replaced by a note. The WASM-only ones stay in an `--aa wasm`
+  folder.
+
+Which rows an A/A folder keeps: a metric both engines produce is kept for both
+slots. A metric only one engine produces is kept for both slots when that
+engine is the A/A engine (`--aa wasm` keeps the WASM linear memory, the
+engine-hosted and fetch/compile startup rows and the attribution shares) and
+left out when it is the other one. The cold WASM load steps are left out of
+both modes. An `--aa ts` pass still runs that probe, on the verdict run's
+schedule, so the page lifecycle matches. Boot order differs only when the two
+slots run different engines, so DOMContentLoaded and the load event are
+compared in an A/A folder. An `--aa ts` pass still needs the WASM package
+and the Node check of both engines to pass, because the harness validates the
+whole setup.
+
+Two limits are open, so the calibration is not complete:
+
+- **δ and ε are adopted only from the calibration summary** that applies steps
+  1 to 4 to a set of A/A folders (follow-up #1110). RUN-0b may collect the
+  folders. Nobody reads values off them by hand.
+- **M4's ε has no A/A source yet.** `perf:compare` measures no long tasks and
+  `perf:worker` has no `--aa` (follow-up #1111), so the long-task ε stays
+  uncalibrated until that lands. RUN-1 needs M4, so #1111 and its A/A passes
+  land before RUN-1, either inside RUN-0b or as a follow-on campaign.
+- **The harness for each metric.** The reference figures of RUN-0a come from
+  `perf:worker`, and the calibration summary reads `perf:compare` folders. A
+  tolerance calibrated on one harness's noise is not applied to the other's
+  ratios, so the summary calibrates per harness and the table in section 6
+  names the harness for each metric (recorded in #1110).
 
 ## 7. Scheduled runs
 
 | Run | Commit | Purpose |
 | --- | --- | --- |
 | RUN-0a | `e25ec01` | Does the desktop reproduce 702 ms (TS) and 830 ms (WASM) on the large tower's 720 bare steps at 1x, inside the committed intervals? |
-| RUN-0b | `main` once PRs #1097, #1098 and the harness PR are merged | The baseline later runs compare with: the shipping host's cost split and each hour's churn, and the A/A passes of section 6.1 |
+| RUN-0b | `main` once PRs #1097, #1098 and the cost-split harness PR are merged, and A5's design rule is committed | The baseline later runs compare with: the shipping host's cost split and each hour's churn, and the A/A passes of section 6.1 (folders only; the values come from the calibration summary, #1110) |
 | RUN-1 | after S6 | The shipping host after S6; the input to cohort stage 3 (M2 to M6 at 1x and 4x) |
 | RUN-2 | after #1051 (and #859), and the cold-start fix if needed | Bare tick parity and cold start |
 | RUN-3 | the candidate commit | The gate verdict with one A/A pass per engine beside it |
@@ -254,14 +313,18 @@ npm.cmd run perf:worker -- --reps 10 --viewport 1280x720 --out docs/performance/
 The run's notes paste both `git status --porcelain` outputs and the patch's
 SHA-256. The folder is marked `-dirty` by the harness because of the declared
 patch; that is expected for RUN-0a only. Send the results folder and the
-console log to the coordinator. A passing run reproduces the two committed
-desktop runs: TypeScript near 702 ms and WASM near 830 ms, each inside the
-committed interval.
+console log to the coordinator. A passing run meets the machine state and the
+GPU renderer above and reproduces the 1280x720 reference run
+(`2026-10-15-e25ec01c-worker-1280x720`): TypeScript near 702 ms and WASM near
+830 ms, each inside that run's committed interval ([670, 734] and [786, 971]).
+The earlier 640x360 run (`2026-10-15-e25ec01-worker`, 705 and 806) used another
+viewport and is not the rule's reference; its WASM interval ([791, 830]) is
+narrower, and a run is reported against both when a reader asks.
 
 ### RUN-0b, exact steps
 
-Run it only after the harness PR with A/A mode and the cost split is merged;
-the commands are completed in that PR's description. The shape:
+Run it after the harness PR with the cost split is merged. A/A mode has
+landed; that PR's description completes the commands. The shape:
 
 ```powershell
 git -c core.autocrlf=false clone https://github.com/maniator/verticopolis.git "C:\Users\nafta\projects\vc-run0b"
@@ -273,11 +336,12 @@ npm.cmd ci
 npm.cmd run wasm:build
 npm.cmd run perf:worker  -- --reps 10 --viewport 1280x720 --out docs/performance/results/<date>-<sha>-run0b-worker-1280x720
 npm.cmd run perf:compare -- --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b
-# A/A passes (not yet): five or more per engine, same flags
+# A/A passes: five or more per engine, same flags
 npm.cmd run perf:compare -- --aa ts   --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b-aa-ts-1
 npm.cmd run perf:compare -- --aa wasm --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b-aa-wasm-1
 ```
 
+Start RUN-0b only after A5's design rule is committed (plan section 5.2).
 RUN-0b also records the shipping host's main-thread cost split (engine step,
 per-step sync, hourly serialize, parse and merge) and each hour's churn. Not
 yet: the harness reports the first three partly (`perf:worker` times the
@@ -288,6 +352,8 @@ hosts; the split into sync, serialize and merge is B3's harness PR).
 1. Validate the folder (section 4), then compare the identity (section 3).
 2. Commit the folder on a branch through a PR. The PR body names the command,
    the machine state notes, the validation result and the verdict against the
-   pass rule in section 6, written before the run.
+   pass rule in section 6, written before the run. An A/A folder has no
+   verdict; its PR names the command, the validation result and the pass
+   number.
 3. A run's report never claims more than its folder shows. Anything that
    rests on clamped frames says so.
