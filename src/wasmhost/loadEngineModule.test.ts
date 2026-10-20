@@ -6,6 +6,8 @@ import { EnginePackageAborted, EnginePackageError } from "./enginePackageCheck";
 import { ENGINE_BUILD_RECORD, ENGINE_GLUE, ENGINE_WASM } from "./enginePackageNames";
 import { engineBuildRecord, expectedOf } from "./enginePackageRecord";
 import { EngineBootError } from "./engineBoot";
+import type { BuildMetadataResult } from "./buildSection";
+import { compileEngineBytes } from "./engineLoad";
 import { loadWasmEngine } from "./startWasmHost";
 import { enginePackageUrls, loadEngineModule, type EngineGlue, type LoadEngineOptions } from "./loadEngineModule";
 
@@ -15,7 +17,14 @@ const ORIGIN = "https://game.example";
 const GLUE_URL = `${ORIGIN}/engine/${ENGINE_GLUE}`;
 
 const glue = enc("export default async function init() {}\n");
-const wasm = new Uint8Array(2048).map((_, i) => (i * 5) & 255);
+/** A module that compiles: the header and one custom section of padding. */
+function customModule(payload: Uint8Array): Uint8Array {
+  const name = enc("pad");
+  const leb = (n: number) => (n < 128 ? [n] : [(n & 127) | 128, n >> 7]);
+  const body = [...leb(name.length), ...name, ...payload];
+  return new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 0, ...leb(body.length), ...body]);
+}
+const wasm = customModule(new Uint8Array(2048).map((_, i) => (i * 5) & 255));
 const record = engineBuildRecord(glue, wasm, "b".repeat(64), sha);
 const expected = expectedOf(record);
 
@@ -43,6 +52,11 @@ function harness() {
   const blobs: Blob[] = [];
   const revoked: string[] = [];
   const io = {
+    initGlue: vi.fn(async (url: string, o?: { onBuild?: (b: BuildMetadataResult) => void; wasmUrl?: string | URL }) => {
+      imported.push(url);
+      o?.onBuild?.({ state: "missing" });
+      return { mod, exports: {} };
+    }),
     importModule: vi.fn((url: string) => {
       imported.push(url);
       return Promise.resolve(mod);
@@ -122,7 +136,8 @@ describe("loadEngineModule", () => {
   it("imports the verified glue from a blob and starts it on the verified binary", async () => {
     const h = harness();
     const s = served();
-    const loaded = await loadEngineModule(GLUE_URL, opts(h, s));
+    const compile = vi.fn(compileEngineBytes);
+    const loaded = await loadEngineModule(GLUE_URL, opts(h, s, { compile }));
     expect(loaded.verified).toBe(true);
     expect(loaded.mod).toBe(h.mod);
     // The import is of the blob, never of the served URL again.
@@ -130,8 +145,10 @@ describe("loadEngineModule", () => {
     expect(new Uint8Array(await h.blobs[0].arrayBuffer())).toEqual(glue);
     expect(h.blobs[0].type).toBe("text/javascript");
     expect(h.revoked).toEqual(["blob:test/1"]);
-    const arg = h.init.mock.calls[0][0] as { module_or_path: Uint8Array };
-    expect(arg.module_or_path).toEqual(wasm);
+    // The module that runs was compiled from the hashed bytes.
+    expect(compile.mock.calls[0][0]).toEqual(wasm);
+    const arg = h.init.mock.calls[0][0] as { module_or_path: WebAssembly.Module };
+    expect(arg.module_or_path).toBe(await compile.mock.results[0].value.then((r: { module: WebAssembly.Module }) => r.module));
     // One request per file, none after the check.
     expect([...s.calls].sort()).toEqual([`${ORIGIN}/engine/${ENGINE_BUILD_RECORD}`, GLUE_URL, `${ORIGIN}/engine/${ENGINE_WASM}`].sort());
   });
@@ -267,6 +284,44 @@ describe("loadEngineModule", () => {
     });
   });
 
+  describe("the binary's build section (#963)", () => {
+    it("reports it once the verified binary has compiled, before the glue is imported", async () => {
+      const h = harness();
+      const seen: string[] = [];
+      const onBuild = vi.fn((b: BuildMetadataResult) => void seen.push(`build:${b.state}`));
+      h.io.importModule.mockImplementationOnce((url: string) => {
+        seen.push("import");
+        h.imported.push(url);
+        return Promise.resolve(h.mod);
+      });
+      await loadEngineModule(GLUE_URL, opts(h, served(), { onBuild }));
+      expect(seen).toEqual(["build:missing", "import"]);
+    });
+
+    it("hands the glue the compiled module, not the bytes", async () => {
+      const h = harness();
+      await loadEngineModule(GLUE_URL, opts(h, served()));
+      const arg = h.init.mock.calls[0]?.[0];
+      expect(arg?.module_or_path).toBeInstanceOf(WebAssembly.Module);
+    });
+
+    it("still reports it when the glue then fails to import", async () => {
+      const h = harness();
+      const onBuild = vi.fn();
+      h.io.importModule.mockRejectedValueOnce(new SyntaxError("bad glue"));
+      await expect(loadEngineModule(GLUE_URL, opts(h, served(), { onBuild }))).rejects.toThrow("bad glue");
+      expect(onBuild).toHaveBeenCalledWith({ state: "missing" });
+    });
+
+    it("does not compile a package the check refused", async () => {
+      const h = harness();
+      const compile = vi.fn();
+      const bad = served({ [`${ORIGIN}/engine/${ENGINE_WASM}`]: customModule(new Uint8Array(2048).fill(9)) });
+      await expect(loadEngineModule(GLUE_URL, opts(h, bad, { compile }))).rejects.toBeInstanceOf(EnginePackageError);
+      expect(compile).not.toHaveBeenCalled();
+    });
+  });
+
   describe("a development serve", () => {
     it("loads the served glue without the check (the unit tests run as a dev serve)", async () => {
       const h = harness();
@@ -276,7 +331,7 @@ describe("loadEngineModule", () => {
         const loaded = await loadEngineModule(GLUE_URL, opts(h, s, { checkInDev: false }));
         expect(loaded.verified).toBe(false);
         expect(h.imported).toEqual([GLUE_URL]);
-        expect(h.init).toHaveBeenCalledWith();
+        expect(h.io.initGlue).toHaveBeenCalledWith(GLUE_URL, expect.objectContaining({ wasmUrl: undefined }));
         expect(s.calls).toEqual([]);
         expect(info).toHaveBeenCalledWith(expect.stringContaining("development serve"));
       } finally {

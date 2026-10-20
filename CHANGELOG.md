@@ -18,6 +18,10 @@ notes, never a past version's.
 - On the opt-in WASM engine (`?engine=wasm`), the start screen now says the engine is loading when the download is slow, instead of showing an empty sky.
 - That engine now checks its own files before it runs them. If the files do not belong together, the game stays on the standard engine instead of running them.
 
+## 2.42.0
+
+- Help's About now shows which game engine runs and which build it is, with a Copy diagnostics button to send us if something looks wrong. It works even when the engine cannot start.
+
 ## 2.41.0
 
 - A save made while an exterminator is booked now remembers which rooms were booked, so after a reload the treatment covers the same rooms as if you had kept playing.

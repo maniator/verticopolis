@@ -1546,6 +1546,39 @@ ul.slots .slot-actions .btn {
   content: "▾ ";
 }
 
+/* Engine diagnostics in Help's About section (#963): a compact label and value
+   list the player can read and copy. */
+.help-diagnostics {
+  margin: 8px 0;
+}
+.help-diagnostics-summary {
+  margin: 0 0 6px;
+}
+.help-diagnostics-rows {
+  margin: 0 0 8px;
+  font-size: 0.9em;
+  color: var(--muted);
+}
+.help-diagnostics-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+.help-diagnostics-row dt {
+  font-weight: 700;
+}
+.help-diagnostics-row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.help-diagnostics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
 /* Help "Report an issue" row — a plain flex row so the link keeps its natural
    button width and would sit beside any future sibling link. */
 .help-report {

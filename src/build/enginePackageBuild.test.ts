@@ -13,11 +13,15 @@ const wasm = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 2, 3]);
 const record = engineBuildRecord(glue, wasm, "a".repeat(64), sha);
 
 let dir = "";
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
+const made: string[] = [];
+afterEach(() => {
+  for (const d of made.splice(0)) rmSync(d, { recursive: true, force: true });
+});
 
 /** A directory with an engine package in it, laid out as src/public or dist. */
 function pkg(over: { record?: string | null; glue?: Uint8Array; wasm?: Uint8Array } = {}): string {
   dir = mkdtempSync(join(tmpdir(), "vc-pkg-"));
+  made.push(dir);
   mkdirSync(join(dir, ENGINE_DIR), { recursive: true });
   writeFileSync(join(dir, ENGINE_DIR, ENGINE_GLUE), over.glue ?? glue);
   writeFileSync(join(dir, ENGINE_DIR, ENGINE_WASM), over.wasm ?? wasm);
@@ -27,11 +31,12 @@ function pkg(over: { record?: string | null; glue?: Uint8Array; wasm?: Uint8Arra
 
 describe("readExpectedPackage", () => {
   it("reads the package id and the file digests of a good record", () => {
-    expect(readExpectedPackage(pkg(), "build")).toEqual({ package: record.package, files: record.files });
+    expect(readExpectedPackage(pkg(), "build")).toEqual({ package: record.package, files: record.files, sources: record.sources });
   });
 
   it("is null when there is no package folder, in a build or not", () => {
     dir = mkdtempSync(join(tmpdir(), "vc-pkg-"));
+    made.push(dir);
     expect(readExpectedPackage(dir, "build")).toBeNull();
     expect(readExpectedPackage(dir, "other")).toBeNull();
   });
@@ -51,9 +56,10 @@ describe("readExpectedPackage", () => {
 
   it("treats an empty engine folder as no package, and reads a record that starts with a byte order mark", () => {
     dir = mkdtempSync(join(tmpdir(), "vc-pkg-"));
+    made.push(dir);
     mkdirSync(join(dir, ENGINE_DIR));
     expect(readExpectedPackage(dir, "build")).toBeNull();
-    expect(readExpectedPackage(pkg({ record: `\uFEFF${JSON.stringify(record)}` }), "build")).toEqual({ package: record.package, files: record.files });
+    expect(readExpectedPackage(pkg({ record: `\uFEFF${JSON.stringify(record)}` }), "build")).toEqual({ package: record.package, files: record.files, sources: record.sources });
   });
 
   it("gives a dev serve or a test null even for a good record", () => {

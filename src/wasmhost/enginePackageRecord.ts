@@ -21,11 +21,23 @@ export interface EngineFileRecord {
 /** The record's `files` block: exactly the glue and the binary. */
 export type EngineFiles = Record<string, EngineFileRecord>;
 
+/** The crate the package was built from, as its `Cargo.toml` names it. */
+export interface EngineCrateRecord {
+  name: string;
+  version: string;
+}
+
 /** `engine/BUILD.json` at schema 2. */
 export interface EnginePackageRecord {
   schema: 2;
   /** The hash of the Rust sources (src/wasmhost/packageHash.ts), unchanged. */
   sources: string;
+  /**
+   * The crate's name and version (#963), so About can show them when the
+   * engine never loaded. Optional: a record cached before this field lacks
+   * it. It is not part of `package`, which covers the two files alone.
+   */
+  crate?: EngineCrateRecord;
   /** The hash of the canonical JSON of `files`: the id of these exact bytes. */
   package: string;
   files: EngineFiles;
@@ -35,6 +47,12 @@ export interface EnginePackageRecord {
 export interface ExpectedEnginePackage {
   package: string;
   files: EngineFiles;
+  /** The crate this shell was built to run, a label for About and diagnostics (#963); the check never reads it. */
+  crate?: EngineCrateRecord;
+  /** The hash of the Rust sources of the package this shell was built with
+   *  (`BUILD.json`'s `sources`), for About to compare with the hash stamped in
+   *  the binary (#963). A label: the package check never reads it. */
+  sources?: string;
 }
 
 /** A SHA-256 as 64 lowercase hex digits. */
@@ -64,17 +82,30 @@ export function engineBuildRecord(
   wasm: Uint8Array,
   sources: string,
   sha256Hex: (data: Uint8Array | string) => string,
+  crate?: EngineCrateRecord,
 ): EnginePackageRecord {
   const files: EngineFiles = {
     [ENGINE_GLUE]: { sha256: sha256Hex(glue), bytes: glue.length },
     [ENGINE_WASM]: { sha256: sha256Hex(wasm), bytes: wasm.length },
   };
-  return { schema: 2, sources, package: sha256Hex(canonicalFilesJson(files)), files };
+  return { schema: 2, sources, ...(crate ? { crate: { name: crate.name, version: crate.version } } : {}), package: sha256Hex(canonicalFilesJson(files)), files };
 }
 
 /** The part of a record the shell compiles in. */
 export function expectedOf(record: EnginePackageRecord): ExpectedEnginePackage {
-  return { package: record.package, files: { [ENGINE_GLUE]: { ...record.files[ENGINE_GLUE] }, [ENGINE_WASM]: { ...record.files[ENGINE_WASM] } } };
+  return {
+    package: record.package,
+    files: { [ENGINE_GLUE]: { ...record.files[ENGINE_GLUE] }, [ENGINE_WASM]: { ...record.files[ENGINE_WASM] } },
+    ...(record.crate ? { crate: { ...record.crate } } : {}),
+    sources: record.sources,
+  };
+}
+
+/** A crate entry is two non-empty strings; anything else reads as absent, since it is a label and never gates the load. */
+function readCrate(v: unknown): EngineCrateRecord | undefined {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) return undefined;
+  const c = v as { name?: unknown; version?: unknown };
+  return typeof c.name === "string" && c.name !== "" && typeof c.version === "string" && c.version !== "" ? { name: c.name, version: c.version } : undefined;
 }
 
 function isFileRecord(v: unknown): v is EngineFileRecord {
@@ -89,7 +120,10 @@ function isFileRecord(v: unknown): v is EngineFileRecord {
  * the binary with valid digests and byte counts. Unknown keys, at the top
  * level or inside an entry, are ignored (a later field must not strand an
  * older shell, and the package id covers only the digest and size of each
- * file); an unknown file or a missing one is not. Returns why not on failure, never throws.
+ * file); an unknown file or a missing one is not. The optional `crate` is kept
+ * when it is two non-empty strings and reads as absent otherwise, since it
+ * labels the package and never gates the load. Returns why not on failure,
+ * never throws.
  */
 export function parseEngineRecord(text: string): { ok: true; record: EnginePackageRecord } | { ok: false; why: string } {
   let v: unknown;
@@ -112,5 +146,6 @@ export function parseEngineRecord(text: string): { ok: true; record: EnginePacka
   }
   const f = files as EngineFiles;
   const entry = (name: string): EngineFileRecord => ({ sha256: f[name].sha256, bytes: f[name].bytes });
-  return { ok: true, record: { schema: 2, sources: r.sources, package: r.package, files: { [ENGINE_GLUE]: entry(ENGINE_GLUE), [ENGINE_WASM]: entry(ENGINE_WASM) } } };
+  const crate = readCrate(r.crate);
+  return { ok: true, record: { schema: 2, sources: r.sources, ...(crate ? { crate } : {}), package: r.package, files: { [ENGINE_GLUE]: entry(ENGINE_GLUE), [ENGINE_WASM]: entry(ENGINE_WASM) } } };
 }

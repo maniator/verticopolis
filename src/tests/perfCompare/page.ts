@@ -46,8 +46,9 @@ export function installProbes(): void {
     };
   }
   // Time the engine package's compile and instantiate on the app's own boot
-  // path (the verified loader passes bytes, so the glue calls instantiate; the
-  // streaming variant is kept in case a path still uses it): the first call's start and end.
+  // path: the first call's start and end. The verified loader compiles the
+  // hashed bytes itself and the glue instantiates that module, so this times
+  // the instantiate; the compile is not in it.
   const wa = WebAssembly as any;
   for (const name of ["instantiateStreaming", "instantiate"]) {
     const orig = wa[name];
@@ -62,8 +63,8 @@ export function installProbes(): void {
         p.then(
           (r) => {
             marks.wasmInstantiateEnd = performance.now();
-            // The app's own instance (the verified loader hands the glue
-            // bytes, so the harness cannot import the glue to reach it).
+            // The app's own instance (the loader imports the glue from a Blob,
+            // so the harness cannot import it by URL to reach the instance).
             const inst = (r as { instance?: { exports?: { memory?: unknown } } }).instance ?? (r as { exports?: { memory?: unknown } });
             w.__perfWasmMemory = inst.exports?.memory;
           },
@@ -284,9 +285,10 @@ export interface WasmColdLoad {
  * fresh page): download the bytes,
  * compile them, instantiate the glue (a cache-busted copy, so it is a fresh
  * module), and build the first Engine from a fixed scenario's save. This is a
- * step-by-step stand-in: the app compiles from bytes it
- * has already downloaded and hashed (the verified loader, #985), which the
- * boot-path probe times on the WASM process.
+ * step-by-step stand-in: the app compiles the bytes it has already downloaded
+ * and hashed (the verified loader, #985; engineLoad.ts reads their build
+ * section), then instantiates that module, which the boot-path probe times on
+ * the WASM process.
  */
 export async function wasmColdLoad(arg: { wasmUrl: string; jsUrl: string; scenario: string }): Promise<WasmColdLoad> {
   const save = (window as any).__perfSaves[arg.scenario] as string;

@@ -1,4 +1,5 @@
 import type { ShadowCommand } from "../dualrun/commands";
+import type { BuildMetadataResult } from "./buildSection";
 import type { FallbackReason, PackageFailure } from "./engineBoot";
 
 /**
@@ -72,6 +73,11 @@ export type ToWorker = InitMessage | LoadMessage | OpsMessage | FreeMessage;
 export interface ReadyReply {
   type: "ready";
   catalogs: { classic: string; modern: string };
+  /** The engine's identity record (`engineIdentity()`, #963), for About. Absent
+   *  from a package built before the call. */
+  identity?: string;
+  /** What the binary's `verticopolis.build` section said (#963). */
+  build?: BuildMetadataResult;
 }
 
 /** The tower's engine exists; `view` is its first frame. */
@@ -132,6 +138,18 @@ export interface ErrorReply {
    *  detail (#985). Absent on every other error. */
   reason?: FallbackReason;
   package?: PackageFailure;
+  /** On a failed package load: what the binary's build section said, when it
+   *  had been read (#963). */
+  build?: BuildMetadataResult;
 }
 
-export type FromWorker = ReadyReply | LoadedReply | FrameReply | ErrorReply;
+/** The binary compiled and its build section was read, sent before the glue
+ *  has linked it, so a worker that then fails or never answers still leaves
+ *  what the binary said (#963). Only the spawn waits for it; a host that is
+ *  attached ignores it, as it ignores any reply with no generation. */
+export interface BuildReply {
+  type: "build";
+  build: BuildMetadataResult;
+}
+
+export type FromWorker = ReadyReply | BuildReply | LoadedReply | FrameReply | ErrorReply;

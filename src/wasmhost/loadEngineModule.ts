@@ -1,3 +1,5 @@
+import type { BuildMetadataResult } from "./buildSection";
+import { compileEngineBytes, initEngineGlue } from "./engineLoad";
 import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_WASM } from "./enginePackageNames";
 import { browserDigest, EnginePackageAborted, isControlled, verifyEnginePackage, type PackageUrls, type VerifyOptions } from "./enginePackageCheck";
 import type { ExpectedEnginePackage } from "./enginePackageRecord";
@@ -12,8 +14,9 @@ import type { ExpectedEnginePackage } from "./enginePackageRecord";
  *
  * It fetches `BUILD.json`, the glue and the binary once each, refuses unless
  * they are the package this shell was built with (`verifyEnginePackage`),
- * imports the glue from a Blob made of the very bytes that were hashed, and
- * hands the verified binary to the glue's `init`. Nothing is fetched a second
+ * compiles the hashed binary (reading the build section the build stamped into
+ * it, #963), imports the glue from a Blob made of the very bytes that were
+ * hashed, and hands the compiled module to the glue's `init`. Nothing is fetched a second
  * time, so a cache that changes between the check and the run cannot matter.
  *
  * Permanent host infrastructure: it is the load path of the Rust engine in
@@ -22,7 +25,7 @@ import type { ExpectedEnginePackage } from "./enginePackageRecord";
 
 /** What the wasm-bindgen glue exports: `default` is its `init`. */
 export interface EngineGlue {
-  default(input?: { module_or_path: BufferSource | WebAssembly.Module }): Promise<{ memory?: WebAssembly.Memory } | undefined>;
+  default(input?: { module_or_path: WebAssembly.Module }): Promise<{ memory?: WebAssembly.Memory } | undefined>;
 }
 
 export interface LoadedEngine {
@@ -39,6 +42,13 @@ export interface LoadEngineOptions {
   signal?: AbortSignal;
   /** The package the shell was built with (default: the compiled-in one). */
   expected?: ExpectedEnginePackage | null;
+  /** Called with what the binary's build section said, as soon as the verified
+   *  binary has compiled, so a glue that then fails to import or link still
+   *  leaves it (#963). */
+  onBuild?: (build: BuildMetadataResult) => void;
+  /** The binary's URL on a development serve, which skips the byte check and
+   *  loads through engineLoad.ts; by default the one beside the glue. */
+  wasmUrl?: string | URL;
   /** Run the byte check on a development serve too (the tests do). */
   checkInDev?: boolean;
   // The rest are test seams; the browser supplies each by default.
@@ -47,6 +57,9 @@ export interface LoadEngineOptions {
   controlled?: boolean;
   origin?: string;
   importModule?: (url: string) => Promise<EngineGlue>;
+  /** The development route's loader (engineLoad.ts). */
+  initGlue?: typeof initEngineGlue;
+  compile?: (bytes: Uint8Array) => Promise<{ module: WebAssembly.Module; build: BuildMetadataResult }>;
   objectUrls?: Pick<typeof URL, "createObjectURL" | "revokeObjectURL">;
 }
 
@@ -74,8 +87,8 @@ export async function loadEngineModule(glueUrl: string, opts: LoadEngineOptions 
   // its marker line; scripts/verify-precache.ts fails the build if it stays.
   if (import.meta.env.DEV && !opts.checkInDev) {
     console.info(`[wasm] ${DEV_SKIP_MARKER}`);
-    const mod = await importModule(glueUrl);
-    return { mod, exports: await mod.default(), verified: false };
+    const { mod, exports } = await (opts.initGlue ?? initEngineGlue)(glueUrl, { onBuild: opts.onBuild, wasmUrl: opts.wasmUrl });
+    return { mod: mod as EngineGlue, exports: exports as LoadedEngine["exports"], verified: false };
   }
   const signal = opts.signal ?? new AbortController().signal;
   const gone = () => {
@@ -91,6 +104,11 @@ export async function loadEngineModule(glueUrl: string, opts: LoadEngineOptions 
     origin: opts.origin ?? globalThis.location.origin,
   });
   gone();
+  // Compiled before the glue is imported, as engineLoad.ts does, so the build
+  // is known even when the glue then fails to import or to link.
+  const binary = await (opts.compile ?? compileEngineBytes)(wasm);
+  opts.onBuild?.(binary.build);
+  gone();
   const urls = opts.objectUrls ?? URL;
   const blobUrl = urls.createObjectURL(new Blob([glue as BlobPart], { type: "text/javascript" }));
   let mod: EngineGlue;
@@ -100,7 +118,7 @@ export async function loadEngineModule(glueUrl: string, opts: LoadEngineOptions 
     urls.revokeObjectURL(blobUrl);
   }
   gone();
-  const exports = await mod.default({ module_or_path: wasm });
+  const exports = await mod.default({ module_or_path: binary.module });
   gone();
   return { mod, exports, verified: true };
 }
