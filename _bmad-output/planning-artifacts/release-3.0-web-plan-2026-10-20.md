@@ -1015,6 +1015,18 @@ own semver policy. Decision 4's text changes with the other cutover
 amendments at the owner's final approval. The policy's content and its
 place in the flip PR are this plan's proposal, listed in section 12.
 
+**The crate's own version (#963, owner decision of 2026-10-20).** The crate
+version in `engine-rs/Cargo.toml` goes up in the same PR as a change to the
+conformance lock, `SAVE_VERSION` or the oldest save version loaded, the frame
+layout, catalog or identity record version, or the binding's declaration
+(`src/dualrun/engine.d.ts`). An internal change that keeps all of these, such
+as a compatible optimization, is told apart by the build hash and needs no
+bump. The app version stays the number players see, and publishing waits for
+#893. Where the tree can show it, a record (`engine-rs/src/compat-record.json`)
+and a guard enforce it; the Rust `pub` API and JSON shapes the declaration only
+describes are a review call (backlog row `engine-compat-coverage`).
+CONTRIBUTING.md's Versioning section has the steps.
+
 ## 8. Priority labels (D6)
 
 Rule: an issue is P1 when a #945 row names it, a story that a row needs

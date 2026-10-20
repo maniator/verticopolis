@@ -23,6 +23,25 @@ fn is_hex16(s: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
+/// The first 16 hex digits of a SHA-256, as the lock and catalog digests are.
+fn hex16(data: &[u8]) -> String {
+    Sha256::digest(data)[..8]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// One pin per `FRAME_LAYOUT_VERSION`, oldest first: entry `n - 1` is the hash
+/// of version `n`'s slot table. A layout change appends an entry and raises the
+/// version together, so pasting the new hash over the old one cannot pass.
+const FRAME_LAYOUT_PINS: &[&str] = &["c62b6d031b60a0d3"];
+
+/// How many layout constants `the_frame_layout_is_pinned` lists.
+const FRAME_LAYOUT_SLOT_COUNT: usize = 53;
+
+/// One pin per `IDENTITY_SCHEMA`, oldest first, on the same terms.
+const IDENTITY_SCHEMA_PINS: &[&str] = &["7d6d6ef773015066"];
+
 /// The record, field by field. A change to any value here is a change to the
 /// contract a host reads, so it is written out rather than derived.
 #[test]
@@ -197,11 +216,69 @@ fn the_frame_layout_is_pinned() {
         ("UNKNOWN_ROUTINE", crate::frame::UNKNOWN_ROUTINE as usize),
     ];
     let table: String = slots.iter().map(|(n, v)| format!("{n}={v}\n")).collect();
-    let digest = Sha256::digest(table.as_bytes());
-    let hex: String = digest[..8].iter().map(|b| format!("{b:02x}")).collect();
+    let hex = hex16(table.as_bytes());
     assert_eq!(
-        (FRAME_LAYOUT_VERSION, hex.as_str()),
-        (1, "c62b6d031b60a0d3"),
-        "the frame layout changed: raise FRAME_LAYOUT_VERSION and update this pin\n{table}"
+        FRAME_LAYOUT_PINS.len(),
+        FRAME_LAYOUT_VERSION as usize,
+        "FRAME_LAYOUT_VERSION and FRAME_LAYOUT_PINS must grow together: one pin per version"
+    );
+    assert_eq!(
+        FRAME_LAYOUT_PINS.last().copied(),
+        Some(hex.as_str()),
+        "the frame layout changed: raise FRAME_LAYOUT_VERSION and append the new pin below it\n{table}"
+    );
+}
+
+/// Every slot the layout declares is in the table above: a new offset or width
+/// constant in `frame.rs` fails here until it is pinned.
+#[test]
+fn the_frame_layout_table_is_complete() {
+    let source = std::fs::read_to_string(crate_dir().join("src/frame.rs")).unwrap();
+    let declared = source
+        .lines()
+        .filter(|l| {
+            let t = l.trim_start();
+            t.starts_with("pub const ") && t.contains(": usize")
+                || t.starts_with("pub const UNKNOWN_ROUTINE")
+        })
+        .count();
+    assert_eq!(
+        declared, FRAME_LAYOUT_SLOT_COUNT,
+        "frame.rs declares {declared} layout constants and the pin table lists {FRAME_LAYOUT_SLOT_COUNT}: add the new one to `the_frame_layout_is_pinned`"
+    );
+}
+
+/// The record's shape: its dotted key paths, hashed. A field added, renamed or
+/// removed changes the hash and needs a new `IDENTITY_SCHEMA`, with a pin for it.
+#[test]
+fn the_identity_record_shape_is_pinned() {
+    fn paths(prefix: &str, v: &Value, out: &mut Vec<String>) {
+        match v.as_object() {
+            Some(map) => {
+                for (k, inner) in map {
+                    let path = if prefix.is_empty() {
+                        k.clone()
+                    } else {
+                        format!("{prefix}.{k}")
+                    };
+                    paths(&path, inner, out);
+                }
+            }
+            None => out.push(prefix.to_owned()),
+        }
+    }
+    let mut keys = Vec::new();
+    paths("", &identity(), &mut keys);
+    keys.sort_unstable();
+    let shape = keys.join("\n");
+    assert_eq!(
+        IDENTITY_SCHEMA_PINS.len(),
+        IDENTITY_SCHEMA as usize,
+        "IDENTITY_SCHEMA and IDENTITY_SCHEMA_PINS must grow together: one pin per version"
+    );
+    assert_eq!(
+        IDENTITY_SCHEMA_PINS.last().copied(),
+        Some(hex16(shape.as_bytes()).as_str()),
+        "the identity record's shape changed: raise IDENTITY_SCHEMA and append the new pin\n{shape}"
     );
 }

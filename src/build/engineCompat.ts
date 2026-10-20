@@ -8,11 +8,13 @@
  * comments and spacing aside).
  * `src/tests/engineCompat.guard.test.ts` recomputes all of it from the tree and
  * fails when a pin moved and the record did not. After a deliberate change,
- * bump `version` in `engine-rs/Cargo.toml` and run `npm run engine:compat`,
- * which rewrites the record from the tree and refuses to when a pin differs
- * from `origin/main`'s record under the same crate version (`unbumpedPins`),
- * so a version that has not merged yet can be re-recorded as main's lock moves
- * under it. A record edited by hand skips that check; review owns that case.
+ * bump `version` in `engine-rs/Cargo.toml` (and the two `Cargo.lock` files)
+ * and run `npm run engine:compat`, which rewrites the record from the tree and
+ * refuses when a pin differs from `origin/main`'s record under the same crate
+ * version (`unbumpedPins`), when the version is not a later `x.y.z`
+ * (`isSemverIncrease`), or when main's record cannot be read (`baseRecord`). A
+ * version that has not merged yet can be re-recorded as main's lock moves under
+ * it. A record edited by hand skips that comparison; review owns that case.
  *
  * The digests are the first 16 hex digits of a SHA-256, as the conformance
  * digests are. `identity_tests.rs` recomputes the lock digest in Rust and
@@ -24,6 +26,9 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+
+/** Where the record lives, inside the crate so the package ships it. */
+export const COMPAT_RECORD_PATH = "engine-rs/src/compat-record.json";
 
 /** The lock files under `conformance/`, in digest order. */
 export const LOCK_FILES = [
@@ -119,19 +124,33 @@ export function interfaceDigest(declaration: string): string {
   return hex16(code);
 }
 
-/** One `const NAME: TYPE = N;` declaration, with any `pub` or `pub(crate)`, at the start of a line. */
+/**
+ * The one `const NAME: TYPE = N;` declaration, with any `pub` or `pub(crate)`,
+ * at the start of a line. Block comments are dropped first, and a second
+ * match (a `#[cfg(test)]` copy, a raw string that quotes it) is an error, so
+ * the constant read here is the constant the engine compiles.
+ */
 export function rustConstant(
   source: string,
   name: string,
   type: string,
 ): number {
-  const m = new RegExp(
-    `^(?:pub(?:\\(crate\\))? )?const ${name}: ${type} = (\\d+);`,
-    "m",
-  ).exec(source);
-  if (!m)
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, "");
+  const found = [
+    ...code.matchAll(
+      new RegExp(
+        `^(?:pub(?:\\(crate\\))? )?const ${name}: ${type} = (\\d+);`,
+        "gm",
+      ),
+    ),
+  ];
+  if (found.length === 0)
     throw new Error(`no \`const ${name}: ${type} = N;\` in the Rust source`);
-  return Number(m[1]);
+  if (found.length > 1)
+    throw new Error(
+      `\`const ${name}: ${type}\` is declared ${found.length} times in the Rust source`,
+    );
+  return Number(found[0][1]);
 }
 
 /** `SAVE_VERSION` as `engine-rs/src/sim.rs` declares it. */
@@ -145,6 +164,16 @@ export function cargoVersion(cargoToml: string): string {
   const m = /^version\s*=\s*"([^"]+)"/m.exec(pkg);
   if (!m) throw new Error("engine-rs/Cargo.toml has no [package] version");
   return m[1];
+}
+
+/** Every file `computeCompat` reads, relative to the repository root. */
+export function compatInputs(): string[] {
+  return [
+    "engine-rs/Cargo.toml",
+    ...new Set(Object.values(VERSION_CONSTANTS).map((c) => c.file)),
+    "src/dualrun/engine.d.ts",
+    ...LOCK_FILES.map((f) => `conformance/${f}`),
+  ];
 }
 
 /** What the tree says today. */
@@ -178,7 +207,82 @@ export function unbumpedPins(old: CompatRecord, now: CompatRecord): string[] {
   );
 }
 
-export const COMPAT_RECORD_PATH = "engine-rs/src/compat-record.json";
+/** `x.y.z` with nothing after it: a release a bump can name. */
+const PLAIN_SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
+
+/**
+ * Whether `to` is a later plain `x.y.z` than `from`. A pre-release, a build
+ * suffix, a lower number or the same number is not a bump.
+ */
+export function isSemverIncrease(from: string, to: string): boolean {
+  const a = PLAIN_SEMVER.exec(from);
+  const b = PLAIN_SEMVER.exec(to);
+  if (!a || !b) return false;
+  for (let i = 1; i <= 3; i++) {
+    const d = Number(b[i]) - Number(a[i]);
+    if (d !== 0) return d > 0;
+  }
+  return false;
+}
+
+/** Runs `git` with these arguments and returns its output; throws when git fails. */
+export type Git = (args: string[]) => string;
+
+export interface BaseRecord {
+  /** Main's record, or null when main has never had one (a new file needs no bump). */
+  record: CompatRecord | null;
+  /** Where it came from, for the script's output. */
+  source: string;
+}
+
+/**
+ * The record `origin/main` holds, for `npm run engine:compat` to judge a bump
+ * against. It refuses, with what to do, in each case it cannot tell: no
+ * `origin/main`, a record main deleted or moved, a record that cannot be read.
+ * It never falls back to the working tree's record, which a PR can edit.
+ */
+export function baseRecord(git: Git): BaseRecord {
+  let sha: string;
+  try {
+    sha = git(["rev-parse", "--verify", "--quiet", "origin/main"]).trim();
+  } catch {
+    throw new Error(
+      "no origin/main to compare with: run `git fetch origin main` (a fork needs its upstream as origin)",
+    );
+  }
+  const source = `origin/main@${sha.slice(0, 8)}`;
+  let text: string;
+  try {
+    text = git(["show", `origin/main:${COMPAT_RECORD_PATH}`]);
+  } catch {
+    const ever = git([
+      "log",
+      "--format=%H",
+      "-1",
+      "origin/main",
+      "--",
+      COMPAT_RECORD_PATH,
+    ]).trim();
+    if (ever)
+      throw new Error(
+        `${source} no longer has ${COMPAT_RECORD_PATH} (deleted or moved); restore it before re-recording`,
+      );
+    return { record: null, source: `${source} (no record yet)` };
+  }
+  let record: unknown;
+  try {
+    record = JSON.parse(text);
+  } catch {
+    throw new Error(`${source}'s ${COMPAT_RECORD_PATH} cannot be read as JSON`);
+  }
+  if (
+    typeof record !== "object" ||
+    record === null ||
+    typeof (record as CompatRecord).crateVersion !== "string"
+  )
+    throw new Error(`${source}'s ${COMPAT_RECORD_PATH} has no crateVersion`);
+  return { record: record as CompatRecord, source };
+}
 
 /** The record's file text: one key per line, a final newline. */
 export function recordText(r: CompatRecord): string {

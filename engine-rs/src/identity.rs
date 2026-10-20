@@ -13,11 +13,13 @@
 //! hash covers it) holds the crate version and the lock digest. A test checks
 //! them against `Cargo.toml`, the conformance files and the constants here, and
 //! `src/tests/engineCompat.guard.test.ts` checks them against the same
-//! constants and the checked-in declarations, so the version cannot stay put when a
-//! contract moves. The rule is in the release plan (section 7.4): the crate
-//! version changes with the conformance lock, `SAVE_VERSION`, or the public
-//! Rust/WASM interface or compatibility contract; an internal change that
-//! keeps all of these is told apart by the build hash alone.
+//! constants and the checked-in binding declaration, so the version cannot stay
+//! put when one of those moves. The rule is in the release plan (section 7.4) and
+//! `CONTRIBUTING.md` (Versioning): the crate version goes up with the conformance
+//! lock, `SAVE_VERSION`, the frame layout, catalog and identity record versions
+//! and `src/dualrun/engine.d.ts`. The Rust `pub` API is not checked by a test, so
+//! a change there is a review call. An internal change that keeps all of these is
+//! told apart by the build hash alone.
 use serde_json::{json, Value};
 
 use crate::canonical::canonical_json;

@@ -74,21 +74,34 @@ Made mechanical where the tree can show it: `engine-rs/src/compat-record.json`
 records the crate version with the lock digest, the five version constants and
 a digest of `engine.d.ts` (comments and spacing aside). The lock is five
 files: the scenario, catalog, loader and `.TDT` tables and the gameplay event
-catalog. A TS guard recomputes all of it and fails when a pin moved and the
-record did not, or when the recorded version differs from `Cargo.toml`.
-`npm run engine:compat` rewrites the record and refuses when a pin differs from
-`origin/main`'s record under the same crate version, so a version that has not
-merged yet can be re-recorded as main's lock moves under it, and the first
-change after a release needs the next version. A record edited by hand in the same PR skips that
-check, since CI has no base branch to compare against; review owns that case
-until #1153 lands. What a frame slot or state code means is not visible to a
-test (#1154); the layout version pin covers offsets and widths.
+catalog. A TS guard recomputes all of it from the tree and fails when a pin
+moved and the record did not, or when the recorded version differs from
+`Cargo.toml` or the native consumer's lockfile. `FRAME_LAYOUT_VERSION` and
+`IDENTITY_SCHEMA` each have a pin table with one entry per version, so a pin
+cannot be pasted over without raising the version.
+
+`npm run engine:compat` rewrites the record. It fetches `origin/main`, names
+the commit it compared with, refuses a pin that differs from main's record
+under the same crate version, refuses a version that is not a later plain
+`x.y.z`, and refuses when main's record is missing, deleted or unreadable. A
+version that has not merged yet can be re-recorded as main's lock moves under
+it. A record edited by hand in the same PR skips that comparison, since CI has
+no base branch to compare against; review owns that case until #1153 lands.
+
+What the guard does not see, each tracked: what a frame slot or state code
+means (#1154); the Rust `pub` API, JSON shapes that the declaration only
+describes in a doc comment, and save fields added through the loader's
+optional seam (#1161). The rule still asks for a bump in those cases.
+
+While the crate is 0.x, the bump size follows the trigger: a minor for a save,
+frame layout, catalog, identity schema or interface change, and a patch for a
+lock change on its own.
 
 **Starting version: 0.1.0 to 0.2.0 in the first PR.** `engineIdentity()` is a
 public interface addition, so the new rule requires a bump at once. The crate
-stays 0.x until #893 publishes it: 0.x semver allows a breaking change at a
-minor, which fits an interface still settling. 1.0.0 is decided under #893
-with its compatibility policy, not by the app's 3.0.0.
+stays 0.x until #893 publishes it, because 0.x semver allows a breaking change
+at a minor, which fits an interface still settling. #893 decides 1.0.0 with its
+compatibility policy; the app's 3.0.0 does not decide it.
 
 ## Acceptance criteria
 
@@ -124,7 +137,7 @@ with its compatibility policy, not by the app's 3.0.0.
 | # | Slice | Review | Owns |
 | --- | --- | --- | --- |
 | 1 | Rust `engineIdentity()`, `FRAME_LAYOUT_VERSION`, `compat-record.json`, crate 0.2.0, the TS version-rule guard and `engine:compat` script, binding export, `engine.d.ts`, export tier entry | `/gds-code-review` (the guard is tooling, read by the same pass) | `engine-rs/src/identity.rs`, `frame.rs`, `load.rs` (one visibility), `wasm.rs` (additive export only), `src/dualrun/engine.d.ts`, `exportTiers.ts`, `src/build/engineCompat.ts`, `scripts/engine-compat.ts`, `package.json` script |
-| 2 | `BUILD.json` `crate` key and its reader | `/bmad-code-review` | `scripts/wasm-build.ts`, `src/wasmhost/enginePackageRecord.ts` (with the "Offline package integrity" lane) |
+| 2 | `BUILD.json` `crate` key and its reader. It changes `scripts/wasm-build.ts`, which is in the replay-window key, so it lands before the freeze | `/bmad-code-review` | `scripts/wasm-build.ts`, `src/wasmhost/enginePackageRecord.ts` (with the "Offline package integrity" lane) |
 | 3 | Diagnostics model, About rendering, Copy Diagnostics, literal guard | `/bmad-code-review` | `src/wasmhost/` (new files; `engineLabel.ts` call sites), `src/ui/` About |
 | 4 | e2e, plan 7.4 text, CONTRIBUTING, backlog, #1104 | `/bmad-code-review` | tests, docs |
 

@@ -107,7 +107,7 @@ tier 2, the harness a host uses to prove conformance.
 | Read a frame | `frame::frame_view(&sim)`: every value a renderer reads between two structural syncs (clock, money, rating, effects, then one record per person, per unit and per shaft with its cars) as one flat `Vec<f64>`, laid out in `src/frame.rs`. Read it by name: the slots in `frame::header`, `frame::person`, `frame::unit`, `frame::transport` and `frame::car` (`frame::header::MONEY`, `frame::person::ROUTINE`, ...), and the record widths `FRAME_HEADER`, `PERSON_FIXED`, `UNIT_RECORD`, `TRANSPORT_FIXED` and `CAR_RECORD`; a routine code of `UNKNOWN_ROUTINE` means the engine has a routine the layout does not name yet, and a decoder should refuse it. `frame::log_since(&sim, seq)` returns the log entries numbered after `seq`. The JavaScript binding passes the same frame across as one typed array |
 | Gameplay events | `sim.gameplay.drain()` after each frame; `to_json()` on each event; names and payloads are listed in `conformance/events/catalog.json` (`gameplay::CATALOG_JSON`, checked with `check_event`). The buffer holds `GAMEPLAY_RING_CAP` events and counts any it had to drop in `sim.gameplay.dropped` |
 | Reference data | `catalog::catalog(mode)`: prices, sizes, caps and rules per facility kind, versioned by `CATALOG_VERSION` |
-| Identity | `identity::identity()` (`engineIdentity()` in the binding): schema, crate name and version, `SAVE_VERSION` and the oldest save version loaded, `FRAME_LAYOUT_VERSION`, `CATALOG_VERSION` with each mode's digest, and the conformance lock digest. It holds no build hash: a hash of the sources cannot be compiled into them, so `BUILD.json` records it. The crate version changes when the conformance lock, `SAVE_VERSION` or the public interface does (`compat-record.json`, guarded by `src/tests/engineCompat.guard.test.ts`) |
+| Identity | `identity::identity()` (`engineIdentity()` in the binding): schema, crate name and version, `SAVE_VERSION` and the oldest save version loaded, `FRAME_LAYOUT_VERSION`, `CATALOG_VERSION` with each mode's digest, and the conformance lock digest. It holds no build hash: a hash of the sources cannot be compiled into them, so `BUILD.json` records it. The crate version goes up with the conformance lock, `SAVE_VERSION`, the frame layout, catalog and identity record versions, and `src/dualrun/engine.d.ts` (`compat-record.json`, guarded by `src/tests/engineCompat.guard.test.ts`); the guard does not see the Rust `pub` API, so a change there is a review call (`CONTRIBUTING.md`, Versioning) |
 | Snapshot hash | `canonical::digest(&snapshot::state_view(&sim))`: the hashed view the conformance lock pins (with the `conformance` feature, `scenario::state_view` names the same function) |
 | Save | `load::encode_simulation_vctower(&sim, app_version, saved_at_ms)`: the `.vctower` bytes the web game writes. A host that holds the save JSON (`sim.serialize()`) gets the same file from `load::stamp_save(&mut save, app_version, saved_at_ms)` then `load::encode_vctower(&save)` |
 | Load | `load::decode_vctower(text)`, then `load::deserialize(&save)`, then `load::mark_founder_from_loaded_file(&mut sim, &save)`, which marks a file with no build stamp as a founder's tower the way the web game does (skip it and a host drops that status on its next save) |
@@ -127,10 +127,11 @@ Two behaviors a host should know:
 ## Stability
 
 - **No semver promise yet.** The crate is unpublished (its version is in
-  `Cargo.toml`); a consumer pins a commit. The version moves with the
-  conformance lock, the save and frame layout versions and the public
-  interface (`src/compat-record.json`, held by
-  `src/tests/engineCompat.guard.test.ts`). Registry releases are #893.
+  `Cargo.toml`); a consumer pins a commit. The version goes up with the
+  conformance lock, the save, frame layout, catalog and identity record
+  versions and the binding declaration (`src/compat-record.json`, held by
+  `src/tests/engineCompat.guard.test.ts`; the Rust `pub` API is a review
+  call). Registry releases are #893.
 - **The lock is the contract.** Any change to simulation behavior lands
   with a regenerated `conformance/expected.json` in the same pull request,
   and that diff is what a consumer must take on a pin bump. A host that

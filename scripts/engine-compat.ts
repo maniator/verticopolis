@@ -1,67 +1,74 @@
 /**
  * Rewrites `engine-rs/src/compat-record.json` from the tree (`npm run engine:compat`).
- * Bump `version` in `engine-rs/Cargo.toml` first when the conformance lock,
- * `SAVE_VERSION` or the public Rust/WASM interface changed; the rules and the
- * guard are in `src/build/engineCompat.ts`.
+ * Bump `version` in `engine-rs/Cargo.toml` first (and in
+ * `engine-rs/consumer/Cargo.lock`) when the conformance lock, `SAVE_VERSION`
+ * or the public Rust/WASM interface changed; the rules and the guard are in
+ * `src/build/engineCompat.ts`.
  *
  * The bump is judged against what `origin/main` records, since a version that
  * has not merged yet may be re-recorded as often as main's lock moves under it.
- * With no `origin/main` to ask (a checkout without it), the record in the
- * working tree stands in.
+ * It fetches `origin/main` first, says which commit it compared with, and
+ * refuses when it cannot read main's record (see `baseRecord`).
  *
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   COMPAT_RECORD_PATH,
+  baseRecord,
   computeCompat,
+  isSemverIncrease,
   recordText,
   unbumpedPins,
-  type CompatRecord,
 } from "../src/build/engineCompat.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const record = computeCompat(root);
-const path = resolve(root, COMPAT_RECORD_PATH);
+const git = (args: string[]) =>
+  execFileSync("git", args, {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 
-/** The record to compare the new one with: main's, when git can say what it holds. */
-function baseRecord(): CompatRecord | null {
-  try {
-    const text = execFileSync(
-      "git",
-      ["show", `origin/main:${COMPAT_RECORD_PATH}`],
-      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-    );
-    return JSON.parse(text) as CompatRecord;
-  } catch {
-    // Either main has no record yet (a new file needs no bump) or there is no
-    // origin/main to read; the second case falls back to the working record.
-  }
-  try {
-    execFileSync("git", ["rev-parse", "--verify", "--quiet", "origin/main"], {
-      cwd: root,
-      stdio: "ignore",
-    });
-    return null;
-  } catch {
-    return existsSync(path)
-      ? (JSON.parse(readFileSync(path, "utf8")) as CompatRecord)
-      : null;
-  }
-}
-
-const base = baseRecord();
-const moved = base ? unbumpedPins(base, record) : [];
-if (moved.length > 0) {
-  console.error(
-    `${moved.join(", ")} changed from main's record but the crate is still ${record.crateVersion}: bump \`version\` in engine-rs/Cargo.toml first (release plan 7.4)`,
-  );
+const refuse = (message: string): never => {
+  console.error(message);
   process.exit(1);
+};
+
+try {
+  git(["fetch", "--quiet", "origin", "main"]);
+} catch {
+  console.warn(
+    "could not fetch origin main; comparing with the copy already here",
+  );
 }
-writeFileSync(path, recordText(record));
+
+const record = computeCompat(root);
+let base;
+try {
+  base = baseRecord(git);
+} catch (e) {
+  refuse(e instanceof Error ? e.message : String(e));
+}
+if (base?.record) {
+  const was = base.record.crateVersion;
+  if (
+    was !== record.crateVersion &&
+    !isSemverIncrease(was, record.crateVersion)
+  )
+    refuse(
+      `crate ${record.crateVersion} is not a later x.y.z release than ${was} on ${base.source}`,
+    );
+  const moved = unbumpedPins(base.record, record);
+  if (moved.length > 0)
+    refuse(
+      `${moved.join(", ")} changed from ${base.source}'s record but the crate is still ${record.crateVersion}: bump \`version\` in engine-rs/Cargo.toml and engine-rs/consumer/Cargo.lock first (release plan 7.4)`,
+    );
+}
+writeFileSync(resolve(root, COMPAT_RECORD_PATH), recordText(record));
 console.log(
-  `wrote ${COMPAT_RECORD_PATH}: crate ${record.crateVersion}, lock ${record.lockDigest}, save ${record.saveVersion}, interface ${record.interfaceDigest}`,
+  `wrote ${COMPAT_RECORD_PATH}: crate ${record.crateVersion}, lock ${record.lockDigest}, save ${record.saveVersion}, interface ${record.interfaceDigest} (compared with ${base?.source})`,
 );

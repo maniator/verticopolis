@@ -330,3 +330,18 @@ A simulation change lands in both engines in the same pull request, with the
 regenerated `conformance/expected.json` (see `conformance/README.md`). CI runs
 the referee on every change to `engine-rs/` or `conformance/`, the save
 fixtures in `conformance/fixtures/` included (`.github/workflows/engine-rs.yml`).
+
+## The crate version
+
+`version` in `Cargo.toml` moves with the engine's compatibility contract:
+the conformance lock, the save version, the frame layout, catalog and identity
+record versions, and the checked-in binding declaration `src/dualrun/engine.d.ts`.
+Change any of them and the version goes up in the same pull request, in
+`Cargo.toml`, `Cargo.lock` and `consumer/Cargo.lock` (CI builds the consumer
+with `--locked`), followed by `npm run engine:compat`, which rewrites
+`src/compat-record.json`. `src/tests/engineCompat.guard.test.ts` fails when a
+pin moved and the record did not. An internal change that keeps all of them is
+told apart by the build hash in `BUILD.json` and needs no bump. The full rule,
+including what the guard does not see, is in `CONTRIBUTING.md` under
+Versioning.
+

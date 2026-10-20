@@ -464,6 +464,47 @@ splash (and the update prompt's build-id line) would otherwise misreport the bui
 as unchanged. Bump once per PR, not per commit. When two open PRs both bump,
 whoever merges second rebases and re-bumps.
 
+### The engine crate version
+
+`engine-rs/Cargo.toml` carries its own version, separate from the app's. It is
+the answer to "which engine contract is this?": `engineIdentity()` reports it
+and About shows it. The app version stays what players see.
+
+**The crate version goes up in the same PR as any of these:**
+
+- the conformance lock: `catalog-digests.json`, `events/catalog.json`,
+  `expected.json`, `loader-cases.json` or `tdt-cases.json` under `conformance/`
+  (a new fixture or scenario lands through `expected.json`, so it counts);
+- `SAVE_VERSION`, or the oldest save version the engine loads;
+- `FRAME_LAYOUT_VERSION`, `CATALOG_VERSION` or `IDENTITY_SCHEMA` (each has a
+  pin table in `engine-rs/src/identity_tests.rs` that grows with it);
+- the binding's declaration, `src/dualrun/engine.d.ts`, outside comments.
+
+An internal change that keeps all of these, such as a performance
+optimization, needs no bump. The build hash (`sources` in the package's
+`BUILD.json`) tells such builds apart. While the crate is 0.x, take a minor
+bump for a save, frame layout, catalog, identity schema or interface change,
+and a patch bump for a lock change on its own. Publishing and 1.0.0 are #893.
+
+**How:** raise `version` in `engine-rs/Cargo.toml`, then in `engine-rs/Cargo.lock`
+and `engine-rs/consumer/Cargo.lock` (CI builds the consumer with `--locked`),
+then run `npm run engine:compat`. It rewrites `engine-rs/src/compat-record.json`
+from the tree, fetches `origin/main`, and refuses a pin that moved from main's
+record under an unchanged version, a version that is not a later `x.y.z`
+release, or a main record it cannot read. A version that has not merged yet can
+be re-recorded as often as main's lock moves under it. When two open PRs bump,
+whoever merges second merges main in, bumps again and re-records.
+
+**What the guard sees and what it does not.** `src/tests/engineCompat.guard.test.ts`
+recomputes the lock digest, the five version constants and a digest of
+`engine.d.ts` (comments and spacing aside) and fails when one moved and the
+record did not. It cannot see the Rust `pub` API, a JSON shape that the
+declaration only describes in a doc comment (the `markers` and `commuteStress`
+arguments, for example), or a field added through the save loader's optional
+seam. A change like that still needs a bump; review owns it, and the backlog row
+`engine-compat-coverage` tracks closing the gap. A record edited by hand in the
+same PR also skips the main comparison, so a reviewer reads the record's diff.
+
 ### Player notes (what the update prompt shows players)
 
 The build emits `dist/version.json` (`{ version, sha, notes }`) that the running
