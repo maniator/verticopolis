@@ -233,11 +233,12 @@ step 4, verbatim:
 > - **Section 6:** skipped, because there is no spec and no story key; sprint status was not synced.
 > - **Section 7:** not shown, because the run stopped at section 5.
 
-The triage fact says an author's wish to defer an always-`patch` finding is
-`decision_needed` until the owner answers. The run kept F1 labeled `patch`
-and recorded it as pending the owner's acceptance. The label differs from the
-fact's wording; the outcome is the one the fact requires: F1 was not deferred,
-and the record says why.
+The author asked to defer F1 at step 4, and the run kept it labeled `patch`
+and recorded it as pending the owner's acceptance, as the triage fact's step 4
+clause says. The fact's step 3 clause then called the same request
+`decision_needed`; round 5 settled the two on one label, so the fact now says
+such a finding stays `patch`, marked pending the owner, at either step. F1 was
+not deferred, and the record says why.
 
 The on_complete check, verbatim:
 
@@ -299,9 +300,9 @@ pins that sentence.
 ## What came out of this run
 
 - **P2's `Unit` clone** is pre-existing on `main` and was not listed in
-  #1158. It is now part of #1158 item A19: the metro paths clone the whole
-  station `Unit` to read its position and width (`motion.rs` 268, `spawn.rs`
-  468 and 474, `visits.rs` 231 at 9cd44d1).
+  #1158. It is now #1158 item A27: the metro paths clone the whole station
+  `Unit` to read its position and width (`motion.rs` 268, `spawn.rs` 468 and
+  474, `visits.rs` 231 at 9cd44d1).
 - **P1, P3 and P4** were already tracked (#1158 A5, which landed with #1139;
   #1143 and A18; A19 and A8).
 - **Findings 2 to 7** concern the throwaway change and are not filed. Finding

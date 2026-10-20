@@ -100,9 +100,11 @@ The rule missed them for reasons the text itself explains:
 - New: `docs/performance/hot-path-review.md`, `_bmad/custom/gds-code-review.toml`,
   `_bmad/custom/bmad-code-review.toml`, `_bmad/custom/gds-quick-dev.toml`,
   `_bmad/custom/bmad-quick-dev.toml`, `src/tests/hotPathReview.guard.test.ts`
-  (pins the page's sections, section 1 surfaces and the clauses the overrides
-  cite, the overrides and the step anchors they name, and runs the resolver;
-  for the summaries it checks only their links), this story, and the proof
+  with `src/tests/hotPathReview.rules.ts` (pins the page's sections, section 1
+  surfaces, record rows and the clauses the overrides cite, the overrides and
+  the step anchors they name, and the `CLAUDE.md` auto-merge rule, and runs the
+  resolver; for the other summaries it checks only their links), this story,
+  and the proof
   records `hot-path-auditor-proof-2026-10-20.md` and
   `hot-path-auditor-proof-nested-scan-2026-10-20.md`.
 - Updated (short summary plus link): `CLAUDE.md`, `AGENTS.md`,
@@ -300,4 +302,41 @@ start agents of its own, so the layers ran from the skill's fallback prompt
 files in fresh agents. The verdict found the record had filed the scan under
 HP-6 only and marked HP-7 n/a, so the auditor prompt now asks for each finding
 in every row it falls under. The station `Unit` clone it found on `main` is
-now part of #1158 A19. Record: `hot-path-auditor-proof-nested-scan-2026-10-20.md`.
+now #1158 A27. Record: `hot-path-auditor-proof-nested-scan-2026-10-20.md`.
+
+**Round 5** (`/bmad-code-review` of the follow-up at 26a7653, after #1139 and
+#1157 merged; Blind Hunter, Edge Case Hunter and Acceptance Auditor; the diff
+touches no hot-path surface). About 55 findings before deduplication.
+Dismissed: bare section cites (the guard pins the numbered headings),
+`{implementation_artifacts}` being undefined (both configs define it),
+pinning the exact fact count, harmless edits that fail the guard loudly, and a
+merge of `main` changing the PR's callers (the PR that changes them reviews
+them). The patches:
+- sign-off names the independent reviewer, who is not Copilot or Codex, and
+  needs a GO, or a CONDITIONAL GO whose conditions are met, on the final
+  commit; a record and a verdict carry to a later commit only when the PR's
+  own diff is unchanged and that reviewer confirms it on the PR;
+- `CLAUDE.md` keeps auto-merge off on any PR, hot-path or not, while an
+  independent review or a review-skill round is requested or running, which
+  is the #1163 race;
+- an always-`patch` finding the author wants deferred stays `patch`, pending
+  the owner, in every mode, and the owner's acceptance is a quote of their own
+  message that the independent reviewer checks against its source; an
+  acceptance another agent relays counts only as that quote;
+- the gate leaves once-per-session code to the auditor; the auditor's prompt
+  gets the head commit, it reads the working tree for an uncommitted diff, a
+  bare row, an unexplained n/a or a timeout counts as a failed layer, and a
+  chunk auditor gets the list of changed files and functions;
+- a hot-path defer needs an issue and a curated row in both skills, and
+  quick-dev halts before acting on other findings;
+- section 1 adds `vite.config.ts` and later toolchain files, a move allows
+  formatting changes but not a changed path inside a body, chunks per step
+  allow for a 30-minute `tick` sub-step, a visit is defined, and the HP-8
+  table adds the housekeeping crew-order memo, `remove_unit`'s scan and the
+  cost of a clone on read;
+- the summaries name moves and cache removal outside a port, the template
+  asks for the cache comparison and a link to the record, #1170 adds saves and
+  the per-day and per-command tiers, and #1158 adds A27;
+- the guard pins the new clauses, the record rows inside section 6, the
+  not-hot-path list's bounds, an empty base `on_complete`, no prepend step and
+  the `CLAUDE.md` rule.
