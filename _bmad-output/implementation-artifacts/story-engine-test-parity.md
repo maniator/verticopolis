@@ -289,7 +289,7 @@ For a row marked "(left out)" the Fails column counts the file's tests
 | `conformance.integration.test.ts` (left out) | 24 | c | the TypeScript side of the referee and the scenario lock writer; its engine twin is `conformanceWasm` |
 | `loaderCases.integration.test.ts` (left out) | 1 | c | the loader-case lock writer; the Rust test replays the lock |
 | `dualRunDay`, `dualRunEdits`, `wasmHost` (left out) | 53 | c | attach a mirror or a host themselves |
-| `wasmHostTelemetry`, `wasmHostLogText` (left out) | 4 | c | drive the TypeScript engine and their own engine side by side |
+| `wasmHostTelemetry`, `wasmHostLogText` (left out) | 5 | c | drive the TypeScript engine and their own engine side by side |
 | `wasmHostAnalyticsBridge`, `wasmWorkerHost`, `wasmWorkerLifecycle`, `wasmWorkerSaves` (left out, slice 3) | 29 | c | start their own host, in process or on the worker; a second host on the instance is refused, and the lifecycle suite's fallback hands a crowded instance back to the TypeScript engine |
 | `conformanceWasmTdt`, `conformanceWasmCanBuild`, `conformanceWasmVctower` (left out) | 51 | c | drive the binding directly, as `conformanceWasm` does |
 | `wasmHostCatalog` (left out) | 10 | c | starts its own host to read the engine's catalog |
@@ -1052,6 +1052,18 @@ other four pre-existing skips no longer run in this project.
 The unit project's file count grew with main (205 files then, 252 now). These figures are
 from a local run; the `test-wasm-parity` job is the live check. The (b) bucket is
 empty, as are (a) and the cost timeouts.
+
+### The run on the takeover branch (2026-10-20, `claude/vitest-on-wasm-3k4ylx` merged with `main`)
+
+`npm run test:wasm:parity` (both projects in one run, four cores): 350 files
+pass and 1 is skipped; 4,545 tests pass and 39 are skipped (the 38
+`itTypeScriptOnly` marks and the hour-cost bench); 0 fail, in 270 s. The same
+branch passes `npm test` (4,793 pass, 14 skipped), `npm run test:wasm` (176
+pass, 13 skipped), typecheck, lint, `npm run build`, `cargo fmt --check`,
+`cargo clippy -D warnings` and `cargo test`. The `test-wasm-parity` job is the
+live check. Both parity projects run with a 120 s test and hook timeout
+(`vite.config.ts`, against the 30 s default), a relaxation S6 (#868) lifts
+with the merge per tick (backlog row `wasm-parity-exclusion-pins`, #1084).
 
 ### What is left for #878
 

@@ -148,6 +148,15 @@ describe.skipIf(!hasWasmPackage())("elevator telemetry on both engines", () => {
       expect(moved, "trips completed and moved the revision").toBeGreaterThan(0);
       expect(betweenMerges, "rows changed on a frame that brought no full merge").toBeGreaterThan(0);
 
+      // Reading the rows and the revision changes nothing the save or the
+      // conformance hash carries.
+      const save = host.engine.serialize();
+      const digest = host.engine.stateDigest();
+      host.engine.commuteStress();
+      host.engine.commuteStressRevision();
+      expect(host.engine.serialize()).toBe(save);
+      expect(host.engine.stateDigest()).toBe(digest);
+
       // Steps outside a frame flush leave the engine's rows ahead of the read
       // model's; detach hands the latest over.
       let pending = false;

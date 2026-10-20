@@ -2,7 +2,7 @@
 title: Preserve commute samples across WASM host handoff
 type: bugfix
 created: 2026-10-16
-status: in-progress
+status: done
 baseline_commit: 300c7d9c47347976f2c54797428ee06d487cd76f
 context: []
 ---
@@ -46,9 +46,9 @@ The scope is #1062 and #878. Performance profiling, worker-transfer optimization
 - [x] Expose a sample revision without changing gameplay or saves.
 - [x] Sync changed rows on main-thread frames and teardown.
 - [x] Carry changed rows in worker replies and retain stale rows until fresh state applies.
-- [ ] Cover replacement, removal, stale replies, detach, event deduplication and save stability.
-- [ ] Run applicable TypeScript, Rust, WASM, codec and parity gates.
-- [ ] Run the complete `gds-code-review` layered review and triage.
+- [x] Cover replacement, removal, stale replies, detach, event deduplication and save stability.
+- [x] Run applicable TypeScript, Rust, WASM, codec and parity gates (results in the story's 2026-10-20 run).
+- [x] Run the complete `gds-code-review` layered review and triage (2026-10-20: Blind Hunter, Edge Case Hunter and Acceptance Auditor; patches applied, deferrals in backlog rows #1082 to #1084).
 
 Given completed trips since the previous merge, when a confirmed host state returns to TypeScript, then its commute rows match that state and the serialized save remains unchanged by telemetry transfer.
 
@@ -61,3 +61,4 @@ Targeted host tests, typecheck, lint, npm test, build, native Rust tests and cli
 ## Spec Change Log
 
 - 2026-10-16: Resume authorized #1062 takeover. Earlier bot-reported commit 47974ae is unavailable through the repository API (422); no follow-up PR exists in the matching PR search. Reconstructed the bounded fix in the existing PR worktree.
+- 2026-10-20: The WS-B evidence thread took the PR over. The recovered patch was applied on 300c7d9 and `main` merged. Beyond the spec: the two commute reads joined the export tier table, the reply watchdog moved from `workerHost.ts` to `workerApply.ts` (the file was at the 500-line ceiling), and two guards pin the parity exclusions and the CI job. The `fingerprint` helper was split out of `wasmHostSetup.ts` for the same reason, earlier in the PR.

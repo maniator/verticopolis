@@ -15,6 +15,12 @@ import { repoRel, sourceFiles } from "../guardFiles";
  * (`<file> itTypeScriptOnly=<n> atEngineFrameCadence=<n>` per line), so an
  * exclusion cannot grow by accident and a removed one has to lower its count.
  * Adding one means adding or raising its line, which a reviewer sees.
+ *
+ * The count is of call sites, not tests: `fixedStep` calls
+ * `atEngineFrameCadence` once inside a loop that runs six cases, so a case
+ * added to that loop adds an excluded test without moving the count (the story's
+ * table gives the per-test figure; a per-test count is backlog row
+ * `wasm-parity-exclusion-pins`, #1084).
  */
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -27,27 +33,35 @@ function parseRatchet(): Map<string, Counts> {
     if (!line || line.startsWith("#")) continue;
     const m = /^(\S+) itTypeScriptOnly=(\d+) atEngineFrameCadence=(\d+)$/.exec(line);
     if (!m) throw new Error(`exclusions.ratchet.txt: cannot read the line "${line}"`);
+    if (out.has(m[1])) throw new Error(`exclusions.ratchet.txt: ${m[1]} is listed twice`);
     out.set(m[1], { itTypeScriptOnly: Number(m[2]), atEngineFrameCadence: Number(m[3]) });
   }
   return out;
 }
 
-/** The calls in a test file: a call site is the name followed by `(` and a
+/** Source with its comments blanked, so a comment that names a marker does
+ *  not count as a call. Strings stay: a marker's reason is a string. */
+const withoutComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/[^\n]*/g, "$1");
+
+/** A reason that says nothing: empty or only whitespace in any quote style. */
+const blankReason = (arg: string) => /^(["'`])\s*\1$/.test(arg.trim());
+
+/** The calls in a source file: a call site is the name followed by `(` and a
  *  non-empty reason, a string literal or a named constant. */
 function scan(): { counts: Map<string, Counts>; bare: string[] } {
   const counts = new Map<string, Counts>();
   const bare: string[] = [];
-  for (const abs of sourceFiles("src", [".test.ts", ".test.tsx"])) {
+  for (const abs of sourceFiles("src", [".ts", ".tsx"])) {
     const rel = repoRel(abs);
-    if (rel.startsWith("src/tests/parity/")) continue; // the marker's own specs
-    const text = readFileSync(abs, "utf8");
+    if (rel.startsWith("src/tests/parity/")) continue; // the markers and their own specs
+    const text = withoutComments(readFileSync(abs, "utf8"));
     const c: Counts = { itTypeScriptOnly: 0, atEngineFrameCadence: 0 };
     for (const [name, re] of [
       ["itTypeScriptOnly", /\bitTypeScriptOnly\(\s*([^)\s][^)]*)\)/g],
       ["atEngineFrameCadence", /\batEngineFrameCadence\(\s*([^)\s][^)]*)\)/g],
     ] as const) {
       const all = text.match(new RegExp(`\\b${name}\\(`, "g"))?.length ?? 0;
-      const withReason = [...text.matchAll(re)].filter((m) => m[1].trim() !== '""' && m[1].trim() !== "''").length;
+      const withReason = [...text.matchAll(re)].filter((m) => !blankReason(m[1])).length;
       c[name] = withReason;
       if (all !== withReason) bare.push(`${rel}: ${name} called without a reason`);
     }

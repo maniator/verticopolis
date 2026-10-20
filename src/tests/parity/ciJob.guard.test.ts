@@ -15,7 +15,8 @@ const read = (rel: string) => readFileSync(resolve(repoRoot, rel), "utf8");
 describe("the WASM parity CI job", () => {
   const script = (JSON.parse(read("package.json")) as { scripts: Record<string, string> }).scripts["test:wasm:parity"];
   const workflow = read(".github/workflows/test.yml");
-  const job = /\n {2}test-wasm-parity:\n([\s\S]*?)(?=\n {2}[a-z][\w-]*:\n|$)/.exec(workflow)?.[1] ?? "";
+  // The job's block: from its key to the next two-space key (any name, a trailing comment allowed).
+  const job = /\n {2}test-wasm-parity:[^\n]*\n([\s\S]*?)(?=\n {2}[\w-]+:[^\n]*\n|$)/.exec(workflow)?.[1] ?? "";
 
   it("exists", () => {
     expect(job).not.toBe("");
@@ -27,6 +28,16 @@ describe("the WASM parity CI job", () => {
     const fromJob = matrix.split(",").map((p) => p.trim()).filter(Boolean).sort();
     expect(fromScript).toEqual(["integrationWasm", "unitWasm"]);
     expect(fromJob).toEqual(fromScript);
+  });
+
+  it("is a plain gate: after the engine build, never skipped, never allowed to fail", () => {
+    expect(job).toMatch(/(^|\n) {4}needs: engine-wasm\n/);
+    expect(job).not.toMatch(/(^|\n) {4}if:/);
+    expect(job).not.toMatch(/continue-on-error/);
+  });
+
+  it("runs the matrix project through vitest", () => {
+    expect(job).toMatch(/run: npx vitest run --project \$\{\{ matrix\.project \}\}\n/);
   });
 
   it("requires the real engine in both", () => {
