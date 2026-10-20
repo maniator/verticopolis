@@ -69,7 +69,7 @@ describe("loadBootEngine, wasm-only build", () => {
 
 describe("fallback reason codes", () => {
   it("keeps the lists closed, with none first and the runtime codes reserved", () => {
-    expect(FALLBACK_REASONS).toEqual(["none", "boot-timeout", "boot-error", "package-mismatch", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"]);
+    expect(FALLBACK_REASONS).toEqual(["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"]);
     expect(FALLBACK_STAGES).toEqual(["none", "load", "start", "adopt", "undo"]);
   });
 
@@ -95,7 +95,7 @@ describe("a refused engine package (#985)", () => {
   it("is a package mismatch only when the bytes disagree with the shell", () => {
     expect(bootFailureReason(refusal("mismatch"))).toBe("package-mismatch");
     expect(bootFailureReason(refusal("load-failed"))).toBe("boot-error");
-    expect(bootFailureReason(refusal("unverifiable"))).toBe("boot-error");
+    expect(bootFailureReason(refusal("unverifiable"))).toBe("unverifiable");
   });
 
   it("keeps the kind, the file and both ids on the failure, beside the closed code", () => {
@@ -129,7 +129,7 @@ describe("a refused engine package (#985)", () => {
 
   it("stops a wasm-only build with the same detail", async () => {
     const r = await loadBootEngine({ wasmOnly: true, load: async () => Promise.reject(refusal("unverifiable")), log: quiet() });
-    expect(r.state).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage: "load", reason: "boot-error", package: { kind: "unverifiable" } } });
+    expect(r.state).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage: "load", reason: "unverifiable", package: { kind: "unverifiable" } } });
   });
 });
 

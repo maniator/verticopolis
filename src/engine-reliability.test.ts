@@ -194,6 +194,21 @@ describe("summarizeReliability", () => {
     expect(s.byReason).toEqual([]);
   });
 
+  it("keeps a browser that cannot verify the engine files out of the rate, on a line of its own", () => {
+    const s = summarizeReliability([
+      // a: the settle row fell back on it, so the engine never ran.
+      life({ session: "a", fallbacks: 1, settleFallbacks: 1, reasons: ["unverifiable"] }),
+      // b: the same, then a reload that ran the engine clean.
+      life({ session: "b", fallbacks: 1, settleFallbacks: 1, reasons: ["unverifiable"] }),
+      life({ session: "b" }),
+      // c: with another reason it is a fault, listed by that reason alone.
+      life({ session: "c", fallbacks: 2, settleFallbacks: 1, reasons: ["unverifiable", "attach-refused"] }),
+    ]);
+    expect(s).toMatchObject({ n: 2, faults: 1, pageLives: 2, unverifiableSessions: 3, unverifiablePageLives: 3, unverifiableNeverRan: 2, mismatchPageLives: 0 });
+    expect(s.byReason).toEqual([{ reason: "attach-refused", pageLives: 1 }]);
+    expect(renderReliabilityMarkdown(s, { windowLabel: "last 30 days", until: "2026-10-20 12:00", hosts: ["wasm"], builds: "all", arms: "all", truncated: false })).toContain("Cannot verify the engine files (outside the rate) | 3 sessions, 3 page lives, 2 of them never ran the engine");
+  });
+
   it("counts a writer latch-off in a mismatch that never ran the engine", () => {
     const s = summarizeReliability([life({ session: "a", fallbacks: 1, settleFallbacks: 1, reasons: ["package-mismatch"], writerLatched: true }), life({ session: "b" })]);
     expect(s).toMatchObject({ n: 1, mismatchNeverRan: 1, latchedSessions: 1, latchedPageLives: 1 });

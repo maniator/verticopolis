@@ -24,14 +24,14 @@ export type BootStage = "load" | "start" | "host";
  * on the console and the boot state and is never put in that event, since an
  * engine message can quote a tower name or a path.
  *
- * Boot sends the first five, plus `other` for a boot step outside the engine
+ * Boot sends the first six, plus `other` for a boot step outside the engine
  * that failed after the worker host started (the host is let go). The
  * runtime fallback (#874) sends the trap codes for a running engine's fault
  * in a command (the undo capture's save just before an edit included), a
  * tick, a frame sync or the event drain, or an undo or redo, and `other` for
  * a save or the reads when a tower is let go.
  */
-export const FALLBACK_REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"] as const;
+export const FALLBACK_REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"] as const;
 export type FallbackReason = (typeof FALLBACK_REASONS)[number];
 
 /** Where a fallback happened: loading the package, starting the host on the
@@ -73,7 +73,7 @@ export class EngineBootError extends Error {
 
 /** The codes a failed load can carry: the rest of the closed list is for a
  *  fault in a running engine or for no fault at all. */
-export const LOAD_FAILURE_REASONS: readonly FallbackReason[] = ["boot-error", "package-mismatch", "boot-timeout"];
+export const LOAD_FAILURE_REASONS: readonly FallbackReason[] = ["boot-error", "package-mismatch", "unverifiable", "boot-timeout"];
 
 const PACKAGE_KINDS: readonly string[] = ["mismatch", "load-failed", "unverifiable"];
 const PACKAGE_FILES: readonly string[] = ["glue", "wasm", "build-record"];
@@ -99,11 +99,12 @@ export function cleanPackageFailure(raw: unknown): PackageFailure | undefined {
 }
 
 /** The code for a refused package. A set that disagrees with the shell is a
- *  mismatch. Files that did not arrive and a browser that cannot hash are
- *  `boot-error` for now: the closed list has no code of their own until the
- *  owner approves one (#985 slice 2b), and the boot state keeps the kind. */
+ *  mismatch, a browser that cannot hash the files is `unverifiable` (the files
+ *  may be fine; neither sits in the fault rate), and files that did not arrive
+ *  are a `boot-error`. */
 export function packageFailureReason(kind: PackageFailureKind): FallbackReason {
-  return kind === "mismatch" ? "package-mismatch" : "boot-error";
+  if (kind === "mismatch") return "package-mismatch";
+  return kind === "unverifiable" ? "unverifiable" : "boot-error";
 }
 
 /** The code for a failure on the way to a running engine. A glue and binary

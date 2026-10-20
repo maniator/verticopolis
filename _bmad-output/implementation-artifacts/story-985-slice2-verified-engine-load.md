@@ -22,7 +22,7 @@ instantiates the same bytes.
 
 **2b, recovery and proof.** Reason-specific failure screens, Copy Diagnostics
 and Repair engine files, cache-key rotation at the first schema 2 worker, the
-`unverifiable` analytics code (needs the owner's production OK), the install
+install
 race, eviction, repair and first-install e2e specs, and the pre-registered
 load-cost measurement on the owner's PC (booked until about 02:00 UTC on
 2026-10-21).
@@ -47,7 +47,9 @@ load-cost measurement on the owner's PC (booked until about 02:00 UTC on
    report `boot-error`, the deadline reports `boot-timeout`. The boot state's
    `failure` also carries the package detail (kind, file, both ids, whether a
    worker controlled the page), codes and hex ids only, never in analytics.
-   A new `unverifiable` code waits for the owner (2b).
+   `unverifiable` reported `boot-error` in 2a. The owner approved the new
+   code on 2026-10-20; the follow-up PR (stacked on 2a) adds it to the closed
+   lists, outside the fault rate, with its own line.
 5. **Builds.** A switchable build that is refused stays on the TypeScript
    engine (existing behavior, one `console.error`). A wasm-only build stops
    with the existing engine failure screen. The screens' copy is 2b.
@@ -106,6 +108,6 @@ retirement story.
 ## Out of scope for 2a
 
 Failure copy, Copy Diagnostics, Repair, cache-key rotation, the
-`unverifiable` code, the respawn latch, eviction, install-race and first-install specs, the load
+the respawn latch, eviction, install-race and first-install specs, the load
 measurement, Safari and Firefox passes (a merge condition for the wasm-only
 flip, design section 11).
