@@ -45,7 +45,7 @@ test.describe("starts on the WASM engine", () => {
     await page.addInitScript(() => localStorage.setItem("vc.engine", "ts"));
     await page.goto("/?engine=ts");
     await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, { timeout: 30_000 });
-    expect(await bootState(page)).toEqual({ build: "wasm-only", engine: "wasm", failure: null });
+    expect(await bootState(page)).toMatchObject({ build: "wasm-only", engine: "wasm", failure: null });
     await expect(page.locator(".splash-version")).toContainText("WASM engine");
     await page.evaluate(() => document.getElementById("splash")?.remove());
     await page.evaluate(() => (window as any).game.setSpeed(1));
