@@ -1,5 +1,6 @@
 import { telemetryHostAllowed } from "./telemetry";
 import { gameplaySession } from "./analyticsSession";
+import { flushEngineStatus } from "./analyticsEngineStatus";
 
 /**
  * Gameplay analytics: the module's public surface plus the boot wiring. The
@@ -65,11 +66,20 @@ export function startGameplaySession(): void {
   // `pagehide` is the terminal signal (tab close / navigation / bfcache), so it
   // ends the session as FINAL: this is where session_emergencies emits, having
   // waited past mid-session tab switches (see GameplaySession.end).
-  window.addEventListener("pagehide", () => gameplaySession.end(true));
+  // Each hide also reports the engine's true fallback count when its capped
+  // rows dropped one (`analyticsEngineStatus.ts`, the #841 lesson).
+  // The engine report goes first: it never throws, and a throw in the
+  // session's end must not cost it.
+  window.addEventListener("pagehide", () => {
+    flushEngineStatus();
+    gameplaySession.end(true);
+  });
   document.addEventListener("visibilitychange", () => {
     // Bank on hidden, (re)start on visible, ignore other states (e.g. prerender).
     // A hide is NOT final (the player may tab back), so session_emergencies waits.
-    if (document.visibilityState === "hidden") gameplaySession.end(false);
-    else if (document.visibilityState === "visible") gameplaySession.begin();
+    if (document.visibilityState === "hidden") {
+      flushEngineStatus();
+      gameplaySession.end(false);
+    } else if (document.visibilityState === "visible") gameplaySession.begin();
   });
 }

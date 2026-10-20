@@ -30,6 +30,7 @@ const MAY_READ_FILES: &[(&str, &[&str])] = &[
         &[
             "start_sim",
             "run_scenario",
+            "run_scenario_detailed",
             "run_scenario_until",
             "run_scenario_inner",
         ],

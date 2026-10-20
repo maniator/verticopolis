@@ -40,6 +40,8 @@ pub mod satisfaction;
 // always have it; a test under `tests/` needs the feature like any host.
 #[cfg(any(test, feature = "conformance"))]
 pub mod scenario;
+#[cfg(any(test, feature = "conformance"))]
+pub mod scenario_detail;
 pub mod schedule;
 pub mod services;
 pub mod sim;
