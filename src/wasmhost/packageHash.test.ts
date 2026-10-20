@@ -49,6 +49,31 @@ describe("engineSourceHash", () => {
     expect(engineSourceHash(c)).not.toBe(before);
   });
 
+  it("gives a CRLF checkout of the same sources the same hash (#880), and reads a binary file as it is", () => {
+    const { crate: c, outside } = crate();
+    writeFileSync(join(c, "src/more.rs"), "pub fn f() {\n    1\n}\n");
+    writeFileSync(join(c, "data.bin"), Buffer.from([0, 13, 10, 1]));
+    const lf = engineSourceHash(c);
+    writeFileSync(join(c, "src/more.rs"), "pub fn f() {\r\n    1\r\n}\r\n");
+    writeFileSync(join(c, "Cargo.toml"), "[package]\r\n");
+    writeFileSync(outside, "{}");
+    expect(engineSourceHash(c)).toBe(lf);
+    // A lone CR is content, and so are the bytes of a binary file.
+    writeFileSync(join(c, "src/more.rs"), "pub fn f() {\r    1\n}\n");
+    expect(engineSourceHash(c)).not.toBe(lf);
+    writeFileSync(join(c, "src/more.rs"), "pub fn f() {\n    1\n}\n");
+    writeFileSync(join(c, "data.bin"), Buffer.from([0, 10, 1]));
+    expect(engineSourceHash(c)).not.toBe(lf);
+  });
+
+  it("ignores a stray dotfile or editor backup beside the sources (#880)", () => {
+    const { crate: c } = crate();
+    const before = engineSourceHash(c);
+    writeFileSync(join(c, "src/.DS_Store"), "junk");
+    writeFileSync(join(c, "src/lib.rs~"), "junk");
+    expect(engineSourceHash(c)).toBe(before);
+  });
+
   it("refuses an include it cannot follow", () => {
     const { crate: c } = crate();
     writeFileSync(join(c, "src/more.rs"), 'pub const D: &str = include_str!(r"../../conformance/catalog.json");\n');
