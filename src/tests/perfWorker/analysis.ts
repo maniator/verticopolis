@@ -1,4 +1,5 @@
 import { rendererFinding } from "../perfCompare/renderer";
+import { contextLossFinding } from "../perfCompare/contextLoss";
 import { pairedRatio, summarize, verdict, type Summary } from "../perfCompare/stats";
 import type { ModeName } from "./pageWorker";
 import type { ModeRun, WorkerConfig } from "./runner";
@@ -270,5 +271,6 @@ export function validate(config: WorkerConfig, runs: readonly ModeRun[], rendere
   const gl = rendererFinding(okRuns.map((r) => r.page?.webgl?.renderer), okRuns.map((r) => r.rendererEnd), { quick: config.quick, exception: rendererException, lateEnds: okRuns.map((r) => r.rendererEndCold) });
   errors.push(...gl.errors);
   warnings.push(...gl.warnings);
+  errors.push(...contextLossFinding(okRuns.map((r) => r.contextLost)));
   return { errors, warnings };
 }
