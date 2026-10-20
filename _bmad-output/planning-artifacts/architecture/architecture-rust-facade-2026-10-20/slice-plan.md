@@ -105,7 +105,11 @@ cohort stage 3.
 evidence only in CI (the dual run and the parity harness), since no
 production path has two engines answering. Slice 8's "recovery point
 refused" report line is a new production analytics field and needs the
-owner's approval when slice 8 ships.
+owner's approval when slice 8 ships. Slices 8 and 10 keep the host's fallback contract
+that A4's sticky safety latch reads (`onFallback(fallback, latched)`, from
+the Runtime lane's #1113 PR, with `latched` true when Rust actually failed
+and false for a clean refusal, plus the coded reasons), each with a
+contract test, so the latch works on the facade unchanged.
 
 ## Who touches which files
 
