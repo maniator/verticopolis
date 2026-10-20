@@ -86,16 +86,21 @@ jobs:
             [ "$seeds" -le $(( 100000 - offset )) ] || { echo "seeds must fit in one block: at most $(( 100000 - offset )) from seed_offset $offset"; exit 2; }
             [ "$last" -le 4294967295 ] || { echo "seeds $first to $last do not fit in 32 bits (seed_block at most 42948)"; exit 2; }
           fi
-          # The window key (scripts/fuzz-key.ts): a night counts only on one
-          # unchanged key. A key that cannot be computed is recorded as such and
-          # the night does not count.
+          # The window key (scripts/fuzz-key.ts): a night counts toward the
+          # window only on one unchanged key, from a scheduled run on main. A key
+          # that cannot be computed, or that is not a 64-digit hex string, is
+          # recorded as unavailable. The key and the run's event and ref are also
+          # written to fuzz-out/window-key.txt, so the scenarios artifact carries them.
           key=$(npx tsx scripts/fuzz-key.ts) || key="unavailable"
+          { [ "${#key}" -eq 64 ] && printf '%s' "$key" | grep -Eq '^[0-9a-f]+$'; } || key="unavailable"
+          mkdir -p fuzz-out
+          echo "key=$key event=$EVENT ref=$GITHUB_REF sha=$GITHUB_SHA" > fuzz-out/window-key.txt
           engine=""; diverged=""; harness=""
           summary() {
             {
               echo "### engine-fuzz"
               echo "- commit: \`$GITHUB_SHA\`; seeds $first to $last"
-              echo "- window key: \`$key\`"
+              echo "- window key: \`$key\` (event $EVENT, ref $GITHUB_REF)"
               [ -n "$ONE" ] || echo "- replay this range at this commit: seed_block=$block seed_offset=$offset seeds=$seeds"
               echo "- TypeScript and Rust diverged:${diverged:- none}"
               echo "- the fuzzer failed on its own scenario (the Rust engine refused it, or the fuzzer crashed):${engine:- none}"

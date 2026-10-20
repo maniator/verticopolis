@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { PART_NAMES, fuzzKey, fuzzKeyFiles, fuzzKeyParts, importClosure, type KeyParts } from "./fuzzKey";
+import { FUZZ_ENTRIES, PART_NAMES, fuzzKey, fuzzKeyFiles, fuzzKeyParts, importClosure, type PartName } from "./fuzzKey";
 import { repoRoot } from "../guardFiles";
 
 const roots: string[] = [];
@@ -51,32 +51,58 @@ describe("the differential's window key", () => {
     expect(keyOf(root)).toBe(keyOf(root));
   });
 
-  it("moves when any input moves", () => {
+  it("moves exactly the part an input belongs to", () => {
     const root = tree();
     const base = keyOf(root);
-    const moves = (rel: string, text: string): KeyParts => {
-      const before = fuzzKeyParts(root);
+    const baseParts = fuzzKeyParts(root);
+    const moved = (rel: string, text: string): PartName[] => {
       const original = readFileSync(join(root, rel), "utf8");
       edit(root, rel, text);
       const after = fuzzKeyParts(root);
       expect(keyOf(root)).not.toBe(base);
       edit(root, rel, original);
       expect(keyOf(root)).toBe(base);
-      return Object.fromEntries(PART_NAMES.map((n) => [n, before[n] === after[n] ? "same" : "moved"])) as KeyParts;
+      return PART_NAMES.filter((n) => after[n] !== baseParts[n]);
     };
-    expect(moves("engine-rs/src/lib.rs", "pub fn g() {}\n")).toMatchObject({ engine: "moved", srcEngine: "same" });
-    expect(moves("src/engine/a.ts", "export const a = 2;\n")).toMatchObject({ srcEngine: "moved", engine: "same" });
-    expect(moves("src/tests/helper.ts", "export const helper = 2;\n")).toMatchObject({ scripts: "moved" });
-    expect(moves("scripts/fuzz-compare.ts", "export {};\n")).toMatchObject({ scripts: "moved" });
-    expect(moves("tsconfig.json", '{"a":1}\n')).toMatchObject({ scripts: "moved" });
-    expect(moves("scripts/wasm-build.ts", "export const w = 1;\n")).toMatchObject({ wasmBuild: "moved" });
-    expect(moves("scripts/build-engine-wasm.sh", "#!/bin/sh\necho\n")).toMatchObject({ wasmBuild: "moved" });
-    expect(moves("package.json", JSON.stringify({ scripts: { "wasm:build": "other" } }))).toMatchObject({ wasmBuild: "moved" });
-    expect(moves(".nvmrc", "24\n")).toMatchObject({ pins: "moved" });
-    expect(moves(".github/workflows/engine-fuzz.yml", "name: other\n")).toMatchObject({ pins: "moved" });
-    expect(moves("conformance/fixtures/f.vctower", "changed\n")).toMatchObject({ fixtures: "moved" });
+    expect(moved("engine-rs/src/lib.rs", "pub fn g() {}\n")).toEqual(["engine"]);
+    expect(moved("engine-rs/Cargo.toml", "[package]\nname = \"x\"\n")).toEqual(["engine"]);
+    expect(moved("src/engine/a.ts", "export const a = 2;\n")).toEqual(["srcEngine"]);
+    expect(moved("src/tests/helper.ts", "export const helper = 2;\n")).toEqual(["scripts"]);
+    expect(moved("scripts/fuzz-compare.ts", "export {};\n")).toEqual(["scripts"]);
+    expect(moved("tsconfig.json", '{"a":1}\n')).toEqual(["scripts"]);
+    expect(moved("scripts/wasm-build.ts", "export const w = 1;\n")).toEqual(["wasmBuild"]);
+    expect(moved("scripts/build-engine-wasm.sh", "#!/bin/sh\necho\n")).toEqual(["wasmBuild"]);
+    expect(moved(".github/actions/engine-wasm/action.yml", "name: y\n")).toEqual(["wasmBuild"]);
+    expect(moved("package.json", JSON.stringify({ scripts: { "wasm:build": "other" } }))).toEqual(["wasmBuild"]);
+    expect(moved(".nvmrc", "24\n")).toEqual(["pins"]);
+    expect(moved(".github/workflows/engine-fuzz.yml", "name: other\n")).toEqual(["pins"]);
+    expect(moved("conformance/fixtures/f.vctower", "changed\n")).toEqual(["fixtures"]);
     const lock = { ...LOCK, packages: { ...LOCK.packages, "node_modules/dep": { version: "2.0.1" } } };
-    expect(moves("package-lock.json", JSON.stringify(lock))).toMatchObject({ pins: "moved" });
+    expect(moved("package-lock.json", JSON.stringify(lock))).toEqual(["pins"]);
+  });
+
+  it("moves when a file is added, removed or renamed", () => {
+    const root = tree();
+    const base = keyOf(root);
+    writeFileSync(join(root, "conformance/fixtures/g.vctower"), "tower\n");
+    expect(keyOf(root)).not.toBe(base);
+    rmSync(join(root, "conformance/fixtures/g.vctower"));
+    expect(keyOf(root)).toBe(base);
+    rmSync(join(root, "conformance/fixtures/f.vctower"));
+    writeFileSync(join(root, "conformance/fixtures/renamed.vctower"), "tower\n");
+    expect(keyOf(root)).not.toBe(base);
+  });
+
+  it("does not depend on where the tree sits, its line endings, dotfiles or symlinks", () => {
+    const a = tree();
+    const b = tree();
+    expect(keyOf(a)).toBe(keyOf(b));
+    writeFileSync(join(b, "src/engine/a.ts"), "export const a = 1;\r\n");
+    expect(keyOf(b)).toBe(keyOf(a));
+    writeFileSync(join(b, "conformance/fixtures/.DS_Store"), "junk");
+    symlinkSync(join(b, "conformance/fixtures"), join(b, "conformance/fixtures/loop"));
+    expect(keyOf(b)).toBe(keyOf(a));
+    unlinkSync(join(b, "conformance/fixtures/loop"));
   });
 
   it("leaves a version bump, an engine test file and unrelated files alone", () => {
@@ -91,12 +117,45 @@ describe("the differential's window key", () => {
     expect(keyOf(root)).toBe(base);
   });
 
-  it("follows relative imports, skips prose that shows one, and fails closed on a missing file", () => {
+  it("follows every relative import form, skips prose that shows one, and fails closed on a missing file", () => {
     const root = tree();
-    edit(root, "scripts/fuzz-compare.ts", '// import { gone } from "./gone";\n/* from "./also-gone" */\nimport { helper } from "../src/tests/helper";\nexport const c = helper;\n');
-    expect(importClosure(root, ["scripts/fuzz-compare.ts"])).toEqual(["scripts/fuzz-compare.ts", "src/tests/helper.ts"]);
+    for (const f of ["a", "b", "c", "d", "e"]) writeFileSync(join(root, `src/tests/${f}.ts`), "export {};\n");
+    mkdirSync(join(root, "src/tests/dir"), { recursive: true });
+    writeFileSync(join(root, "src/tests/dir/index.ts"), "export {};\n");
+    edit(
+      root,
+      "scripts/fuzz-compare.ts",
+      [
+        "// matches src/*.ts and imports { gone } from './gone'",
+        'const glob = "src/*";',
+        'import { helper } from "../src/tests/helper";',
+        'export * from "../src/tests/a";',
+        'import type { T } from "../src/tests/b";',
+        'const lazy = () => import("../src/tests/c");',
+        'import d = require("../src/tests/d.js");',
+        'import "../src/tests/dir";',
+        "/* from './also-gone' */",
+        'export const c = helper;',
+        "",
+      ].join("\n"),
+    );
+    expect(importClosure(root, ["scripts/fuzz-compare.ts"])).toEqual([
+      "scripts/fuzz-compare.ts",
+      "src/tests/a.ts",
+      "src/tests/b.ts",
+      "src/tests/c.ts",
+      "src/tests/d.ts",
+      "src/tests/dir/index.ts",
+      "src/tests/helper.ts",
+    ]);
     edit(root, "scripts/fuzz-compare.ts", 'import { gone } from "./gone";\n');
     expect(() => fuzzKeyParts(root)).toThrow(/cannot resolve "\.\/gone"/);
+  });
+
+  it("names a listed directory that is missing", () => {
+    const root = tree();
+    rmSync(join(root, "conformance/fixtures"), { recursive: true });
+    expect(() => fuzzKeyParts(root)).toThrow(/conformance\/fixtures is listed but missing/);
   });
 
   it("names a listed file that is missing", () => {
@@ -119,6 +178,13 @@ describe("the real tree's key", () => {
     expect(computed.filter((f) => f !== ".github/actions/engine-wasm/action.yml").sort()).toEqual(
       listed.filter((f) => f !== ".github/actions/engine-wasm/action.yml").sort(),
     );
+  });
+
+  it("lists every script the nightly workflow runs as an entry", () => {
+    const workflow = readFileSync(join(repoRoot, ".github/workflows/engine-fuzz.yml"), "utf8");
+    const run = [...workflow.matchAll(/\b(scripts\/[\w-]+\.ts)\b/g)].map((m) => m[1]);
+    expect(run.length).toBeGreaterThan(0);
+    for (const script of new Set(run)) expect(FUZZ_ENTRIES).toContain(script);
   });
 
   it("covers the scripts the nightly runs and the fixtures", () => {

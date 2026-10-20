@@ -21,8 +21,9 @@
  * A version bump leaves the key alone.
  */
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import ts from "typescript";
 import { engineSourceHash } from "../../wasmhost/packageHash.ts";
 
 /** The scripts the nightly runs. The WASM runner and the shrinker join it
@@ -38,20 +39,35 @@ export type KeyParts = Record<PartName, string>;
 const sha = (data: string | Buffer): string => createHash("sha256").update(data).digest("hex");
 const posix = (p: string): string => p.split(sep).join("/");
 
-/** Every file under a directory, sorted, as paths relative to `root`. */
+/** Every file under a directory, sorted, as paths relative to `root`. Like
+ *  `engineSourceHash`, it skips dotfiles and symlinks, so a stray `.DS_Store`
+ *  or editor backup cannot make a local key differ from CI's. A missing
+ *  directory throws: a rename must not turn into an empty hash. */
 function walk(root: string, dir: string, skip: (rel: string) => boolean = () => false): string[] {
+  if (!existsSync(dir)) throw new Error(`fuzz key: ${posix(relative(root, dir))} is listed but missing`);
   const out: string[] = [];
   const visit = (d: string) => {
     for (const name of readdirSync(d).sort()) {
+      if (name.startsWith(".")) continue;
       const p = join(d, name);
       const rel = posix(relative(root, p));
       if (skip(rel)) continue;
-      if (statSync(p).isDirectory()) visit(p);
+      const st = lstatSync(p);
+      if (st.isSymbolicLink()) continue;
+      if (st.isDirectory()) visit(p);
       else out.push(rel);
     }
   };
-  if (existsSync(dir)) visit(dir);
+  visit(dir);
   return out;
+}
+
+/** A text file hashes the same whatever its checkout's line endings, so a key
+ *  computed on a Windows checkout with `core.autocrlf` matches CI's. A file with
+ *  a NUL byte is binary and hashes as it is. */
+function lineEndingsAsLF(data: Buffer): Buffer {
+  if (data.includes(0)) return data;
+  return Buffer.from(data.toString("latin1").replace(/\r\n/g, "\n"), "latin1");
 }
 
 /** A hash over the files' paths and contents, so a rename or an edit moves it. */
@@ -59,27 +75,28 @@ function filesHash(root: string, rels: readonly string[]): string {
   const lines = [...new Set(rels)].sort().map((rel) => {
     const abs = join(root, rel);
     if (!existsSync(abs)) throw new Error(`fuzz key: ${rel} is listed but missing`);
-    return `${rel}\0${sha(readFileSync(abs))}`;
+    return `${rel}\0${sha(lineEndingsAsLF(readFileSync(abs)))}`;
   });
   return sha(lines.join("\n"));
 }
 
 const SOURCE_EXT = /\.(?:[cm]?[jt]sx?)$/;
-/** Relative specifiers: `from "./x"`, bare `import "./x"` and `import("./x")`. */
-const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*)["'](\.{1,2}\/[^"']+)["']/g;
 
 function resolveSpecifier(from: string, spec: string): string {
   const base = resolve(dirname(from), spec);
+  // TypeScript and tsx read "./x.js" as "./x.ts" first.
   const swapped = base.replace(/\.js$/, ".ts");
-  for (const c of [base, `${base}.ts`, `${base}.tsx`, `${base}.mts`, `${base}.d.ts`, swapped, join(base, "index.ts")]) {
+  for (const c of [swapped, base, `${base}.ts`, `${base}.tsx`, `${base}.mts`, `${base}.d.ts`, join(base, "index.ts"), join(base, "index.tsx")]) {
     if (existsSync(c) && statSync(c).isFile()) return c;
   }
   throw new Error(`fuzz key: cannot resolve "${spec}" imported from ${from}`);
 }
 
 /** Every file reachable from the entries through relative imports, entries
- *  included, as paths relative to `root`. An import it cannot resolve throws,
- *  so a file never drops out of the key unnoticed. */
+ *  included, as paths relative to `root`. TypeScript's own scanner reads the
+ *  imports (`import`, `export ... from`, `import()`, `require`), so comments and
+ *  strings that look like one do not count and a real one is not lost. An import
+ *  it cannot resolve throws, so a file never drops out of the key unnoticed. */
 export function importClosure(root: string, entries: readonly string[]): string[] {
   const seen = new Set<string>();
   const queue = entries.map((e) => resolve(root, e));
@@ -89,9 +106,10 @@ export function importClosure(root: string, entries: readonly string[]): string[
     if (!existsSync(file)) throw new Error(`fuzz key: ${relative(root, file)} is listed but missing`);
     seen.add(file);
     if (!SOURCE_EXT.test(file)) continue;
-    // Comments are dropped first, so prose that shows an import does not count.
-    const text = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/[^\n]*/g, "$1");
-    for (const m of text.matchAll(SPECIFIER)) queue.push(resolveSpecifier(file, m[1]));
+    const info = ts.preProcessFile(readFileSync(file, "utf8"), true, true);
+    for (const imp of info.importedFiles) {
+      if (imp.fileName.startsWith(".")) queue.push(resolveSpecifier(file, imp.fileName));
+    }
   }
   return [...seen].map((f) => posix(relative(root, f))).sort();
 }
