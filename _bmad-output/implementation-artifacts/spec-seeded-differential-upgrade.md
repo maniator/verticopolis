@@ -29,18 +29,22 @@ reads it.
 ### Slice 1: a wider compare, and run hygiene
 
 - Compare the `events` hash at every checkpoint, beside `state` and `crowd`.
-- An hourly checkpoint cadence for the fuzzer's own `tick` commands, so a
-  compare happens at every in-game hour. The scenario schema gains no field:
-  the fuzzer splits a tick run at hour boundaries and emits `checkpoint`
-  commands.
+- A checkpoint at least every in-game hour inside each of the fuzzer's own
+  `tick` commands (`checkpointEvery` of `60 / dt` ticks, or a quarter of a
+  short run). The scenario schema gains no field. The cadence counts from the
+  start of each tick command, so it is not aligned to the clock hour.
 - At each hourly checkpoint, both engines also report the full save, money and
   log. The Rust side writes them to `<id>.rs.detail.json`; the TypeScript side
   produces the same record from its runner. `fuzz-compare.ts` names the first
-  differing field (hash, then save path, money, log index, event index).
+  differing field: which hash, and then the first of money, a log part
+  (`seq`, `count`, `digest`) or a top-level save field. A record that is
+  short, relabeled or malformed is a harness failure (exit 3), never an
+  agreement.
   These records stay out of `conformance/expected.json`.
 - Run hygiene in `engine-fuzz.yml`: a manual run gets its own concurrency
   group so it never replaces a scheduled night; a `seed_block` input replays one
-  night's seeds; the run summary records the commit, the seed block and, for
+  night's seeds; the run summary records the commit, the seed range, the `seed_block` and
+  `seed_offset` that replay it and, for
   a red night, which kind of failure each seed was (a divergence, the Rust
   engine refusing its own scenario, or the harness). The summary gains the
   key in slice 4.
@@ -76,9 +80,13 @@ reads it.
 
 ## Boundaries
 
-- No change to gameplay, the engines' sources, the locks or the scenario
-  schema in slice 1 (`engine-rs/src/bin/fuzz.rs` and the TypeScript scripts
-  only). Slices 2 to 4 may add runner features only where a slice says so.
+- No change to gameplay, the locks or the scenario schema in slice 1. The
+  runners gain an optional detail channel (`run_scenario_detailed`, the
+  `details` argument of `runScenario`, a `conformance`-gated Rust module) that
+  the locked conformance path does not use: `conformance/expected.json` and its
+  tests are unchanged. The Rust edits sit inside `engine-rs`, so they change
+  the engine source hash (and so the engine-wasm cache key) once. Slices 2 to 4
+  may add runner features only where a slice says so.
 - The window rules (counting, resets) are the plan's, under OD-7. This spec
   builds the instrument; it does not declare a window.
 

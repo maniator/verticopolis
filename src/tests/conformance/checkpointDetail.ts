@@ -22,8 +22,15 @@ export function tsCheckpointDetail(sim: Simulation): Omit<CheckpointDetail, "lab
   };
 }
 
-/** The detail of an engine that provides it, or an error naming the gap. */
+/** The detail record could not be built: a harness problem, not a finding. */
+export class DetailError extends Error {}
+
+/** The detail of an engine that provides it, or a `DetailError` naming the gap. */
 export function requireDetail(e: { detail?(): Omit<CheckpointDetail, "label"> }): Omit<CheckpointDetail, "label"> {
-  if (!e.detail) throw new Error("this engine does not provide the checkpoint detail");
-  return e.detail();
+  try {
+    if (!e.detail) throw new Error("this engine does not provide the checkpoint detail");
+    return e.detail();
+  } catch (err) {
+    throw err instanceof DetailError ? err : new DetailError((err as Error).message);
+  }
 }

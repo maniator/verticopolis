@@ -58,10 +58,35 @@ describe("seeded differential compare", () => {
   it("names a label or a count difference", () => {
     const relabeled = run();
     relabeled.checkpoints[1].label = "h2";
+    relabeled.details[1].label = "h2";
     expect(compareRuns(run(), relabeled)).toMatchObject({ kind: "label" });
     const short = run();
     short.checkpoints.pop();
+    short.details.pop();
     expect(compareRuns(run(), short)).toMatchObject({ kind: "count", ts: "2", rust: "1" });
+  });
+
+  it("names the detail when a hash and the money both differ", () => {
+    const rust = run();
+    rust.checkpoints[1].crowd = "x";
+    rust.details[1].money += 1;
+    expect(compareRuns(run(), rust)).toMatchObject({ kind: "crowd", field: "money" });
+  });
+
+  it("refuses a record it cannot compare instead of reading it as agreement", () => {
+    const empty = run();
+    empty.details = [];
+    expect(() => compareRuns(run(), empty)).toThrow(/Rust: 0 detail records for 2 checkpoints/);
+    const relabeled = run();
+    relabeled.details[1].label = "zzz";
+    expect(() => compareRuns(run(), relabeled)).toThrow(/Rust: detail 1 does not match checkpoint 1/);
+    const noEvents = run();
+    delete (noEvents.checkpoints[0] as Partial<(typeof noEvents.checkpoints)[0]>).events;
+    expect(() => compareRuns(run(), noEvents)).toThrow(/Rust: checkpoint 0/);
+    const noLog = run();
+    delete (noLog.details[0] as Partial<(typeof noLog.details)[0]>).log;
+    expect(() => compareRuns(noLog, run())).toThrow(/TypeScript: detail 0/);
+    expect(() => compareRuns(run(), { ...run(), details: [null as never, null as never] })).toThrow(/Rust: detail 0/);
   });
 
   it("describes a divergence on one line", () => {

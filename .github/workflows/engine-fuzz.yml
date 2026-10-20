@@ -17,16 +17,19 @@ on:
         description: "Replay one explicit seed instead (the number a failing run printed)"
         default: ""
       seed_block:
-        description: "Replay one night's seeds: the block number a run summary printed (days since 1970-01-01). Empty takes a block the nightly run does not use."
+        description: "Replay a run's seeds: the block number its summary printed (days since 1970-01-01, at most 42948). Empty takes today's block."
+        default: ""
+      seed_offset:
+        description: "With seed_block: the offset its summary printed. Empty means 0 when seed_block is set, and a block range the nightly run does not use when it is not."
         default: ""
 
 permissions:
   contents: read
 
-# A manual run has its own group, so it queues behind other manual runs and
-# never replaces the scheduled night that is waiting.
+# Each manual run has its own group, so it never replaces the scheduled night
+# that is waiting, or another manual run. They run in parallel.
 concurrency:
-  group: engine-fuzz-${{ github.event_name }}
+  group: engine-fuzz-${{ github.event_name == 'schedule' && 'night' || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -52,57 +55,59 @@ jobs:
           SEEDS: ${{ github.event.inputs.seeds || '20' }}
           ONE: ${{ github.event.inputs.seed }}
           BLOCK: ${{ github.event.inputs.seed_block }}
+          OFFSET: ${{ github.event.inputs.seed_offset }}
           EVENT: ${{ github.event_name }}
           RUN_NUMBER: ${{ github.run_number }}
         run: |
-          seeds="$SEEDS"
-          case "$seeds" in ''|*[!0-9]*|0) echo "seeds must be a positive whole number, got '$seeds'"; exit 2;; esac
-          # A seed block is one day's worth of seeds: the nightly run takes
-          # today's, and a summary names the block so the night can be replayed.
-          # A manual run without a block takes one the nightly run does not use.
+          # Whole numbers only, read as base 10 (a leading zero is not octal).
+          num() { case "$1" in ''|*[!0-9]*) echo "$2 must be a whole number, got '$1'"; exit 2;; esac; [ "${#1}" -le 10 ] || { echo "$2 is too long: '$1'"; exit 2; }; echo $(( 10#$1 )); }
+          seeds=$(num "$SEEDS" seeds)
+          [ "$seeds" -ge 1 ] || { echo "seeds must be a positive whole number"; exit 2; }
           block=$(( $(date +%s) / 86400 ))
           offset=0
           if [ -n "$BLOCK" ]; then
-            case "$BLOCK" in *[!0-9]*) echo "seed_block must be a whole number, got '$BLOCK'"; exit 2;; esac
-            if [ "${#BLOCK}" -gt 6 ]; then echo "seed_block must be below 1000000, got '$BLOCK'"; exit 2; fi
-            block=$BLOCK
+            block=$(num "$BLOCK" seed_block)
+            [ -z "$OFFSET" ] || offset=$(num "$OFFSET" seed_offset)
+          elif [ -n "$OFFSET" ]; then
+            offset=$(num "$OFFSET" seed_offset)
           elif [ "$EVENT" = "workflow_dispatch" ]; then
+            # A manual run without a block takes a range the nightly run does
+            # not use, so a dispatch on the same day finds new seeds.
             offset=$(( 10000 + (RUN_NUMBER % 900) * 100 ))
           fi
-          if [ "${#seeds}" -gt 6 ] || [ "$seeds" -gt $(( 100000 - offset )) ]; then
-            echo "seeds must be at most $(( 100000 - offset )) for this run"; exit 2
-          fi
           if [ -n "$ONE" ]; then
-            case "$ONE" in *[!0-9]*) echo "seed must be a whole number, got '$ONE'"; exit 2;; esac
-            if [ "${#ONE}" -gt 10 ] || [ "$ONE" -gt 4294967295 ]; then echo "seed must be below 4294967296, got '$ONE'"; exit 2; fi
-            list="$ONE"
+            one=$(num "$ONE" seed)
+            [ "$one" -le 4294967295 ] || { echo "seed must be below 4294967296, got '$ONE'"; exit 2; }
+            first=$one; last=$one
           else
             # One block of seeds per day; a block holds up to 100000 seeds.
-            base=$(( block * 100000 + offset ))
-            list=$(seq $(( base + 1 )) $(( base + seeds )))
+            first=$(( block * 100000 + offset + 1 )); last=$(( first + seeds - 1 ))
+            [ "$offset" -lt 100000 ] || { echo "seed_offset must be below 100000"; exit 2; }
+            [ "$last" -le 4294967295 ] || { echo "seeds $first to $last do not fit in 32 bits (seed_block at most 42948)"; exit 2; }
           fi
           engine=""; diverged=""; harness=""
-          for seed in $list; do
+          summary() {
+            {
+              echo "### engine-fuzz"
+              echo "- commit: \`$GITHUB_SHA\`; seeds $first to $last"
+              [ -n "$ONE" ] || echo "- replay this range at this commit: seed_block=$block seed_offset=$offset seeds=$seeds"
+              echo "- TypeScript and Rust diverged:${diverged:- none}"
+              echo "- the fuzzer failed on its own scenario (the Rust engine refused it, or the fuzzer crashed):${engine:- none}"
+              echo "- harness failed (missing or malformed record, bad arguments):${harness:- none}"
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
+          trap summary EXIT
+          for seed in $(seq "$first" "$last"); do
             echo "seed $seed"
-            # The fuzzer exits non-zero when the Rust engine refuses a scenario
-            # it grew itself: an engine finding, kept apart from a broken run.
-            if ! engine-rs/target/release/fuzz "$seed" fuzz-out 40; then engine="$engine $seed"; continue; fi
             code=0
-            npx tsx scripts/fuzz-compare.ts "fuzz-out/fuzz-$seed.json" || code=$?
-            case "$code" in
-              0) ;;
-              1) diverged="$diverged $seed" ;;
-              *) harness="$harness $seed" ;;
-            esac
+            timeout 300 engine-rs/target/release/fuzz "$seed" fuzz-out 40 || code=$?
+            # 101 is a Rust panic (the engine refused a scenario it grew, or the
+            # fuzzer crashed); anything else is the harness.
+            case "$code" in 0) ;; 101) engine="$engine $seed"; continue ;; *) harness="$harness $seed"; continue ;; esac
+            code=0
+            timeout 300 npx tsx scripts/fuzz-compare.ts "fuzz-out/fuzz-$seed.json" || code=$?
+            case "$code" in 0) ;; 1) diverged="$diverged $seed" ;; *) harness="$harness $seed" ;; esac
           done
-          {
-            echo "### engine-fuzz"
-            echo "- commit: \`$GITHUB_SHA\`, seed block: $block (offset $offset), seeds: $(echo $list | wc -w)"
-            echo "- TypeScript and Rust diverged:${diverged:- none}"
-            echo "- Rust engine refused its own scenario:${engine:- none}"
-            echo "- harness failed (missing or malformed record, bad arguments):${harness:- none}"
-            echo "- replay a block with seed_block=$block; replay one seed with seed=<number>"
-          } >> "$GITHUB_STEP_SUMMARY"
           echo "replay one seed with: workflow_dispatch seed=<number>, or locally: cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin fuzz -- <number> out 40 && npx tsx scripts/fuzz-compare.ts out/fuzz-<number>.json"
           [ -z "$diverged$engine$harness" ]
       - name: Keep the scenarios of this run

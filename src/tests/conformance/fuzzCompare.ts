@@ -28,6 +28,22 @@ export interface Divergence {
 
 const HASHES = ["state", "crowd", "events"] as const;
 
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** Why a run record cannot be compared, or `null` when it can. A record that is
+ *  short, relabeled or of the wrong shape must never read as agreement, so the
+ *  command line reports it as a harness failure and not a divergence. */
+export function recordProblem(run: RunRecord, what: string): string | null {
+  if (run.details.length !== run.checkpoints.length) return `${what}: ${run.details.length} detail records for ${run.checkpoints.length} checkpoints`;
+  for (let i = 0; i < run.checkpoints.length; i++) {
+    const c: unknown = run.checkpoints[i];
+    const d: unknown = run.details[i];
+    if (!isObject(c) || !["label", "state", "crowd", "events"].every((k) => typeof c[k] === "string")) return `${what}: checkpoint ${i} is not a label with state, crowd and events hashes`;
+    if (!isObject(d) || d.label !== c.label || typeof d.money !== "number" || !isObject(d.log) || !isObject(d.save)) return `${what}: detail ${i} does not match checkpoint ${i} (${String(c.label)})`;
+  }
+  return null;
+}
+
 /** The first detail difference at one checkpoint, if any. */
 function detailDivergence(a: CheckpointDetail, b: CheckpointDetail): Pick<Divergence, "kind" | "field" | "ts" | "rust"> | null {
   if (a.money !== b.money) return { kind: "money", ts: String(a.money), rust: String(b.money) };
@@ -41,19 +57,21 @@ function detailDivergence(a: CheckpointDetail, b: CheckpointDetail): Pick<Diverg
 }
 
 /** The first divergence between two runs of one scenario, or `null` when they
- *  agree. A hash difference also names the first differing save field when the
- *  detail records show one, so the report points at the cause and not only the
- *  digest. */
+ *  agree. A hash difference also names the first thing the detail records show
+ *  differing (money, a log part or a save field), so the report points at the
+ *  cause as well as the digest. Throws when a record cannot be compared. */
 export function compareRuns(ts: RunRecord, rust: RunRecord): Divergence | null {
+  const problem = recordProblem(ts, "TypeScript") ?? recordProblem(rust, "Rust");
+  if (problem) throw new Error(problem);
   const n = Math.min(ts.checkpoints.length, rust.checkpoints.length);
   for (let i = 0; i < n; i++) {
     const a = ts.checkpoints[i];
     const b = rust.checkpoints[i];
     if (a.label !== b.label) return { index: i, label: a.label, kind: "label", ts: a.label, rust: b.label };
-    const detail = ts.details[i] && rust.details[i] ? detailDivergence(ts.details[i], rust.details[i]) : null;
+    const detail = detailDivergence(ts.details[i], rust.details[i]);
     for (const h of HASHES) {
       if (a[h] !== b[h]) {
-        return { index: i, label: a.label, kind: h, ...(detail?.kind === "save" ? { field: detail.field } : {}), ts: a[h], rust: b[h] };
+        return { index: i, label: a.label, kind: h, ...(detail ? { field: detail.field ?? detail.kind } : {}), ts: a[h], rust: b[h] };
       }
     }
     if (detail) return { index: i, label: a.label, ...detail };
