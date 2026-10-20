@@ -1437,11 +1437,11 @@ auto-merge on it.
 
 - Create the live matrix issue (a sub-issue of #945) and its backlog row.
 - Create issues and rows for the steps that have none: the staged cohort
-  (A4), the Windows harness fix (B3a) if its PR (#1093) still needs one,
-  the harness and protocol (B3), the edit scene (PF2), and the cold-start
-  fix (PF5, closed if RUN-0b clears M5's gap). The reliability signal (A1,
-  #1081) and the differential upgrade with its freeze guard (B2, #1085)
-  already have theirs.
+  (A4), the harness and protocol (B3), the edit scene (PF2), and the
+  cold-start fix (PF5, closed if RUN-0b clears M5's gap). The reliability
+  signal (A1, #1081) and the differential upgrade with its freeze guard
+  (B2, #1085) already have theirs, and the Windows harness fix (B3a)
+  merged as #1093.
 - Approving the plan does not approve sending A1's or A4's new analytics
   fields to production. They change no player-visible behavior, but they
   are new data, so each PR asks the owner for a separate OK before its

@@ -443,4 +443,7 @@ the PR state of 2026-10-20 at 12:15 UTC (`main` at `7d02f27`): #1062,
 A1, A2, A3, B0, B1, B2 and B3a, the gate rows they feed and the counting
 windows changed with it. The plan's B2 references and section 13 now name
 the issues that already exist (#1081, #1085), so approval creates no
-duplicates. No rule changed, and no review pass ran on this edit.
+duplicates. A second touch brought it to 12:30 UTC (`main` at `ccc2445`):
+#1089 and #1093 merged, #1088's deploy reporting with early telemetry only,
+both parity checks required on `main`, and #1092's CI green. No rule changed, and no review
+pass ran on either edit.
