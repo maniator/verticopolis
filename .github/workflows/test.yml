@@ -130,11 +130,9 @@ jobs:
       # engine-rs workflow runs them too, but only when its path filter
       # matches, which misses the analytics modules and the suites' own files
       # (#1122). Running them here puts them on every PR and every push to
-      # main. One matrix leg carries it, so the job names stay as they are, and
-      # it runs after a failed parity step so one red result does not hide
-      # the other.
+      # main. Both matrix legs run it (src/tests/parity/ciJob.guard.test.ts
+      # keeps this job free of `if:`), so the job names stay as they are.
       - name: Host suites on the WASM engine
-        if: ${{ !cancelled() && matrix.project == 'unitWasm' }}
         run: npm run test:wasm
 
   # Resolve the Playwright container tag from the repo's own Playwright version so

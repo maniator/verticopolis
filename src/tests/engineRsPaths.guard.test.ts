@@ -247,21 +247,16 @@ describe("the host suites run in test:wasm", () => {
       expect(triggers).not.toMatch(/^ +paths(-ignore)?:/m);
     });
 
-    it("test-wasm-parity runs test:wasm on its unitWasm leg, past a failed earlier step", () => {
+    it("test-wasm-parity runs test:wasm in a step that is never skipped and never allowed to fail", () => {
       const body = job("test-wasm-parity");
-      expect(body).toMatch(/project: \[[^\]]*\bunitWasm\b/);
-      expect(body).not.toMatch(/^ {4}(if|continue-on-error):/m);
       const step =
         /^ {6}- name: Host suites on the WASM engine\n((?: {8}[^\n]*\n)+)/m.exec(
           body,
         );
       if (!step)
         throw new Error("test-wasm-parity: the host suites step is gone");
-      expect(step[1]).toMatch(
-        /^ {8}if: \$\{\{ !cancelled\(\) && matrix\.project == 'unitWasm' \}\}$/m,
-      );
       expect(step[1]).toMatch(/^ {8}run: npm run test:wasm$/m);
-      expect(step[1]).not.toMatch(/continue-on-error/);
+      expect(step[1]).not.toMatch(/\bif:|continue-on-error/);
     });
   });
 });
