@@ -244,6 +244,7 @@ flowchart TD
   RUN0B --> P868
   RUN0B --> PF5["PF5 cold-start fix, if RUN-0b confirms M5's gap (#1005 first)"]
   PF5 --> PERF
+  PF5 -. "M5, inside M2 to M6" .-> STG3
   PF5 -. "if it changes the key" .-> FREEZE
   RUN0 --> P1051["#1051 bare-step gap (#859 if picked)"]
   HARN --> P1048["#1048 perf:worker cost split (part landed in #1056)"]
@@ -373,8 +374,10 @@ A1, runtime reasons with A3.
   each page life into early telemetry or eligible evidence by the commit it
   ran (OD-2, below), assigns each session the arm of its first page life
   (sessions whose arm changes are reported apart), and computes per arm the
-  crash rate (sessions with a `$exception` from engine or host code) and the
-  95% interval of the difference between the arms. The definition's test
+  crash rate (sessions with any `$exception`, the same count in both arms)
+  and the 95% interval of the difference between the arms, with the
+  sessions whose `$exception` comes from engine or host code on a line of
+  their own. The definition's test
   pins these rules. It lives beside `scripts/posthog-report.mjs` with a test
   that pins it to the view's walk, as `src/posthog-report.test.ts` does
   today. A saved insight on the dashboard may show its counts, but the exact
@@ -436,8 +439,9 @@ remain.
   engine or host code (the same `$exception` on the same build in two
   sessions), or a crash-rate difference whose 95% interval lies above zero
   (the WASM arm worse than the control, on A1's governed definition) holds
-  the stage, and the coordinator asks the owner for a drop-back to the stage
-  before or to no cohort. Section 12 asks the owner whether to pre-approve
+  the stage, and so does a committed protocol run that fails M2 to M6 while
+  stage 3 is live. The coordinator then asks the owner for a drop-back to
+  the stage before or to no cohort. Section 12 asks the owner whether to pre-approve
   that drop-back, so it can ship at once.
 - **A size gate through stage 2.** A save above a unit threshold (set by the
   owner from RUN-0b, or from the 2026-10-15 desktop runs if stage 1 is ready
@@ -485,7 +489,7 @@ engine telemetry from the final candidate reliability evidence.
      the engine-fault fallback rate, over all eligible sessions and over the
      tail alone, by build and arm. A fallback whose cause was fixed still
      counts in the all-eligible bound. The report does not present the
-     session count as proof that the true rate is below that bound, and the
+     session count as showing a true rate lower than the achieved bound, and the
      0.1% figure in #945's row leaves the rule, since 1,000 sessions cannot
      show it.
 - **`package-mismatch` fallbacks** come from the deploy race (#1046) and say
@@ -527,8 +531,9 @@ sessions also count toward the 1,000.
 - **What it covers:** every production deploy from the candidate deploy on
   that keeps the key and the tail's paths, since `main` keeps deploying
   (version bumps included) during the freeze. It lasts at least 14 nights
-  from the candidate deploy, and until those deploys hold at least 100
-  eligible sessions; every failure on them is triaged, with no latch-off,
+  from the first of those deploys at stage 3 (a deploy at an earlier stage
+  has no eligible sessions, so its nights do not count), and until those
+  deploys hold at least 100 eligible sessions; every failure on them is triaged, with no latch-off,
   and the report gives the tail's own bound. The 100-session floor is this
   revision's proposal for the owner's final review, so a tail cannot pass on
   a handful of sessions.
@@ -667,16 +672,18 @@ Consequences:
   `engine-fuzz.yml`, its npm group the lockfile); a security fix that cannot
   wait merges and restarts the count, on the owner's call.
 - **A freeze guard (B2).** While a counting window or the tail is open, a
-  pull request check fails on any change to the key's inputs, and during the
-  tail on any change to the tail's paths (4.1); A4's cohort config module is
-  exempt. The guard holds the freeze only as a required check, so the owner
-  makes it one for the window (a branch-protection change that also requires
-  branches to be up to date before they merge). A fix that cannot wait
-  merges past it on the owner's call and restarts the count. B2's spec
-  picks the switch that opens and closes the guard (for example a marker
-  file outside the key, set by a pull request at the freeze). The gate
-  review and the flip each recompute the key and check it against the
-  window's.
+  pull request check recomputes the key and fails when it changes, and
+  during the tail it also fails when a hash over the tail's paths changes
+  (the Workbox block by its content; 4.1). Because it compares hashes,
+  version bumps pass, since the key leaves out the root `version` fields.
+  A4's cohort config module is outside both hashes. The guard holds the
+  freeze only as a required check, so the owner makes it one for the window
+  (a branch-protection change that also requires branches to be up to date
+  before they merge). A fix that cannot wait merges past it on the owner's
+  call and restarts the count. B2's spec picks the switch that opens and
+  closes the guard (for example a marker file outside the key, set by a pull
+  request at the freeze). The gate review and the flip each recompute the
+  key and check it against the window's.
 - **No neutral-change exemption.** A change that passes the existing locks and
   corpus is exactly the case 14 nights of new seeds exist to test. The first
   draft offered one; the review removed it (section 14).
@@ -688,7 +695,7 @@ Consequences:
 | | Freeze the key's inputs on `main` | Run against a frozen candidate ref |
 | --- | --- | --- |
 | Runs the actual candidate | Yes. The scheduled run checks out `main`, which production deploys, and each night records its key | Only while the ref and the eventual release commit share a key, which needs its own check at the flip. The scheduled workflow file comes from `main` while the code comes from the ref, so the key has to cover both trees |
-| What it blocks | Merges to the key's inputs, Dependabot's npm and Actions updates included, until the 14 nights and the tail end | Nothing on `main` for the replay count. The tail still runs on production deploys from `main`, though, and a new key there restarts the tail, so key changes on `main` wait for the tail either way |
+| What it blocks | Merges to the key's inputs, Dependabot's npm and Actions updates included, until the 14 nights and the tail end; and, while the guard is required with up-to-date branches, every pull request rebases on `main` before it merges (a merge queue would remove that cost) | Nothing on `main` for the replay count. The tail still runs on production deploys from `main`, though, and a new key there restarts the tail, so key changes on `main` wait for the tail either way |
 | New machinery | The freeze guard | A ref input for the nightly, a key over two trees, a key check at the flip, and the guard for the tail |
 | How it fails | A merge to the key's inputs resets the count, which the ledger shows; the guard, as a required check, stops them | A stale or wrong ref counts nights on code that never ships; nothing resets, and the flip's key check throws the nights away, late |
 
@@ -825,7 +832,7 @@ Written up as `docs/performance/benchmark-protocol.md` in B3.
 | RUN-0b | After B3, and after A5's design rule is committed | `main`'s harness on `main`: the baseline later runs compare with; the shipping host's cost split and each hour's churn, which decide S6's design by A5's rule (OD-9 (ii)); three A/A passes per engine for δ and ε (OD-4), each with the verdict runs' repetition count |
 | RUN-1 | After S6 lands | The shipping host after S6; also the input to cohort stage 3, which needs M2 to M6 passing at 1x and 4x (4.1) |
 | RUN-2 | After #1051 (and #859), and after the cold-start fix (PF5) if one is needed | Bare tick parity and cold start; a full run, so it can also open stage 3 |
-| RUN-3 | On the candidate commit: its SHA, a clean tree, the window key and the engine source hash recorded | The gate verdict, with one A/A pass beside it; an A/A pass outside δ or ε voids the run and goes to the owner. A change to the host paths (`src/wasmhost`, `src/game/frameLoop.ts`, `src/game/saveLoad.ts`, `src/game/exportFlow.ts`, `src/bootstrap.ts`, `src/dualrun`) merged after it and before the flip means a re-run or an owner-recorded waiver; the flip PR's change to the default is the flip itself and needs neither |
+| RUN-3 | On the candidate commit: its SHA, a clean tree, the window key and the engine source hash recorded | The gate verdict, with one A/A pass beside it; an A/A pass outside δ or ε voids the run and goes to the owner. A change to the host paths (`src/wasmhost`, `src/game/frameLoop.ts`, `src/game/saveLoad.ts`, `src/game/exportFlow.ts`, `src/bootstrap.ts`, `src/dualrun`, and `src/render/**`, which moves the frame metrics) merged after it and before the flip means a re-run or an owner-recorded waiver; the flip PR's change to the default is the flip itself and needs neither |
 
 ### 5.3 What the gate measures (OD-4)
 
@@ -848,7 +855,7 @@ every ratio in the orientation of 5.2:
 | M4 | Main-thread blocking (long tasks past 50 ms) | large; 1x, 4x | The paired difference in ms (WASM minus TypeScript): its upper bound at most ε |
 | M5 | Cold start to ready | 1x, 4x | The paired difference in ms: its upper bound at most that throttle's ε. This replaces the existing row's 500 ms allowance, since a fixed allowance would let a measured regression pass |
 | M6 | Peak JS heaps plus WASM linear memory | large; 1x, 4x | At most 1.25x TypeScript (existing row), read on the paired ratio's upper bound; a memory ceiling, outside the speed rule |
-| M7 | A 5,000+ population fixture in `npm run perf` | e2e | A CI tripwire outside the desktop protocol, read on the candidate commit's CI run: the WASM run within the TypeScript engine's own baseline (existing row). #900 adds a baseline per engine and calibrates M7's tolerances from A/A CI runs under the same cap as δ, so CI also catches each engine regressing against itself. The desktop protocol decides speed |
+| M7 | A 5,000+ population fixture in `npm run perf` | e2e | A CI tripwire outside the desktop protocol, read on the candidate commit's CI run: the WASM run within the TypeScript engine's own baseline (existing row). #900 adds a baseline per engine and calibrates M7's tolerances from A/A CI runs under the same cap as δ, with the same exit to the owner, so CI also catches each engine regressing against itself. The desktop protocol decides speed |
 | M8 | Edits: a scripted build-and-demolish scene (PF2) | large; 1x, 4x | Frame p99 as M1; long tasks as M4 |
 
 **Scenarios.** The existing Performance row names a late-game fixture on
@@ -861,24 +868,28 @@ that reading for the owner's final review.
 metric passes only when its paired interval's upper bound shows WASM slower
 than TypeScript by no more than the tolerance. A tolerance of zero would
 mean two identical engines can never pass, because their interval straddles
-1.0, so the tolerance is calibrated from measured noise. RUN-0b runs three
-A/A passes for each engine (the same engine in both slots), each with the
-repetition count the verdict runs use, since one pass would put δ where a
-second pass of identical engines lands outside it about half the time. Each
-ratio family (M1 and M2 times, M3 and M8 frames) gets its own δ: the
-smallest round value that clears the largest A/A upper bound across both
-engines and both throttles, fixed before RUN-1. ε does the same for the
-paired differences: one ε for long tasks (M4 and M8), and one for cold start
-(M5) at each throttle. δ tracks the harness's noise, so a slowdown can pass
+1.0, so the tolerance is calibrated from measured noise. RUN-0b runs at
+least five A/A passes for each engine (the same engine in both slots), each
+with the repetition count the verdict runs use, since a tolerance set from
+few passes is one a later pass of identical engines often exceeds. B3's
+protocol doc states, for the pass count it picks, how often a stable
+harness would exceed each tolerance, and adds passes until that is under 5%
+for each family. Each ratio family (M1 and M2 times, M3 frames) gets its own
+δ: the smallest round value that clears the largest A/A upper bound across
+both engines and both throttles, fixed before RUN-1. ε does the same for the
+paired differences: one ε for M4's long tasks, and one for cold start (M5)
+at each throttle. δ tracks the harness's noise, so a slowdown can pass
 only when it is smaller than the noise can resolve, and the cap keeps a
 noisy harness from passing a material one: a δ above 0.05, a long-task ε
 above 50 ms of blocking (one 100 ms task), or a cold-start ε above 5% of
 TypeScript's median cold start at that throttle is not adopted. The protocol
 then adds repetitions or removes the noise source and calibrates again;
 after two rounds that still miss the cap, the coordinator takes it to the
-owner. M8's δ and ε are calibrated the same way when PF2 lands. RUN-3
-repeats one A/A pass on its own harness and reports it beside the verdict;
-an A/A pass outside δ or ε voids RUN-3 and goes to the owner. A failed
+owner. M8 gets its own δ and ε, calibrated the same way and fixed when PF2
+lands, so M3's and M4's stay as they were. RUN-3 repeats one A/A pass per
+engine on its own harness (`wasm` against `wasm`, `ts` against `ts`) and
+reports it beside the verdict; an A/A pass outside δ or ε goes to the
+owner, who decides whether RUN-3 stands. A failed
 verdict stands: a run is repeated only after a code change or a recorded
 cause, so no one re-runs to chase a pass. The Codex checkpoint quoted an
 owner no-regression criterion and warned against reusing the report's 5%
@@ -1089,7 +1100,7 @@ plumbing and for every recovered patch.
 | --- | --- | --- | --- |
 | A1 | The reliability instrument (4.1): host status fields, analytics fields, the governed definition and its test (with the split into early telemetry and eligible sessions, the per-arm crash rates, and the exact bound computed in the tested script, OD-2), the analytics data map (A1 creates it) and its entries, the #841 check | none | `src/analytics*`; the new data map; `WasmHostStatus` in `src/wasmhost/startWasmHost.ts` and the boot state in `engineBoot.ts`; a `telemetry.ts` edit, if needed, waits for #1062. Sending the new fields to production needs the owner's separate OK (section 13) |
 | A2 | S5 #902: booked rooms survive attach in both engines | `wasm-authority.patch` | The patch touches `merge.ts`, `load.rs`, `services.rs`, `sim.rs`, `src/engine/sim/*`, `serializedGame.ts`, a new conformance scenario and the parity setup (`src/tests/parity/wasmHostSetup*`); it does not touch `wasmHost.ts`. Draft PR early; merges after A3 (the owner's 2026-10-16 order on #945 queues #902 after #874: the same host and save paths) and after #1062 (shared parity setup). Engine-semantic; lock change, no save-version bump; the rollback loss goes in the exception register |
-| A3 | S4 #874: throw, panic and stall fallback with re-adoption; engine refusals of commands the instance accepted are reported; #1059's last error; #1020's edges if they sit in the same code | `wasm-integration.patch` (#1059 code and tests only) | After #1062 merges (`wasmHost.ts`). A1's runtime reasons ship here. Nothing in WS-A merges ahead of it except A1, though #902's draft may open earlier (risk R19); S4's booking-case test lands with A2, and #874 stays open until A2 merges (the cutover plan's S4 row lists S5 as a dependency for that case; the owner's later order on #945 wins) |
+| A3 | S4 #874: throw, panic and stall fallback with re-adoption; engine refusals of commands the instance accepted are reported; #1059's last error; #1020's edges if they sit in the same code | `wasm-integration.patch` (#1059 code and tests only) | After #1062 merges (`wasmHost.ts`). A1's runtime reasons ship here. Nothing in WS-A merges ahead of it except A1 and docs-only specs (A5's design rule), though #902's draft may open earlier (risk R19); S4's booking-case test lands with A2, and #874 stays open until A2 merges (the cutover plan's S4 row lists S5 as a dependency for that case; the owner's later order on #945 wins) |
 | A4 | The staged cohort (OD-1, 4.1): the bucket draw with its read-back check, the config module that holds the share constant and the size gate's threshold, the `arm` and `stage` fields, the size gate, the stop signals in A1's report, and the help-text sentence | none | Its fields need the owner's production OK, as A1's do. Each stage and each drop-back ships only on the owner's approval; stage 1 waits for stage 0, A3's forced-trap spec and A2; stage 3 waits for A5 and a protocol run passing M2 to M6 at 1x and 4x, and takes the size gate off |
 | A5 | S6 #868: getters and result shapes; remove the per-step sync and the hourly merge (design from RUN-0b, OD-9 (ii)); audio cue-timing test, and #965 if that test fails | `saveDelta` from #1068 only if RUN-0b's evidence picks design A | A5's spec commits the rule below before RUN-0b runs; the design is then chosen from RUN-0b before code; RUN-1 measures it |
 | A6 | S9 #954 with #1064, #1065, #1066 and #1067; audio cue-timing test; #965 if this test is the first to fail | none (re-implementation) | The engine answers; AD-8 on every load path. #954 first, then #1064, #1065 and #1066 each in a focused PR with parity tests (the owner's 2026-10-16 order). Only #1066's `.TDT` half waits for A7 (OD-8); the rest of S9 does not |
@@ -1143,8 +1154,8 @@ Review: `/gds-code-review` for engine and test-parity work,
 | --- | --- | --- | --- |
 | 1 | WS-P | Performance: RUN-0a with a local session; RUN-0b to RUN-3; PF2, the edit scene; #1048 (the rest of the `perf:worker` cost split; #1056 landed part; its desktop check is read from the next protocol run on `main`), then #1051 once #1048's code merges (and #859 from `perf-rust-859.patch` if profiling picks it); #900; #983 and #1005 (`perf-startup.patch`), then the cold-start fix (PF5) if RUN-0b confirms M5's gap; #932 | RUN-0a now, as PC measurement in a local session the coordinator schedules (no implementation thread runs it); code work after B3 merges |
 | 2 | WS-C | Offline and identity: #985 criteria 5 and 7, S17 #963, #1046 (gated) | Once the owner approves #1047; C1's runtime half after A3 merges |
-| 3 | WS-D | S7: #921 parts 2a to 2c, #926 items 1 to 4 | S6 merged; its `src/render` parts do not wait for the stack (9.5) |
-| 4 | WS-R | The rendering stack #817, #831, #1039 (D1, confirmed by the owner on 2026-10-20): its conflicts, reviews and tests, merged in stack order. It never takes priority over the Rust and WASM release blockers, and never gets in the way of the performance work | When a thread is spare after WS-P and WS-C while WS-D waits for S6, or after WS-D (7.1) |
+| 3 | WS-D | S7: #921 parts 2a to 2c, #926 items 1 to 4 | S6 merged; its `src/render` parts wait for the stack only until it parks at its next PR boundary (9.5) |
+| 4 | WS-R | The rendering stack #817, #831, #1039 (D1, confirmed by the owner on 2026-10-20): its conflicts, reviews and tests, merged in stack order. It never takes priority over the Rust and WASM release blockers, and never gets in the way of the performance work: no stack PR merges between a protocol run's scheduling and its commit | When a thread is spare after WS-P and WS-C while WS-D waits for S6, or after WS-D (7.1) |
 | | Release | S14 close-out or exceptions (its engine half before the freeze, since `gameplay.rs` is in the key, and its analytics half before the candidate deploy, since `src/analytics*` is a tail path), the rollback rehearsal, the flip PR edits with 3.0.0's compatibility policy (7.4), the exception register | S14 in Phase C; the rest in Phase D |
 
 ### 9.4 PR takeover strategy
@@ -1188,7 +1199,7 @@ live matrix lists the current holder.
 | `engine-rs/src/clock.rs` | WS-B (B5) | |
 | `src/tests/perfWorker/*`, `src/tests/perfCompare/*`, `scripts/perf-*.ts`, `src/wasmhost/packageHash.ts` | WS-B (B3a, then B3) | WS-P |
 | `engine-rs/src/tower_query.rs`, `tower_routing.rs` (#859) | WS-P (lands before the freeze) | |
-| `src/render/**`, sprites | WS-R, until WS-D needs these files | WS-D (#921 parts 2b and 2c, and their `src/render` lint rule). WS-D does not wait: when it needs `src/render`, the stack parks at its next PR boundary (the coordinator's call) unless its open PR is ready to merge, and later stack PRs rebase over WS-D |
+| `src/render/**`, sprites | WS-R, until WS-D needs these files | WS-D (#921 parts 2b and 2c, and their `src/render` lint rule). WS-D waits only until the stack parks: when it needs `src/render`, the stack parks at its next PR boundary (the coordinator's call) unless its open PR is ready to merge, and later stack PRs rebase over WS-D |
 | `src/ui/**`, `src/game/**` catalog reads | WS-D | |
 | The About and Diagnostics UI (#963); `src/build/workboxGlob.ts`, `scripts/verify-precache.ts` (#985 criteria 5 and 7) | WS-C | |
 | `scripts/wasm-build.ts`, `src/wasmhost/engineAssets.ts`, `src/wasmhost/enginePackageNames.ts` | WS-C (C1) | WS-P (#932's feature split) |
@@ -1250,11 +1261,11 @@ status well and reasons badly.
    so the bump is reviewed with the rest; if another lane takes the number
    first, re-bump on rebase. Auto-merge is armed only after that bump.
 8. **Matrix:** update the live matrix row at each milestone.
-9. **Never without the owner:** the default flip, a cohort stage or a
-   drop-back, the candidate deploy, A1's new analytics fields in production, the 3.0.0 publish, a
-   gate exception, PC cleanup. Never
-   report a desktop number that is not in a committed results folder from a
-   local run.
+9. **Never without the owner:** everything section 12 lists as still the
+   owner's, among them the default flip, a cohort stage or a drop-back, the
+   candidate deploy, A1's and A4's new analytics fields in production, the
+   3.0.0 publish, a gate exception and PC cleanup. Never report a desktop
+   number that is not in a committed results folder from a local run.
 
 ### 9.8 Model and effort per lane
 
@@ -1269,7 +1280,7 @@ step out.
 | WS-A (A1 to A7) | Rust simulation correctness and architecture | Extra High |
 | WS-B: B2, B4, B5, B6 | Rust simulation correctness and architecture | Extra High |
 | WS-B: B0, B1, B3a, B3, B7 | Testing, CI and bounded tooling | High |
-| WS-P: #1048, #1051, #859, #932 | Complex Rust and WASM performance | Extra High |
+| WS-P: #1048, #1051, #859, #932, PF5 | Complex Rust and WASM performance | Extra High |
 | WS-P: PF2, #900, #983, #1005 | Testing, CI and bounded tooling | High |
 | WS-C | Web PWA and deployment, escalating for complex cross-layer failures | High |
 | WS-D | Rust simulation correctness and architecture (the Authority row) | Extra High |
@@ -1314,7 +1325,7 @@ with its evidence.
 | R4 | The 1,000 eligible sessions take months: they start at the later of S9 and stage 3, and stage 3 waits for S6 and a protocol run that passes M2 to M6 | High | Months | Stage 3 not live when S9 merges | Move each stage on as soon as its conditions hold; S6 and the performance work early; the report states the bound it achieved (OD-2) | Owner, WS-A, WS-P |
 | R5 | The 14 nights keep resetting | High | Weeks | A key change in the ledger | Front-load engine work; freeze; rehearsal window; a wide key so a reset is visible, which leaves out the lockfile's version fields so version bumps do not reset it | WS-B |
 | R6 | The shipping host misses the performance gate | High as last measured | Release-blocking | RUN-0b's cost split; RUN-1 results | S6 removes the per-step sync and the merge; OD-9; #1051 | WS-A, WS-P |
-| R7 | The protocol yields "inconclusive" with no time to re-run | Medium | Weeks | Intervals straddling 1 + δ in RUN-1 or RUN-2 | RUN-0a to RUN-2 early; δ and ε calibrated and fixed before RUN-1, with more repetitions where the cap needs them, and the owner after two rounds (5.3) | WS-P, owner |
+| R7 | Noise keeps an engine as fast as TypeScript from passing, with no time to re-run | Medium | Weeks | A/A passes in RUN-0b above the caps, or upper bounds just past 1 + δ in RUN-1 or RUN-2 | RUN-0a to RUN-2 early; δ and ε calibrated and fixed before RUN-1, with more repetitions where the cap needs them, and the owner after two rounds (5.3) | WS-P, owner |
 | R8 | The heap row fails (2.72x historical) | High | Release-blocking | RUN-1 memory rows | Peak WASM memory per phase; S6 | WS-A, WS-P |
 | R9 | Parallel threads collide on shared files | Medium | Days | Two lanes with open PRs on one file | Merge order (9.5); #1062 first | Coordinator |
 | R10 | Outside reviewers stay unavailable | Medium | Days per PR | 429s or errored review jobs | The CLAUDE.md review loop, noted on the PR | Every thread |
@@ -1326,7 +1337,7 @@ with its evidence.
 | R16 | Reliability fields leak personal data | Low | High | A raw message in an event | Closed reason list; codes only; data map first; the relay's no-identifier posture | WS-A (Noor's rule) |
 | R17 | The exception register grows until the gate means little | Medium | Trust | An entry beyond S12, S14, #1067 and the #902 rollback loss | Each exception needs the owner's explicit approval | Owner |
 | R18 | The version queue (rendering stack plus player-facing PRs) causes repeated conflicts | High | Hours | Two PRs holding one version | Bump just before the final review, re-bump on rebase (9.7) | Each PR's author |
-| R19 | S4 slips, so the cohort's early stages start late; the reliability clock starts at stage 3, so the slip delays it only if stage 2 is still short of its floor when stage 3's other conditions hold | Medium | Weeks | #1062 not merged when A1 deploys, or #874 without a draft PR a week after both A1 has deployed and #1062 has merged | B1 is WS-B's first code step, and A1 and #902's draft proceed meanwhile; nothing in WS-A merges ahead of #874 except A1; the recovered #1059 code shortens it | WS-A |
+| R19 | S4 slips, so the cohort's early stages start late; the reliability clock starts at stage 3, so the slip delays it only if stage 2 is still short of its floor when stage 3's other conditions hold | Medium | Weeks | #1062 not merged when A1 deploys, or #874 without a draft PR a week after both A1 has deployed and #1062 has merged | B1 is WS-B's first code step, and A1 and #902's draft proceed meanwhile; nothing in WS-A merges ahead of #874 except A1 and docs-only specs; the recovered #1059 code shortens it | WS-A |
 | R20 | The replay window miscounts (a manual run cancels a night, or an infrastructure failure reads as green) | Medium | Trust | A ledger date with no scheduled run | B2's run hygiene; the ledger | WS-B |
 | R21 | The reliability rate understates real fallbacks | Medium | Trust | Fallbacks in host status that never reach analytics | Stated as a lower bound; triage by repeat, reason and build | WS-A |
 | R22 | The reliability tail keeps restarting, since every tail fix and every host-path merge restarts it | Medium | Weeks | A second candidate deploy | Triage fast and batch tail fixes; the tail's paths wait like the key's, under the freeze guard (4.1, 4.2); the owner may waive a restart for a change outside engine behavior | WS-A, owner |
@@ -1358,20 +1369,29 @@ approves this revision:
   then 100, engine sessions), the 30-day escalation, and the 0 to 99 bucket
   in `localStorage` (4.1);
 - the stop signals, the crash-rate test among them (4.1);
+- stage 3's entry test (M2 to M6 at 1x and 4x, leaving M1, M7 and M8 to
+  the gate itself, with "host reliability" read as stage 2's move-on
+  conditions), and a failed protocol run as a stop signal at stage 3 (4.1);
+- the size gate through stage 2, and its removal at stage 3 (4.1);
 - where eligibility starts: S9's engine answers (#954) on a build without
   the size gate, so stage 3, which puts the 1,000 sessions after the
   performance work (4.1, R4);
 - dropping #945's 0.1% figure for the achieved bound (4.1, section 10);
 - the tail's floor of 100 eligible sessions, its paths and its restart
   rule (4.1);
-- the freeze guard as a required check, and the freeze lasting until the
-  tail ends (4.2);
-- the upper-bound rule with δ and ε from A/A passes, the caps (δ at most
-  0.05; ε at most 50 ms of blocking, or 5% of TypeScript's cold start), and
-  the exit to the owner after two rounds (5.3);
+- the tail's 14 nights counted from the first candidate deploy at stage 3
+  (4.1);
+- the freeze guard as a required check with up-to-date branches, and the
+  freeze lasting until the tail ends (4.2);
+- the upper-bound rule with δ and ε from at least five A/A passes, the caps
+  (δ at most 0.05; ε at most 50 ms of blocking, or 5% of TypeScript's cold
+  start, which may sit below the harness's cold-start noise), and the exit
+  to the owner after two rounds (5.3);
 - every desktop metric binding at 1x and 4x, M6 kept at 1.25x, M7 as a CI
   tripwire with tolerances #900 calibrates, and the harness towers in place
   of the late-game fixture, with #864 off the path (5.3);
+- #1005 to P1 and the cold-start fix as PF5 (5.3, section 8);
+- A5's one-threshold design rule, committed before RUN-0b (9.1);
 - 7.4's policy content, and its place in the flip PR.
 
 **Still the owner's:**
@@ -1382,7 +1402,12 @@ approves this revision:
   drop-back on the stop signals (4.1);
 - the size gate's threshold (4.1);
 - the real saves A7's list asks for, and a local session to run them;
-- making the freeze guard a required check for the window (4.2);
+- making the freeze guard a required check for the window (4.2), and a
+  security fix merged past it;
+- a waiver of a tail restart or of a RUN-3 re-run, a stage left below its
+  floor for 30 days, RUN-3 when its A/A pass misses δ or ε, and δ or ε
+  after two calibration rounds (4.1, 5.2, 5.3);
+- any cleanup of the PC's worktrees and patches (D4);
 - the candidate deploy, gate exceptions, the 3.0.0 flip and its publish;
 - the final review of this plan, and merging this PR.
 
@@ -1502,5 +1527,8 @@ the release evidence, that the plan's own choices read as the owner's, and
 that a narrowed lockfile input could let a missed update change what the
 nightly runs. Each is fixed: the upper-bound rule with capped tolerances
 (5.3), stage 3 behind M2 to M6 and without the size gate (4.1), the list of
-plan choices (section 12), and the whole lockfile back in the key (4.2).
-The record lists every finding and its outcome.
+plan choices (section 12), and the whole lockfile back in the key (4.2). A
+confirming pass on those fixes found 16 more, the largest a tail whose
+nights could pass on a stage-2 deploy and a stage 3 with no way back after
+a performance regression; each is fixed. The record lists every finding and
+its outcome.

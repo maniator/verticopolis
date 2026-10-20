@@ -66,8 +66,8 @@ when the owner approves the reconciled plan at the final review; until then
 | C1 | Engine-set check at boot; size budget and old-cache cleanup | #985 | Deployment | WS-C | B0 approved; A3 (S16 depends on S4) | yes (`wasm-build.ts`, `engineAssets.ts`) | P1 | Criteria 1 to 4 and 6 on `main` | After approval |
 | C2 | About and diagnostics identity | #963 | Version identity | WS-C | C1 | yes (identity export) | P1 | Absent; earlier work lost | Re-implement before the freeze |
 | C3 | Shell precache integrity | #1046 | Deployment (adjacent) | WS-C | A1 signal data | no | P3 (gated) | Design open question | Wait for the signal |
-| UI1 | The UI reads the engine catalog | #921, #926 | Authority | WS-D | A5; for `src/render`, the stack parks when WS-D needs it (plan 9.5) | yes (catalog exports) | P1; P2 → P1 | #921 part 1 merged | After A5 |
-| RS1 | Rendering stack | PR #817 (#812), PR #831 (#813), PR #1039 (#915) | none | WS-R | a spare thread after WS-P and WS-C while WS-D waits for S6, or after WS-D; parks at a PR boundary when WS-D needs `src/render` | no | P1; P2; P3 | Open; #1039 conflicts with its base | Stack order, versions per plan 9.7 |
+| UI1 | The UI reads the engine catalog | #921, #926 | Authority | WS-D | A5; for `src/render`, only until the stack parks at its next PR boundary (plan 9.5) | yes (catalog exports) | P1; P2 → P1 | #921 part 1 merged | After A5 |
+| RS1 | Rendering stack | PR #817 (#812), PR #831 (#813), PR #1039 (#915) | none | WS-R | a spare thread after WS-P and WS-C while WS-D waits for S6, or after WS-D; parks at a PR boundary when WS-D needs `src/render`; no merge between a protocol run's scheduling and its commit | no | P1; P2; P3 | Open; #1039 conflicts with its base | Stack order, versions per plan 9.7 |
 | X1 | Analytics close-out | #879, #873 | Analytics | Release | S1 (done) | #879 yes | P3; P2 | Open | Fix or exception register; engine-side changes (#879's pins in `gameplay.rs`) before the freeze; #873's analytics half before the candidate deploy (a tail path) |
 | X2 | Rollback rehearsal, including a deploy rollback to the last release before #902 | #945 | Rollback | Release | the switchable build (OD-5), candidate | no | n/a | Not started | Script at Phase D |
 | X3 | Flip PR edits: CLAUDE.md source of truth, CONTRIBUTING build line and 3.0.0's compatibility policy (OD-6), `engineChoice.ts`, gallery and baselines from the WASM engine (#878), exception register | #945 | Source of truth, Sign-off | Release | everything | no | P1 | n/a | Owner approval |
@@ -98,7 +98,7 @@ when the owner approves the reconciled plan at the final review; until then
 | `engine-rs/src/clock.rs` | WS-B (B5) | |
 | `src/tests/perfWorker/*`, `src/tests/perfCompare/*`, `scripts/perf-*.ts`, `src/wasmhost/packageHash.ts` | WS-B (B3a, then B3) | WS-P |
 | `engine-rs/src/tower_query.rs`, `tower_routing.rs` (#859) | WS-P (lands before the freeze) | |
-| `src/render/**`, sprites | WS-R, until WS-D needs these files | WS-D (#921 parts 2b and 2c, and their `src/render` lint rule). WS-D does not wait: when it needs `src/render`, the stack parks at its next PR boundary (the coordinator's call) unless its open PR is ready to merge, and later stack PRs rebase over WS-D |
+| `src/render/**`, sprites | WS-R, until WS-D needs these files | WS-D (#921 parts 2b and 2c, and their `src/render` lint rule). WS-D waits only until the stack parks: when it needs `src/render`, the stack parks at its next PR boundary (the coordinator's call) unless its open PR is ready to merge, and later stack PRs rebase over WS-D |
 | `src/ui/**`, `src/game/**` catalog reads | WS-D | |
 | The About and Diagnostics UI (#963); `src/build/workboxGlob.ts`, `scripts/verify-precache.ts` (#985 criteria 5 and 7) | WS-C | |
 | `scripts/wasm-build.ts`, `src/wasmhost/engineAssets.ts`, `src/wasmhost/enginePackageNames.ts` | WS-C (C1) | WS-P (#932's feature split) |

@@ -438,5 +438,8 @@ those choices are proposals for the owner's final review (plan section 12):
   measured noise, and WASM at least as fast as TypeScript. The plan proposes
   an upper-bound rule with δ and ε from A/A noise under caps; cold start
   loses its 500 ms allowance.
-- OD-5, OD-6 (b), OD-7 and OD-8 (a) followed the recommendations. Under
-  OD-9 the owner approved (i) and left S6's design to RUN-0b's evidence.
+- OD-5, OD-6 (b) and OD-8 (a) followed the recommendations; OD-7 approved
+  the gate amendments once the reliability and performance definitions are
+  reconciled. Placing 3.0.0's compatibility policy in the flip PR is the
+  plan's choice. Under OD-9 the owner approved (i) and left S6's design to
+  RUN-0b's evidence.

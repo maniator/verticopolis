@@ -367,7 +367,7 @@ OD-4, which the plan now lists for the owner's final review (plan section
 | FR-6 | M7 keeps a baseline that lets WASM pass up to 10% slower (`e2e/perf.spec.ts:55-57`), and M6's carve-out is the plan's | BH6, AA5, ECH5 | patch | M7 is a CI tripwire whose tolerances #900 calibrates from A/A CI runs under δ's cap; the desktop protocol decides speed; M6's 1.25x ceiling is listed for the owner |
 | FR-7 | "Including 1x and 4x" became "wherever the table lists them", dropping 4x for M3, M4, M6 and M8 | BH7, AA11, ECH24 | patch | Every desktop metric binds at both throttles |
 | FR-8 | Nothing makes RUN-0b wait for A5's design rule, and the rule has a gap between its two branches | BH8, AA8, ECH7 | patch | WS-A commits the rule early as a short spec; RUN-0b waits for it (5.2, graph, matrix PF1 and A5); one threshold on the median hourly churn |
-| FR-9 | The graph makes reliability evidence wait for stage 3 while the text projects a 25% arm | BH9, AA22, ECH25 | patch | Consistent now, since eligibility needs a build without the size gate; the 25% columns are gone |
+| FR-9 | The graph makes reliability evidence wait for stage 3 while the text projects a 25% arm | BH9, AA22, ECH25 (its first half) | patch | Consistent now, since eligibility needs a build without the size gate; the 25% columns are gone |
 | FR-10 | Section 10's Reliability row still reads as keeping 0.1% | BH11 | patch | The row says the figure leaves it |
 | FR-11 | #1005 waits for RUN-0b although it comes before it, keeps P3 while M5 fails, says "Not blocking", and the cold-start fix has no item | BH12, AA13, ECH19 | patch | #1005 to P1 (section 8 and its row, "Not blocking" removed); 5.3 restates M5 from the report's ratios (upper bounds about 1.28 at 1x, 1.22 at 4x); PF5 in WS-P, a new issue on approval, on the graph before RUN-3 and before the freeze if it changes the key |
 | FR-12 | The δ and ε calibration can loop forever; repetition counts, RUN-3's own A/A, M8's calibration and which cold start sets ε are unstated; the 50 ms explanation is wrong | BH13, AA14, ECH6 | patch | Two rounds, then the owner; A/A passes use the verdict runs' repetition count; an A/A pass outside δ or ε voids RUN-3; M8 calibrates when PF2 lands; one ε for long tasks and one per throttle for cold start; 50 ms of blocking is one 100 ms task |
@@ -380,7 +380,7 @@ OD-4, which the plan now lists for the owner's final review (plan section
 | FR-19 | Stage 1 does not need stage 0; floors can be met before a fix ships; a stage that never reaches its floor has no exit | BH20, ECH18 | patch | Stage 1 needs stage 0 moved on; floors count on builds that carry every fix; 30 days below a floor goes to the owner |
 | FR-20 | Override sessions on S9 builds fit neither bucket | BH21 | patch | Override and unassigned sessions on any build are early telemetry, triaged and never counted |
 | FR-21 | The OD-3 table says nothing catches a wrong ref, beside the key check it lists | BH22 | patch | "The flip's key check throws the nights away, late" |
-| FR-22 | The cutover pointer credits decision 4's change to OD-7 | BH23, AA16, ECH25 | patch | Gate rows under OD-7, decision 4 under OD-6, both binding at the final review |
+| FR-22 | The cutover pointer credits decision 4's change to OD-7 | BH23, AA16, ECH25 (its second half) | patch | Gate rows under OD-7, decision 4 under OD-6, both binding at the final review |
 | FR-23 | "X, never Y" restatements in section 12 and 5.3 | BH24, AA15 | patch | Reworded |
 | FR-24 | The narrowed lockfile input contradicts the wide key, does not say whether it covers transitive tools (esbuild under tsx), and cannot drive the corpus filter | BH25, AA7, ECH10 | patch | Item 5 is back to the whole lockfile minus the root `version` fields; Dependabot's npm updates wait like its Actions updates; 4.2 says why |
 | FR-25 | The #1049 and #1051 rows still say "once the owner sets its margin" | AA6 | patch | δ calibrated from measured noise under its cap (OD-4) |
@@ -396,3 +396,30 @@ OD-4, which the plan now lists for the owner's final review (plan section
 | FR-35 | A4 has no issue, and its fields are new data | ECH21 | patch | Section 13 creates A4's issue; A4's `arm` and `stage` fields need the owner's production OK |
 | FR-36 | 4.2 says the freeze ends with the 14 nights, though a new key restarts the tail | ECH22 | patch | The freeze lasts until the 14 nights and the tail both end |
 | FR-37 | B3a's list misses `perfCompare/main.ts`, and a separate thread would split files WS-B holds | ECH23 | patch | B3a covers both harnesses; WS-B owns it; the "same `sh(...)` calls" line in 5.2 is corrected |
+
+## Confirming pass on the focused review
+
+One agent, acting as Acceptance Auditor and Edge Case Hunter, checked the
+committed fixes (`ba5402d`). It confirmed that 33 of the 37 outcomes landed
+in full, that section 7.1 and the shared-files table are unchanged, that
+the memlog stays append-only, and that the arithmetic and every file fact
+hold. It found 16 more; all are patched.
+
+| # | Finding | Class | Outcome |
+| --- | --- | --- | --- |
+| CP-1 | The tail could pass with its 14 nights on a stage-2 deploy, which has no eligible sessions | patch | The nights count from the first candidate deploy at stage 3 (4.1) |
+| CP-2 | Stage 3 had no way back if a later protocol run regressed | patch | A committed run failing M2 to M6 while stage 3 is live is a stop signal |
+| CP-3 | "WS-D does not wait" contradicted 7.1's "they wait for the stack" (FR-4 in part) | patch | WS-D waits only until the stack parks at its next PR boundary (9.3, 9.5, matrix UI1); 7.1 unchanged |
+| CP-4 | Stack merges could move the frame metrics outside any re-run rule | patch | `src/render/**` joins RUN-3's re-run paths, and no stack PR merges between a protocol run's scheduling and its commit (9.3, matrix RS1) |
+| CP-5 | Section 12's list of plan choices missed stage 3's entry test, the size gate, A5's rule, #1005 and PF5, and the up-to-date setting (FR-3 in part) | patch | Added |
+| CP-6 | 9.7 rule 9 and section 12 listed different owner-only steps | patch | Rule 9 points at section 12, which now adds A4's fields, the guard's security bypass, waivers, the 30-day escalation, a RUN-3 whose A/A misses, δ or ε after two rounds, and PC cleanup |
+| CP-7 | Three A/A passes give too few samples for a max rule across this many cells, and RUN-3's A/A engine was unstated | patch | At least five passes; B3's protocol doc states and bounds how often a stable harness would exceed each tolerance; RUN-3's A/A runs both engines against themselves, and a miss goes to the owner |
+| CP-8 | M8 shared M3's δ and M4's ε yet calibrated later (FR-12 in part) | patch | M8 gets its own δ and ε when PF2 lands |
+| CP-9 | "Nothing in WS-A merges ahead of A3" clashed with A5's early rule | patch | Except A1 and docs-only specs (9.1, R19) |
+| CP-10 | A path-based guard would block version bumps | patch | The guard compares the recomputed key and a hash over the tail's paths |
+| CP-11 | The crash rate counted host code only in the WASM arm | patch | Any `$exception` in both arms; the engine and host slice on its own line |
+| CP-12 | The up-to-date setting's cost was missing from the OD-3 evaluation | patch | Added to "What it blocks", with a merge queue as the way to remove it |
+| CP-13 | Rule item 5 misread "proof of a lower true rate" | patch | "Showing a true rate lower than the achieved bound" |
+| CP-14 | The transcript dropped OD-7's condition, and the memlog credited the flip-PR placement to the owner | patch | The transcript is reworded; the memlog gets a new correcting line (append-only) |
+| CP-15 | R7 still spoke of "inconclusive"; no PF5 edge to stage 3; no PF5 row in 9.8; M7 had no exit | patch | R7 restated; the graph edge, the 9.8 row and M7's exit added |
+| CP-16 | ECH25 appeared under two findings | patch | Marked as its first and second halves |
