@@ -41,6 +41,19 @@ VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration conformance
 An update writes the lock only when every test in the run passes and every
 scenario finishes, and it refuses to run in CI.
 
+A change to any of the five lock files (`catalog-digests.json`,
+`events/catalog.json`, `expected.json`, `loader-cases.json`, `tdt-cases.json`)
+also moves the engine crate version, and the steps do not stop at the lock:
+
+1. Bump `version` in `engine-rs/Cargo.toml`, then `engine-rs/Cargo.lock` and
+   `engine-rs/consumer/Cargo.lock` to match (a patch bump for a lock change on
+   its own, while the crate is 0.x).
+2. Run `npm run engine:compat` to rewrite `engine-rs/src/compat-record.json`.
+3. Commit the lock, the version files and the record together.
+
+Without them `engine-rs` and `test` fail on the record, and `consumer` fails on
+its `--locked` build. The rule is in `CONTRIBUTING.md` under Versioning.
+
 A refactor that claims to change nothing must not touch `expected.json`.
 
 ## Fixtures the scenarios start from
