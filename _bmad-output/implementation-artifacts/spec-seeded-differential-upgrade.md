@@ -88,9 +88,16 @@ nightly never builds them today.
 ### Slice 4: the shipped artifact, and the key
 
 - A share of each night's seeds runs through the WASM build in Node.
-- The key script: a SHA-256 over the paths section 4.2 lists, computed from the
-  import graph, and recorded by the nightly. A guard test checks that the
-  engine-wasm action's hand-kept key list and the key script agree.
+- The key script (done): `scripts/fuzz-key.ts` prints a SHA-256 over six
+  parts (the crate, `src/engine` without its tests, the nightly scripts' import
+  closure with `tsconfig.json`, the WASM build's inputs, the pins and the
+  fixtures), computed from the import graph. A version bump leaves it alone. The
+  nightly records it in its run summary; a night whose key cannot be computed
+  says `unavailable` and does not count. `fuzzKey.test.ts` checks that each input
+  moves the key and that the WASM build part matches the engine-wasm action's
+  hand-kept key list. The WASM runner and the shrinker join `FUZZ_ENTRIES` when
+  they land. The freeze guard, a PR check that recomputes the key and fails on a
+  change while a window is open, comes next.
 - The nightly's time budget is set from the measured cost after slices 1 to 3.
 
 ## Boundaries
