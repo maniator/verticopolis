@@ -1,4 +1,4 @@
-import { pairedDifferences, summarize } from "../perfCompare/stats";
+import { MIN_REPS, pairedDifference } from "../perfCompare/stats";
 import { treeSummary } from "../perfCompare/treeRecord";
 import { browserName, rendererBanners, rendererSummary } from "../perfCompare/renderer";
 import type { Metric, Ratio } from "./analysis";
@@ -38,11 +38,11 @@ const DIFFERENCE_GATED = /^main-thread blocking/;
  */
 export function differenceCell(wasm: Metric | undefined, ts: Metric | undefined, aa = false): string {
   if (!wasm || !ts) return "n/a";
-  const diffs = pairedDifferences(wasm, ts);
-  if (!diffs.length) return "n/a";
-  const s = summarize(diffs);
-  const ci = s.medianCiLow !== null && s.medianCiHigh !== null ? ` [${fmt(s.medianCiLow, wasm.unit)}, ${fmt(s.medianCiHigh, wasm.unit)}]` : " (no interval)";
-  return `${fmt(s.median, wasm.unit)}${ci}, ${s.n} pairs (${aa ? "slot wasm minus slot ts" : "wasm minus ts"})`;
+  const d = pairedDifference(wasm, ts);
+  if (!d) return "n/a";
+  const ci = d.ciLow !== null && d.ciHigh !== null ? ` [${fmt(d.ciLow, wasm.unit)}, ${fmt(d.ciHigh, wasm.unit)}]` : " (no interval)";
+  const thin = d.n < MIN_REPS ? `, below the gate's minimum of ${MIN_REPS} pairs` : "";
+  return `${fmt(d.median, wasm.unit)}${ci}, ${d.n} pairs (${aa ? "slot wasm minus slot ts" : "wasm minus ts"})${thin}`;
 }
 
 /** `verdict` false for an A/A folder, which has no verdict words: the interval is the data. */
