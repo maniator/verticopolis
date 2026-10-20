@@ -137,7 +137,7 @@ export async function buildCrashReportZip(
 export function bugReportUrl(details: Pick<CrashDetails, "version" | "crash">): string {
   const params = new URLSearchParams({
     template: "bug_report.yml",
-    title: "[Bug]: Game crashed (graphics context lost)",
+    title: "Game crashed (graphics context lost)",
     version: details.version,
     "what-happened": [
       "The game crashed: the graphics context was lost while playing.",
