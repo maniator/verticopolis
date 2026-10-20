@@ -102,6 +102,14 @@ context:
   The merge-deleting mutation fails all six cases again. The hot-path
   record found nothing new; its pre-existing items are #1173 and #1158's
   A23.
+- 2026-10-20, after #1157 merged first (`a146861`, crate 0.2.0): `main`
+  merged in (a merge commit, no conflicts) and the crate goes to 0.3.0 with
+  `compat-record.json` re-recorded by `npm run engine:compat`. The lock
+  moves (`expected.json`, `loader-cases.json`), and the save gains a field
+  an older engine drops (EX-1), so this takes the minor bump CONTRIBUTING
+  gives a save change rather than the patch for a lock change alone.
+  `SAVE_VERSION`, the frame layout, the catalogs and `engine.d.ts` are
+  unchanged.
 
 ## Design Notes
 
