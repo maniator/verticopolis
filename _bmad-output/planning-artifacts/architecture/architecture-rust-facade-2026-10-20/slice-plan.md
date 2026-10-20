@@ -67,9 +67,9 @@ the Review column so a story cannot drop it (proportional, per the owner's
 | 6d | #868's command gaps | Exterminator `cost` and `rooms`, `previewRentBatch`, an unknown kind refused instead of thrown, `placeTransportDryRun` and `validateTransport` | sign-off | Runtime thread (#868 is on its list) or this lane by agreement | M | gds + HP record | crate minor |
 | 7 | `RustSim` behind a flag | The main-thread adapter over `Engine` and the view; Rust-first commands; restore points riding the saves the host already takes (undo captures, the 30-second autosave, manual saves; no save added per command or tick, #1101's property), each with a versioned sidecar (schema, round trip on both engines, loud refusal on a mismatch); the save budget pre-registered; the `chromium-wasm` e2e project gains a facade run; the cadence-excluded tests move onto the port contract suite and leave the exclusions ratchet, one mapping row each (R1); the CI cross-engine restore-point test (R5) | 2 to 6 | this lane; host boot with the Runtime thread | M | gds + bmad + HP record | app minor if a player can reach the flag, else none |
 | 8 | Fallback from the Rust recovery point | `hostFault` and the recovery path adopt `TsSim` from the newest point that passes the adoption check (it loads and its invariants hold; otherwise the next older one) plus its sidecar; a "recovery point refused" reliability line (R5); the port holds or refuses calls during the adopt; forced-trap tests, one with the network off (the fallback module stays precached); no mirror read | 7 | Runtime thread co-owns (#874, #1101) | M | gds + HP record | none |
-| 9 | PC protocol run | Facade, TypeScript and today's host on medium and large, 1x and 4x: frame pacing, long tasks, memory, command latency, throughput and the save budget (no save task over 50 ms on large at 1x and 4x), on the counting Chromium, GPU-verified, #1164's fresh-page harness | 8 and 13 (R4) | through the coordinator to the PC thread | run | n/a | n/a |
+| 9 | PC protocol run (the facade's pre-switch run, not RUN-1) | Facade, TypeScript and today's host on medium and large, 1x and 4x: frame pacing, long tasks, memory, command latency, throughput and the save budget (no save task over 50 ms on large at 1x and 4x), on the counting Chromium, GPU-verified, #1164's fresh-page harness | 8 and 13 (R4) | through the coordinator to the PC thread | run | n/a | n/a |
 | 10 | Facade becomes the WASM host | `?engine=wasm` selects `RustSim`; today's host stays reachable as `?engine=wasm-mirror` for one release, for rollback. The default engine stays TypeScript | 9 passes, owner approval (a host change for any live cohort) | this lane | S | bmad + HP record | app minor |
-| 11 | Remove the routine mirror | The per-step sync, the hourly merge, the relay and `?engine=wasm-mirror` leave the production WASM path; what the fallback needs stays; the mirror host stays as the test and tooling harness of the parity projects and the dual run, added to `engineBundle`'s player-build guard (R1); the runtime guard that no `Simulation` exists on the healthy path turns on. Lands before the freeze; not a stage-3 input (R3) | 10, one release | this lane, Runtime thread | M | gds + bmad + HP record | app patch or none |
+| 11 | Remove the routine mirror | The per-step sync, the hourly merge, the relay and `?engine=wasm-mirror` leave the production WASM path; what the fallback needs stays; the mirror host stays as the test and tooling harness of the parity projects and the dual run, added to `engineBundle`'s player-build guard (R1), which leaves the worker host its merge path until slice 12 replaces it; the runtime guard that no `Simulation` exists on the healthy path turns on. Lands before the freeze; not a stage-3 input (R3) | 10, one release | this lane, Runtime thread | M | gds + bmad + HP record | app patch or none |
 | 12 | `RustWorkerSim` | The worker adapter of the same port: transferred buffers, async commands and queries; replaces `parseMerge` on `?engine=wasm-worker` | 7, #1068's evaluation | worker thread | M | gds + bmad + HP record | none until it ships |
 | 13 | Engine load-time memory peak | Load the save without building a `serde_json::Value` tree for it (typed deserialization or a streaming parse), measured against M6; a prerequisite of slice 9's verdict run (R4) | none | this lane or the Rust performance lane | M | gds + HP record | crate minor |
 
@@ -84,6 +84,18 @@ A5 (S6, #868) is slices 1 to 8 and 10; S9 (#954) is slices 2, 7 and 10, since
 Eligible sessions count from slice 10 on a stage-3 build. Slice 11 lands
 before the freeze and is not a stage-3 input; `?engine=wasm-mirror` sessions
 after slice 10 are early telemetry, never eligible.
+
+**Slice 9 is not RUN-1.** The release plan defines RUN-1 as the shipping
+host's run after S6 lands, which under this mapping is after slice 10. Slice
+9 is the facade's own run behind its flag, the input to slice 10's decision;
+RUN-1 runs after slice 10 as the plan defines it, and stays the input to
+cohort stage 3.
+
+**Notes the stories carry.** After slice 11, #1064 and #1065 produce
+evidence only in CI (the dual run and the parity harness), since no
+production path has two engines answering. Slice 8's "recovery point
+refused" report line is a new production analytics field and needs the
+owner's approval when slice 8 ships.
 
 ## Who touches which files
 

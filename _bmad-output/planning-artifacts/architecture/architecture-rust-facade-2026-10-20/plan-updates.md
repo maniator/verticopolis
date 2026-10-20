@@ -65,6 +65,7 @@ Amendments:
 | 9.1, A5 | "S6 #868: the Rust-backed facade (AD-9), slices 1 to 8 and 10 of `architecture-rust-facade-2026-10-20/slice-plan.md`; audio cue-timing test; slice 11 before the freeze" (R3) |
 | 9.1, A6 | "S9 #954: commands through the port, Rust first (slices 2, 7 and 10), with #1064, #1065, #1066" |
 | 9.1, new A8 | "Engine load-time memory peak (slice 13), against M6, before the facade's protocol run" (R4) |
+| 8, RUN-1 | Unchanged: RUN-1 is the shipping host's run after S6, which under AD-9 is after slice 10. Slice 9 is the facade's own pre-switch run and does not count as RUN-1 |
 | 11, risks | Add: the port migration regresses a UI flow (strangler order, revert per slice); the facade's PC run fails (stop rule, the owner decides); restore-point cost (the 50 ms save budget measured on the PC, with remedies per kind of save: review section 5.7); a recovery point fails to load at a fault (R5) |
 | 12, OD-9 (ii) | Note: superseded by AD-9 for S6 once signed off; RUN-0b's cost split stays as the baseline |
 
