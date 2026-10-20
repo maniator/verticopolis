@@ -138,8 +138,9 @@ A vs B review and its slice plan are in
 its decisions F1 to F9, and the spine gained AD-9. Under AD-9, S6 (#868,
 A5) is the facade's slices 1 to 8 and 10, and S9 (#954) is slices 2, 7
 and 10, since "nothing else applies a command" holds only once the facade
-is the WASM host. A6's #1064 to #1067 stay D5 release blockers and are not
-eligibility inputs, as under OD-2. Slice 9 is the facade's own PC run before the switch; it
+is the WASM host. A6's #1064, #1065 and #1066 stay D5 release blockers,
+and #1067 is fixed before the freeze or entered in the exception register;
+none of them is an eligibility input, as under OD-2. Slice 9 is the facade's own PC run before the switch; it
 is not RUN-1, which runs on the shipping host after slice 10. Slice 13 (the
 engine's load-time memory peak, A8) lands before slice 9's verdict. The
 fallback's loss bound under the facade is up to 30 seconds of play, the
