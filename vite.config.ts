@@ -250,6 +250,7 @@ function wasmParityProjects() {
     "**/wasmWorkerHost.integration.test.ts",
     "**/wasmWorkerLifecycle.integration.test.ts",
     "**/wasmWorkerSaves.integration.test.ts",
+    "**/wasmFrameDelta.integration.test.ts",
   ];
   const setupFiles = ["src/tests/viewWorldSetup.ts", "src/tests/parity/wasmHostSetup.ts"];
   // Every hosted tick also syncs the engine's frame (and in tick mode merges

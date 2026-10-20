@@ -11,7 +11,9 @@ import { drainEngineBatch } from "./engineEvents";
 import { decodeFrame, decodeHeader, type FrameHeader, type FrameView } from "./frameView";
 import { appendEngineLog, applyRecords, checkRecords } from "./frameApply";
 import { setStepGate } from "./stepGate";
-import { mergeSimulation } from "./merge";
+import { mergeSimulation, rebuildUnitSets } from "./merge";
+import { applyHourlyDelta } from "./hourlyDelta";
+import { KEYFRAME_EXEMPT_OPS } from "./saveSyncRules";
 import { adoptTelemetry, parseCommuteStress, type TelemetryDocument } from "./telemetry";
 import { useTowerCatalogSource } from "../engine/towerCatalog";
 import { catalogFor } from "../engine/catalog";
@@ -47,9 +49,10 @@ export interface WasmHost {
   engine: WasmEngine;
   /** When the read model follows the engine (see {@link WasmHostOptions}). */
   readonly sync: "step" | "frame";
-  /** Syncs so far: frame views applied and full merges done. */
+  /** Syncs so far: frame views, full merges and (prototype) hourly deltas. */
   frames: number;
   merges: number;
+  deltas: number;
   /** Apply the engine's full save to the instance now. */
   syncStructure(): void;
   /** The frame loop's flush: in coalesced mode, apply the engine's frame if
@@ -111,6 +114,11 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   let detached = false;
   /** Coalesced mode: steps ran since the last sync. */
   let stale = false;
+  // MEASUREMENT PROTOTYPE (never merged, `hourlyDelta.ts`): the coalesced
+  // host's hour pass is a delta under the worker's keyframe rules; after
+  // one, the unit sets are rebuilt once the frame's records are in.
+  let commandSinceSync = true;
+  let unitSetsOwed = false;
 
   // The instance's events up to now are real (it was the authority); the
   // engine's start from here. The instance keeps its own buffer object for
@@ -138,6 +146,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     sync: coalesce ? "frame" : "step",
     frames: 0,
     merges: 0,
+    deltas: 0,
     syncStructure() {
       syncFrame(true);
     },
@@ -192,7 +201,9 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   };
 
   const merge = (frame: Pick<FrameView, "header">) => {
-    const fresh = Simulation.deserialize(JSON.parse(engine.serialize()));
+    // Coalesced mode primes the engine's save mirror with every full save,
+    // so the next delta is taken against the save the read model holds.
+    const fresh = Simulation.deserialize(JSON.parse(coalesce ? engine.serializeForSync() : engine.serialize()));
     // The per-origin commute-stress averages, live crowd state no save
     // carries; read before any write, so a bad reply leaves the instance as
     // it was.
@@ -214,7 +225,19 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     sim.crowd.adoptCommuteStress(commute);
     commuteRevision = engine.commuteStressRevision();
     lastRevision = frame.header.revision;
+    commandSinceSync = false;
     host.merges++;
+  };
+
+  /** The hour pass as a delta (`hourlyDelta.ts`); false when a full merge
+   *  has to follow. */
+  const applyDelta = (h: FrameHeader): boolean => {
+    if (!applyHourlyDelta(sim, engine, h)) return false;
+    commuteRevision = engine.commuteStressRevision();
+    lastRevision = h.revision;
+    unitSetsOwed = true;
+    host.deltas++;
+    return true;
   };
 
   /** Apply the engine's frame view to the instance, with a full merge
@@ -233,7 +256,8 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     }
     relay.suppress(() => {
       if (force || h.onHourRuns !== lastHourRuns || h.revision !== lastRevision) {
-        merge({ header: h });
+        const delta = coalesce && !force && !commandSinceSync && h.revision === lastRevision && applyDelta(h);
+        if (!delta) merge({ header: h });
         lastHourRuns = h.onHourRuns;
       }
       const revision = engine.commuteStressRevision();
@@ -283,6 +307,10 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
         syncCars(sim, frame);
       } else {
         applyRecords(sim, view, h);
+        if (unitSetsOwed) {
+          rebuildUnitSets(sim);
+          unitSetsOwed = false;
+        }
       }
     });
     // Cleared once the frame is in: a sync that threw is tried again at
@@ -298,7 +326,10 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   // the host forwards rather than owning (#867).
   let relay: ReturnType<typeof relayCommands>;
   try {
-    relay = relayCommands(sim, (cmd) => { shadow.apply(cmd); }, {
+    relay = relayCommands(sim, (cmd) => {
+      if (!KEYFRAME_EXEMPT_OPS.has(cmd.op)) commandSinceSync = true;
+      shadow.apply(cmd);
+    }, {
       tick(dt) {
         engine.tick(dt);
         if (!coalesce) {
