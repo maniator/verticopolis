@@ -14,6 +14,9 @@ import { refreshSplashVersion } from "./wasmhost/engineLabel";
 import { isHostFault } from "./wasmhost/hostFault";
 import { ENGINE_FAILURE_ID } from "./game/interactionState";
 import { bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState, type FallbackReason } from "./wasmhost/engineBoot";
+import type { BuildMetadataResult } from "./wasmhost/buildSection";
+import { liveDiagnostics } from "./wasmhost/engineDiagnosticsLive";
+import { copyText } from "./ui/copyText";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -109,6 +112,33 @@ export function showBootMessage(content: TemplateResult | string, withReload = f
 
 let inertWatch: MutationObserver | null = null;
 
+/** Copy the engine diagnostics from the stop screen, where Help cannot be
+ *  opened (#963). The report is built from the page's own state, so it works
+ *  when the engine never loaded. */
+function copyEngineDiagnostics(e: Event): void {
+  const status = (e.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(".engine-failure-copy-status");
+  const host = document.getElementById("boot-fallback-host") ?? document.body;
+  const { text } = liveDiagnostics();
+  void copyText(text, navigator, document, host).then((ok) => {
+    if (status) status.textContent = ok ? "Copied." : "Could not copy. Select the text below and copy it by hand.";
+    if (ok) return;
+    // Nothing reached the clipboard, so show the report where it can be selected.
+    let area = host.querySelector<HTMLTextAreaElement>(".engine-failure-copy-text");
+    if (!area) {
+      area = document.createElement("textarea");
+      area.className = "engine-failure-copy-text";
+      area.readOnly = true;
+      area.rows = 12;
+      area.setAttribute("aria-label", "Engine diagnostics");
+      area.style.cssText = "width:min(48em,100%);box-sizing:border-box;font:12px/1.4 ui-monospace,monospace;text-align:left";
+      status?.closest("p")?.insertAdjacentElement("afterend", area);
+    }
+    area.value = text;
+    area.focus();
+    area.select();
+  });
+}
+
 /** Stop the game with the wasm-only build's engine failure: what happened,
  *  why, and what to try. Covers the title screen and any running tower, like
  *  every other boot-fallback message. */
@@ -125,6 +155,10 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
       <ul style="text-align:left;margin:0 auto;max-width:36em">
         ${copy.steps.map((step) => html`<li>${step}</li>`)}
       </ul>
+      <p>
+        <button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="copy-diagnostics" @click=${copyEngineDiagnostics}>Copy diagnostics</button>
+        <span class="engine-failure-copy-status" role="status" aria-live="polite" style="margin-left:.5em;opacity:.8"></span>
+      </p>
     </div>`,
     true,
   );
@@ -147,7 +181,7 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
   // the one control left, so a keyboard or screen-reader user is not left on
   // an inert element.
   const host = document.getElementById("boot-fallback-host");
-  const reload = host?.querySelector<HTMLButtonElement>("#boot-fallback button");
+  const reload = host?.querySelector<HTMLButtonElement>("#boot-fallback button:not([data-act])");
   if (reload) reload.focus();
   else {
     const active = document.activeElement as HTMLElement | null;
@@ -220,16 +254,19 @@ export function bootGame(create: () => BootApp): Promise<void> {
     // drops the experimental hosts from its bundle.
     const choice = __WASM_ONLY__ ? "wasm" : engineRequested();
     const mainThreadWasm = choice === "wasm" || choice === "wasm-frame";
-    const booted = mainThreadWasm ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: () => loadWasmEngine() }) : typescriptBoot();
+    const booted = mainThreadWasm ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: (onBuild) => loadWasmEngine(undefined, { onBuild }) }) : typescriptBoot();
     let engineWorker: SpawnedWorker | null = null;
     let workerHost: WorkerHostHandle | null = null;
     let bootState: EngineBootState = booted.state;
     if (!__WASM_ONLY__ && choice === "wasm-worker") {
       try {
         engineWorker = await spawnEngineWorker(makeBrowserWorker, enginePackageUrl());
+        if (engineWorker.identity !== undefined) bootState = { ...bootState, identity: engineWorker.identity };
+        if (engineWorker.build) bootState = { ...bootState, binary: engineWorker.build };
       } catch (e) {
         // Recorded with its reason, as a failed package load is (#874).
-        bootState = { ...bootState, failure: { stage: "load", reason: bootFailureReason(e), message: e instanceof Error ? e.message : String(e) } };
+        const workerBuild = (e as { build?: BuildMetadataResult } | null)?.build;
+        bootState = { ...bootState, ...(workerBuild ? { binary: workerBuild } : {}), failure: { stage: "load", reason: bootFailureReason(e), message: e instanceof Error ? e.message : String(e) } };
         console.error("[wasm-worker] the engine worker did not start; running on the TypeScript engine:", e);
       }
     }

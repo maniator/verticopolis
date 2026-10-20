@@ -201,3 +201,29 @@ describe("helpTemplate escapes the interpolated version as text", () => {
     expect(frag.textContent).toContain(`Verticopolis v${hostile}`);
   });
 });
+
+describe("helpTemplate engine diagnostics (#963)", () => {
+  const report = {
+    state: "ok" as const,
+    summary: "The WASM engine is running and matches this build.",
+    rows: [{ label: "Engine crate", value: "example-engine 9.8.7" }],
+    text: "Verticopolis diagnostics",
+  };
+
+  it("renders the report and a Copy diagnostics button inside About", () => {
+    const frag = renderToFragment(helpTemplate(false, "1.2.3", noop, "", report));
+    const about = sectionBySummary(frag, "About")!;
+    const block = about.querySelector(".help-diagnostics")!;
+    expect(block.getAttribute("data-state")).toBe("ok");
+    expect(block.querySelector("dt")?.textContent).toBe("Engine crate");
+    expect(block.querySelector("dd")?.textContent).toBe("example-engine 9.8.7");
+    expect(block.querySelector('[data-act="copy-diagnostics"]')?.textContent?.trim()).toBe("Copy diagnostics");
+    expect(block.querySelector(".help-diagnostics-status")?.getAttribute("role")).toBe("status");
+  });
+
+  it("renders no block when no report is passed", () => {
+    const frag = renderToFragment(helpTemplate(false, "1.2.3", noop));
+    expect(frag.querySelector(".help-diagnostics")).toBeNull();
+  });
+});
+
