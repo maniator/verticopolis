@@ -12,7 +12,13 @@ export function npmEntry(env: NodeJS.ProcessEnv = process.env, node = process.ex
     resolve(dirname(node), "../lib/node_modules/npm/bin/npm-cli.js"),
   ];
   const entry = candidates.find((p) => p && isAbsolute(p) && /(?:^|[/\\])npm-cli\.js$/.test(p) && existsSync(p));
-  if (!entry) throw new Error("Cannot locate npm-cli.js; run the comparison with npm run perf:worker.");
+  if (!entry) {
+    throw new Error(
+      "Cannot locate npm-cli.js. Start the harness through npm (npm run perf:worker or npm run perf:compare), which tells it where npm is, " +
+        "or build first and pass --skip-build. Looked at: " +
+        candidates.filter(Boolean).join(", "),
+    );
+  }
   return entry;
 }
 
@@ -23,11 +29,19 @@ export function runNodeCli(entry: string, args: string[], cwd: string, env: Node
 }
 
 export function buildProduction(repo: string, env: NodeJS.ProcessEnv = process.env): void {
-  runNodeCli(npmEntry(env), ["run", "build"], repo, env);
+  // A VC_TOOLING left in the shell would turn this into a tooling build.
+  const clean = { ...env };
+  delete clean.VC_TOOLING;
+  runNodeCli(npmEntry(env), ["run", "build"], repo, clean);
 }
 
 export function buildTooling(repo: string, outDir: string, env: NodeJS.ProcessEnv = process.env): void {
   const require = createRequire(join(repo, "package.json"));
-  const vite = join(dirname(require.resolve("vite/package.json")), "bin/vite.js");
+  let vite: string;
+  try {
+    vite = join(dirname(require.resolve("vite/package.json")), "bin/vite.js");
+  } catch {
+    throw new Error(`Cannot find vite from ${repo}; run npm ci first.`);
+  }
   runNodeCli(vite, ["build", "--outDir", outDir, "--emptyOutDir"], repo, { ...env, VC_TOOLING: "1" });
 }

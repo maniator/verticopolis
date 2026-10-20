@@ -26,8 +26,10 @@ would let a checkout path with `&`, `%`, `^` or spaces change the command.
 
 - `src/tests/perfWorker/build.ts` runs npm's own JS entry (`npm-cli.js`) and
   Vite's `bin/vite.js` through `process.execPath` with a literal argument list,
-  so no shell reads the arguments. `npm run build` keeps its `prebuild` and
-  `postbuild` hooks.
+  so no shell reads the arguments the harness passes. `npm run build` still goes
+  through npm, so its lifecycle hooks (today `postbuild`) run as before; npm
+  starts those scripts itself. A `VC_TOOLING` left in the shell is dropped from
+  the production build.
 - Both harness `main.ts` files call `buildProduction` and `buildTooling` in place
   of their private `sh(...)` helper.
 - `build.test.ts` covers spaces and shell characters in paths, the lifecycle
