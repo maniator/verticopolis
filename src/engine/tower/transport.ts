@@ -1,14 +1,19 @@
 import type { Tower } from "../Tower";
-import { FACILITIES, GRID, isElevatorKind, isFixedSpanTransport, isStaffOnlyTransport, maxCarsFor } from "../facilities";
+import { FACILITIES, GRID, isElevatorKind, isFacilityKind, isFixedSpanTransport, isStaffOnlyTransport, maxCarsFor } from "../facilities";
 import type { FacilityKind, PlaceResult, Transport, Unit } from "../types";
 import { isStructural, isSkyLobbyFloor, NEEDS_FLOORS, SHAFT_OVERLAP } from "./towerTopology";
 import { coerceSchedule, snapHomesToStops } from "../elevatorSchedule";
-import { INVALID_REQUEST, whole } from "../request";
+import { INVALID_REQUEST, UNKNOWN_FACILITY, whole } from "../request";
 
 /** Transport CRUD, stops, and resize (friend functions of {@link Tower}). */
 
-/** Validate a transport placement without mutating anything. */
+/** Validate a transport placement without mutating anything. A kind the
+ *  catalog does not hold is refused with a reason, and a coordinate that is
+ *  not a whole number with {@link INVALID_REQUEST}, before anything is read
+ *  (the Rust binding answers the same, #1216). */
 export function validateTransport(tower: Tower, kind: FacilityKind, x: number, bottom: number, top: number): PlaceResult {
+  if (!isFacilityKind(kind)) return { ok: false, reason: UNKNOWN_FACILITY };
+  if (!whole(x) || !whole(bottom) || !whole(top)) return { ok: false, reason: INVALID_REQUEST };
   const f = FACILITIES[kind];
   if (!f.transport) return { ok: false, reason: "Not a transport." };
   const cap = tower.capReason(kind);

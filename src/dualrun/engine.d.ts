@@ -34,7 +34,8 @@ export class Engine {
     /**
      * `applyRentBatch(kind, target, onlyDefaultPriced)` with the target as
      * JSON text (a number, `"default"` or `"noRate"`): the result counters
-     * as JSON, or null when the batch does not apply.
+     * as JSON, or null when the batch does not apply: an unknown or unpriced
+     * kind, or a target that is not one of those three, as in TypeScript.
      */
     applyRentBatch(kind: string, target: string, only_default_priced: boolean): string | undefined;
     /**
@@ -50,15 +51,19 @@ export class Engine {
     beginExtend(id: number): boolean;
     bombThreat(): void;
     /**
-     * `buildTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`.
+     * `buildTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`. An
+     * unknown kind is refused with "Unknown facility.".
      */
     buildTransport(kind: string, x: number, bottom: number, top: number): string;
     /**
-     * `build(kind, floor, x)`: JSON `{ ok, reason? }`.
+     * `build(kind, floor, x)`: JSON `{ ok, reason? }`. An unknown kind is
+     * refused with "Unknown facility.", as TypeScript's `build` does.
      */
     build(kind: string, floor: number, x: number): string;
     /**
-     * `callExterminator()`: JSON `{ ok, reason? }`.
+     * `callExterminator()`: JSON `{ ok, reason?, cost?, rooms? }`, the
+     * TypeScript `ExterminatorResult`: `cost` and `rooms` ride on a booking
+     * and on the "funds" refusal, the other refusals carry the reason alone.
      */
     callExterminator(): string;
     /**
@@ -193,6 +198,17 @@ export class Engine {
      * The pending player choice as JSON `{ kind, cost, message }`, or null.
      */
     pendingChoice(): string | undefined;
+    /**
+     * `tower.placeTransportDryRun(kind, x, bottom, top)`: whether
+     * `validateTransport` accepts the shaft, read the same way.
+     */
+    placeTransportDryRun(kind: string, x: number, bottom: number, top: number): boolean;
+    /**
+     * `previewRentBatch(kind, target, onlyDefaultPriced)` with the target as
+     * JSON text, as for `applyRentBatch`: the counters that call would
+     * report, as JSON, with nothing written; null where it would not apply.
+     */
+    previewRentBatch(kind: string, target: string, only_default_priced: boolean): string | undefined;
     /**
      * `priceUnit(u, target)`: the new price, or null when not repriceable.
      */
@@ -339,6 +355,13 @@ export class Engine {
      * The unit covering a tile, serialized as the save would, or null.
      */
     unitAt(floor: number, x: number): string | undefined;
+    /**
+     * `tower.validateTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`,
+     * nothing written. An unknown kind is refused with "Unknown facility."; a
+     * coordinate that is not a whole JS number within `Number.isSafeInteger`
+     * is refused with `INVALID_REQUEST`, never coerced (#923).
+     */
+    validateTransport(kind: string, x: number, bottom: number, top: number): string;
 }
 
 /**
