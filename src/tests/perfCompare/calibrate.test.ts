@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { calibrate as calibrateWith, calibrationMarkdown, passesForLimit, stable } from "./calibrate";
 import { main, parseCalibrateArgs } from "./calibrateMain";
+import { workerPass } from "../perfWorker/calibrateM4Fixture";
 import type { EngineName } from "./types";
 
 type Folder = Parameters<typeof calibrateWith>[0][number];
@@ -422,7 +423,7 @@ describe("perf:calibrate", () => {
     expect(stable({ b: 1, a: [2, { d: 1, c: 2 }] })).toBe(stable({ a: [2, { c: 2, d: 1 }], b: 1 }));
     mkdirSync(join(repo, "bad"));
     writeFileSync(join(repo, "bad", "results.json"), "{}");
-    expect(() => main(["bad", "--out", "cal5"], repo)).toThrow(/is not a perf:compare results.json/);
+    expect(() => main(["bad", "--out", "cal5"], repo)).toThrow(/is not a perf:compare or perf:worker results.json/);
     writeFileSync(join(repo, "bad", "results.json"), "{");
     expect(() => main(["bad", "--out", "cal6"], repo)).toThrow(/not valid JSON/);
     // A UTF-8 byte order mark (PowerShell 5.1 writes one) does not abort the run.
@@ -430,5 +431,30 @@ describe("perf:calibrate", () => {
     writeFileSync(join(repo, "bom", "results.json"), `\uFEFF${JSON.stringify(many(1)[0].results)}`);
     expect(main([...names, "bom", "--out", "cal8"], repo)).toBe(1);
     expect(JSON.parse(readFileSync(join(repo, "cal8", "calibration.json"), "utf8")).excluded[0].reason).toMatch(/identical to aa-0/);
+  });
+
+  it("takes perf:worker folders beside perf:compare folders and needs both to pass", () => {
+    const repo = mkdtempSync(join(tmpdir(), "calibrate-mixed-"));
+    dirs.push(repo);
+    const write = (name: string, results: unknown): string => {
+      mkdirSync(join(repo, name));
+      writeFileSync(join(repo, name, "results.json"), JSON.stringify(results));
+      return name;
+    };
+    const compare = many(40).map((f, i) => write(`aa-${i}`, f.results));
+    const worker = (diff4: number) => Array.from({ length: 40 }, (_, i) => workerPass(i, { diff4 })).map((f) => write(`${f.folder}-${diff4}`, f.results));
+    expect(main([...compare, ...worker(3), "--out", "both"], repo, () => "2026-10-21T00:00:00Z")).toBe(0);
+    const json = JSON.parse(readFileSync(join(repo, "both", "calibration.json"), "utf8"));
+    expect(json.adoptable).toBe(true);
+    expect(json.families.map((f: { id: string }) => f.id)).toContain("M1");
+    expect(json.m4.family.candidate).toBe(5);
+    const md = readFileSync(join(repo, "both", "calibration.md"), "utf8");
+    expect(md).toContain("it covers M1, M2, M3, M4 and M5");
+    expect(md).toContain("## M4 long-task ε");
+    // A cap miss in the worker folders fails the whole command even though the compare half passes.
+    expect(main([...compare, ...worker(80), "--out", "miss"], repo)).toBe(1);
+    const miss = JSON.parse(readFileSync(join(repo, "miss", "calibration.json"), "utf8"));
+    expect(miss.adoptable).toBe(false);
+    expect(miss.m4.adoptable).toBe(false);
   });
 });
