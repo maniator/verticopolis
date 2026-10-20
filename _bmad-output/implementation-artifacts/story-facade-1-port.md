@@ -1,11 +1,12 @@
 # Story facade.1: The port and its contract (`SimPort`, `TsSim`, the Simulation reach guard)
 
-Status: ready-for-dev
+Status: review
 
 Slice 1 of the Rust-backed facade
 (`_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/slice-plan.md`),
 under spine AD-9 (owner direction 2026-10-20 20:45 UTC, signed off 21:40 UTC).
-Relates to #868 (S6, the read side) by reference only: no closing keyword.
+Issue #1208, under the facade tracker #1207. Relates to #868 (S6, the read side)
+by reference only: no closing keyword.
 
 ## Story
 
@@ -142,30 +143,30 @@ in while they do.
 
 ## Tasks / Subtasks
 
-- [ ] Types (AC 1 to 4)
-  - [ ] `view.ts`: the interfaces, from the member lists in Dev Notes
-  - [ ] `commands.ts`: the `Command` union and `CommandResult<C>` via a
-        result map keyed by `kind`
-  - [ ] `queries.ts`: `Query`, `QueryResult<Q>`, the cache key
-  - [ ] `port.ts`: `SimPort`
-  - [ ] `view.types.test.ts`: assignability of the live types; the
+- [x] Types (AC 1 to 4)
+  - [x] `view.ts`: the interfaces, from the member lists in Dev Notes
+  - [x] `commands.ts`: the `Command` union and `CommandResult<C>` via a
+        result map keyed by `op` (see Completion Notes)
+  - [x] `queries.ts`: `Query`, `QueryResult<Q>`, the cache key
+  - [x] `port.ts`: `SimPort`
+  - [x] `view.types.test.ts`: assignability of the live types; the
         `ShadowCommand` drift check
-- [ ] `TsSim` (AC 5)
-  - [ ] the per-kind dispatch, each through the instance's own method
-  - [ ] the result conversion, lossless against today's return values
-  - [ ] the header read and the live tower and crowd
-- [ ] Contract suite (AC 6)
-  - [ ] `contract.ts` with the cases above
-  - [ ] `tsSim.test.ts`; run it under `npm run test:wasm:parity` too
-- [ ] Guard (AC 7)
-  - [ ] extract `importScan.ts` from `frontendEngineImports.guard.test.ts`
-  - [ ] `simulationReach.guard.test.ts` and its ratchet, seeded with the 9
+- [x] `TsSim` (AC 5)
+  - [x] the per-kind dispatch, each through the instance's own method
+  - [x] the result conversion, lossless against today's return values
+  - [x] the header read and the live tower and crowd
+- [x] Contract suite (AC 6)
+  - [x] `contract.fixture.ts` with the cases above
+  - [x] `tsSim.test.ts`; run it under `npm run test:wasm:parity` too
+- [x] Guard (AC 7)
+  - [x] extract `importScan.ts` from `frontendEngineImports.guard.test.ts`
+  - [x] `simulationReach.guard.test.ts` and its ratchet, seeded with the 9
         edges and a reason on each line
-  - [ ] the synthetic-graph self-test
-- [ ] Gates and records (AC 8 to 10)
-  - [ ] the four gates, coverage, `test:wasm:parity`
-  - [ ] the HP record in the PR body
-  - [ ] `/bmad-code-review`, fixes, backlog rows for defers
+  - [x] the synthetic-graph self-test
+- [x] Gates and records (AC 8 to 10)
+  - [x] the four gates, coverage, `test:wasm:parity`
+  - [x] the HP record in the PR body
+  - [x] `/bmad-code-review`, fixes, backlog rows for defers
 
 ## Dev Notes
 
@@ -278,8 +279,52 @@ remain.
 
 ### Agent Model Used
 
+Claude Code (the facade lane's thread), 2026-10-20.
+
 ### Debug Log References
+
+- `npm run wasm:build` before the parity run (exit 0).
+- The parity run caught the spy test recording `callExterminator` twice: the
+  `unitWasm` setup attaches the host inside the first `callExterminator` and
+  re-dispatches it, which went through the test's spy a second time. The
+  test now ticks once before the spies go on; `TsSim` calls each method once.
+- `npm run typecheck` caught `Array.prototype.at` in a test (the lib target
+  predates it).
 
 ### Completion Notes List
 
+- Deviations from the story, each deliberate:
+  - The command and query unions are discriminated on `op`, as
+    `ShadowCommand` is, since `kind` is already a field name in today's calls
+    (`sim.build(kind, floor, x)`) and would collide.
+  - The contract suite is `src/simport/contract.fixture.ts`, so the shipped
+    code scan and the coverage ratchet treat it as test code.
+  - `src/build/engineBundle.ts` exports `DUAL_RUN` (one word, no behavior
+    change) so the reach guard imports the build guard's own list.
+  - A file whose `import()` loads the engine package's glue by URL
+    (`src/wasmhost/engineLoad.ts`) is named in the reach guard as a package
+    loader rather than failing as unreadable; the guard checks it still is.
+- The reach set on `main` at this branch's base is `Simulation.ts`,
+  `sim/loop.ts` and `sim/serialization.ts`, and the crossings are the 9
+  files the Dev Notes list, each into `Simulation`, each with a reason and
+  the slice that removes it.
+- The header read calls `Simulation.population`, a scan over the rooms
+  (`routing.totalPopulation`), the same cost the HUD pays per UI tick today.
+  Slice 3 must not read `view.header` per frame on `TsSim` without caching
+  it; the PR's hot-path record says so.
+
 ### File List
+
+- `src/simport/port.ts` (new)
+- `src/simport/view.ts` (new)
+- `src/simport/commands.ts` (new)
+- `src/simport/queries.ts` (new)
+- `src/simport/tsSim.ts` (new)
+- `src/simport/contract.fixture.ts` (new)
+- `src/simport/tsSim.test.ts` (new)
+- `src/simport/view.types.test.ts` (new)
+- `src/tests/importScan.ts` (new)
+- `src/tests/simulationReach.guard.test.ts` (new)
+- `src/tests/simulationReach.ratchet.txt` (new)
+- `src/tests/frontendEngineImports.guard.test.ts` (reads imports through `importScan.ts`)
+- `src/build/engineBundle.ts` (exports `DUAL_RUN`)

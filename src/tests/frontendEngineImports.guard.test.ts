@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, posix, resolve } from "node:path";
-import ts from "typescript";
+import { dirname, resolve } from "node:path";
 import { repoRel, repoRoot, sourceFiles } from "./guardFiles";
+import { isTestFile, resolveRelative, scanRuntimeImports } from "./importScan";
 
 /**
  * The frontend's runtime imports of the TypeScript engine, held to a ratchet.
@@ -20,14 +20,15 @@ import { repoRel, repoRoot, sourceFiles } from "./guardFiles";
  * engine modules each file imports at runtime, leaving out the catalog handle
  * ({@link CATALOG_HANDLE}).
  *
- * An import counts the way the retirement inventory counts it: it is
- * type-only when it says `import type` or `export type`, or marks every name it
- * brings in with `type`, and anything else is a runtime import, including a
- * bare `import "..."`, a dynamic `import()`, `new URL("...", import.meta.url)`
- * and `import.meta.glob`. A name used only as a type but imported without
- * `type` counts as runtime (the build drops it, the guard cannot tell), so
- * mark it `type`. A dynamic `import()` whose module is not a string literal
- * fails, since the guard cannot read it.
+ * An import counts the way the retirement inventory counts it (the rules are
+ * in `importScan.ts`, which the `Simulation` reach guard shares): type-only
+ * when it says `import type` or `export type`, or marks every name it brings
+ * in with `type`, and anything else is a runtime import, including a bare
+ * `import "..."`, a dynamic `import()`, `new URL("...", import.meta.url)` and
+ * `import.meta.glob`. A name used only as a type but imported without `type`
+ * counts as runtime (the build drops it, the guard cannot tell), so mark it
+ * `type`. A dynamic `import()` whose module is not a string literal fails,
+ * since the guard cannot read it.
  *
  * A runtime import the list does not name fails, and so does a line that names
  * more than its file imports. The list shrinks as the frontend moves off the
@@ -50,73 +51,21 @@ const NOT_FRONTEND = ["src/engine/", "src/tests/", "src/wasmhost/", "src/dualrun
 const CATALOG_HANDLE = ["towerCatalog", "catalogTypes"] as const;
 const counted = (mod: string): boolean => !(CATALOG_HANDLE as readonly string[]).includes(mod);
 
-const isTestFile = (rel: string): boolean => /\.(test|spec|fixture)\.tsx?$/.test(rel);
-
 /** The engine module a relative specifier names from `rel`, as its path under
  *  `src/engine/` without query or extension (`index` for the directory
  *  itself), or null for anything else. */
 function engineModule(rel: string, spec: string): string | null {
-  if (!spec.startsWith(".")) return null;
-  const target = posix
-    .normalize(posix.join(posix.dirname(rel), spec.replace(/\?.*$/, "")))
-    .replace(/\/$/, "")
-    .replace(/\.(d\.ts|tsx?|mts|jsx?|mjs)$/, "");
+  const target = resolveRelative(rel, spec);
   if (target === "src/engine") return "index";
-  return target.startsWith("src/engine/") ? target.slice("src/engine/".length) : null;
+  return target?.startsWith("src/engine/") ? target.slice("src/engine/".length) : null;
 }
-
-/** True when an import brings in types only. */
-function importIsTypeOnly(clause: ts.ImportClause | undefined): boolean {
-  if (!clause) return false; // `import "../engine/x"` runs the module
-  if (clause.isTypeOnly) return true;
-  const named = clause.namedBindings;
-  return !clause.name && named !== undefined && ts.isNamedImports(named) && named.elements.length > 0 && named.elements.every((e) => e.isTypeOnly);
-}
-
-/** True when a re-export brings in types only. */
-function exportIsTypeOnly(node: ts.ExportDeclaration): boolean {
-  if (node.isTypeOnly) return true;
-  const clause = node.exportClause;
-  return clause !== undefined && ts.isNamedExports(clause) && clause.elements.length > 0 && clause.elements.every((e) => e.isTypeOnly);
-}
-
-/** `import.meta` in `import.meta.url` or `import.meta.glob`. */
-const isImportMeta = (node: ts.Node): boolean => ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.ImportKeyword;
 
 /** The engine modules one file imports at runtime, sorted, and the dynamic
  *  imports it holds that the guard cannot read. */
 function runtimeEngineImports(rel: string, text: string): { modules: string[]; unreadable: string[] } {
-  const found = new Set<string>();
-  const unreadable: string[] = [];
-  const note = (spec: ts.Expression | undefined): void => {
-    if (spec === undefined || !ts.isStringLiteralLike(spec)) return;
-    const mod = engineModule(rel, spec.text);
-    if (mod !== null) found.add(mod);
-  };
-  const source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, true);
-  const visit = (node: ts.Node): void => {
-    if (ts.isImportDeclaration(node)) {
-      if (!importIsTypeOnly(node.importClause)) note(node.moduleSpecifier);
-    } else if (ts.isExportDeclaration(node)) {
-      if (!exportIsTypeOnly(node)) note(node.moduleSpecifier);
-    } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
-      if (!node.isTypeOnly) note(node.moduleReference.expression);
-    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-      const arg = node.arguments[0];
-      if (arg !== undefined && ts.isStringLiteralLike(arg)) note(arg);
-      else unreadable.push(`${rel}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}`);
-    } else if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "glob" && isImportMeta(node.expression.expression)) {
-      const arg = node.arguments[0];
-      if (arg !== undefined && ts.isArrayLiteralExpression(arg)) arg.elements.forEach(note);
-      else note(arg);
-    } else if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "URL") {
-      const base = node.arguments?.[1];
-      if (base !== undefined && ts.isPropertyAccessExpression(base) && isImportMeta(base.expression)) note(node.arguments?.[0]);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-  return { modules: [...found].sort(), unreadable };
+  const { imports, unreadable } = scanRuntimeImports(rel, text);
+  const modules = new Set(imports.map((i) => engineModule(rel, i.spec)).filter((mod): mod is string => mod !== null));
+  return { modules: [...modules].sort(), unreadable };
 }
 
 /** Every non-test frontend file under `src/`, repo-relative. */
