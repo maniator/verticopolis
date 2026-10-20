@@ -14,6 +14,7 @@ import {
   REASONS,
   REQUESTS,
   ROW_LIMIT,
+  buildCrashSessionsQuery,
   buildPageLivesQuery,
   pageLivesFromRows,
   parseArgs,
@@ -38,12 +39,21 @@ function life(over: Partial<PageLife> = {}): PageLife {
     sha: "abc1234",
     build: "switchable",
     requested: "wasm",
-    arm: "none",
+    stage: "none",
+    assignedArm: "none",
+    selectedBy: "default",
+    safetySuppressed: false,
     sizeGated: false,
     fallbacks: 0,
     settleFallbacks: 0,
     reasons: [],
     writerLatched: false,
+    settled: true,
+    attempted: false,
+    engaged: false,
+    engagedEngine: "none",
+    engagedBy: "none",
+    firstSeen: "2026-10-20 12:00:00",
     ...over,
   };
 }
@@ -71,7 +81,8 @@ describe("the page-lives query", () => {
     expect(q).toContain("GROUP BY session_id, page_life");
     // The window holds the page lives that settled in it, so a fault from
     // before the window is never charged to it.
-    expect(q).toContain("HAVING countIf(properties.trigger = 'settle') > 0");
+    // ...or made an attempt in it (the `attempt` row proposed for #1090).
+    expect(q).toContain("HAVING countIf(properties.trigger IN ('settle', 'attempt')) > 0");
     // A truncated result keeps the latest builds.
     expect(q).toContain("ORDER BY first_seen DESC");
     expect(q).toContain(`LIMIT ${ROW_LIMIT}`);
@@ -103,13 +114,18 @@ describe("the page-lives query", () => {
     expect(view).toContain("AND properties.environment = 'production'");
     expect(q).toContain("distinct_id AS session_id,");
     expect(q).toContain("properties.environment = 'production'");
+    // The crash sessions use the same unit.
+    const crashes = buildCrashSessionsQuery(720);
+    expect(crashes).toContain("distinct_id AS session_id");
+    expect(crashes).toContain("properties.environment = 'production'");
   });
 
   it("reads only fields the game sends or the cohort work plans", () => {
     // Every properties.x the query names is a real engine_status field, the
-    // relay's environment stamp, or one of the two the A4 cohort work adds (a
-    // missing one reads as the default).
-    const planned = ["arm", "size_gated", "environment"];
+    // relay's environment stamp, one the A4 cohort work adds (#1197), or the
+    // `engaged_by` field proposed for #1090 (a missing one reads as the
+    // default).
+    const planned = ["stage", "assigned_arm", "selected_by", "safety_suppressed", "size_gated", "engaged_by", "environment"];
     const read = [...q.matchAll(/properties\.([a-z_]+)/g)].map((m) => m[1]);
     for (const field of read) expect([...ENGINE_STATUS_FIELDS, ...planned]).toContain(field);
   });
@@ -118,11 +134,16 @@ describe("the page-lives query", () => {
 describe("pageLivesFromRows", () => {
   it("normalizes the query's rows, keeping a placeholder for a missing value", () => {
     const [a, b] = pageLivesFromRows([
-      { session_id: "s", page_life: "p", version: "2.36.0", sha: "abc", build: "switchable", requested: "wasm", arm: null, size_gated: 1, fallbacks: "2", settle_fallbacks: 1, reasons: ["none", "attach-refused", ""], writer_latched: "true" },
+      { session_id: "s", page_life: "p", version: "2.36.0", sha: "abc", build: "switchable", requested: "wasm", assigned_arm: null, size_gated: 1, fallbacks: "2", settle_fallbacks: 1, reasons: ["none", "attach-refused", ""], writer_latched: "true" },
       { session_id: "t", page_life: "q" },
     ]);
-    expect(a).toEqual({ session: "s", pageLife: "p", version: "2.36.0", sha: "abc", build: "switchable", requested: "wasm", arm: "none", sizeGated: true, fallbacks: 2, settleFallbacks: 1, reasons: ["attach-refused"], writerLatched: true });
-    expect(b).toMatchObject({ version: "unknown", sha: "unknown", build: "unknown", requested: "unknown", arm: "none", sizeGated: false, fallbacks: 0, settleFallbacks: 0, reasons: [], writerLatched: false });
+    expect(a).toEqual({ session: "s", pageLife: "p", version: "2.36.0", sha: "abc", build: "switchable", requested: "wasm", stage: "none", assignedArm: "none", selectedBy: "default", safetySuppressed: false, sizeGated: true, fallbacks: 2, settleFallbacks: 1, reasons: ["attach-refused"], writerLatched: true, settled: true, attempted: false, engaged: false, engagedEngine: "none", engagedBy: "none", firstSeen: "" });
+    expect(b).toMatchObject({ version: "unknown", sha: "unknown", build: "unknown", requested: "unknown", assignedArm: "none", selectedBy: "default", sizeGated: false, fallbacks: 0, settleFallbacks: 0, reasons: [], writerLatched: false });
+  });
+
+  it("reads an empty string, which argMinIf gives a page life with no engaged row, as the default", () => {
+    const [a] = pageLivesFromRows([{ session_id: "s", page_life: "p", stage: "", assigned_arm: "", selected_by: "", engaged_engine: "", engaged_by: "" }]);
+    expect(a).toMatchObject({ stage: "none", assignedArm: "none", selectedBy: "default", engagedEngine: "none", engagedBy: "none" });
   });
 
   it("never passes a forged value through to the report", () => {
@@ -208,7 +229,7 @@ describe("summarizeReliability", () => {
   it("counts a session only for its counted page lives, even when another of its page lives faulted", () => {
     const s = summarizeReliability([
       life({ session: "a", requested: "wasm-worker", fallbacks: 1, reasons: ["boot-error"] }),
-      life({ session: "a", arm: "override", fallbacks: 1, reasons: ["attach-refused"] }),
+      life({ session: "a", selectedBy: "setting", fallbacks: 1, reasons: ["attach-refused"] }),
       life({ session: "a" }),
     ]);
     expect(s).toMatchObject({ n: 1, faults: 0, pageLives: 1 });
@@ -261,8 +282,8 @@ describe("summarizeReliability", () => {
   it("narrows to the asked commits, versions, bundles and arms, and reads a row with no arm as none", () => {
     const lives = [
       life({ session: "a", sha: "0dd0000", version: "2.35.0", fallbacks: 1, reasons: ["boot-error"] }),
-      life({ session: "b", arm: "wasm" }),
-      life({ session: "c", arm: "ts", build: "wasm-only" }),
+      life({ session: "b", assignedArm: "wasm" }),
+      life({ session: "c", assignedArm: "ts", build: "wasm-only" }),
     ];
     expect(summarizeReliability(lives, { shas: ["abc1234"] })).toMatchObject({ n: 2, faults: 0 });
     expect(summarizeReliability(lives, { versions: ["2.35.0"] })).toMatchObject({ n: 1, faults: 1 });
@@ -282,7 +303,7 @@ describe("summarizeReliability", () => {
 
   it("leaves out the override and unassigned arms unless they are asked for", () => {
     expect(EXCLUDED_ARMS).toEqual(["override", "unassigned"]);
-    const lives = [life({ session: "a", arm: "override", fallbacks: 1, reasons: ["boot-error"] }), life({ session: "b", arm: "unassigned" }), life({ session: "c", arm: "wasm" }), life({ session: "d" })];
+    const lives = [life({ session: "a", selectedBy: "setting", fallbacks: 1, reasons: ["boot-error"] }), life({ session: "b", assignedArm: "unassigned" }), life({ session: "c", assignedArm: "wasm" }), life({ session: "d" })];
     expect(summarizeReliability(lives)).toMatchObject({ n: 2, faults: 0 });
     expect(summarizeReliability(lives, { arms: ["override"] })).toMatchObject({ n: 1, faults: 1 });
   });
@@ -294,7 +315,7 @@ describe("summarizeReliability", () => {
   });
 
   it("reports by arm as it reports by build", () => {
-    const s = summarizeReliability([life({ session: "a", arm: "wasm", fallbacks: 1, reasons: ["trap-tick"] }), life({ session: "b", arm: "wasm" }), life({ session: "c", arm: "ts" })]);
+    const s = summarizeReliability([life({ session: "a", assignedArm: "wasm", fallbacks: 1, reasons: ["trap-tick"] }), life({ session: "b", assignedArm: "wasm" }), life({ session: "c", assignedArm: "ts" })]);
     expect(s.byArm).toEqual([
       { arm: "ts", sessions: 1, faults: 0, pageLives: 1, faultPageLives: 0, upper95: upperBound(0, 1) },
       { arm: "wasm", sessions: 2, faults: 1, pageLives: 2, faultPageLives: 1, upper95: upperBound(1, 2) },
@@ -340,7 +361,7 @@ describe("summarizeReliability", () => {
 
 describe("the command line", () => {
   it("reads the window and the lists", () => {
-    expect(parseArgs([])).toEqual({ window: { hours: 720, label: "30 days" }, opts: { hosts: ["wasm"], shas: null, versions: null, builds: null, arms: null } });
+    expect(parseArgs([])).toEqual({ window: { hours: 720, label: "30 days" }, opts: { hosts: ["wasm"], shas: null, versions: null, builds: null, arms: null }, eligibleShas: [], tailShas: [] });
     expect(parseArgs(["--window=7", "--shas", "abc1234, def5678a", "--arms", "wasm", "--hosts", "wasm,wasm-frame", "--builds", "wasm-only", "--versions", "2.36.0"]).opts).toEqual({
       hosts: ["wasm", "wasm-frame"],
       shas: ["abc1234", "def5678a"],
@@ -392,9 +413,10 @@ describe("renderReliabilityMarkdown", () => {
   it("puts the snapshot window, the live source and the lower-bound caveat above every figure", () => {
     const md = renderReliabilityMarkdown(summarizeReliability([life()]), meta);
     const firstFigure = md.indexOf("| Measure |");
-    // Until the eligibility split (#1090), every session is early telemetry,
-    // which plan 4.1 (OD-2) never publishes as a reliability figure.
-    for (const lead of ["**Snapshot** of the last 30 days to 2026-10-20 12:00 (UTC), production only", "node scripts/engine-reliability.mjs", "src/engine-reliability.test.ts", "**Early telemetry, not release evidence.**", "**A lower bound.**"]) {
+    // The overall rate is early telemetry, which plan 4.1 (OD-2) never
+    // publishes as a reliability figure; release evidence is only the engaged
+    // eligible cohort (#1090).
+    for (const lead of ["**Snapshot** of the last 30 days to 2026-10-20 12:00 (UTC), production only", "node scripts/engine-reliability.mjs", "src/engine-reliability.test.ts", "**This overall rate is early telemetry, not release evidence**", "**A lower bound.**"]) {
       const at = md.indexOf(lead);
       expect(at, lead).toBeGreaterThan(-1);
       expect(at, lead).toBeLessThan(firstFigure);
@@ -421,8 +443,14 @@ describe("renderReliabilityMarkdown", () => {
   });
 
   it("prints every value in a code span, so none reads as markup", () => {
-    const md = renderReliabilityMarkdown(summarizeReliability([life({ arm: "__x__" })], { arms: ["__x__"] }), meta);
-    expect(md).toContain("| `__x__` | 1 | 0 |");
+    // A markup-like value is not one the game sends, so it is never printed.
+    const forged = renderReliabilityMarkdown(summarizeReliability([life({ build: "__x__" })]), meta);
+    expect(forged).not.toContain("__x__");
+    expect(forged).toContain("| Unrecognized page lives (values the game never sends; left out) | 1 |");
+    const md = renderReliabilityMarkdown(summarizeReliability([life({ assignedArm: "wasm", stage: "3" })]), meta);
+    expect(md).toContain("| `2.36.0 (abc1234, switchable)` | 1 | 0 |");
+    expect(md).toContain("| `wasm` | 1 | 0 |");
+    expect(md).toContain("| `3` | 1 | 0 |");
   });
 
   it("names the worker host's blind spots when it is counted", () => {

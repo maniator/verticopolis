@@ -135,29 +135,53 @@ error does; see above.)
 | `version` | the build's version | Which release sent the row |
 | `sha` | the build's short commit (`__APP_SHA__`) | Which exact build, so two deploys of one version stay apart |
 
-**Planned, not collected yet.** The A4 cohort work adds `arm` (the cohort arm)
-and `size_gated` (a tower too large for the engine), and #954 adds
-`divergence_reports`, a count of commands the engine refused after the
-TypeScript instance accepted them (the report moved there from #874). The governed definition already reads `arm` and `size_gated`, and an
-absent value reads as `none` and `false`. Each lands in this table, with its
-reason, in the change that sends it.
+**Planned, not collected yet.** The A4 cohort work (#1197) adds `stage`,
+`assigned_arm` (the randomized arm, never rewritten by a setting, a URL, a
+safety suppression or the size gate), `selected_by` (which policy rule chose
+the engine; `setting` and `url` are manual overrides), `safety_suppressed` and
+`size_gated`, and #954 adds `divergence_reports`, a count of commands the
+engine refused after the TypeScript instance accepted them (the report moved
+there from #874). #1090 proposes two rows, waiting for the owner's analytics
+approval: `trigger: attempt`, once per page life when boot has chosen the
+engine and before the package loads, so a tab closed or crashed during the
+load is counted; and `trigger: engaged` with `engaged_by` (`command` or
+`play`), once per page life, the first time the running engine accepts a
+player's gameplay command or 30 s of foreground play pass with the game clock
+advancing. The governed definition already reads all of them, and an absent
+value reads as `none`, `default`, false, no attempt row or not engaged. Each
+lands in this table, with its reason, in the change that sends it.
 
-**How it is counted.** Only through `scripts/engine-reliability.mjs`: a window
-holds the page lives whose `settle` row falls in it; sessions are distinct
-`distinct_id`s in production, as in the `session_lengths` view; a page life
-carrying a value the game never sends is left out and counted on its own line;
-N counts the sessions with a counted page life that ran the engine (one whose
-settle row already fell back on `package-mismatch` alone did not); a session is
-a fault when any of those page lives fell back for a reason other than
-`package-mismatch`, which is reported on its own line; `override` and
-`unassigned` arms are left out unless asked for; the bound is the exact
-one-sided 95% Clopper-Pearson bound, by build and by arm as well. The rate is a
-lower bound: the relay has no offline queue and a per-IP limit, a tab closed
-while the engine loads never sends its row, and runtime traps are reported only
-from the build that carries #874 (the worker host's are not reported yet). Until the definition sorts sessions into eligible evidence
-(#1090), every session it counts is early telemetry under plan 4.1 (OD-2),
-triaged and never published as a reliability figure. The script's header
-comment carries every rule and every gap.
+**How it is counted.** Only through `scripts/engine-reliability.mjs` and
+`scripts/engine-reliability-cohorts.mjs`: a window holds the page lives whose
+`settle` (or `attempt`) row falls in it; sessions are distinct `distinct_id`s
+in production, as in the `session_lengths` view; a page life carrying a value
+the game never sends is left out and counted on its own line. The overall rate
+counts the sessions with a settled page life that ran the engine (one whose
+settle row already fell back on `package-mismatch` alone did not); a session
+is a fault when any of those page lives fell back for a reason other than
+`package-mismatch`, which is reported on its own line; overrides and the
+`unassigned` arm are left out unless asked for; the bound is the exact
+one-sided 95% Clopper-Pearson bound, by build and by arm as well. That rate is
+early telemetry. The proposed release count (#1090; whether it replaces
+#945's "1,000 engine sessions" is the owner's decision) is the engaged
+eligible cohort: sessions in the `wasm` arm, on the production host, chosen by
+the cohort, at stage 3, not safety-suppressed and not size-gated, on commits
+the gate review names, that engaged on the engine; a fault in any of their
+eligible page lives counts, one before the engagement too. Beside it, the
+eligible attempts row holds the same sessions engaged or not, so a fault that
+stopped a player engaging still shows, and the all-attempts safety denominator
+holds every session that asked for the engine, overrides and sessions that
+never engaged included. Opt-outs and safety suppressions are counted in the
+WASM arm's row as their own figure, outside its fault rate, since they never
+ran the engine; the report also prints the rate with them in N, as #1197
+words it, and the owner decides which reading the gate uses. A crash loop that
+a suppressed boot detects counts as a fault. The report also gives the candidate tail's bound, an arm
+comparison by stage with the crash-rate interval, and the stop signals. Every
+rate is a lower bound: the relay has no offline queue and a per-IP limit, a
+tab closed or crashed while the engine loads sends nothing until the `attempt`
+row ships (and with it, is counted as having left, since nothing tells a crash
+from a close), and the worker host reports only its first tower. The scripts' header comments carry
+every rule and every gap.
 
 ## Retention and deletion
 
