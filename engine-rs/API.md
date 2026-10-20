@@ -107,7 +107,7 @@ tier 2, the harness a host uses to prove conformance.
 | Read a frame | `frame::frame_view(&sim)`: every value a renderer reads between two structural syncs (clock, money, rating, effects, then one record per person, per unit and per shaft with its cars) as one flat `Vec<f64>`, laid out in `src/frame.rs`. Read it by name: the slots in `frame::header`, `frame::person`, `frame::unit`, `frame::transport` and `frame::car` (`frame::header::MONEY`, `frame::person::ROUTINE`, ...), and the record widths `FRAME_HEADER`, `PERSON_FIXED`, `UNIT_RECORD`, `TRANSPORT_FIXED` and `CAR_RECORD`; a routine code of `UNKNOWN_ROUTINE` means the engine has a routine the layout does not name yet, and a decoder should refuse it. `frame::log_since(&sim, seq)` returns the log entries numbered after `seq`. The JavaScript binding passes the same frame across as one typed array |
 | Gameplay events | `sim.gameplay.drain()` after each frame; `to_json()` on each event; names and payloads are listed in `conformance/events/catalog.json` (`gameplay::CATALOG_JSON`, checked with `check_event`). The buffer holds `GAMEPLAY_RING_CAP` events and counts any it had to drop in `sim.gameplay.dropped` |
 | Reference data | `catalog::catalog(mode)`: prices, sizes, caps and rules per facility kind, versioned by `CATALOG_VERSION` |
-| Identity | `identity::identity()` (`engineIdentity()` in the binding): schema, crate name and version, `SAVE_VERSION` and the oldest save version loaded, `FRAME_LAYOUT_VERSION`, `CATALOG_VERSION` with each mode's digest, and the conformance lock digest. It holds no build hash: a hash of the sources cannot be compiled into them, so `BUILD.json` records it. The crate version goes up with the conformance lock, `SAVE_VERSION`, the frame layout, catalog and identity record versions, and `src/dualrun/engine.d.ts` (`compat-record.json`, guarded by `src/tests/engineCompat.guard.test.ts`); the guard does not see the Rust `pub` API, so a change there is a review call (`CONTRIBUTING.md`, Versioning) |
+| Identity | `identity::identity()` (`engineIdentity()` in the binding): schema, crate name and version, `SAVE_VERSION` and the oldest save version loaded, `FRAME_LAYOUT_VERSION`, `CATALOG_VERSION` with each mode's digest, and the conformance lock digest. It holds no build hash: a hash of the sources cannot be compiled into them, so the packaging supplies it as build metadata (below). The crate version goes up with the conformance lock, `SAVE_VERSION`, the frame layout, catalog and identity record versions, and `src/dualrun/engine.d.ts` (`compat-record.json`, guarded by `src/tests/engineCompat.guard.test.ts`); the guard does not see the Rust `pub` API, so a change there is a review call (`CONTRIBUTING.md`, Versioning) |
 | Snapshot hash | `canonical::digest(&snapshot::state_view(&sim))`: the hashed view the conformance lock pins (with the `conformance` feature, `scenario::state_view` names the same function) |
 | Save | `load::encode_simulation_vctower(&sim, app_version, saved_at_ms)`: the `.vctower` bytes the web game writes. A host that holds the save JSON (`sim.serialize()`) gets the same file from `load::stamp_save(&mut save, app_version, saved_at_ms)` then `load::encode_vctower(&save)` |
 | Load | `load::decode_vctower(text)`, then `load::deserialize(&save)`, then `load::mark_founder_from_loaded_file(&mut sim, &save)`, which marks a file with no build stamp as a founder's tower the way the web game does (skip it and a host drops that status on its next save) |
@@ -123,6 +123,27 @@ Two behaviors a host should know:
 - **The loader repairs.** `deserialize` coerces damaged or forged fields
   the way the web game's loader does; it refuses only what it cannot read
   (`decode_vctower` refuses a file that is not a `.vctower`).
+
+## Build metadata (supplied by the host's packaging)
+
+The identity record is everything the engine knows about itself. Which
+sources a build came from is not among those facts, so the packaging supplies
+it, and nothing in the engine reads it or requires it:
+
+```json
+{ "schema": 1, "sourceHash": "<64 lowercase hex digits>" }
+```
+
+`sourceHash` is the SHA-256 over the engine's Rust sources and the conformance
+event catalog (`engineSourceHash` in `src/wasmhost/packageHash.ts`). It names
+sources, not a compiled binary; a binary's own digest is a separate fact (the
+package id in `BUILD.json`). The web build writes the object, as UTF-8 JSON,
+into a custom section named `verticopolis.build` of each `.wasm`
+(`scripts/wasm-build.ts`, before any digest is taken). A native Rust or Godot
+host supplies the same object its own way, for example a file its build step
+writes next to the library or a constant it links in, and a frontend that shows
+both shows them side by side. A missing or malformed object is reported as
+unavailable, never as a failure of the engine.
 
 ## Stability
 
