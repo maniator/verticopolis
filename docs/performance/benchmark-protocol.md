@@ -254,6 +254,13 @@ goes first). A failed repetition is re-run and the report says how many were.
 Every desktop metric runs at **1x and 4x** CPU throttle, on the small, medium
 and large scenarios with their pinned scenario hashes.
 
+`perf:compare` opens a fresh page for every scenario and engine in the timed
+simulation passes and in each gameplay-frames block. A page that already ran a
+scenario carries its JIT type feedback into the next one, which made the second
+tower on the TypeScript engine about twice as slow (PC, 1,441 ms against 705 ms
+on a fresh page). `perf:compare` results from before that change do not support
+a medium-versus-large engine comparison on the second tower (#1162).
+
 | Command (PowerShell) | What it measures |
 | --- | --- |
 | `npm.cmd run perf:worker -- --reps 10 --viewport 1280x720 --out docs/performance/results/<date>-<sha>-<label>-worker-1280x720` | Bare engine, the four hosts, frames, memory and traffic. Always pass `--viewport 1280x720`: the harness default is 640x360, and the committed desktop acceptance run (`2026-10-15-e25ec01c-worker-1280x720`) used 1280x720. `perf:compare` renders at 1280x720 fixed and has no `--viewport` flag |

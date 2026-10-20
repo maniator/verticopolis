@@ -5,6 +5,7 @@ import { audioStatus, measureFrames, startAudio, type FrameRun } from "./pageFra
 import { simRun, type SimRun } from "./pageSim";
 import type { PerfServer, ServedRequest } from "./server";
 import { launchOptions, type BrowserLaunch } from "./renderer";
+import { eachScenarioFresh } from "./scenarioPages";
 import type { Scenario } from "./scenarios";
 import { frameStats, quantile } from "./stats";
 import type { CompareConfig, EngineName, FrameSummary, MemorySummary, ProcessRun, StartupSample, StepSummary } from "./types";
@@ -257,12 +258,12 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     log(`  rep ${rep} ${slot}: cold ready ${cold.sample.gameReadyMs?.toFixed(0)} ms, warm ready ${warm.sample.gameReadyMs?.toFixed(0)} ms`);
 
     const memory = await memoryPass(page, cdp, opts, engine, engineUrl);
-    await freshPage(page, engine, "timed passes boot");
 
-    // Timed simulation passes. Per scenario and throttle the order is the
-    // same on both engines (hosted, then raw); the WASM attribution pass
-    // runs after both, so it cannot warm or grow anything they measure.
-    for (const sc of scenarios) {
+    // Timed simulation passes, each scenario in a page of its own (see
+    // scenarioPages.ts). Per scenario and throttle the order is the same on
+    // both engines (hosted, then raw); the WASM attribution pass runs after
+    // both, so it cannot warm or grow anything they measure.
+    await eachScenarioFresh(scenarios, (sc) => freshPage(page, engine, `${sc.name} timed passes boot`), async (sc) => {
       await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
       run.scenarios[sc.name] = { ...memory[sc.name], hosted: {}, raw: {}, frames: {}, framesAudio: {} };
       const scenarioRun = run.scenarios[sc.name];
@@ -297,24 +298,23 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
         await expectEngine(page, engine, `${sc.name} ${t}x`);
         log(`  rep ${rep} ${slot} ${sc.name} ${t}x: hosted ${scenarioRun.hosted[t].totalMs.toFixed(0)} ms, raw ${scenarioRun.raw[t].totalMs.toFixed(0)} ms`);
       }
-    }
+    });
     // The WASM package's load steps, before any audio runs.
     if (engine === "ts") run.wasmCold = await ev(page, "wasm cold load", wasmColdLoad, { wasmUrl: `${server.url}/engine/verticopolis_engine_bg.wasm`, jsUrl: engineUrl, scenario: scenarios[0].name });
 
-    // Gameplay frames: an audio-off block and an audio-on block, each in a
-    // fresh page, their order alternating by repetition so neither always
-    // runs in the older process.
+    // Gameplay frames: an audio-off block and an audio-on block, their order
+    // alternating by repetition so neither always runs in the older process.
+    // Each scenario runs in a fresh page of its own, as above.
     const blocks: ("off" | "on")[] = rep % 2 === 0 ? ["off", "on"] : ["on", "off"];
     for (const block of blocks) {
-      await freshPage(page, engine, `frames (audio ${block}) boot`);
-      for (const sc of scenarios) await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
-      if ((await ev(page, "audio status", audioStatus, undefined)).started) throw new Error("audio was running in a fresh page");
-      if (block === "on") {
-        run.audio = await ev(page, "start audio", startAudio, 15_000);
-        log(`  rep ${rep} ${slot}: audio ${run.audio.started ? "started" : "DID NOT START"} (contexts: ${run.audio.contexts.join(", ") || "none"})`);
-        if (!run.audio.started || !run.audio.contexts.includes("running")) continue;
-      }
-      for (const sc of scenarios) {
+      await eachScenarioFresh(scenarios, (sc) => freshPage(page, engine, `${sc.name} frames (audio ${block}) boot`), async (sc) => {
+        await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
+        if ((await ev(page, "audio status", audioStatus, undefined)).started) throw new Error("audio was running in a fresh page");
+        if (block === "on") {
+          run.audio = await ev(page, "start audio", startAudio, 15_000);
+          log(`  rep ${rep} ${slot} ${sc.name}: audio ${run.audio.started ? "started" : "DID NOT START"} (contexts: ${run.audio.contexts.join(", ") || "none"})`);
+          if (!run.audio.started || !run.audio.contexts.includes("running")) return false;
+        }
         for (const rate of config.throttles) {
           await ev(page, "adopt", adoptScenario, sc.name);
           await ev(page, "prepare", prepareLiveApp, undefined);
@@ -328,7 +328,8 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
             await throttle(cdp, 1);
           }
         }
-      }
+        return undefined;
+      });
       await expectEngine(page, engine, `frames (audio ${block})`);
     }
     // The adapter again, from a new context, once every frame is measured (and
