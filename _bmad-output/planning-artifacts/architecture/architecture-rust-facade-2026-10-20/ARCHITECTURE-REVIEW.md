@@ -104,7 +104,7 @@ peak. It needs its own item (section 8, M6).
 | F5 | #1068 stays on hold. Its read-model role ends under B; its Rust `SaveMirror` is kept only if restore-point cost needs it (section 5.7) | Yes. The worker evaluation keeps running |
 | F6 | #1049 and #1050 are retargeted from the mirror to B's view (changed units, structural snapshot) | Yes |
 | F7 | A new engine item for the load-time memory peak, checked against M6 | Yes |
-| F8 | Restore points under B are an engine `serialize()` plus a versioned transient sidecar, on a real-time cadence #874 sets, with a pre-registered budget of no restore-point task over 50 ms on large at 1x and 4x on the PC | Yes |
+| F8 | Restore points under B are the engine saves the host already takes (undo captures, the 30-second autosave, manual saves), each with a versioned transient sidecar; no save added per command or tick (#1101's property); a pre-registered budget of no save task over 50 ms on large at 1x and 4x on the PC | Yes |
 | F9 | Accept the longer path to the flip: eligible sessions start when the facade becomes the WASM host (slice 10) | Yes, given the owner's direction; the alternative is to ship 3.0 on A |
 
 ## 2. The two options
@@ -331,17 +331,22 @@ carries a version and a schema, has a round-trip test on both engines, and
 is refused loudly on a mismatch; it lives in memory only and never needs a
 save version.
 
-The cadence is real time, not game time: at the top speed (120 game
-minutes a second) a game hour is half a real second, and a `serialize()`
-on large costs about 63 ms in the cloud, so an hourly point would be a long
-task twice a second. Points are taken on a real-time interval and after a
-structural edit, preferably in idle time, at a cadence #874 sets against a
-pre-registered budget: no restore-point task over 50 ms on large at 1x and
-4x on the PC. If idle-time capture and a faster serializer do not meet it,
-#1068's `SaveMirror` (keyframe plus deltas, the C6 patcher) is the known
-remedy, and that is the one place its Rust half may still be wanted (F5).
-Today's host pays a 370 ms merge on the same hour, so this is a smaller
-version of a cost players already have.
+Points ride the engine saves the host already takes, as #1101 does today,
+whose tests pin that no save is added per command or tick. Under A the
+hourly merge's save is one of those; under B it is gone, so the points come
+from the others: the undo capture before a gesture's first command, the
+30-second autosave and manual saves, each with its sidecar read beside it.
+That keeps #1101's property and avoids the game-hour clock, which matters:
+at the top speed (120 game minutes a second) a game hour is half a real
+second, and a `serialize()` on large costs about 63 ms in the cloud. The
+lost-progress bound becomes "since the last gesture or autosave", at most
+30 seconds of play, which #874's disclosure states. The budget is
+pre-registered: no save task over 50 ms on large at 1x and 4x on the PC. If
+the autosave's `serialize()` misses it, the remedies in order are idle-time
+capture, a faster serializer, then #1068's `SaveMirror` (keyframe plus
+deltas, the C6 patcher), the one place its Rust half may still be wanted
+(F5). Today's host pays a 370 ms merge every game hour, so this is a
+smaller version of a cost players already have.
 
 On a fault, the host builds a TypeScript `Simulation` from the newest point
 that loads, applies the sidecar, swaps in `TsSim`, and rebuilds the view
@@ -370,7 +375,7 @@ save, `state_view` and the digest.
 | Rust getters disagree with the TypeScript functions | stats, inspector, diagnostics, overlays | A differential test per getter on the conformance corpus; the Rust value is authoritative on the healthy path |
 | Diagnostics port is large | about 790 lines of TypeScript across three files | Facts in Rust, wording in TypeScript; its own slice and review |
 | The view lags or shows a stale structure | renderer | Revision-keyed snapshot; a test that the view equals a fresh snapshot after every caught-up frame (the oracle #1068 built, aimed at the view) |
-| Restore points cost a long task | fallback | PC measurement of the cadence; idle-time capture; `SaveMirror` as the fallback remedy |
+| Restore points cost a long task | fallback | Points ride the existing saves (no added save); PC measurement against the budget; idle-time capture; `SaveMirror` as the last remedy |
 | Shared files with other lanes | `wasmHost.ts`, `startWasmHost.ts`, `hostFault.ts` (Runtime), renderer files (Rendering), worker files (worker thread) | Slices that touch them are agreed with the owning thread first; none starts while #1092 is mid-flight in the same files |
 | The critical path gets longer | S6 and S9 grow | Offset in part: A5's sync design, RUN-0b's churn decision and #1050's mirror patching drop out. Section 8 and the slice plan show the order |
 
