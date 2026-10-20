@@ -54,8 +54,8 @@ records one line saying so (section 6).
 
 This page took effect when it merged (2026-10-20, 19:49 UTC). For the pull
 requests open then, the owner set the scope on 2026-10-20 at 20:16 UTC (quoted
-on #1168). #1139 (at 9cd44d1) and #1157 (at a146861) have since merged, so
-their bullets are a record:
+on #1168). #1139 (at 9cd44d1), #1157 (at a146861) and #1092 (at f1777e1) have
+since merged, so their bullets are a record:
 
 - #1139 (the bare-step indexes for #1051) keeps its independent review's GO at
   3fa30a8c for the code that review covered. A docs-only results commit on it
@@ -564,12 +564,13 @@ The Hot-Path Auditor's prompt:
 > repository; read it at the diff's head commit, `<commit>` (`git show
 > <commit>:<path>` when the checkout is elsewhere, or the working tree when the
 > diff holds uncommitted changes). Apply `docs/performance/hot-path-review.md`,
-> items HP-1 to HP-12, to this change. For each changed, added or ported function, trace its callers
-> across every hot-path surface in section 1 (both engines, the hosts, the
-> frame loop, rendering and UI) up to an entry point in section 2, and record
-> the tier and the loops in between. Flag whole-collection work, route
-> searches, allocations, clones, sorts, hashing and id scans under a
-> multiplier, including inside helpers the diff calls but does not change.
+> items HP-1 to HP-12, to this change. For each changed, added or ported
+> function, trace its callers across every hot-path surface in section 1 (both
+> engines, the hosts, the frame loop, rendering and UI) up to an entry point in
+> section 2, and record the tier and the loops in between. Flag
+> whole-collection work, route searches, allocations, clones, sorts, hashing
+> and id scans under a multiplier, including inside helpers the diff calls but
+> does not change.
 > Check that the change keeps every cache, index and counter either engine has
 > on these paths (the HP-8 table) and computes nothing one already answers; for
 > ported code, also list the TypeScript caches, indexes and counters for the
