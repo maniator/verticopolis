@@ -3,9 +3,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames";
+import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames";
 import { engineBuildRecord } from "../wasmhost/enginePackageRecord";
-import { INTEGRITY_FILES, engineDistProblems, engineIntegrityTransform, integrityOf, manifestIntegrity, readExpectedPackage } from "./enginePackageBuild";
+import { INTEGRITY_FILES, engineDistProblems, engineIntegrityTransform, integrityOf, manifestIntegrity, readExpectedPackage, shellProblems } from "./enginePackageBuild";
 
 const sha = (d: Uint8Array | string) => createHash("sha256").update(d).digest("hex");
 const glue = new TextEncoder().encode("export default async function init() {}\n");
@@ -179,6 +179,65 @@ describe("engineDistProblems", () => {
     const d = pkg();
     expect(engineDistProblems(d, manifestFor(d, { [`${ENGINE_DIR}${ENGINE_WASM}`]: null })).join("\n")).toContain("carries no integrity");
     expect(engineDistProblems(d, manifestFor(d, { [`${ENGINE_DIR}${ENGINE_GLUE}`]: "sha256-AAAA" })).join("\n")).toContain("not the digest of the file in dist/");
+  });
+});
+
+describe("shellProblems", () => {
+  const OTHER = "c".repeat(64);
+  /** A dist with the engine package and some emitted scripts. */
+  function distWith(scripts: Record<string, string>, over: Parameters<typeof pkg>[0] = {}): string {
+    const d = pkg(over);
+    mkdirSync(join(d, "assets"), { recursive: true });
+    for (const [name, text] of Object.entries(scripts)) writeFileSync(join(d, name), text);
+    return d;
+  }
+  /** A chunk shaped as the define leaves it: the expected record inlined. */
+  const chunkWith = (id: string) => `const e={package:"${id}",files:{"${ENGINE_GLUE}":{sha256:"${"d".repeat(64)}",bytes:3}}};export{e};`;
+
+  it("finds nothing wrong when a chunk carries the engine's id and none carries another", () => {
+    const d = distWith({ "assets/index-1.js": chunkWith(record.package), "assets/engineWorker-2.js": chunkWith(record.package), "assets/other-3.js": "export const x=1;" });
+    expect(shellProblems(d, true)).toEqual([]);
+  });
+
+  it("reads a quoted key, as a minifier or a JSON define can leave it", () => {
+    const d = distWith({ "assets/index-1.js": `x={"package":"${record.package}"}` });
+    expect(shellProblems(d, true)).toEqual([]);
+  });
+
+  it("reports a shell built for another package, and names both ids", () => {
+    const d = distWith({ "assets/index-1.js": chunkWith(OTHER) });
+    const problems = shellProblems(d, true).join("\n");
+    expect(problems).toContain("no script in dist/ carries the engine package id");
+    expect(problems).toContain(`dist/assets/index-1.js carries engine package id ${OTHER.slice(0, 12)}`);
+  });
+
+  it("reports a second chunk left on another id", () => {
+    const d = distWith({ "assets/index-1.js": chunkWith(record.package), "assets/engineWorker-2.js": chunkWith(OTHER) });
+    const problems = shellProblems(d, true);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("engineWorker-2.js");
+  });
+
+  it("reports a shell that carries no id at all", () => {
+    expect(shellProblems(distWith({ "assets/index-1.js": "export{};" }), true).join("\n")).toContain("carries the engine package id");
+  });
+
+  it("reports a missing or unusable record rather than guessing", () => {
+    expect(shellProblems(distWith({ "assets/index-1.js": chunkWith(record.package) }, { record: null }), true).join("\n")).toContain("missing or unusable");
+    expect(shellProblems(distWith({ "assets/index-1.js": chunkWith(record.package) }, { record: "{}" }), true).join("\n")).toContain("missing or unusable");
+  });
+
+  it("fails a bundle that still holds the development-only skip, in any script", () => {
+    const skip = `console.info("[wasm] ${DEV_SKIP_MARKER}")`;
+    const d = distWith({ "assets/index-1.js": `${chunkWith(record.package)};${skip}` });
+    expect(shellProblems(d, true).join("\n")).toContain("development-only skip");
+    // Also when the build ships no engine, and in a nested chunk.
+    const none = distWith({ "assets/lazy-9.js": skip });
+    expect(shellProblems(none, false).join("\n")).toContain("dist/assets/lazy-9.js still carries");
+  });
+
+  it("asks nothing of the ids in a build that ships no engine", () => {
+    expect(shellProblems(distWith({ "assets/index-1.js": "export{};" }), false)).toEqual([]);
   });
 });
 

@@ -6,8 +6,8 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames.ts";
+import { relative, resolve, sep } from "node:path";
+import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames.ts";
 import { canonicalFilesJson, expectedOf, parseEngineRecord, type ExpectedEnginePackage } from "../wasmhost/enginePackageRecord.ts";
 
 /** A text file as the page reads it: the page's TextDecoder drops a leading
@@ -133,6 +133,53 @@ export function engineDistProblems(distDir: string, manifest: string): string[] 
     const have = integrity.get(url);
     if (!have) problems.push(`precache entry ${url} carries no integrity, so a body from another build could enter the precache`);
     else if (existsSync(file) && have !== integrityOf(readFileSync(file))) problems.push(`precache entry ${url} carries an integrity that is not the digest of the file in dist/`);
+  }
+  return problems;
+}
+
+/** Every `.js` and `.html` file under a folder, as folder-relative POSIX paths. */
+function emittedScripts(dir: string): string[] {
+  return readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile() && /\.(?:js|mjs|html)$/.test(e.name))
+    .map((e) => relative(dir, resolve(e.parentPath, e.name)).split(sep).join("/"));
+}
+
+/** A package id as an object literal's `package` member, bare or quoted key. */
+const PACKAGE_MEMBER = /["']?\bpackage["']?\s*:\s*["']([0-9a-f]{64})["']/g;
+
+/**
+ * What is wrong with the shell in a built `dist/`, as sentences (an empty list
+ * means it is sound). The page checks the engine against the package id
+ * compiled into its chunks, so:
+ *
+ * - no emitted script may carry the development-only skip of the byte check
+ *   (its marker line, see `loadEngineModule.ts`), whatever the build;
+ * - when the build ships an engine, some chunk must carry the id of
+ *   `dist/engine/BUILD.json` (the loader's chunk), and no chunk may carry any
+ *   other id, so the shell and the engine it checks are the same build.
+ *
+ * `hasEngine` is false for a deliberate no-engine build, which has no id.
+ */
+export function shellProblems(distDir: string, hasEngine: boolean): string[] {
+  const problems: string[] = [];
+  const scripts = emittedScripts(distDir);
+  const withId = new Map<string, Set<string>>();
+  for (const file of scripts) {
+    const text = readFileSync(resolve(distDir, file), "utf8");
+    if (text.includes(DEV_SKIP_MARKER)) problems.push(`dist/${file} still carries the development-only skip of the engine byte check`);
+    const ids = new Set([...text.matchAll(PACKAGE_MEMBER)].map((m) => m[1]));
+    if (ids.size > 0) withId.set(file, ids);
+  }
+  if (!hasEngine) return problems;
+  const recordFile = resolve(distDir, ENGINE_DIR, ENGINE_BUILD_RECORD);
+  const parsed = existsSync(recordFile) ? parseEngineRecord(readText(recordFile)) : null;
+  if (!parsed?.ok) return [...problems, `cannot compare the shell with the engine package: dist/${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing or unusable`];
+  const want = parsed.record.package;
+  const carriers = [...withId].filter(([, ids]) => ids.has(want)).map(([file]) => file);
+  if (carriers.length === 0) problems.push(`no script in dist/ carries the engine package id ${want.slice(0, 12)} from BUILD.json, so the page would check the engine against nothing`);
+  for (const [file, ids] of withId) {
+    const other = [...ids].filter((id) => id !== want);
+    if (other.length > 0) problems.push(`dist/${file} carries engine package id ${other.map((id) => id.slice(0, 12)).join(", ")}, but dist/${ENGINE_DIR}${ENGINE_BUILD_RECORD} says ${want.slice(0, 12)}`);
   }
   return problems;
 }
