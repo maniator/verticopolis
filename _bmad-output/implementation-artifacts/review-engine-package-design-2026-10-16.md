@@ -67,3 +67,6 @@ row that PR restores. Keep #985 open until implementation and CI proof merge.
 - Removed a duplicated "First update" paragraph.
 - The PR description now lists the three files this diff changes. The #1046
   backlog row is still restored by #1080, so this PR must not merge first.
+- Repair is offered whenever a worker controls the page. The offer no longer
+  depends on a reachability check; a failed fetch stops Repair and leaves
+  every entry as it was.

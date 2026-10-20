@@ -382,7 +382,7 @@ found 91be0477aa13)".
 
 | Reason | Copy and retry policy in both builds |
 | --- | --- |
-| `mismatch` | "The engine files do not match this version of the game. The engine was not started." Show both package ids when known, otherwise an unavailable label. Reload is a manual retry. The **Repair engine files** action is offered only when a worker controls the page and the reachability check below passes; on an uncontrolled page there is no worker to refetch, so only Reload is offered. |
+| `mismatch` | "The engine files do not match this version of the game. The engine was not started." Show both package ids when known, otherwise an unavailable label. Reload is a manual retry. The **Repair engine files** action is offered whenever a worker controls the page, online or not (reachability is decided by the fetch attempt itself, see the corrupted-entry recovery rules below); on an uncontrolled page there is no worker to refetch, so only Reload is offered. |
 | `load-failed` | "The engine files could not be loaded. Connect to the internet and try Reload." Covers HTTP errors, interrupted streams, import/init failures, and a missing compiled package. That last case explains that a corrected deployment is needed. Repair is offered under the same conditions as for `mismatch`. |
 | `timeout` | "The engine took too long to load. Try Reload when your connection is ready." The expired attempt stays terminal. Reload starts a fresh document and attempt. |
 | `unverifiable` | "This browser connection cannot verify the engine files. Open the game using HTTPS." Reload alone cannot repair an insecure context. Do not offer cache repair for this reason. |
