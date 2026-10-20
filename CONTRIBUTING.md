@@ -129,8 +129,12 @@ Verticopolis has **two test tiers**:
     it, a Rust test replays it), and the `.TDT` codec by
     `conformance/tdt-cases.json` (`tdtCases.integration.test.ts` writes it,
     `cargo run --release --features conformance --bin tdt` and a Rust test replay it). A nightly differential fuzzer
-    (`engine-fuzz.yml`) runs seeded random scenarios through both engines; a
-    divergence it finds is pinned as a named scenario in the fix PR.
+    (`engine-fuzz.yml`) runs seeded random scenarios through both engines and
+    compares the state, crowd and events hashes at every in-game hour, then
+    the money, the log and each field of the full save, naming the first
+    field that differs (`scripts/fuzz-compare.ts`). A divergence it finds is
+    pinned as a named scenario in the fix PR. A run summary names its seed
+    block, so a night replays with the `seed_block` input.
 
     **The vitest tiers on the WASM engine.** `npm run test:wasm:parity` runs
     the `integrationWasm` and `unitWasm` projects, whose setup file hosts
