@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { cargoPackage } from "../build/engineCompat";
 import { engineSourceHash } from "./packageHash";
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -14,6 +15,11 @@ describe.skipIf(!existsSync(BUILD))("the served engine package", () => {
   it("was built from the Rust sources in the tree (run npm run wasm:build after a Rust change)", () => {
     const built = JSON.parse(readFileSync(BUILD, "utf8")) as { sources: string };
     expect(built.sources).toBe(engineSourceHash(resolve(ROOT, "engine-rs")));
+  });
+
+  it("names the crate it was built from (run npm run wasm:build after a Cargo.toml change)", () => {
+    const built = JSON.parse(readFileSync(BUILD, "utf8")) as { crate?: unknown };
+    expect(built.crate).toEqual(cargoPackage(readFileSync(resolve(ROOT, "engine-rs/Cargo.toml"), "utf8")));
   });
 
   it("ships the loader and the binary beside the app", () => {

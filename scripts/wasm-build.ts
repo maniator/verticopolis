@@ -26,6 +26,7 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { engineSourceHash } from "../src/wasmhost/packageHash.ts";
 import { engineBuildRecord } from "../src/wasmhost/enginePackageRecord.ts";
+import { cargoPackage } from "../src/build/engineCompat.ts";
 import { ENGINE_BUILD_RECORD, ENGINE_GLUE, ENGINE_PACKAGE, ENGINE_WASM } from "../src/wasmhost/engineAssets.ts";
 import { ENGINE_THIRD_PARTY, checkToolchain, engineThirdParty } from "./engine-third-party.ts";
 import { checkCatalog, renderGameplayEventRules, renderGameplayEventsDts } from "../src/engine/gameplayCatalog.ts";
@@ -107,7 +108,10 @@ if (which === "engine") {
   // and `files` name the exact glue and binary bytes, so the page can refuse a
   // glue or binary from another build.
   const sha256Hex = (data: Uint8Array | string) => createHash("sha256").update(data).digest("hex");
-  const record = engineBuildRecord(readFileSync(resolve(web, ENGINE_GLUE)), readFileSync(resolve(web, ENGINE_WASM)), sources, sha256Hex);
+  // The crate's name and version ride along (#963) so About can name them when
+  // the engine never loads; they are not part of the package id.
+  const crateRecord = cargoPackage(readFileSync(resolve(crate, "Cargo.toml"), "utf8"));
+  const record = engineBuildRecord(readFileSync(resolve(web, ENGINE_GLUE)), readFileSync(resolve(web, ENGINE_WASM)), sources, sha256Hex, crateRecord);
   writeFileSync(resolve(web, ENGINE_BUILD_RECORD), `${JSON.stringify(record, null, 2)}\n`);
   // The crates and the standard library compiled into the package, with
   // their licenses, so the site's notices can list them without a Rust
