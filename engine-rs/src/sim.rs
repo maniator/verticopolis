@@ -159,6 +159,8 @@ pub struct Simulation {
     pub extermination_room_ids: Option<Vec<i64>>,
     /// `floorReachable` memo keyed by tower revision.
     pub reach_memo: (i64, HashMap<i64, bool>),
+    /// `noiseMemo`: unit id to `noiseAfflicted`, keyed by tower revision.
+    pub noise_memo: (i64, HashMap<i64, bool>),
     /// The saved camera view (inert cargo the save carries).
     pub view: Option<Value>,
     /// The gameplay events since the host last drained (never saved or
@@ -237,6 +239,7 @@ impl Simulation {
             metro_platform_nudged: false,
             extermination_room_ids: None,
             reach_memo: (-1, HashMap::new()),
+            noise_memo: (-1, HashMap::new()),
             view: None,
             gameplay: GameplayEvents::default(),
             extend_gesture: None,

@@ -18,9 +18,9 @@ const config = { ...makeConfig(parseArgs(["--reps", "6"]), ["small"]) };
  *  repetitions differ by a known factor), the same digests everywhere. */
 function run(rep: number, mode: ModeName, scale: number, over: Partial<ModeRun> = {}): ModeRun {
   const hosted = (t: number) => ({ wallMs: 100 * scale * t, mainMs: 50 * scale * t, batchMainP50Ms: 1, batchMainP95Ms: 2 * scale, batchMainMaxMs: 3, startDigest: "s", endDigest: "e", hostErrorsAdded: [],
-    worker: mode === "wasm-worker" ? { replies: 180, staleReplies: 0, merges: 6, messagesSent: 200, messagesReceived: 181, bytesReceived: 1000, frameBytes: 1800, mergeBytes: 600, applyMs: 10, mergeMs: 5, workerOpsMs: 40, workerReplyMs: 4 } : null });
+    worker: mode === "wasm-worker" ? { replies: 180, staleReplies: 0, merges: 6, messagesSent: 200, messagesReceived: 181, bytesReceived: 1000, frameBytes: 1800, mergeBytes: 600, applyMs: 10, mergeMs: 5, workerOpsMs: 40, workerReplyMs: 4, deltas: 18, deltaBytes: 360, deltaMs: 2 * scale, workerSaveMs: 3, deltasRefused: 1, approximateSaves: 2 } : null });
   const frames = { frames: 60, meanFps: 10 / scale, medianMs: 100, p95Ms: 150, p99Ms: 190, onePercentLowFps: 5, simMinutesPerSecond: 50, clampedFrames: 0, longTasks: 3, blockingMs: 20 * scale, commands: 5, commandsUnanswered: 0, commandToFrameP50Ms: 30, commandToFrameP95Ms: 40, commandToFrameMinMs: 20, hostErrorsAdded: [],
-    worker: mode === "wasm-worker" ? { repliesPerSecond: 9, messagesPerSecond: 20, bytesPerSecond: 5000, staleReplies: 0, merges: 2, applyMsPerSecond: 3, commandAckP50Ms: 4, commandAckP95Ms: 6 } : null };
+    worker: mode === "wasm-worker" ? { repliesPerSecond: 9, messagesPerSecond: 20, bytesPerSecond: 5000, staleReplies: 0, merges: 2, deltas: 7, deltasRefused: 1, approximateSaves: 3, applyMsPerSecond: 3, commandAckP50Ms: 4, commandAckP95Ms: 6 } : null };
   return {
     rep, mode, order: 0, ok: true, error: null, pageErrors: [], browserVersion: "141", page: { crossOriginIsolated: true, userAgent: "ua", webgl: { renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)", vendor: "Google Inc. (NVIDIA)" } }, rendererEnd: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)",
     cold: { mode, gameReadyMs: 100, modeReadyMs: 200 * scale, firstFrameMs: 300, bytesBeforeReady: 1000, requestsBeforeReady: 9, wasmRequests: mode === "ts" || mode === "wasm-worker" ? 0 : 1 },
@@ -60,6 +60,33 @@ describe("perf:worker analysis", () => {
     expect(traffic.length).toBeGreaterThan(0);
     expect(traffic.every((m) => m.mode === "wasm-worker")).toBe(true);
     expect(traffic.find((m) => m.metric.startsWith("frame view bytes per reply") && m.throttle === "1")!.summary!.median).toBe(10);
+    // The hourly delta rows (#1045): the count, bytes per delta, and time.
+    const row = (prefix: string) => traffic.find((m) => m.metric.startsWith(prefix) && m.throttle === "1")!;
+    expect(row("hourly deltas, ").summary!.median).toBe(18);
+    expect(row("bytes per hourly delta").summary!.median).toBe(20);
+    expect(row("main-thread delta time").values.length).toBeGreaterThan(0);
+    expect(row("worker save time").summary!.median).toBe(3);
+    expect(row("deltas refused, ").summary!.median).toBe(1);
+    // The frames window counts its own saves, so a full save in it is seen.
+    expect(row("full-save merges (frames)").summary!.median).toBe(2);
+    expect(row("hourly deltas (frames)").summary!.median).toBe(7);
+    expect(row("deltas refused (frames)").summary!.median).toBe(1);
+    expect(row("approximate saves (frames)").summary!.median).toBe(3);
+    // A run recorded before the deltas has no sample in their rows. The
+    // harness reads a missing counter as NaN (undefined minus undefined), and a
+    // JSON round trip turns that into null, so all three spellings are checked.
+    const counters = ["deltas", "deltaBytes", "deltaMs", "deltasRefused", "approximateSaves"] as const;
+    const without = (value: undefined | null | number) => runs().map((r) => {
+      if (r.mode !== "wasm-worker") return r;
+      const hosted = r.scenarios.small.hosted[1]!;
+      const worker = { ...hosted.worker! } as Record<string, unknown>;
+      for (const k of counters) worker[k] = value;
+      return { ...r, scenarios: { small: { ...r.scenarios.small, hosted: { ...r.scenarios.small.hosted, 1: { ...hosted, worker } } } } } as unknown as ModeRun;
+    });
+    const hostedRows = (ms: ReturnType<typeof aggregate>) => ms.filter((m) => m.throttle === "1" && m.metric.includes("(hosted)") && /^(hourly deltas, |bytes per hourly delta|deltas refused, |main-thread delta time)/.test(m.metric));
+    expect(hostedRows(traffic).every((m) => m.values.length > 0)).toBe(true);
+    expect(hostedRows(traffic)).toHaveLength(4);
+    for (const v of [undefined, null, Number.NaN]) expect(hostedRows(aggregate(config, without(v))).filter((m) => m.values.length > 0)).toEqual([]);
     // A worker run whose worker heap could not be read has no combined sample.
     const missing = runs().map((r) => (r.mode === "wasm-worker" ? { ...r, scenarios: { small: { ...r.scenarios.small, memory: { ...r.scenarios.small.memory, workerHeapUsedBytes: null } } } } : r));
     expect(aggregate(config, missing).find((m) => m.metric.startsWith("JS heaps + WASM") && m.mode === "wasm-worker")!.values).toEqual([]);
@@ -95,6 +122,43 @@ describe("perf:worker analysis", () => {
     const f = summarizeFrames({ intervalsMs: [100, 100, 300, 100], wallMs: 600, simMinutes: 30, longTasks: 2, longTaskMs: 400, blockingMs: 300, commandToFrameMs: [10, 30], commandsUnanswered: 0, worker: { replies: 6, staleReplies: 1, merges: 1, messagesSent: 7, messagesReceived: 6, bytesReceived: 600, applyMs: 12, commandAckMs: [4] }, hostErrorsAdded: [] });
     expect(f).toMatchObject({ frames: 4, clampedFrames: 1, simMinutesPerSecond: 50, commands: 2, commandToFrameP50Ms: 20, commandToFrameMinMs: 10, blockingMs: 300 });
     expect(f.worker).toMatchObject({ repliesPerSecond: 10, bytesPerSecond: 1000, applyMsPerSecond: 20, commandAckP50Ms: 4 });
+  });
+
+  it("marks only the worker host's rows above 1x as unthrottled, in the metrics, both CSVs and the report", () => {
+    const rs = runs();
+    const metrics = aggregate(config, rs);
+    const rr = ratios(metrics, config.modes);
+    const flagged = metrics.filter((m) => m.unthrottled);
+    expect(flagged.length).toBeGreaterThan(0);
+    expect(flagged.every((m) => m.mode === "wasm-worker" && m.throttle !== "1")).toBe(true);
+    expect(metrics.filter((m) => m.mode === "wasm-worker" && m.throttle !== "1").every((m) => m.unthrottled === "worker")).toBe(true);
+    expect(metrics.filter((m) => m.mode !== "wasm-worker" || m.throttle === "1").some((m) => m.unthrottled)).toBe(false);
+    const csvRows = (text: string) => text.trim().split("\n").slice(1);
+    expect(metricsCsv(metrics).split("\n")[0]).toMatch(/,unthrottled,values$/);
+    const markedMetrics = csvRows(metricsCsv(metrics)).filter((l) => /,worker,/.test(l));
+    expect(markedMetrics).toHaveLength(flagged.length);
+    expect(markedMetrics.every((l) => l.includes(",wasm-worker,"))).toBe(true);
+    const flaggedRatios = rr.filter((r) => r.unthrottled);
+    expect(flaggedRatios.length).toBeGreaterThan(0);
+    expect(flaggedRatios.every((r) => r.mode === "wasm-worker" && r.throttle !== "1")).toBe(true);
+    expect(csvRows(ratiosCsv(rr)).filter((l) => l.endsWith(",worker"))).toHaveLength(flaggedRatios.length);
+    const result = {
+      schema: 1 as const, startedAt: "2026-10-14T10:00:00Z", generatedAt: "2026-10-14T14:00:00Z", config, browser: { version: "141", executable: null },
+      environment: { commitShort: "abc1234", appVersion: "2.31.1", dirty: false, enginePackage: {}, engineBuildHash: "h", cpuModel: "cpu", logicalCpus: 4, totalMemoryBytes: 2 ** 34, os: "linux", node: "22", playwright: "1.61" } as never,
+      scenarios: [{ name: "small", sha256: "a".repeat(64), population: 10, units: 2, transports: 1, saveBytes: 5 }],
+      scripts: { worker: { raw: 8000, brotli: 2600 }, otherJs: { raw: 1, brotli: 1 }, enginePackage: { raw: 900_000, brotli: 330_000 } }, runs: rs, metrics, ratios: rr, validation: { ok: true, errors: [], warnings: [] }, limitations: ["one"],
+    };
+    const md = markdown(result);
+    expect(md).toMatch(/† The engine worker was barely CPU-throttled/);
+    expect(md).toMatch(/7 to 41% slower/);
+    const tableRows = md.split("\n").filter((l) => l.startsWith("| small |"));
+    expect(tableRows.some((l) => l.includes("†"))).toBe(true);
+    // A row is daggered when its own throttle is above 1x and its host is the worker: the 1x rows carry none, and the daggers sit only on 4x rows.
+    expect(tableRows.filter((l) => l.startsWith("| small | 1x |")).some((l) => l.includes("†"))).toBe(false);
+    expect(tableRows.filter((l) => l.includes("†")).every((l) => l.startsWith("| small | 4x |"))).toBe(true);
+    // Without the worker host in the run there is nothing to mark and no footnote.
+    const noWorker = markdown({ ...result, metrics: metrics.filter((m) => m.mode !== "wasm-worker"), ratios: rr.filter((r) => r.mode !== "wasm-worker" && r.against !== "wasm-worker") });
+    expect(noWorker).not.toMatch(/†/);
   });
 
   it("writes the CSVs and a report that leads with the snapshot window and the validation state", () => {
