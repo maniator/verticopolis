@@ -711,6 +711,9 @@ What it does not do, so a reader does not assume it:
   Worker (measured on Chromium 141), so the `wasm-worker` rows at 4x have a
   barely throttled engine thread. Those rows carry a dagger in both reports and
   the CSV `unthrottled` column says `worker`.
+  A 4x TypeScript-versus-worker throughput comparison is therefore not release
+  evidence (the owner's decision of 2026-10-20). The before/after comparison
+  of the worker against itself can still inform the #1068 decision.
 - **No separate hour-pass spike row.** The hourly main-thread spike is read
   from the per-batch maximum and the frame-time p99 rows.
 - **No GPU driver version check.** The runs do not record it.
