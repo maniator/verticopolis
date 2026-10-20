@@ -810,6 +810,12 @@ impl Engine {
         self.sim.crowd.commute_stress_json().to_string()
     }
 
+    /// Changes whenever a completed trip contributes a commute sample.
+    #[wasm_bindgen(js_name = commuteStressRevision)]
+    pub fn commute_stress_revision(&self) -> u32 {
+        self.sim.crowd.commute_revision
+    }
+
     /// Replace the elevator telemetry with an `elevatorTelemetry` document.
     /// Tooling only (the gallery's engine leg); no game command reaches it.
     #[wasm_bindgen(js_name = seedElevatorTelemetry)]

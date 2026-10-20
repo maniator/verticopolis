@@ -8,13 +8,12 @@ import { loadCommand, relayCommands, type CommandRelay } from "../dualrun/mirror
 import { appendEngineLog, applyRecords, checkRecords } from "./frameApply";
 import { decodeHeader } from "./frameView";
 import { SETTLE_TIMEOUT_MS, setStepGate } from "./stepGate";
+import { parseCommuteStress } from "./telemetry";
 import { refuseForeignCatalog } from "./wasmHost";
 import type { FrameReply, FrameRequest, Op, ToWorker } from "./workerProtocol";
 import { applyHeaderFields, isEventItem, isLogItem, mergeSave, parseArray, parseCount, parseMerge, parsePending, restoreOwn, structuredCloneOf } from "./workerApply";
 import { LATENCY_SAMPLES, newWorkerHostStats, pushSample, type WorkerHost, type WorkerHostOptions } from "./workerStats";
-
 export type { WorkerHost, WorkerHostOptions, WorkerHostStats } from "./workerStats";
-
 /**
  * The main-thread half of the experimental worker host (`?engine=wasm-worker`;
  * design in `docs/architecture/wasm-worker-host.md`). The engine runs in a
@@ -42,17 +41,13 @@ export type { WorkerHost, WorkerHostOptions, WorkerHostStats } from "./workerSta
  *   carried one and nothing was sent since; otherwise with the read model's
  *   own save. `settle` asks for an exact one, for the async save paths.
  */
-
 /** The default reply watchdog: far past a working worker's reply (it
  *  answers between frames), short enough that a stuck worker gives the
  *  tower back to TypeScript while the player waits. */
 export const REPLY_TIMEOUT_MS = 10_000;
-
 /** Stale replies in a row after which the gate opens anyway (see `idle`). */
 export const MAX_STALE_STREAK = 4;
-
 const now = (): number => (globalThis.performance ? performance.now() : Date.now());
-
 export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): WorkerHost {
   const catalogs = {
     classic: readCatalog({ catalog: () => opts.catalogs.classic }, "classic"),
@@ -90,7 +85,6 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       return false;
     }
   };
-
   let loaded = false;
   let detached = false;
   /** The last op numbered, the last command's number, and the last op a
@@ -117,6 +111,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
    *  again (so they are dropped there rather than handed out twice). */
   let staleStreak = 0;
   let held: GameplayEvent[] = [];
+  let heldCommute: [number, number][] | null = null;
   /** The last op that is not a camera stamp, and the last camera stamp:
    *  a reply that includes the first is caught up, with the second patched
    *  into its save. */
@@ -133,7 +128,6 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   let engineLogSeq = 0;
   let engineMealRev = 0;
   let simLogSeqAtSync = sim.logSeq;
-
   let carried: GameplayEvent[] = sim.gameplayEvents.drain();
   const droppedAtAttach = sim.gameplayEvents.dropped;
   let droppedEngine = 0;
@@ -197,7 +191,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     disarm();
     stats.replies++;
     stats.frameBytes += r.view.byteLength;
-    stats.bytesReceived += r.view.byteLength + 2 * (r.events.length + (r.log?.length ?? 0) + (r.pending?.length ?? 0));
+    stats.bytesReceived += r.view.byteLength + 2 * (r.events.length + (r.log?.length ?? 0) + (r.pending?.length ?? 0) + (r.commute?.length ?? 0));
     stats.workerOpsMs += r.workMs.ops;
     stats.workerReplyMs += r.workMs.reply;
     stats.workerMemoryBytes = r.memoryBytes;
@@ -210,6 +204,8 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     checkRecords(r.view, h);
     const events = parseArray<GameplayEvent>(r.events, "event batch", isEventItem);
     const dropped = parseCount(r.dropped, "dropped-event count");
+    const commuteText = r.merge?.commute ?? r.commute;
+    const commute = commuteText == null ? heldCommute : parseCommuteStress(commuteText);
     // A reply that includes every command the instance ran. One that does
     // not is refused (#908) except for its events: its state predates a
     // command the instance already answered, and its crowd and cars may name
@@ -228,6 +224,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       staleStreak++;
       droppedEngine = dropped;
       for (const e of events) held.push(e);
+      heldCommute = commute;
       if (r.merge) needMerge = true;
       stats.applyMs += now() - t0;
       // Asked again at once, so the read model waits a round trip; after a
@@ -272,6 +269,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
         simLogSeqAtSync = sim.logSeq;
       }
       applyRecords(sim, r.view, h);
+      if (commute) sim.crowd.adoptCommuteStress(commute);
     });
     // Applied: every command so far is in the read model, so its copies of
     // their events give way to the engine's, which arrive now, after any
@@ -281,6 +279,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     for (const e of held) carried.push(e);
     for (const e of events) carried.push(e);
     held = [];
+    heldCommute = null;
     sim.gameplayEvents.drain();
     staleStreak = 0;
     engineMinutes = h.minutes;

@@ -10,6 +10,48 @@ import { rig } from "./workerRig.fixture";
 const last = <T>(xs: readonly T[]): T | undefined => xs[xs.length - 1];
 
 describe("worker host (fake engine)", () => {
+  it.each([true, false])("holds stale commute samples until a fresh reply (detach: %s)", async (detach) => {
+    const r = rig();
+    await r.settleTasks();
+    r.sim.crowd.adoptCommuteStress([[2, 10]]);
+    r.engine().commuteRows = "[[2,25]]";
+    r.engine().commuteRevision++;
+    r.sim.tick(1);
+    r.gate().flush();
+    r.sim.money = 1;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(r.host.stats.staleReplies).toBe(1);
+    expect([...r.sim.crowd.commuteStressByFloor]).toEqual([[2, 10]]);
+    if (!detach) {
+      await r.settleTasks();
+      expect([...r.sim.crowd.commuteStressByFloor]).toEqual([[2, 25]]);
+      expect(r.fatal).toEqual([]);
+    }
+    r.host.detach();
+    expect([...r.sim.crowd.commuteStressByFloor]).toEqual([[2, detach ? 10 : 25]]);
+    await r.settleTasks();
+  });
+  it("retains changed commute rows from a frame without an hourly merge through detach", async () => {
+    const r = rig();
+    await r.settleTasks();
+    r.sim.crowd.adoptCommuteStress([[2, 10], [7, 80]]);
+    r.engine().commuteRows = "[[2,25]]";
+    r.engine().commuteRevision++;
+    r.engine().owed = [{ name: "star_reached", payload: { star: 2 } }];
+    const merges = r.host.stats.merges;
+    r.sim.tick(1);
+    r.gate().flush();
+    await r.settleTasks();
+    expect(r.host.stats.merges).toBe(merges);
+    expect([...r.sim.crowd.commuteStressByFloor]).toEqual([[2, 25]]);
+    const save = r.engine().serialize();
+    r.host.detach();
+    expect([...r.sim.crowd.commuteStressByFloor]).toEqual([[2, 25]]);
+    expect(r.engine().serialize()).toBe(save);
+    expect(r.sim.drainGameplayEvents().filter((e) => e.name === "star_reached")).toHaveLength(1);
+    expect(r.sim.drainGameplayEvents()).toEqual([]);
+  });
   it("holds steps until the tower is loaded, then steps, batches and applies the reply", async () => {
     const r = rig();
     expect(r.gate().canStep()).toBe(false);

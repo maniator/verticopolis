@@ -108,6 +108,8 @@ export interface FrameReply {
   log: string | null;
   pending: string | null;
   merge: MergePayload | null;
+  /** Changed commute rows when this reply carries no full merge. */
+  commute?: string | null;
   workMs: { ops: number; reply: number };
   /** The worker's WASM linear memory, when the entry point can read it. */
   memoryBytes: number | null;

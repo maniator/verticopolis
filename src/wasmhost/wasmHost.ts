@@ -107,6 +107,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   // never land on the same number and the counter never steps back.
   let engineMealRev = decodeFrame(engine.frameView()).header.mealOverlayRevision;
   let simLogSeqAtSync = sim.logSeq;
+  let commuteRevision = Number.NaN;
   let detached = false;
   /** Coalesced mode: steps ran since the last sync. */
   let stale = false;
@@ -170,6 +171,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
       const duplicates = sim.gameplayEvents.length;
       const handOff = { events: carried, dropped: droppedAtAttach + unreadable + duplicates };
       runEach(
+        () => sim.crowd.adoptCommuteStress(parseCommuteStress(engine.commuteStress())),
         () => {
           const engineDropped = engine.gameplayEventsDropped();
           handOff.dropped += engineDropped;
@@ -210,6 +212,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     const hk = engine.housekeepingReport();
     sim.economy.adoptHousekeepingReport(hk ? (JSON.parse(hk) as { cleaned: number; leftover: number }) : null);
     sim.crowd.adoptCommuteStress(commute);
+    commuteRevision = engine.commuteStressRevision();
     lastRevision = frame.header.revision;
     host.merges++;
   };
@@ -232,6 +235,11 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
       if (force || h.onHourRuns !== lastHourRuns || h.revision !== lastRevision) {
         merge({ header: h });
         lastHourRuns = h.onHourRuns;
+      }
+      const revision = engine.commuteStressRevision();
+      if (revision !== commuteRevision) {
+        sim.crowd.adoptCommuteStress(parseCommuteStress(engine.commuteStress()));
+        commuteRevision = revision;
       }
       // The meal overlay moves mid-hour (a worker leaves for lunch), and the
       // renderer repaints rooms when the instance's counter moves, so the

@@ -7,6 +7,30 @@ import { advanceOwedMinutes } from "../game/frameLoop";
 import { engineSuffix } from "./engineLabel";
 
 describe("the coalesced main-thread host (sync: frame)", () => {
+  it.each(["frame", "step"] as const)("hands current commute rows back before an hourly merge (%s)", (sync) => {
+    const sim = Simulation.newGame(9, "classic");
+    const mod = fakeModule();
+    const host = attachWasmHost(sim, mod, { sync });
+    const engine = mod.engines[0];
+    host.syncStructure();
+    sim.crowd.adoptCommuteStress([[2, 10], [7, 80]]);
+    engine.commuteRows = "[[2,25]]";
+    engine.commuteRevision++;
+    const merges = host.merges;
+    sim.tick(1);
+    host.flush();
+    expect([...sim.crowd.commuteStressByFloor]).toEqual([[2, 25]]);
+    expect(host.merges).toBe(merges);
+    const save = engine.serialize();
+    engine.commuteRows = "[[2,30],[3,15]]";
+    engine.commuteRevision++;
+    engine.owed = [{ name: "star_reached", payload: { star: 2 } }];
+    host.detach();
+    expect([...sim.crowd.commuteStressByFloor]).toEqual([[2, 30], [3, 15]]);
+    expect(engine.serialize()).toBe(save);
+    expect(sim.drainGameplayEvents().filter((e) => e.name === "star_reached")).toHaveLength(1);
+    expect(sim.drainGameplayEvents()).toEqual([]);
+  });
   it("advances the clock per step and applies the frame once, at the flush", () => {
     const sim = Simulation.newGame(9, "classic");
     const mod = fakeModule();

@@ -26,6 +26,7 @@ export class EngineWorkerCore {
   private seq = 0;
   private sentRevision = Number.NaN;
   private sentHourRuns = Number.NaN;
+  private sentCommuteRevision = Number.NaN;
   private errors = 0;
 
   /** `memoryBytes` reads the engine's linear memory size, for the
@@ -68,6 +69,7 @@ export class EngineWorkerCore {
     this.errors = 0;
     this.sentRevision = Number.NaN;
     this.sentHourRuns = Number.NaN;
+    this.sentCommuteRevision = Number.NaN;
     try {
       this.shadow.apply({ op: "load", gen, save, markers });
       const engine = this.shadow.handle();
@@ -125,6 +127,9 @@ export class EngineWorkerCore {
         this.sentHourRuns = hourRuns;
       }
       const events = engine.drainGameplayEvents();
+      const commuteRevision = engine.commuteStressRevision();
+      const commute = !merge && commuteRevision !== this.sentCommuteRevision ? engine.commuteStress() : null;
+      this.sentCommuteRevision = commuteRevision;
       const reply: FromWorker = {
         type: "frame",
         gen: this.gen,
@@ -136,6 +141,7 @@ export class EngineWorkerCore {
         log: logSeq !== msg.request.logSeq ? engine.logSince(msg.request.logSeq) : null,
         pending,
         merge,
+        commute,
         workMs: { ops: t1 - t0, reply: now() - t1 },
         memoryBytes: this.memoryBytes(),
       };
