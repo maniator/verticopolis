@@ -341,7 +341,9 @@ A1, runtime reasons with A3.
     command, reports `trap-command` with its own stage;
   - `size_gated`, a flag kept apart from fallback;
   - `writer_latched` (the S2 writer's latch-off);
-  - `divergence_reports`, a count, from A3 onward (S4's reports, then S9's);
+  - `divergence_reports`, a count, from #954 (S9) onward. It was A3's (S4's
+    refusal report) until #874's spec moved that report to #954, whose
+    per-command adapter is what tells a refusal apart (2026-10-20);
   - `arm` (`wasm`, `ts`, `override`, `unassigned`) and `stage` (the cohort
     stage the build carries), once the cohort runs (A4). Sending these
     two also needs the owner's production OK, which A4's PR asks for.
@@ -977,11 +979,13 @@ The architecture review documents **no exception**:
   the owner's own saves. The owner chose to keep #1066 whole and complete
   the four for 3.0 (OD-8 (a)), with the real-save inputs identified early:
   A7's first task lists them (9.1).
-- **#1064 is S9's mirror image of S4's report.** S4, with the instance
-  answering first as today, reports a command the instance accepted and the
-  engine refused (A3, under #874). After S9 the engine answers first, and
-  #1064 reports a command the engine refused that the instance would have
-  accepted (A6).
+- **#1064 is S9's mirror image of the refusal report.** With the instance
+  answering first as today, a command the instance accepted and the engine
+  refused would be reported. That report was S4's third clause; #874 (A3)
+  moved it to #954 (A6), since telling a refusal apart needs #954's
+  per-command adapter. After S9 the engine answers first, and #1064 reports
+  a command the engine refused that the instance would have accepted
+  (A6).
 - **#1065 is S9's "a disagreement is reported"**, deep enough to see the same
   price with a different placement. It stays cheap: the revision, the counts
   and a layout hash, with no full state view per click.
@@ -1014,6 +1018,18 @@ carries no published API promise until #893 publishes the crate with its
 own semver policy. Decision 4's text changes with the other cutover
 amendments at the owner's final approval. The policy's content and its
 place in the flip PR are this plan's proposal, listed in section 12.
+
+**The crate's own version (#963, owner decision of 2026-10-20).** The crate
+version in `engine-rs/Cargo.toml` goes up in the same PR as a change to the
+conformance lock, `SAVE_VERSION` or the oldest save version loaded, the frame
+layout, catalog or identity record version, or the binding's declaration
+(`src/dualrun/engine.d.ts`). An internal change that keeps all of these, such
+as a compatible optimization, is told apart by the build hash and needs no
+bump. The app version stays the number players see, and publishing waits for
+#893. Where the tree can show it, a record (`engine-rs/src/compat-record.json`)
+and a guard enforce it; the Rust `pub` API and JSON shapes the declaration only
+describes are a review call (backlog row `engine-compat-coverage`).
+CONTRIBUTING.md's Versioning section has the steps.
 
 ## 8. Priority labels (D6)
 
@@ -1100,7 +1116,7 @@ plumbing and for every recovered patch.
 | --- | --- | --- | --- |
 | A1 | The reliability instrument (4.1): host status fields, analytics fields, the governed definition and its test (with the split into early telemetry and eligible sessions, the per-arm crash rates, and the exact bound computed in the tested script, OD-2), the analytics data map (A1 creates it) and its entries, the #841 check | none | `src/analytics*`; the new data map; `WasmHostStatus` in `src/wasmhost/startWasmHost.ts` and the boot state in `engineBoot.ts`; a `telemetry.ts` edit, if needed, waits for #1062. Sending the new fields to production needs the owner's separate OK (section 13) |
 | A2 | S5 #902: booked rooms survive attach in both engines | `wasm-authority.patch` | The patch touches `merge.ts`, `load.rs`, `services.rs`, `sim.rs`, `src/engine/sim/*`, `serializedGame.ts`, a new conformance scenario and the parity setup (`src/tests/parity/wasmHostSetup*`); it does not touch `wasmHost.ts`. Draft PR early; merges after A3 (the owner's 2026-10-16 order on #945 queues #902 after #874: the same host and save paths) and after #1062 (shared parity setup). Engine-semantic; lock change, no save-version bump; its PR opens the exception register (section 10, Sign-off) with the rollback loss as the first entry |
-| A3 | S4 #874: throw, panic and stall fallback with re-adoption; engine refusals of commands the instance accepted are reported; #1059's last error; #1020's edges if they sit in the same code | `wasm-integration.patch` (#1059 code and tests only) | After #1062 merges (`wasmHost.ts`). A1's runtime reasons ship here. Nothing in WS-A merges ahead of it except A1 and docs-only specs (A5's design rule), though #902's draft may open earlier (risk R19); S4's booking-case test lands with A2, and #874 stays open until A2 merges (the cutover plan's S4 row lists S5 as a dependency for that case; the owner's later order on #945 wins) |
+| A3 | S4 #874: throw, panic and stall fallback with re-adoption; #1059's last error (the report of engine refusals of commands the instance accepted moved to #954, S9, on 2026-10-20: it needs #954's per-command adapter); #1020's edges if they sit in the same code | `wasm-integration.patch` (#1059 code and tests only) | After #1062 merges (`wasmHost.ts`). A1's runtime reasons ship here. Nothing in WS-A merges ahead of it except A1 and docs-only specs (A5's design rule), though #902's draft may open earlier (risk R19); S4's booking-case test lands with A2, and #874 stays open until A2 merges (the cutover plan's S4 row lists S5 as a dependency for that case; the owner's later order on #945 wins) |
 | A4 | The staged cohort (OD-1, 4.1): the bucket draw with its read-back check, the config module that holds the share constant and the size gate's threshold, the `arm` and `stage` fields, the size gate, the stop signals in A1's report, and the help-text sentence | none | Its fields need the owner's production OK, as A1's do. Each stage and each drop-back ships only on the owner's approval; stage 1 waits for stage 0, A3's forced-trap spec and A2; stage 3 waits for A5 and a protocol run passing M2 to M6 at 1x and 4x, and takes the size gate off |
 | A5 | S6 #868: getters and result shapes; remove the per-step sync and the hourly merge (design from RUN-0b, OD-9 (ii)); audio cue-timing test, and #965 if that test fails | `saveDelta` from #1068 only if RUN-0b's evidence picks design A | A5's spec commits the rule below before RUN-0b runs; the design is then chosen from RUN-0b before code; RUN-1 measures it |
 | A6 | S9 #954 with #1064, #1065, #1066 and #1067; audio cue-timing test; #965 if this test is the first to fail | none (re-implementation) | The engine answers; AD-8 on every load path. #954 first, then #1064, #1065 and #1066 each in a focused PR with parity tests (the owner's 2026-10-16 order). Only #1066's `.TDT` half waits for A7 (OD-8); the rest of S9 does not |

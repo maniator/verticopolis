@@ -80,9 +80,9 @@ file changes. And attaching at the first tick lets a test set its tower up
 the way the suites do today (`tower.place`, a direct field write) before
 the engine starts from the instance's own save, so setup that bypasses the
 command relay still reaches the engine. `callExterminator` is hooked too:
-it attaches the host ahead of the first tick, because the booked room ids
-live in memory only (`exterminationRoomIds`, which no save carries), and
-hosting first relays the booking so the engine books the same rooms.
+it attaches the host ahead of the first tick, so the booking is relayed and
+compared like other commands. Since #902 the save carries the booked room
+ids (`exterminationRoomIds`), so a re-host mid-booking keeps them.
 
 **Attach-time normalization.** The engine's load can log lines the
 instance never had (the Classic rent-snap bulletin). The instance adopts
@@ -133,8 +133,6 @@ leaves it out.
   it;
 - an instance that already has a crowd at attach (one Simulation shared
   between tests and ticked on the TypeScript engine after its release);
-- an exterminator booking the save cannot carry: booked room ids on the
-  instance at attach, and any pending booking at a re-host (#902);
 - a re-host after the first tick under `VC_WASM_SYNC=hour`, where the
   instance is behind the engine between merges and its save would rewind
   the engine.
@@ -350,10 +348,9 @@ repeats it.
   engines) and sets No Rate through `sim.setNoRate`; `housekeepingMaids`
   ticks to the noon dispatch in place of a clock write plus a direct
   `dispatchHousekeepers()`; `cockroachInfestation` passes through a hook in
-  the setup file: `callExterminator` keeps its booked room ids in memory
-  only (`exterminationRoomIds`, which no save carries), so a booking before
-  the first tick would reach the engine as a due day with no rooms; the
-  setup hosts the instance first and the relay books the same rooms.
+  the setup file: `callExterminator` hosts the instance first so the relay
+  books the same rooms on both engines (the booked room ids have been in the
+  save since #902).
 - **TypeScript-only (10 tests, 6 files):** two clock jumps and one direct
   drive of the event system (`attendanceTripwire`), two `customersIn`
   stamps (`personRoundTrip`), the weather write (`faqComplete`), the

@@ -250,3 +250,27 @@ describe("splash Ground floor badge (2.0 upgrade recognition)", () => {
     expect(el.querySelector(".splash-founder")).toBeNull();
   });
 });
+
+describe("a tower swapped in without the player choosing it (#874)", () => {
+  function controllerWithSplash() {
+    const { ctl, opts } = makeController();
+    ctl.showSplash({ hasSave: true, onContinue: vi.fn(), onLoadTower: vi.fn(), onNewTower: vi.fn(), muted: () => false });
+    return { ctl, opts };
+  }
+  const sim = {} as Parameters<OnboardingController["adoptSim"]>[0];
+
+  it("keeps the title screen up for the WASM engine's fallback or an undo restore", () => {
+    const { ctl, opts } = controllerWithSplash();
+    const pauses = opts.pauseForSplash.mock.calls.length; // the splash's own
+    ctl.adoptSim(sim, true);
+    expect(document.getElementById("splash")).not.toBeNull();
+    expect(opts.pauseForSplash).toHaveBeenCalledTimes(pauses);
+  });
+
+  it("still takes it down for a tower the player opened", () => {
+    const { ctl, opts } = controllerWithSplash();
+    ctl.adoptSim(sim);
+    expect(document.getElementById("splash")).toBeNull();
+    expect(opts.pauseForSplash).toHaveBeenCalledWith(true);
+  });
+});

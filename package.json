@@ -1,6 +1,6 @@
 {
   "name": "verticopolis",
-  "version": "2.39.0",
+  "version": "2.42.0",
   "description": "Verticopolis: a browser-native SimTower clone in TypeScript",
   "license": "MIT",
   "type": "module",
@@ -26,6 +26,9 @@
     "perf:compare": "tsx scripts/perf-compare.ts",
     "perf:worker": "tsx scripts/perf-worker.ts",
     "perf:worker-diff": "tsx scripts/perf-worker-diff.ts",
+    "perf:restore": "tsx scripts/perf-restore-points.ts",
+    "perf:calibrate": "tsx scripts/perf-calibrate.ts",
+    "perf:before-after": "tsx scripts/perf-before-after.ts",
     "lint": "eslint src api --ext .ts,.tsx",
     "lint:fix": "eslint src api --ext .ts,.tsx --fix",
     "screenshots": "VC_TOOLING=1 vite build && RUN_SERVER=1 node scripts/screenshots.ts",
@@ -36,6 +39,7 @@
     "atlas": "tsx scripts/export-atlas.ts",
     "gen:events": "node scripts/gen-gameplay-events.ts",
     "wasm:build": "node scripts/wasm-build.ts",
+    "engine:compat": "node scripts/engine-compat.ts",
     "test:wasm": "VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm dualRun wasmHost wasmWorker chargeBindingRaw perfCompare/scenarios.integration",
     "test:wasm:parity": "VC_REQUIRE_WASM=1 vitest run --project integrationWasm --project unitWasm"
   },
@@ -56,7 +60,7 @@
     "tsx": "^4.23.0",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.54.0",
-    "vite": "^7.3.1",
+    "vite": "^7.3.7",
     "vite-plugin-pwa": "^1.3.0",
     "vitest": "^4.1.11"
   },

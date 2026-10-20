@@ -2,6 +2,7 @@ import type { WasmModule } from "../dualrun/binding";
 import { ShadowEngine } from "../dualrun/shadow";
 import { KEYFRAME_EXEMPT_OPS } from "./saveSyncRules";
 import type { FromWorker, OpsMessage, ToWorker } from "./workerProtocol";
+import { readEngineIdentity } from "./engineIdentity";
 
 /**
  * The engine worker's logic, apart from the worker global so it runs in Node
@@ -54,6 +55,13 @@ export class EngineWorkerCore {
       return this.mod.catalog(mode);
     };
     return { classic: read("classic"), modern: read("modern") };
+  }
+
+  /** The engine's identity record for the ready reply, or undefined when the
+   *  package has no such call or it throws: About reports the gap, so a
+   *  failure here never stops the worker. */
+  identity(): string | undefined {
+    return readEngineIdentity(this.mod);
   }
 
   handle(msg: ToWorker): void {

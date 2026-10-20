@@ -1,3 +1,4 @@
+import type { ChurnReport } from "./churn";
 import type { Environment } from "./env";
 import type { BundleReport } from "./bundle";
 import type { NodeCheck } from "./nodeCheck";
@@ -39,7 +40,7 @@ export interface StepSummary {
   stepMaxMs: number;
   /** From a separate wrapped pass (hosted WASM only); the timings above
    *  come from an unwrapped pass. */
-  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; wrappedTotalMs: number; merges: number; engineTicks: number; exportCalls: number; exportsWrapped: number } | null;
+  attribution: { engineTickMs: number; engineExportMs: number; hostJsMs: number; wrappedTotalMs: number; merges: number; engineTicks: number; exportCalls: number; exportsWrapped: number; byExport: Record<string, { calls: number; ms: number }>; parseMs: number; parseCalls: number } | null;
   engineActive: EngineName;
   hostErrorsAdded: string[];
   /** The loop began from a full GC (gc() was there). */
@@ -131,6 +132,8 @@ export interface ProcessRun {
   rendererEnd?: string | null;
   /** The same read after the throttled cold start, kept apart so it cannot hide a change after the frames; absent for a run without a cold start. */
   rendererEndCold?: string | null;
+  /** One line per WebGL context lost on a canvas in any of the run's pages (contextLoss.ts); absent in results written before this check, empty for none. Any entry fails validation in every mode. */
+  contextLost?: string[];
   cold: StartupSample | null;
   warm: StartupSample | null;
   /** A cold start under the heaviest configured CPU throttle (4x by
@@ -143,7 +146,7 @@ export interface ProcessRun {
   cpuProbe: { unthrottledMs: number; throttledMs: number | null; rate: number; timed: Record<string, number> } | null;
   scenarios: Record<string, ScenarioRun>;
   wasmCold: { fetchMs: number; bytes: number; compileMs: number; instantiateMs: number; firstEngineMs: number } | null;
-  /** The audio start for the audio-on frame pass. */
+  /** The audio start of the audio-on frame pass: the last scenario's page, since each scenario starts audio in its own. */
   audio: { started: boolean; muted: boolean; contexts: string[] } | null;
   /** A first visit with the service worker allowed, then an offline
    *  reload: which engine came back without the network. */
@@ -212,6 +215,8 @@ export interface CompareResults {
   browser: { version: string | null; headless: boolean; executable: string | null; channel?: string | null; args?: string[]; rendererException?: string | null; rendererExceptionSha256?: string | null; rendererExceptionCommit?: string | null; gpuVerified?: boolean };
   scenarios: { name: string; description: string; sha256: string; population: number; units: number; transports: number; saveBytes: number }[];
   nodeChecks: NodeCheck[];
+  /** Hourly save churn on the WASM engine in Node, per scenario. */
+  churn?: ChurnReport[];
   runs: ProcessRun[];
   bundle: BundleReport | null;
   /** The same totals for the VC_TOOLING=1 build the timings ran on. */

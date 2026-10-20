@@ -159,9 +159,8 @@ export function callExterminator(sim: Simulation): ExterminatorResult {
   sim.recordMoney("upkeep", -cost);
   sim.exterminationDueDay = sim.clock.day + 1;
   // Remember exactly which rooms were billed, so an overnight-escalated wing is
-  // NOT swept up for the price of today's smaller count. Transient by design: a
-  // save taken mid-booking loses this and resolution falls back to clearing all
-  // infested rooms (the dueDay itself persists, so the treatment still lands).
+  // NOT swept up for the price of today's smaller count. The billed set is
+  // saved with the due day, so a reload or a host attach treats the same rooms.
   sim.exterminationRoomIds = ids;
   sim.emit(
     `🧹 Exterminator booked for ${rooms} infested room(s): $${cost.toLocaleString("en-US")} charged. The rooms clear tomorrow.`,
@@ -173,8 +172,8 @@ export function callExterminator(sim: Simulation): ExterminatorResult {
 /** Land a booked exterminator's treatment once its day arrives, clearing the
  *  rooms it was billed for (those still `infested`) back to a rentable `empty`.
  *  A room bulldozed or burned before resolution is simply not found (no refund).
- *  After a mid-booking save the billed set is gone, so it clears every infested
- *  room. No-op when nothing is en route. */
+ *  Older saves without a billed set clear every infested room. No-op when
+ *  nothing is en route. */
 export function resolveExtermination(sim: Simulation): void {
   if (sim.exterminationDueDay === undefined || sim.clock.day < sim.exterminationDueDay) return;
   sim.exterminationDueDay = undefined;

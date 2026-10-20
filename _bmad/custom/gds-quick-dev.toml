@@ -1,0 +1,15 @@
+# Team override for gds-quick-dev, merged over the installer-owned
+# .claude/skills/gds-quick-dev/customize.toml (the .agents copy is identical).
+# Arrays append to the base list.
+#
+# Quick-dev runs its own three-layer review in step-04-review.md. On a hot-path
+# change that loop does not replace the review skill, and its classify step
+# must not reject a hot-path finding. The checklist lives in
+# docs/performance/hot-path-review.md; each fact cites it as "section N (Name)".
+# src/tests/hotPathReview.guard.test.ts checks this hook stays in place.
+
+[workflow]
+
+persistent_facts = [
+  "Hot-path review: when the change touches a surface in section 1 (When it applies) of docs/performance/hot-path-review.md, read that page before step-04-review.md. In its Classify step, a hot-path finding is never reject: classify it by section 7 (Resolving a finding), as patch or defer. This loop does not replace the deep review: the change still goes through /gds-code-review or /bmad-code-review, whichever CLAUDE.md names, before it is done.",
+]

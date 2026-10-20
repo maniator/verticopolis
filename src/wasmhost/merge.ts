@@ -114,9 +114,9 @@ function adoptSimulationFields(target: Simulation, fresh: Simulation, keepUnitSe
     t[key] = f[key];
   }
   target.clock.minutes = fresh.clock.minutes;
-  // A transient the instance set on a command and the save never carries;
-  // the engine resolves it in its own tick, so it must not stick here.
-  delete target.exterminationRoomIds;
+  // Set the billed rooms outright as well, so a fresh instance without the
+  // key still clears a list whose treatment the engine landed.
+  target.exterminationRoomIds = fresh.exterminationRoomIds;
   target.events.loadState(fresh.events.saveState());
   target.economy.restoreBlockbusters(fresh.economy.blockbusterIds);
 }

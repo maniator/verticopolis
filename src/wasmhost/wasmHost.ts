@@ -1,6 +1,5 @@
 import { LOG_RING_CAP } from "../engine/sim/constants";
 import { Simulation } from "../engine/Simulation";
-import type { Person } from "../engine/crowd/person";
 import type { LogEntry } from "../engine/types";
 import type { GameplayEvent } from "../engine/gameplayEvents";
 import type { WasmEngine, WasmModule } from "../dualrun/binding";
@@ -14,9 +13,11 @@ import { setStepGate } from "./stepGate";
 import { mergeSimulation } from "./merge";
 import { adoptTelemetry, parseCommuteStress, type TelemetryDocument } from "./telemetry";
 import { useTowerCatalogSource } from "../engine/towerCatalog";
-import { catalogFor } from "../engine/catalog";
-import type { Catalog, CatalogWorld } from "../engine/catalogTypes";
-import { PERSON_OPTIONALS, clearOptional } from "./personFields";
+import { syncCars, syncPeople, syncUnits } from "./frameSync";
+import { refuseForeignCatalog } from "./catalogCheck";
+export { refuseForeignCatalog } from "./catalogCheck";
+import { FaultLatch, RestorePoints, carryLiveState, type FaultContext, type HostFault } from "./hostFault";
+import { HostEvents, type EventRead } from "./hostEvents";
 
 /**
  * Run a live `Simulation` on the WASM engine (story-engine-wasm-switch).
@@ -40,7 +41,10 @@ import { PERSON_OPTIONALS, clearOptional } from "./personFields";
  * instance's away, so a host that drains `sim` sees each event once whichever
  * engine runs. Events the instance emitted before the host attached (the
  * founding) come out at the first drain, and events the engine emitted
- * after the last drain go back to the instance when the host detaches.
+ * after the last drain go back to the instance when the host detaches. A
+ * command's events wait in the host until a restore point covers the command
+ * (#874): the next merge (the sync after a structural command, or the hour
+ * pass) or the next save the game reads (an undo capture, an autosave).
  */
 export interface WasmHost {
   /** The engine behind the instance. */
@@ -55,8 +59,22 @@ export interface WasmHost {
   /** The frame loop's flush: in coalesced mode, apply the engine's frame if
    *  a step ran since the last one; nothing in step mode. */
   flush(): void;
-  /** Put the instance back the way it was and free the engine. */
+  /** Put the instance back the way it was and free the engine. A trap
+   *  while letting go is a fault like any other (#874). A faulted tower is
+   *  a read model the fault left part synchronized, so it stays frozen: it
+   *  never ticks again, and its save is the newest restore point. */
   detach(): void;
+  /** The fault that froze this host, or null while the engine answers. */
+  readonly fault: HostFault | null;
+  /** Commands relayed since the newest restore point, log lines and the
+   *  camera aside: what a fallback to that point undoes, the trapped
+   *  command and any after the fault included (#874). Temporary, with the
+   *  restore points. */
+  readonly lostEdits: number;
+  /** A fresh TypeScript tower from the newest restore point that loads,
+   *  carrying the read model's live state no save holds (#874). Throws when
+   *  no point loads. Temporary, with the restore points. */
+  restore(): Simulation;
 }
 
 /** Attach a host to `sim`. Throws, leaving the instance untouched, when the
@@ -75,6 +93,16 @@ export interface WasmHostOptions {
    *  engine's clock does, so the fixed step sizes the same steps. A caller
    *  that ticks outside the frame loop syncs with `syncStructure`. */
   sync?: "step" | "frame";
+  /** Called once when a call into the engine throws (#874). By then the
+   *  host is frozen: ticks and commands no longer reach the engine, and a
+   *  save answers with the newest restore point. Nothing on the instance
+   *  throws again, except a save when no restore point loads (the merges'
+   *  and the attach save were loaded by TypeScript, so one always does). A
+   *  throw from the callback is ignored. */
+  onFault?: (fault: HostFault) => void;
+  /** What the app is doing, so a fault in an undo or redo is coded
+   *  `trap-undo` and one in an undo capture's save `trap-command`. */
+  context?: () => FaultContext;
 }
 
 export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHostOptions = {}): WasmHost {
@@ -90,8 +118,13 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   // here, once, instead of failing the status pump after the switch.
   for (const c of Object.values(catalogs)) refuseForeignCatalog(c);
   const shadow = new ShadowEngine(mod);
-  shadow.apply(loadCommand(sim, 0));
+  const load = loadCommand(sim, 0);
+  shadow.apply(load);
   const engine = shadow.handle();
+  // The saves a fault goes back to (#874): first the one the engine was just
+  // built from. Temporary, removed with the TypeScript simulation, like
+  // everything below that reads or notes a point.
+  const points = new RestorePoints(load.save);
   let lastRevision = sim.tower.revision;
   let lastHourRuns = -1;
   // The engine's own log cursor, kept apart from the instance's `logSeq`
@@ -116,83 +149,131 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   // engine's start from here. The instance keeps its own buffer object for
   // the whole attach (the merge puts it back), so its marks, its drop count
   // and the read model's copies since the last drain all stay on it.
-  let carried: GameplayEvent[] = sim.gameplayEvents.drain();
+  const events = new HostEvents(sim.gameplayEvents.drain());
   // The read model's own ring overflows with duplicates while hosted, so the
   // drop count is the instance's at attach plus the engine's.
   const droppedAtAttach = sim.gameplayEvents.dropped;
-  // Events lost to a batch the host could not read (#907).
-  let unreadable = 0;
-  const drainHosted = (): GameplayEvent[] => {
-    // The engine first: when it traps, the read model's copies stay for the
-    // detach to count what the trap took.
+  const dropCount = () => droppedAtAttach + events.unreadable + events.engineDropped;
+  /** Read the engine's pending events and its drop count, and throw away
+   *  the read model's copies. Nothing is kept until `events` takes the read:
+   *  a read that throws part way keeps none of it, and its events are after
+   *  the newest restore point, which a fallback emits again. */
+  const readEvents = (): EventRead => {
     const batch = drainEngineBatch(engine);
+    const dropped = engine.gameplayEventsDropped();
     sim.gameplayEvents.drain();
-    unreadable += batch.lost;
-    const out = [...carried, ...batch.events];
-    carried = [];
-    return out;
+    return { ...batch, dropped };
   };
-  const droppedSoFar = () => droppedAtAttach + unreadable + engine.gameplayEventsDropped();
+  /** A restore point: the engine's pending events move behind the host's,
+   *  then its save is read. Both or neither: when the save throws, the events
+   *  read with it are dropped, since the fallback's replay emits them. */
+  const readPoint = (): string => {
+    const batch = readEvents();
+    const text = engine.serialize();
+    events.cover(batch);
+    points.note(text);
+    return text;
+  };
+  /** Events the engine emitted since the host last read them came from
+   *  ticks after the newest point, so a newer point is taken before they can
+   *  leave the host, and a fallback never emits them twice. The engine's tick
+   *  events come with its hour pass, whose merge reads them first, so this
+   *  rarely costs a save. */
+  const pullTicks = () => {
+    const batch = readEvents();
+    if (batch.events.length === 0 && batch.lost === 0) {
+      events.count(batch);
+      return;
+    }
+    points.note(engine.serialize());
+    events.cover(batch);
+  };
+  const drainHosted = (): GameplayEvent[] => {
+    pullTicks();
+    return events.take();
+  };
+  const droppedSoFar = () => {
+    events.engineDropped = guard("trap-tick", () => engine.gameplayEventsDropped(), events.engineDropped);
+    return dropCount();
+  };
+  // A throw from the engine freezes the host once (#874); every call into
+  // it goes through `guard`, so the instance's caller never sees one.
+  const latch = new FaultLatch(options, () => {
+    stale = false;
+    events.dropHeld();
+  });
+  const guard = latch.guard.bind(latch);
   const host: WasmHost = {
     engine,
     sync: coalesce ? "frame" : "step",
     frames: 0,
     merges: 0,
+    get fault() {
+      return latch.fault;
+    },
+    get lostEdits() {
+      return events.lostEdits;
+    },
     syncStructure() {
-      syncFrame(true);
+      if (!detached) guard("trap-tick", () => syncFrame(true), undefined);
     },
     flush() {
-      if (coalesce && stale && !detached) syncFrame();
+      if (coalesce && stale && !detached) guard("trap-tick", () => syncFrame(), undefined);
+    },
+    restore() {
+      const fresh = points.restore().sim;
+      carryLiveState(sim, fresh);
+      return fresh;
     },
     detach() {
       if (detached) return;
-      // Coalesced mode: steps since the last sync are applied first, so the
-      // instance that becomes the authority again holds them (best effort:
-      // an engine that cannot answer is let go below as before).
-      if (coalesce && stale) {
-        try {
-          syncFrame();
-        } catch {
-          /* the teardown below still runs */
-        }
-      }
-      detached = true;
-      // The instance is the authority again: it keeps the events the engine
-      // still owes and the engine's drop count. Every step of the teardown
-      // runs even when an earlier one throws (an engine that can no longer
-      // answer, a trap), so the instance is always let go and the engine
-      // always freed. When the engine cannot hand its batch over, the read
-      // model's copies of the commands' events since the last drain count as
-      // dropped. That is an estimate: the engine's own tick events (fires,
-      // stars, milestones) have no copy in the read model; a command the
-      // instance accepted but the engine refused (#874) has no twin there;
-      // a command the engine's full ring already dropped is counted again
-      // from its copy; and the copies stop at the read model's ring cap.
-      const duplicates = sim.gameplayEvents.length;
-      const handOff = { events: carried, dropped: droppedAtAttach + unreadable + duplicates };
-      runEach(
-        () => sim.crowd.adoptCommuteStress(parseCommuteStress(engine.commuteStress())),
+      // A live host hands over what the engine still owes: coalesced steps
+      // since the last sync, the commute averages, the pending events.
+      // Through the latch, so a trap here is a fault like any other, and a
+      // faulted host asks the engine nothing.
+      guard(
+        "other",
         () => {
-          const engineDropped = engine.gameplayEventsDropped();
-          handOff.dropped += engineDropped;
-          handOff.events = drainHosted();
-          handOff.dropped = droppedAtAttach + unreadable + engineDropped;
+          if (coalesce && stale) syncFrame();
+          sim.crowd.adoptCommuteStress(parseCommuteStress(engine.commuteStress()));
+          // A healthy engine's commands all stand: the instance keeps them.
+          events.cover(readEvents());
         },
+        undefined,
+        "while letting a tower go",
+      );
+      detached = true;
+      const faulted = latch.fault !== null;
+      // The instance is the authority again: it keeps the events the host
+      // holds (after a fault, every one up to the newest restore point) and
+      // the engine's last drop count. Every step runs even when an
+      // earlier one throws, so the instance is always let go.
+      const handOff = { events: events.take(), dropped: dropCount() };
+      runEach(
         () => relay.detach(),
         () => useTowerCatalogSource(sim, null),
         () => setStepGate(sim, null),
-        () => restoreOwn(sim, "serialize", ownSerialize),
+        // A faulted tower never runs on TypeScript: its tick does nothing and
+        // its save stays the newest restore point (temporary, with them).
+        faulted ? () => Object.defineProperty(sim, "tick", { value: () => {}, configurable: true, writable: true }) : () => restoreOwn(sim, "serialize", ownSerialize),
         () => restoreOwn(sim, "drainGameplayEvents", ownDrain),
         () => restoreOwn(sim, "gameplayEventsDropped", ownDropped),
-        // The read model's duplicates go; the owed batch takes their place.
         () => sim.gameplayEvents.restore(handOff.events, handOff.dropped),
-        () => shadow.free(),
+        () => {
+          try {
+            shadow.free();
+          } catch (e) {
+            // A trapped engine cannot be freed; its module is not used again.
+            if (!faulted) throw e;
+          }
+        },
       );
     },
   };
 
   const merge = (frame: Pick<FrameView, "header">) => {
-    const fresh = Simulation.deserialize(JSON.parse(engine.serialize()));
+    const text = engine.serialize();
+    const fresh = Simulation.deserialize(JSON.parse(text));
     // The per-origin commute-stress averages, live crowd state no save
     // carries; read before any write, so a bad reply leaves the instance as
     // it was.
@@ -214,6 +295,10 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     sim.crowd.adoptCommuteStress(commute);
     commuteRevision = engine.commuteStressRevision();
     lastRevision = frame.header.revision;
+    // The merged save is the newest restore point, and the events the engine
+    // emitted up to it move behind the host's (see `readPoint`).
+    events.cover(readEvents());
+    points.noteMerge(text);
     host.merges++;
   };
 
@@ -285,31 +370,42 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
         applyRecords(sim, view, h);
       }
     });
-    // Cleared once the frame is in: a sync that threw is tried again at
-    // the next flush rather than skipped until another step runs.
     stale = false;
     host.frames++;
   };
 
-  // The sink and the tick override are synchronous and let an engine throw
-  // propagate to the caller (backlog #874 records the fallback to build:
-  // catch, record on the status, re-adopt the last merged save). The tick
-  // itself still arrives through the instance's frame-loop step math, which
-  // the host forwards rather than owning (#867).
+  // The sink and the tick override catch every engine throw (#874): the
+  // host freezes, the caller gets the instance's answer, and `onFault`
+  // tells the owner, which re-adopts a restore point. The tick itself still
+  // arrives through the instance's frame-loop step math, which the host
+  // forwards rather than owning (#867).
   let relay: ReturnType<typeof relayCommands>;
   try {
-    relay = relayCommands(sim, (cmd) => { shadow.apply(cmd); }, {
+    relay = relayCommands(sim, (cmd) => {
+      guard("trap-command", () => {
+        // Events still in the engine here came from ticks.
+        pullTicks();
+        shadow.apply(cmd);
+        // The command's own events wait for a point that covers it.
+        events.hold(readEvents());
+      }, undefined);
+      // The read model ran the command and the newest point is from before
+      // it, so a fallback undoes it.
+      events.noteCommand(cmd.op);
+    }, {
       tick(dt) {
-        engine.tick(dt);
-        if (!coalesce) {
-          syncFrame();
-          return;
-        }
-        // The engine's clock moved by exactly these minutes; the instance's
-        // follows so the next step is sized from the same clock, and the
-        // rest of the frame waits for the flush.
-        sim.clock.minutes += dt;
-        stale = true;
+        guard("trap-tick", () => {
+          engine.tick(dt);
+          if (!coalesce) {
+            syncFrame();
+            return;
+          }
+          // The engine's clock moved by exactly these minutes; the
+          // instance's follows so the next step is sized from the same
+          // clock, and the rest of the frame waits for the flush.
+          sim.clock.minutes += dt;
+          stale = true;
+        }, undefined);
       },
     });
   } catch (e) {
@@ -319,7 +415,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     try {
       runEach(
         () => shadow.free(),
-        () => sim.gameplayEvents.restore(carried, sim.gameplayEvents.dropped),
+        () => sim.gameplayEvents.restore(events.take(), sim.gameplayEvents.dropped),
       );
     } catch {
       // The refusal is the caller's answer; a failure to free behind it is not.
@@ -329,10 +425,28 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   const ownSerialize = Object.getOwnPropertyDescriptor(sim, "serialize");
   const ownDrain = Object.getOwnPropertyDescriptor(sim, "drainGameplayEvents");
   const ownDropped = Object.getOwnPropertyDescriptor(sim, "gameplayEventsDropped");
-  Object.defineProperty(sim, "serialize", { value: () => JSON.parse(engine.serialize()), configurable: true, writable: true });
+  // Every save the game reads (an undo capture, an autosave, an export) is
+  // a restore point at no extra cost, and one asked of a faulted host is the
+  // point the fallback goes back to.
+  const serializeHosted = () => {
+    const text = guard("other", readPoint, null);
+    return text === null ? points.newestSave() : JSON.parse(text);
+  };
+  Object.defineProperty(sim, "serialize", { value: serializeHosted, configurable: true, writable: true });
   // A reference to the override kept past detach drains the instance, which
-  // is the authority again, and never reaches the freed engine.
-  const drainOverride = (): GameplayEvent[] => (detached ? sim.gameplayEvents.drain() : drainHosted());
+  // is the authority again, and never reaches the freed engine. The
+  // analytics session's own flush releases the held events (`release`),
+  // after a drain that did not fault: a fault drops them with their commands.
+  const drainOverride = (opts?: { release?: boolean }): GameplayEvent[] => {
+    if (detached) return sim.gameplayEvents.drain();
+    const out = guard("trap-tick", drainHosted, null);
+    if (out === null) return events.take();
+    if (opts?.release && !latch.fault) {
+      events.release();
+      out.push(...events.take());
+    }
+    return out;
+  };
   Object.defineProperty(sim, "drainGameplayEvents", { value: drainOverride, configurable: true, writable: true });
   Object.defineProperty(sim, "gameplayEventsDropped", { get: droppedSoFar, configurable: true });
   // Prices, sizes and build rules come from the engine that runs the tower.
@@ -342,7 +456,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
       canStep: () => true,
       flush: () => host.flush(),
       settle: () => {
-        if (stale && !detached) syncFrame();
+        if (stale && !detached) guard("trap-tick", () => syncFrame(), undefined);
         return Promise.resolve();
       },
     });
@@ -370,100 +484,4 @@ function runEach(...steps: (() => void)[]): void {
 function restoreOwn(sim: Simulation, name: string, desc: PropertyDescriptor | undefined): void {
   if (desc) Object.defineProperty(sim, name, desc);
   else delete (sim as unknown as Record<string, unknown>)[name];
-}
-
-export function syncPeople(sim: Simulation, frame: FrameView): void {
-  const held = new Map<number, Person>();
-  for (const p of sim.crowd.people) held.set(p.id, p);
-  const next = frame.people.map((r) => {
-    let p = held.get(r.id);
-    if (!p) {
-      // A person first seen in a frame starts from placeholders for the
-      // fields the frame does not carry (the route's leg, shaftId and
-      // carIndex, destX, tripWait, age, linger), so a reader of those sees
-      // a new walker's values even while the engine has the person riding.
-      // Backlog #868 owns the gap.
-      p = {
-        id: r.id, seed: r.seed, state: r.state, floor: r.floor, fy: r.fy, x: r.x,
-        floors: [], originFloor: r.originFloor, shafts: [], leg: 0, shaftId: null, carIndex: null,
-        destX: r.x, wait: r.wait, tripWait: 0, age: 0, linger: 0,
-      };
-    } else {
-      p.seed = r.seed;
-      p.state = r.state;
-      p.floor = r.floor;
-      p.x = r.x;
-      p.fy = r.fy;
-      p.wait = r.wait;
-      p.originFloor = r.originFloor;
-    }
-    // The route, in place: a holder of the arrays sees the new legs.
-    p.floors.splice(0, p.floors.length, ...r.floors);
-    p.shafts.splice(0, p.shafts.length, ...r.shafts);
-    for (const key of PERSON_OPTIONALS) {
-      const value = r[key];
-      if (value === undefined) clearOptional(p, key);
-      else (p as Record<typeof key, typeof value>)[key] = value;
-    }
-    // The flags: true when set, and a false one cleared as above.
-    if (r.staff) p.staff = true;
-    else clearOptional(p, "staff");
-    if (r.countedHotelGuest) p.countedHotelGuest = true;
-    else clearOptional(p, "countedHotelGuest");
-    if (r.returning) p.returning = true;
-    else clearOptional(p, "returning");
-    return p;
-  });
-  sim.crowd.people.splice(0, sim.crowd.people.length, ...next);
-}
-
-export function syncUnits(sim: Simulation, frame: FrameView): void {
-  for (const r of frame.units) {
-    const u = sim.tower.byId.get(r.id);
-    if (!u) continue;
-    u.state = r.state;
-    u.occupants = r.occupants;
-    u.customersIn = r.customersIn;
-    u.hotelCustomersIn = r.hotelCustomersIn;
-    u.outForMeal = r.outForMeal;
-  }
-}
-
-export function syncCars(sim: Simulation, frame: FrameView): void {
-  for (const r of frame.transports) {
-    const t = sim.tower.transportsById.get(r.id);
-    if (!t) continue;
-    t.carPositions.splice(0, t.carPositions.length, ...r.carPositions);
-    t.carDir.splice(0, t.carDir.length, ...r.carDir);
-    if (r.carLoad) {
-      if (t.carLoad) t.carLoad.splice(0, t.carLoad.length, ...r.carLoad);
-      else t.carLoad = r.carLoad;
-    } else {
-      delete t.carLoad;
-    }
-  }
-}
-
-/** Refuses a binding catalog that states another world, or lists other
- *  facility kinds, than this build's tables for the same mode: the view was
- *  sized from that world and the UI has a color and a description only for
- *  those kinds. The error names the field or the kinds that differ. Shared
- *  with the worker host, so both hosts refuse the same bindings. */
-export function refuseForeignCatalog(c: Catalog): void {
-  const own = catalogFor(c.mode);
-  for (const field of Object.keys(own.world) as (keyof CatalogWorld)[]) {
-    if (c.world[field] !== own.world[field]) {
-      throw new Error(`the WASM engine's ${c.mode} catalog states a different world from this build's tables (${field})`);
-    }
-  }
-  // `readCatalog` already refuses a kind listed twice.
-  const keys = c.facilities.map((f) => f.key);
-  const kinds = new Set(own.facilities.map((f) => f.key));
-  const listed = new Set(keys);
-  const extra = keys.filter((k) => !kinds.has(k));
-  const missing = [...kinds].filter((k) => !listed.has(k));
-  if (extra.length > 0 || missing.length > 0) {
-    const parts = [extra.length > 0 ? `unknown ${extra.join(", ")}` : "", missing.length > 0 ? `missing ${missing.join(", ")}` : ""];
-    throw new Error(`the WASM engine's ${c.mode} catalog lists other facility kinds than this build draws (${parts.filter(Boolean).join("; ")})`);
-  }
 }

@@ -1,0 +1,27 @@
+# Team override for gds-code-review, merged over the installer-owned
+# .claude/skills/gds-code-review/customize.toml (the .agents copy is identical).
+# Arrays append to the base list; on_complete replaces the empty base.
+# A personal gds-code-review.user.toml merges over this file the same way, so an
+# on_complete there replaces this one: keep the hot-path line in it.
+#
+# It wires in the hot-path complexity review. The checklist itself lives in
+# docs/performance/hot-path-review.md; change the rule there, and keep this
+# file to the hooks that make the review apply it. Each fact cites the page as
+# "section N (Name)" so the guard test can match it to the heading.
+# src/tests/hotPathReview.guard.test.ts checks these hooks stay in place.
+
+[workflow]
+
+persistent_facts = [
+  "file:{project-root}/docs/performance/hot-path-review.md",
+  "Hot-path gate: at the CHECKPOINT of steps/step-01-gather-context.md, check the changed paths in {diff_output} against the table in section 1 (When it applies) of docs/performance/hot-path-review.md; for any other changed production file under src/ or engine-rs/, search its importers to see whether an entry point in section 2 (Frequencies and sizes) reaches it. Say in the checkpoint summary whether this run includes the Hot-Path Auditor layer.",
+  "Hot-Path Auditor layer: when the gate says yes, steps/step-02-review.md launches a fourth parallel subagent beside the other layers, with {diff_output} and read access to the repository, using the prompt in section 9 (How the review tools apply it) of docs/performance/hot-path-review.md. If subagents are unavailable, write a fourth prompt file for it with the others. Its output is the record table from section 6 (Recording the review), in Markdown, plus a Markdown list of findings. Output without that table, or without a row for each of HP-1 to HP-12, counts as a failed layer: append Hot-Path Auditor to {failed_layers}.",
+  "Hot-path triage: steps/step-03-triage.md normalizes the Hot-Path Auditor's list like the Blind Hunter's prose, with source hotpath (kept in merged sources), and classifies every hot-path finding from any layer by section 7 (Resolving a finding): patch or defer, never dismissed for being pre-existing, for matching the TypeScript or for sitting outside the diff; dismiss only for a false positive as section 7 defines it. A finding section 7 calls always patch is patch; if the PR author wants to defer it instead, it is decision_needed until the repository owner answers (in no-spec mode, ask the owner before closing triage). A defer cites an issue and backlog row, or the open issue and item that already list it. If the Hot-Path Auditor is in {failed_layers}, do not state a clean review at step-03 even when no findings remain.",
+  "Hot-path record: steps/step-04-present.md prints the section 6 (Recording the review) table (or the one line for a diff with no hot-path surface) with the findings, before any choice is offered. If the Hot-Path Auditor is in {failed_layers}, do not announce a clean review, and do not set the story status to done.",
+]
+
+activation_steps_append = [
+  "Read sections 1, 6, 7 and 9 of docs/performance/hot-path-review.md now. The hot-path gate itself runs later, at the step-01 checkpoint, once the diff exists.",
+]
+
+on_complete = "Before closing, confirm the hot-path record: the section 6 (Recording the review) table from docs/performance/hot-path-review.md with every HP item filled, or one line saying the diff touches no hot-path surface. Every hot-path defer names its issue."

@@ -95,6 +95,7 @@ export class FakeEngine {
     this.owed = [];
     return out;
   }
+  gameplayEventsPending(): number { return this.owed.length; }
   gameplayEventsDropped(): number { return this.dropped; }
   private check(name: string): void {
     if (this.failOn === name) {

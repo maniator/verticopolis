@@ -10,7 +10,7 @@ vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // The WASM engine switch: the request and the package load are stubbed so the
 // fallback (package fails to load, the game boots on the TypeScript engine)
 // can be asserted without a package.
-const wasmStub = vi.hoisted(() => ({ requested: "ts" as "ts" | "wasm" | "wasm-worker", loadError: null as Error | null, module: null as unknown, workerError: null as Error | null }));
+const wasmStub = vi.hoisted(() => ({ requested: "ts" as "ts" | "wasm" | "wasm-worker", loadError: null as Error | null, module: null as unknown, workerError: null as Error | null, binary: null as { state: "ok"; sourceHash: string } | null }));
 vi.mock("./wasmhost/engineChoice", async (importOriginal) => {
   const real = await importOriginal<typeof import("./wasmhost/engineChoice")>();
   return { ...real, engineRequested: () => wasmStub.requested };
@@ -19,7 +19,8 @@ vi.mock("./wasmhost/startWasmHost", async (importOriginal) => {
   const real = await importOriginal<typeof import("./wasmhost/startWasmHost")>();
   return {
     ...real,
-    loadWasmEngine: vi.fn(async () => {
+    loadWasmEngine: vi.fn(async (_url?: string, opts?: { onBuild?: (b: unknown) => void }) => {
+      if (wasmStub.binary) opts?.onBuild?.(wasmStub.binary);
       if (wasmStub.module) return wasmStub.module;
       throw wasmStub.loadError ?? new Error("no package in this test");
     }),
@@ -33,8 +34,8 @@ vi.mock("./wasmhost/workerController", async (importOriginal) => {
   return {
     ...real,
     spawnEngineWorker: vi.fn(async () => {
-      if (wasmStub.workerError) throw wasmStub.workerError;
-      return { worker: { terminate: vi.fn() }, catalogs: { classic: "{}", modern: "{}" } };
+      if (wasmStub.workerError) throw Object.assign(wasmStub.workerError, wasmStub.binary ? { build: wasmStub.binary } : {});
+      return { worker: { terminate: vi.fn() }, catalogs: { classic: "{}", modern: "{}" }, ...(wasmStub.binary ? { build: wasmStub.binary } : {}) };
     }),
     startWorkerHost: vi.fn(() => ({ status: { hosted: true, errors: [] as string[] }, stop: vi.fn() })),
   };
@@ -139,6 +140,39 @@ describe("bootGame engine", () => {
     } finally {
       wasmStub.requested = "ts";
       wasmStub.workerError = null;
+    }
+  });
+
+  it("keeps what the binary's build section said on the boot state, for a package that loaded and one that did not link", async () => {
+    stubWebGL();
+    const binary = { state: "ok", sourceHash: "a".repeat(64) } as const;
+    const boot = () => (globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    wasmStub.binary = binary;
+    try {
+      wasmStub.requested = "wasm";
+      wasmStub.module = { Engine: class {} };
+      await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+      expect(boot()).toEqual({ build: "switchable", engine: "wasm", failure: null, binary });
+      // The binary was read, then the glue and binary did not link.
+      wasmStub.module = null;
+      wasmStub.loadError = new WebAssembly.LinkError("import mismatch");
+      await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "load", reason: "package-mismatch", message: "import mismatch" }, binary });
+      // The worker host: the worker read it, whether it then answered ready or failed.
+      wasmStub.requested = "wasm-worker";
+      wasmStub.loadError = null;
+      await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+      expect(boot()).toEqual({ build: "switchable", engine: "wasm", failure: null, binary });
+      wasmStub.workerError = new Error("link failed in the worker");
+      await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+      expect(boot()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "load", reason: "boot-error", message: "link failed in the worker" }, binary });
+    } finally {
+      wasmStub.requested = "ts";
+      wasmStub.module = null;
+      wasmStub.loadError = null;
+      wasmStub.workerError = null;
+      wasmStub.binary = null;
     }
   });
 
@@ -297,6 +331,40 @@ describe("bootGame engine_status", () => {
     await SaveGame.export(new Simulation(1));
     expect(lastRow(engineRows())).toMatchObject({ trigger: "writer-latch", engine: "wasm", writer_latched: true });
     expect(bootState()).toEqual({ build: "switchable", engine: "wasm", failure: null, writerLatched: true });
+  });
+
+  it("records a switchable build's running engine fault on the boot state, turns the engine writer off and shows no stop (#874)", async () => {
+    stubWebGL();
+    wasmStub.requested = "wasm";
+    const encodeVctower = vi.fn(() => "VCTOWER1\nZW5naW5l\n");
+    wasmStub.module = { Engine: class {}, encodeVctower };
+    let opts: WasmHostOptions | undefined;
+    const status = { engine: "wasm" as const, starts: 1, hosted: true, fallbacks: 0, errors: [] as string[], lastError: null as string | null, droppedErrors: 0 };
+    vi.mocked(startWasmHost).mockImplementationOnce((_app, _mod, _log, o) => {
+      opts = o;
+      return { status, current: () => null, stop: () => {} } as never;
+    });
+    const setSpeed = vi.fn();
+    resetEngineStatus();
+    vi.mocked(sendToRelay).mockClear();
+    window.location.href = "https://verticopolis.com/";
+    await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn(), setSpeed })));
+    expect(opts?.strict).toBeUndefined();
+    expect(await SaveGame.export(new Simulation(1))).toBe("VCTOWER1\nZW5naW5l\n");
+    expect(encodeVctower).toHaveBeenCalledTimes(1);
+    // The engine traps in a tick; the host has frozen it and moves the game
+    // to TypeScript.
+    status.lastError = `the WASM engine failed during a tick: ${secret}`;
+    opts?.onFallback?.({ reason: "trap-tick", stage: "start" });
+    expect(bootState()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "host", reason: "trap-tick", message: status.lastError } });
+    // The game runs on: no stop message, and the clock is left alone.
+    expect(document.getElementById("engine-failure")).toBeNull();
+    expect(setSpeed).not.toHaveBeenCalled();
+    // Saves go back to the TypeScript writer: the trapped module is not asked.
+    expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
+    expect(encodeVctower).toHaveBeenCalledTimes(1);
+    expect(lastRow(engineRows())).toMatchObject({ trigger: "fallback", engine: "ts-fallback", fallback_reason: "trap-tick", fallbacks: 1 });
+    expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret/);
   });
 
   it("codes every boot failure path, and sends none of the message behind it", async () => {

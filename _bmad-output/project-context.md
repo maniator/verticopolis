@@ -169,16 +169,19 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   feedback; one primary per dialog; the splash is box art and stays un-unified.**
 
 ## Performance & platform gotchas
-- **Keep hot paths sub-quadratic. This is a review gate, not a nicety.** The tick loop
-  (`Simulation.tick` → `Crowd`, `ElevatorDispatch`, `EconomySystem`) and the render/UI refresh
-  run over the whole tower every step, and a real save holds hundreds of units, dozens of shafts,
-  ~100 floors and thousands of person-trips. So: look up entities by id through `Tower.getUnit` /
-  `getTransport` (O(1) indexes), never `units.find` / `transports.find`; hoist tower-wide facts
-  and per-tick maps **out** of per-unit / per-person loops; keep running counters instead of
-  re-deriving them by scanning; and memoize per-`revision` work (see `Tower.stopsOf`) rather than
-  recomputing it per call. **The deep review must reject any new `.find` / `.filter` / `.some` (or
-  other full-collection scan) nested inside a loop over another collection on a per-tick or
-  per-frame path**. Call it out the same as a correctness bug.
+- **Hot paths get a complexity review, and it is a review gate.** The tick loop
+  (`Simulation.tick` → `Crowd`, `ElevatorDispatch`, `EconomySystem`), the hosts and the render/UI
+  refresh run over the whole tower every step or frame, and the reference towers hold 12,062 to
+  43,358 units (most of the large one floor tiles), 110 floors and thousands of people. Look up
+  entities by id (`Tower.getUnit` / `getTransport`, `get_unit` / `get_transport`), hoist
+  tower-wide facts out of per-unit and per-person loops, keep counters instead of re-scanning, and
+  memoize per-`revision` work (see `Tower.stopsOf`). The checklist,
+  `docs/performance/hot-path-review.md` (HP-1 to HP-12), applies to Rust and TypeScript alike, to
+  ported and inherited code, and to scans hidden in helpers. The deep review flags a
+  whole-collection scan under any HP-2 multiplier and resolves it under that page's section 7:
+  fixed, or deferred with evidence and an issue, never dismissed as pre-existing. The review
+  skills load the page through `_bmad/custom/gds-code-review.toml` and
+  `_bmad/custom/bmad-code-review.toml`.
 - **Excalibur physics is deliberately disabled** (nothing uses it; enabled, it froze phones on
   big towers at high speed). Do not re-enable it.
 - **Never draw one oversized surface**: tall shafts and the ground plane are tiled into

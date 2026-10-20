@@ -198,6 +198,9 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     expect(sim.drainGameplayEvents()).toEqual([]);
   });
 
+  // A trap while a tower is let go is a fault like any other (#874): the
+  // detach finishes without throwing, and the tower stays frozen on its
+  // newest restore point.
   it("lets go of the instance when the engine can no longer answer at detach", () => {
     const sim = Simulation.newGame(42, "modern");
     const host = attachWasmHost(sim, wasm());
@@ -205,15 +208,22 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     for (let x = 170; x < 180; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
     // A trapped engine throws from every call.
     (host.engine as { drainGameplayEvents: () => string }).drainGameplayEvents = () => { throw new Error("unreachable executed"); };
-    expect(() => host.detach()).toThrow(/unreachable/);
+    expect(() => host.detach()).not.toThrow();
+    expect(host.fault).toMatchObject({ reason: "other", message: "the WASM engine failed while letting a tower go: unreachable executed" });
     expect(Object.getOwnPropertyDescriptor(sim, "drainGameplayEvents")).toBeUndefined();
     expect(Object.getOwnPropertyDescriptor(sim, "gameplayEventsDropped")).toBeUndefined();
-    expect(Object.getOwnPropertyDescriptor(sim, "serialize")).toBeUndefined();
-    // The founding, emitted before the host attached, is still owed. The
-    // engine's ten placements are lost with it, and the drop count records
-    // them from the read model's ten copies.
-    expect(sim.drainGameplayEvents()).toEqual([{ name: "tower_founded", payload: { mode: "modern" } }]);
-    expect(sim.gameplayEventsDropped).toBe(10);
+    expect(Object.getOwnPropertyDescriptor(sim, "serialize")).toBeDefined(); // the restore point's
+    const minutes = sim.clock.minutes;
+    sim.tick(30);
+    expect(sim.clock.minutes).toBe(minutes);
+    // The founding, emitted before the host attached, is still owed. The ten
+    // placements waited for a point that never came, so the fault drops them
+    // with their commands: the fallback goes back to the attach save (#874).
+    const kept = sim.drainGameplayEvents();
+    expect(kept[0]).toEqual({ name: "tower_founded", payload: { mode: "modern" } });
+    expect(kept.filter((e) => e.name === "facility_placed")).toHaveLength(0);
+    expect(host.restore().tower.units.filter((u) => u.kind === "lobby")).toHaveLength(0);
+    expect(sim.gameplayEventsDropped).toBe(0);
     expect(() => host.engine.mode()).toThrow(); // freed
   });
 
@@ -225,60 +235,72 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     const garbled = () => real().slice(0, -1); // the engine's batch, cut short
     sim.money = 1e9;
     sim.drainGameplayEvents(); // the founding
-    // Four placements whose batch arrives unreadable are lost, and counted.
-    for (let x = 170; x < 174; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    // Four placements whose batches arrive unreadable are lost, and counted.
     engine.drainGameplayEvents = garbled;
+    for (let x = 170; x < 174; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
     expect(sim.drainGameplayEvents()).toEqual([]);
     expect(sim.gameplayEventsDropped).toBe(4);
     // The next batch reads again.
     engine.drainGameplayEvents = real;
     expect(sim.build("lobby", 1, 174).ok).toBe(true);
+    expect(sim.drainGameplayEvents()).toEqual([]); // held until a point covers it (#874)
+    sim.serialize();
     expect(sim.drainGameplayEvents()).toEqual([{ name: "facility_placed", payload: { kind: "lobby", floor: 1, count: 1 } }]);
     // At detach the instance keeps the count, two more included.
-    for (let x = 175; x < 177; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
     engine.drainGameplayEvents = garbled;
+    for (let x = 175; x < 177; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
     host.detach();
     expect(sim.drainGameplayEvents()).toEqual([]);
     expect(sim.gameplayEventsDropped).toBe(6);
   });
 
-  it("keeps an unreadable batch's loss when the engine traps at detach", () => {
+  it("keeps an unreadable batch's loss when the engine traps at detach, and drops the held events no point covered", () => {
     const sim = Simulation.newGame(48, "classic");
     const host = attachWasmHost(sim, wasm());
     const engine = host.engine as { drainGameplayEvents: () => string };
     const real = engine.drainGameplayEvents.bind(engine);
     sim.money = 1e9;
     sim.drainGameplayEvents(); // the founding
-    for (let x = 170; x < 173; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
     engine.drainGameplayEvents = () => real().slice(0, -1);
-    expect(sim.drainGameplayEvents()).toEqual([]); // three lost to an unreadable batch
+    for (let x = 170; x < 173; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    expect(sim.drainGameplayEvents()).toEqual([]); // three lost to unreadable batches
+    engine.drainGameplayEvents = real;
     for (let x = 173; x < 175; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
     engine.drainGameplayEvents = () => {
       throw new Error("unreachable executed");
     };
-    expect(() => host.detach()).toThrow(/unreachable/);
-    // The three counted while hosted, and the two the trap took, estimated
-    // from the read model's copies.
-    expect(sim.drainGameplayEvents()).toEqual([]);
-    expect(sim.gameplayEventsDropped).toBe(5);
+    expect(() => host.detach()).not.toThrow();
+    expect(host.fault?.reason).toBe("other");
+    // The three counted while hosted. The two after them waited for a point
+    // that never came, so the fault drops them with their commands (#874).
+    expect(sim.drainGameplayEvents().filter((e) => e.name === "facility_placed")).toHaveLength(0);
+    expect(sim.gameplayEventsDropped).toBe(3);
   });
 
-  it("counts what a trap took while hosted once the host lets go", () => {
+  // A drain that traps freezes the host (#874). Nothing is counted as lost:
+  // every event a restore point covers is handed back, and those of the
+  // commands after it go with them, since the owner's fallback undoes them.
+  it("freezes on a drain that traps and hands back every event a point covers", () => {
     const sim = Simulation.newGame(49, "classic");
     const host = attachWasmHost(sim, wasm());
     sim.money = 1e9;
     sim.drainGameplayEvents(); // the founding
     for (let x = 170; x < 173; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    sim.tick(1); // a merge: the restore point
+    for (let x = 173; x < 175; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
     (host.engine as { drainGameplayEvents: () => string }).drainGameplayEvents = () => {
       throw new Error("unreachable executed");
     };
-    expect(() => sim.drainGameplayEvents()).toThrow(/unreachable/); // the bridge counts a failed drain
-    for (let x = 173; x < 175; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
-    expect(() => host.detach()).toThrow(/unreachable/);
-    // All five, estimated from the read model's copies, the three from the
-    // hosted trap included.
+    const drained = sim.drainGameplayEvents();
+    expect(drained.filter((e) => e.name === "facility_placed")).toHaveLength(3);
+    expect(host.fault?.reason).toBe("trap-tick");
+    expect(() => host.detach()).not.toThrow();
     expect(sim.drainGameplayEvents()).toEqual([]);
-    expect(sim.gameplayEventsDropped).toBe(5);
+    expect(sim.gameplayEventsDropped).toBe(0);
+    // The fallback's tower has the three, without the two built after.
+    const fresh = host.restore();
+    expect(fresh.tower.units.filter((u) => u.kind === "lobby")).toHaveLength(3);
+    expect(() => host.engine.mode()).toThrow(); // freed by the detach
   });
 
   // A paused player builds, then undoes before anything drains: the app swaps
@@ -314,8 +336,8 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
   });
 
   // A merge copies the fresh deserialization's empty buffer; the host puts
-  // the instance's own back, so its mark (a title backdrop's) and the read
-  // model's copies since the last drain survive the hour pass.
+  // the instance's own back, so its mark (a title backdrop's) survives the
+  // hour pass.
   it("keeps the instance's own buffer across a merge", () => {
     const sim = Simulation.newGame(46, "classic");
     const buffer = sim.gameplayEvents;
@@ -327,7 +349,10 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     expect(host.merges).toBeGreaterThan(0);
     expect(sim.gameplayEvents).toBe(buffer);
     expect(buffer.discardOnHandOff).toBe(true);
-    expect(buffer.length).toBe(1); // the read model's copy of the placement
+    // The merge moved the engine's placement behind the host, as the newest
+    // restore point (#874), and dropped the read model's copy of it.
+    expect(buffer.length).toBe(0);
+    expect(sim.drainGameplayEvents().filter((e) => e.name === "facility_placed")).toHaveLength(1);
     host.detach();
   });
 

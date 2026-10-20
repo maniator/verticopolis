@@ -464,6 +464,49 @@ splash (and the update prompt's build-id line) would otherwise misreport the bui
 as unchanged. Bump once per PR, not per commit. When two open PRs both bump,
 whoever merges second rebases and re-bumps.
 
+### The engine crate version
+
+`engine-rs/Cargo.toml` carries its own version, separate from the app's. It is
+the answer to "which engine contract is this?": `engineIdentity()` reports it
+and About will show it (#963 slice 3). The app version stays what players see.
+
+**The crate version goes up in the same PR as any of these:**
+
+- the conformance lock: `catalog-digests.json`, `events/catalog.json`,
+  `expected.json`, `loader-cases.json` or `tdt-cases.json` under `conformance/`
+  (a new fixture or scenario lands through `expected.json`, so it counts);
+- `SAVE_VERSION`, or the oldest save version the engine loads;
+- `FRAME_LAYOUT_VERSION`, `CATALOG_VERSION` or `IDENTITY_SCHEMA` (the frame
+  layout and the identity record's shape each have a pin table in
+  `engine-rs/src/identity_tests.rs` that grows with the version; the catalog
+  version has none yet, see #1154);
+- the binding's declaration, `src/dualrun/engine.d.ts`, outside comments.
+
+An internal change that keeps all of these, such as a performance
+optimization, needs no bump. The build hash (`sources` in the package's
+`BUILD.json`) tells such builds apart. While the crate is 0.x, take a minor
+bump for a save, frame layout, catalog, identity schema or interface change,
+and a patch bump for a lock change on its own. Publishing and 1.0.0 are #893.
+
+**How:** raise `version` in `engine-rs/Cargo.toml`, then in `engine-rs/Cargo.lock`
+and `engine-rs/consumer/Cargo.lock` (CI builds the consumer with `--locked`),
+then run `npm run engine:compat`. It rewrites `engine-rs/src/compat-record.json`
+from the tree, fetches `origin/main`, and refuses a pin that moved from main's
+record under an unchanged version, a version that is not a later `x.y.z`
+release, or a main record it cannot read. A version that has not merged yet can
+be re-recorded as often as main's lock moves under it. When two open PRs bump,
+whoever merges second merges main in, bumps again and re-records.
+
+**What the guard sees and what it does not.** `src/tests/engineCompat.guard.test.ts`
+recomputes the lock digest, the five version constants and a digest of
+`engine.d.ts` (comments and spacing aside) and fails when one moved and the
+record did not. It cannot see the Rust `pub` API, a JSON shape that the
+declaration only describes in a doc comment (the `markers` and `commuteStress`
+arguments, for example), or a field added through the save loader's optional
+seam. A change like that still needs a bump; review owns it, and the backlog row
+`engine-compat-coverage` tracks closing the gap. A record edited by hand in the
+same PR also skips the main comparison, so a reviewer reads the record's diff.
+
 ### Player notes (what the update prompt shows players)
 
 The build emits `dist/version.json` (`{ version, sha, notes }`) that the running
@@ -528,14 +571,18 @@ alone.
   `await`, broken call sites), cleanup (duplication, dead code, needless
   complexity), and **algorithmic complexity** (below). Fix what you find
   before opening or updating a PR.
-- **No Big-O regressions on hot paths.** The tick loop and render/UI refresh run
-  over the whole tower every step, and towers get large (hundreds of units,
-  dozens of shafts, ~100 floors, thousands of person-trips). Look entities up by
-  id via `Tower.getUnit` / `getTransport`, never `units.find` / `transports.find`.
-  Hoist tower-wide facts out of per-unit/per-person loops, keep running counters
-  instead of re-scanning, and memoize per-`revision` work. A new `.find` /
-  `.filter` / `.some` nested in a loop over another collection on a per-tick or
-  per-frame path is a review-blocking finding, the same as a correctness bug.
+- **Hot paths get a complexity review.** The checklist is
+  [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md).
+  It covers Rust, TypeScript, the WASM binding, the hosts, simulation ticks,
+  rendering and the other surfaces its section 1 lists, and ported, moved or
+  inherited code as much as new code. Trace each changed function's callers to
+  an entry point (its section 2); a whole-collection walk, clone, sort or
+  rebuilt map under one of its multipliers is a finding in either language,
+  helpers included. A significant change (its section 5) carries the
+  complexity note in the PR. A finding is fixed, or deferred with evidence and
+  a tracked issue, and never dismissed because it existed before; a new,
+  ported or moved scan over its tier's budget, or a dropped TypeScript cache,
+  gets fixed unless the owner accepts the deferral.
 - **Deep, adversarial review before merge, never deferred to "later."** The change gets a full
   adversarial review while its context is still loaded (before pushing, or
   immediately after opening/updating the PR), not left to a hypothetical

@@ -1,4 +1,4 @@
-import type { Engine, catalog, encodeVctower } from "./engine";
+import type { Engine, catalog, encodeVctower, engineIdentity } from "./engine";
 
 /**
  * The WASM binding's surface, as wasm-bindgen declares it from
@@ -17,6 +17,10 @@ export interface WasmModule {
   catalog?: typeof catalog;
   /** The engine's `.vctower` writer; absent from a test double. */
   encodeVctower?: typeof encodeVctower;
+  /** The engine's identity record as canonical JSON (#963). Optional: a
+   *  package built before it still runs, and About says the identity is
+   *  unavailable. */
+  engineIdentity?: typeof engineIdentity;
 }
 
 /** Every method the adapters call on an instance, and on the class. Each

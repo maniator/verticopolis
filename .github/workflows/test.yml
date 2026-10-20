@@ -122,6 +122,7 @@ jobs:
       - name: Run ${{ matrix.project }} on the WASM engine
         env:
           VC_REQUIRE_WASM: "1"
+          VC_LOG_TEST_STARTS: "1"
         run: npx vitest run --project ${{ matrix.project }}
 
       # The integrationWasm project hands some suites to the TypeScript side
@@ -132,7 +133,15 @@ jobs:
       # (#1122). Running them here puts them on every PR and every push to
       # main. Both matrix legs run it (src/tests/parity/ciJob.guard.test.ts
       # keeps this job free of `if:`), so the job names stay as they are.
+      #
+      # The step has its own limit, well under the job's, and each test writes
+      # a line to stderr as it starts (src/tests/ci/testStartLogSetup.ts), so a
+      # stall names the test it stopped in and ends the step in minutes
+      # instead of holding every PR for the job's 40 (#1152).
       - name: Host suites on the WASM engine
+        timeout-minutes: 12
+        env:
+          VC_LOG_TEST_STARTS: "1"
         run: npm run test:wasm
 
   # Resolve the Playwright container tag from the repo's own Playwright version so

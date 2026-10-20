@@ -17,7 +17,8 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   (population census, elevator/transport behavior, floor/lobby/view mapping), a
   gameplay-parity concern. Run both when a change also carries a big
   tooling/UI-plumbing surface.** Its adversarial layers (Blind Hunter →
-  Edge Case Hunter → Acceptance Auditor → triage) are the review. A self-read or
+  Edge Case Hunter → Acceptance Auditor, plus the Hot-Path Auditor on a
+  hot-path diff, then triage) are the review. A self-read or
   a generic `/code-review` does **not** satisfy it. Fix every `patch` finding and
   record every `defer` finding in
   `_bmad-output/implementation-artifacts/backlog.md`. A PR is not "done"
@@ -26,6 +27,18 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   invariants (e.g. build caps, transport pooling, economy math). Green quality
   gates are **not** a substitute for the review skill, and "the diff is tiny" is
   not an exemption.
+- **Hot paths get the complexity checklist,
+  [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md),**
+  in Rust, TypeScript, the WASM binding, the hosts, ticks, rendering and the
+  other surfaces its section 1 lists. The review skills load it and add a
+  Hot-Path Auditor layer that traces callers past the diff. The skills and the
+  independent reviewer print its one-row-per-item record, and Copilot and Codex
+  are asked to; without a record on the PR there is no GO and no sign-off.
+  Ported, moved or inherited code is reviewed as new. A finding is fixed or
+  deferred with evidence and an issue, and never dismissed as pre-existing; a
+  new, ported or moved scan over its tier's budget, or a dropped TypeScript
+  cache, gets fixed unless the owner accepts the deferral. PRs opened before
+  the page merged keep the review they had.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
   `npm test`, `npm run build`. All four must be green. The build needs the
   engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a
@@ -167,6 +180,13 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   after believing the number is too late.
 
 ## Canon reference (don't re-derive from memory)
+
+- **The engine crate version (`engine-rs/Cargo.toml`) goes up with the
+  conformance lock, the save/frame layout/catalog/identity versions and the
+  binding declaration `src/dualrun/engine.d.ts`.** Raise it in `Cargo.toml`,
+  `Cargo.lock` and `engine-rs/consumer/Cargo.lock`, then run
+  `npm run engine:compat`; a guard fails the PR otherwise. Steps and limits are
+  in CONTRIBUTING.md → Versioning → The engine crate version.
 
 - **Per-tower build caps live in `src/engine/facilities.ts`** (`BUILD_CAPS`,
   `POOLED_CAPS`, `MAX_CARS`, `maxSpanFor`) and are enforced in one place,

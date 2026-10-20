@@ -92,6 +92,7 @@ export const BINDING_EXPORT_TIERS = {
   fromSave: T2,
   fromVctower: T2,
   catalog: T2,
+  engineIdentity: T2,
   importTdt: T2,
   exportTdt: T2,
   encodeVctower: T2,

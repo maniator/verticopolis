@@ -137,11 +137,12 @@ export class Engine {
      * (`load::parse_save_json`). Nothing else the import path does (the
      * founder mark) runs.
      * `markers`, when given, is JSON `{ lastHour, lastDay, lastQuarter,
-     * lastMonth, extendGesture? }`: the live engine's boundary markers and
-     * open extend gesture `{ id, bottom, top }` (#990), which a save does
-     * not carry (a load rebuilds the markers from the clock, a founded game
-     * keeps them unset until the first boundary, and a load has no
-     * gesture), so a shadow can start exactly where the live engine stands.
+     * lastMonth, extendGesture?, commuteStress? }`: the live engine's
+     * boundary markers, open extend gesture `{ id, bottom, top }` (#990) and
+     * commute-stress rows (#1083), which a save does not carry (a load
+     * rebuilds the markers from the clock, a founded game keeps them unset
+     * until the first boundary, and a load has no gesture and no averages),
+     * so a shadow can start exactly where the live engine stands.
      */
     static fromSave(text: string, markers?: string | null): Engine;
     /**
@@ -372,6 +373,17 @@ export function catalog(mode: string): string;
  * (`load::parse_save_json`).
  */
 export function encodeVctower(save_json: string, app_version: string, saved_at_ms: number): string;
+
+/**
+ * Which engine this is and which contracts it speaks, as canonical JSON in
+ * the shape of `verticopolis_engine::identity::identity`: the record's
+ * schema, the crate's name and version, the save version it writes and the
+ * oldest it loads, the frame layout version, the catalog version with each
+ * mode's digest, and the conformance lock digest. It needs no running game
+ * and holds no build hash: a hash of the sources cannot be compiled into
+ * them, so the served package's `BUILD.json` records it.
+ */
+export function engineIdentity(): string;
 
 /**
  * `exportTdt(saveJson)`: the `.TDT` bytes for a serialized game (what

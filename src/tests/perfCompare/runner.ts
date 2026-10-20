@@ -1,10 +1,12 @@
 import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright";
 import { processTreePss } from "./env";
-import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave, wasmColdLoad, wasmMemoryBytes, webglRenderer, type PageInfo } from "./page";
+import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave, wasmColdLoad, wasmMemoryBytes, watchContextLoss, webglRenderer, type PageInfo } from "./page";
+import { trackContextLoss } from "./contextLoss";
 import { audioStatus, measureFrames, startAudio, type FrameRun } from "./pageFrames";
 import { simRun, type SimRun } from "./pageSim";
 import type { PerfServer, ServedRequest } from "./server";
 import { launchOptions, type BrowserLaunch } from "./renderer";
+import { eachScenarioFresh } from "./scenarioPages";
 import type { Scenario } from "./scenarios";
 import { frameStats, quantile } from "./stats";
 import type { CompareConfig, EngineName, FrameSummary, MemorySummary, ProcessRun, StartupSample, StepSummary } from "./types";
@@ -14,11 +16,13 @@ import type { CompareConfig, EngineName, FrameSummary, MemorySummary, ProcessRun
  * 1. cold start and warm start (reload);
  * 2. a memory pass: per scenario, a fresh page (reload), load the save,
  *    two in-game hours, full GC, then JS heap, WASM memory and browser PSS;
- * 3. per scenario and CPU throttle: the simulation-only runs (hosted, then
- *    the bare engine, then on WASM a separate attribution pass);
+ * 3. per scenario (each in a fresh page) and CPU throttle: the
+ *    simulation-only runs (hosted, then the bare engine, then on WASM a
+ *    separate attribution pass);
  * 4. (TypeScript process) the WASM package's load steps, timed apart;
- * 5. the gameplay frames in two fresh-page blocks, audio off (never
- *    started) and audio on, their order alternating by repetition;
+ * 5. the gameplay frames in two blocks, audio off (never started) and audio
+ *    on, each scenario in a fresh page, the block order alternating by
+ *    repetition;
  * 6. a cold start under the heaviest throttle in a second fresh context,
  *    with a CPU probe showing the throttle held;
  * 7. a first visit with the service worker allowed, then an offline reload
@@ -137,7 +141,7 @@ async function throttle(cdp: CDPSession, rate: number): Promise<void> {
   await cdp.send("Emulation.setCPUThrottlingRate", { rate });
 }
 
-async function newContext(browser: Browser, config: CompareConfig, serviceWorkers: "allow" | "block"): Promise<BrowserContext> {
+async function newContext(browser: Browser, config: CompareConfig, serviceWorkers: "allow" | "block", onLoss: (line: string) => void): Promise<BrowserContext> {
   const ctx = await browser.newContext({ viewport: config.viewport, deviceScaleFactor: 1, serviceWorkers });
   // tsx compiles this harness with esbuild's keepNames, which wraps inner
   // functions in a `__name(fn, "name")` helper. The functions Playwright
@@ -145,6 +149,8 @@ async function newContext(browser: Browser, config: CompareConfig, serviceWorker
   // page gets an identity stand-in before anything else runs.
   await ctx.addInitScript({ content: "globalThis.__name = (fn) => fn;" });
   await ctx.addInitScript(installProbes);
+  await ctx.addInitScript(watchContextLoss);
+  await trackContextLoss(ctx, onLoss);
   return ctx;
 }
 
@@ -209,6 +215,10 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     wasmCold: null,
     audio: null,
     firstVisitWithServiceWorker: null,
+    contextLost: [],
+  };
+  const noteLoss = (line: string): void => {
+    run.contextLost?.push(line);
   };
   const engineUrl = `${server.url}/engine/verticopolis_engine.js`;
   const url = `${server.url}/?engine=${engine}`;
@@ -240,7 +250,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     // starts from a full collection. Both engines get the same flags.
     browser = await chromium.launch(launchOptions(opts.executablePath, opts.launch));
     run.browserVersion = browser.version();
-    const ctx = await newContext(browser, config, "block");
+    const ctx = await newContext(browser, config, "block", noteLoss);
     const page = await ctx.newPage();
     listen(page);
     const cdp = await ctx.newCDPSession(page);
@@ -257,12 +267,12 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     log(`  rep ${rep} ${slot}: cold ready ${cold.sample.gameReadyMs?.toFixed(0)} ms, warm ready ${warm.sample.gameReadyMs?.toFixed(0)} ms`);
 
     const memory = await memoryPass(page, cdp, opts, engine, engineUrl);
-    await freshPage(page, engine, "timed passes boot");
 
-    // Timed simulation passes. Per scenario and throttle the order is the
-    // same on both engines (hosted, then raw); the WASM attribution pass
-    // runs after both, so it cannot warm or grow anything they measure.
-    for (const sc of scenarios) {
+    // Timed simulation passes, each scenario in a page of its own (see
+    // scenarioPages.ts). Per scenario and throttle the order is the same on
+    // both engines (hosted, then raw); the WASM attribution pass runs after
+    // both, so it cannot warm or grow anything they measure.
+    await eachScenarioFresh(scenarios, (sc) => freshPage(page, engine, `${sc.name} timed passes boot`), async (sc) => {
       await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
       run.scenarios[sc.name] = { ...memory[sc.name], hosted: {}, raw: {}, frames: {}, framesAudio: {} };
       const scenarioRun = run.scenarios[sc.name];
@@ -297,24 +307,26 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
         await expectEngine(page, engine, `${sc.name} ${t}x`);
         log(`  rep ${rep} ${slot} ${sc.name} ${t}x: hosted ${scenarioRun.hosted[t].totalMs.toFixed(0)} ms, raw ${scenarioRun.raw[t].totalMs.toFixed(0)} ms`);
       }
+    });
+    // The WASM package's load steps, before any audio runs. The page is the last scenario's fresh page, so the cold load's scenario is stashed in it first.
+    if (engine === "ts") {
+      await ev(page, "stash", stashSave, { name: scenarios[0].name, save: scenarios[0].save });
+      run.wasmCold = await ev(page, "wasm cold load", wasmColdLoad, { wasmUrl: `${server.url}/engine/verticopolis_engine_bg.wasm`, jsUrl: engineUrl, scenario: scenarios[0].name });
     }
-    // The WASM package's load steps, before any audio runs.
-    if (engine === "ts") run.wasmCold = await ev(page, "wasm cold load", wasmColdLoad, { wasmUrl: `${server.url}/engine/verticopolis_engine_bg.wasm`, jsUrl: engineUrl, scenario: scenarios[0].name });
 
-    // Gameplay frames: an audio-off block and an audio-on block, each in a
-    // fresh page, their order alternating by repetition so neither always
-    // runs in the older process.
+    // Gameplay frames: an audio-off block and an audio-on block, their order
+    // alternating by repetition so neither always runs in the older process.
+    // Each scenario runs in a fresh page of its own, as above.
     const blocks: ("off" | "on")[] = rep % 2 === 0 ? ["off", "on"] : ["on", "off"];
     for (const block of blocks) {
-      await freshPage(page, engine, `frames (audio ${block}) boot`);
-      for (const sc of scenarios) await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
-      if ((await ev(page, "audio status", audioStatus, undefined)).started) throw new Error("audio was running in a fresh page");
-      if (block === "on") {
-        run.audio = await ev(page, "start audio", startAudio, 15_000);
-        log(`  rep ${rep} ${slot}: audio ${run.audio.started ? "started" : "DID NOT START"} (contexts: ${run.audio.contexts.join(", ") || "none"})`);
-        if (!run.audio.started || !run.audio.contexts.includes("running")) continue;
-      }
-      for (const sc of scenarios) {
+      await eachScenarioFresh(scenarios, (sc) => freshPage(page, engine, `${sc.name} frames (audio ${block}) boot`), async (sc) => {
+        await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
+        if ((await ev(page, "audio status", audioStatus, undefined)).started) throw new Error("audio was running in a fresh page");
+        if (block === "on") {
+          run.audio = await ev(page, "start audio", startAudio, 15_000);
+          log(`  rep ${rep} ${slot} ${sc.name}: audio ${run.audio.started ? "started" : "DID NOT START"} (contexts: ${run.audio.contexts.join(", ") || "none"})`);
+          if (!run.audio.started || !run.audio.contexts.includes("running")) return false;
+        }
         for (const rate of config.throttles) {
           await ev(page, "adopt", adoptScenario, sc.name);
           await ev(page, "prepare", prepareLiveApp, undefined);
@@ -328,7 +340,9 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
             await throttle(cdp, 1);
           }
         }
-      }
+        await expectEngine(page, engine, `${sc.name} frames (audio ${block})`);
+        return undefined;
+      });
       await expectEngine(page, engine, `frames (audio ${block})`);
     }
     // The adapter again, from a new context, once every frame is measured (and
@@ -340,7 +354,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     // (fresh HTTP cache), throttled before navigation and again at commit,
     // with the CPU probe run under it to show the throttle held.
     if (slowRate > 1) {
-      const slow = await newContext(browser, config, "block");
+      const slow = await newContext(browser, config, "block", noteLoss);
       const slowPage = await slow.newPage();
       listen(slowPage);
       const slowCdp = await slow.newCDPSession(slowPage);
@@ -384,7 +398,8 @@ async function firstVisit(browser: Browser, config: CompareConfig, server: PerfS
   let sw: BrowserContext | null = null;
   sink.side = result.onlinePageErrors;
   try {
-    sw = await newContext(browser, config, "allow");
+    // A side measurement with no frames in it: a loss here fails nothing.
+    sw = await newContext(browser, config, "allow", () => {});
     const page = await sw.newPage();
     listen(page);
     server.take();

@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { csvField, limitations, readModelLimitations, loadWorkerCheckpoint, makeConfig, metricsCsv, parseArgs, ratiosCsv, scriptSizes } from "./main";
-import { markdown, num, pct, readModelMarkdown, readModelSection, slices } from "./report";
+import { differenceCell, markdown, num, pct, readModelMarkdown, readModelSection, slices } from "./report";
 import { Simulation } from "../../engine/Simulation";
 import { serializeUnit } from "../../engine/sim/coerce";
 import { FRAME_UNIT_FIELDS, churn, composition, measureReadModel, spread, summarizeMerges, type MergePass } from "./readModel";
@@ -12,27 +12,7 @@ import { buildSmallTower } from "../perfCompare/scenarios";
 import { modeOrder, summarizeFrames, summarizeHosted, type ModeRun } from "./runner";
 import type { ModeName } from "./pageWorker";
 
-const config = { ...makeConfig(parseArgs(["--reps", "6"]), ["small"]) };
-
-/** A finished run with every sample set from `scale` (so the modes and
- *  repetitions differ by a known factor), the same digests everywhere. */
-function run(rep: number, mode: ModeName, scale: number, over: Partial<ModeRun> = {}): ModeRun {
-  const hosted = (t: number) => ({ wallMs: 100 * scale * t, mainMs: 50 * scale * t, batchMainP50Ms: 1, batchMainP95Ms: 2 * scale, batchMainMaxMs: 3, startDigest: "s", endDigest: "e", hostErrorsAdded: [],
-    worker: mode === "wasm-worker" ? { replies: 180, staleReplies: 0, merges: 6, messagesSent: 200, messagesReceived: 181, bytesReceived: 1000, frameBytes: 1800, mergeBytes: 600, applyMs: 10, mergeMs: 5, workerOpsMs: 40, workerReplyMs: 4, deltas: 18, deltaBytes: 360, deltaMs: 2 * scale, workerSaveMs: 3, deltasRefused: 1, approximateSaves: 2 } : null });
-  const frames = { frames: 60, meanFps: 10 / scale, medianMs: 100, p95Ms: 150, p99Ms: 190, onePercentLowFps: 5, simMinutesPerSecond: 50, clampedFrames: 0, longTasks: 3, blockingMs: 20 * scale, commands: 5, commandsUnanswered: 0, commandToFrameP50Ms: 30, commandToFrameP95Ms: 40, commandToFrameMinMs: 20, hostErrorsAdded: [],
-    worker: mode === "wasm-worker" ? { repliesPerSecond: 9, messagesPerSecond: 20, bytesPerSecond: 5000, staleReplies: 0, merges: 2, deltas: 7, deltasRefused: 1, approximateSaves: 3, applyMsPerSecond: 3, commandAckP50Ms: 4, commandAckP95Ms: 6 } : null };
-  return {
-    rep, mode, order: 0, ok: true, error: null, pageErrors: [], browserVersion: "141", page: { crossOriginIsolated: true, userAgent: "ua", webgl: { renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)", vendor: "Google Inc. (NVIDIA)" } }, rendererEnd: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)",
-    cold: { mode, gameReadyMs: 100, modeReadyMs: 200 * scale, firstFrameMs: 300, bytesBeforeReady: 1000, requestsBeforeReady: 9, wasmRequests: mode === "ts" || mode === "wasm-worker" ? 0 : 1 },
-    warm: null, cold4x: null, cpuProbe: { unthrottledMs: 100, timed: { "small:4": 390 } },
-    scenarios: { small: { raw: mode === "ts" || mode === "wasm" ? { "1": { engine: mode === "ts" ? "ts" : "wasm", totalMs: 80 * scale, startDigest: "s", endDigest: "e" }, "4": { engine: mode === "ts" ? "ts" : "wasm", totalMs: 320 * scale, startDigest: "s", endDigest: "e" } } : {}, memory: { mainHeapUsedBytes: 10, workerHeapUsedBytes: mode === "wasm-worker" ? 5 : null, mainWasmBytes: mode === "wasm" || mode === "wasm-frame" ? 7 : null, workerWasmBytes: mode === "wasm-worker" ? 7 : null, processPssBytes: 100 }, hosted: { "1": hosted(1), "4": hosted(4) }, frames: { "1": frames, "4": frames } } },
-    offline: null,
-    ...over,
-  };
-}
-
-const SCALE: Record<ModeName, number> = { ts: 1, wasm: 4, "wasm-frame": 2, "wasm-worker": 1 };
-const runs = (): ModeRun[] => Array.from({ length: 6 }, (_, rep) => config.modes.map((m) => run(rep, m, SCALE[m] * (1 + rep / 100)))).flat();
+import { config, run, runs } from "./analysisFixture";
 
 describe("perf:worker analysis", () => {
   it("summarizes each metric per mode and pairs the ratios by repetition", () => {
@@ -124,23 +104,95 @@ describe("perf:worker analysis", () => {
     expect(f.worker).toMatchObject({ repliesPerSecond: 10, bytesPerSecond: 1000, applyMsPerSecond: 20, commandAckP50Ms: 4 });
   });
 
+  it("marks only the worker host's rows above 1x as unthrottled, in the metrics, both CSVs and the report", () => {
+    const rs = runs();
+    const metrics = aggregate(config, rs);
+    const rr = ratios(metrics, config.modes);
+    const flagged = metrics.filter((m) => m.unthrottled);
+    expect(flagged.length).toBeGreaterThan(0);
+    expect(flagged.every((m) => m.mode === "wasm-worker" && m.throttle !== "1")).toBe(true);
+    expect(metrics.filter((m) => m.mode === "wasm-worker" && m.throttle !== "1").every((m) => m.unthrottled === "worker")).toBe(true);
+    expect(metrics.filter((m) => m.mode !== "wasm-worker" || m.throttle === "1").some((m) => m.unthrottled)).toBe(false);
+    const csvRows = (text: string) => text.trim().split("\n").slice(1);
+    expect(metricsCsv(metrics).split("\n")[0]).toMatch(/,unthrottled,values$/);
+    const markedMetrics = csvRows(metricsCsv(metrics)).filter((l) => /,worker,/.test(l));
+    expect(markedMetrics).toHaveLength(flagged.length);
+    expect(markedMetrics.every((l) => l.includes(",wasm-worker,"))).toBe(true);
+    const flaggedRatios = rr.filter((r) => r.unthrottled);
+    expect(flaggedRatios.length).toBeGreaterThan(0);
+    expect(flaggedRatios.every((r) => r.mode === "wasm-worker" && r.throttle !== "1")).toBe(true);
+    expect(csvRows(ratiosCsv(rr)).filter((l) => l.endsWith(",worker"))).toHaveLength(flaggedRatios.length);
+    const result = {
+      schema: 1 as const, startedAt: "2026-10-14T10:00:00Z", generatedAt: "2026-10-14T14:00:00Z", config, browser: { version: "141", executable: null },
+      environment: { commitShort: "abc1234", appVersion: "2.31.1", dirty: false, enginePackage: {}, engineBuildHash: "h", cpuModel: "cpu", logicalCpus: 4, totalMemoryBytes: 2 ** 34, os: "linux", node: "22", playwright: "1.61" } as never,
+      scenarios: [{ name: "small", sha256: "a".repeat(64), population: 10, units: 2, transports: 1, saveBytes: 5 }],
+      scripts: { worker: { raw: 8000, brotli: 2600 }, otherJs: { raw: 1, brotli: 1 }, enginePackage: { raw: 900_000, brotli: 330_000 } }, runs: rs, metrics, ratios: rr, validation: { ok: true, errors: [], warnings: [] }, limitations: ["one"],
+    };
+    const md = markdown(result);
+    expect(md).toMatch(/† The engine worker was barely CPU-throttled/);
+    expect(md).toMatch(/7 to 41% slower/);
+    const tableRows = md.split("\n").filter((l) => l.startsWith("| small |"));
+    expect(tableRows.some((l) => l.includes("†"))).toBe(true);
+    // A row is daggered when its own throttle is above 1x and its host is the worker: the 1x rows carry none, and the daggers sit only on 4x rows.
+    expect(tableRows.filter((l) => l.startsWith("| small | 1x |")).some((l) => l.includes("†"))).toBe(false);
+    expect(tableRows.filter((l) => l.includes("†")).every((l) => l.startsWith("| small | 4x |"))).toBe(true);
+    // Without the worker host in the run there is nothing to mark and no footnote.
+    const noWorker = markdown({ ...result, metrics: metrics.filter((m) => m.mode !== "wasm-worker"), ratios: rr.filter((r) => r.mode !== "wasm-worker" && r.against !== "wasm-worker") });
+    expect(noWorker).not.toMatch(/†/);
+  });
+
   it("writes the CSVs and a report that leads with the snapshot window and the validation state", () => {
     const rs = runs();
     const metrics = aggregate(config, rs);
     const rr = ratios(metrics, config.modes);
     expect(metricsCsv(metrics).split("\n")[0]).toMatch(/^group,scenario,throttle,metric/);
     expect(ratiosCsv(rr).split("\n").length).toBe(rr.length + 2);
-    const md = markdown({
-      schema: 1, startedAt: "2026-10-14T10:00:00Z", generatedAt: "2026-10-14T14:00:00Z", config, browser: { version: "141", executable: null },
+    const result = {
+      schema: 1 as const, startedAt: "2026-10-14T10:00:00Z", generatedAt: "2026-10-14T14:00:00Z", config, browser: { version: "141", executable: null },
       environment: { commitShort: "abc1234", appVersion: "2.31.1", dirty: false, enginePackage: { "verticopolis_engine_bg.wasm": "f".repeat(64) }, engineBuildHash: "h", cpuModel: "cpu", logicalCpus: 4, totalMemoryBytes: 2 ** 34, os: "linux", node: "22", playwright: "1.61" } as never,
       scenarios: [{ name: "small", sha256: "a".repeat(64), population: 10, units: 2, transports: 1, saveBytes: 5 }],
       scripts: { worker: { raw: 8000, brotli: 2600 }, otherJs: { raw: 1, brotli: 1 }, enginePackage: { raw: 900_000, brotli: 330_000 } }, runs: rs, metrics, ratios: rr, validation: { ok: true, errors: [], warnings: [] }, limitations: ["one"],
-    });
+    };
+    const md = markdown(result);
     expect(md.split("\n")[2]).toMatch(/^> \*\*Snapshot, measured 2026-10-14T10:00:00Z to 2026-10-14T14:00:00Z on commit `abc1234`.*Live numbers: re-run `npm run perf:worker`.*Validation passed/);
     expect(md).toMatch(/\| small \| 1x \| wall time, 720 steps \(ms\) \|/);
     expect(md).toMatch(/0\.50x .* lower/);
     expect(md).toMatch(/frames at a 640x360 CSS viewport/);
     expect(definitions(config).length).toBeGreaterThan(20);
+    // The gate column comes first after the metric, in the protocol's orientation: above 1.0 is worse.
+    const header = md.split("\n").find((l) => l.startsWith("| scenario | throttle | metric |"))!;
+    expect(header.split("|").map((c) => c.trim()).slice(4, 5)).toEqual(["gate: wasm / ts (rates: ts / wasm)"]);
+    expect(md).not.toMatch(/\| ts \/ wasm \|/);
+    const gateOf = (metric: string, mode: "ts" | "wasm", against: "ts" | "wasm") => {
+      const r = rr.find((x) => x.metric === metric && x.throttle === "1" && x.mode === mode && x.against === against)!;
+      return `${r.ratio.toFixed(2)}x`;
+    };
+    const cells = (metric: string) => md.split("\n").find((l) => l.startsWith("| small | 1x | " + metric))!.split("|").map((c) => c.trim());
+    expect(cells("wall time, 720 steps")[4]).toContain(gateOf("wall time, 720 steps", "wasm", "ts"));
+    expect(cells("mean FPS")[4]).toContain(gateOf("mean FPS", "ts", "wasm"));
+    // The ratio the other columns carry for a rate is the opposite one, so the gate cell differs from it.
+    expect(cells("mean FPS")[4]).not.toEqual(cells("mean FPS")[cells("mean FPS").length - 2]);
+    // M4 is gated by a paired difference, so its gate cell carries no ratio or verdict.
+    const blocking = (mode: "ts" | "wasm") => metrics.find((m) => m.scenario === "small" && m.throttle === "1" && m.metric.startsWith("main-thread blocking") && m.mode === mode)!;
+    expect(cells("main-thread blocking")[4]).toBe(differenceCell(blocking("wasm"), blocking("ts")));
+    expect(cells("main-thread blocking")[4]).toMatch(/pairs \(wasm minus ts\)$/);
+    // Every table row has as many cells as its header and delimiter row, with or without the extra ratio columns.
+    const countCells = (l: string) => l.replace(/\\\|/g, "").split("|").length;
+    const rectangular = (text: string) => {
+      const lines = text.split("\n");
+      let tables = 0;
+      for (let i = 0; i < lines.length; i++) {
+        if (!lines[i].startsWith("| scenario | throttle | metric |")) continue;
+        tables++;
+        const width = countCells(lines[i]);
+        for (let j = i + 1; j < lines.length && lines[j].startsWith("|"); j++) expect(countCells(lines[j]), lines[j]).toBe(width);
+      }
+      return tables;
+    };
+    expect(rectangular(md)).toBeGreaterThan(3);
+    // Only the two gate modes: no extra ratio columns, and the header, delimiter and rows still agree.
+    const gateOnly = markdown({ ...result, metrics: metrics.filter((m) => m.mode === "ts" || m.mode === "wasm") });
+    expect(rectangular(gateOnly)).toBeGreaterThan(3);
   });
 
   const RTX = "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)";
@@ -161,6 +213,14 @@ describe("perf:worker analysis", () => {
       expect(quick.errors.filter((e) => /renderer/i.test(e)), label).toEqual([]);
       expect(quick.warnings.join(), label).toMatch(/renderer|rasterizer|adapter/i);
     }
+  });
+
+  it("fails a run that lost a WebGL context, in every mode (#1136)", () => {
+    const lost = runs().map((r, i) => (i === 0 ? { ...r, contextLost: ["WebGL context lost on canvas#game (1280x720) at 900 ms of a page"] } : { ...r, contextLost: [] }));
+    expect(validate(config, lost).errors.join()).toMatch(/1 of \d+ process runs lost a WebGL context/);
+    expect(validate({ ...config, quick: true }, lost).errors.join()).toMatch(/lost a WebGL context/);
+    expect(validate(config, lost, "EX-4").errors.join()).toMatch(/lost a WebGL context/);
+    expect(validate(config, runs()).errors.join()).not.toMatch(/lost a WebGL context/);
   });
 
   it("fails mixed renderers and a renderer that changed after the frames, even under a quick run or an exception", () => {

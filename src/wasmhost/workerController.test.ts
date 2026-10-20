@@ -186,3 +186,98 @@ describe("settleEngine", () => {
     expect(stepGate(sim)).toBeUndefined();
   });
 });
+
+describe("spawnEngineWorker, engine identity (#963)", () => {
+  const readyWorker = (identity: string | undefined): EngineWorkerLike => {
+    const w: EngineWorkerLike = {
+      onmessage: null,
+      onerror: null,
+      postMessage() {
+        setTimeout(() => w.onmessage?.({ data: { type: "ready", catalogs: { classic: "c", modern: "m" }, ...(identity === undefined ? {} : { identity }) } satisfies FromWorker }), 0);
+      },
+      terminate() {},
+    };
+    return w;
+  };
+
+  it("hands the worker's identity record to the caller", async () => {
+    const spawned = await spawnEngineWorker(() => readyWorker('{"schema":1}'), "u");
+    expect(spawned.identity).toBe('{"schema":1}');
+  });
+
+  it("leaves it undefined for a worker whose package has no such call", async () => {
+    const spawned = await spawnEngineWorker(() => readyWorker(undefined), "u");
+    expect(spawned.identity).toBeUndefined();
+  });
+});
+
+describe("spawnEngineWorker, the engine binary's build metadata (#963)", () => {
+  const answering = (reply: FromWorker): EngineWorkerLike => {
+    const w: EngineWorkerLike = {
+      onmessage: null,
+      onerror: null,
+      postMessage() {
+        setTimeout(() => w.onmessage?.({ data: reply }), 0);
+      },
+      terminate() {},
+    };
+    return w;
+  };
+  const ok = { state: "ok", sourceHash: "a".repeat(64) } as const;
+
+  it("hands the worker's read of the section to the caller", async () => {
+    const reply: FromWorker = { type: "ready", catalogs: { classic: "c", modern: "m" }, build: ok };
+    expect((await spawnEngineWorker(() => answering(reply), "u")).build).toEqual(ok);
+  });
+
+  it("leaves it undefined for a worker that did not say", async () => {
+    const reply: FromWorker = { type: "ready", catalogs: { classic: "c", modern: "m" } };
+    expect((await spawnEngineWorker(() => answering(reply), "u")).build).toBeUndefined();
+  });
+
+  it("carries it on the rejection of a load that failed after the binary compiled", async () => {
+    const err = await spawnEngineWorker(() => answering({ type: "error", fatal: true, message: "link failed", build: ok }), "u").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).toMatchObject({ message: "link failed", build: ok });
+  });
+
+  it("adds no build to a rejection that has none", async () => {
+    const err = await spawnEngineWorker(() => answering({ type: "error", fatal: true, message: "404" }), "u").catch((e: unknown) => e);
+    expect("build" in (err as object)).toBe(false);
+  });
+
+  /** A worker that reports the binary's build, then does `then`. */
+  const reporting = (then: (w: EngineWorkerLike) => void): EngineWorkerLike => {
+    const w: EngineWorkerLike = {
+      onmessage: null,
+      onerror: null,
+      postMessage() {
+        setTimeout(() => {
+          w.onmessage?.({ data: { type: "build", build: ok } });
+          then(w);
+        }, 0);
+      },
+      terminate() {},
+    };
+    return w;
+  };
+
+  it("keeps the build a worker reported when it then never answers", async () => {
+    const err = await spawnEngineWorker(() => reporting(() => undefined), "u", 20).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(EngineBootError);
+    expect(err).toMatchObject({ reason: "boot-timeout", build: ok });
+  });
+
+  it("keeps the build a worker reported when it then fails to start", async () => {
+    const err = await spawnEngineWorker(() => reporting((w) => w.onerror?.({ message: "boom" } as ErrorEvent)), "u").catch((e: unknown) => e);
+    expect(err).toMatchObject({ build: ok });
+  });
+
+  it("prefers the build an error reply carries over the one reported earlier", async () => {
+    const other = { state: "missing" } as const;
+    const err = await spawnEngineWorker(() => reporting((w) => w.onmessage?.({ data: { type: "error", fatal: true, message: "x", build: other } })), "u").catch(
+      (e: unknown) => e,
+    );
+    expect(err).toMatchObject({ build: other });
+  });
+});

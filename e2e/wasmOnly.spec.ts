@@ -45,7 +45,7 @@ test.describe("starts on the WASM engine", () => {
     await page.addInitScript(() => localStorage.setItem("vc.engine", "ts"));
     await page.goto("/?engine=ts");
     await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, { timeout: 30_000 });
-    expect(await bootState(page)).toEqual({ build: "wasm-only", engine: "wasm", failure: null });
+    expect(await bootState(page)).toMatchObject({ build: "wasm-only", engine: "wasm", failure: null });
     await expect(page.locator(".splash-version")).toContainText("WASM engine");
     await page.evaluate(() => document.getElementById("splash")?.remove());
     await page.evaluate(() => (window as any).game.setSpeed(1));
@@ -133,7 +133,7 @@ test.describe("never falls back to the TypeScript engine", () => {
     const failure = page.locator("#engine-failure");
     await expect(failure).toBeVisible({ timeout: 30_000 });
     await expect(failure).toHaveAttribute("data-stage", stage);
-    await expect(page.locator("#boot-fallback button")).toHaveText("Reload");
+    await expect(page.locator("#boot-fallback button:not([data-act])")).toHaveText("Reload");
     const state = await bootState(page);
     expect(state).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage } });
     expect(await page.evaluate(() => ({ game: !!(window as any).game, host: !!(window as any).__vcEngine }))).toEqual({ game: false, host: false });
@@ -146,6 +146,16 @@ test.describe("never falls back to the TypeScript engine", () => {
     const text = await expectStopped(page, "load");
     expect(text).toContain("could not start");
     expect(text).toContain("Reload the page to try again");
+    // Help cannot open here, so the stop screen carries Copy diagnostics (#963).
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t: string) => ((window as any).__copied = t) }, configurable: true });
+    });
+    await page.locator('#boot-fallback button[data-act="copy-diagnostics"]').click();
+    await expect(page.locator(".engine-failure-copy-status")).toHaveText("Copied.");
+    const copied = await page.evaluate(() => (window as any).__copied as string);
+    expect(copied).toContain("Failed at: load");
+    expect(copied).toContain("Engine in use: none");
+    expect(copied).toContain("Build: wasm-only");
   });
 
   test("a corrupted engine binary stops boot", async ({ page }) => {
@@ -209,6 +219,70 @@ test.describe("never falls back to the TypeScript engine", () => {
     await page.waitForTimeout(500);
     expect(await page.evaluate(() => (window as any).game.speed)).toBe(0);
     expect(await page.evaluate(() => (window as any).game.sim.clock.minutes)).toBe(after.minutes);
+  });
+
+  test("an engine that traps mid-game stops the game instead of running it on TypeScript (#874)", async ({ page }) => {
+    const errors = pageErrors(page);
+    await page.goto("/");
+    await hostedGame(page);
+    await page.evaluate(() => (window as any).game.setSpeed(1));
+    // The real tick runs, then the call traps and every later call on the
+    // engine throws, as a poisoned wasm-bindgen object does.
+    await page.evaluate(() => {
+      const engine = (window as any).__vcEngine.current().engine;
+      const proto = Object.getPrototypeOf(engine);
+      const real = engine.tick.bind(engine);
+      Object.defineProperty(engine, "tick", {
+        value: (dt: number) => {
+          real(dt);
+          for (const key of Object.getOwnPropertyNames(proto)) {
+            if (key === "constructor" || typeof Object.getOwnPropertyDescriptor(proto, key)?.value !== "function") continue;
+            Object.defineProperty(engine, key, {
+              value: () => {
+                throw new Error("recursive use of an object detected which would lead to unsafe aliasing in rust");
+              },
+              configurable: true,
+              writable: true,
+            });
+          }
+          throw new WebAssembly.RuntimeError("unreachable");
+        },
+        configurable: true,
+        writable: true,
+      });
+    });
+    const failure = page.locator("#engine-failure");
+    await expect(failure).toBeVisible({ timeout: 30_000 });
+    await expect(failure).toHaveAttribute("data-stage", "host");
+    expect(await bootState(page)).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage: "host" } });
+    const after = await page.evaluate(() => {
+      const w = window as any;
+      const sim = w.game.sim;
+      return {
+        hosted: !!w.__vcEngine.status.hosted,
+        reason: w.__vcEngine.status.lastFallback?.reason,
+        speed: w.game.speed,
+        minutes: sim.clock.minutes as number,
+        // The frozen host's own save, which answers with the restore point.
+        hostSave: Object.prototype.hasOwnProperty.call(sim, "serialize"),
+        saved: typeof sim.serialize().minutes === "number",
+      };
+    });
+    // Stopped on the engine's last state: a save still answers (the restore
+    // point), and no TypeScript tick moves the tower.
+    expect(after).toMatchObject({ hosted: false, reason: "trap-tick", speed: 0, hostSave: true, saved: true });
+    await page.keyboard.press("3");
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => (window as any).game.speed)).toBe(0);
+    expect(await page.evaluate(() => (window as any).game.sim.clock.minutes)).toBe(after.minutes);
+    // Even a speed set directly moves nothing: the frozen host's guarded tick
+    // asks the engine nothing.
+    await page.evaluate(() => (window as any).game.setSpeed(3));
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => (window as any).game.sim.clock.minutes)).toBe(after.minutes);
+    // The fault is the only error the page reports: a failed fallback report
+    // or a failed stop would show here.
+    expect(errors.filter((e) => !/the WASM engine failed during a tick: unreachable/.test(e))).toEqual([]);
   });
 
   /** Install the worker and reload under it, so the engine package is in
