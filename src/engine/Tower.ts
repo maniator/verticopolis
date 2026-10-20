@@ -1,6 +1,7 @@
 import { facilityFloors } from "./facilities";
 import { CLASSIC_RULES, type GameRules } from "./gameRules";
-import { FACILITIES } from "./facilitiesData";
+import { FACILITIES, isFacilityKind } from "./facilitiesData";
+import { INVALID_REQUEST, UNKNOWN_FACILITY, whole } from "./request";
 import { wellFormed } from "./wellFormed";
 import type { Facility, FacilityKind, PlaceResult, Transport, Unit } from "./types";
 import { isStructural } from "./tower/towerTopology";
@@ -309,7 +310,10 @@ export class Tower {
     return placement.spanReason(this, kind, bottom, top);
   }
 
+  /** Refuses an unknown kind or a non-whole coordinate before the check reads either (#1216). */
   validateTransport(kind: FacilityKind, x: number, bottom: number, top: number): PlaceResult {
+    if (!isFacilityKind(kind)) return { ok: false, reason: UNKNOWN_FACILITY };
+    if (!whole(x) || !whole(bottom) || !whole(top)) return { ok: false, reason: INVALID_REQUEST };
     return transport.validateTransport(this, kind, x, bottom, top);
   }
 
