@@ -481,7 +481,8 @@ class GameApp implements GameAppPorts {
   /** @internal */ captureUndo(label: string): void { this.history.capture(label); }
   /** @internal */ commitUndo(): void { this.history.commit(); }
   /** @internal */ discardUndo(): void { this.history.discard(); }
-  /** @internal Temporary, with the WASM engine's fallback (#874). */ dropEmptyUndo(): void { this.history.dropUnchanged(); }
+  /** @internal Temporary, with the WASM engine's fallback (#874). */ dropEmptyUndo(): number { return this.history.dropUnchanged(); }
+  /** @internal Temporary, with the WASM engine's fallback (#874). */ holdClearedRedo(on: boolean): void { this.history.holdClearedRedo = on; }
   undo(): void { this.history.undo(); }
   redo(): void { this.history.redo(); }
 }

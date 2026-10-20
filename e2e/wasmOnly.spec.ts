@@ -265,7 +265,8 @@ test.describe("never falls back to the TypeScript engine", () => {
     await page.waitForTimeout(500);
     expect(await page.evaluate(() => (window as any).game.speed)).toBe(0);
     expect(await page.evaluate(() => (window as any).game.sim.clock.minutes)).toBe(after.minutes);
-    // Even a speed set directly moves nothing: the frozen tower's tick is its own.
+    // Even a speed set directly moves nothing: the frozen host's guarded tick
+    // asks the engine nothing.
     await page.evaluate(() => (window as any).game.setSpeed(3));
     await page.waitForTimeout(500);
     expect(await page.evaluate(() => (window as any).game.sim.clock.minutes)).toBe(after.minutes);

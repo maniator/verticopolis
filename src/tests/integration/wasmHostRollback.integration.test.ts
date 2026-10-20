@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import type { GameplayEvent } from "../../engine/gameplayEvents";
 import { hasWasmPackage, wasmRequired } from "../conformance/wasmEngine";
 import { FrameDriver } from "../dualrun/dualRunHarness";
 import { freePoisoned, trapAfter } from "./wasmTraps";
@@ -228,6 +229,28 @@ describe.skipIf(!hasWasmPackage())("an edit whose engine command traps is undone
       a.undo();
       expect(a.toasts).toEqual(["Undid: Build Floor"]);
       expect(tiles()).toEqual([]);
+    } finally {
+      h.stop();
+    }
+  });
+
+  it("keeps an edit's held events from the analytics flush when that flush's own drain traps", async () => {
+    const { a, h, engine, deliver, delivered } = setUp(75);
+    try {
+      const sim = a.sim;
+      a.captureUndo("office");
+      const good = lastGood(sim);
+      expect(sim.build("office", 2, 190).ok).toBe(true);
+      a.commitUndo(); // paused: no point covers it, so its event is held
+      trapAfter(engine(), "gameplayEventsPending", false);
+      const flush = sim.drainGameplayEvents as (opts?: { release?: boolean }) => GameplayEvent[];
+      delivered.push(...flush({ release: true })); // a hide's flush, which traps
+      expect(h.status.lastFallback).toEqual({ reason: "trap-tick", stage: "start" });
+      await settle();
+      expectRolledBack(a, sim, good);
+      expect(offices(a)).toEqual([170]);
+      deliver();
+      expect(tally(delivered)).toEqual(SET_UP); // the office the recovery took away never reached the game
     } finally {
       h.stop();
     }

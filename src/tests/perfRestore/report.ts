@@ -119,6 +119,10 @@ export function problems(runs: readonly MeasuredRun[], expected: number, tree: {
     if (r.commands < r.planned) out.push(`${at}: issued ${r.commands} of the ${r.planned} commands it planned, so the workload did not run as described`);
     if (r.accepted < r.commands) out.push(`${at}: the tower refused ${r.commands - r.accepted} of ${r.commands} commands, so the workload did not run as described`);
     if (r.extraSaves > 0) out.push(`${at}: ${r.extraSaves} engine saves beyond the merges' and the hosted ones, which the design expects to be 0`);
+    if (r.extraSaves < 0) out.push(`${at}: the merges and hosted saves counted exceed the engine's saves by ${-r.extraSaves}, so the save counts cannot be trusted`);
+    // Each rapid edit's undo capture reads a hosted save; fewer means the
+    // captures stopped reading one, and the rows measured a plain drag.
+    if (r.workload === "edits" && r.hostedSaves < r.commands) out.push(`${at}: ${r.hostedSaves} hosted saves for ${r.commands} edits, so the edits' undo captures did not each read a save and the rapid-edit check did not run`);
   }
   if (runs.length < expected) out.push(`${expected - runs.length} of ${expected} runs are missing`);
   return out;

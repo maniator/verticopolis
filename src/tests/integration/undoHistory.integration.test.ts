@@ -120,6 +120,12 @@ describe("UndoHistory.dropUnchanged (#874)", () => {
     return { hist, notes, set: (v: number) => (world.v = v) };
   }
 
+  // The redo trails the history holds, on either stack: what the hold costs.
+  function heldTrails(hist: UndoHistory): number {
+    const stacks = hist as unknown as { undoStack: { cleared?: unknown }[]; redoStack: { cleared?: unknown }[] };
+    return [...stacks.undoStack, ...stacks.redoStack].filter((e) => e.cleared).length;
+  }
+
   it("drops the newest steps that would change nothing now, and keeps the rest", () => {
     const { hist, notes, set } = withSigOf();
     hist.capture("a");
@@ -172,6 +178,163 @@ describe("UndoHistory.dropUnchanged (#874)", () => {
     hist.redo();
     expect(notes.slice(2)).toEqual(["Undid: b", "Redid: b"]);
     expect(world.v).toBe(2);
+  });
+
+  it("fingerprints a gesture's capture again from its own snapshot, so a release after the fallback leaves no empty step", () => {
+    let world = { v: 0 };
+    // A frozen host's snapshot answers with its newest restore point.
+    let point: string | null = null;
+    const notes: string[] = [];
+    const hist = new UndoHistory({
+      snapshot: () => point ?? JSON.stringify(world),
+      restore: (s) => {
+        world = JSON.parse(s) as { v: number };
+      },
+      signature: () => String(world.v),
+      signatureOf: (s) => String((JSON.parse(s) as { v: number }).v),
+      notify: (m) => notes.push(m),
+    });
+    hist.capture("a");
+    world.v = 1;
+    hist.commit();
+    // A press: its capture's save traps, so it takes the point from before
+    // "a", while the frozen tower still shows "a".
+    point = JSON.stringify({ v: 0 });
+    hist.capture("b");
+    point = null;
+    world.v = 0; // the fallback goes back to that point
+    expect(hist.dropUnchanged()).toBe(1);
+    hist.commit(); // the release, with nothing done since
+    hist.undo();
+    expect(notes).toEqual(["Nothing to undo."]);
+    // A capture that read the tower itself keeps its fingerprint, so what
+    // the gesture does after the tidy is one step.
+    hist.capture("c");
+    world.v = 2;
+    expect(hist.dropUnchanged()).toBe(0);
+    hist.commit();
+    hist.undo();
+    expect(notes.slice(1)).toEqual(["Undid: c"]);
+    expect(world.v).toBe(0);
+  });
+
+  it("puts back the redo steps a dropped step's commit cleared, while the hold is on", () => {
+    const { hist, notes, set } = withSigOf();
+    hist.holdClearedRedo = true;
+    hist.capture("a");
+    set(1);
+    hist.commit();
+    hist.undo(); // a redo trail: "a"
+    hist.capture("b");
+    set(2);
+    hist.commit(); // clears it, and holds it with "b"
+    set(0); // a fallback put the world back to the state "b" captured
+    expect(hist.dropUnchanged()).toBe(1);
+    hist.redo();
+    expect(notes).toEqual(["Undid: a", "Redid: a"]);
+    expect(notes).toHaveLength(2);
+  });
+
+  it("puts back the cleared redo steps under two dropped steps", () => {
+    const { hist, notes, set } = withSigOf();
+    hist.holdClearedRedo = true;
+    hist.capture("a");
+    set(1);
+    hist.commit();
+    hist.undo();
+    hist.capture("b");
+    set(2);
+    hist.commit(); // holds the "a" redo step
+    // The next capture's save traps: its snapshot is the point "b" captured.
+    set(0);
+    hist.capture("c");
+    set(3);
+    hist.commit();
+    set(0); // the fallback goes back to that point
+    expect(hist.dropUnchanged()).toBe(2);
+    hist.redo();
+    expect(notes).toEqual(["Undid: a", "Redid: a"]);
+  });
+
+  it("forgets the held redo steps when the player undoes the step that holds them", () => {
+    const { hist, notes, set } = withSigOf();
+    hist.holdClearedRedo = true;
+    hist.capture("a");
+    set(1);
+    hist.commit();
+    hist.undo();
+    hist.capture("b");
+    set(2);
+    hist.commit();
+    expect(heldTrails(hist)).toBe(1);
+    hist.undo();
+    expect(heldTrails(hist)).toBe(0); // the undone step's trail goes with it
+    expect(hist.dropUnchanged()).toBe(0);
+    hist.redo();
+    hist.redo();
+    expect(notes).toEqual(["Undid: a", "Undid: b", "Redid: b", "Nothing to redo."]);
+  });
+
+  it("holds one cleared trail at a time: a later commit that clears a trail lets the older one go", () => {
+    const { hist, notes, set } = withSigOf();
+    hist.holdClearedRedo = true;
+    hist.capture("a");
+    set(1);
+    hist.commit();
+    hist.undo(); // a redo trail: "a"
+    hist.capture("b");
+    set(2);
+    hist.commit(); // holds the "a" redo step
+    hist.capture("c");
+    set(3);
+    hist.commit();
+    hist.undo(); // a redo trail: "c"
+    hist.capture("d");
+    set(4);
+    hist.commit(); // holds the "c" redo step, and lets "a" go
+    expect(heldTrails(hist)).toBe(1);
+    hist.undo();
+    // Put the world back to before "b" by hand: no fallback reaches that far
+    // back, since the undo of "c" read a point after "b".
+    set(0);
+    expect(hist.dropUnchanged()).toBe(1);
+    hist.redo();
+    hist.redo();
+    expect(notes).toEqual(["Undid: a", "Undid: c", "Undid: d", "Redid: d", "Nothing to redo."]);
+  });
+
+  it("lets the held trail go when the hold turns off", () => {
+    const { hist, notes, set } = withSigOf();
+    hist.holdClearedRedo = true;
+    hist.capture("a");
+    set(1);
+    hist.commit();
+    hist.undo();
+    hist.capture("b");
+    set(2);
+    hist.commit(); // holds the "a" redo step
+    hist.holdClearedRedo = false;
+    expect(hist.holdClearedRedo).toBe(false);
+    expect(heldTrails(hist)).toBe(0);
+    set(0);
+    expect(hist.dropUnchanged()).toBe(1);
+    hist.redo();
+    expect(notes).toEqual(["Undid: a", "Nothing to redo."]);
+  });
+
+  it("clears the redo trail for good while the hold is off, as main does", () => {
+    const { hist, notes, set } = withSigOf();
+    hist.capture("a");
+    set(1);
+    hist.commit();
+    hist.undo();
+    hist.capture("b");
+    set(2);
+    hist.commit();
+    set(0);
+    expect(hist.dropUnchanged()).toBe(1);
+    hist.redo();
+    expect(notes).toEqual(["Undid: a", "Nothing to redo."]);
   });
 
   it("keeps every step when the world differs from the newest one", () => {

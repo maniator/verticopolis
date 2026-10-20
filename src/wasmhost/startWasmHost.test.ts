@@ -207,7 +207,7 @@ describe("startWasmHost", () => {
     a.adoptSim(next);
     expect(a.sim).toBe(next);
     expect(handle.status).toMatchObject({ starts: 1, hosted: false, fallbacks: 1, lastFallback: { reason: "other", stage: "start" } });
-    expect(handle.status.errors).toEqual(["the WASM engine failed during letting a tower go: unreachable executed"]);
+    expect(handle.status.errors).toEqual(["the WASM engine failed while letting a tower go: unreachable executed"]);
     expect(trapped.freed).toBe(true);
     expect(mod.engines).toHaveLength(1); // the loaded tower stays on TypeScript
     expect(next.drainGameplayEvents()).toEqual([{ name: "tower_founded", payload: { mode: "modern" } }]);
@@ -226,7 +226,7 @@ describe("startWasmHost", () => {
     const sim = a.sim;
     const logged = sim.log.length;
     handle.stop();
-    expect(handle.status.errors).toEqual(["the WASM engine failed during letting a tower go: unreachable executed"]);
+    expect(handle.status.errors).toEqual(["the WASM engine failed while letting a tower go: unreachable executed"]);
     expect(mod.engines[0].freed).toBe(true);
     expect(handle.status.hosted).toBe(false);
     // The stopped tower is frozen, and its save is the newest restore point.

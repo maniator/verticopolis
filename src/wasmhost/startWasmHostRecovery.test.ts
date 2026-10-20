@@ -8,11 +8,15 @@ import { startWasmHost, type WasmHostApp, type WasmHostOptions } from "./startWa
  * told on every path, and what the app is asked to do.
  */
 
-function app(): WasmHostApp & { adopted: Simulation[]; dropped: number } {
+function app(): WasmHostApp & { adopted: Simulation[]; dropped: number; steps: number; holds: boolean[] } {
   const a = {
     sim: Simulation.newGame(3, "classic"),
     adopted: [] as Simulation[],
+    /** Tidies asked for. */
     dropped: 0,
+    /** The steps each tidy answers it dropped. */
+    steps: 0,
+    holds: [] as boolean[],
     adoptSim(next: Simulation) {
       next.gameplayEvents.inherit(a.sim.gameplayEvents);
       a.sim = next;
@@ -20,6 +24,10 @@ function app(): WasmHostApp & { adopted: Simulation[]; dropped: number } {
     },
     dropEmptyUndo() {
       a.dropped++;
+      return a.steps;
+    },
+    holdClearedRedo(on: boolean) {
+      a.holds.push(on);
     },
   };
   return a;
@@ -132,6 +140,98 @@ describe("the recovery after a fault (#874)", () => {
       await settle();
       expect(a.dropped).toBe(1);
       expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: "The WASM engine stopped, so the game runs on the TypeScript engine now.", kind: "bad" }));
+    } finally {
+      handle.stop();
+    }
+  });
+
+  const LOST = "The WASM engine stopped, so some of your recent changes were lost. The game runs on the TypeScript engine now.";
+
+  it("says changes were lost when an undo replaced the faulted tower after a command no point covers", async () => {
+    const a = app();
+    const { handle, engine } = start(a);
+    try {
+      a.sim.money = 5; // a command after the newest point
+      engine().failOn = "tick";
+      a.sim.tick(1);
+      a.adoptSim(Simulation.newGame(3, "classic"), true);
+      await settle();
+      expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: LOST, kind: "bad" }));
+    } finally {
+      handle.stop();
+    }
+  });
+
+  it("says changes were lost when an undo replaced the faulted tower and the tidy dropped a step", async () => {
+    const a = app();
+    a.steps = 1;
+    const { handle, engine } = start(a);
+    try {
+      engine().failOn = "tick";
+      a.sim.tick(1);
+      a.adoptSim(Simulation.newGame(3, "classic"), true);
+      await settle();
+      expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: LOST, kind: "bad" }));
+    } finally {
+      handle.stop();
+    }
+  });
+
+  it("says only that the engine stopped when a load or a new game replaced the faulted tower", async () => {
+    const a = app();
+    a.steps = 1;
+    const { handle, engine } = start(a);
+    try {
+      a.sim.money = 5; // a command after the newest point
+      engine().failOn = "tick";
+      a.sim.tick(1);
+      a.adoptSim(Simulation.newGame(3, "classic")); // a load drops the old tower's changes itself
+      await settle();
+      expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: "The WASM engine stopped, so the game runs on the TypeScript engine now.", kind: "bad" }));
+    } finally {
+      handle.stop();
+    }
+  });
+
+  it("has the history hold cleared redo steps while hosting, until a recovery or a stop", async () => {
+    const a = app();
+    const { handle, engine } = start(a);
+    expect(a.holds).toEqual([true]);
+    engine().failOn = "tick";
+    a.sim.tick(1);
+    expect(a.holds).toEqual([true]); // the tidy has not run yet
+    await settle();
+    expect(a.holds).toEqual([true, false]);
+    handle.stop();
+    expect(a.holds).toEqual([true, false, false]);
+  });
+
+  it("has the history hold no redo steps in a wasm-only build, which stops instead of falling back", () => {
+    const a = app();
+    const { handle, engine } = start(a, { strict: true, onFatal: vi.fn() });
+    expect(handle.status.hosted).toBe(true);
+    engine().failOn = "tick";
+    a.sim.tick(1);
+    handle.stop();
+    expect(a.holds).not.toContain(true);
+  });
+
+  it("lets the held redo steps go for a tower left on TypeScript, and holds them again for a hosted one", () => {
+    const a = app();
+    const mod = fakeModule();
+    const handle = startWasmHost(a, mod, { info: vi.fn(), error: vi.fn() });
+    try {
+      const fromSave = mod.Engine.fromSave;
+      mod.Engine.fromSave = () => {
+        throw new Error("refused");
+      };
+      a.adoptSim(Simulation.newGame(4, "classic"));
+      expect(handle.status.hosted).toBe(false);
+      expect(a.holds).toEqual([true, false]);
+      mod.Engine.fromSave = fromSave;
+      a.adoptSim(Simulation.newGame(5, "classic"));
+      expect(handle.status.hosted).toBe(true);
+      expect(a.holds).toEqual([true, false, true]);
     } finally {
       handle.stop();
     }

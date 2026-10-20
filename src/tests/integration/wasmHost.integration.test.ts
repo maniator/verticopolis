@@ -209,7 +209,7 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     // A trapped engine throws from every call.
     (host.engine as { drainGameplayEvents: () => string }).drainGameplayEvents = () => { throw new Error("unreachable executed"); };
     expect(() => host.detach()).not.toThrow();
-    expect(host.fault).toMatchObject({ reason: "other", message: "the WASM engine failed during letting a tower go: unreachable executed" });
+    expect(host.fault).toMatchObject({ reason: "other", message: "the WASM engine failed while letting a tower go: unreachable executed" });
     expect(Object.getOwnPropertyDescriptor(sim, "drainGameplayEvents")).toBeUndefined();
     expect(Object.getOwnPropertyDescriptor(sim, "gameplayEventsDropped")).toBeUndefined();
     expect(Object.getOwnPropertyDescriptor(sim, "serialize")).toBeDefined(); // the restore point's
@@ -254,7 +254,7 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     expect(sim.gameplayEventsDropped).toBe(6);
   });
 
-  it("keeps an unreadable batch's loss, and the events already out, when the engine traps at detach", () => {
+  it("keeps an unreadable batch's loss when the engine traps at detach, and drops the held events no point covered", () => {
     const sim = Simulation.newGame(48, "classic");
     const host = attachWasmHost(sim, wasm());
     const engine = host.engine as { drainGameplayEvents: () => string };

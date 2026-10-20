@@ -41,7 +41,7 @@ describe("the coalesced main-thread host (sync: frame)", () => {
     engine.commuteRevision++;
     sim.tick(1);
     expect(() => host.detach()).not.toThrow();
-    expect(host.fault).toMatchObject({ reason: "other", message: expect.stringMatching(/during letting a tower go: .*commute stress/) });
+    expect(host.fault).toMatchObject({ reason: "other", message: expect.stringMatching(/while letting a tower go: .*commute stress/) });
     expect(engine.freed).toBe(true);
     expect([...sim.crowd.commuteStressByFloor]).toEqual([[2, 10]]);
     // A faulted tower never runs on TypeScript, and its save is the newest

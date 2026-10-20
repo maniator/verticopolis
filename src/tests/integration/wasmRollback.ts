@@ -18,6 +18,7 @@ import { FrameDriver } from "../dualrun/dualRunHarness";
 export const UNDONE = "The WASM engine stopped, so the tower went back to its last good state and your recent changes were undone. It runs on the TypeScript engine now.";
 export const RESTORED = "The WASM engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.";
 export const REPLACED = "The WASM engine stopped, so the game runs on the TypeScript engine now.";
+export const LOST = "The WASM engine stopped, so some of your recent changes were lost. The game runs on the TypeScript engine now.";
 
 /** GameApp as far as the host and the undo trail see it: its adopt, its
  *  history (the real one, through the app's own ports) and its toasts. */
@@ -38,6 +39,7 @@ export function gameApp(sim: Simulation) {
     undo: () => a.history.undo(),
     redo: () => a.history.redo(),
     dropEmptyUndo: () => a.history.dropUnchanged(),
+    holdClearedRedo: (on: boolean) => void (a.history.holdClearedRedo = on),
   };
   a.history = createAppHistory(a);
   return a;

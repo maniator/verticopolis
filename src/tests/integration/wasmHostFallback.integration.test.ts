@@ -90,7 +90,10 @@ describe.skipIf(!hasWasmPackage())("WASM host runtime fallback (#874)", () => {
       expect(before.minutes - fresh.clock.minutes).toBeGreaterThanOrEqual(0);
       expect(before.minutes - fresh.clock.minutes).toBeLessThanOrEqual(60);
       expect(fresh.tower.units).toHaveLength(before.units);
-      expect(fresh.log[fresh.log.length - 1]?.text).toMatch(/WASM engine stopped/);
+      expect(fresh.log[fresh.log.length - 1]).toMatchObject({
+        text: "The WASM engine stopped, so the tower went back to its last good state and your recent changes were undone. It runs on the TypeScript engine now.",
+        kind: "bad",
+      });
       // The TypeScript engine runs it now.
       new FrameDriver(fresh, 3).run(60);
       expect(fresh.clock.minutes).toBeGreaterThan(before.minutes);

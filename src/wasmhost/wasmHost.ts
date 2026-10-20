@@ -240,7 +240,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
           events.cover(readEvents());
         },
         undefined,
-        "letting a tower go",
+        "while letting a tower go",
       );
       detached = true;
       const faulted = latch.fault !== null;
@@ -435,11 +435,17 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   Object.defineProperty(sim, "serialize", { value: serializeHosted, configurable: true, writable: true });
   // A reference to the override kept past detach drains the instance, which
   // is the authority again, and never reaches the freed engine. The
-  // analytics session's own flush releases the held events (`release`).
+  // analytics session's own flush releases the held events (`release`),
+  // after a drain that did not fault: a fault drops them with their commands.
   const drainOverride = (opts?: { release?: boolean }): GameplayEvent[] => {
     if (detached) return sim.gameplayEvents.drain();
-    if (opts?.release && !latch.fault) events.release();
-    return guard("trap-tick", drainHosted, null) ?? events.take();
+    const out = guard("trap-tick", drainHosted, null);
+    if (out === null) return events.take();
+    if (opts?.release && !latch.fault) {
+      events.release();
+      out.push(...events.take());
+    }
+    return out;
   };
   Object.defineProperty(sim, "drainGameplayEvents", { value: drainOverride, configurable: true, writable: true });
   Object.defineProperty(sim, "gameplayEventsDropped", { get: droppedSoFar, configurable: true });

@@ -9,7 +9,9 @@ import type { FaultContext, HostFault } from "./hostFault";
 import { towerStateSig } from "../engine/UndoHistory";
 
 /** What a player can change and see: the undo signature (rooms, transports,
- *  labels, rents, money), the tower's name and an open emergency choice. */
+ *  labels, rents, money), the tower's name and an open emergency choice.
+ *  Temporary, with the WASM engine's fallback (#874): it picks the line a
+ *  recovery shows. */
 function playerState(sim: Simulation): string {
   return `${towerStateSig(sim.tower, sim.money)}|${sim.tower.towerName ?? ""}|${sim.pendingChoice ? "choice" : ""}`;
 }
@@ -80,8 +82,13 @@ export interface WasmHostApp {
   captureUndo?(label: string): void;
   /** Drop the undo and redo steps that would change nothing on the tower
    *  the recovery adopted (the lost change's), when the app keeps a
-   *  history. Temporary, with the re-adoption on TypeScript. */
-  dropEmptyUndo?(): void;
+   *  history, and answer how many went. Temporary, with the re-adoption on
+   *  TypeScript. */
+  dropEmptyUndo?(): number;
+  /** Keep the redo steps an edit clears while a fallback can still take
+   *  that edit away, so the tidy can put them back. Temporary, with the
+   *  re-adoption on TypeScript. */
+  holdClearedRedo?(on: boolean): void;
 }
 
 export interface WasmHostHandle {
@@ -128,7 +135,7 @@ export interface WasmHostOptions {
   sync?: "step" | "frame";
   /** Called with the codes of every tower the host would not take, the first
    *  one included, and of every fault, after the status records it. A throw
-   *  is reported, never passed back into the adopt or the faulted call. */
+   *  from it is logged, and the adopt or the faulted call goes on. */
   onFallback?: (fallback: HostFallback) => void;
 }
 
@@ -138,6 +145,9 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
   let fatal = false;
   // A fault latches hosting off for the page life (#874).
   let faulted = false;
+  // Whether the latest swap kept the undo trail (an undo or a redo), where
+  // a load or a new game drops it. Temporary, with the re-adoption.
+  let keptHistory = false;
   let undoDepth = 0;
   let captureDepth = 0;
   const noteError = (message: string) => {
@@ -199,8 +209,8 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     }
     if (opts.strict && !fatal) {
       fatal = true;
-      // The stop is reported, never thrown into the adopt or the call that
-      // caused it.
+      // A throw from the stop is logged, and the adopt or the call that
+      // caused it goes on.
       try {
         opts.onFatal?.(message, reason);
       } catch (err) {
@@ -218,10 +228,17 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     status.hosted = false;
     fallBack(fault.message, fault.reason, stage);
     if (opts.strict) return;
-    queueMicrotask(() => recover(h, sim));
+    queueMicrotask(() => {
+      try {
+        recover(h, sim);
+      } finally {
+        holdRedo(false);
+      }
+    });
   };
   // Temporary compatibility code: removed with the TypeScript simulation.
   const REPLACED = "The WASM engine stopped, so the game runs on the TypeScript engine now.";
+  const LOST = "The WASM engine stopped, so some of your recent changes were lost. The game runs on the TypeScript engine now.";
   const STUCK = "The WASM engine stopped, and the tower could not go back to a good state. Load a save or start a new tower to keep playing.";
   const RESTORED = "The WASM engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.";
   const UNDONE = "The WASM engine stopped, so the tower went back to its last good state and your recent changes were undone. It runs on the TypeScript engine now.";
@@ -233,22 +250,38 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     }
   };
   // Undo and redo steps that would change nothing on the tower now: the
-  // lost change's, or a redo step an undo took from the frozen tower.
-  const tidyHistory = () => {
+  // lost change's, or a redo step an undo took from the frozen tower. It
+  // answers how many went.
+  const tidyHistory = (): number => {
     try {
-      app.dropEmptyUndo?.();
+      return app.dropEmptyUndo?.() ?? 0;
     } catch (e) {
       noteError(`tidying the undo trail: ${e instanceof Error ? e.message : String(e)}`);
+      return 0;
+    }
+  };
+  // While a fault can still take an edit away (a hosted tower, in a build
+  // that falls back), the history keeps the redo steps the edit cleared, for
+  // the tidy to put back.
+  const holdRedo = (on: boolean) => {
+    try {
+      app.holdClearedRedo?.(on);
+    } catch (e) {
+      noteError(`setting the undo trail's redo hold: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
   const recover = (h: WasmHost, sim: Simulation) => {
     if (stopped) return;
     // A load, a new game, an undo or a redo replaced the tower since the
     // fault (the swap let the faulted host go, and nothing is hosted again),
-    // so there is nothing to restore; the player still hears why.
+    // so there is nothing to restore; the player still hears why. After an
+    // undo or a redo, the line also says changes were lost when commands ran
+    // after the newest point or the trail lost steps (an undo's own snapshot
+    // read that point). A load or a new game let the old tower's changes go
+    // itself, so the line does not blame the engine for them.
     if (app.sim !== sim) {
-      tidyHistory();
-      say(app.sim, REPLACED);
+      const dropped = tidyHistory();
+      say(app.sim, keptHistory && (h.lostEdits > 0 || dropped > 0) ? LOST : REPLACED);
       return;
     }
     let fresh: Simulation;
@@ -310,6 +343,9 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     } catch (e) {
       fallBack(`not hosting this tower: ${e instanceof Error ? e.message : String(e)}`, foreignPackage() ? "package-mismatch" : "attach-refused", stage);
     }
+    // A wasm-only build stops instead of falling back, and a tower left on
+    // the TypeScript engine has nothing to fall back from.
+    holdRedo(!opts.strict && host !== null);
   };
   follow(app.sim, "start");
 
@@ -347,6 +383,7 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     // no crowd yet and otherwise reported and left on the TypeScript engine.
     // Adopting the tower already held keeps its host.
     if (sim === app.sim) return adopt.call(this, sim, preserveHistory);
+    keptHistory = preserveHistory === true;
     release();
     try {
       adopt.call(this, sim, preserveHistory);
@@ -361,6 +398,7 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     current: () => host,
     stop() {
       stopped = true;
+      holdRedo(false);
       release();
       if (ownAdopt) Object.defineProperty(app, "adoptSim", ownAdopt);
       else delete (app as Partial<WasmHostApp>).adoptSim;

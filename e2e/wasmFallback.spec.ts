@@ -25,9 +25,8 @@ async function runningOnEngine(page: Page): Promise<string[]> {
   await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, { timeout: 30_000 });
   await page.evaluate(() => {
     const g = (window as any).game;
-    // Leave the title screen as a player does. Removing its element alone
-    // leaves the onboarding thinking it is up, and the recovery's adopt would
-    // then take it down and pause the game.
+    // Leave the title screen as a player does, so the game runs. (A
+    // recovery keeps a title screen that is still up: keepSplash.)
     g.onboarding.dismissSplash();
     g.sim.money = 1e9;
     for (let x = 160; x < 190; x++) g.sim.build("lobby", 1, x);
@@ -93,9 +92,11 @@ test("a tick that traps mid-game falls back to TypeScript and the game keeps run
   const after = await state(page);
   expect(after).toMatchObject({ hosted: false, fallbacks: 1, lastFallback: { reason: "trap-tick", stage: "start" }, onTypeScript: true, lobbies: 30 });
   expect(after.lastError).toMatch(/failed during a tick: unreachable/);
-  expect(after.recentLog).toMatch(/WASM engine stopped/);
-  // The UI shows the line as an alert toast.
-  await expect(page.locator("#toast-wrap .toast.bad[role=alert]", { hasText: "The WASM engine stopped" })).toBeVisible({ timeout: 10_000 });
+  // No command ran after the newest point, so the line says only that the
+  // tower went back, and the UI shows it as an alert toast.
+  const RESTORED = "The WASM engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.";
+  expect(after.recentLog.split("\n")).toContain(RESTORED);
+  await expect(page.locator("#toast-wrap .toast.bad[role=alert]", { hasText: RESTORED })).toBeVisible({ timeout: 10_000 });
   // The TypeScript engine runs the tower now, and the fault was the only error.
   await page.waitForFunction((b) => (window as any).game.sim.clock.minutes > b + 5, after.minutes, { timeout: 30_000 });
   expect((await state(page)).fallbacks).toBe(1);

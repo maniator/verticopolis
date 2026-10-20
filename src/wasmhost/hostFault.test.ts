@@ -82,7 +82,7 @@ describe("the fault latch (#874)", () => {
     expect(hostFault("trap-tick", "undo", "x").reason).toBe("trap-undo");
     expect(hostFault("trap-command", null, "x").message).toBe("the WASM engine failed during a command: x");
     expect(hostFault("trap-tick", null, new Error("y")).message).toBe("the WASM engine failed during a tick: y");
-    expect(hostFault("other", null, "z", "letting a tower go").message).toBe("the WASM engine failed during letting a tower go: z");
+    expect(hostFault("other", null, "z", "while letting a tower go").message).toBe("the WASM engine failed while letting a tower go: z");
     expect(["trap-command", "trap-tick", "trap-undo", "other"].every(isHostFault)).toBe(true);
     expect(["attach-refused", "package-mismatch", "none", "boot-error"].some(isHostFault)).toBe(false);
   });

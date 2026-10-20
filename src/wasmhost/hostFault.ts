@@ -35,15 +35,16 @@ export interface HostFault {
   message: string;
 }
 
-const WHERE: Record<HostFaultReason, string> = { "trap-command": "a command", "trap-tick": "a tick", "trap-undo": "an undo or redo", other: "a save" };
+const WHERE: Record<HostFaultReason, string> = { "trap-command": "during a command", "trap-tick": "during a tick", "trap-undo": "during an undo or redo", other: "during a save" };
 
 /** The fault for a throw on `path`, named for the log and the status.
- *  `where` names the path when its code's usual name does not fit. */
+ *  `where` says where it failed ("during a save") when its code's usual
+ *  place does not fit. */
 export function hostFault(path: HostFaultReason, context: FaultContext, error: unknown, where = WHERE[path]): HostFault {
   let reason = path;
   if (context === "undo") reason = "trap-undo";
   else if (context === "capture" && path === "other") reason = "trap-command";
-  return { reason, message: `the WASM engine failed during ${where}: ${error instanceof Error ? error.message : String(error)}` };
+  return { reason, message: `the WASM engine failed ${where}: ${error instanceof Error ? error.message : String(error)}` };
 }
 
 /** Freezes a host on the first throw from its engine and reports it. */

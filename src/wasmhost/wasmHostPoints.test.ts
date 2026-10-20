@@ -113,7 +113,7 @@ describe("restore points on the main-thread host (#874)", () => {
     expect(host.lostEdits).toBe(1);
     expect(host.restore().money).not.toBe(5);
     expect(sim.drainGameplayEvents()).toEqual([]);
-    sim.money = 7; // the read model runs on, frozen: counted, never relayed
+    sim.money = 7; // the frozen read model counts it and relays nothing
     expect(host.lostEdits).toBe(2);
     host.detach();
     expect(sim.drainGameplayEvents()).toEqual([]); // nor handed over
@@ -137,6 +137,21 @@ describe("restore points on the main-thread host (#874)", () => {
     expect(host.lostEdits).toBe(1); // a fallback still undoes the command
     expect(extra()).toBe(0);
     host.detach();
+  });
+
+  it("keeps the held events from a flush whose own drain faults, since the fallback undoes their command", () => {
+    const { sim, host, engine } = hosted();
+    commandEmits(engine);
+    sim.money = 5;
+    engine.drainGameplayEvents = () => {
+      throw new Error("unreachable executed");
+    };
+    const release = sim.drainGameplayEvents as (opts?: { release?: boolean }) => unknown[];
+    expect(release({ release: true })).toEqual([]);
+    expect(host.fault?.reason).toBe("trap-tick");
+    expect(release({ release: true })).toEqual([]);
+    host.detach();
+    expect(sim.drainGameplayEvents()).toEqual([]);
   });
 
   it("hands a healthy host's held events to the instance when it lets go", () => {

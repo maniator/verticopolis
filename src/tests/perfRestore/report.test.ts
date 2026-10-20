@@ -117,7 +117,7 @@ describe("the restore-point benchmark (#874)", () => {
   it("names every run that cannot stand as evidence", () => {
     expect(problems([run()], 1, { dirty: false })).toEqual([]);
     const issues = problems(
-      [run({ fault: "trap-tick: boom" }), run({ workload: "drag", planned: 3, commands: 3, accepted: 0 }), run({ workload: "edits", planned: 40, commands: 12, accepted: 12 }), run({ workload: "click", extraSaves: 2 })],
+      [run({ fault: "trap-tick: boom" }), run({ workload: "drag", planned: 3, commands: 3, accepted: 0 }), run({ workload: "edits", planned: 40, commands: 12, accepted: 12, hostedSaves: 12 }), run({ workload: "click", extraSaves: 2 })],
       6,
       { dirty: true },
     );
@@ -129,6 +129,15 @@ describe("the restore-point benchmark (#874)", () => {
     // A save the restore points added is the cost the design rules out.
     expect(issues[4]).toMatch(/small click at 1x: 2 engine saves beyond the merges' and the hosted ones/);
     expect(issues[5]).toMatch(/2 of 6 runs are missing/);
+  });
+
+  it("names an edits run whose captures read too few saves, and save counts that do not add up", () => {
+    expect(problems([run({ workload: "edits", planned: 40, commands: 40, accepted: 40, hostedSaves: 40 })], 1, { dirty: false })).toEqual([]);
+    const issues = problems([run({ workload: "edits", planned: 40, commands: 40, accepted: 40, hostedSaves: 39 }), run({ workload: "drag", extraSaves: -1 })], 2, { dirty: false });
+    expect(issues).toEqual([
+      "rep 1, small edits at 1x: 39 hosted saves for 40 edits, so the edits' undo captures did not each read a save and the rapid-edit check did not run",
+      "rep 1, small drag at 1x: the merges and hosted saves counted exceed the engine's saves by 1, so the save counts cannot be trusted",
+    ]);
   });
 
   it("writes the snapshot header first and every row", () => {
