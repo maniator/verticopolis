@@ -16,6 +16,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "n
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets.ts";
+import { engineDistProblems } from "../src/build/enginePackageBuild.ts";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
 import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, glueLoads } from "../src/wasmhost/engineAssets.ts";
 
@@ -134,6 +135,11 @@ if (builtEngine) {
   // reading one, mark it runtime in engineAssets.ts instead.
   const wasted = ENGINE_BUILD_ONLY_FILES.filter((f) => seen.has(f));
   if (wasted.length > 0) fail(`engine files the game never fetches are in the precache manifest (src/wasmhost/engineAssets.ts marks them build-only): ${wasted.join(", ")}`);
+  // The package check (#985 criterion 5): BUILD.json describes the files
+  // beside it, and the three engine entries carry the integrity that keeps a
+  // body from another build out of the precache.
+  const unsound = engineDistProblems(DIST, manifest);
+  if (unsound.length > 0) fail(`the engine package in dist/ is not one consistent set: ${unsound.join("; ")}`);
 }
 
 // Today's sounds must play offline too (#985): the lazy chunk that carries
