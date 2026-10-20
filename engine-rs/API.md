@@ -137,10 +137,11 @@ it, and nothing in the engine reads it or requires it:
 `sourceHash` is the SHA-256 over the engine's Rust sources and the conformance
 event catalog (`engineSourceHash` in `src/wasmhost/packageHash.ts`). It names
 sources, not a compiled binary; a binary's own digest is a separate fact (the
-package id in `BUILD.json`). The web build writes the object, as UTF-8 JSON,
-into a custom section named `verticopolis.build` of each `.wasm`
-(`scripts/wasm-build.ts`, before any digest is taken). A native Rust or Godot
-host supplies the same object its own way, for example a file its build step
+package id in `BUILD.json`). The web build is to write the object, as UTF-8
+JSON, into a custom section named `verticopolis.build` of each `.wasm`
+(`scripts/wasm-build.ts`, before any digest is taken); that packaging step
+lands with the second slice of #963, so today no binary carries the section. A
+native Rust or Godot host supplies the same object its own way, for example a file its build step
 writes next to the library or a constant it links in, and a frontend that shows
 both shows them side by side. A missing or malformed object is reported as
 unavailable, never as a failure of the engine.
