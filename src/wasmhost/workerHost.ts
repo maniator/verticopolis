@@ -11,9 +11,11 @@ import { SETTLE_TIMEOUT_MS, setStepGate } from "./stepGate";
 import { parseCommuteStress } from "./telemetry";
 import { refuseForeignCatalog } from "./wasmHost";
 import type { FrameReply, FrameRequest, Op, ToWorker } from "./workerProtocol";
-import { applyHeaderFields, isEventItem, isLogItem, mergeSave, parseArray, parseCount, parseMerge, parsePending, restoreOwn, structuredCloneOf } from "./workerApply";
+import { applyHeaderFields, isEventItem, isLogItem, mergeSave, parseArray, parseCount, parseMerge, parsePending, replyWatchdog, restoreOwn, structuredCloneOf } from "./workerApply";
 import { LATENCY_SAMPLES, newWorkerHostStats, pushSample, type WorkerHost, type WorkerHostOptions } from "./workerStats";
+
 export type { WorkerHost, WorkerHostOptions, WorkerHostStats } from "./workerStats";
+
 /**
  * The main-thread half of the experimental worker host (`?engine=wasm-worker`;
  * design in `docs/architecture/wasm-worker-host.md`). The engine runs in a
@@ -41,13 +43,17 @@ export type { WorkerHost, WorkerHostOptions, WorkerHostStats } from "./workerSta
  *   carried one and nothing was sent since; otherwise with the read model's
  *   own save. `settle` asks for an exact one, for the async save paths.
  */
+
 /** The default reply watchdog: far past a working worker's reply (it
  *  answers between frames), short enough that a stuck worker gives the
  *  tower back to TypeScript while the player waits. */
 export const REPLY_TIMEOUT_MS = 10_000;
+
 /** Stale replies in a row after which the gate opens anyway (see `idle`). */
 export const MAX_STALE_STREAK = 4;
+
 const now = (): number => (globalThis.performance ? performance.now() : Date.now());
+
 export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): WorkerHost {
   const catalogs = {
     classic: readCatalog({ catalog: () => opts.catalogs.classic }, "classic"),
@@ -58,20 +64,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   const load = loadCommand(sim, gen); // refuses a tower whose crowd exists
   const stats = newWorkerHostStats();
   const replyTimeoutMs = opts.replyTimeoutMs ?? REPLY_TIMEOUT_MS;
-  let watchdog: ReturnType<typeof setTimeout> | undefined;
-  const arm = (what: string) => {
-    clearTimeout(watchdog);
-    watchdog = setTimeout(() => {
-      // A hidden or frozen page can run an overdue timer before the reply
-      // queued behind it; the watchdog waits for a visible page.
-      if ((globalThis as { document?: { hidden?: boolean } }).document?.hidden) arm(what);
-      else fatal(`the worker did not answer ${what} within ${replyTimeoutMs} ms`);
-    }, replyTimeoutMs);
-  };
-  const disarm = () => {
-    clearTimeout(watchdog);
-    watchdog = undefined;
-  };
+  const { arm, disarm } = replyWatchdog(replyTimeoutMs, (message) => fatal(message));
   /** Post to the worker. A message that cannot be posted (a command whose
    *  payload cannot be cloned, a closed port) would leave a gap in the
    *  sequence the worker refuses, so it is fatal here. */
@@ -85,6 +78,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
       return false;
     }
   };
+
   let loaded = false;
   let detached = false;
   /** The last op numbered, the last command's number, and the last op a
@@ -128,6 +122,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   let engineLogSeq = 0;
   let engineMealRev = 0;
   let simLogSeqAtSync = sim.logSeq;
+
   let carried: GameplayEvent[] = sim.gameplayEvents.drain();
   const droppedAtAttach = sim.gameplayEvents.dropped;
   let droppedEngine = 0;

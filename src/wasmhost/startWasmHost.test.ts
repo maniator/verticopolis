@@ -27,6 +27,7 @@ class FakeEngine {
   elevatorTelemetry(): string { return '{"util":[],"hourly":[],"origins":[]}'; }
   housekeepingReport(): string | undefined { return undefined; }
   commuteStress(): string { return "[]"; }
+  commuteStressRevision(): number { return 0; }
   /** What the engine still owes: handed over once, then empty. */
   owed: unknown[] = [];
   gameplayEventsPending(): number { return this.owed.length; }

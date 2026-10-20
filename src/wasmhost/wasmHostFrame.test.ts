@@ -31,6 +31,20 @@ describe("the coalesced main-thread host (sync: frame)", () => {
     expect(sim.drainGameplayEvents().filter((e) => e.name === "star_reached")).toHaveLength(1);
     expect(sim.drainGameplayEvents()).toEqual([]);
   });
+  it("still frees the engine and gives the tower back when the commute rows at detach are malformed", () => {
+    const sim = Simulation.newGame(9, "classic");
+    const mod = fakeModule();
+    const host = attachWasmHost(sim, mod, { sync: "frame" });
+    const engine = mod.engines[0];
+    sim.crowd.adoptCommuteStress([[2, 10]]);
+    engine.commuteRows = '[[2,"x"]]';
+    engine.commuteRevision++;
+    sim.tick(1);
+    expect(() => host.detach()).toThrow(/commute stress/);
+    expect(engine.freed).toBe(true);
+    expect([...sim.crowd.commuteStressByFloor]).toEqual([[2, 10]]);
+    expect(Object.getOwnPropertyDescriptor(sim, "serialize")).toBeUndefined();
+  });
   it("advances the clock per step and applies the frame once, at the flush", () => {
     const sim = Simulation.newGame(9, "classic");
     const mod = fakeModule();

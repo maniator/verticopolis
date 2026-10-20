@@ -123,6 +123,47 @@ describe.skipIf(!hasWasmPackage())("elevator telemetry on both engines", () => {
     }
   }, 60_000);
 
+  it("the hosted read model follows the engine's commute stress between merges and keeps the latest rows through detach", () => {
+    const sim = loadFixture(FIXTURES[0]);
+    const host = attachWasmHost(sim, wasm(), { sync: "frame" });
+    const engineRows = () => (JSON.parse(host.engine.commuteStress()) as [number, number][]).sort((a, b) => a[0] - b[0]);
+    try {
+      const driver = new FrameDriver(sim, 3);
+      let revision = host.engine.commuteStressRevision();
+      let moved = 0;
+      let betweenMerges = 0;
+      for (let frame = 0; frame < 3000 && betweenMerges < 3; frame++) {
+        const merges = host.merges;
+        driver.frame();
+        host.flush();
+        const now = host.engine.commuteStressRevision();
+        if (now !== revision) {
+          moved++;
+          if (host.merges === merges) betweenMerges++;
+          revision = now;
+        }
+        // Whatever the frame did, the rows a reader holds are the engine's.
+        expect(commuteRows(sim), `frame ${frame}`).toEqual(engineRows());
+      }
+      expect(moved, "trips completed and moved the revision").toBeGreaterThan(0);
+      expect(betweenMerges, "rows changed on a frame that brought no full merge").toBeGreaterThan(0);
+
+      // Steps outside a frame flush leave the engine's rows ahead of the read
+      // model's; detach hands the latest over.
+      let pending = false;
+      for (let i = 0; i < 2000 && !pending; i++) {
+        sim.tick(1);
+        pending = JSON.stringify(commuteRows(sim)) !== JSON.stringify(engineRows());
+      }
+      expect(pending, "a step completed a trip the read model has not adopted").toBe(true);
+      const latest = engineRows();
+      host.detach();
+      expect(commuteRows(sim)).toEqual(latest);
+    } finally {
+      host.detach();
+    }
+  }, 120_000);
+
   it("seeds the telemetry and the loop memos, and moves the clock without a pass", () => {
     const sim = loadFixture(FIXTURES[0]);
     const shadow = new ShadowEngine(wasm());

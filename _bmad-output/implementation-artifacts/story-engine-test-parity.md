@@ -1028,6 +1028,16 @@ this slice closes the rest and puts the projects in CI.
   `atEngineFrameCadence` in one of its pins to test the opt-in itself; it
   is the setup's test and has no row in the table.
 
+- **The exclusions are counted (2026-10-20, #945's "Unit and integration"
+  row).** `src/tests/parity/exclusions.ratchet.txt` pins how many
+  `itTypeScriptOnly` marks and `atEngineFrameCadence` calls each test file
+  holds, and `exclusions.guard.test.ts` fails on a new one, on a bare one
+  (no reason) and on a stale line. The cadence calls (`fixedStep`,
+  `rooms`, `rentalCrowd`) are the merge-per-tick cost exclusions; the
+  structural snapshot of S6 (#868) removes them, and each removal lowers the
+  ratchet. `ciJob.guard.test.ts` keeps the `test-wasm-parity` job and
+  `npm run test:wasm:parity` on the same two projects, on the real engine.
+
 ### The runs (2026-10-15, this machine, four cores)
 
 | Project | Files | Pass | Fail | Skip | Wall time |

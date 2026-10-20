@@ -107,3 +107,23 @@ export function restoreOwn(sim: Simulation, name: string, desc: PropertyDescript
   if (desc) Object.defineProperty(sim, name, desc);
   else delete (sim as unknown as Record<string, unknown>)[name];
 }
+
+/** The reply watchdog (see `REPLY_TIMEOUT_MS`): `arm` starts or restarts the
+ *  timer for the reply in flight, `disarm` stops it. A hidden or frozen page
+ *  can run an overdue timer before the reply queued behind it, so the
+ *  watchdog waits for a visible page before it calls the worker stuck. */
+export function replyWatchdog(timeoutMs: number, fatal: (message: string) => void): { arm: (what: string) => void; disarm: () => void } {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const arm = (what: string): void => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if ((globalThis as { document?: { hidden?: boolean } }).document?.hidden) arm(what);
+      else fatal(`the worker did not answer ${what} within ${timeoutMs} ms`);
+    }, timeoutMs);
+  };
+  const disarm = (): void => {
+    clearTimeout(timer);
+    timer = undefined;
+  };
+  return { arm, disarm };
+}

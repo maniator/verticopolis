@@ -228,6 +228,8 @@ describe("worker host round 2 (fake engine)", () => {
       { name: "a save that parses but is no save", reply: { merge: { save: "{}", telemetry: '{"util":[],"hourly":[],"origins":[]}', housekeeping: null, commute: "[]" } }, error: /the save is not/ },
       { name: "commute-stress rows of the wrong shape", reply: { merge: { save: otherSave, telemetry: '{"util":[],"hourly":[],"origins":[]}', housekeeping: null, commute: '[[3,"x"]]' } }, error: /commute stress/ },
       { name: "a floor listed twice in the commute stress", reply: { merge: { save: otherSave, telemetry: '{"util":[],"hourly":[],"origins":[]}', housekeeping: null, commute: "[[3,1],[3,2]]" } }, error: /commute stress/ },
+      { name: "changed commute rows of the wrong shape", reply: { commute: '[[3,"x"]]' }, error: /commute stress/ },
+      { name: "a floor listed twice in changed commute rows", reply: { commute: "[[3,1],[3,2]]" }, error: /commute stress/ },
       { name: "a merge with no commute stress", reply: { merge: { save: otherSave, telemetry: '{"util":[],"hourly":[],"origins":[]}', housekeeping: null } }, error: /commute stress/ },
     ];
     for (const [i, c] of cases.entries()) {
