@@ -16,8 +16,9 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "n
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets.ts";
+import { engineDistProblems } from "../src/build/enginePackageBuild.ts";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
-import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, glueLoads } from "../src/wasmhost/engineAssets.ts";
+import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, ENGINE_WASM, glueLoads } from "../src/wasmhost/engineAssets.ts";
 
 const DIST = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const SW = resolve(DIST, "sw.js");
@@ -125,6 +126,10 @@ if (builtEngine) {
   // itself; each such file must be one the list marks as fetched.
   const glueRefs = glueLoads(readFileSync(resolve(DIST, ENGINE_DIR + ENGINE_GLUE), "utf8")).map((f) => ENGINE_DIR + f);
   if (!glueRefs.some((f) => f !== ENGINE_DIR + ENGINE_GLUE)) fail(`found no file the engine glue loads beside itself (its binary); did wasm-bindgen's output change shape? (glueLoads in src/wasmhost/engineAssets.ts)`);
+  // The byte check verifies the glue and the binary only, so a glue that
+  // pulls in anything else (a snippet) would run bytes nothing has hashed.
+  const stray = glueRefs.filter((f) => f !== ENGINE_DIR + ENGINE_GLUE && f !== ENGINE_DIR + ENGINE_WASM);
+  if (stray.length > 0) fail(`the engine glue loads files besides its binary (${stray.join(", ")}); the package check hashes only the glue and the binary, so extend it (design 5.2) before shipping them`);
   const notRuntime = glueRefs.filter((f) => !ENGINE_RUNTIME_FILES.includes(f));
   if (notRuntime.length > 0) fail(`the engine glue loads files src/wasmhost/engineAssets.ts does not mark as fetched at run time, so they would not be precached: ${notRuntime.join(", ")}`);
   const absent = ENGINE_RUNTIME_FILES.filter((f) => !seen.has(f));
@@ -134,6 +139,11 @@ if (builtEngine) {
   // reading one, mark it runtime in engineAssets.ts instead.
   const wasted = ENGINE_BUILD_ONLY_FILES.filter((f) => seen.has(f));
   if (wasted.length > 0) fail(`engine files the game never fetches are in the precache manifest (src/wasmhost/engineAssets.ts marks them build-only): ${wasted.join(", ")}`);
+  // The package check (#985 criterion 5): BUILD.json describes the files
+  // beside it, and the three engine entries carry the integrity that keeps a
+  // body from another build out of the precache.
+  const unsound = engineDistProblems(DIST, manifest);
+  if (unsound.length > 0) fail(`the engine package in dist/ is not one consistent set: ${unsound.join("; ")}`);
 }
 
 // Today's sounds must play offline too (#985): the lazy chunk that carries

@@ -7,6 +7,7 @@ import { VitePWA } from "vite-plugin-pwa";
 import { notesForVersion } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
 import { parseEngineBuild, type EngineBuild } from "./src/build/engineBundle";
+import { engineIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
 
@@ -94,6 +95,18 @@ function gitShortSha(): string {
   } catch {
     return "unknown";
   }
+}
+
+/** Where the build writes dist/, as Vite resolved it (outDir is relative to
+ *  root, so the engine integrity transform asks rather than guesses). */
+let builtDistDir = resolve(__dirname, "dist");
+function captureOutDir(set: (dir: string) => void): Plugin {
+  return {
+    name: "capture-out-dir",
+    configResolved(config) {
+      set(resolve(config.root, config.build.outDir));
+    },
+  };
 }
 
 /**
@@ -292,8 +305,19 @@ export default defineConfig(({ command }) => ({
     // runtime engine switch, the TypeScript fallback and the dual run in
     // bootstrap.ts; scripts/verify-engine-bundle.ts checks the result.
     __WASM_ONLY__: JSON.stringify(ENGINE_BUILD === "wasm-only"),
+    // The engine package this shell was built with (#985 criterion 5): the
+    // package id and the glue and binary digests from
+    // src/public/engine/BUILD.json. The page hashes what it fetches against
+    // this before it runs the engine. Null for a dev serve and Vitest (they
+    // skip the check) and for a production build with no package folder at
+    // all (VC_ALLOW_NO_ENGINE=1); a production build with a broken record
+    // stops here.
+    __ENGINE_PACKAGE__: JSON.stringify(readExpectedPackage(resolve(__dirname, "src/public"), command === "build" ? "build" : "other")),
   },
   plugins: [
+    captureOutDir((dir) => {
+      builtDistDir = dir;
+    }),
     emitVersionJson(),
     noUnlistedPackageFiles(),
     sharedHead(),
@@ -352,29 +376,41 @@ export default defineConfig(({ command }) => ({
         // has closed, and deletes
         // the old version's entries, so from 2.32.0 on a page the worker
         // controls runs the shell and engine its install fetched together.
-        // Not covered here, and tracked on #985 (the cutover plan's S16
-        // version check): a page no worker controls yet (a first visit) fetches them
-        // separately; an install that overlaps a deploy can store the engine's
-        // unhashed files from the newer build; and a worker from before 2.32.0
-        // never precached the engine at all. The
-        // cost is about 430 KB compressed per install, paid by every player
-        // (owner decision, 2026-10-13: the engine becomes the default at 3.0).
+        // An install that overlaps a deploy used to be able to store the
+        // engine's unhashed files from the newer build; the integrity below
+        // closes that. Still not covered by the precache itself, and
+        // answered by the page's byte check (#985 criterion 5): a page no
+        // worker controls yet (a first visit) fetches the files separately,
+        // and a worker from before 2.32.0 never precached the engine at all.
+        // The cost is about 430 KB compressed per install, paid by every
+        // player (owner decision, 2026-10-13: the engine becomes the default
+        // at 3.0).
         // Which engine files the game fetches at run time is recorded in
-        // src/wasmhost/engineAssets.ts: the glue and the `.wasm` are fetched,
-        // while `engine/BUILD.json` and `engine/THIRD-PARTY.json` are read only
-        // at build and test time. Both stay out because the pattern matches no
-        // `.json` at all, and it should stay that way: a blanket `json` would
-        // also sweep in THIRD-PARTY.json (about 0.6 MB), `version.json` (the
-        // update check, which must come from the network) and any later data
-        // file. If the game starts reading a `.json` at run time (BUILD.json
-        // for #985's package check, or audio data for #968), mark it in
-        // engineAssets.ts or audioAssets.ts and add that one file to this
-        // list by its own path (for example "engine/BUILD.json").
+        // src/wasmhost/engineAssets.ts: the glue, the `.wasm` and
+        // `engine/BUILD.json`. `engine/THIRD-PARTY.json` is read only at
+        // build time. The extension pattern matches no `.json`, and it should
+        // stay that way: a blanket `json` would also sweep in THIRD-PARTY.json
+        // (about 0.6 MB), `version.json` (the update check, which must come
+        // from the network) and any later data
+        // file. `engine/BUILD.json` is the one `.json` listed by its own path:
+        // the page reads it at boot to check the glue and binary against the
+        // build (#985 criterion 5). If the game starts reading another `.json`
+        // at run time (audio data for #968, say), mark it in engineAssets.ts
+        // or audioAssets.ts and add that one file to this list by its own path.
+        //
+        // The three engine entries (glue, binary, BUILD.json) carry a Workbox
+        // `integrity` (manifestTransforms below), so a body that is not the
+        // build's own bytes cannot be newly cached: an install that overlaps
+        // a deploy fails whole and the old, consistent set stays. Workbox
+        // applies it only to an entry it has to fetch; an entry already in
+        // the cache under the same revision key is served as it is, which is
+        // why the page's own byte check (#985 slice 2) is the defense for
+        // caches filled before this change.
         // scripts/verify-precache.ts fails the build when a run-time engine
         // or audio file is missing from the manifest, when a build-only
         // engine file is in it, and when the package holds a file the list
         // does not classify.
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3,wasm}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3,wasm}", "engine/BUILD.json"],
         // og-image.png is the social/crawler share card, not part of the game
         // shell, so keep it out of the offline precache. `help.html` and its own
         // page entry chunk (`help-*.js`) are excluded too (see the note below),
@@ -445,6 +481,7 @@ export default defineConfig(({ command }) => ({
           // host's own 404 rather than the game shell, same as the file below it.
           /\.well-known/,
         ],
+        manifestTransforms: [engineIntegrityTransform(() => builtDistDir)],
         cleanupOutdatedCaches: true,
         // Excalibur's bundle is comfortably large; lift the precache ceiling.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
