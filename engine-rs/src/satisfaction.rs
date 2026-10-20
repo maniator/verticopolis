@@ -125,48 +125,6 @@ impl Simulation {
         self.crowd.segment_connected(&self.tower, u.floor, u.x)
     }
 
-    /// `nearestKindWithin`.
-    fn nearest_kind_within(
-        &self,
-        u: &Unit,
-        is_source: impl Fn(Kind) -> bool,
-        max_tiles: i64,
-    ) -> bool {
-        for dir in [-1i64, 1] {
-            let start = if dir < 0 { u.x - 1 } else { u.x + u.width };
-            for d in 0..=max_tiles {
-                let x = start + dir * d;
-                if self.tower.structure_kind_at(u.floor, x) == Some(Kind::Lobby) {
-                    break;
-                }
-                let room = self.tower.room_at(u.floor, x);
-                if let Some(r) = room {
-                    if is_source(r.kind) {
-                        return true;
-                    }
-                } else if !self.tower.has_structure(u.floor, x) {
-                    break;
-                }
-            }
-        }
-        false
-    }
-
-    /// `noiseAfflicted` (computed fresh; the TypeScript memo is pure).
-    pub fn noise_afflicted(&self, u: &Unit) -> bool {
-        if u.kind == Kind::Office {
-            return self.nearest_kind_within(u, |k| k.is_commercial(), OFFICE_NOISE_TILES);
-        }
-        if u.kind.is_hotel() || u.kind == Kind::Condo || u.kind.is_rental() {
-            return self.nearest_kind_within(
-                u,
-                |k| k == Kind::Office || k.is_commercial(),
-                HOTEL_NOISE_TILES,
-            );
-        }
-        false
-    }
-
     /// `satisfactionStep`.
     pub fn satisfaction_step(
         &mut self,
