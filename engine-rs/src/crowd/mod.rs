@@ -254,6 +254,30 @@ impl Crowd {
         );
     }
 
+    /// Replace the commute-stress averages with `[[floor, seconds], ...]`
+    /// rows, the shape [`Crowd::commute_stress_json`] writes: a host seeds
+    /// them at attach, since no save carries them (#1083). The revision is
+    /// left alone. Refuses rows that are not whole floors with finite
+    /// seconds, or that name a floor twice, and then changes nothing.
+    pub fn seed_commute_stress(&mut self, rows: &Value) -> Result<(), String> {
+        let bad =
+            || "commuteStress must be [[floor, seconds], ...] with each floor once".to_string();
+        let mut seeded = HashMap::new();
+        for row in rows.as_array().ok_or_else(bad)? {
+            let pair = row.as_array().filter(|p| p.len() == 2).ok_or_else(bad)?;
+            let floor = pair[0]
+                .as_f64()
+                .filter(|f| f.fract() == 0.0 && f.abs() < 9007199254740992.0)
+                .ok_or_else(bad)?;
+            let seconds = pair[1].as_f64().filter(|s| s.is_finite()).ok_or_else(bad)?;
+            if seeded.insert(floor as i64, seconds).is_some() {
+                return Err(bad());
+            }
+        }
+        self.commute_wait_by_floor = seeded;
+        Ok(())
+    }
+
     /// The commute-stress averages as `[[floor, seconds], ...]`, by floor.
     pub fn commute_stress_json(&self) -> Value {
         let mut rows: Vec<(i64, f64)> = self
@@ -342,6 +366,34 @@ mod tests {
         assert_eq!(
             crowd.commute_stress_json(),
             json!([[3, 65.0], [7, seventh]])
+        );
+    }
+
+    #[test]
+    fn seeding_replaces_the_averages_and_refuses_malformed_rows() {
+        let mut crowd = Crowd::new(1);
+        crowd.record_commute(9, 12.0);
+        crowd
+            .seed_commute_stress(&json!([[7, 40.5], [-1, 3.0]]))
+            .expect("rows in the written shape seed");
+        assert_eq!(crowd.commute_stress_json(), json!([[-1, 3.0], [7, 40.5]]));
+        assert_eq!(
+            crowd.commute_revision, 1,
+            "seeding leaves the revision alone"
+        );
+        for bad in [
+            json!({}),
+            json!([[1]]),
+            json!([[1.5, 2.0]]),
+            json!([[1, "x"]]),
+            json!([[1, 2.0], [1, 3.0]]),
+        ] {
+            assert!(crowd.seed_commute_stress(&bad).is_err(), "{bad}");
+        }
+        assert_eq!(
+            crowd.commute_stress_json(),
+            json!([[-1, 3.0], [7, 40.5]]),
+            "a refusal changes nothing"
         );
     }
 }

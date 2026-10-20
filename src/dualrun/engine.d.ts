@@ -137,11 +137,12 @@ export class Engine {
      * (`load::parse_save_json`). Nothing else the import path does (the
      * founder mark) runs.
      * `markers`, when given, is JSON `{ lastHour, lastDay, lastQuarter,
-     * lastMonth, extendGesture? }`: the live engine's boundary markers and
-     * open extend gesture `{ id, bottom, top }` (#990), which a save does
-     * not carry (a load rebuilds the markers from the clock, a founded game
-     * keeps them unset until the first boundary, and a load has no
-     * gesture), so a shadow can start exactly where the live engine stands.
+     * lastMonth, extendGesture?, commuteStress? }`: the live engine's
+     * boundary markers, open extend gesture `{ id, bottom, top }` (#990) and
+     * commute-stress rows (#1083), which a save does not carry (a load
+     * rebuilds the markers from the clock, a founded game keeps them unset
+     * until the first boundary, and a load has no gesture and no averages),
+     * so a shadow can start exactly where the live engine stands.
      */
     static fromSave(text: string, markers?: string | null): Engine;
     /**

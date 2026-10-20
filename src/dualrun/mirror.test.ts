@@ -144,13 +144,20 @@ describe("attachMirror", () => {
     const sim = Simulation.newGame(2, "classic");
     const load = loadCommand(sim, 3);
     expect(load.gen).toBe(3);
-    expect(load.markers).toEqual({ lastHour: -1, lastDay: 0, lastQuarter: -1, lastMonth: -1, extendGesture: null });
+    expect(load.markers).toEqual({ lastHour: -1, lastDay: 0, lastQuarter: -1, lastMonth: -1, extendGesture: null, commuteStress: [] });
     const cmds: ShadowCommand[] = [];
     const detach = attachMirror(sim, (c) => cmds.push(c), 3);
     sim.tick(1);
     expect(cmds.find((c) => c.op === "checkpoint")).toMatchObject({ gen: 3 });
     detach();
     expect(loadCommand(sim, 4).markers.lastHour).toBe(7);
+    // The commute averages travel as rows, a copy of the instance's (#1083),
+    // without the rows the engine would refuse.
+    sim.crowd.adoptCommuteStress([[5, 42], [6, Number.NaN], [7, Infinity], [1.5, 3]]);
+    const rows = loadCommand(sim, 5).markers.commuteStress;
+    expect(rows).toEqual([[5, 42]]);
+    sim.crowd.adoptCommuteStress([[5, 1]]);
+    expect(rows).toEqual([[5, 42]]);
   });
 
   it("hands an open extend gesture over with the markers, leaving the tower's own alone (#990)", () => {
