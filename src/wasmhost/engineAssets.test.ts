@@ -50,9 +50,9 @@ function code(text: string): string {
 const ENGINE_NAME = /\bverticopolis_engine[\w.-]*\.(?:js|wasm)\b|\bBUILD\.json\b|\bTHIRD-PARTY\.json\b|(?<![\w./-])engine\/[\w.-]+\.(?:js|wasm|json)\b/g;
 
 describe("ENGINE_PACKAGE", () => {
-  it("lists each file once, and fetches the glue and the binary", () => {
+  it("lists each file once, and fetches the glue, the binary and the build record", () => {
     expect(new Set(NAMES).size).toBe(NAMES.length);
-    expect(ENGINE_RUNTIME_FILES).toEqual([ENGINE_DIR + ENGINE_GLUE, ENGINE_DIR + ENGINE_WASM]);
+    expect(ENGINE_RUNTIME_FILES).toEqual([ENGINE_DIR + ENGINE_GLUE, ENGINE_DIR + ENGINE_WASM, ENGINE_DIR + "BUILD.json"]);
     expect([...ENGINE_RUNTIME_FILES, ...ENGINE_BUILD_ONLY_FILES].sort()).toEqual(NAMES.map((n) => ENGINE_DIR + n).sort());
   });
 

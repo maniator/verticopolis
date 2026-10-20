@@ -350,8 +350,7 @@ export function pgSettle(leg: "ts" | "wasm"): string {
     if (vc) {
       const host = vc.current?.();
       if (!host || !vc.status?.hosted) {
-        const errors = (vc.status?.errors ?? []) as string[];
-        refused = `the host refused the tower: ${errors[errors.length - 1] ?? "no reason given"}`;
+        refused = `the host refused the tower: ${(vc.status?.lastError as string | null | undefined) ?? "no reason given"}`;
       } else {
         try {
           host.engine.seedLoopMemos(memos[0], memos[1], memos[2], memos[3]);
