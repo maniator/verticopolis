@@ -138,4 +138,42 @@ Sonnet 5.5 (high)
 
 ### Completion Notes List
 
+- **Differential (AC3).** `panelGettersWasm.integration.test.ts` runs all 24
+  conformance scenarios on each engine and probes every getter at every
+  checkpoint. Compared on the corpus: 606 checkpoints, 10,387 unit cards, 4,678
+  shaft cards, 501,186 heat cells, 739 stranded-floor readings, 23 checkpoints
+  with an infested room, 484 with a shaft of two or more cars. Every answer
+  equals its TypeScript reference; only `severity` carries a 1e-12 tolerance
+  (V8 `Math.pow` against Rust `powf`).
+- **TypeScript branch coverage (AC4)** of the compared functions, from
+  `vitest --coverage` on that suite alone (v8, branches reached/total):
+  `averagePerDay` 6/6, `hasData` 1/1, `elevatorStats` 5/5, `parkingDemand` 8/8,
+  `housekeepingCoverage` 14/14, `strandedFloors` 4/4, `ratingPopulation` 1/1,
+  `cumulativeStarGates` 3/3, `unitPrice` 4/4, `stats` 18/19, `floorHeatmap`
+  50/52, `peakCongestionHotspot` 6/7, `congestionSeverity` 4/5,
+  `nextStarRequirements` 6/9, `nextStarThreshold` 0/1. The one-line readers
+  (`incomeBreakdown`, `isShowingBlockbuster`, `recyclingCapacity`,
+  `recyclingDemandMet`, `hotelsCountTowardRating`, `milestoneProgress`) have no
+  branch of their own. Unreached on the corpus, and the native test that
+  covers each: the gridlock clamp in `congestionSeverity` (ramp test), the
+  `star >= 5` and `star >= 6` returns and the TOWER rung in `nextStarThreshold`
+  and `nextStarRequirements` (star progress test), a No Rate vacancy in `stats`
+  (tower stats test). The remaining two branches are the legacy `simModel`
+  `"v1"` paths in `peakCongestionHotspot` and `floorHeatmap`: the Rust engine
+  has only the v2 model, so there is nothing to port or test.
+- **Cost (AC6).** Medians from the cloud sandbox, so indicative only; the
+  owner's PC is the source for figures that go in a gate. Large fixture
+  (43,358 units): `towerStats` 0.45 ms, `statsReport` 3.7 ms,
+  `housekeepingCoverage` 0.27 ms, `unitDetail` 0.007 ms,
+  `peakCongestionHotspot` 0.31 ms, `onboardingFacts` 0.40 ms, `floorHeatmap`
+  congestion 2.6 ms, occupancy 1.8 ms, satisfaction 3.6 ms, cleanliness 0.42
+  ms. `statsReport` and three of the four overlays are over the 1 ms bar.
+  They run on a panel open or an hourly overlay refresh, not per tick.
+  Decision for the review: documented deferral or a revision-keyed memo.
+
 ### File List
+
+- `engine-rs/src/panels/` (new): the getters and their native tests
+- `src/tests/conformance/panelReference.ts`, `panelProbe.ts`: the TypeScript reference and the probe
+- `src/tests/integration/panelGettersWasm.integration.test.ts`, `panelGettersCost.integration.test.ts`
+- Wrappers, `engine.d.ts`, binding tiers and the crate bump: after slice 6a
