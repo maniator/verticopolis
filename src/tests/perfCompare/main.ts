@@ -16,6 +16,7 @@ import { buildScenarios } from "./scenarios";
 import { startServer } from "./server";
 import type { CompareConfig, CompareResults, EngineName, ProcessRun } from "./types";
 import type { Environment as Env } from "./env";
+import { incompleteTreeError } from "./treeRecord";
 import { validateResults } from "./validate";
 import { buildProduction, buildTooling } from "../perfWorker/build";
 
@@ -226,7 +227,8 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   // (the two ends only).
   for (const e of packageErrors(packageState(distPerf), packageState(dist), sourceHash, { files: environment.enginePackage, buildHash: environment.engineBuildHash })) validation.errors.push(e);
   if (environment.commit === "unknown") validation.errors.push("the commit could not be read (git failed), so the results cannot be tied to a tree");
-  if (environment.tree && !environment.tree.complete) validation.errors.push("git could not finish the working-tree record, so the run cannot be tied to a tree");
+  const treeError = incompleteTreeError(environment.tree);
+  if (treeError) validation.errors.push(treeError);
   if (environment.mainCommit && !environment.mainFetched) validation.warnings.push(`origin/main could not be fetched just now, so ${environment.mainCommit} is the ref as last fetched and may not be the latest main`);
   if (!environment.mainCommit) validation.warnings.push("origin/main is unknown here (no remote or no fetch), so whether this is a baseline of the latest main was not checked");
   for (const a of interruptedAttempts) validation.warnings.push(`rep ${a.rep} ${a.engine}: an attempt started at ${a.at} was interrupted (the run was stopped and resumed) and ran again; its partial measurements were not kept`);
