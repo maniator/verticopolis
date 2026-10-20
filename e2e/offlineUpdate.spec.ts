@@ -15,11 +15,15 @@ import { expectControlledWithEngine, hostedGame, installWorker, watch } from "./
  * chromium-wasm project, where the engine is the chosen one. They read the
  * precache the way the worker keeps it: one cache, one key per manifest entry,
  * a revisioned entry keyed `url?__WB_REVISION__=<revision>`.
+ *
+ * "Bounded" has two halves. The byte bound (4 MiB) is the build gate in
+ * scripts/verify-precache.ts, which `postbuild` runs for every e2e build. The
+ * half checked here is that the precache does not grow across updates.
  */
 test.beforeEach(({}, info) => test.skip(!onWasm(info.project.name), "the engine runs on the chromium-wasm and chromium-wasm-only projects"));
-// Chromium holds the first update check on a fresh registration for about a
-// minute (the next ones answer at once), and the flow makes two updates, so the
-// test needs well over the default 30s.
+// Two installs, two updates and an offline hold: more than the default 30s.
+// (On some machines Chromium holds the first update check on a fresh
+// registration for about a minute; CI does not see it.)
 test.setTimeout(240_000);
 
 let deployments: Deployments;
@@ -73,8 +77,12 @@ async function expectCacheIs(page: Page, which: Deployment): Promise<void> {
   expect(keys.filter((k) => k.includes("/engine/")).sort(), `the engine files are all ${which}'s`).toEqual(expected.sort());
 }
 
-/** Deploy `which` and take the update the player is offered. */
-async function updateTo(page: Page, which: Deployment): Promise<void> {
+/**
+ * Deploy `which` and take the update the player is offered. `named` is what
+ * the prompt must say about the incoming build: its version when version.json
+ * arrived, nothing when it did not.
+ */
+async function updateTo(page: Page, which: Deployment, named: string | null): Promise<void> {
   deployments.serve(which);
   await page.evaluate(async () => {
     const registration = await navigator.serviceWorker.getRegistration();
@@ -82,51 +90,72 @@ async function updateTo(page: Page, which: Deployment): Promise<void> {
   });
   const update = page.locator('[data-act="update"]');
   await update.waitFor({ state: "visible", timeout: 90_000 });
+  const buildLine = page.locator(".build-id");
+  if (named === null) await expect(buildLine, "version.json is missing, so the prompt names no build").toHaveCount(0);
+  else await expect(buildLine, "the prompt names the incoming build").toContainText(named);
   // Update now: the page reloads onto the worker that was waiting.
   await Promise.all([page.waitForEvent("load", { timeout: 30_000 }), update.click()]);
   // The reload is on the new worker when nothing is installing or waiting any
   // more (the page was controlled by the old worker before, so a controller
   // alone proves nothing).
-  await page.waitForFunction(
-    async () => {
-      const registration = await navigator.serviceWorker.getRegistration();
-      return !!navigator.serviceWorker.controller && !registration?.installing && !registration?.waiting;
-    },
-    undefined,
-    { timeout: 30_000 },
-  );
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async () => {
+          const registration = await navigator.serviceWorker.getRegistration();
+          return !!navigator.serviceWorker.controller && !registration?.installing && !registration?.waiting;
+        }),
+      { message: "the new worker is active and nothing is waiting", timeout: 30_000 },
+    )
+    .toBe(true);
   await hostedGame(page);
 }
 
+/** Fetch `path` from the page and require that the service worker answered it. */
+async function servedByWorker(page: Page, path: string): Promise<string> {
+  const response = page.waitForResponse((r) => new URL(r.url()).pathname === `/${path}`, { timeout: 30_000 });
+  const text = await page.evaluate((p) => fetch(new URL(p, document.baseURI), { cache: "no-store" }).then((r) => r.text()), path);
+  expect((await response).fromServiceWorker(), `${path} is answered by the service worker`).toBe(true);
+  return text;
+}
+
 /** The glue the page would load, as the worker answers it. */
-const servedGlue = (page: Page): Promise<string> =>
-  page.evaluate(() => fetch(new URL("engine/verticopolis_engine.js", document.baseURI), { cache: "no-store" }).then((r) => r.text()));
+const servedGlue = (page: Page): Promise<string> => servedByWorker(page, "engine/verticopolis_engine.js");
+
+/** The requests the browser itself makes to check for a new worker: the worker
+ *  script and the scripts it imports. They are not the game's or the worker's
+ *  fetches, and Playwright's offline flag does not stop them. */
+const isUpdateCheck = (path: string): boolean => path === "/sw.js" || /^\/workbox-[\w-]+\.js$/.test(path);
 
 test("an update replaces the engine files in the cache, and the updated game plays with no network", async ({ browser }) => {
   deployments = await startDeployments();
-  const { page, context } = await installedFirst(browser);
+  let context: BrowserContext | undefined;
   try {
+    const first = await installedFirst(browser);
+    const { page } = first;
+    context = first.context;
     await expectCacheIs(page, "A");
     expect(await servedGlue(page)).not.toContain("deployment B");
 
     await test.step("an update moves the engine files to the new build and leaves no old engine entry", async () => {
-      await updateTo(page, "B");
+      await updateTo(page, "B", "999.0.0");
       await expectCacheIs(page, "B");
       expect(await servedGlue(page), "the page now gets the second build's glue").toContain("deployment B");
-      const record = await page.evaluate(() => fetch(new URL("engine/BUILD.json", document.baseURI)).then((r) => r.json()));
+      const record = JSON.parse(await servedByWorker(page, "engine/BUILD.json"));
       expect(record.package, "and the second build's record").toBe(deployments.packageId.B);
       await expectEngineHosted(page);
     });
 
     await test.step("the updated game starts and plays with no network", async () => {
-      // Nothing the worker or the page asks for may reach the server while
+      // Nothing the game or the worker asks for may reach the server while
       // offline: the worker's own requests count, which Playwright's offline
-      // flag does not cut. The server still answers with the first build, so a
-      // request that slipped through would also change the glue. The window
-      // starts before the network is cut.
+      // flag does not cut. The server keeps answering with the second build, so
+      // a cache miss would not change the glue; the log is what proves it. The
+      // browser's own update check for sw.js (about two seconds after a load)
+      // also gets through, finds the same worker and changes nothing, so the
+      // window is held past it. The window starts before the network is cut.
       const served = deployments.requests.length;
-      await context.setOffline(true);
-      deployments.serve("A");
+      await context!.setOffline(true);
       const seen = watch(page);
       await page.reload();
       await expectControlledWithEngine(page);
@@ -135,10 +164,12 @@ test("an update replaces the engine files in the cache, and the updated game pla
       await page.evaluate(() => (window as any).game.setSpeed(1));
       const minutes = await page.evaluate(() => (window as any).game.sim.clock.minutes as number);
       await page.waitForFunction((m) => (window as any).game.sim.clock.minutes > m + 5, minutes, { timeout: 30_000 });
-      expect(deployments.requests.slice(served), "no request reached the server").toEqual([]);
+      await page.waitForTimeout(4_000);
+      const reached = deployments.requests.slice(served).filter((r) => !isUpdateCheck(r.path));
+      expect(reached, "no request but the browser's update check reached the server").toEqual([]);
       expect(seen).toEqual({ errors: [], failed: [] });
       await expectEngineHosted(page);
-      await context.setOffline(false);
+      await context!.setOffline(false);
     });
 
     await test.step("an update still arrives and moves the engine files when version.json cannot be fetched", async () => {
@@ -146,14 +177,17 @@ test("an update replaces the engine files in the cache, and the updated game pla
       // update is the same update. This one goes back to the first build.
       deployments.failVersionJson(true);
       const asked = deployments.requests.filter((r) => r.path === "/version.json").length;
-      await updateTo(page, "A");
+      await updateTo(page, "A", null);
       expect(deployments.requests.filter((r) => r.path === "/version.json").length, "the page did ask for it").toBeGreaterThan(asked);
       await expectCacheIs(page, "A");
       expect(await servedGlue(page)).not.toContain("deployment B");
       await expectEngineHosted(page);
     });
   } finally {
-    await context.close();
-    await deployments.close();
+    try {
+      await context?.close();
+    } finally {
+      await deployments.close();
+    }
   }
 });

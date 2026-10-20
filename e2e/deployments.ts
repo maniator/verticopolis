@@ -28,8 +28,10 @@ import { ENGINE_GLUE, ENGINE_WASM } from "../src/wasmhost/enginePackageNames";
  * The second deployment's page bundle is the first's, so the package id
  * compiled into the shell (`__ENGINE_PACKAGE__`) is still the first's. Nothing
  * reads it at run time yet. When the loader checks the engine against it
- * (#985 slice 2), this fixture must also rewrite that value in the second
- * deployment's chunk, or the page would refuse the engine it just cached.
+ * (#985 slice 2), rewriting that value in the copied chunk will not do: the
+ * chunk keeps its hashed name, is served immutable, and so the second install
+ * would keep the first's cached copy. That slice needs a real second
+ * `vite build` with a different engine package (design section 6.2).
  */
 
 export type Deployment = "A" | "B";
@@ -82,7 +84,7 @@ function repointEntry(sw: string, url: string, bytes: Uint8Array | string): stri
   return sw.replace(entry, `$1${md5(bytes)}$2"${sha256Integrity(bytes)}"`);
 }
 
-/** A WebAssembly custom section named "B" with an empty payload: the binary
+/** A WebAssembly custom section named "B" with a one-byte payload: the binary
  *  stays valid and loads, and its bytes (and so its hash) differ. */
 const SALT_SECTION = Buffer.from([0x00, 0x03, 0x01, 0x42, 0x00]);
 
@@ -152,8 +154,8 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
   }
   const roots: Record<Deployment, string> = { A: dist, B: second.dir };
   const firstRecord = JSON.parse(readFileSync(join(dist, "engine", "BUILD.json"), "utf8")) as { package: string };
-  // What each deployment's own sw.js says it precaches: the test compares the
-  // cache with this, not with a value computed here.
+  // What each deployment's own sw.js says it precaches. The test compares the
+  // cache with these values and computes none of its own.
   const manifests = {
     A: manifestOf(readFileSync(join(roots.A, "sw.js"), "utf8")),
     B: manifestOf(readFileSync(join(roots.B, "sw.js"), "utf8")),
