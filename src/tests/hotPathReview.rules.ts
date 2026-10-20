@@ -116,6 +116,7 @@ export const PROMPT = [
   "list the TypeScript caches, indexes and counters for the same function and its callees",
   "Report pre-existing code too, marked pre-existing.",
   "Output the section 6 table with a row for every item",
+  "Put each finding in the row of every item it falls under",
   "add the section 6 appendix lines for its changed functions",
 ];
 

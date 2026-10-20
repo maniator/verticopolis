@@ -543,6 +543,9 @@ The Hot-Path Auditor's prompt:
 > remedy, any risk to results or cache invalidation (HP-10), and whether an
 > open issue already lists it. Report pre-existing code too, marked
 > pre-existing. Output the section 6 table with a row for every item, then the
-> findings as a Markdown list. When you are given one chunk of a larger port,
-> rewrite or addition, review that chunk with the rest of the diff as context,
-> and add the section 6 appendix lines for its changed functions.
+> findings as a Markdown list. Put each finding in the row of every item it
+> falls under: an id scan where an index already answers the query is HP-6 and
+> HP-8, and a cost in inherited code on the traced path is HP-7 as well. When
+> you are given one chunk of a larger port, rewrite or addition, review that
+> chunk with the rest of the diff as context, and add the section 6 appendix
+> lines for its changed functions.
