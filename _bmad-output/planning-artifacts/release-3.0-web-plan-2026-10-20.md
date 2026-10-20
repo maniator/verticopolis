@@ -51,8 +51,8 @@ eight recovered Codex patches, and the planning party
      on the candidate build, and the confidence bound reported as achieved).
      Eligible sessions start once S9's engine answers ship and the size gate
      is off, which in this plan is stage 3, after the performance gaps close
-     (4.1). Under AD-9, S9 completes with slice 10, and the owner's
-     conditions for the clock are in 1.2. Zero fallbacks in 1,000 sessions bounds the rate at about 0.3%
+     (4.1). Under AD-9, S9's engine answers (#954) complete with slice 10,
+     and the owner's conditions for the clock are in 1.2. Zero fallbacks in 1,000 sessions bounds the rate at about 0.3%
      at 95%, and the report states that bound.
    - **Seeded replay** has a nightly fuzzer, but the differential the row
      describes does not exist yet: it compares only two hashes per checkpoint,
@@ -116,6 +116,19 @@ D1 to D6 are given. The owner decided OD-1 to OD-9 on 2026-10-20; section
 
 ### 1.2 Rust authority and when reliability evidence starts (owner, 2026-10-20 evening)
 
+**Release identity (owner, 22:12 UTC).** All of this is for 3.0.0. Stages 0
+to 3 run on 2.x builds as a 3.0 pre-release test: stage 0 keeps TypeScript
+the default with Rust/WASM selectable, stages 1 and 2 are owner-approved 10%
+and 25% cohorts with the size gate, and stage 3 is an owner-approved 50%
+cohort without the size gate, on the Rust-backed facade as its WASM host.
+The 1,000 eligible sessions, the observation period on the candidate build
+and the 14-night seeded replay all come before the 3.0.0 flip, which makes
+Rust/WASM the default only after every #945 gate and the owner's final
+approval, with TypeScript kept as the emergency fallback. None of it waits
+for 3.1, and post-3.0 work (worker adoption, more compatibility-code
+retirement) is neither a 3.1 feature nor a prerequisite by default. Stage 3
+is a pre-release test on 2.x, never a "3.0 launch".
+
 **The direction (20:45 UTC, signed off 21:40 UTC).** The healthy WASM path
 holds no TypeScript `Simulation`. Rust is the only simulation, behind a
 Rust-backed facade (`SimPort`), and the TypeScript engine runs only as the
@@ -123,14 +136,18 @@ fallback after a fault, started from an engine-written restore point. The
 A vs B review and its slice plan are in
 `architecture/architecture-rust-facade-2026-10-20/`; the owner signed off
 its decisions F1 to F9, and the spine gained AD-9. Under AD-9, S6 (#868,
-A5) is the facade's slices 1 to 8 and 10, and S9 (#954, A6) is slices 2, 7
+A5) is the facade's slices 1 to 8 and 10, and S9 (#954) is slices 2, 7
 and 10, since "nothing else applies a command" holds only once the facade
-is the WASM host. Slice 9 is the facade's own PC run before the switch; it
+is the WASM host. A6's #1064 to #1067 stay D5 release blockers and are not
+eligibility inputs, as under OD-2. Slice 9 is the facade's own PC run before the switch; it
 is not RUN-1, which runs on the shipping host after slice 10. Slice 13 (the
 engine's load-time memory peak, A8) lands before slice 9's verdict. The
 fallback's loss bound under the facade is up to 30 seconds of play, the
 owner's choice at 22:07 UTC (review R6): restore points ride the saves the
-host already takes, with no added cadence.
+host already takes, with no added cadence. What that requires (one record
+per point, cross-engine validation, truthful loss reporting, offline
+recovery, the 50 ms budget) and the one case it cannot bound (a refused
+point, R6a, back to the owner) are in the review's section 5.7.
 
 **When the clock starts (21:56 UTC).** The eligibility clock starts at slice
 10, not slice 11, under six conditions:
@@ -140,15 +157,19 @@ host already takes, with no added cadence.
    `Simulation`; Rust answers commands, owns the state and writes saves.
    Automated runtime and e2e checks prove it before the deploy.
 2. Sessions count only once stage 3 is explicitly approved and live, the
-   size gate is off, S9 is complete, and the approved `engine_status`
-   eligibility definition is satisfied. Merging slice 10 does not start the
-   clock.
+   size gate is off, S9's Rust-first command authority (#954) is complete,
+   and the approved `engine_status` eligibility definition (#1090) accepts
+   the session. Merging slice 10 does not start the clock.
 3. Slice 11 removes the old mirror implementation and its compatibility
    flag (`?engine=wasm-mirror`). It is not a prerequisite for counting
    eligible slice-10 facade sessions. Sessions that actually use the old
-   mirror host or the TypeScript arm are not counted.
+   mirror host or the TypeScript arm are not counted, nor are override
+   sessions or sessions from earlier stages (owner, 22:12 UTC). After slice
+   11 the mirror survives only as CI and parity tooling, outside the player
+   bundle; the TypeScript emergency fallback stays.
 4. The 1,000 eligible sessions and the observation period on the final
-   candidate build stay distinct. If slice 11 or any later change affects
+   candidate build stay distinct. If slice 11 or any later change (from the
+   freeze on) affects
    the engine, the host, the fallback, the telemetry or the window key, it
    is assessed for whether it restarts the observation period or the
    14-night replay window. Evidence is never carried silently across
@@ -166,7 +187,7 @@ host already takes, with no added cadence.
 
 | | What it is | When it starts | What ends or passes it | What restarts or voids it |
 | --- | --- | --- | --- | --- |
-| (a) | Slice 10, the facade deployed as the WASM host, and stage-3 eligibility | Slice 10 deploys after slice 9's PC run and the owner's approval; eligibility begins only under conditions 1 and 2 | Slice 10 is a deploy, not evidence; a session is eligible or it is not (4.1) | A drop-back (owner) stops new eligible sessions until stage 3 is live again |
+| (a) | Slice 10, the facade deployed as the WASM host, and stage-3 eligibility | Slice 10 deploys after slice 9's PC run and the owner's approval; eligibility begins only under conditions 1 and 2 | Slice 10 is a deploy, not evidence; a session is eligible or it is not (4.1) | A drop-back, or a slice-10 rollback to the mirror host (each on the owner's approval), stops new eligible sessions until stage 3 runs the facade again |
 | (b) | The 1,000 eligible sessions (4.1) | The first eligible session | At least 1,000, every failure triaged, the bound stated as achieved | Not restarted by later builds; reported by build, and a fallback whose cause was fixed still counts |
 | (c) | The observation period on the final candidate build (the tail, 4.1) | The candidate deploy at stage 3, after the freeze | At least 14 nights and 100 eligible sessions on the candidate deploys, every failure triaged, no latch-off | A merge to the tail's paths or a new key; any other engine, host, fallback or telemetry change is assessed (condition 4) |
 | (d) | The 14-night seeded replay (4.2) | The freeze, on the candidate engine's key | 14 counted green nights on one key | A new key or an engine-output failure |
@@ -253,8 +274,8 @@ the critical path is the work in front of each window:
   booking case, and the owner's approval of each cohort stage (4.1).
   Eligible sessions start with S9 (#954) on a stage-3 build, and stage 3
   waits for S6 and a protocol run that passes M2 to M6, so the 1,000
-  accumulate after both. Under AD-9 both S6 and S9 complete with slice 10
-  (1.2). The observation period runs on the candidate
+  accumulate after both. Under AD-9 S6 and S9's engine answers (#954)
+  both complete with slice 10 (1.2). The observation period runs on the candidate
   engine, which reaches players in a cohort release (the candidate deploy,
   an owner step).
 - **Seeded replay window** needs the full differential upgrade (with #865's
@@ -490,14 +511,15 @@ remain.
   drop-back is then a production deploy that restarts neither the tail nor
   the replay count, and the freeze guard exempts that file. Each one ships
   only on the owner's approval. The day counts are projections from 749
-  sessions per 30 days, before exclusions.
+  sessions per 30 days, before exclusions; the governed view read 671 on
+  2026-10-20, and the traffic projection (4.1) recomputes them.
 
   | Stage | WASM share | Starts when | Moves on when (each move on the owner's approval) |
   | --- | --- | --- | --- |
   | 0 | none (`?engine=wasm` only) | A1 is live in production, with the owner's separate OK | A1's fields arrive from production `?engine=wasm` sessions, and a forced fallback on a preview tooling build of the same commit reports the reason the host status shows (that preview's sessions stay out of every count) |
   | 1 | 10% | Stage 0 has moved on, A3 (#874) has merged with its forced-trap spec green on `chromium-wasm`, A2 (#902) has merged, and the size gate and A4's help sentence are in the build | At least 14 days and 30 engine sessions (about 12 days of traffic at 10%) on builds that carry every fix the stage needed, every fallback and every engine or host `$exception` triaged, each engine-fault fallback fixed and deployed or excepted by the owner, no latch-off, and no stop signal open |
   | 2 | 25% | Stage 1 has moved on | At least 14 days and 100 engine sessions (about 16 days at 25%), with the same conditions |
-  | 3 | 50%, without the size gate | Stage 2 has moved on (its host reliability conditions held), S6 (A5) has merged, which under AD-9 means slice 10 has deployed the facade as the WASM host (1.2), and the last committed protocol run (RUN-1, RUN-2, or a run repeated after a fix) shows M2 to M6 passing at 1x and 4x on the medium and large towers | The flip, or a drop-back |
+  | 3 | 50%, without the size gate | Stage 2 has moved on (its host reliability conditions held), S6 (A5) is complete, which under AD-9 means slices 1 to 8 and 10 have merged, slice 10 has deployed the facade as the WASM host (1.2), and the audio cue-timing test is green on it, and the last committed protocol run (RUN-1, RUN-2, or a run repeated after a fix) shows M2 to M6 passing at 1x and 4x on the medium and large towers | The flip, or a drop-back |
 
   A stage that stays below its move-on floor for 30 days goes to the owner,
   who keeps it, moves it on or drops it back.
@@ -548,8 +570,11 @@ engine telemetry from the final candidate reliability evidence.
   A1's definition pins. Under AD-9 it also meets the owner's conditions in
   1.2: it runs the Rust-backed facade as the WASM host (slice 10), stage 3
   is approved and live, and the approved `engine_status` eligibility
-  definition is satisfied. Merging slice 10 starts nothing; a page life on
-  the old mirror host or in the TypeScript arm never counts.
+  definition accepts it (#1090, which gains the owner's engagement
+  threshold and a separate all-attempts safety denominator, owner direction
+  of 2026-10-20, section 5). Merging slice 10 starts nothing; a page life on
+  the old mirror host, in the TypeScript arm, under an override or at an
+  earlier stage never counts.
 - **The rule:**
   1. at least 1,000 eligible engine sessions;
   2. every failure triaged to a root cause with a linked issue, in early
@@ -571,23 +596,28 @@ engine telemetry from the final candidate reliability evidence.
   engine-fault rate, and #1046 comes forward if they appear in the field.
 
 What the report would state, with zero or one engine-fault fallback; with
-zero in *n* sessions the bound is about 3/*n*, with one about 4.74/*n*. The
-day column is a projection from 749 sessions per 30 days at stage 3's 50%
-arm, counted from the first eligible build and before any exclusion
-(overrides and unassigned); it is not a measurement.
+zero in *n* sessions the bound is about 3/*n*, with one about 4.74/*n*.
+The time each takes is a projection, given below the table.
 
-| Eligible sessions | Engine-fault fallbacks | 95% upper bound | Days at stage 3 (50%) |
-| --- | --- | --- | --- |
-| 1,000 | 0 | about 0.30% | about 80 |
-| 1,000 | 1 | about 0.47% | about 80 |
-| 3,000 | 0 | about 0.10% | about 240 |
+| Eligible sessions | Engine-fault fallbacks | 95% upper bound |
+| --- | --- | --- |
+| 1,000 | 0 | about 0.30% |
+| 1,000 | 1 | about 0.47% |
+| 3,000 | 0 | about 0.10% |
 
 Reliability is therefore the release date: the 1,000 eligible sessions start
-at the later of S9 and stage 3 and take about 80 days, a projection (R4).
-The owner asked on 2026-10-20 for that projection to be checked against the
-current governed analytics, the eligible-session definition and stage 3's
-real exposure, with its assumptions and scenarios shown; until that check
-lands, 80 days is a projection, not a timeline.
+at the later of S9 and stage 3 (R4). The earlier figure of about 80 days
+(749 sessions per 30 days at stage 3's 50% arm, no exclusions) is not the
+current estimate. The traffic projection of 2026-10-20
+(`release-3.0/traffic-projection/eligible-session-projection.md` in the
+project's shared folder, read from the governed `session_lengths` view)
+puts the central estimate near 110 days, 88 to 135, before #1090's
+engagement filter; it is recomputed once that definition is approved, with
+stages 1 and 2's floors, stage 3's real exposure and exclusions, and the
+candidate and replay windows reported separately. 1,000 clean sessions do
+not show a fallback rate below 0.1% at 95%. These are projections, not
+deadlines or evidence, and no session count or outreach burst by itself
+moves a stage or waives a gate.
 
 **The observation period on the candidate build (the tail).** The owner's
 rule requires one. Once the freeze starts, a 2.x release carries the
@@ -625,7 +655,7 @@ sessions also count toward the 1,000.
   that runs its full period with every engine-fault fallback fixed earlier
   or excepted by the owner (R22).
 - **Evidence is not carried across candidates (owner, 1.2).** Any change
-  after the candidate deploy that affects the engine, the host, the
+  from the freeze on that affects the engine, the host, the
   fallback, the telemetry or the window key, slice 11 included, is assessed
   for whether it restarts the tail or the replay window, and the assessment
   is recorded on the matrix issue. A change to the tail's paths or the key
@@ -636,8 +666,8 @@ sessions also count toward the 1,000.
   sends the build's commit (`__APP_SHA__`) beside `version`, and the tail is
   read by commit.
 - **Size.** Over its first 14 nights at stage 3's 50% arm the tail holds at
-  most about 175 sessions, a projection from the same 749 per 30 days that
-  assumes every session runs the new build at once; the report gives the
+  most about 175 sessions, a projection from the same 749 per 30 days (671
+  on 2026-10-20, recomputed by the traffic projection) that assumes every session runs the new build at once; the report gives the
   real share from A1's commit field.
 
 ### 4.2 Seeded replay: the differential and its window
@@ -1511,7 +1541,8 @@ approves this revision:
   1.2);
 - slice 10, the facade becoming the WASM host; skipping slice 11 before the
   freeze, if it is ever proposed (1.2). The facade's fallback loss bound
-  is decided: up to 30 seconds of play (review R6, 22:07 UTC);
+  is decided: up to 30 seconds of play (review R6, 22:07 UTC); what a
+  refused restore point may lose beyond it is R6a (review 5.7);
 - the size gate's threshold (4.1);
 - the real saves A7's list asks for, and a local session to run them;
 - making the freeze guard a required check for the window (4.2), and a

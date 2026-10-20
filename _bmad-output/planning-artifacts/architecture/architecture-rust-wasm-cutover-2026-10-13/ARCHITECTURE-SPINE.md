@@ -205,6 +205,13 @@ host; nothing in `src/ui` calls the binding directly.
   lazily) or tooling kept out of player builds; runtime and e2e checks fail
   when normal play constructs, executes or deserializes one. The parity projects and the dual run keep
   the mirror host as a test and tooling harness, kept out of player builds.
+- **Release identity (owner, 2026-10-20 22:12 UTC):** the facade reaches
+  players during the 3.0 pre-release test on 2.x (stages 0 to 3, the release
+  plan's 1.2); stage 3 runs it as the WASM host, and the reliability
+  evidence and both 14-night windows finish before the 3.0.0 flip. From
+  slice 10 the healthy WASM path holds no mirror; once slice 11 lands the
+  mirror lives only in CI and parity tooling, outside the player bundle,
+  and the TypeScript emergency fallback stays.
 - **Owner decision (2026-10-20):** adopted (F1 to F9, 21:40 UTC); the design
   and slice plan are
   `architecture-rust-facade-2026-10-20/` (ARCHITECTURE-REVIEW.md,

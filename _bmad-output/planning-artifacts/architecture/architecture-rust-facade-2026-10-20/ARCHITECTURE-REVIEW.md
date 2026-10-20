@@ -1,7 +1,7 @@
 ---
 name: 'Rust-backed simulation facade'
 type: architecture-review
-status: accepted (owner sign-off of F1 to F9, 2026-10-20 21:40 UTC; R3 decided 21:56 UTC with conditions; R6 decided 22:07 UTC)
+status: accepted (owner sign-off of F1 to F9, 2026-10-20 21:40 UTC; R3 decided 21:56 UTC with conditions; R6 decided 22:07 UTC; R6a, a refused restore point, goes back to the owner)
 created: '2026-10-20'
 binds: [AD-1, AD-3, AD-4, AD-7, AD-8, '#868', '#954', '#874', '#1068', '#1049', '#1050']
 companions:
@@ -19,7 +19,8 @@ companions:
 > at 21:40 UTC; the independent review's amendments (R1 to R6, after the
 > decisions table) are applied. The owner decided R3 at 21:56 UTC with six
 > conditions (recorded in the release plan, section 1.2), and R6 at 22:07
-> UTC (accept a loss of up to 30 seconds of play). Nothing here is built yet, and nothing here changes the default
+> UTC (accept a loss of up to 30 seconds of play). Section 5.7 lists what R6
+> requires; the case it cannot bound, a refused point, is R6a for the owner. Nothing here is built yet, and nothing here changes the default
 > engine, starts a cohort stage or removes the TypeScript fallback. Every figure below is either a cloud
 > measurement labeled exploratory (method and tables in
 > [`measurements.md`](./measurements.md)) or a PC figure the owner quoted as
@@ -131,7 +132,7 @@ UTC.
 | R3 | The A5 mapping said both "slices 1 to 8" and "slices 1 to 8, 10, 11"; the second would start stage 3 and the 1,000-session clock at slice 11, a release later | Recommended: A5 (S6) is slices 1 to 8 and 10, S9 (#954) is slices 2, 7 and 10, and eligible sessions count from slice 10 on a stage-3 build. Slice 11 lands before the freeze and is not a stage-3 input. `?engine=wasm-mirror` sessions after slice 10 are early telemetry, never eligible. The alternative counts from slice 11. Either way slice 9 is not RUN-1: RUN-1 runs after slice 10, as the plan defines it (the shipping host after S6) | **decided 21:56 UTC: slice 10**, under six conditions (release plan 1.2): slice 10 really deploys the facade, with automated runtime and e2e proof that normal WASM play constructs, executes and deserializes no TypeScript `Simulation`; sessions count only once stage 3 is approved and live, the size gate is off, S9 is complete and the `engine_status` eligibility definition holds; mirror-host and TypeScript-arm sessions never count; the 1,000 sessions and the candidate's observation period stay distinct, and later engine, host, fallback, telemetry or key changes are assessed for restarting the observation or replay window; slice 11 before the freeze where practical, skipping it a separate decision; the ramp 0, 10, 25, 50% with every stage and rollback on his approval |
 | R4 | M6 would trip the stop rule at slice 9 on the load-time peak, a cost both designs share (the reviewer's probe: about 82% of the WASM high-water mark is transient load overhead) | Slice 13 becomes a hard prerequisite of slice 9's verdict run. M6's bar is unchanged | none |
 | R5 | No recovery point is checked on TypeScript before a fault | "Validated" means three things. A CI test on every change to the Rust save writer, the sidecar or the TypeScript load path loads Rust-written restore points (save plus sidecar, the conformance corpus and the medium and large scenarios) through the fallback's own adopt path and plays on. At a fault, the adopt checks the point (it loads, its invariants hold) and steps back to the next older point if not. A "recovery point refused" line in the reliability report counts each refusal. Points live in memory only, so the engine that wrote one and the fallback that reads it always come from the same commit, which the CI test covers. A TypeScript load during play would check more, but the owner's direction bans a normal-play deserialize, so it is not used | the report line, a new production analytics field, needs the owner's approval when slice 8 ships |
-| R6 | The fallback's loss bound grows from one game hour (about 6 s of play at speed 1, 0.5 s at top speed) to 30 s of play | Recommended: accept up to 30 s, since faults are rare and this is the emergency path. The alternative adds a point every 10 s of running play (at most 10 s lost, three times as many save pauses). A shorter cadence does not help the 50 ms budget, since each save costs the same (cloud, exploratory: 18 ms medium, 63 ms large); keeping the game-hour bound would cost about 126 ms of every second on large at top speed | decided 22:07 UTC: accept up to 30 s, no added cadence |
+| R6 | The fallback's loss bound grows from one game hour (about 6 s of play at speed 1, 0.5 s at top speed) to 30 s of play | Recommended: accept up to 30 s, since faults are rare and this is the emergency path. The alternative adds a point every 10 s of running play (at most 10 s lost, three times as many save pauses). A shorter cadence does not help the 50 ms budget, since each save costs the same (cloud, exploratory: 18 ms medium, 63 ms large); keeping the game-hour bound would cost about 126 ms of every second on large at top speed | decided 22:07 UTC: accept up to 30 s, no added cadence. Section 5.7 lists what slice 8 must prove; the one case it cannot bound, a refused point, goes back to the owner as R6a |
 
 The review's non-blocking points are applied too: totals beside the heap in
 section 3, a hot-path record marked on every code slice, branch coverage
@@ -425,7 +426,41 @@ that passes the adoption check, applies the sidecar, swaps in `TsSim`, and rebui
 from it. The TypeScript engine never runs before that. The fallback module
 may load through a dynamic import, but it stays in the precache manifest
 (the `verify-precache` gate), and a test plays on after a forced trap with
-the network off.
+the network off. What the next page load runs after a fault is A4's sticky
+safety fallback (the owner's direction of 2026-10-20, section 3), which
+keeps the player on TypeScript for that build; the facade's fallback covers
+the page life it happens in.
+
+**What the R6 decision requires (owner, 22:07 UTC, restated 22:12 UTC).**
+The bound is up to 30 seconds of real play, counted in play time, never in
+game time or wall-clock time. Slice 8 implements and proves each of these:
+
+1. **One record per point.** A restore point is a single record: a sequence
+   number, the engine's save bytes, the sidecar, the play-time reading and a
+   digest of the save. It is built in one synchronous turn on the main
+   thread (in one message on the worker host), so a save and a sidecar from
+   different moments can never pair. The sidecar carries the save's digest
+   and sequence, and adoption refuses a record whose digest does not match.
+   The sidecar never lives apart from its save.
+2. **Cross-engine validation.** R5's CI test, plus a schema and version
+   check on the sidecar when the point is taken.
+3. **Truthful loss.** The host keeps a play-time counter (foreground seconds
+   the clock advanced). The recovery notice and the report state how much
+   play the recovery actually rewound, from the adopted point's reading,
+   and say so when it stepped back past the newest point.
+4. **Offline recovery.** The forced-trap test with the network off, above.
+5. **The budget.** No save task over 50 ms on the large PC fixture at 1x
+   and 4x (slice 9), with the remedies above.
+
+Where the 30 seconds could be exceeded, and what closes each case:
+
+| Case | What could happen | What closes it |
+| --- | --- | --- |
+| The autosave is late or skipped (the last one still writing, an idle-time deferral, a skipped tick) | Play since the last point grows past 30 s | The frame loop counts play seconds since the last point, and at 30 it runs the autosave at once. That is a deadline, never a new cadence: in normal play the 30-second interval fires first, since play time cannot outrun wall-clock time. Idle-time capture gets the same deadline |
+| The storage write fails (quota, private mode) | The save is not persisted | The point is taken when `serialize()` returns, before the write, so a failed write keeps the point; the save failure is reported as today |
+| A hidden, paused or frozen tab | A timer runs late while the tab is away | Hidden time advances no play (the frame loop runs on animation frames); a frozen tab that resumes with an overdue interval is covered by the play-time deadline |
+| The fault happens inside a capture | The newest point is the one before | That point is at most 30 s of play old, by the deadline |
+| The newest point is refused at adoption | The fallback steps back to an older point, which can be more than 30 s of play old | Not closable without loading points on TypeScript during normal play, which condition 1 of 1.2 forbids. Prevention: the CI corpus, the capture-time sidecar check. When it happens: the notice states the real loss and the "recovery point refused" line counts it. This case goes back to the owner (R6a) |
 
 ### 5.8 Rust independence
 
