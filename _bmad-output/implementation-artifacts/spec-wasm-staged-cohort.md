@@ -290,16 +290,24 @@ loop is not visible in analytics; that gap closes when the fields ship.
 The data map and its tests change first, in the PR that sends the fields;
 nothing ships to production before the owner approves this list.
 
-**The fields ship with the governed definition, in one approval and one PR.**
+**The fields ship with their binding to the governed definition, in one approval and one PR.**
 `scripts/engine-reliability.mjs` reads `arm` today and excludes `override`
 and `unassigned`; a row without that field reads as `none` and is counted. A
 row that started carrying `selected_by: setting` or `url` without that
 script learning it would count Settings and URL opt-ins as cohort sessions.
-So the PR that turns `COHORT_TELEMETRY` on also changes the governed
-definition (the script, its test and the data map paragraph) to read
-`assigned_arm` and `selected_by`, and the owner approves the fields and that
-change as one packet. The #1090 lane owns the definition change; this story
-supplies the fields.
+The work splits in two:
+
+- **The base definition lands first** (#1232, the #1090 projection lane):
+  `scripts/engine-reliability.mjs`, its test and the data map's "How it is
+  counted" paragraph learn `assigned_arm`, `selected_by` and the other
+  cohort fields, with their value lists pinned to this spec's literals and
+  marked as temporary by a test.
+- **This story's fields PR does the binding.** In the same PR that adds the
+  fields and turns `COHORT_TELEMETRY` on, the script imports `STAGES`,
+  `ASSIGNED_ARMS` and `SELECTIONS` from the cohort module in place of the
+  pinned literals, `unclean-exit` is bound as a fallback reason, and the
+  data map's field table gains the new rows. The owner approves those
+  fields and that binding as one packet.
 
 New `engine_status` fields, on every row:
 
