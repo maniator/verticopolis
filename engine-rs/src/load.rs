@@ -1512,6 +1512,30 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     } else {
         None
     };
+    if sim.extermination_due_day.is_some() {
+        if let Some(value) = data.get("exterminationRoomIds") {
+            let mut seen = std::collections::HashSet::new();
+            let mut ids = Vec::new();
+            if let Some(values) = value.as_array() {
+                for value in values {
+                    if let Some(id) = value.as_f64() {
+                        if id.is_finite()
+                            && id.fract() == 0.0
+                            && id > 0.0
+                            && id < 2147483648.0
+                            && seen.insert(id as i64)
+                        {
+                            ids.push(id as i64);
+                        }
+                    }
+                    if ids.len() >= UNIT_CAP {
+                        break;
+                    }
+                }
+            }
+            sim.extermination_room_ids = Some(ids);
+        }
+    }
     if let Some(a) = data.get("excavated").and_then(Value::as_array) {
         for k in a {
             if let Some(s) = k.as_str() {

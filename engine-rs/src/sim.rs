@@ -373,6 +373,9 @@ impl Simulation {
         m.insert("treasuresFound".into(), json!(self.treasures_found));
         if let Some(d) = self.extermination_due_day {
             m.insert("exterminationDueDay".into(), json!(d));
+            if let Some(ids) = &self.extermination_room_ids {
+                m.insert("exterminationRoomIds".into(), json!(ids));
+            }
         }
         m.insert("events".into(), self.events.save_state());
         m.insert("excavated".into(), json!(self.excavated));

@@ -6,6 +6,21 @@ import { LOG_RING_CAP, LOG_TEXT_CAP } from "./constants";
 import { FACILITIES, GRID, isHotelKind } from "../facilities";
 import { INFEST_DAYS } from "../economy/housekeeping";
 import { subtypeListFor } from "../retailSubtypes";
+import { UNIT_CAP } from "./deserializeGuards";
+
+/** Missing means a legacy tower-wide booking. A present malformed list
+ * authorizes no rooms. Bound valid unique ids by the whole lot's capacity. */
+export function coerceExterminationRoomIds(value: unknown): number[] | undefined {
+  if (value === undefined) return undefined;
+  const ids = new Set<number>();
+  if (Array.isArray(value)) {
+    for (const id of value) {
+      if (typeof id === "number" && Number.isInteger(id) && id > 0 && id < 2 ** 31) ids.add(id);
+      if (ids.size >= UNIT_CAP) break;
+    }
+  }
+  return [...ids];
+}
 
 /**
  * Write a unit for a save, omitting every field whose value equals the fallback

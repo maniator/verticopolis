@@ -43,9 +43,9 @@ export function mergeSimulation(target: Simulation, fresh: Simulation, marks: Me
     t[key] = f[key];
   }
   target.clock.minutes = fresh.clock.minutes;
-  // A transient the instance set on a command and the save never carries;
-  // the engine resolves it in its own tick, so it must not stick here.
-  delete target.exterminationRoomIds;
+  // Optional properties absent on the fresh instance must clear too, so a
+  // completed or cancelled booking cannot retain an earlier room list.
+  target.exterminationRoomIds = fresh.exterminationRoomIds;
   target.events.loadState(fresh.events.saveState());
   target.events.restore(fresh.tower.units.filter((u) => u.state === "fire").map((u) => u.id));
   target.economy.restoreBlockbusters(fresh.economy.blockbusterIds);

@@ -293,8 +293,7 @@ impl Simulation {
         self.extermination_due_day = Some((self.clock.day() + 1) as f64);
         // `resolve_extermination` clears only the rooms billed here, so a wing
         // that escalates overnight is not swept for today's price. The list
-        // is transient on both sides: a save taken mid-booking drops it and
-        // the resolution falls back to clearing every infested room.
+        // survives save/load and host attachment.
         self.extermination_room_ids = Some(ids);
         // Logged as a money line in the TypeScript (`"money"`).
         self.emit(
@@ -316,7 +315,10 @@ impl Simulation {
             return;
         }
         self.extermination_due_day = None;
-        let billed = self.extermination_room_ids.take();
+        let billed = self
+            .extermination_room_ids
+            .take()
+            .map(|ids| ids.into_iter().collect::<std::collections::HashSet<_>>());
         let mut cleared = 0;
         for u in self.tower.units.iter_mut() {
             if !u.kind.is_hotel() || u.state != UnitState::Infested {
@@ -558,5 +560,40 @@ mod tests {
             classic.call_exterminator(),
             Err(ExterminatorRefusal::Unavailable)
         );
+    }
+
+    #[test]
+    fn pending_booking_survives_reload_without_treating_unpaid_rooms() {
+        let mut sim = modern_with_rooms(1, 1);
+        sim.money = 1e6;
+        assert_eq!(sim.call_exterminator(), Ok((7000.0, 1)));
+        let ids: Vec<_> = sim
+            .tower
+            .units
+            .iter()
+            .filter(|u| u.kind.is_hotel())
+            .map(|u| u.id)
+            .collect();
+        sim.tower.get_unit_mut(ids[1]).unwrap().state = UnitState::Infested;
+        let mut loaded = crate::load::deserialize(&sim.serialize()).unwrap();
+        assert_eq!(loaded.extermination_room_ids, Some(vec![ids[0]]));
+        assert_eq!(
+            loaded.call_exterminator(),
+            Err(ExterminatorRefusal::Pending)
+        );
+        loaded.clock.minutes += 1440.0;
+        loaded.resolve_extermination();
+        assert_eq!(
+            loaded.tower.get_unit(ids[0]).unwrap().state,
+            UnitState::Empty
+        );
+        assert_eq!(
+            loaded.tower.get_unit(ids[1]).unwrap().state,
+            UnitState::Infested
+        );
+        assert_eq!(loaded.extermination_room_ids, None);
+        assert!(loaded.serialize().get("exterminationRoomIds").is_none());
+        loaded.tower.get_unit_mut(ids[0]).unwrap().state = UnitState::Infested;
+        assert_eq!(loaded.call_exterminator(), Ok((9000.0, 2)));
     }
 }

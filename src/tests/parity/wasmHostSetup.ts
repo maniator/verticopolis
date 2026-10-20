@@ -25,10 +25,8 @@ import { WASM_PARITY_FLAG } from "./typescriptOnly";
  * (`tower.place`, a direct field write) before the engine starts from the
  * instance's own save, so setup that bypasses the command relay still
  * reaches the engine. `callExterminator` also attaches the host ahead of the
- * first tick: it keeps its booked room ids in memory only
- * (`exterminationRoomIds`, which no save carries), so a booking made before
- * hosting would reach the engine as a due day with no rooms. Hosting first
- * relays the command, and the engine books the same rooms.
+ * first tick so the booking is compared and relayed like other commands.
+ * Pending booked room ids also survive a save and re-host (#902).
  *
  * Attaching normalizes the instance. The engine's load can log lines the
  * instance never had (the Classic rent-snap bulletin); the instance adopts
@@ -68,8 +66,6 @@ import { WASM_PARITY_FLAG } from "./typescriptOnly";
  *   tick, since the save does not carry it and the engine never ported it;
  * - an instance that already has a crowd at attach (a Simulation shared
  *   between tests, ticked on the TypeScript engine after its release);
- * - an exterminator booking the save cannot carry: booked room ids on the
- *   instance at attach, and any pending booking at a re-host (#902);
  * - a re-host after the first tick under `VC_WASM_SYNC=hour`, where the
  *   instance is behind the engine between merges and its save would rewind
  *   the engine.
@@ -252,12 +248,6 @@ function attach(sim: Simulation): Hosting {
   if (sim.crowd.people.length > 0) {
     throw new Error("wasm parity: this Simulation already has a crowd, so it was released after a previous test; the parity projects need one Simulation per test");
   }
-  // Booked room ids live on the instance only, and the engine starts from a
-  // save that carries the due day without them (#902). (A due day alone, as
-  // a load leaves it, is in the save, so both engines resolve it alike.)
-  if ((sim.exterminationRoomIds?.length ?? 0) > 0) {
-    throw new Error("wasm parity: this Simulation already holds an exterminator booking the save cannot carry (the booked room ids, #902); the parity projects need one Simulation per test, booked after hosting");
-  }
   const host = attachWasmHost(sim, wasm());
   try {
     return finishAttach(sim, host);
@@ -351,15 +341,6 @@ function release(sim: Simulation): void {
   if (sim.tick !== Simulation.prototype.tick) throw new Error("wasm parity: a released instance still has its own tick");
 }
 
-/** Whether the instance holds an exterminator booking the engine would lose
- *  on a re-host (the save carries the due day but not the room ids). The
- *  resolution clears the due day to undefined on both engines (a merge
- *  copies it so), and a real due day is never 0 (it is the booking day plus
- *  one), so any falsy due day reads as no booking. */
-function bookingPending(sim: Simulation): boolean {
-  return (sim.exterminationRoomIds?.length ?? 0) > 0 || Boolean(sim.exterminationDueDay);
-}
-
 /** Compare the instance's state view with the engine's (see the module
  *  doc for when), re-host on a difference while the crowd is empty, and
  *  throw once it exists. Returns the hosting in force afterwards. */
@@ -405,12 +386,6 @@ function compareOrRehost(sim: Simulation, entry: Hosting): Hosting {
     throw new WasmParityError(
       `the instance's state departs from the engine's between ticks at ${d?.path ?? "?"} (instance ${JSON.stringify(d?.live)}, engine ${JSON.stringify(d?.shadow)})${entryDetail}: ` +
         "an edit the relay does not carry (tower.place, a direct field write) or a divergence on a relayed command, after the crowd exists",
-    );
-  }
-  if (bookingPending(sim)) {
-    throw new WasmParityError(
-      `the instance's state departs from the engine's at ${d?.path ?? "?"} while an exterminator booking is pending, and a re-host would start the engine from a save that carries the due day but not the booked room ids (#902): ` +
-        "make the edit before the callExterminator call, or relay it",
     );
   }
   if (SYNC_MODE === "hour" && entry.ticked) {
