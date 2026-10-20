@@ -11,6 +11,7 @@ import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
 import { rentOf } from "../../engine/econConfig";
 import { serializeUnit } from "../../engine/sim/coerce";
 import { digest } from "./canonical";
+import { requireDetail, tsCheckpointDetail, type CheckpointDetail } from "./checkpointDetail";
 import { crowdView, stateView } from "../../engine/conformanceView";
 import { drainChecked } from "./gameplayEvents";
 
@@ -225,6 +226,7 @@ export interface ScenarioEngine extends ChargeEngine {
   drainEvents(): unknown[];
   /** Events a full buffer has pushed out since the engine was made. */
   eventsDropped(): number;
+  detail?(): Omit<CheckpointDetail, "label">; // the fuzz record, checkpointDetail.ts
   /** Release the engine, for a binding that owns memory; the runner calls it
    *  when the run ends, whether it finished or threw. */
   free?(): void;
@@ -288,6 +290,7 @@ export function tsEngine(sim: Simulation): ScenarioEngine {
     crowdDigest: () => digest(crowdView(sim)),
     drainEvents: () => sim.drainGameplayEvents(),
     eventsDropped: () => sim.gameplayEventsDropped,
+    detail: () => tsCheckpointDetail(sim),
   };
 }
 
@@ -470,8 +473,8 @@ export function firstDivergence(got: Checkpoint[], want: Checkpoint[]): { checkp
 /** Run a scenario from its start, returning every checkpoint in order: `start`
  *  before the first command, the ones the commands take, and `final` after the
  *  last command, so nothing a scenario runs goes unchecked. The engine defaults
- *  to the TypeScript one; a port passes its own `start`. */
-export function runScenario(s: Scenario, start: EngineStart = startTsEngine): Checkpoint[] {
+ *  to the TypeScript one; a port passes its own `start`; `details` collects the fuzz record. */
+export function runScenario(s: Scenario, start: EngineStart = startTsEngine, details?: CheckpointDetail[]): Checkpoint[] {
   let e = start(s.start);
   const out: Checkpoint[] = [];
   const clock = { minutes: 0 };
@@ -483,6 +486,7 @@ export function runScenario(s: Scenario, start: EngineStart = startTsEngine): Ch
     const events = [...carried, ...drainChecked(e)];
     carried = [];
     out.push({ label, state: e.stateDigest(), crowd: e.crowdDigest(), events: digest(events) });
+    if (details) details.push({ label, ...requireDetail(e) });
   };
   const carry = (events: unknown[]) => { carried.push(...events); };
   try {
