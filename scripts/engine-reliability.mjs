@@ -32,9 +32,10 @@
  *   commit of another length still matches; both sides are at least 7 hex
  *   digits.
  * - A page life whose request, bundle kind, reasons, version or commit is not
- *   a value the game can send is UNRECOGNIZED: the rows come through a public
- *   route, so it is left out of everything and counted on its own line. (A
- *   forged row with valid codes cannot be told apart.)
+ *   a value the game can send, or whose fallback count is not a whole number
+ *   of zero or more, is UNRECOGNIZED: the rows come through a public route, so
+ *   it is left out of everything and counted on its own line. (A forged row
+ *   with valid codes cannot be told apart.)
  * - A counted page life FELL BACK when its highest `fallbacks` is above 0.
  *   Its fallback is an ENGINE FAULT when it sent any reason but
  *   `package-mismatch` (or, with its rows lost, no reason at all).
@@ -46,7 +47,7 @@
  *   that sent no other reason, never ran the engine: it is neither a pass nor
  *   a fault. One whose first tower ran on the engine and that met the mismatch
  *   later ran the engine without a fault. Both are counted on the mismatch
- *   line.
+ *   line, and a writer latch-off in either still counts on the latch line.
  * - N counts sessions with at least one counted page life that ran the engine.
  *   A session counts as a fault when any of those page lives had an engine
  *   fault; it counts once however many did, and stays a fault if a later page
@@ -159,6 +160,17 @@ export function buildPageLivesQuery(hours) {
 
 const truthy = (v) => v === true || v === 1 || v === "true" || v === "1";
 
+const isCount = (n) => Number.isSafeInteger(n) && n >= 0;
+
+/** A fallback count: 0 when absent, NaN when it is not a whole number of zero
+ *  or more, which no build sends, so the page life is left out as
+ *  unrecognized. */
+function count(v) {
+  if (v == null || v === "") return 0;
+  const n = Number(v);
+  return isCount(n) ? n : Number.NaN;
+}
+
 /** One printable value: `missing` when absent, `unrecognized` when it is not
  *  the shape of a code, a version or a commit. */
 function value(v, missing) {
@@ -179,8 +191,8 @@ export function pageLivesFromRows(rows) {
     requested: value(r.requested, "unknown"),
     arm: value(r.arm, "none"),
     sizeGated: truthy(r.size_gated),
-    fallbacks: Number(r.fallbacks) || 0,
-    settleFallbacks: Number(r.settle_fallbacks) || 0,
+    fallbacks: count(r.fallbacks),
+    settleFallbacks: count(r.settle_fallbacks),
     reasons: [...new Set((Array.isArray(r.reasons) ? r.reasons : []).filter((x) => typeof x === "string" && x !== "" && x !== "none").map((x) => value(x, "unknown")))],
     writerLatched: truthy(r.writer_latched),
   }));
@@ -230,7 +242,9 @@ const recognized = (pl) =>
   BUILDS.includes(pl.build) &&
   pl.reasons.every((r) => REASONS.includes(r)) &&
   (SHA.test(pl.sha) || pl.sha === "unknown") &&
-  VERSION.test(pl.version);
+  VERSION.test(pl.version) &&
+  isCount(pl.fallbacks) &&
+  isCount(pl.settleFallbacks);
 
 /** Count page lives by the rules in the module comment. `opts.hosts`,
  *  `opts.shas`, `opts.versions`, `opts.builds` and `opts.arms` narrow what
@@ -279,6 +293,10 @@ export function summarizeReliability(pageLives, opts = {}) {
       s.mismatch = true;
       totals.mismatchPageLives++;
     }
+    if (pl.writerLatched) {
+      s.latched = true;
+      totals.latchedPageLives++;
+    }
     if (mismatch && !fault && pl.settleFallbacks > 0) {
       totals.mismatchNeverRan++;
       continue;
@@ -300,10 +318,6 @@ export function summarizeReliability(pageLives, opts = {}) {
         g.faults.add(pl.session);
         g.faultPageLives++;
       }
-    }
-    if (pl.writerLatched) {
-      s.latched = true;
-      totals.latchedPageLives++;
     }
   }
 

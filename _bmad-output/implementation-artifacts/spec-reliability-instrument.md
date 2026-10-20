@@ -348,3 +348,14 @@ gate being a process step (merging is shipping, by design); the Help privacy
 copy (checked: an in-memory page-life id does not point back across visits);
 `setEngineWriter`'s optional latch callback (its one production caller passes
 it, and a test pins the report).
+
+### Codex review on PR #1088, 2026-10-20 (on 702c4a4)
+
+Two findings, both fixed:
+
+1. A fallback count that no build sends (negative, fractional or infinite)
+   was read as a number: a negative count looked like a clean run and an
+   infinite one swallowed the loop-size line. Such a page life is now
+   unrecognized.
+2. A writer latch-off in a page life that hit the package mismatch at settle
+   was skipped with the rest of that page life. The latch line now counts it.

@@ -130,6 +130,13 @@ describe("pageLivesFromRows", () => {
     const [pl] = pageLivesFromRows([{ session: "s", page_life: "p", version: "2.36.0 | [x](http://e.vil)", sha: "abc\n# hi", build: "<b>", reasons: ["boot-error", "![i](x)"] }]);
     expect(pl).toMatchObject({ version: "unrecognized", sha: "unrecognized", build: "unrecognized", reasons: ["boot-error", "unrecognized"] });
   });
+
+  it("marks a fallback count that is not a whole number of zero or more", () => {
+    const lives = pageLivesFromRows([-1, 0.5, Infinity, "abc"].map((fallbacks) => ({ session_id: "s", page_life: "p", fallbacks, settle_fallbacks: 0 })));
+    for (const pl of lives) expect(pl.fallbacks).toBeNaN();
+    const [settle] = pageLivesFromRows([{ session_id: "s", page_life: "p", fallbacks: 1, settle_fallbacks: -2 }]);
+    expect(settle.settleFallbacks).toBeNaN();
+  });
 });
 
 describe("upperBound (one-sided 95% Clopper-Pearson)", () => {
@@ -187,6 +194,11 @@ describe("summarizeReliability", () => {
     expect(s.byReason).toEqual([]);
   });
 
+  it("counts a writer latch-off in a mismatch that never ran the engine", () => {
+    const s = summarizeReliability([life({ session: "a", fallbacks: 1, settleFallbacks: 1, reasons: ["package-mismatch"], writerLatched: true }), life({ session: "b" })]);
+    expect(s).toMatchObject({ n: 1, mismatchNeverRan: 1, latchedSessions: 1, latchedPageLives: 1 });
+  });
+
   it("counts a mismatch that came with another reason as a fault, listing only the fault's reason", () => {
     const s = summarizeReliability([life({ fallbacks: 2, settleFallbacks: 1, reasons: ["package-mismatch", "attach-refused"] })]);
     expect(s).toMatchObject({ n: 1, faults: 1, mismatchSessions: 1, mismatchNeverRan: 0 });
@@ -214,6 +226,20 @@ describe("summarizeReliability", () => {
       life({ session: "g" }),
     ]);
     expect(s).toMatchObject({ n: 2, faults: 0, unrecognizedPageLives: 5 });
+  });
+
+  it("leaves out a page life whose fallback count no build sends", () => {
+    // A negative count would read as a clean run, a fraction as a fallback,
+    // and an infinite one would swallow the loop-size line.
+    const s = summarizeReliability([
+      life({ session: "a", fallbacks: -1, reasons: ["boot-error"] }),
+      life({ session: "b", fallbacks: 0.5, reasons: ["boot-error"] }),
+      life({ session: "c", fallbacks: Infinity, reasons: ["attach-refused"] }),
+      life({ session: "d", fallbacks: Number.NaN }),
+      life({ session: "e", fallbacks: 1, settleFallbacks: -1, reasons: ["package-mismatch"] }),
+      life({ session: "f" }),
+    ]);
+    expect(s).toMatchObject({ n: 1, faults: 0, unrecognizedPageLives: 5, totalFallbacks: 0, maxFallbacks: 0, mismatchPageLives: 0 });
   });
 
   it("binds its closed lists to the values the game sends", () => {
