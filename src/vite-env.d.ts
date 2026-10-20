@@ -12,3 +12,8 @@ declare const __TOOLING_BUILD__: boolean;
  *  the only engine, with no runtime switch and no TypeScript fallback (see
  *  src/build/engineBundle.ts and bootstrap.ts). */
 declare const __WASM_ONLY__: boolean;
+/** The engine package this shell was built with: its package id and the
+ *  digests of the glue and the binary, from src/public/engine/BUILD.json
+ *  (see src/wasmhost/enginePackageRecord.ts). Null when the build carries no
+ *  usable package. */
+declare const __ENGINE_PACKAGE__: import("./wasmhost/enginePackageRecord").ExpectedEnginePackage | null;

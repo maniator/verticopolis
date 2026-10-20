@@ -4,6 +4,7 @@ import { Simulation } from "../engine/Simulation";
 import type { WasmEngine, WasmModule } from "../dualrun/binding";
 import { FRAME_HEADER } from "./frameView";
 import { enginePackageUrl, startWasmHost, type WasmHostApp } from "./startWasmHost";
+import { HOST_ERROR_HISTORY } from "./hostErrors";
 
 /** An engine stand-in: holds the save it was built from, answers a frame
  *  view that says nothing moved, and counts its ticks. */
@@ -71,6 +72,64 @@ function app(): WasmHostApp & { adopted: Simulation[] } {
 const quiet = () => ({ info: vi.fn(), error: vi.fn() });
 
 describe("startWasmHost", () => {
+  it("retains the latest failure once the error list is full, including after recovery", () => {
+    const a = app();
+    const mod = fakeModule();
+    const log = quiet();
+    let failure: string | null = "failure 1";
+    const fromSave = mod.Engine.fromSave;
+    mod.Engine.fromSave = (save: string) => {
+      if (failure) throw new Error(failure);
+      return fromSave(save);
+    };
+    const h = startWasmHost(a, mod, log);
+    try {
+      const last = HOST_ERROR_HISTORY + 1;
+      for (let i = 2; i <= last; i++) {
+        failure = `failure ${i}`;
+        a.adoptSim(Simulation.newGame(i, "classic"));
+      }
+      expect(h.status.errors).toHaveLength(HOST_ERROR_HISTORY);
+      expect(h.status.lastError).toBe(`not hosting this tower: failure ${last}`);
+      expect(h.status.droppedErrors).toBe(1);
+      failure = null;
+      a.adoptSim(Simulation.newGame(last + 1, "classic"));
+      expect(h.status.hosted).toBe(true);
+      failure = "relapsed";
+      a.adoptSim(Simulation.newGame(last + 2, "classic"));
+      expect(h.status).toMatchObject({ hosted: false, lastError: "not hosting this tower: relapsed", droppedErrors: 2 });
+      expect(h.status.errors).toHaveLength(HOST_ERROR_HISTORY);
+      expect(h.status.errors[0]).toBe("not hosting this tower: failure 1");
+      expect(log.error).toHaveBeenCalledTimes(last + 1);
+    } finally {
+      h.stop();
+    }
+  });
+
+  it("gives each host its own status, so one host's failures leave another's empty", () => {
+    const failing = fakeModule();
+    failing.Engine.fromSave = () => {
+      throw new Error("refused");
+    };
+    const first = startWasmHost(app(), failing, quiet());
+    const b = app();
+    const mod = fakeModule();
+    const second = startWasmHost(b, mod, quiet());
+    try {
+      expect(first.status).toMatchObject({ hosted: false, errors: ["not hosting this tower: refused"], lastError: "not hosting this tower: refused", droppedErrors: 0 });
+      expect(second.status).toMatchObject({ hosted: true, errors: [], lastError: null, droppedErrors: 0 });
+      mod.Engine.fromSave = () => {
+        throw new Error("second refused");
+      };
+      b.adoptSim(Simulation.newGame(9, "classic"));
+      expect(second.status).toMatchObject({ hosted: false, errors: ["not hosting this tower: second refused"], lastError: "not hosting this tower: second refused" });
+      expect(first.status).toMatchObject({ errors: ["not hosting this tower: refused"], lastError: "not hosting this tower: refused" });
+    } finally {
+      second.stop();
+      first.stop();
+    }
+  });
+
   it("hosts with the sync mode it is given, and every adopted tower with the same one", () => {
     const a = app();
     const handle = startWasmHost(a, fakeModule(), quiet(), { sync: "frame" });
@@ -88,7 +147,7 @@ describe("startWasmHost", () => {
     const a = app();
     const log = quiet();
     const handle = startWasmHost(a, mod, log);
-    expect(handle.status).toMatchObject({ engine: "wasm", starts: 1, hosted: true, errors: [] });
+    expect(handle.status).toMatchObject({ engine: "wasm", starts: 1, hosted: true, errors: [], lastError: null, droppedErrors: 0 });
     expect(mod.engines.length).toBe(1);
     expect((globalThis as { __vcEngine?: unknown }).__vcEngine).toBe(handle);
     a.sim.tick(1);

@@ -14,12 +14,14 @@
  * Today the game fetches two files: the glue, which the host and the dual run
  * import by URL (enginePackageUrl in startWasmHost.ts), and the binary, which
  * the glue fetches beside itself (`new URL("verticopolis_engine_bg.wasm",
- * import.meta.url)` in wasm-bindgen's web target). `BUILD.json` and
- * `THIRD-PARTY.json` are read only at build and test time (the source hash in
- * packageHash.ts, the notices in src/build/rustNotices.ts), so they stay out
- * of the precache. When a run-time check starts reading `BUILD.json` (#985's
- * criterion 5), mark it `runtime: true` in the same change and add it to the
- * workbox glob by its own path (see the note in vite.config.ts).
+ * import.meta.url)` in wasm-bindgen's web target). `BUILD.json` is listed as a
+ * run-time file and precached with them because the package check
+ * (enginePackageCheck.ts, #985's criterion 5) reads it once the loader is
+ * wired to it. `THIRD-PARTY.json` is read only at
+ * build and test time (the notices in src/build/rustNotices.ts), so it stays
+ * out of the precache. Each run-time file is listed in the workbox glob by its
+ * own path where the pattern matches no `.json` (see the note in
+ * vite.config.ts).
  *
  * Keep this file ERASABLE (type-only TypeScript syntax, no enums or
  * namespaces; the rule is spelled out in scripts/screenshot-env.ts): the
@@ -47,7 +49,7 @@ export interface EngineFile {
 export const ENGINE_PACKAGE: readonly EngineFile[] = [
   { name: ENGINE_GLUE, runtime: true, readBy: "the WASM host and the dual run's worker, imported by URL (startWasmHost.ts)" },
   { name: ENGINE_WASM, runtime: true, readBy: "the glue, fetched beside itself at init" },
-  { name: ENGINE_BUILD_RECORD, runtime: false, readBy: "the build, CI's package cache and packageHash.test.ts" },
+  { name: ENGINE_BUILD_RECORD, runtime: true, readBy: "the page, once the loader runs enginePackageCheck.ts (it hashes the glue and binary against this record); also the build, CI's package cache and packageHash.test.ts" },
   { name: ENGINE_THIRD_PARTY_RECORD, runtime: false, readBy: "the third-party notices build (scripts/gen-third-party-notices.ts)" },
 ];
 
