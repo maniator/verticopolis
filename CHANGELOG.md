@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.41.0
+
+- A save made while an exterminator is booked now remembers which rooms were booked, so after a reload the treatment covers the same rooms as if you had kept playing.
+
 ## 2.40.0
 
 - On the opt-in WASM engine (`?engine=wasm`), a tower whose engine fails keeps running instead of freezing. It rewinds by up to an in-game hour, so recent changes may be undone, and a message says so.

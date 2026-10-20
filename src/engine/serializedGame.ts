@@ -82,6 +82,9 @@ export interface SerializedGame {
   treasuresFound?: number;
   /** Modern only: the day a booked exterminator's treatment lands (persisted). */
   exterminationDueDay?: number;
+  /** Rooms paid for by a pending Modern exterminator booking. Older saves
+   * without this field retain their tower-wide treatment. */
+  exterminationRoomIds?: number[];
   /** Basement tiles already excavated ("floor:x"), so buried treasure stays a
    * one-time find per tile across save/reload. Optional for older saves. */
   excavated?: string[];

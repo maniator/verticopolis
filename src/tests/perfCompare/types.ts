@@ -132,6 +132,8 @@ export interface ProcessRun {
   rendererEnd?: string | null;
   /** The same read after the throttled cold start, kept apart so it cannot hide a change after the frames; absent for a run without a cold start. */
   rendererEndCold?: string | null;
+  /** One line per WebGL context lost on a canvas in any of the run's pages (contextLoss.ts); absent in results written before this check, empty for none. Any entry fails validation in every mode. */
+  contextLost?: string[];
   cold: StartupSample | null;
   warm: StartupSample | null;
   /** A cold start under the heaviest configured CPU throttle (4x by

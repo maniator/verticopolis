@@ -18,6 +18,7 @@ import { modeOrder, runMode, type ModeRun, type WorkerConfig } from "./runner";
 import { markdown, readModelMarkdown } from "./report";
 import { measureReadModel, type ReadModelShape } from "./readModel";
 import { buildProduction, buildTooling } from "./build";
+import { AA_SLOTS, aaLimitation, checkAaFolder, parseAa, type AaMode } from "./aa";
 
 /**
  * `npm run perf:worker`: the engine-host comparison (TypeScript, the shipped
@@ -42,10 +43,12 @@ export interface Args {
   /** `--read-model`: only the read model's shape (readModel.ts), in Node,
    *  with no build and no browser. */
   readModelOnly: boolean;
+  /** `--aa ts|wasm`: an A/A pass, the same mode in both slots (aa.ts). */
+  aa: AaMode | null;
 }
 
 export function parseArgs(argv: readonly string[]): Args {
-  const a: Args = { reps: 10, quick: false, skipBuild: false, readModelOnly: false, out: null, resume: null, scenarios: null, viewport: { ...DEFAULT_VIEWPORT } };
+  const a: Args = { reps: 10, quick: false, skipBuild: false, readModelOnly: false, aa: null, out: null, resume: null, scenarios: null, viewport: { ...DEFAULT_VIEWPORT } };
   let repsSet = false;
   let viewportSet = false;
   for (let i = 0; i < argv.length; i++) {
@@ -57,6 +60,7 @@ export function parseArgs(argv: readonly string[]): Args {
     };
     if (arg === "--quick") a.quick = true;
     else if (arg === "--read-model") a.readModelOnly = true;
+    else if (arg === "--aa") a.aa = parseAa(next());
     else if (arg === "--skip-build") a.skipBuild = true;
     else if (arg === "--reps") {
       a.reps = Number(next());
@@ -76,10 +80,11 @@ export function parseArgs(argv: readonly string[]): Args {
       a.viewport = { width, height };
       viewportSet = true;
     }
-    else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --viewport WxH, --read-model`);
+    else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --viewport WxH, --aa ts|wasm, --read-model`);
   }
   if (a.quick && !repsSet) a.reps = 2;
   if (a.resume && a.out) throw new Error("--resume continues its own folder; it takes no --out");
+  if (a.readModelOnly && a.aa) throw new Error("--read-model measures one engine in Node; it takes no --aa");
   if (a.readModelOnly && (a.resume || a.skipBuild || repsSet || viewportSet)) throw new Error("--read-model runs no build and no browser; it takes no --resume, --skip-build, --reps or --viewport");
   return a;
 }
@@ -107,8 +112,9 @@ export function makeConfig(args: Args, scenarios: string[]): WorkerConfig {
     speed: 3,
     viewport: { ...args.viewport },
     scenarios,
-    modes: [...MODES],
+    modes: args.aa ? [...AA_SLOTS] : [...MODES],
     quick: args.quick,
+    aa: args.aa,
   };
 }
 
@@ -118,6 +124,7 @@ export function limitations(config: WorkerConfig, renderers: readonly string[] =
   const firsts = Array.from({ length: k }, (_, i) => Math.floor(config.reps / k) + (i < config.reps % k ? 1 : 0));
   const firstText = firsts.every((n) => n === firsts[0]) ? `each mode first ${firsts[0]} time(s)` : `modes first between ${Math.min(...firsts)} and ${Math.max(...firsts)} times`;
   return [
+  ...(config.aa ? [aaLimitation(config.aa)] : []),
   "One machine and one headless browser (its name and version are in the Browser row). The renderer line says whether the page used the GPU; a software rasterizer fails validation in a protocol run, because render cost then dominates every frame and the FPS rows say more about the CPU than about GPU-backed frame rates.",
   "CPU throttling is DevTools emulation of the page's main thread. Chromium refuses it on worker targets and a page-level throttle leaves a dedicated worker nearly unthrottled (probed on Chromium 141: a busy loop took 41 ms at 1x and 44 to 58 ms with the page at 4x, 7 to 41% slower against about 4x on the main thread). So at a throttle above 1x the worker host's main thread ran throttled and its engine thread did not; its rows are marked † and carry an `unthrottled` column in the CSVs. A comparison of the worker host with a main-thread host at that throttle favors the worker. Two runs of the same mode are comparable with each other.",
   `Hosted rows run ${config.steps} steps of ${config.dt} minutes in batches of ${config.batch} (the frame loop's cap is 4) with no rendering. Wall time includes the worker host's wait for each reply; main-thread time counts the steps, the flushes and the time applying replies, and leaves the worker's own time out (reported apart). The browser's unpacking of each reply (the structured clone of its strings, the full save's included) runs on the main thread before the host sees the reply and is not in the hosted main-thread rows; the frames rows (frame times, long tasks) include it.`,
@@ -194,18 +201,22 @@ export interface WorkerResults {
   limitations: string[];
 }
 
-export function metricsCsv(metrics: readonly Metric[]): string {
-  const rows = ["group,scenario,throttle,metric,unit,mode,n,median,ci_low,ci_high,mean,cv,unthrottled,values"];
+/** An A/A folder's CSVs carry one more column, `aa`, naming the mode both slots ran, so a row cannot be read as a comparison. */
+const withAa = (cells: (string | number)[], aa: AaMode | null | undefined): (string | number)[] => (aa ? [...cells, aa] : cells);
+
+export function metricsCsv(metrics: readonly Metric[], aa?: AaMode | null): string {
+  const rows = [`group,scenario,throttle,metric,unit,mode,n,median,ci_low,ci_high,mean,cv,unthrottled,values${aa ? ",aa" : ""}`];
   for (const m of metrics) {
     const s = m.summary;
-    rows.push([m.group, m.scenario, m.throttle, m.metric, m.unit, m.mode, s?.n ?? 0, s?.median ?? "", s?.medianCiLow ?? "", s?.medianCiHigh ?? "", s?.mean ?? "", s?.cv ?? "", m.unthrottled ?? "", m.values.join(" ")].map(csvField).join(","));
+    rows.push(withAa([m.group, m.scenario, m.throttle, m.metric, m.unit, m.mode, s?.n ?? 0, s?.median ?? "", s?.medianCiLow ?? "", s?.medianCiHigh ?? "", s?.mean ?? "", s?.cv ?? "", m.unthrottled ?? "", m.values.join(" ")], aa).map(csvField).join(","));
   }
   return rows.join("\n") + "\n";
 }
 
-export function ratiosCsv(rs: readonly Ratio[]): string {
-  const rows = ["group,scenario,throttle,metric,mode,against,ratio,ci_low,ci_high,pairs,zero_reference,verdict,unthrottled"];
-  for (const r of rs) rows.push([r.group, r.scenario, r.throttle, r.metric, r.mode, r.against, r.ratio, r.ciLow ?? "", r.ciHigh ?? "", r.n, r.zeroReference, r.verdict, r.unthrottled ?? ""].map(csvField).join(","));
+/** In an A/A folder the `verdict` column is "A/A": there is no verdict, only the interval. */
+export function ratiosCsv(rs: readonly Ratio[], aa?: AaMode | null): string {
+  const rows = [`group,scenario,throttle,metric,mode,against,ratio,ci_low,ci_high,pairs,zero_reference,verdict,unthrottled${aa ? ",aa" : ""}`];
+  for (const r of rs) rows.push(withAa([r.group, r.scenario, r.throttle, r.metric, r.mode, r.against, r.ratio, r.ciLow ?? "", r.ciHigh ?? "", r.n, r.zeroReference, aa ? "A/A" : r.verdict, r.unthrottled ?? ""], aa).map(csvField).join(","));
   return rows.join("\n") + "\n";
 }
 
@@ -256,8 +267,11 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     log(`perf:worker: resuming ${out} with ${runs.length} finished run(s)${cp.retried ? `; ${cp.retried} failed run(s) will run again` : ""}`);
   } else {
     const day = started.slice(0, 10);
-    if (args.out) checkExceptionFolder(basename(resolve(repo, args.out)), launch.rendererException);
-    out = args.out ? resolve(repo, args.out) : resolve(repo, "docs/performance/results", `${day}-${environment.commitShort}-worker${args.quick ? "-quick" : ""}${launch.rendererException ? `-${exceptionMarker(launch.rendererException)}` : ""}${environment.dirty ? "-dirty" : ""}`);
+    if (args.out) {
+      checkExceptionFolder(basename(resolve(repo, args.out)), launch.rendererException);
+      checkAaFolder(basename(resolve(repo, args.out)), args.aa);
+    }
+    out = args.out ? resolve(repo, args.out) : resolve(repo, "docs/performance/results", `${day}-${environment.commitShort}-worker${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${launch.rendererException ? `-${exceptionMarker(launch.rendererException)}` : ""}${environment.dirty ? "-dirty" : ""}`);
     if (existsSync(out)) throw new Error(`${out} already exists; results are never overwritten`);
     mkdirSync(out, { recursive: true });
     writeFileSync(join(out, "checkpoint.json"), JSON.stringify({ ...meta, startedAt }, null, 1) + "\n");
@@ -270,7 +284,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     log(`perf:worker: read model shape, ${s.name}`);
     return measureReadModel(s, { steps: config.steps, dt: config.dt, batch: config.batch });
   });
-  log(`perf:worker: measuring ${environment.commit}${environment.dirty ? " (dirty)" : ""}, ${config.reps} reps of ${config.modes.join(", ")}`);
+  log(`perf:worker: measuring ${environment.commit}${environment.dirty ? " (dirty)" : ""}, ${config.reps} reps of ${config.aa ? `${config.aa} in both slots (A/A)` : config.modes.join(", ")}`);
   const server = await startServer(distPerf);
   try {
     for (let rep = 0; rep < config.reps; rep++) {
@@ -310,8 +324,8 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     limitations: limitations(config, [...new Set(runs.filter((r) => r.ok).flatMap((r) => [r.page?.webgl?.renderer, r.rendererEnd, r.rendererEndCold]).filter((x): x is string => !!x))], launch.rendererException),
   };
   writeFileSync(join(out, "results.json"), JSON.stringify(results, null, 1) + "\n");
-  writeFileSync(join(out, "metrics.csv"), metricsCsv(results.metrics));
-  writeFileSync(join(out, "ratios.csv"), ratiosCsv(results.ratios));
+  writeFileSync(join(out, "metrics.csv"), metricsCsv(results.metrics, config.aa));
+  writeFileSync(join(out, "ratios.csv"), ratiosCsv(results.ratios, config.aa));
   writeFileSync(join(out, "report.md"), markdown(results));
   rmSync(join(out, "runs.jsonl"), { force: true });
   rmSync(join(out, "checkpoint.json"), { force: true });

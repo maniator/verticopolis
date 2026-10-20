@@ -128,6 +128,9 @@ pub struct Simulation {
     pub last_vip_nag_day: i64,
     pub treasures_found: f64,
     pub extermination_due_day: Option<f64>,
+    /// The infested room ids a booking billed, saved while it is due. `None`
+    /// on a legacy save, which treats every infested room.
+    pub extermination_room_ids: Option<Vec<i64>>,
     /// `"floor:x"` keys in insertion order.
     pub excavated: Vec<String>,
     /// The cinemas booked for a blockbuster this month, by id, as the save
@@ -156,7 +159,6 @@ pub struct Simulation {
     pub suite_parking_nudged: bool,
     pub stranded_nudged: bool,
     pub metro_platform_nudged: bool,
-    pub extermination_room_ids: Option<Vec<i64>>,
     /// `floorReachable` memo keyed by tower revision.
     pub reach_memo: (i64, HashMap<i64, bool>),
     /// `noiseMemo`: unit id to `noiseAfflicted`, keyed by tower revision.
@@ -376,6 +378,9 @@ impl Simulation {
         m.insert("treasuresFound".into(), json!(self.treasures_found));
         if let Some(d) = self.extermination_due_day {
             m.insert("exterminationDueDay".into(), json!(d));
+            if let Some(ids) = &self.extermination_room_ids {
+                m.insert("exterminationRoomIds".into(), json!(ids));
+            }
         }
         m.insert("events".into(), self.events.save_state());
         m.insert("excavated".into(), json!(self.excavated));
