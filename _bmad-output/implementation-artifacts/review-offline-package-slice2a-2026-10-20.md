@@ -117,3 +117,21 @@ run build` (wasm-only) green. E2E: `engineIntegrity`, `bootLoading`,
 `offlineUpdate` and `wasmOnly` on the wasm-only lane (21 tests), and the first
 three on `chromium-wasm` against the switchable build (10 tests). One tamper
 spec failed once on `chromium-wasm` and passed on five reruns; watch it in CI.
+
+## Independent review round (2026-10-20, after the merge with #1177)
+
+Interim notes at 1b9b8c7 and a CONDITIONAL GO at f435818. Applied at the merge:
+`workerPackageCheck.test.ts` (the engine worker and the dual run's worker with
+the development skip off), `engineGlueImport.guard.test.ts`, the page's
+`controlled` value on a worker refusal, cleaning of a worker's build account,
+the `engineIdentity` e2e rewritten for the gate, and notes L3, L7 and L8.
+
+Condition M1 (the worker route's refusal detail on `__vcEngineBoot`) is
+`bootstrapWorkerRefusal.test.ts`; restoring main's form of the rewritten line
+in `bootstrap.ts` fails it. The non-blocking survivors are covered too:
+`engineWorkerBinding.test.ts` (a binding that does not fit, and one with no
+catalog, are `package-mismatch`; the build reported before a refusal rides on
+it), the build message and `ready` cleaning in `workerController.test.ts`, the
+unit-test twin named as the development route, and `compileEngineBinary` in
+the import guard. Deferred on the #985 row: L1, L2 (the check's `expected` on
+a refusal), L5, L6, HP-11.
