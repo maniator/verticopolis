@@ -2,6 +2,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { WasmHostApp } from "./startWasmHost";
 import { attachWorkerHost, type WorkerHost } from "./workerHost";
 import type { FromWorker, ToWorker } from "./workerProtocol";
+import { EngineBootError } from "./engineBoot";
 
 /**
  * The app side of the experimental worker host (`?engine=wasm-worker`): own
@@ -63,14 +64,16 @@ export function spawnEngineWorker(make: () => EngineWorkerLike, url: string, tim
     return Promise.reject(e instanceof Error ? e : new Error(String(e)));
   }
   return new Promise<SpawnedWorker>((resolve, reject) => {
-    const fail = (message: string) => {
+    // The ready timeout carries its code (`boot-timeout`), as the main-thread
+    // load's limit does; every other start failure is an untyped error.
+    const fail = (message: string, timedOut = false) => {
       clearTimeout(timer);
       worker.onmessage = null;
       worker.onerror = null;
       worker.terminate();
-      reject(new Error(message));
+      reject(timedOut ? new EngineBootError("boot-timeout", message) : new Error(message));
     };
-    const timer = setTimeout(() => fail(`the engine worker did not answer within ${timeoutMs} ms`), timeoutMs);
+    const timer = setTimeout(() => fail(`the engine worker did not answer within ${timeoutMs} ms`, true), timeoutMs);
     worker.onmessage = (e) => {
       const msg = e.data;
       if (msg.type === "ready") {

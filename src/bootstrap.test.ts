@@ -190,7 +190,7 @@ describe("showEngineFailure", () => {
   });
 
   it("stops the game with the stage, the reason, the steps to try and a Reload button", () => {
-    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "load", message: "CompileError: <b>bad</b>" } }, false);
+    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "load", reason: "boot-error", message: "CompileError: <b>bad</b>" } }, false);
     const box = document.getElementById("engine-failure")!;
     expect(box.dataset.stage).toBe("load");
     expect(box.textContent).toContain("could not start");
@@ -212,7 +212,7 @@ describe("showEngineFailure", () => {
     document.body.innerHTML = `<div id="stage"><button id="quick-save">Quick Save</button></div><div id="splash"></div>`;
     const button = document.getElementById("quick-save") as HTMLButtonElement;
     button.focus();
-    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "host", message: "x" } });
+    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "attach-refused", message: "x" } });
     expect((document.getElementById("stage") as HTMLElement).inert).toBe(true);
     expect((document.getElementById("splash") as HTMLElement).inert).toBe(true);
     expect((document.getElementById("boot-fallback-host") as HTMLElement).inert).toBeFalsy();
@@ -230,7 +230,7 @@ describe("showEngineFailure", () => {
     document.body.innerHTML = `<div id="stage"></div><dialog id="modal"></dialog>`;
     const dialog = document.getElementById("modal") as HTMLDialogElement;
     dialog.showModal();
-    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "host", message: "x" } });
+    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "attach-refused", message: "x" } });
     expect(dialog.open).toBe(false);
   });
 
