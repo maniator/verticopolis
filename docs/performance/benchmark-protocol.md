@@ -200,31 +200,54 @@ noise the tolerance has to cover.
 
 `perf:compare --aa ts|wasm` runs one engine in both slots. `results.json`
 records it in `config.aa`, and each run records the slot (`engine`) and the
-engine that ran (`ranEngine`). The slot labels stay `ts` and `wasm`, and every
-ratio is slot `wasm` over slot `ts`, so an A/A folder reads with the same
-tools as a real one. Validation judges each run by the engine that ran and
-refuses a folder whose runs do not match `config.aa`; a resume refuses a
-checkpoint from a different mode.
+engine it was asked to run (`ranEngine`, which is `config.aa ?? engine`). The
+engine the page reported running is checked against `ranEngine` during the run
+(`engineActive`), so a page that fell back to the other engine fails
+validation. The slot labels stay `ts` and `wasm`, and every ratio is slot
+`wasm` over slot `ts`. Validation judges each run by `ranEngine` and refuses a
+folder whose runs do not match `config.aa`; a resume refuses a checkpoint from
+a different mode.
 
-Four things keep an A/A folder from passing for a comparison. The report opens
-with a banner. The three CSVs end in an `aa` column. A difference outside the
-5% band reads "outside band" where a real run says which engine is faster. The
-folder name must contain `aa-<engine>`: it gains `-aa-<engine>` without
-`--out`, and `--out` is refused without it. Rows only one engine produces (the
-wasm-load, WASM-memory and attribution rows) are left out, and the
-cross-engine limitations in the report do not apply to its ratios. An `--aa ts`
-pass still needs the WASM package and the Node check of both engines to pass,
-because the harness validates the whole setup.
+Four things keep an A/A folder from passing for a comparison:
 
-Not yet: the calibration summary that applies the steps above to a set of A/A
-folders; until it lands, the folders are read by hand.
+- The report opens with a banner, says "A/A calibration results" in its title,
+  names the columns by slot, and has no Verdict column. The comparisons CSV
+  reads `A/A` where a real run gives a verdict word, so no A/A ratio is
+  called equivalent or faster. The interval bounds are the result.
+- The three CSVs end in an `aa` column.
+- The folder's own name (the last path segment) must contain `aa-<engine>`. It
+  gains `-aa-<engine>` without `--out`, `--out` is refused without it, and a
+  run without `--aa` refuses an `aa-ts` or `aa-wasm` name.
+- The cross-engine limitations in the report are replaced by a note saying
+  they do not apply.
+
+Which rows an A/A folder keeps: a metric both engines produce is kept for both
+slots. A metric only one engine produces is kept for both slots when that
+engine is the A/A engine (`--aa wasm` keeps the WASM linear memory, the
+engine-hosted and fetch/compile startup rows and the attribution shares) and
+left out when it is the other one. The cold WASM load steps are left out of
+both modes. An `--aa ts` pass still runs that probe, on the verdict run's
+schedule, so the page lifecycle matches. Boot order differs between engines,
+not between two slots of one engine, so DOMContentLoaded and the load event
+are compared in an A/A folder. An `--aa ts` pass still needs the WASM package
+and the Node check of both engines to pass, because the harness validates the
+whole setup.
+
+Two limits are open, so the calibration is not complete:
+
+- **δ and ε are adopted only from the calibration summary** that applies steps
+  1 to 4 to a set of A/A folders (follow-up #1110). RUN-0b may collect the
+  folders. Nobody reads values off them by hand.
+- **M4's ε has no A/A source yet.** `perf:compare` measures no long tasks and
+  `perf:worker` has no `--aa` (follow-up #1111), so the long-task ε stays
+  uncalibrated until that lands.
 
 ## 7. Scheduled runs
 
 | Run | Commit | Purpose |
 | --- | --- | --- |
 | RUN-0a | `e25ec01` | Does the desktop reproduce 702 ms (TS) and 830 ms (WASM) on the large tower's 720 bare steps at 1x, inside the committed intervals? |
-| RUN-0b | `main` once PRs #1097, #1098 and the cost-split harness PR are merged | The baseline later runs compare with: the shipping host's cost split and each hour's churn, and the A/A passes of section 6.1 |
+| RUN-0b | `main` once PRs #1097, #1098 and the cost-split harness PR are merged, and A5's design rule is committed | The baseline later runs compare with: the shipping host's cost split and each hour's churn, and the A/A passes of section 6.1 (folders only; the values come from the calibration summary, #1110) |
 | RUN-1 | after S6 | The shipping host after S6; the input to cohort stage 3 (M2 to M6 at 1x and 4x) |
 | RUN-2 | after #1051 (and #859), and the cold-start fix if needed | Bare tick parity and cold start |
 | RUN-3 | the candidate commit | The gate verdict with one A/A pass per engine beside it |

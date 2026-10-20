@@ -479,7 +479,7 @@ PW_CHROMIUM_PATH=/path/to/chromium npm run perf:compare
 
 A full run takes about 2.5 hours on this machine and writes a new folder
 under `docs/performance/results/<date>-<commit>/`. It never overwrites an existing
-folder, and it marks quick, `--skip-build` and dirty runs in the folder name.
+folder, and it marks quick, A/A (`-aa-<engine>`), `--skip-build` and dirty runs in the folder name.
 `--quick` gives a 2-repetition smoke run. A stopped run continues with
 `--resume <folder>` on the same commit and machine.
 
