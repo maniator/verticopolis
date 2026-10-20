@@ -69,8 +69,18 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # engine conformance (holidays-classic runs 720 in-game hours of a large
+      # tower, 15 s of CPU alone) is excluded here and runs in the next step.
+      # Under v8 coverage with the other test files running beside it, it took
+      # 61 s against its 60 s limit and failed unrelated PRs. The scenario and
+      # its assertions are unchanged; src/tests/conformanceCi.guard.test.ts
+      # keeps the two steps paired.
       - name: Run tests
-        run: npm run test:coverage -- --run
+        run: npm run test:coverage -- --run --exclude '**/conformance.integration.test.ts'
+
+      - name: Engine conformance (no coverage)
+        if: ${{ !cancelled() }}
+        run: npm exec --no -- vitest run --project integration conformance.integration
 
       # This job only proves the bundle builds, with no engine package (the e2e
       # job below builds with one), so it opts out of the engine requirement
