@@ -124,6 +124,28 @@ own line: the PR, the files, and why the fallback needs them):
   assertions), strict-stop case and trap-coding case (without its adopt
   assertion).
 
+- **#1092 (#902, a pending exterminator booking survives saves and
+  attach).** The Rust writer and loader of `exterminationRoomIds`
+  (`engine-rs/src/sim.rs`, `load.rs`, `extermination_tests.rs`), its
+  conformance cases and the `hotel-exterminator-reload-modern` scenario are
+  Rust-authoritative and stay. Its TypeScript side goes:
+  - the TypeScript writer and loader of the field
+    (`src/engine/sim/serialization.ts`, `coerceExterminationRoomIds` in
+    `src/engine/sim/coerce.ts`, the field in `src/engine/serializedGame.ts`)
+    and the TypeScript treatment's use of it (`src/engine/sim/services.ts`,
+    `src/engine/Simulation.ts`), with `exterminationPersistence.test.ts`;
+  - the read model's copy of the billed rooms in `mergeSimulation`
+    (`src/wasmhost/merge.ts`), which goes when the read model stops being a
+    TypeScript `Simulation`;
+  - the parity setup's re-host mid-booking (`src/tests/parity/wasmHostSetup.ts`
+    and its test);
+  - in `wasmHostExtermination.integration.test.ts`, the cases that run the
+    TypeScript loop after a host lets go ("keeps the treatment to the billed
+    rooms when the host lets go mid-booking" and its worker-host twin) and
+    S4's booking case ("after a trap in a tick" and "in a command", which
+    the fallback needs). The attach cases stay, without their TypeScript
+    steps after the detach.
+
 ## Sequence it sits in
 
 See the roadmap's "Order and gates" section:

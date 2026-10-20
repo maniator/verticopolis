@@ -45,7 +45,7 @@ context:
 - `src/tests/parity/wasmHostSetup.ts` and `src/tests/parity/wasmHostSetup.integration.test.ts`: the parity setup no longer refuses a re-host while a booking is pending, and its test re-hosts mid-booking and ticks through the treatment.
 - `vite.config.ts` (`typescriptSide`) and `.github/workflows/engine-rs.yml` (paths and the named case list): the new host test runs on the TypeScript side and in the engine workflow.
 - `src/engine/sim/exterminationPersistence.test.ts` and `engine-rs/src/extermination_tests.rs`: the same cases in both engines (reload, legacy, non-array list, orphan and Classic lists, the cap and its boundaries, a demolished billed room).
-- `src/tests/integration/wasmHostExtermination.integration.test.ts`: actual WASM attach and mid-booking detach regressions (kept out of the parity projects, since it starts its own host).
+- `src/tests/integration/wasmHostExtermination.integration.test.ts`: actual WASM attach and mid-booking detach regressions; S4's booking case, an engine trap in a tick or a command mid-booking that falls back through `startWasmHost` and keeps the treatment; and the worker host's attach mid-booking, through the treatment and with a detach mid-booking (kept out of the parity projects, since it starts its own hosts).
 - `src/tests/integration/loaderCases.integration.test.ts`, `conformance/scenarios/hotel-exterminator-reload-modern.json`, `conformance/`: cross-engine lock evidence.
 - `_bmad-output/planning-artifacts/release-3.0-exception-register.md`: EX-1, the rollback loss.
 
@@ -57,7 +57,7 @@ context:
 - [x] Add unit regressions for booking, clearing, relapsing and malformed/legacy loads.
 - [x] Add Rust and actual WASM attach regressions and conformance input cases.
 - [x] Run applicable gates and mandatory `gds-code-review`, recording triage.
-- [ ] After #874 (A3) merges: rebase onto it and add S4's booking case (an engine trap mid-booking falls back and keeps the treatment) and a worker-host attach mid-booking.
+- [x] After #874 (A3) merged: merge it in (a merge commit) and add S4's booking case (an engine trap mid-booking falls back and keeps the treatment) and a worker-host attach mid-booking.
 
 **Acceptance Criteria:**
 - Given A was billed and B was not, when saved, reloaded or attached mid-booking, then the treatment clears only A.
@@ -77,6 +77,19 @@ context:
   original's lock moves only where a booking is pending, since the state now
   carries the billed ids. The rollback loss is EX-1 in the release exception
   register.
+- 2026-10-20, after #874 (A3, PR #1101) merged: `main` merged in (a merge
+  commit, 2.41.0 kept above #1101's 2.40.0). `wasmHostExtermination` adds
+  S4's booking case through the real fallback (`startWasmHost` with the app's
+  undo history): an engine trap in a tick, whose newest restore point is the
+  last merge's save, and in a command, whose point is the undo capture's
+  save. Both restore from an engine-written save taken after the attach,
+  keep the booked list, and the TypeScript loop then treats only the billed
+  room. The worker host's cases attach mid-booking and run through the
+  treatment on the engine, and let go mid-booking after an hourly pass, with
+  the TypeScript loop treating only the billed room. All six cases in the
+  file fail with the TypeScript loader dropping the list, with the merge
+  deleting it, and with the Rust writer leaving it out (each checked by
+  hand).
 
 ## Design Notes
 
@@ -123,9 +136,9 @@ Blind Hunter, Edge Case Hunter and Acceptance Auditor. Fixed:
 9. The Rust test grew `services.rs`, already over the ceiling; the booking
    tests now live in `engine-rs/src/extermination_tests.rs`.
 
-With the A3 rebase (the last task above): S4's trap-mid-booking case and a
-worker-host attach mid-booking. The worker host adopts the engine's state
-through the same `mergeSimulation`, so the risk until then is low.
+With A3 merged in (the last task above): S4's trap-mid-booking case and a
+worker-host attach mid-booking, now in `wasmHostExtermination` (see the
+change log).
 
 Dismissed: the TypeScript treatment lookup being linear (it already uses a
 `Set`); a save stripped of the list getting the legacy treatment (a

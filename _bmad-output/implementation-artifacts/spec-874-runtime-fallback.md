@@ -319,8 +319,9 @@ retirement):
   before its swap, is handled by the recovery now (the tower still
   restores).
 - **An exterminator booking pending at the trap** keeps its billed rooms
-  after the fallback: that test lands with #1092, which rebases onto this,
-  and #874 stays open until it does.
+  after the fallback: #1092 merges this in and pins it in
+  `wasmHostExtermination.integration.test.ts` (a trap in a tick and in a
+  command); #874 stays open until it lands.
 - **A rollout, the default flip, a gate exception:** owner decisions (#945).
 
 ## Code map
