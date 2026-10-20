@@ -30,6 +30,7 @@ pub mod housekeeping;
 pub mod jsmath;
 pub mod ledger;
 pub mod load;
+mod noise;
 pub mod presence;
 pub mod rent;
 pub mod rng;

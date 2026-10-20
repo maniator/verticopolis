@@ -5,7 +5,7 @@ use crate::clock::GameMode;
 use crate::crowd::spawn::{pick_x, pick_x_in_segment};
 use crate::facilities::Kind;
 use crate::sim::Simulation;
-use crate::tower::Tower;
+use crate::tower::{Tower, UnitState};
 
 /// `pickX`'s tile list as the walk over every unit builds it.
 fn walked_tiles(tower: &Tower, floor: i64) -> Vec<i64> {
@@ -69,7 +69,9 @@ fn assert_matches_walks(tower: &Tower) {
         .collect();
     assert_eq!(rooms, walked);
     for floor in -2..=7 {
-        let tiles = tower.structural_tiles(floor).to_vec();
+        let tiles = tower
+            .structural_tiles(floor)
+            .map_or_else(Vec::new, |t| t.to_vec());
         assert_eq!(tiles, walked_tiles(tower, floor), "floor {floor}");
         for seed in SEEDS {
             assert_eq!(
@@ -123,11 +125,17 @@ fn the_indexes_follow_every_layout_edit() {
     assert!(tower.remove_unit(gap).is_some());
     assert_matches_walks(&tower);
     must(tower.place(Kind::Floor, 4, 120));
-    assert_eq!(tower.structural_tiles(4).last(), Some(&120));
+    assert_eq!(tower.structural_tiles(4).unwrap().last(), Some(&120));
     assert_matches_walks(&tower);
     // Removing a room, or the first unit, shifts every later position.
     assert!(tower.remove_unit(office).is_some());
     assert_matches_walks(&tower);
+    // A swap leaves the unit count as it was: only the revision tells.
+    let tile = tower.unit_at(2, 135).map(|u| u.id).unwrap();
+    assert!(tower.remove_unit(tile).is_some());
+    let office = must(tower.place(Kind::Office, 2, 100));
+    assert_matches_walks(&tower);
+    assert!(tower.remove_unit(office).is_some());
     assert!(tower.remove_unit(food).is_some());
     let first = tower.units[0].id;
     assert!(tower.remove_unit(first).is_some());
@@ -146,39 +154,87 @@ fn a_reload_rebuilds_the_indexes() {
     tower.units = units;
     tower.reindex();
     assert_matches_walks(&tower);
+    // The real save round trip answers like a fresh walk of what it loaded.
+    let mut sim = Simulation::new_game(7, GameMode::Classic);
+    sim.tower = tower;
+    assert_matches_walks(&sim.tower);
+    let loaded = crate::load::deserialize(&sim.serialize()).expect("the save loads");
+    assert_eq!(loaded.tower.units.len(), sim.tower.units.len());
+    assert_matches_walks(&loaded.tower);
+}
+
+#[test]
+fn a_list_changed_behind_the_revision_rebuilds_rather_than_overruns() {
+    // `units` is public: a list cut without a bump or a reindex must not
+    // index past its end. The unit count in the key catches it, as it does
+    // for `roomUnits` in TypeScript.
+    let mut tower = stacked();
+    must(tower.place(Kind::Office, 2, 104));
+    assert_matches_walks(&tower);
+    let revision = tower.revision;
+    tower.units.truncate(tower.units.len() - 1);
+    assert_eq!(tower.revision, revision);
+    assert_matches_walks(&tower);
+}
+
+/// Every unit's memoized noise answer equals a fresh scan.
+fn assert_noise_parity(sim: &mut Simulation) {
+    for i in 0..sim.tower.units.len() {
+        let u = sim.tower.units[i].clone();
+        let fresh = sim.noise_afflicted_fresh(&u);
+        assert_eq!(sim.noise_afflicted(&u), fresh, "unit {}", u.id);
+    }
+}
+
+fn afflicted(sim: &mut Simulation, id: i64) -> bool {
+    let u = sim.tower.get_unit(id).unwrap().clone();
+    sim.noise_afflicted(&u)
 }
 
 #[test]
 fn the_noise_memo_matches_the_fresh_scan_after_every_edit() {
     let mut sim = Simulation::new_game(7, GameMode::Classic);
     sim.tower = stacked();
-    let parity = |sim: &mut Simulation| {
-        for i in 0..sim.tower.units.len() {
-            let u = sim.tower.units[i].clone();
-            let fresh = sim.noise_afflicted_fresh(&u);
-            assert_eq!(sim.noise_afflicted(&u), fresh, "unit {}", u.id);
-        }
-    };
     let office = must(sim.tower.place(Kind::Office, 3, 100));
     let width = Kind::Office.facility().width;
-    parity(&mut sim);
-    let afflicted = |sim: &mut Simulation, id: i64| {
-        let u = sim.tower.get_unit(id).unwrap().clone();
-        sim.noise_afflicted(&u)
-    };
+    assert_noise_parity(&mut sim);
     assert!(!afflicted(&mut sim, office));
     // A shared wall with a commercial room is the harshest case.
     let food = must(sim.tower.place(Kind::FastFood, 3, 100 + width));
-    parity(&mut sim);
+    assert_noise_parity(&mut sim);
     assert!(afflicted(&mut sim, office));
     // Demolition heals it with no manual invalidation: the removal moves
     // the revision and the next query refills from the scan.
     assert!(sim.tower.remove_unit(food).is_some());
-    parity(&mut sim);
+    assert_noise_parity(&mut sim);
     assert!(!afflicted(&mut sim, office));
-    // State is not an input: an empty or gutted source still radiates.
+    // The other branch: a condo hears an office as well as a shop.
+    let condo = must(sim.tower.place(Kind::Condo, 2, 100));
+    assert_noise_parity(&mut sim);
+    assert!(!afflicted(&mut sim, condo));
+    let next = 100 + Kind::Condo.facility().width;
+    must(sim.tower.place(Kind::Office, 2, next));
+    assert_noise_parity(&mut sim);
+    assert!(afflicted(&mut sim, condo));
+}
+
+#[test]
+fn unit_state_is_not_an_input_to_the_noise_memo() {
+    // The memo is filled first, then states change without moving the
+    // revision. If the scan read state, the memo would now disagree with it.
+    let mut sim = Simulation::new_game(7, GameMode::Classic);
+    sim.tower = stacked();
+    let office = must(sim.tower.place(Kind::Office, 3, 100));
+    let width = Kind::Office.facility().width;
     let food = must(sim.tower.place(Kind::FastFood, 3, 100 + width));
-    sim.tower.get_unit_mut(food).unwrap().state = crate::tower::UnitState::Gutted;
-    parity(&mut sim);
+    assert_noise_parity(&mut sim);
     assert!(afflicted(&mut sim, office));
+    let revision = sim.tower.revision;
+    for state in [UnitState::Empty, UnitState::Gutted, UnitState::Occupied] {
+        sim.tower.get_unit_mut(food).unwrap().state = state;
+        sim.tower.get_unit_mut(office).unwrap().state = state;
+        assert_eq!(sim.tower.revision, revision);
+        assert_noise_parity(&mut sim);
+        assert!(afflicted(&mut sim, office), "{state:?}");
+    }
 }

@@ -114,11 +114,10 @@ fn abs_seed(seed: i32) -> usize {
 }
 
 pub fn pick_x(tower: &Tower, floor: i64, seed: i32) -> i64 {
-    let tiles = tower.structural_tiles(floor);
-    if tiles.is_empty() {
-        return 2 + (abs_seed(seed) % 40) as i64;
+    match tower.structural_tiles(floor) {
+        Some(tiles) if !tiles.is_empty() => tiles[abs_seed(seed) % tiles.len()],
+        _ => 2 + (abs_seed(seed) % 40) as i64,
     }
-    tiles[abs_seed(seed) % tiles.len()]
 }
 
 pub fn pick_x_in_segment(tower: &Tower, floor: i64, seed: i32, anchor_x: i64) -> i64 {
@@ -136,7 +135,9 @@ pub fn pick_x_in_segment(tower: &Tower, floor: i64, seed: i32, anchor_x: i64) ->
     }
     // The tiles inside [lo, hi] in pickX's order, counted and then indexed
     // in place rather than copied out.
-    let tiles = tower.structural_tiles(floor);
+    let Some(tiles) = tower.structural_tiles(floor) else {
+        return anchor_x;
+    };
     let in_run = |x: &&i64| **x >= lo && **x <= hi;
     let n = tiles.iter().filter(in_run).count();
     if n == 0 {
