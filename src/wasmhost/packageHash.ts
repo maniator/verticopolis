@@ -10,6 +10,18 @@ const INCLUDE = /\binclude_(?:str|bytes)!\(\s*"([^"]+)"\s*\)/g;
 const ANY_INCLUDE = /\binclude(?:_str|_bytes)?\s*!\s*[({[]/g;
 
 /**
+ * A text file hashes the same whatever line endings its checkout has (a Windows
+ * checkout with `core.autocrlf=true` has CRLF in every file, and the repo has
+ * no `.gitattributes`), so two checkouts of one commit agree. A file with a NUL
+ * byte is binary and hashes as it is. A Linux checkout has no CRLF in the
+ * hashed files, so its hash does not move.
+ */
+function lineEndingsAsLF(data: Buffer): Buffer {
+  if (data.includes(0)) return data;
+  return Buffer.from(data.toString("latin1").replace(/\r\n/g, "\n"), "latin1");
+}
+
+/**
  * A hash over everything the served package is built from, by path and
  * content, so `src/public/engine/BUILD.json` can say which engine it holds,
  * CI can key its package cache on it, and a test can tell when the sources
@@ -78,7 +90,7 @@ export function engineSourceHash(crate: string): string {
   for (const [label, p] of labeled) {
     h.update(label);
     h.update("\0");
-    h.update(readFileSync(p));
+    h.update(lineEndingsAsLF(readFileSync(p)));
     h.update("\0");
   }
   return h.digest("hex");
