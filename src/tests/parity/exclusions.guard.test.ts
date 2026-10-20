@@ -2,19 +2,23 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import ts from "typescript";
 import { repoRel, sourceFiles } from "../guardFiles";
 
 /**
  * The WASM parity projects' exclusions, counted (#878, story-engine-test-parity).
  *
  * A test the parity projects cannot run on the engine is marked, never
- * dropped: `itTypeScriptOnly(reason)` skips it by name on those projects, and
+ * dropped: `itTypeScriptOnly(reason)` skips it by name on those projects,
  * `atEngineFrameCadence(reason)` runs it at the host's own cadence instead of a
- * full merge after every tick (the cost exclusion S6, #868, removes). This
- * guard pins how many of each every test file holds, in `exclusions.ratchet.txt`
- * (`<file> itTypeScriptOnly=<n> atEngineFrameCadence=<n>` per line), so an
- * exclusion cannot grow by accident and a removed one has to lower its count.
- * Adding one means adding or raising its line, which a reviewer sees.
+ * full merge after every tick (the cost exclusion S6, #868, removes), and a
+ * direct `onWasmParityProject()` branch skips by hand. This guard parses every
+ * source file under `src/` (comments, strings and aliased imports are handled
+ * by the parser) and pins how many of each a file holds in
+ * `exclusions.ratchet.txt` (`<file> itTypeScriptOnly=<n> atEngineFrameCadence=<n>
+ * onWasmParityProject=<n>` per line), so an exclusion cannot grow by accident
+ * and a removed one has to lower its count. Adding one means adding or raising
+ * its line, which a reviewer sees.
  *
  * The count is of call sites, not tests: `fixedStep` calls
  * `atEngineFrameCadence` once inside a loop that runs six cases, so a case
@@ -24,72 +28,99 @@ import { repoRel, sourceFiles } from "../guardFiles";
  */
 const here = dirname(fileURLToPath(import.meta.url));
 
-type Counts = { itTypeScriptOnly: number; atEngineFrameCadence: number };
+const KEYS = ["itTypeScriptOnly", "atEngineFrameCadence", "onWasmParityProject"] as const;
+type Key = (typeof KEYS)[number];
+type Counts = Record<Key, number>;
+const zero = (): Counts => ({ itTypeScriptOnly: 0, atEngineFrameCadence: 0, onWasmParityProject: 0 });
+
+/** The marker's own module and the setup's spec of it, which call the markers
+ *  to test them. Everything else under `src/` is counted. */
+const OWN_FILES = new Set(["src/tests/parity/typescriptOnly.ts", "src/tests/parity/wasmHostSetup.integration.test.ts"]);
 
 function parseRatchet(): Map<string, Counts> {
   const out = new Map<string, Counts>();
   for (const raw of readFileSync(resolve(here, "exclusions.ratchet.txt"), "utf8").split("\n")) {
     const line = raw.trim();
     if (!line || line.startsWith("#")) continue;
-    const m = /^(\S+) itTypeScriptOnly=(\d+) atEngineFrameCadence=(\d+)$/.exec(line);
+    const m = /^(\S+) itTypeScriptOnly=(\d+) atEngineFrameCadence=(\d+) onWasmParityProject=(\d+)$/.exec(line);
     if (!m) throw new Error(`exclusions.ratchet.txt: cannot read the line "${line}"`);
     if (out.has(m[1])) throw new Error(`exclusions.ratchet.txt: ${m[1]} is listed twice`);
-    out.set(m[1], { itTypeScriptOnly: Number(m[2]), atEngineFrameCadence: Number(m[3]) });
+    out.set(m[1], { itTypeScriptOnly: Number(m[2]), atEngineFrameCadence: Number(m[3]), onWasmParityProject: Number(m[4]) });
   }
   return out;
 }
 
-/** Source with its comments blanked, so a comment that names a marker does
- *  not count as a call. Strings stay: a marker's reason is a string. */
-const withoutComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/[^\n]*/g, "$1");
+/** A reason that says nothing: a string with only whitespace in it. */
+const blank = (arg: ts.Expression) => (ts.isStringLiteralLike(arg) ? arg.text.trim() === "" : false);
 
-/** A reason that says nothing: empty or only whitespace in any quote style. */
-const blankReason = (arg: string) => /^(["'`])\s*\1$/.test(arg.trim());
+/** The marker calls in one file, and the ones with no reason. */
+function scanFile(rel: string, text: string): { counts: Counts; problems: string[] } {
+  const counts = zero();
+  const problems: string[] = [];
+  const source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, true);
+  const visit = (node: ts.Node): void => {
+    // An aliased import hides a call from the name match: refuse it.
+    if (ts.isImportSpecifier(node) && node.propertyName && (KEYS as readonly string[]).includes(node.propertyName.text)) {
+      problems.push(`${rel}: ${node.propertyName.text} is imported under another name`);
+    }
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && (KEYS as readonly string[]).includes(node.expression.text)) {
+      const name = node.expression.text as Key;
+      counts[name]++;
+      // The two markers take a reason; the predicate takes nothing.
+      if (name !== "onWasmParityProject" && (node.arguments.length === 0 || blank(node.arguments[0]))) {
+        problems.push(`${rel}: ${name} called without a reason`);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return { counts, problems };
+}
 
-/** The calls in a source file: a call site is the name followed by `(` and a
- *  non-empty reason, a string literal or a named constant. */
-function scan(): { counts: Map<string, Counts>; bare: string[] } {
+function scan(): { counts: Map<string, Counts>; problems: string[] } {
   const counts = new Map<string, Counts>();
-  const bare: string[] = [];
+  const problems: string[] = [];
   for (const abs of sourceFiles("src", [".ts", ".tsx"])) {
     const rel = repoRel(abs);
-    if (rel.startsWith("src/tests/parity/")) continue; // the markers and their own specs
-    const text = withoutComments(readFileSync(abs, "utf8"));
-    const c: Counts = { itTypeScriptOnly: 0, atEngineFrameCadence: 0 };
-    for (const [name, re] of [
-      ["itTypeScriptOnly", /\bitTypeScriptOnly\(\s*([^)\s][^)]*)\)/g],
-      ["atEngineFrameCadence", /\batEngineFrameCadence\(\s*([^)\s][^)]*)\)/g],
-    ] as const) {
-      const all = text.match(new RegExp(`\\b${name}\\(`, "g"))?.length ?? 0;
-      const withReason = [...text.matchAll(re)].filter((m) => !blankReason(m[1])).length;
-      c[name] = withReason;
-      if (all !== withReason) bare.push(`${rel}: ${name} called without a reason`);
-    }
-    if (c.itTypeScriptOnly > 0 || c.atEngineFrameCadence > 0) counts.set(rel, c);
+    if (OWN_FILES.has(rel)) continue;
+    const found = scanFile(rel, readFileSync(abs, "utf8"));
+    problems.push(...found.problems);
+    if (KEYS.some((k) => found.counts[k] > 0)) counts.set(rel, found.counts);
   }
-  return { counts, bare };
+  return { counts, problems };
 }
 
 describe("the WASM parity exclusions", () => {
-  const { counts, bare } = scan();
+  const { counts, problems } = scan();
   const ratchet = parseRatchet();
 
-  it("every exclusion names its reason", () => {
-    expect(bare).toEqual([]);
+  it("every exclusion names its reason and is imported by its own name", () => {
+    expect(problems).toEqual([]);
   });
 
-  it("scans the test files that hold exclusions", () => {
+  it("scans the files that hold exclusions", () => {
     // A scan that silently found nothing would pass forever.
     expect(counts.size).toBeGreaterThan(5);
+  });
+
+  it("reads comments, strings and aliases the way the compiler does", () => {
+    const sample = [
+      'import { itTypeScriptOnly as tsOnly } from "../parity/typescriptOnly";',
+      '// itTypeScriptOnly("in a comment")',
+      'const s = "atEngineFrameCadence(\\"in a string\\")";',
+      "const t = `/* ${1} */`; atEngineFrameCadence('real');",
+      "itTypeScriptOnly(' ')('blank', () => {});",
+    ].join("\n");
+    const { counts: c, problems: p } = scanFile("sample.test.ts", sample);
+    expect(c).toEqual({ itTypeScriptOnly: 1, atEngineFrameCadence: 1, onWasmParityProject: 0 });
+    expect(p).toEqual(["sample.test.ts: itTypeScriptOnly is imported under another name", "sample.test.ts: itTypeScriptOnly called without a reason"]);
   });
 
   it("no file holds more exclusions than the ratchet allows", () => {
     const grown: string[] = [];
     for (const [file, c] of counts) {
-      const allowed = ratchet.get(file) ?? { itTypeScriptOnly: 0, atEngineFrameCadence: 0 };
-      for (const key of ["itTypeScriptOnly", "atEngineFrameCadence"] as const) {
-        if (c[key] > allowed[key]) grown.push(`${file}: ${key} ${c[key]} > ${allowed[key]}`);
-      }
+      const allowed = ratchet.get(file) ?? zero();
+      for (const key of KEYS) if (c[key] > allowed[key]) grown.push(`${file}: ${key} ${c[key]} > ${allowed[key]}`);
     }
     expect(grown, `Raise exclusions.ratchet.txt only with a reason a reviewer accepts:\n${grown.join("\n")}`).toEqual([]);
   });
@@ -97,10 +128,8 @@ describe("the WASM parity exclusions", () => {
   it("the ratchet has no stale entries", () => {
     const stale: string[] = [];
     for (const [file, allowed] of ratchet) {
-      const c = counts.get(file) ?? { itTypeScriptOnly: 0, atEngineFrameCadence: 0 };
-      for (const key of ["itTypeScriptOnly", "atEngineFrameCadence"] as const) {
-        if (c[key] < allowed[key]) stale.push(`${file}: ${key} is ${c[key]}, the ratchet says ${allowed[key]}`);
-      }
+      const c = counts.get(file) ?? zero();
+      for (const key of KEYS) if (c[key] < allowed[key]) stale.push(`${file}: ${key} is ${c[key]}, the ratchet says ${allowed[key]}`);
     }
     expect(stale, `Lower these in exclusions.ratchet.txt:\n${stale.join("\n")}`).toEqual([]);
   });

@@ -47,7 +47,7 @@ The scope is #1062 and #878. Performance profiling, worker-transfer optimization
 - [x] Sync changed rows on main-thread frames and teardown.
 - [x] Carry changed rows in worker replies and retain stale rows until fresh state applies.
 - [x] Cover replacement, removal, stale replies, detach, event deduplication and save stability.
-- [x] Run applicable TypeScript, Rust, WASM, codec and parity gates (results in the story's 2026-10-20 run).
+- [x] Run applicable TypeScript, Rust, WASM, codec and parity gates (results in the story's 2026-10-20 run; `npm run wasm:build` ran first, and there is no separate codec gate in `package.json`: the codec differential runs inside `test:wasm`).
 - [x] Run the complete `gds-code-review` layered review and triage (2026-10-20: Blind Hunter, Edge Case Hunter and Acceptance Auditor; patches applied, deferrals in backlog rows #1082 to #1084).
 
 Given completed trips since the previous merge, when a confirmed host state returns to TypeScript, then its commute rows match that state and the serialized save remains unchanged by telemetry transfer.

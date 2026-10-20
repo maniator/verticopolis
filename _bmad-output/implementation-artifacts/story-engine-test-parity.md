@@ -252,7 +252,9 @@ name suffixed with `[TypeScript-only: <reason>]`, the reason this table
 repeats.
 
 For a row marked "(left out)" the Fails column counts the file's tests
-(as of slice 3), since none of them runs on the parity projects.
+(as of slice 3), since none of them runs on the parity projects. A row's
+passes are its count minus the marked tests; the project totals are in the
+run records below.
 
 | Test file | Fails | Bucket | Reason |
 | --- | --- | --- | --- |
@@ -295,7 +297,8 @@ For a row marked "(left out)" the Fails column counts the file's tests
 | `wasmHostCatalog` (left out) | 10 | c | starts its own host to read the engine's catalog |
 | `perfCompare/*.integration.test.ts` (left out) | 6 | c | the engine comparison's checks (`page`, `scenarios`) run each engine themselves (#972) |
 | `conformanceWasm.integration.test.ts` (left out) | 26 | c | drives the binding directly through its own engine instances (the raw binding suites that build no host of their own, `chargeBindingRaw` and the like, stay in the project and pass) |
-| `src/dualrun/mirror.test.ts` (left out) | 10 | c | attaches the relay itself |
+| `src/dualrun/mirror.test.ts` (left out) | 12 | c | attaches the relay itself |
+| `hourCost.bench.integration.test.ts` | opt-in | n/a | skipped everywhere unless `RUN_HOUR_BENCH=1`; not a parity exclusion, listed so the 39 skips reconcile (38 marks plus this) |
 | `src/dualrun/dualRun.test.ts` (left out) | 6 | c | attaches the dual run's relay itself |
 | `e2e/regions.spec.ts` (Playwright, `chromium-wasm`) | skipped (1 test) | c | toggles a unit between fire and empty in place; see the e2e slice |
 | `e2e/perf.spec.ts` (Playwright, `chromium-wasm`) | skipped (1 test) | c | the perf baseline is the TypeScript engine's (#900) |
@@ -991,7 +994,7 @@ this slice closes the rest and puts the projects in CI.
   as `commute`, shape-checked with the rest of the reply).
   `wasmHostTelemetry.integration.test.ts` now compares them with the
   TypeScript engine hour by hour on every fixture, and they agree exactly.
-  Nothing in the game reads the averages yet (#502 will), so this changes
+  Nothing in the game reads the averages (they are the read-only #514 substrate; #502 settled as legibility only), so this changes
   no player-visible behavior.
 - **The cost bucket.** A test that reads only what the frame carries every
   tick (the people, the clock, the unit states and counters) or the

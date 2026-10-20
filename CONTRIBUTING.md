@@ -140,8 +140,14 @@ Verticopolis has **two test tiers**:
     engine's frame carries but ticks too often for a full merge after every
     tick calls `atEngineFrameCadence(reason)` and runs at the host's own
     cadence. The story's test-mapping table names each one with the same
-    reason. CI runs both projects on every PR (`test-wasm-parity` in
-    `test.yml`).
+    reason, and `src/tests/parity/exclusions.ratchet.txt` pins how many each
+    file holds. CI runs both projects on every PR (`test-wasm-parity` in
+    `test.yml`). Knobs: `VC_WASM_SYNC=hour` runs every test at the host's own
+    cadence, `VC_PARITY_DUMP=<dir>` writes both views where the instance
+    and the engine depart, `VC_PARITY_TRACE=1` logs each re-host (see the header of
+    `src/tests/parity/wasmHostSetup.ts`). The projects run with a 120 s test
+    timeout, so a test with its own shorter timeout can still time out on a
+    slow machine.
 
   `npm test` (`vitest run`) runs **both** projects and is the CI gate. Coverage
   stays a single root-level measurement across both projects (see Coverage

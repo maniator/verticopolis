@@ -8,17 +8,51 @@ import { repoRoot } from "../guardFiles";
  * `.github/workflows/test.yml` run the same two projects (#878, #945's "Unit
  * and integration" row). The job splits them across a matrix to run side by
  * side; this keeps the script a developer runs and the job CI runs from
- * drifting apart, and keeps both on the real engine (`VC_REQUIRE_WASM=1`).
+ * drifting apart, keeps both on the real engine (`VC_REQUIRE_WASM=1`), and
+ * keeps the job from being skipped or allowed to fail. Whether the job is a
+ * required check is branch protection, not the workflow (backlog row
+ * `wasm-parity-required-check`, #1082).
  */
 const read = (rel: string) => readFileSync(resolve(repoRoot, rel), "utf8");
 
-describe("the WASM parity CI job", () => {
-  const script = (JSON.parse(read("package.json")) as { scripts: Record<string, string> }).scripts["test:wasm:parity"];
-  const workflow = read(".github/workflows/test.yml");
-  // The job's block: from its key to the next two-space key (any name, a trailing comment allowed).
-  const job = /\n {2}test-wasm-parity:[^\n]*\n([\s\S]*?)(?=\n {2}[\w-]+:[^\n]*\n|$)/.exec(workflow)?.[1] ?? "";
+/** The workflow text without comment lines or trailing comments. */
+const withoutComments = (text: string) =>
+  text
+    .split("\n")
+    .filter((l) => !/^\s*#/.test(l))
+    .map((l) => l.replace(/\s+#.*$/, ""))
+    .join("\n");
 
-  it("exists", () => {
+/** The job's lines (after its key, up to the next two-space key) and its steps. */
+function jobBlock(workflow: string): { lines: string[]; steps: string[][] } {
+  const all = withoutComments(workflow).split("\n");
+  const start = all.findIndex((l) => /^ {2}test-wasm-parity:\s*$/.test(l));
+  if (start < 0) return { lines: [], steps: [] };
+  let end = all.length;
+  for (let i = start + 1; i < all.length; i++) {
+    if (/^ {2}[\w-]+:/.test(all[i])) {
+      end = i;
+      break;
+    }
+  }
+  const lines = all.slice(start + 1, end);
+  const steps: string[][] = [];
+  for (const l of lines) {
+    if (/^ {6}- /.test(l)) steps.push([l]);
+    else if (steps.length > 0) steps[steps.length - 1].push(l);
+  }
+  return { lines, steps };
+}
+
+describe("the WASM parity CI job", () => {
+  const scripts = (JSON.parse(read("package.json")) as { scripts: Record<string, string> }).scripts;
+  const script = scripts["test:wasm:parity"] ?? "";
+  const { lines, steps } = jobBlock(read(".github/workflows/test.yml"));
+  const job = lines.join("\n");
+  const vitestStep = steps.find((s) => s.some((l) => /run: npx vitest run /.test(l))) ?? [];
+
+  it("exists, and the script it mirrors exists", () => {
+    expect(script).not.toBe("");
     expect(job).not.toBe("");
   });
 
@@ -31,18 +65,21 @@ describe("the WASM parity CI job", () => {
   });
 
   it("is a plain gate: after the engine build, never skipped, never allowed to fail", () => {
-    expect(job).toMatch(/(^|\n) {4}needs: engine-wasm\n/);
-    expect(job).not.toMatch(/(^|\n) {4}if:/);
+    expect(job).toMatch(/^ {4}needs: (engine-wasm|\[[^\]]*\bengine-wasm\b[^\]]*\])$/m);
+    expect(job).not.toMatch(/\bif:/); // job level or any step
     expect(job).not.toMatch(/continue-on-error/);
   });
 
-  it("runs the matrix project through vitest", () => {
-    expect(job).toMatch(/run: npx vitest run --project \$\{\{ matrix\.project \}\}\n/);
+  it("runs the matrix project through vitest, on the real engine, in that step", () => {
+    expect(vitestStep.join("\n")).toMatch(/run: npx vitest run --project \$\{\{ matrix\.project \}\}$/m);
+    expect(vitestStep.join("\n")).toMatch(/^ {10}VC_REQUIRE_WASM: "1"$/m);
+    expect(script).toContain("VC_REQUIRE_WASM=1");
   });
 
-  it("requires the real engine in both", () => {
-    expect(script).toContain("VC_REQUIRE_WASM=1");
-    expect(job).toMatch(/VC_REQUIRE_WASM: "1"/);
-    expect(job).toMatch(/uses: \.\/\.github\/actions\/engine-wasm/);
+  it("gets the engine package before the tests", () => {
+    const at = (needle: RegExp) => steps.findIndex((s) => needle.test(s.join("\n")));
+    const engine = at(/uses: \.\/\.github\/actions\/engine-wasm\b/);
+    expect(engine).toBeGreaterThanOrEqual(0);
+    expect(engine).toBeLessThan(steps.indexOf(vitestStep));
   });
 });

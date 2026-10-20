@@ -99,7 +99,11 @@ export class WasmParityError extends Error {
 if (!hasWasmPackage()) throw new Error("the WASM parity projects need engine-rs/pkg/; run npm run wasm:build");
 (globalThis as Record<string, unknown>)[WASM_PARITY_FLAG] = true;
 
-const ENV_SYNC_MODE: "tick" | "hour" = process.env.VC_WASM_SYNC === "hour" ? "hour" : "tick";
+const ENV_SYNC_MODE: "tick" | "hour" = (() => {
+  const v = process.env.VC_WASM_SYNC;
+  if (v !== undefined && v !== "" && v !== "tick" && v !== "hour") throw new Error(`VC_WASM_SYNC must be tick or hour, got "${v}"`);
+  return v === "hour" ? "hour" : "tick";
+})();
 /** The cadence in force: the switch's, or the host's own for a test that
  *  asked for it through `atEngineFrameCadence` (reset after each test). */
 const syncMode = (): "tick" | "hour" => (frameCadenceRequested() ? "hour" : ENV_SYNC_MODE);
