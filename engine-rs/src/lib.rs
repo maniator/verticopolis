@@ -31,6 +31,7 @@ pub mod identity;
 pub mod jsmath;
 pub mod ledger;
 pub mod load;
+mod noise;
 pub mod presence;
 pub mod rent;
 pub mod rng;
@@ -55,6 +56,7 @@ pub mod tdt;
 pub use tdt::{export_tdt, import_tdt};
 pub mod telemetry;
 pub mod tower;
+mod tower_index;
 pub mod tower_query;
 #[cfg(feature = "wasm")]
 pub mod wasm;
