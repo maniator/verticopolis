@@ -302,3 +302,20 @@ detail a step's spec would otherwise have to settle.
 | R4-14 | The owner's order asks for #1064, #1065 and #1066 in focused PRs after #954, and A6 bundles them | AA6 | patch | A6: #954 first, then each in a focused PR with parity tests |
 | R4-15 | Key item 4's file list is hand-maintained with no test, and item 6 depends on what each night reads | BH4, ECH6 | patch | Item 4 is computed from the import graph, with a B2 guard test that the action's list agrees; item 6 hashes the whole `conformance/fixtures/` directory, and B2's spec keeps nightly scenarios from naming fixtures elsewhere |
 | R4-16 | The fallback codes leave redo, the undo capture's serialize, and autosave or export serialize traps unclassified | ECH7 | patch | `trap-undo` covers undo and redo; the capture reports `trap-command` with its own stage; autosave and export serialize traps report `other` with their stage |
+
+## Coordinator corrections (2026-10-20, after round 4)
+
+The coordinator reviewed head `a79d751` and asked for nine corrections. Each
+was checked against the repository or the project instructions and applied.
+
+| # | Correction | Outcome |
+| --- | --- | --- |
+| C-1 | A verdict needs at least 10 valid paired repetitions, with failed ones re-run (the project instructions), where 5.2 said six pairs | 5.2 steps 4 and 6 say at least 10 valid pairs and re-run failures; no other place gave fewer |
+| C-2 | The "234 commits behind" figure for #1062 | Re-verified with git against `main` at `8f3a143`: #1062 is four merges behind on `main`'s first-parent line (#1060, #1055, #823, #816), and `git rev-list` counts 234 commits because #823 carried 211 commits from its own branch; #1068 is two merges behind (#823, #816), 221 commits by the same count. The coordinator's 29 commits did not reproduce; section 2 and the matrix give both measures |
+| C-3 | 9.4 applied `wasm-integration.patch` on `main`, against 9.7 rule 3 | #874 branches from the patch's base, applies only the #1059 code and tests, then merges `main` once #1062 has merged |
+| C-4 | A1 and #1062 both edit `startWasmHost.test.ts` and `fakeEngine.fixture.ts` | 9.5: B1 merges first, and A1 and A3 rebase over it |
+| C-5 | `WasmHostStatus` lives in `startWasmHost.ts`, and no analytics data map exists | 4.1 and 9.1 name both files; A1 creates the data map |
+| C-6 | B0 drops #1047's copy of the #1046 row, so it must not merge before this PR | 9.2, 9.4 and the matrix say so |
+| C-7 | Plan approval must not cover A1's fields in production | Section 13, 9.1, 9.7 rule 9, R3 and the matrix: A1's PR asks the owner for a separate OK |
+| C-8 | Model and effort per lane | New 9.8, keyed to the project instructions' kinds of work; the model names stay in the project instructions, since repository artifacts carry no model identifiers |
+| C-9 | RUN-0a is PC measurement | 5.2, 9.3 and the matrix: a local session the coordinator schedules, and no implementation thread runs it |

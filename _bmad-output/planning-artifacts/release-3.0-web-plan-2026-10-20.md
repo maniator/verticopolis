@@ -124,8 +124,11 @@ the plan builds on:
   | `perf-startup.patch` | `ad6892444572ab4cb733e3701e7357c91fd24325cf2ab4b9490a3ca93ced29c3` | `8f3a143` | new PR for #983 and #1005 (WS-P) |
   | `perf-parity-tracking.patch` | `c9a180e9ad898111f268672c06edb81c8f9a1093224836ea61823fdbd1e2483b` | `8f3a143` | read into this plan; no PR |
 
-- **Open PRs:** #1062 (#878, 234 commits behind, green only before #1060),
-  #1068 (#1045, red since #1060, on the owner's hold), #1047 (the #985
+- **Open PRs:** #1062 (#878, four merges behind `main`: #1060, #1055, #823
+  and #816; `git rev-list` counts 234 commits, 211 of them from #823's own
+  branch; green only before #1060), #1068 (#1045, two merges behind, #823
+  and #816, 221 commits by the same count; red since #1060, on the owner's
+  hold), #1047 (the #985
   criterion 5 design), and the rendering stack #817, #831, #1039 (#1039
   conflicts with its base). None is a draft.
 - **No #945 row passes today except Coverage.** Section 10 has each row's
@@ -276,8 +279,10 @@ starts, is in section 9.
 
 ### 4.1 Reliability: instrument, population, pass rule
 
-**What exists.** The host status records a boot fallback reason
-(`src/wasmhost/engineBoot.ts`). No analytics event carries the engine kind, a
+**What exists.** The boot state records a boot fallback reason with its
+stage (`EngineBootState` in `src/wasmhost/engineBoot.ts`), and the host
+status (`WasmHostStatus` in `src/wasmhost/startWasmHost.ts`) records a
+refused tower as an error string. No analytics data map exists yet. No analytics event carries the engine kind, a
 fallback, its reason, or an engine-writer latch-off. Runtime fallback does not
 exist (#874).
 
@@ -313,8 +318,9 @@ A1, runtime reasons with A3.
   and stack for any uncaught error (`src/analyticsErrors.ts`, whose privacy
   note covers that choice). A1 routes the engine traps the host catches through
   the coded path and leaves `$exception` as it is.
-- **A data map entry lands before the field ships** (Noor's rule), with
-  purpose, retention and deletion path.
+- **A1 creates the analytics data map,** and each field's entry lands
+  before the field ships (Noor's rule), with purpose, retention and deletion
+  path.
 - **A governed definition, bound by a test.** The unit is the governed view's
   session: a distinct session id, which survives a reload and so can span
   several page lives, walked page life by page life as `session_lengths`
@@ -641,7 +647,8 @@ Written up as `docs/performance/benchmark-protocol.md` in B3.
      for the same sources (#1079, filed by this PR).
    - CI's package is not needed: CI keeps it for seven days and builds pull
      requests from the merge ref.
-4. **Runs.** Both engines from the same commit, 10 repetitions each in fresh
+4. **Runs.** Both engines from the same commit, at least 10 valid paired
+   repetitions each (a failed repetition is re-run) in fresh
    browser processes with the order rotated, at 1x and 4x CPU throttle, on the
    small, medium and large scenarios with their pinned scenario hashes, plus
    the edit scene (PF2) and a stress fixture once they exist.
@@ -654,7 +661,8 @@ Written up as `docs/performance/benchmark-protocol.md` in B3.
    fallback, clamped frames reported.
 6. **Analysis.**
    - Ratios are paired by repetition, with the distribution-free 95%
-     order-statistic interval; a verdict needs at least six pairs.
+     order-statistic interval; a verdict needs at least 10 valid pairs. A
+     repetition that fails is re-run, and the report says how many were.
    - Every gate ratio is written so that above 1.0 means WASM is worse: WASM
      ÷ TypeScript for times, memory and long tasks, TypeScript ÷ WASM for
      frame rates. Today `perf:worker`'s report leads with TypeScript ÷ WASM
@@ -672,7 +680,7 @@ Written up as `docs/performance/benchmark-protocol.md` in B3.
 
 | Run | When | Purpose |
 | --- | --- | --- |
-| RUN-0a | Now, with a local session | Reconciliation: the `e25ec01` harness on `e25ec01`. Do 702 and 830 reproduce inside their intervals? |
+| RUN-0a | Now: PC measurement in a local session on the owner's desktop, scheduled by the coordinator; no implementation thread runs it | Reconciliation: the `e25ec01` harness on `e25ec01`. Do 702 and 830 reproduce inside their intervals? |
 | RUN-0b | After B3 | `main`'s harness on `main`: the baseline later runs compare with; the shipping host's cost split, which decides S6's design (OD-9); an A/A calibration for δ (OD-4) |
 | RUN-1 | After S6 lands | The shipping host after S6 |
 | RUN-2 | After #1051 (and #859) | Bare tick parity |
@@ -885,7 +893,7 @@ plumbing and for every recovered patch.
 
 | Step | Work | Recovered input | Notes |
 | --- | --- | --- | --- |
-| A1 | The reliability instrument (4.1): host status fields, analytics fields, the governed definition and its test, the data map entry, the #841 check | none | `src/analytics*`, the data map, `src/wasmhost/engineBoot.ts` (read side); a `telemetry.ts` edit, if needed, waits for #1062. Ships in a production deploy once reviewed (section 13) |
+| A1 | The reliability instrument (4.1): host status fields, analytics fields, the governed definition and its test, the analytics data map (A1 creates it) and its entries, the #841 check | none | `src/analytics*`; the new data map; `WasmHostStatus` in `src/wasmhost/startWasmHost.ts` and the boot state in `engineBoot.ts`; a `telemetry.ts` edit, if needed, waits for #1062. Sending the new fields to production needs the owner's separate OK (section 13) |
 | A2 | S5 #902: booked rooms survive attach in both engines | `wasm-authority.patch` | The patch touches `merge.ts`, `load.rs`, `services.rs`, `sim.rs`, `src/engine/sim/*`, `serializedGame.ts`, a new conformance scenario and the parity setup (`src/tests/parity/wasmHostSetup*`); it does not touch `wasmHost.ts`. Draft PR early; merges after A3 (the owner's 2026-10-16 order on #945 queues #902 after #874: the same host and save paths) and after #1062 (shared parity setup). Engine-semantic; lock change, no save-version bump; the rollback loss goes in the exception register |
 | A3 | S4 #874: throw, panic and stall fallback with re-adoption; engine refusals of commands the instance accepted are reported; #1059's last error; #1020's edges if they sit in the same code | `wasm-integration.patch` (#1059 code and tests only) | After #1062 merges (`wasmHost.ts`). A1's runtime reasons ship here. Nothing in WS-A merges ahead of it except A1, though #902's draft may open earlier (risk R19); S4's booking-case test lands with A2, and #874 stays open until A2 merges (the cutover plan's S4 row lists S5 as a dependency for that case; the owner's later order on #945 wins) |
 | A4 | Owner decision OD-1, then the cohort build and its help-text sentence | none | No cohort without the owner's approval |
@@ -900,7 +908,7 @@ Review: `/gds-code-review` for engine and test-parity work,
 
 | Step | Work | Recovered input | Notes |
 | --- | --- | --- | --- |
-| B0 | Push the #1047 design repair (commit `32cc179` content) so the owner can review it in parallel | `wasm-offline.patch` | Docs only; the review-input diffs stay out. #1047 also adds a #1046 backlog row (typed `design-deferral`, which Copilot's open thread flags); this PR already restores that row as `design-decision`, so B0 drops #1047's copy, which answers the thread |
+| B0 | Push the #1047 design repair (commit `32cc179` content) so the owner can review it in parallel | `wasm-offline.patch` | Docs only; the review-input diffs stay out. #1047 also adds a #1046 backlog row (typed `design-deferral`, which Copilot's open thread flags); this PR already restores that row as `design-decision`, so B0 drops #1047's copy, which answers the thread. B0's PR merges only after this PR, which carries the row |
 | B1 | Take over #1062 (S3 #878): apply the patch, merge `main`, tier `commuteStress`, add the missing regressions; `test:wasm:parity` in CI, with the six merge-per-tick timeouts named as exclusions until S6 | `wasm-conformance.patch` | Merges before A2 and A3 (9.5) |
 | B2 | The differential upgrade (4.2, items 1 to 3 and 5 to 8, and item 4's dropped-command forms) and the PR corpus; the rehearsal window starts | none | Touches none of #1062's files; starts as soon as B1 is up for review. New issue on approval |
 | B3 | The harness: the shell-free Windows perf build on `main`, #880, `docs/performance/benchmark-protocol.md`, gate-orientation ratios, an A/A mode, and the shipping host's main-thread cost split (engine step, per-step sync, hourly serialize, parse and merge) | `perf-worker-1068.patch` (build half: `src/tests/perfWorker/build*.ts`, `main.ts`), ported by hand since it does not apply to `main`; `perf:compare`'s build gets the same fix | Tooling only; it carries none of #1068's held worker change (D2), and the owner confirms the extraction with OD-9. If the owner declines, B3 writes its own fix from the Windows failure, without #1068's code. Unblocks RUN-0b |
@@ -913,7 +921,7 @@ Review: `/gds-code-review` for engine and test-parity work,
 
 | Order | Lane | Work | Starts |
 | --- | --- | --- | --- |
-| 1 | WS-P | Performance: RUN-0a with a local session; RUN-0b to RUN-3; PF2, the edit scene; #1048 (the rest of the `perf:worker` cost split; #1056 landed part; its desktop check is read from the next protocol run on `main`), then #1051 once #1048's code merges (and #859 from `perf-rust-859.patch` if profiling picks it); #900; #983 and #1005 (`perf-startup.patch`); #932 | RUN-0a now (it needs only a local session); code work after B3 merges |
+| 1 | WS-P | Performance: RUN-0a with a local session; RUN-0b to RUN-3; PF2, the edit scene; #1048 (the rest of the `perf:worker` cost split; #1056 landed part; its desktop check is read from the next protocol run on `main`), then #1051 once #1048's code merges (and #859 from `perf-rust-859.patch` if profiling picks it); #900; #983 and #1005 (`perf-startup.patch`); #932 | RUN-0a now, as PC measurement in a local session the coordinator schedules (no implementation thread runs it); code work after B3 merges |
 | 2 | WS-C | Offline and identity: #985 criteria 5 and 7, S17 #963, #1046 (gated) | Once the owner approves #1047; C1's runtime half after A3 merges |
 | 3 | WS-D | S7: #921 parts 2a to 2c, #926 items 1 to 4 | S6 merged; its `src/render` parts after the stack merges or parks |
 | 4 | WS-R | The rendering stack #817, #831, #1039 (D1) | When a thread is spare after WS-P and WS-C while WS-D waits for S6, or after WS-D (7.1) |
@@ -925,10 +933,10 @@ Review: `/gds-code-review` for engine and test-parity work,
 | --- | --- | --- |
 | #1062 | WS-B (B1) | Take over in place on its branch and post a takeover note. Check the patch against the manifest's SHA-256, apply `wasm-conformance.patch` on the branch head (its base, `300c7d9`), then merge `main`, then add the missing regressions; both reviews; Copilot if available |
 | #1068 | WS-B (B3, B7) | Take over in place. If the owner approves OD-9 (i), the Windows build fix goes to `main` in B3's own PR (otherwise B3 writes its own); the tier entries come here in B7. The owner's hold stays: no merge without paired desktop evidence (D2) |
-| #1047 | WS-B (B0), then WS-C | Push the repair, drop its copy of the #1046 backlog row (this PR restores it), address and resolve the 9 Codex threads and Copilot's open thread, ask the owner for approval; the implementation is a separate PR |
+| #1047 | WS-B (B0), then WS-C | Push the repair, drop its copy of the #1046 backlog row (this PR restores it), address and resolve the 9 Codex threads and Copilot's open thread, ask the owner for approval; merges only after this PR; the implementation is a separate PR |
 | #817, #831, #1039 | WS-R | Take over in stack order (D1) |
 | New: #902 | WS-A (A2) | Branch from `8f3a143` (the patch's base), apply `wasm-authority.patch`, merge `main`; draft PR at the first push, early; merges after #874 (A3) |
-| New: #874 with #1059 | WS-A (A3) | Branch from `main` after #1062 merges; take only the #1059 code and tests from `wasm-integration.patch` |
+| New: #874 with #1059 | WS-A (A3) | Branch from `8f3a143` (the patch's base) and apply only the #1059 code and tests from `wasm-integration.patch`, then merge `main` once #1062 has merged (9.7 rule 3); draft PR at the first push |
 | New: #859, #983 and #1005 | WS-P | Branch from each patch's base (`8f3a143`), apply it, merge `main`, finish its spec |
 | Copilot drafts #1073 to #1077 | none | Closed and empty; nothing to carry |
 
@@ -951,7 +959,7 @@ live matrix lists the current holder.
 | `src/wasmhost/wasmHost.ts`, `telemetry.ts`, `engine-rs/src/wasm.rs`, `engine-rs/src/crowd/mod.rs`, `src/engine/Crowd.ts`, `src/dualrun/binding.ts`, `engine.d.ts`, `src/tests/parity/*`, `vite.config.ts`, `.github/workflows/test.yml` (all in #1062) | WS-B (B1) | WS-A (each A-step PR in lane order while it is open: A3, then A2's parity setup); WS-C for the Workbox block in `vite.config.ts`. After B1 merges, other lanes add binding exports in their own PRs (WS-B's B5, WS-C's S17 identity export, WS-D's catalog exports, WS-P's #932 feature split) and merge after any open A-step PR on the same file |
 | `src/wasmhost/workerApply.ts`, `workerCore.ts`, `workerHost.ts`, `workerProtocol.ts` | WS-B (B1) | WS-P (#1048's cost split); B7 keeps #1068 rebased over it under the hold |
 | `src/wasmhost/merge.ts`, `engine-rs/src/load.rs`, `services.rs`, `sim.rs`, `src/engine/sim/*`, `src/engine/serializedGame.ts` | WS-A (A2) | WS-B (B5's `fixedStep.ts`, B6's `load.rs`) after A2 merges |
-| `src/wasmhost/startWasmHost.ts`, `workerController.ts`, `hostErrors.ts`, `engineBoot.ts`, `engineChoice.ts`, `src/bootstrap.ts` | WS-A (A1, A3, A4) | WS-C (C1's boot check) after A3 merges; the release lane at the flip. #1062 touches only `startWasmHost.test.ts`, which A3 rebases over |
+| `src/wasmhost/startWasmHost.ts`, `workerController.ts`, `hostErrors.ts`, `engineBoot.ts`, `engineChoice.ts`, `src/bootstrap.ts` | WS-A (A1, A3, A4) | WS-C (C1's boot check) after A3 merges; the release lane at the flip. #1062 also touches `startWasmHost.test.ts` and `src/wasmhost/fakeEngine.fixture.ts`, which A1 and A3 edit too: B1 merges first, and A1 and A3 rebase over it |
 | `src/analytics*`, the data map | WS-A | The release lane (X1, #873) |
 | `src/ui/templates/helpContent.ts` | WS-A (A4's cohort sentence) | WS-C (C2's About changes) |
 | `engine-rs/src/bin/fuzz.rs`, `scripts/fuzz-compare.ts`, `engine-fuzz.yml`, the `conformance/` corpus | WS-B (B2, B4) | |
@@ -1022,9 +1030,31 @@ status well and reasons badly.
    first, re-bump on rebase. Auto-merge is armed only after that bump.
 8. **Matrix:** update the live matrix row at each milestone.
 9. **Never without the owner:** the default flip, a cohort, the candidate
-   deploy, the 3.0.0 publish, a gate exception, PC cleanup. Never
+   deploy, A1's new analytics fields in production, the 3.0.0 publish, a
+   gate exception, PC cleanup. Never
    report a desktop number that is not in a committed results folder from a
    local run.
+
+### 9.8 Model and effort per lane
+
+The project instructions name a model and an effort level for each kind of
+work, and the coordinator assigns the model each kind names (the model names
+stay in the project instructions, outside the repository). A lane that holds
+steps of two kinds runs at the higher one, unless the coordinator splits a
+step out.
+
+| Lane or steps | Kind of work, as the project instructions name it | Effort |
+| --- | --- | --- |
+| WS-A (A1 to A7) | Rust simulation correctness and architecture | Extra High |
+| WS-B: B2, B4, B5, B6 | Rust simulation correctness and architecture | Extra High |
+| WS-B: B0, B1, B3, B7 | Testing, CI and bounded tooling | High |
+| WS-P: #1048, #1051, #859, #932 | Complex Rust and WASM performance | Extra High |
+| WS-P: PF2, #900, #983, #1005 | Testing, CI and bounded tooling | High |
+| WS-C | Web PWA and deployment, escalating for complex cross-layer failures | High |
+| WS-D | Rust simulation correctness and architecture (the Authority row) | Extra High |
+| WS-R | Not named; bounded web work, like WS-C | High |
+| The release lane and the gate review | Final adversarial release review | Extra High |
+| RUN-0a to RUN-3 | PC measurement in a local session the coordinator schedules; no implementation thread | n/a |
 
 ## 10. Acceptance gates (#945 rows, objective form)
 
@@ -1056,7 +1086,7 @@ restates the row as it stands with its evidence.
 | --- | --- | --- | --- | --- | --- | --- |
 | R1 | PC-only Codex work is lost before it is recovered | Medium | High | A patch hash no longer matches, or the PC changes | Patches verified and held off the PC; recover each into a branch in the first step of its lane; no PC cleanup without the owner (D4) | WS-A, WS-B, WS-P |
 | R2 | Finished work is lost again in a session that dies | Medium | High | A thread reports "done" with no PR link | Draft PR at the first push, pushes at every green step while a draft (9.7) | Every thread |
-| R3 | Reliability cannot collect engine sessions | Certain without a cohort | Release-blocking | A1 not deployed by the end of Phase A | Instrument first; OD-1 | Owner, WS-A |
+| R3 | Reliability cannot collect engine sessions | Certain without a cohort | Release-blocking | A1 not deployed by the end of Phase A | Instrument first; the owner's OK to ship it asked for early; OD-1 | Owner, WS-A |
 | R4 | The 0.1% threshold is unprovable at current traffic | Certain as an upper bound | Release-blocking | OD-2 still open when the cohort starts | OD-2 restates it, with the price of each bound | Owner |
 | R5 | The 14 nights keep resetting | High | Weeks | A key change in the ledger | Front-load engine work; freeze; rehearsal window; a wide key so a reset is visible, which leaves out the lockfile's version fields so version bumps do not reset it | WS-B |
 | R6 | The shipping host misses the performance gate | High as last measured | Release-blocking | RUN-0b's cost split; RUN-1 results | S6 removes the per-step sync and the merge; OD-9; #1051 | WS-A, WS-P |
@@ -1100,9 +1130,11 @@ it. OD-1 to OD-9 stay open until the owner answers each one.
 - Create the live matrix issue (a sub-issue of #945) and its backlog row.
 - Create issues and rows for: the reliability signal (A1), the differential
   upgrade (B2), the harness and protocol (B3), and the edit scene (PF2).
-- Approving the plan also approves: A1's fields shipping to production once
-  reviewed (they change no player-visible behavior), and B3's extraction of
-  #1068's build fix if OD-9 (i) is approved.
+- Approving the plan does not approve sending A1's new analytics fields to
+  production. They change no player-visible behavior, but they are new
+  data, so A1's PR asks the owner for a separate OK before its fields reach
+  production. B3's extraction of #1068's build fix likewise waits for OD-9
+  (i).
 - Post the takeover notes (9.4) as each lane starts.
 - Comment on #868 and #954 with the audio cue-timing acceptance, and on #945
   with the proposed amendments for the owner.
