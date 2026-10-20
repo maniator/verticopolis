@@ -85,7 +85,7 @@ export interface Calibration {
 
 type Pass = Pick<CompareResults, "config" | "comparisons" | "metrics" | "validation"> & {
   startedAt?: string;
-  browser?: Partial<Pick<CompareResults["browser"], "version" | "executable" | "channel" | "args" | "rendererException">>;
+  browser?: Partial<Pick<CompareResults["browser"], "version" | "executable" | "channel" | "args" | "rendererException" | "gpuVerified">>;
   runs?: Pick<CompareResults["runs"][number], "ok" | "page" | "rendererEnd">[];
   environment: Pick<CompareResults["environment"], "commit" | "dirty"> & Partial<Pick<CompareResults["environment"], "tree" | "cpuModel" | "logicalCpus" | "totalMemoryBytes" | "os" | "kernel" | "arch" | "node" | "rust" | "playwright" | "engineBuildHash" | "enginePackage">>;
 };
@@ -188,6 +188,7 @@ function treeProblem(r: Pass): string | null {
  */
 function rendererProblem(r: Pass): string | null {
   if (r.browser?.rendererException) return `it declared renderer exception ${r.browser.rendererException}`;
+  if (r.browser?.gpuVerified === false) return "it recorded gpuVerified: false";
   const good = (r.runs ?? []).filter((x) => x.ok);
   const f = rendererFinding(good.map((x) => x.page?.webgl?.renderer), good.map((x) => x.rendererEnd), { quick: false });
   return f.errors.length ? f.errors[0] : null;

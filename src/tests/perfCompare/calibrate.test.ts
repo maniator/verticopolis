@@ -34,6 +34,7 @@ interface Spec {
   args?: string[];
   browserVersion?: string;
   exception?: string | null;
+  gpuVerified?: boolean;
   tree?: unknown;
   throttles?: number[];
   startedAt?: string;
@@ -59,7 +60,7 @@ function pass(i: number, s: Spec = {}): Folder {
     results: {
       startedAt: s.startedAt ?? `2026-10-21T0${i % 10}:00:00Z${i}`,
       config: { aa: s.engine === undefined ? alternate(i) : s.engine, reps, scenarios, throttles: s.throttles ?? [1, 4], quick: s.quick ?? false, dt: 2, steps: 720 },
-      browser: { version: s.browserVersion ?? "141.0.1", executable: null, channel: s.channel ?? null, args: s.args ?? [], rendererException: s.exception ?? null },
+      browser: { version: s.browserVersion ?? "141.0.1", executable: null, channel: s.channel ?? null, args: s.args ?? [], rendererException: s.exception ?? null, gpuVerified: s.gpuVerified },
       runs: [{ ok: true, page: { webgl: s.renderer === null ? null : { renderer: s.renderer ?? RTX, vendor: "v" } }, rendererEnd: s.rendererEnd === undefined ? (s.renderer ?? (s.renderer === null ? null : RTX)) : s.rendererEnd }],
       comparisons,
       metrics: ["1", "4"].flatMap((t) => [startup("ts", t), startup("wasm", t)]),
@@ -198,6 +199,7 @@ describe("calibrate", () => {
     expect(left({ rendererEnd: null })).toMatch(/renderer is not verified hardware/);
     expect(left({ rendererEnd: SWIFT })).toMatch(/renderer is not verified hardware/);
     expect(left({ exception: "EX-4" })).toMatch(/declared renderer exception EX-4/);
+    expect(left({ gpuVerified: false })).toMatch(/gpuVerified: false/);
     expect(left({})).toBe("");
     // An all-software set adopts nothing.
     const soft = calibrate(many(10, () => ({ renderer: SWIFT, rendererEnd: SWIFT })));

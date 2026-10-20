@@ -49,8 +49,8 @@ reference only when the browser build, the channel, the switches and the
 renderer all match. The references are the 2026-10-15 runs, RUN-0a, the A/A
 folders of one calibration and any earlier acceptance run. When any of those
 differ, the reference is run again on the same settings before it is used.
-`--resume` refuses a change of any of them. `perf:calibrate` (not yet, #1124)
-will refuse passes that differ in them and passes without a verified GPU.
+`--resume` refuses a change of any of them. `perf:calibrate` refuses passes
+that differ in them and passes without a verified GPU (`gpuVerified`).
 
 What the references ran, from their committed `results.json` files: the two
 2026-10-15 folders (`2026-10-15-e25ec01-worker` and
